@@ -1,0 +1,147 @@
+"""Attacher against a stubbed Zotero client - exercises key handling and error mapping, no Zotero needed."""
+
+from __future__ import annotations
+
+import json
+
+import pytest
+from pyzotero import errors as ze
+
+from scihub_dl import attach as at
+from scihub_dl.attach import Attacher, _interpret, attachment_payload
+
+
+class StubZot:
+    def __init__(self):
+        self.local_api_key = None
+        self.client = type("C", (), {"timeout": 30})()
+        self.authorize_calls = 0
+        self.authorize_response = {"key": "KEY1", "remember": True}
+        self.authorize_error = None
+
+    def authorize_local(self, app_name):
+        self.authorize_calls += 1
+        if self.authorize_error:
+            raise self.authorize_error
+        self.local_api_key = self.authorize_response["key"]
+        return self.authorize_response
+
+
+class StubZL:
+    def __init__(self, supports_write=True):
+        self.zot = StubZot()
+        self._supports = supports_write
+
+    def ping(self):
+        return {"supports_write": self._supports}
+
+
+class ScriptedUpload:
+    """Replacement for LocalZupload: returns scripted results or raises."""
+
+    script: list = []
+    seen: list = []
+
+    def __init__(self, zot, payload, parentid, basedir=None):
+        ScriptedUpload.seen.append((parentid, payload[0]["filename"], basedir, zot.local_api_key))
+
+    def upload(self):
+        step = ScriptedUpload.script.pop(0)
+        if isinstance(step, Exception):
+            raise step
+        return step
+
+
+@pytest.fixture
+def pdf(tmp_path):
+    p = tmp_path / "Smith - 2019 - Title.pdf"
+    p.write_bytes(b"%PDF-1.4 x")
+    return p
+
+
+@pytest.fixture
+def scripted(monkeypatch):
+    ScriptedUpload.script = []
+    ScriptedUpload.seen = []
+    monkeypatch.setattr(at, "LocalZupload", ScriptedUpload)
+    return ScriptedUpload
+
+
+def test_interpret_buckets():
+    assert _interpret({"success": [{"key": "A"}]}).ok
+    assert _interpret({"unchanged": [{"key": "A"}]}).reason == "unchanged"
+    r = _interpret({"failure": [{"error": "bad"}]})
+    assert not r.ok and r.reason == "bad"
+    assert not _interpret({}).ok
+
+
+def test_attachment_payload_shape(pdf):
+    p = attachment_payload(pdf, title="Custom")
+    assert p["title"] == "Custom" and p["filename"] == pdf.name and p["linkMode"] == "imported_file"
+    assert attachment_payload(pdf)["title"] == "Full Text PDF"
+
+
+def test_missing_file_and_no_write_support(cfg, pdf):
+    a = Attacher(cfg, StubZL(supports_write=True))
+    assert "file missing" in a.attach("K", pdf.parent / "nope.pdf").reason
+    b = Attacher(cfg, StubZL(supports_write=False))
+    assert "Zotero 10+" in b.attach("K", pdf).reason
+
+
+def test_authorises_stores_key_and_uploads(cfg, pdf, scripted):
+    scripted.script.append({"success": [{"key": "ATT"}], "failure": [], "unchanged": []})
+    zl = StubZL()
+    a = Attacher(cfg, zl)
+    res = a.attach("PARENT", pdf)
+    assert res.ok and res.attachment_key == "ATT"
+    assert zl.zot.authorize_calls == 1
+    assert json.loads(cfg.local_key_path.read_text()) == {"key": "KEY1"}
+    assert scripted.seen == [("PARENT", pdf.name, str(pdf.parent), "KEY1")]
+    assert zl.zot.client.timeout == at.DIALOG_TIMEOUT_S
+
+
+def test_stored_key_is_reused_without_dialog(cfg, pdf, scripted):
+    cfg.local_key_path.parent.mkdir(parents=True)
+    cfg.local_key_path.write_text(json.dumps({"key": "STORED"}))
+    scripted.script.append({"success": [{"key": "ATT"}]})
+    zl = StubZL()
+    a = Attacher(cfg, zl)
+    assert a.attach("P", pdf).ok
+    assert zl.zot.authorize_calls == 0 and scripted.seen[0][3] == "STORED"
+
+
+def test_single_use_key_consumed_triggers_reauthorise(cfg, pdf, scripted):
+    scripted.script += [ze.LocalAPIKeyRequiredError("consumed"), {"success": [{"key": "ATT2"}]}]
+    zl = StubZL()
+    zl.zot.authorize_response = {"key": "ONCE", "remember": False}
+    a = Attacher(cfg, zl)
+    res = a.attach("P", pdf)
+    assert res.ok and zl.zot.authorize_calls == 2
+    assert not cfg.local_key_path.exists()  # one-shot keys are never persisted
+
+
+def test_denied_and_transport_failures(cfg, pdf, scripted):
+    zl = StubZL()
+    zl.zot.authorize_error = ze.LocalAPIDeniedError("no")
+    assert "denied" in Attacher(cfg, zl).attach("P", pdf).reason
+
+    zl2 = StubZL()
+    zl2.zot.authorize_error = TimeoutError("dialog")
+    assert "authorisation failed" in Attacher(cfg, zl2).attach("P", pdf).reason
+
+    scripted.script.append(ze.TooManyRequestsError("slow down"))
+    assert "rate-limited" in Attacher(cfg, StubZL()).attach("P", pdf).reason
+
+    scripted.script.append(ze.UploadError("boom"))
+    assert "UploadError" in Attacher(cfg, StubZL()).attach("P", pdf).reason
+
+    scripted.script.append(RuntimeError("transport"))
+    assert "RuntimeError" in Attacher(cfg, StubZL()).attach("P", pdf).reason
+
+
+def test_supports_write_swallows_ping_errors(cfg):
+    class Broken(StubZL):
+        def ping(self):
+            raise ConnectionError("down")
+
+    assert Attacher(cfg, Broken()).supports_write() is False

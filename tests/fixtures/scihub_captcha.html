@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title translate = "ru:title">Sci-Hub: проверка на робота</title>
+        <meta charset = "UTF-8">
+        <meta name = "viewport" content = "width=device-width">
+
+        <script async defer src = "/scripts/altcha.min.js" type="module"></script>
+    </head>
+    <body>
+
+        
+
+<script>
+
+    function local(id) { return document.querySelector(".messages ." + id).innerText  }
+
+</script>
+
+        
+
+        <script>
+
+            function local(id) { return document.querySelector(".messages ." + id).innerText  }
+
+            window.onload = function()
+            {
+
+                document.querySelector('altcha-widget').configure({
+                    strings: { label: '', verifying: ''},
+                })
+
+                document.querySelector("altcha-widget").addEventListener("statechange",
+                    async (ev) =>
+                    {
+                        if (ev.detail.state === "verified")
+                        
+                            try
+                            {
+                                let data = {captcha: ev.detail.payload}
+
+                                let response = await fetch('/captcha/solution/91226685',
+                                {
+                                    method   : 'POST', 
+                                    headers  : { 'Content-Type': 'application/json' },
+                                    body     : JSON.stringify(data)
+                                })
+
+                                if (response.ok)
+                                {
+                                    response = await response.json()
+
+                                    if (response.success)
+                                    {
+                                        document.querySelector(".result").innerText = local('verified')
+
+                                        window.location.reload()
+                                    }
+                                }
+
+                                else
+                                    throw new Error(response.status)
+
+                            } catch (error) { console.error(error) }
+
+                    })
+
+            }
+
+            function check()
+            {                
+                document.querySelector('.answer').style.display = 'none'
+                document.querySelector('altcha-widget').verify()
+
+                document.querySelector(".result").style.display = 'block'
+            }
+
+        </script>
+
+        <div class = "question">
+            <div class = "ask" translate = "ru:isrobot">Вы робот?</div>
+            <div class = "answer" onclick = "check()" translate = "ru:nope">Нет</div>
+            <div class = "result"><span translate = "ru:verifying">Проверка</span> <span class = "rotate">|</span></div>
+
+            <altcha-widget style="--altcha-border-width:0" challengeurl = "/captcha/challenge/91226685" hidelogo hidefooter></altcha-widget>
+        </div>
+
+        <div class = "background">
+            <img src = "/pictures/robot.svg">
+        </div>
+    
+        <div class = "messages">
+            <div class = "verified" translate = "ru:verified">Проверка пройдена!...</div>
+        </div>
+
+    </body>
+</html>

@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Sci-Hub. Vulnerability to impacts of climate change on marine fisheries and food security / Marine Policy, 2017</title>
+        <meta charset = "UTF-8">
+        <meta name = "viewport" content = "width=device-width">
+
+        <meta  name="citation_title" content="Vulnerability to impacts of climate change on marine fisheries and food security">
+
+        <meta name="citation_author" content="Ding, Qi">
+<meta name="citation_author" content="Chen, Xinjun">
+<meta name="citation_author" content="Hilborn, Ray">
+<meta name="citation_author" content="Chen, Yong">
+
+        
+        <meta  name="citation_publication_date" content="2017">
+        <meta  name="citation_journal_title" content="Marine Policy">
+        <meta name="citation_doi" content="10.1016/j.marpol.2017.05.011">
+        <meta name="citation_pdf_url" content="/storage/zero/6364/41ab8ffb30f3383b52e955640fd17dc4/ding2017.pdf"> <!-- https://sci-hub.ru/storage/ -->
+        
+        <script async defer src = "/scripts/altcha.min.js" type="module"></script>
+        <script async defer src = "/scripts/pdf2md.bundle.js" type="module"></script>
+    </head>
+    <body>
+
+        
+
+<script>
+
+    function local(id) { return document.querySelector(".messages ." + id).innerText  }
+
+</script>
+        
+        
+
+        
+
+<script>
+
+    function unwrap(window)
+    {
+        window = document.querySelector('dialog.' + window)
+        window.style.visibility = 'visible'
+        window.showModal()
+    }
+
+    function wrap(window)
+    {
+        window = document.querySelector('dialog.' + window)
+        window.style.visibility = 'hidden'
+        window.close()
+    }
+
+    function array(objects) { return Array.isArray(objects) ? objects : ( objects instanceof HTMLCollection ? Array.prototype.slice.call(objects) : [ objects ] ) }
+
+    function toggle(objects, on = true)
+    {
+        objects = array(objects)
+
+        for (let o of objects)
+        {
+            o.classList.add(on ? 'yes' : 'no')
+            o.classList.remove(on ? 'no' : 'yes')
+        }
+    }
+
+    function select(objects, on = true)
+    {
+        objects = array(objects)
+
+        for (let o of objects)
+        if  (on) o.classList.add('selected')
+        else     o.classList.remove('selected')
+    }
+
+</script>
+        
+
+<script>
+
+    function recite(style)
+    {
+        style = style == 'ГОСТ' ? 'gost' : style.toLowerCase()
+
+        fetch('/recite/' + style + '/10.1016/j.marpol.2017.05.011')
+            .then(response =>
+            {
+                if (response.ok)
+                    return response.json()
+
+                throw new Error(`${response.status}`)
+            })
+            .then(result =>
+            {
+                let buttons = document.querySelector('dialog.styles').getElementsByTagName('button')
+                let plain   = document.querySelector('dialog.styles .plain button')
+
+                if (style == 'plain' && result.success)
+                {
+                    select(buttons, false)
+                    select(plain)
+                    toggle(plain)
+                }
+
+                else
+
+                if (result.style)
+                {
+                    for (let button of buttons)
+                        select(button, button.innerText == result.style)
+                    
+                    toggle(plain, null)
+                }
+
+                citestyle(style, result)
+
+                wrap('styles')
+                
+            })
+            .catch(error => { console.error(error) })
+    }
+
+</script>
+
+
+<dialog class = "styles">
+    <div class = "close">
+        <button onclick = "wrap('styles')">x</button>
+    </div>
+
+
+    <div class = "plain">
+        <span translate = "ru:formatting">формат </span>
+        <button class = "yes" onclick = "recite('plain')" translate = "ru:off">по умолчанию</button>
+    </div>
+
+    <div class = "list"><button class = "" onclick = "recite('ГОСТ')">ГОСТ</button>
+<button class = "" onclick = "recite('ACS')">ACS</button>
+<button class = "" onclick = "recite('ACM')">ACM</button>
+<button class = "" onclick = "recite('AIP')">AIP</button>
+<button class = "" onclick = "recite('AMA')">AMA</button>
+<button class = "" onclick = "recite('APA')">APA</button>
+<button class = "" onclick = "recite('APS')">APS</button>
+<button class = "" onclick = "recite('CSE')">CSE</button>
+<button class = "" onclick = "recite('CEP')">CEP</button>
+<button class = "" onclick = "recite('GSA')">GSA</button>
+<button class = "" onclick = "recite('IEEE')">IEEE</button>
+<button class = "" onclick = "recite('MLA')">MLA</button>
+<button class = "" onclick = "recite('Chicago')">Chicago</button>
+</div>
+
+</dialog>
+
+        <script>
+
+            var check   = setInterval(checksum, 2000)
+            var retry   = 8
+
+            var captcha = {}
+
+            async function live(buffer)
+            {
+                await fetch('/live',
+                {
+                    method: 'POST',
+                    body: JSON.stringify({ url: '/storage/zero/6364/41ab8ffb30f3383b52e955640fd17dc4/ding2017.pdf', doi: '10.1016/j.marpol.2017.05.011' })
+                })
+            }
+
+            async function calc(buffer)
+            {
+                let hash = await crypto.subtle.digest('SHA-256', buffer)
+
+                hash = Array.from(new Uint8Array(hash))
+                hash = hash.map(b => b.toString(16).padStart(2, '0')).join('')
+
+                return hash == '0efb03746ceebcc9bde83a3498cc11f3ae9ec7b4a7a743505ae0eed613ba2bf6'
+            }
+
+            function nameshow(appear = true)
+            {
+                let name = document.querySelector('.name')
+                
+                if (name.classList.contains('appear') && !appear)
+                    name.classList.add('disappear')
+
+                if (appear)
+                    name.classList.add('appear')
+
+                name.classList.remove(!appear ? 'appear' : 'disappear')
+            }
+
+            function checksum()
+            {
+                fetch('/storage/zero/6364/41ab8ffb30f3383b52e955640fd17dc4/ding2017.pdf',
+                {
+                    mode  : 'same-origin',
+                    cache : 'only-if-cached'
+                })
+                .then(async (response) =>
+                {
+                    if (response.ok)
+                    {
+                        clearInterval(check)
+
+                        var buffer = await response.arrayBuffer()
+                        if (buffer)
+                            if (buffer.byteLength < 1024* 1024 * 2)
+                            {
+                                if (await calc(buffer))
+                                    await  live()
+                            }
+
+//                        await mark(buffer)
+                    }
+                })
+                .then().catch(error =>
+                { 
+                    retry -= 1;
+                    if (retry == 0)
+                        clearInterval(check)
+                })
+            }
+
+            async function mark(buffer)
+            {
+                try
+                {
+                    console.log('Markdown...');
+                    var markdown = await window.pdf2md(buffer);
+
+                    console.log(markdown);
+                }
+                
+                catch (err) { console.error(err) }
+            }
+
+            async function report()
+            {
+                document.querySelector("dialog.problem .submit").style.display = 'none'
+
+                let status = document.querySelector('.status')
+                status.style.display = 'block'
+                status.innerText = local('sending')
+
+                try
+                {
+                    let reason = document.querySelector('input[name="reason"]:checked')
+                    let data   = {captcha: captcha, reason: reason.value}
+
+                    let response = await fetch('/problem/10.1016/j.marpol.2017.05.011',
+                    {
+                        method   : 'POST', 
+                        headers  : { 'Content-Type': 'application/json' },
+                        body     : JSON.stringify(data)
+                    })
+
+                    if (response.ok)
+                    {
+                        response = await response.json()
+
+                        console.log(response)
+
+                        if (response.result == 'success')
+                        {
+                            document.querySelector("dialog.problem .reason").style.display = 'none'
+
+                            status.innerText = local('success')
+                            return true
+                        }
+                    }
+
+                    else
+                        throw new Error(response.status)
+
+                } catch (error) { console.error(error) }
+
+                status.innerText = local('error')
+            }
+
+            window.onload = function()
+            {
+                let reports = document.querySelectorAll('input[name="reason"]')
+                for (let radio of reports)
+                    radio.addEventListener('change', () =>
+                        document.querySelector('dialog.problem .submit').style.display = 'flex')
+
+
+                document.querySelector('altcha-widget').configure({
+                    strings: {
+                        label: local('robot'),
+                        verifying: local('verifying')
+                    },
+                })
+
+                document.querySelector("altcha-widget").addEventListener("statechange", (ev) =>
+                {
+                    if (ev.detail.state === "verified")
+                    {
+                        captcha = ev.detail.payload
+
+                        document.querySelector("altcha-widget").style.display = 'none'
+                        document.querySelector("dialog.problem .submit button").style.display = 'block'
+                    }
+                })
+
+            }
+
+            function citestyle(style, result)
+            {
+                let   divr   = document.querySelector('div.ref')
+                let   divs   = document.querySelector('div.style')
+                let [ divp,
+                      divc ] = document.querySelectorAll('div.cite')
+
+                if (style == 'plain' && result.success)
+                {
+                    toggle([divr, divp])
+                    toggle([divc, divs], null)
+                }
+
+                else
+
+                if (result.style && result.style != divs.innerText)
+                {
+                    divc.innerText = result.citation
+                    divs.innerText = result.style
+                    
+                    toggle([divr, divp], null)
+                    toggle([divc, divs])
+                }
+            }
+
+        </script>
+
+        <div class = "pdf">
+            <object type = "application/pdf" data = "/storage/zero/6364/41ab8ffb30f3383b52e955640fd17dc4/ding2017.pdf#navpanes=0&view=FitH"></object>
+        </div>
+
+        <div class = "menu" onmouseleave = "nameshow(false)">
+
+            <div class = "logo" onmouseover = "nameshow()">
+                <a href = "/"><img src = "/pictures/ravenround.gif"></a>
+            </div>
+
+            <a class = "name" href = "/">
+                sci<br>hub
+            </a>
+
+            <div class = "panel">
+
+                <div class = "cite yes">
+                   <div class = "title">Vulnerability to impacts of climate change on marine fisheries and food security</div>
+                    <div class = "journal-year">
+                        <div class = "journal">Marine Policy,&nbsp;</div>
+                        <div class = "year">2017</div>
+                    </div>
+                </div>
+                
+                <div class = "cite no">
+                    {citation}
+                </div>
+
+                <div class = "style no" onclick = "unwrap('styles')">{style}</div>
+
+                <div class = "ref yes">
+                    <a onclick = "unwrap('styles')"></a>
+                </div>
+
+                <a class = "more" target = "_blank" href = "/meta/10.1016/j.marpol.2017.05.011">...</a>
+
+                <div class = "report" onclick = "unwrap('problem')">!</div>
+
+                <div class = "download"><a href = "/storage/zero/6364/41ab8ffb30f3383b52e955640fd17dc4/ding2017.pdf"></a></div>
+
+                <a class = "similar" target = "_blank" href = "/similar/10.1016/j.marpol.2017.05.011" >↗</a>
+
+            </div>
+
+            <div class = "panel options no">
+                <div class = "inner">
+                    <div class = "label" translate = "ru:version">версия от</div>
+                    <div class = "list"></div>
+                </div>
+            </div>
+
+        </div>
+    
+        <dialog class = "problem">
+            <div class = "close">
+                <button onclick = "wrap('problem')">x</button>
+            </div>
+
+            <div class = "header" translate = "ru:report">проблема со статьей</div>
+            <div class = "reason">
+
+                <div>
+                    <input type = "radio" id = "wrong" name = "reason" value = "wrong">
+                    <label for = "wrong" translate = "ru:wrong">открывается не та статья</label>
+                </div>
+
+                <div>
+                    <input type = "radio" id = "damaged" name = "reason" value = "damaged">
+                    <label for = "damaged" translate = "ru:damaged">файл статьи не открывается / поврежден</label>
+                </div>
+
+                <div>
+                    <input type = "radio" id = "missing" name = "reason" value = "missing">
+                    <label for = "missing" translate = "ru:missing">файл неполный, некоторые страницы отсутствуют</label>
+                </div>
+
+                <div>
+                    <input type = "radio" id = "preprint" name = "reason" value = "preprint">
+                    <label for = "preprint" translate = "ru:preprint">это препринт, а не финальная версия</label>
+                </div>
+
+                <div>
+                    <input type = "radio" id = "quality" name = "reason" value = "quality">
+                    <label for = "quality" translate = "ru:quality">в статье имеются серьезные ошибки и недочеты</label>
+                </div>
+
+                <div>
+                    <input type = "radio" id = "other" name = "reason" value = "other">
+                    <label for = "other" translate = "ru:other">другая проблема</label>
+                </div>
+
+            </div>
+                
+            <div class = "submit">
+                <altcha-widget style="--altcha-border-width:0" challengeurl = "/captcha/challenge" hidelogo hidefooter></altcha-widget>
+                <button onclick = "report()" translate = "ru:send">отправить</button>
+            </div>
+
+            <div class = "status"></div>
+        </dialog>
+
+        <div class = "messages">
+            <div class = "sending" translate = "ru:sending">отправка...</div>
+            <div class = "success" translate = "ru:success">Сообщение отправлено.</div>
+            <div class = "error" translate = "ru:error">Ошибка при отправке сообщения :(</div>
+            <div class = "robot" translate = "ru:robot">Я не робот</div>
+            <div class = "verifying" translate = "ru:verifying">проверка...</div>
+        </div>
+
+    </body>
+</html>

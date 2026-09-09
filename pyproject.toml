@@ -1,0 +1,34 @@
+[project]
+name = "scihub-dl"
+version = "0.1.0"
+description = "Fetch missing PDFs for Zotero items from open-access sources and Sci-Hub, save to disk, attach back into Zotero."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pyzotero>=1.15,<2",  # attach.py subclasses pyzotero._upload.Zupload
+    "httpx>=0.27",
+    "beautifulsoup4>=4.12",
+    "typer>=0.12",
+    "rich>=13",
+    "tomli>=2.0; python_version < '3.11'",
+]
+
+[project.scripts]
+scihub-dl = "scihub_dl.cli:app"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["scihub_dl"]
+
+[tool.hatch.build.targets.sdist]
+# Personal config (email), runtime state/output and editor files never ship.
+exclude = ["config.toml", "out/", "state/", ".cursor/", ".coverage", "*.log"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

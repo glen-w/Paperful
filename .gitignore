@@ -1,0 +1,13 @@
+.venv/
+out/
+state/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+.DS_Store
+.cursor/commands/
+*cookies*.txt
+ezproxy-cookies.txt

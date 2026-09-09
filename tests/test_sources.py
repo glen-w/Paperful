@@ -1,0 +1,278 @@
+"""Source adapters against httpx.MockTransport - no network."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import httpx
+
+from scihub_dl.sources import REGISTRY, arxiv, direct, openalex, scihub, semanticscholar, unpaywall
+from scihub_dl.sources import base as base_mod
+from scihub_dl.sources.base import Outcome, http_json
+from tests.conftest import PDF_BYTES, make_item
+
+FIX = Path(__file__).parent / "fixtures"
+
+
+def _json(payload, status=200):
+    return httpx.Response(status, content=json.dumps(payload).encode(), headers={"content-type": "application/json"})
+
+
+def test_registry_has_every_planned_source_and_scihub_last_in_default_order():
+    from scihub_dl.config import DEFAULT_SOURCES
+
+    assert set(REGISTRY) == {
+        "unpaywall", "openalex", "arxiv", "semanticscholar", "scholar", "direct", "ezproxy", "scihub"
+    }
+    assert DEFAULT_SOURCES[-1] == "scihub"
+    assert "ezproxy" in DEFAULT_SOURCES and DEFAULT_SOURCES.index("ezproxy") < DEFAULT_SOURCES.index("scihub")
+    assert all(s in REGISTRY for s in DEFAULT_SOURCES)
+
+
+# ---- unpaywall ---------------------------------------------------------------
+
+
+def test_unpaywall_returns_best_then_alternates(ctx_factory):
+    def handler(req):
+        assert req.url.host == "api.unpaywall.org" and req.url.params["email"] == "test@example.org"
+        return _json(
+            {
+                "best_oa_location": {"url_for_pdf": "https://pub.test/best.pdf", "url_for_landing_page": "https://pub.test/land"},
+                "oa_locations": [
+                    {"url_for_pdf": "https://pub.test/best.pdf"},
+                    {"url_for_pdf": None},
+                    {"url_for_pdf": "https://repo.test/copy.pdf"},
+                ],
+            }
+        )
+
+    cand = unpaywall.find(make_item(), ctx_factory(handler))
+    assert cand.outcome is Outcome.FOUND
+    assert cand.urls == ["https://pub.test/best.pdf", "https://repo.test/copy.pdf"]
+    assert cand.referer == "https://pub.test/land"
+
+
+def test_unpaywall_skips_without_doi_or_email(ctx_factory, cfg):
+    assert unpaywall.find(make_item(doi=None), ctx_factory(lambda r: _json({}))).outcome is Outcome.SKIPPED
+    cfg.email = ""
+    assert unpaywall.find(make_item(), ctx_factory(lambda r: _json({}))).outcome is Outcome.SKIPPED
+
+
+def test_unpaywall_404_and_no_pdf_are_not_found(ctx_factory):
+    assert unpaywall.find(make_item(), ctx_factory(lambda r: httpx.Response(404))).outcome is Outcome.NOT_FOUND
+    assert unpaywall.find(make_item(), ctx_factory(lambda r: _json({"oa_locations": []}))).outcome is Outcome.NOT_FOUND
+
+
+# ---- openalex ----------------------------------------------------------------
+
+
+def test_openalex_uses_doi_url_and_collects_pdf_urls(ctx_factory):
+    def handler(req):
+        assert "works/https://doi.org/10.1000/test.doi" in str(req.url)
+        return _json(
+            {
+                "best_oa_location": {"pdf_url": "https://a.test/1.pdf", "landing_page_url": "https://a.test/"},
+                "locations": [{"pdf_url": None}, {"pdf_url": "https://b.test/2.pdf"}],
+            }
+        )
+
+    cand = openalex.find(make_item(), ctx_factory(handler))
+    assert cand.urls == ["https://a.test/1.pdf", "https://b.test/2.pdf"]
+
+
+# ---- semantic scholar --------------------------------------------------------
+
+
+def test_semanticscholar_prefers_doi_then_arxiv(ctx_factory):
+    seen = []
+
+    def handler(req):
+        seen.append(req.url.path)
+        return _json({"openAccessPdf": {"url": "https://s2.test/p.pdf", "status": "GREEN"}})
+
+    ctx = ctx_factory(handler)
+    assert semanticscholar.find(make_item(), ctx).url == "https://s2.test/p.pdf"
+    assert semanticscholar.find(make_item(doi=None, arxiv_id="2101.00001"), ctx).outcome is Outcome.FOUND
+    assert seen == ["/graph/v1/paper/DOI:10.1000/test.doi", "/graph/v1/paper/ARXIV:2101.00001"]
+    assert semanticscholar.find(make_item(doi=None), ctx).outcome is Outcome.SKIPPED
+
+
+def test_semanticscholar_no_pdf(ctx_factory):
+    assert semanticscholar.find(make_item(), ctx_factory(lambda r: _json({"openAccessPdf": None}))).outcome is Outcome.NOT_FOUND
+
+
+# ---- arxiv -------------------------------------------------------------------
+
+
+def test_arxiv_direct_by_id_or_datacite_doi(ctx_factory):
+    ctx = ctx_factory(lambda r: httpx.Response(500))  # must not be called
+    assert arxiv.find(make_item(arxiv_id="2101.00001"), ctx).url == "https://arxiv.org/pdf/2101.00001"
+    assert arxiv.find(make_item(doi="10.48550/arxiv.2101.00002"), ctx).url == "https://arxiv.org/pdf/2101.00002"
+    assert arxiv.find(make_item(item_type="webpage"), ctx).outcome is Outcome.SKIPPED
+
+
+def test_arxiv_title_search_requires_close_match(ctx_factory):
+    feed = """<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+      <entry><id>http://arxiv.org/abs/1706.03762v5</id><title>Attention Is All You Need</title></entry>
+      <entry><id>http://arxiv.org/abs/2101.00001v1</id><title>A sufficiently long test title about marine governance</title></entry>
+    </feed>"""
+    ctx = ctx_factory(lambda r: httpx.Response(200, content=feed.encode()))
+    cand = arxiv.find(make_item(doi=None), ctx)
+    assert cand.url == "https://arxiv.org/pdf/2101.00001"
+    ctx2 = ctx_factory(lambda r: httpx.Response(200, content=feed.encode()))
+    assert arxiv.find(make_item(doi=None, title="Something else entirely, unrelated words here"), ctx2).outcome is Outcome.NOT_FOUND
+
+
+# ---- direct ------------------------------------------------------------------
+
+
+def test_direct_url_heuristics(ctx_factory):
+    ctx = ctx_factory(lambda r: httpx.Response(200, content=b"<html>", headers={"content-type": "text/html"}))
+    assert direct.find(make_item(url=None), ctx).outcome is Outcome.SKIPPED
+    assert direct.find(make_item(url="https://doi.org/10.1/x"), ctx).outcome is Outcome.SKIPPED
+    assert direct.find(make_item(url="https://x.test/report.PDF?dl=1"), ctx).url == "https://x.test/report.PDF?dl=1"
+    assert direct.find(make_item(url="https://x.test/page"), ctx).outcome is Outcome.NOT_FOUND
+
+
+def test_direct_accepts_pdf_content_type_and_octet_stream_magic(ctx_factory):
+    ctx = ctx_factory(lambda r: httpx.Response(200, content=PDF_BYTES, headers={"content-type": "application/pdf"}))
+    assert direct.find(make_item(url="https://x.test/dl"), ctx).outcome is Outcome.FOUND
+    ctx2 = ctx_factory(lambda r: httpx.Response(200, content=PDF_BYTES, headers={"content-type": "application/octet-stream"}))
+    assert direct.find(make_item(url="https://x.test/dl"), ctx2).note == "octet-stream pdf"
+
+
+def test_direct_unreachable_is_error(ctx_factory):
+    def handler(req):
+        raise httpx.ConnectError("nope", request=req)
+
+    assert direct.find(make_item(url="https://x.test/dl"), ctx_factory(handler)).outcome is Outcome.ERROR
+
+
+# ---- http_json ---------------------------------------------------------------
+
+
+def test_http_json_retries_once_on_429(ctx_factory, monkeypatch):
+    slept = []
+    monkeypatch.setattr(base_mod.time, "sleep", lambda s: slept.append(s))
+    calls = []
+
+    def handler(req):
+        calls.append(1)
+        return httpx.Response(429, headers={"Retry-After": "3"}) if len(calls) == 1 else _json({"ok": 1})
+
+    assert http_json(ctx_factory(handler), "https://api.test/x") == {"ok": 1}
+    assert slept == [3.0] and len(calls) == 2
+
+
+# ---- scihub network layer ----------------------------------------------------
+
+
+def _scihub_handler(pages: dict[str, httpx.Response | Exception]):
+    def handler(req):
+        resp = pages.get(req.url.host)
+        if isinstance(resp, Exception):
+            raise resp
+        return resp or httpx.Response(500)
+
+    return handler
+
+
+def test_scihub_found_on_first_mirror(ctx_factory):
+    html = (FIX / "scihub_found.html").read_text()
+    cand = scihub.find(make_item(), ctx_factory(_scihub_handler({"m1.test": httpx.Response(200, text=html)})))
+    assert cand.outcome is Outcome.FOUND
+    assert cand.url.startswith("https://m1.test/storage/") and cand.note == "m1.test"
+    assert cand.referer == "https://m1.test/10.1000/test.doi"
+
+
+def test_scihub_not_found_is_terminal_across_mirrors(ctx_factory):
+    html = (FIX / "scihub_not_found.html").read_text()
+    calls = []
+
+    def handler(req):
+        calls.append(req.url.host)
+        return httpx.Response(200, text=html)
+
+    cand = scihub.find(make_item(), ctx_factory(handler))
+    assert cand.outcome is Outcome.NOT_FOUND and calls == ["m1.test"]
+
+
+def test_scihub_fails_over_and_circuit_breaks(ctx_factory):
+    html = (FIX / "scihub_found.html").read_text()
+    ctx = ctx_factory(
+        _scihub_handler({"m1.test": httpx.ConnectError("down"), "m2.test": httpx.Response(200, text=html)})
+    )
+    assert scihub.find(make_item(), ctx).outcome is Outcome.FOUND
+    assert ctx.mirror_failures["m1.test"] == 1 and ctx.mirror_ok("m1.test")
+    scihub.find(make_item(), ctx)
+    assert ctx.mirror_failures["m1.test"] == 2 and not ctx.mirror_ok("m1.test")
+    # now m1 is skipped without a request
+    calls = []
+
+    def handler(req):
+        calls.append(req.url.host)
+        return httpx.Response(200, text=html)
+
+    ctx.client = httpx.Client(transport=httpx.MockTransport(handler))
+    cand = scihub.find(make_item(), ctx)
+    assert calls == ["m2.test"] and cand.outcome is Outcome.FOUND
+
+
+def test_scihub_all_mirrors_down_is_error_with_per_mirror_notes(ctx_factory):
+    ctx = ctx_factory(_scihub_handler({"m1.test": httpx.Response(502), "m2.test": httpx.Response(403)}))
+    cand = scihub.find(make_item(), ctx)
+    assert cand.outcome is Outcome.ERROR
+    assert "m1.test=HTTP 502" in cand.note and "m2.test=HTTP 403" in cand.note
+
+
+def test_scihub_solves_altcha_then_gets_article(ctx_factory):
+    import hashlib
+
+    captcha = (FIX / "scihub_captcha.html").read_text()
+    article = (FIX / "scihub_found.html").read_text()
+    state = {"solved": False}
+    salt, number = "s?expires=1&", 77
+    challenge = {"algorithm": "SHA-256", "salt": salt, "maxNumber": 500, "signature": "sig",
+                 "challenge": hashlib.sha256(f"{salt}{number}".encode()).hexdigest()}
+
+    def handler(req):
+        if req.url.path.startswith("/captcha/challenge"):
+            return _json(challenge)
+        if req.url.path.startswith("/captcha/solution"):
+            body = json.loads(req.content)
+            assert "captcha" in body
+            state["solved"] = True
+            return _json({"success": True})
+        return httpx.Response(200, text=article if state["solved"] else captcha)
+
+    cand = scihub.find(make_item(), ctx_factory(handler))
+    assert cand.outcome is Outcome.FOUND and state["solved"]
+
+
+def test_scihub_unsolvable_captcha_reports_captcha(ctx_factory):
+    captcha = (FIX / "scihub_captcha.html").read_text()
+
+    def handler(req):
+        if req.url.path.startswith("/captcha/challenge"):
+            return httpx.Response(500)
+        return httpx.Response(200, text=captcha)
+
+    cand = scihub.find(make_item(), ctx_factory(handler))
+    assert cand.outcome is Outcome.CAPTCHA
+
+
+def test_scihub_direct_pdf_response_and_404(ctx_factory):
+    ctx = ctx_factory(lambda r: httpx.Response(200, content=PDF_BYTES, headers={"content-type": "application/pdf"}))
+    assert scihub.fetch_from_mirror(ctx, "m1.test", "10.1/x").outcome is Outcome.FOUND
+    ctx404 = ctx_factory(lambda r: httpx.Response(404))
+    assert scihub.fetch_from_mirror(ctx404, "m1.test", "10.1/x").outcome is Outcome.NOT_FOUND
+
+
+def test_ping_mirrors(ctx_factory):
+    def handler(req):
+        if req.url.host == "m1.test":
+            return httpx.Response(200)
+        raise httpx.ConnectError("down", request=req)
+
+    assert scihub.ping_mirrors(ctx_factory(handler)) == [("m1.test", "HTTP 200"), ("m2.test", "down (ConnectError)")]
