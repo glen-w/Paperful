@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..zot import Item
 from .base import Candidate, Context, Outcome, http_json
+from .landing import looks_like_pdf_url, resolve_landings
 
 NAME = "semanticscholar"
 
@@ -23,6 +24,13 @@ def find(item: Item, ctx: Context) -> Candidate:
     if not data:
         return Candidate.miss(NAME, Outcome.NOT_FOUND)
     oa = data.get("openAccessPdf") or {}
-    if oa.get("url"):
-        return Candidate(url=oa["url"], source=NAME, note=oa.get("status") or "")
-    return Candidate.miss(NAME, Outcome.NOT_FOUND, "no openAccessPdf")
+    url = oa.get("url")
+    if not url:
+        return Candidate.miss(NAME, Outcome.NOT_FOUND, "no openAccessPdf")
+    note = oa.get("status") or ""
+    if looks_like_pdf_url(url):
+        return Candidate(url=url, source=NAME, note=note)
+    resolved = resolve_landings(ctx, [url], item.title)
+    if resolved:
+        return Candidate(url=resolved[0], source=NAME, note=note or "landing", referer=url, alternates=resolved[1:])
+    return Candidate(url=url, source=NAME, note=note)

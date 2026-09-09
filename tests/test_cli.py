@@ -6,9 +6,9 @@ from __future__ import annotations
 import pytest
 from typer.testing import CliRunner
 
-from scihub_dl import cli
-from scihub_dl.store import STATUS_ATTACHED, STATUS_NOT_FOUND, STATUS_OK, Manifest, Record
-from scihub_dl.zot import Collection
+from paperful import cli
+from paperful.store import STATUS_ATTACHED, STATUS_NOT_FOUND, STATUS_OK, Manifest, Record
+from paperful.zot import Collection
 
 runner = CliRunner()
 
@@ -89,8 +89,49 @@ def test_run_dry_run_lists_items_and_writes_nothing(cfg_file, stub_zotero, tmp_p
     res = runner.invoke(cli.app, ["run", "-c", str(cfg_file), "--collection", "BBNJ/EIA / SEA", "--dry-run"], env={"COLUMNS": "200"})
     assert res.exit_code == 0, res.stdout
     assert "2 items without PDF" in res.stdout and "I1" in res.stdout and "10.1000/test.doi" in res.stdout
+    assert "scihub" not in res.stdout.split("Sources:")[-1].split("\n")[0]
+    assert "legal grey zone" not in res.stdout
     assert not (tmp_path / "state" / "manifest.jsonl").exists()
     assert not list((tmp_path / "out").rglob("*.pdf"))
+
+
+def test_run_scihub_opt_in_appends_and_prints_disclaimer(cfg_file, stub_zotero):
+    from paperful.config import SCIHUB_DISCLAIMER
+
+    res = runner.invoke(
+        cli.app,
+        ["run", "-c", str(cfg_file), "--library", "--dry-run", "--scihub"],
+        env={"COLUMNS": "200"},
+    )
+    assert res.exit_code == 0, res.stdout
+    sources_line = res.stdout.split("Sources:")[-1].split("\n")[0]
+    assert sources_line.strip().endswith("scihub")
+    assert SCIHUB_DISCLAIMER in res.stdout
+
+
+def test_run_scihub_via_sources_override_prints_disclaimer(cfg_file, stub_zotero):
+    from paperful.config import SCIHUB_DISCLAIMER
+
+    res = runner.invoke(
+        cli.app,
+        ["run", "-c", str(cfg_file), "--library", "--dry-run", "--sources", "unpaywall,scihub"],
+        env={"COLUMNS": "200"},
+    )
+    assert res.exit_code == 0, res.stdout
+    assert SCIHUB_DISCLAIMER in res.stdout
+    assert "Sources: unpaywall, scihub" in res.stdout
+
+
+def test_source_list_override_and_scihub_flag():
+    from paperful.config import Config
+    from paperful.cli import _source_list
+
+    cfg = Config(sources=["unpaywall", "ezproxy"])
+    assert _source_list(cfg, None, False) == ["unpaywall", "ezproxy"]
+    assert _source_list(cfg, None, True) == ["unpaywall", "ezproxy", "scihub"]
+    assert _source_list(cfg, "unpaywall,scihub", False) == ["unpaywall", "scihub"]
+    assert _source_list(cfg, "unpaywall", True) == ["unpaywall", "scihub"]
+    assert _source_list(cfg, "unpaywall,scihub", True) == ["unpaywall", "scihub"]
 
 
 def test_run_unknown_collection(cfg_file, stub_zotero):
@@ -129,10 +170,47 @@ def test_report_empty_and_populated(cfg_file, tmp_path):
     assert "scihub=1" in res.stdout and "Paper two" in res.stdout and "10.1/b" in res.stdout
 
 
+def test_scholar_command_missing_cookies(cfg_file, monkeypatch):
+    monkeypatch.setattr("webbrowser.open", lambda url: None)
+    res = runner.invoke(cli.app, ["scholar", "-c", str(cfg_file), "--no-open"])
+    assert res.exit_code == 2 and "No cookie file yet" in res.stdout
+    assert "mv ~/Desktop/cookies.txt" in res.stdout
+
+
+def test_scholar_command_session_ok(cfg_file, tmp_path, monkeypatch):
+    cookie_file = tmp_path / "state" / "scholar-cookies.txt"
+    cookie_file.parent.mkdir(parents=True)
+    cookie_file.write_text(".google.com\tTRUE\t/\tTRUE\t0\tSID\ttest\n")
+    monkeypatch.setattr("webbrowser.open", lambda url: None)
+    monkeypatch.setattr("paperful.sources.scholar.session_ok", lambda ctx: (True, "ok (200)"))
+    res = runner.invoke(cli.app, ["scholar", "-c", str(cfg_file), "--no-open"])
+    assert res.exit_code == 0 and "Session OK" in res.stdout
+
+
+def test_scholar_command_session_not_ready(cfg_file, tmp_path, monkeypatch):
+    cookie_file = tmp_path / "state" / "scholar-cookies.txt"
+    cookie_file.parent.mkdir(parents=True)
+    cookie_file.write_text(".google.com\tTRUE\t/\tTRUE\t0\tSID\ttest\n")
+    monkeypatch.setattr("webbrowser.open", lambda url: None)
+    monkeypatch.setattr(
+        "paperful.sources.scholar.session_ok",
+        lambda ctx: (False, "blocked or CAPTCHA (HTTP 429 at https://www.google.com/sorry/index)"),
+    )
+    res = runner.invoke(cli.app, ["scholar", "-c", str(cfg_file), "--no-open"])
+    assert res.exit_code == 2
+    assert "Session not ready" in res.stdout
+    assert "not cookies alone" in res.stdout
+    assert "overwrite" in res.stdout
+
+
 def test_mirrors_command(cfg_file, monkeypatch):
+    from paperful.config import SCIHUB_DISCLAIMER
+
     monkeypatch.setattr(cli, "ping_mirrors", lambda ctx: [("m1.test", "HTTP 200"), ("m2.test", "down (ConnectError)")])
     res = runner.invoke(cli.app, ["mirrors", "-c", str(cfg_file)])
     assert res.exit_code == 0 and "m1.test" in res.stdout and "down" in res.stdout
+    assert SCIHUB_DISCLAIMER in res.stdout
+    assert "Sci-Hub is off until" in res.stdout
 
 
 def test_attach_command_uses_pending_records(cfg_file, stub_zotero, tmp_path, monkeypatch):
@@ -150,7 +228,7 @@ def test_attach_command_uses_pending_records(cfg_file, stub_zotero, tmp_path, mo
             return True
 
         def attach(self, key, path, title=None):
-            from scihub_dl.attach import AttachResult
+            from paperful.attach import AttachResult
 
             return AttachResult(True, "ATT", "success")
 

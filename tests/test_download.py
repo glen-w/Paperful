@@ -1,8 +1,8 @@
 import httpx
 import pytest
 
-from scihub_dl import download as dl
-from scihub_dl.download import DownloadError, fetch_pdf, looks_like_pdf
+from paperful import download as dl
+from paperful.download import DownloadError, fetch_pdf, looks_like_pdf
 from tests.conftest import PDF_BYTES, mock_client
 
 

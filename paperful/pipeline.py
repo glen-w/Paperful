@@ -12,10 +12,13 @@ from typing import Callable
 
 import httpx
 from rich.console import Console
+from rich.markup import escape
 
 from .attach import Attacher
+from .circuit import CircuitBreaker
 from .config import Config
-from .cookies import load_netscape_cookies
+from .cookies import apply_netscape_cookies
+from .routing import sources_for_item
 from .download import DownloadError, fetch_pdf
 from .resolve import crossref_lookup
 from .sources import REGISTRY, Candidate, Context, Outcome
@@ -45,10 +48,8 @@ def make_client(cfg: Config) -> httpx.Client:
         timeout=30,
         limits=httpx.Limits(max_connections=cfg.concurrency_oa + 2),
     )
-    cookie_path = cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt")
-    if cookie_path.is_file():
-        for c in load_netscape_cookies(cookie_path).jar:
-            client.cookies.set(c.name, c.value, domain=c.domain, path=c.path)
+    apply_netscape_cookies(client, cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt"))
+    apply_netscape_cookies(client, cfg.scholar_cookies or (cfg.state_dir / "scholar-cookies.txt"))
     return client
 
 
@@ -79,18 +80,24 @@ class Pipeline:
         sources: list[str] | None = None,
         attacher: Attacher | None = None,
         progress: Callable[[], None] | None = None,
+        try_all: bool | None = None,
     ):
         self.cfg = cfg
         self.manifest = manifest
         self.console = console
         self.sources = sources or cfg.sources
+        self.try_all = try_all if try_all is not None else not cfg.source_routing
         self.attacher = attacher
         self.progress = progress or (lambda: None)
         self.client = make_client(cfg)
         self.ctx = Context(config=cfg, client=self.client)
         self.stats = RunStats()
+        self._circuit = CircuitBreaker(cfg.circuit_breaker_threshold)
         self._attach_lock = threading.Lock()
+        self._print_lock = threading.Lock()
         self._stop = threading.Event()
+        self._run_total = 0
+        self._item_index: dict[str, int] = {}
 
     def stop(self) -> None:
         self._stop.set()
@@ -103,13 +110,18 @@ class Pipeline:
         batch of Sci-Hub work) and interleaves fast OA hits with slow Sci-Hub polling.
         """
         total = len(items)
+        self._run_total = total
+        self._item_index = {it.key: i for i, it in enumerate(items, start=1)}
+        self._circuit.reset()
         for start in range(0, total, batch_size):
             if self._stop.is_set():
                 break
             batch = items[start : start + batch_size]
             if total > batch_size:
-                self.console.print(f"[bold]-- batch {start // batch_size + 1}/{-(-total // batch_size)} "
-                                   f"(items {start + 1}-{start + len(batch)} of {total})[/]")
+                self._emit(
+                    f"[bold]-- batch {start // batch_size + 1}/{-(-total // batch_size)} "
+                    f"(items {start + 1}-{start + len(batch)} of {total})[/]"
+                )
             self._run_batch(batch)
         return self.stats
 
@@ -127,11 +139,15 @@ class Pipeline:
             attempts = self._phase_oa(item, oa_sources)
             if attempts is None:
                 return  # resolved (ok or terminal)
-            if use_ezproxy or (use_scihub and item.doi):
+            lanes = self._lanes_for(item)
+            next_serial = next((s for s in self.sources if s in _SERIAL_SOURCES and s in lanes), None)
+            if next_serial:
                 with queue_lock:
                     pending.append((item, attempts))
+                self._log_item(item, f"[dim]queued for {next_serial}[/]")
             else:
                 self._finish_miss(item, attempts)
+                self.progress()
 
         with ThreadPoolExecutor(max_workers=self.cfg.concurrency_oa) as pool:
             futures = [pool.submit(oa_worker, it) for it in items]
@@ -139,7 +155,7 @@ class Pipeline:
                 for fut in as_completed(futures):
                     exc = fut.exception()
                     if exc:
-                        self.console.print(f"[red]worker error:[/] {type(exc).__name__}: {exc}")
+                        self._emit(f"[red]worker error:[/] {type(exc).__name__}: {exc}")
             except KeyboardInterrupt:
                 self._stop.set()
                 pool.shutdown(wait=False, cancel_futures=True)
@@ -150,13 +166,14 @@ class Pipeline:
             if self._stop.is_set():
                 return
             if use_scihub:
-                no_doi = [(it, att) for it, att in still if not it.doi]
-                with_doi = [(it, att) for it, att in still if it.doi]
-                for item, attempts in no_doi:
-                    self._finish_miss(item, attempts)
-                    self.progress()
-                if with_doi:
-                    self._phase_scihub(with_doi)
+                scihub_queue = [(it, att) for it, att in still if "scihub" in self._lanes_for(it)]
+                scihub_keys = {it.key for it, _ in scihub_queue}
+                for item, attempts in still:
+                    if item.key not in scihub_keys:
+                        self._finish_miss(item, attempts)
+                        self.progress()
+                if scihub_queue:
+                    self._phase_scihub(scihub_queue)
             else:
                 for item, attempts in still:
                     self._finish_miss(item, attempts)
@@ -165,20 +182,30 @@ class Pipeline:
     # ---- phase 1: identifier + OA -------------------------------------------
     def _phase_oa(self, item: Item, oa_sources: list[str]) -> list[str] | None:
         attempts: list[str] = []
+        self._log_item_label(item)
         if not item.doi and item.title and item.item_type not in {"webpage", "blogPost", "forumPost"}:
+            self._log_item(item, "[dim]crossref: looking up DOI from title...[/]")
             match = crossref_lookup(
                 self.client, item.title, item.first_author, item.year, self.cfg.email, self.cfg.crossref_min_score
             )
             if match:
                 item.doi, item.doi_source = match.doi, "crossref"
                 attempts.append(f"crossref:matched({match.score:.2f})")
+                self._log_item(item, f"crossref: [green]matched[/] {escape(match.doi)} (score {match.score:.2f})")
             else:
                 attempts.append("crossref:no-match")
+                self._log_item(item, "crossref: [dim]no match[/]")
+        lanes = self._lanes_for(item)
+        self._log_item_trying_line(item, lanes)
         for name in oa_sources:
             if self._stop.is_set():
                 return attempts
+            if self._skip_source(item, name, lanes, attempts):
+                continue
             cand = REGISTRY[name].find(item, self.ctx)
             attempts.append(f"{name}:{cand.outcome.value}" + (f"({cand.note})" if cand.note else ""))
+            self._log_source_result(item, name, cand)
+            self._maybe_trip_circuit(name, cand)
             if cand.outcome is Outcome.FOUND and self._try_download(item, cand, attempts):
                 self.progress()
                 return None
@@ -187,6 +214,7 @@ class Pipeline:
     # ---- phase 2: campus EZProxy, serial ------------------------------------
     def _phase_serial(self, queue: list[tuple[Item, list[str]]], name: str) -> list[tuple[Item, list[str]]]:
         """Try a serial source; return items that still need Sci-Hub / finish_miss."""
+        self._emit(f"[bold]-- {name}[/] ({len(queue)} remaining)")
         still: list[tuple[Item, list[str]]] = []
         lo, hi = self.cfg.delay_scihub_s
         first = True
@@ -197,14 +225,21 @@ class Pipeline:
             if not first:
                 time.sleep(random.uniform(min(lo, 1.0), min(hi, 3.0)))
             first = False
+            lanes = self._lanes_for(item)
+            if self._skip_source(item, name, lanes, attempts):
+                still.append((item, attempts))
+                continue
+            self._log_item(item, f"[dim]{name}: checking...[/]")
             cand = REGISTRY[name].find(item, self.ctx)
             note = f"({cand.note})" if cand.note else ""
             attempts.append(f"{name}:{cand.outcome.value}{note}")
+            self._log_source_result(item, name, cand)
+            self._maybe_trip_circuit(name, cand)
             if cand.outcome is Outcome.FOUND and self._try_download(item, cand, attempts):
                 self.progress()
                 continue
             if cand.outcome is Outcome.ERROR and "session expired" in (cand.note or ""):
-                self.console.print("[yellow]ezproxy session expired; skipping remaining proxy attempts this batch[/]")
+                self._emit("[yellow]ezproxy session expired; skipping remaining proxy attempts this batch[/]")
                 still.append((item, attempts))
                 still.extend(queue[idx + 1 :])
                 return still
@@ -213,6 +248,7 @@ class Pipeline:
 
     # ---- phase 3: Sci-Hub, serial --------------------------------------------
     def _phase_scihub(self, queue: list[tuple[Item, list[str]]]) -> None:
+        self._emit(f"[bold]-- scihub[/] ({len(queue)} remaining)")
         lo, hi = self.cfg.delay_scihub_s
         first = True
         for item, attempts in queue:
@@ -221,8 +257,16 @@ class Pipeline:
             if not first:
                 time.sleep(random.uniform(lo, hi))
             first = False
+            lanes = self._lanes_for(item)
+            if self._skip_source(item, "scihub", lanes, attempts):
+                self._finish_miss(item, attempts)
+                self.progress()
+                continue
+            self._log_item(item, "[dim]scihub: checking...[/]")
             cand = REGISTRY["scihub"].find(item, self.ctx)
             attempts.append(f"scihub:{cand.outcome.value}" + (f"({cand.note})" if cand.note else ""))
+            self._log_source_result(item, "scihub", cand)
+            self._maybe_trip_circuit("scihub", cand)
             if cand.outcome is Outcome.FOUND and self._try_download(item, cand, attempts):
                 self.progress()
                 continue
@@ -235,7 +279,34 @@ class Pipeline:
             self.progress()
 
     # ---- helpers ----------------------------------------------------------------
+    def _lanes_for(self, item: Item) -> list[str]:
+        configured = [s for s in self.sources if s in REGISTRY]
+        if self.try_all:
+            routed = configured
+        else:
+            routed = sources_for_item(item, self.cfg, configured)
+        return [s for s in routed if not self._circuit.tripped(s)]
+
+    def _skip_source(self, item: Item, name: str, lanes: list[str], attempts: list[str]) -> bool:
+        if name in lanes:
+            return False
+        if self._circuit.tripped(name):
+            attempts.append(f"{name}:skipped(circuit open)")
+            self._log_item(item, f"{escape(name)}: [dim]skipped[/] (blocked for rest of run)")
+        else:
+            attempts.append(f"{name}:skipped(not applicable)")
+            self._log_item(item, f"{escape(name)}: [dim]skipped[/] (not applicable)")
+        return True
+
+    def _maybe_trip_circuit(self, name: str, cand: Candidate) -> None:
+        if self._circuit.note(name, cand.outcome, cand.note or ""):
+            self._emit(
+                f"[yellow]{name} blocked {self.cfg.circuit_breaker_threshold} times; "
+                f"skipping {name} for rest of run[/]"
+            )
+
     def _try_download(self, item: Item, cand: Candidate, attempts: list[str]) -> bool:
+        self._log_item(item, f"[dim]{cand.source}: downloading...[/]")
         dl = None
         for url in cand.urls[:6]:
             try:
@@ -243,6 +314,7 @@ class Pipeline:
                 break
             except DownloadError as exc:
                 attempts.append(f"{cand.source}:download-failed({exc})")
+                self._log_item(item, f"{escape(cand.source)}: [yellow]download failed[/] ({escape(str(exc))})")
         if dl is None:
             return False
         primary, extras = save_pdf(self.cfg.out_dir, item, dl.content, dl.md5)
@@ -261,7 +333,10 @@ class Pipeline:
         )
         self.manifest.write(rec)
         self.stats.bump(STATUS_OK, cand.source)
-        self.console.print(f"[green]ok[/] [{cand.source}] {item.label} -> {primary.relative_to(self.cfg.out_dir)}")
+        self._log_item(
+            item,
+            f"[green]ok[/] {escape('[' + cand.source + ']')} -> {escape(str(primary.relative_to(self.cfg.out_dir)))}",
+        )
         if self.attacher:
             self.attach_record(rec)
         return True
@@ -275,12 +350,12 @@ class Pipeline:
             rec.status = STATUS_ATTACHED
             rec.reason = res.reason
             self.stats.bump(STATUS_ATTACHED)
-            self.console.print(f"   [cyan]attached[/] {rec.itemKey} ({res.reason})")
+            self._emit(f"   [cyan]attached[/] {rec.itemKey} ({res.reason})")
         else:
             rec.status = STATUS_ATTACH_FAILED
             rec.reason = res.reason
             self.stats.bump(STATUS_ATTACH_FAILED)
-            self.console.print(f"   [yellow]attach failed[/] {rec.itemKey}: {res.reason}")
+            self._emit(f"   [yellow]attach failed[/] {rec.itemKey}: {res.reason}")
         self.manifest.write(rec)
         return res.ok
 
@@ -308,4 +383,40 @@ class Pipeline:
         self.manifest.write(rec)
         self.stats.bump(status)
         colour = {STATUS_NOT_FOUND: "dim", STATUS_NO_IDENTIFIER: "dim", STATUS_CAPTCHA: "yellow", STATUS_ERROR: "red"}[status]
-        self.console.print(f"[{colour}]{status}[/] {item.label}" + (f" [dim]({reason})[/]" if reason else ""))
+        self._log_item(item, f"[{colour}]{status}[/]" + (f" [dim]({reason})[/]" if reason else ""))
+
+    # ---- console --------------------------------------------------------------
+    def _emit(self, message: str) -> None:
+        with self._print_lock:
+            self.console.print(message)
+
+    def _item_tag(self, item: Item) -> str:
+        idx = self._item_index.get(item.key)
+        if idx is None or not self._run_total:
+            return item.key
+        return f"{idx}/{self._run_total}"
+
+    def _log_item_label(self, item: Item) -> None:
+        self._emit(f"[bold]\\[{self._item_tag(item)}][/] {escape(item.label)}")
+
+    def _log_item_trying_line(self, item: Item, lanes: list[str]) -> None:
+        ident = (
+            f"DOI {item.doi}"
+            if item.doi
+            else (f"arXiv:{item.arxiv_id}" if item.arxiv_id else (f"URL {item.url}" if item.url else "no identifier"))
+        )
+        self._log_item(item, f"[dim]{escape(ident)} · trying: {escape(', '.join(lanes))}[/]")
+    def _log_item(self, item: Item, message: str) -> None:
+        self._emit(f"\\[{self._item_tag(item)}] {message}")
+
+    def _log_source_result(self, item: Item, name: str, cand: Candidate) -> None:
+        colours = {
+            Outcome.FOUND: "green",
+            Outcome.NOT_FOUND: "dim",
+            Outcome.SKIPPED: "dim",
+            Outcome.ERROR: "yellow",
+            Outcome.CAPTCHA: "yellow",
+        }
+        colour = colours.get(cand.outcome, "white")
+        note = f" ({escape(cand.note)})" if cand.note else ""
+        self._log_item(item, f"{escape(name)}: [{colour}]{cand.outcome.value}[/]{note}")

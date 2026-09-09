@@ -1,4 +1,4 @@
-"""Configuration loading for scihub-dl."""
+"""Configuration loading for paperful."""
 
 from __future__ import annotations
 
@@ -13,6 +13,8 @@ if sys.version_info >= (3, 11):
 else:  # pragma: no cover
     import tomli as tomllib
 
+# Sci-Hub is opt-in (legal grey zone in some jurisdictions). Add "scihub" to
+# `sources` or pass --scihub; it is not in the default list.
 DEFAULT_SOURCES = [
     "unpaywall",
     "openalex",
@@ -23,9 +25,12 @@ DEFAULT_SOURCES = [
     "scholar",
     "direct",
     "ezproxy",
-    "scihub",
 ]
 DEFAULT_MIRRORS = ["sci-hub.ru", "sci-hub.ren", "sci-hub.box", "sci-hub.se", "sci-hub.st"]
+SCIHUB_DISCLAIMER = (
+    "Sci-Hub occupies a legal grey zone in some jurisdictions. "
+    "You are responsible for complying with the laws that apply to you."
+)
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
@@ -44,12 +49,15 @@ class Config:
     min_pdf_bytes: int = 10_000
     crossref_min_score: float = 0.90
     attach: bool = True
-    app_name: str = "scihub-dl"
+    app_name: str = "paperful"
     mirror_failures_before_skip: int = 3
+    source_routing: bool = True  # skip sources that look inapplicable from item metadata
+    circuit_breaker_threshold: int = 3  # block-like failures before skipping a source for the run
     user_agent: str = USER_AGENT
     # Campus EZProxy (e.g. Sciences Po). Empty base disables the source.
     ezproxy_base: str = ""
     ezproxy_cookies: Path | None = None  # Netscape cookies.txt; default state/ezproxy-cookies.txt
+    scholar_cookies: Path | None = None  # Netscape cookies.txt; default state/scholar-cookies.txt
     config_path: Path | None = None
 
     @property
@@ -68,7 +76,7 @@ def _candidate_paths(explicit: Path | None) -> list[Path]:
     return [
         Path.cwd() / "config.toml",
         here / "config.toml",
-        Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "scihub_dl" / "config.toml",
+        Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "paperful" / "config.toml",
     ]
 
 
@@ -111,12 +119,18 @@ def _from_dict(raw: dict[str, Any], source: Path) -> Config:
         cfg.app_name = str(raw["app_name"])
     if "mirror_failures_before_skip" in raw:
         cfg.mirror_failures_before_skip = int(raw["mirror_failures_before_skip"])
+    if "source_routing" in raw:
+        cfg.source_routing = bool(raw["source_routing"])
+    if "circuit_breaker_threshold" in raw:
+        cfg.circuit_breaker_threshold = max(1, int(raw["circuit_breaker_threshold"]))
     if "user_agent" in raw:
         cfg.user_agent = str(raw["user_agent"])
     if "ezproxy_base" in raw:
         cfg.ezproxy_base = str(raw["ezproxy_base"]).strip()
     if "ezproxy_cookies" in raw and raw["ezproxy_cookies"]:
         cfg.ezproxy_cookies = Path(str(raw["ezproxy_cookies"])).expanduser()
+    if "scholar_cookies" in raw and raw["scholar_cookies"]:
+        cfg.scholar_cookies = Path(str(raw["scholar_cookies"])).expanduser()
     if not cfg.out_dir.is_absolute():
         cfg.out_dir = (source.parent / cfg.out_dir).resolve()
     if not cfg.state_dir.is_absolute():
@@ -125,4 +139,8 @@ def _from_dict(raw: dict[str, Any], source: Path) -> Config:
         cfg.ezproxy_cookies = cfg.state_dir / "ezproxy-cookies.txt"
     elif not cfg.ezproxy_cookies.is_absolute():
         cfg.ezproxy_cookies = (source.parent / cfg.ezproxy_cookies).resolve()
+    if cfg.scholar_cookies is None:
+        cfg.scholar_cookies = cfg.state_dir / "scholar-cookies.txt"
+    elif not cfg.scholar_cookies.is_absolute():
+        cfg.scholar_cookies = (source.parent / cfg.scholar_cookies).resolve()
     return cfg

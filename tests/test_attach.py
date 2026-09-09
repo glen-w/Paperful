@@ -7,8 +7,8 @@ import json
 import pytest
 from pyzotero import errors as ze
 
-from scihub_dl import attach as at
-from scihub_dl.attach import Attacher, _interpret, attachment_payload
+from paperful import attach as at
+from paperful.attach import Attacher, _interpret, attachment_payload
 
 
 class StubZot:

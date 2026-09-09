@@ -2,15 +2,16 @@ from pathlib import Path
 
 import pytest
 
-from scihub_dl.config import DEFAULT_MIRRORS, DEFAULT_SOURCES, Config, load_config
+from paperful.config import DEFAULT_MIRRORS, DEFAULT_SOURCES, Config, load_config
 
 
 def test_defaults_when_no_file(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
-    monkeypatch.setattr("scihub_dl.config._candidate_paths", lambda explicit: [tmp_path / "nope.toml"])
+    monkeypatch.setattr("paperful.config._candidate_paths", lambda explicit: [tmp_path / "nope.toml"])
     cfg = load_config()
     assert cfg.sources == DEFAULT_SOURCES and cfg.scihub_mirrors == DEFAULT_MIRRORS
+    assert "scihub" not in cfg.sources
     assert cfg.attach is True and cfg.concurrency_oa == 4
 
 
@@ -49,10 +50,28 @@ def test_missing_explicit_path_raises(tmp_path):
         load_config(tmp_path / "missing.toml")
 
 
-def test_repo_config_toml_parses_and_keeps_scihub_last():
+def test_load_routing_and_scholar_cookie_paths(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text(
+        """
+email = "me@example.org"
+source_routing = false
+circuit_breaker_threshold = 5
+scholar_cookies = "cookies/scholar.txt"
+state_dir = "state"
+"""
+    )
+    cfg = load_config(p)
+    assert cfg.source_routing is False
+    assert cfg.circuit_breaker_threshold == 5
+    assert cfg.scholar_cookies == (tmp_path / "cookies" / "scholar.txt").resolve()
+
+
+def test_repo_config_toml_parses_and_omits_scihub_by_default():
     repo_cfg = Path(__file__).resolve().parent.parent / "config.toml"
     cfg = load_config(repo_cfg)
     assert cfg.email and "@" in cfg.email
-    assert cfg.sources[-1] == "scihub"
+    assert "scihub" not in cfg.sources
+    assert cfg.sources[-1] == "ezproxy"
     assert cfg.out_dir.is_absolute() and cfg.state_dir.is_absolute()
     assert isinstance(cfg, Config)

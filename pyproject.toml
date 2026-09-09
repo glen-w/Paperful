@@ -1,7 +1,7 @@
 [project]
-name = "scihub-dl"
+name = "paperful"
 version = "0.1.0"
-description = "Fetch missing PDFs for Zotero items from open-access sources and Sci-Hub, save to disk, attach back into Zotero."
+description = "Fetch missing PDFs for Zotero items from open-access sources (Sci-Hub opt-in), save to disk, attach back into Zotero."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-scihub-dl = "scihub_dl.cli:app"
+paperful = "paperful.cli:app"
 
 [dependency-groups]
 dev = ["pytest>=8"]
@@ -24,7 +24,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["scihub_dl"]
+packages = ["paperful"]
 
 [tool.hatch.build.targets.sdist]
 # Personal config (email), runtime state/output and editor files never ship.

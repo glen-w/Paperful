@@ -5,7 +5,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from scihub_dl.zot import UNCOLLECTED, ZoteroLocal
+from paperful.zot import UNCOLLECTED, ZoteroLocal
 
 
 def _col(key, name, parent=None):
@@ -66,7 +66,7 @@ class FakeZot:
 @pytest.fixture
 def zl(monkeypatch):
     fake = FakeZot(httpx.Response(200, headers={"X-Zotero-Version": "10.0.1", "Zotero-API-Version": "3", "Zotero-Server-ID": "abc"}))
-    monkeypatch.setattr("scihub_dl.zot.zotero.Zotero", lambda *a, **k: fake)
+    monkeypatch.setattr("paperful.zot.zotero.Zotero", lambda *a, **k: fake)
     return ZoteroLocal()
 
 
@@ -74,10 +74,10 @@ def test_ping_reports_version_and_write_support(zl, monkeypatch):
     info = zl.ping()
     assert info["zotero_version"] == "10.0.1" and info["supports_write"] is True
     old = FakeZot(httpx.Response(200, headers={"X-Zotero-Version": "7.0.15", "Zotero-API-Version": "3"}))
-    monkeypatch.setattr("scihub_dl.zot.zotero.Zotero", lambda *a, **k: old)
+    monkeypatch.setattr("paperful.zot.zotero.Zotero", lambda *a, **k: old)
     assert ZoteroLocal().ping()["supports_write"] is False
     disabled = FakeZot(httpx.Response(403))
-    monkeypatch.setattr("scihub_dl.zot.zotero.Zotero", lambda *a, **k: disabled)
+    monkeypatch.setattr("paperful.zot.zotero.Zotero", lambda *a, **k: disabled)
     with pytest.raises(ConnectionError, match="disabled"):
         ZoteroLocal().ping()
 

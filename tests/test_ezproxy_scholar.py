@@ -6,9 +6,9 @@ from pathlib import Path
 
 import httpx
 
-from scihub_dl.cookies import load_netscape_cookies
-from scihub_dl.sources import ezproxy, scholar
-from scihub_dl.sources.base import Outcome
+from paperful.cookies import apply_netscape_cookies, load_netscape_cookies
+from paperful.sources import ezproxy, scholar
+from paperful.sources.base import Outcome
 from tests.conftest import PDF_BYTES, make_item, mock_client
 
 
@@ -32,6 +32,19 @@ def test_extract_pdf_urls_sciencedirect():
     urls = ezproxy.extract_pdf_urls(html, base)
     assert any("pdfft" in u for u in urls)
     assert any("S0964569126000761" in u for u in urls)
+
+
+def test_ezproxy_skips_non_publisher_url(ctx_factory, cfg, tmp_path):
+    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cookie_file = tmp_path / "ezproxy-cookies.txt"
+    cookie_file.write_text(".scpo.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n")
+    cfg.ezproxy_cookies = cookie_file
+    ctx = ctx_factory(lambda r: httpx.Response(200, text="should not be fetched"))
+    for c in load_netscape_cookies(cookie_file).jar:
+        ctx.client.cookies.set(c.name, c.value, domain=c.domain, path=c.path)
+    cand = ezproxy.find(make_item(doi=None, url="https://www.youtube.com/watch?v=Zv4vNEFf_qE"), ctx)
+    assert cand.outcome is Outcome.SKIPPED
+    assert "publisher" in cand.note
 
 
 def test_ezproxy_skips_without_config(ctx_factory, cfg):
@@ -98,11 +111,11 @@ def test_scholar_extracts_pdf_sidebar():
     assert any("open.example.org" in u for u in urls)
 
 
-def test_scholar_captcha_is_error(ctx_factory):
+def test_scholar_captcha_is_captcha(ctx_factory):
     def handler(req):
         return httpx.Response(200, text="<html>captcha</html>", request=httpx.Request("GET", "https://www.google.com/sorry/index"))
 
-    assert scholar.find(make_item(), ctx_factory(handler)).outcome is Outcome.ERROR
+    assert scholar.find(make_item(), ctx_factory(handler)).outcome is Outcome.CAPTCHA
 
 
 def test_scholar_not_found(ctx_factory):
@@ -110,3 +123,49 @@ def test_scholar_not_found(ctx_factory):
         return httpx.Response(200, text='<div class="gs_r">no pdfs here</div>')
 
     assert scholar.find(make_item(), ctx_factory(handler)).outcome is Outcome.NOT_FOUND
+
+
+def test_scholar_session_ok(cfg, tmp_path, ctx_factory):
+    cookie_file = tmp_path / "scholar-cookies.txt"
+    cookie_file.write_text(".google.com\tTRUE\t/\tTRUE\t0\tSID\ttest\n")
+    cfg.scholar_cookies = cookie_file
+
+    def handler(req):
+        return httpx.Response(200, text='<div class="gs_r">results</div>', request=req)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    apply_netscape_cookies(client, cookie_file)
+    ctx = ctx_factory(lambda r: httpx.Response(200, text='<div class="gs_r">results</div>'))
+    ctx.client = client
+    ctx.config = cfg
+    assert scholar.session_ok(ctx) == (True, "ok (200)")
+
+
+def test_scholar_session_blocked(cfg, tmp_path, ctx_factory):
+    cookie_file = tmp_path / "scholar-cookies.txt"
+    cookie_file.write_text(".google.com\tTRUE\t/\tTRUE\t0\tSID\ttest\n")
+    cfg.scholar_cookies = cookie_file
+
+    def handler(req):
+        return httpx.Response(
+            200,
+            text="<html>captcha</html>",
+            request=httpx.Request("GET", "https://www.google.com/sorry/index"),
+        )
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    apply_netscape_cookies(client, cookie_file)
+    ctx = ctx_factory(handler)
+    ctx.client = client
+    ctx.config = cfg
+    ok, detail = scholar.session_ok(ctx)
+    assert not ok and "CAPTCHA" in detail
+    assert "HTTP" in detail
+
+
+def test_scholar_session_missing_cookies_file(cfg, tmp_path, ctx_factory):
+    cfg.scholar_cookies = tmp_path / "missing.txt"
+    ctx = ctx_factory(lambda r: httpx.Response(200))
+    ctx.config = cfg
+    ok, detail = scholar.session_ok(ctx)
+    assert not ok and "missing" in detail

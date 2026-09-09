@@ -7,9 +7,9 @@ from typing import Callable
 import httpx
 import pytest
 
-from scihub_dl.config import Config
-from scihub_dl.sources.base import Context
-from scihub_dl.zot import Item
+from paperful.config import Config
+from paperful.sources.base import Context
+from paperful.zot import Item
 
 PDF_BYTES = b"%PDF-1.4\n" + b"x" * 20_000 + b"\n%%EOF"
 

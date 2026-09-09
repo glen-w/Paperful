@@ -1,0 +1,239 @@
+"""Turn OA landing pages into PDF URLs (DSpace REST, OAI-PMH, HTML meta/links)."""
+
+from __future__ import annotations
+
+import re
+import xml.etree.ElementTree as ET
+from urllib.parse import urljoin, urlparse
+
+import httpx
+from bs4 import BeautifulSoup
+
+from ..resolve import title_similarity
+from .base import Context, http_json
+
+_PDF_HREF_RE = re.compile(r"pdfft|/pdf(?:\?|$)|citation_pdf_url|download=true|viewcontent\.cgi", re.I)
+_HANDLE_RE = re.compile(r"(?:/handle/|hdl\.handle\.net/)(\d+(?:\.\d+)*/[^\s/?#]+)", re.I)
+_PMC_RE = re.compile(
+    r"(?:ncbi\.nlm\.nih\.gov/pmc/articles|europepmc\.org/(?:articles|article/pmc))/(PMC\d+)",
+    re.I,
+)
+_ARXIV_ABS_RE = re.compile(r"arxiv\.org/abs/([0-9]+\.[0-9]+|[a-z\-]+(?:\.[A-Z]{2})?/\d{7})", re.I)
+_HAL_RE = re.compile(r"https?://(?:hal\.science|hal\.archives-ouvertes\.fr)/(hal-\d+(?:v\d+)?)", re.I)
+_DC_PATH_RE = re.compile(r"^/([^/]+)/(\d+)/?$")
+_SKIP_OAI_HOSTS = ("doi.org", "hdl.handle.net", "scholar.google", "zotero.org")
+_TITLE_MIN = 0.55
+_MAX_LANDINGS = 3
+_TIMEOUT = 20.0
+
+
+def looks_like_pdf_url(url: str) -> bool:
+    low = url.lower()
+    path = low.split("?")[0]
+    if path.endswith(".pdf"):
+        return True
+    if "pdfdirect" in low or "viewcontent.cgi" in low or "/pdfft" in low:
+        return True
+    if path.endswith("/pdf") or "/pdf/" in path:
+        return True
+    return False
+
+
+def rewrite_known_pdf_url(url: str) -> str | None:
+    """Map a few well-known landing URLs to a direct PDF without fetching."""
+    m = _PMC_RE.search(url)
+    if m:
+        pmcid = m.group(1)
+        if "europepmc" in url.lower():
+            return f"https://europepmc.org/articles/{pmcid}?pdf=render"
+        return f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/pdf/"
+    m = _ARXIV_ABS_RE.search(url)
+    if m:
+        return f"https://arxiv.org/pdf/{m.group(1)}"
+    m = _HAL_RE.match(url.split("?")[0])
+    if m:
+        return f"https://hal.science/{m.group(1)}/document"
+    return None
+
+
+def extract_pdf_urls(html: str, base_url: str) -> list[str]:
+    soup = BeautifulSoup(html, "html.parser")
+    found: list[str] = []
+
+    def add(u: str | None) -> None:
+        if not u:
+            return
+        abs_url = urljoin(base_url, u.strip())
+        if abs_url not in found:
+            found.append(abs_url)
+
+    for meta in soup.find_all("meta", attrs={"name": re.compile(r"citation_pdf_url", re.I)}):
+        add(meta.get("content"))
+    for link in soup.find_all("link", attrs={"type": "application/pdf"}):
+        add(link.get("href"))
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        text = a.get_text(" ", strip=True).lower()
+        if _PDF_HREF_RE.search(href) or text in {"pdf", "download pdf", "view pdf", "full text pdf"}:
+            add(href)
+    m = re.search(r"/pii/([A-Z0-9]+)", base_url, re.I) or re.search(r"/pii/([A-Z0-9]+)", html, re.I)
+    if m:
+        pii = m.group(1)
+        parsed = urlparse(base_url)
+        add(f"{parsed.scheme}://{parsed.netloc}/science/article/pii/{pii}/pdfft?isDTMRedir=true&download=true")
+    return found
+
+
+def resolve_landings(ctx: Context, landings: list[str], title: str | None = None) -> list[str]:
+    """Follow OA landing URLs and return PDF URLs, skipping stale title mismatches."""
+    pdfs: list[str] = []
+    seen_land: list[str] = []
+    for landing in landings:
+        if not landing or landing in seen_land:
+            continue
+        seen_land.append(landing)
+        for url in _resolve_one(ctx, landing, title):
+            if url not in pdfs:
+                pdfs.append(url)
+        if pdfs or len(seen_land) >= _MAX_LANDINGS:
+            break
+    return pdfs
+
+
+def _resolve_one(ctx: Context, url: str, title: str | None) -> list[str]:
+    rewritten = rewrite_known_pdf_url(url)
+    if rewritten:
+        return [rewritten]
+    if looks_like_pdf_url(url):
+        return [url]
+    pdfs = _dspace_pdfs(ctx, url, title)
+    if pdfs:
+        return pdfs
+    pdfs = _digital_commons_pdfs(ctx, url, title)
+    if pdfs:
+        return pdfs
+    return _html_pdfs(ctx, url)
+
+
+def _title_ok(expected: str | None, got: str | None) -> bool:
+    if not expected or not got:
+        return True
+    return title_similarity(expected, got) >= _TITLE_MIN
+
+
+def _origin(url: str) -> str:
+    p = urlparse(url)
+    return f"{p.scheme}://{p.netloc}"
+
+
+def _abs(origin: str, href: str | None) -> str | None:
+    if not href:
+        return None
+    return urljoin(origin + "/", href)
+
+
+def _dspace_pdfs(ctx: Context, url: str, title: str | None) -> list[str]:
+    handle = _HANDLE_RE.search(url)
+    origin = _origin(url)
+    handle_id = handle.group(1) if handle else None
+    if "hdl.handle.net" in urlparse(url).netloc.lower():
+        try:
+            resp = ctx.client.get(url, timeout=_TIMEOUT)
+        except httpx.HTTPError:
+            return []
+        origin = _origin(str(resp.url))
+        found = _HANDLE_RE.search(str(resp.url))
+        handle_id = found.group(1) if found else handle_id
+    if not handle_id:
+        return []
+    item = http_json(ctx, f"{origin}/server/api/pid/find", params={"id": handle_id}, timeout=_TIMEOUT)
+    if not item:
+        return []
+    if not _title_ok(title, item.get("name")):
+        return []
+    bundles_href = _abs(origin, ((item.get("_links") or {}).get("bundles") or {}).get("href"))
+    if not bundles_href:
+        return []
+    bundles_data = http_json(ctx, bundles_href, timeout=_TIMEOUT) or {}
+    bundles = ((bundles_data.get("_embedded") or {}).get("bundles")) or []
+    original = [b for b in bundles if (b.get("name") or "").upper() == "ORIGINAL"]
+    pdfs: list[str] = []
+    for bundle in original or bundles:
+        name = (bundle.get("name") or "").upper()
+        if name in {"LICENSE", "THUMBNAIL"}:
+            continue
+        bits_href = _abs(origin, ((bundle.get("_links") or {}).get("bitstreams") or {}).get("href"))
+        if not bits_href:
+            continue
+        bits_data = http_json(ctx, bits_href, timeout=_TIMEOUT) or {}
+        for bit in ((bits_data.get("_embedded") or {}).get("bitstreams")) or []:
+            bit_name = bit.get("name") or ""
+            mime = (bit.get("mimeType") or "").lower()
+            if mime != "application/pdf" and not bit_name.lower().endswith(".pdf"):
+                continue
+            content = _abs(origin, ((bit.get("_links") or {}).get("content") or {}).get("href"))
+            if content and content not in pdfs:
+                pdfs.append(content)
+    return pdfs
+
+
+def _digital_commons_pdfs(ctx: Context, url: str, title: str | None) -> list[str]:
+    p = urlparse(url)
+    if any(h in p.netloc.lower() for h in _SKIP_OAI_HOSTS):
+        return []
+    if "/handle/" in p.path:
+        return []
+    m = _DC_PATH_RE.match(p.path)
+    if not m:
+        return []
+    context, rec_id = m.group(1), m.group(2)
+    oai_id = f"oai:{p.netloc}:{context}-{rec_id}"
+    try:
+        resp = ctx.client.get(
+            f"{p.scheme}://{p.netloc}/do/oai/",
+            params={"verb": "GetRecord", "metadataPrefix": "oai_dc", "identifier": oai_id},
+            timeout=_TIMEOUT,
+        )
+    except httpx.HTTPError:
+        return []
+    if resp.status_code >= 400:
+        return []
+    return _oai_pdfs(resp.text, title)
+
+
+def _oai_pdfs(xml_text: str, title: str | None) -> list[str]:
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return []
+    titles: list[str] = []
+    idents: list[str] = []
+    for el in root.iter():
+        name = el.tag.rsplit("}", 1)[-1]
+        if name == "error":
+            return []
+        text = (el.text or "").strip()
+        if not text:
+            continue
+        if name == "title":
+            titles.append(text)
+        elif name == "identifier":
+            idents.append(text)
+    if titles and not _title_ok(title, titles[0]):
+        return []
+    return [u for u in idents if looks_like_pdf_url(u)]
+
+
+def _html_pdfs(ctx: Context, url: str) -> list[str]:
+    try:
+        resp = ctx.client.get(url, timeout=_TIMEOUT)
+    except httpx.HTTPError:
+        return []
+    if resp.status_code >= 400:
+        return []
+    ctype = resp.headers.get("content-type", "").lower()
+    if "application/pdf" in ctype or resp.content[:8].lstrip().startswith(b"%PDF"):
+        return [str(resp.url)]
+    if "html" not in ctype and "xml" not in ctype:
+        return []
+    return extract_pdf_urls(resp.text, str(resp.url))

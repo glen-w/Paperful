@@ -16,6 +16,7 @@ from ..zot import Item
 from .base import Candidate, Context, Outcome
 
 NAME = "scholar"
+_PROBE_URL = "https://scholar.google.com/scholar?q=information&hl=en&as_sdt=0%2C5"
 
 _SKIP_HOSTS = (
     "scholar.google.",
@@ -30,6 +31,39 @@ _SKIP_HOSTS = (
 )
 
 
+def is_blocked(resp: httpx.Response) -> bool:
+    final = str(resp.url).lower()
+    body = resp.text
+    if resp.status_code in {429, 503} or "sorry" in final or "/sorry/" in final:
+        return True
+    return "captcha" in body.lower()[:3000] and "gs_r" not in body
+
+
+def looks_like_results(html: str) -> bool:
+    return "gs_r" in html or "gs_ri" in html
+
+
+def session_ok(ctx: Context) -> tuple[bool, str]:
+    """Cheap check: probe Scholar with exported browser cookies."""
+    from ..cookies import has_domain_cookies
+
+    cookie_path = ctx.config.scholar_cookies or (ctx.config.state_dir / "scholar-cookies.txt")
+    if not cookie_path.is_file():
+        return False, f"cookie file missing ({cookie_path})"
+    if not has_domain_cookies(ctx.client, "google"):
+        return False, "scholar cookies not loaded into client"
+    try:
+        resp = ctx.client.get(_PROBE_URL, timeout=30)
+    except httpx.HTTPError as exc:
+        return False, f"request failed: {type(exc).__name__}"
+    if is_blocked(resp):
+        host = str(resp.url).split("?", 1)[0]
+        return False, f"blocked or CAPTCHA (HTTP {resp.status_code} at {host})"
+    if looks_like_results(resp.text):
+        return True, f"ok ({resp.status_code})"
+    return False, f"unexpected response ({resp.status_code})"
+
+
 def find(item: Item, ctx: Context) -> Candidate:
     query = item.doi or item.title
     if not query or (not item.doi and len(item.title) < 20):
@@ -41,12 +75,9 @@ def find(item: Item, ctx: Context) -> Candidate:
     except httpx.HTTPError as exc:
         return Candidate.miss(NAME, Outcome.ERROR, f"request failed ({type(exc).__name__})")
 
-    final = str(resp.url).lower()
     body = resp.text
-    if resp.status_code in {429, 503} or "sorry" in final or "/sorry/" in final:
-        return Candidate.miss(NAME, Outcome.ERROR, "scholar blocked/captcha")
-    if "captcha" in body.lower()[:3000] and "gs_r" not in body:
-        return Candidate.miss(NAME, Outcome.ERROR, "scholar captcha")
+    if is_blocked(resp):
+        return Candidate.miss(NAME, Outcome.CAPTCHA, "scholar blocked/captcha")
     if resp.status_code >= 400:
         return Candidate.miss(NAME, Outcome.ERROR, f"HTTP {resp.status_code}")
 

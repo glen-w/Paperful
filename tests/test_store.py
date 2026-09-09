@@ -1,7 +1,7 @@
 import hashlib
 import os
 
-from scihub_dl.store import (
+from paperful.store import (
     STATUS_ATTACHED,
     STATUS_ERROR,
     STATUS_NOT_FOUND,
@@ -12,7 +12,7 @@ from scihub_dl.store import (
     save_pdf,
     unique_path,
 )
-from scihub_dl.zot import Item
+from paperful.zot import Item
 
 
 def test_safe_filename_basic():
@@ -98,7 +98,7 @@ def test_manifest_tolerates_corrupt_lines(tmp_path):
 def test_attachment_payload_is_stored_file_with_basename():
     from pathlib import Path
 
-    from scihub_dl.attach import attachment_payload
+    from paperful.attach import attachment_payload
 
     p = attachment_payload(Path("/x/y/Smith - 2020 - A paper.pdf"))
     assert p["itemType"] == "attachment" and p["linkMode"] == "imported_file"

@@ -1,4 +1,4 @@
-from scihub_dl.zot import UNCOLLECTED, build_collection_tree, is_pdf_attachment, item_from_json, parse_year
+from paperful.zot import UNCOLLECTED, build_collection_tree, is_pdf_attachment, item_from_json, parse_year
 
 
 def _col(key, name, parent=None):
@@ -65,7 +65,7 @@ def test_parse_year():
 
 
 def test_collection_raw_path_and_squash_matching():
-    from scihub_dl.zot import _squash
+    from paperful.zot import _squash
 
     cols = build_collection_tree([_col("A", "BBNJ"), _col("B", "EIA / SEA", "A")])
     assert cols["B"].path == "BBNJ/EIA _ SEA"

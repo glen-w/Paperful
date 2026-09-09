@@ -4,7 +4,7 @@ import json
 
 import httpx
 
-from scihub_dl.resolve import crossref_lookup, short_title
+from paperful.resolve import crossref_lookup, short_title
 from tests.conftest import mock_client
 
 

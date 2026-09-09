@@ -1,4 +1,4 @@
-"""Direct: the item's own URL, if it serves a PDF (reports, webpages, grey literature)."""
+"""Direct: the item's own URL, if it serves a PDF or links to one (reports, grey literature)."""
 
 from __future__ import annotations
 
@@ -6,9 +6,20 @@ import httpx
 
 from ..zot import Item
 from .base import Candidate, Context, Outcome
+from .landing import extract_pdf_urls
 
 NAME = "direct"
-_SKIP_HOSTS = ("doi.org", "scholar.google", "zotero.org", "twitter.com", "x.com", "youtube.com")
+_SKIP_HOSTS = (
+    "doi.org",
+    "scholar.google",
+    "zotero.org",
+    "twitter.com",
+    "x.com",
+    "youtube.com",
+    "youtu.be",
+    "vimeo.com",
+    "facebook.com",
+)
 
 
 def find(item: Item, ctx: Context) -> Candidate:
@@ -31,6 +42,17 @@ def find(item: Item, ctx: Context) -> Candidate:
                     break
                 if head.lstrip().startswith(b"%PDF"):
                     return Candidate(url=str(resp.url), source=NAME, note="octet-stream pdf")
+            if resp.status_code < 400 and "html" in ctype:
+                text = b"".join(resp.iter_bytes()).decode("utf-8", "replace")
+                pdfs = extract_pdf_urls(text, str(resp.url))
+                if pdfs:
+                    return Candidate(
+                        url=pdfs[0],
+                        source=NAME,
+                        note="html link",
+                        referer=str(resp.url),
+                        alternates=pdfs[1:5],
+                    )
     except httpx.HTTPError:
         return Candidate.miss(NAME, Outcome.ERROR, "url unreachable")
     return Candidate.miss(NAME, Outcome.NOT_FOUND, "url is not a PDF")

@@ -207,7 +207,7 @@ def _pass_robot_check(ctx: Context, base: str, page_url: str, html: str) -> bool
 
 
 def ping_mirrors(ctx: Context) -> list[tuple[str, str]]:
-    """(mirror, status) for each configured mirror; used by `scihub-dl mirrors`."""
+    """(mirror, status) for each configured mirror; used by `paperful mirrors`."""
     out = []
     for mirror in ctx.config.scihub_mirrors:
         try:

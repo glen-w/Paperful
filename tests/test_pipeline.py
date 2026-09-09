@@ -8,10 +8,10 @@ import httpx
 import pytest
 from rich.console import Console
 
-from scihub_dl import pipeline as pl
-from scihub_dl.attach import AttachResult
-from scihub_dl.sources.base import Candidate, Outcome
-from scihub_dl.store import (
+from paperful import pipeline as pl
+from paperful.attach import AttachResult
+from paperful.sources.base import Candidate, Outcome
+from paperful.store import (
     STATUS_ATTACH_FAILED,
     STATUS_ATTACHED,
     STATUS_CAPTCHA,
@@ -112,6 +112,58 @@ def test_miss_classification(pipe_factory):
     assert manifest2.get("NF").status == STATUS_NOT_FOUND
 
 
+def test_circuit_breaker_skips_source_after_repeated_blocks(pipe_factory):
+    blocked = StubSource("blocked", default=Outcome.CAPTCHA)
+    oa = StubSource("oa", default=Outcome.NOT_FOUND)
+    pipe, manifest = pipe_factory({"oa": oa, "blocked": blocked}, ["oa", "blocked"])
+    items = [make_item(key=f"I{i}") for i in range(5)]
+    pipe.run(items)
+
+    assert blocked.calls == ["I0", "I1", "I2"]
+    assert "blocked:skipped(circuit open)" in manifest.get("I3").attempts
+    assert "blocked:skipped(circuit open)" in manifest.get("I4").attempts
+
+
+def test_source_routing_skips_inapplicable_sources(pipe_factory, cfg):
+    oa = StubSource("unpaywall", default=Outcome.NOT_FOUND)
+    scholar = StubSource("scholar", default=Outcome.NOT_FOUND)
+    pipe, manifest = pipe_factory({"unpaywall": oa, "scholar": scholar}, ["unpaywall", "scholar"])
+    pipe.try_all = False
+    item = make_item(key="N", doi=None, url="https://www.npr.org/story", title="A long enough title for scholar routing")
+    pipe.run([item])
+
+    assert oa.calls == []
+    assert scholar.calls == ["N"]
+    assert "unpaywall:skipped(not applicable)" in manifest.get("N").attempts
+
+
+def test_make_client_loads_scholar_cookies(cfg, tmp_path):
+    cookie_file = tmp_path / "scholar-cookies.txt"
+    cookie_file.write_text(".google.com\tTRUE\t/\tTRUE\t0\tSID\ttest\n")
+    cfg.scholar_cookies = cookie_file
+    client = pl.make_client(cfg)
+    assert any(c.name == "SID" and c.value == "test" for c in client.cookies.jar)
+
+
+def test_circuit_breaker_trips_serial_scihub(pipe_factory):
+    sh = StubSource("scihub", default=Outcome.CAPTCHA)
+    pipe, manifest = pipe_factory({"scihub": sh}, ["scihub"])
+    items = [make_item(key=f"S{i}") for i in range(4)]
+    pipe.run(items)
+    assert len(sh.calls) == 3
+    skipped = [k for k in ("S0", "S1", "S2", "S3") if k not in sh.calls]
+    assert len(skipped) == 1
+    assert "scihub:skipped(circuit open)" in manifest.get(skipped[0]).attempts
+
+
+def test_try_all_runs_inapplicable_sources(pipe_factory):
+    oa = StubSource("unpaywall", default=Outcome.NOT_FOUND)
+    pipe, manifest = pipe_factory({"unpaywall": oa}, ["unpaywall"])
+    pipe.try_all = True
+    pipe.run([make_item(key="N", doi=None, url="https://www.npr.org/story")])
+    assert oa.calls == ["N"]
+
+
 def test_scihub_captcha_and_error_statuses(pipe_factory):
     sh = StubSource("scihub", {
         "C": Candidate.miss("scihub", Outcome.CAPTCHA, "m1=captcha unsolved"),
@@ -162,7 +214,7 @@ def test_batches_and_stop_flag(pipe_factory):
 
 
 def test_crossref_resolution_feeds_sources(pipe_factory, monkeypatch):
-    from scihub_dl.resolve import CrossrefMatch
+    from paperful.resolve import CrossrefMatch
 
     src = StubSource("oa")
     pipe, manifest = pipe_factory({"oa": src}, ["oa"])  # factory stubs crossref to None; override after

@@ -1,4 +1,4 @@
-from scihub_dl.resolve import extract_arxiv_id, extract_doi, normalize_doi, title_similarity
+from paperful.resolve import extract_arxiv_id, extract_doi, normalize_doi, title_similarity
 
 
 def test_normalize_doi_strips_prefixes_and_case():
@@ -44,7 +44,7 @@ def test_title_similarity_ignores_case_punctuation_and_accents():
 
 
 def test_short_title_splits_on_sentence_or_colon():
-    from scihub_dl.resolve import short_title
+    from paperful.resolve import short_title
 
     assert short_title("A rights revolution for nature. Introduction of legal rights for nature could protect") == (
         "A rights revolution for nature"

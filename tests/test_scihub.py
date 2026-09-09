@@ -3,8 +3,8 @@ import hashlib
 import json
 from pathlib import Path
 
-from scihub_dl.sources.base import Outcome
-from scihub_dl.sources.scihub import extract_altcha_urls, is_captcha_page, parse_page, solve_altcha
+from paperful.sources.base import Outcome
+from paperful.sources.scihub import extract_altcha_urls, is_captcha_page, parse_page, solve_altcha
 
 FIX = Path(__file__).parent / "fixtures"
 BASE = "https://sci-hub.ru/10.1016/j.marpol.2017.05.011"

@@ -7,9 +7,9 @@ from pathlib import Path
 
 import httpx
 
-from scihub_dl.sources import REGISTRY, arxiv, biorxiv, direct, europepmc, openalex, scihub, semanticscholar, unpaywall
-from scihub_dl.sources import base as base_mod
-from scihub_dl.sources.base import Outcome, http_json
+from paperful.sources import REGISTRY, arxiv, biorxiv, direct, europepmc, openalex, scihub, semanticscholar, unpaywall
+from paperful.sources import base as base_mod
+from paperful.sources.base import Outcome, http_json
 from tests.conftest import PDF_BYTES, make_item
 
 FIX = Path(__file__).parent / "fixtures"
@@ -19,18 +19,19 @@ def _json(payload, status=200):
     return httpx.Response(status, content=json.dumps(payload).encode(), headers={"content-type": "application/json"})
 
 
-def test_registry_has_every_planned_source_and_scihub_last_in_default_order():
-    from scihub_dl.config import DEFAULT_SOURCES
+def test_registry_has_every_planned_source_and_scihub_is_opt_in():
+    from paperful.config import DEFAULT_SOURCES
 
     assert set(REGISTRY) == {
         "unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar",
         "scholar", "direct", "ezproxy", "scihub",
     }
-    assert DEFAULT_SOURCES[-1] == "scihub"
-    assert "ezproxy" in DEFAULT_SOURCES and DEFAULT_SOURCES.index("ezproxy") < DEFAULT_SOURCES.index("scihub")
+    assert "scihub" not in DEFAULT_SOURCES
+    assert DEFAULT_SOURCES[-1] == "ezproxy"
     assert DEFAULT_SOURCES.index("biorxiv") < DEFAULT_SOURCES.index("semanticscholar")
     assert DEFAULT_SOURCES.index("europepmc") < DEFAULT_SOURCES.index("semanticscholar")
     assert all(s in REGISTRY for s in DEFAULT_SOURCES)
+    assert "scihub" in REGISTRY
 
 
 # ---- unpaywall ---------------------------------------------------------------
@@ -64,7 +65,39 @@ def test_unpaywall_skips_without_doi_or_email(ctx_factory, cfg):
 
 def test_unpaywall_404_and_no_pdf_are_not_found(ctx_factory):
     assert unpaywall.find(make_item(), ctx_factory(lambda r: httpx.Response(404))).outcome is Outcome.NOT_FOUND
-    assert unpaywall.find(make_item(), ctx_factory(lambda r: _json({"oa_locations": []}))).outcome is Outcome.NOT_FOUND
+    miss = unpaywall.find(make_item(), ctx_factory(lambda r: _json({"oa_locations": []})))
+    assert miss.outcome is Outcome.NOT_FOUND and miss.note == "no OA location"
+
+
+def test_unpaywall_follows_html_landing(ctx_factory):
+    def handler(req):
+        if req.url.host == "api.unpaywall.org":
+            return _json(
+                {
+                    "best_oa_location": {
+                        "url_for_pdf": None,
+                        "url": "https://repo.test/art",
+                        "url_for_landing_page": "https://repo.test/art",
+                    }
+                }
+            )
+        html = '<html><head><meta name="citation_pdf_url" content="https://repo.test/art.pdf"></head></html>'
+        return httpx.Response(200, text=html, headers={"content-type": "text/html"})
+
+    cand = unpaywall.find(make_item(), ctx_factory(handler))
+    assert cand.outcome is Outcome.FOUND
+    assert cand.url == "https://repo.test/art.pdf"
+    assert cand.note == "landing"
+
+
+def test_unpaywall_uses_url_that_looks_like_pdf(ctx_factory):
+    cand = unpaywall.find(
+        make_item(),
+        ctx_factory(
+            lambda r: _json({"oa_locations": [{"url_for_pdf": None, "url": "https://repo.test/copy.pdf"}]})
+        ),
+    )
+    assert cand.urls == ["https://repo.test/copy.pdf"]
 
 
 # ---- openalex ----------------------------------------------------------------
@@ -103,6 +136,39 @@ def test_semanticscholar_prefers_doi_then_arxiv(ctx_factory):
 
 def test_semanticscholar_no_pdf(ctx_factory):
     assert semanticscholar.find(make_item(), ctx_factory(lambda r: _json({"openAccessPdf": None}))).outcome is Outcome.NOT_FOUND
+
+
+def test_semanticscholar_resolves_handle_landing(ctx_factory):
+    title = make_item().title
+    pdf = "https://dspace.test/server/api/core/bitstreams/x/content"
+
+    def handler(req):
+        if "semanticscholar.org" in req.url.host:
+            return _json({"openAccessPdf": {"url": "https://dspace.test/handle/1874/1", "status": "GREEN"}})
+        if req.url.path.endswith("/pid/find"):
+            return _json(
+                {
+                    "name": title,
+                    "_links": {"bundles": {"href": "https://dspace.test/server/api/core/items/i1/bundles"}},
+                }
+            )
+        if req.url.path.endswith("/bundles"):
+            return _json(
+                {
+                    "_embedded": {
+                        "bundles": [
+                            {"name": "ORIGINAL", "_links": {"bitstreams": {"href": "https://dspace.test/b/bitstreams"}}}
+                        ]
+                    }
+                }
+            )
+        if req.url.path.endswith("/bitstreams"):
+            return _json({"_embedded": {"bitstreams": [{"name": "p.pdf", "_links": {"content": {"href": pdf}}}]}})
+        return httpx.Response(404)
+
+    cand = semanticscholar.find(make_item(), ctx_factory(handler))
+    assert cand.url == pdf
+    assert cand.referer == "https://dspace.test/handle/1874/1"
 
 
 # ---- arxiv -------------------------------------------------------------------
@@ -247,8 +313,19 @@ def test_direct_url_heuristics(ctx_factory):
     ctx = ctx_factory(lambda r: httpx.Response(200, content=b"<html>", headers={"content-type": "text/html"}))
     assert direct.find(make_item(url=None), ctx).outcome is Outcome.SKIPPED
     assert direct.find(make_item(url="https://doi.org/10.1/x"), ctx).outcome is Outcome.SKIPPED
+    assert direct.find(make_item(url="https://www.youtube.com/watch?v=x"), ctx).outcome is Outcome.SKIPPED
+    assert direct.find(make_item(url="https://youtu.be/x"), ctx).outcome is Outcome.SKIPPED
     assert direct.find(make_item(url="https://x.test/report.PDF?dl=1"), ctx).url == "https://x.test/report.PDF?dl=1"
     assert direct.find(make_item(url="https://x.test/page"), ctx).outcome is Outcome.NOT_FOUND
+
+
+def test_direct_follows_html_pdf_link(ctx_factory):
+    html = '<html><head><meta name="citation_pdf_url" content="https://x.test/full.pdf"></head></html>'
+    ctx = ctx_factory(lambda r: httpx.Response(200, text=html, headers={"content-type": "text/html"}))
+    cand = direct.find(make_item(url="https://x.test/page"), ctx)
+    assert cand.outcome is Outcome.FOUND
+    assert cand.url == "https://x.test/full.pdf"
+    assert cand.note == "html link"
 
 
 def test_direct_accepts_pdf_content_type_and_octet_stream_magic(ctx_factory):
