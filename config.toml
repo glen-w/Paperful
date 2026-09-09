@@ -11,7 +11,7 @@ state_dir = "~/Documents/Paperful/state"
 
 # Source order. Open-access first, campus EZProxy, Sci-Hub last.
 # Remove "scihub" / "scholar" / "ezproxy" to disable. Scholar is optional (CAPTCHA-prone).
-sources = ["unpaywall", "openalex", "arxiv", "semanticscholar", "scholar", "direct", "ezproxy", "scihub"]
+sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "scholar", "direct", "ezproxy", "scihub"]
 
 # Campus EZProxy (any institution that offers login?url=). Leave empty to disable.
 # Find the URL on your library site (“EZProxy” / off-campus access), then:

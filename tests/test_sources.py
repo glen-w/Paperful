@@ -7,7 +7,7 @@ from pathlib import Path
 
 import httpx
 
-from scihub_dl.sources import REGISTRY, arxiv, direct, openalex, scihub, semanticscholar, unpaywall
+from scihub_dl.sources import REGISTRY, arxiv, biorxiv, direct, europepmc, openalex, scihub, semanticscholar, unpaywall
 from scihub_dl.sources import base as base_mod
 from scihub_dl.sources.base import Outcome, http_json
 from tests.conftest import PDF_BYTES, make_item
@@ -23,10 +23,13 @@ def test_registry_has_every_planned_source_and_scihub_last_in_default_order():
     from scihub_dl.config import DEFAULT_SOURCES
 
     assert set(REGISTRY) == {
-        "unpaywall", "openalex", "arxiv", "semanticscholar", "scholar", "direct", "ezproxy", "scihub"
+        "unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar",
+        "scholar", "direct", "ezproxy", "scihub",
     }
     assert DEFAULT_SOURCES[-1] == "scihub"
     assert "ezproxy" in DEFAULT_SOURCES and DEFAULT_SOURCES.index("ezproxy") < DEFAULT_SOURCES.index("scihub")
+    assert DEFAULT_SOURCES.index("biorxiv") < DEFAULT_SOURCES.index("semanticscholar")
+    assert DEFAULT_SOURCES.index("europepmc") < DEFAULT_SOURCES.index("semanticscholar")
     assert all(s in REGISTRY for s in DEFAULT_SOURCES)
 
 
@@ -122,6 +125,119 @@ def test_arxiv_title_search_requires_close_match(ctx_factory):
     assert cand.url == "https://arxiv.org/pdf/2101.00001"
     ctx2 = ctx_factory(lambda r: httpx.Response(200, content=feed.encode()))
     assert arxiv.find(make_item(doi=None, title="Something else entirely, unrelated words here"), ctx2).outcome is Outcome.NOT_FOUND
+
+
+# ---- biorxiv / medrxiv -------------------------------------------------------
+
+
+def test_biorxiv_builds_pdf_from_latest_version(ctx_factory):
+    seen = []
+
+    def handler(req):
+        seen.append(req.url.path)
+        if "details/biorxiv/" in req.url.path:
+            return _json(
+                {
+                    "collection": [
+                        {"doi": "10.1101/2020.01.10.901900", "version": "1"},
+                        {"doi": "10.1101/2020.01.10.901900", "version": "2"},
+                    ]
+                }
+            )
+        return _json({"collection": []})
+
+    cand = biorxiv.find(make_item(doi="10.1101/2020.01.10.901900"), ctx_factory(handler))
+    assert cand.outcome is Outcome.FOUND
+    assert cand.url == "https://www.biorxiv.org/content/10.1101/2020.01.10.901900v2.full.pdf"
+    assert cand.alternates == ["https://www.biorxiv.org/content/10.1101/2020.01.10.901900.full.pdf"]
+    assert cand.note == "biorxiv v2"
+    assert seen == ["/details/biorxiv/10.1101/2020.01.10.901900"]
+
+
+def test_biorxiv_falls_back_to_medrxiv_and_url_doi(ctx_factory):
+    def handler(req):
+        if "details/biorxiv/" in req.url.path:
+            return _json({"collection": []})
+        return _json({"collection": [{"doi": "10.1101/2020.03.09.20033217", "version": "1"}]})
+
+    cand = biorxiv.find(make_item(doi="10.1101/2020.03.09.20033217"), ctx_factory(handler))
+    assert cand.url.startswith("https://www.medrxiv.org/content/") and cand.note == "medrxiv v1"
+
+    cand2 = biorxiv.find(
+        make_item(doi=None, url="https://www.biorxiv.org/content/10.1101/2020.01.10.901900v1"),
+        ctx_factory(lambda r: _json({"collection": [{"doi": "10.1101/2020.01.10.901900", "version": "1"}]})),
+    )
+    assert cand2.outcome is Outcome.FOUND
+
+
+def test_biorxiv_skips_non_cshl_dois(ctx_factory):
+    ctx = ctx_factory(lambda r: httpx.Response(500))
+    assert biorxiv.find(make_item(), ctx).outcome is Outcome.SKIPPED
+    assert biorxiv.find(make_item(doi=None, url=None), ctx).outcome is Outcome.SKIPPED
+
+
+# ---- europepmc ---------------------------------------------------------------
+
+
+def test_europepmc_prefers_europe_pmc_oa_pdf(ctx_factory):
+    def handler(req):
+        assert req.url.params["query"] == "DOI:10.1000/test.doi"
+        assert req.url.params["resultType"] == "core"
+        return _json(
+            {
+                "resultList": {
+                    "result": [
+                        {
+                            "pmcid": "PMC1817752",
+                            "fullTextUrlList": {
+                                "fullTextUrl": [
+                                    {
+                                        "availabilityCode": "OA",
+                                        "documentStyle": "pdf",
+                                        "site": "Unpaywall",
+                                        "url": "https://pub.test/copy.pdf",
+                                    },
+                                    {
+                                        "availabilityCode": "OA",
+                                        "documentStyle": "html",
+                                        "site": "Europe_PMC",
+                                        "url": "https://europepmc.org/articles/PMC1817752",
+                                    },
+                                    {
+                                        "availabilityCode": "OA",
+                                        "documentStyle": "pdf",
+                                        "site": "Europe_PMC",
+                                        "url": "https://europepmc.org/articles/PMC1817752?pdf=render",
+                                    },
+                                    {
+                                        "availabilityCode": "S",
+                                        "documentStyle": "pdf",
+                                        "site": "Publisher",
+                                        "url": "https://paywall.test/x.pdf",
+                                    },
+                                ]
+                            },
+                        }
+                    ]
+                }
+            }
+        )
+
+    cand = europepmc.find(make_item(), ctx_factory(handler))
+    assert cand.urls == [
+        "https://europepmc.org/articles/PMC1817752?pdf=render",
+        "https://pub.test/copy.pdf",
+    ]
+    assert cand.note == "PMC1817752"
+
+
+def test_europepmc_skips_without_doi_and_misses_empty(ctx_factory):
+    assert europepmc.find(make_item(doi=None), ctx_factory(lambda r: _json({}))).outcome is Outcome.SKIPPED
+    assert europepmc.find(make_item(), ctx_factory(lambda r: _json({"resultList": {"result": []}}))).outcome is Outcome.NOT_FOUND
+    assert europepmc.find(
+        make_item(),
+        ctx_factory(lambda r: _json({"resultList": {"result": [{"fullTextUrlList": {"fullTextUrl": []}}]}})),
+    ).outcome is Outcome.NOT_FOUND
 
 
 # ---- direct ------------------------------------------------------------------

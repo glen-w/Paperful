@@ -17,6 +17,8 @@ DEFAULT_SOURCES = [
     "unpaywall",
     "openalex",
     "arxiv",
+    "biorxiv",
+    "europepmc",
     "semanticscholar",
     "scholar",
     "direct",

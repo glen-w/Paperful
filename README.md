@@ -3,10 +3,10 @@
 Fetch missing PDFs for Zotero items, save them to disk in a folder tree that mirrors your
 collections, and attach them back into Zotero.
 
-Sources are tried in order: **open access** first (Unpaywall, OpenAlex, arXiv, Semantic Scholar,
-optional Google Scholar, the item's own URL), then your campus **EZProxy** (if configured), then
-**Sci-Hub** mirrors. Sci-Hub coverage after ~2021 is thin; recent paywalled papers are best fetched
-via EZProxy when your library has a subscription.
+Sources are tried in order: **open access** first (Unpaywall, OpenAlex, arXiv, bioRxiv/medRxiv,
+Europe PMC, Semantic Scholar, optional Google Scholar, the item's own URL), then your campus
+**EZProxy** (if configured), then **Sci-Hub** mirrors. Sci-Hub coverage after ~2021 is thin; recent
+paywalled papers are best fetched via EZProxy when your library has a subscription.
 
 ## Requirements
 
@@ -76,7 +76,7 @@ then `~/.config/scihub_dl/config.toml`. Relative paths resolve against the confi
 | --- | --- | --- |
 | `email` | `""` | Sent as `mailto` to Unpaywall/OpenAlex/Crossref (required by Unpaywall) |
 | `out_dir` / `state_dir` | `out` / `state` | PDF tree and manifest/key location |
-| `sources` | OA → `scholar` → `direct` → `ezproxy` → `scihub` | Source order; `--sources` overrides per run |
+| `sources` | OA → `biorxiv` → `europepmc` → `scholar` → `direct` → `ezproxy` → `scihub` | Source order; `--sources` overrides per run |
 | `ezproxy_base` | `""` (disabled) | Campus proxy prefix ending in `url=` — see [Campus EZProxy](#campus-ezproxy) |
 | `ezproxy_cookies` | `state/ezproxy-cookies.txt` | Netscape cookies file after browser login |
 | `scihub_mirrors` | built-in list | Hostnames tried in order |
@@ -150,8 +150,8 @@ ezproxy_base = "https://YOUR-PREFIX.idm.oclc.org/login?url="
 # ezproxy_cookies = "state/ezproxy-cookies.txt"
 
 sources = [
-  "unpaywall", "openalex", "arxiv", "semanticscholar", "scholar",
-  "direct", "ezproxy", "scihub",
+  "unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar",
+  "scholar", "direct", "ezproxy", "scihub",
 ]
 ```
 
@@ -276,6 +276,8 @@ Fix: repeat steps 3–5 (login → export → verify), then `--retry-failed` if 
 - **Google Scholar**: already in the default source list; often blocked by CAPTCHA for automated
   clients — remove `scholar` from `sources` if noisy.
 - **arXiv**: already in the default list (by arXiv id, `10.48550/arxiv.…` DOI, or strict title match).
+- **bioRxiv / medRxiv**: `10.1101/…` DOIs via the Cold Spring Harbor details API; PDF URL built from the latest version.
+- **Europe PMC**: OA PDF links (including `?pdf=render`) for PubMed Central deposits, by DOI.
 
 ---
 
