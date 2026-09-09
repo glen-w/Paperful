@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from .config import Config
 from .resolve import normalize_doi
-from .sources.base import Outcome
 from .zot import Item
+
+if TYPE_CHECKING:
+    from .sources.base import Outcome
 
 _ARXIV_TYPES = frozenset({"preprint", "journalArticle", "conferencePaper", "report", "manuscript"})
 _DIRECT_SKIP_HOSTS = (
@@ -31,9 +34,11 @@ _BLOCK_NOTE_HINTS = ("blocked", "captcha", "429", "rate limit", "sorry")
 
 
 def is_block_failure(outcome: Outcome, note: str = "") -> bool:
-    if outcome is Outcome.CAPTCHA:
+    # Compare by value so this module never imports sources at runtime
+    # (sources.ezproxy imports ezproxy_target from here).
+    if outcome == "captcha":
         return True
-    if outcome is Outcome.ERROR:
+    if outcome == "error":
         low = note.lower()
         return any(h in low for h in _BLOCK_NOTE_HINTS)
     return False
