@@ -11,7 +11,27 @@ local Chromium profile; they do not rewrite the fetcher.
 Ambition beyond core is framed as a **local research library workbench** —
 one catalogue, one disk ledger, one write-back bus — grown as optional modules
 that speak the same adapter + `state/` protocol. Do not expand that surface
-until the fetch / lint / attach loop is boringly reliable.
+until the fetch / lint / attach loop is boringly reliable. **1.0 is that loop
+plus the trust checklist below** — not a GUI or a second product.
+
+(trust-10)=
+## 0.1 → 1.0 (trust)
+
+`0.1` is a first usable gap-filler. Do not call it **1.0** until these land.
+Do **not** grow this list into a second product (no GUI, no auto Sci-Hub, no
+“AI fetch everything”).
+
+| Step | UX outcome | Status |
+| --- | --- | --- |
+| End-of-run **one-line** banner: `downloaded N · attached M · deferred K · not_found J` plus write-API yes/no | Trust after a run | Summary **table** ships; banner not locked |
+| Attachment **provenance stamp** (`oa:unpaywall` / `campus:ezproxy` / `grey:undocs` on notes or title prefix) | Trust inside Zotero | Not shipped |
+| `--dry-run` **Would-hit** column (sources in order) | Trust before network | Shipped |
+| Exit **2** + next-steps when Zotero is down (`collections` / `run` / `attach`) | Fresh clone never dead-ends | Shipped |
+| Slim README + [CHANGELOG](../CHANGELOG.md) known limits | Trust before install | Shipped |
+| Lock `paperful.run_report.v1` | Trust for agents | Named schema; not frozen |
+
+Nice-to-have (not 1.0 blockers): colour glossary next to `doctor` (documented);
+collection picker hint on fuzzy `--collection` miss.
 
 ## Core (keep sharpening)
 
@@ -91,9 +111,10 @@ on the map; not prerequisites for 1.x usefulness.
 
 1. **Catalogue unification** — multi-manager adapters as equals; conflict journal;
    query-scoped virtual collections as run scopes
-2. **Acquire beyond journal PDFs** — **first slice shipped:** local session vault
-   (`paperful session login`) replacing cookies.txt choreography; grey-lit PDF
-   playbooks in `direct`/`landing` (undocs symbols, ISA/UN link hints). Still
+2. **Acquire beyond journal PDFs** — **shipped:** local session vault
+   (`paperful session login`); **pluggable grey-lit PDF playbooks** in
+   `direct`/`landing` with builtin packs (UNGA/undocs · BBNJ/DOALOS · ISA;
+   plus FAO/OECD/IEA/WHO — extend via `[[grey_playbooks]]`). Still
    parked: SI/dataset/code siblings; watch/alert → propose items.
 3. **Identity / resolver graph** — work ↔ version ↔ preprint; scored patches with
    undo; citation ingest; manifestation-aware dedupe
@@ -112,8 +133,8 @@ Larger product bets. Park until the ledger and core loop justify them.
    typed source/policy permissions; playbooks
 8. **Collaboration without SaaS** — shared `state/` over syncthing/git; attach
    locks; optional headless fetch node
-9. **Compliance & provenance** — per-PDF chain of custody; jurisdictional
-   presets beyond `eoi`; reproducible run records
+9. **Compliance & provenance** — 1.0 attach stamp is listed above; later:
+   per-PDF chain of custody, more jurisdictional presets, reproducible run records
 
 ## Explicitly out of near-term scope
 
@@ -125,4 +146,5 @@ Larger product bets. Park until the ledger and core loop justify them.
 ## Related docs
 
 - [architecture.md](architecture.md) — disk-first adapters and data flow
+- [releases.md](releases.md) — 0.x vs 1.0; known limits
 - [comparison.md](comparison.md) — what paperful does and does not replace today

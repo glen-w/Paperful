@@ -333,6 +333,8 @@ def test_doctor_ok(cfg_file, stub_zotero):
     assert res.exit_code == 0
     assert "green" in res.stdout and "Zotero :23119" in res.stdout
     assert "pdftotext" in res.stdout
+    assert "Grey playbooks" in res.stdout
+    assert "UNGA/undocs" in res.stdout
 
 
 def test_doctor_scholar_session_amber_without_vault(cfg_file, stub_zotero):

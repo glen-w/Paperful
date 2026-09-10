@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>paperful — fill the gaps in your Zotero library</title>
+    <meta
+      name="description"
+      content="paperful fetches the PDFs your Zotero items are missing, keeps them in a collection-shaped folder tree, and attaches them back. Local CLI. Open access first."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="chrome/site_chrome.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site-header pf-site-chrome">
+      <div class="wrap header-inner">
+        <a class="brand" href="./">paperful</a>
+        <button
+          class="nav-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="site-nav"
+          data-nav-toggle
+        >
+          Menu
+        </button>
+        <nav id="site-nav" class="site-nav" data-nav>
+          <a href="#product">See how it works</a>
+          <a href="./guide/comparison.html">Compare</a>
+          <a href="./guide/">Docs</a>
+          <a href="#install">Install</a>
+          <a href="https://github.com/glen-w/Paperful">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="hero-atmosphere" aria-hidden="true"></div>
+        <div class="wrap hero-copy">
+          <img
+            class="hero-logo"
+            src="images/logo.png"
+            alt=""
+            width="140"
+            height="140"
+          />
+          <p class="brand-mark">paperful</p>
+          <h1>Fill the gaps in your Zotero library.</h1>
+          <p class="lede">
+            Fetch the PDFs your items are missing. Keep them in a folder tree
+            that mirrors your collections. Attach them back. Work stays on
+            disk. Zotero is a library adapter, not the whole product.
+          </p>
+          <div class="cta-row">
+            <a class="btn primary" href="#product">See how it works</a>
+            <a class="btn ghost" href="#install">Install</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="product">
+        <div class="wrap">
+          <h2>The briefing for missing PDFs</h2>
+          <p class="section-lead">
+            Open access first. Campus EZProxy when you have a subscription.
+            Sci-Hub is opt-in and off by default.
+          </p>
+          <div class="feature-grid">
+            <div class="feature">
+              <h3>On disk first</h3>
+              <p>
+                Downloads land under <code>out/</code>. Resume lives in
+                <code>state/</code>. Zotero is read in, then written back —
+                attach and metadata apply are separate steps.
+              </p>
+            </div>
+            <div class="feature">
+              <h3>Routed sources</h3>
+              <p>
+                Each item only hits sources that match its metadata unless you
+                pass <code>--try-all</code>. A circuit breaker skips blocked
+                sources for the rest of the run.
+              </p>
+            </div>
+            <div class="feature">
+              <h3>Campus when you have it</h3>
+              <p>
+                Log in once with headed Chromium. EZProxy uses your library
+                entitlement. Passwords never live in TOML.
+              </p>
+            </div>
+            <div class="feature">
+              <h3>Grey literature</h3>
+              <p>
+                Playbooks rewrite UN, FAO, ISA, and similar landings to PDFs.
+                Optional HTML→PDF covers blogs and news pages.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section muted" id="what">
+        <div class="wrap narrow">
+          <h2>What can I do with it?</h2>
+          <ul class="outcomes">
+            <li>Fill a collection (or the whole library) with missing PDFs</li>
+            <li>Keep a folder tree that matches Zotero collections</li>
+            <li>Lint DOIs and propose metadata patches on disk</li>
+            <li>Use campus EZProxy without storing your password</li>
+            <li>Opt in to Sci-Hub only when you choose to</li>
+          </ul>
+          <p>
+            Walkthrough:
+            <a href="./guide/commands.html">commands</a>.
+            Not sure if this is the right tool?
+            <a href="./guide/comparison.html">comparison</a>
+            ·
+            <a href="./guide/architecture.html">architecture</a>.
+          </p>
+        </div>
+      </section>
+
+      <section class="section" id="privacy">
+        <div class="wrap narrow">
+          <h2>On your machine</h2>
+          <p>
+            paperful is a local CLI. Catalogue reads and PDF writes go through
+            Zotero’s local API. Session cookies stay under
+            <code>state/sessions/</code>. Sci-Hub stays off until you add it
+            to <code>sources</code> or pass <code>--scihub</code>.
+          </p>
+        </div>
+      </section>
+
+      <section class="section muted" id="how">
+        <div class="wrap narrow">
+          <h2>From a checkout to a filled collection</h2>
+          <ol class="steps">
+            <li>
+              Copy <code>config.example.toml</code>, set <code>email</code> and
+              <code>out_dir</code>, then run <code>paperful doctor</code>.
+            </li>
+            <li>
+              List collections with “No PDF” counts:
+              <code>paperful collections</code>.
+            </li>
+            <li>
+              Dry-run a collection, then fetch and attach.
+            </li>
+            <li>
+              Optionally log in to EZProxy or Scholar before a big run.
+            </li>
+          </ol>
+          <p>
+            <a href="./guide/commands.html">Commands</a>
+            ·
+            <a href="./guide/config.html">Config</a>
+            ·
+            <a href="./guide/ezproxy.html">EZProxy</a>
+            ·
+            <a href="./guide/sessions.html">Sessions</a>
+          </p>
+        </div>
+      </section>
+
+      <section class="section" id="install">
+        <div class="wrap narrow">
+          <h2>Install</h2>
+          <p>
+            Python 3.10+ and
+            <a href="https://docs.astral.sh/uv/">uv</a>. Zotero running with
+            the local API enabled.
+          </p>
+          <pre class="code"><code>git clone https://github.com/glen-w/Paperful.git
+cd Paperful
+uv sync
+cp config.example.toml config.toml
+uv run paperful doctor
+uv run paperful run --collection interesting --dry-run</code></pre>
+          <p class="fine">
+            Details:
+            <a href="./guide/">Documentation</a>
+            ·
+            <a href="./guide/releases.html">0.x / 1.0</a>
+            ·
+            <a href="https://github.com/glen-w/Paperful/blob/main/README.md"
+              >README</a
+            >
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap footer-inner">
+        <p>© paperful contributors. Local-first software. Version 0.1.0 (0.x — flags may still move).</p>
+        <p>
+          <a href="https://github.com/glen-w/Paperful">GitHub</a>
+          ·
+          <a
+            href="https://ko-fi.com/C0C1XK8G"
+            target="_blank"
+            rel="noopener noreferrer"
+            ><img
+              height="36"
+              style="border: 0; height: 36px"
+              src="https://storage.ko-fi.com/cdn/kofi6.png?v=6"
+              alt="Buy Me a Coffee at ko-fi.com"
+          /></a>
+        </p>
+      </div>
+    </footer>
+    <script src="chrome/site_nav.js" defer></script>
+  </body>
+</html>

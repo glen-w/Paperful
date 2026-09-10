@@ -107,7 +107,9 @@ def _zotero(*, quiet: bool = False) -> ZoteroLocal:
     except ConnectionError as exc:
         _exit_env(str(exc))
     except Exception as exc:  # Zotero not running
-        _exit_env(f"Cannot reach Zotero local API at localhost:23119: {exc}")
+        from .zot import zotero_local_label
+
+        _exit_env(f"Cannot reach Zotero local API at {zotero_local_label()}: {exc}")
     if not quiet:
         console.print(
             f"[dim]Zotero {info.get('zotero_version') or '?'}, local API v{info['api_version']}, write support: "

@@ -1,0 +1,127 @@
+/* Shared top chrome for marketing landing + Sphinx /guide/ pages. */
+.pf-site-chrome {
+  --pf-ink: #101820;
+  --pf-ink-soft: #3d4a55;
+  --pf-paper: #f7f1e8;
+  --pf-accent: #c46a2a;
+  --pf-line: rgba(16, 24, 32, 0.12);
+  --pf-font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --pf-font-body: "Source Sans 3", "Segoe UI", sans-serif;
+  --pf-header-height: 3.5rem;
+
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  backdrop-filter: blur(10px);
+  background: rgba(247, 241, 232, 0.92);
+  border-bottom: 1px solid var(--pf-line);
+  font-family: var(--pf-font-body);
+  color: var(--pf-ink);
+}
+
+.pf-site-chrome .wrap {
+  width: min(1080px, calc(100% - 2.5rem));
+  margin-inline: auto;
+}
+
+.pf-site-chrome .header-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: var(--pf-header-height);
+}
+
+.pf-site-chrome .brand {
+  font-family: var(--pf-font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  text-decoration: none;
+  color: var(--pf-ink);
+  letter-spacing: -0.02em;
+}
+
+.pf-site-chrome .nav-toggle {
+  display: none;
+  border: 1px solid var(--pf-line);
+  background: transparent;
+  color: var(--pf-ink);
+  padding: 0.4rem 0.7rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pf-site-chrome .site-nav {
+  display: flex;
+  gap: 1.25rem;
+}
+
+.pf-site-chrome .site-nav a {
+  text-decoration: none;
+  color: var(--pf-ink-soft);
+  font-weight: 600;
+}
+
+.pf-site-chrome .site-nav a:hover,
+.pf-site-chrome .site-nav a:focus-visible {
+  color: var(--pf-accent);
+}
+
+/* Furo: keep page layout usable under the persistent chrome */
+.pf-site-chrome + .page {
+  min-height: calc(100% - var(--pf-header-height));
+}
+
+@media (max-width: 720px) {
+  .pf-site-chrome .nav-toggle {
+    display: inline-flex;
+  }
+
+  .pf-site-chrome .site-nav {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(var(--pf-header-height) - 0.1rem);
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+    background: var(--pf-paper);
+    border: 1px solid var(--pf-line);
+    border-radius: 0.4rem;
+  }
+
+  .pf-site-chrome .site-nav.open {
+    display: flex;
+  }
+}
+
+/* Dark docs theme: keep chrome readable without flipping brand colors */
+body[data-theme="dark"] .pf-site-chrome {
+  background: rgba(24, 28, 32, 0.92);
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+  color: #e8eaed;
+}
+
+body[data-theme="dark"] .pf-site-chrome .brand {
+  color: #e8eaed;
+}
+
+body[data-theme="dark"] .pf-site-chrome .nav-toggle {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #e8eaed;
+}
+
+body[data-theme="dark"] .pf-site-chrome .site-nav a {
+  color: #c4c9cf;
+}
+
+body[data-theme="dark"] .pf-site-chrome .site-nav a:hover,
+body[data-theme="dark"] .pf-site-chrome .site-nav a:focus-visible {
+  color: #e8a06a;
+}
+
+body[data-theme="dark"] .pf-site-chrome .site-nav {
+  background: #1c2126;
+  border-color: rgba(255, 255, 255, 0.12);
+}

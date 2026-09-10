@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -197,11 +198,26 @@ def _from_dict(raw: dict[str, Any], source: Path) -> Config:
     if "grey_playbooks_builtin" in raw:
         cfg.grey_playbooks_builtin = bool(raw["grey_playbooks_builtin"])
     user_playbooks: list[GreyPlaybook] = []
-    for row in raw.get("grey_playbooks") or []:
-        if isinstance(row, dict):
-            pb = playbook_from_dict(row)
-            if pb:
-                user_playbooks.append(pb)
+    for i, row in enumerate(raw.get("grey_playbooks") or []):
+        if not isinstance(row, dict):
+            warnings.warn(
+                f"config grey_playbooks[{i}] ignored: expected a table, got {type(row).__name__}",
+                UserWarning,
+                stacklevel=2,
+            )
+            continue
+        pb = playbook_from_dict(row)
+        if pb:
+            user_playbooks.append(pb)
+        else:
+            name = row.get("name", "?")
+            kind = row.get("kind", "?")
+            warnings.warn(
+                f"config grey_playbooks entry {name!r} (kind={kind!r}) ignored: "
+                "need name and kind in {{rewrite, scrape, synthesize}}",
+                UserWarning,
+                stacklevel=2,
+            )
     # __post_init__ may have loaded builtin already; replace with merge of pack + user.
     cfg.grey_playbooks = merge_playbooks(cfg.grey_playbooks_builtin, user_playbooks)
     if not cfg.out_dir.is_absolute():

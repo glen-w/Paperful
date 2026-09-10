@@ -488,6 +488,16 @@ def test_direct_url_heuristics(ctx_factory):
     )
     assert from_extra.outcome is Outcome.FOUND
     assert from_extra.url == "https://undocs.org/pdf?symbol=A/79/123"
+    yt_extra = direct.find(
+        make_item(
+            url="https://www.youtube.com/watch?v=x",
+            extra="A/CONF.232/2023/4",
+            doi=None,
+        ),
+        ctx,
+    )
+    assert yt_extra.outcome is Outcome.FOUND
+    assert yt_extra.url == "https://undocs.org/pdf?symbol=A/CONF.232/2023/4"
 
 
 def test_direct_follows_html_pdf_link(ctx_factory):

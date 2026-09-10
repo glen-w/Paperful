@@ -114,4 +114,5 @@ More branches: [comparison reference](comparison-reference.md#choosing-in-one-gl
 - [architecture.md](architecture.md) — disk-first adapters, circuit breaker, Sci-Hub
 - [ROADMAP.md](ROADMAP.md) — core vs maybe-later; optional LLM title assist
 - [comparison-reference.md](comparison-reference.md) — vendor notes and extra tables
-- [README](../README.md) — commands, configuration, session vault, EZProxy
+- [commands.md](commands.md) — CLI and disk artifacts
+- [config.md](config.md) — `config.toml` and operations

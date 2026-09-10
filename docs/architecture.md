@@ -83,21 +83,85 @@ When Zotero cloud storage is full, attachments may fail with quota errors; PDFs 
 
 ## Operator tooling
 
-- `paperful doctor` — preflight (Zotero, writable dirs, email, sessions, pdftotext).
+- `paperful doctor` — preflight. Colours: **green** = ready; **amber** = usable with
+  a degraded path (empty email, missing session, no `pdftotext`, Zotero 7–9
+  write API, incomplete grey-lit pack); **red** on `Zotero :23119` / `out_dir` /
+  `state_dir` is fatal (`doctor` and any command that needs Zotero). Reports
+  grey-lit packs (UNGA/undocs · BBNJ/DOALOS · ISA) when builtin is on. See
+  [commands](commands.md#doctor).
+- `paperful run --dry-run` — no downloads. Per item: **Would-hit** is the
+  routed source list in order (full `sources` when `--try-all`).
 - `paperful lint` / `paperful fix-metadata` — identifier hygiene; apply is explicit.
 - `paperful report` / `paperful report --last-run` — manifest totals plus the latest
   auditable run report (`state/last-run.json`, history under `state/runs/`).
-  Each `run` ends with a summary: PDFs downloaded, in-memory field corrections,
-  sources checked, and typed errors.
+  Each `run` prints a **Run summary** table (downloads, attached, deferred,
+  errors). A one-line banner is a [1.0](ROADMAP.md#trust-10) tightening.
+
+When Zotero is unreachable, `collections`, `run`, and `attach` exit **2** and
+print next steps (start Zotero, enable local API, `paperful doctor`).
+
+(run-report-v1)=
+## Report JSON (`paperful.run_report.v1`)
+
+`paperful report --json` is `{ counts, by_source, no_identifier, no_doi,
+attach_failed_by_code, last_run? }`. `last_run` (when present) is the same object
+as `state/last-run.json`. **0.x may add keys**; 1.0 freezes this schema name.
+
+| Field | Meaning |
+| --- | --- |
+| `schema` | Always `paperful.run_report.v1` on run reports |
+| `command` | `run` (or `fix-metadata` on apply reports under `state/runs/`) |
+| `started_at` / `finished_at` | ISO-8601 UTC |
+| `duration_s` | Wall time, or `null` if start unknown |
+| `scope` | Collection path(s) or library |
+| `sources_configured` | Source names for that run |
+| `flags` | CLI flags (`dry_run`, `scihub`, `preset`, …) |
+| `paths.out_dir` / `manifest` / `state_dir` | Absolute paths |
+| `summary.pdfs_downloaded` | Successful downloads (`ok` bumps) |
+| `summary.attached` / `attach_failed` | Write-back counts |
+| `summary.not_found` / `no_identifier` / `captcha` / `error` | Item outcomes |
+| `summary.skipped_manifest` / `linked_url_skipped` | Not attempted this run |
+| `summary.fields_corrected` / `fields_corrected_by_kind` | In-memory DOI enrichments (not library writes) |
+| `summary.identifiers_verified` | `verify:ok` count |
+| `summary.by_source` | Hits per source name |
+| `summary.sources_checked` | Per-source outcome tallies |
+| `summary.errors_by_type` / `attach_failed_by_code` | Typed errors |
+| `items[]` | Per-item: `itemKey`, `title`, `status`, `source`, `reason`, `doi`, `doi_verified`, `attempts`, `fields_corrected`, `path`, `error_type` |
+
+Manifest `counts` keys match ledger statuses (`ok`, `attached`, `not_found`, …).
 
 ## Grey literature
 
-`direct` rewrites known landings to PDFs (PMC, arXiv, HAL, FAO, **undocs / daccess / documents.un.org**). A UN document symbol in Extra or title (`A/CONF.232/2023/4`, `A/AC.292/…`) is enough to synthesize an undocs PDF URL when the item has no URL. ISA and `un.org` landings pick up `.pdf` / download links. DOI-less `report` items can fall through to `htmlpdf`. Campus EZProxy is never used for these public hosts.
+`direct` runs a **playbook engine** ([`paperful/playbooks.py`](../paperful/playbooks.py)):
+declarative `rewrite` / `scrape` / `synthesize` rules from config. A builtin
+**ocean/governance example pack** (`paperful/data/grey_playbooks_ocean.toml`)
+ships named grey-lit packs plus FAO/OECD/IEA/WHO examples — not core product
+logic; set `grey_playbooks_builtin = false` or override by `name`.
+Skip-host item URLs (YouTube, Scholar, …) still allow Extra/title synthesize.
+Domain-agnostic OA rewrites (PMC, arXiv, HAL) and DSpace/OAI stay in code.
+DOI-less `report` / `document` items can fall through to `htmlpdf`. Campus
+EZProxy is never used for these public hosts. Unpaywall/OpenAlex already skip
+DOI-less items (no quota burn on institutional reports).
 
-Items with no DOI, arXiv id, PMID, URL, or UN symbol still stop at `no_identifier`.
+### Named packs (BBNJ product)
+
+| Pack id | Hosts / patterns | Rules |
+| --- | --- | --- |
+| `undocs-unga-vme` | `undocs.org`, `documents.un.org`, `daccess-ods.un.org` | `rewrite` via `parser = "undocs"` → `https://undocs.org/pdf?symbol=…` |
+| `undocs-unga-vme-symbol` | Extra/title symbols `A/RES/…`, `A/N/N`, `A/CONF.…`, `A/AC.…`, `ISBA/…`, `S/…` | `synthesize` → same undocs PDF URL |
+| `bbnj-doalos-prepcom` | `un.org` (`/bbnjagreement/`, `/depts/los/`), `highseasalliance.org`, `iisd.org` (ENB) | `scrape` first same-origin `.pdf` / `sites/default/files` / Download; direct `.pdf` URLs need no rewrite |
+| `isa-deepdata` | `isa.org.jm` (documents / news landings) | `scrape` same-origin PDF/download; OBIS/ODIS links are not treated as PDF sources |
+
+Smoke collections (dry-run): `HKF7T7EI` (UNGA/VME), `7R77ZJFH` / `XFD86ZFP` (BBNJ/PrepCom), `J2SEXDC5` (ISA).
+
+Items with no DOI, arXiv id, PMID, URL, or matching synthesize playbook still
+stop at `no_identifier`.
 
 ## Related docs
 
-- [ROADMAP.md](ROADMAP.md) — core vs maybe-later workbench; optional local/LiteLLM title assist
+- [ROADMAP.md](ROADMAP.md) — 0.1→1.0 trust; core vs maybe-later
+- [releases.md](releases.md) — 0.x vs 1.0
 - [comparison.md](comparison.md) — where paperful sits next to plugins and bib tools
-- [README](../README.md) — commands, configuration, session vault, EZProxy
+- [commands.md](commands.md) — CLI and disk artifacts
+- [config.md](config.md) — `config.toml` keys and grey playbooks
+- [ezproxy.md](ezproxy.md) / [sessions.md](sessions.md) — campus proxy and browser vault

@@ -65,3 +65,23 @@ app_name = "paperful"
 
 # Consecutive network failures before a Sci-Hub mirror is skipped for the rest of the run.
 mirror_failures_before_skip = 3
+
+# Grey literature playbooks (rewrite / scrape / synthesize). Builtin pack =
+# UNGA/undocs · BBNJ/DOALOS · ISA (+ FAO, OECD, IEA, WHO examples) — not product core.
+# grey_playbooks_builtin = true
+# [[grey_playbooks]]
+# name = "my_org"
+# kind = "rewrite"
+# hosts = ["example.org"]
+# url_re = '(?i)example\\.org/docs/(?P<code>[a-z0-9]+)/?'
+# pdf_template = "https://example.org/docs/{code}/{code}.pdf"
+# [[grey_playbooks]]
+# name = "my_org_scrape"
+# kind = "scrape"
+# hosts = ["example.org"]
+# href_re = '\\.pdf$|/download/'
+# [[grey_playbooks]]
+# name = "my_doc_id"
+# kind = "synthesize"
+# match_re = '\\b(DOC-\\d{4}-\\d+)\\b'
+# pdf_template = "https://docs.example.org/pdf?id={0}"

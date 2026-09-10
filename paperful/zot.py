@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -14,6 +15,21 @@ from .resolve import extract_arxiv_id, extract_doi, extract_pmid, normalize_doi
 SKIP_TYPES = {"attachment", "note", "annotation"}
 UNCOLLECTED = "_uncollected"
 _PATH_UNSAFE = re.compile(r"[\\/:*?\"<>|\x00-\x1f]")
+_ZOTERO_PORT = 23119
+
+
+def zotero_local_host() -> str:
+    """Host for the Zotero local API (override with PAPERFUL_ZOTERO_HOST for Docker)."""
+    return (os.environ.get("PAPERFUL_ZOTERO_HOST") or "localhost").strip() or "localhost"
+
+
+def zotero_local_endpoint() -> str:
+    return f"http://{zotero_local_host()}:{_ZOTERO_PORT}/api"
+
+
+def zotero_local_label() -> str:
+    """Human-readable address for errors and doctor output."""
+    return f"{zotero_local_host()}:{_ZOTERO_PORT}"
 
 
 @dataclass
@@ -54,10 +70,12 @@ class Item:
 
 
 class ZoteroLocal:
-    """Thin wrapper over pyzotero pointed at localhost:23119."""
+    """Thin wrapper over pyzotero pointed at the Zotero local API (:23119)."""
 
     def __init__(self, local_api_key: str | None = None):
         self.zot = zotero.Zotero(0, "user", local=True, local_api_key=local_api_key)
+        # pyzotero hardcodes localhost; Docker Desktop needs host.docker.internal.
+        self.zot.endpoint = zotero_local_endpoint()
         self._collections: dict[str, Collection] | None = None
 
     # ---- connectivity -------------------------------------------------

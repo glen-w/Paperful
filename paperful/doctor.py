@@ -9,11 +9,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .config import Config
+from .zot import zotero_local_label
 
 if TYPE_CHECKING:
     from .zot import ZoteroLocal
 
 Status = str  # green | amber | red
+_ZOTERO_CHECK = "Zotero :23119"
 
 
 @dataclass
@@ -39,17 +41,20 @@ def run_checks(
 ) -> list[Check]:
     checks: list[Check] = []
     info: dict | None = None
+    zot_where = zotero_local_label()
     if zl is None:
-        checks.append(Check("Zotero :23119", "red", "not checked"))
+        checks.append(Check(_ZOTERO_CHECK, "red", f"not checked ({zot_where})"))
     else:
         try:
             info = ping() if ping else zl.ping()
             ver = info.get("zotero_version") or "?"
-            checks.append(Check("Zotero :23119", "green", f"reachable (Zotero {ver})"))
+            checks.append(
+                Check(_ZOTERO_CHECK, "green", f"reachable at {zot_where} (Zotero {ver})")
+            )
         except ConnectionError as exc:
-            checks.append(Check("Zotero :23119", "red", str(exc)))
+            checks.append(Check(_ZOTERO_CHECK, "red", f"{zot_where}: {exc}"))
         except Exception as exc:
-            checks.append(Check("Zotero :23119", "red", f"unreachable: {exc}"))
+            checks.append(Check(_ZOTERO_CHECK, "red", f"{zot_where} unreachable: {exc}"))
 
     if info is not None:
         if info.get("supports_write"):
@@ -119,9 +124,47 @@ def run_checks(
             )
         )
 
+    checks.append(_grey_playbooks_check(cfg))
+
     return checks
 
 
+_NAMED_GREY_PACKS = (
+    "undocs-unga-vme",
+    "bbnj-doalos-prepcom",
+    "isa-deepdata",
+)
+
+
+def _grey_playbooks_check(cfg: Config) -> Check:
+    """Builtin ocean packs present, or user-only / disabled."""
+    names = {p.name for p in cfg.grey_playbooks}
+    present = [n for n in _NAMED_GREY_PACKS if n in names]
+    pack_note = ""
+    if cfg.grey_playbooks_dir is not None:
+        pack_note = f"; packs dir {cfg.grey_playbooks_dir}"
+    if cfg.grey_playbooks_builtin:
+        if len(present) == len(_NAMED_GREY_PACKS):
+            return Check(
+                "Grey playbooks",
+                "green",
+                f"UNGA/undocs · BBNJ/DOALOS · ISA{pack_note}",
+            )
+        missing = [n for n in _NAMED_GREY_PACKS if n not in names]
+        return Check(
+            "Grey playbooks",
+            "amber",
+            f"builtin on but missing pack entries: {', '.join(missing)}{pack_note}",
+        )
+    if cfg.grey_playbooks:
+        return Check(
+            "Grey playbooks",
+            "green",
+            f"builtin off — {len(cfg.grey_playbooks)} rule(s){pack_note}",
+        )
+    return Check("Grey playbooks", "green", f"builtin off — no rules{pack_note}")
+
+
 def has_red(checks: list[Check]) -> bool:
-    fatal = {"Zotero :23119", "out_dir", "state_dir"}
+    fatal = {_ZOTERO_CHECK, "out_dir", "state_dir"}
     return any(c.status == "red" and c.name in fatal for c in checks)

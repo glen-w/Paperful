@@ -160,4 +160,4 @@ Need reproducible .bib for a paper submission?
 
 - [comparison.md](comparison.md) — short routing tables
 - [architecture.md](architecture.md) — paperful internals
-- [README](../README.md) — configuration and operations
+- [config.md](config.md) — configuration and operations

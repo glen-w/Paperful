@@ -2,6 +2,8 @@ config.toml
 .venv/
 out/
 state/
+docs/_build/
+_site/
 __pycache__/
 *.pyc
 .pytest_cache/

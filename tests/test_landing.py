@@ -67,7 +67,7 @@ def test_extract_un_symbol_and_grey_target_from_extra():
     assert extract_un_symbol("A sufficiently long test title") is None
     item = make_item(url=None, extra="UN symbol: A/AC.292/2024/1", doi=None)
     assert grey_target(item) == "https://undocs.org/pdf?symbol=A/AC.292/2024/1"
-    # Skip-host URL + Extra symbol → synthesize (builtin un_symbol playbook)
+    # Skip-host URL + Extra symbol → synthesize (builtin undocs-unga-vme-symbol)
     yt = make_item(
         url="https://www.youtube.com/watch?v=x",
         extra="A/CONF.232/2023/4",

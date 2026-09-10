@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -201,7 +201,7 @@ def _symbol_from_undocs_url(url: str, symbol_re: re.Pattern[str] | None) -> str 
 
 def _undocs_symbol_re(playbooks: list[GreyPlaybook]) -> re.Pattern[str] | None:
     for pb in playbooks:
-        if pb.kind == "synthesize" and pb.name.startswith("un") and pb.match_re:
+        if pb.kind == "synthesize" and "undocs" in pb.name and pb.match_re:
             return pb.compiled_match()
     for pb in playbooks:
         if pb.kind == "synthesize" and pb.match_re:

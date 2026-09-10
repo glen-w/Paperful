@@ -1,23 +1,55 @@
-# Pre-rolled ocean / governance grey-lit examples — not product core.
+# Pre-rolled ocean / governance grey-lit packs — not product core.
 # Disable with grey_playbooks_builtin = false, or override any name via [[grey_playbooks]].
+#
+# Named packs (BBNJ product):
+#   undocs-unga-vme      — UNGA resolutions & SG reports (undocs / daccess)
+#   bbnj-doalos-prepcom  — BBNJ Agreement + DOALOS landings (+ NGO mirrors)
+#   isa-deepdata         — International Seabed Authority document landings
+# Plus generic examples: FAO rewrite, IRENA/OECD/IEA/WHO scrape hints.
+
+# --- Pack: undocs-unga-vme ---------------------------------------------------
 
 [[grey_playbooks]]
-name = "undocs_url"
+name = "undocs-unga-vme"
 kind = "rewrite"
 hosts = ["undocs.org", "documents.un.org", "docs.un.org", "daccess-ods.un.org"]
 parser = "undocs"
 
 [[grey_playbooks]]
-name = "un_symbol"
+name = "undocs-unga-vme-symbol"
 kind = "synthesize"
-# A/CONF.232/2023/4, A/AC.292/2024/1, A/79/123, S/2024/55, Add./Rev./Corr. suffixes
+# A/RES/61/105, A/75/157, A/CONF.232/2023/4, A/AC.292|296/…, S/2024/55,
+# ISBA/27/C/15, Add./Rev./Corr./INF suffixes
 match_re = '''(?ix)\b(
     (?:A|S|E|ST|UNEP|ISA|SPLOS|ISBA)
-    (?:/[A-Z]{2,12}(?:\.\d+)?)*
-    (?:/\d{1,4})+
-    (?:/(?:Add|Rev|Corr)\.\d+|/?INF(?:\.\d+)?(?:/\d+)?)*
+    (?:/[A-Z]{1,12}(?:\.\d+)?|/\d{1,4})+
+    (?:/(?:Add|Rev|Corr)\.\d+)*
+    (?:/?INF(?:\.\d+)?(?:/\d+)?)*
 )\b'''
 pdf_template = "https://undocs.org/pdf?symbol={0}"
+
+# --- Pack: bbnj-doalos-prepcom -----------------------------------------------
+
+[[grey_playbooks]]
+name = "bbnj-doalos-prepcom"
+kind = "scrape"
+# Direct .pdf under /bbnjagreement/ or /depts/los/ is handled by direct (no rewrite).
+# Landing scrape: same-origin PDF / Download / sites/default/files.
+# NGO mirrors (highseasalliance, ENB/IISD) as secondary PDF link hosts.
+hosts = ["un.org", "highseasalliance.org", "iisd.org"]
+href_re = '''(?i)\.pdf(?:\?|$)|/sites/default/files/|/wp-content/uploads/|/bitstream/|download|/depts/los/|/bbnjagreement/'''
+
+# --- Pack: isa-deepdata ------------------------------------------------------
+
+[[grey_playbooks]]
+name = "isa-deepdata"
+kind = "scrape"
+# isa.org.jm news / documents / Deep Data announcements → same-origin PDF/download.
+# OBIS/ODIS cross-links are reference-only (href_re does not treat APIs as PDFs).
+hosts = ["isa.org.jm"]
+href_re = '''(?i)\.pdf(?:\?|$)|/wp-content/uploads/|/documents/|/bitstream/|download'''
+
+# --- Other ocean/gov examples ------------------------------------------------
 
 [[grey_playbooks]]
 name = "fao"
@@ -25,12 +57,6 @@ kind = "rewrite"
 hosts = ["fao.org", "documents.fao.org"]
 url_re = '''(?i)(?:www\.)?(?:documents\.)?fao\.org/3/(?P<code>[a-z0-9]+)/'''
 pdf_template = "https://www.fao.org/3/{code}/{code}.pdf"
-
-[[grey_playbooks]]
-name = "isa_un_scrape"
-kind = "scrape"
-hosts = ["isa.org.jm", "un.org"]
-href_re = '''(?i)\.pdf(?:\?|$)|/bitstream/|/wp-content/uploads/|download'''
 
 [[grey_playbooks]]
 name = "irena_scrape"
