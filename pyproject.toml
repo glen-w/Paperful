@@ -1,7 +1,7 @@
 [project]
 name = "paperful"
 version = "0.1.0"
-description = "Fetch missing PDFs for Zotero items from open-access sources (Sci-Hub opt-in), save to disk, attach back into Zotero."
+description = "Fill the gaps in your Zotero library: fetch missing PDFs, save them in a collection-shaped folder tree, attach them back."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
