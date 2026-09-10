@@ -37,14 +37,18 @@ def find(item: Item, ctx: Context) -> Candidate:
         with ctx.client.stream("GET", url, timeout=30) as resp:
             ctype = resp.headers.get("content-type", "").lower()
             if resp.status_code < 400 and "application/pdf" in ctype:
-                return Candidate(url=str(resp.url), source=NAME, note="content-type pdf")
+                return Candidate(
+                    url=str(resp.url), source=NAME, note="content-type pdf"
+                )
             if resp.status_code < 400 and "octet-stream" in ctype:
                 head = b""
                 for chunk in resp.iter_bytes(chunk_size=1024):
                     head = chunk
                     break
                 if head.lstrip().startswith(b"%PDF"):
-                    return Candidate(url=str(resp.url), source=NAME, note="octet-stream pdf")
+                    return Candidate(
+                        url=str(resp.url), source=NAME, note="octet-stream pdf"
+                    )
             if resp.status_code < 400 and "html" in ctype:
                 text = b"".join(resp.iter_bytes()).decode("utf-8", "replace")
                 pdfs = extract_pdf_urls(text, str(resp.url))

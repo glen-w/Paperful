@@ -16,6 +16,7 @@ from bs4 import BeautifulSoup
 DOI_RE = re.compile(r"\b(10\.\d{4,9}/[^\s\"'<>\[\]\{\}]+)", re.IGNORECASE)
 ARXIV_NEW_RE = re.compile(r"(?<!\d)(\d{4}\.\d{4,5})(v\d+)?(?!\d)")
 ARXIV_OLD_RE = re.compile(r"\b([a-z\-]+(?:\.[A-Z]{2})?/\d{7})(v\d+)?\b")
+PMID_RE = re.compile(r"(?im)^\s*(?:PMID|PubMed PMID|PubMed ID):\s*(\d+)\b")
 _TRAILING_PUNCT_NO_PAREN = ".,;:>\"'"
 
 
@@ -35,7 +36,9 @@ def normalize_doi(raw: str | None) -> str | None:
         doi = doi[:-1].rstrip(_TRAILING_PUNCT_NO_PAREN)
     doi = doi.rstrip("/")
     # Common URL suffixes glued to DOIs in URL fields
-    doi = re.sub(r"/(?:full|abstract|pdf|epdf|meta|summary)$", "", doi, flags=re.IGNORECASE)
+    doi = re.sub(
+        r"/(?:full|abstract|pdf|epdf|meta|summary)$", "", doi, flags=re.IGNORECASE
+    )
     return doi.lower()
 
 
@@ -49,6 +52,14 @@ def extract_doi(text: str | None) -> str | None:
         if d:
             return d
     return normalize_doi(text)
+
+
+def extract_pmid(text: str | None) -> str | None:
+    """Find a PubMed ID in Zotero `extra` (or similar free text)."""
+    if not text:
+        return None
+    m = PMID_RE.search(text)
+    return m.group(1) if m else None
 
 
 def extract_arxiv_id(text: str | None) -> str | None:
@@ -117,7 +128,9 @@ def crossref_lookup(
     if short and short != title:
         variants.append(short)
     for variant in variants:
-        match = _crossref_query(client, variant, variants, author, year, email, min_score)
+        match = _crossref_query(
+            client, variant, variants, author, year, email, min_score
+        )
         if match:
             return match
     return None
@@ -139,7 +152,11 @@ def _crossref_query(
     email: str,
     min_score: float,
 ) -> CrossrefMatch | None:
-    params: dict[str, Any] = {"query.bibliographic": query, "rows": 5, "select": "DOI,title,issued,author"}
+    params: dict[str, Any] = {
+        "query.bibliographic": query,
+        "rows": 5,
+        "select": "DOI,title,issued,author",
+    }
     if author:
         params["query.author"] = author
     if email:
@@ -160,7 +177,9 @@ def _crossref_query(
         if year and cr_year and abs(cr_year - year) > 1:
             score -= 0.1
         if best is None or score > best.score:
-            best = CrossrefMatch(doi=it["DOI"].lower(), score=score, title=titles[0], year=cr_year)
+            best = CrossrefMatch(
+                doi=it["DOI"].lower(), score=score, title=titles[0], year=cr_year
+            )
     if best and best.score >= min_score:
         return best
     return None
@@ -202,15 +221,44 @@ class Enrichable(Protocol):
     url: str | None
     first_author: str | None
     year: int | None
+    library_doi: str | None
+    pmid: str | None
+    doi_verified: str
 
 
 @dataclass
 class EnrichMatch:
     doi: str
-    source: str  # url | meta | crossref | openalex | semanticscholar
+    source: str  # url | meta | crossref | openalex | semanticscholar | pubmed
     score: float = 1.0
     title: str = ""
     year: int | None = None
+
+
+@dataclass
+class WorkMeta:
+    doi: str
+    title: str = ""
+    year: int | None = None
+    first_author: str | None = None
+    venue: str | None = None
+    source: str = ""  # crossref | openalex | semanticscholar | pubmed
+
+
+@dataclass
+class VerifyResult:
+    status: str  # ok | suspect | unknown | missing
+    score: float = 0.0
+    work: WorkMeta | None = None
+    note: str = ""
+
+
+class IdentifierCache:
+    """Per-run cache so verify + lint + sources do not triple-hit Crossref."""
+
+    def __init__(self) -> None:
+        self.works: dict[str, WorkMeta | None] = {}
+        self.pmids: dict[str, str | None] = {}
 
 
 def enrich_identifiers(
@@ -249,27 +297,246 @@ def enrich_identifiers(
             return attempts
         attempts.append("meta:no-doi")
 
-    cr = crossref_lookup(client, item.title, item.first_author, item.year, email, min_score)
+    cr = crossref_lookup(
+        client, item.title, item.first_author, item.year, email, min_score
+    )
     if cr:
         item.doi, item.doi_source = cr.doi, "crossref"
         attempts.append(f"crossref:matched({cr.score:.2f})")
         return attempts
     attempts.append("crossref:no-match")
 
-    oa = openalex_title_lookup(client, item.title, item.first_author, item.year, email, min_score)
+    oa = openalex_title_lookup(
+        client, item.title, item.first_author, item.year, email, min_score
+    )
     if oa:
         item.doi, item.doi_source = oa.doi, oa.source
         attempts.append(f"openalex:matched({oa.score:.2f})")
         return attempts
     attempts.append("openalex:no-match")
 
-    ss = semanticscholar_title_lookup(client, item.title, item.first_author, item.year, min_score)
+    ss = semanticscholar_title_lookup(
+        client, item.title, item.first_author, item.year, min_score
+    )
     if ss:
         item.doi, item.doi_source = ss.doi, ss.source
         attempts.append(f"semanticscholar:matched({ss.score:.2f})")
         return attempts
     attempts.append("semanticscholar:no-match")
     return attempts
+
+
+def work_by_doi(
+    client: httpx.Client,
+    doi: str,
+    email: str = "",
+    cache: IdentifierCache | None = None,
+) -> WorkMeta | None:
+    """Resolve a DOI to WorkMeta. Crossref first, then OpenAlex. None = unknown (API miss or empty)."""
+    key = doi.lower()
+    if cache is not None and key in cache.works:
+        return cache.works[key]
+    work = _crossref_work(client, doi, email) or _openalex_work(client, doi, email)
+    if cache is not None:
+        cache.works[key] = work
+    return work
+
+
+def verify_doi(
+    client: httpx.Client,
+    item: Enrichable,
+    email: str = "",
+    min_score: float = 0.90,
+    suspect_score: float = 0.70,
+    cache: IdentifierCache | None = None,
+) -> VerifyResult:
+    """Check the library DOI against Crossref/OpenAlex title similarity."""
+    if not item.doi:
+        return VerifyResult(status="missing", note="no DOI")
+    work = work_by_doi(client, item.doi, email, cache)
+    if work is None:
+        return VerifyResult(status="unknown", note="no work record")
+    score = title_similarity(item.title, work.title)
+    if item.year and work.year and abs(work.year - item.year) > 1:
+        score -= 0.1
+    if score >= min_score:
+        return VerifyResult(status="ok", score=score, work=work)
+    if score < suspect_score:
+        return VerifyResult(
+            status="suspect", score=score, work=work, note="title mismatch"
+        )
+    return VerifyResult(status="unknown", score=score, work=work, note="weak match")
+
+
+def pmid_to_doi(
+    client: httpx.Client,
+    pmid: str,
+    email: str = "",
+    cache: IdentifierCache | None = None,
+) -> str | None:
+    if cache is not None and pmid in cache.pmids:
+        return cache.pmids[pmid]
+    doi: str | None = None
+    params: dict[str, Any] = {"ids": pmid, "format": "json", "tool": "paperful"}
+    if email:
+        params["email"] = email
+    try:
+        resp = client.get(
+            "https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/",
+            params=params,
+            timeout=30,
+        )
+        if resp.status_code < 400:
+            records = resp.json().get("records") or []
+            if records:
+                doi = normalize_doi(records[0].get("doi"))
+    except (httpx.HTTPError, ValueError, TypeError):
+        doi = None
+    if cache is not None:
+        cache.pmids[pmid] = doi
+    return doi
+
+
+def prepare_identifiers(
+    client: httpx.Client,
+    item: Enrichable,
+    email: str = "",
+    min_score: float = 0.90,
+    suspect_score: float = 0.70,
+    verify: bool = True,
+    cache: IdentifierCache | None = None,
+) -> list[str]:
+    """Fill/verify DOI in memory. Never writes to a reference manager.
+
+    Swap the working DOI only when the library DOI is suspect and a replacement
+    scores at or above min_score. API failure (`unknown`) keeps the original DOI.
+    """
+    notes: list[str] = []
+    if item.library_doi is None and item.doi:
+        item.library_doi = item.doi
+    if item.item_type in _SKIP_ENRICH_TYPES:
+        item.doi_verified = "unknown" if item.doi else "missing"
+        return notes
+
+    if item.doi and verify:
+        result = verify_doi(client, item, email, min_score, suspect_score, cache)
+        notes.append(
+            f"verify:{result.status}({result.score:.2f})"
+            if result.score
+            else f"verify:{result.status}"
+        )
+        if result.status == "ok":
+            item.doi_verified = "ok"
+            return notes
+        if result.status == "unknown":
+            item.doi_verified = "unknown"
+            return notes
+        original = item.doi
+        original_source = item.doi_source
+        item.doi = None
+        notes.extend(enrich_identifiers(client, item, email, min_score))
+        if not item.doi and getattr(item, "pmid", None):
+            doi = pmid_to_doi(client, item.pmid, email, cache)
+            if doi:
+                item.doi, item.doi_source = doi, "pubmed"
+                notes.append("pubmed:matched")
+            else:
+                notes.append("pubmed:no-doi")
+        if item.doi and item.doi != original:
+            item.doi_verified = "swapped"
+            notes.append(f"swap:{original}->{item.doi}")
+        else:
+            item.doi = original
+            item.doi_source = original_source
+            item.doi_verified = "suspect"
+        return notes
+
+    if not item.doi and getattr(item, "pmid", None):
+        doi = pmid_to_doi(client, item.pmid, email, cache)
+        if doi:
+            item.doi, item.doi_source = doi, "pubmed"
+            item.doi_verified = "ok"
+            notes.append("pubmed:matched")
+            return notes
+        notes.append("pubmed:no-doi")
+
+    notes.extend(enrich_identifiers(client, item, email, min_score))
+    if item.doi:
+        item.doi_verified = "unknown" if (item.library_doi and not verify) else "ok"
+    else:
+        item.doi_verified = "missing"
+    return notes
+
+
+def _crossref_work(client: httpx.Client, doi: str, email: str) -> WorkMeta | None:
+    params: dict[str, Any] = {}
+    if email:
+        params["mailto"] = email
+    try:
+        resp = client.get(
+            f"https://api.crossref.org/works/{doi}", params=params or None, timeout=30
+        )
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        msg = resp.json().get("message") or {}
+    except (httpx.HTTPError, ValueError, TypeError):
+        return None
+    titles = msg.get("title") or []
+    title = titles[0] if titles else ""
+    authors = msg.get("author") or []
+    first = None
+    if authors:
+        first = authors[0].get("family") or authors[0].get("name")
+    venue_list = msg.get("container-title") or []
+    return WorkMeta(
+        doi=normalize_doi(msg.get("DOI") or doi) or doi.lower(),
+        title=title,
+        year=_issued_year(msg),
+        first_author=first,
+        venue=venue_list[0] if venue_list else None,
+        source="crossref",
+    )
+
+
+def _openalex_work(client: httpx.Client, doi: str, email: str) -> WorkMeta | None:
+    params: dict[str, Any] = {}
+    if email:
+        params["mailto"] = email
+    try:
+        resp = client.get(
+            f"https://api.openalex.org/works/https://doi.org/{doi}",
+            params=params or None,
+            timeout=30,
+        )
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        data = resp.json()
+    except (httpx.HTTPError, ValueError, TypeError):
+        return None
+    doi_raw = data.get("doi") or ""
+    resolved = normalize_doi(doi_raw.replace("https://doi.org/", "")) or doi.lower()
+    authorships = data.get("authorships") or []
+    first = None
+    if authorships:
+        first = ((authorships[0].get("author") or {}).get("display_name")) or None
+    loc = data.get("primary_location") or {}
+    source = loc.get("source") or {}
+    venue = source.get("display_name") if isinstance(source, dict) else None
+    year = data.get("publication_year")
+    try:
+        year_i = int(year) if year else None
+    except (TypeError, ValueError):
+        year_i = None
+    return WorkMeta(
+        doi=resolved,
+        title=data.get("display_name") or "",
+        year=year_i,
+        first_author=first,
+        venue=venue,
+        source="openalex",
+    )
 
 
 def doi_from_url(url: str | None) -> EnrichMatch | None:
@@ -304,7 +571,10 @@ def doi_from_url(url: str | None) -> EnrichMatch | None:
 def doi_from_page_meta(client: httpx.Client, url: str) -> EnrichMatch | None:
     try:
         resp = client.get(url, timeout=20)
-        if resp.status_code >= 400 or "html" not in resp.headers.get("content-type", "").lower():
+        if (
+            resp.status_code >= 400
+            or "html" not in resp.headers.get("content-type", "").lower()
+        ):
             return None
         soup = BeautifulSoup(resp.text, "html.parser")
     except (httpx.HTTPError, ValueError):
@@ -360,7 +630,9 @@ def openalex_title_lookup(
         if author and not _author_hint_ok(author, it.get("authorships")):
             score -= 0.05
         if best is None or score > best.score:
-            best = EnrichMatch(doi=doi, source="openalex", score=score, title=titles[0], year=pub_year)
+            best = EnrichMatch(
+                doi=doi, source="openalex", score=score, title=titles[0], year=pub_year
+            )
     if best and best.score >= min_score:
         return best
     return None
@@ -379,7 +651,11 @@ def semanticscholar_title_lookup(
         "fields": "title,year,externalIds,authors",
     }
     try:
-        resp = client.get("https://api.semanticscholar.org/graph/v1/paper/search", params=params, timeout=30)
+        resp = client.get(
+            "https://api.semanticscholar.org/graph/v1/paper/search",
+            params=params,
+            timeout=30,
+        )
         if resp.status_code >= 400:
             return None
         results = resp.json().get("data") or []
@@ -398,7 +674,13 @@ def semanticscholar_title_lookup(
         if author and not _ss_author_ok(author, it.get("authors")):
             score -= 0.05
         if best is None or score > best.score:
-            best = EnrichMatch(doi=doi, source="semanticscholar", score=score, title=it.get("title") or "", year=pub_year)
+            best = EnrichMatch(
+                doi=doi,
+                source="semanticscholar",
+                score=score,
+                title=it.get("title") or "",
+                year=pub_year,
+            )
     if best and best.score >= min_score:
         return best
     return None

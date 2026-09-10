@@ -17,14 +17,22 @@ from tests.conftest import make_item, mock_client
 
 
 def _json(payload, status=200):
-    return httpx.Response(status, content=json.dumps(payload).encode(), headers={"content-type": "application/json"})
+    return httpx.Response(
+        status,
+        content=json.dumps(payload).encode(),
+        headers={"content-type": "application/json"},
+    )
 
 
 def test_doi_from_url_variants():
     assert doi_from_url("https://doi.org/10.1000/xyz").doi == "10.1000/xyz"
     assert doi_from_url("https://dx.doi.org/10.1000/xyz").doi == "10.1000/xyz"
-    assert doi_from_url("https://example.org/paper?doi=10.1000/abc").doi == "10.1000/abc"
-    assert doi_from_url("https://consensus.app/papers/10.1000/cons/").doi == "10.1000/cons"
+    assert (
+        doi_from_url("https://example.org/paper?doi=10.1000/abc").doi == "10.1000/abc"
+    )
+    assert (
+        doi_from_url("https://consensus.app/papers/10.1000/cons/").doi == "10.1000/cons"
+    )
     assert doi_from_url("https://www.npr.org/story") is None
 
 
@@ -190,3 +198,143 @@ def test_enrich_aggregator_meta_then_title_fallback():
     notes = enrich_identifiers(mock_client(handler), item, email="a@b.c", min_score=0.9)
     assert "meta:no-doi" in notes
     assert item.doi == "10.1000/from-cr"
+
+
+def test_work_by_doi_crossref():
+    title = "A sufficiently long test title about marine governance"
+
+    def handler(req):
+        if "crossref.org" in (req.url.host or ""):
+            return _json(
+                {
+                    "message": {
+                        "DOI": "10.1000/test.doi",
+                        "title": [title],
+                        "issued": {"date-parts": [[2019]]},
+                        "container-title": ["Marine Policy"],
+                        "author": [{"family": "Smith"}],
+                    }
+                }
+            )
+        return httpx.Response(404)
+
+    from paperful.resolve import work_by_doi
+
+    work = work_by_doi(mock_client(handler), "10.1000/test.doi", "a@b.c")
+    assert work and work.title == title and work.venue == "Marine Policy"
+
+
+def test_verify_doi_ok_suspect_unknown():
+    from paperful.resolve import verify_doi
+
+    title = "A sufficiently long test title about marine governance"
+
+    def ok_handler(req):
+        return _json(
+            {
+                "message": {
+                    "DOI": "10.1000/test.doi",
+                    "title": [title],
+                    "issued": {"date-parts": [[2019]]},
+                }
+            }
+        )
+
+    item = make_item(title=title)
+    assert verify_doi(mock_client(ok_handler), item, email="a@b.c").status == "ok"
+
+    def mismatch(req):
+        return _json(
+            {
+                "message": {
+                    "DOI": "10.1000/test.doi",
+                    "title": ["Completely unrelated other paper"],
+                    "issued": {"date-parts": [[2019]]},
+                }
+            }
+        )
+
+    assert verify_doi(mock_client(mismatch), item, email="a@b.c").status == "suspect"
+
+    def down(req):
+        return httpx.Response(500)
+
+    assert verify_doi(mock_client(down), item, email="a@b.c").status == "unknown"
+
+
+def test_prepare_swaps_suspect_doi():
+    from paperful.resolve import prepare_identifiers
+
+    title = "A sufficiently long test title about marine governance"
+
+    def handler(req):
+        host = req.url.host or ""
+        path = req.url.path
+        if "crossref.org" in host and "/works/" in path and not path.endswith("/works"):
+            return _json(
+                {
+                    "message": {
+                        "DOI": "10.1/wrong",
+                        "title": ["Totally different"],
+                        "issued": {"date-parts": [[2010]]},
+                    }
+                }
+            )
+        if "crossref.org" in host:
+            return _json(
+                {
+                    "message": {
+                        "items": [
+                            {
+                                "DOI": "10.9/right",
+                                "title": [title],
+                                "issued": {"date-parts": [[2019]]},
+                            }
+                        ]
+                    }
+                }
+            )
+        return httpx.Response(404)
+
+    item = make_item(doi="10.1/wrong", title=title, url=None)
+    notes = prepare_identifiers(
+        mock_client(handler), item, email="a@b.c", min_score=0.9, suspect_score=0.7
+    )
+    assert item.library_doi == "10.1/wrong"
+    assert item.doi == "10.9/right"
+    assert item.doi_verified == "swapped"
+    assert any(n.startswith("swap:") for n in notes)
+
+
+def test_prepare_unknown_keeps_original_doi():
+    from paperful.resolve import prepare_identifiers
+
+    item = make_item(doi="10.1/x", url=None)
+    notes = prepare_identifiers(
+        mock_client(lambda r: httpx.Response(500)), item, email="a@b.c"
+    )
+    assert item.doi == "10.1/x"
+    assert item.doi_verified == "unknown"
+    assert any(n.startswith("verify:unknown") for n in notes)
+
+
+def test_prepare_skips_verify_when_disabled():
+    from paperful.resolve import prepare_identifiers
+
+    item = make_item(doi="10.1/x", url=None)
+    notes = prepare_identifiers(
+        mock_client(lambda r: httpx.Response(500)), item, email="a@b.c", verify=False
+    )
+    assert item.doi == "10.1/x"
+    assert item.doi_verified == "unknown"
+    assert notes == []
+
+
+def test_pmid_to_doi():
+    from paperful.resolve import pmid_to_doi
+
+    def handler(req):
+        assert "idconv" in str(req.url)
+        return _json({"records": [{"pmid": "1", "doi": "10.1000/from-pmid"}]})
+
+    assert pmid_to_doi(mock_client(handler), "1", "a@b.c") == "10.1000/from-pmid"

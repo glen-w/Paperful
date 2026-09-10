@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import mimetypes
 from dataclasses import dataclass
 from pathlib import Path
-
-import hashlib
-import mimetypes
 from typing import Any
 from urllib.parse import quote, urlencode
 
@@ -33,10 +32,12 @@ class LocalZupload(Zupload):
     'Aron - 1990 - Title.pdf' would be stored as 'Aron+-+1990+-+Title.pdf'.
     """
 
-    def _get_auth(self, attachment: str, reg_key: str, md5: str | None = None) -> dict[str, Any]:
+    def _get_auth(
+        self, attachment: str, reg_key: str, md5: str | None = None
+    ) -> dict[str, Any]:
         att_path = Path(attachment)
         stat = att_path.stat()
-        digest = hashlib.md5()  # noqa: S324
+        digest = hashlib.md5()
         with att_path.open("rb") as fh:
             for chunk in iter(lambda: fh.read(8192), b""):
                 digest.update(chunk)
@@ -55,11 +56,17 @@ class LocalZupload(Zupload):
             self.zinstance.endpoint,
             f"/{self.zinstance.library_type}/{self.zinstance.library_id}/items/{reg_key}/file",
         )
-        req = self._post_with_retry(lambda: self.zinstance._write("POST", url=url, content=body, headers=headers))
+        req = self._post_with_retry(
+            lambda: self.zinstance._write(
+                "POST", url=url, content=body, headers=headers
+            )
+        )
         return req.json()
 
 
-ATTACH_CODES = frozenset({"success", "unchanged", "quota", "no_write_api", "auth", "other"})
+ATTACH_CODES = frozenset(
+    {"success", "unchanged", "quota", "no_write_api", "auth", "other"}
+)
 
 
 def attach_failure_code(reason: str) -> str:
@@ -95,7 +102,9 @@ class Attacher:
         # The authorisation dialog blocks the HTTP response until the user clicks;
         # uploads of big PDFs also take a while. Reads are local and unaffected.
         try:
-            self.zl.zot.client.timeout = DIALOG_TIMEOUT_S  # pyzotero vendors httpx; a float avoids type mixing
+            self.zl.zot.client.timeout = (
+                DIALOG_TIMEOUT_S  # pyzotero vendors httpx; a float avoids type mixing
+            )
         except Exception:
             pass
 
@@ -137,14 +146,20 @@ class Attacher:
             resp = self.zl.zot.authorize_local(self.cfg.app_name)
         except ze.LocalAPIDeniedError:
             return False
-        except Exception as exc:  # dialog timed out, Zotero quit, vendored-httpx transport error
-            raise AttachTransportError(f"authorisation failed: {type(exc).__name__}: {exc}") from exc
+        except (
+            Exception
+        ) as exc:  # dialog timed out, Zotero quit, vendored-httpx transport error
+            raise AttachTransportError(
+                f"authorisation failed: {type(exc).__name__}: {exc}"
+            ) from exc
         if resp.get("remember"):
             self._store_key(resp["key"])
         return True
 
     # ---- attach -----------------------------------------------------------------
-    def attach(self, item_key: str, pdf_path: Path, title: str | None = None) -> AttachResult:
+    def attach(
+        self, item_key: str, pdf_path: Path, title: str | None = None
+    ) -> AttachResult:
         if not pdf_path.is_file():
             return AttachResult(False, reason=f"file missing: {pdf_path}", code="other")
         if not self.supports_write():
@@ -159,14 +174,22 @@ class Attacher:
                     granted = self.authorize()
                 except AttachTransportError as exc:
                     msg = str(exc)
-                    return AttachResult(False, reason=msg, code=attach_failure_code(msg))
+                    return AttachResult(
+                        False, reason=msg, code=attach_failure_code(msg)
+                    )
                 if not granted:
-                    return AttachResult(False, reason="write authorisation denied in Zotero", code="auth")
+                    return AttachResult(
+                        False,
+                        reason="write authorisation denied in Zotero",
+                        code="auth",
+                    )
             try:
                 # attachment_simple() needs the /items/new template endpoint, which the local
                 # API does not serve; build the stored-file attachment item ourselves.
                 payload = [attachment_payload(pdf_path, title)]
-                result = LocalZupload(self.zl.zot, payload, item_key, basedir=str(pdf_path.parent)).upload()
+                result = LocalZupload(
+                    self.zl.zot, payload, item_key, basedir=str(pdf_path.parent)
+                ).upload()
             except (ze.LocalAPIKeyRequiredError, ze.UserNotAuthorisedError) as exc:
                 # single-use key consumed, or revoked in Zotero settings
                 self._forget_key()
@@ -209,7 +232,9 @@ def attachment_payload(pdf_path: Path, title: str | None = None) -> dict:
 def _interpret(result: dict) -> AttachResult:
     for bucket in ("success", "unchanged"):
         for entry in result.get(bucket) or []:
-            return AttachResult(True, attachment_key=entry.get("key"), reason=bucket, code=bucket)
+            return AttachResult(
+                True, attachment_key=entry.get("key"), reason=bucket, code=bucket
+            )
     for entry in result.get("failure") or []:
         msg = str(entry.get("error") or "upload failed")
         return AttachResult(False, reason=msg, code=attach_failure_code(msg))

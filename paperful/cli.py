@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
+import time
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -24,17 +23,25 @@ from . import __version__
 from .attach import Attacher
 from .config import SCIHUB_DISCLAIMER, SOURCE_PRESETS, Config, load_config
 from .doctor import has_red, run_checks
+from .library import LibraryError, get_backend
 from .pipeline import Pipeline, RunStats, make_client
 from .routing import sources_for_item
+from .runreport import build_report, print_run_summary, write_run_report
 from .sources import Context
 from .sources.scihub import ping_mirrors
 from .store import STATUS_ATTACHED, STATUS_NOT_FOUND, Manifest
 from .zot import ZoteroLocal
 
-app = typer.Typer(add_completion=False, no_args_is_help=True, help="Fetch missing PDFs for Zotero items.")
+app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Fetch missing PDFs for Zotero items.",
+)
 console = Console(highlight=False)
 
-ConfigOpt = typer.Option(None, "--config", "-c", help="Path to config.toml", exists=True, dir_okay=False)
+ConfigOpt = typer.Option(
+    None, "--config", "-c", help="Path to config.toml", exists=True, dir_okay=False
+)
 
 
 def _item_progress() -> Progress:
@@ -51,19 +58,21 @@ def _item_progress() -> Progress:
     )
 
 
-def _cfg(path: Optional[Path]) -> Config:
+def _cfg(path: Path | None) -> Config:
     cfg = load_config(path)
     cfg.out_dir.mkdir(parents=True, exist_ok=True)
     cfg.state_dir.mkdir(parents=True, exist_ok=True)
     return cfg
 
 
-def _resolve_source_names(sources: Optional[str], preset: Optional[str]) -> list[str] | None:
+def _resolve_source_names(sources: str | None, preset: str | None) -> list[str] | None:
     """Return explicit source names from --sources or --preset, or None to use config."""
     if preset:
         key = preset.strip().lower()
         if key not in SOURCE_PRESETS:
-            console.print(f"[red]Unknown preset '{preset}'.[/] Known: {', '.join(sorted(SOURCE_PRESETS))}")
+            console.print(
+                f"[red]Unknown preset '{preset}'.[/] Known: {', '.join(sorted(SOURCE_PRESETS))}"
+            )
             raise typer.Exit(1)
         return list(SOURCE_PRESETS[key])
     if not sources:
@@ -74,13 +83,31 @@ def _resolve_source_names(sources: Optional[str], preset: Optional[str]) -> list
     return [s.strip() for s in sources.split(",") if s.strip()]
 
 
-def _source_list(cfg: Config, sources: Optional[str], enable_scihub: bool, preset: Optional[str] = None) -> list[str]:
+def _source_list(
+    cfg: Config, sources: str | None, enable_scihub: bool, preset: str | None = None
+) -> list[str]:
     """Configured order, optional --sources/--preset override, then optional --scihub append."""
     resolved = _resolve_source_names(sources, preset)
     listed = resolved if resolved is not None else list(cfg.sources)
     if enable_scihub and "scihub" not in listed:
         listed.append("scihub")
     return listed
+
+
+def _zotero(*, quiet: bool = False) -> ZoteroLocal:
+    zl = ZoteroLocal()
+    try:
+        info = zl.ping()
+    except ConnectionError as exc:
+        _exit_env(str(exc))
+    except Exception as exc:  # Zotero not running
+        _exit_env(f"Cannot reach Zotero local API at localhost:23119: {exc}")
+    if not quiet:
+        console.print(
+            f"[dim]Zotero {info.get('zotero_version') or '?'}, local API v{info['api_version']}, write support: "
+            f"{'yes' if info['supports_write'] else 'no (Zotero 10+ needed)'}[/]"
+        )
+    return zl
 
 
 def _print_exit_ladder() -> None:
@@ -104,19 +131,29 @@ def _warn_if_scihub(source_list: list[str]) -> None:
         console.print(f"[yellow]{SCIHUB_DISCLAIMER}[/]")
 
 
-def _zotero() -> ZoteroLocal:
-    zl = ZoteroLocal()
-    try:
-        info = zl.ping()
-    except ConnectionError as exc:
-        _exit_env(str(exc))
-    except Exception as exc:  # Zotero not running
-        _exit_env(f"Cannot reach Zotero local API at localhost:23119: {exc}")
-    console.print(
-        f"[dim]Zotero {info.get('zotero_version') or '?'}, local API v{info['api_version']}, write support: "
-        f"{'yes' if info['supports_write'] else 'no (Zotero 10+ needed)'}[/]"
-    )
-    return zl
+def _require_manager(cfg: Config) -> None:
+    if (cfg.manager or "zotero").strip().lower() != "zotero":
+        console.print(
+            f'[red]manager={cfg.manager!r} is not implemented.[/] Set manager = "zotero" '
+            "(Mendeley write-back comes later)."
+        )
+        raise typer.Exit(1)
+
+
+def _scope_keys(
+    zl: ZoteroLocal, collection: list[str], library: bool
+) -> tuple[list[str] | None, str]:
+    if library:
+        return None, "whole library"
+    keys: list[str] = []
+    for spec in collection:
+        try:
+            root = zl.resolve_collection(spec)
+        except LookupError as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(1)
+        keys.extend(zl.subtree_keys(root))
+    return keys, ", ".join(collection)
 
 
 @app.callback()
@@ -130,7 +167,7 @@ def version() -> None:
 
 
 @app.command()
-def doctor(config: Optional[Path] = ConfigOpt) -> None:
+def doctor(config: Path | None = ConfigOpt) -> None:
     """Check Zotero, paths, email, and optional session cookies (green / amber / red)."""
     cfg = _cfg(config)
     zl: ZoteroLocal | None = None
@@ -154,9 +191,10 @@ def doctor(config: Optional[Path] = ConfigOpt) -> None:
 
 
 @app.command()
-def collections(config: Optional[Path] = ConfigOpt) -> None:
+def collections(config: Path | None = ConfigOpt) -> None:
     """Show the collection tree with item counts and how many lack a PDF."""
-    _cfg(config)
+    cfg = _cfg(config)
+    _require_manager(cfg)
     zl = _zotero()
     cols = zl.collections()
     counts = zl.collection_counts()
@@ -173,22 +211,236 @@ def collections(config: Optional[Path] = ConfigOpt) -> None:
 
 
 @app.command()
+def lint(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool = typer.Option(
+        False, "--library", help="Whole library instead of collections."
+    ),
+    limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
+    as_json: bool = typer.Option(False, "--json", help="Machine-readable findings."),
+    strict: bool = typer.Option(False, "--strict", help="Exit 1 if any finding."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Read-only check of identifiers vs APIs and PDF text on disk. Does not write to the manager."""
+    from .lint import lint_items
+    from .pipeline import make_client
+
+    if not collection and not library:
+        console.print("[red]Give --collection PATH (repeatable) or --library.[/]")
+        raise typer.Exit(1)
+    cfg = _cfg(config)
+    _require_manager(cfg)
+    zl = _zotero(quiet=as_json)
+    keys, scope = _scope_keys(zl, collection, library)
+    backend = get_backend(cfg, zl)
+    items = backend.items_in_scope(keys)
+    if limit:
+        items = items[:limit]
+    manifest = Manifest(cfg.manifest_path)
+    if not as_json:
+        console.print(f"Scope: [bold]{scope}[/] — linting {len(items)} items")
+    findings = lint_items(
+        make_client(cfg), cfg, items, backend=backend, manifest=manifest
+    )
+    if as_json:
+        console.print(json.dumps([f.__dict__ for f in findings], indent=2))
+    elif not findings:
+        console.print("[green]No findings.[/]")
+    else:
+        table = Table(title=f"{len(findings)} findings")
+        table.add_column("Code")
+        table.add_column("Key", style="dim")
+        table.add_column("Title")
+        table.add_column("Detail")
+        for f in findings:
+            table.add_row(f.code, f.itemKey, f.title[:50], f.detail[:80])
+        console.print(table)
+    if strict and findings:
+        raise typer.Exit(1)
+
+
+@app.command("fix-metadata")
+def fix_metadata(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool = typer.Option(
+        False, "--library", help="Whole library instead of collections."
+    ),
+    limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
+    apply: bool = typer.Option(
+        False, "--apply", help="Write patches to the library (default is dry-run)."
+    ),
+    overwrite: bool = typer.Option(
+        False, "--overwrite", help="Replace title/date/venue even when already set."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Propose bibliographic patches on disk; --apply writes them through the library adapter.
+
+    `run` never rewrites metadata. This is the only write path for DOI/title/date/venue.
+    """
+    from .lint import lint_item
+    from .metadata import apply_patches, propose_patch, write_patches
+    from .pipeline import make_client
+    from .resolve import IdentifierCache
+
+    if not collection and not library:
+        console.print("[red]Give --collection PATH (repeatable) or --library.[/]")
+        raise typer.Exit(1)
+    cfg = _cfg(config)
+    _require_manager(cfg)
+    zl = _zotero()
+    keys, scope = _scope_keys(zl, collection, library)
+    backend = get_backend(cfg, zl)
+    items = backend.items_in_scope(keys)
+    if limit:
+        items = items[:limit]
+    manifest = Manifest(cfg.manifest_path)
+    client = make_client(cfg)
+    cache = IdentifierCache()
+    patches = []
+    for item in items:
+        findings = lint_item(
+            client, cfg, item, backend=backend, manifest=manifest, cache=cache
+        )
+        patch = propose_patch(
+            client, cfg, item, findings, overwrite=overwrite, cache=cache
+        )
+        if patch:
+            patches.append(patch)
+    console.print(f"Scope: [bold]{scope}[/] — {len(patches)} proposed patches")
+    if patches:
+        table = Table(title="Proposed patches")
+        table.add_column("Key", style="dim")
+        table.add_column("Title")
+        table.add_column("After")
+        for p in patches:
+            table.add_row(
+                p.itemKey,
+                p.title[:40],
+                ", ".join(f"{k}={v}" for k, v in p.after.items())[:80],
+            )
+        console.print(table)
+    write_patches(cfg.patches_path, patches)
+    field_counts: dict[str, int] = {}
+    for p in patches:
+        for key in p.after:
+            field_counts[key] = field_counts.get(key, 0) + 1
+    console.print(f"[dim]Wrote {len(patches)} lines to {cfg.patches_path}[/]")
+    if not apply:
+        _print_fix_summary(len(patches), field_counts, applied=None, errors=[])
+        console.print(
+            "Dry-run. Pass [bold]--apply[/] to write these fields into the library."
+        )
+        return
+    if not backend.supports_write():
+        _exit_env(
+            "This Zotero has no local write API. Upgrade to Zotero 10+ to apply metadata."
+        )
+    try:
+        ok, errors = apply_patches(backend, patches)
+    except LibraryError as exc:
+        _exit_env(str(exc))
+    _print_fix_summary(len(patches), field_counts, applied=ok, errors=errors)
+    _write_fix_report(cfg, scope, patches, field_counts, applied=ok, errors=errors)
+
+
+def _print_fix_summary(
+    proposed: int,
+    field_counts: dict[str, int],
+    *,
+    applied: int | None,
+    errors: list[str],
+) -> None:
+    kinds = ", ".join(f"{k}={v}" for k, v in sorted(field_counts.items())) or "none"
+    console.print("\n[bold]Fix-metadata summary[/]")
+    console.print(f"Fields corrected (proposed): {proposed} patches  ({kinds})")
+    if applied is not None:
+        console.print(f"Applied: {applied}/{proposed}")
+    if errors:
+        console.print(f"Errors: {len(errors)}")
+        for err in errors[:20]:
+            console.print(f"[yellow]{err}[/]")
+        if len(errors) > 20:
+            console.print(f"[dim]… and {len(errors) - 20} more[/]")
+
+
+def _write_fix_report(
+    cfg: Config,
+    scope: str,
+    patches: list,
+    field_counts: dict[str, int],
+    *,
+    applied: int,
+    errors: list[str],
+) -> None:
+    from .runreport import write_run_report
+
+    report = {
+        "schema": "paperful.run_report.v1",
+        "command": "fix-metadata",
+        "scope": scope,
+        "summary": {
+            "fields_corrected": sum(field_counts.values()),
+            "fields_corrected_by_kind": field_counts,
+            "patches_proposed": len(patches),
+            "patches_applied": applied,
+            "errors_by_type": {"apply_failed": len(errors)} if errors else {},
+            "pdfs_downloaded": 0,
+            "sources_checked": {},
+        },
+        "items": [
+            {
+                "itemKey": p.itemKey,
+                "title": p.title,
+                "status": "patched",
+                "fields_corrected": list(p.after.keys()),
+                "after": p.after,
+                "before": p.before,
+            }
+            for p in patches
+        ],
+        "errors": errors,
+        "paths": {"state_dir": str(cfg.state_dir), "patches": str(cfg.patches_path)},
+    }
+    write_run_report(cfg, report, as_last_run=False)
+
+
+@app.command()
 def run(
     collection: list[str] = typer.Option(
-        [], "--collection", "-C", help="Collection path/name/key (repeatable). Subcollections included."
+        [],
+        "--collection",
+        "-C",
+        help="Collection path/name/key (repeatable). Subcollections included.",
     ),
-    library: bool = typer.Option(False, "--library", help="Whole library instead of collections."),
-    dry_run: bool = typer.Option(False, "--dry-run", help="List what would be fetched; no network beyond Zotero."),
-    limit: Optional[int] = typer.Option(None, "--limit", "-n", help="Stop after N items."),
-    no_attach: bool = typer.Option(False, "--no-attach", help="Do not attach PDFs into Zotero."),
-    retry_failed: bool = typer.Option(False, "--retry-failed", help="Retry items previously marked not_found."),
+    library: bool = typer.Option(
+        False, "--library", help="Whole library instead of collections."
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="List what would be fetched; no network beyond Zotero."
+    ),
+    limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
+    no_attach: bool = typer.Option(
+        False, "--no-attach", help="Do not attach PDFs into Zotero."
+    ),
+    retry_failed: bool = typer.Option(
+        False, "--retry-failed", help="Retry items previously marked not_found."
+    ),
     try_all: bool = typer.Option(
         False,
         "--try-all",
         help="Try every configured source even when item metadata looks inapplicable (overrides source_routing).",
     ),
-    sources: Optional[str] = typer.Option(None, "--sources", help="Comma-separated source order override (or preset name eoi)."),
-    preset: Optional[str] = typer.Option(
+    sources: str | None = typer.Option(
+        None,
+        "--sources",
+        help="Comma-separated source order override (or preset name eoi).",
+    ),
+    preset: str | None = typer.Option(
         None,
         "--preset",
         help="Named source preset (eoi = OA + EZProxy, no Scholar or Sci-Hub).",
@@ -203,31 +455,19 @@ def run(
         "--upgrade-linked",
         help="Also fetch items that only have a linked PDF URL in Zotero (adds imported_file).",
     ),
-    config: Optional[Path] = ConfigOpt,
+    config: Path | None = ConfigOpt,
 ) -> None:
     """Find and download PDFs for items lacking one, then attach them."""
     if not collection and not library:
         console.print("[red]Give --collection PATH (repeatable) or --library.[/]")
         raise typer.Exit(1)
     cfg = _cfg(config)
+    _require_manager(cfg)
     source_list = _source_list(cfg, sources, scihub, preset)
     _warn_if_scihub(source_list)
     zl = _zotero()
 
-    keys: list[str] | None
-    if library:
-        keys = None
-        scope = "whole library"
-    else:
-        keys = []
-        for spec in collection:
-            try:
-                root = zl.resolve_collection(spec)
-            except LookupError as exc:
-                console.print(f"[red]{exc}[/]")
-                raise typer.Exit(1)
-            keys.extend(zl.subtree_keys(root))
-        scope = ", ".join(collection)
+    keys, scope = _scope_keys(zl, collection, library)
 
     manifest = Manifest(cfg.manifest_path)
     linked_skipped = 0 if upgrade_linked else zl.count_linked_url_only(keys)
@@ -236,7 +476,9 @@ def run(
     skipped_manifest = len(items) - len(todo)
     if limit:
         todo = todo[:limit]
-    linked_note = f", {linked_skipped} linked URL only (skipped)" if linked_skipped else ""
+    linked_note = (
+        f", {linked_skipped} linked URL only (skipped)" if linked_skipped else ""
+    )
     console.print(
         f"Scope: [bold]{scope}[/] - {len(items)} items without PDF, {skipped_manifest} already handled, "
         f"{len(todo)} to process{linked_note}. Sources: {', '.join(source_list)}"
@@ -261,7 +503,11 @@ def run(
                 it.key,
                 it.item_type,
                 it.label,
-                f"{it.doi} ({it.doi_source})" if it.doi else ("arXiv:" + it.arxiv_id if it.arxiv_id else "-"),
+                (
+                    f"{it.doi} ({it.doi_source})"
+                    if it.doi
+                    else ("arXiv:" + it.arxiv_id if it.arxiv_id else "-")
+                ),
                 would,
                 (it.url or "-")[:60],
                 "; ".join(it.collection_paths),
@@ -273,13 +519,33 @@ def run(
     if cfg.attach and not no_attach:
         attacher = Attacher(cfg, zl)
         if not attacher.supports_write():
-            console.print("[yellow]Attach disabled: this Zotero has no local write API (upgrade to Zotero 10+). PDFs still saved to disk.[/]")
+            console.print(
+                "[yellow]Attach disabled: this Zotero has no local write API (upgrade to Zotero 10+). PDFs still saved to disk.[/]"
+            )
             attacher = None
 
     if not todo:
-        stats = RunStats(skipped_manifest=skipped_manifest, linked_url_skipped=linked_skipped)
-        _print_stats(stats, cfg)
-        _write_last_run(cfg, stats)
+        stats = RunStats(
+            skipped_manifest=skipped_manifest, linked_url_skipped=linked_skipped
+        )
+        stats.scope = scope
+        stats.sources_configured = list(source_list)
+        stats.finished_at = stats.started_at
+        _finish_run(
+            cfg,
+            stats,
+            scope=scope,
+            flags=_run_flags(
+                dry_run=False,
+                no_attach=no_attach,
+                retry_failed=retry_failed,
+                try_all=try_all,
+                upgrade_linked=upgrade_linked,
+                scihub=scihub,
+                preset=preset,
+                sources=sources,
+            ),
+        )
         return
 
     with _item_progress() as progress:
@@ -296,21 +562,40 @@ def run(
         try:
             stats = pipe.run(todo)
         except KeyboardInterrupt:
-            console.print("\n[yellow]Interrupted - progress is in the manifest; rerun to resume.[/]")
+            console.print(
+                "\n[yellow]Interrupted - progress is in the manifest; rerun to resume.[/]"
+            )
             stats = pipe.stats
+            if not stats.finished_at:
+                stats.finished_at = time.time()
     stats.skipped_manifest = skipped_manifest
     stats.linked_url_skipped = linked_skipped
-    _print_stats(stats, cfg)
-    _write_last_run(cfg, stats)
+    stats.scope = scope
+    _finish_run(
+        cfg,
+        stats,
+        scope=scope,
+        flags=_run_flags(
+            dry_run=False,
+            no_attach=no_attach,
+            retry_failed=retry_failed,
+            try_all=try_all,
+            upgrade_linked=upgrade_linked,
+            scihub=scihub,
+            preset=preset,
+            sources=sources,
+        ),
+    )
 
 
-def _write_last_run(cfg: Config, stats: RunStats) -> None:
-    path = cfg.state_dir / "last-run.json"
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(asdict(stats), indent=2))
-    except OSError:
-        pass
+def _run_flags(**kwargs) -> dict:
+    return {k: v for k, v in kwargs.items() if v}
+
+
+def _finish_run(cfg: Config, stats: RunStats, *, scope: str, flags: dict) -> None:
+    report = build_report(stats, cfg, command="run", scope=scope, flags=flags)
+    path = write_run_report(cfg, report)
+    print_run_summary(console, report, path)
 
 
 def _load_last_run(cfg: Config) -> dict | None:
@@ -321,37 +606,20 @@ def _load_last_run(cfg: Config) -> dict | None:
         return None
 
 
-def _print_stats(stats: RunStats, cfg: Config) -> None:
-    downloaded = stats.ok + stats.attached
-    deferred = stats.skipped_manifest + stats.linked_url_skipped + stats.not_found + stats.no_identifier
-    console.print(
-        f"\n[bold]Done.[/] downloaded {downloaded} · attached {stats.attached} · deferred/skipped {deferred}"
-    )
-    if stats.linked_url_skipped:
-        console.print(f"[dim]linked URL only (not fetched): {stats.linked_url_skipped}[/]")
-    console.print(
-        f"ok={stats.ok} attach_failed={stats.attach_failed} not_found={stats.not_found} "
-        f"no_identifier={stats.no_identifier} captcha={stats.captcha} error={stats.error}"
-    )
-    if stats.attach_failed_by_code:
-        console.print(
-            "Attach failures: "
-            + ", ".join(f"{k}={v}" for k, v in sorted(stats.attach_failed_by_code.items()))
-        )
-    if stats.by_source:
-        console.print("By source: " + ", ".join(f"{k}={v}" for k, v in sorted(stats.by_source.items())))
-    console.print(f"[dim]PDFs: {cfg.out_dir}   manifest: {cfg.manifest_path}[/]")
-
-
 @app.command()
-def attach(config: Optional[Path] = ConfigOpt, limit: Optional[int] = typer.Option(None, "--limit", "-n")) -> None:
+def attach(
+    config: Path | None = ConfigOpt,
+    limit: int | None = typer.Option(None, "--limit", "-n"),
+) -> None:
     """Attach already-downloaded PDFs (status ok / attach_failed) into Zotero."""
     cfg = _cfg(config)
     zl = _zotero()
     manifest = Manifest(cfg.manifest_path)
     attacher = Attacher(cfg, zl)
     if not attacher.supports_write():
-        _exit_env("This Zotero has no local write API. Upgrade to Zotero 10+ to attach.")
+        _exit_env(
+            "This Zotero has no local write API. Upgrade to Zotero 10+ to attach."
+        )
     pending = manifest.pending_attach()
     if limit:
         pending = pending[:limit]
@@ -375,22 +643,40 @@ def attach(config: Optional[Path] = ConfigOpt, limit: Optional[int] = typer.Opti
 
 @app.command()
 def report(
-    config: Optional[Path] = ConfigOpt,
-    not_found: bool = typer.Option(False, "--not-found", help="List not_found items with DOIs."),
-    status: Optional[str] = typer.Option(None, "--status", help="List items with this status."),
-    as_json: bool = typer.Option(False, "--json", help="Machine-readable summary for agents."),
+    config: Path | None = ConfigOpt,
+    not_found: bool = typer.Option(
+        False, "--not-found", help="List not_found items with DOIs."
+    ),
+    status: str | None = typer.Option(
+        None, "--status", help="List items with this status."
+    ),
+    as_json: bool = typer.Option(
+        False, "--json", help="Machine-readable summary for agents."
+    ),
+    last_run: bool = typer.Option(
+        False, "--last-run", help="Show only the latest run report summary."
+    ),
 ) -> None:
-    """Summarise the manifest: counts by status and by source."""
+    """Summarise the manifest and the latest auditable run report."""
     cfg = _cfg(config)
     manifest = Manifest(cfg.manifest_path)
+    last = _load_last_run(cfg)
     if as_json:
-        payload = manifest.report_payload(_load_last_run(cfg))
+        payload = manifest.report_payload(last)
         console.print(json.dumps(payload, indent=2))
         raise typer.Exit(0)
+    if last and last.get("schema") == "paperful.run_report.v1":
+        print_run_summary(console, last, cfg.state_dir / "last-run.json")
+        if last_run:
+            raise typer.Exit(0)
+        console.print()
+    elif last_run:
+        console.print("No auditable run report yet. Run [bold]paperful run[/] first.")
+        raise typer.Exit(1)
     if not manifest.records:
         console.print("Manifest is empty.")
         raise typer.Exit(0)
-    table = Table(title=f"{len(manifest.records)} items in manifest")
+    table = Table(title=f"{len(manifest.records)} items in manifest (all runs)")
     table.add_column("Status")
     table.add_column("Count", justify="right")
     for k, v in sorted(manifest.counts().items(), key=lambda kv: -kv[1]):
@@ -398,7 +684,12 @@ def report(
     console.print(table)
     by_src = manifest.by_source()
     if by_src:
-        console.print("PDFs by source: " + ", ".join(f"{k}={v}" for k, v in sorted(by_src.items(), key=lambda kv: -kv[1])))
+        console.print(
+            "PDFs by source: "
+            + ", ".join(
+                f"{k}={v}" for k, v in sorted(by_src.items(), key=lambda kv: -kv[1])
+            )
+        )
     want = STATUS_NOT_FOUND if not_found else status
     if want:
         rows = [r for r in manifest.records.values() if r.status == want]
@@ -408,17 +699,28 @@ def report(
         t.add_column("DOI")
         t.add_column("Attempts" if want != STATUS_ATTACHED else "Path")
         for r in sorted(rows, key=lambda r: r.title.lower()):
-            t.add_row(r.itemKey, r.title[:70], r.doi or "-", (r.path or "") if want == STATUS_ATTACHED else " ".join(r.attempts)[-90:])
+            t.add_row(
+                r.itemKey,
+                r.title[:70],
+                r.doi or "-",
+                (
+                    (r.path or "")
+                    if want == STATUS_ATTACHED
+                    else " ".join(r.attempts)[-90:]
+                ),
+            )
         console.print(t)
 
 
 @app.command()
-def mirrors(config: Optional[Path] = ConfigOpt) -> None:
+def mirrors(config: Path | None = ConfigOpt) -> None:
     """Ping the configured Sci-Hub mirrors."""
     cfg = _cfg(config)
     console.print(f"[yellow]{SCIHUB_DISCLAIMER}[/]")
     if "scihub" not in cfg.sources:
-        console.print("[dim]Sci-Hub is off until you add \"scihub\" to sources or pass --scihub on run.[/]")
+        console.print(
+            '[dim]Sci-Hub is off until you add "scihub" to sources or pass --scihub on run.[/]'
+        )
     ctx = Context(config=cfg, client=make_client(cfg))
     for mirror, status in ping_mirrors(ctx):
         colour = "green" if status == "HTTP 200" else "red"
@@ -427,8 +729,10 @@ def mirrors(config: Optional[Path] = ConfigOpt) -> None:
 
 @app.command("ezproxy")
 def ezproxy_cmd(
-    config: Optional[Path] = ConfigOpt,
-    open_browser: bool = typer.Option(True, "--open/--no-open", help="Open the EZProxy login page"),
+    config: Path | None = ConfigOpt,
+    open_browser: bool = typer.Option(
+        True, "--open/--no-open", help="Open the EZProxy login page"
+    ),
 ) -> None:
     """Check / refresh the campus EZProxy session.
 
@@ -446,7 +750,9 @@ def ezproxy_cmd(
     cookie_path = cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt")
     if not cfg.ezproxy_base:
         console.print("[red]ezproxy_base is empty in config.toml[/]")
-        console.print("Set it to your library EZProxy prefix, e.g. https://PREFIX.idm.oclc.org/login?url=")
+        console.print(
+            "Set it to your library EZProxy prefix, e.g. https://PREFIX.idm.oclc.org/login?url="
+        )
         raise typer.Exit(1)
 
     console.print(f"Proxy:   {cfg.ezproxy_base}")
@@ -481,8 +787,10 @@ def ezproxy_cmd(
 
 @app.command("scholar")
 def scholar_cmd(
-    config: Optional[Path] = ConfigOpt,
-    open_browser: bool = typer.Option(True, "--open/--no-open", help="Open Google Scholar in your browser"),
+    config: Path | None = ConfigOpt,
+    open_browser: bool = typer.Option(
+        True, "--open/--no-open", help="Open Google Scholar in your browser"
+    ),
 ) -> None:
     """Check / refresh Google Scholar session cookies.
 
@@ -522,7 +830,9 @@ def scholar_cmd(
         raise typer.Exit(2)
 
     ctx = Context(config=cfg, client=make_client(cfg))
-    gs_domains = sorted(d for d in cookie_domains(ctx.client.cookies) if "google" in (d or "").lower())
+    gs_domains = sorted(
+        d for d in cookie_domains(ctx.client.cookies) if "google" in (d or "").lower()
+    )
     if gs_domains:
         console.print(f"Loaded domains: {', '.join(gs_domains)}")
     ok, detail = gs.session_ok(ctx)

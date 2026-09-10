@@ -20,7 +20,11 @@ from ..zot import Item
 from .base import Candidate, Context, Outcome
 
 NAME = "scihub"
-_ALTCHA_HASHES = {"SHA-256": hashlib.sha256, "SHA-1": hashlib.sha1, "SHA-512": hashlib.sha512}
+_ALTCHA_HASHES = {
+    "SHA-256": hashlib.sha256,
+    "SHA-1": hashlib.sha1,
+    "SHA-512": hashlib.sha512,
+}
 _NOT_FOUND_MARKERS = (
     "не найден",  # "статьи по запросу не найдены"
     "отсутствует в базе",  # "статья отсутствует в базе"
@@ -74,7 +78,9 @@ def parse_page(html: str, base_url: str) -> PageResult:
     if is_captcha_page(html):
         return PageResult(Outcome.CAPTCHA, note="altcha robot check")
 
-    if soup.select_one("div.notfound, block-rounded.message") or any(m in title for m in _NOT_FOUND_MARKERS):
+    if soup.select_one("div.notfound, block-rounded.message") or any(
+        m in title for m in _NOT_FOUND_MARKERS
+    ):
         return PageResult(Outcome.NOT_FOUND, note="article not in Sci-Hub")
     body = soup.get_text(" ", strip=True).lower()
     if any(m in body for m in _NOT_FOUND_MARKERS):
@@ -119,7 +125,9 @@ def solve_altcha(challenge: dict) -> str:
     hasher = _ALTCHA_HASHES.get(alg, hashlib.sha256)
     salt = challenge["salt"]
     target = challenge["challenge"]
-    max_number = int(challenge.get("maxNumber") or challenge.get("maxnumber") or 1_000_000)
+    max_number = int(
+        challenge.get("maxNumber") or challenge.get("maxnumber") or 1_000_000
+    )
     number = None
     for n in range(max_number + 1):
         if hasher(f"{salt}{n}".encode()).hexdigest() == target:
@@ -153,7 +161,12 @@ def find(item: Item, ctx: Context) -> Candidate:
         result = fetch_from_mirror(ctx, mirror, item.doi)
         if result.outcome is Outcome.FOUND:
             ctx.mirror_succeeded(mirror)
-            return Candidate(url=result.pdf_url or "", source=NAME, referer=f"https://{mirror}/{item.doi}", note=mirror)
+            return Candidate(
+                url=result.pdf_url or "",
+                source=NAME,
+                referer=f"https://{mirror}/{item.doi}",
+                note=mirror,
+            )
         if result.outcome is Outcome.NOT_FOUND:
             ctx.mirror_succeeded(mirror)
             return Candidate.miss(NAME, Outcome.NOT_FOUND, f"{mirror}: {result.note}")
@@ -163,7 +176,9 @@ def find(item: Item, ctx: Context) -> Candidate:
             continue  # try another mirror without penalising this one
         ctx.mirror_failed(mirror)
     summary = "; ".join(notes) or "no mirror configured"
-    return Candidate.miss(NAME, Outcome.CAPTCHA if saw_captcha else Outcome.ERROR, summary)
+    return Candidate.miss(
+        NAME, Outcome.CAPTCHA if saw_captcha else Outcome.ERROR, summary
+    )
 
 
 def fetch_from_mirror(ctx: Context, mirror: str, doi: str) -> PageResult:
@@ -196,10 +211,15 @@ def _pass_robot_check(ctx: Context, base: str, page_url: str, html: str) -> bool
     if not challenge_path or not solution_path:
         return False
     try:
-        ch = ctx.client.get(urljoin(base, challenge_path), timeout=30, headers={"Referer": page_url}).json()
+        ch = ctx.client.get(
+            urljoin(base, challenge_path), timeout=30, headers={"Referer": page_url}
+        ).json()
         payload = solve_altcha(ch)
         resp = ctx.client.post(
-            urljoin(base, solution_path), json={"captcha": payload}, timeout=30, headers={"Referer": page_url}
+            urljoin(base, solution_path),
+            json={"captcha": payload},
+            timeout=30,
+            headers={"Referer": page_url},
         )
         return resp.status_code == 200 and bool(resp.json().get("success"))
     except (httpx.HTTPError, ValueError, KeyError):

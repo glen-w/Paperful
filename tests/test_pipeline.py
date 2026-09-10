@@ -49,17 +49,29 @@ class FakeAttacher:
 
     def attach(self, key, path, title=None):
         self.calls.append((key, path))
-        return AttachResult(self.ok, attachment_key="ATT1" if self.ok else None, reason="success" if self.ok else "denied")
+        return AttachResult(
+            self.ok,
+            attachment_key="ATT1" if self.ok else None,
+            reason="success" if self.ok else "denied",
+        )
 
 
 @pytest.fixture
 def pipe_factory(cfg, monkeypatch):
     def _make(registry: dict, sources: list[str], handler=None, attacher=None):
         monkeypatch.setattr(pl, "REGISTRY", registry)
-        monkeypatch.setattr(pl, "enrich_identifiers", lambda *a, **k: [])
+        monkeypatch.setattr(pl, "prepare_identifiers", lambda *a, **k: [])
         manifest = Manifest(cfg.manifest_path)
-        pipe = pl.Pipeline(cfg, manifest, Console(file=io.StringIO()), sources=sources, attacher=attacher)
-        client = mock_client(handler or (lambda r: httpx.Response(200, content=PDF_BYTES)))
+        pipe = pl.Pipeline(
+            cfg,
+            manifest,
+            Console(file=io.StringIO()),
+            sources=sources,
+            attacher=attacher,
+        )
+        client = mock_client(
+            handler or (lambda r: httpx.Response(200, content=PDF_BYTES))
+        )
         pipe.client = client
         pipe.ctx.client = client
         return pipe, manifest
@@ -70,8 +82,12 @@ def pipe_factory(cfg, monkeypatch):
 def test_oa_sources_run_in_order_and_scihub_only_after_all_miss(pipe_factory, cfg):
     oa1 = StubSource("oa1")
     oa2 = StubSource("oa2", {"B": Candidate(url="https://x.test/b.pdf", source="oa2")})
-    sh = StubSource("scihub", {"A": Candidate(url="https://m1.test/a.pdf", source="scihub")})
-    pipe, manifest = pipe_factory({"oa1": oa1, "oa2": oa2, "scihub": sh}, ["oa1", "oa2", "scihub"])
+    sh = StubSource(
+        "scihub", {"A": Candidate(url="https://m1.test/a.pdf", source="scihub")}
+    )
+    pipe, manifest = pipe_factory(
+        {"oa1": oa1, "oa2": oa2, "scihub": sh}, ["oa1", "oa2", "scihub"]
+    )
     items = [make_item(key="A"), make_item(key="B")]
     stats = pipe.run(items)
 
@@ -79,7 +95,11 @@ def test_oa_sources_run_in_order_and_scihub_only_after_all_miss(pipe_factory, cf
     assert sh.calls == ["A"]  # B was satisfied by an OA source, never reaches Sci-Hub
     assert manifest.get("B").source == "oa2" and manifest.get("A").source == "scihub"
     assert manifest.get("B").attempts == ["oa1:not_found", "oa2:found"]
-    assert (cfg.out_dir / "Col" / "Smith - 2019 - A sufficiently long test title about marine governance.pdf").exists()
+    assert (
+        cfg.out_dir
+        / "Col"
+        / "Smith - 2019 - A sufficiently long test title about marine governance.pdf"
+    ).exists()
 
 
 def test_alternate_urls_are_tried_after_download_failure(pipe_factory):
@@ -88,7 +108,16 @@ def test_alternate_urls_are_tried_after_download_failure(pipe_factory):
             return httpx.Response(403)
         return httpx.Response(200, content=PDF_BYTES)
 
-    src = StubSource("oa", {"A": Candidate(url="https://blocked.test/a.pdf", source="oa", alternates=["https://repo.test/a.pdf"])})
+    src = StubSource(
+        "oa",
+        {
+            "A": Candidate(
+                url="https://blocked.test/a.pdf",
+                source="oa",
+                alternates=["https://repo.test/a.pdf"],
+            )
+        },
+    )
     pipe, manifest = pipe_factory({"oa": src}, ["oa"], handler=handler)
     pipe.run([make_item(key="A")])
     rec = manifest.get("A")
@@ -99,12 +128,16 @@ def test_alternate_urls_are_tried_after_download_failure(pipe_factory):
 def test_miss_classification(pipe_factory):
     err_src = StubSource("oa", default=Outcome.ERROR)
     pipe, manifest = pipe_factory({"oa": err_src}, ["oa"])
-    pipe.run([
-        make_item(key="NOID", doi=None, url=None, arxiv_id=None),
-        make_item(key="ERR"),
-    ])
+    pipe.run(
+        [
+            make_item(key="NOID", doi=None, url=None, arxiv_id=None),
+            make_item(key="ERR"),
+        ]
+    )
     assert manifest.get("NOID").status == STATUS_NO_IDENTIFIER
-    assert manifest.get("ERR").status == STATUS_ERROR  # only transient failures -> retried next run
+    assert (
+        manifest.get("ERR").status == STATUS_ERROR
+    )  # only transient failures -> retried next run
 
     nf_src = StubSource("oa", default=Outcome.NOT_FOUND)
     pipe2, manifest2 = pipe_factory({"oa": nf_src}, ["oa"])
@@ -128,9 +161,16 @@ def test_circuit_breaker_skips_source_after_repeated_blocks(pipe_factory, cfg):
 def test_source_routing_skips_inapplicable_sources(pipe_factory, cfg):
     oa = StubSource("unpaywall", default=Outcome.NOT_FOUND)
     scholar = StubSource("scholar", default=Outcome.NOT_FOUND)
-    pipe, manifest = pipe_factory({"unpaywall": oa, "scholar": scholar}, ["unpaywall", "scholar"])
+    pipe, manifest = pipe_factory(
+        {"unpaywall": oa, "scholar": scholar}, ["unpaywall", "scholar"]
+    )
     pipe.try_all = False
-    item = make_item(key="N", doi=None, url="https://www.npr.org/story", title="A long enough title for scholar routing")
+    item = make_item(
+        key="N",
+        doi=None,
+        url="https://www.npr.org/story",
+        title="A long enough title for scholar routing",
+    )
     pipe.run([item])
 
     assert oa.calls == []
@@ -166,10 +206,13 @@ def test_try_all_runs_inapplicable_sources(pipe_factory):
 
 
 def test_scihub_captcha_and_error_statuses(pipe_factory):
-    sh = StubSource("scihub", {
-        "C": Candidate.miss("scihub", Outcome.CAPTCHA, "m1=captcha unsolved"),
-        "E": Candidate.miss("scihub", Outcome.ERROR, "m1=HTTP 502"),
-    })
+    sh = StubSource(
+        "scihub",
+        {
+            "C": Candidate.miss("scihub", Outcome.CAPTCHA, "m1=captcha unsolved"),
+            "E": Candidate.miss("scihub", Outcome.ERROR, "m1=HTTP 502"),
+        },
+    )
     pipe, manifest = pipe_factory({"scihub": sh}, ["scihub"])
     pipe.run([make_item(key="C"), make_item(key="E"), make_item(key="N")])
     assert manifest.get("C").status == STATUS_CAPTCHA
@@ -195,7 +238,9 @@ def test_attach_after_download_success_and_failure(pipe_factory):
     assert ok_attacher.calls[0][0] == "A"
 
     src2 = StubSource("oa", {"B": Candidate(url="https://x.test/b.pdf", source="oa")})
-    pipe2, manifest2 = pipe_factory({"oa": src2}, ["oa"], attacher=FakeAttacher(ok=False))
+    pipe2, manifest2 = pipe_factory(
+        {"oa": src2}, ["oa"], attacher=FakeAttacher(ok=False)
+    )
     pipe2.run([make_item(key="B")])
     assert manifest2.get("B").status == STATUS_ATTACH_FAILED
     assert manifest2.pending_attach()[0].itemKey == "B"
@@ -215,51 +260,97 @@ def test_batches_and_stop_flag(pipe_factory):
 
 
 def test_enrich_resolution_feeds_sources(pipe_factory, monkeypatch):
-    def fake_enrich(client, item, email="", min_score=0.9):
+    def fake_prepare(client, item, **kwargs):
         item.doi = "10.9/found"
         item.doi_source = "crossref"
+        item.doi_verified = "ok"
         return ["crossref:matched(0.97)"]
 
     src = StubSource("oa")
     pipe, manifest = pipe_factory({"oa": src}, ["oa"])
-    monkeypatch.setattr(pl, "enrich_identifiers", fake_enrich)
+    monkeypatch.setattr(pl, "prepare_identifiers", fake_prepare)
     pipe.run([make_item(key="X", doi=None)])
     rec = manifest.get("X")
     assert rec.doi == "10.9/found" and rec.doi_source == "crossref"
     assert rec.attempts[0] == "crossref:matched(0.97)"
 
 
-def test_enrich_not_used_when_doi_present(pipe_factory, monkeypatch):
-    called = []
+def test_verify_runs_when_doi_present(pipe_factory, monkeypatch):
+    seen = []
 
-    def fake_enrich(*a, **k):
-        called.append(1)
-        return []
+    def fake_prepare(client, item, **kwargs):
+        seen.append(item.doi)
+        item.doi_verified = "ok"
+        return ["verify:ok(0.99)"]
 
-    monkeypatch.setattr(pl, "enrich_identifiers", fake_enrich)
+    monkeypatch.setattr(pl, "prepare_identifiers", fake_prepare)
     pipe, _ = pipe_factory({"oa": StubSource("oa")}, ["oa"])
+    monkeypatch.setattr(pl, "prepare_identifiers", fake_prepare)
     pipe.run([make_item(key="W", doi="10.1/x")])
-    assert called == []
+    assert seen == ["10.1/x"]
+
+
+def test_suspect_doi_swap_feeds_sources(pipe_factory, monkeypatch):
+    def fake_prepare(client, item, **kwargs):
+        item.library_doi = "10.1/wrong"
+        item.doi = "10.9/right"
+        item.doi_source = "crossref"
+        item.doi_verified = "swapped"
+        return ["verify:suspect(0.20)", "swap:10.1/wrong->10.9/right"]
+
+    src = StubSource("oa")
+    pipe, manifest = pipe_factory({"oa": src}, ["oa"])
+    monkeypatch.setattr(pl, "prepare_identifiers", fake_prepare)
+    pipe.run([make_item(key="S", doi="10.1/wrong")])
+    rec = manifest.get("S")
+    assert rec.doi == "10.9/right"
+    assert rec.library_doi == "10.1/wrong"
+    assert rec.doi_verified == "swapped"
+    assert src.calls == ["S"]
+
+
+def test_verify_api_down_keeps_original_doi(pipe_factory, monkeypatch):
+    from paperful.resolve import prepare_identifiers
+
+    src = StubSource("oa")
+    pipe, manifest = pipe_factory(
+        {"oa": src},
+        ["oa"],
+        handler=lambda r: httpx.Response(500),
+    )
+    monkeypatch.setattr(pl, "prepare_identifiers", prepare_identifiers)
+    pipe.run([make_item(key="U", doi="10.1/original", url=None)])
+    rec = manifest.get("U")
+    assert rec.doi == "10.1/original"
+    assert rec.library_doi == "10.1/original"
+    assert rec.doi_verified == "unknown"
 
 
 def test_enrich_skipped_for_webpages_via_enrich_fn(pipe_factory, monkeypatch):
-    """Pipeline still calls enrich when doi is missing; enrich_identifiers itself skips web types."""
-    from paperful.resolve import enrich_identifiers
+    """Pipeline still calls prepare; prepare_identifiers itself skips web types."""
+    from paperful.resolve import prepare_identifiers
 
-    monkeypatch.setattr(pl, "enrich_identifiers", enrich_identifiers)
+    monkeypatch.setattr(pl, "prepare_identifiers", prepare_identifiers)
     pipe, manifest = pipe_factory({"oa": StubSource("oa")}, ["oa"])
     pipe.run([make_item(key="W", doi=None, item_type="webpage")])
-    # no crossref/openalex attempt strings
-    assert not any("crossref:" in a or "openalex:" in a for a in (manifest.get("W").attempts or []))
+    assert not any(
+        "crossref:" in a or "openalex:" in a for a in (manifest.get("W").attempts or [])
+    )
 
 
 def test_embedded_pdf_content_skips_http_download(pipe_factory):
     src = StubSource(
         "htmlpdf",
-        {"A": Candidate(url="https://news.test/a", source="htmlpdf", content=PDF_BYTES)},
+        {
+            "A": Candidate(
+                url="https://news.test/a", source="htmlpdf", content=PDF_BYTES
+            )
+        },
     )
     pipe, manifest = pipe_factory({"htmlpdf": src}, ["htmlpdf"])
-    pipe.run([make_item(key="A", item_type="webpage", doi=None, url="https://news.test/a")])
+    pipe.run(
+        [make_item(key="A", item_type="webpage", doi=None, url="https://news.test/a")]
+    )
     rec = manifest.get("A")
     assert rec.status in {STATUS_OK, STATUS_ATTACHED}
     assert rec.source == "htmlpdf"
@@ -270,11 +361,19 @@ def test_htmlpdf_runs_after_ezproxy_in_serial_chain(pipe_factory):
     ez = StubSource("ezproxy", default=Outcome.NOT_FOUND)
     hp = StubSource(
         "htmlpdf",
-        {"W": Candidate(url="https://news.test/w", source="htmlpdf", content=PDF_BYTES)},
+        {
+            "W": Candidate(
+                url="https://news.test/w", source="htmlpdf", content=PDF_BYTES
+            )
+        },
     )
-    pipe, manifest = pipe_factory({"ezproxy": ez, "htmlpdf": hp}, ["ezproxy", "htmlpdf"])
+    pipe, manifest = pipe_factory(
+        {"ezproxy": ez, "htmlpdf": hp}, ["ezproxy", "htmlpdf"]
+    )
     pipe.try_all = True
-    pipe.run([make_item(key="W", item_type="webpage", doi=None, url="https://news.test/w")])
+    pipe.run(
+        [make_item(key="W", item_type="webpage", doi=None, url="https://news.test/w")]
+    )
     assert ez.calls == ["W"]
     assert hp.calls == ["W"]
     assert manifest.get("W").source == "htmlpdf"
@@ -283,10 +382,16 @@ def test_htmlpdf_runs_after_ezproxy_in_serial_chain(pipe_factory):
 def test_invalid_embedded_pdf_content_fails(pipe_factory):
     src = StubSource(
         "htmlpdf",
-        {"A": Candidate(url="https://news.test/a", source="htmlpdf", content=b"not-a-pdf")},
+        {
+            "A": Candidate(
+                url="https://news.test/a", source="htmlpdf", content=b"not-a-pdf"
+            )
+        },
     )
     pipe, manifest = pipe_factory({"htmlpdf": src}, ["htmlpdf"])
-    pipe.run([make_item(key="A", item_type="webpage", doi=None, url="https://news.test/a")])
+    pipe.run(
+        [make_item(key="A", item_type="webpage", doi=None, url="https://news.test/a")]
+    )
     rec = manifest.get("A")
     # download-failed without a not_found → error (retried next run)
     assert rec.status == STATUS_ERROR
@@ -296,7 +401,9 @@ def test_invalid_embedded_pdf_content_fails(pipe_factory):
 def test_serial_chain_ezproxy_htmlpdf_then_scihub(pipe_factory):
     ez = StubSource("ezproxy", default=Outcome.NOT_FOUND)
     hp = StubSource("htmlpdf", default=Outcome.SKIPPED)
-    sh = StubSource("scihub", {"J": Candidate(url="https://m.test/j.pdf", source="scihub")})
+    sh = StubSource(
+        "scihub", {"J": Candidate(url="https://m.test/j.pdf", source="scihub")}
+    )
     pipe, manifest = pipe_factory(
         {"ezproxy": ez, "htmlpdf": hp, "scihub": sh},
         ["ezproxy", "htmlpdf", "scihub"],

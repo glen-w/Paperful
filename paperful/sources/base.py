@@ -29,11 +29,15 @@ class Candidate:
     outcome: Outcome = Outcome.FOUND
     referer: str | None = None
     note: str = ""
-    alternates: list[str] = field(default_factory=list)  # further PDF URLs to try if `url` fails
-    content: bytes | None = None  # pre-fetched PDF bytes (e.g. htmlpdf); skips HTTP download
+    alternates: list[str] = field(
+        default_factory=list
+    )  # further PDF URLs to try if `url` fails
+    content: bytes | None = (
+        None  # pre-fetched PDF bytes (e.g. htmlpdf); skips HTTP download
+    )
 
     @classmethod
-    def miss(cls, source: str, outcome: Outcome, note: str = "") -> "Candidate":
+    def miss(cls, source: str, outcome: Outcome, note: str = "") -> Candidate:
         return cls(url="", source=source, outcome=outcome, note=note)
 
     @property
@@ -53,7 +57,10 @@ class Context:
     lock: threading.Lock = field(default_factory=threading.Lock)
 
     def mirror_ok(self, mirror: str) -> bool:
-        return self.mirror_failures.get(mirror, 0) < self.config.mirror_failures_before_skip
+        return (
+            self.mirror_failures.get(mirror, 0)
+            < self.config.mirror_failures_before_skip
+        )
 
     def mirror_failed(self, mirror: str) -> None:
         with self.lock:
@@ -70,17 +77,23 @@ class Source(Protocol):
     def find(self, item: Item, ctx: Context) -> Candidate: ...
 
 
-def http_json(ctx: Context, url: str, params: dict | None = None, timeout: float = 30) -> dict | None:
+def http_json(
+    ctx: Context,
+    url: str,
+    params: dict | None = None,
+    timeout: float = 30,
+    headers: dict[str, str] | None = None,
+) -> dict | None:
     """GET JSON, returning None on any HTTP/network/parse failure. Honours one 429 Retry-After."""
     try:
-        resp = ctx.client.get(url, params=params, timeout=timeout)
+        resp = ctx.client.get(url, params=params, timeout=timeout, headers=headers)
         if resp.status_code == 429:
             try:
                 delay = min(float(resp.headers.get("Retry-After", "5")), 20.0)
             except ValueError:
                 delay = 5.0
             time.sleep(delay)
-            resp = ctx.client.get(url, params=params, timeout=timeout)
+            resp = ctx.client.get(url, params=params, timeout=timeout, headers=headers)
         if resp.status_code == 404:
             return None
         resp.raise_for_status()

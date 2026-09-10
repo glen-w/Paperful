@@ -13,7 +13,9 @@ def find(item: Item, ctx: Context) -> Candidate:
     if not item.doi:
         return Candidate.miss(NAME, Outcome.SKIPPED, "no DOI")
     params = {"mailto": ctx.config.email} if ctx.config.email else None
-    data = http_json(ctx, f"https://api.openalex.org/works/https://doi.org/{item.doi}", params=params)
+    data = http_json(
+        ctx, f"https://api.openalex.org/works/https://doi.org/{item.doi}", params=params
+    )
     if data is None:
         return Candidate.miss(NAME, Outcome.NOT_FOUND)
     locations = []
@@ -53,7 +55,14 @@ def find(item: Item, ctx: Context) -> Candidate:
         if not landings and not any(loc.get("pdf_url") for loc in locations):
             return Candidate.miss(NAME, Outcome.NOT_FOUND, "no pdf_url")
         return Candidate.miss(NAME, Outcome.NOT_FOUND, "OA landing, no PDF")
-    landing = next((loc.get("landing_page_url") for loc in locations if loc.get("pdf_url") or loc.get("is_oa")), None)
+    landing = next(
+        (
+            loc.get("landing_page_url")
+            for loc in locations
+            if loc.get("pdf_url") or loc.get("is_oa")
+        ),
+        None,
+    )
     return Candidate(
         url=pdfs[0],
         source=NAME,

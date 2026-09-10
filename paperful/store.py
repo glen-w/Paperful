@@ -8,9 +8,9 @@ import re
 import threading
 import time
 import unicodedata
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Iterable
 
 from .attach import attach_failure_code
 from .zot import Item
@@ -38,6 +38,9 @@ class Record:
     title: str = ""
     doi: str | None = None
     doi_source: str = "none"
+    library_doi: str | None = None
+    doi_verified: str = ""
+    pdf_doi: str | None = None
     source: str | None = None
     url: str | None = None
     path: str | None = None
@@ -51,7 +54,7 @@ class Record:
         return json.dumps(asdict(self), ensure_ascii=False)
 
     @classmethod
-    def from_json(cls, line: str) -> "Record":
+    def from_json(cls, line: str) -> Record:
         data = json.loads(line)
         known = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
         return cls(**known)
@@ -98,7 +101,11 @@ class Manifest:
         return True  # error / captcha / attach_failed
 
     def pending_attach(self) -> list[Record]:
-        return [r for r in self.records.values() if r.status in {STATUS_OK, STATUS_ATTACH_FAILED} and r.path]
+        return [
+            r
+            for r in self.records.values()
+            if r.status in {STATUS_OK, STATUS_ATTACH_FAILED} and r.path
+        ]
 
     def counts(self) -> dict[str, int]:
         out: dict[str, int] = {}
@@ -185,7 +192,9 @@ def unique_path(directory: Path, filename: str, md5: str) -> Path:
     return directory / f"{stem} ({md5[:8]}){suffix}"
 
 
-def save_pdf(out_dir: Path, item: Item, content: bytes, md5: str) -> tuple[Path, list[Path]]:
+def save_pdf(
+    out_dir: Path, item: Item, content: bytes, md5: str
+) -> tuple[Path, list[Path]]:
     """Write once under the first collection path; hardlink under the others."""
     filename = item_filename(item)
     paths = item.collection_paths or ["_uncollected"]

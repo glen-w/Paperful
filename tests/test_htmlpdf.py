@@ -11,7 +11,9 @@ from tests.conftest import PDF_BYTES, make_item
 
 def test_htmlpdf_skips_non_web_types(ctx_factory):
     ctx = ctx_factory(lambda r: None)
-    cand = htmlpdf.find(make_item(item_type="journalArticle", url="https://news.test/a"), ctx)
+    cand = htmlpdf.find(
+        make_item(item_type="journalArticle", url="https://news.test/a"), ctx
+    )
     assert cand.outcome is Outcome.SKIPPED
 
 
@@ -19,7 +21,9 @@ def test_htmlpdf_skips_without_playwright(ctx_factory, monkeypatch):
     monkeypatch.setattr(htmlpdf, "playwright_available", lambda: False)
     ctx = ctx_factory(lambda r: None)
     cand = htmlpdf.find(
-        make_item(key="W", doi=None, item_type="webpage", url="https://www.npr.org/story"),
+        make_item(
+            key="W", doi=None, item_type="webpage", url="https://www.npr.org/story"
+        ),
         ctx,
     )
     assert cand.outcome is Outcome.SKIPPED
@@ -35,7 +39,9 @@ def test_htmlpdf_uses_embedded_render(ctx_factory, monkeypatch):
     )
     ctx = ctx_factory(lambda r: None)
     cand = htmlpdf.find(
-        make_item(key="W", doi=None, item_type="blogPost", url="https://blog.test/post"),
+        make_item(
+            key="W", doi=None, item_type="blogPost", url="https://blog.test/post"
+        ),
         ctx,
     )
     assert cand.outcome is Outcome.FOUND
@@ -52,14 +58,18 @@ def test_htmlpdf_paywall_note(ctx_factory, monkeypatch):
     )
     ctx = ctx_factory(lambda r: None)
     cand = htmlpdf.find(
-        make_item(key="W", doi=None, item_type="newspaperArticle", url="https://news.test/pay"),
+        make_item(
+            key="W", doi=None, item_type="newspaperArticle", url="https://news.test/pay"
+        ),
         ctx,
     )
     assert cand.outcome is Outcome.NOT_FOUND
     assert "paywall" in cand.note
 
 
-@pytest.mark.skipif(not htmlpdf.playwright_available(), reason="playwright not installed")
+@pytest.mark.skipif(
+    not htmlpdf.playwright_available(), reason="playwright not installed"
+)
 def test_htmlpdf_live_render_smoke(ctx_factory):
     """Optional live Chromium print (no network) when Playwright + browser are available."""
     from playwright.sync_api import sync_playwright
@@ -85,7 +95,9 @@ def test_htmlpdf_live_render_smoke(ctx_factory):
         ctx = ctx_factory(lambda r: None)
         ctx.config.min_pdf_bytes = 100
         cand = htmlpdf.find(
-            make_item(key="S", doi=None, item_type="webpage", url="https://example.org/smoke"),
+            make_item(
+                key="S", doi=None, item_type="webpage", url="https://example.org/smoke"
+            ),
             ctx,
         )
         assert cand.outcome is Outcome.FOUND

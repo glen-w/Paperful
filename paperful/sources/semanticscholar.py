@@ -32,5 +32,11 @@ def find(item: Item, ctx: Context) -> Candidate:
         return Candidate(url=url, source=NAME, note=note)
     resolved = resolve_landings(ctx, [url], item.title)
     if resolved:
-        return Candidate(url=resolved[0], source=NAME, note=note or "landing", referer=url, alternates=resolved[1:])
+        return Candidate(
+            url=resolved[0],
+            source=NAME,
+            note=note or "landing",
+            referer=url,
+            alternates=resolved[1:],
+        )
     return Candidate(url=url, source=NAME, note=note)

@@ -1,13 +1,19 @@
 # paperful configuration. Copy to config.toml and edit:
 #   cp config.example.toml config.toml
 
-# Contact email sent to Crossref / Unpaywall / OpenAlex (polite pool). Required by Unpaywall.
+# Contact email sent to Crossref / Unpaywall / OpenAlex / NCBI ID Converter.
+# Required by Unpaywall.
 email = "you@example.org"
+
+# Library adapter. zotero is implemented; mendeley is reserved for a later write-back.
+# Work (fetch, lint, patches) happens on disk; the manager is only read/write at the edges.
+manager = "zotero"
 
 # Where PDFs land. Sub-folders mirror the Zotero collection path.
 out_dir = "out"
 
-# Where manifest.jsonl and the Zotero local-API key live.
+# Where manifest.jsonl, metadata-patches.jsonl, pdf-cache/, last-run.json,
+# state/runs/, and the Zotero local-API key live.
 state_dir = "state"
 
 # Source order. Open-access first, then EZProxy, then HTML→PDF for web/news.
@@ -16,8 +22,8 @@ state_dir = "state"
 # appending "scihub" here, or pass --scihub on a run. You are responsible for
 # complying with the laws that apply to you. See README “Sci-Hub”.
 # htmlpdf needs: uv sync --extra htmlpdf && uv run playwright install chromium
-sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "scholar", "direct", "ezproxy", "htmlpdf"]
-# sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "scholar", "direct", "ezproxy", "htmlpdf", "scihub"]
+sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "core", "scholar", "direct", "ezproxy", "htmlpdf"]
+# sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "core", "scholar", "direct", "ezproxy", "htmlpdf", "scihub"]
 
 # Campus EZProxy (any institution that offers login?url=). Leave empty to disable.
 # Only used for DOIs and known publisher URLs (ScienceDirect, Springer, JSTOR, …),
@@ -48,6 +54,12 @@ min_pdf_bytes = 10000
 
 # Title→DOI enrichment (Crossref, then OpenAlex, then Semantic Scholar): accept if similarity >= this.
 crossref_min_score = 0.90
+# Library DOI is suspect (eligible for in-memory swap) if title similarity is below this.
+# Mid-range scores and API failures stay unknown and keep the original DOI.
+# doi_suspect_score = 0.70
+# verify_doi = true   # false → existing library DOIs are stamped unknown, never swapped
+# CORE OA lookup (https://core.ac.uk/services/api). Empty key skips the source.
+# core_api_key = ""
 # Attach downloaded PDFs into Zotero (needs Zotero 10+ with local API enabled).
 attach = true
 app_name = "paperful"

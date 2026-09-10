@@ -10,6 +10,7 @@ dependencies = [
     "beautifulsoup4>=4.12",
     "typer>=0.12",
     "rich>=13",
+    "pypdf>=5.0",
     "tomli>=2.0; python_version < '3.11'",
 ]
 

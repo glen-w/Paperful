@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from .config import Config
 
@@ -32,7 +34,9 @@ def _writable(path: Path) -> bool:
         return False
 
 
-def run_checks(cfg: Config, zl: ZoteroLocal | None, ping: Callable[[], dict] | None = None) -> list[Check]:
+def run_checks(
+    cfg: Config, zl: ZoteroLocal | None, ping: Callable[[], dict] | None = None
+) -> list[Check]:
     checks: list[Check] = []
     info: dict | None = None
     if zl is None:
@@ -51,12 +55,18 @@ def run_checks(cfg: Config, zl: ZoteroLocal | None, ping: Callable[[], dict] | N
         if info.get("supports_write"):
             checks.append(Check("Write API", "green", "yes (Zotero 10+)"))
         else:
-            checks.append(Check("Write API", "amber", "no — download-only until Zotero 10+"))
+            checks.append(
+                Check("Write API", "amber", "no — download-only until Zotero 10+")
+            )
 
     if cfg.email.strip():
         checks.append(Check("email", "green", cfg.email))
     else:
-        checks.append(Check("email", "amber", "empty — Unpaywall and polite-pool APIs need an email"))
+        checks.append(
+            Check(
+                "email", "amber", "empty — Unpaywall and polite-pool APIs need an email"
+            )
+        )
 
     for label, path in (("out_dir", cfg.out_dir), ("state_dir", cfg.state_dir)):
         if _writable(path):
@@ -69,7 +79,13 @@ def run_checks(cfg: Config, zl: ZoteroLocal | None, ping: Callable[[], dict] | N
         if cookie_path.is_file():
             checks.append(Check("EZProxy cookies", "green", str(cookie_path)))
         else:
-            checks.append(Check("EZProxy cookies", "amber", f"missing — run: paperful ezproxy ({cookie_path})"))
+            checks.append(
+                Check(
+                    "EZProxy cookies",
+                    "amber",
+                    f"missing — run: paperful ezproxy ({cookie_path})",
+                )
+            )
     else:
         checks.append(Check("EZProxy", "green", "disabled (ezproxy_base empty)"))
 
@@ -78,9 +94,26 @@ def run_checks(cfg: Config, zl: ZoteroLocal | None, ping: Callable[[], dict] | N
         if scholar_path.is_file():
             checks.append(Check("Scholar cookies", "green", str(scholar_path)))
         else:
-            checks.append(Check("Scholar cookies", "amber", f"missing — run: paperful scholar ({scholar_path})"))
+            checks.append(
+                Check(
+                    "Scholar cookies",
+                    "amber",
+                    f"missing — run: paperful scholar ({scholar_path})",
+                )
+            )
     else:
         checks.append(Check("Scholar", "green", "not in sources"))
+
+    if shutil.which("pdftotext"):
+        checks.append(Check("pdftotext", "green", "on PATH"))
+    else:
+        checks.append(
+            Check(
+                "pdftotext",
+                "amber",
+                "missing — install poppler for PDF DOI extraction; pypdf is fallback",
+            )
+        )
 
     return checks
 

@@ -21,13 +21,19 @@ _PDF_TEXT_RE = re.compile(
     r"télécharger|telecharger|lire\s+le\s+pdf|download\s+(?:the\s+)?(?:report|publication|document))\b",
     re.I,
 )
-_HANDLE_RE = re.compile(r"(?:/handle/|hdl\.handle\.net/)(\d+(?:\.\d+)*/[^\s/?#]+)", re.I)
+_HANDLE_RE = re.compile(
+    r"(?:/handle/|hdl\.handle\.net/)(\d+(?:\.\d+)*/[^\s/?#]+)", re.I
+)
 _PMC_RE = re.compile(
     r"(?:ncbi\.nlm\.nih\.gov/pmc/articles|europepmc\.org/(?:articles|article/pmc))/(PMC\d+)",
     re.I,
 )
-_ARXIV_ABS_RE = re.compile(r"arxiv\.org/abs/([0-9]+\.[0-9]+|[a-z\-]+(?:\.[A-Z]{2})?/\d{7})", re.I)
-_HAL_RE = re.compile(r"https?://(?:hal\.science|hal\.archives-ouvertes\.fr)/(hal-\d+(?:v\d+)?)", re.I)
+_ARXIV_ABS_RE = re.compile(
+    r"arxiv\.org/abs/([0-9]+\.[0-9]+|[a-z\-]+(?:\.[A-Z]{2})?/\d{7})", re.I
+)
+_HAL_RE = re.compile(
+    r"https?://(?:hal\.science|hal\.archives-ouvertes\.fr)/(hal-\d+(?:v\d+)?)", re.I
+)
 _FAO_RE = re.compile(r"https?://www\.fao\.org/3/([a-z0-9]+)/", re.I)
 _DC_PATH_RE = re.compile(r"^/([^/]+)/(\d+)/?$")
 _SKIP_OAI_HOSTS = ("doi.org", "hdl.handle.net", "scholar.google", "zotero.org")
@@ -104,7 +110,11 @@ def extract_pdf_urls(html: str, base_url: str) -> list[str]:
         content = meta.get("content")
         if name in {"citation_pdf_url", "bepress_citation_pdf_url"}:
             add(content, prefer=True)
-        elif name in {"og:url", "dc.identifier", "dc.identifier.url"} and content and looks_like_pdf_url(content):
+        elif (
+            name in {"og:url", "dc.identifier", "dc.identifier.url"}
+            and content
+            and looks_like_pdf_url(content)
+        ):
             add(content, prefer=True)
 
     for link in soup.find_all("link", attrs={"type": "application/pdf"}):
@@ -127,11 +137,21 @@ def extract_pdf_urls(html: str, base_url: str) -> list[str]:
             # Same-host links win over off-site trackers
             abs_u = urljoin(base_url, href.strip())
             host = (urlparse(abs_u).hostname or "").lower()
-            if base_host and host and (host == base_host or host.endswith("." + base_host) or base_host.endswith("." + host)):
+            if (
+                base_host
+                and host
+                and (
+                    host == base_host
+                    or host.endswith("." + base_host)
+                    or base_host.endswith("." + host)
+                )
+            ):
                 prefer = True
             add(href, prefer=prefer)
 
-    m = re.search(r"/pii/([A-Z0-9]+)", base_url, re.I) or re.search(r"/pii/([A-Z0-9]+)", html, re.I)
+    m = re.search(r"/pii/([A-Z0-9]+)", base_url, re.I) or re.search(
+        r"/pii/([A-Z0-9]+)", html, re.I
+    )
     if m:
         pii = m.group(1)
         parsed = urlparse(base_url)
@@ -155,7 +175,9 @@ def extract_pdf_urls(html: str, base_url: str) -> list[str]:
     return ordered
 
 
-def resolve_landings(ctx: Context, landings: list[str], title: str | None = None) -> list[str]:
+def resolve_landings(
+    ctx: Context, landings: list[str], title: str | None = None
+) -> list[str]:
     """Follow OA landing URLs and return PDF URLs, skipping stale title mismatches."""
     pdfs: list[str] = []
     seen_land: list[str] = []
@@ -217,12 +239,16 @@ def _dspace_pdfs(ctx: Context, url: str, title: str | None) -> list[str]:
         handle_id = found.group(1) if found else handle_id
     if not handle_id:
         return []
-    item = http_json(ctx, f"{origin}/server/api/pid/find", params={"id": handle_id}, timeout=_TIMEOUT)
+    item = http_json(
+        ctx, f"{origin}/server/api/pid/find", params={"id": handle_id}, timeout=_TIMEOUT
+    )
     if not item:
         return []
     if not _title_ok(title, item.get("name")):
         return []
-    bundles_href = _abs(origin, ((item.get("_links") or {}).get("bundles") or {}).get("href"))
+    bundles_href = _abs(
+        origin, ((item.get("_links") or {}).get("bundles") or {}).get("href")
+    )
     if not bundles_href:
         return []
     bundles_data = http_json(ctx, bundles_href, timeout=_TIMEOUT) or {}
@@ -233,7 +259,9 @@ def _dspace_pdfs(ctx: Context, url: str, title: str | None) -> list[str]:
         name = (bundle.get("name") or "").upper()
         if name in {"LICENSE", "THUMBNAIL"}:
             continue
-        bits_href = _abs(origin, ((bundle.get("_links") or {}).get("bitstreams") or {}).get("href"))
+        bits_href = _abs(
+            origin, ((bundle.get("_links") or {}).get("bitstreams") or {}).get("href")
+        )
         if not bits_href:
             continue
         bits_data = http_json(ctx, bits_href, timeout=_TIMEOUT) or {}
@@ -242,7 +270,9 @@ def _dspace_pdfs(ctx: Context, url: str, title: str | None) -> list[str]:
             mime = (bit.get("mimeType") or "").lower()
             if mime != "application/pdf" and not bit_name.lower().endswith(".pdf"):
                 continue
-            content = _abs(origin, ((bit.get("_links") or {}).get("content") or {}).get("href"))
+            content = _abs(
+                origin, ((bit.get("_links") or {}).get("content") or {}).get("href")
+            )
             if content and content not in pdfs:
                 pdfs.append(content)
     return pdfs
@@ -262,7 +292,11 @@ def _digital_commons_pdfs(ctx: Context, url: str, title: str | None) -> list[str
     try:
         resp = ctx.client.get(
             f"{p.scheme}://{p.netloc}/do/oai/",
-            params={"verb": "GetRecord", "metadataPrefix": "oai_dc", "identifier": oai_id},
+            params={
+                "verb": "GetRecord",
+                "metadataPrefix": "oai_dc",
+                "identifier": oai_id,
+            },
             timeout=_TIMEOUT,
         )
     except httpx.HTTPError:

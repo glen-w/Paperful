@@ -16,9 +16,9 @@ from paperful.zot import Item
 
 
 def test_safe_filename_basic():
-    assert safe_filename("Ding", 2017, "Vulnerability to impacts of climate change") == (
-        "Ding - 2017 - Vulnerability to impacts of climate change.pdf"
-    )
+    assert safe_filename(
+        "Ding", 2017, "Vulnerability to impacts of climate change"
+    ) == ("Ding - 2017 - Vulnerability to impacts of climate change.pdf")
 
 
 def test_safe_filename_strips_unsafe_and_accents():
@@ -54,7 +54,9 @@ def test_save_pdf_writes_primary_and_hardlinks_extras(tmp_path):
     primary, extras = save_pdf(tmp_path, _item(paths=["BBNJ/sub", "AO"]), content, md5)
     assert primary == tmp_path / "BBNJ" / "sub" / "Smith - 2020 - A paper.pdf"
     assert primary.read_bytes() == content
-    assert len(extras) == 1 and extras[0] == tmp_path / "AO" / "Smith - 2020 - A paper.pdf"
+    assert (
+        len(extras) == 1 and extras[0] == tmp_path / "AO" / "Smith - 2020 - A paper.pdf"
+    )
     assert os.stat(primary).st_ino == os.stat(extras[0]).st_ino  # hardlink
 
 
@@ -85,7 +87,12 @@ def test_manifest_latest_record_wins_and_resume_logic(tmp_path):
     assert reloaded.should_process("K3", retry_failed=False)
     assert reloaded.should_process("NEW", retry_failed=False)
     assert [r.itemKey for r in reloaded.pending_attach()] == ["K1"]
-    assert reloaded.counts() == {STATUS_OK: 1, STATUS_NOT_FOUND: 1, STATUS_ERROR: 1, STATUS_ATTACHED: 1}
+    assert reloaded.counts() == {
+        STATUS_OK: 1,
+        STATUS_NOT_FOUND: 1,
+        STATUS_ERROR: 1,
+        STATUS_ATTACHED: 1,
+    }
 
 
 def test_manifest_tolerates_corrupt_lines(tmp_path):
@@ -93,6 +100,27 @@ def test_manifest_tolerates_corrupt_lines(tmp_path):
     path.write_text('{"itemKey": "K1", "status": "ok"}\nnot json\n{"unknown": 1}\n')
     m = Manifest(path)
     assert set(m.records) == {"K1"}
+
+
+def test_manifest_loads_new_identifier_fields(tmp_path):
+    path = tmp_path / "manifest.jsonl"
+    rec = Record(
+        itemKey="K2",
+        status=STATUS_OK,
+        doi="10.9/new",
+        library_doi="10.1/old",
+        doi_verified="swapped",
+        pdf_doi="10.9/new",
+    )
+    m = Manifest(path)
+    m.write(rec)
+    m2 = Manifest(path)
+    got = m2.get("K2")
+    assert (
+        got.library_doi == "10.1/old"
+        and got.doi_verified == "swapped"
+        and got.pdf_doi == "10.9/new"
+    )
 
 
 def test_attachment_payload_is_stored_file_with_basename():

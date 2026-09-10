@@ -8,7 +8,12 @@ import pytest
 from pyzotero import errors as ze
 
 from paperful import attach as at
-from paperful.attach import Attacher, _interpret, attach_failure_code, attachment_payload
+from paperful.attach import (
+    Attacher,
+    _interpret,
+    attach_failure_code,
+    attachment_payload,
+)
 
 
 class StubZot:
@@ -43,7 +48,9 @@ class ScriptedUpload:
     seen: list = []
 
     def __init__(self, zot, payload, parentid, basedir=None):
-        ScriptedUpload.seen.append((parentid, payload[0]["filename"], basedir, zot.local_api_key))
+        ScriptedUpload.seen.append(
+            (parentid, payload[0]["filename"], basedir, zot.local_api_key)
+        )
 
     def upload(self):
         step = ScriptedUpload.script.pop(0)
@@ -77,7 +84,11 @@ def test_interpret_buckets():
 
 def test_attachment_payload_shape(pdf):
     p = attachment_payload(pdf, title="Custom")
-    assert p["title"] == "Custom" and p["filename"] == pdf.name and p["linkMode"] == "imported_file"
+    assert (
+        p["title"] == "Custom"
+        and p["filename"] == pdf.name
+        and p["linkMode"] == "imported_file"
+    )
     assert attachment_payload(pdf)["title"] == "Full Text PDF"
 
 
@@ -91,12 +102,16 @@ def test_missing_file_and_no_write_support(cfg, pdf):
 
 def test_attach_failure_code_classification():
     assert attach_failure_code("storage quota exceeded") == "quota"
-    assert attach_failure_code("Zotero local API has no write support") == "no_write_api"
+    assert (
+        attach_failure_code("Zotero local API has no write support") == "no_write_api"
+    )
     assert attach_failure_code("write authorisation denied") == "auth"
 
 
 def test_authorises_stores_key_and_uploads(cfg, pdf, scripted):
-    scripted.script.append({"success": [{"key": "ATT"}], "failure": [], "unchanged": []})
+    scripted.script.append(
+        {"success": [{"key": "ATT"}], "failure": [], "unchanged": []}
+    )
     zl = StubZL()
     a = Attacher(cfg, zl)
     res = a.attach("PARENT", pdf)
@@ -118,7 +133,10 @@ def test_stored_key_is_reused_without_dialog(cfg, pdf, scripted):
 
 
 def test_single_use_key_consumed_triggers_reauthorise(cfg, pdf, scripted):
-    scripted.script += [ze.LocalAPIKeyRequiredError("consumed"), {"success": [{"key": "ATT2"}]}]
+    scripted.script += [
+        ze.LocalAPIKeyRequiredError("consumed"),
+        {"success": [{"key": "ATT2"}]},
+    ]
     zl = StubZL()
     zl.zot.authorize_response = {"key": "ONCE", "remember": False}
     a = Attacher(cfg, zl)

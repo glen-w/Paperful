@@ -22,6 +22,7 @@ DEFAULT_SOURCES = [
     "biorxiv",
     "europepmc",
     "semanticscholar",
+    "core",
     "scholar",
     "direct",
     "ezproxy",
@@ -35,12 +36,20 @@ EOI_SOURCES = [
     "biorxiv",
     "europepmc",
     "semanticscholar",
+    "core",
     "direct",
     "ezproxy",
     "htmlpdf",
 ]
 SOURCE_PRESETS: dict[str, list[str]] = {"eoi": EOI_SOURCES}
-DEFAULT_MIRRORS = ["sci-hub.ru", "sci-hub.ren", "sci-hub.box", "sci-hub.se", "sci-hub.st"]
+KNOWN_MANAGERS = ("zotero", "mendeley")
+DEFAULT_MIRRORS = [
+    "sci-hub.ru",
+    "sci-hub.ren",
+    "sci-hub.box",
+    "sci-hub.se",
+    "sci-hub.st",
+]
 SCIHUB_DISCLAIMER = (
     "Sci-Hub occupies a legal grey zone in some jurisdictions. "
     "You are responsible for complying with the laws that apply to you."
@@ -56,27 +65,47 @@ class Config:
     email: str = ""
     out_dir: Path = Path("out")
     state_dir: Path = Path("state")
+    manager: str = "zotero"
     sources: list[str] = field(default_factory=lambda: list(DEFAULT_SOURCES))
     scihub_mirrors: list[str] = field(default_factory=lambda: list(DEFAULT_MIRRORS))
     delay_scihub_s: tuple[float, float] = (3.0, 8.0)
     concurrency_oa: int = 4
     min_pdf_bytes: int = 10_000
     crossref_min_score: float = 0.90
+    doi_suspect_score: float = 0.70
+    verify_doi: bool = True
+    core_api_key: str = ""
     attach: bool = True
     app_name: str = "paperful"
     mirror_failures_before_skip: int = 3
-    source_routing: bool = True  # skip sources that look inapplicable from item metadata
-    circuit_breaker_threshold: int = 3  # block-like failures before skipping a source for the run
+    source_routing: bool = (
+        True  # skip sources that look inapplicable from item metadata
+    )
+    circuit_breaker_threshold: int = (
+        3  # block-like failures before skipping a source for the run
+    )
     user_agent: str = USER_AGENT
     # Campus EZProxy (e.g. Sciences Po). Empty base disables the source.
     ezproxy_base: str = ""
-    ezproxy_cookies: Path | None = None  # Netscape cookies.txt; default state/ezproxy-cookies.txt
-    scholar_cookies: Path | None = None  # Netscape cookies.txt; default state/scholar-cookies.txt
+    ezproxy_cookies: Path | None = (
+        None  # Netscape cookies.txt; default state/ezproxy-cookies.txt
+    )
+    scholar_cookies: Path | None = (
+        None  # Netscape cookies.txt; default state/scholar-cookies.txt
+    )
     config_path: Path | None = None
 
     @property
     def manifest_path(self) -> Path:
         return self.state_dir / "manifest.jsonl"
+
+    @property
+    def patches_path(self) -> Path:
+        return self.state_dir / "metadata-patches.jsonl"
+
+    @property
+    def pdf_cache_dir(self) -> Path:
+        return self.state_dir / "pdf-cache"
 
     @property
     def local_key_path(self) -> Path:
@@ -90,7 +119,9 @@ def _candidate_paths(explicit: Path | None) -> list[Path]:
     return [
         Path.cwd() / "config.toml",
         here / "config.toml",
-        Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "paperful" / "config.toml",
+        Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+        / "paperful"
+        / "config.toml",
     ]
 
 
@@ -110,6 +141,8 @@ def _from_dict(raw: dict[str, Any], source: Path) -> Config:
     cfg = Config(config_path=source)
     if "email" in raw:
         cfg.email = str(raw["email"])
+    if "manager" in raw:
+        cfg.manager = str(raw["manager"]).strip().lower() or "zotero"
     if "out_dir" in raw:
         cfg.out_dir = Path(str(raw["out_dir"])).expanduser()
     if "state_dir" in raw:
@@ -127,6 +160,12 @@ def _from_dict(raw: dict[str, Any], source: Path) -> Config:
         cfg.min_pdf_bytes = int(raw["min_pdf_bytes"])
     if "crossref_min_score" in raw:
         cfg.crossref_min_score = float(raw["crossref_min_score"])
+    if "doi_suspect_score" in raw:
+        cfg.doi_suspect_score = float(raw["doi_suspect_score"])
+    if "verify_doi" in raw:
+        cfg.verify_doi = bool(raw["verify_doi"])
+    if "core_api_key" in raw:
+        cfg.core_api_key = str(raw["core_api_key"]).strip()
     if "attach" in raw:
         cfg.attach = bool(raw["attach"])
     if "app_name" in raw:

@@ -22,11 +22,19 @@ def pdf_url(arxiv_id: str) -> str:
 
 def find(item: Item, ctx: Context) -> Candidate:
     if item.arxiv_id:
-        return Candidate(url=pdf_url(item.arxiv_id), source=NAME, note=f"arXiv:{item.arxiv_id}")
+        return Candidate(
+            url=pdf_url(item.arxiv_id), source=NAME, note=f"arXiv:{item.arxiv_id}"
+        )
     if item.doi and item.doi.startswith("10.48550/arxiv."):
         aid = item.doi.split("arxiv.", 1)[1]
         return Candidate(url=pdf_url(aid), source=NAME, note=f"arXiv:{aid}")
-    if item.item_type not in {"preprint", "journalArticle", "conferencePaper", "report", "manuscript"}:
+    if item.item_type not in {
+        "preprint",
+        "journalArticle",
+        "conferencePaper",
+        "report",
+        "manuscript",
+    }:
         return Candidate.miss(NAME, Outcome.SKIPPED, "type not searched")
     return _title_search(item, ctx)
 
@@ -52,5 +60,9 @@ def _title_search(item: Item, ctx: Context) -> Candidate:
         ident = entry.findtext("a:id", default="", namespaces=_NS) or ""
         m = ARXIV_NEW_RE.search(ident) or ARXIV_OLD_RE.search(ident)
         if m:
-            return Candidate(url=pdf_url(m.group(1)), source=NAME, note=f"title match arXiv:{m.group(1)}")
+            return Candidate(
+                url=pdf_url(m.group(1)),
+                source=NAME,
+                note=f"title match arXiv:{m.group(1)}",
+            )
     return Candidate.miss(NAME, Outcome.NOT_FOUND)

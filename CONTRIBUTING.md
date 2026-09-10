@@ -27,4 +27,7 @@ CI runs the same suite on every push and pull request (see `.github/workflows/ci
 
 ## Architecture
 
-See [docs/architecture.md](docs/architecture.md) for how the pipeline fits together.
+See [docs/architecture.md](docs/architecture.md). CLI orchestrates; identifier
+and PDF-text work lives in `resolve` / `pdfid` / `lint` / `metadata`; source
+adapters must not write `manifest` or `out_dir`. Managers go through
+`LibraryBackend` in `paperful/library.py`. Default tests stay offline.

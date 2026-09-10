@@ -47,7 +47,9 @@ def session_ok(ctx: Context) -> tuple[bool, str]:
     """Cheap check: probe Scholar with exported browser cookies."""
     from ..cookies import has_domain_cookies
 
-    cookie_path = ctx.config.scholar_cookies or (ctx.config.state_dir / "scholar-cookies.txt")
+    cookie_path = ctx.config.scholar_cookies or (
+        ctx.config.state_dir / "scholar-cookies.txt"
+    )
     if not cookie_path.is_file():
         return False, f"cookie file missing ({cookie_path})"
     if not has_domain_cookies(ctx.client, "google"):
@@ -73,7 +75,9 @@ def find(item: Item, ctx: Context) -> Candidate:
     try:
         resp = ctx.client.get(url, timeout=30)
     except httpx.HTTPError as exc:
-        return Candidate.miss(NAME, Outcome.ERROR, f"request failed ({type(exc).__name__})")
+        return Candidate.miss(
+            NAME, Outcome.ERROR, f"request failed ({type(exc).__name__})"
+        )
 
     body = resp.text
     if is_blocked(resp):
@@ -84,7 +88,13 @@ def find(item: Item, ctx: Context) -> Candidate:
     pdfs = extract_pdf_links(body, str(resp.url))
     if not pdfs:
         return Candidate.miss(NAME, Outcome.NOT_FOUND, "no free PDF link")
-    return Candidate(url=pdfs[0], source=NAME, note="google scholar", referer=str(resp.url), alternates=pdfs[1:4])
+    return Candidate(
+        url=pdfs[0],
+        source=NAME,
+        note="google scholar",
+        referer=str(resp.url),
+        alternates=pdfs[1:4],
+    )
 
 
 def extract_pdf_links(html: str, base_url: str) -> list[str]:
@@ -110,7 +120,11 @@ def extract_pdf_links(html: str, base_url: str) -> list[str]:
     for a in soup.find_all("a", href=True):
         text = a.get_text(" ", strip=True).lower()
         href = a["href"]
-        if text.startswith("[pdf]") or text == "pdf" or href.lower().split("?")[0].endswith(".pdf"):
+        if (
+            text.startswith("[pdf]")
+            or text == "pdf"
+            or href.lower().split("?")[0].endswith(".pdf")
+        ):
             add(href)
     # Strip Google redirector
     cleaned: list[str] = []

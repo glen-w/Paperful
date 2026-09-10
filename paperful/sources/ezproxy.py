@@ -51,7 +51,11 @@ def looks_like_login(resp: httpx.Response) -> bool:
     body = resp.text[:4000].lower()
     if any(h in body for h in _LOGIN_HINTS):
         return True
-    if "idm.oclc.org" in url and "/login" in url and ("password" in body or "identifiant" in body):
+    if (
+        "idm.oclc.org" in url
+        and "/login" in url
+        and ("password" in body or "identifiant" in body)
+    ):
         return True
     return False
 
@@ -61,9 +65,13 @@ def find(item: Item, ctx: Context) -> Candidate:
     if not cfg.ezproxy_base:
         return Candidate.miss(NAME, Outcome.SKIPPED, "ezproxy_base not set")
     if not cfg.ezproxy_cookies or not cfg.ezproxy_cookies.is_file():
-        return Candidate.miss(NAME, Outcome.SKIPPED, "no ezproxy cookie file - run: paperful ezproxy")
+        return Candidate.miss(
+            NAME, Outcome.SKIPPED, "no ezproxy cookie file - run: paperful ezproxy"
+        )
     if not list(ctx.client.cookies.jar):
-        return Candidate.miss(NAME, Outcome.SKIPPED, "ezproxy cookies not loaded into client")
+        return Candidate.miss(
+            NAME, Outcome.SKIPPED, "ezproxy cookies not loaded into client"
+        )
 
     target = ezproxy_target(item)
     if not target:
@@ -73,10 +81,16 @@ def find(item: Item, ctx: Context) -> Candidate:
     try:
         resp = ctx.client.get(url, timeout=45)
     except httpx.HTTPError as exc:
-        return Candidate.miss(NAME, Outcome.ERROR, f"proxy request failed ({type(exc).__name__})")
+        return Candidate.miss(
+            NAME, Outcome.ERROR, f"proxy request failed ({type(exc).__name__})"
+        )
 
     if looks_like_login(resp):
-        return Candidate.miss(NAME, Outcome.ERROR, "ezproxy session expired - re-login via paperful ezproxy")
+        return Candidate.miss(
+            NAME,
+            Outcome.ERROR,
+            "ezproxy session expired - re-login via paperful ezproxy",
+        )
     if resp.status_code == 404:
         return Candidate.miss(NAME, Outcome.NOT_FOUND, "publisher 404 via proxy")
     if resp.status_code >= 400:
@@ -84,7 +98,12 @@ def find(item: Item, ctx: Context) -> Candidate:
 
     ctype = resp.headers.get("content-type", "").lower()
     if "application/pdf" in ctype or resp.content[:8].lstrip().startswith(b"%PDF"):
-        return Candidate(url=str(resp.url), source=NAME, note="direct pdf via proxy", referer=str(resp.url))
+        return Candidate(
+            url=str(resp.url),
+            source=NAME,
+            note="direct pdf via proxy",
+            referer=str(resp.url),
+        )
 
     pdfs = extract_pdf_urls(resp.text, str(resp.url))
     if not pdfs:
@@ -107,7 +126,9 @@ def _ensure_proxied(pdf_url: str, ezproxy_base: str, landing_url: str) -> str:
     if "idm.oclc.org" in land_host and "idm.oclc.org" not in pdf_host:
         # Host-rewritten session: mirror the landing host pattern when possible
         # www.sciencedirect.com -> www-sciencedirect-com.<proxy>
-        proxy_root = land_host.split(".", 1)[-1] if land_host.count(".") >= 2 else land_host
+        proxy_root = (
+            land_host.split(".", 1)[-1] if land_host.count(".") >= 2 else land_host
+        )
         if pdf_host and proxy_root.endswith("idm.oclc.org"):
             rewritten = pdf_host.replace(".", "-") + "." + proxy_root
             p = urlparse(pdf_url)

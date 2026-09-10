@@ -9,7 +9,7 @@
 </p>
 
 Open access first (Unpaywall, OpenAlex, arXiv, bioRxiv/medRxiv, Europe PMC,
-Semantic Scholar, optional Google Scholar, the item's own URL). Campus
+Semantic Scholar, CORE, optional Google Scholar, the item's own URL). Campus
 **EZProxy** when you have a subscription. **Sci-Hub is opt-in and off by
 default** — it occupies a legal grey zone in some jurisdictions; see
 [Sci-Hub](#sci-hub).
@@ -18,6 +18,11 @@ By default each item only hits sources that match its metadata (DOI, arXiv
 id, URL, …); `--try-all` disables that. Sci-Hub coverage after ~2021 is thin;
 recent paywalled papers are best fetched via EZProxy when your library has a
 subscription.
+
+Work happens **on disk** (`out/`, `state/`). Zotero is a library adapter:
+read the catalogue in, write PDFs and metadata patches back. Mendeley is
+reserved in config for a later adapter. Not sure if this is the right
+tool? [How paperful compares](docs/comparison.md).
 
 ## Quick start
 
@@ -32,6 +37,9 @@ subscription.
   (ScienceDirect, Springer, Wiley, Taylor & Francis, …).
 - Optional: a browser session for Google Scholar (`paperful scholar`) if you
   keep `scholar` enabled.
+- Optional: [Poppler](https://poppler.freedesktop.org/) `pdftotext` on `PATH`
+  for PDF-text DOI extraction (`pypdf` is the fallback; `doctor` ambers if
+  Poppler is missing).
 
 ```sh
 git clone https://github.com/glen-w/Paperful.git
@@ -73,7 +81,8 @@ uv run paperful attach
 
 # what happened
 uv run paperful report
-uv run paperful report --json          # agent-friendly counts (incl. attach failure types)
+uv run paperful report --last-run      # latest run summary only
+uv run paperful report --json          # agent-friendly (manifest + last run)
 uv run paperful report --not-found
 uv run paperful report --status error
 
@@ -99,14 +108,23 @@ uv run paperful run --library --scihub
 uv run paperful ezproxy              # open campus proxy login
 uv run paperful scholar               # open Google Scholar (solve CAPTCHA, then export cookies)
 uv run paperful mirrors              # which Sci-Hub mirrors are up (Sci-Hub itself stays off)
+
+# identifiers vs PDFs (read-only); metadata writes are a separate step
+uv run paperful lint --library --json
+uv run paperful lint -C BBNJ --strict             # exit 1 if any finding
+uv run paperful fix-metadata --library            # dry-run → state/metadata-patches.jsonl
+uv run paperful fix-metadata --library --apply    # write DOI/title/date/venue into Zotero 10+
+uv run paperful fix-metadata --library --apply --overwrite   # also replace title/date/venue
 ```
 
 | Command | Purpose |
 | --- | --- |
-| `doctor` | Environment check (Zotero, paths, email, cookies) |
-| `run` | Find and download missing PDFs (`--dry-run`, `--preset eoi`, `--upgrade-linked`, `--try-all`, `--retry-failed`, `--sources`, `--scihub`, `--limit`) |
+| `doctor` | Environment check (Zotero, paths, email, cookies, pdftotext) |
+| `run` | Find and download missing PDFs (`--dry-run`, `--preset eoi`, `--upgrade-linked`, `--try-all`, `--retry-failed`, `--sources`, `--scihub`, `--limit`). Never rewrites bibliographic fields. |
+| `lint` | Read-only identifier / PDF-DOI findings (`--json`, `--strict`, `--limit`). Codes: `missing_doi`, `suspect_doi`, `swappable_doi`, `pmid_no_doi`, `pdf_doi_mismatch`, `no_identifier` |
+| `fix-metadata` | Propose patches on disk; `--apply` writes them to the library (`--overwrite` for title/date/venue). Whitelist: `doi`, `title`, `date`, `publicationTitle` |
 | `collections` | Collection tree with “No PDF” counts |
-| `report` | Manifest summary (`--json`, `--not-found`, `--status`) |
+| `report` | Manifest summary + latest run report (`--last-run`, `--json`, `--not-found`, `--status`) |
 | `attach` | Attach already-downloaded PDFs into Zotero |
 | `ezproxy` | Open / verify campus EZProxy session |
 | `scholar` | Open / verify Google Scholar cookies |
@@ -130,13 +148,18 @@ against the config file's folder.
 resolve PrepCom papers, many DOALOS/UN docs, or undocs without a DOI. Paperful
 will try `direct` (item URL) and `htmlpdf` (web/news types) when routing
 allows; otherwise the manifest records `no_identifier`. See
-[docs/architecture.md](docs/architecture.md).
+[docs/architecture.md](docs/architecture.md). Longer-horizon notes:
+[docs/ROADMAP.md](docs/ROADMAP.md).
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `email` | `""` | Sent as `mailto` to Unpaywall/OpenAlex/Crossref (required by Unpaywall) |
-| `out_dir` / `state_dir` | `out` / `state` | PDF tree and manifest/key location |
-| `sources` | `unpaywall` → `openalex` → `arxiv` → `biorxiv` → `europepmc` → `semanticscholar` → `scholar` → `direct` → `ezproxy` → `htmlpdf` | Source order; `--sources` overrides per run. `scihub` is **not** included unless you opt in |
+| `email` | `""` | Sent as `mailto` to Unpaywall/OpenAlex/Crossref and as `email` to NCBI ID Converter (required by Unpaywall) |
+| `manager` | `zotero` | Library adapter. `mendeley` is reserved (not implemented yet) |
+| `out_dir` / `state_dir` | `out` / `state` | PDF tree; manifest, patches, PDF cache, run reports, and write key |
+| `sources` | `unpaywall` → `openalex` → `arxiv` → `biorxiv` → `europepmc` → `semanticscholar` → `core` → `scholar` → `direct` → `ezproxy` → `htmlpdf` | Source order; `--sources` overrides per run. `scihub` is **not** included unless you opt in. `core` is skipped until `core_api_key` is set |
+| `verify_doi` | `true` | Check library DOIs against Crossref/OpenAlex before fetching; may swap DOI **in memory** for that run. `false` leaves an existing DOI as `doi_verified=unknown` and does not swap |
+| `doi_suspect_score` | `0.70` | Title similarity below this marks a library DOI as suspect (eligible for in-memory swap). API failure is `unknown` and **keeps** the original DOI |
+| `core_api_key` | `""` | CORE API bearer token; empty skips the `core` source |
 | `ezproxy_base` | `""` (disabled) | Campus proxy prefix ending in `url=` — see [Campus EZProxy](#campus-ezproxy) |
 | `ezproxy_cookies` | `state/ezproxy-cookies.txt` | Netscape cookies file after browser login |
 | `scholar_cookies` | `state/scholar-cookies.txt` | Google Scholar cookies after CAPTCHA — see [Google Scholar cookies](#google-scholar-cookies) |
@@ -166,7 +189,19 @@ untrustworthy and you want every configured source tried anyway.
   key wins. Statuses: `ok` (on disk), `attached` (on disk + in Zotero),
   `not_found`, `no_identifier`, `captcha`, `error`, `attach_failed`. `ok` /
   `attached` are never retried; `not_found` / `no_identifier` only with
-  `--retry-failed`; the rest are retried on every run.
+  `--retry-failed`; the rest are retried on every run. Extra fields:
+  `library_doi` (DOI as stored in the manager), `doi` (DOI used for this
+  attempt), `doi_verified` (`ok` / `suspect` / `swapped` / `unknown` /
+  `missing`), `pdf_doi` (extracted from the file on disk after a successful
+  download).
+- `state/metadata-patches.jsonl` — proposed bibliographic patches from
+  `fix-metadata` (dry-run and `--apply` both append here first).
+- `state/pdf-cache/` — PDFs exported from the manager so lint can read text
+  on disk (`pdftotext`, then `pypdf`).
+- `state/last-run.json` — latest auditable `run` report (summary + per-item
+  outcomes). Historical copies land in `state/runs/<timestamp>-<command>.json`
+  (`run`, or `fix-metadata` after `--apply`). `fix-metadata --apply` does
+  not overwrite `last-run.json`.
 - `state/zotero-local-api-key.json` — the Zotero write key if you chose
   "Always Allow".
 - `state/ezproxy-cookies.txt` — library session cookies (gitignored; never
@@ -189,15 +224,21 @@ lists that lane, not the full `sources` list.
 | `arxiv` | arXiv id, `10.48550/arxiv.…` DOI, or a scholarly item type with a long title |
 | `biorxiv` | `10.1101/…` DOI (including from a bioRxiv/medRxiv URL) |
 | `semanticscholar` | DOI or arXiv id |
+| `core` | DOI and `core_api_key` |
 | `scholar` | DOI, or title at least 20 characters |
 | `direct` | HTTP(S) URL that is not a resolver/aggregator/video host (doi.org, Scholar, Zotero, YouTube, X/Twitter, Consensus, …) |
 | `ezproxy` | `ezproxy_base` plus a cookie file, **and** a DOI or a URL on a [known publisher host](#what-ezproxy-will-try) |
 | `htmlpdf` | `webpage` / `blogPost` / `newspaperArticle` / `magazineArticle` / `forumPost` (or DOI-less `document`) with an HTTP(S) URL; needs optional Playwright — see [HTML→PDF](#htmlpdf-web-news-blogs) |
 
-Before sources run, items without a DOI get **identifier enrichment**: DOI from
-URL/path or page meta (aggregators), then Crossref, OpenAlex, and Semantic
-Scholar title search (skipped for web/blog/forum types). Matches are kept for
-the run and recorded in the manifest; Zotero fields are not rewritten.
+Before sources run, **identifier preparation** verifies an existing library DOI
+against Crossref/OpenAlex (title similarity ≥ `crossref_min_score` → `ok`).
+A library DOI below `doi_suspect_score` is `suspect` and can be **swapped in
+memory** when a title match scores ≥ `crossref_min_score`; the original stays
+in the manifest as `library_doi`. API failure or a mid-range match is `unknown`
+and **does not swap**. Missing DOIs are filled from URL/meta, PubMed ID
+converter (PMID in Extra), then Crossref / OpenAlex / Semantic Scholar
+(skipped for web/blog/forum types). `run` never writes bibliographic fields —
+use `paperful lint` then `paperful fix-metadata --apply`.
 
 `--try-all` (or `source_routing = false`) tries every configured source regardless
 of those filters. Use that when library records have missing or wrong
@@ -308,7 +349,7 @@ ezproxy_base = "https://YOUR-PREFIX.idm.oclc.org/login?url="
 
 sources = [
   "unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar",
-  "scholar", "direct", "ezproxy", "htmlpdf",
+  "core", "scholar", "direct", "ezproxy", "htmlpdf",
 ]
 ```
 
@@ -598,3 +639,9 @@ uv run pytest
 ## License
 
 [MIT](LICENSE)
+
+---
+
+<p align="center">
+  <a href="https://ko-fi.com/C0C1XK8G" target="_blank" rel="noopener noreferrer"><img height="36" style="border:0;height:36px" src="https://storage.ko-fi.com/cdn/kofi6.png?v=6" alt="Buy Me a Coffee at ko-fi.com" /></a>
+</p>

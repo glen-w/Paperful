@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import Any
 
 from pyzotero import zotero
 
-from .resolve import extract_arxiv_id, extract_doi, normalize_doi
+from .resolve import extract_arxiv_id, extract_doi, extract_pmid, normalize_doi
 
 SKIP_TYPES = {"attachment", "note", "annotation"}
 UNCOLLECTED = "_uncollected"
@@ -35,7 +36,15 @@ class Item:
     year: int | None
     first_author: str | None
     collection_paths: list[str] = field(default_factory=list)
-    doi_source: str = "none"  # field | extra | url | crossref | none
+    doi_source: str = "none"  # field | extra | url | crossref | pubmed | none
+    library_doi: str | None = None  # DOI as stored in the manager at read time
+    pmid: str | None = None
+    extra: str = ""
+    publication_title: str | None = None
+    date: str | None = None
+    doi_verified: str = "missing"  # ok | suspect | swapped | unknown | missing
+    pdf_path: str | None = None
+    has_pdf: bool = False
 
     @property
     def label(self) -> str:
@@ -91,7 +100,9 @@ class ZoteroLocal:
             return matches[0]
         if len(matches) > 1:
             paths = ", ".join(sorted(c.path for c in matches))
-            raise LookupError(f"Collection name '{spec}' is ambiguous; use a path: {paths}")
+            raise LookupError(
+                f"Collection name '{spec}' is ambiguous; use a path: {paths}"
+            )
         raise LookupError(f"No collection matching '{spec}'")
 
     def subtree_keys(self, root: Collection) -> list[str]:
@@ -180,7 +191,9 @@ class ZoteroLocal:
             n += 1
         return n
 
-    def items_lacking_pdf(self, collection_keys: list[str] | None, upgrade_linked: bool = False) -> list[Item]:
+    def items_lacking_pdf(
+        self, collection_keys: list[str] | None, upgrade_linked: bool = False
+    ) -> list[Item]:
         """Top-level regular items in the selected collections (or library) without a PDF child."""
         cols = self.collections()
         imported, linked_only = self._pdf_parent_sets()
@@ -204,8 +217,42 @@ class ZoteroLocal:
                 continue
             if key in linked_only and not upgrade_linked:
                 continue
-            items.append(item_from_json(it, cols, selected))
-        items.sort(key=lambda i: (i.collection_paths[0] if i.collection_paths else "~", i.label.lower()))
+            items.append(item_from_json(it, cols, selected, has_pdf=key in imported))
+        items.sort(
+            key=lambda i: (
+                i.collection_paths[0] if i.collection_paths else "~",
+                i.label.lower(),
+            )
+        )
+        return items
+
+    def items_in_scope(self, collection_keys: list[str] | None) -> list[Item]:
+        """All top-level regular items in the selected collections (or library)."""
+        cols = self.collections()
+        imported, _linked = self._pdf_parent_sets()
+        if collection_keys is None:
+            raw = self.zot.everything(self.zot.top())
+            selected: set[str] | None = None
+        else:
+            raw_by_key: dict[str, dict[str, Any]] = {}
+            for ck in collection_keys:
+                for it in self.zot.everything(self.zot.collection_items_top(ck)):
+                    raw_by_key[it["key"]] = it
+            raw = list(raw_by_key.values())
+            selected = set(collection_keys)
+        items: list[Item] = []
+        for it in raw:
+            data = it["data"]
+            if data.get("itemType") in SKIP_TYPES or data.get("deleted"):
+                continue
+            key = it["key"]
+            items.append(item_from_json(it, cols, selected, has_pdf=key in imported))
+        items.sort(
+            key=lambda i: (
+                i.collection_paths[0] if i.collection_paths else "~",
+                i.label.lower(),
+            )
+        )
         return items
 
 
@@ -219,7 +266,10 @@ def is_pdf_attachment(data: dict[str, Any]) -> bool:
 
 
 def is_linked_url_pdf(data: dict[str, Any]) -> bool:
-    return data.get("contentType") == "application/pdf" and data.get("linkMode") == "linked_url"
+    return (
+        data.get("contentType") == "application/pdf"
+        and data.get("linkMode") == "linked_url"
+    )
 
 
 def build_collection_tree(raw: Iterable[dict[str, Any]]) -> dict[str, Collection]:
@@ -239,7 +289,11 @@ def build_collection_tree(raw: Iterable[dict[str, Any]]) -> dict[str, Collection
 
     for key, (name, parent) in nodes.items():
         out[key] = Collection(
-            key=key, name=name, parent=parent, path=path_of(key, True), raw_path=path_of(key, False)
+            key=key,
+            name=name,
+            parent=parent,
+            path=path_of(key, True),
+            raw_path=path_of(key, False),
         )
     return out
 
@@ -250,27 +304,36 @@ def _squash(s: str) -> str:
     return re.sub(r"\s*[/_]\s*", "/", s)
 
 
-def item_from_json(it: dict[str, Any], cols: dict[str, Collection], selected: set[str] | None) -> Item:
+def item_from_json(
+    it: dict[str, Any],
+    cols: dict[str, Collection],
+    selected: set[str] | None,
+    has_pdf: bool = False,
+) -> Item:
     data = it["data"]
     meta = it.get("meta", {})
+    extra = data.get("extra") or ""
     doi, doi_source = None, "none"
     if data.get("DOI"):
         doi, doi_source = normalize_doi(data["DOI"]), "field"
-    if not doi and data.get("extra"):
-        doi = extract_doi(data["extra"])
+    if not doi and extra:
+        doi = extract_doi(extra)
         doi_source = "extra" if doi else doi_source
     if not doi and data.get("url"):
         doi = extract_doi(data["url"])
         doi_source = "url" if doi else doi_source
     if not doi:
         doi_source = "none"
-    arxiv_id = extract_arxiv_id(data.get("url")) or extract_arxiv_id(data.get("extra"))
+    arxiv_id = extract_arxiv_id(data.get("url")) or extract_arxiv_id(extra)
+    pmid = extract_pmid(extra)
     paths = []
     for ck in data.get("collections", []):
         if ck in cols and (selected is None or ck in selected):
             paths.append(cols[ck].path)
     if not paths:
         paths = [UNCOLLECTED]
+    pub = (data.get("publicationTitle") or "").strip() or None
+    date = (data.get("date") or "").strip() or None
     return Item(
         key=it["key"],
         item_type=data.get("itemType", "document"),
@@ -282,6 +345,12 @@ def item_from_json(it: dict[str, Any], cols: dict[str, Collection], selected: se
         first_author=first_author(data.get("creators") or []),
         collection_paths=sorted(paths),
         doi_source=doi_source,
+        library_doi=doi,
+        pmid=pmid,
+        extra=extra,
+        publication_title=pub,
+        date=date,
+        has_pdf=has_pdf,
     )
 
 

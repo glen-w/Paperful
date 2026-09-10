@@ -22,7 +22,9 @@ def load_netscape_cookies(path: Path) -> httpx.Cookies:
         if len(parts) < 7:
             continue
         domain, _flag, cookie_path, _secure, _expires, name, value = parts[:7]
-        cookies.set(name, value, domain=domain.lstrip(".") or domain, path=cookie_path or "/")
+        cookies.set(
+            name, value, domain=domain.lstrip(".") or domain, path=cookie_path or "/"
+        )
     return cookies
 
 
@@ -41,4 +43,6 @@ def apply_netscape_cookies(client: httpx.Client, path: Path) -> None:
 def has_domain_cookies(client: httpx.Client, *fragments: str) -> bool:
     """True if the client jar has a cookie for any domain containing a fragment."""
     needles = [f.lower() for f in fragments]
-    return any(any(n in (c.domain or "").lower() for n in needles) for c in client.cookies.jar)
+    return any(
+        any(n in (c.domain or "").lower() for n in needles) for c in client.cookies.jar
+    )

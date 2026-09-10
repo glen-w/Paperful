@@ -6,10 +6,10 @@ import hashlib
 import random
 import threading
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
 
 import httpx
 from rich.console import Console
@@ -20,8 +20,16 @@ from .circuit import CircuitBreaker
 from .config import Config
 from .cookies import apply_netscape_cookies
 from .download import Download, DownloadError, fetch_pdf
-from .resolve import enrich_identifiers
+from .pdfid import doi_from_pdf
+from .resolve import IdentifierCache, prepare_identifiers
 from .routing import sources_for_item
+from .runreport import (
+    ItemOutcome,
+    bump,
+    bump_nested,
+    classify_enrichment,
+    error_type_for,
+)
 from .sources import REGISTRY, Candidate, Context, Outcome
 from .store import (
     STATUS_ATTACH_FAILED,
@@ -49,8 +57,12 @@ def make_client(cfg: Config) -> httpx.Client:
         timeout=30,
         limits=httpx.Limits(max_connections=cfg.concurrency_oa + 2),
     )
-    apply_netscape_cookies(client, cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt"))
-    apply_netscape_cookies(client, cfg.scholar_cookies or (cfg.state_dir / "scholar-cookies.txt"))
+    apply_netscape_cookies(
+        client, cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt")
+    )
+    apply_netscape_cookies(
+        client, cfg.scholar_cookies or (cfg.state_dir / "scholar-cookies.txt")
+    )
     return client
 
 
@@ -67,12 +79,43 @@ class RunStats:
     linked_url_skipped: int = 0
     attach_failed_by_code: dict[str, int] = field(default_factory=dict)
     by_source: dict[str, int] = field(default_factory=dict)
+    sources_checked: dict[str, dict[str, int]] = field(default_factory=dict)
+    fields_corrected: dict[str, int] = field(default_factory=dict)
+    errors_by_type: dict[str, int] = field(default_factory=dict)
+    items: list[ItemOutcome] = field(default_factory=list)
+    started_at: float = field(default_factory=time.time)
+    finished_at: float = 0.0
+    scope: str = ""
+    sources_configured: list[str] = field(default_factory=list)
 
     def bump(self, status: str, source: str | None = None) -> None:
-        if hasattr(self, status):
+        if hasattr(self, status) and status in {
+            "ok",
+            "not_found",
+            "no_identifier",
+            "captcha",
+            "error",
+            "attached",
+            "attach_failed",
+        }:
             setattr(self, status, getattr(self, status) + 1)
         if source and status in (STATUS_OK, STATUS_ATTACHED):
             self.by_source[source] = self.by_source.get(source, 0) + 1
+
+    def note_source(self, name: str, outcome: str) -> None:
+        bump_nested(self.sources_checked, name, outcome)
+
+    def note_fields(self, labels: list[str]) -> None:
+        for lab in labels:
+            bump(self.fields_corrected, lab)
+
+    def note_error(self, err_type: str | None) -> None:
+        if err_type:
+            bump(self.errors_by_type, err_type)
+
+    def add_item(self, outcome: ItemOutcome) -> None:
+        self.items.append(outcome)
+        self.note_error(outcome.error_type)
 
 
 class Pipeline:
@@ -96,12 +139,16 @@ class Pipeline:
         self.client = make_client(cfg)
         self.ctx = Context(config=cfg, client=self.client)
         self.stats = RunStats()
+        self.stats.sources_configured = list(self.sources)
         self._circuit = CircuitBreaker(cfg.circuit_breaker_threshold)
         self._attach_lock = threading.Lock()
         self._print_lock = threading.Lock()
+        self._stats_lock = threading.Lock()
         self._stop = threading.Event()
         self._run_total = 0
         self._item_index: dict[str, int] = {}
+        self._id_cache = IdentifierCache()
+        self._item_fields: dict[str, list[str]] = {}
 
     def stop(self) -> None:
         self._stop.set()
@@ -127,10 +174,13 @@ class Pipeline:
                     f"(items {start + 1}-{start + len(batch)} of {total})[/]"
                 )
             self._run_batch(batch)
+        self.stats.finished_at = time.time()
         return self.stats
 
     def _run_batch(self, items: list[Item]) -> None:
-        oa_sources = [s for s in self.sources if s not in _SERIAL_SOURCES and s in REGISTRY]
+        oa_sources = [
+            s for s in self.sources if s not in _SERIAL_SOURCES and s in REGISTRY
+        ]
         serial = [s for s in self.sources if s in _SERIAL_SOURCES and s in REGISTRY]
         pending: list[tuple[Item, list[str]]] = []
         queue_lock = threading.Lock()
@@ -169,9 +219,15 @@ class Pipeline:
                 if self._stop.is_set():
                     return
                 if name == "scihub":
-                    scihub_queue = [(it, att) for it, att in still if "scihub" in self._lanes_for(it)]
+                    scihub_queue = [
+                        (it, att)
+                        for it, att in still
+                        if "scihub" in self._lanes_for(it)
+                    ]
                     scihub_keys = {it.key for it, _ in scihub_queue}
-                    leftovers = [(it, att) for it, att in still if it.key not in scihub_keys]
+                    leftovers = [
+                        (it, att) for it, att in still if it.key not in scihub_keys
+                    ]
                     for item, attempts in leftovers:
                         self._finish_miss(item, attempts)
                         self.progress()
@@ -187,18 +243,32 @@ class Pipeline:
     def _phase_oa(self, item: Item, oa_sources: list[str]) -> list[str] | None:
         attempts: list[str] = []
         self._log_item_label(item)
-        if not item.doi:
-            notes = enrich_identifiers(
-                self.client, item, self.cfg.email, self.cfg.crossref_min_score
-            )
-            if notes:
-                self._log_item(item, "[dim]enrich: looking up DOI...[/]")
-                for note in notes:
-                    attempts.append(note)
-                    if ":matched" in note:
-                        self._log_item(item, f"enrich: [green]{escape(note)}[/]")
-                    else:
-                        self._log_item(item, f"enrich: [dim]{escape(note)}[/]")
+        notes = prepare_identifiers(
+            self.client,
+            item,
+            email=self.cfg.email,
+            min_score=self.cfg.crossref_min_score,
+            suspect_score=self.cfg.doi_suspect_score,
+            verify=self.cfg.verify_doi,
+            cache=self._id_cache,
+        )
+        if notes:
+            self._log_item(item, "[dim]enrich: looking up DOI...[/]")
+            for note in notes:
+                attempts.append(note)
+                if (
+                    ":matched" in note
+                    or note.startswith("swap:")
+                    or note.startswith("verify:ok")
+                ):
+                    self._log_item(item, f"enrich: [green]{escape(note)}[/]")
+                else:
+                    self._log_item(item, f"enrich: [dim]{escape(note)}[/]")
+            labels = classify_enrichment(notes)
+            if labels:
+                with self._stats_lock:
+                    self._item_fields[item.key] = labels
+                    self.stats.note_fields(labels)
         lanes = self._lanes_for(item)
         self._log_item_trying_line(item, lanes)
         for name in oa_sources:
@@ -207,16 +277,24 @@ class Pipeline:
             if self._skip_source(item, name, lanes, attempts):
                 continue
             cand = REGISTRY[name].find(item, self.ctx)
-            attempts.append(f"{name}:{cand.outcome.value}" + (f"({cand.note})" if cand.note else ""))
+            attempts.append(
+                f"{name}:{cand.outcome.value}" + (f"({cand.note})" if cand.note else "")
+            )
+            with self._stats_lock:
+                self.stats.note_source(name, cand.outcome.value)
             self._log_source_result(item, name, cand)
             self._maybe_trip_circuit(name, cand)
-            if cand.outcome is Outcome.FOUND and self._try_download(item, cand, attempts):
+            if cand.outcome is Outcome.FOUND and self._try_download(
+                item, cand, attempts
+            ):
                 self.progress()
                 return None
         return attempts
 
     # ---- phase 2: campus EZProxy, serial ------------------------------------
-    def _phase_serial(self, queue: list[tuple[Item, list[str]]], name: str) -> list[tuple[Item, list[str]]]:
+    def _phase_serial(
+        self, queue: list[tuple[Item, list[str]]], name: str
+    ) -> list[tuple[Item, list[str]]]:
         """Try a serial source; return items that still need Sci-Hub / finish_miss."""
         self._emit(f"[bold]-- {name}[/] ({len(queue)} remaining)")
         still: list[tuple[Item, list[str]]] = []
@@ -237,13 +315,19 @@ class Pipeline:
             cand = REGISTRY[name].find(item, self.ctx)
             note = f"({cand.note})" if cand.note else ""
             attempts.append(f"{name}:{cand.outcome.value}{note}")
+            with self._stats_lock:
+                self.stats.note_source(name, cand.outcome.value)
             self._log_source_result(item, name, cand)
             self._maybe_trip_circuit(name, cand)
-            if cand.outcome is Outcome.FOUND and self._try_download(item, cand, attempts):
+            if cand.outcome is Outcome.FOUND and self._try_download(
+                item, cand, attempts
+            ):
                 self.progress()
                 continue
             if cand.outcome is Outcome.ERROR and "session expired" in (cand.note or ""):
-                self._emit("[yellow]ezproxy session expired; skipping remaining proxy attempts this batch[/]")
+                self._emit(
+                    "[yellow]ezproxy session expired; skipping remaining proxy attempts this batch[/]"
+                )
                 still.append((item, attempts))
                 still.extend(queue[idx + 1 :])
                 return still
@@ -268,10 +352,16 @@ class Pipeline:
                 continue
             self._log_item(item, "[dim]scihub: checking...[/]")
             cand = REGISTRY["scihub"].find(item, self.ctx)
-            attempts.append(f"scihub:{cand.outcome.value}" + (f"({cand.note})" if cand.note else ""))
+            attempts.append(
+                f"scihub:{cand.outcome.value}" + (f"({cand.note})" if cand.note else "")
+            )
+            with self._stats_lock:
+                self.stats.note_source("scihub", cand.outcome.value)
             self._log_source_result(item, "scihub", cand)
             self._maybe_trip_circuit("scihub", cand)
-            if cand.outcome is Outcome.FOUND and self._try_download(item, cand, attempts):
+            if cand.outcome is Outcome.FOUND and self._try_download(
+                item, cand, attempts
+            ):
                 self.progress()
                 continue
             if cand.outcome is Outcome.CAPTCHA:
@@ -291,14 +381,22 @@ class Pipeline:
             routed = sources_for_item(item, self.cfg, configured)
         return [s for s in routed if not self._circuit.tripped(s)]
 
-    def _skip_source(self, item: Item, name: str, lanes: list[str], attempts: list[str]) -> bool:
+    def _skip_source(
+        self, item: Item, name: str, lanes: list[str], attempts: list[str]
+    ) -> bool:
         if name in lanes:
             return False
         if self._circuit.tripped(name):
             attempts.append(f"{name}:skipped(circuit open)")
-            self._log_item(item, f"{escape(name)}: [dim]skipped[/] (blocked for rest of run)")
+            with self._stats_lock:
+                self.stats.note_source(name, "skipped")
+            self._log_item(
+                item, f"{escape(name)}: [dim]skipped[/] (blocked for rest of run)"
+            )
         else:
             attempts.append(f"{name}:skipped(not applicable)")
+            with self._stats_lock:
+                self.stats.note_source(name, "skipped")
             self._log_item(item, f"{escape(name)}: [dim]skipped[/] (not applicable)")
         return True
 
@@ -314,9 +412,15 @@ class Pipeline:
         dl = None
         if cand.content is not None:
             content = cand.content
-            if not content.lstrip().startswith(b"%PDF") or len(content) < self.cfg.min_pdf_bytes:
+            if (
+                not content.lstrip().startswith(b"%PDF")
+                or len(content) < self.cfg.min_pdf_bytes
+            ):
                 attempts.append(f"{cand.source}:download-failed(invalid embedded PDF)")
-                self._log_item(item, f"{escape(cand.source)}: [yellow]download failed[/] (invalid embedded PDF)")
+                self._log_item(
+                    item,
+                    f"{escape(cand.source)}: [yellow]download failed[/] (invalid embedded PDF)",
+                )
                 return False
             dl = Download(
                 content=content,
@@ -326,20 +430,37 @@ class Pipeline:
         else:
             for url in cand.urls[:6]:
                 try:
-                    dl = fetch_pdf(self.client, url, referer=cand.referer, min_bytes=self.cfg.min_pdf_bytes)
+                    dl = fetch_pdf(
+                        self.client,
+                        url,
+                        referer=cand.referer,
+                        min_bytes=self.cfg.min_pdf_bytes,
+                    )
                     break
                 except DownloadError as exc:
                     attempts.append(f"{cand.source}:download-failed({exc})")
-                    self._log_item(item, f"{escape(cand.source)}: [yellow]download failed[/] ({escape(str(exc))})")
+                    self._log_item(
+                        item,
+                        f"{escape(cand.source)}: [yellow]download failed[/] ({escape(str(exc))})",
+                    )
         if dl is None:
             return False
         primary, extras = save_pdf(self.cfg.out_dir, item, dl.content, dl.md5)
+        pdf_doi = doi_from_pdf(primary)
+        if pdf_doi and item.doi and pdf_doi != item.doi:
+            self._log_item(
+                item,
+                f"[yellow]pdf DOI {escape(pdf_doi)} differs from {escape(item.doi)}[/]",
+            )
         rec = Record(
             itemKey=item.key,
             status=STATUS_OK,
             title=item.title,
             doi=item.doi,
             doi_source=item.doi_source,
+            library_doi=item.library_doi,
+            doi_verified=item.doi_verified,
+            pdf_doi=pdf_doi,
             source=cand.source,
             url=dl.final_url,
             path=str(primary),
@@ -348,13 +469,16 @@ class Pipeline:
             attempts=attempts,
         )
         self.manifest.write(rec)
-        self.stats.bump(STATUS_OK, cand.source)
+        with self._stats_lock:
+            self.stats.bump(STATUS_OK, cand.source)
         self._log_item(
             item,
             f"[green]ok[/] {escape('[' + cand.source + ']')} -> {escape(str(primary.relative_to(self.cfg.out_dir)))}",
         )
         if self.attacher:
             self.attach_record(rec)
+        else:
+            self._add_outcome(rec)
         return True
 
     def attach_record(self, rec: Record) -> bool:
@@ -365,43 +489,84 @@ class Pipeline:
         if res.ok:
             rec.status = STATUS_ATTACHED
             rec.reason = res.reason
-            self.stats.bump(STATUS_ATTACHED)
+            with self._stats_lock:
+                self.stats.bump(STATUS_ATTACHED)
             self._emit(f"   [cyan]attached[/] {rec.itemKey} ({res.reason})")
+            self._add_outcome(rec)
         else:
             rec.status = STATUS_ATTACH_FAILED
             rec.reason = res.reason
             code = res.code or "other"
-            self.stats.attach_failed_by_code[code] = self.stats.attach_failed_by_code.get(code, 0) + 1
-            self.stats.bump(STATUS_ATTACH_FAILED)
+            with self._stats_lock:
+                self.stats.attach_failed_by_code[code] = (
+                    self.stats.attach_failed_by_code.get(code, 0) + 1
+                )
+                self.stats.bump(STATUS_ATTACH_FAILED)
             self._emit(f"   [yellow]attach failed[/] {rec.itemKey}: {res.reason}")
+            self._add_outcome(rec, attach_code=code)
         self.manifest.write(rec)
         return res.ok
 
     def _finish_miss(self, item: Item, attempts: list[str]) -> None:
         if not item.doi and not item.arxiv_id and not item.url:
-            self._record(item, STATUS_NO_IDENTIFIER, attempts, reason="no DOI, arXiv id or URL")
-        elif any(a.endswith(":error") or "download-failed" in a for a in attempts) and not any(
-            a.endswith(":not_found") for a in attempts
-        ):
+            self._record(
+                item, STATUS_NO_IDENTIFIER, attempts, reason="no DOI, arXiv id or URL"
+            )
+        elif any(
+            a.endswith(":error") or "download-failed" in a for a in attempts
+        ) and not any(a.endswith(":not_found") for a in attempts):
             self._record(item, STATUS_ERROR, attempts, reason="only transient failures")
         else:
             self._record(item, STATUS_NOT_FOUND, attempts, reason="no source had it")
 
-    def _record(self, item: Item, status: str, attempts: list[str], reason: str = "") -> None:
+    def _record(
+        self, item: Item, status: str, attempts: list[str], reason: str = ""
+    ) -> None:
         rec = Record(
             itemKey=item.key,
             status=status,
             title=item.title,
             doi=item.doi,
             doi_source=item.doi_source,
+            library_doi=item.library_doi,
+            doi_verified=item.doi_verified,
             url=item.url,
             reason=reason,
             attempts=attempts,
         )
         self.manifest.write(rec)
-        self.stats.bump(status)
-        colour = {STATUS_NOT_FOUND: "dim", STATUS_NO_IDENTIFIER: "dim", STATUS_CAPTCHA: "yellow", STATUS_ERROR: "red"}[status]
-        self._log_item(item, f"[{colour}]{status}[/]" + (f" [dim]({reason})[/]" if reason else ""))
+        with self._stats_lock:
+            self.stats.bump(status)
+        colour = {
+            STATUS_NOT_FOUND: "dim",
+            STATUS_NO_IDENTIFIER: "dim",
+            STATUS_CAPTCHA: "yellow",
+            STATUS_ERROR: "red",
+        }[status]
+        self._log_item(
+            item, f"[{colour}]{status}[/]" + (f" [dim]({reason})[/]" if reason else "")
+        )
+        self._add_outcome(rec)
+
+    def _add_outcome(self, rec: Record, attach_code: str | None = None) -> None:
+        err = error_type_for(rec.status, rec.reason, attach_code)
+        with self._stats_lock:
+            fields = self._item_fields.pop(rec.itemKey, [])
+            self.stats.add_item(
+                ItemOutcome(
+                    itemKey=rec.itemKey,
+                    title=rec.title,
+                    status=rec.status,
+                    source=rec.source,
+                    reason=rec.reason,
+                    doi=rec.doi,
+                    doi_verified=rec.doi_verified,
+                    attempts=list(rec.attempts),
+                    fields_corrected=fields,
+                    path=rec.path,
+                    error_type=err,
+                )
+            )
 
     # ---- console --------------------------------------------------------------
     def _emit(self, message: str) -> None:
@@ -421,9 +586,16 @@ class Pipeline:
         ident = (
             f"DOI {item.doi}"
             if item.doi
-            else (f"arXiv:{item.arxiv_id}" if item.arxiv_id else (f"URL {item.url}" if item.url else "no identifier"))
+            else (
+                f"arXiv:{item.arxiv_id}"
+                if item.arxiv_id
+                else (f"URL {item.url}" if item.url else "no identifier")
+            )
         )
-        self._log_item(item, f"[dim]{escape(ident)} · trying: {escape(', '.join(lanes))}[/]")
+        self._log_item(
+            item, f"[dim]{escape(ident)} · trying: {escape(', '.join(lanes))}[/]"
+        )
+
     def _log_item(self, item: Item, message: str) -> None:
         self._emit(f"\\[{self._item_tag(item)}] {message}")
 

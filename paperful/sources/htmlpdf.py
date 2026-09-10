@@ -51,7 +51,9 @@ def playwright_available() -> bool:
 
 
 def find(item: Item, ctx: Context) -> Candidate:
-    if item.item_type not in _WEB_TYPES and not (item.item_type == "document" and item.url and not item.doi):
+    if item.item_type not in _WEB_TYPES and not (
+        item.item_type == "document" and item.url and not item.doi
+    ):
         return Candidate.miss(NAME, Outcome.SKIPPED, "not a web/news item")
     url = (item.url or "").strip()
     if not url.lower().startswith(("http://", "https://")):
@@ -59,7 +61,11 @@ def find(item: Item, ctx: Context) -> Candidate:
     if any(h in url.lower() for h in _SKIP_HOSTS):
         return Candidate.miss(NAME, Outcome.SKIPPED, "resolver/aggregator URL")
     if not playwright_available():
-        return Candidate.miss(NAME, Outcome.SKIPPED, "install paperful[htmlpdf] + playwright install chromium")
+        return Candidate.miss(
+            NAME,
+            Outcome.SKIPPED,
+            "install paperful[htmlpdf] + playwright install chromium",
+        )
 
     try:
         pdf_bytes, final_url, note = _render_pdf(url, ctx.config.user_agent)
@@ -71,7 +77,9 @@ def find(item: Item, ctx: Context) -> Candidate:
     if not pdf_bytes or not pdf_bytes.lstrip().startswith(b"%PDF"):
         return Candidate.miss(NAME, Outcome.NOT_FOUND, "render produced no PDF")
     if len(pdf_bytes) < ctx.config.min_pdf_bytes:
-        return Candidate.miss(NAME, Outcome.NOT_FOUND, f"too small ({len(pdf_bytes)} bytes)")
+        return Candidate.miss(
+            NAME, Outcome.NOT_FOUND, f"too small ({len(pdf_bytes)} bytes)"
+        )
 
     return Candidate(
         url=final_url or url,
@@ -103,7 +111,12 @@ def _render_pdf(url: str, user_agent: str) -> tuple[bytes, str, str]:
             pdf = page.pdf(
                 format="A4",
                 print_background=True,
-                margin={"top": "12mm", "bottom": "12mm", "left": "12mm", "right": "12mm"},
+                margin={
+                    "top": "12mm",
+                    "bottom": "12mm",
+                    "left": "12mm",
+                    "right": "12mm",
+                },
             )
             return pdf, str(page.url), "chromium print"
         finally:

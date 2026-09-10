@@ -18,8 +18,14 @@ def test_looks_like_pdf_allows_leading_junk():
 
 
 def test_fetch_pdf_happy_path():
-    client = mock_client(lambda req: httpx.Response(200, content=PDF_BYTES, headers={"content-type": "application/pdf"}))
-    got = fetch_pdf(client, "https://x.test/a.pdf", referer="https://x.test/", min_bytes=1000)
+    client = mock_client(
+        lambda req: httpx.Response(
+            200, content=PDF_BYTES, headers={"content-type": "application/pdf"}
+        )
+    )
+    got = fetch_pdf(
+        client, "https://x.test/a.pdf", referer="https://x.test/", min_bytes=1000
+    )
     assert got.content == PDF_BYTES
     assert got.md5 and got.final_url == "https://x.test/a.pdf"
 
@@ -31,13 +37,24 @@ def test_fetch_pdf_sends_referer_and_accept():
         seen.update(req.headers)
         return httpx.Response(200, content=PDF_BYTES)
 
-    fetch_pdf(mock_client(handler), "https://x.test/a.pdf", referer="https://landing.test/", min_bytes=10)
+    fetch_pdf(
+        mock_client(handler),
+        "https://x.test/a.pdf",
+        referer="https://landing.test/",
+        min_bytes=10,
+    )
     assert seen["referer"] == "https://landing.test/"
     assert "application/pdf" in seen["accept"]
 
 
 def test_fetch_pdf_rejects_html_landing_page():
-    client = mock_client(lambda req: httpx.Response(200, content=b"<html>paywall</html>" * 500, headers={"content-type": "text/html"}))
+    client = mock_client(
+        lambda req: httpx.Response(
+            200,
+            content=b"<html>paywall</html>" * 500,
+            headers={"content-type": "text/html"},
+        )
+    )
     with pytest.raises(DownloadError, match="not a PDF"):
         fetch_pdf(client, "https://x.test/a.pdf")
 
@@ -69,7 +86,9 @@ def test_fetch_pdf_retries_on_503_then_succeeds():
             return httpx.Response(503, headers={"Retry-After": "1"})
         return httpx.Response(200, content=PDF_BYTES)
 
-    got = fetch_pdf(mock_client(handler), "https://x.test/a.pdf", min_bytes=10, retries=3)
+    got = fetch_pdf(
+        mock_client(handler), "https://x.test/a.pdf", min_bytes=10, retries=3
+    )
     assert got.content == PDF_BYTES and len(calls) == 3
 
 

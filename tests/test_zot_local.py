@@ -13,13 +13,29 @@ def _col(key, name, parent=None):
 
 
 def _item(key, title, cols, item_type="journalArticle", **data):
-    d = {"key": key, "itemType": item_type, "title": title, "collections": cols, "creators": [], "date": "2020"}
+    d = {
+        "key": key,
+        "itemType": item_type,
+        "title": title,
+        "collections": cols,
+        "creators": [],
+        "date": "2020",
+    }
     d.update(data)
     return {"key": key, "data": d}
 
 
 def _att(key, parent, content_type="application/pdf", link_mode="imported_file"):
-    return {"key": key, "data": {"key": key, "itemType": "attachment", "parentItem": parent, "contentType": content_type, "linkMode": link_mode}}
+    return {
+        "key": key,
+        "data": {
+            "key": key,
+            "itemType": "attachment",
+            "parentItem": parent,
+            "contentType": content_type,
+            "linkMode": link_mode,
+        },
+    }
 
 
 class FakeZot:
@@ -28,7 +44,9 @@ class FakeZot:
     endpoint = "http://localhost:23119/api"
 
     def __init__(self, ping_response: httpx.Response):
-        self.client = httpx.Client(transport=httpx.MockTransport(lambda r: ping_response))
+        self.client = httpx.Client(
+            transport=httpx.MockTransport(lambda r: ping_response)
+        )
         self._cols = [
             _col("ROOT", "BBNJ"),
             _col("SUB", "EIA / SEA", "ROOT"),
@@ -44,7 +62,11 @@ class FakeZot:
             _item("N", "Standalone note", ["ROOT"], item_type="note"),
             _item("U", "Uncollected", []),
         ]
-        self._atts = [_att("A1", "A"), _att("B1", "B", link_mode="linked_url"), _att("C1", "C", content_type="text/html")]
+        self._atts = [
+            _att("A1", "A"),
+            _att("B1", "B", link_mode="linked_url"),
+            _att("C1", "C", content_type="text/html"),
+        ]
 
     def everything(self, x):
         return x
@@ -65,7 +87,16 @@ class FakeZot:
 
 @pytest.fixture
 def zl(monkeypatch):
-    fake = FakeZot(httpx.Response(200, headers={"X-Zotero-Version": "10.0.1", "Zotero-API-Version": "3", "Zotero-Server-ID": "abc"}))
+    fake = FakeZot(
+        httpx.Response(
+            200,
+            headers={
+                "X-Zotero-Version": "10.0.1",
+                "Zotero-API-Version": "3",
+                "Zotero-Server-ID": "abc",
+            },
+        )
+    )
     monkeypatch.setattr("paperful.zot.zotero.Zotero", lambda *a, **k: fake)
     return ZoteroLocal()
 
@@ -73,7 +104,11 @@ def zl(monkeypatch):
 def test_ping_reports_version_and_write_support(zl, monkeypatch):
     info = zl.ping()
     assert info["zotero_version"] == "10.0.1" and info["supports_write"] is True
-    old = FakeZot(httpx.Response(200, headers={"X-Zotero-Version": "7.0.15", "Zotero-API-Version": "3"}))
+    old = FakeZot(
+        httpx.Response(
+            200, headers={"X-Zotero-Version": "7.0.15", "Zotero-API-Version": "3"}
+        )
+    )
     monkeypatch.setattr("paperful.zot.zotero.Zotero", lambda *a, **k: old)
     assert ZoteroLocal().ping()["supports_write"] is False
     disabled = FakeZot(httpx.Response(403))
@@ -119,3 +154,13 @@ def test_items_lacking_pdf_scope_and_filters(zl):
     assert uncollected.collection_paths == [UNCOLLECTED]
     # sorted by first collection path, then label: "_uncollected" < "interesting"
     assert [i.key for i in whole] == ["U", "C"]
+
+
+def test_items_in_scope_includes_items_with_pdf(zl):
+    scoped = zl.items_in_scope(["ROOT", "SUB"])
+    keys = {i.key for i in scoped}
+    assert keys == {"A", "B"}
+    a = next(i for i in scoped if i.key == "A")
+    assert a.has_pdf is True and a.library_doi == "10.1000/a"
+    b = next(i for i in scoped if i.key == "B")
+    assert b.has_pdf is False

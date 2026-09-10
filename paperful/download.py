@@ -64,7 +64,11 @@ def fetch_pdf(
                 content = b"".join(chunks)
             if len(content) < min_bytes:
                 raise DownloadError(f"too small ({len(content)} bytes)")
-            return Download(content=content, md5=hashlib.md5(content).hexdigest(), final_url=str(resp.url))
+            return Download(
+                content=content,
+                md5=hashlib.md5(content).hexdigest(),
+                final_url=str(resp.url),
+            )
         except httpx.HTTPError as exc:
             last = type(exc).__name__
             time.sleep(1.5 * (attempt + 1))
