@@ -370,6 +370,13 @@ def test_doctor_zotero_red(cfg_file, monkeypatch):
     assert res.exit_code == 2 and "red" in res.stdout
 
 
+def test_doctor_shows_paperful_zotero_host(cfg_file, stub_zotero, monkeypatch):
+    monkeypatch.setenv("PAPERFUL_ZOTERO_HOST", "host.docker.internal")
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file)])
+    assert res.exit_code == 0
+    assert "host.docker.internal:23119" in res.stdout
+
+
 def test_report_json(cfg_file, tmp_path):
     m = Manifest(tmp_path / "state" / "manifest.jsonl")
     m.write(Record(itemKey="K1", status=STATUS_OK, source="unpaywall", doi="10.1/a"))

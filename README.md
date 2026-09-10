@@ -46,9 +46,10 @@ Live: [glenwright.earth/Paperful](https://glenwright.earth/Paperful/).
 git clone https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
-cp config.example.toml config.toml   # set email, optional ezproxy_base
+# Keep current layout: set PAPERFUL_DATA=. in .env
+# Or use sibling data: mkdir -p ../paperful-data && cp config.example.toml ../paperful-data/config.toml
+cp config.example.toml config.toml   # if PAPERFUL_DATA=. ; set email, optional ezproxy_base
 mkdir -p packs out state
-cp compose.override.example.yaml compose.override.yaml   # keep config/out/state in-repo
 docker compose build
 docker compose run --rm paperful doctor
 docker compose run --rm paperful collections

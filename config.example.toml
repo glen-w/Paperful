@@ -10,6 +10,7 @@ email = "you@example.org"
 manager = "zotero"
 
 # Where PDFs land. Sub-folders mirror the Zotero collection path.
+# Prefer relative paths (Docker mounts this config's folder as /data).
 out_dir = "out"
 
 # Where manifest.jsonl, metadata-patches.jsonl, pdf-cache/, last-run.json,

@@ -1,15 +1,12 @@
-# Copy to compose.override.yaml (gitignored) to keep your *current* repo-local
-# config/out/state without migrating into ../paperful-data first.
+# Optional local Compose overrides (gitignored as compose.override.yaml).
 #
-#   cp compose.override.example.yaml compose.override.yaml
+# Prefer editing .env for data location:
+#   PAPERFUL_DATA=../paperful-data   # sibling dir (recommended)
+#   PAPERFUL_DATA=.                 # keep config/out/state in the repo
 #
-# Requires Compose v2.24+ (`!override`). Simpler alternative: set PAPERFUL_DATA=. in .env.
-
-services:
-  paperful:
-    volumes: !override
-      - ./config.toml:/data/config.toml
-      - ./out:/data/out
-      - ./state:/data/state
-      # Optional custom playbook packs (create ./packs if you use grey_playbooks_dir).
-      - ./packs:/data/packs
+# Example: pin Zotero host explicitly
+#
+# services:
+#   paperful:
+#     environment:
+#       PAPERFUL_ZOTERO_HOST: host.docker.internal

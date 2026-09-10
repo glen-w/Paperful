@@ -30,9 +30,8 @@ cp .env.example .env
 **Keep your current repo-local setup** (no data move):
 
 ```sh
-mkdir -p packs out state
-cp compose.override.example.yaml compose.override.yaml
-# ensure config.toml exists (copy from config.example.toml if needed)
+cp .env.example .env
+# edit .env: PAPERFUL_DATA=.
 docker compose build
 docker compose run --rm paperful doctor
 docker compose run --rm paperful run --collection interesting --dry-run
@@ -41,6 +40,7 @@ docker compose run --rm paperful run --collection interesting --dry-run
 **Or migrate into a sibling data directory** (recommended long-term):
 
 ```sh
+cp .env.example .env   # PAPERFUL_DATA=../paperful-data
 mkdir -p ../paperful-data/packs ../paperful-data/out ../paperful-data/state
 cp config.example.toml ../paperful-data/config.toml
 # edit email / ezproxy_base / grey_playbooks_dir = "packs" as needed
@@ -50,9 +50,10 @@ docker compose run --rm paperful doctor
 ```
 
 `PAPERFUL_DATA` in `.env` defaults to `../paperful-data`. Compose mounts that
-tree at `/data` inside the container. Relative `out_dir` / `state_dir` /
-`grey_playbooks_dir` in config resolve against the config file’s folder
-(`/data`).
+tree at `/data` inside the container. Use **relative** `out_dir` / `state_dir` /
+`grey_playbooks_dir` in config (e.g. `"out"`, `"state"`, `"packs"`) so they
+resolve under the mounted data dir. Absolute host paths (e.g. `/Users/...`)
+will not land on the volume.
 
 ## Environment and override
 
@@ -60,10 +61,12 @@ tree at `/data` inside the container. Relative `out_dir` / `state_dir` /
 | --- | --- |
 | [`.env.example`](https://github.com/glen-w/Paperful/blob/main/.env.example) | Copy to `.env` — `PAPERFUL_DATA`, `PAPERFUL_ZOTERO_HOST` |
 | [`compose.yaml`](https://github.com/glen-w/Paperful/blob/main/compose.yaml) | Base service (build, Zotero host, data volume) |
-| [`compose.override.example.yaml`](https://github.com/glen-w/Paperful/blob/main/compose.override.example.yaml) | Copy to `compose.override.yaml` to bind repo-local `config.toml` / `out` / `state` / `packs` |
+| [`compose.override.example.yaml`](https://github.com/glen-w/Paperful/blob/main/compose.override.example.yaml) | Optional local Compose tweaks |
 
 `.env` and `compose.override.yaml` are gitignored so your machine-local paths
-never land in the repo.
+never land in the repo. Set `PAPERFUL_DATA=.` to keep config/`out`/`state` in the
+repo; use `../paperful-data` (default) to keep packs and outputs outside the
+git root.
 
 `PAPERFUL_ZOTERO_HOST` defaults to `host.docker.internal` so Docker Desktop
 (macOS/Windows) can reach host Zotero. Compose also adds

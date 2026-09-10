@@ -1,6 +1,7 @@
 # Preferred deploy: one-shot CLI against host Zotero + durable data outside the repo.
 #   cp .env.example .env
-#   cp compose.override.example.yaml compose.override.yaml   # keep repo-local config/out/state
+#   # keep repo-local data: set PAPERFUL_DATA=. in .env
+#   # or: mkdir -p ../paperful-data && cp config.example.toml ../paperful-data/config.toml
 #   docker compose build
 #   docker compose run --rm paperful doctor
 #   docker compose run --rm paperful run --collection interesting --dry-run

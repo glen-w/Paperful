@@ -209,6 +209,13 @@ def test_core_oa_rewrites_without_builtin_pack():
     )
 
 
+def test_pack_dir_missing_is_empty(tmp_path):
+    from paperful.playbooks import load_pack_dir
+
+    missing = tmp_path / "no-such-packs"
+    assert load_pack_dir(missing) == []
+
+
 def test_pack_dir_loads_and_merges(tmp_path):
     packs = tmp_path / "packs"
     packs.mkdir()
