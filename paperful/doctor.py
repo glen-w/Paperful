@@ -49,12 +49,16 @@ def run_checks(
             info = ping() if ping else zl.ping()
             ver = info.get("zotero_version") or "?"
             checks.append(
-                Check(_ZOTERO_CHECK, "green", f"reachable at {zot_where} (Zotero {ver})")
+                Check(
+                    _ZOTERO_CHECK, "green", f"reachable at {zot_where} (Zotero {ver})"
+                )
             )
         except ConnectionError as exc:
             checks.append(Check(_ZOTERO_CHECK, "red", f"{zot_where}: {exc}"))
         except Exception as exc:
-            checks.append(Check(_ZOTERO_CHECK, "red", f"{zot_where} unreachable: {exc}"))
+            checks.append(
+                Check(_ZOTERO_CHECK, "red", f"{zot_where} unreachable: {exc}")
+            )
 
     if info is not None:
         if info.get("supports_write"):
@@ -84,7 +88,9 @@ def run_checks(
     meta = cfg.state_dir / "sessions" / "meta.json"
     if cfg.ezproxy_base:
         if cookie_path.is_file() or vault.is_file() or meta.is_file():
-            where = str(meta if meta.is_file() else (vault if vault.is_file() else cookie_path))
+            where = str(
+                meta if meta.is_file() else (vault if vault.is_file() else cookie_path)
+            )
             checks.append(Check("EZProxy session", "green", where))
         else:
             checks.append(
@@ -100,7 +106,9 @@ def run_checks(
     scholar_path = cfg.scholar_cookies or (cfg.state_dir / "scholar-cookies.txt")
     if "scholar" in cfg.sources:
         if scholar_path.is_file() or vault.is_file() or meta.is_file():
-            where = str(meta if meta.is_file() else (vault if vault.is_file() else scholar_path))
+            where = str(
+                meta if meta.is_file() else (vault if vault.is_file() else scholar_path)
+            )
             checks.append(Check("Scholar session", "green", where))
         else:
             checks.append(

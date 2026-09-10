@@ -4,6 +4,14 @@ All notable user-facing changes. Paperful is **0.x**: flags and report fields
 may still move. **1.0** will lock `paperful.run_report.v1` and attach behaviour
 (see [releases](docs/releases.md)).
 
+## 0.2.0 — 2026-09-10
+
+Docker Compose is the preferred operator deploy: one-shot CLI image talks to
+host Zotero (`PAPERFUL_ZOTERO_HOST` / Host-header fix for
+`host.docker.internal`), durable data outside the repo. Optional
+`grey_playbooks_dir` loads extra pack TOML files (merged after builtin, before
+inline). See [Docker](docs/docker.md).
+
 ## 0.1.0 — 2026-09-10
 
 First usable local Zotero gap-filler: `doctor` → `collections` → `run --dry-run`

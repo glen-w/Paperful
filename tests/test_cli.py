@@ -302,9 +302,7 @@ def test_session_status_probe_scholar(cfg_file, tmp_path, monkeypatch):
     monkeypatch.setattr(
         "paperful.sources.scholar.session_ok", lambda ctx: (True, "ok (200)")
     )
-    res = runner.invoke(
-        cli.app, ["session", "status", "--probe", "-c", str(cfg_file)]
-    )
+    res = runner.invoke(cli.app, ["session", "status", "--probe", "-c", str(cfg_file)])
     assert res.exit_code == 0 and "Session OK" in res.stdout
 
 

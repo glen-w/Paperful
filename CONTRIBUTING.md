@@ -2,6 +2,9 @@
 
 ## Setup
 
+Operators: prefer [Docker Compose](docs/docker.md). Contributors hacking on
+the package use `uv`:
+
 ```sh
 git clone https://github.com/glen-w/Paperful.git
 cd Paperful
@@ -29,7 +32,8 @@ User-facing changes: note them in [CHANGELOG.md](CHANGELOG.md) and
 
 - Keep changes focused; match existing style in `paperful/`.
 - Add or update tests for behaviour changes.
-- Do not commit personal `config.toml`, `state/`, `out/`, or cookie files.
+- Do not commit personal `config.toml`, `state/`, `out/`, `packs/`, `.env`,
+  `compose.override.yaml`, or cookie files.
 
 ## Architecture
 

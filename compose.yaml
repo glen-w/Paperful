@@ -1,0 +1,22 @@
+# Preferred deploy: one-shot CLI against host Zotero + durable data outside the repo.
+#   cp .env.example .env
+#   cp compose.override.example.yaml compose.override.yaml   # keep repo-local config/out/state
+#   docker compose build
+#   docker compose run --rm paperful doctor
+#   docker compose run --rm paperful run --collection interesting --dry-run
+
+services:
+  paperful:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: paperful:local
+    working_dir: /data
+    environment:
+      PAPERFUL_ZOTERO_HOST: ${PAPERFUL_ZOTERO_HOST:-host.docker.internal}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # Sibling data dir by default (packs/, out/, state/, config.toml).
+      - ${PAPERFUL_DATA:-../paperful-data}:/data
+    # No long-running daemon — always use: docker compose run --rm paperful <cmd>

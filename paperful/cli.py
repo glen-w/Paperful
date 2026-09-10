@@ -846,7 +846,9 @@ def session_login(
         raise typer.Exit(2)
     for path in written:
         console.print(f"Wrote {path}")
-    console.print("[green]Session saved.[/] Probe with [bold]paperful session status[/].")
+    console.print(
+        "[green]Session saved.[/] Probe with [bold]paperful session status[/]."
+    )
 
 
 @session_app.command("status")

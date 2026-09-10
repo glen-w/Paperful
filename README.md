@@ -17,67 +17,80 @@ default** — it occupies a legal grey zone in some jurisdictions; see
 By default each item only hits sources that match its metadata (DOI, arXiv
 id, URL, …); `--try-all` disables that. Sci-Hub coverage after ~2021 is thin;
 recent paywalled papers are best fetched via EZProxy when your library has a
-subscription. Grey-lit packs (UNGA/undocs · BBNJ/DOALOS · ISA) cover DOI-less
-institutional PDFs via `direct`/`landing` — see [architecture](docs/architecture.md#grey-literature).
+subscription.
 
-Work happens **on disk** (`out/`, `state/`). Zotero is a library adapter.
-**0.x** flags and report JSON may still move; **1.0** locks
-`paperful.run_report.v1` and attach behaviour ([releases](docs/releases.md),
-[changelog](CHANGELOG.md)).
+Work happens **on disk** (`out/`, `state/`). Zotero is a library adapter:
+read the catalogue in, write PDFs and metadata patches back. Mendeley is
+reserved in config for a later adapter. Not sure if this is the right
+tool? [How paperful compares](docs/comparison.md).
 
-Not sure if this is the right tool? [How paperful compares](docs/comparison.md)
-(that page owns the routing table — this README does not).
+Hosted site (GitHub Pages): landing in [`website/`](website/) plus Sphinx HTML
+from this `docs/` tree at `/guide/`. Preview locally with
+`uv sync --extra docs && make pages-site`, then open `_site/index.html`.
+Live: [glenwright.earth/Paperful](https://glenwright.earth/Paperful/).
 
-Site: [glenwright.earth/Paperful](https://glenwright.earth/Paperful/)
-(`website/` + Sphinx `/guide/`; `uv sync --extra docs && make pages-site`).
-
-## Quick start
+## Quick start (Docker — preferred)
 
 **You need**
 
+- [Docker](https://docs.docker.com/get-docker/) with Compose v2.
 - Zotero running, with the local API enabled:
   Settings → Advanced → *Allow other applications on this computer to communicate with Zotero*.
 - Zotero 10+ to attach PDFs into the library. On Zotero 7–9 the tool still
   downloads to disk; attach later with `paperful attach` once upgraded.
-- [`uv`](https://docs.astral.sh/uv/) (Python 3.10+).
-- Optional: a university/library account and EZProxy URL for publisher PDFs
-  (ScienceDirect, Springer, Wiley, Taylor & Francis, …).
-- Optional: a browser session for Google Scholar (`paperful scholar`) if you
-  keep `scholar` enabled.
-- Optional: [Poppler](https://poppler.freedesktop.org/) `pdftotext` on `PATH`
-  for PDF-text DOI extraction (`pypdf` is the fallback; `doctor` ambers if
-  Poppler is missing).
+- Optional: a university/library account and EZProxy URL for publisher PDFs.
+- Optional: a browser session for Google Scholar (`paperful session login scholar`
+  on the host) if you keep `scholar` enabled.
 
 ```sh
 git clone https://github.com/glen-w/Paperful.git
 cd Paperful
-uv sync
-cp config.example.toml config.toml   # then set email, out_dir, optional ezproxy_base
-uv run paperful doctor               # Zotero, paths, cookies — green / amber / red
-uv run paperful collections          # sanity check: tree with "No PDF" counts
+cp .env.example .env
+cp config.example.toml config.toml   # set email, optional ezproxy_base
+mkdir -p packs out state
+cp compose.override.example.yaml compose.override.yaml   # keep config/out/state in-repo
+docker compose build
+docker compose run --rm paperful doctor
+docker compose run --rm paperful collections
 ```
 
 Then pick a collection and go:
 
 ```sh
-uv run paperful run --collection interesting --dry-run   # see what would be fetched
-uv run paperful run --collection interesting                   # fetch + attach
+docker compose run --rm paperful run --collection interesting --dry-run
+docker compose run --rm paperful run --collection interesting
 ```
+
+Full Docker layout (sibling `../paperful-data`, Zotero networking, packs):
+[Docker](docs/docker.md).
 
 If you use campus EZProxy, finish [Campus EZProxy](docs/ezproxy.md) before a
 big run. If you keep `scholar` in `sources`, log in once with
-`paperful session login scholar` — see [Browser sessions](docs/sessions.md).
+`paperful session login scholar` on the host — see [Browser sessions](docs/sessions.md).
 
-Reference:
+Reference (same corpus as the hosted guide):
 
-- [Commands](docs/commands.md) · [config](docs/config.md) · [sources](docs/sources.md)
-- [EZProxy](docs/ezproxy.md) · [sessions](docs/sessions.md) · [architecture](docs/architecture.md)
+- [Docker (preferred deploy)](docs/docker.md)
+- [Commands and output](docs/commands.md)
+- [Configuration](docs/config.md)
+- [Source routing](docs/sources.md)
+- [Architecture](docs/architecture.md)
 
-## Tests
+## Develop with uv
+
+Contributors and anyone hacking on the package:
 
 ```sh
+uv sync --group dev
+cp config.example.toml config.toml   # then set email, out_dir, optional ezproxy_base
+uv run paperful doctor
 uv run pytest
 ```
+
+Optional: [Poppler](https://poppler.freedesktop.org/) `pdftotext` on `PATH`
+for PDF-text DOI extraction (`pypdf` is the fallback; `doctor` ambers if
+Poppler is missing). For `htmlpdf` / sessions:
+`uv sync --extra htmlpdf && uv run playwright install chromium`.
 
 ## License
 

@@ -1,0 +1,15 @@
+# Copy to compose.override.yaml (gitignored) to keep your *current* repo-local
+# config/out/state without migrating into ../paperful-data first.
+#
+#   cp compose.override.example.yaml compose.override.yaml
+#
+# Requires Compose v2.24+ (`!override`). Simpler alternative: set PAPERFUL_DATA=. in .env.
+
+services:
+  paperful:
+    volumes: !override
+      - ./config.toml:/data/config.toml
+      - ./out:/data/out
+      - ./state:/data/state
+      # Optional custom playbook packs (create ./packs if you use grey_playbooks_dir).
+      - ./packs:/data/packs

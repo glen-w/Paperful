@@ -46,9 +46,12 @@ def test_rewrite_known_pdf_url():
         rewrite_known_pdf_url("https://undocs.org/en/A/CONF.232/2023/4")
         == "https://undocs.org/pdf?symbol=A/CONF.232/2023/4"
     )
-    assert rewrite_known_pdf_url(
-        "https://daccess-ods.un.org/access.nsf/Get?OpenAgent&DS=A/AC.292/2024/1&Lang=E"
-    ) == "https://undocs.org/pdf?symbol=A/AC.292/2024/1"
+    assert (
+        rewrite_known_pdf_url(
+            "https://daccess-ods.un.org/access.nsf/Get?OpenAgent&DS=A/AC.292/2024/1&Lang=E"
+        )
+        == "https://undocs.org/pdf?symbol=A/AC.292/2024/1"
+    )
     assert (
         rewrite_known_pdf_url("https://documents.un.org/en/A/CONF.232/2023/4")
         == "https://undocs.org/pdf?symbol=A/CONF.232/2023/4"

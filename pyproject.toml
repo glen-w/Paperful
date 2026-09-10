@@ -1,6 +1,6 @@
 [project]
 name = "paperful"
-version = "0.1.0"
+version = "0.2.0"
 description = "Fill the gaps in your Zotero library: fetch missing PDFs, save them in a collection-shaped folder tree, attach them back."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -38,12 +38,9 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["paperful"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"paperful/data" = "paperful/data"
-
 [tool.hatch.build.targets.sdist]
 # Personal config (email), runtime state/output and editor files never ship.
-exclude = ["config.toml", "out/", "state/", ".cursor/", ".coverage", "*.log"]
+exclude = ["config.toml", "out/", "state/", "packs/", ".cursor/", ".coverage", "*.log"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

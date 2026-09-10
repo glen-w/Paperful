@@ -20,7 +20,9 @@ _ZOTERO_PORT = 23119
 
 def zotero_local_host() -> str:
     """Host for the Zotero local API (override with PAPERFUL_ZOTERO_HOST for Docker)."""
-    return (os.environ.get("PAPERFUL_ZOTERO_HOST") or "localhost").strip() or "localhost"
+    return (
+        os.environ.get("PAPERFUL_ZOTERO_HOST") or "localhost"
+    ).strip() or "localhost"
 
 
 def zotero_local_endpoint() -> str:
@@ -30,6 +32,11 @@ def zotero_local_endpoint() -> str:
 def zotero_local_label() -> str:
     """Human-readable address for errors and doctor output."""
     return f"{zotero_local_host()}:{_ZOTERO_PORT}"
+
+
+# Zotero's local server rejects requests unless Host is exactly localhost:23119
+# (even when reached via host.docker.internal from a container).
+_ZOTERO_LOCAL_HOST_HEADER = f"localhost:{_ZOTERO_PORT}"
 
 
 @dataclass
@@ -76,6 +83,11 @@ class ZoteroLocal:
         self.zot = zotero.Zotero(0, "user", local=True, local_api_key=local_api_key)
         # pyzotero hardcodes localhost; Docker Desktop needs host.docker.internal.
         self.zot.endpoint = zotero_local_endpoint()
+        # httpx omits Host from client.headers; set it on every request. Zotero's
+        # local API requires Host: localhost:23119 even via host.docker.internal.
+        self.zot.client.event_hooks.setdefault("request", []).append(
+            _force_zotero_local_host_header
+        )
         self._collections: dict[str, Collection] | None = None
 
     # ---- connectivity -------------------------------------------------
@@ -272,6 +284,10 @@ class ZoteroLocal:
             )
         )
         return items
+
+
+def _force_zotero_local_host_header(request: Any) -> None:
+    request.headers["Host"] = _ZOTERO_LOCAL_HOST_HEADER
 
 
 # ---- pure helpers (testable without Zotero) -------------------------------

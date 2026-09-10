@@ -10,7 +10,11 @@ from paperful.playbooks import (
     load_builtin_pack,
     merge_playbooks,
 )
-from paperful.sources.landing import extract_pdf_urls, grey_target, rewrite_known_pdf_url
+from paperful.sources.landing import (
+    extract_pdf_urls,
+    grey_target,
+    rewrite_known_pdf_url,
+)
 from tests.conftest import make_item
 
 _NAMED_PACKS = (
@@ -69,15 +73,11 @@ def test_bbnj_doalos_prepcom_scrape_and_symbol():
       <a href="/wp-content/uploads/2024/04/prepcom-report.pdf">PDF</a>
     </body></html>
     """
-    urls2 = extract_pdf_urls(
-        hsa, "https://www.highseasalliance.org/resources/prepcom/"
-    )
+    urls2 = extract_pdf_urls(hsa, "https://www.highseasalliance.org/resources/prepcom/")
     assert any(u.endswith("prepcom-report.pdf") for u in urls2)
 
     # Direct PDF under bbnjagreement is already a grey target (no rewrite needed)
-    pdf = (
-        "https://www.un.org/bbnjagreement/sites/default/files/2024-04/report.pdf"
-    )
+    pdf = "https://www.un.org/bbnjagreement/sites/default/files/2024-04/report.pdf"
     assert grey_target(make_item(url=pdf, doi=None)) == pdf
 
     item = make_item(
@@ -132,9 +132,10 @@ def test_merge_user_overrides_and_appends():
     by_name = {p.name: p for p in merged}
     assert "https://cdn.example/fao/{code}.pdf" == by_name["fao"].pdf_template
     assert "my_org" in by_name
-    assert apply_rewrite(
-        "https://example.org/d/42", merged
-    ) == "https://example.org/d/42.pdf"
+    assert (
+        apply_rewrite("https://example.org/d/42", merged)
+        == "https://example.org/d/42.pdf"
+    )
 
 
 def test_custom_playbook_via_config_toml(tmp_path):
@@ -171,9 +172,12 @@ pdf_template = "https://acme.test/pdf/{0}"
     item = make_item(url=None, extra="See ACME-99", doi=None)
     assert grey_target(item, cfg.grey_playbooks) == "https://acme.test/pdf/ACME-99"
     # Builtin FAO off when pack disabled
-    assert rewrite_known_pdf_url(
-        "https://www.fao.org/3/ca1234en/ca1234en.htm", cfg.grey_playbooks
-    ) is None
+    assert (
+        rewrite_known_pdf_url(
+            "https://www.fao.org/3/ca1234en/ca1234en.htm", cfg.grey_playbooks
+        )
+        is None
+    )
 
 
 def test_who_scrape_playbook():
@@ -185,9 +189,10 @@ def test_who_scrape_playbook():
 
 
 def test_documents_fao_rewrite():
-    assert rewrite_known_pdf_url(
-        "https://documents.fao.org/3/ca9999en/index.html"
-    ) == "https://www.fao.org/3/ca9999en/ca9999en.pdf"
+    assert (
+        rewrite_known_pdf_url("https://documents.fao.org/3/ca9999en/index.html")
+        == "https://www.fao.org/3/ca9999en/ca9999en.pdf"
+    )
 
 
 def test_core_oa_rewrites_without_builtin_pack():
@@ -198,9 +203,100 @@ def test_core_oa_rewrites_without_builtin_pack():
         )
         == "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1817752/pdf/"
     )
-    assert rewrite_known_pdf_url(
-        "https://www.fao.org/3/ca1234en/ca1234en.htm", empty
-    ) is None
+    assert (
+        rewrite_known_pdf_url("https://www.fao.org/3/ca1234en/ca1234en.htm", empty)
+        is None
+    )
+
+
+def test_pack_dir_loads_and_merges(tmp_path):
+    packs = tmp_path / "packs"
+    packs.mkdir()
+    (packs / "acme.toml").write_text(
+        """
+[[grey_playbooks]]
+name = "acme_pack"
+kind = "rewrite"
+hosts = ["acme.test"]
+url_re = '(?i)acme\\.test/p/(?P<code>[a-z0-9]+)'
+pdf_template = "https://acme.test/p/{code}.pdf"
+
+[[grey_playbooks]]
+name = "fao"
+kind = "rewrite"
+hosts = ["fao.org"]
+url_re = '(?i)fao\\.org/3/(?P<code>[a-z0-9]+)/'
+pdf_template = "https://cdn.example/fao/{code}.pdf"
+""",
+        encoding="utf-8",
+    )
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        """
+email = "t@example.org"
+out_dir = "out"
+state_dir = "state"
+grey_playbooks_dir = "packs"
+
+[[grey_playbooks]]
+name = "inline_only"
+kind = "synthesize"
+match_re = '\\b(INLINE-\\d+)\\b'
+pdf_template = "https://inline.test/{0}"
+""",
+        encoding="utf-8",
+    )
+    cfg = load_config(cfg_path)
+    assert cfg.grey_playbooks_dir == packs.resolve()
+    by_name = {p.name: p for p in cfg.grey_playbooks}
+    assert "acme_pack" in by_name
+    assert "inline_only" in by_name
+    assert "undocs-unga-vme" in by_name  # builtin still on
+    # Dir pack overrides builtin fao; inline does not touch fao.
+    assert by_name["fao"].pdf_template == "https://cdn.example/fao/{code}.pdf"
+    assert (
+        apply_rewrite("https://acme.test/p/ab12", cfg.grey_playbooks)
+        == "https://acme.test/p/ab12.pdf"
+    )
+
+
+def test_pack_dir_before_inline_override(tmp_path):
+    packs = tmp_path / "packs"
+    packs.mkdir()
+    (packs / "one.toml").write_text(
+        """
+[[grey_playbooks]]
+name = "shared"
+kind = "rewrite"
+hosts = ["shared.test"]
+url_re = '(?i)shared\\.test/(?P<id>\\d+)'
+pdf_template = "https://packs.test/{id}.pdf"
+""",
+        encoding="utf-8",
+    )
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        """
+email = "t@example.org"
+out_dir = "out"
+state_dir = "state"
+grey_playbooks_builtin = false
+grey_playbooks_dir = "packs"
+
+[[grey_playbooks]]
+name = "shared"
+kind = "rewrite"
+hosts = ["shared.test"]
+url_re = '(?i)shared\\.test/(?P<id>\\d+)'
+pdf_template = "https://inline.test/{id}.pdf"
+""",
+        encoding="utf-8",
+    )
+    cfg = load_config(cfg_path)
+    assert (
+        apply_rewrite("https://shared.test/9", cfg.grey_playbooks)
+        == "https://inline.test/9.pdf"
+    )
 
 
 def test_invalid_playbook_rows_warn(tmp_path):

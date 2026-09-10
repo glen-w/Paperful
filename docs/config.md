@@ -30,6 +30,7 @@ and [architecture](architecture.md).
 | `ezproxy_cookies` | `state/ezproxy-cookies.txt` | Compat Netscape dump after `session login ezproxy` |
 | `scholar_cookies` | `state/scholar-cookies.txt` | Compat Netscape dump after `session login scholar` |
 | `grey_playbooks_builtin` | `true` | Load the packaged ocean/governance example pack |
+| `grey_playbooks_dir` | (none) | Directory of extra pack `*.toml` files (merged after builtin, before inline). Relative paths resolve against the config file's folder |
 | `[[grey_playbooks]]` | (none) | User rewrite/scrape/synthesize rules; same `name` overrides the pack |
 | `scihub_mirrors` | built-in list | Hostnames tried in order |
 | `delay_scihub_s` | `[3, 8]` | Random pause (seconds) before each Sci-Hub / EZProxy / htmlpdf page fetch |
@@ -64,14 +65,17 @@ The packaged file
 [`paperful/data/grey_playbooks_ocean.toml`](https://github.com/glen-w/Paperful/blob/main/paperful/data/grey_playbooks_ocean.toml)
 is an **ocean/governance example pack** — grey-lit packs **UNGA/undocs ·
 BBNJ/DOALOS · ISA**, plus FAO/OECD/IEA/WHO examples — on by default via
-`grey_playbooks_builtin = true`. Turn it off and/or append your own
-`[[grey_playbooks]]` in `config.toml` (same `name` replaces a pack entry).
+`grey_playbooks_builtin = true`. Optionally set `grey_playbooks_dir = "packs"`
+to load every `*.toml` in that directory (same schema). Merge order: builtin →
+dir packs → inline `[[grey_playbooks]]` (same `name` replaces earlier entries).
 PMC / arXiv / HAL stay as core OA rewrites, not playbooks. See
 [architecture § Grey literature](architecture.md#grey-literature) for hosts
-and symbol patterns.
+and symbol patterns. Under Docker, put packs next to config under `/data`
+(see [Docker](docker.md)).
 
 ```toml
 grey_playbooks_builtin = true
+grey_playbooks_dir = "packs"
 
 [[grey_playbooks]]
 name = "my_org"

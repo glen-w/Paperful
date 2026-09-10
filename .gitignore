@@ -2,6 +2,7 @@ config.toml
 .venv/
 out/
 state/
+packs/
 docs/_build/
 _site/
 __pycache__/
@@ -14,3 +15,6 @@ dist/
 .cursor/commands/
 *cookies*.txt
 ezproxy-cookies.txt
+.env
+compose.override.yaml
+docker-compose.override.yml

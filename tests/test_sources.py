@@ -478,9 +478,7 @@ def test_direct_url_heuristics(ctx_factory):
         direct.find(make_item(url="https://x.test/page"), ctx).outcome
         is Outcome.NOT_FOUND
     )
-    undocs = direct.find(
-        make_item(url="https://undocs.org/en/A/CONF.232/2023/4"), ctx
-    )
+    undocs = direct.find(make_item(url="https://undocs.org/en/A/CONF.232/2023/4"), ctx)
     assert undocs.outcome is Outcome.FOUND
     assert undocs.url == "https://undocs.org/pdf?symbol=A/CONF.232/2023/4"
     from_extra = direct.find(

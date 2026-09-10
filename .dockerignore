@@ -1,0 +1,34 @@
+.git
+.github
+.venv
+.cursor
+.pytest_cache
+.coverage
+htmlcov
+__pycache__
+*.pyc
+*.pyo
+.DS_Store
+.env
+compose.override.yaml
+docker-compose.override.yml
+
+# Personal / runtime — never bake into the image
+config.toml
+out/
+state/
+packs/
+
+# Docs site / build noise
+docs/_build/
+_site/
+website/
+*.md
+!README.md
+tests/
+Makefile
+scripts/
+CONTRIBUTING.md
+CHANGELOG.md
+LICENSE
+.readthedocs.yml

@@ -112,9 +112,7 @@ def test_htmlpdf_uses_browser_session_when_available(ctx_factory):
     ctx = ctx_factory(lambda r: None)
     ctx.browser = StubBrowser()
     cand = htmlpdf.find(
-        make_item(
-            key="W", doi=None, item_type="webpage", url="https://news.test/a"
-        ),
+        make_item(key="W", doi=None, item_type="webpage", url="https://news.test/a"),
         ctx,
     )
     assert cand.outcome is Outcome.FOUND

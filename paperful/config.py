@@ -9,7 +9,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .playbooks import GreyPlaybook, merge_playbooks, playbook_from_dict
+from .playbooks import (
+    GreyPlaybook,
+    load_pack_dir,
+    merge_playbooks,
+    playbook_from_dict,
+)
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -96,8 +101,9 @@ class Config:
     scholar_cookies: Path | None = (
         None  # Netscape cookies.txt; default state/scholar-cookies.txt
     )
-    # Grey-lit PDF playbooks: builtin ocean/gov pack + optional user [[grey_playbooks]].
+    # Grey-lit PDF playbooks: builtin ocean/gov pack + optional dir packs + [[grey_playbooks]].
     grey_playbooks_builtin: bool = True
+    grey_playbooks_dir: Path | None = None
     grey_playbooks: list[GreyPlaybook] = field(default_factory=list)
     config_path: Path | None = None
 
@@ -197,6 +203,8 @@ def _from_dict(raw: dict[str, Any], source: Path) -> Config:
         cfg.scholar_cookies = Path(str(raw["scholar_cookies"])).expanduser()
     if "grey_playbooks_builtin" in raw:
         cfg.grey_playbooks_builtin = bool(raw["grey_playbooks_builtin"])
+    if "grey_playbooks_dir" in raw and raw["grey_playbooks_dir"]:
+        cfg.grey_playbooks_dir = Path(str(raw["grey_playbooks_dir"])).expanduser()
     user_playbooks: list[GreyPlaybook] = []
     for i, row in enumerate(raw.get("grey_playbooks") or []):
         if not isinstance(row, dict):
@@ -218,12 +226,12 @@ def _from_dict(raw: dict[str, Any], source: Path) -> Config:
                 UserWarning,
                 stacklevel=2,
             )
-    # __post_init__ may have loaded builtin already; replace with merge of pack + user.
-    cfg.grey_playbooks = merge_playbooks(cfg.grey_playbooks_builtin, user_playbooks)
     if not cfg.out_dir.is_absolute():
         cfg.out_dir = (source.parent / cfg.out_dir).resolve()
     if not cfg.state_dir.is_absolute():
         cfg.state_dir = (source.parent / cfg.state_dir).resolve()
+    if cfg.grey_playbooks_dir is not None and not cfg.grey_playbooks_dir.is_absolute():
+        cfg.grey_playbooks_dir = (source.parent / cfg.grey_playbooks_dir).resolve()
     if cfg.ezproxy_cookies is None:
         cfg.ezproxy_cookies = cfg.state_dir / "ezproxy-cookies.txt"
     elif not cfg.ezproxy_cookies.is_absolute():
@@ -232,4 +240,13 @@ def _from_dict(raw: dict[str, Any], source: Path) -> Config:
         cfg.scholar_cookies = cfg.state_dir / "scholar-cookies.txt"
     elif not cfg.scholar_cookies.is_absolute():
         cfg.scholar_cookies = (source.parent / cfg.scholar_cookies).resolve()
+    # Builtin → dir packs → inline [[grey_playbooks]]; same name wins later.
+    extra = (
+        load_pack_dir(cfg.grey_playbooks_dir)
+        if cfg.grey_playbooks_dir is not None
+        else []
+    )
+    cfg.grey_playbooks = merge_playbooks(
+        cfg.grey_playbooks_builtin, user_playbooks, extra=extra
+    )
     return cfg

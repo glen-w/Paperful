@@ -118,20 +118,45 @@ def load_builtin_pack() -> tuple[GreyPlaybook, ...]:
     return tuple(playbooks_from_toml_raw(raw))
 
 
+def load_pack_file(path: Path) -> list[GreyPlaybook]:
+    """Load `[[grey_playbooks]]` rows from a single TOML pack file."""
+    if not path.is_file():
+        return []
+    with path.open("rb") as fh:
+        raw = tomllib.load(fh)
+    return playbooks_from_toml_raw(raw)
+
+
+def load_pack_dir(directory: Path) -> list[GreyPlaybook]:
+    """Load every `*.toml` pack in *directory* (sorted by name). Missing dir → []."""
+    if not directory.is_dir():
+        return []
+    out: list[GreyPlaybook] = []
+    for path in sorted(directory.glob("*.toml")):
+        out.extend(load_pack_file(path))
+    return out
+
+
 def merge_playbooks(
-    builtin: bool, user: list[GreyPlaybook] | tuple[GreyPlaybook, ...]
+    builtin: bool,
+    user: list[GreyPlaybook] | tuple[GreyPlaybook, ...] = (),
+    *,
+    extra: list[GreyPlaybook] | tuple[GreyPlaybook, ...] = (),
 ) -> list[GreyPlaybook]:
-    """Builtin pack first; later same `name` from user replaces."""
+    """Builtin pack, then *extra* (dir packs), then *user*; later same `name` replaces."""
     by_name: dict[str, GreyPlaybook] = {}
     order: list[str] = []
-    if builtin:
-        for pb in load_builtin_pack():
+
+    def _layer(books: list[GreyPlaybook] | tuple[GreyPlaybook, ...]) -> None:
+        for pb in books:
+            if pb.name not in by_name:
+                order.append(pb.name)
             by_name[pb.name] = pb
-            order.append(pb.name)
-    for pb in user:
-        if pb.name not in by_name:
-            order.append(pb.name)
-        by_name[pb.name] = pb
+
+    if builtin:
+        _layer(load_builtin_pack())
+    _layer(extra)
+    _layer(user)
     return [by_name[n] for n in order if n in by_name]
 
 
@@ -172,7 +197,11 @@ def _symbol_from_undocs_url(url: str, symbol_re: re.Pattern[str] | None) -> str 
     host = (p.netloc or "").lower()
     qs = parse_qs(p.query, keep_blank_values=False)
     qs_l = {k.lower(): v for k, v in qs.items()}
-    if "undocs.org" in host or host.endswith("docs.un.org") or "documents.un.org" in host:
+    if (
+        "undocs.org" in host
+        or host.endswith("docs.un.org")
+        or "documents.un.org" in host
+    ):
         for key in ("symbol", "ds"):
             if key in qs_l and qs_l[key]:
                 return unquote(qs_l[key][0]).strip()
@@ -209,9 +238,7 @@ def _undocs_symbol_re(playbooks: list[GreyPlaybook]) -> re.Pattern[str] | None:
     return None
 
 
-def apply_rewrite(
-    url: str, playbooks: list[GreyPlaybook] | None = None
-) -> str | None:
+def apply_rewrite(url: str, playbooks: list[GreyPlaybook] | None = None) -> str | None:
     """Zero-fetch URL → PDF from rewrite playbooks (and registered parsers)."""
     books = playbooks if playbooks is not None else default_playbooks()
     host = (urlparse(url).netloc or "").lower()
@@ -222,7 +249,11 @@ def apply_rewrite(
         if pb.hosts and not host_matches(host, pb.hosts):
             continue
         if pb.parser == "undocs":
-            if looks_like_pdf_url(url) and "undocs.org" in host and "symbol=" in url.lower():
+            if (
+                looks_like_pdf_url(url)
+                and "undocs.org" in host
+                and "symbol=" in url.lower()
+            ):
                 return url
             symbol = _symbol_from_undocs_url(url, symbol_re)
             if symbol:

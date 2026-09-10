@@ -164,3 +164,30 @@ def test_items_in_scope_includes_items_with_pdf(zl):
     assert a.has_pdf is True and a.library_doi == "10.1000/a"
     b = next(i for i in scoped if i.key == "B")
     assert b.has_pdf is False
+
+
+def test_paperful_zotero_host_overrides_endpoint(monkeypatch):
+    from paperful.zot import (
+        ZoteroLocal,
+        _ZOTERO_LOCAL_HOST_HEADER,
+        zotero_local_endpoint,
+        zotero_local_label,
+    )
+
+    monkeypatch.setenv("PAPERFUL_ZOTERO_HOST", "host.docker.internal")
+    assert zotero_local_endpoint() == "http://host.docker.internal:23119/api"
+    assert zotero_local_label() == "host.docker.internal:23119"
+    zl = ZoteroLocal()
+    assert zl.zot.endpoint == "http://host.docker.internal:23119/api"
+    hooks = zl.zot.client.event_hooks.get("request") or []
+    assert hooks, "expected Host header request hook"
+
+    # Simulate httpx request hook mutation
+    class _Req:
+        def __init__(self):
+            self.headers = {}
+
+    req = _Req()
+    hooks[-1](req)
+    assert req.headers["Host"] == _ZOTERO_LOCAL_HOST_HEADER
+    assert req.headers["Host"] == "localhost:23119"
