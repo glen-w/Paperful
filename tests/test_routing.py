@@ -38,6 +38,37 @@ def test_source_applicable_by_metadata(cfg):
     assert not source_applicable(
         make_item(doi=None, url="https://consensus.app/x"), cfg, "direct"
     )
+    report = make_item(
+        key="R",
+        doi=None,
+        item_type="report",
+        url="https://undocs.org/en/A/CONF.232/2023/4",
+    )
+    assert source_applicable(report, cfg, "htmlpdf")
+    assert source_applicable(report, cfg, "direct")
+    no_url = make_item(
+        key="S", doi=None, url=None, extra="A/AC.292/2024/1", title="PrepCom"
+    )
+    assert source_applicable(no_url, cfg, "direct")
+    assert not source_applicable(
+        make_item(
+            doi=None,
+            url="https://www.youtube.com/watch?v=x",
+            extra="A/CONF.232/2023/4",
+        ),
+        cfg,
+        "direct",
+    )
+    assert not source_applicable(
+        make_item(
+            key="RD",
+            doi="10.1000/x",
+            item_type="report",
+            url="https://undocs.org/en/A/CONF.232/2023/4",
+        ),
+        cfg,
+        "htmlpdf",
+    )
 
 
 def test_sources_for_item_preserves_config_order(cfg):

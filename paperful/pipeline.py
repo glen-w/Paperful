@@ -23,6 +23,7 @@ from .download import Download, DownloadError, fetch_pdf
 from .pdfid import doi_from_pdf
 from .resolve import IdentifierCache, prepare_identifiers
 from .routing import sources_for_item
+from .session import BrowserSession, vault_cookies_path
 from .runreport import (
     ItemOutcome,
     bump,
@@ -47,7 +48,7 @@ from .store import (
 from .zot import Item
 
 # Sources that share a browser/session or are heavy — keep serial & polite.
-_SERIAL_SOURCES = frozenset({"scihub", "ezproxy", "htmlpdf"})
+_SERIAL_SOURCES = frozenset({"scihub", "ezproxy", "htmlpdf", "scholar"})
 
 
 def make_client(cfg: Config) -> httpx.Client:
@@ -57,6 +58,7 @@ def make_client(cfg: Config) -> httpx.Client:
         timeout=30,
         limits=httpx.Limits(max_connections=cfg.concurrency_oa + 2),
     )
+    apply_netscape_cookies(client, vault_cookies_path(cfg))
     apply_netscape_cookies(
         client, cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt")
     )
@@ -137,7 +139,8 @@ class Pipeline:
         self.attacher = attacher
         self.progress = progress or (lambda: None)
         self.client = make_client(cfg)
-        self.ctx = Context(config=cfg, client=self.client)
+        self.browser = BrowserSession(cfg)
+        self.ctx = Context(config=cfg, client=self.client, browser=self.browser)
         self.stats = RunStats()
         self.stats.sources_configured = list(self.sources)
         self._circuit = CircuitBreaker(cfg.circuit_breaker_threshold)
@@ -164,16 +167,19 @@ class Pipeline:
         self._run_total = total
         self._item_index = {it.key: i for i, it in enumerate(items, start=1)}
         self._circuit.reset()
-        for start in range(0, total, batch_size):
-            if self._stop.is_set():
-                break
-            batch = items[start : start + batch_size]
-            if total > batch_size:
-                self._emit(
-                    f"[bold]-- batch {start // batch_size + 1}/{-(-total // batch_size)} "
-                    f"(items {start + 1}-{start + len(batch)} of {total})[/]"
-                )
-            self._run_batch(batch)
+        try:
+            for start in range(0, total, batch_size):
+                if self._stop.is_set():
+                    break
+                batch = items[start : start + batch_size]
+                if total > batch_size:
+                    self._emit(
+                        f"[bold]-- batch {start // batch_size + 1}/{-(-total // batch_size)} "
+                        f"(items {start + 1}-{start + len(batch)} of {total})[/]"
+                    )
+                self._run_batch(batch)
+        finally:
+            self.browser.close()
         self.stats.finished_at = time.time()
         return self.stats
 

@@ -5,8 +5,8 @@ Guidance for contributors, not a commitment calendar. Paperful stays a
 disk, write back through a library adapter. See [architecture.md](architecture.md).
 
 Surfaces like a Zotero plugin, Firefox extension, or web GUI are **not** the
-product direction. Optional thin bridges (shell-out, cookie helpers) may appear
-later; they do not rewrite the fetcher.
+product direction. Optional thin bridges (`paperful session login`) capture a
+local Chromium profile; they do not rewrite the fetcher.
 
 Ambition beyond core is framed as a **local research library workbench** —
 one catalogue, one disk ledger, one write-back bus — grown as optional modules
@@ -91,9 +91,10 @@ on the map; not prerequisites for 1.x usefulness.
 
 1. **Catalogue unification** — multi-manager adapters as equals; conflict journal;
    query-scoped virtual collections as run scopes
-2. **Acquire beyond journal PDFs** — grey-literature playbooks; SI/dataset/code
-   siblings; watch/alert → propose items; session broker instead of manual
-   `cookies.txt` choreography
+2. **Acquire beyond journal PDFs** — **first slice shipped:** local session vault
+   (`paperful session login`) replacing cookies.txt choreography; grey-lit PDF
+   playbooks in `direct`/`landing` (undocs symbols, ISA/UN link hints). Still
+   parked: SI/dataset/code siblings; watch/alert → propose items.
 3. **Identity / resolver graph** — work ↔ version ↔ preprint; scored patches with
    undo; citation ingest; manifestation-aware dedupe
 4. **File & attachment OS** — linked vs stored policy, rename, orphan GC,

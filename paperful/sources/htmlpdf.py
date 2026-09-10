@@ -16,6 +16,7 @@ _WEB_TYPES = frozenset(
         "magazineArticle",
     }
 )
+_DOC_TYPES = frozenset({"document", "report"})
 _SKIP_HOSTS = (
     "doi.org",
     "scholar.google",
@@ -52,7 +53,7 @@ def playwright_available() -> bool:
 
 def find(item: Item, ctx: Context) -> Candidate:
     if item.item_type not in _WEB_TYPES and not (
-        item.item_type == "document" and item.url and not item.doi
+        item.item_type in _DOC_TYPES and item.url and not item.doi
     ):
         return Candidate.miss(NAME, Outcome.SKIPPED, "not a web/news item")
     url = (item.url or "").strip()
@@ -60,7 +61,8 @@ def find(item: Item, ctx: Context) -> Candidate:
         return Candidate.miss(NAME, Outcome.SKIPPED, "no URL")
     if any(h in url.lower() for h in _SKIP_HOSTS):
         return Candidate.miss(NAME, Outcome.SKIPPED, "resolver/aggregator URL")
-    if not playwright_available():
+    use_browser = ctx.browser is not None and ctx.browser.available()
+    if not use_browser and not playwright_available():
         return Candidate.miss(
             NAME,
             Outcome.SKIPPED,
@@ -68,7 +70,10 @@ def find(item: Item, ctx: Context) -> Candidate:
         )
 
     try:
-        pdf_bytes, final_url, note = _render_pdf(url, ctx.config.user_agent)
+        if use_browser:
+            pdf_bytes, final_url, note = ctx.browser.render_pdf(url, _PAYWALL_HINTS)
+        else:
+            pdf_bytes, final_url, note = _render_pdf(url, ctx.config.user_agent)
     except Exception as exc:  # Playwright / browser errors
         return Candidate.miss(NAME, Outcome.ERROR, type(exc).__name__)
 

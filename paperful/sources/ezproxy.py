@@ -64,13 +64,11 @@ def find(item: Item, ctx: Context) -> Candidate:
     cfg = ctx.config
     if not cfg.ezproxy_base:
         return Candidate.miss(NAME, Outcome.SKIPPED, "ezproxy_base not set")
-    if not cfg.ezproxy_cookies or not cfg.ezproxy_cookies.is_file():
-        return Candidate.miss(
-            NAME, Outcome.SKIPPED, "no ezproxy cookie file - run: paperful ezproxy"
-        )
     if not list(ctx.client.cookies.jar):
         return Candidate.miss(
-            NAME, Outcome.SKIPPED, "ezproxy cookies not loaded into client"
+            NAME,
+            Outcome.SKIPPED,
+            "no ezproxy session - run: paperful session login ezproxy",
         )
 
     target = ezproxy_target(item)
@@ -145,8 +143,15 @@ def session_ok(ctx: Context) -> tuple[bool, str]:
     """Cheap check: hit the proxy login URL and see if we bounce to CAS."""
     if not ctx.config.ezproxy_base:
         return False, "ezproxy_base not set"
-    if not ctx.config.ezproxy_cookies or not ctx.config.ezproxy_cookies.is_file():
-        return False, f"cookie file missing ({ctx.config.ezproxy_cookies})"
+    from ..session import profile_ready, vault_cookies_path
+
+    cookie_path = ctx.config.ezproxy_cookies or (ctx.config.state_dir / "ezproxy-cookies.txt")
+    if (
+        not cookie_path.is_file()
+        and not vault_cookies_path(ctx.config).is_file()
+        and not profile_ready(ctx.config)
+    ):
+        return False, f"cookie file missing ({cookie_path})"
     probe = proxify("https://doi.org/10.1038/nature", ctx.config.ezproxy_base)
     try:
         resp = ctx.client.get(probe, timeout=30)

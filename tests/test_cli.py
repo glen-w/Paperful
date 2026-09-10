@@ -252,8 +252,9 @@ def test_report_empty_and_populated(cfg_file, tmp_path):
 def test_scholar_command_missing_cookies(cfg_file, monkeypatch):
     monkeypatch.setattr("webbrowser.open", lambda url: None)
     res = runner.invoke(cli.app, ["scholar", "-c", str(cfg_file), "--no-open"])
-    assert res.exit_code == 2 and "No cookie file yet" in res.stdout
+    assert res.exit_code == 2 and "No session yet" in res.stdout
     assert "mv ~/Desktop/cookies.txt" in res.stdout
+    assert "session login" in res.stdout
 
 
 def test_scholar_command_session_ok(cfg_file, tmp_path, monkeypatch):
@@ -284,7 +285,33 @@ def test_scholar_command_session_not_ready(cfg_file, tmp_path, monkeypatch):
     assert res.exit_code == 2
     assert "Session not ready" in res.stdout
     assert "not cookies alone" in res.stdout
-    assert "overwrite" in res.stdout
+    assert "session login scholar" in res.stdout
+
+
+def test_session_status_empty_vault(cfg_file):
+    res = runner.invoke(cli.app, ["session", "status", "-c", str(cfg_file)])
+    assert res.exit_code == 0
+    assert "Ready:" in res.stdout
+    assert "False" in res.stdout
+
+
+def test_session_status_probe_scholar(cfg_file, tmp_path, monkeypatch):
+    cookie_file = tmp_path / "state" / "scholar-cookies.txt"
+    cookie_file.parent.mkdir(parents=True, exist_ok=True)
+    cookie_file.write_text(".google.com\tTRUE\t/\tTRUE\t0\tSID\ttest\n")
+    monkeypatch.setattr(
+        "paperful.sources.scholar.session_ok", lambda ctx: (True, "ok (200)")
+    )
+    res = runner.invoke(
+        cli.app, ["session", "status", "--probe", "-c", str(cfg_file)]
+    )
+    assert res.exit_code == 0 and "Session OK" in res.stdout
+
+
+def test_session_login_unknown_slot(cfg_file):
+    res = runner.invoke(cli.app, ["session", "login", "ftp", "-c", str(cfg_file)])
+    assert res.exit_code == 1
+    assert "Unknown slot" in res.stdout
 
 
 def test_mirrors_command(cfg_file, monkeypatch):
@@ -306,6 +333,23 @@ def test_doctor_ok(cfg_file, stub_zotero):
     assert res.exit_code == 0
     assert "green" in res.stdout and "Zotero :23119" in res.stdout
     assert "pdftotext" in res.stdout
+
+
+def test_doctor_scholar_session_amber_without_vault(cfg_file, stub_zotero):
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file)])
+    assert res.exit_code == 0
+    assert "Scholar session" in res.stdout
+    assert "paperful session login scholar" in res.stdout
+
+
+def test_doctor_scholar_session_green_with_cookies(cfg_file, tmp_path, stub_zotero):
+    cookie = tmp_path / "state" / "scholar-cookies.txt"
+    cookie.parent.mkdir(parents=True, exist_ok=True)
+    cookie.write_text(".google.com\tTRUE\t/\tTRUE\t0\tSID\ttest\n")
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file)])
+    assert res.exit_code == 0
+    assert "Scholar session" in res.stdout
+    assert "session login scholar" not in res.stdout
 
 
 def test_doctor_pdftotext_amber(cfg_file, stub_zotero, monkeypatch):

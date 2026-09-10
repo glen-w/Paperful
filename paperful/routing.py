@@ -77,10 +77,14 @@ def source_applicable(item: Item, cfg: Config, name: str) -> bool:
     if name == "scholar":
         return bool(item.doi or (item.title and len(item.title) >= 20))
     if name == "direct":
-        url = (item.url or "").strip().lower()
-        if not url.startswith(("http://", "https://")):
+        from .sources.landing import grey_target
+
+        target = grey_target(item)
+        if not target:
             return False
-        return not any(h in url for h in _DIRECT_SKIP_HOSTS)
+        url = (item.url or "").strip().lower()
+        check = url if url.startswith(("http://", "https://")) else target.lower()
+        return not any(h in check for h in _DIRECT_SKIP_HOSTS)
     if name == "htmlpdf":
         url = (item.url or "").strip().lower()
         if not url.startswith(("http://", "https://")):
@@ -95,12 +99,13 @@ def source_applicable(item: Item, cfg: Config, name: str) -> bool:
             "magazineArticle",
         }:
             return True
-        return item.item_type == "document" and not item.doi
+        return item.item_type in {"document", "report"} and not item.doi
     if name == "ezproxy":
         if not cfg.ezproxy_base:
             return False
         cookie_path = cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt")
-        if not cookie_path.is_file():
+        vault = cfg.state_dir / "sessions" / "cookies.txt"
+        if not cookie_path.is_file() and not vault.is_file():
             return False
         return bool(ezproxy_target(item))
     if name == "scihub":

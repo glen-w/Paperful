@@ -8,6 +8,8 @@ import httpx
 
 from paperful.sources.landing import (
     extract_pdf_urls,
+    extract_un_symbol,
+    grey_target,
     resolve_landings,
     rewrite_known_pdf_url,
 )
@@ -40,7 +42,38 @@ def test_rewrite_known_pdf_url():
     assert rewrite_known_pdf_url("https://www.fao.org/3/ca1234en/ca1234en.htm") == (
         "https://www.fao.org/3/ca1234en/ca1234en.pdf"
     )
+    assert (
+        rewrite_known_pdf_url("https://undocs.org/en/A/CONF.232/2023/4")
+        == "https://undocs.org/pdf?symbol=A/CONF.232/2023/4"
+    )
+    assert rewrite_known_pdf_url(
+        "https://daccess-ods.un.org/access.nsf/Get?OpenAgent&DS=A/AC.292/2024/1&Lang=E"
+    ) == "https://undocs.org/pdf?symbol=A/AC.292/2024/1"
+    assert (
+        rewrite_known_pdf_url("https://documents.un.org/en/A/CONF.232/2023/4")
+        == "https://undocs.org/pdf?symbol=A/CONF.232/2023/4"
+    )
+    already = "https://undocs.org/pdf?symbol=A/79/123"
+    assert rewrite_known_pdf_url(already) == already
     assert rewrite_known_pdf_url("https://dspace.example/handle/1874/1") is None
+
+
+def test_extract_un_symbol_and_grey_target_from_extra():
+    assert extract_un_symbol("See A/CONF.232/2023/4/Add.1 (English)") == (
+        "A/CONF.232/2023/4/Add.1"
+    )
+    assert extract_un_symbol("A/79/123") == "A/79/123"
+    assert extract_un_symbol("S/2024/55") == "S/2024/55"
+    assert extract_un_symbol("A sufficiently long test title") is None
+    item = make_item(url=None, extra="UN symbol: A/AC.292/2024/1", doi=None)
+    assert grey_target(item) == "https://undocs.org/pdf?symbol=A/AC.292/2024/1"
+    # URL present wins; do not synthesize undocs from Extra
+    yt = make_item(
+        url="https://www.youtube.com/watch?v=x",
+        extra="A/CONF.232/2023/4",
+        doi=None,
+    )
+    assert grey_target(yt) == yt.url
 
 
 def test_extract_pdf_urls_meta_and_pii():
@@ -86,6 +119,12 @@ def test_extract_pdf_urls_irena_oecd_hints():
     """
     urls2 = extract_pdf_urls(oecd, "https://www.oecd-ilibrary.org/economics/foo_123")
     assert any("/download/" in u for u in urls2)
+
+    isa = """
+    <html><body><a href="/wp-content/uploads/2024/isa-report.pdf">Download</a></body></html>
+    """
+    urls3 = extract_pdf_urls(isa, "https://www.isa.org.jm/documents/foo")
+    assert any(u.endswith(".pdf") for u in urls3)
 
 
 def test_resolve_dspace_handle(ctx_factory):

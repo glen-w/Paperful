@@ -9,7 +9,7 @@ from paperful.sources.base import Outcome
 from tests.conftest import PDF_BYTES, make_item
 
 
-def test_htmlpdf_skips_non_web_types(ctx_factory):
+def test_htmlpdf_skips_journal_with_doi(ctx_factory):
     ctx = ctx_factory(lambda r: None)
     cand = htmlpdf.find(
         make_item(item_type="journalArticle", url="https://news.test/a"), ctx
@@ -65,6 +65,60 @@ def test_htmlpdf_paywall_note(ctx_factory, monkeypatch):
     )
     assert cand.outcome is Outcome.NOT_FOUND
     assert "paywall" in cand.note
+
+
+def test_htmlpdf_allows_report_without_doi(ctx_factory, monkeypatch):
+    monkeypatch.setattr(htmlpdf, "playwright_available", lambda: True)
+    monkeypatch.setattr(
+        htmlpdf,
+        "_render_pdf",
+        lambda url, ua: (PDF_BYTES, url, "chromium print"),
+    )
+    ctx = ctx_factory(lambda r: None)
+    cand = htmlpdf.find(
+        make_item(
+            key="R",
+            doi=None,
+            item_type="report",
+            url="https://www.un.org/bbnj/prepcom",
+        ),
+        ctx,
+    )
+    assert cand.outcome is Outcome.FOUND
+
+
+def test_htmlpdf_skips_report_with_doi(ctx_factory):
+    ctx = ctx_factory(lambda r: None)
+    cand = htmlpdf.find(
+        make_item(
+            key="R",
+            doi="10.1000/x",
+            item_type="report",
+            url="https://www.un.org/bbnj/prepcom",
+        ),
+        ctx,
+    )
+    assert cand.outcome is Outcome.SKIPPED
+
+
+def test_htmlpdf_uses_browser_session_when_available(ctx_factory):
+    class StubBrowser:
+        def available(self) -> bool:
+            return True
+
+        def render_pdf(self, url, hints, timeout_ms=45_000):
+            return PDF_BYTES, url, "chromium print"
+
+    ctx = ctx_factory(lambda r: None)
+    ctx.browser = StubBrowser()
+    cand = htmlpdf.find(
+        make_item(
+            key="W", doi=None, item_type="webpage", url="https://news.test/a"
+        ),
+        ctx,
+    )
+    assert cand.outcome is Outcome.FOUND
+    assert cand.content == PDF_BYTES
 
 
 @pytest.mark.skipif(

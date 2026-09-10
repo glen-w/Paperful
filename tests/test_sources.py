@@ -478,6 +478,16 @@ def test_direct_url_heuristics(ctx_factory):
         direct.find(make_item(url="https://x.test/page"), ctx).outcome
         is Outcome.NOT_FOUND
     )
+    undocs = direct.find(
+        make_item(url="https://undocs.org/en/A/CONF.232/2023/4"), ctx
+    )
+    assert undocs.outcome is Outcome.FOUND
+    assert undocs.url == "https://undocs.org/pdf?symbol=A/CONF.232/2023/4"
+    from_extra = direct.find(
+        make_item(url=None, extra="Symbol A/79/123", doi=None), ctx
+    )
+    assert from_extra.outcome is Outcome.FOUND
+    assert from_extra.url == "https://undocs.org/pdf?symbol=A/79/123"
 
 
 def test_direct_follows_html_pdf_link(ctx_factory):

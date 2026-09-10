@@ -36,6 +36,7 @@ flowchart LR
 | `state/manifest.jsonl` | Append-only resume ledger. Latest line per item key wins. Fields include `doi` (used this attempt), `library_doi`, `doi_verified`, `pdf_doi` |
 | `state/metadata-patches.jsonl` | Proposed patches (`doi`, `title`, `date`, `publicationTitle`) |
 | `state/pdf-cache/` | Manager PDFs exported so lint reads text on disk |
+| `state/sessions/` | Chromium profile + `meta.json` (login timestamps, no secrets). Netscape dumps for httpx |
 | `state/last-run.json` | Latest `run` report (`paperful.run_report.v1`) |
 | `state/runs/<stamp>-<command>.json` | Historical `run` and `fix-metadata` reports |
 
@@ -70,7 +71,7 @@ flowchart LR
 
 ## Circuit breaker
 
-Open-access sources run in parallel (`concurrency_oa`). Block-like outcomes (CAPTCHA, 429, “sorry”, …) increment a per-source counter; after `circuit_breaker_threshold` the source is skipped for the rest of the run. Sci-Hub, EZProxy, and HTML→PDF stay serial.
+Open-access sources run in parallel (`concurrency_oa`). Block-like outcomes (CAPTCHA, 429, “sorry”, …) increment a per-source counter; after `circuit_breaker_threshold` the source is skipped for the rest of the run. Scholar, Sci-Hub, EZProxy, and HTML→PDF stay serial (Scholar/htmlpdf share one Chromium profile lock).
 
 ## Sci-Hub and presets
 
@@ -82,19 +83,21 @@ When Zotero cloud storage is full, attachments may fail with quota errors; PDFs 
 
 ## Operator tooling
 
-- `paperful doctor` — preflight (Zotero, writable dirs, email, cookies, pdftotext).
+- `paperful doctor` — preflight (Zotero, writable dirs, email, sessions, pdftotext).
 - `paperful lint` / `paperful fix-metadata` — identifier hygiene; apply is explicit.
 - `paperful report` / `paperful report --last-run` — manifest totals plus the latest
   auditable run report (`state/last-run.json`, history under `state/runs/`).
   Each `run` ends with a summary: PDFs downloaded, in-memory field corrections,
   sources checked, and typed errors.
 
-## Grey literature limits
+## Grey literature
 
-Items without a DOI (and without a usable arXiv id, PMID, or direct URL) stop at `no_identifier`. UN and process documents (PrepCom, DOALOS, undocs) often lack DOIs Unpaywall can resolve — use `direct` / `htmlpdf` when a stable URL exists, or add metadata in the library then `fix-metadata`.
+`direct` rewrites known landings to PDFs (PMC, arXiv, HAL, FAO, **undocs / daccess / documents.un.org**). A UN document symbol in Extra or title (`A/CONF.232/2023/4`, `A/AC.292/…`) is enough to synthesize an undocs PDF URL when the item has no URL. ISA and `un.org` landings pick up `.pdf` / download links. DOI-less `report` items can fall through to `htmlpdf`. Campus EZProxy is never used for these public hosts.
+
+Items with no DOI, arXiv id, PMID, URL, or UN symbol still stop at `no_identifier`.
 
 ## Related docs
 
 - [ROADMAP.md](ROADMAP.md) — core vs maybe-later workbench; optional local/LiteLLM title assist
 - [comparison.md](comparison.md) — where paperful sits next to plugins and bib tools
-- [README](../README.md) — commands, configuration, EZProxy, Scholar cookies
+- [README](../README.md) — commands, configuration, session vault, EZProxy

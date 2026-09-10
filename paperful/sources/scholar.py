@@ -32,9 +32,12 @@ _SKIP_HOSTS = (
 
 
 def is_blocked(resp: httpx.Response) -> bool:
-    final = str(resp.url).lower()
-    body = resp.text
-    if resp.status_code in {429, 503} or "sorry" in final or "/sorry/" in final:
+    return _blocked_html(resp.text, str(resp.url), status=resp.status_code)
+
+
+def _blocked_html(body: str, final_url: str, status: int = 200) -> bool:
+    final = final_url.lower()
+    if status in {429, 503} or "sorry" in final or "/sorry/" in final:
         return True
     return "captcha" in body.lower()[:3000] and "gs_r" not in body
 
@@ -44,14 +47,31 @@ def looks_like_results(html: str) -> bool:
 
 
 def session_ok(ctx: Context) -> tuple[bool, str]:
-    """Cheap check: probe Scholar with exported browser cookies."""
+    """Cheap check: probe Scholar with exported cookies or a persistent profile."""
     from ..cookies import has_domain_cookies
+    from ..session import profile_ready, vault_cookies_path
 
     cookie_path = ctx.config.scholar_cookies or (
         ctx.config.state_dir / "scholar-cookies.txt"
     )
-    if not cookie_path.is_file():
+    vault = vault_cookies_path(ctx.config)
+    if (
+        not cookie_path.is_file()
+        and not vault.is_file()
+        and not profile_ready(ctx.config)
+    ):
         return False, f"cookie file missing ({cookie_path})"
+    if ctx.browser is not None and ctx.browser.available():
+        try:
+            body, final = ctx.browser.fetch_html(_PROBE_URL)
+        except Exception as exc:
+            return False, f"browser request failed: {type(exc).__name__}"
+        if _blocked_html(body, final):
+            host = final.split("?", 1)[0]
+            return False, f"blocked or CAPTCHA at {host}"
+        if looks_like_results(body):
+            return True, "ok (browser profile)"
+        return False, "unexpected response (browser profile)"
     if not has_domain_cookies(ctx.client, "google"):
         return False, "scholar cookies not loaded into client"
     try:
@@ -73,26 +93,33 @@ def find(item: Item, ctx: Context) -> Candidate:
     q = f'"{item.doi}"' if item.doi else item.title
     url = f"https://scholar.google.com/scholar?q={quote_plus(q)}&hl=en&as_sdt=0%2C5"
     try:
-        resp = ctx.client.get(url, timeout=30)
+        if ctx.browser is not None and ctx.browser.available():
+            body, final_url = ctx.browser.fetch_html(url)
+            final = final_url
+        else:
+            resp = ctx.client.get(url, timeout=30)
+            body = resp.text
+            final = str(resp.url)
+            if resp.status_code >= 400:
+                return Candidate.miss(NAME, Outcome.ERROR, f"HTTP {resp.status_code}")
     except httpx.HTTPError as exc:
         return Candidate.miss(
             NAME, Outcome.ERROR, f"request failed ({type(exc).__name__})"
         )
+    except Exception as exc:
+        return Candidate.miss(NAME, Outcome.ERROR, f"browser ({type(exc).__name__})")
 
-    body = resp.text
-    if is_blocked(resp):
+    if _blocked_html(body, final):
         return Candidate.miss(NAME, Outcome.CAPTCHA, "scholar blocked/captcha")
-    if resp.status_code >= 400:
-        return Candidate.miss(NAME, Outcome.ERROR, f"HTTP {resp.status_code}")
 
-    pdfs = extract_pdf_links(body, str(resp.url))
+    pdfs = extract_pdf_links(body, final)
     if not pdfs:
         return Candidate.miss(NAME, Outcome.NOT_FOUND, "no free PDF link")
     return Candidate(
         url=pdfs[0],
         source=NAME,
         note="google scholar",
-        referer=str(resp.url),
+        referer=final,
         alternates=pdfs[1:4],
     )
 

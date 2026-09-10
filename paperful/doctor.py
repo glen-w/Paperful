@@ -75,15 +75,18 @@ def run_checks(
             checks.append(Check(label, "red", f"not writable: {path}"))
 
     cookie_path = cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt")
+    vault = cfg.state_dir / "sessions" / "cookies.txt"
+    meta = cfg.state_dir / "sessions" / "meta.json"
     if cfg.ezproxy_base:
-        if cookie_path.is_file():
-            checks.append(Check("EZProxy cookies", "green", str(cookie_path)))
+        if cookie_path.is_file() or vault.is_file() or meta.is_file():
+            where = str(meta if meta.is_file() else (vault if vault.is_file() else cookie_path))
+            checks.append(Check("EZProxy session", "green", where))
         else:
             checks.append(
                 Check(
-                    "EZProxy cookies",
+                    "EZProxy session",
                     "amber",
-                    f"missing — run: paperful ezproxy ({cookie_path})",
+                    f"missing — run: paperful session login ezproxy ({cookie_path})",
                 )
             )
     else:
@@ -91,14 +94,15 @@ def run_checks(
 
     scholar_path = cfg.scholar_cookies or (cfg.state_dir / "scholar-cookies.txt")
     if "scholar" in cfg.sources:
-        if scholar_path.is_file():
-            checks.append(Check("Scholar cookies", "green", str(scholar_path)))
+        if scholar_path.is_file() or vault.is_file() or meta.is_file():
+            where = str(meta if meta.is_file() else (vault if vault.is_file() else scholar_path))
+            checks.append(Check("Scholar session", "green", where))
         else:
             checks.append(
                 Check(
-                    "Scholar cookies",
+                    "Scholar session",
                     "amber",
-                    f"missing — run: paperful scholar ({scholar_path})",
+                    f"missing — run: paperful session login scholar ({scholar_path})",
                 )
             )
     else:

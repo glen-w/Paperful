@@ -186,6 +186,10 @@ def test_make_client_loads_scholar_cookies(cfg, tmp_path):
     assert any(c.name == "SID" and c.value == "test" for c in client.cookies.jar)
 
 
+def test_scholar_is_serial_source():
+    assert "scholar" in pl._SERIAL_SOURCES
+
+
 def test_circuit_breaker_trips_serial_scihub(pipe_factory):
     sh = StubSource("scihub", default=Outcome.CAPTCHA)
     pipe, manifest = pipe_factory({"scihub": sh}, ["scihub"])

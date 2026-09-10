@@ -6,12 +6,15 @@ import threading
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 import httpx
 
 from ..config import Config
 from ..zot import Item
+
+if TYPE_CHECKING:
+    from ..session import BrowserSession
 
 
 class Outcome(str, Enum):
@@ -55,6 +58,7 @@ class Context:
     client: httpx.Client
     mirror_failures: dict[str, int] = field(default_factory=dict)
     lock: threading.Lock = field(default_factory=threading.Lock)
+    browser: BrowserSession | None = None
 
     def mirror_ok(self, mirror: str) -> bool:
         return (

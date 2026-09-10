@@ -58,6 +58,13 @@ def test_ezproxy_skips_non_publisher_url(ctx_factory, cfg, tmp_path):
     assert "publisher" in cand.note
 
 
+def test_ezproxy_skips_without_cookies_in_jar(ctx_factory, cfg):
+    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cand = ezproxy.find(make_item(), ctx_factory(lambda r: httpx.Response(200)))
+    assert cand.outcome is Outcome.SKIPPED
+    assert "session" in cand.note
+
+
 def test_ezproxy_skips_without_config(ctx_factory, cfg):
     cfg.ezproxy_base = ""
     assert (
@@ -113,6 +120,25 @@ def test_netscape_cookie_loader(tmp_path):
     p.write_text("#HttpOnly_.scpo.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsid\tsecret\n")
     cookies = load_netscape_cookies(p)
     assert any(c.name == "sid" and c.value == "secret" for c in cookies.jar)
+
+
+def test_scholar_playwright_find(ctx_factory):
+    html = """
+    <div class="gs_r"><div class="gs_or_ggsm"><a href="https://repo.test/a.pdf">[PDF]</a></div></div>
+    """
+
+    class StubBrowser:
+        def available(self) -> bool:
+            return True
+
+        def fetch_html(self, url, timeout_ms=45_000):
+            return html, "https://scholar.google.com/scholar"
+
+    ctx = ctx_factory(lambda r: httpx.Response(500, text="should not be used"))
+    ctx.browser = StubBrowser()
+    cand = scholar.find(make_item(), ctx)
+    assert cand.outcome is Outcome.FOUND
+    assert cand.url == "https://repo.test/a.pdf"
 
 
 def test_scholar_extracts_pdf_sidebar():

@@ -37,6 +37,12 @@ app = typer.Typer(
     no_args_is_help=True,
     help="Fetch missing PDFs for Zotero items.",
 )
+session_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Local browser session vault for Scholar, EZProxy, and publishers.",
+)
+app.add_typer(session_app, name="session")
 console = Console(highlight=False)
 
 ConfigOpt = typer.Option(
@@ -168,7 +174,7 @@ def version() -> None:
 
 @app.command()
 def doctor(config: Path | None = ConfigOpt) -> None:
-    """Check Zotero, paths, email, and optional session cookies (green / amber / red)."""
+    """Check Zotero, paths, email, and optional browser sessions (green / amber / red)."""
     cfg = _cfg(config)
     zl: ZoteroLocal | None = None
     try:
@@ -727,23 +733,179 @@ def mirrors(config: Path | None = ConfigOpt) -> None:
         console.print(f"[{colour}]{status:<10}[/] {mirror}")
 
 
+def _confirm_session_login() -> None:
+    console.print("Complete login or CAPTCHA in the browser window, then press Enter.")
+    try:
+        input()
+    except EOFError:
+        pass
+
+
+def _netscape_fallback_hint(cookie_path: Path, *, scholar: bool) -> None:
+    extra = (
+        "Include [bold].google.com[/] and [bold]scholar.google.com[/]. "
+        if scholar
+        else "Include your EZProxy host (e.g. [bold]*.idm.oclc.org[/]). "
+    )
+    console.print(
+        f"\n[yellow]No session yet.[/] Preferred: [bold]paperful session login "
+        f"{'scholar' if scholar else 'ezproxy'}[/] "
+        f"(needs [bold]paperful[htmlpdf][/]).\n"
+        f"Or export a Netscape cookies.txt ({extra}) to:\n"
+        f"  {cookie_path}\n"
+        f"If an extension saved to your Desktop:\n"
+        f"  mv ~/Desktop/cookies.txt {cookie_path}\n"
+        f"  chmod 600 {cookie_path}\n"
+        "Firefox: addons.mozilla.org → cookies.txt · Chrome: Get cookies.txt LOCALLY\n"
+    )
+
+
+def _probe_slot(cfg: Config, slot: str) -> None:
+    from .cookies import cookie_domains
+    from .session import BrowserSession, profile_ready, vault_cookies_path
+    from .sources import ezproxy as ez
+    from .sources import scholar as gs
+
+    browser = BrowserSession(cfg)
+    ctx = Context(config=cfg, client=make_client(cfg), browser=browser)
+    try:
+        if slot == "ezproxy":
+            cookie_path = cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt")
+            if (
+                not cookie_path.is_file()
+                and not vault_cookies_path(cfg).is_file()
+                and not profile_ready(cfg)
+            ):
+                _netscape_fallback_hint(cookie_path, scholar=False)
+                _print_exit_ladder()
+                raise typer.Exit(2)
+            ok, detail = ez.session_ok(ctx)
+        else:
+            cookie_path = cfg.scholar_cookies or (cfg.state_dir / "scholar-cookies.txt")
+            gs_domains = sorted(
+                d
+                for d in cookie_domains(ctx.client.cookies)
+                if "google" in (d or "").lower()
+            )
+            if gs_domains:
+                console.print(f"Loaded domains: {', '.join(gs_domains)}")
+            if (
+                not cookie_path.is_file()
+                and not vault_cookies_path(cfg).is_file()
+                and not profile_ready(cfg)
+            ):
+                _netscape_fallback_hint(cookie_path, scholar=True)
+                _print_exit_ladder()
+                raise typer.Exit(2)
+            ok, detail = gs.session_ok(ctx)
+    finally:
+        browser.close()
+    if ok:
+        console.print(f"[green]Session OK[/] — {detail}")
+        return
+    console.print(f"[red]Session not ready:[/] {detail}")
+    if slot == "scholar":
+        console.print(
+            "Solve the CAPTCHA in [bold]paperful session login scholar[/] "
+            "(the same Chromium profile used during [bold]run[/]).\n"
+            "A cookie file can still fail: Google often keys the pass to the browser, "
+            "not cookies alone. Do not retry in a tight loop."
+        )
+    else:
+        console.print("Run [bold]paperful session login ezproxy[/] and retry.")
+    _print_exit_ladder()
+    raise typer.Exit(2)
+
+
+@session_app.command("login")
+def session_login(
+    slot: str = typer.Argument(..., help="scholar or ezproxy"),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Open headed Chromium on the local vault; log in once, reuse on run."""
+    from . import session as sess
+
+    cfg = _cfg(config)
+    key = slot.strip().lower()
+    if key not in sess.SLOTS:
+        console.print(f"[red]Unknown slot {slot!r}.[/] Use scholar or ezproxy.")
+        raise typer.Exit(1)
+    console.print(f"Vault: {sess.sessions_dir(cfg)}")
+    try:
+        url = sess.login_url_for(cfg, key)
+    except sess.SessionError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1)
+    console.print(f"Opening: {url}")
+    try:
+        written = sess.login_headed(cfg, key, confirm=_confirm_session_login)
+    except sess.SessionError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(2)
+    for path in written:
+        console.print(f"Wrote {path}")
+    console.print("[green]Session saved.[/] Probe with [bold]paperful session status[/].")
+
+
+@session_app.command("status")
+def session_status(
+    config: Path | None = ConfigOpt,
+    probe: bool = typer.Option(
+        False, "--probe/--no-probe", help="Hit Scholar / EZProxy session_ok (network)"
+    ),
+) -> None:
+    """Show the vault. Default is offline file presence; --probe runs session_ok."""
+    from . import session as sess
+
+    cfg = _cfg(config)
+    console.print(f"Vault:     {sess.sessions_dir(cfg)}")
+    console.print(f"Chromium:  {sess.chromium_dir(cfg)}")
+    console.print(f"Ready:     {sess.profile_ready(cfg)}")
+    meta = sess.load_meta(cfg)
+    slots = meta.get("slots") or {}
+    if slots:
+        for name, info in slots.items():
+            console.print(f"  {name}: {info}")
+    else:
+        console.print("[dim]No login slots recorded. Run paperful session login.[/]")
+    vault = sess.vault_cookies_path(cfg)
+    ez_path = cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt")
+    gs_path = cfg.scholar_cookies or (cfg.state_dir / "scholar-cookies.txt")
+    console.print(f"Vault cookies:  {'yes' if vault.is_file() else 'no'} ({vault})")
+    console.print(f"EZProxy file:  {'yes' if ez_path.is_file() else 'no'} ({ez_path})")
+    console.print(f"Scholar file:   {'yes' if gs_path.is_file() else 'no'} ({gs_path})")
+    if not probe:
+        return
+    if cfg.ezproxy_base:
+        _probe_slot(cfg, "ezproxy")
+    if "scholar" in cfg.sources:
+        _probe_slot(cfg, "scholar")
+
+
+@session_app.command("export")
+def session_export(config: Path | None = ConfigOpt) -> None:
+    """Dump Netscape cookies from the Chromium profile (httpx compat)."""
+    from . import session as sess
+
+    cfg = _cfg(config)
+    try:
+        written = sess.dump_profile_cookies(cfg)
+    except sess.SessionError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(2)
+    for path in written:
+        console.print(f"Wrote {path}")
+
+
 @app.command("ezproxy")
 def ezproxy_cmd(
     config: Path | None = ConfigOpt,
     open_browser: bool = typer.Option(
-        True, "--open/--no-open", help="Open the EZProxy login page"
+        True, "--open/--no-open", help="Open headed Chromium (or the system browser)"
     ),
 ) -> None:
-    """Check / refresh the campus EZProxy session.
-
-    1. Set ezproxy_base in config.toml to your library's login?url= prefix.
-    2. This command opens that login in your browser (SSO).
-    3. After you are logged in, export Netscape cookies for the proxy host
-       (e.g. *.idm.oclc.org) to the path shown — see README “Campus EZProxy”.
-    4. Re-run with --no-open to verify Session OK.
-    """
-    import webbrowser
-
+    """Check / refresh the campus EZProxy session (wrapper for session login ezproxy)."""
+    from . import session as sess
     from .sources import ezproxy as ez
 
     cfg = _cfg(config)
@@ -759,95 +921,45 @@ def ezproxy_cmd(
     console.print(f"Cookies: {cookie_path}")
     login_url = ez.proxify("https://www.sciencedirect.com/", cfg.ezproxy_base)
     if open_browser:
+        if sess.playwright_available():
+            session_login("ezproxy", config)
+            return
+        import webbrowser
+
         console.print(f"Opening login: {login_url}")
         webbrowser.open(login_url)
-
-    if not cookie_path.is_file():
-        console.print(
-            "\n[yellow]No cookie file yet.[/] Complete library SSO in the browser, then export a\n"
-            "Netscape cookies.txt that includes your EZProxy host (e.g. [bold]*.idm.oclc.org[/]) to:\n"
-            f"  {cookie_path}\n"
-            "Firefox: addons.mozilla.org → cookies.txt · Chrome: Get cookies.txt LOCALLY\n"
-            "Details: README → Campus EZProxy\n"
-            "Then re-run: [bold]uv run paperful ezproxy --no-open[/]"
-        )
-        _print_exit_ladder()
+        _netscape_fallback_hint(cookie_path, scholar=False)
+        console.print("Then re-run: [bold]uv run paperful ezproxy --no-open[/]")
         raise typer.Exit(2)
-
-    ctx = Context(config=cfg, client=make_client(cfg))
-    ok, detail = ez.session_ok(ctx)
-    if ok:
-        console.print(f"[green]Session OK[/] — {detail}")
-    else:
-        console.print(f"[red]Session not ready:[/] {detail}")
-        console.print("Log in again in the browser, re-export cookies, then retry.")
-        _print_exit_ladder()
-        raise typer.Exit(2)
+    _probe_slot(cfg, "ezproxy")
 
 
 @app.command("scholar")
 def scholar_cmd(
     config: Path | None = ConfigOpt,
     open_browser: bool = typer.Option(
-        True, "--open/--no-open", help="Open Google Scholar in your browser"
+        True, "--open/--no-open", help="Open headed Chromium (or the system browser)"
     ),
 ) -> None:
-    """Check / refresh Google Scholar session cookies.
-
-    1. This command opens scholar.google.com in your browser.
-    2. Complete any CAPTCHA until search results load; stay logged in if you use a Google account.
-    3. Export Netscape cookies from that Scholar tab (not the sorry page) to the path shown.
-    4. Re-run with --no-open to verify Session OK. See README “Google Scholar cookies”.
-    """
-    import webbrowser
-
-    from .cookies import cookie_domains
-    from .sources import scholar as gs
+    """Check / refresh Google Scholar (wrapper for session login scholar)."""
+    from . import session as sess
 
     cfg = _cfg(config)
     cookie_path = cfg.scholar_cookies or (cfg.state_dir / "scholar-cookies.txt")
-    login_url = "https://scholar.google.com/"
-
-    console.print(f"Scholar: {login_url}")
+    console.print(f"Scholar: {sess.SCHOLAR_URL}")
     console.print(f"Cookies: {cookie_path}")
     if open_browser:
-        console.print(f"Opening: {login_url}")
-        webbrowser.open(login_url)
+        if sess.playwright_available():
+            session_login("scholar", config)
+            return
+        import webbrowser
 
-    if not cookie_path.is_file():
-        console.print(
-            "\n[yellow]No cookie file yet.[/] Solve any CAPTCHA until search results load, then export a\n"
-            "Netscape cookies.txt that includes [bold].google.com[/] and [bold]scholar.google.com[/] to:\n"
-            f"  {cookie_path}\n"
-            "If the extension saved to your Desktop:\n"
-            f"  mv ~/Desktop/cookies.txt {cookie_path}\n"
-            f"  chmod 600 {cookie_path}\n"
-            "Firefox: addons.mozilla.org → cookies.txt · Chrome: Get cookies.txt LOCALLY\n"
-            "Export from a scholar.google.com tab — not google.com/sorry.\n"
-            "Then re-run: [bold]uv run paperful scholar --no-open[/]"
-        )
-        _print_exit_ladder()
+        console.print(f"Opening: {sess.SCHOLAR_URL}")
+        webbrowser.open(sess.SCHOLAR_URL)
+        _netscape_fallback_hint(cookie_path, scholar=True)
+        console.print("Then re-run: [bold]uv run paperful scholar --no-open[/]")
         raise typer.Exit(2)
-
-    ctx = Context(config=cfg, client=make_client(cfg))
-    gs_domains = sorted(
-        d for d in cookie_domains(ctx.client.cookies) if "google" in (d or "").lower()
-    )
-    if gs_domains:
-        console.print(f"Loaded domains: {', '.join(gs_domains)}")
-    ok, detail = gs.session_ok(ctx)
-    if ok:
-        console.print(f"[green]Session OK[/] — {detail}")
-    else:
-        console.print(f"[red]Session not ready:[/] {detail}")
-        console.print(
-            "Export from a [bold]scholar.google.com[/] tab after results load (not the sorry/CAPTCHA page),\n"
-            f"overwrite {cookie_path}, then retry [bold]uv run paperful scholar --no-open[/].\n"
-            "A valid cookie file can still fail: Google often keys the CAPTCHA pass to the browser,\n"
-            "not cookies alone. Do not retry in a tight loop. Details: README → Google Scholar cookies."
-        )
-        _print_exit_ladder()
-        raise typer.Exit(2)
+    _probe_slot(cfg, "scholar")
 
 
 if __name__ == "__main__":

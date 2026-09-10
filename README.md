@@ -58,8 +58,8 @@ uv run paperful run --collection interesting                   # fetch + attach
 ```
 
 If you use campus EZProxy, finish [Campus EZProxy](#campus-ezproxy) before a
-big run. If you keep `scholar` in `sources`, optionally export cookies with
-`paperful scholar` — see [Google Scholar cookies](#google-scholar-cookies).
+big run. If you keep `scholar` in `sources`, log in once with
+`paperful session login scholar` — see [Browser sessions](#browser-sessions-scholar-ezproxy-publishers).
 
 ---
 
@@ -104,10 +104,13 @@ uv run paperful run --library --limit 50
 # Sci-Hub is off unless you opt in (config `sources`, or this flag)
 uv run paperful run --library --scihub
 
-# session cookies (optional)
-uv run paperful ezproxy              # open campus proxy login
-uv run paperful scholar               # open Google Scholar (solve CAPTCHA, then export cookies)
-uv run paperful mirrors              # which Sci-Hub mirrors are up (Sci-Hub itself stays off)
+# session (optional)
+uv run paperful session login ezproxy   # headed Chromium, campus SSO
+uv run paperful session login scholar    # same profile; solve Scholar CAPTCHA here
+uv run paperful session status
+uv run paperful ezproxy --no-open       # probe the EZProxy session
+uv run paperful scholar --no-open       # probe Scholar
+uv run paperful mirrors                  # which Sci-Hub mirrors are up (Sci-Hub itself stays off)
 
 # identifiers vs PDFs (read-only); metadata writes are a separate step
 uv run paperful lint --library --json
@@ -119,15 +122,16 @@ uv run paperful fix-metadata --library --apply --overwrite   # also replace titl
 
 | Command | Purpose |
 | --- | --- |
-| `doctor` | Environment check (Zotero, paths, email, cookies, pdftotext) |
+| `doctor` | Environment check (Zotero, paths, email, sessions, pdftotext) |
 | `run` | Find and download missing PDFs (`--dry-run`, `--preset eoi`, `--upgrade-linked`, `--try-all`, `--retry-failed`, `--sources`, `--scihub`, `--limit`). Never rewrites bibliographic fields. |
 | `lint` | Read-only identifier / PDF-DOI findings (`--json`, `--strict`, `--limit`). Codes: `missing_doi`, `suspect_doi`, `swappable_doi`, `pmid_no_doi`, `pdf_doi_mismatch`, `no_identifier` |
 | `fix-metadata` | Propose patches on disk; `--apply` writes them to the library (`--overwrite` for title/date/venue). Whitelist: `doi`, `title`, `date`, `publicationTitle` |
 | `collections` | Collection tree with “No PDF” counts |
 | `report` | Manifest summary + latest run report (`--last-run`, `--json`, `--not-found`, `--status`) |
 | `attach` | Attach already-downloaded PDFs into Zotero |
-| `ezproxy` | Open / verify campus EZProxy session |
-| `scholar` | Open / verify Google Scholar cookies |
+| `session` | Local Chromium vault: `login scholar|ezproxy`, `status`, `export` |
+| `ezproxy` | Wrapper: headed login (or Netscape fallback) / `--no-open` probe |
+| `scholar` | Wrapper: headed login (or Netscape fallback) / `--no-open` probe |
 | `mirrors` | Ping configured Sci-Hub mirrors |
 | `version` | Print the package version |
 
@@ -145,11 +149,10 @@ Looked up as `--config PATH`, then `./config.toml`, then the project folder's
 against the config file's folder.
 
 **Grey literature and no-DOI items** — Unpaywall and most DOI sources cannot
-resolve PrepCom papers, many DOALOS/UN docs, or undocs without a DOI. Paperful
-will try `direct` (item URL) and `htmlpdf` (web/news types) when routing
-allows; otherwise the manifest records `no_identifier`. See
-[docs/architecture.md](docs/architecture.md). Longer-horizon notes:
-[docs/ROADMAP.md](docs/ROADMAP.md).
+resolve PrepCom papers, many DOALOS/UN docs, or undocs without a DOI. `direct`
+rewrites undocs/daccess URLs (and UN symbols in Extra/title) to a PDF link;
+then `htmlpdf` can print DOI-less `document` / `report` pages. Otherwise the
+manifest records `no_identifier`. See [docs/architecture.md](docs/architecture.md).
 
 | Key | Default | Meaning |
 | --- | --- | --- |
@@ -161,11 +164,11 @@ allows; otherwise the manifest records `no_identifier`. See
 | `doi_suspect_score` | `0.70` | Title similarity below this marks a library DOI as suspect (eligible for in-memory swap). API failure is `unknown` and **keeps** the original DOI |
 | `core_api_key` | `""` | CORE API bearer token; empty skips the `core` source |
 | `ezproxy_base` | `""` (disabled) | Campus proxy prefix ending in `url=` — see [Campus EZProxy](#campus-ezproxy) |
-| `ezproxy_cookies` | `state/ezproxy-cookies.txt` | Netscape cookies file after browser login |
-| `scholar_cookies` | `state/scholar-cookies.txt` | Google Scholar cookies after CAPTCHA — see [Google Scholar cookies](#google-scholar-cookies) |
+| `ezproxy_cookies` | `state/ezproxy-cookies.txt` | Compat Netscape dump after `session login ezproxy` |
+| `scholar_cookies` | `state/scholar-cookies.txt` | Compat Netscape dump after `session login scholar` |
 | `scihub_mirrors` | built-in list | Hostnames tried in order |
 | `delay_scihub_s` | `[3, 8]` | Random pause (seconds) before each Sci-Hub / EZProxy / htmlpdf page fetch |
-| `concurrency_oa` | `4` | Parallel workers for open-access sources (EZProxy, htmlpdf, and Sci-Hub are serial) |
+| `concurrency_oa` | `4` | Parallel workers for open-access sources (Scholar, EZProxy, htmlpdf, and Sci-Hub are serial) |
 | `min_pdf_bytes` | `10000` | Smaller downloads are rejected as error pages |
 | `crossref_min_score` | `0.90` | Title-similarity threshold for accepting a title→DOI match (Crossref, then OpenAlex, then Semantic Scholar) |
 | `mirror_failures_before_skip` | `3` | Network failures before a Sci-Hub mirror is skipped for the run |
@@ -176,10 +179,10 @@ allows; otherwise the manifest records `no_identifier`. See
 | `user_agent` | Chrome-like string | HTTP `User-Agent` for source and download requests |
 
 Leave `ezproxy_base` empty (or remove `ezproxy` from `sources`) if you do not
-use a library proxy. Remove `scholar` from `sources` if Google Scholar CAPTCHAs
-add noise even with cookies. Sci-Hub is off until you add `"scihub"` to
-`sources` or pass `--scihub` — see [Sci-Hub](#sci-hub). Set
-`source_routing = false` (or pass `--try-all`) when Zotero fields are
+use a library proxy. Remove `scholar` from `sources` if Google Scholar
+CAPTCHAs add noise even after `session login scholar`. Sci-Hub is off until
+you add `"scihub"` to `sources` or pass `--scihub` — see [Sci-Hub](#sci-hub).
+Set `source_routing = false` (or pass `--try-all`) when Zotero fields are
 untrustworthy and you want every configured source tried anyway.
 
 ## Output
@@ -202,12 +205,11 @@ untrustworthy and you want every configured source tried anyway.
   outcomes). Historical copies land in `state/runs/<timestamp>-<command>.json`
   (`run`, or `fix-metadata` after `--apply`). `fix-metadata --apply` does
   not overwrite `last-run.json`.
+- `state/sessions/` — Chromium profile (`chromium/`) plus `meta.json` (no
+  passwords). Gitignored; `chmod 700`. Netscape dumps also land here and as
+  `ezproxy-cookies.txt` / `scholar-cookies.txt` for httpx.
 - `state/zotero-local-api-key.json` — the Zotero write key if you chose
   "Always Allow".
-- `state/ezproxy-cookies.txt` — library session cookies (gitignored; never
-  commit this file).
-- `state/scholar-cookies.txt` — Google Scholar session cookies (gitignored;
-  never commit this file).
 
 ---
 
@@ -226,9 +228,9 @@ lists that lane, not the full `sources` list.
 | `semanticscholar` | DOI or arXiv id |
 | `core` | DOI and `core_api_key` |
 | `scholar` | DOI, or title at least 20 characters |
-| `direct` | HTTP(S) URL that is not a resolver/aggregator/video host (doi.org, Scholar, Zotero, YouTube, X/Twitter, Consensus, …) |
-| `ezproxy` | `ezproxy_base` plus a cookie file, **and** a DOI or a URL on a [known publisher host](#what-ezproxy-will-try) |
-| `htmlpdf` | `webpage` / `blogPost` / `newspaperArticle` / `magazineArticle` / `forumPost` (or DOI-less `document`) with an HTTP(S) URL; needs optional Playwright — see [HTML→PDF](#htmlpdf-web-news-blogs) |
+| `direct` | HTTP(S) URL that is not a resolver/aggregator/video host, **or** a UN document symbol in Extra/title (undocs / daccess) |
+| `ezproxy` | `ezproxy_base` plus a session (vault or cookie file), **and** a DOI or a URL on a [known publisher host](#what-ezproxy-will-try) |
+| `htmlpdf` | `webpage` / `blogPost` / `newspaperArticle` / `magazineArticle` / `forumPost` (or DOI-less `document` / `report`) with an HTTP(S) URL; needs optional Playwright — see [HTML→PDF](#htmlpdf-web-news-blogs) |
 
 Before sources run, **identifier preparation** verifies an existing library DOI
 against Crossref/OpenAlex (title similarity ≥ `crossref_min_score` → `ok`).
@@ -258,13 +260,15 @@ does not disable the breaker.
 ## HTML→PDF (web, news, blogs)
 
 Items typed as `webpage`, `blogPost`, `newspaperArticle`, `magazineArticle`, or
-`forumPost` (and DOI-less `document`s with a URL) rarely have a native PDF.
-After `direct` fails to find a PDF link on the page, the optional `htmlpdf`
-source prints the page with headless Chromium and attaches the result.
+`forumPost` (and DOI-less `document` / `report` items with a URL) rarely have a
+native PDF. After `direct` fails to find a PDF link on the page, the optional
+`htmlpdf` source prints the page with Chromium. If you have run
+`paperful session login`, it reuses that profile (so a campus login can apply);
+otherwise it launches a fresh headless browser.
 
 ```sh
 uv sync --extra htmlpdf
-uv run playwright install chromium
+uv run playwright install chromium   # or: playwright install chrome
 # ensure "htmlpdf" is in config sources (it is in the default list)
 uv run paperful run --collection interesting --retry-failed
 ```
@@ -304,8 +308,8 @@ The canonical list is `_EZPROXY_PUBLISHER_HOSTS` in `paperful/routing.py`.
 `--try-all` does not wrap YouTube or other non-publisher URLs.
 
 The tool never asks for or stores your institutional password. You log in
-once in a normal browser, export session cookies to a local file, and paperful
-reuses that session until it expires.
+once in headed Chromium (`paperful session login ezproxy`); `run` reuses that
+vault and exported cookies until the campus session expires.
 
 ### 1. Find your library’s EZProxy base URL
 
@@ -356,103 +360,31 @@ sources = [
 If you later opt in to Sci-Hub, keep `ezproxy` **before** `"scihub"` so
 institutional access is preferred when both could work.
 
-### 3. Open the login page
+### 3. Log in (session vault)
 
 ```sh
-uv run paperful ezproxy
+uv sync --extra htmlpdf
+uv run playwright install chromium   # or: playwright install chrome
+uv run paperful session login ezproxy
 ```
 
-This prints your configured proxy and cookie path, and opens the login URL
-in your default browser (`--no-open` skips the browser). Complete SSO until
-you can browse a proxied publisher page.
+`paperful ezproxy` does the same when Playwright is installed. Complete campus
+SSO in the window that opens, then press Enter in the terminal. Cookies are
+written under `state/sessions/` (and compat `state/ezproxy-cookies.txt`).
+Never commit that directory.
 
-Stay logged in; do not clear cookies before exporting.
-
-### 4. Export cookies (Netscape `cookies.txt`)
-
-paperful reads a **Netscape-format** cookie file (the same format curl uses).
-Export it from the browser that just completed login.
-
-#### Firefox
-
-1. Install a cookie exporter from [addons.mozilla.org](https://addons.mozilla.org),
-   for example **[cookies.txt](https://addons.mozilla.org/firefox/addon/cookies-txt/)**.
-   Prefer extensions that keep data local (names often include “LOCALLY”).
-2. Open a tab whose address bar contains your proxy host, e.g. `….idm.oclc.org`
-   or a rewritten host like `www-sciencedirect-com.…idm.oclc.org`.
-3. Click the extension icon → export cookies for **this site** / **current domain**.
-4. Choose Netscape / cookies.txt format if asked.
-5. Save or move the file to:
-
-   ```text
-   <state_dir>/ezproxy-cookies.txt
-   ```
-
-   With the default project layout that is:
-
-   ```text
-   state/ezproxy-cookies.txt
-   ```
-
-   (absolute example: `/path/to/Paperful/state/ezproxy-cookies.txt`)
-
-If the extension downloads to your Desktop as `cookies.txt`:
-
-```sh
-mv ~/Desktop/cookies.txt /path/to/Paperful/state/ezproxy-cookies.txt
-chmod 600 /path/to/Paperful/state/ezproxy-cookies.txt
-```
-
-#### Chrome / Edge / Brave / Chromium
-
-1. Install **[Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc)**
-   (or another local-only Netscape exporter). Avoid older “cookies.txt”
-   extensions that upload data to a remote server.
-2. On a tab whose URL contains your `….idm.oclc.org` proxy host, open the
-   extension.
-3. Export **current site** (or include related proxy domains if the UI offers
-   that).
-4. Save as `state/ezproxy-cookies.txt` under your configured `state_dir` (same
-   path as above).
-
-#### Safari
-
-Safari has no well-supported one-click Netscape exporter. Use Firefox or Chrome
-for the one-time login + export step; you can keep using Safari for everyday
-browsing afterward.
-
-#### What must be in the file
-
-- Format: Netscape HTTP Cookie File (tab-separated lines; often starts with a
-  `# Netscape…` comment).
-- At least cookies for your EZProxy host (e.g. `….idm.oclc.org`). Including
-  SSO cookies for your IdP domain (CAS / Shibboleth / Microsoft login host)
-  can help some setups but is not always required.
-- Permissions: `chmod 600` is recommended; the path is gitignored — **never
-  commit it** and never paste it into chat or email.
-
-### 5. Verify the session
+### 4. Verify the session
 
 ```sh
 uv run paperful ezproxy --no-open
 ```
 
-Success looks like:
+Success looks like `Session OK`. If not, run `session login ezproxy` again.
 
-```text
-Session OK — ok (…)
-```
+### 5. Run (or retry) downloads
 
-If you see `Session not ready` / `session expired` / `cookie file missing`:
-
-- Confirm the file path matches `ezproxy_cookies` / `state_dir`.
-- Confirm you exported **after** a successful SSO login, from a **proxied** tab.
-- Log in again in the browser, re-export, overwrite `ezproxy-cookies.txt`, retry.
-
-### 6. Run (or retry) downloads
-
-New runs pick up EZProxy automatically when `ezproxy` is in `sources` and the
-cookie file is valid:
+New runs pick up EZProxy when `ezproxy` is in `sources` and the session is
+valid:
 
 ```sh
 uv run paperful run --collection YOUR_COLLECTION
@@ -465,29 +397,32 @@ unless you ask:
 uv run paperful run --collection YOUR_COLLECTION --retry-failed
 ```
 
-### 7. When the session expires
+### 6. When the session expires
 
-Library SSO cookies typically last hours to a few days. When EZProxy starts
-failing you will see attempts like `ezproxy:error(ezproxy session expired…)` in
-`paperful report`, and the run will fall through to Sci-Hub (if you opted in)
-or `not_found`.
+Library SSO typically lasts hours to a few days. When EZProxy starts failing
+you will see `ezproxy:error(ezproxy session expired…)` in `paperful report`.
+Fix: `paperful session login ezproxy`, then `--retry-failed` if needed.
 
-Fix: repeat steps 3–5 (login → export → verify), then `--retry-failed` if
-needed.
+### Advanced: Netscape cookies.txt
+
+If you cannot install Playwright, `paperful ezproxy` opens the system browser
+and you can still drop a Netscape `cookies.txt` at `ezproxy_cookies` (Firefox
+**cookies.txt**, Chrome **Get cookies.txt LOCALLY** — local-only exporters).
+`chmod 600`. Never commit or paste the file.
 
 ### Alternatives and limits
 
 - **Campus VPN**: if VPN alone gives you full publisher access without EZProxy,
   you can leave `ezproxy_base` empty and still use OA sources (and Sci-Hub
-  only if you opt in); VPN does not replace cookie export for this tool’s
-  EZProxy source.
+  only if you opt in); VPN does not replace a session for this tool’s EZProxy
+  source.
 - **No subscription**: EZProxy cannot unlock journals your library does not
   license.
 - **Non-publisher URLs**: YouTube, Zotero, FAO, and similar pages are never
-  proxied — see [What EZProxy will try](#what-ezproxy-will-try).
-- **Google Scholar**: often blocked by CAPTCHA for automated clients — export
-  browser cookies ([Google Scholar cookies](#google-scholar-cookies)) or
-  remove `scholar` from `sources` if noisy.
+  proxied — see [What EZProxy will try](#what-ezproxy-will-try). Public UN /
+  process PDFs go through `direct` (URL rewrites) then `htmlpdf`.
+- **Google Scholar**: solve CAPTCHA in `paperful session login scholar` (same
+  Chromium profile used during `run`). Cookie-only export is often not enough.
 - **arXiv**: already in the default list (by arXiv id, `10.48550/arxiv.…`
   DOI, or strict title match).
 - **bioRxiv / medRxiv**: `10.1101/…` DOIs via the Cold Spring Harbor details
@@ -497,110 +432,39 @@ needed.
 
 ---
 
-## Google Scholar cookies
+## Browser sessions (Scholar, EZProxy, publishers)
 
-Google Scholar treats scripted clients as bots. If you keep `scholar` in
-`sources`, paperful can reuse a normal browser session the same way as EZProxy:
-pass the CAPTCHA once, export cookies, and the next runs load that file. This
-is **best-effort**. A cookie file that looks complete can still fail the probe,
-because Google often keys the “not a robot” pass to the browser (TLS
-fingerprint, not cookies alone). Scholar is optional — drop it from `sources`
-if it is more noise than help.
-
-Never commit `scholar-cookies.txt`, never paste it into chat or email, and do
-not overwrite `ezproxy-cookies.txt` with a Google export (both extensions
-default to `cookies.txt`).
-
-### 1. Open Scholar and pass the CAPTCHA
+One local vault: `state/sessions/`. Requires `paperful[htmlpdf]`.
 
 ```sh
-uv run paperful scholar
+uv run paperful session login scholar
+uv run paperful session login ezproxy
+uv run paperful session status
+uv run paperful session status --probe  # optional Scholar / EZProxy session_ok
+uv run paperful session export          # refresh Netscape dumps for httpx
 ```
 
-This prints the cookie path and opens [scholar.google.com](https://scholar.google.com/)
-(`--no-open` skips the browser). Stay in **the same browser profile**. Complete
-any “unusual traffic” / CAPTCHA check until a **normal search-results page**
-loads (result cards, not `google.com/sorry`). Stay logged into a Google
-account if you use one. Do not clear cookies before exporting.
+Scholar fetches during `run` use this Chromium profile when it exists (Google
+often keys CAPTCHA to the browser, not cookies). htmlpdf uses the same profile
+so a publisher login can apply. EZProxy PDF downloads stay on httpx using the
+exported cookies.
 
-### 2. Export cookies (Netscape `cookies.txt`)
+Never commit `state/sessions/` or cookie files; never paste them into chat.
 
-Use the same local-only extensions as
-[Campus EZProxy](#4-export-cookies-netscape-cookiestxt) (Firefox **cookies.txt**,
-Chrome **Get cookies.txt LOCALLY**). JSON / “EditThisCookie” dumps will not
-parse.
-
-1. Stay on the **scholar.google.com** tab that already shows results — not the
-   sorry/CAPTCHA page.
-2. Export **this site**, and include related Google cookies if the UI offers
-   that. You need both `.google.com` (account cookies such as `SID` / `NID`)
-   and `.scholar.google.com` (`GSP`).
-3. Save to the path printed by `paperful scholar` (from `scholar_cookies`,
-   else `<state_dir>/scholar-cookies.txt`). With the default layout that is:
-
-   ```text
-   state/scholar-cookies.txt
-   ```
-
-If the extension downloads to your Desktop as `cookies.txt`:
-
-```sh
-mv ~/Desktop/cookies.txt /path/to/Paperful/state/scholar-cookies.txt
-chmod 600 /path/to/Paperful/state/scholar-cookies.txt
-```
-
-Use your real `state_dir` from `config.toml` (the `paperful scholar` output is
-the source of truth). Safari has no reliable Netscape exporter; use Firefox or
-Chrome for this step.
-
-### 3. Verify
-
-```sh
-uv run paperful scholar --no-open
-```
-
-Success looks like:
-
-```text
-Session OK — ok (200)
-```
-
-`Loaded domains:` should mention `google.com` and usually `scholar.google.com`.
-
-### 4. If you see `Session not ready`
-
-Typical causes, in order:
+### If you see `Session not ready` (Scholar)
 
 | What you see | Likely cause | Fix |
 | --- | --- | --- |
-| `cookie file missing` / `No cookie file yet` | Export still on Desktop, or wrong `state_dir` | `mv` to the path the command prints; `chmod 600` |
-| File exists but no `.google.com` cookies | Exported only the Scholar host, or JSON format | Re-export Netscape from the Scholar tab; include Google cookies |
-| `blocked or CAPTCHA` / `HTTP 429` at `google.com/sorry` | Exported from the sorry page, or Google still fingerprinting the client | Solve CAPTCHA until **results** load, re-export **once**, wait before retrying |
-| `unexpected response` | Page loaded but was not a results listing | Confirm the browser tab itself shows results, then re-export |
-| Works in the browser, fails here anyway | CAPTCHA pass is tied to Chrome/Firefox, not the cookie jar | Wait, try one more export; or remove `scholar` from `sources` |
+| `No session yet` / cookie file missing | No login / export | `paperful session login scholar` |
+| `blocked or CAPTCHA` | Solved CAPTCHA in a different browser | Login in the paperful Chromium window |
+| Works in Chrome, fails here | Fingerprint mismatch | `session login scholar`; or drop `scholar` from `sources` |
 
-Do **not** run `paperful scholar --no-open` in a tight loop. Each failed probe
-is more “unusual traffic” and makes the next attempt worse.
+Do **not** probe Scholar in a tight loop.
 
-### 5. During a download run
-
-When Scholar is blocked mid-run you will see `scholar blocked/captcha` in
-`paperful report`. After `circuit_breaker_threshold` (default 3) block-like
-failures, Scholar is skipped for the rest of that run so it does not hammer
-Google. Refresh cookies (steps 1–3) is the real fix; then rerun. Items left
-`captcha` / `error` are retried on the next run; `not_found` needs
-`--retry-failed`.
-
-Cookies typically last hours to a few days. Repeat steps 1–3 when they go
-stale.
-
-### Alternatives
-
-- Remove `"scholar"` from `sources` if CAPTCHAs dominate. Open-access sources
-  and EZProxy do not need a Google session (nor does Sci-Hub, if you have
-  opted in).
-- `user_agent` in `config.toml` can be set to match your browser, but it will
-  not beat Google’s TLS fingerprint on its own.
+When Scholar is blocked mid-run you will see `scholar blocked/captcha`. After
+`circuit_breaker_threshold` (default 3) it is skipped for the rest of that
+run. Items left `captcha` / `error` are retried on the next run; `not_found`
+needs `--retry-failed`.
 
 ---
 

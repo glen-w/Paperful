@@ -6,7 +6,7 @@ import httpx
 
 from ..zot import Item
 from .base import Candidate, Context, Outcome
-from .landing import extract_pdf_urls
+from .landing import extract_pdf_urls, grey_target, looks_like_pdf_url
 
 NAME = "direct"
 _SKIP_HOSTS = (
@@ -26,15 +26,22 @@ _SKIP_HOSTS = (
 
 
 def find(item: Item, ctx: Context) -> Candidate:
-    url = item.url
-    if not url or not url.lower().startswith(("http://", "https://")):
+    target = grey_target(item)
+    if not target or not target.lower().startswith(("http://", "https://")):
         return Candidate.miss(NAME, Outcome.SKIPPED, "no URL")
-    if any(h in url.lower() for h in _SKIP_HOSTS):
+    original = (item.url or "").strip()
+    check = original.lower() if original.startswith(("http://", "https://")) else target.lower()
+    if any(h in check for h in _SKIP_HOSTS):
         return Candidate.miss(NAME, Outcome.SKIPPED, "resolver/aggregator URL")
-    if url.lower().split("?")[0].endswith(".pdf"):
-        return Candidate(url=url, source=NAME, note="url ends in .pdf")
+    note = "url rewrite" if target != original else "url ends in .pdf"
+    if looks_like_pdf_url(target) or target.lower().split("?")[0].endswith(".pdf"):
+        return Candidate(
+            url=target,
+            source=NAME,
+            note=note if target != original else "url ends in .pdf",
+        )
     try:
-        with ctx.client.stream("GET", url, timeout=30) as resp:
+        with ctx.client.stream("GET", target, timeout=30) as resp:
             ctype = resp.headers.get("content-type", "").lower()
             if resp.status_code < 400 and "application/pdf" in ctype:
                 return Candidate(
