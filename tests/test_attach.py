@@ -8,7 +8,7 @@ import pytest
 from pyzotero import errors as ze
 
 from paperful import attach as at
-from paperful.attach import Attacher, _interpret, attachment_payload
+from paperful.attach import Attacher, _interpret, attach_failure_code, attachment_payload
 
 
 class StubZot:
@@ -85,7 +85,14 @@ def test_missing_file_and_no_write_support(cfg, pdf):
     a = Attacher(cfg, StubZL(supports_write=True))
     assert "file missing" in a.attach("K", pdf.parent / "nope.pdf").reason
     b = Attacher(cfg, StubZL(supports_write=False))
-    assert "Zotero 10+" in b.attach("K", pdf).reason
+    res = b.attach("K", pdf)
+    assert "Zotero 10+" in res.reason and res.code == "no_write_api"
+
+
+def test_attach_failure_code_classification():
+    assert attach_failure_code("storage quota exceeded") == "quota"
+    assert attach_failure_code("Zotero local API has no write support") == "no_write_api"
+    assert attach_failure_code("write authorisation denied") == "auth"
 
 
 def test_authorises_stores_key_and_uploads(cfg, pdf, scripted):

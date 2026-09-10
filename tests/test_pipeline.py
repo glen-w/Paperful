@@ -112,10 +112,11 @@ def test_miss_classification(pipe_factory):
     assert manifest2.get("NF").status == STATUS_NOT_FOUND
 
 
-def test_circuit_breaker_skips_source_after_repeated_blocks(pipe_factory):
+def test_circuit_breaker_skips_source_after_repeated_blocks(pipe_factory, cfg):
     blocked = StubSource("blocked", default=Outcome.CAPTCHA)
     oa = StubSource("oa", default=Outcome.NOT_FOUND)
     pipe, manifest = pipe_factory({"oa": oa, "blocked": blocked}, ["oa", "blocked"])
+    pipe.cfg.concurrency_oa = 1
     items = [make_item(key=f"I{i}") for i in range(5)]
     pipe.run(items)
 

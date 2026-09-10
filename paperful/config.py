@@ -27,6 +27,19 @@ DEFAULT_SOURCES = [
     "ezproxy",
     "htmlpdf",
 ]
+# Open access + campus EZProxy only (no Scholar, no Sci-Hub) — suitable for EOI / policy-sensitive runs.
+EOI_SOURCES = [
+    "unpaywall",
+    "openalex",
+    "arxiv",
+    "biorxiv",
+    "europepmc",
+    "semanticscholar",
+    "direct",
+    "ezproxy",
+    "htmlpdf",
+]
+SOURCE_PRESETS: dict[str, list[str]] = {"eoi": EOI_SOURCES}
 DEFAULT_MIRRORS = ["sci-hub.ru", "sci-hub.ren", "sci-hub.box", "sci-hub.se", "sci-hub.st"]
 SCIHUB_DISCLAIMER = (
     "Sci-Hub occupies a legal grey zone in some jurisdictions. "

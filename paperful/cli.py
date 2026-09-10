@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
 
@@ -20,8 +22,10 @@ from rich.table import Table
 
 from . import __version__
 from .attach import Attacher
-from .config import SCIHUB_DISCLAIMER, Config, load_config
+from .config import SCIHUB_DISCLAIMER, SOURCE_PRESETS, Config, load_config
+from .doctor import has_red, run_checks
 from .pipeline import Pipeline, RunStats, make_client
+from .routing import sources_for_item
 from .sources import Context
 from .sources.scihub import ping_mirrors
 from .store import STATUS_ATTACHED, STATUS_NOT_FOUND, Manifest
@@ -54,12 +58,45 @@ def _cfg(path: Optional[Path]) -> Config:
     return cfg
 
 
-def _source_list(cfg: Config, sources: Optional[str], enable_scihub: bool) -> list[str]:
-    """Configured order, optional --sources override, then optional --scihub append."""
-    listed = [s.strip() for s in sources.split(",") if s.strip()] if sources else list(cfg.sources)
+def _resolve_source_names(sources: Optional[str], preset: Optional[str]) -> list[str] | None:
+    """Return explicit source names from --sources or --preset, or None to use config."""
+    if preset:
+        key = preset.strip().lower()
+        if key not in SOURCE_PRESETS:
+            console.print(f"[red]Unknown preset '{preset}'.[/] Known: {', '.join(sorted(SOURCE_PRESETS))}")
+            raise typer.Exit(1)
+        return list(SOURCE_PRESETS[key])
+    if not sources:
+        return None
+    token = sources.strip().lower()
+    if token in SOURCE_PRESETS:
+        return list(SOURCE_PRESETS[token])
+    return [s.strip() for s in sources.split(",") if s.strip()]
+
+
+def _source_list(cfg: Config, sources: Optional[str], enable_scihub: bool, preset: Optional[str] = None) -> list[str]:
+    """Configured order, optional --sources/--preset override, then optional --scihub append."""
+    resolved = _resolve_source_names(sources, preset)
+    listed = resolved if resolved is not None else list(cfg.sources)
     if enable_scihub and "scihub" not in listed:
         listed.append("scihub")
     return listed
+
+
+def _print_exit_ladder() -> None:
+    console.print(
+        "\n[bold]Next steps[/]\n"
+        "  1. Start Zotero on this machine.\n"
+        "  2. Settings → Advanced → enable the local API.\n"
+        "  3. Run [bold]paperful doctor[/] for a full check.\n"
+        "  4. If you have no config yet: [bold]cp config.example.toml config.toml[/] and set email.\n"
+    )
+
+
+def _exit_env(message: str) -> None:
+    console.print(f"[red]{message}[/]")
+    _print_exit_ladder()
+    raise typer.Exit(2)
 
 
 def _warn_if_scihub(source_list: list[str]) -> None:
@@ -72,11 +109,9 @@ def _zotero() -> ZoteroLocal:
     try:
         info = zl.ping()
     except ConnectionError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(2)
+        _exit_env(str(exc))
     except Exception as exc:  # Zotero not running
-        console.print(f"[red]Cannot reach Zotero local API at localhost:23119:[/] {exc}\nIs Zotero running?")
-        raise typer.Exit(2)
+        _exit_env(f"Cannot reach Zotero local API at localhost:23119: {exc}")
     console.print(
         f"[dim]Zotero {info.get('zotero_version') or '?'}, local API v{info['api_version']}, write support: "
         f"{'yes' if info['supports_write'] else 'no (Zotero 10+ needed)'}[/]"
@@ -92,6 +127,30 @@ def _main() -> None:
 @app.command()
 def version() -> None:
     console.print(__version__)
+
+
+@app.command()
+def doctor(config: Optional[Path] = ConfigOpt) -> None:
+    """Check Zotero, paths, email, and optional session cookies (green / amber / red)."""
+    cfg = _cfg(config)
+    zl: ZoteroLocal | None = None
+    try:
+        zl = ZoteroLocal()
+        checks = run_checks(cfg, zl)
+    except Exception:
+        checks = run_checks(cfg, None)
+
+    table = Table(title="paperful doctor")
+    table.add_column("Check")
+    table.add_column("Status")
+    table.add_column("Detail")
+    colour = {"green": "green", "amber": "yellow", "red": "red"}
+    for ch in checks:
+        table.add_row(ch.name, f"[{colour[ch.status]}]{ch.status}[/]", ch.detail)
+    console.print(table)
+    if has_red(checks):
+        _print_exit_ladder()
+        raise typer.Exit(2)
 
 
 @app.command()
@@ -128,11 +187,21 @@ def run(
         "--try-all",
         help="Try every configured source even when item metadata looks inapplicable (overrides source_routing).",
     ),
-    sources: Optional[str] = typer.Option(None, "--sources", help="Comma-separated source order override."),
+    sources: Optional[str] = typer.Option(None, "--sources", help="Comma-separated source order override (or preset name eoi)."),
+    preset: Optional[str] = typer.Option(
+        None,
+        "--preset",
+        help="Named source preset (eoi = OA + EZProxy, no Scholar or Sci-Hub).",
+    ),
     scihub: bool = typer.Option(
         False,
         "--scihub",
         help="Opt in to Sci-Hub for this run (off by default; legal grey zone in some jurisdictions).",
+    ),
+    upgrade_linked: bool = typer.Option(
+        False,
+        "--upgrade-linked",
+        help="Also fetch items that only have a linked PDF URL in Zotero (adds imported_file).",
     ),
     config: Optional[Path] = ConfigOpt,
 ) -> None:
@@ -141,7 +210,7 @@ def run(
         console.print("[red]Give --collection PATH (repeatable) or --library.[/]")
         raise typer.Exit(1)
     cfg = _cfg(config)
-    source_list = _source_list(cfg, sources, scihub)
+    source_list = _source_list(cfg, sources, scihub, preset)
     _warn_if_scihub(source_list)
     zl = _zotero()
 
@@ -161,14 +230,16 @@ def run(
         scope = ", ".join(collection)
 
     manifest = Manifest(cfg.manifest_path)
-    items = zl.items_lacking_pdf(keys)
+    linked_skipped = 0 if upgrade_linked else zl.count_linked_url_only(keys)
+    items = zl.items_lacking_pdf(keys, upgrade_linked=upgrade_linked)
     todo = [it for it in items if manifest.should_process(it.key, retry_failed)]
-    skipped = len(items) - len(todo)
+    skipped_manifest = len(items) - len(todo)
     if limit:
         todo = todo[:limit]
+    linked_note = f", {linked_skipped} linked URL only (skipped)" if linked_skipped else ""
     console.print(
-        f"Scope: [bold]{scope}[/] - {len(items)} items without PDF, {skipped} already handled, "
-        f"{len(todo)} to process. Sources: {', '.join(source_list)}"
+        f"Scope: [bold]{scope}[/] - {len(items)} items without PDF, {skipped_manifest} already handled, "
+        f"{len(todo)} to process{linked_note}. Sources: {', '.join(source_list)}"
     )
 
     if dry_run:
@@ -177,14 +248,21 @@ def run(
         table.add_column("Type", no_wrap=True, max_width=14)
         table.add_column("Item", no_wrap=True, overflow="ellipsis", ratio=3)
         table.add_column("DOI (source)", no_wrap=True, overflow="ellipsis", ratio=2)
+        table.add_column("Would-hit", no_wrap=True, overflow="ellipsis", ratio=2)
         table.add_column("URL", no_wrap=True, overflow="ellipsis", ratio=1)
         table.add_column("Collections", no_wrap=True, overflow="ellipsis", ratio=1)
         for it in todo:
+            if try_all or not cfg.source_routing:
+                lanes = source_list
+            else:
+                lanes = sources_for_item(it, cfg, source_list)
+            would = ", ".join(lanes) if lanes else "-"
             table.add_row(
                 it.key,
                 it.item_type,
                 it.label,
                 f"{it.doi} ({it.doi_source})" if it.doi else ("arXiv:" + it.arxiv_id if it.arxiv_id else "-"),
+                would,
                 (it.url or "-")[:60],
                 "; ".join(it.collection_paths),
             )
@@ -199,7 +277,9 @@ def run(
             attacher = None
 
     if not todo:
-        _print_stats(RunStats(), cfg)
+        stats = RunStats(skipped_manifest=skipped_manifest, linked_url_skipped=linked_skipped)
+        _print_stats(stats, cfg)
+        _write_last_run(cfg, stats)
         return
 
     with _item_progress() as progress:
@@ -218,14 +298,46 @@ def run(
         except KeyboardInterrupt:
             console.print("\n[yellow]Interrupted - progress is in the manifest; rerun to resume.[/]")
             stats = pipe.stats
+    stats.skipped_manifest = skipped_manifest
+    stats.linked_url_skipped = linked_skipped
     _print_stats(stats, cfg)
+    _write_last_run(cfg, stats)
 
 
-def _print_stats(stats, cfg: Config) -> None:
+def _write_last_run(cfg: Config, stats: RunStats) -> None:
+    path = cfg.state_dir / "last-run.json"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(asdict(stats), indent=2))
+    except OSError:
+        pass
+
+
+def _load_last_run(cfg: Config) -> dict | None:
+    path = cfg.state_dir / "last-run.json"
+    try:
+        return json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+
+
+def _print_stats(stats: RunStats, cfg: Config) -> None:
+    downloaded = stats.ok + stats.attached
+    deferred = stats.skipped_manifest + stats.linked_url_skipped + stats.not_found + stats.no_identifier
     console.print(
-        f"\n[bold]Done.[/] ok={stats.ok} attached={stats.attached} attach_failed={stats.attach_failed} "
-        f"not_found={stats.not_found} no_identifier={stats.no_identifier} captcha={stats.captcha} error={stats.error}"
+        f"\n[bold]Done.[/] downloaded {downloaded} · attached {stats.attached} · deferred/skipped {deferred}"
     )
+    if stats.linked_url_skipped:
+        console.print(f"[dim]linked URL only (not fetched): {stats.linked_url_skipped}[/]")
+    console.print(
+        f"ok={stats.ok} attach_failed={stats.attach_failed} not_found={stats.not_found} "
+        f"no_identifier={stats.no_identifier} captcha={stats.captcha} error={stats.error}"
+    )
+    if stats.attach_failed_by_code:
+        console.print(
+            "Attach failures: "
+            + ", ".join(f"{k}={v}" for k, v in sorted(stats.attach_failed_by_code.items()))
+        )
     if stats.by_source:
         console.print("By source: " + ", ".join(f"{k}={v}" for k, v in sorted(stats.by_source.items())))
     console.print(f"[dim]PDFs: {cfg.out_dir}   manifest: {cfg.manifest_path}[/]")
@@ -239,8 +351,7 @@ def attach(config: Optional[Path] = ConfigOpt, limit: Optional[int] = typer.Opti
     manifest = Manifest(cfg.manifest_path)
     attacher = Attacher(cfg, zl)
     if not attacher.supports_write():
-        console.print("[red]This Zotero has no local write API. Upgrade to Zotero 10+ to attach.[/]")
-        raise typer.Exit(2)
+        _exit_env("This Zotero has no local write API. Upgrade to Zotero 10+ to attach.")
     pending = manifest.pending_attach()
     if limit:
         pending = pending[:limit]
@@ -267,10 +378,15 @@ def report(
     config: Optional[Path] = ConfigOpt,
     not_found: bool = typer.Option(False, "--not-found", help="List not_found items with DOIs."),
     status: Optional[str] = typer.Option(None, "--status", help="List items with this status."),
+    as_json: bool = typer.Option(False, "--json", help="Machine-readable summary for agents."),
 ) -> None:
     """Summarise the manifest: counts by status and by source."""
     cfg = _cfg(config)
     manifest = Manifest(cfg.manifest_path)
+    if as_json:
+        payload = manifest.report_payload(_load_last_run(cfg))
+        console.print(json.dumps(payload, indent=2))
+        raise typer.Exit(0)
     if not manifest.records:
         console.print("Manifest is empty.")
         raise typer.Exit(0)
@@ -349,6 +465,7 @@ def ezproxy_cmd(
             "Details: README → Campus EZProxy\n"
             "Then re-run: [bold]uv run paperful ezproxy --no-open[/]"
         )
+        _print_exit_ladder()
         raise typer.Exit(2)
 
     ctx = Context(config=cfg, client=make_client(cfg))
@@ -358,6 +475,7 @@ def ezproxy_cmd(
     else:
         console.print(f"[red]Session not ready:[/] {detail}")
         console.print("Log in again in the browser, re-export cookies, then retry.")
+        _print_exit_ladder()
         raise typer.Exit(2)
 
 
@@ -400,6 +518,7 @@ def scholar_cmd(
             "Export from a scholar.google.com tab — not google.com/sorry.\n"
             "Then re-run: [bold]uv run paperful scholar --no-open[/]"
         )
+        _print_exit_ladder()
         raise typer.Exit(2)
 
     ctx = Context(config=cfg, client=make_client(cfg))
@@ -417,6 +536,7 @@ def scholar_cmd(
             "A valid cookie file can still fail: Google often keys the CAPTCHA pass to the browser,\n"
             "not cookies alone. Do not retry in a tight loop. Details: README → Google Scholar cookies."
         )
+        _print_exit_ladder()
         raise typer.Exit(2)
 
 

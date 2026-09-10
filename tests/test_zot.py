@@ -1,4 +1,11 @@
-from paperful.zot import UNCOLLECTED, build_collection_tree, is_pdf_attachment, item_from_json, parse_year
+from paperful.zot import (
+    UNCOLLECTED,
+    build_collection_tree,
+    is_linked_url_pdf,
+    is_pdf_attachment,
+    item_from_json,
+    parse_year,
+)
 
 
 def _col(key, name, parent=None):
@@ -17,6 +24,7 @@ def test_is_pdf_attachment():
     assert is_pdf_attachment({"contentType": "application/pdf", "linkMode": "linked_file"})
     assert not is_pdf_attachment({"contentType": "application/pdf", "linkMode": "linked_url"})
     assert not is_pdf_attachment({"contentType": "text/html", "linkMode": "imported_url"})
+    assert is_linked_url_pdf({"contentType": "application/pdf", "linkMode": "linked_url"})
 
 
 def test_item_from_json_extracts_identifiers_and_paths():

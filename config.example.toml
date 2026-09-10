@@ -1,0 +1,56 @@
+# paperful configuration. Copy to config.toml and edit:
+#   cp config.example.toml config.toml
+
+# Contact email sent to Crossref / Unpaywall / OpenAlex (polite pool). Required by Unpaywall.
+email = "you@example.org"
+
+# Where PDFs land. Sub-folders mirror the Zotero collection path.
+out_dir = "out"
+
+# Where manifest.jsonl and the Zotero local-API key live.
+state_dir = "state"
+
+# Source order. Open-access first, then EZProxy, then HTML→PDF for web/news.
+# Remove "scholar" / "ezproxy" / "htmlpdf" to disable. Scholar is optional (CAPTCHA-prone).
+# Sci-Hub is off by default (legal grey zone in some jurisdictions). Opt in by
+# appending "scihub" here, or pass --scihub on a run. You are responsible for
+# complying with the laws that apply to you. See README “Sci-Hub”.
+# htmlpdf needs: uv sync --extra htmlpdf && uv run playwright install chromium
+sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "scholar", "direct", "ezproxy", "htmlpdf"]
+# sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "scholar", "direct", "ezproxy", "htmlpdf", "scihub"]
+
+# Campus EZProxy (any institution that offers login?url=). Leave empty to disable.
+# Only used for DOIs and known publisher URLs (ScienceDirect, Springer, JSTOR, …),
+# never YouTube, Zotero, FAO, or other non-publisher pages. See README “What EZProxy will try”.
+# Find the URL on your library site (“EZProxy” / off-campus access), then:
+#   uv run paperful ezproxy   → browser SSO → export Netscape cookies → state/ezproxy-cookies.txt
+# Never put your password here. See README “Campus EZProxy”.
+ezproxy_base = ""
+# ezproxy_cookies = "state/ezproxy-cookies.txt"  # default under state_dir
+# scholar_cookies = "state/scholar-cookies.txt"   # default; see README “Google Scholar cookies”
+
+# Skip sources that look inapplicable from item metadata (DOI, URL, …). --try-all overrides.
+# source_routing = true
+# Block-like failures (CAPTCHA, 429, …) before a source is skipped for the rest of the run.
+# circuit_breaker_threshold = 3
+
+# Ordered Sci-Hub mirrors. Reorder after `paperful mirrors` if one dies.
+scihub_mirrors = ["sci-hub.ru", "sci-hub.ren", "sci-hub.box", "sci-hub.se", "sci-hub.st"]
+
+# Random delay between Sci-Hub / EZProxy / htmlpdf requests, seconds [min, max].
+delay_scihub_s = [3.0, 8.0]
+
+# Parallelism for open-access sources; EZProxy, htmlpdf, and Sci-Hub are always serial.
+concurrency_oa = 4
+
+# Reject downloads smaller than this (bytes) - usually an HTML error page.
+min_pdf_bytes = 10000
+
+# Title→DOI enrichment (Crossref, then OpenAlex, then Semantic Scholar): accept if similarity >= this.
+crossref_min_score = 0.90
+# Attach downloaded PDFs into Zotero (needs Zotero 10+ with local API enabled).
+attach = true
+app_name = "paperful"
+
+# Consecutive network failures before a Sci-Hub mirror is skipped for the rest of the run.
+mirror_failures_before_skip = 3

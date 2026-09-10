@@ -12,6 +12,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Iterable
 
+from .attach import attach_failure_code
 from .zot import Item
 
 STATUS_OK = "ok"  # PDF on disk, not yet attached
@@ -111,6 +112,31 @@ class Manifest:
             if r.status in {STATUS_OK, STATUS_ATTACHED} and r.source:
                 out[r.source] = out.get(r.source, 0) + 1
         return out
+
+    def attach_failed_by_code(self) -> dict[str, int]:
+        out: dict[str, int] = {}
+        for r in self.records.values():
+            if r.status != STATUS_ATTACH_FAILED:
+                continue
+            code = attach_failure_code(r.reason)
+            out[code] = out.get(code, 0) + 1
+        return out
+
+    def report_payload(self, last_run: dict | None = None) -> dict:
+        counts = self.counts()
+        no_doi = sum(1 for r in self.records.values() if not r.doi)
+        payload: dict = {
+            "counts": counts,
+            "by_source": self.by_source(),
+            "no_identifier": counts.get(STATUS_NO_IDENTIFIER, 0),
+            "no_doi": no_doi,
+            "attach_failed_by_code": self.attach_failed_by_code(),
+        }
+        if last_run:
+            payload["last_run"] = last_run
+            if "linked_url_skipped" in last_run:
+                payload["linked_url"] = last_run["linked_url_skipped"]
+        return payload
 
 
 # ---- filenames ---------------------------------------------------------------

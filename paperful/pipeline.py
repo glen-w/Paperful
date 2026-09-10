@@ -63,6 +63,9 @@ class RunStats:
     error: int = 0
     attached: int = 0
     attach_failed: int = 0
+    skipped_manifest: int = 0
+    linked_url_skipped: int = 0
+    attach_failed_by_code: dict[str, int] = field(default_factory=dict)
     by_source: dict[str, int] = field(default_factory=dict)
 
     def bump(self, status: str, source: str | None = None) -> None:
@@ -367,6 +370,8 @@ class Pipeline:
         else:
             rec.status = STATUS_ATTACH_FAILED
             rec.reason = res.reason
+            code = res.code or "other"
+            self.stats.attach_failed_by_code[code] = self.stats.attach_failed_by_code.get(code, 0) + 1
             self.stats.bump(STATUS_ATTACH_FAILED)
             self._emit(f"   [yellow]attach failed[/] {rec.itemKey}: {res.reason}")
         self.manifest.write(rec)

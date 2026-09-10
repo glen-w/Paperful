@@ -67,12 +67,13 @@ state_dir = "state"
     assert cfg.scholar_cookies == (tmp_path / "cookies" / "scholar.txt").resolve()
 
 
-def test_repo_config_toml_parses_and_omits_scihub_by_default():
-    repo_cfg = Path(__file__).resolve().parent.parent / "config.toml"
+def test_example_config_toml_parses_and_omits_scihub_by_default():
+    repo_cfg = Path(__file__).resolve().parent.parent / "config.example.toml"
     cfg = load_config(repo_cfg)
-    assert cfg.email and "@" in cfg.email
+    assert cfg.email == "you@example.org"
     assert "scihub" not in cfg.sources
     assert cfg.sources[-1] == "htmlpdf"
     assert "htmlpdf" in cfg.sources
-    assert cfg.out_dir.is_absolute() and cfg.state_dir.is_absolute()
+    assert cfg.out_dir == (repo_cfg.parent / "out").resolve()
+    assert cfg.state_dir == (repo_cfg.parent / "state").resolve()
     assert isinstance(cfg, Config)

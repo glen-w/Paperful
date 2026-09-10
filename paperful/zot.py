@@ -109,7 +109,8 @@ class ZoteroLocal:
     def collection_counts(self) -> dict[str, tuple[int, int]]:
         """Per collection key: (top-level items, items lacking PDF), counting subcollections."""
         cols = self.collections()
-        pdf_parents = self._pdf_parent_keys()
+        imported, _linked = self._pdf_parent_sets()
+        pdf_parents = imported
         raw_items = self.zot.everything(self.zot.top())
         direct: dict[str, list[dict[str, Any]]] = {k: [] for k in cols}
         for it in raw_items:
@@ -129,19 +130,60 @@ class ZoteroLocal:
         return counts
 
     # ---- items ----------------------------------------------------------
-    def _pdf_parent_keys(self) -> set[str]:
-        """Keys of parent items that already have a PDF attachment."""
+    def _pdf_parent_sets(self) -> tuple[set[str], set[str]]:
+        """Imported PDF parents, and parents with only a linked PDF URL (no imported file)."""
         attachments = self.zot.everything(self.zot.items(itemType="attachment"))
-        return {
-            a["data"]["parentItem"]
-            for a in attachments
-            if a["data"].get("parentItem") and is_pdf_attachment(a["data"])
-        }
+        imported: set[str] = set()
+        linked_url: set[str] = set()
+        for a in attachments:
+            data = a["data"]
+            parent = data.get("parentItem")
+            if not parent:
+                continue
+            if is_pdf_attachment(data):
+                imported.add(parent)
+            elif is_linked_url_pdf(data):
+                linked_url.add(parent)
+        linked_url -= imported
+        return imported, linked_url
 
-    def items_lacking_pdf(self, collection_keys: list[str] | None) -> list[Item]:
+    def _pdf_parent_keys(self) -> set[str]:
+        """Keys of parent items that already have an imported PDF attachment."""
+        return self._pdf_parent_sets()[0]
+
+    def count_linked_url_only(self, collection_keys: list[str] | None) -> int:
+        """Items in scope that only have a linked PDF URL (skipped unless --upgrade-linked)."""
+        cols = self.collections()
+        imported, linked_only = self._pdf_parent_sets()
+        if collection_keys is None:
+            raw = self.zot.everything(self.zot.top())
+            selected: set[str] | None = None
+        else:
+            raw_by_key: dict[str, dict[str, Any]] = {}
+            for ck in collection_keys:
+                for it in self.zot.everything(self.zot.collection_items_top(ck)):
+                    raw_by_key[it["key"]] = it
+            raw = list(raw_by_key.values())
+            selected = set(collection_keys)
+        n = 0
+        for it in raw:
+            data = it["data"]
+            if data.get("itemType") in SKIP_TYPES or data.get("deleted"):
+                continue
+            key = it["key"]
+            if key in imported or key not in linked_only:
+                continue
+            if selected is not None:
+                item = item_from_json(it, cols, selected)
+                if not item.collection_paths:
+                    continue
+            n += 1
+        return n
+
+    def items_lacking_pdf(self, collection_keys: list[str] | None, upgrade_linked: bool = False) -> list[Item]:
         """Top-level regular items in the selected collections (or library) without a PDF child."""
         cols = self.collections()
-        pdf_parents = self._pdf_parent_keys()
+        imported, linked_only = self._pdf_parent_sets()
         if collection_keys is None:
             raw = self.zot.everything(self.zot.top())
             selected: set[str] | None = None
@@ -157,7 +199,10 @@ class ZoteroLocal:
             data = it["data"]
             if data.get("itemType") in SKIP_TYPES or data.get("deleted"):
                 continue
-            if it["key"] in pdf_parents:
+            key = it["key"]
+            if key in imported:
+                continue
+            if key in linked_only and not upgrade_linked:
                 continue
             items.append(item_from_json(it, cols, selected))
         items.sort(key=lambda i: (i.collection_paths[0] if i.collection_paths else "~", i.label.lower()))
@@ -171,6 +216,10 @@ def is_pdf_attachment(data: dict[str, Any]) -> bool:
     if data.get("contentType") != "application/pdf":
         return False
     return data.get("linkMode") in {"imported_file", "imported_url", "linked_file"}
+
+
+def is_linked_url_pdf(data: dict[str, Any]) -> bool:
+    return data.get("contentType") == "application/pdf" and data.get("linkMode") == "linked_url"
 
 
 def build_collection_tree(raw: Iterable[dict[str, Any]]) -> dict[str, Collection]:

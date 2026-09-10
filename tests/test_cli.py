@@ -7,7 +7,7 @@ import pytest
 from typer.testing import CliRunner
 
 from paperful import cli
-from paperful.store import STATUS_ATTACHED, STATUS_NOT_FOUND, STATUS_OK, Manifest, Record
+from paperful.store import STATUS_ATTACH_FAILED, STATUS_ATTACHED, STATUS_NOT_FOUND, STATUS_OK, Manifest, Record
 from paperful.zot import Collection
 
 runner = CliRunner()
@@ -56,10 +56,13 @@ class StubZL:
     def subtree_keys(self, root):
         return [root.key] + [c.key for c in self.cols.values() if c.parent == root.key]
 
-    def items_lacking_pdf(self, keys):
+    def items_lacking_pdf(self, keys, upgrade_linked=False):
         from tests.conftest import make_item
 
         return [make_item(key="I1", collection_paths=["BBNJ"]), make_item(key="I2", doi=None, collection_paths=["BBNJ/EIA _ SEA"])]
+
+    def count_linked_url_only(self, keys):
+        return 1
 
 
 @pytest.fixture
@@ -89,6 +92,7 @@ def test_run_dry_run_lists_items_and_writes_nothing(cfg_file, stub_zotero, tmp_p
     res = runner.invoke(cli.app, ["run", "-c", str(cfg_file), "--collection", "BBNJ/EIA / SEA", "--dry-run"], env={"COLUMNS": "200"})
     assert res.exit_code == 0, res.stdout
     assert "2 items without PDF" in res.stdout and "I1" in res.stdout and "10.1000/test.doi" in res.stdout
+    assert "Would-hit" in res.stdout and "linked URL only" in res.stdout
     assert "scihub" not in res.stdout.split("Sources:")[-1].split("\n")[0]
     assert "legal grey zone" not in res.stdout
     assert not (tmp_path / "state" / "manifest.jsonl").exists()
@@ -123,7 +127,7 @@ def test_run_scihub_via_sources_override_prints_disclaimer(cfg_file, stub_zotero
 
 
 def test_source_list_override_and_scihub_flag():
-    from paperful.config import Config
+    from paperful.config import Config, EOI_SOURCES
     from paperful.cli import _source_list
 
     cfg = Config(sources=["unpaywall", "ezproxy"])
@@ -132,6 +136,8 @@ def test_source_list_override_and_scihub_flag():
     assert _source_list(cfg, "unpaywall,scihub", False) == ["unpaywall", "scihub"]
     assert _source_list(cfg, "unpaywall", True) == ["unpaywall", "scihub"]
     assert _source_list(cfg, "unpaywall,scihub", True) == ["unpaywall", "scihub"]
+    assert _source_list(cfg, None, False, preset="eoi") == EOI_SOURCES
+    assert "scholar" not in _source_list(cfg, "eoi", False)
 
 
 def test_run_unknown_collection(cfg_file, stub_zotero):
@@ -156,7 +162,7 @@ def test_zotero_unreachable_exits_2(cfg_file, monkeypatch):
 
     monkeypatch.setattr(cli, "ZoteroLocal", lambda *a, **k: Down())
     res = runner.invoke(cli.app, ["collections", "-c", str(cfg_file)])
-    assert res.exit_code == 2 and "disabled" in res.stdout
+    assert res.exit_code == 2 and "disabled" in res.stdout and "paperful doctor" in res.stdout
 
 
 def test_report_empty_and_populated(cfg_file, tmp_path):
@@ -211,6 +217,36 @@ def test_mirrors_command(cfg_file, monkeypatch):
     assert res.exit_code == 0 and "m1.test" in res.stdout and "down" in res.stdout
     assert SCIHUB_DISCLAIMER in res.stdout
     assert "Sci-Hub is off until" in res.stdout
+
+
+def test_doctor_ok(cfg_file, stub_zotero):
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file)])
+    assert res.exit_code == 0
+    assert "green" in res.stdout and "Zotero :23119" in res.stdout
+
+
+def test_doctor_zotero_red(cfg_file, monkeypatch):
+    class Down:
+        def ping(self):
+            raise ConnectionError("Zotero local API is disabled.")
+
+    monkeypatch.setattr(cli, "ZoteroLocal", lambda *a, **k: Down())
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file)])
+    assert res.exit_code == 2 and "red" in res.stdout
+
+
+def test_report_json(cfg_file, tmp_path):
+    m = Manifest(tmp_path / "state" / "manifest.jsonl")
+    m.write(Record(itemKey="K1", status=STATUS_OK, source="unpaywall", doi="10.1/a"))
+    m.write(Record(itemKey="K2", status=STATUS_ATTACH_FAILED, reason="storage quota exceeded"))
+    res = runner.invoke(cli.app, ["report", "-c", str(cfg_file), "--json"])
+    assert res.exit_code == 0
+    import json
+
+    data = json.loads(res.stdout)
+    assert data["counts"]["ok"] == 1
+    assert data["no_doi"] == 1
+    assert data["attach_failed_by_code"].get("quota") == 1
 
 
 def test_attach_command_uses_pending_records(cfg_file, stub_zotero, tmp_path, monkeypatch):

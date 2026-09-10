@@ -106,13 +106,16 @@ def test_subtree_keys_and_counts(zl):
 
 def test_items_lacking_pdf_scope_and_filters(zl):
     scoped = zl.items_lacking_pdf(["ROOT", "SUB"])
-    assert [i.key for i in scoped] == ["B"]  # A has PDF, D deleted, N is a note
-    assert scoped[0].collection_paths == ["BBNJ/EIA _ SEA"]
+    assert scoped == []  # B only has linked_url PDF — skipped unless upgrade_linked
+    upgraded = zl.items_lacking_pdf(["ROOT", "SUB"], upgrade_linked=True)
+    assert [i.key for i in upgraded] == ["B"]
+    assert upgraded[0].collection_paths == ["BBNJ/EIA _ SEA"]
+    assert zl.count_linked_url_only(["ROOT", "SUB"]) == 1
 
     whole = zl.items_lacking_pdf(None)
     keys = {i.key for i in whole}
-    assert keys == {"B", "C", "U"}
+    assert keys == {"C", "U"}
     uncollected = next(i for i in whole if i.key == "U")
     assert uncollected.collection_paths == [UNCOLLECTED]
-    # sorted by first collection path, then label: "BBNJ/..." < "_uncollected" < "interesting"
-    assert [i.key for i in whole] == ["B", "U", "C"]
+    # sorted by first collection path, then label: "_uncollected" < "interesting"
+    assert [i.key for i in whole] == ["U", "C"]

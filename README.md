@@ -37,7 +37,8 @@ subscription.
 git clone https://github.com/glen-w/Paperful.git
 cd Paperful
 uv sync
-# edit config.toml: email, out_dir, and (optional) ezproxy_base / scholar cookies
+cp config.example.toml config.toml   # then set email, out_dir, optional ezproxy_base
+uv run paperful doctor               # Zotero, paths, cookies — green / amber / red
 uv run paperful collections          # sanity check: tree with "No PDF" counts
 ```
 
@@ -72,8 +73,15 @@ uv run paperful attach
 
 # what happened
 uv run paperful report
+uv run paperful report --json          # agent-friendly counts (incl. attach failure types)
 uv run paperful report --not-found
 uv run paperful report --status error
+
+# policy-sensitive runs (OA + campus EZProxy; no Scholar / Sci-Hub)
+uv run paperful run -C BBNJ --preset eoi --dry-run
+
+# items with only a linked PDF URL in Zotero are skipped by default
+uv run paperful run --library --upgrade-linked
 
 # retry items marked not_found / no_identifier (e.g. after EZProxy login)
 uv run paperful run --library --retry-failed
@@ -95,9 +103,10 @@ uv run paperful mirrors              # which Sci-Hub mirrors are up (Sci-Hub its
 
 | Command | Purpose |
 | --- | --- |
-| `run` | Find and download missing PDFs (`--dry-run`, `--try-all`, `--retry-failed`, `--sources`, `--scihub`, `--limit`) |
+| `doctor` | Environment check (Zotero, paths, email, cookies) |
+| `run` | Find and download missing PDFs (`--dry-run`, `--preset eoi`, `--upgrade-linked`, `--try-all`, `--retry-failed`, `--sources`, `--scihub`, `--limit`) |
 | `collections` | Collection tree with “No PDF” counts |
-| `report` | Manifest summary (`--not-found`, `--status`) |
+| `report` | Manifest summary (`--json`, `--not-found`, `--status`) |
 | `attach` | Attach already-downloaded PDFs into Zotero |
 | `ezproxy` | Open / verify campus EZProxy session |
 | `scholar` | Open / verify Google Scholar cookies |
@@ -110,9 +119,18 @@ collections are written once and hard-linked into the other folders.
 
 ## Configuration (`config.toml`)
 
+Copy `config.example.toml` to `config.toml` and edit locally; the example file
+is tracked in git, personal config is not.
+
 Looked up as `--config PATH`, then `./config.toml`, then the project folder's
 `config.toml`, then `~/.config/paperful/config.toml`. Relative paths resolve
 against the config file's folder.
+
+**Grey literature and no-DOI items** — Unpaywall and most DOI sources cannot
+resolve PrepCom papers, many DOALOS/UN docs, or undocs without a DOI. Paperful
+will try `direct` (item URL) and `htmlpdf` (web/news types) when routing
+allows; otherwise the manifest records `no_identifier`. See
+[docs/architecture.md](docs/architecture.md).
 
 | Key | Default | Meaning |
 | --- | --- | --- |

@@ -59,11 +59,26 @@ class LocalZupload(Zupload):
         return req.json()
 
 
+ATTACH_CODES = frozenset({"success", "unchanged", "quota", "no_write_api", "auth", "other"})
+
+
+def attach_failure_code(reason: str) -> str:
+    low = reason.lower()
+    if "write support" in low or "zotero 10" in low or "needs zotero 10" in low:
+        return "no_write_api"
+    if "quota" in low or "storage" in low or "limit exceeded" in low:
+        return "quota"
+    if "auth" in low or "unauthor" in low or "denied" in low:
+        return "auth"
+    return "other"
+
+
 @dataclass
 class AttachResult:
     ok: bool
     attachment_key: str | None = None
     reason: str = ""
+    code: str = ""
 
 
 class Attacher:
@@ -131,17 +146,22 @@ class Attacher:
     # ---- attach -----------------------------------------------------------------
     def attach(self, item_key: str, pdf_path: Path, title: str | None = None) -> AttachResult:
         if not pdf_path.is_file():
-            return AttachResult(False, reason=f"file missing: {pdf_path}")
+            return AttachResult(False, reason=f"file missing: {pdf_path}", code="other")
         if not self.supports_write():
-            return AttachResult(False, reason="Zotero local API has no write support (needs Zotero 10+)")
+            return AttachResult(
+                False,
+                reason="Zotero local API has no write support (needs Zotero 10+)",
+                code="no_write_api",
+            )
         for attempt in range(2):
             if not self.zl.zot.local_api_key:
                 try:
                     granted = self.authorize()
                 except AttachTransportError as exc:
-                    return AttachResult(False, reason=str(exc))
+                    msg = str(exc)
+                    return AttachResult(False, reason=msg, code=attach_failure_code(msg))
                 if not granted:
-                    return AttachResult(False, reason="write authorisation denied in Zotero")
+                    return AttachResult(False, reason="write authorisation denied in Zotero", code="auth")
             try:
                 # attachment_simple() needs the /items/new template endpoint, which the local
                 # API does not serve; build the stored-file attachment item ourselves.
@@ -151,16 +171,23 @@ class Attacher:
                 # single-use key consumed, or revoked in Zotero settings
                 self._forget_key()
                 if attempt == 1:
-                    return AttachResult(False, reason=f"unauthorised: {exc}")
+                    msg = f"unauthorised: {exc}"
+                    return AttachResult(False, reason=msg, code="auth")
                 continue
             except ze.TooManyRequestsError:
-                return AttachResult(False, reason="Zotero rate-limited authorisation prompts; wait a minute")
+                return AttachResult(
+                    False,
+                    reason="Zotero rate-limited authorisation prompts; wait a minute",
+                    code="other",
+                )
             except ze.PyZoteroError as exc:
-                return AttachResult(False, reason=f"{type(exc).__name__}: {exc}")
+                msg = f"{type(exc).__name__}: {exc}"
+                return AttachResult(False, reason=msg, code=attach_failure_code(msg))
             except Exception as exc:  # transport errors from pyzotero's vendored httpx
-                return AttachResult(False, reason=f"{type(exc).__name__}: {exc}")
+                msg = f"{type(exc).__name__}: {exc}"
+                return AttachResult(False, reason=msg, code=attach_failure_code(msg))
             return _interpret(result)
-        return AttachResult(False, reason="gave up")
+        return AttachResult(False, reason="gave up", code="other")
 
 
 def attachment_payload(pdf_path: Path, title: str | None = None) -> dict:
@@ -182,7 +209,8 @@ def attachment_payload(pdf_path: Path, title: str | None = None) -> dict:
 def _interpret(result: dict) -> AttachResult:
     for bucket in ("success", "unchanged"):
         for entry in result.get(bucket) or []:
-            return AttachResult(True, attachment_key=entry.get("key"), reason=bucket)
+            return AttachResult(True, attachment_key=entry.get("key"), reason=bucket, code=bucket)
     for entry in result.get("failure") or []:
-        return AttachResult(False, reason=str(entry.get("error") or "upload failed"))
-    return AttachResult(False, reason="no result from Zotero")
+        msg = str(entry.get("error") or "upload failed")
+        return AttachResult(False, reason=msg, code=attach_failure_code(msg))
+    return AttachResult(False, reason="no result from Zotero", code="other")
