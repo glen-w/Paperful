@@ -19,6 +19,9 @@ _SKIP_HOSTS = (
     "youtu.be",
     "vimeo.com",
     "facebook.com",
+    "consensus.app",
+    "semanticscholar.org",
+    "researchgate.net",
 )
 
 

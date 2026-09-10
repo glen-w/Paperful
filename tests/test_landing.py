@@ -23,6 +23,9 @@ def test_rewrite_known_pdf_url():
     )
     assert rewrite_known_pdf_url("https://arxiv.org/abs/2101.00001") == "https://arxiv.org/pdf/2101.00001"
     assert rewrite_known_pdf_url("https://hal.science/hal-01234567") == "https://hal.science/hal-01234567/document"
+    assert rewrite_known_pdf_url("https://www.fao.org/3/ca1234en/ca1234en.htm") == (
+        "https://www.fao.org/3/ca1234en/ca1234en.pdf"
+    )
     assert rewrite_known_pdf_url("https://dspace.example/handle/1874/1") is None
 
 
@@ -34,6 +37,37 @@ def test_extract_pdf_urls_meta_and_pii():
     urls = extract_pdf_urls(html, "https://www.sciencedirect.com/science/article/pii/S123")
     assert "https://www.sciencedirect.com/a.pdf" in urls
     assert any("pdfft" in u for u in urls)
+
+
+def test_extract_pdf_urls_data_attr_and_text():
+    html = """
+    <html><body>
+      <a href="https://facebook.com/share">Share</a>
+      <a href="/files/report.pdf" data-pdf-url="/files/report.pdf">Full report</a>
+      <button data-download-url="/dl/doc.pdf">Télécharger</button>
+      <a href="https://cdn.example.org/offsite.pdf">PDF</a>
+    </body></html>
+    """
+    urls = extract_pdf_urls(html, "https://www.iea.org/reports/foo")
+    assert "https://www.iea.org/files/report.pdf" in urls
+    assert "https://www.iea.org/dl/doc.pdf" in urls
+    assert "https://facebook.com/share" not in urls
+    # same-host preferred before offsite
+    assert urls.index("https://www.iea.org/files/report.pdf") < urls.index("https://cdn.example.org/offsite.pdf")
+
+
+def test_extract_pdf_urls_irena_oecd_hints():
+    irena = """
+    <html><body><a href="/-/media/Files/IRENA/Agency/Publication/2023/foo.pdf">Download</a></body></html>
+    """
+    urls = extract_pdf_urls(irena, "https://www.irena.org/publications/2023/Foo")
+    assert any(u.endswith(".pdf") for u in urls)
+
+    oecd = """
+    <html><body><a href="/download/pdf?id=123">Download PDF</a></body></html>
+    """
+    urls2 = extract_pdf_urls(oecd, "https://www.oecd-ilibrary.org/economics/foo_123")
+    assert any("/download/" in u for u in urls2)
 
 
 def test_resolve_dspace_handle(ctx_factory):

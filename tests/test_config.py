@@ -72,6 +72,7 @@ def test_repo_config_toml_parses_and_omits_scihub_by_default():
     cfg = load_config(repo_cfg)
     assert cfg.email and "@" in cfg.email
     assert "scihub" not in cfg.sources
-    assert cfg.sources[-1] == "ezproxy"
+    assert cfg.sources[-1] == "htmlpdf"
+    assert "htmlpdf" in cfg.sources
     assert cfg.out_dir.is_absolute() and cfg.state_dir.is_absolute()
     assert isinstance(cfg, Config)

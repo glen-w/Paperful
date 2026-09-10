@@ -30,6 +30,7 @@ class Candidate:
     referer: str | None = None
     note: str = ""
     alternates: list[str] = field(default_factory=list)  # further PDF URLs to try if `url` fails
+    content: bytes | None = None  # pre-fetched PDF bytes (e.g. htmlpdf); skips HTTP download
 
     @classmethod
     def miss(cls, source: str, outcome: Outcome, note: str = "") -> "Candidate":

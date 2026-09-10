@@ -22,7 +22,7 @@ architecture_rules:
   - open-access sources before Sci-Hub; Sci-Hub stays serial
   - default tests stay offline (fixture HTML / mocks — no live Zotero or network)
 release_governance: none
-backup_hub: sibling
+backup_hub: "$HOME/Documents/code backups"
 backup_excludes:
   - out
   - state

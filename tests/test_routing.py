@@ -16,6 +16,11 @@ def test_source_applicable_by_metadata(cfg):
     assert source_applicable(no_doi, cfg, "direct")
     assert not source_applicable(no_doi, cfg, "scihub")
     assert source_applicable(with_doi, cfg, "scihub")
+    web = make_item(key="W", doi=None, item_type="webpage", url="https://www.npr.org/story")
+    assert source_applicable(web, cfg, "htmlpdf")
+    assert not source_applicable(with_doi, cfg, "htmlpdf")
+    assert not source_applicable(make_item(doi=None, item_type="webpage", url="https://consensus.app/x"), cfg, "htmlpdf")
+    assert not source_applicable(make_item(doi=None, url="https://consensus.app/x"), cfg, "direct")
 
 
 def test_sources_for_item_preserves_config_order(cfg):

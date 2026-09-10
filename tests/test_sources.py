@@ -24,10 +24,11 @@ def test_registry_has_every_planned_source_and_scihub_is_opt_in():
 
     assert set(REGISTRY) == {
         "unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar",
-        "scholar", "direct", "ezproxy", "scihub",
+        "scholar", "direct", "ezproxy", "htmlpdf", "scihub",
     }
     assert "scihub" not in DEFAULT_SOURCES
-    assert DEFAULT_SOURCES[-1] == "ezproxy"
+    assert DEFAULT_SOURCES[-1] == "htmlpdf"
+    assert DEFAULT_SOURCES.index("ezproxy") < DEFAULT_SOURCES.index("htmlpdf")
     assert DEFAULT_SOURCES.index("biorxiv") < DEFAULT_SOURCES.index("semanticscholar")
     assert DEFAULT_SOURCES.index("europepmc") < DEFAULT_SOURCES.index("semanticscholar")
     assert all(s in REGISTRY for s in DEFAULT_SOURCES)

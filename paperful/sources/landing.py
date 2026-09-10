@@ -12,7 +12,15 @@ from bs4 import BeautifulSoup
 from ..resolve import title_similarity
 from .base import Context, http_json
 
-_PDF_HREF_RE = re.compile(r"pdfft|/pdf(?:\?|$)|citation_pdf_url|download=true|viewcontent\.cgi", re.I)
+_PDF_HREF_RE = re.compile(
+    r"pdfft|/pdf(?:\?|$)|citation_pdf_url|download=true|viewcontent\.cgi|\.pdf(?:\?|$)|/download/|/bitstream/",
+    re.I,
+)
+_PDF_TEXT_RE = re.compile(
+    r"\b(?:pdf|download\s+pdf|view\s+pdf|full\s+text(?:\s+pdf)?|full\s+report|"
+    r"télécharger|telecharger|lire\s+le\s+pdf|download\s+(?:the\s+)?(?:report|publication|document))\b",
+    re.I,
+)
 _HANDLE_RE = re.compile(r"(?:/handle/|hdl\.handle\.net/)(\d+(?:\.\d+)*/[^\s/?#]+)", re.I)
 _PMC_RE = re.compile(
     r"(?:ncbi\.nlm\.nih\.gov/pmc/articles|europepmc\.org/(?:articles|article/pmc))/(PMC\d+)",
@@ -20,8 +28,19 @@ _PMC_RE = re.compile(
 )
 _ARXIV_ABS_RE = re.compile(r"arxiv\.org/abs/([0-9]+\.[0-9]+|[a-z\-]+(?:\.[A-Z]{2})?/\d{7})", re.I)
 _HAL_RE = re.compile(r"https?://(?:hal\.science|hal\.archives-ouvertes\.fr)/(hal-\d+(?:v\d+)?)", re.I)
+_FAO_RE = re.compile(r"https?://www\.fao\.org/3/([a-z0-9]+)/", re.I)
 _DC_PATH_RE = re.compile(r"^/([^/]+)/(\d+)/?$")
 _SKIP_OAI_HOSTS = ("doi.org", "hdl.handle.net", "scholar.google", "zotero.org")
+_DEMOTE_HOST_FRAGMENTS = (
+    "facebook.com",
+    "twitter.com",
+    "x.com",
+    "linkedin.com",
+    "mailto:",
+    "javascript:",
+    "doubleclick",
+    "googletagmanager",
+)
 _TITLE_MIN = 0.55
 _MAX_LANDINGS = 3
 _TIMEOUT = 20.0
@@ -53,35 +72,87 @@ def rewrite_known_pdf_url(url: str) -> str | None:
     m = _HAL_RE.match(url.split("?")[0])
     if m:
         return f"https://hal.science/{m.group(1)}/document"
+    # FAO document pages: https://www.fao.org/3/ca1234en/ca1234en.pdf
+    m = _FAO_RE.match(url.split("?")[0])
+    if m:
+        code = m.group(1)
+        return f"https://www.fao.org/3/{code}/{code}.pdf"
     return None
 
 
 def extract_pdf_urls(html: str, base_url: str) -> list[str]:
     soup = BeautifulSoup(html, "html.parser")
-    found: list[str] = []
+    primary: list[str] = []
+    secondary: list[str] = []
+    base_host = (urlparse(base_url).hostname or "").lower()
 
-    def add(u: str | None) -> None:
+    def add(u: str | None, *, prefer: bool = False) -> None:
         if not u:
             return
         abs_url = urljoin(base_url, u.strip())
-        if abs_url not in found:
-            found.append(abs_url)
+        low = abs_url.lower()
+        if any(x in low for x in _DEMOTE_HOST_FRAGMENTS):
+            return
+        if not abs_url.startswith(("http://", "https://")):
+            return
+        bucket = primary if prefer else secondary
+        if abs_url not in primary and abs_url not in secondary:
+            bucket.append(abs_url)
 
-    for meta in soup.find_all("meta", attrs={"name": re.compile(r"citation_pdf_url", re.I)}):
-        add(meta.get("content"))
+    for meta in soup.find_all("meta"):
+        name = str(meta.get("name") or meta.get("property") or "").lower()
+        content = meta.get("content")
+        if name in {"citation_pdf_url", "bepress_citation_pdf_url"}:
+            add(content, prefer=True)
+        elif name in {"og:url", "dc.identifier", "dc.identifier.url"} and content and looks_like_pdf_url(content):
+            add(content, prefer=True)
+
     for link in soup.find_all("link", attrs={"type": "application/pdf"}):
-        add(link.get("href"))
+        add(link.get("href"), prefer=True)
+
+    for tag in soup.find_all(True):
+        for attr in ("data-pdf-url", "data-download-url", "data-file-url"):
+            if tag.has_attr(attr):
+                add(tag.get(attr), prefer=True)
+
     for a in soup.find_all("a", href=True):
         href = a["href"]
-        text = a.get_text(" ", strip=True).lower()
-        if _PDF_HREF_RE.search(href) or text in {"pdf", "download pdf", "view pdf", "full text pdf"}:
-            add(href)
+        text = a.get_text(" ", strip=True)
+        aria = (a.get("aria-label") or a.get("title") or "").strip()
+        combined = f"{text} {aria}".strip()
+        href_hit = bool(_PDF_HREF_RE.search(href)) or looks_like_pdf_url(href)
+        text_hit = bool(_PDF_TEXT_RE.search(combined))
+        if href_hit or text_hit:
+            prefer = href_hit or looks_like_pdf_url(href)
+            # Same-host links win over off-site trackers
+            abs_u = urljoin(base_url, href.strip())
+            host = (urlparse(abs_u).hostname or "").lower()
+            if base_host and host and (host == base_host or host.endswith("." + base_host) or base_host.endswith("." + host)):
+                prefer = True
+            add(href, prefer=prefer)
+
     m = re.search(r"/pii/([A-Z0-9]+)", base_url, re.I) or re.search(r"/pii/([A-Z0-9]+)", html, re.I)
     if m:
         pii = m.group(1)
         parsed = urlparse(base_url)
-        add(f"{parsed.scheme}://{parsed.netloc}/science/article/pii/{pii}/pdfft?isDTMRedir=true&download=true")
-    return found
+        add(
+            f"{parsed.scheme}://{parsed.netloc}/science/article/pii/{pii}/pdfft?isDTMRedir=true&download=true",
+            prefer=True,
+        )
+
+    # IRENA / OECD: prefer explicit .pdf hrefs already collected; add download path hints
+    if "irena.org" in base_host:
+        for a in soup.find_all("a", href=True):
+            if ".pdf" in a["href"].lower():
+                add(a["href"], prefer=True)
+    if "oecd" in base_host:
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            if "/download/" in href.lower() or href.lower().endswith(".pdf"):
+                add(href, prefer=True)
+
+    ordered = primary + [u for u in secondary if u not in primary]
+    return ordered
 
 
 def resolve_landings(ctx: Context, landings: list[str], title: str | None = None) -> list[str]:

@@ -24,6 +24,9 @@ _DIRECT_SKIP_HOSTS = (
     "youtu.be",
     "vimeo.com",
     "facebook.com",
+    "consensus.app",
+    "semanticscholar.org",
+    "researchgate.net",
 )
 _BIORXIV_DOI = re.compile(r"^10\.1101/", re.IGNORECASE)
 _BIORXIV_URL = re.compile(
@@ -74,6 +77,21 @@ def source_applicable(item: Item, cfg: Config, name: str) -> bool:
         if not url.startswith(("http://", "https://")):
             return False
         return not any(h in url for h in _DIRECT_SKIP_HOSTS)
+    if name == "htmlpdf":
+        url = (item.url or "").strip().lower()
+        if not url.startswith(("http://", "https://")):
+            return False
+        if any(h in url for h in _DIRECT_SKIP_HOSTS):
+            return False
+        if item.item_type in {
+            "webpage",
+            "blogPost",
+            "forumPost",
+            "newspaperArticle",
+            "magazineArticle",
+        }:
+            return True
+        return item.item_type == "document" and not item.doi
     if name == "ezproxy":
         if not cfg.ezproxy_base:
             return False

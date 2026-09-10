@@ -118,15 +118,15 @@ against the config file's folder.
 | --- | --- | --- |
 | `email` | `""` | Sent as `mailto` to Unpaywall/OpenAlex/Crossref (required by Unpaywall) |
 | `out_dir` / `state_dir` | `out` / `state` | PDF tree and manifest/key location |
-| `sources` | `unpaywall` → `openalex` → `arxiv` → `biorxiv` → `europepmc` → `semanticscholar` → `scholar` → `direct` → `ezproxy` | Source order; `--sources` overrides per run. `scihub` is **not** included unless you opt in |
+| `sources` | `unpaywall` → `openalex` → `arxiv` → `biorxiv` → `europepmc` → `semanticscholar` → `scholar` → `direct` → `ezproxy` → `htmlpdf` | Source order; `--sources` overrides per run. `scihub` is **not** included unless you opt in |
 | `ezproxy_base` | `""` (disabled) | Campus proxy prefix ending in `url=` — see [Campus EZProxy](#campus-ezproxy) |
 | `ezproxy_cookies` | `state/ezproxy-cookies.txt` | Netscape cookies file after browser login |
 | `scholar_cookies` | `state/scholar-cookies.txt` | Google Scholar cookies after CAPTCHA — see [Google Scholar cookies](#google-scholar-cookies) |
 | `scihub_mirrors` | built-in list | Hostnames tried in order |
-| `delay_scihub_s` | `[3, 8]` | Random pause (seconds) before each Sci-Hub / EZProxy page fetch |
-| `concurrency_oa` | `4` | Parallel workers for open-access sources (EZProxy and Sci-Hub are serial) |
+| `delay_scihub_s` | `[3, 8]` | Random pause (seconds) before each Sci-Hub / EZProxy / htmlpdf page fetch |
+| `concurrency_oa` | `4` | Parallel workers for open-access sources (EZProxy, htmlpdf, and Sci-Hub are serial) |
 | `min_pdf_bytes` | `10000` | Smaller downloads are rejected as error pages |
-| `crossref_min_score` | `0.90` | Title-similarity threshold for accepting a Crossref DOI |
+| `crossref_min_score` | `0.90` | Title-similarity threshold for accepting a title→DOI match (Crossref, then OpenAlex, then Semantic Scholar) |
 | `mirror_failures_before_skip` | `3` | Network failures before a Sci-Hub mirror is skipped for the run |
 | `source_routing` | `true` | Skip sources that look inapplicable from item metadata; use `--try-all` to override per run |
 | `circuit_breaker_threshold` | `3` | Block-like failures (CAPTCHA, rate limits) before a source is skipped for the rest of the run |
@@ -172,8 +172,14 @@ lists that lane, not the full `sources` list.
 | `biorxiv` | `10.1101/…` DOI (including from a bioRxiv/medRxiv URL) |
 | `semanticscholar` | DOI or arXiv id |
 | `scholar` | DOI, or title at least 20 characters |
-| `direct` | HTTP(S) URL that is not a resolver/aggregator/video host (doi.org, Scholar, Zotero, YouTube, X/Twitter, …) |
+| `direct` | HTTP(S) URL that is not a resolver/aggregator/video host (doi.org, Scholar, Zotero, YouTube, X/Twitter, Consensus, …) |
 | `ezproxy` | `ezproxy_base` plus a cookie file, **and** a DOI or a URL on a [known publisher host](#what-ezproxy-will-try) |
+| `htmlpdf` | `webpage` / `blogPost` / `newspaperArticle` / `magazineArticle` / `forumPost` (or DOI-less `document`) with an HTTP(S) URL; needs optional Playwright — see [HTML→PDF](#htmlpdf-web-news-blogs) |
+
+Before sources run, items without a DOI get **identifier enrichment**: DOI from
+URL/path or page meta (aggregators), then Crossref, OpenAlex, and Semantic
+Scholar title search (skipped for web/blog/forum types). Matches are kept for
+the run and recorded in the manifest; Zotero fields are not rewritten.
 
 `--try-all` (or `source_routing = false`) tries every configured source regardless
 of those filters. Use that when library records have missing or wrong
@@ -187,6 +193,25 @@ after `circuit_breaker_threshold` (default 3) CAPTCHA or block-like errors
 miss for that source; the item continues through the rest of its lane. Only
 an unsolved Sci-Hub robot check records the item as `captcha`. `--try-all`
 does not disable the breaker.
+
+---
+
+## HTML→PDF (web, news, blogs)
+
+Items typed as `webpage`, `blogPost`, `newspaperArticle`, `magazineArticle`, or
+`forumPost` (and DOI-less `document`s with a URL) rarely have a native PDF.
+After `direct` fails to find a PDF link on the page, the optional `htmlpdf`
+source prints the page with headless Chromium and attaches the result.
+
+```sh
+uv sync --extra htmlpdf
+uv run playwright install chromium
+# ensure "htmlpdf" is in config sources (it is in the default list)
+uv run paperful run --collection interesting --retry-failed
+```
+
+Without the extra, `htmlpdf` is skipped with a note to install
+`paperful[htmlpdf]`. Soft paywall pages are treated as not found.
 
 ---
 
@@ -265,7 +290,7 @@ ezproxy_base = "https://YOUR-PREFIX.idm.oclc.org/login?url="
 
 sources = [
   "unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar",
-  "scholar", "direct", "ezproxy",
+  "scholar", "direct", "ezproxy", "htmlpdf",
 ]
 ```
 

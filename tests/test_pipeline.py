@@ -56,7 +56,7 @@ class FakeAttacher:
 def pipe_factory(cfg, monkeypatch):
     def _make(registry: dict, sources: list[str], handler=None, attacher=None):
         monkeypatch.setattr(pl, "REGISTRY", registry)
-        monkeypatch.setattr(pl, "crossref_lookup", lambda *a, **k: None)
+        monkeypatch.setattr(pl, "enrich_identifiers", lambda *a, **k: [])
         manifest = Manifest(cfg.manifest_path)
         pipe = pl.Pipeline(cfg, manifest, Console(file=io.StringIO()), sources=sources, attacher=attacher)
         client = mock_client(handler or (lambda r: httpx.Response(200, content=PDF_BYTES)))
@@ -213,21 +213,96 @@ def test_batches_and_stop_flag(pipe_factory):
     assert manifest2.get("Z") is None  # nothing processed once stopped
 
 
-def test_crossref_resolution_feeds_sources(pipe_factory, monkeypatch):
-    from paperful.resolve import CrossrefMatch
+def test_enrich_resolution_feeds_sources(pipe_factory, monkeypatch):
+    def fake_enrich(client, item, email="", min_score=0.9):
+        item.doi = "10.9/found"
+        item.doi_source = "crossref"
+        return ["crossref:matched(0.97)"]
 
     src = StubSource("oa")
-    pipe, manifest = pipe_factory({"oa": src}, ["oa"])  # factory stubs crossref to None; override after
-    monkeypatch.setattr(pl, "crossref_lookup", lambda *a, **k: CrossrefMatch("10.9/found", 0.97, "t", 2019))
+    pipe, manifest = pipe_factory({"oa": src}, ["oa"])
+    monkeypatch.setattr(pl, "enrich_identifiers", fake_enrich)
     pipe.run([make_item(key="X", doi=None)])
     rec = manifest.get("X")
     assert rec.doi == "10.9/found" and rec.doi_source == "crossref"
     assert rec.attempts[0] == "crossref:matched(0.97)"
 
 
-def test_crossref_not_used_for_webpages(pipe_factory, monkeypatch):
+def test_enrich_not_used_when_doi_present(pipe_factory, monkeypatch):
     called = []
-    monkeypatch.setattr(pl, "crossref_lookup", lambda *a, **k: called.append(1))
+
+    def fake_enrich(*a, **k):
+        called.append(1)
+        return []
+
+    monkeypatch.setattr(pl, "enrich_identifiers", fake_enrich)
     pipe, _ = pipe_factory({"oa": StubSource("oa")}, ["oa"])
-    pipe.run([make_item(key="W", doi=None, item_type="webpage")])
+    pipe.run([make_item(key="W", doi="10.1/x")])
     assert called == []
+
+
+def test_enrich_skipped_for_webpages_via_enrich_fn(pipe_factory, monkeypatch):
+    """Pipeline still calls enrich when doi is missing; enrich_identifiers itself skips web types."""
+    from paperful.resolve import enrich_identifiers
+
+    monkeypatch.setattr(pl, "enrich_identifiers", enrich_identifiers)
+    pipe, manifest = pipe_factory({"oa": StubSource("oa")}, ["oa"])
+    pipe.run([make_item(key="W", doi=None, item_type="webpage")])
+    # no crossref/openalex attempt strings
+    assert not any("crossref:" in a or "openalex:" in a for a in (manifest.get("W").attempts or []))
+
+
+def test_embedded_pdf_content_skips_http_download(pipe_factory):
+    src = StubSource(
+        "htmlpdf",
+        {"A": Candidate(url="https://news.test/a", source="htmlpdf", content=PDF_BYTES)},
+    )
+    pipe, manifest = pipe_factory({"htmlpdf": src}, ["htmlpdf"])
+    pipe.run([make_item(key="A", item_type="webpage", doi=None, url="https://news.test/a")])
+    rec = manifest.get("A")
+    assert rec.status in {STATUS_OK, STATUS_ATTACHED}
+    assert rec.source == "htmlpdf"
+    assert rec.url == "https://news.test/a"
+
+
+def test_htmlpdf_runs_after_ezproxy_in_serial_chain(pipe_factory):
+    ez = StubSource("ezproxy", default=Outcome.NOT_FOUND)
+    hp = StubSource(
+        "htmlpdf",
+        {"W": Candidate(url="https://news.test/w", source="htmlpdf", content=PDF_BYTES)},
+    )
+    pipe, manifest = pipe_factory({"ezproxy": ez, "htmlpdf": hp}, ["ezproxy", "htmlpdf"])
+    pipe.try_all = True
+    pipe.run([make_item(key="W", item_type="webpage", doi=None, url="https://news.test/w")])
+    assert ez.calls == ["W"]
+    assert hp.calls == ["W"]
+    assert manifest.get("W").source == "htmlpdf"
+
+
+def test_invalid_embedded_pdf_content_fails(pipe_factory):
+    src = StubSource(
+        "htmlpdf",
+        {"A": Candidate(url="https://news.test/a", source="htmlpdf", content=b"not-a-pdf")},
+    )
+    pipe, manifest = pipe_factory({"htmlpdf": src}, ["htmlpdf"])
+    pipe.run([make_item(key="A", item_type="webpage", doi=None, url="https://news.test/a")])
+    rec = manifest.get("A")
+    # download-failed without a not_found → error (retried next run)
+    assert rec.status == STATUS_ERROR
+    assert any("invalid embedded PDF" in a for a in rec.attempts)
+
+
+def test_serial_chain_ezproxy_htmlpdf_then_scihub(pipe_factory):
+    ez = StubSource("ezproxy", default=Outcome.NOT_FOUND)
+    hp = StubSource("htmlpdf", default=Outcome.SKIPPED)
+    sh = StubSource("scihub", {"J": Candidate(url="https://m.test/j.pdf", source="scihub")})
+    pipe, manifest = pipe_factory(
+        {"ezproxy": ez, "htmlpdf": hp, "scihub": sh},
+        ["ezproxy", "htmlpdf", "scihub"],
+    )
+    pipe.try_all = True
+    pipe.run([make_item(key="J", doi="10.1000/j", item_type="journalArticle")])
+    assert ez.calls == ["J"]
+    assert "J" in hp.calls
+    assert sh.calls == ["J"]
+    assert manifest.get("J").source == "scihub"

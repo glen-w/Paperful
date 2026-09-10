@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import random
 import threading
 import time
@@ -18,9 +19,9 @@ from .attach import Attacher
 from .circuit import CircuitBreaker
 from .config import Config
 from .cookies import apply_netscape_cookies
+from .download import Download, DownloadError, fetch_pdf
+from .resolve import enrich_identifiers
 from .routing import sources_for_item
-from .download import DownloadError, fetch_pdf
-from .resolve import crossref_lookup
 from .sources import REGISTRY, Candidate, Context, Outcome
 from .store import (
     STATUS_ATTACH_FAILED,
@@ -37,8 +38,8 @@ from .store import (
 )
 from .zot import Item
 
-# Sources that hit publishers via a shared campus session — keep serial & polite.
-_SERIAL_SOURCES = frozenset({"scihub", "ezproxy"})
+# Sources that share a browser/session or are heavy — keep serial & polite.
+_SERIAL_SOURCES = frozenset({"scihub", "ezproxy", "htmlpdf"})
 
 
 def make_client(cfg: Config) -> httpx.Client:
@@ -128,8 +129,6 @@ class Pipeline:
     def _run_batch(self, items: list[Item]) -> None:
         oa_sources = [s for s in self.sources if s not in _SERIAL_SOURCES and s in REGISTRY]
         serial = [s for s in self.sources if s in _SERIAL_SOURCES and s in REGISTRY]
-        use_scihub = "scihub" in serial
-        use_ezproxy = "ezproxy" in serial
         pending: list[tuple[Item, list[str]]] = []
         queue_lock = threading.Lock()
 
@@ -140,7 +139,7 @@ class Pipeline:
             if attempts is None:
                 return  # resolved (ok or terminal)
             lanes = self._lanes_for(item)
-            next_serial = next((s for s in self.sources if s in _SERIAL_SOURCES and s in lanes), None)
+            next_serial = next((s for s in serial if s in lanes), None)
             if next_serial:
                 with queue_lock:
                     pending.append((item, attempts))
@@ -162,39 +161,41 @@ class Pipeline:
                 raise
 
         if pending and not self._stop.is_set():
-            still = self._phase_serial(pending, "ezproxy") if use_ezproxy else pending
-            if self._stop.is_set():
-                return
-            if use_scihub:
-                scihub_queue = [(it, att) for it, att in still if "scihub" in self._lanes_for(it)]
-                scihub_keys = {it.key for it, _ in scihub_queue}
-                for item, attempts in still:
-                    if item.key not in scihub_keys:
+            still = pending
+            for name in serial:
+                if self._stop.is_set():
+                    return
+                if name == "scihub":
+                    scihub_queue = [(it, att) for it, att in still if "scihub" in self._lanes_for(it)]
+                    scihub_keys = {it.key for it, _ in scihub_queue}
+                    leftovers = [(it, att) for it, att in still if it.key not in scihub_keys]
+                    for item, attempts in leftovers:
                         self._finish_miss(item, attempts)
                         self.progress()
-                if scihub_queue:
-                    self._phase_scihub(scihub_queue)
-            else:
-                for item, attempts in still:
-                    self._finish_miss(item, attempts)
-                    self.progress()
+                    if scihub_queue:
+                        self._phase_scihub(scihub_queue)
+                    return
+                still = self._phase_serial(still, name)
+            for item, attempts in still:
+                self._finish_miss(item, attempts)
+                self.progress()
 
     # ---- phase 1: identifier + OA -------------------------------------------
     def _phase_oa(self, item: Item, oa_sources: list[str]) -> list[str] | None:
         attempts: list[str] = []
         self._log_item_label(item)
-        if not item.doi and item.title and item.item_type not in {"webpage", "blogPost", "forumPost"}:
-            self._log_item(item, "[dim]crossref: looking up DOI from title...[/]")
-            match = crossref_lookup(
-                self.client, item.title, item.first_author, item.year, self.cfg.email, self.cfg.crossref_min_score
+        if not item.doi:
+            notes = enrich_identifiers(
+                self.client, item, self.cfg.email, self.cfg.crossref_min_score
             )
-            if match:
-                item.doi, item.doi_source = match.doi, "crossref"
-                attempts.append(f"crossref:matched({match.score:.2f})")
-                self._log_item(item, f"crossref: [green]matched[/] {escape(match.doi)} (score {match.score:.2f})")
-            else:
-                attempts.append("crossref:no-match")
-                self._log_item(item, "crossref: [dim]no match[/]")
+            if notes:
+                self._log_item(item, "[dim]enrich: looking up DOI...[/]")
+                for note in notes:
+                    attempts.append(note)
+                    if ":matched" in note:
+                        self._log_item(item, f"enrich: [green]{escape(note)}[/]")
+                    else:
+                        self._log_item(item, f"enrich: [dim]{escape(note)}[/]")
         lanes = self._lanes_for(item)
         self._log_item_trying_line(item, lanes)
         for name in oa_sources:
@@ -308,13 +309,25 @@ class Pipeline:
     def _try_download(self, item: Item, cand: Candidate, attempts: list[str]) -> bool:
         self._log_item(item, f"[dim]{cand.source}: downloading...[/]")
         dl = None
-        for url in cand.urls[:6]:
-            try:
-                dl = fetch_pdf(self.client, url, referer=cand.referer, min_bytes=self.cfg.min_pdf_bytes)
-                break
-            except DownloadError as exc:
-                attempts.append(f"{cand.source}:download-failed({exc})")
-                self._log_item(item, f"{escape(cand.source)}: [yellow]download failed[/] ({escape(str(exc))})")
+        if cand.content is not None:
+            content = cand.content
+            if not content.lstrip().startswith(b"%PDF") or len(content) < self.cfg.min_pdf_bytes:
+                attempts.append(f"{cand.source}:download-failed(invalid embedded PDF)")
+                self._log_item(item, f"{escape(cand.source)}: [yellow]download failed[/] (invalid embedded PDF)")
+                return False
+            dl = Download(
+                content=content,
+                md5=hashlib.md5(content).hexdigest(),
+                final_url=cand.url or item.url or "",
+            )
+        else:
+            for url in cand.urls[:6]:
+                try:
+                    dl = fetch_pdf(self.client, url, referer=cand.referer, min_bytes=self.cfg.min_pdf_bytes)
+                    break
+                except DownloadError as exc:
+                    attempts.append(f"{cand.source}:download-failed({exc})")
+                    self._log_item(item, f"{escape(cand.source)}: [yellow]download failed[/] ({escape(str(exc))})")
         if dl is None:
             return False
         primary, extras = save_pdf(self.cfg.out_dir, item, dl.content, dl.md5)

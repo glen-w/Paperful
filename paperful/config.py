@@ -25,6 +25,7 @@ DEFAULT_SOURCES = [
     "scholar",
     "direct",
     "ezproxy",
+    "htmlpdf",
 ]
 DEFAULT_MIRRORS = ["sci-hub.ru", "sci-hub.ren", "sci-hub.box", "sci-hub.se", "sci-hub.st"]
 SCIHUB_DISCLAIMER = (

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .base import Candidate, Context, Outcome, Source
-from . import arxiv, biorxiv, direct, europepmc, ezproxy, openalex, scholar, scihub, semanticscholar, unpaywall
+from . import arxiv, biorxiv, direct, europepmc, ezproxy, htmlpdf, openalex, scholar, scihub, semanticscholar, unpaywall
 
 REGISTRY: dict[str, Source] = {
     "unpaywall": unpaywall,
@@ -15,6 +15,7 @@ REGISTRY: dict[str, Source] = {
     "scholar": scholar,
     "direct": direct,
     "ezproxy": ezproxy,
+    "htmlpdf": htmlpdf,
     "scihub": scihub,
 }
 

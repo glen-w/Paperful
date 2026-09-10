@@ -9,13 +9,14 @@ out_dir = "~/Documents/Paperful/out"
 # Where manifest.jsonl and the Zotero local-API key live.
 state_dir = "~/Documents/Paperful/state"
 
-# Source order. Open-access first, campus EZProxy last among defaults.
-# Remove "scholar" / "ezproxy" to disable. Scholar is optional (CAPTCHA-prone).
+# Source order. Open-access first, then EZProxy, then HTML→PDF for web/news.
+# Remove "scholar" / "ezproxy" / "htmlpdf" to disable. Scholar is optional (CAPTCHA-prone).
 # Sci-Hub is off by default (legal grey zone in some jurisdictions). Opt in by
 # appending "scihub" here, or pass --scihub on a run. You are responsible for
 # complying with the laws that apply to you. See README “Sci-Hub”.
-sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "scholar", "direct", "ezproxy"]
-# sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "scholar", "direct", "ezproxy", "scihub"]
+# htmlpdf needs: uv sync --extra htmlpdf && uv run playwright install chromium
+sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "scholar", "direct", "ezproxy", "htmlpdf"]
+# sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "scholar", "direct", "ezproxy", "htmlpdf", "scihub"]
 
 # Campus EZProxy (any institution that offers login?url=). Leave empty to disable.
 # Only used for DOIs and known publisher URLs (ScienceDirect, Springer, JSTOR, …),
@@ -35,18 +36,17 @@ ezproxy_base = "https://scpo.idm.oclc.org/login?url="
 # Ordered Sci-Hub mirrors. Reorder after `paperful mirrors` if one dies.
 scihub_mirrors = ["sci-hub.ru", "sci-hub.ren", "sci-hub.box", "sci-hub.se", "sci-hub.st"]
 
-# Random delay between Sci-Hub requests, seconds [min, max].
+# Random delay between Sci-Hub / EZProxy / htmlpdf requests, seconds [min, max].
 delay_scihub_s = [3.0, 8.0]
 
-# Parallelism for open-access sources; EZProxy and Sci-Hub are always serial.
+# Parallelism for open-access sources; EZProxy, htmlpdf, and Sci-Hub are always serial.
 concurrency_oa = 4
 
 # Reject downloads smaller than this (bytes) - usually an HTML error page.
 min_pdf_bytes = 10000
 
-# Crossref title lookup: accept a DOI only if normalised title similarity >= this.
+# Title→DOI enrichment (Crossref, then OpenAlex, then Semantic Scholar): accept if similarity >= this.
 crossref_min_score = 0.90
-
 # Attach downloaded PDFs into Zotero (needs Zotero 10+ with local API enabled).
 attach = true
 app_name = "paperful"
