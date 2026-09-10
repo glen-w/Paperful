@@ -28,8 +28,9 @@ The canonical list is `_EZPROXY_PUBLISHER_HOSTS` in `paperful/routing.py`.
 `--try-all` does not wrap YouTube or other non-publisher URLs.
 
 The tool never asks for or stores your institutional password. You log in
-once in headed Chromium (`paperful session login ezproxy`); `run` reuses that
-vault and exported cookies until the campus session expires.
+once in a headed browser (`paperful session login ezproxy` prefers system
+Chrome/Edge so campus SSO works); `run` reuses that vault and exported cookies
+until the campus session expires.
 
 ## 1. Find your library’s EZProxy base URL
 
@@ -83,15 +84,15 @@ institutional access is preferred when both could work.
 ## 3. Log in (session vault)
 
 ```sh
-uv sync --extra htmlpdf
-uv run playwright install chromium   # or: playwright install chrome
 uv run paperful session login ezproxy
 ```
 
-`paperful ezproxy` does the same when Playwright is installed. Complete campus
-SSO in the window that opens, then press Enter in the terminal. Cookies are
-written under `state/sessions/` (and compat `state/ezproxy-cookies.txt`).
-Never commit that directory.
+Playwright is already a core dependency (`uv sync`). Chromium downloads on the
+first login if needed. Login prefers your system Chrome/Edge (Google and campus
+SSO often reject a Playwright-launched window). `paperful ezproxy` does the
+same. Complete campus SSO in the window that opens, then press Enter in the
+terminal. Cookies are written under `state/sessions/` (and compat
+`state/ezproxy-cookies.txt`). Never commit that directory.
 
 ## 4. Verify the session
 
@@ -125,10 +126,10 @@ Fix: `paperful session login ezproxy`, then `--retry-failed` if needed.
 
 ## Advanced: Netscape cookies.txt
 
-If you cannot install Playwright, `paperful ezproxy` opens the system browser
-and you can still drop a Netscape `cookies.txt` at `ezproxy_cookies` (Firefox
-**cookies.txt**, Chrome **Get cookies.txt LOCALLY** — local-only exporters).
-`chmod 600`. Never commit or paste the file.
+If headed login is unavailable, `paperful ezproxy` can still use a Netscape
+`cookies.txt` at `ezproxy_cookies` (Firefox **cookies.txt**, Chrome **Get
+cookies.txt LOCALLY** — local-only exporters). `chmod 600`. Never commit or
+paste the file.
 
 ## Alternatives and limits
 

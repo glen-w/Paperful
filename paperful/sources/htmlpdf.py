@@ -1,4 +1,4 @@
-"""Render web/news/blog HTML pages to PDF via Playwright Chromium (optional extra)."""
+"""Render web/news/blog HTML pages to PDF via Playwright Chromium."""
 
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ def find(item: Item, ctx: Context) -> Candidate:
         return Candidate.miss(
             NAME,
             Outcome.SKIPPED,
-            "install paperful[htmlpdf] + playwright install chromium",
+            "install paperful + playwright install chromium",
         )
 
     try:

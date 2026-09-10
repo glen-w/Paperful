@@ -19,13 +19,13 @@ coverage_cmd: uv run pytest --cov=paperful --cov-report=term-missing -q
 docker_build_cmd: docker compose build
 docker_smoke_cmd: docker compose run --rm paperful doctor
 docker_operator_cmd: docker compose run --rm paperful
-preferred_deploy: docker compose (see docs/docker.md); uv for contributors
+preferred_deploy: uv (README); docker compose is an optional pack (docs/docker.md)
 architecture_rules:
   - CLI orchestrates only (no download/resolve logic in cli.py)
   - source adapters under sources/ must not write the manifest or out_dir
   - open-access sources before Sci-Hub; Sci-Hub stays serial
   - default tests stay offline (fixture HTML / mocks — no live Zotero or network)
-  - Docker is preferred operator deploy; durable data via PAPERFUL_DATA (packs/out/state outside git root by default)
+  - uv is the usual operator path; Docker is an optional fetch pack (host Zotero + headed session login stay outside); durable data via PAPERFUL_DATA when using Compose
 release_governance: none
 backup_hub: "$HOME/Documents/code backups"
 backup_excludes:
@@ -46,9 +46,9 @@ verify_paths:
 staging_prefix: paperful-backup
 high_leverage_tests: Sci-Hub HTML parse and captcha/not-found classification; resolve/Crossref title scoring; store/manifest resume semantics; Zotero local API attach stubs (incl. PAPERFUL_ZOTERO_HOST Host header); pipeline source order; routing lanes and circuit breaker; Scholar/EZProxy cookie session probes; grey_playbooks_dir pack merge
 probe_small: uv run pytest tests/test_scihub.py tests/test_resolve.py tests/test_zot_local.py tests/test_playbooks.py -q (offline fixture HTML + Docker-related unit tests)
-probe_large: docker compose run --rm paperful run --collection <user-named small collection> --dry-run (preferred; requires Zotero + compose); fallback uv run paperful run --collection <…> --dry-run; if Zotero unavailable → skipped
-probe_extra: docker compose run --rm paperful doctor (preferred); optionally docker compose run --rm paperful mirrors / collections; fallback uv run paperful mirrors; never touch sibling ports
-doc_contracts: README.md only (light parity pass; do not invent a CONTRACT tree); Docker preferred deploy lives in docs/docker.md
+probe_large: uv run paperful run --collection <user-named small collection> --dry-run (requires Zotero); optional docker compose run --rm paperful run --collection <…> --dry-run; if Zotero unavailable → skipped
+probe_extra: uv run paperful doctor; optionally uv run paperful mirrors / collections; docker compose equivalents are optional; never touch sibling ports
+doc_contracts: README.md only (light parity pass; do not invent a CONTRACT tree); Docker is optional (docs/docker.md), not preferred deploy
 ```
 
 Skipped on instantiate (no surface): `streamlit.md`, `rebuild.md`.

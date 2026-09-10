@@ -27,7 +27,7 @@ def test_htmlpdf_skips_without_playwright(ctx_factory, monkeypatch):
         ctx,
     )
     assert cand.outcome is Outcome.SKIPPED
-    assert "paperful[htmlpdf]" in cand.note
+    assert "playwright install chromium" in cand.note or "paperful" in cand.note
 
 
 def test_htmlpdf_uses_embedded_render(ctx_factory, monkeypatch):

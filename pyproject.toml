@@ -1,20 +1,23 @@
 [project]
 name = "paperful"
-version = "0.2.0"
+version = "0.3.0"
 description = "Fill the gaps in your Zotero library: fetch missing PDFs, save them in a collection-shaped folder tree, attach them back."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "pyzotero>=1.15,<2",  # attach.py subclasses pyzotero._upload.Zupload
+    "pyzotero>=1.15,<2", # attach.py subclasses pyzotero._upload.Zupload
     "httpx>=0.27",
     "beautifulsoup4>=4.12",
     "typer>=0.12",
     "rich>=13",
     "pypdf>=5.0",
     "tomli>=2.0; python_version < '3.11'",
+    "fonttools>=4.0",
+    "playwright>=1.40",  # htmlpdf source + session login (Chromium)
 ]
 
 [project.optional-dependencies]
+# Kept for older install docs (`pip install paperful[htmlpdf]`); Playwright is now core.
 htmlpdf = ["playwright>=1.40"]
 docs = [
     "sphinx>=7.0.0",

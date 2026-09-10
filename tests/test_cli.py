@@ -331,15 +331,58 @@ def test_doctor_ok(cfg_file, stub_zotero):
     assert res.exit_code == 0
     assert "green" in res.stdout and "Zotero :23119" in res.stdout
     assert "pdftotext" in res.stdout
+    assert "Playwright" in res.stdout
     assert "Grey playbooks" in res.stdout
     assert "UNGA/undocs" in res.stdout
 
 
 def test_doctor_scholar_session_amber_without_vault(cfg_file, stub_zotero):
-    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file)])
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--no-guide"])
     assert res.exit_code == 0
     assert "Scholar session" in res.stdout
     assert "paperful session login scholar" in res.stdout
+    assert "\nGuide" not in res.stdout
+    assert "paperful doctor --guide" in res.stdout
+
+
+def test_doctor_guide_greens_scholar_after_host_login(
+    cfg_file, tmp_path, stub_zotero, monkeypatch
+):
+    monkeypatch.setattr("paperful.doctor.shutil.which", lambda name: "/bin/pdftotext")
+    cookie = tmp_path / "state" / "scholar-cookies.txt"
+
+    def after_login(_prompt: str = "") -> str:
+        cookie.parent.mkdir(parents=True, exist_ok=True)
+        cookie.write_text(".google.com\tTRUE\t/\tTRUE\t0\tSID\ttest\n")
+        return ""
+
+    monkeypatch.setattr("builtins.input", after_login)
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--guide"])
+    assert res.exit_code == 0
+    assert "Guide" in res.stdout
+    assert "session login scholar" in res.stdout
+    assert "Scholar session" in res.stdout
+    assert "is green" in res.stdout
+
+
+def test_doctor_guide_docker_hints_host_login(cfg_file, stub_zotero, monkeypatch):
+    monkeypatch.setattr("paperful.doctor.shutil.which", lambda name: "/bin/pdftotext")
+    monkeypatch.setattr("paperful.cli.in_docker", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda _p="": "")
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--guide"])
+    assert res.exit_code == 0
+    assert "on the host (not inside this container)" in res.stdout
+    assert "PAPERFUL_DATA" in res.stdout
+
+
+def test_doctor_auto_guides_in_docker(cfg_file, stub_zotero, monkeypatch):
+    monkeypatch.setattr("paperful.doctor.shutil.which", lambda name: "/bin/pdftotext")
+    monkeypatch.setattr("paperful.cli.in_docker", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda _p="": "")
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file)])
+    assert res.exit_code == 0
+    assert "Guide" in res.stdout
+    assert "session login scholar" in res.stdout
 
 
 def test_doctor_scholar_session_green_with_cookies(cfg_file, tmp_path, stub_zotero):
@@ -354,7 +397,7 @@ def test_doctor_scholar_session_green_with_cookies(cfg_file, tmp_path, stub_zote
 
 def test_doctor_pdftotext_amber(cfg_file, stub_zotero, monkeypatch):
     monkeypatch.setattr("paperful.doctor.shutil.which", lambda name: None)
-    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file)])
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--no-guide"])
     assert res.exit_code == 0
     assert "pdftotext" in res.stdout
     assert "amber" in res.stdout
@@ -366,13 +409,13 @@ def test_doctor_zotero_red(cfg_file, monkeypatch):
             raise ConnectionError("Zotero local API is disabled.")
 
     monkeypatch.setattr(cli, "ZoteroLocal", lambda *a, **k: Down())
-    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file)])
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--no-guide"])
     assert res.exit_code == 2 and "red" in res.stdout
 
 
 def test_doctor_shows_paperful_zotero_host(cfg_file, stub_zotero, monkeypatch):
     monkeypatch.setenv("PAPERFUL_ZOTERO_HOST", "host.docker.internal")
-    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file)])
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--no-guide"])
     assert res.exit_code == 0
     assert "host.docker.internal:23119" in res.stdout
 

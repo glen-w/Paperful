@@ -84,11 +84,12 @@ When Zotero cloud storage is full, attachments may fail with quota errors; PDFs 
 ## Operator tooling
 
 - `paperful doctor` — preflight. Colours: **green** = ready; **amber** = usable with
-  a degraded path (empty email, missing session, no `pdftotext`, Zotero 7–9
-  write API, incomplete grey-lit pack); **red** on `Zotero :23119` / `out_dir` /
-  `state_dir` is fatal (`doctor` and any command that needs Zotero). Reports
-  grey-lit packs (UNGA/undocs · BBNJ/DOALOS · ISA) when builtin is on. See
-  [commands](commands.md#doctor).
+  a degraded path (empty email, missing session, no `pdftotext`, Playwright /
+  Chromium not ready, Zotero 7–9 write API, incomplete grey-lit pack); **red** on
+  `Zotero :23119` / `out_dir` / `state_dir` is fatal (`doctor` and any command that
+  needs Zotero). Reports grey-lit packs (UNGA/undocs · BBNJ/DOALOS · ISA) when
+  builtin is on. On a TTY, walks amber/red remediations (`--guide` / `--no-guide`).
+  See [commands](commands.md#doctor).
 - `paperful run --dry-run` — no downloads. Per item: **Would-hit** is the
   routed source list in order (full `sources` when `--try-all`).
 - `paperful lint` / `paperful fix-metadata` — identifier hygiene; apply is explicit.
@@ -165,3 +166,4 @@ stop at `no_identifier`.
 - [commands.md](commands.md) — CLI and disk artifacts
 - [config.md](config.md) — `config.toml` keys and grey playbooks
 - [ezproxy.md](ezproxy.md) / [sessions.md](sessions.md) — campus proxy and browser vault
+- [docker.md](docker.md) — optional image (host Zotero + headed login stay outside)

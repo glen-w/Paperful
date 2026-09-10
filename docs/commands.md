@@ -1,6 +1,14 @@
 # Commands
 
+Snippets use `uv run`. Same commands work as
+`docker compose run --rm paperful …` with the [optional Docker image](docker.md).
+Headed `session login` is host-only either way.
+
 ```sh
+# environment check (TTY guide for amber/red)
+uv run paperful doctor
+uv run paperful collections
+
 # fetch to disk only
 uv run paperful run --collection interesting --no-attach
 
@@ -37,8 +45,8 @@ uv run paperful run --library --limit 50
 uv run paperful run --library --scihub
 
 # session (optional)
-uv run paperful session login ezproxy   # headed Chromium, campus SSO
-uv run paperful session login scholar    # same profile; solve Scholar CAPTCHA here
+uv run paperful session login ezproxy   # system Chrome/Edge when present; campus SSO
+uv run paperful session login scholar    # same; --engine playwright to force Playwright
 uv run paperful session status
 uv run paperful ezproxy --no-open       # probe the EZProxy session
 uv run paperful scholar --no-open       # probe Scholar
@@ -54,14 +62,14 @@ uv run paperful fix-metadata --library --apply --overwrite   # also replace titl
 
 | Command | Purpose |
 | --- | --- |
-| `doctor` | Environment check (Zotero, paths, email, sessions, pdftotext, grey-lit packs). Green / amber / red. |
+| `doctor` | Environment check (Zotero, paths, email, sessions, pdftotext, Playwright, grey-lit packs). Green / amber / red. TTY guide for remediations (`--guide` / `--no-guide`). |
 | `run` | Find and download missing PDFs (`--dry-run`, `--preset eoi`, `--upgrade-linked`, `--try-all`, `--retry-failed`, `--sources`, `--scihub`, `--limit`). Never rewrites bibliographic fields. |
 | `lint` | Read-only identifier / PDF-DOI findings (`--json`, `--strict`, `--limit`). Codes: `missing_doi`, `suspect_doi`, `swappable_doi`, `pmid_no_doi`, `pdf_doi_mismatch`, `no_identifier` |
 | `fix-metadata` | Propose patches on disk; `--apply` writes them to the library (`--overwrite` for title/date/venue). Whitelist: `doi`, `title`, `date`, `publicationTitle` |
 | `collections` | Collection tree with “No PDF” counts |
 | `report` | Manifest summary + latest run report (`--last-run`, `--json`, `--not-found`, `--status`) |
 | `attach` | Attach already-downloaded PDFs into Zotero |
-| `session` | Local Chromium vault: `login scholar|ezproxy`, `status`, `export` |
+| `session` | Local browser vault: `login scholar|ezproxy` (`--engine auto|chrome|playwright`), `status`, `export` |
 | `ezproxy` | Wrapper: headed login (or Netscape fallback) / `--no-open` probe |
 | `scholar` | Wrapper: headed login (or Netscape fallback) / `--no-open` probe |
 | `mirrors` | Ping configured Sci-Hub mirrors |
@@ -78,10 +86,16 @@ collections are written once and hard-linked into the other folders.
 | Colour | Meaning |
 | --- | --- |
 | **green** | Ready |
-| **amber** | Degraded but you can continue (empty `email`, missing EZProxy/Scholar session, no `pdftotext`, Zotero without write API) |
+| **amber** | Degraded but you can continue (empty `email`, missing EZProxy/Scholar session, no `pdftotext`, Playwright/Chromium not ready, Zotero without write API) |
 | **red** | Fatal if the check is `Zotero :23119`, `out_dir`, or `state_dir` |
 
-Unpaywall needs a real `email`. Missing sessions: `paperful session login ezproxy` or `scholar`. Missing `pdftotext`: Poppler; `pypdf` is the fallback.
+Unpaywall needs a real `email`. Missing sessions: `paperful session login ezproxy` or `scholar` (system Chrome/Edge when present). Missing `pdftotext`: Poppler; `pypdf` is the fallback. Playwright is core; Chromium installs on first `session login`.
+
+On a TTY (Compose sets `stdin_open` / `tty` for the optional image), amber/red
+checks open an interactive **Guide**: each step prints what to do, waits for
+Enter, then re-runs that check. Session logins still need a headed browser on
+the host when you run inside Docker. Force or skip with `--guide` / `--no-guide`.
+Inside Docker, `docker compose run --rm paperful` with no extra args is `doctor`.
 
 ## Dry-run
 

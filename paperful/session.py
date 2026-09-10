@@ -1,18 +1,26 @@
 """Local browser session vault: one Chromium profile for Scholar, EZProxy, publishers.
 
-Requires `paperful[htmlpdf]` (Playwright). Cookies may be exported to Netscape files
-for httpx; Scholar and htmlpdf prefer this persistent profile when it exists.
-Never stores passwords.
+Uses Playwright (core dependency). Headed `session login` prefers the system
+Chrome/Edge binary (no automation flags) so Google SSO works, then attaches
+over CDP to export cookies into the vault. Chromium browsers for the Playwright
+fallback install on first need. Never stores passwords.
 """
 
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import socket
+import subprocess
+import sys
 import threading
 import time
+import urllib.error
+import urllib.request
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from .config import Config
 from .cookies import split_playwright_cookies, write_netscape
@@ -23,6 +31,28 @@ SCHOLAR_URL = "https://scholar.google.com/"
 _META_NAME = "meta.json"
 _CHROMIUM = "chromium"
 _COOKIES_NAME = "cookies.txt"
+LoginEngine = Literal["auto", "chrome", "playwright"]
+
+_SYSTEM_CHROME_CANDIDATES = (
+    Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+    Path("/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary"),
+    Path("/Applications/Chromium.app/Contents/MacOS/Chromium"),
+    Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
+    Path("/usr/bin/google-chrome"),
+    Path("/usr/bin/google-chrome-stable"),
+    Path("/usr/bin/chromium"),
+    Path("/usr/bin/chromium-browser"),
+    Path("/usr/bin/microsoft-edge"),
+    Path("/usr/bin/microsoft-edge-stable"),
+)
+_SYSTEM_CHROME_WHICH = (
+    "google-chrome",
+    "google-chrome-stable",
+    "chromium",
+    "chromium-browser",
+    "msedge",
+    "microsoft-edge",
+)
 
 
 class SessionError(Exception):
@@ -36,6 +66,114 @@ def playwright_available() -> bool:
         return True
     except ImportError:
         return False
+
+
+def chromium_installed() -> bool:
+    """True when Playwright's Chromium binary is on disk."""
+    if not playwright_available():
+        return False
+    try:
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as p:
+            return Path(p.chromium.executable_path).is_file()
+    except Exception:
+        return False
+
+
+def ensure_playwright(*, auto_install: bool = True) -> str | None:
+    """Ensure the Playwright package and Chromium browser are ready.
+
+    Returns a short note if Chromium was just installed; raises SessionError
+    when the package is missing or install fails.
+    """
+    if not playwright_available():
+        raise SessionError(
+            "Playwright is missing — run: uv sync (or: pip install 'paperful[htmlpdf]')"
+        )
+    if chromium_installed():
+        return None
+    if not auto_install:
+        raise SessionError(
+            "Chromium not installed — run: uv run playwright install chromium"
+        )
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "playwright", "install", "chromium"],
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise SessionError(
+            f"failed to install Chromium ({exc}). "
+            "Run: uv run playwright install chromium"
+        ) from exc
+    if not chromium_installed():
+        raise SessionError(
+            "Chromium still missing after install — run: "
+            "uv run playwright install chromium"
+        )
+    return "Installed Playwright Chromium for this environment."
+
+
+def find_system_chrome() -> Path | None:
+    """Path to a real Chrome/Chromium/Edge binary, if installed."""
+    for path in _SYSTEM_CHROME_CANDIDATES:
+        if path.is_file() and os.access(path, os.X_OK):
+            return path
+    for name in _SYSTEM_CHROME_WHICH:
+        found = shutil.which(name)
+        if found:
+            return Path(found)
+    local = os.environ.get("LOCALAPPDATA", "")
+    program = os.environ.get("PROGRAMFILES", r"C:\Program Files")
+    program86 = os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")
+    for base in (local, program, program86):
+        if not base:
+            continue
+        for rel in (
+            r"Google\Chrome\Application\chrome.exe",
+            r"Chromium\Application\chrome.exe",
+            r"Microsoft\Edge\Application\msedge.exe",
+        ):
+            path = Path(base) / rel
+            if path.is_file():
+                return path
+    return None
+
+
+def _free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def _wait_cdp(port: int, *, timeout_s: float = 45.0) -> None:
+    url = f"http://127.0.0.1:{port}/json/version"
+    deadline = time.time() + timeout_s
+    last_err: Exception | None = None
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=1.0) as resp:
+                if getattr(resp, "status", 200) == 200:
+                    return
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            last_err = exc
+            time.sleep(0.2)
+    raise SessionError(
+        f"Chrome did not open a debug port on 127.0.0.1:{port}"
+        + (f" ({last_err})" if last_err else "")
+    )
+
+
+def _prepare_profile_dir(cfg: Config) -> Path:
+    ensure_sessions_dir(cfg)
+    user_dir = chromium_dir(cfg)
+    user_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        user_dir.chmod(0o700)
+    except OSError:
+        pass
+    return user_dir
 
 
 def sessions_dir(cfg: Config) -> Path:
@@ -123,6 +261,8 @@ def _launch_persistent(p: Any, user_data_dir: Path, *, headed: bool, user_agent:
         "viewport": {"width": 1280, "height": 800},
         "user_agent": user_agent,
         "accept_downloads": True,
+        # Reduce automation fingerprints when Playwright must launch the browser.
+        "ignore_default_args": ["--enable-automation"],
     }
     try:
         return p.chromium.launch_persistent_context(channel="chrome", **common)
@@ -149,30 +289,94 @@ def export_cookies(cfg: Config, cookies: list[dict[str, Any]]) -> list[Path]:
     return written
 
 
-def login_headed(
+def _login_via_system_chrome(
+    cfg: Config,
+    slot: str,
+    *,
+    chrome: Path,
+    confirm: Callable[[], None],
+    on_note: Callable[[str], None] | None = None,
+) -> list[Path]:
+    """Start system Chrome without Playwright automation flags; export via CDP."""
+    note = ensure_playwright(auto_install=True)
+    if note and on_note:
+        on_note(note)
+    url = login_url_for(cfg, slot)
+    user_dir = _prepare_profile_dir(cfg)
+    port = _free_port()
+    cmd = [
+        str(chrome),
+        f"--user-data-dir={user_dir}",
+        f"--remote-debugging-port={port}",
+        "--remote-allow-origins=*",
+        "--no-first-run",
+        "--no-default-browser-check",
+        url,
+    ]
+    if on_note:
+        on_note(
+            f"Opening system browser ({chrome.name}) — Google blocks "
+            "Playwright-launched Chrome; this window is your normal browser."
+        )
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    cookies: list[dict[str, Any]] = []
+    try:
+        _wait_cdp(port)
+        confirm()
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as p:
+            browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
+            context = browser.contexts[0] if browser.contexts else None
+            if context is None:
+                raise SessionError(
+                    "Chrome opened but has no browser context yet — "
+                    "complete login, leave a tab open, then press Enter again."
+                )
+            cookies = list(context.cookies())
+            # Close via CDP only (do not also terminate the process — that race
+            # prints TargetClosedError / "Task was destroyed" after success).
+            browser.close()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=5)
+    finally:
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+    written = export_cookies(cfg, cookies)
+    mark_slot(cfg, slot)
+    return written
+
+
+def _login_via_playwright(
     cfg: Config,
     slot: str,
     *,
     confirm: Callable[[], None],
+    on_note: Callable[[str], None] | None = None,
 ) -> list[Path]:
-    """Open headed Chromium on the persistent profile; dump cookies after confirm()."""
-    if slot not in SLOTS:
-        raise SessionError(f"unknown session slot {slot!r}")
-    if not playwright_available():
-        raise SessionError(
-            "install paperful[htmlpdf] + playwright install chromium "
-            "(or: playwright install chrome)"
+    note = ensure_playwright(auto_install=True)
+    if note and on_note:
+        on_note(note)
+    if on_note:
+        on_note(
+            "Using Playwright-launched Chromium — Google SSO often fails here; "
+            "prefer system Chrome (default) or install Google Chrome."
         )
     url = login_url_for(cfg, slot)
     from playwright.sync_api import sync_playwright
 
-    ensure_sessions_dir(cfg)
-    user_dir = chromium_dir(cfg)
-    user_dir.mkdir(parents=True, exist_ok=True)
-    try:
-        user_dir.chmod(0o700)
-    except OSError:
-        pass
+    user_dir = _prepare_profile_dir(cfg)
     cookies: list[dict[str, Any]] = []
     with sync_playwright() as p:
         context = _launch_persistent(
@@ -190,12 +394,38 @@ def login_headed(
     return written
 
 
+def login_headed(
+    cfg: Config,
+    slot: str,
+    *,
+    confirm: Callable[[], None],
+    on_note: Callable[[str], None] | None = None,
+    engine: LoginEngine = "auto",
+) -> list[Path]:
+    """Open a headed browser on the vault profile; dump cookies after confirm()."""
+    if slot not in SLOTS:
+        raise SessionError(f"unknown session slot {slot!r}")
+    key = engine if engine in ("auto", "chrome", "playwright") else "auto"
+    chrome = find_system_chrome()
+    if key == "playwright":
+        return _login_via_playwright(cfg, slot, confirm=confirm, on_note=on_note)
+    if key == "chrome" and chrome is None:
+        raise SessionError(
+            "No system Chrome/Edge found. Install Google Chrome, or use "
+            "--engine playwright (Google SSO may fail)."
+        )
+    if chrome is not None and key in ("auto", "chrome"):
+        return _login_via_system_chrome(
+            cfg, slot, chrome=chrome, confirm=confirm, on_note=on_note
+        )
+    return _login_via_playwright(cfg, slot, confirm=confirm, on_note=on_note)
+
+
 def dump_profile_cookies(cfg: Config) -> list[Path]:
     """Headless open of the persistent profile to refresh Netscape exports."""
-    if not playwright_available():
-        raise SessionError("install paperful[htmlpdf] + playwright install chromium")
     if not chromium_dir(cfg).is_dir():
         raise SessionError(f"no Chromium profile yet ({chromium_dir(cfg)})")
+    ensure_playwright(auto_install=True)
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:

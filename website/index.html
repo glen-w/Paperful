@@ -93,8 +93,8 @@
             <div class="feature">
               <h3>Campus when you have it</h3>
               <p>
-                Log in once with headed Chromium. EZProxy uses your library
-                entitlement. Passwords never live in TOML.
+                Log in once in your system Chrome or Edge. EZProxy uses your
+                library entitlement. Passwords never live in TOML.
               </p>
             </div>
             <div class="feature">
@@ -187,6 +187,12 @@ cp config.example.toml config.toml
 uv run paperful doctor
 uv run paperful run --collection interesting --dry-run</code></pre>
           <p class="fine">
+            Optional Docker image (Python + Poppler + Chromium) if you do not
+            want those on the host —
+            <a href="./guide/docker.html">Docker</a>.
+            Zotero and headed logins still run on this machine.
+          </p>
+          <p class="fine">
             Details:
             <a href="./guide/">Documentation</a>
             ·
@@ -202,7 +208,7 @@ uv run paperful run --collection interesting --dry-run</code></pre>
 
     <footer class="site-footer">
       <div class="wrap footer-inner">
-        <p>© paperful contributors. Local-first software. Version 0.2.0 (0.x — flags may still move).</p>
+        <p>© paperful contributors. Local-first software. Version 0.3.0 (0.x — flags may still move).</p>
         <p>
           <a href="https://github.com/glen-w/Paperful">GitHub</a>
           ·

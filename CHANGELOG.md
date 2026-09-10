@@ -4,6 +4,17 @@ All notable user-facing changes. Paperful is **0.x**: flags and report fields
 may still move. **1.0** will lock `paperful.run_report.v1` and attach behaviour
 (see [releases](docs/releases.md)).
 
+## 0.3.0 — 2026-09-10
+
+Usual path is `uv`. Docker Compose is an optional one-shot image (Python +
+Poppler + Chromium); Zotero and headed `session login` stay on the host. Bare
+`docker compose run --rm paperful` is `doctor`.
+
+`paperful doctor` walks amber/red remediations on a TTY (`--guide` /
+`--no-guide`). Playwright is a core dependency; Chromium installs on first
+`session login`. Login prefers system Chrome/Edge (CDP) so Google SSO works;
+`--engine playwright` is the fallback.
+
 ## 0.2.0 — 2026-09-10
 
 Docker Compose is the preferred operator deploy: one-shot CLI image talks to

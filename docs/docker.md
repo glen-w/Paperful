@@ -1,13 +1,28 @@
-# Docker (preferred deploy)
+# Docker (optional)
 
-Docker Compose is the **preferred** way to run paperful as an operator.
-Developers still use [`uv`](https://docs.astral.sh/uv/) locally (see
-[CONTRIBUTING](https://github.com/glen-w/Paperful/blob/main/CONTRIBUTING.md)).
+paperful is a **local CLI**. Zotero and headed browser login live on the host.
+Docker does not replace them.
 
-The image is a one-shot CLI (not a daemon). Zotero stays on the host; paperful
-in the container talks to it over the local API (`:23119`). Durable data —
-config, custom playbook packs, `out/`, and `state/` — lives **outside** the
-git root by default.
+The Compose image is a **one-shot pack** — Python 3.12, paperful, Poppler
+(`pdftotext`), Playwright Chromium — for unattended commands (`run`, `lint`,
+`report`, `attach` once a write key exists). It is not a daemon and not a
+complete environment. Developers and most operators should use
+[`uv`](https://docs.astral.sh/uv/) (see the [README](https://github.com/glen-w/Paperful#readme)).
+
+Use the image when you want a sealed fetch runtime and do not want to install
+Poppler or Playwright on the host. Durable data — config, custom playbook
+packs, `out/`, and `state/` — still lives **outside** the container (and, by
+default, outside the git root).
+
+## What still runs on the host
+
+- Zotero (GUI, local API, “Always allow”)
+- `paperful session login …` (headed Chrome/Edge on the host: campus SSO, Scholar CAPTCHA)
+- Any scripts that read `out/` / `state/` as files
+
+The container talks to host Zotero over the local API (`:23119`). Session
+vaults and the write key must be the **same** `state/` tree the container
+mounts (`PAPERFUL_DATA`).
 
 ## Prerequisites
 
@@ -16,8 +31,10 @@ git root by default.
   (Settings → Advanced → *Allow other applications on this computer to communicate with Zotero*)
 - For attach / `fix-metadata --apply`: complete the Zotero “Always allow”
   dialog once on the host (key is stored under `state/`)
-- For Scholar / EZProxy sessions: run `paperful session login …` on the host
-  (headed browser), then reuse the mounted `state/sessions/` from the container
+- For Scholar / EZProxy sessions: a host `uv` install so you can run
+  `paperful session login …`, then reuse the mounted `state/sessions/`
+  from the container. Interactive `doctor` (default on a TTY) walks you
+  through this and re-checks.
 
 ## Quick start
 
@@ -37,7 +54,8 @@ docker compose run --rm paperful doctor
 docker compose run --rm paperful run --collection interesting --dry-run
 ```
 
-**Or migrate into a sibling data directory** (recommended long-term):
+**Or migrate into a sibling data directory** (recommended if you use Compose
+long-term):
 
 ```sh
 cp .env.example .env   # PAPERFUL_DATA=../paperful-data
@@ -86,10 +104,26 @@ grey_playbooks_dir = "packs"
 Merge order: builtin pack → `packs/*.toml` → inline `[[grey_playbooks]]`
 (same `name` wins later). See [Configuration](config.md).
 
+## After doctor is green
+
+Keep Zotero running. Bare `docker compose run --rm paperful` is `doctor`
+(image `CMD`). To fetch:
+
+```sh
+docker compose run --rm paperful collections
+docker compose run --rm paperful run --collection interesting --dry-run
+docker compose run --rm paperful run --collection interesting
+docker compose run --rm paperful report
+```
+
+`--no-attach` writes to `out/` only. `--library` walks the whole library
+(resumable; Ctrl-C then rerun). Same flags as [Commands](commands.md).
+
 ## Common commands
 
 ```sh
-docker compose run --rm paperful doctor
+docker compose run --rm paperful            # doctor (default)
+docker compose run --rm paperful doctor --no-guide
 docker compose run --rm paperful collections
 docker compose run --rm paperful run --collection interesting --dry-run
 docker compose run --rm paperful run --collection interesting
@@ -99,10 +133,12 @@ make docker-doctor
 ```
 
 Pass any CLI flag after the service name; the image `ENTRYPOINT` is `paperful`.
+The same commands as [uv snippets](commands.md) — `docker compose run --rm paperful`
+instead of `uv run paperful`. Headed `session login` is still host-only.
 
 ## Image contents
 
-- Python 3.12, paperful + `htmlpdf` (Playwright Chromium)
+- Python 3.12, paperful + Playwright Chromium (htmlpdf / session vault reuse)
 - Poppler (`pdftotext`)
 - Non-root user `paperful` (uid 1000)
 
@@ -114,15 +150,21 @@ If bind-mounted `out/` / `state/` are not writable, fix ownership on the host
 Headed Chromium login and Zotero’s authorize dialog need the host GUI. Typical
 flow:
 
-1. On the host (uv or a previous install): `paperful session login ezproxy`
-   and/or `scholar`; approve attach once so `state/zotero-local-api-key.json`
-   exists.
+1. `docker compose run --rm paperful doctor` — on a TTY, amber session checks
+   open a guide: run `paperful session login ezproxy` / `scholar` **on the host**
+   (same `PAPERFUL_DATA` / `state/` the container mounts), press Enter in the
+   container to re-check. Or skip with `--no-guide`.
+2. Approve attach once on the host so `state/zotero-local-api-key.json` exists.
+3. Run fetch/attach from the container as above.
+
+Without the guide:
+
+1. On the host (`uv`): `paperful session login ezproxy` and/or `scholar`;
+   approve attach once so `state/zotero-local-api-key.json` exists.
 2. Ensure that `state/` is the same tree the container mounts.
-3. Run fetch/attach from Docker as above.
+3. Run fetch/attach from the container as above.
 
-## Develop with uv
-
-For hacking on the package itself:
+## Usual path (`uv`)
 
 ```sh
 uv sync --group dev

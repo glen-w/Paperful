@@ -7,8 +7,10 @@ Work happens **on disk** (`out/`, `state/`). Zotero is a library adapter. Open
 access first; campus EZProxy when you have a subscription; **Sci-Hub is opt-in
 and off by default**.
 
-**Preferred deploy:** [Docker Compose](docker.md). Use `uv` when developing
-the package itself.
+Run it with [`uv`](https://docs.astral.sh/uv/) (see the GitHub
+[README](https://github.com/glen-w/Paperful#readme)). [Docker](docker.md) is
+an optional image that packs Python, Poppler, and Chromium; Zotero and
+headed session login still run on the host.
 
 The GitHub [README](https://github.com/glen-w/Paperful#readme) is the same
 first-run story. **0.x** flags may still move; see [releases](releases.md).
@@ -17,7 +19,6 @@ first-run story. **0.x** flags may still move; see [releases](releases.md).
 :maxdepth: 2
 :caption: Start here
 
-docker
 commands
 config
 architecture
@@ -32,6 +33,7 @@ sources
 ezproxy
 sessions
 scihub
+docker
 ```
 
 ```{toctree}

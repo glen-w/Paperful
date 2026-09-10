@@ -2,8 +2,9 @@
 
 ## Setup
 
-Operators: prefer [Docker Compose](docs/docker.md). Contributors hacking on
-the package use `uv`:
+Operators and contributors use `uv`. [Docker](docs/docker.md) is an optional
+fetch pack (Python + Poppler + Chromium); Zotero and headed session login
+still run on the host.
 
 ```sh
 git clone https://github.com/glen-w/Paperful.git

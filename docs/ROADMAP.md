@@ -5,8 +5,8 @@ Guidance for contributors, not a commitment calendar. Paperful stays a
 disk, write back through a library adapter. See [architecture.md](architecture.md).
 
 Surfaces like a Zotero plugin, Firefox extension, or web GUI are **not** the
-product direction. Optional thin bridges (`paperful session login`) capture a
-local Chromium profile; they do not rewrite the fetcher.
+product direction. Optional thin bridges (`paperful session login`) capture a local browser
+profile; they do not rewrite the fetcher.
 
 Ambition beyond core is framed as a **local research library workbench** —
 one catalogue, one disk ledger, one write-back bus — grown as optional modules

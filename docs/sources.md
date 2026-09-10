@@ -15,7 +15,7 @@ lists that lane, not the full `sources` list.
 | `scholar` | DOI, or title at least 20 characters |
 | `direct` | HTTP(S) URL that is not a resolver/aggregator/video host after playbook rewrite/synthesize, **or** Extra/title match from a `synthesize` playbook (e.g. UN symbol → undocs) |
 | `ezproxy` | `ezproxy_base` plus a session (vault or cookie file), **and** a DOI or a URL on a [known publisher host](ezproxy.md#what-ezproxy-will-try) |
-| `htmlpdf` | `webpage` / `blogPost` / `newspaperArticle` / `magazineArticle` / `forumPost` (or DOI-less `document` / `report`) with an HTTP(S) URL; needs optional Playwright — see [HTML→PDF](#htmlpdf-web-news-blogs) |
+| `htmlpdf` | `webpage` / `blogPost` / `newspaperArticle` / `magazineArticle` / `forumPost` (or DOI-less `document` / `report`) with an HTTP(S) URL; needs Playwright Chromium — see [HTML→PDF](#htmlpdf-web-news-blogs) |
 
 Before sources run, **identifier preparation** verifies an existing library DOI
 against Crossref/OpenAlex (title similarity ≥ `crossref_min_score` → `ok`).
@@ -44,17 +44,15 @@ does not disable the breaker.
 
 Items typed as `webpage`, `blogPost`, `newspaperArticle`, `magazineArticle`, or
 `forumPost` (and DOI-less `document` / `report` items with a URL) rarely have a
-native PDF. After `direct` fails to find a PDF link on the page, the optional
-`htmlpdf` source prints the page with Chromium. If you have run
-`paperful session login`, it reuses that profile (so a campus login can apply);
-otherwise it launches a fresh headless browser.
+native PDF. After `direct` fails to find a PDF link on the page, the `htmlpdf`
+source prints the page with Chromium. If you have run `paperful session login`,
+it reuses that profile (so a campus login can apply); otherwise it launches a
+fresh headless browser. Playwright is a core dependency; Chromium installs on
+the first `session login` (or: `uv run playwright install chromium`).
 
 ```sh
-uv sync --extra htmlpdf
-uv run playwright install chromium   # or: playwright install chrome
 # ensure "htmlpdf" is in config sources (it is in the default list)
 uv run paperful run --collection interesting --retry-failed
 ```
 
-Without the extra, `htmlpdf` is skipped with a note to install
-`paperful[htmlpdf]`. Soft paywall pages are treated as not found.
+Soft paywall pages are treated as not found.

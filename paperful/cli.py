@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import time
 from pathlib import Path
 
@@ -22,7 +23,14 @@ from rich.table import Table
 from . import __version__
 from .attach import Attacher
 from .config import SCIHUB_DISCLAIMER, SOURCE_PRESETS, Config, load_config
-from .doctor import has_red, run_checks
+from .doctor import (
+    Check,
+    actionable_checks,
+    has_red,
+    in_docker,
+    remediation_text,
+    run_checks,
+)
 from .library import LibraryError, get_backend
 from .pipeline import Pipeline, RunStats, make_client
 from .routing import sources_for_item
@@ -174,17 +182,14 @@ def version() -> None:
     console.print(__version__)
 
 
-@app.command()
-def doctor(config: Path | None = ConfigOpt) -> None:
-    """Check Zotero, paths, email, and optional browser sessions (green / amber / red)."""
-    cfg = _cfg(config)
-    zl: ZoteroLocal | None = None
+def _collect_doctor_checks(cfg: Config) -> list[Check]:
     try:
-        zl = ZoteroLocal()
-        checks = run_checks(cfg, zl)
+        return run_checks(cfg, ZoteroLocal())
     except Exception:
-        checks = run_checks(cfg, None)
+        return run_checks(cfg, None)
 
+
+def _print_doctor_table(checks: list[Check]) -> None:
     table = Table(title="paperful doctor")
     table.add_column("Check")
     table.add_column("Status")
@@ -193,6 +198,96 @@ def doctor(config: Path | None = ConfigOpt) -> None:
     for ch in checks:
         table.add_row(ch.name, f"[{colour[ch.status]}]{ch.status}[/]", ch.detail)
     console.print(table)
+
+
+def _wait_doctor_continue() -> bool:
+    """Wait for Enter. Return False if the user stops (EOF / interrupt)."""
+    console.print("[dim]Press Enter when done (Ctrl-C to stop guide)…[/]")
+    try:
+        input()
+        return True
+    except EOFError:
+        return False
+    except KeyboardInterrupt:
+        console.print("\n[dim]Guide stopped.[/]")
+        return False
+
+
+def _guide_doctor(cfg: Config, checks: list[Check]) -> list[Check]:
+    """Walk amber/red remediations interactively; re-check after each step."""
+    docker = in_docker()
+    pending = actionable_checks(checks, cfg, docker=docker)
+    if not pending:
+        return checks
+
+    console.print(
+        "\n[bold]Guide[/] — fix the checks below one at a time. "
+        "Sessions need a headed browser"
+        + (" on the host" if docker else "")
+        + "; this process only re-checks.\n"
+    )
+    for check, _text in pending:
+        name = check.name
+        checks = _collect_doctor_checks(cfg)
+        current = next((c for c in checks if c.name == name), None)
+        if current is None or current.status == "green":
+            if current is not None:
+                console.print(f"[green]✓ {name}[/] already green — skipping.")
+            continue
+        text = remediation_text(current, cfg, docker=docker)
+        if not text:
+            continue
+        colour = "red" if current.status == "red" else "yellow"
+        console.print(f"\n[{colour}]• {current.name}[/] ({current.status})")
+        console.print(f"[dim]{current.detail}[/]")
+        console.print(text)
+        if not _wait_doctor_continue():
+            break
+        # Reload config so email / path edits are picked up mid-guide.
+        cfg = _cfg(cfg.config_path)
+        checks = _collect_doctor_checks(cfg)
+        updated = next((c for c in checks if c.name == name), None)
+        if updated is None:
+            continue
+        if updated.status == "green":
+            console.print(f"[green]✓ {name} is green[/]")
+        else:
+            console.print(f"[yellow]Still {updated.status}:[/] {updated.detail}")
+
+    console.print()
+    _print_doctor_table(checks)
+    return checks
+
+
+@app.command()
+def doctor(
+    config: Path | None = ConfigOpt,
+    guide: bool | None = typer.Option(
+        None,
+        "--guide/--no-guide",
+        help="Walk through amber/red fixes interactively (default: on when stdin is a TTY)",
+    ),
+) -> None:
+    """Check Zotero, paths, email, and optional browser sessions (green / amber / red)."""
+    cfg = _cfg(config)
+    checks = _collect_doctor_checks(cfg)
+    _print_doctor_table(checks)
+
+    actionable = actionable_checks(checks, cfg)
+    if guide is None:
+        # Compose/Docker often reports isatty() False even with a real terminal.
+        want_guide = sys.stdin.isatty() or in_docker()
+    else:
+        want_guide = guide
+    if want_guide and actionable:
+        checks = _guide_doctor(cfg, checks)
+    elif actionable and not want_guide:
+        console.print(
+            "\n[dim]Amber/red fixes available — re-run with[/] "
+            "[bold]paperful doctor --guide[/]"
+            + (" [dim](or omit --no-guide / -T)[/]" if in_docker() else "")
+        )
+
     if has_red(checks):
         _print_exit_ladder()
         raise typer.Exit(2)
@@ -823,14 +918,23 @@ def _probe_slot(cfg: Config, slot: str) -> None:
 def session_login(
     slot: str = typer.Argument(..., help="scholar or ezproxy"),
     config: Path | None = ConfigOpt,
+    engine: str = typer.Option(
+        "auto",
+        "--engine",
+        help="Browser for headed login: auto (system Chrome if present), chrome, playwright",
+    ),
 ) -> None:
-    """Open headed Chromium on the local vault; log in once, reuse on run."""
+    """Open a headed browser on the local vault; log in once, reuse on run."""
     from . import session as sess
 
     cfg = _cfg(config)
     key = slot.strip().lower()
     if key not in sess.SLOTS:
         console.print(f"[red]Unknown slot {slot!r}.[/] Use scholar or ezproxy.")
+        raise typer.Exit(1)
+    eng = engine.strip().lower()
+    if eng not in ("auto", "chrome", "playwright"):
+        console.print("[red]--engine must be auto, chrome, or playwright.[/]")
         raise typer.Exit(1)
     console.print(f"Vault: {sess.sessions_dir(cfg)}")
     try:
@@ -840,7 +944,13 @@ def session_login(
         raise typer.Exit(1)
     console.print(f"Opening: {url}")
     try:
-        written = sess.login_headed(cfg, key, confirm=_confirm_session_login)
+        written = sess.login_headed(
+            cfg,
+            key,
+            confirm=_confirm_session_login,
+            on_note=lambda msg: console.print(f"[dim]{msg}[/]"),
+            engine=eng,  # type: ignore[arg-type]
+        )
     except sess.SessionError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(2)

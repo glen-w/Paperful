@@ -10,7 +10,7 @@ email = "you@example.org"
 manager = "zotero"
 
 # Where PDFs land. Sub-folders mirror the Zotero collection path.
-# Prefer relative paths (Docker mounts this config's folder as /data).
+# Prefer relative paths (resolved against this config's folder; Compose mounts that folder at /data).
 out_dir = "out"
 
 # Where manifest.jsonl, metadata-patches.jsonl, pdf-cache/, last-run.json,
@@ -22,7 +22,8 @@ state_dir = "state"
 # Sci-Hub is off by default (legal grey zone in some jurisdictions). Opt in by
 # appending "scihub" here, or pass --scihub on a run. You are responsible for
 # complying with the laws that apply to you. See README “Sci-Hub”.
-# htmlpdf + session vault: uv sync --extra htmlpdf && uv run playwright install chromium
+# htmlpdf + session vault: Playwright is a core dep; Chromium installs on first
+# `paperful session login …` (or: uv run playwright install chromium)
 sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "core", "scholar", "direct", "ezproxy", "htmlpdf"]
 # sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "core", "scholar", "direct", "ezproxy", "htmlpdf", "scihub"]
 
@@ -71,7 +72,7 @@ mirror_failures_before_skip = 3
 # UNGA/undocs · BBNJ/DOALOS · ISA (+ FAO, OECD, IEA, WHO examples) — not product core.
 # grey_playbooks_builtin = true
 # Optional directory of extra pack TOML files (merged after builtin, before inline).
-# Relative paths resolve against this config file's folder (Docker: packs/ under /data).
+# Relative paths resolve against this config file's folder (Compose: packs/ under /data).
 # grey_playbooks_dir = "packs"
 # [[grey_playbooks]]
 # name = "my_org"

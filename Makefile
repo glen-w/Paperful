@@ -1,4 +1,4 @@
-# paperful maintainer docs + Docker targets.
+# paperful maintainer docs + optional Docker targets.
 
 .DEFAULT_GOAL := help
 
@@ -7,7 +7,9 @@
 help:
 	@echo "paperful Makefile"
 	@echo ""
-	@echo "Docker (preferred deploy):"
+	@echo "Usual path: uv run paperful <cmd>  (see README)"
+	@echo ""
+	@echo "Docker (optional pack):"
 	@echo "  docker-build      Build the paperful image via Compose"
 	@echo "  docker-doctor     Run paperful doctor in the container"
 	@echo ""
@@ -16,14 +18,15 @@ help:
 	@echo "  docs-clean        Remove Sphinx build artifacts"
 	@echo "  pages-site        Assemble website/ + Sphinx guide into _site/ (GitHub Pages)"
 	@echo ""
-	@echo "Usage: docker compose run --rm paperful <cmd>"
+	@echo "Usage: uv run paperful <cmd>"
+	@echo "       docker compose run --rm paperful <cmd>   # optional image"
 	@echo "       uv sync --extra docs && make docs"
 
 docker-build:
 	docker compose build
 
 docker-doctor:
-	docker compose run --rm paperful doctor
+	docker compose run --rm paperful doctor --guide
 
 docs:
 	@bash scripts/release/build_docs.sh

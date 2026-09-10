@@ -29,69 +29,80 @@ from this `docs/` tree at `/guide/`. Preview locally with
 `uv sync --extra docs && make pages-site`, then open `_site/index.html`.
 Live: [glenwright.earth/Paperful](https://glenwright.earth/Paperful/).
 
-## Quick start (Docker — preferred)
+## Quick start
+
+paperful is a host-local CLI. Zotero (and headed browser login) stay on this
+machine; work lands on disk (`out/`, `state/`).
 
 **You need**
 
-- [Docker](https://docs.docker.com/get-docker/) with Compose v2.
+- Python 3.10+ and [uv](https://docs.astral.sh/uv/).
 - Zotero running, with the local API enabled:
   Settings → Advanced → *Allow other applications on this computer to communicate with Zotero*.
 - Zotero 10+ to attach PDFs into the library. On Zotero 7–9 the tool still
   downloads to disk; attach later with `paperful attach` once upgraded.
 - Optional: a university/library account and EZProxy URL for publisher PDFs.
-- Optional: a browser session for Google Scholar (`paperful session login scholar`
-  on the host) if you keep `scholar` enabled.
+- Optional: a browser session for Google Scholar
+  (`paperful session login scholar`) if you keep `scholar` enabled.
 
 ```sh
 git clone https://github.com/glen-w/Paperful.git
 cd Paperful
-cp .env.example .env
-# Keep current layout: set PAPERFUL_DATA=. in .env
-# Or use sibling data: mkdir -p ../paperful-data && cp config.example.toml ../paperful-data/config.toml
-cp config.example.toml config.toml   # if PAPERFUL_DATA=. ; set email, optional ezproxy_base
+uv sync
+cp config.example.toml config.toml   # set email, optional ezproxy_base
 mkdir -p packs out state
-docker compose build
-docker compose run --rm paperful doctor
-docker compose run --rm paperful collections
+uv run paperful doctor
+uv run paperful collections
 ```
 
 Then pick a collection and go:
 
 ```sh
-docker compose run --rm paperful run --collection interesting --dry-run
-docker compose run --rm paperful run --collection interesting
-```
-
-Full Docker layout (sibling `../paperful-data`, Zotero networking, packs):
-[Docker](docs/docker.md).
-
-If you use campus EZProxy, finish [Campus EZProxy](docs/ezproxy.md) before a
-big run. If you keep `scholar` in `sources`, log in once with
-`paperful session login scholar` on the host — see [Browser sessions](docs/sessions.md).
-
-Reference (same corpus as the hosted guide):
-
-- [Docker (preferred deploy)](docs/docker.md)
-- [Commands and output](docs/commands.md)
-- [Configuration](docs/config.md)
-- [Source routing](docs/sources.md)
-- [Architecture](docs/architecture.md)
-
-## Develop with uv
-
-Contributors and anyone hacking on the package:
-
-```sh
-uv sync --group dev
-cp config.example.toml config.toml   # then set email, out_dir, optional ezproxy_base
-uv run paperful doctor
-uv run pytest
+uv run paperful run --collection interesting --dry-run
+uv run paperful run --collection interesting
 ```
 
 Optional: [Poppler](https://poppler.freedesktop.org/) `pdftotext` on `PATH`
 for PDF-text DOI extraction (`pypdf` is the fallback; `doctor` ambers if
-Poppler is missing). For `htmlpdf` / sessions:
-`uv sync --extra htmlpdf && uv run playwright install chromium`.
+Poppler is missing). Playwright ships with a normal `uv sync`; Chromium is
+installed automatically on the first `paperful session login …`.
+
+If you use campus EZProxy, finish [Campus EZProxy](docs/ezproxy.md) before a
+big run. If you keep `scholar` in `sources`, log in once with
+`paperful session login scholar` — see [Browser sessions](docs/sessions.md).
+
+### Docker (optional)
+
+The image packs Python, Poppler, and Chromium so you can skip installing those
+on the host. It does **not** replace Zotero or headed `session login` — those
+stay on the host, sharing `out/` and `state/` via `PAPERFUL_DATA`.
+
+```sh
+cp .env.example .env   # PAPERFUL_DATA=. to keep repo-local data
+docker compose build
+docker compose run --rm paperful doctor   # default if you omit the command
+docker compose run --rm paperful collections
+docker compose run --rm paperful run --collection interesting --dry-run
+```
+
+Layout, Zotero networking, and the host/container split: [Docker](docs/docker.md).
+
+Reference (same corpus as the hosted guide):
+
+- [Commands and output](docs/commands.md)
+- [Configuration](docs/config.md)
+- [Source routing](docs/sources.md)
+- [Architecture](docs/architecture.md)
+- [Docker](docs/docker.md) — optional image, not a complete install
+
+## Develop
+
+```sh
+uv sync --group dev
+uv run pytest
+```
+
+See [CONTRIBUTING](CONTRIBUTING.md).
 
 ## License
 

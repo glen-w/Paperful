@@ -1,4 +1,4 @@
-# paperful — preferred runtime for operators (CLI against host Zotero).
+# paperful — optional runtime pack (CLI against host Zotero).
 # syntax=docker/dockerfile:1
 
 FROM python:3.12-slim-bookworm AS builder
@@ -14,7 +14,7 @@ COPY pyproject.toml uv.lock README.md ./
 COPY paperful ./paperful
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --extra htmlpdf --no-dev --no-editable
+    uv sync --no-dev --no-editable
 
 FROM python:3.12-slim-bookworm AS runtime
 

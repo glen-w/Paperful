@@ -5,9 +5,11 @@ front door: hero → what the app does → outcomes → local-first → install.
 
 - Open `index.html` locally, or deploy via GitHub Pages (`.github/workflows/pages.yml`).
 - Logo lives in [images/](images/) (copied from `docs/logo.png`).
-- Footer version should match [pyproject.toml](../pyproject.toml) `version` (currently **0.2.0**).
+- Footer version should match [pyproject.toml](../pyproject.toml) `version` (currently **0.3.0**).
 - **0.x** is called out in the footer; stability story is [docs/releases.md](../docs/releases.md).
 - Install snippet matches README: `uv sync` then `doctor` then a dry-run.
+  Optional Docker image is documented in the guide (`./guide/docker.html`);
+  it is not the default install.
 - Docs CTAs point at the **Sphinx HTML guide** published beside this landing (`./guide/`), rebuilt from `docs/` on every qualifying `main` push.
 - The sticky header nav is shared with `/guide/` via `website/chrome/` (Sphinx injects the same chrome).
 - Full local preview (landing + guide): `uv sync --extra docs && make pages-site` then open `_site/index.html`.

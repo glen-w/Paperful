@@ -3,9 +3,10 @@
 Copy `config.example.toml` to `config.toml` and edit locally; the example file
 is tracked in git, personal config is not.
 
-Looked up as `--config PATH`, then `./config.toml`, then the project folder's
-`config.toml`, then `~/.config/paperful/config.toml`. Relative paths resolve
-against the config file's folder.
+**Docker:** prefer relative `out_dir` / `state_dir` (`"out"` / `"state"`). Paths
+with `~/…` expand to the container user's home (not the Compose `/data` mount),
+so host `session login` and `docker compose run` will disagree about where
+cookies live. `paperful doctor` ambers when that happens.
 
 **Grey literature and no-DOI items** — Unpaywall and most DOI sources cannot
 resolve PrepCom papers, many DOALOS/UN docs, or undocs without a DOI. `direct`
@@ -70,8 +71,8 @@ to load every `*.toml` in that directory (same schema). Merge order: builtin →
 dir packs → inline `[[grey_playbooks]]` (same `name` replaces earlier entries).
 PMC / arXiv / HAL stay as core OA rewrites, not playbooks. See
 [architecture § Grey literature](architecture.md#grey-literature) for hosts
-and symbol patterns. Under Docker, put packs next to config under `/data`
-(see [Docker](docker.md)).
+and symbol patterns. If you use the optional Docker image, put packs next to
+config under `/data` (see [Docker](docker.md)).
 
 ```toml
 grey_playbooks_builtin = true

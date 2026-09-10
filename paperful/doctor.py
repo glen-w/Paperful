@@ -25,6 +25,116 @@ class Check:
     detail: str
 
 
+def in_docker() -> bool:
+    """True when running inside a container (Compose image or similar)."""
+    return Path("/.dockerenv").exists()
+
+
+def remediation_text(
+    check: Check, cfg: Config, *, docker: bool | None = None
+) -> str | None:
+    """Human steps to green a non-green check, or None if nothing actionable."""
+    if check.status == "green":
+        return None
+    if docker is None:
+        docker = in_docker()
+    cfg_hint = str(cfg.config_path) if cfg.config_path else "config.toml"
+    host = " on the host (not inside this container)" if docker else ""
+    data_hint = (
+        " Use the same PAPERFUL_DATA / state dir this container mounts."
+        if docker
+        else ""
+    )
+
+    if check.name == _ZOTERO_CHECK:
+        return (
+            f"1. Start Zotero{host}.\n"
+            "2. Settings → Advanced → allow other apps to talk to Zotero (local API).\n"
+            "3. Confirm :23119 is reachable, then continue."
+        )
+    if check.name == "Write API":
+        return (
+            "Zotero 7–9 is download-only here. Upgrade to Zotero 10+ for attach / "
+            "write-back, or keep fetching to disk and run attach later."
+        )
+    if check.name == "email":
+        return (
+            f'Edit {cfg_hint}: set email = "you@example.org" '
+            "(Unpaywall and polite-pool APIs need it), save, then continue."
+        )
+    if check.name in ("out_dir", "state_dir"):
+        path = cfg.out_dir if check.name == "out_dir" else cfg.state_dir
+        return (
+            f"{check.name} is not writable at {path}.\n"
+            "Fix ownership/permissions on the data dir"
+            + (" (PAPERFUL_DATA mount)" if docker else "")
+            + ", then continue."
+        )
+    if check.name == "EZProxy session":
+        cmd = "uv run paperful session login ezproxy"
+        return (
+            f"Run{host}: {cmd}\n"
+            f"(system Chrome/Edge when available — campus SSO).{data_hint}\n"
+            "When the vault is saved, continue here to re-check."
+        )
+    if check.name == "Scholar session":
+        cmd = "uv run paperful session login scholar"
+        return (
+            f"Run{host}: {cmd}\n"
+            f"(system Chrome/Edge when available; solve CAPTCHA there)."
+            f"{data_hint}\n"
+            "When the vault is saved, continue here to re-check."
+        )
+    if check.name == "pdftotext":
+        if docker:
+            return (
+                "This image should ship Poppler. Rebuild the image "
+                "(docker compose build) or install poppler-utils in a custom image."
+            )
+        return (
+            "Install Poppler so pdftotext is on PATH (e.g. brew install poppler / "
+            "apt install poppler-utils). pypdf remains the fallback."
+        )
+    if check.name == "Playwright":
+        if "missing" in check.detail:
+            return (
+                "Run: uv sync\n"
+                "Then retry session login (Chromium downloads on first login)."
+            )
+        return (
+            "Chromium is not installed yet. Run:\n"
+            "  uv run paperful session login ezproxy\n"
+            "(or: uv run playwright install chromium), then continue."
+        )
+    if check.name == "Docker paths":
+        cfg_hint = str(cfg.config_path) if cfg.config_path else "config.toml"
+        return (
+            f"Edit {cfg_hint}: set out_dir = \"out\" and state_dir = \"state\" "
+            "(relative to the config file / Compose /data mount). "
+            "Avoid ~/… paths — they resolve to a different home inside the container."
+        )
+    if check.name == "Grey playbooks":
+        return (
+            f"Builtin grey-lit packs are incomplete. Check {cfg_hint} "
+            "(grey_playbooks_builtin / grey_playbooks_dir) or update paperful."
+        )
+    return None
+
+
+def actionable_checks(
+    checks: list[Check], cfg: Config, *, docker: bool | None = None
+) -> list[tuple[Check, str]]:
+    """Non-green checks that have remediation text, in doctor order."""
+    if docker is None:
+        docker = in_docker()
+    out: list[tuple[Check, str]] = []
+    for ch in checks:
+        text = remediation_text(ch, cfg, docker=docker)
+        if text:
+            out.append((ch, text))
+    return out
+
+
 def _writable(path: Path) -> bool:
     try:
         path.mkdir(parents=True, exist_ok=True)
@@ -83,6 +193,12 @@ def run_checks(
         else:
             checks.append(Check(label, "red", f"not writable: {path}"))
 
+    docker_paths = _docker_paths_check(cfg)
+    if docker_paths is not None:
+        checks.append(docker_paths)
+
+    checks.append(_playwright_check())
+
     cookie_path = cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt")
     vault = cfg.state_dir / "sessions" / "cookies.txt"
     meta = cfg.state_dir / "sessions" / "meta.json"
@@ -135,6 +251,51 @@ def run_checks(
     checks.append(_grey_playbooks_check(cfg))
 
     return checks
+
+
+def _playwright_check() -> Check:
+    from . import session as sess
+
+    if not sess.playwright_available():
+        return Check(
+            "Playwright",
+            "amber",
+            "missing — run: uv sync (needed for session login / htmlpdf)",
+        )
+    if sess.chromium_installed():
+        return Check("Playwright", "green", "package + Chromium ready")
+    return Check(
+        "Playwright",
+        "amber",
+        "package ok — Chromium installs on first session login "
+        "(or: uv run playwright install chromium)",
+    )
+
+
+def _docker_paths_check(cfg: Config) -> Check | None:
+    """Warn when ~/… paths resolve outside the Compose /data mount."""
+    if not in_docker():
+        return None
+    data = Path("/data")
+    if not data.is_dir():
+        return None
+    data = data.resolve()
+    bad: list[str] = []
+    for label, path in (("out_dir", cfg.out_dir), ("state_dir", cfg.state_dir)):
+        try:
+            path.resolve().relative_to(data)
+        except ValueError:
+            bad.append(f"{label}={path}")
+    if not bad:
+        return Check("Docker paths", "green", "out_dir/state_dir under /data")
+    return Check(
+        "Docker paths",
+        "amber",
+        "outside /data ("
+        + ", ".join(bad)
+        + ") — set out_dir/state_dir to relative paths (out / state) so host "
+        "session login and the container share the mount",
+    )
 
 
 _NAMED_GREY_PACKS = (
