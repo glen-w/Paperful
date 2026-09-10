@@ -17,6 +17,8 @@ lists that lane, not the full `sources` list.
 | `ezproxy` | `ezproxy_base` plus a session (vault or cookie file), **and** a DOI or a URL on a [known publisher host](ezproxy.md#what-ezproxy-will-try) |
 | `htmlpdf` | `webpage` / `blogPost` / `newspaperArticle` / `magazineArticle` / `forumPost` (or DOI-less `document` / `report`) with an HTTP(S) URL; needs Playwright Chromium — see [HTML→PDF](#htmlpdf-web-news-blogs) |
 
+Indexes can **find** a publisher PDF URL that then **403s** on httpx (bronze/hybrid Elsevier is the usual case). With a session profile, that GET is retried in Chromium and wrapped in EZProxy when configured; the same publisher host is not downloaded again by the next OA source.
+
 Before sources run, **identifier preparation** verifies an existing library DOI
 against Crossref/OpenAlex (title similarity ≥ `crossref_min_score` → `ok`).
 A library DOI below `doi_suspect_score` is `suspect` and can be **swapped in

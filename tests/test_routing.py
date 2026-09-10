@@ -6,6 +6,8 @@ from paperful.circuit import CircuitBreaker
 from paperful.routing import (
     ezproxy_target,
     is_block_failure,
+    is_publisher_url,
+    publisher_host,
     source_applicable,
     sources_for_item,
 )
@@ -167,3 +169,21 @@ def test_circuit_breaker_trips_after_threshold():
         assert not cb.tripped("scholar")
     assert cb.note("scholar", Outcome.CAPTCHA, "blocked")
     assert cb.tripped("scholar")
+
+
+def test_publisher_host_groups_rewritten_ezproxy_hosts():
+    assert publisher_host(
+        "https://www.sciencedirect.com/science/article/pii/S1/pdfft"
+    ) == "sciencedirect.com"
+    assert (
+        publisher_host(
+            "https://www-sciencedirect-com.scpo.idm.oclc.org/science/article/pii/S1/pdfft"
+        )
+        == "sciencedirect.com"
+    )
+    assert publisher_host("https://www.tandfonline.com/doi/pdf/10.1/x") == (
+        "tandfonline.com"
+    )
+    assert is_publisher_url("https://linkinghub.elsevier.com/retrieve/pii/S1")
+    assert not is_publisher_url("https://arxiv.org/pdf/1234.5678")
+    assert not publisher_host("https://repository.example.edu/bitstream/1/a.pdf")

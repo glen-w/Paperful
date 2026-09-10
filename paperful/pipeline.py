@@ -10,6 +10,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlparse
 
 import httpx
 from rich.console import Console
@@ -19,11 +20,12 @@ from .attach import Attacher
 from .circuit import CircuitBreaker
 from .config import Config
 from .cookies import apply_netscape_cookies
-from .download import Download, DownloadError, fetch_pdf
+from .download import Download, DownloadError, fetch_pdf, looks_like_pdf
 from .pdfid import doi_from_pdf
 from .resolve import IdentifierCache, prepare_identifiers
-from .routing import sources_for_item
+from .routing import is_publisher_url, publisher_host, sources_for_item
 from .session import BrowserSession, vault_cookies_path
+from .sources.ezproxy import proxify
 from .runreport import (
     ItemOutcome,
     bump,
@@ -248,6 +250,7 @@ class Pipeline:
     # ---- phase 1: identifier + OA -------------------------------------------
     def _phase_oa(self, item: Item, oa_sources: list[str]) -> list[str] | None:
         attempts: list[str] = []
+        blocked_hosts: set[str] = set()
         self._log_item_label(item)
         notes = prepare_identifiers(
             self.client,
@@ -291,7 +294,7 @@ class Pipeline:
             self._log_source_result(item, name, cand)
             self._maybe_trip_circuit(name, cand)
             if cand.outcome is Outcome.FOUND and self._try_download(
-                item, cand, attempts
+                item, cand, attempts, blocked_hosts
             ):
                 self.progress()
                 return None
@@ -413,10 +416,17 @@ class Pipeline:
                 f"skipping {name} for rest of run[/]"
             )
 
-    def _try_download(self, item: Item, cand: Candidate, attempts: list[str]) -> bool:
-        self._log_item(item, f"[dim]{cand.source}: downloading...[/]")
+    def _try_download(
+        self,
+        item: Item,
+        cand: Candidate,
+        attempts: list[str],
+        blocked_hosts: set[str] | None = None,
+    ) -> bool:
+        blocked = blocked_hosts if blocked_hosts is not None else set()
         dl = None
         if cand.content is not None:
+            self._log_item(item, f"[dim]{cand.source}: downloading...[/]")
             content = cand.content
             if (
                 not content.lstrip().startswith(b"%PDF")
@@ -434,21 +444,30 @@ class Pipeline:
                 final_url=cand.url or item.url or "",
             )
         else:
+            urls: list[str] = []
+            skipped_blocked = False
             for url in cand.urls[:6]:
-                try:
-                    dl = fetch_pdf(
-                        self.client,
-                        url,
-                        referer=cand.referer,
-                        min_bytes=self.cfg.min_pdf_bytes,
-                    )
-                    break
-                except DownloadError as exc:
-                    attempts.append(f"{cand.source}:download-failed({exc})")
+                host = publisher_host(url)
+                if host and host in blocked:
+                    skipped_blocked = True
+                    continue
+                urls.append(url)
+            if not urls:
+                if skipped_blocked:
+                    attempts.append(f"{cand.source}:skipped(publisher already blocked)")
                     self._log_item(
                         item,
-                        f"{escape(cand.source)}: [yellow]download failed[/] ({escape(str(exc))})",
+                        f"{escape(cand.source)}: [dim]skipped[/] (publisher already blocked)",
                     )
+                return False
+            self._log_item(item, f"[dim]{cand.source}: downloading...[/]")
+            for url in urls:
+                dl = self._fetch_url(item, cand, url, attempts)
+                if dl is not None:
+                    break
+                host = publisher_host(url)
+                if host:
+                    blocked.add(host)
         if dl is None:
             return False
         primary, extras = save_pdf(self.cfg.out_dir, item, dl.content, dl.md5)
@@ -486,6 +505,82 @@ class Pipeline:
         else:
             self._add_outcome(rec)
         return True
+
+    def _fetch_url(
+        self, item: Item, cand: Candidate, url: str, attempts: list[str]
+    ) -> Download | None:
+        browser_first = self._browser_first(url, cand.source)
+        if browser_first:
+            dl = self._browser_pdf(item, cand, url, attempts)
+            if dl is not None:
+                return dl
+        try:
+            return fetch_pdf(
+                self.client,
+                url,
+                referer=cand.referer,
+                min_bytes=self.cfg.min_pdf_bytes,
+            )
+        except DownloadError as exc:
+            attempts.append(f"{cand.source}:download-failed({exc})")
+            self._log_item(
+                item,
+                f"{escape(cand.source)}: [yellow]download failed[/] ({escape(str(exc))})",
+            )
+            if not browser_first:
+                return self._browser_pdf(item, cand, url, attempts)
+            return None
+
+    def _browser_first(self, url: str, source: str) -> bool:
+        if self.browser is None or not self.browser.available():
+            return False
+        if source == "ezproxy":
+            return True
+        return is_publisher_url(url)
+
+    def _browser_pdf(
+        self, item: Item, cand: Candidate, url: str, attempts: list[str]
+    ) -> Download | None:
+        if self.browser is None or not self.browser.available():
+            return None
+        if cand.source not in {"ezproxy", "scholar"} and not is_publisher_url(url):
+            return None
+        targets = [url]
+        if (
+            self.cfg.ezproxy_base
+            and is_publisher_url(url)
+            and "idm.oclc.org" not in urlparse(url).netloc
+        ):
+            wrapped = proxify(url, self.cfg.ezproxy_base)
+            if wrapped != url:
+                targets = [wrapped, url]
+        for target in targets:
+            self._log_item(
+                item, f"[dim]{escape(cand.source)}: downloading via browser...[/]"
+            )
+            try:
+                content, final = self.browser.fetch_pdf(target)
+            except Exception as exc:
+                attempts.append(f"{cand.source}:browser-failed({exc})")
+                self._log_item(
+                    item,
+                    f"{escape(cand.source)}: [yellow]browser failed[/] ({escape(str(exc))})",
+                )
+                continue
+            if not looks_like_pdf(content) or len(content) < self.cfg.min_pdf_bytes:
+                attempts.append(f"{cand.source}:browser-failed(not a PDF)")
+                self._log_item(
+                    item,
+                    f"{escape(cand.source)}: [yellow]browser failed[/] (not a PDF)",
+                )
+                continue
+            attempts.append(f"{cand.source}:browser")
+            return Download(
+                content=content,
+                md5=hashlib.md5(content).hexdigest(),
+                final_url=final or target,
+            )
+        return None
 
     def attach_record(self, rec: Record) -> bool:
         if not self.attacher or not rec.path:

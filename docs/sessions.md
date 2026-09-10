@@ -19,8 +19,9 @@ uv run paperful session export          # refresh Netscape dumps for httpx
 
 Scholar fetches during `run` reuse this Chromium profile when it exists (Google
 often keys CAPTCHA to the browser, not cookies). htmlpdf uses the same profile
-so a publisher login can apply. EZProxy PDF downloads stay on httpx using the
-exported cookies.
+so a publisher login can apply. EZProxy landing pages and publisher PDFs that
+403 on a cookie-only GET (ScienceDirect `/pdfft`, …) are fetched in this
+profile too; exported cookies remain a fallback for httpx.
 
 Never commit `state/sessions/` or cookie files; never paste them into chat.
 

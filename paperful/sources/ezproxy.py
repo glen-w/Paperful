@@ -44,27 +44,34 @@ def proxify(target: str, base: str) -> str:
     return f"{base}{target}"
 
 
-def looks_like_login(resp: httpx.Response) -> bool:
-    url = str(resp.url).lower()
-    if any(x in url for x in ("/cas/login", "federation.sciences-po.fr", "shibboleth")):
+def looks_like_login_page(url: str, body: str) -> bool:
+    url_l = url.lower()
+    if any(
+        x in url_l for x in ("/cas/login", "federation.sciences-po.fr", "shibboleth")
+    ):
         return True
-    body = resp.text[:4000].lower()
-    if any(h in body for h in _LOGIN_HINTS):
+    body_l = body[:4000].lower()
+    if any(h in body_l for h in _LOGIN_HINTS):
         return True
     if (
-        "idm.oclc.org" in url
-        and "/login" in url
-        and ("password" in body or "identifiant" in body)
+        "idm.oclc.org" in url_l
+        and "/login" in url_l
+        and ("password" in body_l or "identifiant" in body_l)
     ):
         return True
     return False
+
+
+def looks_like_login(resp: httpx.Response) -> bool:
+    return looks_like_login_page(str(resp.url), resp.text)
 
 
 def find(item: Item, ctx: Context) -> Candidate:
     cfg = ctx.config
     if not cfg.ezproxy_base:
         return Candidate.miss(NAME, Outcome.SKIPPED, "ezproxy_base not set")
-    if not list(ctx.client.cookies.jar):
+    use_browser = ctx.browser is not None and ctx.browser.available()
+    if not list(ctx.client.cookies.jar) and not use_browser:
         return Candidate.miss(
             NAME,
             Outcome.SKIPPED,
@@ -76,43 +83,61 @@ def find(item: Item, ctx: Context) -> Candidate:
         return Candidate.miss(NAME, Outcome.SKIPPED, "no DOI or proxied publisher URL")
 
     url = proxify(target, cfg.ezproxy_base)
+    html = ""
+    final = url
+    ctype = ""
+    status = 200
+    content: bytes = b""
     try:
-        resp = ctx.client.get(url, timeout=45)
+        if use_browser:
+            html, final = ctx.browser.fetch_html(url)
+        else:
+            resp = ctx.client.get(url, timeout=45)
+            status = resp.status_code
+            html = resp.text
+            final = str(resp.url)
+            ctype = resp.headers.get("content-type", "").lower()
+            content = resp.content
     except httpx.HTTPError as exc:
         return Candidate.miss(
             NAME, Outcome.ERROR, f"proxy request failed ({type(exc).__name__})"
         )
+    except Exception as exc:
+        return Candidate.miss(NAME, Outcome.ERROR, f"browser ({type(exc).__name__})")
 
-    if looks_like_login(resp):
+    if looks_like_login_page(final, html):
         return Candidate.miss(
             NAME,
             Outcome.ERROR,
             "ezproxy session expired - re-login via paperful ezproxy",
         )
-    if resp.status_code == 404:
+    if not use_browser and status == 404:
         return Candidate.miss(NAME, Outcome.NOT_FOUND, "publisher 404 via proxy")
-    if resp.status_code >= 400:
-        return Candidate.miss(NAME, Outcome.ERROR, f"HTTP {resp.status_code} via proxy")
+    if not use_browser and status >= 400:
+        return Candidate.miss(NAME, Outcome.ERROR, f"HTTP {status} via proxy")
 
-    ctype = resp.headers.get("content-type", "").lower()
-    if "application/pdf" in ctype or resp.content[:8].lstrip().startswith(b"%PDF"):
+    if (
+        "application/pdf" in ctype
+        or content.lstrip().startswith(b"%PDF")
+        or html.lstrip().startswith("%PDF")
+    ):
         return Candidate(
-            url=str(resp.url),
+            url=final,
             source=NAME,
             note="direct pdf via proxy",
-            referer=str(resp.url),
+            referer=final,
         )
 
-    pdfs = extract_pdf_urls(resp.text, str(resp.url))
+    pdfs = extract_pdf_urls(html, final)
     if not pdfs:
         return Candidate.miss(NAME, Outcome.NOT_FOUND, "no PDF link on publisher page")
     # Keep PDF links on the proxy host when the landing page was rewritten.
-    proxied = [_ensure_proxied(u, cfg.ezproxy_base, str(resp.url)) for u in pdfs]
+    proxied = [_ensure_proxied(u, cfg.ezproxy_base, final) for u in pdfs]
     return Candidate(
         url=proxied[0],
         source=NAME,
-        note=urlparse(str(resp.url)).netloc,
-        referer=str(resp.url),
+        note=urlparse(final).netloc,
+        referer=final,
         alternates=proxied[1:5],
     )
 

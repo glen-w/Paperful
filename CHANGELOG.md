@@ -4,6 +4,15 @@ All notable user-facing changes. Paperful is **0.x**: flags and report fields
 may still move. **1.0** will lock `paperful.run_report.v1` and attach behaviour
 (see [releases](docs/releases.md)).
 
+## Unreleased
+
+Publisher PDF URLs that Unpaywall / OpenAlex / Semantic Scholar “find” often
+403 on a cookie-only GET (Elsevier ScienceDirect especially). `run` now
+retries those through the session Chromium profile, wrapping the URL in
+EZProxy when `ezproxy_base` is set. A publisher host that already 403’d is
+not tried again by the next OA source. EZProxy landing pages use the same
+profile when it exists.
+
 ## 0.3.0 — 2026-09-10
 
 Usual path is `uv`. Docker Compose is an optional one-shot image (Python +

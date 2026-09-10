@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from paperful import pipeline as pl
 from paperful.cookies import (
     load_netscape_cookies,
     netscape_from_playwright,
@@ -9,6 +10,8 @@ from paperful.cookies import (
     write_netscape,
 )
 from paperful.session import (
+    SessionError,
+    collect_pdf_from_page,
     export_cookies,
     load_meta,
     mark_slot,
@@ -16,7 +19,7 @@ from paperful.session import (
     sessions_dir,
     vault_cookies_path,
 )
-from paperful import pipeline as pl
+from tests.conftest import PDF_BYTES
 
 
 def test_netscape_from_playwright_roundtrip(tmp_path):
@@ -117,3 +120,107 @@ def test_ensure_sessions_dir_chmod(cfg):
     except SessionError as exc:
         msg = str(exc).lower()
         assert "chromium" in msg or "htmlpdf" in msg or "not installed" in msg
+
+
+class _FakeResp:
+    def __init__(self, body, url, headers=None):
+        self._body = body
+        self.url = url
+        self.headers = headers or {}
+
+    def body(self):
+        return self._body
+
+
+class _FakeDownload:
+    def __init__(self, path, url):
+        self._path = path
+        self.url = url
+
+    def path(self):
+        return self._path
+
+
+class _FakeLoc:
+    def __init__(self, n, click=None):
+        self._n = n
+        self._click = click
+        self.first = self
+
+    def count(self):
+        return self._n
+
+    def click(self, timeout=5000):
+        if self._click:
+            self._click()
+
+
+class _FakePage:
+    def __init__(self, resp=None, goto_error=None, download=None, locators=None):
+        self._resp = resp
+        self._goto_error = goto_error
+        self._download = download
+        self._handlers: dict[str, list] = {}
+        self._locators = locators or {}
+
+    def on(self, event, cb):
+        self._handlers.setdefault(event, []).append(cb)
+
+    def remove_listener(self, event, cb):
+        lst = self._handlers.get(event, [])
+        if cb in lst:
+            lst.remove(cb)
+
+    def locator(self, selector):
+        return self._locators.get(selector, _FakeLoc(0))
+
+    def goto(self, url, **kwargs):
+        if self._download:
+            for cb in self._handlers.get("download", []):
+                cb(self._download)
+        if self._goto_error:
+            raise self._goto_error
+        if self._resp is not None:
+            for cb in self._handlers.get("response", []):
+                cb(self._resp)
+        return self._resp
+
+
+def test_collect_pdf_from_page_uses_pdf_response():
+    page = _FakePage(
+        resp=_FakeResp(
+            PDF_BYTES,
+            "https://x.test/a.pdf",
+            headers={"content-type": "application/pdf"},
+        )
+    )
+    data, final = collect_pdf_from_page(page, "https://x.test/a.pdf")
+    assert data == PDF_BYTES
+    assert final.endswith("a.pdf")
+
+
+def test_collect_pdf_from_page_uses_download_when_goto_aborts(tmp_path):
+    path = tmp_path / "a.pdf"
+    path.write_bytes(PDF_BYTES)
+    page = _FakePage(
+        goto_error=RuntimeError("Download is starting"),
+        download=_FakeDownload(path, "https://x.test/a.pdf"),
+    )
+    data, final = collect_pdf_from_page(page, "https://x.test/a.pdf")
+    assert data == PDF_BYTES
+    assert final.endswith("a.pdf")
+
+
+def test_collect_pdf_from_page_raises_when_html_only():
+    page = _FakePage(
+        resp=_FakeResp(
+            b"<html>article</html>",
+            "https://x.test/article",
+            headers={"content-type": "text/html"},
+        )
+    )
+    try:
+        collect_pdf_from_page(page, "https://x.test/article")
+        raise AssertionError("expected SessionError")
+    except SessionError as exc:
+        assert "PDF" in str(exc)

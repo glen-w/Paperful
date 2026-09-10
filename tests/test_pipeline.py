@@ -418,3 +418,109 @@ def test_serial_chain_ezproxy_htmlpdf_then_scihub(pipe_factory):
     assert "J" in hp.calls
     assert sh.calls == ["J"]
     assert manifest.get("J").source == "scihub"
+
+
+class _StubBrowser:
+    def __init__(self, pdf=PDF_BYTES):
+        self.pdf = pdf
+        self.urls: list[str] = []
+
+    def available(self) -> bool:
+        return True
+
+    def fetch_pdf(self, url, timeout_ms=60_000):
+        self.urls.append(url)
+        return self.pdf, url
+
+    def close(self) -> None:
+        return
+
+
+def test_publisher_403_retries_via_browser_and_proxifies(pipe_factory, cfg):
+    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    browser = _StubBrowser()
+    src = StubSource(
+        "unpaywall",
+        {
+            "A": Candidate(
+                url="https://www.sciencedirect.com/science/article/pii/S1/pdfft",
+                source="unpaywall",
+            )
+        },
+    )
+    pipe, manifest = pipe_factory(
+        {"unpaywall": src},
+        ["unpaywall"],
+        handler=lambda r: httpx.Response(403),
+    )
+    pipe.browser = browser
+    pipe.ctx.browser = browser
+    pipe.run([make_item(key="A")])
+    rec = manifest.get("A")
+    assert rec.status == STATUS_OK
+    assert "unpaywall:browser" in rec.attempts
+    assert browser.urls[0].startswith("https://scpo.idm.oclc.org/login?url=")
+
+
+def test_ezproxy_uses_browser_before_httpx(pipe_factory):
+    browser = _StubBrowser()
+    src = StubSource(
+        "ezproxy",
+        {
+            "A": Candidate(
+                url="https://www-sciencedirect-com.scpo.idm.oclc.org/pdfft",
+                source="ezproxy",
+            )
+        },
+    )
+    calls = []
+
+    def handler(req):
+        calls.append(str(req.url))
+        return httpx.Response(403)
+
+    pipe, manifest = pipe_factory({"ezproxy": src}, ["ezproxy"], handler=handler)
+    pipe.try_all = True
+    pipe.browser = browser
+    pipe.ctx.browser = browser
+    pipe.run([make_item(key="A")])
+    assert manifest.get("A").status == STATUS_OK
+    assert calls == []
+    assert "ezproxy:browser" in manifest.get("A").attempts
+
+
+def test_oa_skips_same_publisher_host_after_403(pipe_factory):
+    calls = []
+
+    def handler(req):
+        calls.append(str(req.url))
+        return httpx.Response(403)
+
+    up = StubSource(
+        "unpaywall",
+        {
+            "A": Candidate(
+                url="https://www.sciencedirect.com/science/article/pii/S1/pdfft",
+                source="unpaywall",
+            )
+        },
+    )
+    oa = StubSource(
+        "openalex",
+        {
+            "A": Candidate(
+                url="https://www.sciencedirect.com/science/article/pii/S1/pdfft?alt=1",
+                source="openalex",
+            )
+        },
+    )
+    pipe, manifest = pipe_factory(
+        {"unpaywall": up, "openalex": oa},
+        ["unpaywall", "openalex"],
+        handler=handler,
+    )
+    pipe.run([make_item(key="A")])
+    assert len(calls) == 1
+    rec = manifest.get("A")
+    assert any("publisher already blocked" in a for a in rec.attempts)
+

@@ -71,7 +71,7 @@ flowchart LR
 
 ## Circuit breaker
 
-Open-access sources run in parallel (`concurrency_oa`). Block-like outcomes (CAPTCHA, 429, “sorry”, …) increment a per-source counter; after `circuit_breaker_threshold` the source is skipped for the rest of the run. Scholar, Sci-Hub, EZProxy, and HTML→PDF stay serial (Scholar/htmlpdf share one Chromium profile lock).
+Open-access sources run in parallel (`concurrency_oa`). Block-like outcomes (CAPTCHA, 429, “sorry”, …) increment a per-source counter; after `circuit_breaker_threshold` the source is skipped for the rest of the run. Scholar, Sci-Hub, EZProxy, and HTML→PDF stay serial (they share one Chromium profile lock). Publisher PDF URLs that 403 on httpx are retried in that profile (EZProxy-wrapped when configured).
 
 ## Sci-Hub and presets
 

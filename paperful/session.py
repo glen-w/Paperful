@@ -24,6 +24,7 @@ from typing import Any, Literal
 
 from .config import Config
 from .cookies import split_playwright_cookies, write_netscape
+from .download import looks_like_pdf
 from .sources.ezproxy import proxify
 
 SLOTS = ("scholar", "ezproxy")
@@ -439,8 +440,102 @@ def dump_profile_cookies(cfg: Config) -> list[Path]:
     return export_cookies(cfg, cookies)
 
 
+_PDF_CLICK_SELECTORS = (
+    "a[href*='pdfft']",
+    "a[href*='/pdf'][href*='download']",
+    "a[data-aa-name='pdf-download']",
+    "a#pdfLink",
+    "a:has-text('Download PDF')",
+    "button:has-text('Download PDF')",
+)
+
+
+def collect_pdf_from_page(
+    page: Any, url: str, timeout_ms: int = 60_000
+) -> tuple[bytes, str]:
+    """Drive a Playwright page to `url` and return PDF bytes.
+
+    Handles three publisher behaviours: PDF as the navigation body, a
+    `download` event (Content-Disposition: attachment), and a landing page
+    with a Download PDF control. Raises SessionError if nothing looks like
+    a PDF.
+    """
+    found: list[tuple[bytes, str]] = []
+
+    def _take(data: bytes, final: str) -> None:
+        if found or not data or not looks_like_pdf(data):
+            return
+        found.append((data, final))
+
+    def on_download(download: Any) -> None:
+        try:
+            path = download.path()
+            if path:
+                _take(Path(path).read_bytes(), str(getattr(download, "url", url)))
+        except Exception:
+            return
+
+    def on_response(response: Any) -> None:
+        try:
+            headers = {
+                str(k).lower(): str(v) for k, v in (response.headers or {}).items()
+            }
+            ctype = headers.get("content-type", "")
+            disp = headers.get("content-disposition", "")
+            if "application/pdf" not in ctype and ".pdf" not in disp.lower():
+                return
+            _take(response.body(), str(getattr(response, "url", url)))
+        except Exception:
+            return
+
+    page.on("download", on_download)
+    page.on("response", on_response)
+    try:
+        resp = None
+        try:
+            resp = page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+        except Exception:
+            resp = None
+        if found:
+            return found[0]
+        if resp is not None:
+            try:
+                _take(resp.body(), str(getattr(resp, "url", url)))
+            except Exception:
+                pass
+            if found:
+                return found[0]
+        elif not found:
+            # Navigation aborted (typical for Content-Disposition: attachment).
+            deadline = time.time() + min(8.0, timeout_ms / 1000)
+            while time.time() < deadline and not found:
+                time.sleep(0.2)
+            if found:
+                return found[0]
+        for selector in _PDF_CLICK_SELECTORS:
+            loc = page.locator(selector)
+            try:
+                if loc.count() == 0:
+                    continue
+                loc.first.click(timeout=5_000)
+            except Exception:
+                continue
+            click_deadline = time.time() + 10.0
+            while time.time() < click_deadline and not found:
+                time.sleep(0.2)
+            if found:
+                return found[0]
+        raise SessionError("browser did not receive a PDF")
+    finally:
+        for event, handler in (("download", on_download), ("response", on_response)):
+            try:
+                page.remove_listener(event, handler)
+            except Exception:
+                pass
+
+
 class BrowserSession:
-    """Lazy persistent Chromium for Scholar fetches and htmlpdf (one lock)."""
+    """Lazy persistent Chromium for Scholar fetches, htmlpdf, and publisher PDFs (one lock)."""
 
     def __init__(self, cfg: Config):
         self.cfg = cfg
@@ -480,6 +575,16 @@ class BrowserSession:
             except Exception:
                 pass
             return page.content(), str(page.url)
+
+    def fetch_pdf(self, url: str, timeout_ms: int = 60_000) -> tuple[bytes, str]:
+        """Navigate in the vault profile and return PDF bytes + final URL.
+
+        ScienceDirect / Wiley / T&F often 403 a cookie-only GET; the same URL
+        in this profile (campus SSO cookies + a real Chromium) can download.
+        """
+        with self._lock:
+            self._ensure()
+            return collect_pdf_from_page(self._page(), url, timeout_ms=timeout_ms)
 
     def render_pdf(
         self,

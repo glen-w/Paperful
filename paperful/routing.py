@@ -91,7 +91,13 @@ def source_applicable(item: Item, cfg: Config, name: str) -> bool:
             return False
         cookie_path = cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt")
         vault = cfg.state_dir / "sessions" / "cookies.txt"
-        if not cookie_path.is_file() and not vault.is_file():
+        profile = cfg.state_dir / "sessions" / "meta.json"
+        chromium = cfg.state_dir / "sessions" / "chromium"
+        if (
+            not cookie_path.is_file()
+            and not vault.is_file()
+            and not (profile.is_file() and chromium.is_dir())
+        ):
             return False
         return bool(ezproxy_target(item))
     if name == "scihub":
@@ -183,6 +189,33 @@ _EZPROXY_PUBLISHER_HOSTS = frozenset(
         "bioone.org",
     }
 )
+
+
+def publisher_host(url: str) -> str | None:
+    """Canonical publisher suffix (sciencedirect.com, …), if `url` is one.
+
+    Hyphen-rewritten EZProxy hosts (www-sciencedirect-com.proxy.edu) map
+    back to the same family so a 403 on the naked publisher is not retried
+    on the rewritten URL.
+    """
+    host = (urlparse(url).hostname or "").lower()
+    if not host:
+        return None
+    if host.startswith("www."):
+        host = host[4:]
+    for suffix in _EZPROXY_PUBLISHER_HOSTS:
+        if host == suffix or host.endswith("." + suffix):
+            return suffix
+        hyphen = suffix.replace(".", "-")
+        if hyphen and hyphen in host:
+            return suffix
+    if "idm.oclc.org" in host:
+        return "idm.oclc.org"
+    return None
+
+
+def is_publisher_url(url: str) -> bool:
+    return publisher_host(url) is not None
 
 
 def ezproxy_target(item: Item) -> str | None:

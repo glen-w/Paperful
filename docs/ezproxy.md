@@ -104,6 +104,11 @@ Success looks like `Session OK`. If not, run `session login ezproxy` again.
 
 ## 5. Run (or retry) downloads
 
+Publisher sites (especially Elsevier ScienceDirect) often **403 a cookie-only
+GET** even when Unpaywall lists a PDF URL. After `session login ezproxy`,
+`run` opens those URLs in the vault Chromium profile (and wraps them in
+`ezproxy_base`) instead of stopping at `download failed (HTTP 403)`.
+
 New runs pick up EZProxy when `ezproxy` is in `sources` and the session is
 valid:
 

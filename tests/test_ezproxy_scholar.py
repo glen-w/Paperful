@@ -73,6 +73,31 @@ def test_ezproxy_skips_without_config(ctx_factory, cfg):
     )
 
 
+def test_ezproxy_finds_pdf_via_browser_html(ctx_factory, cfg, tmp_path):
+    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    html = (
+        '<html><head><meta name="citation_pdf_url" '
+        'content="https://www-sciencedirect-com.scpo.idm.oclc.org/science/article/pii/S1/pdfft">'
+        "</head></html>"
+    )
+
+    class StubBrowser:
+        def available(self) -> bool:
+            return True
+
+        def fetch_html(self, url, timeout_ms=45_000):
+            return (
+                html,
+                "https://www-sciencedirect-com.scpo.idm.oclc.org/science/article/pii/S1",
+            )
+
+    ctx = ctx_factory(lambda r: httpx.Response(500, text="should not be used"))
+    ctx.browser = StubBrowser()
+    cand = ezproxy.find(make_item(), ctx)
+    assert cand.outcome is Outcome.FOUND
+    assert "pdfft" in cand.url
+
+
 def test_ezproxy_finds_pdf_via_proxy(ctx_factory, cfg, tmp_path):
     cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
     cookie_file = tmp_path / "ezproxy-cookies.txt"
