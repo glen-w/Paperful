@@ -1,0 +1,57 @@
+# Pre-rolled ocean / governance grey-lit examples — not product core.
+# Disable with grey_playbooks_builtin = false, or override any name via [[grey_playbooks]].
+
+[[grey_playbooks]]
+name = "undocs_url"
+kind = "rewrite"
+hosts = ["undocs.org", "documents.un.org", "docs.un.org", "daccess-ods.un.org"]
+parser = "undocs"
+
+[[grey_playbooks]]
+name = "un_symbol"
+kind = "synthesize"
+# A/CONF.232/2023/4, A/AC.292/2024/1, A/79/123, S/2024/55, Add./Rev./Corr. suffixes
+match_re = '''(?ix)\b(
+    (?:A|S|E|ST|UNEP|ISA|SPLOS|ISBA)
+    (?:/[A-Z]{2,12}(?:\.\d+)?)*
+    (?:/\d{1,4})+
+    (?:/(?:Add|Rev|Corr)\.\d+|/?INF(?:\.\d+)?(?:/\d+)?)*
+)\b'''
+pdf_template = "https://undocs.org/pdf?symbol={0}"
+
+[[grey_playbooks]]
+name = "fao"
+kind = "rewrite"
+hosts = ["fao.org", "documents.fao.org"]
+url_re = '''(?i)(?:www\.)?(?:documents\.)?fao\.org/3/(?P<code>[a-z0-9]+)/'''
+pdf_template = "https://www.fao.org/3/{code}/{code}.pdf"
+
+[[grey_playbooks]]
+name = "isa_un_scrape"
+kind = "scrape"
+hosts = ["isa.org.jm", "un.org"]
+href_re = '''(?i)\.pdf(?:\?|$)|/bitstream/|/wp-content/uploads/|download'''
+
+[[grey_playbooks]]
+name = "irena_scrape"
+kind = "scrape"
+hosts = ["irena.org"]
+href_re = '''(?i)\.pdf(?:\?|$)'''
+
+[[grey_playbooks]]
+name = "oecd_scrape"
+kind = "scrape"
+hosts = ["oecd.org", "oecd-ilibrary.org"]
+href_re = '''(?i)/download/|\.pdf(?:\?|$)'''
+
+[[grey_playbooks]]
+name = "iea_scrape"
+kind = "scrape"
+hosts = ["iea.org"]
+href_re = '''(?i)/files/|/dl/|\.pdf(?:\?|$)'''
+
+[[grey_playbooks]]
+name = "who_scrape"
+kind = "scrape"
+hosts = ["who.int"]
+href_re = '''(?i)/iris/|\.pdf(?:\?|$)|download'''

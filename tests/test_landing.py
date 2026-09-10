@@ -67,13 +67,20 @@ def test_extract_un_symbol_and_grey_target_from_extra():
     assert extract_un_symbol("A sufficiently long test title") is None
     item = make_item(url=None, extra="UN symbol: A/AC.292/2024/1", doi=None)
     assert grey_target(item) == "https://undocs.org/pdf?symbol=A/AC.292/2024/1"
-    # URL present wins; do not synthesize undocs from Extra
+    # Skip-host URL + Extra symbol → synthesize (builtin un_symbol playbook)
     yt = make_item(
         url="https://www.youtube.com/watch?v=x",
         extra="A/CONF.232/2023/4",
         doi=None,
     )
-    assert grey_target(yt) == yt.url
+    assert grey_target(yt) == "https://undocs.org/pdf?symbol=A/CONF.232/2023/4"
+    # Non-skip landing URL still wins over Extra symbol
+    landing = make_item(
+        url="https://www.example.org/report",
+        extra="A/CONF.232/2023/4",
+        doi=None,
+    )
+    assert grey_target(landing) == landing.url
 
 
 def test_extract_pdf_urls_meta_and_pii():

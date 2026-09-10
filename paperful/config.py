@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .playbooks import GreyPlaybook, merge_playbooks, playbook_from_dict
+
 if sys.version_info >= (3, 11):
     import tomllib
 else:  # pragma: no cover
@@ -93,7 +95,15 @@ class Config:
     scholar_cookies: Path | None = (
         None  # Netscape cookies.txt; default state/scholar-cookies.txt
     )
+    # Grey-lit PDF playbooks: builtin ocean/gov pack + optional user [[grey_playbooks]].
+    grey_playbooks_builtin: bool = True
+    grey_playbooks: list[GreyPlaybook] = field(default_factory=list)
     config_path: Path | None = None
+
+    def __post_init__(self) -> None:
+        # Resolve pack+user once so Config() in tests gets the builtin examples.
+        if not self.grey_playbooks and self.grey_playbooks_builtin:
+            self.grey_playbooks = merge_playbooks(True, ())
 
     @property
     def manifest_path(self) -> Path:
@@ -184,6 +194,16 @@ def _from_dict(raw: dict[str, Any], source: Path) -> Config:
         cfg.ezproxy_cookies = Path(str(raw["ezproxy_cookies"])).expanduser()
     if "scholar_cookies" in raw and raw["scholar_cookies"]:
         cfg.scholar_cookies = Path(str(raw["scholar_cookies"])).expanduser()
+    if "grey_playbooks_builtin" in raw:
+        cfg.grey_playbooks_builtin = bool(raw["grey_playbooks_builtin"])
+    user_playbooks: list[GreyPlaybook] = []
+    for row in raw.get("grey_playbooks") or []:
+        if isinstance(row, dict):
+            pb = playbook_from_dict(row)
+            if pb:
+                user_playbooks.append(pb)
+    # __post_init__ may have loaded builtin already; replace with merge of pack + user.
+    cfg.grey_playbooks = merge_playbooks(cfg.grey_playbooks_builtin, user_playbooks)
     if not cfg.out_dir.is_absolute():
         cfg.out_dir = (source.parent / cfg.out_dir).resolve()
     if not cfg.state_dir.is_absolute():

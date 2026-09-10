@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from .config import Config
+from .playbooks import DIRECT_SKIP_HOSTS, url_is_direct_skip
 from .resolve import normalize_doi
 from .zot import Item
 
@@ -15,20 +16,6 @@ if TYPE_CHECKING:
 
 _ARXIV_TYPES = frozenset(
     {"preprint", "journalArticle", "conferencePaper", "report", "manuscript"}
-)
-_DIRECT_SKIP_HOSTS = (
-    "doi.org",
-    "scholar.google",
-    "zotero.org",
-    "twitter.com",
-    "x.com",
-    "youtube.com",
-    "youtu.be",
-    "vimeo.com",
-    "facebook.com",
-    "consensus.app",
-    "semanticscholar.org",
-    "researchgate.net",
 )
 _BIORXIV_DOI = re.compile(r"^10\.1101/", re.IGNORECASE)
 _BIORXIV_URL = re.compile(
@@ -79,17 +66,16 @@ def source_applicable(item: Item, cfg: Config, name: str) -> bool:
     if name == "direct":
         from .sources.landing import grey_target
 
-        target = grey_target(item)
+        target = grey_target(item, cfg.grey_playbooks)
         if not target:
             return False
-        url = (item.url or "").strip().lower()
-        check = url if url.startswith(("http://", "https://")) else target.lower()
-        return not any(h in check for h in _DIRECT_SKIP_HOSTS)
+        # grey_target may synthesize a PDF URL when the item URL is a skip-host.
+        return not url_is_direct_skip(target)
     if name == "htmlpdf":
         url = (item.url or "").strip().lower()
         if not url.startswith(("http://", "https://")):
             return False
-        if any(h in url for h in _DIRECT_SKIP_HOSTS):
+        if any(h in url for h in DIRECT_SKIP_HOSTS):
             return False
         if item.item_type in {
             "webpage",

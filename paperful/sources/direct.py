@@ -4,34 +4,24 @@ from __future__ import annotations
 
 import httpx
 
+from ..playbooks import url_is_direct_skip
 from ..zot import Item
 from .base import Candidate, Context, Outcome
 from .landing import extract_pdf_urls, grey_target, looks_like_pdf_url
 
 NAME = "direct"
-_SKIP_HOSTS = (
-    "doi.org",
-    "scholar.google",
-    "zotero.org",
-    "twitter.com",
-    "x.com",
-    "youtube.com",
-    "youtu.be",
-    "vimeo.com",
-    "facebook.com",
-    "consensus.app",
-    "semanticscholar.org",
-    "researchgate.net",
-)
 
 
 def find(item: Item, ctx: Context) -> Candidate:
-    target = grey_target(item)
+    books = ctx.config.grey_playbooks
+    target = grey_target(item, books)
     if not target or not target.lower().startswith(("http://", "https://")):
         return Candidate.miss(NAME, Outcome.SKIPPED, "no URL")
     original = (item.url or "").strip()
-    check = original.lower() if original.startswith(("http://", "https://")) else target.lower()
-    if any(h in check for h in _SKIP_HOSTS):
+    # After synthesize, target may be undocs while original was YouTube — do not skip.
+    if target == original and url_is_direct_skip(original):
+        return Candidate.miss(NAME, Outcome.SKIPPED, "resolver/aggregator URL")
+    if url_is_direct_skip(target):
         return Candidate.miss(NAME, Outcome.SKIPPED, "resolver/aggregator URL")
     note = "url rewrite" if target != original else "url ends in .pdf"
     if looks_like_pdf_url(target) or target.lower().split("?")[0].endswith(".pdf"):
@@ -58,7 +48,7 @@ def find(item: Item, ctx: Context) -> Candidate:
                     )
             if resp.status_code < 400 and "html" in ctype:
                 text = b"".join(resp.iter_bytes()).decode("utf-8", "replace")
-                pdfs = extract_pdf_urls(text, str(resp.url))
+                pdfs = extract_pdf_urls(text, str(resp.url), books)
                 if pdfs:
                     return Candidate(
                         url=pdfs[0],

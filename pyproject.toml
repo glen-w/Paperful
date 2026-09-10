@@ -30,6 +30,9 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["paperful"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"paperful/data" = "paperful/data"
+
 [tool.hatch.build.targets.sdist]
 # Personal config (email), runtime state/output and editor files never ship.
 exclude = ["config.toml", "out/", "state/", ".cursor/", ".coverage", "*.log"]

@@ -50,12 +50,17 @@ def test_source_applicable_by_metadata(cfg):
         key="S", doi=None, url=None, extra="A/AC.292/2024/1", title="PrepCom"
     )
     assert source_applicable(no_url, cfg, "direct")
-    assert not source_applicable(
+    assert source_applicable(
         make_item(
             doi=None,
             url="https://www.youtube.com/watch?v=x",
             extra="A/CONF.232/2023/4",
         ),
+        cfg,
+        "direct",
+    )
+    assert not source_applicable(
+        make_item(doi=None, url="https://www.youtube.com/watch?v=x"),
         cfg,
         "direct",
     )
