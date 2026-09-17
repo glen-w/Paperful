@@ -39,6 +39,12 @@ def test_parse_captcha_page():
     )
 
 
+def test_parse_turnstile_page():
+    html = (FIX / "scihub_turnstile.html").read_text()
+    assert is_captcha_page(html)
+    assert parse_page(html, BASE).outcome is Outcome.CAPTCHA
+
+
 def test_parse_legacy_embed_layout():
     html = (
         '<html><body><div id="article"><embed id="pdf" src="//moscow.sci-hub.ru/1/abc.pdf#navpanes=0"></div>'

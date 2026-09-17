@@ -16,7 +16,7 @@ import httpx
 from rich.console import Console
 from rich.markup import escape
 
-from .attach import Attacher
+from .attach import Attacher, parent_missing
 from .circuit import CircuitBreaker
 from .config import Config
 from .cookies import apply_netscape_cookies
@@ -45,6 +45,7 @@ from .store import (
     Manifest,
     Record,
     relpaths,
+    resolve_pdf_path,
     save_pdf,
 )
 from .zot import Item
@@ -154,6 +155,9 @@ class Pipeline:
         self._item_index: dict[str, int] = {}
         self._id_cache = IdentifierCache()
         self._item_fields: dict[str, list[str]] = {}
+        self._pdf_parents: set[str] | None = None
+        self._parent_by_doi: dict[str, str] | None = None
+        self._parent_by_title: dict[str, str] | None = None
 
     def stop(self) -> None:
         self._stop.set()
@@ -585,8 +589,27 @@ class Pipeline:
     def attach_record(self, rec: Record) -> bool:
         if not self.attacher or not rec.path:
             return False
+        pdf = resolve_pdf_path(self.cfg.out_dir, rec.path)
+        if pdf is None:
+            with self._attach_lock:
+                rec.status = STATUS_ATTACH_FAILED
+                rec.reason = f"file missing: {rec.path}"
+                code = "other"
+                with self._stats_lock:
+                    self.stats.attach_failed_by_code[code] = (
+                        self.stats.attach_failed_by_code.get(code, 0) + 1
+                    )
+                    self.stats.bump(STATUS_ATTACH_FAILED)
+                self._emit(f"   [yellow]attach failed[/] {rec.itemKey}: {rec.reason}")
+                self._add_outcome(rec, attach_code=code)
+                self.manifest.write(rec)
+            return False
+        if str(pdf) != rec.path:
+            rec.path = str(pdf)
         with self._attach_lock:
-            res = self.attacher.attach(rec.itemKey, Path(rec.path))
+            res = self.attacher.attach(rec.itemKey, pdf)
+            if not res.ok and parent_missing(res.reason):
+                res = self._attach_after_remap(rec, pdf, res.reason)
         if res.ok:
             rec.status = STATUS_ATTACHED
             rec.reason = res.reason
@@ -607,6 +630,86 @@ class Pipeline:
             self._add_outcome(rec, attach_code=code)
         self.manifest.write(rec)
         return res.ok
+
+    def _attach_after_remap(self, rec: Record, pdf: Path, prior_reason: str):
+        """Retry attach when Zotero remapped the parent key (sync / restore)."""
+        from .attach import AttachResult
+
+        zl = self.attacher.zl if self.attacher else None
+        if zl is None:
+            return AttachResult(False, reason=prior_reason, code="parent_missing")
+        new_key = self._live_parent_key(rec)
+        if not new_key or new_key == rec.itemKey:
+            return AttachResult(False, reason=prior_reason, code="parent_missing")
+        old_key = rec.itemKey
+        if self._pdf_parents is None:
+            self._pdf_parents = zl._pdf_parent_keys()
+        if new_key in self._pdf_parents:
+            rec.itemKey = new_key
+            self.manifest.write(
+                Record(
+                    itemKey=old_key,
+                    status=STATUS_ATTACHED,
+                    title=rec.title,
+                    doi=rec.doi,
+                    path=rec.path,
+                    source=rec.source,
+                    reason=f"remapped to {new_key} (PDF already present)",
+                    md5=rec.md5,
+                )
+            )
+            return AttachResult(
+                True,
+                reason=f"remapped {old_key}→{new_key} (already attached)",
+                code="unchanged",
+            )
+        assert self.attacher is not None
+        res = self.attacher.attach(new_key, pdf)
+        if res.ok:
+            rec.itemKey = new_key
+            self._pdf_parents.add(new_key)
+            self.manifest.write(
+                Record(
+                    itemKey=old_key,
+                    status=STATUS_ATTACHED,
+                    title=rec.title,
+                    doi=rec.doi,
+                    path=rec.path,
+                    source=rec.source,
+                    reason=f"remapped to {new_key}",
+                    md5=rec.md5,
+                )
+            )
+            res.reason = f"remapped {old_key}→{new_key} ({res.reason})"
+        return res
+
+    def _live_parent_key(self, rec: Record) -> str | None:
+        """Map a stale manifest key to the current library item via DOI/title."""
+        from .resolve import normalize_doi
+
+        zl = self.attacher.zl if self.attacher else None
+        if zl is None:
+            return None
+        if self._parent_by_doi is None or self._parent_by_title is None:
+            by_doi: dict[str, str] = {}
+            by_title: dict[str, str] = {}
+            for it in zl.items_in_scope(None):
+                if it.doi:
+                    nd = normalize_doi(it.doi)
+                    if nd and nd not in by_doi:
+                        by_doi[nd] = it.key
+                title = (it.title or "").strip().lower()
+                if title and title not in by_title:
+                    by_title[title] = it.key
+            self._parent_by_doi = by_doi
+            self._parent_by_title = by_title
+        nd = normalize_doi(rec.doi)
+        if nd and nd in self._parent_by_doi:
+            return self._parent_by_doi[nd]
+        title = (rec.title or "").strip().lower()
+        if title and title in self._parent_by_title:
+            return self._parent_by_title[title]
+        return None
 
     def _finish_miss(self, item: Item, attempts: list[str]) -> None:
         if not item.doi and not item.arxiv_id and not item.url:

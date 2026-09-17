@@ -386,7 +386,7 @@ def fix_metadata(
     `run` never rewrites metadata. This is the only write path for DOI/title/date/venue.
     """
     from .lint import lint_item
-    from .metadata import apply_patches, propose_patch, write_patches
+    from .metadata import apply_patches, dedupe_patches, propose_patch, write_patches
     from .pipeline import make_client
     from .resolve import IdentifierCache
 
@@ -410,10 +410,17 @@ def fix_metadata(
             client, cfg, item, backend=backend, manifest=manifest, cache=cache
         )
         patch = propose_patch(
-            client, cfg, item, findings, overwrite=overwrite, cache=cache
+            client,
+            cfg,
+            item,
+            findings,
+            overwrite=overwrite,
+            cache=cache,
+            prepared=True,
         )
         if patch:
             patches.append(patch)
+    patches = dedupe_patches(patches)
     console.print(f"Scope: [bold]{scope}[/] — {len(patches)} proposed patches")
     if patches:
         table = Table(title="Proposed patches")

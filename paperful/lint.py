@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,7 +11,7 @@ import httpx
 from .config import Config
 from .library import LibraryBackend
 from .pdfid import doi_from_pdf
-from .resolve import IdentifierCache, prepare_identifiers
+from .resolve import IdentifierCache, prepare_identifiers, strip_title_markup
 from .store import Manifest
 from .zot import Item
 
@@ -26,6 +27,9 @@ _SCHOLARLY = frozenset(
         "manuscript",
     }
 )
+
+_FILENAME_EXT = re.compile(r"\.(pdf|docx?|txt|html?)$", re.I)
+_PATHY = re.compile(r"[/\\]")
 
 
 @dataclass
@@ -50,6 +54,33 @@ def resolve_pdf_path(cfg: Config, item: Item, manifest: Manifest | None) -> Path
         if p.is_file():
             return p
     return None
+
+
+def title_is_all_caps(title: str) -> bool:
+    letters = [c for c in title if c.isalpha()]
+    if len(letters) < 12:
+        return False
+    return sum(1 for c in letters if c.isupper()) / len(letters) >= 0.85
+
+
+def title_looks_like_filename(title: str) -> bool:
+    t = (title or "").strip()
+    if not t:
+        return False
+    if _FILENAME_EXT.search(t):
+        return True
+    if _PATHY.search(t):
+        return True
+    return False
+
+
+def title_has_markup(title: str) -> bool:
+    if not title:
+        return False
+    if re.search(r"<[^>]+>", title):
+        return True
+    cleaned = strip_title_markup(title)
+    return bool(cleaned) and cleaned != title.strip()
 
 
 def lint_item(
@@ -108,6 +139,14 @@ def lint_item(
         add("no_identifier", "no DOI, arXiv id, PMID or URL")
     if item.pmid and not item.doi and "pubmed:no-doi" in notes:
         add("pmid_no_doi", f"PMID {item.pmid} did not convert")
+
+    if scholarly and item.title:
+        if title_has_markup(item.title):
+            add("title_html", "title contains HTML markup or entities")
+        if title_is_all_caps(item.title):
+            add("title_all_caps", "title is mostly ALL CAPS")
+        if title_looks_like_filename(item.title):
+            add("title_filename", "title looks like a filename or path")
 
     pdf_path = resolve_pdf_path(cfg, item, manifest)
     if pdf_path is None and item.has_pdf and backend is not None:

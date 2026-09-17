@@ -222,6 +222,7 @@ def test_work_by_doi_crossref():
 
     work = work_by_doi(mock_client(handler), "10.1000/test.doi", "a@b.c")
     assert work and work.title == title and work.venue == "Marine Policy"
+    assert work.date == "2019"
 
 
 def test_verify_doi_ok_suspect_unknown():

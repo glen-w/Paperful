@@ -106,6 +106,14 @@ def test_attach_failure_code_classification():
         attach_failure_code("Zotero local API has no write support") == "no_write_api"
     )
     assert attach_failure_code("write authorisation denied") == "auth"
+    assert (
+        attach_failure_code(
+            "{'key': '', 'code': 400, 'message': 'Parent item 1/ABCD1234 not found'}"
+        )
+        == "parent_missing"
+    )
+    assert at.parent_missing("Parent item 1/X not found")
+    assert not at.parent_missing("UploadError: boom")
 
 
 def test_authorises_stores_key_and_uploads(cfg, pdf, scripted):

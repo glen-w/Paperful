@@ -65,8 +65,22 @@ class LocalZupload(Zupload):
 
 
 ATTACH_CODES = frozenset(
-    {"success", "unchanged", "quota", "no_write_api", "auth", "other"}
+    {
+        "success",
+        "unchanged",
+        "quota",
+        "no_write_api",
+        "auth",
+        "parent_missing",
+        "other",
+    }
 )
+
+
+def parent_missing(reason: str) -> bool:
+    """Zotero rejected the upload because the parent item key is gone (often after sync remaps)."""
+    low = reason.lower()
+    return "parent item" in low and "not found" in low
 
 
 def attach_failure_code(reason: str) -> str:
@@ -77,6 +91,8 @@ def attach_failure_code(reason: str) -> str:
         return "quota"
     if "auth" in low or "unauthor" in low or "denied" in low:
         return "auth"
+    if parent_missing(reason):
+        return "parent_missing"
     return "other"
 
 

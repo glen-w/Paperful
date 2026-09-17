@@ -71,7 +71,7 @@ def test_propose_patch_sets_doi_on_swap(cfg):
         host = req.url.host or ""
         path = req.url.path
         if "crossref.org" in host and "/works/" in path and not path.endswith("/works"):
-            doi = path.rsplit("/", 1)[-1]
+            doi = path.split("/works/", 1)[1]
             if doi.startswith("10.9"):
                 return _json(
                     {
@@ -113,9 +113,13 @@ def test_propose_patch_sets_doi_on_swap(cfg):
     )
     client = mock_client(handler)
     findings = lint_item(client, cfg, item)
-    patch = propose_patch(client, cfg, item, findings)
+    patch = propose_patch(client, cfg, item, findings, prepared=True)
     assert patch is not None
     assert patch.after.get("doi") == "10.9/right"
+    assert patch.after.get("publicationTitle") == "Marine Policy"
+    assert patch.after.get("date") == "2019"
+    assert "creators" not in patch.after
+    assert "title" not in patch.after
 
 
 def test_pdf_doi_mismatch_uses_disk_not_export(cfg, tmp_path, monkeypatch):

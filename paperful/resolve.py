@@ -186,13 +186,71 @@ def _crossref_query(
 
 
 def _issued_year(work: dict[str, Any]) -> int | None:
-    parts = (work.get("issued") or {}).get("date-parts") or []
-    if parts and parts[0] and parts[0][0]:
+    parts = _best_date_parts(work)
+    if parts and parts[0]:
         try:
-            return int(parts[0][0])
+            return int(parts[0])
         except (TypeError, ValueError):
             return None
     return None
+
+
+def _best_date_parts(work: dict[str, Any]) -> list[Any] | None:
+    """Prefer issued, then published-print, then published-online date-parts."""
+    for key in ("issued", "published-print", "published-online"):
+        parts = (work.get(key) or {}).get("date-parts") or []
+        if parts and parts[0] and parts[0][0]:
+            return list(parts[0])
+    return None
+
+
+def format_date_parts(parts: list[Any] | None) -> str | None:
+    """Format Crossref-style date-parts as YYYY, YYYY-MM, or YYYY-MM-DD."""
+    if not parts or parts[0] is None:
+        return None
+    try:
+        year = int(parts[0])
+    except (TypeError, ValueError):
+        return None
+    if len(parts) >= 3 and parts[1] is not None and parts[2] is not None:
+        try:
+            return f"{year:04d}-{int(parts[1]):02d}-{int(parts[2]):02d}"
+        except (TypeError, ValueError):
+            pass
+    if len(parts) >= 2 and parts[1] is not None:
+        try:
+            return f"{year:04d}-{int(parts[1]):02d}"
+        except (TypeError, ValueError):
+            pass
+    return str(year)
+
+
+def date_precision(date: str | None) -> int:
+    """0 = empty/junk, 1 = year, 2 = year-month, 3 = year-month-day."""
+    if not date or not date.strip():
+        return 0
+    s = date.strip()
+    m = re.match(r"^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?$", s)
+    if m:
+        if m.group(3):
+            return 3
+        if m.group(2):
+            return 2
+        return 1
+    if not re.search(r"\b(1[5-9]\d{2}|20\d{2})\b", s):
+        return 0
+    if re.search(r"[A-Za-z]", s) and re.search(r"\b\d{1,2}\b", s):
+        return 2
+    return 1
+
+
+def strip_title_markup(title: str) -> str:
+    """Unescape entities and strip HTML tags; collapse whitespace."""
+    import html
+
+    t = html.unescape(title or "")
+    t = re.sub(r"<[^>]+>", " ", t)
+    return " ".join(t.split()).strip()
 
 
 # ---- enrichment (URL rewrite + Crossref + OpenAlex + Semantic Scholar) ------
@@ -240,6 +298,7 @@ class WorkMeta:
     doi: str
     title: str = ""
     year: int | None = None
+    date: str | None = None  # richest available: YYYY / YYYY-MM / YYYY-MM-DD
     first_author: str | None = None
     venue: str | None = None
     source: str = ""  # crossref | openalex | semanticscholar | pubmed
@@ -489,10 +548,18 @@ def _crossref_work(client: httpx.Client, doi: str, email: str) -> WorkMeta | Non
     if authors:
         first = authors[0].get("family") or authors[0].get("name")
     venue_list = msg.get("container-title") or []
+    parts = _best_date_parts(msg)
+    year = None
+    if parts and parts[0] is not None:
+        try:
+            year = int(parts[0])
+        except (TypeError, ValueError):
+            year = None
     return WorkMeta(
         doi=normalize_doi(msg.get("DOI") or doi) or doi.lower(),
         title=title,
-        year=_issued_year(msg),
+        year=year,
+        date=format_date_parts(parts),
         first_author=first,
         venue=venue_list[0] if venue_list else None,
         source="crossref",
@@ -529,10 +596,19 @@ def _openalex_work(client: httpx.Client, doi: str, email: str) -> WorkMeta | Non
         year_i = int(year) if year else None
     except (TypeError, ValueError):
         year_i = None
+    pub_date = data.get("publication_date")
+    date_str: str | None = None
+    if isinstance(pub_date, str) and re.match(
+        r"^\d{4}(?:-\d{2}(?:-\d{2})?)?$", pub_date.strip()
+    ):
+        date_str = pub_date.strip()
+    elif year_i is not None:
+        date_str = str(year_i)
     return WorkMeta(
         doi=resolved,
         title=data.get("display_name") or "",
         year=year_i,
+        date=date_str,
         first_author=first,
         venue=venue,
         source="openalex",

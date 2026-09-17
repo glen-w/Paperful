@@ -38,7 +38,10 @@ collection picker hint on fuzzy `--collection` miss.
 - Resumable missing-PDF fetch, source routing, circuit breaker, EZProxy / Scholar
   session hygiene, attach reliability, `doctor` / `report`
 - Deterministic `lint` / `fix-metadata` (Crossref / OpenAlex / Semantic Scholar /
-  PubMed, PDF-text DOI via pdftotext then pypdf) with explicit `--apply`
+  PubMed, PDF-text DOI via pdftotext then pypdf) with explicit `--apply`.
+  **Shipped:** verified PDF-DOI → patch; date precision guard; HTML title cleanup;
+  title hygiene findings (`title_html` / `title_all_caps` / `title_filename`).
+  ALL CAPS / filename stay findings until the optional LLM title MVP below.
 - CORE as an OA PDF source when `core_api_key` is set
 - Library adapter seam (`LibraryBackend`); Mendeley when someone needs it
 
@@ -115,7 +118,12 @@ on the map; not prerequisites for 1.x usefulness.
    (`paperful session login`); **pluggable grey-lit PDF playbooks** in
    `direct`/`landing` with builtin packs (UNGA/undocs · BBNJ/DOALOS · ISA;
    plus FAO/OECD/IEA/WHO — extend via `[[grey_playbooks]]`). Still
-   parked: SI/dataset/code siblings; watch/alert → propose items.
+   parked: SI/dataset/code siblings; watch/alert → propose items;
+   **opt-in LibGen** for `book` / `bookSection` gap-fill (title or ISBN routing;
+   unofficial scrapers only — spike
+   [libgen-api](https://pypi.org/project/libgen-api/) /
+   [libgenesis-api](https://pypi.org/project/libgenesis-api/) first; same
+   opt-in + disclaimer bar as Sci-Hub; no third-party HTTP gateways).
 3. **Identity / resolver graph** — work ↔ version ↔ preprint; scored patches with
    undo; citation ingest; manifestation-aware dedupe
 4. **File & attachment OS** — linked vs stored policy, rename, orphan GC,

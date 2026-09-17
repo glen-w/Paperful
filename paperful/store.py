@@ -227,3 +227,32 @@ def relpaths(out_dir: Path, paths: Iterable[Path]) -> list[str]:
         except ValueError:
             out.append(str(p))
     return out
+
+
+def resolve_pdf_path(out_dir: Path, raw: str | None) -> Path | None:
+    """Locate a manifest PDF path on this machine.
+
+    Docker Compose mounts PAPERFUL_DATA at /data, so older manifest lines may
+    store absolute /data/out/... paths. Rewrite those to the configured out_dir
+    when the original path is missing.
+    """
+    if not raw:
+        return None
+    path = Path(raw)
+    if path.is_file():
+        return path
+    text = raw.replace("\\", "/")
+    for prefix in ("/data/out/", "data/out/"):
+        if text.startswith(prefix):
+            alt = out_dir / text[len(prefix) :]
+            if alt.is_file():
+                return alt
+    try:
+        rel = path.relative_to("/data/out")
+    except ValueError:
+        rel = None
+    if rel is not None:
+        alt = out_dir / rel
+        if alt.is_file():
+            return alt
+    return path if path.exists() else None

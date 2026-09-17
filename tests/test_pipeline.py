@@ -43,17 +43,33 @@ class StubSource:
 
 
 class FakeAttacher:
-    def __init__(self, ok=True):
+    def __init__(self, ok=True, by_key=None):
         self.ok = ok
+        self.by_key = by_key or {}
         self.calls = []
+        self.zl = None
 
     def attach(self, key, path, title=None):
         self.calls.append((key, path))
+        if key in self.by_key:
+            return self.by_key[key]
         return AttachResult(
             self.ok,
             attachment_key="ATT1" if self.ok else None,
             reason="success" if self.ok else "denied",
         )
+
+
+class FakeZL:
+    def __init__(self, pdf_parents=None, items=None):
+        self._pdf_parents = set(pdf_parents or [])
+        self._items = items or []
+
+    def _pdf_parent_keys(self):
+        return set(self._pdf_parents)
+
+    def items_in_scope(self, collection_keys):
+        return list(self._items)
 
 
 @pytest.fixture
@@ -248,6 +264,41 @@ def test_attach_after_download_success_and_failure(pipe_factory):
     pipe2.run([make_item(key="B")])
     assert manifest2.get("B").status == STATUS_ATTACH_FAILED
     assert manifest2.pending_attach()[0].itemKey == "B"
+
+
+def test_attach_remaps_when_parent_key_missing(pipe_factory, tmp_path):
+    from paperful.store import Record
+
+    pdf = tmp_path / "paper.pdf"
+    pdf.write_bytes(b"%PDF-1.4 remapped")
+    attacher = FakeAttacher(
+        by_key={
+            "OLDKEY": AttachResult(
+                False,
+                reason="{'key': '', 'code': 400, 'message': 'Parent item 1/OLDKEY not found'}",
+                code="parent_missing",
+            ),
+            "NEWKEY": AttachResult(
+                True, attachment_key="ATT9", reason="success", code="success"
+            ),
+        }
+    )
+    attacher.zl = FakeZL(
+        items=[make_item(key="NEWKEY", doi="10.1000/xyz", title="Remapped Title")]
+    )
+    pipe, manifest = pipe_factory({"oa": StubSource("oa")}, ["oa"], attacher=attacher)
+    rec = Record(
+        itemKey="OLDKEY",
+        status=STATUS_OK,
+        title="Remapped Title",
+        doi="10.1000/xyz",
+        path=str(pdf),
+    )
+    assert pipe.attach_record(rec) is True
+    assert [c[0] for c in attacher.calls] == ["OLDKEY", "NEWKEY"]
+    assert manifest.get("NEWKEY").status == STATUS_ATTACHED
+    assert manifest.get("OLDKEY").status == STATUS_ATTACHED
+    assert "remapped to NEWKEY" in manifest.get("OLDKEY").reason
 
 
 def test_batches_and_stop_flag(pipe_factory):

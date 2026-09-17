@@ -285,6 +285,33 @@ class ZoteroLocal:
         )
         return items
 
+    def item_exists(self, key: str) -> bool:
+        """True if a top-level or child item with this key is in the local library."""
+        try:
+            self.zot.item(key)
+            return True
+        except Exception:
+            return False
+
+    def find_top_item_key(
+        self, *, doi: str | None = None, title: str | None = None
+    ) -> str | None:
+        """Resolve a live parent key after sync remapped keys (DOI first, then title)."""
+        want_doi = normalize_doi(doi)
+        want_title = (title or "").strip().lower()
+        if not want_doi and not want_title:
+            return None
+        items = self.items_in_scope(None)
+        if want_doi:
+            for it in items:
+                if it.doi and normalize_doi(it.doi) == want_doi:
+                    return it.key
+        if want_title:
+            for it in items:
+                if (it.title or "").strip().lower() == want_title:
+                    return it.key
+        return None
+
 
 def _force_zotero_local_host_header(request: Any) -> None:
     request.headers["Host"] = _ZOTERO_LOCAL_HOST_HEADER

@@ -64,8 +64,8 @@ uv run paperful fix-metadata --library --apply --overwrite   # also replace titl
 | --- | --- |
 | `doctor` | Environment check (Zotero, paths, email, sessions, pdftotext, Playwright, grey-lit packs). Green / amber / red. TTY guide for remediations (`--guide` / `--no-guide`). |
 | `run` | Find and download missing PDFs (`--dry-run`, `--preset eoi`, `--upgrade-linked`, `--try-all`, `--retry-failed`, `--sources`, `--scihub`, `--limit`). Never rewrites bibliographic fields. |
-| `lint` | Read-only identifier / PDF-DOI findings (`--json`, `--strict`, `--limit`). Codes: `missing_doi`, `suspect_doi`, `swappable_doi`, `pmid_no_doi`, `pdf_doi_mismatch`, `no_identifier` |
-| `fix-metadata` | Propose patches on disk; `--apply` writes them to the library (`--overwrite` for title/date/venue). Whitelist: `doi`, `title`, `date`, `publicationTitle` |
+| `lint` | Read-only identifier / PDF-DOI / title-hygiene findings (`--json`, `--strict`, `--limit`). Codes: `missing_doi`, `suspect_doi`, `swappable_doi`, `pmid_no_doi`, `pdf_doi_mismatch`, `title_html`, `title_all_caps`, `title_filename`, `no_identifier` |
+| `fix-metadata` | Propose patches on disk; `--apply` writes them to the library (`--overwrite` for title/date/venue). Whitelist: `doi`, `title`, `date`, `publicationTitle`. HTML title cleanup and verified PDF-DOI adoption included; ALL CAPS / filename are lint-only. |
 | `collections` | Collection tree with “No PDF” counts |
 | `report` | Manifest summary + latest run report (`--last-run`, `--json`, `--not-found`, `--status`) |
 | `attach` | Attach already-downloaded PDFs into Zotero |
@@ -129,8 +129,10 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
   attempt), `doi_verified` (`ok` / `suspect` / `swapped` / `unknown` /
   `missing`), `pdf_doi` (extracted from the file on disk after a successful
   download).
-- `state/metadata-patches.jsonl` — proposed bibliographic patches from
-  `fix-metadata` (dry-run and `--apply` both append here first).
+- `state/metadata-patches.jsonl` — append-only audit log of proposed bibliographic
+  patches from `fix-metadata` (dry-run and `--apply` both append here first).
+  One patch per item key per invocation; inspect the file for review — it is not
+  a selective re-apply queue.
 - `state/pdf-cache/` — PDFs exported from the manager so lint can read text
   on disk (`pdftotext`, then `pypdf`).
 - `state/last-run.json` — latest auditable `run` report (summary + per-item

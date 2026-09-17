@@ -8,6 +8,7 @@ from paperful.store import (
     STATUS_OK,
     Manifest,
     Record,
+    resolve_pdf_path,
     safe_filename,
     save_pdf,
     unique_path,
@@ -132,3 +133,13 @@ def test_attachment_payload_is_stored_file_with_basename():
     assert p["itemType"] == "attachment" and p["linkMode"] == "imported_file"
     assert p["filename"] == "Smith - 2020 - A paper.pdf"
     assert p["contentType"] == "application/pdf"
+
+
+def test_resolve_pdf_path_rewrites_docker_data_prefix(tmp_path):
+    pdf = tmp_path / "ocean" / "BBNJ" / "paper.pdf"
+    pdf.parent.mkdir(parents=True)
+    pdf.write_bytes(b"%PDF-1.4 x")
+    assert resolve_pdf_path(tmp_path, str(pdf)) == pdf
+    docker = f"/data/out/ocean/BBNJ/{pdf.name}"
+    assert resolve_pdf_path(tmp_path, docker) == pdf
+    assert resolve_pdf_path(tmp_path, "/data/out/missing.pdf") is None

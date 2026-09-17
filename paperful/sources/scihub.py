@@ -96,6 +96,9 @@ def is_captcha_page(html: str) -> bool:
     return (
         "проверка на робота" in low
         or "are you a robot" in low
+        or "verification - sci-hub" in low
+        or "cf-turnstile" in low
+        or "challenges.cloudflare.com/turnstile" in low
         or bool(re.search(r"fetch\(\s*['\"]/captcha/solution/", html))
     )
 
