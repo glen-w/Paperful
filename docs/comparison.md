@@ -3,7 +3,7 @@
 A plain-language map of where paperful sits next to Zotero plugins, bibliography
 fixers, Mendeley export cleaners, and DOI-centric download scripts.
 
-**Last reviewed:** 2026-09-10. Feature lists for other products are based on public
+**Last reviewed:** 2026-09-18. Feature lists for other products are based on public
 docs and positioning — not paid pilots or exhaustive release testing.
 
 Vendor-by-vendor notes live in the [comparison reference](comparison-reference.md).
@@ -17,7 +17,8 @@ Prefer this page for “is this the right tool?”
 | **In-Zotero** “find OA PDF” plus optional grey-zone sources in one plugin UI | [zotero-zotadata](https://github.com/ydeng11/zotero-zotadata) |
 | **Attachment hygiene** (broken links, rename, linked-file layout, merge duplicate files) | [StorScan](https://github.com/brian-j-griffith/StorScan), [Attanger](https://github.com/MuiseDestiny/zotero-attanger), [ZotMoov](https://github.com/wileyyugioh/zotmoov) |
 | **Metadata repair** (DOI/ISBN/arXiv bulk update, parent-from-PDF) | paperful `lint` / `fix-metadata`, or [ZotMeta](https://github.com/RoadToDream/ZotMeta) |
-| **Scriptable library surgery** (dedupe, enrich, `pdf-fetch`, disk GC) via CLI/MCP | [zotero-agent](https://github.com/alex-roc/zotero-agent) |
+| **Duplicate parents** in one collection (DOI, then title+year). Review a pack, then trash extras. No field merge. | **paperful** `dedupe` |
+| **Scriptable library surgery** (merge, enrich, disk GC) via CLI/MCP | [zotero-agent](https://github.com/alex-roc/zotero-agent) |
 | **AI assistant** read/write over the library | zotero-mcp forks ([richardjlyon](https://github.com/richardjlyon/zotero-mcp), [cookjohn](https://github.com/cookjohn/zotero-mcp), [mcp-zotero](https://github.com/Xevos117/mcp-zotero)) |
 | **`.bib` normalize / dedupe / upgrade preprints** (no Zotero required) | [bibcite](https://github.com/leo1oel/bibcite), [bibtex-tidy](https://github.com/FlamingTempura/bibtex-tidy), [bibmanager](https://bibmanager.readthedocs.io/) |
 | **Mendeley** dedup inside the app; clean **exported** BibTeX | Mendeley Duplicates smart collection; export cleaners such as [mendeley_bibtex_cleaner](https://gist.github.com/alexandrehuat/6d3263f73ccae87d0107977978316c02) |
@@ -52,6 +53,7 @@ Zotero library  →  paperful run  →  out/<collection>/…pdf  →  attach (Zo
 
 Parallel tracks:
   Metadata: paperful lint/fix-metadata, ZotMeta, zotero-agent
+  Duplicates: paperful dedupe (trash the extra; no field merge), Zotero’s duplicate UI, zotero-agent
   Attachment plugins (StorScan, Attanger)
   Bib CLI (bibcite, bibtex-tidy)
 ```
@@ -71,7 +73,7 @@ Legend: **Yes** = first-class · **Partial** = adjacent or lighter · **No** = a
 | Metadata verify / lint | Yes | No | Yes | No | Yes | Yes |
 | Metadata **apply** to library | Yes (`fix-metadata --apply`) | No | Yes | No | Yes | Yes |
 | Broken link / file layout repair | No | Partial | Partial | Yes | No | Partial |
-| Dedupe / merge items | No | Partial | No | Partial | No | Yes |
+| Dedupe / merge items | Partial (`dedupe --apply` trashes extras; no field merge) | Partial | No | Partial | No | Yes |
 | Runs **outside** Zotero UI (CLI) | Yes | No | No | No | No | Yes |
 | Work on disk, then write-back | Yes | No | No | Partial | No | Partial |
 
@@ -81,7 +83,7 @@ zotero-mcp and BibTeX-cluster columns: [comparison reference](comparison-referen
 
 - Mendeley write-back (config key reserved)
 - Attachment path surgery (author folders, stored→linked conversion)
-- Item merge/dedupe
+- Item field-merge (dedupe trashes the extra parent; it does not merge children or notes)
 - Hosted multi-user service
 - Jeffersonian transcription or qualitative coding
 

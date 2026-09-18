@@ -21,9 +21,9 @@ doctor → collections → run --dry-run → run → report / report --json
 `--dry-run` lists each item and a **Would-hit** column (sources that routing
 would try, in order). It does not download.
 
-When Zotero is down, `collections`, `run`, and `attach` exit **2** and print
-the same next-steps ladder (`paperful doctor`, enable local API, copy
-`config.example.toml`).
+When Zotero is down, `collections`, `run`, `attach`, `lint`, `fix-metadata`,
+`dedupe`, and `gaps` exit **2** and print the same next-steps ladder
+(`paperful doctor`, enable local API, copy `config.example.toml`).
 
 ## What 1.0 still owes operators
 

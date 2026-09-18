@@ -121,6 +121,10 @@ class Config:
         return self.state_dir / "metadata-patches.jsonl"
 
     @property
+    def dedupe_applied_path(self) -> Path:
+        return self.state_dir / "dedupe-applied.jsonl"
+
+    @property
     def pdf_cache_dir(self) -> Path:
         return self.state_dir / "pdf-cache"
 

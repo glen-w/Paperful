@@ -58,6 +58,11 @@ uv run paperful lint -C BBNJ --strict             # exit 1 if any finding
 uv run paperful fix-metadata --library            # dry-run → state/metadata-patches.jsonl
 uv run paperful fix-metadata --library --apply    # write DOI/title/date/venue into Zotero 10+
 uv run paperful fix-metadata --library --apply --overwrite   # also replace title/date/venue
+
+# duplicates, then remaining PDF gaps (review the pack before --apply)
+uv run paperful dedupe -C BBNJ --dry-run
+uv run paperful dedupe -C BBNJ --apply          # high_doi only; add --apply-medium for title+year
+uv run paperful gaps -C BBNJ
 ```
 
 | Command | Purpose |
@@ -66,6 +71,8 @@ uv run paperful fix-metadata --library --apply --overwrite   # also replace titl
 | `run` | Find and download missing PDFs (`--dry-run`, `--preset eoi`, `--upgrade-linked`, `--try-all`, `--retry-failed`, `--sources`, `--scihub`, `--limit`). Never rewrites bibliographic fields. |
 | `lint` | Read-only identifier / PDF-DOI / title-hygiene findings (`--json`, `--strict`, `--limit`). Codes: `missing_doi`, `suspect_doi`, `swappable_doi`, `pmid_no_doi`, `pdf_doi_mismatch`, `title_html`, `title_all_caps`, `title_filename`, `no_identifier` |
 | `fix-metadata` | Propose patches on disk; `--apply` writes them to the library (`--overwrite` for title/date/venue). Whitelist: `doi`, `title`, `date`, `publicationTitle`. HTML title cleanup and verified PDF-DOI adoption included; ALL CAPS / filename are lint-only. |
+| `dedupe` | Duplicate pack on disk (`high_doi`, then `title+year`). `--apply` trashes DOI extras only; title+year needs `--apply-medium`. Held when same-DOI titles diverge. See [dedupe](dedupe.md). |
+| `gaps` | Counts: no stored PDF, linked PDF URL only, missing DOI. Read-only. Next steps are `run` and `lint`. |
 | `collections` | Collection tree with “No PDF” counts |
 | `report` | Manifest summary + latest run report (`--last-run`, `--json`, `--not-found`, `--status`) |
 | `attach` | Attach already-downloaded PDFs into Zotero |
@@ -89,7 +96,7 @@ collections are written once and hard-linked into the other folders.
 | **amber** | Degraded but you can continue (empty `email`, missing EZProxy/Scholar session, no `pdftotext`, Playwright/Chromium not ready, Zotero without write API) |
 | **red** | Fatal if the check is `Zotero :23119`, `out_dir`, or `state_dir` |
 
-Unpaywall needs a real `email`. Missing sessions: `paperful session login ezproxy` or `scholar` (system Chrome/Edge when present). Missing `pdftotext`: Poppler; `pypdf` is the fallback. Playwright is core; Chromium installs on first `session login`.
+Unpaywall needs a real `email`. Missing sessions: `paperful session login ezproxy` or `scholar` (system Chrome/Edge when present). Missing `pdftotext`: Poppler; `pypdf` is the fallback. Playwright is core; Chromium installs on first `session login`. An amber Write API means Zotero 7–9: fetch still works, but `attach`, `fix-metadata --apply`, and `dedupe --apply` do not.
 
 On a TTY (Compose sets `stdin_open` / `tty` for the optional image), amber/red
 checks open an interactive **Guide**: each step prints what to do, waits for
@@ -103,13 +110,17 @@ Inside Docker, `docker compose run --rm paperful` with no extra args is `doctor`
 **Would-hit** column is the source lane for that item, in order. `--try-all`
 (or `source_routing = false`) lists every configured source.
 
+`paperful dedupe` is a dry-run unless you pass `--apply`: it writes
+`state/dedupe-packs/` and does not trash. Do not pass `--dry-run` and
+`--apply` together.
+
 ## Exits
 
 | Code | When |
 | --- | --- |
 | 0 | Success (including empty dry-run) |
-| 1 | User error (unknown collection, bad preset, `--strict` lint findings) |
-| 2 | Environment: Zotero unreachable on `collections` / `run` / `attach`. Prints **Next steps** (start Zotero, enable local API, `paperful doctor`) |
+| 1 | User error (unknown collection, bad preset, unknown `--phase`, `--dry-run` together with `--apply`, `--strict` lint findings) |
+| 2 | Environment: Zotero unreachable on `collections`, `run`, `attach`, `lint`, `fix-metadata`, `dedupe`, or `gaps`. Prints **Next steps** (start Zotero, enable local API, `paperful doctor`) |
 
 ## Run summary
 
@@ -133,6 +144,10 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
   patches from `fix-metadata` (dry-run and `--apply` both append here first).
   One patch per item key per invocation; inspect the file for review — it is not
   a selective re-apply queue.
+- `state/dedupe-packs/` — `dedupe` review packs (`.json` and `.md`). Not applied
+  until `--apply`.
+- `state/dedupe-applied.jsonl` — one line per item moved to trash by
+  `dedupe --apply`.
 - `state/pdf-cache/` — PDFs exported from the manager so lint can read text
   on disk (`pdftotext`, then `pypdf`).
 - `state/last-run.json` — latest auditable `run` report (summary + per-item

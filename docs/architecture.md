@@ -5,8 +5,9 @@ patches happen **on disk** (`out/`, `state/`). A **library adapter** reads the
 catalogue and, separately, writes PDFs or field patches back. Zotero (local API
 on `localhost:23119`) is the first adapter; `manager = "mendeley"` is reserved.
 
-`run` never rewrites bibliographic fields. Attach and `fix-metadata --apply`
-use the Zotero 10+ write API.
+`run` never rewrites bibliographic fields. Attach, `fix-metadata --apply`, and
+`dedupe --apply` use the Zotero 10+ write API. Dedupe moves extras to the
+Zotero trash; it does not delete files under `out/`.
 
 ## Data flow
 
@@ -35,6 +36,8 @@ flowchart LR
 | `out/<collection>/…pdf` | Collection-mirrored downloads |
 | `state/manifest.jsonl` | Append-only resume ledger. Latest line per item key wins. Fields include `doi` (used this attempt), `library_doi`, `doi_verified`, `pdf_doi` |
 | `state/metadata-patches.jsonl` | Proposed patches (`doi`, `title`, `date`, `publicationTitle`) |
+| `state/dedupe-packs/` | Duplicate review packs from `dedupe` (JSON + Markdown) |
+| `state/dedupe-applied.jsonl` | Trash audit; appended only on `dedupe --apply` |
 | `state/pdf-cache/` | Manager PDFs exported so lint reads text on disk |
 | `state/sessions/` | Chromium profile + `meta.json` (login timestamps, no secrets). Netscape dumps for httpx |
 | `state/last-run.json` | Latest `run` report (`paperful.run_report.v1`) |
@@ -44,7 +47,7 @@ flowchart LR
 
 ## Library adapter
 
-[`paperful/library.py`](../paperful/library.py) defines `LibraryBackend`: list items, export a PDF **onto disk**, apply a field patch, attach a file. Identifier logic (`resolve`, `lint`, `pdfid`, `metadata`) must not import Zotero except through this protocol.
+[`paperful/library.py`](../paperful/library.py) defines `LibraryBackend`: list items, export a PDF **onto disk**, apply a field patch, trash a duplicate parent, attach a file. Identifier and dedupe logic (`resolve`, `lint`, `pdfid`, `metadata`, `dedupe`) must not import Zotero except through this protocol. `trash_item` sets `deleted` and updates the item; it does not call a permanent delete.
 
 ## Identifiers and lint
 
@@ -96,13 +99,17 @@ When Zotero cloud storage is full, attachments may fail with quota errors; PDFs 
 - `paperful run --dry-run` — no downloads. Per item: **Would-hit** is the
   routed source list in order (full `sources` when `--try-all`).
 - `paperful lint` / `paperful fix-metadata` — identifier hygiene; apply is explicit.
+- `paperful dedupe` / `paperful gaps` — duplicate packs and PDF/DOI counts.
+  `dedupe` writes `state/dedupe-packs/` and trashes only with `--apply`
+  (title+year also needs `--apply-medium`). See [dedupe](dedupe.md).
 - `paperful report` / `paperful report --last-run` — manifest totals plus the latest
   auditable run report (`state/last-run.json`, history under `state/runs/`).
   Each `run` prints a **Run summary** table (downloads, attached, deferred,
   errors). A one-line banner is a [1.0](ROADMAP.md#trust-10) tightening.
 
-When Zotero is unreachable, `collections`, `run`, and `attach` exit **2** and
-print next steps (start Zotero, enable local API, `paperful doctor`).
+When Zotero is unreachable, `collections`, `run`, `attach`, `lint`,
+`fix-metadata`, `dedupe`, and `gaps` exit **2** and print next steps (start
+Zotero, enable local API, `paperful doctor`).
 
 (run-report-v1)=
 ## Report JSON (`paperful.run_report.v1`)
@@ -167,6 +174,7 @@ stop at `no_identifier`.
 - [releases.md](releases.md) — 0.x vs 1.0
 - [comparison.md](comparison.md) — where paperful sits next to plugins and bib tools
 - [commands.md](commands.md) — CLI and disk artifacts
+- [dedupe.md](dedupe.md) — duplicate packs and the BBNJ hygiene loop
 - [config.md](config.md) — `config.toml` keys and grey playbooks
 - [ezproxy.md](ezproxy.md) / [sessions.md](sessions.md) — campus proxy and browser vault
 - [docker.md](docker.md) — optional image (host Zotero + headed login stay outside)

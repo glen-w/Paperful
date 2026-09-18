@@ -164,6 +164,7 @@ def test_items_in_scope_includes_items_with_pdf(zl):
     assert a.has_pdf is True and a.library_doi == "10.1000/a"
     b = next(i for i in scoped if i.key == "B")
     assert b.has_pdf is False
+    assert b.has_linked_url is True
 
 
 def test_paperful_zotero_host_overrides_endpoint(monkeypatch):

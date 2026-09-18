@@ -90,6 +90,7 @@ Layout, Zotero networking, and the host/container split: [Docker](docs/docker.md
 Reference (same corpus as the hosted guide):
 
 - [Commands and output](docs/commands.md)
+- [Duplicate packs](docs/dedupe.md)
 - [Configuration](docs/config.md)
 - [Source routing](docs/sources.md)
 - [Architecture](docs/architecture.md)

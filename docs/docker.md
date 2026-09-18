@@ -125,6 +125,7 @@ docker compose run --rm paperful report
 docker compose run --rm paperful            # doctor (default)
 docker compose run --rm paperful doctor --no-guide
 docker compose run --rm paperful collections
+docker compose run --rm paperful dedupe -C BBNJ --dry-run
 docker compose run --rm paperful run --collection interesting --dry-run
 docker compose run --rm paperful run --collection interesting
 docker compose run --rm paperful report

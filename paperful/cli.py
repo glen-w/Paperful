@@ -520,6 +520,208 @@ def _write_fix_report(
 
 
 @app.command()
+def dedupe(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool = typer.Option(
+        False, "--library", help="Whole library instead of collections."
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Write the pack only. This is the default; do not combine with --apply.",
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Trash high_doi extras (Zotero 10+). Title+year needs --apply-medium.",
+    ),
+    apply_medium: bool = typer.Option(
+        False,
+        "--apply-medium",
+        help="Also trash title+year extras. Off by default.",
+    ),
+    phase: str = typer.Option(
+        "all",
+        "--phase",
+        help="high_doi, medium_title_year, or all (default). Apply runs high_doi first.",
+    ),
+    limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
+    as_json: bool = typer.Option(
+        False, "--json", help="Print pack paths and counts as JSON."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Find duplicate parents and write a review pack. Trash only with --apply.
+
+    Default is classify-only. Same-DOI groups whose titles diverge are held.
+    """
+    from .dedupe import PHASES, apply_trash, classify, pack_counts, write_pack
+
+    if dry_run and apply:
+        console.print("[red]Pass either --dry-run or --apply, not both.[/]")
+        raise typer.Exit(1)
+    phase_name = phase.strip().lower()
+    if phase_name not in PHASES:
+        console.print(
+            f"[red]Unknown phase '{phase}'.[/] Known: {', '.join(PHASES)}"
+        )
+        raise typer.Exit(1)
+    if not collection and not library:
+        console.print("[red]Give --collection PATH (repeatable) or --library.[/]")
+        raise typer.Exit(1)
+    cfg = _cfg(config)
+    _require_manager(cfg)
+    zl = _zotero(quiet=as_json)
+    keys, scope = _scope_keys(zl, collection, library)
+    backend = get_backend(cfg, zl)
+    items = backend.items_in_scope(keys)
+    if limit:
+        items = items[:limit]
+    try:
+        groups = classify(items, phase_name)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1)
+    json_path, md_path = write_pack(
+        cfg.state_dir, scope, groups, phase=phase_name, n_items=len(items)
+    )
+    counts = pack_counts(groups, len(items))
+    applied = 0
+    errors: list[str] = []
+    if apply:
+        if not backend.supports_write():
+            _exit_env(
+                "This Zotero has no local write API. Upgrade to Zotero 10+ to dedupe --apply."
+            )
+        try:
+            applied, errors = apply_trash(
+                backend,
+                groups,
+                apply_medium=apply_medium,
+                audit_path=cfg.dedupe_applied_path,
+                scope=scope,
+                pack=json_path,
+            )
+        except LibraryError as exc:
+            _exit_env(str(exc))
+    payload = {
+        "pack": str(json_path),
+        "markdown": str(md_path),
+        "counts": counts,
+        "applied": applied,
+        "errors": errors,
+    }
+    if as_json:
+        console.print(
+            json.dumps(payload, indent=2), soft_wrap=True, highlight=False, markup=False
+        )
+    else:
+        console.print(f"Scope: [bold]{scope}[/] — {len(items)} items")
+        _print_dedupe_table(groups)
+        console.print(f"[dim]Wrote {json_path}[/]")
+        console.print(f"[dim]Wrote {md_path}[/]")
+        if apply:
+            console.print(f"Trashed: {applied}")
+            if apply_medium:
+                console.print("[dim]Included medium_title_year groups.[/]")
+            elif any(g.phase == "medium_title_year" and g.trash for g in groups):
+                console.print(
+                    "Title+year groups were not trashed. Pass [bold]--apply-medium[/] to include them."
+                )
+        else:
+            console.print(
+                "Dry-run. Pass [bold]--apply[/] to trash high_doi extras "
+                "(title+year needs [bold]--apply-medium[/])."
+            )
+        if errors:
+            console.print(f"Errors: {len(errors)}")
+            for err in errors[:20]:
+                console.print(f"[yellow]{err}[/]")
+    if errors:
+        raise typer.Exit(1)
+
+
+def _print_dedupe_table(groups: list) -> None:
+    if not groups:
+        console.print("[green]No duplicate groups.[/]")
+        return
+    table = Table(title=f"{len(groups)} duplicate groups")
+    table.add_column("Phase")
+    table.add_column("Keep", style="dim")
+    table.add_column("Trash")
+    table.add_column("Note")
+    for group in groups:
+        if group.held:
+            note = group.reason
+            keep = "-"
+            trash = "-"
+        else:
+            note = "needs review" if group.needs_review else group.reason
+            keep = group.keep or "-"
+            trash = ", ".join(group.trash)
+        table.add_row(group.phase, keep, trash, note)
+    console.print(table)
+
+
+@app.command()
+def gaps(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool = typer.Option(
+        False, "--library", help="Whole library instead of collections."
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Print counts as JSON."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Count items with no stored PDF, a linked PDF URL only, or no DOI.
+
+    Points at `run` (PDFs) and `lint` (identifiers). Does not write the library.
+    """
+    from .dedupe import summarize_gaps
+
+    if not collection and not library:
+        console.print("[red]Give --collection PATH (repeatable) or --library.[/]")
+        raise typer.Exit(1)
+    cfg = _cfg(config)
+    _require_manager(cfg)
+    zl = _zotero(quiet=as_json)
+    keys, scope = _scope_keys(zl, collection, library)
+    backend = get_backend(cfg, zl)
+    counts = summarize_gaps(backend.items_in_scope(keys))
+    payload = {
+        "scope": scope,
+        "items": counts.items,
+        "no_stored_pdf": counts.no_stored_pdf,
+        "linked_url_only": counts.linked_url_only,
+        "missing_doi": counts.missing_doi,
+    }
+    if as_json:
+        console.print(
+            json.dumps(payload, indent=2), soft_wrap=True, highlight=False, markup=False
+        )
+        return
+    console.print(f"Scope: [bold]{scope}[/]")
+    table = Table(title="Gaps")
+    table.add_column("Count", justify="right")
+    table.add_column("Gap")
+    table.add_column("Next")
+    table.add_row(str(counts.items), "items in scope", "")
+    table.add_row(
+        str(counts.no_stored_pdf), "no stored PDF", "paperful run (or --upgrade-linked)"
+    )
+    table.add_row(
+        str(counts.linked_url_only),
+        "linked PDF URL only",
+        "paperful run --upgrade-linked",
+    )
+    table.add_row(str(counts.missing_doi), "missing DOI", "paperful lint")
+    console.print(table)
+
+
+@app.command()
 def run(
     collection: list[str] = typer.Option(
         [],
