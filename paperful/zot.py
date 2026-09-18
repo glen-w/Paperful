@@ -68,6 +68,9 @@ class Item:
     doi_verified: str = "missing"  # ok | suspect | swapped | unknown | missing
     pdf_path: str | None = None
     has_pdf: bool = False
+    has_linked_url: bool = False  # PDF attachment is a linked URL, not a stored file
+    date_added: str | None = None  # Zotero dateAdded; older wins keep ties
+    creator_count: int = 0
 
     @property
     def label(self) -> str:
@@ -247,7 +250,15 @@ class ZoteroLocal:
                 continue
             if key in linked_only and not upgrade_linked:
                 continue
-            items.append(item_from_json(it, cols, selected, has_pdf=key in imported))
+            items.append(
+                item_from_json(
+                    it,
+                    cols,
+                    selected,
+                    has_pdf=key in imported,
+                    has_linked_url=key in linked_only,
+                )
+            )
         items.sort(
             key=lambda i: (
                 i.collection_paths[0] if i.collection_paths else "~",
@@ -259,7 +270,7 @@ class ZoteroLocal:
     def items_in_scope(self, collection_keys: list[str] | None) -> list[Item]:
         """All top-level regular items in the selected collections (or library)."""
         cols = self.collections()
-        imported, _linked = self._pdf_parent_sets()
+        imported, linked_only = self._pdf_parent_sets()
         if collection_keys is None:
             raw = self.zot.everything(self.zot.top())
             selected: set[str] | None = None
@@ -276,7 +287,15 @@ class ZoteroLocal:
             if data.get("itemType") in SKIP_TYPES or data.get("deleted"):
                 continue
             key = it["key"]
-            items.append(item_from_json(it, cols, selected, has_pdf=key in imported))
+            items.append(
+                item_from_json(
+                    it,
+                    cols,
+                    selected,
+                    has_pdf=key in imported,
+                    has_linked_url=key in linked_only,
+                )
+            )
         items.sort(
             key=lambda i: (
                 i.collection_paths[0] if i.collection_paths else "~",
@@ -370,6 +389,7 @@ def item_from_json(
     cols: dict[str, Collection],
     selected: set[str] | None,
     has_pdf: bool = False,
+    has_linked_url: bool = False,
 ) -> Item:
     data = it["data"]
     meta = it.get("meta", {})
@@ -395,6 +415,8 @@ def item_from_json(
         paths = [UNCOLLECTED]
     pub = (data.get("publicationTitle") or "").strip() or None
     date = (data.get("date") or "").strip() or None
+    creators = data.get("creators") or []
+    date_added = (data.get("dateAdded") or "").strip() or None
     return Item(
         key=it["key"],
         item_type=data.get("itemType", "document"),
@@ -403,7 +425,7 @@ def item_from_json(
         arxiv_id=arxiv_id,
         url=(data.get("url") or "").strip() or None,
         year=parse_year(meta.get("parsedDate") or data.get("date")),
-        first_author=first_author(data.get("creators") or []),
+        first_author=first_author(creators),
         collection_paths=sorted(paths),
         doi_source=doi_source,
         library_doi=doi,
@@ -412,6 +434,9 @@ def item_from_json(
         publication_title=pub,
         date=date,
         has_pdf=has_pdf,
+        has_linked_url=has_linked_url and not has_pdf,
+        date_added=date_added,
+        creator_count=len(creators),
     )
 
 

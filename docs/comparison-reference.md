@@ -66,8 +66,8 @@ Verify against each project’s latest release before upgrading Zotero.
 ### paperful
 
 - **Sites:** [GitHub](https://github.com/glen-w/Paperful) · this repo
-- **Fit:** CLI gap-filler. Routed OA stack (including CORE with API key), optional EZProxy and Scholar cookies, opt-in Sci-Hub, collection-mirrored `out/` tree, `manifest.jsonl`, attach on Zotero 10+. Identifier verify (Crossref/OpenAlex/PubMed) + lint + `fix-metadata` on disk, then adapter write-back.
-- **With others:** StorScan or Attanger when paths and linked files are wrong; zotero-agent for dedupe.
+- **Fit:** CLI gap-filler. Routed OA stack (including CORE with API key), optional EZProxy and Scholar cookies, opt-in Sci-Hub, collection-mirrored `out/` tree, `manifest.jsonl`, attach on Zotero 10+. Identifier verify (Crossref/OpenAlex/PubMed) + lint + `fix-metadata` on disk, then adapter write-back. `dedupe` writes a review pack and, with `--apply`, trashes extra parents (DOI, then title+year). `gaps` counts missing PDFs and DOIs.
+- **With others:** StorScan or Attanger when paths and linked files are wrong; zotero-agent when you need a real merge (children, notes), not only trash.
 - **Not a substitute for:** In-app plugin UX, or `.bib` hygiene tools.
 
 ### Zotero built-in

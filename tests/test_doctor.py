@@ -16,6 +16,12 @@ def test_remediation_scholar_host_vs_docker(cfg):
     assert "uv run paperful session login scholar" in dock
 
 
+def test_remediation_write_api_names_dedupe(cfg):
+    text = remediation_text(Check("Write API", "amber", "no"), cfg)
+    assert text and "dedupe --apply" in text
+    assert "fix-metadata --apply" in text
+
+
 def test_remediation_skips_green(cfg):
     assert remediation_text(Check("email", "green", "x@y.z"), cfg) is None
 

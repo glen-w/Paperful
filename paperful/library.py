@@ -27,6 +27,7 @@ class LibraryBackend(Protocol):
     def count_linked_url_only(self, collection_keys: list[str] | None) -> int: ...
     def export_pdf(self, item: Item, dest: Path) -> Path | None: ...
     def apply_patch(self, item_key: str, fields: dict[str, Any]) -> None: ...
+    def trash_item(self, item_key: str) -> None: ...
     def supports_write(self) -> bool: ...
 
 
@@ -125,4 +126,11 @@ class ZoteroBackend:
         data = raw["data"]
         for name, value in fields.items():
             data[mapping.get(name, name)] = value
+        self.zl.zot.update_item(raw)
+
+    def trash_item(self, item_key: str) -> None:
+        """Move a parent item to the Zotero trash. Does not delete files under out/."""
+        self._ensure_write()
+        raw = self.zl.zot.item(item_key)
+        raw["data"]["deleted"] = True
         self.zl.zot.update_item(raw)

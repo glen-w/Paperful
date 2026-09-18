@@ -54,8 +54,8 @@ def remediation_text(
         )
     if check.name == "Write API":
         return (
-            "Zotero 7–9 is download-only here. Upgrade to Zotero 10+ for attach / "
-            "write-back, or keep fetching to disk and run attach later."
+            "Zotero 7–9 is download-only here. Upgrade to Zotero 10+ for attach, "
+            "fix-metadata --apply, and dedupe --apply, or keep fetching to disk."
         )
     if check.name == "email":
         return (
@@ -175,7 +175,11 @@ def run_checks(
             checks.append(Check("Write API", "green", "yes (Zotero 10+)"))
         else:
             checks.append(
-                Check("Write API", "amber", "no — download-only until Zotero 10+")
+                Check(
+                    "Write API",
+                    "amber",
+                    "no — attach, fix-metadata --apply, and dedupe --apply need Zotero 10+",
+                )
             )
 
     if cfg.email.strip():

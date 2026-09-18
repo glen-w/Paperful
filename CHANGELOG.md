@@ -6,6 +6,13 @@ may still move. **1.0** will lock `paperful.run_report.v1` and attach behaviour
 
 ## Unreleased
 
+`paperful dedupe` writes a collection-scoped duplicate pack (normalised DOI,
+then title+year) and trashes only on `--apply`. Same-DOI groups with divergent
+titles are held. Title+year groups need `--apply-medium`. `paperful gaps`
+counts missing PDFs, linked-URL-only items, and missing DOIs. Crossref
+year-backfill ingest, summary notes, and CRM contact scans stay outside this
+tool.
+
 Publisher PDF URLs that Unpaywall / OpenAlex / Semantic Scholar “find” often
 403 on a cookie-only GET (Elsevier ScienceDirect especially). `run` now
 retries those through the session Chromium profile, wrapping the URL in

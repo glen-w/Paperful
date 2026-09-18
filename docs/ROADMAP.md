@@ -42,6 +42,9 @@ collection picker hint on fuzzy `--collection` miss.
   **Shipped:** verified PDF-DOI → patch; date precision guard; HTML title cleanup;
   title hygiene findings (`title_html` / `title_all_caps` / `title_filename`).
   ALL CAPS / filename stay findings until the optional LLM title MVP below.
+- Collection-scoped duplicate packs: `paperful dedupe` (DOI, then title+year).
+  Trash is explicit `--apply`; title+year needs `--apply-medium`. See
+  [dedupe](dedupe.md).
 - CORE as an OA PDF source when `core_api_key` is set
 - Library adapter seam (`LibraryBackend`); Mendeley when someone needs it
 
@@ -125,7 +128,11 @@ on the map; not prerequisites for 1.x usefulness.
    [libgenesis-api](https://pypi.org/project/libgenesis-api/) first; same
    opt-in + disclaimer bar as Sci-Hub; no third-party HTTP gateways).
 3. **Identity / resolver graph** — work ↔ version ↔ preprint; scored patches with
-   undo; citation ingest; manifestation-aware dedupe
+   undo; citation ingest; manifestation-aware dedupe. Collection DOI / title+year
+   trash is already `paperful dedupe`. Still later:
+   `paperful ingest-dois --from-file dois.txt -C BBNJ --dry-run` then `--apply`
+   (create items by DOI, tag `crossref-backfill`, hand off to `run` for PDFs).
+   That backfill stays out of any scheduled bot inside Paperful.
 4. **File & attachment OS** — linked vs stored policy, rename, orphan GC,
    broken-link repair, PDF quality / wrong-paper triage (eat StorScan-class tools)
 

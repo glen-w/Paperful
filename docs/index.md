@@ -20,6 +20,7 @@ first-run story. **0.x** flags may still move; see [releases](releases.md).
 :caption: Start here
 
 commands
+dedupe
 config
 architecture
 releases
