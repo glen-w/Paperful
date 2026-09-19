@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from paperful.circuit import CircuitBreaker
 from paperful.routing import (
+    doi_from_biorxiv_url,
     ezproxy_target,
     is_block_failure,
+    is_cshl_doi,
     is_publisher_url,
     publisher_host,
     source_applicable,
@@ -187,3 +189,22 @@ def test_publisher_host_groups_rewritten_ezproxy_hosts():
     assert is_publisher_url("https://linkinghub.elsevier.com/retrieve/pii/S1")
     assert not is_publisher_url("https://arxiv.org/pdf/1234.5678")
     assert not publisher_host("https://repository.example.edu/bitstream/1/a.pdf")
+
+
+def test_biorxiv_doi_helpers_are_shared(cfg):
+    assert is_cshl_doi("10.1101/2020.01.10.901900")
+    assert not is_cshl_doi("10.1000/x")
+    assert not is_cshl_doi(None)
+    url = "https://www.biorxiv.org/content/10.1101/2020.01.10.901900v1"
+    assert doi_from_biorxiv_url(url) == "10.1101/2020.01.10.901900"
+    assert (
+        doi_from_biorxiv_url(
+            "https://www.medrxiv.org/content/10.1101/2020.03.09.20033217v2.full"
+        )
+        == "10.1101/2020.03.09.20033217"
+    )
+    assert doi_from_biorxiv_url("https://example.org/not-biorxiv") is None
+    assert source_applicable(make_item(doi=None, url=url), cfg, "biorxiv")
+    assert not source_applicable(
+        make_item(doi="10.1000/x", url=None), cfg, "biorxiv"
+    )

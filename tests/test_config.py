@@ -13,6 +13,8 @@ def test_defaults_when_no_file(tmp_path, monkeypatch):
     )
     cfg = load_config()
     assert cfg.sources == DEFAULT_SOURCES and cfg.scihub_mirrors == DEFAULT_MIRRORS
+    assert cfg.ezproxy_cookie_path == cfg.state_dir / "ezproxy-cookies.txt"
+    assert cfg.scholar_cookie_path == cfg.state_dir / "scholar-cookies.txt"
     assert "scihub" not in cfg.sources
     assert cfg.attach is True and cfg.concurrency_oa == 4
 
@@ -67,6 +69,8 @@ state_dir = "state"
     assert cfg.source_routing is False
     assert cfg.circuit_breaker_threshold == 5
     assert cfg.scholar_cookies == (tmp_path / "cookies" / "scholar.txt").resolve()
+    assert cfg.scholar_cookie_path == cfg.scholar_cookies
+    assert cfg.ezproxy_cookie_path == cfg.state_dir / "ezproxy-cookies.txt"
 
 
 def test_load_manager_and_verify_flags(tmp_path):

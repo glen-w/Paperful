@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from .config import Config
-from .playbooks import DIRECT_SKIP_HOSTS, url_is_direct_skip
+from .playbooks import url_is_direct_skip
 from .resolve import normalize_doi
 from .zot import Item
 
@@ -19,7 +19,7 @@ _ARXIV_TYPES = frozenset(
 )
 _BIORXIV_DOI = re.compile(r"^10\.1101/", re.IGNORECASE)
 _BIORXIV_URL = re.compile(
-    r"(?:bio|med)rxiv\.org/content/(?:[^/\s]+/)*(10\.1101/[0-9./]+?)(?:v\d+)?(?:[./?]|$)",
+    r"(?:bio|med)rxiv\.org/content/(?:[^/\s]+/)*(10\.1101/\d+(?:\.\d+)*)(?:v\d+)?",
     re.IGNORECASE,
 )
 _BLOCK_NOTE_HINTS = ("blocked", "captcha", "429", "rate limit", "sorry")
@@ -53,8 +53,8 @@ def source_applicable(item: Item, cfg: Config, name: str) -> bool:
             return True
         return item.item_type in _ARXIV_TYPES and len(item.title) >= 20
     if name == "biorxiv":
-        doi = item.doi or _doi_from_biorxiv_url(item.url)
-        return bool(doi and _BIORXIV_DOI.match(doi))
+        doi = item.doi or doi_from_biorxiv_url(item.url)
+        return is_cshl_doi(doi)
     if name == "europepmc":
         return bool(item.doi)
     if name == "semanticscholar":
@@ -75,7 +75,7 @@ def source_applicable(item: Item, cfg: Config, name: str) -> bool:
         url = (item.url or "").strip().lower()
         if not url.startswith(("http://", "https://")):
             return False
-        if any(h in url for h in DIRECT_SKIP_HOSTS):
+        if url_is_direct_skip(url):
             return False
         if item.item_type in {
             "webpage",
@@ -89,7 +89,7 @@ def source_applicable(item: Item, cfg: Config, name: str) -> bool:
     if name == "ezproxy":
         if not cfg.ezproxy_base:
             return False
-        cookie_path = cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt")
+        cookie_path = cfg.ezproxy_cookie_path
         vault = cfg.state_dir / "sessions" / "cookies.txt"
         profile = cfg.state_dir / "sessions" / "meta.json"
         chromium = cfg.state_dir / "sessions" / "chromium"
@@ -105,7 +105,13 @@ def source_applicable(item: Item, cfg: Config, name: str) -> bool:
     return True
 
 
-def _doi_from_biorxiv_url(url: str | None) -> str | None:
+def is_cshl_doi(doi: str | None) -> bool:
+    """True for Cold Spring Harbor DOIs (bioRxiv, medRxiv, and a few journals)."""
+    return bool(doi and _BIORXIV_DOI.match(doi))
+
+
+def doi_from_biorxiv_url(url: str | None) -> str | None:
+    """Pull a 10.1101 DOI out of a bioRxiv or medRxiv content URL."""
     if not url:
         return None
     m = _BIORXIV_URL.search(url)

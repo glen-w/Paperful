@@ -51,9 +51,7 @@ def session_ok(ctx: Context) -> tuple[bool, str]:
     from ..cookies import has_domain_cookies
     from ..session import profile_ready, vault_cookies_path
 
-    cookie_path = ctx.config.scholar_cookies or (
-        ctx.config.state_dir / "scholar-cookies.txt"
-    )
+    cookie_path = ctx.config.scholar_cookie_path
     vault = vault_cookies_path(ctx.config)
     if (
         not cookie_path.is_file()

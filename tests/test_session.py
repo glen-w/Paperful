@@ -76,8 +76,8 @@ def test_export_cookies_writes_vault_and_compat(cfg, tmp_path):
     written = export_cookies(cfg, cookies)
     assert vault_cookies_path(cfg) in written
     assert vault_cookies_path(cfg).is_file()
-    assert (cfg.scholar_cookies or cfg.state_dir / "scholar-cookies.txt").is_file()
-    assert (cfg.ezproxy_cookies or cfg.state_dir / "ezproxy-cookies.txt").is_file()
+    assert cfg.scholar_cookie_path.is_file()
+    assert cfg.ezproxy_cookie_path.is_file()
     client = pl.make_client(cfg)
     names = {c.name for c in client.cookies.jar}
     assert "SID" in names and "proxy" in names

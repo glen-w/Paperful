@@ -170,9 +170,7 @@ def session_ok(ctx: Context) -> tuple[bool, str]:
         return False, "ezproxy_base not set"
     from ..session import profile_ready, vault_cookies_path
 
-    cookie_path = ctx.config.ezproxy_cookies or (
-        ctx.config.state_dir / "ezproxy-cookies.txt"
-    )
+    cookie_path = ctx.config.ezproxy_cookie_path
     if (
         not cookie_path.is_file()
         and not vault_cookies_path(ctx.config).is_file()

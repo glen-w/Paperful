@@ -41,6 +41,7 @@ machine; work lands on disk (`out/`, `state/`).
   Settings → Advanced → *Allow other applications on this computer to communicate with Zotero*.
 - Zotero 10+ to attach PDFs into the library. On Zotero 7–9 the tool still
   downloads to disk; attach later with `paperful attach` once upgraded.
+  Host header, write keys, and ghost attachments: [Zotero](docs/zotero.md).
 - Optional: a university/library account and EZProxy URL for publisher PDFs.
 - Optional: a browser session for Google Scholar
   (`paperful session login scholar`) if you keep `scholar` enabled.

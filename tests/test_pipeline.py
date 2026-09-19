@@ -471,6 +471,61 @@ def test_serial_chain_ezproxy_htmlpdf_then_scihub(pipe_factory):
     assert manifest.get("J").source == "scihub"
 
 
+def test_scihub_miss_still_tries_later_serial(pipe_factory):
+    sh = StubSource("scihub", default=Outcome.NOT_FOUND)
+    hp = StubSource(
+        "htmlpdf",
+        {
+            "J": Candidate(
+                url="https://news.test/j", source="htmlpdf", content=PDF_BYTES
+            )
+        },
+    )
+    pipe, manifest = pipe_factory(
+        {"scihub": sh, "htmlpdf": hp},
+        ["scihub", "htmlpdf"],
+    )
+    pipe.try_all = True
+    pipe.run([make_item(key="J", doi="10.1000/j", item_type="journalArticle")])
+    assert sh.calls == ["J"]
+    assert hp.calls == ["J"]
+    assert manifest.get("J").source == "htmlpdf"
+
+
+def test_scihub_captcha_does_not_fall_through(pipe_factory):
+    sh = StubSource(
+        "scihub",
+        {"J": Candidate.miss("scihub", Outcome.CAPTCHA, "captcha")},
+    )
+    hp = StubSource("htmlpdf")
+    pipe, manifest = pipe_factory(
+        {"scihub": sh, "htmlpdf": hp},
+        ["scihub", "htmlpdf"],
+    )
+    pipe.try_all = True
+    pipe.run([make_item(key="J", doi="10.1000/j", item_type="journalArticle")])
+    assert sh.calls == ["J"]
+    assert hp.calls == []
+    assert manifest.get("J").status == STATUS_CAPTCHA
+
+
+def test_scihub_error_does_not_fall_through(pipe_factory):
+    sh = StubSource(
+        "scihub",
+        {"J": Candidate.miss("scihub", Outcome.ERROR, "HTTP 502")},
+    )
+    hp = StubSource("htmlpdf")
+    pipe, manifest = pipe_factory(
+        {"scihub": sh, "htmlpdf": hp},
+        ["scihub", "htmlpdf"],
+    )
+    pipe.try_all = True
+    pipe.run([make_item(key="J", doi="10.1000/j", item_type="journalArticle")])
+    assert sh.calls == ["J"]
+    assert hp.calls == []
+    assert manifest.get("J").status == STATUS_ERROR
+
+
 class _StubBrowser:
     def __init__(self, pdf=PDF_BYTES):
         self.pdf = pdf

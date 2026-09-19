@@ -2,27 +2,20 @@
 
 from __future__ import annotations
 
-import re
-
 from ..resolve import normalize_doi
+from ..routing import doi_from_biorxiv_url, is_cshl_doi
 from ..zot import Item
 from .base import Candidate, Context, Outcome, http_json
 
 NAME = "biorxiv"
 _SERVERS = ("biorxiv", "medrxiv")
-# Cold Spring Harbor Laboratory Press (bioRxiv, medRxiv, and a few journals).
-_CSHL_DOI = re.compile(r"^10\.1101/", re.IGNORECASE)
-_CONTENT_DOI = re.compile(
-    r"(?:bio|med)rxiv\.org/content/(?:[^/\s]+/)*(10\.1101/[0-9./]+?)(?:v\d+)?(?:[./?]|$)",
-    re.IGNORECASE,
-)
 
 
 def find(item: Item, ctx: Context) -> Candidate:
-    doi = item.doi or _doi_from_url(item.url)
+    doi = item.doi or doi_from_biorxiv_url(item.url)
     if not doi:
         return Candidate.miss(NAME, Outcome.SKIPPED, "no DOI")
-    if not _CSHL_DOI.match(doi):
+    if not is_cshl_doi(doi):
         return Candidate.miss(NAME, Outcome.SKIPPED, "not a 10.1101 DOI")
 
     for server in _SERVERS:
@@ -47,10 +40,3 @@ def find(item: Item, ctx: Context) -> Candidate:
             alternates=[alt] if alt != pdf else [],
         )
     return Candidate.miss(NAME, Outcome.NOT_FOUND)
-
-
-def _doi_from_url(url: str | None) -> str | None:
-    if not url:
-        return None
-    m = _CONTENT_DOI.search(url)
-    return normalize_doi(m.group(1)) if m else None

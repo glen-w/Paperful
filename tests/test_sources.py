@@ -347,17 +347,22 @@ def test_biorxiv_falls_back_to_medrxiv_and_url_doi(ctx_factory):
         and cand.note == "medrxiv v1"
     )
 
+    cand2_paths: list[str] = []
+
+    def url_handler(req):
+        cand2_paths.append(req.url.path)
+        return _json(
+            {"collection": [{"doi": "10.1101/2020.01.10.901900", "version": "1"}]}
+        )
+
     cand2 = biorxiv.find(
         make_item(
             doi=None, url="https://www.biorxiv.org/content/10.1101/2020.01.10.901900v1"
         ),
-        ctx_factory(
-            lambda r: _json(
-                {"collection": [{"doi": "10.1101/2020.01.10.901900", "version": "1"}]}
-            )
-        ),
+        ctx_factory(url_handler),
     )
     assert cand2.outcome is Outcome.FOUND
+    assert cand2_paths == ["/details/biorxiv/10.1101/2020.01.10.901900"]
 
 
 def test_biorxiv_skips_non_cshl_dois(ctx_factory):

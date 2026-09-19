@@ -132,6 +132,14 @@ class Config:
     def local_key_path(self) -> Path:
         return self.state_dir / "zotero-local-api-key.json"
 
+    @property
+    def ezproxy_cookie_path(self) -> Path:
+        return self.ezproxy_cookies or (self.state_dir / "ezproxy-cookies.txt")
+
+    @property
+    def scholar_cookie_path(self) -> Path:
+        return self.scholar_cookies or (self.state_dir / "scholar-cookies.txt")
+
 
 def _candidate_paths(explicit: Path | None) -> list[Path]:
     if explicit:

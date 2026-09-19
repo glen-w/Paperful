@@ -62,12 +62,8 @@ def make_client(cfg: Config) -> httpx.Client:
         limits=httpx.Limits(max_connections=cfg.concurrency_oa + 2),
     )
     apply_netscape_cookies(client, vault_cookies_path(cfg))
-    apply_netscape_cookies(
-        client, cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt")
-    )
-    apply_netscape_cookies(
-        client, cfg.scholar_cookies or (cfg.state_dir / "scholar-cookies.txt")
-    )
+    apply_netscape_cookies(client, cfg.ezproxy_cookie_path)
+    apply_netscape_cookies(client, cfg.scholar_cookie_path)
     return client
 
 
@@ -231,22 +227,11 @@ class Pipeline:
                 if self._stop.is_set():
                     return
                 if name == "scihub":
-                    scihub_queue = [
-                        (it, att)
-                        for it, att in still
-                        if "scihub" in self._lanes_for(it)
-                    ]
-                    scihub_keys = {it.key for it, _ in scihub_queue}
-                    leftovers = [
-                        (it, att) for it, att in still if it.key not in scihub_keys
-                    ]
-                    for item, attempts in leftovers:
-                        self._finish_miss(item, attempts)
-                        self.progress()
-                    if scihub_queue:
-                        self._phase_scihub(scihub_queue)
-                    return
-                still = self._phase_serial(still, name)
+                    still = self._phase_scihub(still)
+                else:
+                    still = self._phase_serial(still, name)
+            if self._stop.is_set():
+                return
             for item, attempts in still:
                 self._finish_miss(item, attempts)
                 self.progress()
@@ -348,20 +333,24 @@ class Pipeline:
         return still
 
     # ---- phase 3: Sci-Hub, serial --------------------------------------------
-    def _phase_scihub(self, queue: list[tuple[Item, list[str]]]) -> None:
+    def _phase_scihub(
+        self, queue: list[tuple[Item, list[str]]]
+    ) -> list[tuple[Item, list[str]]]:
+        """Try Sci-Hub. CAPTCHA and ERROR end the item; misses stay queued."""
         self._emit(f"[bold]-- scihub[/] ({len(queue)} remaining)")
+        still: list[tuple[Item, list[str]]] = []
         lo, hi = self.cfg.delay_scihub_s
         first = True
-        for item, attempts in queue:
+        for idx, (item, attempts) in enumerate(queue):
             if self._stop.is_set():
-                return
+                still.extend(queue[idx:])
+                return still
             if not first:
                 time.sleep(random.uniform(lo, hi))
             first = False
             lanes = self._lanes_for(item)
             if self._skip_source(item, "scihub", lanes, attempts):
-                self._finish_miss(item, attempts)
-                self.progress()
+                still.append((item, attempts))
                 continue
             self._log_item(item, "[dim]scihub: checking...[/]")
             cand = REGISTRY["scihub"].find(item, self.ctx)
@@ -379,11 +368,14 @@ class Pipeline:
                 continue
             if cand.outcome is Outcome.CAPTCHA:
                 self._record(item, STATUS_CAPTCHA, attempts, reason=cand.note)
-            elif cand.outcome is Outcome.ERROR:
+                self.progress()
+                continue
+            if cand.outcome is Outcome.ERROR:
                 self._record(item, STATUS_ERROR, attempts, reason=cand.note)
-            else:
-                self._finish_miss(item, attempts)
-            self.progress()
+                self.progress()
+                continue
+            still.append((item, attempts))
+        return still
 
     # ---- helpers ----------------------------------------------------------------
     def _lanes_for(self, item: Item) -> list[str]:

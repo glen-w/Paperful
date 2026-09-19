@@ -87,6 +87,16 @@ Sci-Hub is **never** in the default source list; opt in via config, `--scihub`, 
 
 When Zotero cloud storage is full, attachments may fail with quota errors; PDFs still land on disk and can be attached later. Linked PDF URLs in Zotero are treated as “already covered” unless `--upgrade-linked` is set.
 
+## Ghost attachments
+
+Zotero can show **The attached file could not be found** for a path under the data directory’s `storage/<key>/`. The attachment record is there (MD5 and storage folder) but the bytes never landed on this machine. That is a ghost, not a file moved or deleted outside Zotero.
+
+Attachments created through the API as `imported_url` open that storage slot without always finishing a local download. `linked_url` attachments (including a quota-full open-access pass) do not use that path: they open in the browser and do not raise this dialog. Paperful’s attach path is `imported_file`: the PDF is already on disk, then uploaded through the local write API. Prefer `paperful run` / `paperful attach` for gap-fills so the file is written on this machine.
+
+A refill from the attachment’s open-access URL is only good when the downloaded bytes match the stored MD5. Publishers that return 403 to a scripted download (Cambridge, Taylor & Francis, some institutional hosts, parliamentary briefings) will not refill that way. Open those in a browser, or with Paperful and [EZProxy](ezproxy.md), and drop the PDF onto the parent item — or trash the empty attachment and re-attach.
+
+In Zotero 10 the settings pane is **Account** (older builds still say Sync). Turn file sync on for this data directory, or right-click the attachment → Download File. Setup, write keys, and link modes: [Zotero](zotero.md).
+
 ## Operator tooling
 
 - `paperful doctor` — preflight. Colours: **green** = ready; **amber** = usable with
@@ -178,3 +188,4 @@ stop at `no_identifier`.
 - [config.md](config.md) — `config.toml` keys and grey playbooks
 - [ezproxy.md](ezproxy.md) / [sessions.md](sessions.md) — campus proxy and browser vault
 - [docker.md](docker.md) — optional image (host Zotero + headed login stay outside)
+- [zotero.md](zotero.md) — local API, write keys, attachment modes, ghosts
