@@ -3,6 +3,8 @@ config.toml
 out/
 state/
 packs/
+# repo-root scratch (tool state, one-off exports). Not paperful/data/.
+/data/
 docs/_build/
 _site/
 __pycache__/

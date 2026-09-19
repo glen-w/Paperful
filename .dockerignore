@@ -18,6 +18,7 @@ config.toml
 out/
 state/
 packs/
+/data/
 
 # Docs site / build noise
 docs/_build/

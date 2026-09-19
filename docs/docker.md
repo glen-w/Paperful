@@ -173,4 +173,4 @@ uv run pytest
 uv run paperful doctor
 ```
 
-See [Commands](commands.md) and [Architecture](architecture.md).
+See [Commands](commands.md), [Architecture](architecture.md), and [Zotero](zotero.md).

@@ -30,6 +30,7 @@ releases
 :maxdepth: 2
 :caption: Using paperful
 
+zotero
 sources
 ezproxy
 sessions
