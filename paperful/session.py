@@ -279,8 +279,8 @@ def export_cookies(cfg: Config, cookies: list[dict[str, Any]]) -> list[Path]:
     write_netscape(vault, cookies)
     written.append(vault)
     scholar, other = split_playwright_cookies(cookies)
-    scholar_path = cfg.scholar_cookies or (cfg.state_dir / "scholar-cookies.txt")
-    ez_path = cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt")
+    scholar_path = cfg.scholar_cookie_path
+    ez_path = cfg.ezproxy_cookie_path
     if scholar:
         write_netscape(scholar_path, scholar)
         written.append(scholar_path)

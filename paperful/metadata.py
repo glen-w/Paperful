@@ -12,7 +12,7 @@ import httpx
 
 from .config import Config
 from .library import LibraryBackend
-from .lint import Finding
+from .lint import Finding, lint_item
 from .resolve import (
     IdentifierCache,
     WorkMeta,
@@ -22,6 +22,7 @@ from .resolve import (
     title_similarity,
     work_by_doi,
 )
+from .store import Manifest
 from .zot import Item
 
 PATCH_FIELDS = ("doi", "title", "date", "publicationTitle")
@@ -194,6 +195,36 @@ def _should_set_date(existing: str | None, candidate: str, overwrite: bool) -> b
     # With --overwrite: allow replace when candidate is at least as precise,
     # or when existing is junk-year-parseable but candidate is richer.
     return cand_p >= exist_p
+
+
+def collect_patches(
+    client: httpx.Client,
+    cfg: Config,
+    items: list[Item],
+    *,
+    backend: LibraryBackend | None = None,
+    manifest: Manifest | None = None,
+    overwrite: bool = False,
+) -> list[Patch]:
+    """Lint each item once, then propose a whitelist patch. Deduped by item key."""
+    cache = IdentifierCache()
+    patches: list[Patch] = []
+    for item in items:
+        findings = lint_item(
+            client, cfg, item, backend=backend, manifest=manifest, cache=cache
+        )
+        patch = propose_patch(
+            client,
+            cfg,
+            item,
+            findings,
+            overwrite=overwrite,
+            cache=cache,
+            prepared=True,
+        )
+        if patch:
+            patches.append(patch)
+    return dedupe_patches(patches)
 
 
 def dedupe_patches(patches: list[Patch]) -> list[Patch]:

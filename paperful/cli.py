@@ -31,7 +31,7 @@ from .doctor import (
     remediation_text,
     run_checks,
 )
-from .library import LibraryError, get_backend
+from .library import LibraryBackend, LibraryError, get_backend
 from .pipeline import Pipeline, RunStats, make_client
 from .routing import sources_for_item
 from .runreport import build_report, print_run_summary, write_run_report
@@ -157,18 +157,18 @@ def _require_manager(cfg: Config) -> None:
 
 
 def _scope_keys(
-    zl: ZoteroLocal, collection: list[str], library: bool
+    backend: LibraryBackend, collection: list[str], library: bool
 ) -> tuple[list[str] | None, str]:
     if library:
         return None, "whole library"
     keys: list[str] = []
     for spec in collection:
         try:
-            root = zl.resolve_collection(spec)
+            root = backend.resolve_collection(spec)
         except LookupError as exc:
             console.print(f"[red]{exc}[/]")
             raise typer.Exit(1)
-        keys.extend(zl.subtree_keys(root))
+        keys.extend(backend.subtree_keys(root))
     return keys, ", ".join(collection)
 
 
@@ -299,8 +299,9 @@ def collections(config: Path | None = ConfigOpt) -> None:
     cfg = _cfg(config)
     _require_manager(cfg)
     zl = _zotero()
-    cols = zl.collections()
-    counts = zl.collection_counts()
+    backend = get_backend(cfg, zl)
+    cols = backend.collections()
+    counts = backend.collection_counts()
     table = Table(title="Zotero collections (counts include subcollections)")
     table.add_column("Path")
     table.add_column("Items", justify="right")
@@ -336,8 +337,8 @@ def lint(
     cfg = _cfg(config)
     _require_manager(cfg)
     zl = _zotero(quiet=as_json)
-    keys, scope = _scope_keys(zl, collection, library)
     backend = get_backend(cfg, zl)
+    keys, scope = _scope_keys(backend, collection, library)
     items = backend.items_in_scope(keys)
     if limit:
         items = items[:limit]
@@ -385,10 +386,8 @@ def fix_metadata(
 
     `run` never rewrites metadata. This is the only write path for DOI/title/date/venue.
     """
-    from .lint import lint_item
-    from .metadata import apply_patches, dedupe_patches, propose_patch, write_patches
+    from .metadata import apply_patches, collect_patches, write_patches
     from .pipeline import make_client
-    from .resolve import IdentifierCache
 
     if not collection and not library:
         console.print("[red]Give --collection PATH (repeatable) or --library.[/]")
@@ -396,31 +395,16 @@ def fix_metadata(
     cfg = _cfg(config)
     _require_manager(cfg)
     zl = _zotero()
-    keys, scope = _scope_keys(zl, collection, library)
     backend = get_backend(cfg, zl)
+    keys, scope = _scope_keys(backend, collection, library)
     items = backend.items_in_scope(keys)
     if limit:
         items = items[:limit]
     manifest = Manifest(cfg.manifest_path)
     client = make_client(cfg)
-    cache = IdentifierCache()
-    patches = []
-    for item in items:
-        findings = lint_item(
-            client, cfg, item, backend=backend, manifest=manifest, cache=cache
-        )
-        patch = propose_patch(
-            client,
-            cfg,
-            item,
-            findings,
-            overwrite=overwrite,
-            cache=cache,
-            prepared=True,
-        )
-        if patch:
-            patches.append(patch)
-    patches = dedupe_patches(patches)
+    patches = collect_patches(
+        client, cfg, items, backend=backend, manifest=manifest, overwrite=overwrite
+    )
     console.print(f"Scope: [bold]{scope}[/] — {len(patches)} proposed patches")
     if patches:
         table = Table(title="Proposed patches")
@@ -574,8 +558,8 @@ def dedupe(
     cfg = _cfg(config)
     _require_manager(cfg)
     zl = _zotero(quiet=as_json)
-    keys, scope = _scope_keys(zl, collection, library)
     backend = get_backend(cfg, zl)
+    keys, scope = _scope_keys(backend, collection, library)
     items = backend.items_in_scope(keys)
     if limit:
         items = items[:limit]
@@ -688,8 +672,8 @@ def gaps(
     cfg = _cfg(config)
     _require_manager(cfg)
     zl = _zotero(quiet=as_json)
-    keys, scope = _scope_keys(zl, collection, library)
     backend = get_backend(cfg, zl)
+    keys, scope = _scope_keys(backend, collection, library)
     counts = summarize_gaps(backend.items_in_scope(keys))
     payload = {
         "scope": scope,
@@ -778,12 +762,12 @@ def run(
     source_list = _source_list(cfg, sources, scihub, preset)
     _warn_if_scihub(source_list)
     zl = _zotero()
-
-    keys, scope = _scope_keys(zl, collection, library)
+    backend = get_backend(cfg, zl)
+    keys, scope = _scope_keys(backend, collection, library)
 
     manifest = Manifest(cfg.manifest_path)
-    linked_skipped = 0 if upgrade_linked else zl.count_linked_url_only(keys)
-    items = zl.items_lacking_pdf(keys, upgrade_linked=upgrade_linked)
+    linked_skipped = 0 if upgrade_linked else backend.count_linked_url_only(keys)
+    items = backend.items_lacking_pdf(keys, upgrade_linked=upgrade_linked)
     todo = [it for it in items if manifest.should_process(it.key, retry_failed)]
     skipped_manifest = len(items) - len(todo)
     if limit:
@@ -1076,7 +1060,7 @@ def _probe_slot(cfg: Config, slot: str) -> None:
     ctx = Context(config=cfg, client=make_client(cfg), browser=browser)
     try:
         if slot == "ezproxy":
-            cookie_path = cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt")
+            cookie_path = cfg.ezproxy_cookie_path
             if (
                 not cookie_path.is_file()
                 and not vault_cookies_path(cfg).is_file()
@@ -1087,7 +1071,7 @@ def _probe_slot(cfg: Config, slot: str) -> None:
                 raise typer.Exit(2)
             ok, detail = ez.session_ok(ctx)
         else:
-            cookie_path = cfg.scholar_cookies or (cfg.state_dir / "scholar-cookies.txt")
+            cookie_path = cfg.scholar_cookie_path
             gs_domains = sorted(
                 d
                 for d in cookie_domains(ctx.client.cookies)
@@ -1192,8 +1176,8 @@ def session_status(
     else:
         console.print("[dim]No login slots recorded. Run paperful session login.[/]")
     vault = sess.vault_cookies_path(cfg)
-    ez_path = cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt")
-    gs_path = cfg.scholar_cookies or (cfg.state_dir / "scholar-cookies.txt")
+    ez_path = cfg.ezproxy_cookie_path
+    gs_path = cfg.scholar_cookie_path
     console.print(f"Vault cookies:  {'yes' if vault.is_file() else 'no'} ({vault})")
     console.print(f"EZProxy file:  {'yes' if ez_path.is_file() else 'no'} ({ez_path})")
     console.print(f"Scholar file:   {'yes' if gs_path.is_file() else 'no'} ({gs_path})")
@@ -1232,7 +1216,7 @@ def ezproxy_cmd(
     from .sources import ezproxy as ez
 
     cfg = _cfg(config)
-    cookie_path = cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt")
+    cookie_path = cfg.ezproxy_cookie_path
     if not cfg.ezproxy_base:
         console.print("[red]ezproxy_base is empty in config.toml[/]")
         console.print(
@@ -1268,7 +1252,7 @@ def scholar_cmd(
     from . import session as sess
 
     cfg = _cfg(config)
-    cookie_path = cfg.scholar_cookies or (cfg.state_dir / "scholar-cookies.txt")
+    cookie_path = cfg.scholar_cookie_path
     console.print(f"Scholar: {sess.SCHOLAR_URL}")
     console.print(f"Cookies: {cookie_path}")
     if open_browser:

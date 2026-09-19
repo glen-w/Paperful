@@ -203,7 +203,7 @@ def run_checks(
 
     checks.append(_playwright_check())
 
-    cookie_path = cfg.ezproxy_cookies or (cfg.state_dir / "ezproxy-cookies.txt")
+    cookie_path = cfg.ezproxy_cookie_path
     vault = cfg.state_dir / "sessions" / "cookies.txt"
     meta = cfg.state_dir / "sessions" / "meta.json"
     if cfg.ezproxy_base:
@@ -223,7 +223,7 @@ def run_checks(
     else:
         checks.append(Check("EZProxy", "green", "disabled (ezproxy_base empty)"))
 
-    scholar_path = cfg.scholar_cookies or (cfg.state_dir / "scholar-cookies.txt")
+    scholar_path = cfg.scholar_cookie_path
     if "scholar" in cfg.sources:
         if scholar_path.is_file() or vault.is_file() or meta.is_file():
             where = str(

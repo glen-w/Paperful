@@ -7,7 +7,13 @@ import json
 import httpx
 
 from paperful.lint import lint_item
-from paperful.metadata import Patch, apply_patches, dedupe_patches, propose_patch
+from paperful.metadata import (
+    Patch,
+    apply_patches,
+    collect_patches,
+    dedupe_patches,
+    propose_patch,
+)
 from paperful.resolve import date_precision, format_date_parts, strip_title_markup
 from tests.conftest import make_item, mock_client
 
@@ -495,6 +501,40 @@ def test_dedupe_patches():
     b = Patch(itemKey="K", title="t", before={}, after={"doi": "10.1/b"}, source="b")
     out = dedupe_patches([a, b])
     assert len(out) == 1 and out[0].after["doi"] == "10.1/b"
+
+
+def test_collect_patches_lints_then_proposes_with_one_cache(cfg, monkeypatch):
+    linted: list[str] = []
+    caches: list[object] = []
+
+    def fake_lint(client, config, item, **kwargs):
+        linted.append(item.key)
+        caches.append(kwargs["cache"])
+        return []
+
+    def fake_propose(client, config, item, findings, **kwargs):
+        assert kwargs["prepared"] is True
+        assert kwargs["cache"] is caches[0]
+        if item.key == "DROP":
+            return None
+        return Patch(
+            itemKey=item.key,
+            title=item.title,
+            before={},
+            after={"doi": "10.1/" + item.key.lower()},
+            source="test",
+        )
+
+    monkeypatch.setattr("paperful.metadata.lint_item", fake_lint)
+    monkeypatch.setattr("paperful.metadata.propose_patch", fake_propose)
+    patches = collect_patches(
+        mock_client(lambda r: None),
+        cfg,
+        [make_item(key="A"), make_item(key="DROP")],
+    )
+    assert linted == ["A", "DROP"]
+    assert [p.itemKey for p in patches] == ["A"]
+    assert patches[0].after["doi"] == "10.1/a"
 
 
 def test_pdf_doi_rejected_when_title_mismatches(cfg, tmp_path, monkeypatch):

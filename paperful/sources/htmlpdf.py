@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ..playbooks import url_is_direct_skip
 from ..zot import Item
 from .base import Candidate, Context, Outcome
 
@@ -17,20 +18,6 @@ _WEB_TYPES = frozenset(
     }
 )
 _DOC_TYPES = frozenset({"document", "report"})
-_SKIP_HOSTS = (
-    "doi.org",
-    "scholar.google",
-    "zotero.org",
-    "twitter.com",
-    "x.com",
-    "youtube.com",
-    "youtu.be",
-    "vimeo.com",
-    "facebook.com",
-    "consensus.app",
-    "semanticscholar.org",
-    "researchgate.net",
-)
 _PAYWALL_HINTS = (
     "subscribe to continue",
     "create an account to read",
@@ -59,7 +46,7 @@ def find(item: Item, ctx: Context) -> Candidate:
     url = (item.url or "").strip()
     if not url.lower().startswith(("http://", "https://")):
         return Candidate.miss(NAME, Outcome.SKIPPED, "no URL")
-    if any(h in url.lower() for h in _SKIP_HOSTS):
+    if url_is_direct_skip(url):
         return Candidate.miss(NAME, Outcome.SKIPPED, "resolver/aggregator URL")
     use_browser = ctx.browser is not None and ctx.browser.available()
     if not use_browser and not playwright_available():

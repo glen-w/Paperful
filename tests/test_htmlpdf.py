@@ -9,6 +9,18 @@ from paperful.sources.base import Outcome
 from tests.conftest import PDF_BYTES, make_item
 
 
+def test_htmlpdf_skips_aggregator_url(ctx_factory):
+    ctx = ctx_factory(lambda r: None)
+    cand = htmlpdf.find(
+        make_item(
+            doi=None, item_type="webpage", url="https://www.youtube.com/watch?v=x"
+        ),
+        ctx,
+    )
+    assert cand.outcome is Outcome.SKIPPED
+    assert cand.note == "resolver/aggregator URL"
+
+
 def test_htmlpdf_skips_journal_with_doi(ctx_factory):
     ctx = ctx_factory(lambda r: None)
     cand = htmlpdf.find(
