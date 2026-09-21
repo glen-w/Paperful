@@ -6,6 +6,13 @@ may still move. **1.0** will lock `paperful.run_report.v1` and attach behaviour
 
 ## Unreleased
 
+`--year-from` / `--year-to` and `--type` / `-T` restrict collection-scoped
+commands (`run`, `lint`, `fix-metadata`, `dedupe`, `gaps`, `summarize`) by
+publication year and Zotero item type. `summarize --apply` creates child notes
+without pyzotero's `item_template()` (the Zotero local API has no `/items/new`).
+`fix-metadata` recases ALL CAPS scholarly titles to Title Case; filename
+titles stay lint-only.
+
 ## 0.5.0 — 2026-09-21
 
 Optional local-first LLM is off by default (Ollama on loopback; LiteLLM via

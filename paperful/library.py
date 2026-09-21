@@ -14,6 +14,47 @@ class LibraryError(Exception):
     pass
 
 
+def note_payload(html: str, tag: str, parent_item: str) -> dict[str, Any]:
+    """A child note as the Zotero write API expects it (no /items/new template)."""
+    return {
+        "itemType": "note",
+        "note": html,
+        "parentItem": parent_item,
+        "tags": [{"tag": tag}],
+        "collections": [],
+        "relations": {},
+    }
+
+
+def created_item_key(result: Any) -> str:
+    """Pull the new item key out of a Zotero write-API create_items response."""
+    if not result:
+        return ""
+    if isinstance(result, list):
+        if not result:
+            return ""
+        first = result[0]
+        if isinstance(first, dict):
+            return str(first.get("key") or (first.get("data") or {}).get("key") or "")
+        return str(first)
+    if isinstance(result, dict):
+        for bucket in ("success", "successful", "unchanged"):
+            val = result.get(bucket)
+            if isinstance(val, dict) and val:
+                first = next(iter(val.values()))
+                if isinstance(first, dict):
+                    return str(
+                        first.get("key") or (first.get("data") or {}).get("key") or ""
+                    )
+                return str(first)
+            if isinstance(val, list) and val:
+                first = val[0]
+                if isinstance(first, dict):
+                    return str(first.get("key") or "")
+                return str(first)
+    return ""
+
+
 class LibraryBackend(Protocol):
     def ping(self) -> dict[str, Any]: ...
     def collections(self) -> dict[str, Collection]: ...
@@ -190,14 +231,18 @@ class ZoteroBackend:
             raw["data"]["note"] = html
             self.zl.zot.update_item(raw)
             return key
-        template = self.zl.zot.item_template("note")
-        template["note"] = html
-        template["parentItem"] = item_key
-        template["tags"] = [{"tag": tag}]
-        created = self.zl.zot.create_items([template])
-        if not created:
-            raise LibraryError("Zotero did not create note")
-        first = created[0]
-        if isinstance(first, dict):
-            return str(first.get("key") or first.get("data", {}).get("key") or "")
-        return str(first)
+        # item_template() hits /items/new, which the local API does not serve.
+        payload = note_payload(html, tag, item_key)
+        try:
+            created = self.zl.zot.create_items([payload])
+        except Exception as exc:
+            raise LibraryError(f"Zotero did not create note: {exc}") from exc
+        key = created_item_key(created)
+        if not key:
+            failed = ""
+            if isinstance(created, dict):
+                failed = str(created.get("failed") or created.get("failure") or "")
+            raise LibraryError(
+                f"Zotero did not create note{': ' + failed if failed else ''}"
+            )
+        return key

@@ -92,21 +92,28 @@ mirror_failures_before_skip = 3
 # pdf_template = "https://docs.example.org/pdf?id={0}"
 
 # Optional LLM (off by default). Local Ollama unless you opt into LiteLLM.
-# uv sync --extra llm            # paid / OpenAI-compatible APIs
-# uv sync --extra browser-agent  # paperful recover (Python 3.11+)
+# Setup, model advice, and troubleshooting: docs/llm.md
+#   ollama pull qwen2.5:7b          # local default; no Python extra needed
+#   uv sync --extra llm             # LiteLLM for paid / OpenAI-compatible APIs (keys via env)
+#   uv sync --extra browser-agent   # `paperful recover` (Python 3.11+)
 # [llm]
 # enabled = false
-# provider = "ollama"          # ollama | litellm
-# model = "qwen2.5:7b"
+# provider = "ollama"            # ollama | litellm
+# model = "qwen2.5:7b"           # LiteLLM: "openai/gpt-4.1-mini" etc. (never "ollama/…")
 # base_url = "http://127.0.0.1:11434"
-# # api_base = ""
-# # allow_remote = false
+# # api_base = ""                # LiteLLM / OpenAI-compatible base URL
+# # allow_remote = false         # true for a non-loopback Ollama (Docker: host.docker.internal)
+# timeout_s = 120
 # [fix_metadata]
-# llm_title = false
+# llm_title = false              # grounded title proposals → metadata-patches.jsonl
 # [lint]
-# llm_pdf_match = false
+# llm_pdf_match = false          # pdf_identity_mismatch finding
+# llm_pdf_match_min_confidence = 0.6
 # [summarize]
-# prompt_template = "default"
-# tag = "paperful-summary"
+# prompt_template = "default"    # or "prompts/summary.md"
+# max_context_chars = 24000
+# tag = "paperful-summary"       # child-note tag; --apply updates, never duplicates
 # [browser_agent]
 # max_steps = 20
+# max_wall_s = 300
+# # model = "qwen2.5:14b"        # larger model for browsing only

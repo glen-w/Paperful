@@ -63,6 +63,98 @@ def title_is_all_caps(title: str) -> bool:
     return sum(1 for c in letters if c.isupper()) / len(letters) >= 0.85
 
 
+# Articles, coordinating conjunctions, and short prepositions stay lowercase
+# in Title Case unless they are the first or last word (Chicago-ish).
+_TITLE_SMALL = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "as",
+        "at",
+        "but",
+        "by",
+        "en",
+        "for",
+        "from",
+        "if",
+        "in",
+        "nor",
+        "of",
+        "on",
+        "or",
+        "per",
+        "the",
+        "to",
+        "via",
+        "vs",
+        "vs.",
+        "v",
+        "v.",
+        "with",
+    }
+)
+_LEAD_TRAIL = re.compile(r"^(\W*)(.*?)(\W*)$", re.UNICODE)
+
+
+def title_to_title_case(title: str) -> str:
+    """Recase an ALL CAPS (or mostly-caps) scholarly title.
+
+    Deterministic: same words, Chicago-ish Title Case. Two-letter tokens that
+    are not small words stay acronyms (UN, EU, UK). Filename-like titles should
+    be skipped by the caller.
+    """
+    parts = (title or "").split()
+    if not parts:
+        return title or ""
+    last = len(parts) - 1
+    out: list[str] = []
+    for i, part in enumerate(parts):
+        force = i == 0 or i == last or (i > 0 and parts[i - 1].endswith(":"))
+        out.append(_title_case_hyphenated(part, force=force))
+    return " ".join(out)
+
+
+def _title_case_hyphenated(token: str, *, force: bool) -> str:
+    bits = token.split("-")
+    if len(bits) == 1:
+        return _title_case_piece(bits[0], force=force)
+    n = len(bits)
+    return "-".join(
+        _title_case_piece(bit, force=j == 0 or j == n - 1)
+        for j, bit in enumerate(bits)
+    )
+
+
+def _title_case_piece(piece: str, *, force: bool) -> str:
+    m = _LEAD_TRAIL.match(piece)
+    if not m:
+        return piece
+    lead, core, trail = m.group(1), m.group(2), m.group(3)
+    if not core:
+        return piece
+    low = core.lower()
+    if not force and low in _TITLE_SMALL:
+        return f"{lead}{low}{trail}"
+    if len(core) == 2 and core.isalpha() and low not in _TITLE_SMALL:
+        return f"{lead}{core.upper()}{trail}"
+    return f"{lead}{_cap_apostrophe(core)}{trail}"
+
+
+def _cap_apostrophe(core: str) -> str:
+    chunks = re.split(r"(['’])", core)
+    out: list[str] = []
+    for i, chunk in enumerate(chunks):
+        if not chunk or chunk in {"'", "’"}:
+            out.append(chunk)
+            continue
+        if i > 0 and chunks[i - 1] in {"'", "’"} and len(chunk) == 1:
+            out.append(chunk.lower())
+            continue
+        out.append(chunk[0].upper() + chunk[1:].lower())
+    return "".join(out)
+
+
 def title_looks_like_filename(title: str) -> bool:
     t = (title or "").strip()
     if not t:

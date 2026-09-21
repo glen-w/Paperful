@@ -13,10 +13,16 @@ uv run paperful dedupe -C BBNJ --dry-run
 uv run paperful dedupe -C BBNJ --apply
 uv run paperful gaps -C BBNJ
 uv run paperful run -C BBNJ
+
+# optional: same year / item-type filters as run
+uv run paperful dedupe -C BBNJ --year-from 2023 --year-to 2026 -T journalArticle
+uv run paperful gaps -C BBNJ -T journalArticle,report
 ```
 
 `-C` accepts a path, a unique name, or a collection key (`2DBKZRPC`).
 Subcollections are included. `--library` is the whole library.
+`--year-from` / `--year-to` and `--type` / `-T` match [Commands — Scope
+filters](commands.md#scope-filters).
 
 ## Phases
 
@@ -52,6 +58,8 @@ placeholder, and missing years are skipped. These groups are marked
 | `--apply-medium` | Also trash title+year extras. |
 | `--phase` | `high_doi`, `medium_title_year`, or `all`. |
 | `--limit` / `-n` | Only the first N items in scope. |
+| `--year-from` / `--year-to` | Inclusive publication-year range; undated items excluded. |
+| `--type` / `-T` | Only these Zotero item types (repeatable or comma-separated). |
 | `--json` | Pack paths and counts on stdout (`dedupe`), or the four gap counts (`gaps`). |
 
 Pack JSON is `paperful.dedupe_pack.v1`. Both commands exit 2 if Zotero is
@@ -68,7 +76,7 @@ run.
 
 ## Gaps
 
-`paperful gaps -C BBNJ` (`--library`, `--json`) counts items with no stored PDF, a linked PDF URL only,
+`paperful gaps -C BBNJ` (`--library`, `--year-from` / `--year-to`, `--type` / `-T`, `--json`) counts items with no stored PDF, a linked PDF URL only,
 or no DOI. It does not fetch or edit. Use `run` for PDFs and `lint` for
 identifiers.
 

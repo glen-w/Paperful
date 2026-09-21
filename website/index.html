@@ -193,7 +193,8 @@ cd Paperful
 uv sync
 cp config.example.toml config.toml
 uv run paperful doctor
-uv run paperful run --collection interesting --dry-run</code></pre>
+uv run paperful run --collection interesting --dry-run
+# optional: uv run paperful run -C BBNJ --year-from 2023 -T journalArticle</code></pre>
           <p class="fine">
             Optional Docker image (Python + Poppler + Chromium) if you do not
             want those on the host —

@@ -5,7 +5,13 @@ in a folder tree that mirrors your collections, and attach them back.
 
 Work happens **on disk** (`out/`, `state/`). Zotero is a library adapter. Open
 access first; campus EZProxy when you have a subscription; **Sci-Hub is opt-in
-and off by default**.
+and off by default**. An optional **local-first LLM** (Ollama; off until you
+enable it) adds grounded title proposals, a PDF identity check, `summarize`
+notes, and a separate `recover` browser-agent lane — see [LLM](llm.md).
+
+Narrow a run with `--collection` / `--library`, plus optional `--year-from` /
+`--year-to` and `--type` / `-T` (Zotero item types). Details in
+[Commands](commands.md#scope-filters).
 
 Run it with [`uv`](https://docs.astral.sh/uv/) (see the GitHub
 [README](https://github.com/glen-w/Paperful#readme)). [Docker](docker.md) is
@@ -36,6 +42,7 @@ sources
 ezproxy
 sessions
 scihub
+llm
 docker
 ```
 

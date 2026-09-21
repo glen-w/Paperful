@@ -19,11 +19,23 @@ doctor → collections → run --dry-run → run → report / report --json
 ```
 
 `--dry-run` lists each item and a **Would-hit** column (sources that routing
-would try, in order). It does not download.
+would try, in order). It does not download. Narrow with `--collection` /
+`--library`, plus optional `--year-from` / `--year-to` and `--type` / `-T`
+([Commands — Scope filters](commands.md#scope-filters)).
 
 When Zotero is down, `collections`, `run`, `attach`, `lint`, `fix-metadata`,
-`dedupe`, and `gaps` exit **2** and print the same next-steps ladder
-(`paperful doctor`, enable local API, copy `config.example.toml`).
+`dedupe`, `gaps`, `recover`, and `summarize` exit **2** and print the same
+next-steps ladder (`paperful doctor`, enable local API, copy
+`config.example.toml`).
+
+## Optional LLM at 0.5
+
+Off by default and additive: with `[llm].enabled = false` nothing in the PDF
+loop changes. Known limits: `recover` needs Python 3.11+ and a 14B-class
+local model to be useful; the Docker image does not include the LLM extras;
+identity/title verbs need a text-layer PDF (no OCR). Config keys under `[llm]`,
+`[browser_agent]`, `[summarize]`, `[lint]`, `[fix_metadata]` may still move
+before 1.0. See [LLM](llm.md).
 
 ## What 1.0 still owes operators
 

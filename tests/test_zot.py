@@ -120,6 +120,59 @@ def test_parse_year():
     assert parse_year("n.d.") is None
 
 
+def test_filter_items_by_year():
+    from tests.conftest import make_item
+    from paperful.zot import filter_items_by_year
+
+    items = [
+        make_item(key="A", year=2022),
+        make_item(key="B", year=2023),
+        make_item(key="C", year=2026),
+        make_item(key="D", year=2027),
+        make_item(key="E", year=None),
+    ]
+    assert [it.key for it in filter_items_by_year(items)] == ["A", "B", "C", "D", "E"]
+    assert [it.key for it in filter_items_by_year(items, year_from=2023, year_to=2026)] == [
+        "B",
+        "C",
+    ]
+    assert [it.key for it in filter_items_by_year(items, year_from=2026)] == ["C", "D"]
+    assert [it.key for it in filter_items_by_year(items, year_to=2022)] == ["A"]
+    assert filter_items_by_year(items, year_from=2030) == []
+
+
+def test_normalize_and_filter_item_types():
+    from tests.conftest import make_item
+    from paperful.zot import (
+        filter_items_by_type,
+        normalize_item_type,
+        resolve_item_types,
+    )
+
+    assert normalize_item_type("journalArticle") == "journalArticle"
+    assert normalize_item_type("Journal Article") == "journalArticle"
+    assert normalize_item_type("journal-article") == "journalArticle"
+    assert normalize_item_type("not-a-type") is None
+
+    types = resolve_item_types(["Journal Article", "report,preprint"])
+    assert types == frozenset({"journalArticle", "report", "preprint"})
+    assert resolve_item_types([]) is None
+
+    try:
+        resolve_item_types(["journalArticle", "banana"])
+        assert False, "expected ValueError"
+    except ValueError as exc:
+        assert "banana" in str(exc)
+
+    items = [
+        make_item(key="J", item_type="journalArticle"),
+        make_item(key="R", item_type="report"),
+        make_item(key="W", item_type="webpage"),
+    ]
+    assert [it.key for it in filter_items_by_type(items, types)] == ["J", "R"]
+    assert [it.key for it in filter_items_by_type(items, None)] == ["J", "R", "W"]
+
+
 def test_collection_raw_path_and_squash_matching():
     from paperful.zot import _squash
 

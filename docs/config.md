@@ -89,7 +89,8 @@ pdf_template = "https://example.org/docs/{code}/{code}.pdf"
 ## LLM (optional, local-first)
 
 Off by default. Install extras: `uv sync --extra llm` (LiteLLM for paid APIs),
-`uv sync --extra browser-agent` (Python 3.11+ only, for `recover`).
+`uv sync --extra browser-agent` (Python 3.11+ only, for `recover`). Setup
+walkthrough, model advice, Docker networking, and troubleshooting: [LLM](llm.md).
 
 | Table / key | Default | Role |
 | --- | --- | --- |
@@ -98,11 +99,15 @@ Off by default. Install extras: `uv sync --extra llm` (LiteLLM for paid APIs),
 | `[llm].model` | `qwen2.5:7b` | Model id |
 | `[llm].base_url` | `http://127.0.0.1:11434` | Ollama API |
 | `[llm].api_base` | `""` | OpenAI-compatible base when `provider = litellm` |
-| `[llm].allow_remote` | `false` | Allow non-loopback Ollama |
+| `[llm].allow_remote` | `false` | Allow non-loopback Ollama (e.g. `host.docker.internal` from the image) |
+| `[llm].timeout_s` | `120` | Per-completion timeout |
 | `[fix_metadata].llm_title` | `false` | Grounded title proposals in `fix-metadata` |
-| `[lint].llm_pdf_match` | `false` | `pdf_identity_mismatch` finding |
-| `[summarize].prompt_template` | `default` | Or path to a custom prompt file |
-| `[summarize].tag` | `paperful-summary` | Zotero note tag for idempotent updates |
-| `[browser_agent].max_steps` | `20` | Agent step cap for `recover` |
+| `[lint].llm_pdf_match` | `false` | `pdf_identity_mismatch` finding; `summarize` refuses flagged items unless `--force` |
+| `[lint].llm_pdf_match_min_confidence` | `0.6` | A `match: true` below this confidence is still flagged |
+| `[summarize].prompt_template` | `default` | Or path to a custom prompt file (relative to the config file); its SHA is stamped in the note footer |
+| `[summarize].max_context_chars` | `24000` | Budget for PDF text sent to the model (head + headings + tail) |
+| `[summarize].tag` | `paperful-summary` | Zotero note tag for idempotent updates (`--apply` updates the note carrying it) |
+| `[browser_agent].max_steps` / `max_wall_s` | `20` / `300` | Step and wall-clock caps for `recover` |
+| `[browser_agent].model` | (`[llm].model`) | Larger model for browsing only; `doctor` warns under ~10B |
 
 API keys stay in the environment (never in `config.toml`).

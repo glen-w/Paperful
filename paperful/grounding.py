@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 from .config import Config
 from .library import LibraryBackend
@@ -12,7 +11,7 @@ from .pdfid import text_from_pdf
 from .store import Manifest
 from .zot import Item
 
-_HEADING = re.compile(r"^(?:\d+\.?\s+|[A-Z][A-Z0-9 \-]{3,60})$", re.M)
+_HEADING = re.compile(r"^(?:\d+\.?\s+|[A-Z][A-Z0-9 \-]{3,60})$", re.MULTILINE)
 
 
 def pdf_text_for(

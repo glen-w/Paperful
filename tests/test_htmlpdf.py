@@ -131,8 +131,16 @@ def test_htmlpdf_uses_browser_session_when_available(ctx_factory):
     assert cand.content == PDF_BYTES
 
 
+def _chromium_ready() -> bool:
+    if not htmlpdf.playwright_available():
+        return False
+    from paperful.session import chromium_installed
+
+    return chromium_installed()
+
+
 @pytest.mark.skipif(
-    not htmlpdf.playwright_available(), reason="playwright not installed"
+    not _chromium_ready(), reason="playwright package or Chromium binary not installed"
 )
 def test_htmlpdf_live_render_smoke(ctx_factory):
     """Optional live Chromium print (no network) when Playwright + browser are available."""

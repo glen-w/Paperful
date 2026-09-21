@@ -12,7 +12,13 @@ import httpx
 
 from .config import Config
 from .library import LibraryBackend
-from .lint import Finding, lint_item
+from .lint import (
+    Finding,
+    lint_item,
+    title_is_all_caps,
+    title_looks_like_filename,
+    title_to_title_case,
+)
 from .resolve import (
     IdentifierCache,
     WorkMeta,
@@ -109,10 +115,20 @@ def propose_patch(
         if source != "pdf":
             source = work.source or source
 
-    cleaned = strip_title_markup(item.title)
-    if cleaned and cleaned != item.title.strip():
-        # Deterministic HTML cleanup only; never invent a title.
-        if "title" not in after:
+    if "title" not in after:
+        cleaned = strip_title_markup(item.title)
+        candidate = cleaned or item.title.strip()
+        if (
+            candidate
+            and title_is_all_caps(candidate)
+            and not title_looks_like_filename(candidate)
+        ):
+            cased = title_to_title_case(candidate)
+            if cased and cased != item.title.strip():
+                after["title"] = cased
+                if source == "prepare":
+                    source = "title_case"
+        elif cleaned and cleaned != item.title.strip():
             after["title"] = cleaned
             if source == "prepare":
                 source = "title_html"

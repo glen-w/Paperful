@@ -23,6 +23,10 @@ so a publisher login can apply. EZProxy landing pages and publisher PDFs that
 403 on a cookie-only GET (ScienceDirect `/pdfft`, …) are fetched in this
 profile too; exported cookies remain a fallback for httpx.
 
+`paperful recover` (opt-in browser agent) launches its own Chromium on this same
+profile, so the normal `BrowserSession` is not opened during `recover`; do not run
+`run` and `recover` at the same time against one vault.
+
 Never commit `state/sessions/` or cookie files; never paste them into chat.
 
 ## If Google says “This browser or app may not be secure”

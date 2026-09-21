@@ -7,7 +7,7 @@ from pathlib import Path
 
 import httpx
 
-from paperful.lint import lint_item
+from paperful.lint import lint_item, title_to_title_case
 from paperful.metadata import propose_patch
 from tests.conftest import make_item, mock_client
 
@@ -17,6 +17,19 @@ def _json(payload, status=200):
         status,
         content=json.dumps(payload).encode(),
         headers={"content-type": "application/json"},
+    )
+
+
+def test_title_to_title_case():
+    assert (
+        title_to_title_case("A STUDY OF THE EFFECTIVENESS OF THE ONE HAND AND T")
+        == "A Study of the Effectiveness of the One Hand and T"
+    )
+    assert title_to_title_case("WOMEN'S RIGHTS IN THE UN") == "Women's Rights in the UN"
+    assert title_to_title_case("STATE-OF-THE-ART METHODS") == "State-of-the-Art Methods"
+    assert (
+        title_to_title_case("CLIMATE CHANGE: THE OCEAN AND US")
+        == "Climate Change: The Ocean and US"
     )
 
 

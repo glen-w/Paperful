@@ -87,8 +87,7 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
         llm = ChatLiteLLM(model=llm_model_for_agent(cfg))
     else:
         host = cfg.llm_base_url.rstrip("/")
-        if host.endswith("/v1"):
-            host = host[:-3]
+        host = host.removesuffix("/v1")
         llm = ChatOllama(model=llm_model_for_agent(cfg), host=host)
 
     with tempfile.TemporaryDirectory(prefix="paperful-recover-") as tmp:

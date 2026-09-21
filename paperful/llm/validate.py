@@ -33,10 +33,10 @@ def validate_ollama_url(url: str, allow_remote: bool) -> None:
 
 def reject_litellm_ollama_model(model: str, *, context: str = "") -> None:
     low = model.strip().lower()
-    if low.startswith("ollama/") or low.startswith("ollama:"):
+    if low.startswith(("ollama/", "ollama:")):
         prefix = f"{context}: " if context else ""
         raise LlmConfigError(
-            f"{prefix}model {model!r} must use llm.provider = \"ollama\", not litellm."
+            f'{prefix}model {model!r} must use llm.provider = "ollama", not litellm.'
         )
 
 

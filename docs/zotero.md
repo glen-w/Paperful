@@ -77,7 +77,8 @@ read is **412**. A missing or bad key on a write is **401**.
 
 **Paperful attaches `imported_file` only:** the PDF is already under `out/`,
 then uploaded (md5, filename, filesize, mtime) and registered. It builds the
-attachment JSON itself and does not call `/items/new`. Filename spaces are
+attachment JSON itself and does not call `/items/new`. Summary notes
+(`summarize --apply`) are posted the same way. Filename spaces are
 encoded as `%20`, not `+`.
 
 `linked_url` (including a quota workaround that only stores a URL) is not a
@@ -142,6 +143,25 @@ item-types reference.
 Item lists omit the trash. Paperful trashes duplicates with `deleted: true`
 and does not permanently delete. Collection **keys** are the stable ids; the
 same display name can appear more than once.
+
+## Scoping runs (paperful)
+
+Paperful never invents Zotero saved searches. Scope is:
+
+1. **Collection** (`-C` / `--collection`, repeatable) or **`--library`**
+2. Optional **`--year-from` / `--year-to`** (parsed publication year)
+3. Optional **`--type` / `-T`** (Zotero `itemType`)
+
+Example: journal articles in BBNJ from 2023 through 2026:
+
+```sh
+uv run paperful run -C BBNJ --year-from 2023 --year-to 2026 -T journalArticle
+```
+
+`--type` accepts the built-in Zotero type ids (`journalArticle`, `report`,
+`preprint`, …) or friendly labels (`Journal Article`). See
+[Commands — Scope filters](commands.md#scope-filters). Year and type also
+apply to `lint`, `fix-metadata`, `dedupe`, `gaps`, and `summarize`.
 
 ## Local API vs web API
 

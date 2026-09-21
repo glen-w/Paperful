@@ -21,7 +21,10 @@ flowchart LR
   adapter -->|read| resolve --> sources --> disk --> writeback --> adapter
 ```
 
-1. **Scope** — collection subtree or whole library; `run` skips items that already have an imported PDF (and by default skip items with only a `linked_url` PDF).
+1. **Scope** — collection subtree or whole library; optional `--year-from` /
+   `--year-to` (inclusive; undated items dropped) and `--type` / `-T` (Zotero
+   item types); `run` skips items that already have an imported PDF (and by
+   default skip items with only a `linked_url` PDF).
 2. **Prepare identifiers** — verify library DOI; optional in-memory swap; PubMed PMID→DOI; title→DOI via Crossref / OpenAlex / Semantic Scholar. Skipped for web/blog/forum types.
 3. **Sources** — ordered list (Unpaywall, OpenAlex, arXiv, …, CORE, EZProxy, HTML→PDF); per-item routing skips inapplicable sources unless `--try-all`.
 4. **Download** — validate PDF size; write under `out_dir`; extract PDF DOI (`pdftotext`, then `pypdf`); append to `state/manifest.jsonl`.
@@ -39,6 +42,7 @@ flowchart LR
 | `state/dedupe-packs/` | Duplicate review packs from `dedupe` (JSON + Markdown) |
 | `state/dedupe-applied.jsonl` | Trash audit; appended only on `dedupe --apply` |
 | `state/pdf-cache/` | Manager PDFs exported so lint reads text on disk |
+| `state/summaries/<key>.html` | `summarize` output; `--apply` pushes it as a tagged child note |
 | `state/sessions/` | Chromium profile + `meta.json` (login timestamps, no secrets). Netscape dumps for httpx |
 | `state/last-run.json` | Latest `run` report (`paperful.run_report.v1`) |
 | `state/runs/<stamp>-<command>.json` | Historical `run` and `fix-metadata` reports |
@@ -47,7 +51,20 @@ flowchart LR
 
 ## Library adapter
 
-[`paperful/library.py`](../paperful/library.py) defines `LibraryBackend`: list items, export a PDF **onto disk**, apply a field patch, trash a duplicate parent, attach a file. Identifier and dedupe logic (`resolve`, `lint`, `pdfid`, `metadata`, `dedupe`) must not import Zotero except through this protocol. `trash_item` sets `deleted` and updates the item; it does not call a permanent delete.
+[`paperful/library.py`](../paperful/library.py) defines `LibraryBackend`: list items, fetch one item by key (`get_item`), export a PDF **onto disk**, apply a field patch, trash a duplicate parent, attach a file, and create-or-update a **tagged child note** (`create_or_update_note`, used by `summarize --apply`; the tag makes re-runs update instead of duplicate). Notes are posted as a dict (the local API has no `/items/new` template), same idea as stored-file attachments. Identifier and dedupe logic (`resolve`, `lint`, `pdfid`, `metadata`, `dedupe`) must not import Zotero except through this protocol. `trash_item` sets `deleted` and updates the item; it does not call a permanent delete.
+
+## LLM layer (optional, local-first)
+
+[`paperful/llm/`](../paperful/llm/) is a thin transport: `OllamaClient` (httpx to a loopback daemon by default), `LiteLLMClient` (import-gated behind `paperful[llm]`, keys from env), `NullLLMClient` when `[llm].enabled = false`. Verbs import only `paperful.llm`; `validate.py` / `preflight.py` fail before any network call. [`paperful/grounding.py`](../paperful/grounding.py) supplies PDF text disk-first (`out/`, then `state/pdf-cache/` via `export_pdf`) and a head+headings+tail budget slice.
+
+| Verb | Gate | Output | Library write |
+| --- | --- | --- | --- |
+| `recover --item` | `llm.enabled` + `paperful[browser-agent]` (Py 3.11+) | PDF in `out/`, manifest `source=browser_agent` | existing attach |
+| `fix-metadata` title proposals | `[fix_metadata].llm_title` | `Patch(source="llm_title")` | `--apply` |
+| `lint` identity check | `[lint].llm_pdf_match` | finding `pdf_identity_mismatch` | none |
+| `summarize` | `llm.enabled` | `state/summaries/<key>.html` | `--apply` note |
+
+`browser_agent` is a registered **serial** source but never in `DEFAULT_SOURCES`; `recover` builds the pipeline with `use_browser=False` so the agent owns the vault Chromium profile (no double lock). Hard CAPTCHAs end as `captcha`, not auto-solved. `summarize` refuses items the gated identity check flags unless `--force`.
 
 ## Identifiers and lint
 
@@ -63,17 +80,18 @@ flowchart LR
 | `pmid_no_doi` | PMID present, converter failed |
 | `pdf_doi_mismatch` | PDF-text DOI ≠ library DOI and ≠ prepared DOI |
 | `title_html` | Scholarly title contains HTML tags or entities |
-| `title_all_caps` | Scholarly title is mostly ALL CAPS (finding only) |
+| `title_all_caps` | Scholarly title is mostly ALL CAPS (`fix-metadata` recases to Title Case) |
 | `title_filename` | Scholarly title looks like a filename or path (finding only) |
 | `no_identifier` | No DOI, arXiv id, PMID, or URL |
+| `pdf_identity_mismatch` | Opt-in LLM says first pages do not match the record (or low confidence) |
 
 `--json` prints only findings. Exit 0 unless `--strict`. Lint prefers a file already on disk (`item.pdf_path` or manifest `path`) and calls `export_pdf` only when `has_pdf` and nothing is on disk.
 
-[`paperful/metadata.py`](../paperful/metadata.py) whitelist: `doi`, `title`, `date`, `publicationTitle`. Default fills empty venue/date (richest Crossref/OpenAlex date available). `--overwrite` may replace title/date/venue when the candidate is at least as precise. Verified `pdf_doi_mismatch` can propose a DOI (`source=pdf`). HTML markup in titles is stripped into a title patch; ALL CAPS / filename stay lint-only. Never invents creators. `state/metadata-patches.jsonl` is an append-only audit log (one patch per item key per invocation); not a curated re-apply queue.
+[`paperful/metadata.py`](../paperful/metadata.py) whitelist: `doi`, `title`, `date`, `publicationTitle`. Default fills empty venue/date (richest Crossref/OpenAlex date available). `--overwrite` may replace title/date/venue when the candidate is at least as precise. Verified `pdf_doi_mismatch` can propose a DOI (`source=pdf`). HTML markup in titles is stripped into a title patch; ALL CAPS titles are recased to Title Case (`source=title_case`); filename titles stay lint-only. Never invents creators. `state/metadata-patches.jsonl` is an append-only audit log (one patch per item key per invocation); not a curated re-apply queue.
 
 ## PDF text
 
-[`paperful/pdfid.py`](../paperful/pdfid.py): `pdftotext` (Poppler) if on `PATH`, else `pypdf` (first two pages + `/Title`). Manager fulltext is last-resort: export the file to `state/pdf-cache/` first. `paperful doctor` reports amber if `pdftotext` is missing.
+[`paperful/pdfid.py`](../paperful/pdfid.py): `pdftotext` (Poppler) if on `PATH`, else `pypdf` (first two pages + `/Title`; `max_pages=None` reads the whole file for `summarize`). Manager fulltext is last-resort: export the file to `state/pdf-cache/` first. `paperful doctor` reports amber if `pdftotext` is missing.
 
 ## Circuit breaker
 
@@ -136,7 +154,7 @@ as `state/last-run.json`. **0.x may add keys**; 1.0 freezes this schema name.
 | Field | Meaning |
 | --- | --- |
 | `schema` | Always `paperful.run_report.v1` on run reports |
-| `command` | `run` (or `fix-metadata` on apply reports under `state/runs/`) |
+| `command` | `run`, `recover`, or `fix-metadata` (apply reports under `state/runs/`) |
 | `started_at` / `finished_at` | ISO-8601 UTC |
 | `duration_s` | Wall time, or `null` if start unknown |
 | `scope` | Collection path(s) or library |

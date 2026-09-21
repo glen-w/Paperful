@@ -17,6 +17,50 @@ UNCOLLECTED = "_uncollected"
 _PATH_UNSAFE = re.compile(r"[\\/:*?\"<>|\x00-\x1f]")
 _ZOTERO_PORT = 23119
 
+# Regular (non-attachment) Zotero item types from the CSL/Zotero schema.
+ITEM_TYPES: frozenset[str] = frozenset(
+    {
+        "artwork",
+        "audioRecording",
+        "bill",
+        "blogPost",
+        "book",
+        "bookSection",
+        "case",
+        "computerProgram",
+        "conferencePaper",
+        "dataset",
+        "dictionaryEntry",
+        "document",
+        "email",
+        "encyclopediaArticle",
+        "film",
+        "forumPost",
+        "hearing",
+        "instantMessage",
+        "interview",
+        "journalArticle",
+        "letter",
+        "magazineArticle",
+        "manuscript",
+        "map",
+        "newspaperArticle",
+        "patent",
+        "podcast",
+        "preprint",
+        "presentation",
+        "radioBroadcast",
+        "report",
+        "standard",
+        "statute",
+        "thesis",
+        "tvBroadcast",
+        "videoRecording",
+        "webpage",
+    }
+)
+_ITEM_TYPE_BY_NORM = {t.lower(): t for t in ITEM_TYPES}
+
 
 def zotero_local_host() -> str:
     """Host for the Zotero local API (override with PAPERFUL_ZOTERO_HOST for Docker)."""
@@ -456,6 +500,80 @@ def parse_year(date: str | None) -> int | None:
         return None
     m = re.search(r"\b(1[5-9]\d{2}|20\d{2})\b", date)
     return int(m.group(1)) if m else None
+
+
+def filter_items_by_year(
+    items: list[Item],
+    year_from: int | None = None,
+    year_to: int | None = None,
+) -> list[Item]:
+    """Keep items whose parsed year is in ``[year_from, year_to]`` (inclusive).
+
+    Open ends are allowed (only ``year_from`` or only ``year_to``). Items with
+    no year are excluded whenever either bound is set.
+    """
+    if year_from is None and year_to is None:
+        return list(items)
+    out: list[Item] = []
+    for it in items:
+        if it.year is None:
+            continue
+        if year_from is not None and it.year < year_from:
+            continue
+        if year_to is not None and it.year > year_to:
+            continue
+        out.append(it)
+    return out
+
+
+def normalize_item_type(spec: str) -> str | None:
+    """Map a user type string to a canonical Zotero ``itemType`` id.
+
+    Accepts camelCase ids (``journalArticle``), spaced labels
+    (``Journal Article``), and hyphen/underscore forms. Case-insensitive.
+    """
+    token = re.sub(r"[\s_\-]+", "", (spec or "").strip()).lower()
+    if not token:
+        return None
+    return _ITEM_TYPE_BY_NORM.get(token)
+
+
+def resolve_item_types(specs: list[str]) -> frozenset[str] | None:
+    """Parse repeatable/comma-separated type specs into a frozenset of ids.
+
+    Returns ``None`` when ``specs`` is empty (no type filter). Raises
+    ``ValueError`` listing unknown tokens.
+    """
+    if not specs:
+        return None
+    wanted: set[str] = set()
+    unknown: list[str] = []
+    for raw in specs:
+        for part in raw.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            canon = normalize_item_type(part)
+            if canon is None:
+                unknown.append(part)
+            else:
+                wanted.add(canon)
+    if unknown:
+        hint = ", ".join(sorted(ITEM_TYPES)[:8]) + ", …"
+        raise ValueError(
+            f"Unknown item type(s): {', '.join(unknown)}. "
+            f"Use Zotero types such as: {hint}"
+        )
+    return frozenset(wanted) if wanted else None
+
+
+def filter_items_by_type(
+    items: list[Item], types: frozenset[str] | set[str] | None
+) -> list[Item]:
+    """Keep items whose ``item_type`` is in ``types``. ``None`` keeps all."""
+    if not types:
+        return list(items)
+    return [it for it in items if it.item_type in types]
 
 
 def first_author(creators: list[dict[str, Any]]) -> str | None:

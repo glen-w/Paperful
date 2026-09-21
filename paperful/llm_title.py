@@ -32,7 +32,7 @@ def propose_llm_title(
     client = get_client(cfg)
     prompt = (
         "Propose a cleaned bibliographic title for this work. "
-        "Reply with JSON only: {\"title\": \"...\"}. "
+        'Reply with JSON only: {"title": "..."}. '
         "Use the metadata and PDF excerpt; do not invent authors or DOI.\n\n"
         f"{metadata_block(item)}\n\nPDF excerpt:\n{body[:8000]}"
     )

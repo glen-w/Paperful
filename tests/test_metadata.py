@@ -351,7 +351,23 @@ def test_html_title_cleanup_patch(cfg):
     assert patch.source == "title_html"
 
 
-def test_title_all_caps_and_filename_findings_only(cfg):
+def test_html_all_caps_title_strips_then_recases(cfg):
+    title = "<i>A SUFFICIENTLY LONG TEST TITLE ABOUT MARINE GOVERNANCE</i>"
+    item = make_item(doi=None, title=title, url=None, arxiv_id=None)
+    findings = lint_item(mock_client(lambda r: httpx.Response(500)), cfg, item)
+    patch = propose_patch(
+        mock_client(lambda r: httpx.Response(500)),
+        cfg,
+        item,
+        findings,
+        prepared=True,
+    )
+    assert patch is not None
+    assert patch.after["title"] == "A Sufficiently Long Test Title About Marine Governance"
+    assert patch.source == "title_case"
+
+
+def test_title_all_caps_recases_filename_stays_findings(cfg):
     caps = make_item(
         doi=None,
         url=None,
@@ -363,8 +379,9 @@ def test_title_all_caps_and_filename_findings_only(cfg):
     patch = propose_patch(
         mock_client(lambda r: httpx.Response(500)), cfg, caps, findings, prepared=True
     )
-    # ALL CAPS is findings-only (no invented title case)
-    assert patch is None or "title" not in patch.after
+    assert patch is not None
+    assert patch.after["title"] == "A Sufficiently Long Test Title About Marine Governance"
+    assert patch.source == "title_case"
 
     fn = make_item(
         doi=None,
@@ -374,6 +391,10 @@ def test_title_all_caps_and_filename_findings_only(cfg):
     )
     findings2 = lint_item(mock_client(lambda r: httpx.Response(500)), cfg, fn)
     assert any(f.code == "title_filename" for f in findings2)
+    patch2 = propose_patch(
+        mock_client(lambda r: httpx.Response(500)), cfg, fn, findings2, prepared=True
+    )
+    assert patch2 is None or "title" not in patch2.after
 
 
 def test_pdf_doi_adopted_when_verified(cfg, tmp_path, monkeypatch):

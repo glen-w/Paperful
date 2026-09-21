@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from ..config import Config
 from .client import get_client_impl
-from .validate import LlmConfigError, reject_litellm_ollama_model, validate_llm_api_base, validate_ollama_url
+from .validate import (
+    LlmConfigError,
+    reject_litellm_ollama_model,
+    validate_llm_api_base,
+    validate_ollama_url,
+)
 
 
 def _agent_model(cfg: Config) -> str:
@@ -31,7 +36,7 @@ def validate_llm_for_verb(cfg: Config, *, require_enabled: bool = True) -> str:
 
 
 def validate_llm_for_recover(cfg: Config) -> str:
-    model = validate_llm_for_verb(cfg)
+    validate_llm_for_verb(cfg)
     agent_model = _agent_model(cfg)
     if cfg.llm_provider == "litellm":
         reject_litellm_ollama_model(agent_model, context="browser_agent")

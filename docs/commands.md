@@ -37,16 +37,26 @@ uv run paperful run --library --retry-failed
 uv run paperful run --collection BBNJ --retry-failed
 uv run paperful run --collection BBNJ --try-all   # ignore source_routing when metadata is unreliable
 
-# opt-in LLM browser recovery (needs llm.enabled, Python 3.11+, paperful[browser-agent])
-uv run paperful recover --item ITEMKEY
-
-# grounded summary from local PDF text (state/summaries/; --apply writes a tagged child note)
-uv run paperful summarize --item ITEMKEY
-uv run paperful summarize -C BBNJ --apply
+# optional LLM verbs — off until [llm].enabled; setup in docs/llm.md
+uv run paperful recover --item ITEMKEY --dry-run     # browser agent: show start URL only
+uv run paperful recover --item ITEMKEY               # needs Python 3.11+ and paperful[browser-agent]
+uv run paperful summarize --item ITEMKEY             # → state/summaries/ITEMKEY.html (no Zotero write)
+uv run paperful summarize -C BBNJ --limit 5 --apply  # create/update tagged child notes
+uv run paperful summarize --item ITEMKEY --prompt prompts/mine.md --force
 
 # restrict / reorder sources for one run, or cap the number of items processed
 uv run paperful run -C hoops --sources unpaywall,openalex,ezproxy
 uv run paperful run --library --limit 50
+
+# year range (inclusive; undated items excluded) — e.g. full run on BBNJ 2023–2026
+uv run paperful run -C BBNJ --year-from 2023 --year-to 2026
+uv run paperful run -C BBNJ --year-from 2023 --year-to 2026 --dry-run
+uv run paperful gaps -C BBNJ --year-from 2023 --year-to 2026
+
+# restrict to Zotero item types (repeatable / comma-separated; friendly names ok)
+uv run paperful run -C BBNJ -T journalArticle --year-from 2023 --year-to 2026
+uv run paperful run -C BBNJ -T "Journal Article" -T report
+uv run paperful lint -C BBNJ --type journalArticle,preprint
 
 # Sci-Hub is off unless you opt in (config `sources`, or this flag)
 uv run paperful run --library --scihub
@@ -74,12 +84,14 @@ uv run paperful gaps -C BBNJ
 
 | Command | Purpose |
 | --- | --- |
-| `doctor` | Environment check (Zotero, paths, email, sessions, pdftotext, Playwright, grey-lit packs). Green / amber / red. TTY guide for remediations (`--guide` / `--no-guide`). |
-| `run` | Find and download missing PDFs (`--dry-run`, `--preset eoi`, `--upgrade-linked`, `--try-all`, `--retry-failed`, `--sources`, `--scihub`, `--limit`). Never rewrites bibliographic fields. |
-| `lint` | Read-only identifier / PDF-DOI / title-hygiene findings (`--json`, `--strict`, `--limit`). Codes: `missing_doi`, `suspect_doi`, `swappable_doi`, `pmid_no_doi`, `pdf_doi_mismatch`, `title_html`, `title_all_caps`, `title_filename`, `no_identifier` |
-| `fix-metadata` | Propose patches on disk; `--apply` writes them to the library (`--overwrite` for title/date/venue). Whitelist: `doi`, `title`, `date`, `publicationTitle`. HTML title cleanup and verified PDF-DOI adoption included; ALL CAPS / filename are lint-only. |
-| `dedupe` | Duplicate pack on disk (`high_doi`, then `title+year`). `--apply` trashes DOI extras only; title+year needs `--apply-medium`. Held when same-DOI titles diverge. See [dedupe](dedupe.md). |
-| `gaps` | Counts: no stored PDF, linked PDF URL only, missing DOI. Read-only. Next steps are `run` and `lint`. |
+| `doctor` | Environment check (Zotero, paths, email, sessions, pdftotext, Playwright, grey-lit packs, LLM, browser-agent extra). Green / amber / red. TTY guide for remediations (`--guide` / `--no-guide`). |
+| `run` | Find and download missing PDFs (`--dry-run`, `--preset eoi`, `--upgrade-linked`, `--try-all`, `--retry-failed`, `--sources`, `--scihub`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). Never rewrites bibliographic fields. |
+| `recover` | Opt-in **browser-agent** PDF recovery for named items (`--item KEY` repeatable, `--dry-run`, `--no-attach`). Only the `browser_agent` source; never part of `run`. Needs `[llm].enabled`, Python 3.11+, `paperful[browser-agent]`, and a session vault. Report: `state/runs/<stamp>-recover.json`. See [LLM](llm.md#a-recover-browser-agent-pdf-recovery). |
+| `lint` | Read-only identifier / PDF-DOI / title-hygiene findings (`--json`, `--strict`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). Codes: `missing_doi`, `suspect_doi`, `swappable_doi`, `pmid_no_doi`, `pdf_doi_mismatch`, `title_html`, `title_all_caps`, `title_filename`, `no_identifier`, plus `pdf_identity_mismatch` when `[lint].llm_pdf_match` is on |
+| `fix-metadata` | Propose patches on disk; `--apply` writes them to the library (`--overwrite` for title/date/venue; `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). Whitelist: `doi`, `title`, `date`, `publicationTitle`. HTML title cleanup, ALL CAPS → Title Case, and verified PDF-DOI adoption included; filename titles stay lint-only unless `[fix_metadata].llm_title` proposes a grounded title (`source = "llm_title"`). |
+| `summarize` | Grounded LLM summary from the PDF already on disk (`--item` / `-C` / `--library`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`, `--prompt FILE`, `--force`). Always writes `state/summaries/<key>.html`; `--apply` creates or updates one child note tagged `[summarize].tag`. See [LLM](llm.md#d-summarize-grounded-summary-note). |
+| `dedupe` | Duplicate pack on disk (`high_doi`, then `title+year`). `--apply` trashes DOI extras only; title+year needs `--apply-medium`. Held when same-DOI titles diverge. Same year/type scope flags as `run`. See [dedupe](dedupe.md). |
+| `gaps` | Counts: no stored PDF, linked PDF URL only, missing DOI. Read-only. Year/type scope flags apply. Next steps are `run` and `lint`. |
 | `collections` | Collection tree with “No PDF” counts |
 | `report` | Manifest summary + latest run report (`--last-run`, `--json`, `--not-found`, `--status`) |
 | `attach` | Attach already-downloaded PDFs into Zotero |
@@ -93,6 +105,44 @@ Collections can be given as a path (`BBNJ/not undermine`), a unique name, or
 a key. Subcollections are always included. Items in several selected
 collections are written once and hard-linked into the other folders.
 
+## Scope filters
+
+After collection / `--library` selection, these optional filters shrink the
+item list further (applied before `--limit`). They appear in the Scope line
+(e.g. `BBNJ, years 2023–2026, types journalArticle`).
+
+| Flag | Effect |
+| --- | --- |
+| `--year-from YEAR` | Keep items dated this year or later (inclusive). |
+| `--year-to YEAR` | Keep items dated this year or earlier (inclusive). |
+| `--type` / `-T TYPE` | Keep only these Zotero item types (repeatable or comma-separated). |
+
+**Year.** Open ends are fine (`--year-from 2023` alone). Items with no
+parsed publication year are excluded whenever either bound is set.
+`--year-from` must be ≤ `--year-to`.
+
+**Type.** Accepts Zotero camelCase ids (`journalArticle`), spaced labels
+(`Journal Article`), and hyphen/underscore forms (`journal-article`). Case
+insensitive. Unknown tokens exit 1. Common scholarly types:
+
+`journalArticle`, `preprint`, `conferencePaper`, `report`, `book`,
+`bookSection`, `thesis`, `manuscript`, `document`, `webpage`,
+`newspaperArticle`, `magazineArticle`, `blogPost`, `dataset`, `standard`,
+`patent`, `presentation`, …
+
+Attachments, notes, and annotations are never in scope (Zotero skips them
+already). Full list: Zotero’s item-types reference; paperful rejects anything
+not in that set.
+
+```sh
+uv run paperful run -C BBNJ --year-from 2023 --year-to 2026 -T journalArticle
+uv run paperful gaps -C BBNJ -T "Journal Article" -T report
+uv run paperful lint -C BBNJ --type journalArticle,preprint --strict
+```
+
+Same flags on `run`, `lint`, `fix-metadata`, `dedupe`, `gaps`, and
+`summarize`.
+
 ## Doctor
 
 `paperful doctor` prints one line per check.
@@ -100,7 +150,7 @@ collections are written once and hard-linked into the other folders.
 | Colour | Meaning |
 | --- | --- |
 | **green** | Ready |
-| **amber** | Degraded but you can continue (empty `email`, missing EZProxy/Scholar session, no `pdftotext`, Playwright/Chromium not ready, Zotero without write API) |
+| **amber** | Degraded but you can continue (empty `email`, missing EZProxy/Scholar session, no `pdftotext`, Playwright/Chromium not ready, Zotero without write API, LLM enabled but daemon/model/extra not ready, small model for the browser agent) |
 | **red** | Fatal if the check is `Zotero :23119`, `out_dir`, or `state_dir` |
 
 Unpaywall needs a real `email`. Missing sessions: `paperful session login ezproxy` or `scholar` (system Chrome/Edge when present). Missing `pdftotext`: Poppler; `pypdf` is the fallback. Playwright is core; Chromium installs on first `session login`. An amber Write API means Zotero 7–9: fetch still works, but `attach`, `fix-metadata --apply`, and `dedupe --apply` do not.
@@ -126,8 +176,8 @@ Inside Docker, `docker compose run --rm paperful` with no extra args is `doctor`
 | Code | When |
 | --- | --- |
 | 0 | Success (including empty dry-run) |
-| 1 | User error (unknown collection, bad preset, unknown `--phase`, `--dry-run` together with `--apply`, `--strict` lint findings) |
-| 2 | Environment: Zotero unreachable on `collections`, `run`, `attach`, `lint`, `fix-metadata`, `dedupe`, or `gaps`. Prints **Next steps** (start Zotero, enable local API, `paperful doctor`) |
+| 1 | User error (unknown collection, bad preset, unknown `--phase`, `--dry-run` together with `--apply`, `--year-from` > `--year-to`, unknown `--type`, `--strict` lint findings, unknown `--item` key, LLM not enabled/misconfigured for `recover` / `summarize`, `recover` on Python < 3.11, note write refused) |
+| 2 | Environment: Zotero unreachable on `collections`, `run`, `attach`, `lint`, `fix-metadata`, `dedupe`, `gaps`, `recover`, or `summarize`. Prints **Next steps** (start Zotero, enable local API, `paperful doctor`) |
 
 ## Run summary
 

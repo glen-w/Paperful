@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,12 +16,89 @@ from .zot import Item
 
 _DEFAULT_PROMPT = """You are summarizing a scholarly work for a personal research library.
 Use ONLY the metadata and document text below. If information is missing, say so.
-Structure the summary in HTML (no outer html/body tags):
+Structure the summary in simple HTML (no outer html/body tags, no Markdown, no code fences):
 <h2>Objective</h2>
 <h2>Methods</h2>
 <h2>Key findings</h2>
 <h2>Limitations</h2>
-Keep under 600 words."""
+Use <p> and <ul><li> for bullets. Keep under 600 words."""
+
+
+_FENCE = re.compile(r"^```[a-zA-Z]*\s*$")
+_HEADING = re.compile(r"^(#{1,6})\s+(.*)$")
+_BULLET = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+(.*)$")
+_BOLD = re.compile(r"\*\*(.+?)\*\*")
+_ITALIC = re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)")
+_TAG = re.compile(r"<\s*(h[1-6]|p|ul|ol|li|strong|em|br)\b", re.IGNORECASE)
+
+
+def to_note_html(text: str) -> str:
+    """Normalise model output for a Zotero note.
+
+    Local models often ignore "reply in HTML" and emit Markdown (``## Heading``,
+    ``* bullet``, ``**bold**``) or wrap the answer in a code fence. Zotero renders
+    notes as HTML, so convert the common Markdown shapes; leave real HTML alone.
+    """
+    lines = [ln for ln in text.strip().splitlines() if not _FENCE.match(ln.strip())]
+    body = "\n".join(lines).strip()
+    if not body:
+        return ""
+    has_md = "**" in body or any(
+        _HEADING.match(ln) or _BULLET.match(ln) for ln in body.splitlines()
+    )
+    if _TAG.search(body) and not has_md:
+        return body
+    out: list[str] = []
+    para: list[str] = []
+    in_list = False
+
+    def flush_para() -> None:
+        if para:
+            out.append(f"<p>{_inline(' '.join(para))}</p>")
+            para.clear()
+
+    def close_list() -> None:
+        nonlocal in_list
+        if in_list:
+            out.append("</ul>")
+            in_list = False
+
+    for raw in body.splitlines():
+        line = raw.rstrip()
+        if not line.strip():
+            flush_para()
+            close_list()
+            continue
+        h = _HEADING.match(line)
+        if h:
+            flush_para()
+            close_list()
+            level = min(len(h.group(1)), 3)
+            out.append(f"<h{level}>{_inline(h.group(2).strip())}</h{level}>")
+            continue
+        b = _BULLET.match(line)
+        if b:
+            flush_para()
+            if not in_list:
+                out.append("<ul>")
+                in_list = True
+            out.append(f"<li>{_inline(b.group(1).strip())}</li>")
+            continue
+        if _TAG.match(line.strip()):
+            flush_para()
+            close_list()
+            out.append(line.strip())
+            continue
+        para.append(line.strip())
+    flush_para()
+    close_list()
+    return "\n".join(out)
+
+
+def _inline(text: str) -> str:
+    text = _BOLD.sub(r"<strong>\1</strong>", text)
+    text = _ITALIC.sub(r"<em>\1</em>", text)
+    return text
 
 
 def load_prompt_template(cfg: Config) -> tuple[str, str]:
@@ -56,27 +134,23 @@ def summarize_item(
     if not raw.strip():
         raise ValueError("could not extract PDF text")
     text = budget_slice(raw, cfg.summarize_max_context_chars)
-    template, template_id = load_prompt_template(cfg)
+    template, _template_id = load_prompt_template(cfg)
     client = get_client(cfg)
-    prompt = (
-        f"{template}\n\n---\n{metadata_block(item)}\n\n---\nDocument text:\n{text}"
-    )
-    html_body = client.complete(
-        CompletionRequest(
-            model=cfg.llm_model,
-            prompt=prompt,
-            timeout_seconds=cfg.llm_timeout_s,
+    prompt = f"{template}\n\n---\n{metadata_block(item)}\n\n---\nDocument text:\n{text}"
+    html_body = to_note_html(
+        client.complete(
+            CompletionRequest(
+                model=cfg.llm_model,
+                prompt=prompt,
+                timeout_seconds=cfg.llm_timeout_s,
+            )
         )
-    ).strip()
+    )
     sha = hashlib.sha256(template.encode()).hexdigest()[:8]
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    footer = (
-        f'<p><em>paperful · {cfg.llm_model} · {stamp} · prompt {sha}</em></p>'
-    )
+    footer = f"<p><em>paperful · {cfg.llm_model} · {stamp} · prompt {sha}</em></p>"
     if llm_egress_is_remote(cfg):
-        footer = (
-            f'<p><em>paperful · remote LLM · {cfg.llm_model} · {stamp}</em></p>'
-        )
+        footer = f"<p><em>paperful · remote LLM · {cfg.llm_model} · {stamp}</em></p>"
     html = f"{html_body}\n{footer}"
     out = cfg.summaries_dir / f"{item.key}.html"
     out.parent.mkdir(parents=True, exist_ok=True)

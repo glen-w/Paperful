@@ -60,8 +60,7 @@ class OllamaClient:
 
     def _api_root(self) -> str:
         root = self.base_url.rstrip("/")
-        if root.endswith("/v1"):
-            root = root[:-3]
+        root = root.removesuffix("/v1")
         return root
 
     def check_config(self, model: str) -> tuple[bool, str]:

@@ -92,6 +92,24 @@ git root.
 paperful always sends `Host: localhost:23119` — Zotero’s local API requires
 that header even when the TCP peer is `host.docker.internal`.
 
+## Optional LLM inside the image
+
+The image ships neither `litellm` nor `browser-use`, so `paperful recover` is
+host-only (it also needs the headed-login vault). `fix-metadata` title
+proposals, the `lint` identity check, and `summarize` work from the container
+against an Ollama running on the host:
+
+```toml
+[llm]
+enabled = true
+base_url = "http://host.docker.internal:11434"
+allow_remote = true    # host.docker.internal is not loopback
+```
+
+Start Ollama listening on all interfaces (`OLLAMA_HOST=0.0.0.0 ollama serve`).
+`docker compose run --rm paperful doctor` shows the `LLM` row. Details:
+[LLM](llm.md#docker).
+
 ## Custom playbook packs
 
 Put extra grey-playbook TOML files in `packs/` (under the data dir) and set in
@@ -117,7 +135,12 @@ docker compose run --rm paperful report
 ```
 
 `--no-attach` writes to `out/` only. `--library` walks the whole library
-(resumable; Ctrl-C then rerun). Same flags as [Commands](commands.md).
+(resumable; Ctrl-C then rerun). Same flags as [Commands](commands.md),
+including `--year-from` / `--year-to` and `--type` / `-T`.
+
+```sh
+docker compose run --rm paperful run -C BBNJ --year-from 2023 -T journalArticle --dry-run
+```
 
 ## Common commands
 

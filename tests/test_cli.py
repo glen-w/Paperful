@@ -68,14 +68,23 @@ class StubZL:
         from tests.conftest import make_item
 
         return [
-            make_item(key="I1", collection_paths=["BBNJ"]),
-            make_item(key="I2", doi=None, collection_paths=["BBNJ/EIA _ SEA"]),
+            make_item(key="I1", year=2024, collection_paths=["BBNJ"]),
+            make_item(key="I2", year=2019, doi=None, collection_paths=["BBNJ/EIA _ SEA"]),
         ]
 
     def items_in_scope(self, keys):
         from tests.conftest import make_item
 
-        return [make_item(key="I1", collection_paths=["BBNJ"], has_pdf=True)]
+        return [
+            make_item(key="I1", year=2024, collection_paths=["BBNJ"], has_pdf=True),
+            make_item(
+                key="I2",
+                year=2019,
+                doi=None,
+                collection_paths=["BBNJ/EIA _ SEA"],
+                has_linked_url=True,
+            ),
+        ]
 
     def count_linked_url_only(self, keys):
         return 1
@@ -125,6 +134,90 @@ def test_run_dry_run_lists_items_and_writes_nothing(cfg_file, stub_zotero, tmp_p
     assert "legal grey zone" not in res.stdout
     assert not (tmp_path / "state" / "manifest.jsonl").exists()
     assert not list((tmp_path / "out").rglob("*.pdf"))
+
+
+def test_run_year_range_filters_items(cfg_file, stub_zotero):
+    res = runner.invoke(
+        cli.app,
+        [
+            "run",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--year-from",
+            "2023",
+            "--year-to",
+            "2026",
+            "--dry-run",
+        ],
+        env={"COLUMNS": "200"},
+    )
+    assert res.exit_code == 0, res.stdout
+    assert "years 2023–2026" in res.stdout
+    assert "1 items without PDF" in res.stdout
+    assert "I1" in res.stdout
+    assert "I2" not in res.stdout.split("Dry run")[-1]
+
+
+def test_run_type_filter(cfg_file, stub_zotero):
+    from tests.conftest import make_item
+
+    stub_zotero.items_lacking_pdf = lambda keys, upgrade_linked=False: [
+        make_item(
+            key="I1", year=2024, item_type="journalArticle", collection_paths=["BBNJ"]
+        ),
+        make_item(
+            key="I2", year=2019, item_type="report", doi=None, collection_paths=["BBNJ"]
+        ),
+    ]
+    res = runner.invoke(
+        cli.app,
+        [
+            "run",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "-T",
+            "Journal Article",
+            "--dry-run",
+        ],
+        env={"COLUMNS": "200"},
+    )
+    assert res.exit_code == 0, res.stdout
+    assert "types journalArticle" in res.stdout
+    assert "1 items without PDF" in res.stdout
+    assert "I1" in res.stdout
+    assert "I2" not in res.stdout.split("Dry run")[-1]
+
+
+def test_run_rejects_unknown_type(cfg_file, stub_zotero):
+    res = runner.invoke(
+        cli.app,
+        ["run", "-c", str(cfg_file), "--library", "-T", "banana", "--dry-run"],
+    )
+    assert res.exit_code == 1
+    assert "Unknown item type" in res.stdout
+
+
+def test_run_rejects_inverted_year_range(cfg_file, stub_zotero):
+    res = runner.invoke(
+        cli.app,
+        [
+            "run",
+            "-c",
+            str(cfg_file),
+            "--library",
+            "--year-from",
+            "2026",
+            "--year-to",
+            "2023",
+            "--dry-run",
+        ],
+    )
+    assert res.exit_code == 1
+    assert "--year-from must be" in res.stdout
 
 
 def test_run_scihub_opt_in_appends_and_prints_disclaimer(cfg_file, stub_zotero):
@@ -349,6 +442,14 @@ def test_doctor_guide_greens_scholar_after_host_login(
     cfg_file, tmp_path, stub_zotero, monkeypatch
 ):
     monkeypatch.setattr("paperful.doctor.shutil.which", lambda name: "/bin/pdftotext")
+    # CI has the Playwright package but no Chromium: that amber step would come
+    # first in the guide and consume the input stub. Pin it green.
+    from paperful.doctor import Check
+
+    monkeypatch.setattr(
+        "paperful.doctor._playwright_check",
+        lambda: Check("Playwright", "green", "package + Chromium ready"),
+    )
     cookie = tmp_path / "state" / "scholar-cookies.txt"
 
     def after_login(_prompt: str = "") -> str:
@@ -572,3 +673,147 @@ def test_mendeley_manager_exits(cfg_file, tmp_path):
     res = runner.invoke(cli.app, ["collections", "-c", str(cfg_file)])
     assert res.exit_code == 1
     assert "not implemented" in res.stdout
+
+
+# ---- LLM verbs: recover / summarize gating -----------------------------------
+
+
+def _llm_cfg_file(tmp_path, extra=""):
+    p = tmp_path / "config.toml"
+    p.write_text(
+        f'email = "t@example.org"\nout_dir = "{tmp_path / "out"}"\nstate_dir = "{tmp_path / "state"}"\n'
+        "[llm]\nenabled = true\n" + extra
+    )
+    return p
+
+
+def test_recover_requires_item(cfg_file):
+    res = runner.invoke(cli.app, ["recover", "-c", str(cfg_file)])
+    assert res.exit_code == 1 and "--item" in res.stdout
+
+
+def test_recover_exits_when_llm_disabled(cfg_file, stub_zotero):
+    res = runner.invoke(cli.app, ["recover", "-c", str(cfg_file), "--item", "I1"])
+    assert res.exit_code == 1 and "llm.enabled" in res.stdout
+
+
+def test_recover_python_gate(cfg_file, monkeypatch):
+    import sys as real_sys
+    from collections import namedtuple
+
+    VI = namedtuple("VI", "major minor micro releaselevel serial")
+    fake = type("S", (), {"version_info": VI(3, 10, 0, "final", 0), "modules": real_sys.modules})()
+    monkeypatch.setattr(cli, "sys", fake)
+    res = runner.invoke(cli.app, ["recover", "-c", str(cfg_file), "--item", "I1"])
+    assert res.exit_code == 1 and "3.11" in res.stdout
+
+
+def test_recover_dry_run_prints_start_url(tmp_path, stub_zotero, monkeypatch):
+    from paperful.config import RECOVER_DISCLAIMER
+    from tests.conftest import make_item
+
+    cfg_file = _llm_cfg_file(tmp_path)
+    monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model)
+    monkeypatch.setattr(
+        cli, "get_backend", lambda cfg, zl: type("B", (), {"get_item": lambda self, k: make_item(key=k)})()
+    )
+    res = runner.invoke(cli.app, ["recover", "-c", str(cfg_file), "--item", "I1", "--dry-run"])
+    assert res.exit_code == 0, res.stdout
+    assert RECOVER_DISCLAIMER in res.stdout
+    assert "https://doi.org/10.1000/test.doi" in res.stdout
+    assert not (tmp_path / "state" / "manifest.jsonl").exists()
+
+
+def test_recover_unknown_item(tmp_path, stub_zotero, monkeypatch):
+    cfg_file = _llm_cfg_file(tmp_path)
+    monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model)
+    monkeypatch.setattr(cli, "get_backend", lambda cfg, zl: type("B", (), {"get_item": lambda self, k: None})())
+    res = runner.invoke(cli.app, ["recover", "-c", str(cfg_file), "--item", "NOPE", "--dry-run"])
+    assert res.exit_code == 1 and "Unknown item" in res.stdout
+
+
+def test_summarize_requires_scope(cfg_file):
+    res = runner.invoke(cli.app, ["summarize", "-c", str(cfg_file)])
+    assert res.exit_code == 1 and "--item" in res.stdout
+
+
+def test_summarize_exits_when_llm_disabled(cfg_file, stub_zotero):
+    res = runner.invoke(cli.app, ["summarize", "-c", str(cfg_file), "--item", "I1"])
+    assert res.exit_code == 1 and "llm.enabled" in res.stdout
+
+
+def test_summarize_dry_run_writes_disk_only(tmp_path, stub_zotero, monkeypatch):
+    from tests.conftest import make_item
+
+    cfg_file = _llm_cfg_file(tmp_path)
+    monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model)
+
+    class B:
+        applied = []
+
+        def get_item(self, k):
+            return make_item(key=k, has_pdf=True)
+
+        def create_or_update_note(self, *a):
+            self.applied.append(a)
+            return "N1"
+
+    monkeypatch.setattr(cli, "get_backend", lambda cfg, zl: B())
+    monkeypatch.setattr("paperful.summarize.pdf_text_for", lambda *a, **k: "Marine governance text.")
+
+    class Stub:
+        provider = "stub"
+
+        def complete(self, req):
+            return "<h2>Objective</h2><p>ok</p>"
+
+    monkeypatch.setattr("paperful.summarize.get_client", lambda cfg: Stub())
+    res = runner.invoke(cli.app, ["summarize", "-c", str(cfg_file), "--item", "I1"])
+    assert res.exit_code == 0, res.stdout
+    assert (tmp_path / "state" / "summaries" / "I1.html").is_file()
+    assert "--apply" in res.stdout and not B.applied
+
+    res = runner.invoke(cli.app, ["summarize", "-c", str(cfg_file), "--item", "I1", "--apply"])
+    assert res.exit_code == 0, res.stdout
+    assert "attached note N1" in res.stdout and len(B.applied) == 1
+
+
+def test_summarize_remote_egress_notice(tmp_path, stub_zotero, monkeypatch):
+    from tests.conftest import make_item
+
+    cfg_file = _llm_cfg_file(tmp_path, 'provider = "litellm"\nmodel = "openai/gpt"\n')
+    monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model)
+    monkeypatch.setattr(
+        cli, "get_backend", lambda cfg, zl: type("B", (), {"get_item": lambda self, k: make_item(key=k, has_pdf=False)})()
+    )
+    res = runner.invoke(cli.app, ["summarize", "-c", str(cfg_file), "--item", "I1"])
+    assert "Remote LLM" in res.stdout
+    assert "No items with PDFs" in res.stdout
+
+
+def test_doctor_llm_disabled_row(cfg_file, stub_zotero):
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--no-guide"])
+    assert res.exit_code == 0 and "LLM" in res.stdout and "disabled" in res.stdout
+
+
+def test_doctor_llm_enabled_amber_when_unreachable(tmp_path, stub_zotero, monkeypatch):
+    cfg_file = _llm_cfg_file(tmp_path, 'base_url = "http://127.0.0.1:1"\n')
+    import httpx as _httpx
+
+    import paperful.llm.client as mod
+
+    orig = _httpx.Client
+
+    class _C(orig):
+        def __init__(self, *a, **kw):
+            def boom(r):
+                raise _httpx.ConnectError("refused")
+
+            kw["transport"] = _httpx.MockTransport(boom)
+            super().__init__(*a, **kw)
+
+    monkeypatch.setattr(mod.httpx, "Client", _C)
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--no-guide"])
+    assert res.exit_code == 0
+    assert "LLM" in res.stdout and "unreachable" in res.stdout
+    assert "browser-agent extra" in res.stdout

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import sys
-
 import httpx
 import pytest
 
@@ -53,13 +51,21 @@ def test_routing_requires_llm_and_identifier(cfg):
     assert not source_applicable(item, cfg, "browser_agent")
     cfg.llm_enabled = True
     assert source_applicable(item, cfg, "browser_agent")
-    assert source_applicable(make_item(doi=None, url="https://x.test/p"), cfg, "browser_agent")
+    assert source_applicable(
+        make_item(doi=None, url="https://x.test/p"), cfg, "browser_agent"
+    )
     assert not source_applicable(make_item(doi=None, url=None), cfg, "browser_agent")
 
 
 def test_recover_start_url_prefers_doi():
-    assert recover_start_url(make_item(doi="10.1/a", url="https://x")) == "https://doi.org/10.1/a"
-    assert recover_start_url(make_item(doi=None, url="https://x.test/p")) == "https://x.test/p"
+    assert (
+        recover_start_url(make_item(doi="10.1/a", url="https://x"))
+        == "https://doi.org/10.1/a"
+    )
+    assert (
+        recover_start_url(make_item(doi=None, url="https://x.test/p"))
+        == "https://x.test/p"
+    )
     assert recover_start_url(make_item(doi=None, url="ftp://x")) is None
     assert recover_start_url(make_item(doi=None, url=None)) is None
 
@@ -75,22 +81,30 @@ def test_find_skipped_when_llm_off(ctx_factory, cfg, stub_runner):
 
 def test_find_skipped_without_identifier(ctx_factory, cfg, stub_runner, monkeypatch):
     cfg.llm_enabled = True
-    monkeypatch.setattr("paperful.sources.browser_agent.browser_agent_extra_available", lambda: True)
+    monkeypatch.setattr(
+        "paperful.sources.browser_agent.browser_agent_extra_available", lambda: True
+    )
     stub_runner(RecoverResult(PDF_BYTES, "stub"))
-    cand = find(make_item(doi=None, url=None), ctx_factory(lambda r: httpx.Response(404)))
+    cand = find(
+        make_item(doi=None, url=None), ctx_factory(lambda r: httpx.Response(404))
+    )
     assert cand.outcome is Outcome.SKIPPED and "no DOI" in cand.note
 
 
 def test_find_skipped_without_extra(ctx_factory, cfg, monkeypatch):
     cfg.llm_enabled = True
-    monkeypatch.setattr("paperful.sources.browser_agent.browser_agent_extra_available", lambda: False)
+    monkeypatch.setattr(
+        "paperful.sources.browser_agent.browser_agent_extra_available", lambda: False
+    )
     cand = find(make_item(), ctx_factory(lambda r: httpx.Response(404)))
     assert cand.outcome is Outcome.SKIPPED and "browser-agent" in cand.note
 
 
 def test_find_found_with_stub(ctx_factory, cfg, stub_runner, monkeypatch):
     cfg.llm_enabled = True
-    monkeypatch.setattr("paperful.sources.browser_agent.browser_agent_extra_available", lambda: True)
+    monkeypatch.setattr(
+        "paperful.sources.browser_agent.browser_agent_extra_available", lambda: True
+    )
     r = stub_runner(RecoverResult(PDF_BYTES, "stub"))
     cand = find(make_item(doi="10.1000/x"), ctx_factory(lambda r: httpx.Response(404)))
     assert cand.outcome is Outcome.FOUND and cand.content == PDF_BYTES
@@ -99,7 +113,9 @@ def test_find_found_with_stub(ctx_factory, cfg, stub_runner, monkeypatch):
 
 def test_find_captcha_stub(ctx_factory, cfg, stub_runner, monkeypatch):
     cfg.llm_enabled = True
-    monkeypatch.setattr("paperful.sources.browser_agent.browser_agent_extra_available", lambda: True)
+    monkeypatch.setattr(
+        "paperful.sources.browser_agent.browser_agent_extra_available", lambda: True
+    )
     stub_runner(RecoverResult(None, "captcha", captcha=True))
     cand = find(make_item(), ctx_factory(lambda r: httpx.Response(404)))
     assert cand.outcome is Outcome.CAPTCHA
@@ -107,7 +123,9 @@ def test_find_captcha_stub(ctx_factory, cfg, stub_runner, monkeypatch):
 
 def test_find_not_found_stub(ctx_factory, cfg, stub_runner, monkeypatch):
     cfg.llm_enabled = True
-    monkeypatch.setattr("paperful.sources.browser_agent.browser_agent_extra_available", lambda: True)
+    monkeypatch.setattr(
+        "paperful.sources.browser_agent.browser_agent_extra_available", lambda: True
+    )
     stub_runner(RecoverResult(None, "no PDF in download folder"))
     cand = find(make_item(), ctx_factory(lambda r: httpx.Response(404)))
     assert cand.outcome is Outcome.NOT_FOUND and "download folder" in cand.note
@@ -115,7 +133,9 @@ def test_find_not_found_stub(ctx_factory, cfg, stub_runner, monkeypatch):
 
 def test_find_runner_exception_is_error(ctx_factory, cfg, monkeypatch):
     cfg.llm_enabled = True
-    monkeypatch.setattr("paperful.sources.browser_agent.browser_agent_extra_available", lambda: True)
+    monkeypatch.setattr(
+        "paperful.sources.browser_agent.browser_agent_extra_available", lambda: True
+    )
 
     class Boom:
         def run(self, *a):
@@ -149,7 +169,9 @@ def test_run_recover_uses_injected_runner(cfg, monkeypatch):
     monkeypatch.setattr(ba, "browser_agent_extra_available", lambda: True)
     monkeypatch.setattr(ba, "profile_ready", lambda cfg: True)
     r = _StubRunner(RecoverResult(PDF_BYTES, "ok"))
-    assert ba.run_recover(cfg, make_item(), "https://x", runner=r).pdf_bytes == PDF_BYTES
+    assert (
+        ba.run_recover(cfg, make_item(), "https://x", runner=r).pdf_bytes == PDF_BYTES
+    )
 
 
 def test_largest_pdf_in_folder(tmp_path):
@@ -172,7 +194,9 @@ def test_pipeline_records_browser_agent_source(cfg, stub_runner, monkeypatch):
     from paperful.store import STATUS_OK, Manifest
 
     cfg.llm_enabled = True
-    monkeypatch.setattr("paperful.sources.browser_agent.browser_agent_extra_available", lambda: True)
+    monkeypatch.setattr(
+        "paperful.sources.browser_agent.browser_agent_extra_available", lambda: True
+    )
     stub_runner(RecoverResult(PDF_BYTES, "stub"))
     manifest = Manifest(cfg.manifest_path)
     pipe = Pipeline(

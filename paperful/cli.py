@@ -38,7 +38,12 @@ from .runreport import build_report, print_run_summary, write_run_report
 from .sources import Context
 from .sources.scihub import ping_mirrors
 from .store import STATUS_ATTACHED, STATUS_NOT_FOUND, Manifest
-from .zot import ZoteroLocal
+from .zot import (
+    ZoteroLocal,
+    filter_items_by_type,
+    filter_items_by_year,
+    resolve_item_types,
+)
 
 app = typer.Typer(
     add_completion=False,
@@ -55,6 +60,25 @@ console = Console(highlight=False)
 
 ConfigOpt = typer.Option(
     None, "--config", "-c", help="Path to config.toml", exists=True, dir_okay=False
+)
+YearFromOpt = typer.Option(
+    None,
+    "--year-from",
+    help="Only items dated this year or later (inclusive). Undated items excluded.",
+)
+YearToOpt = typer.Option(
+    None,
+    "--year-to",
+    help="Only items dated this year or earlier (inclusive). Undated items excluded.",
+)
+ItemTypeOpt = typer.Option(
+    [],
+    "--type",
+    "-T",
+    help=(
+        "Only these Zotero item types (repeatable or comma-separated; "
+        "e.g. journalArticle, 'Journal Article', report)."
+    ),
 )
 
 
@@ -170,6 +194,55 @@ def _scope_keys(
             raise typer.Exit(1)
         keys.extend(backend.subtree_keys(root))
     return keys, ", ".join(collection)
+
+
+def _year_scope_label(year_from: int | None, year_to: int | None) -> str | None:
+    if year_from is None and year_to is None:
+        return None
+    if year_from is not None and year_to is not None:
+        return f"years {year_from}–{year_to}"
+    if year_from is not None:
+        return f"years ≥{year_from}"
+    return f"years ≤{year_to}"
+
+
+def _type_scope_label(types: frozenset[str] | None) -> str | None:
+    if not types:
+        return None
+    return "types " + ", ".join(sorted(types))
+
+
+def _resolve_types(item_type: list[str]) -> frozenset[str] | None:
+    try:
+        return resolve_item_types(item_type)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1)
+
+
+def _apply_item_filters(
+    items: list,
+    scope: str,
+    *,
+    year_from: int | None = None,
+    year_to: int | None = None,
+    item_types: frozenset[str] | None = None,
+    label: bool = True,
+) -> tuple[list, str]:
+    """Filter by year and/or item type; optionally append labels to scope."""
+    if year_from is not None and year_to is not None and year_from > year_to:
+        console.print("[red]--year-from must be ≤ --year-to.[/]")
+        raise typer.Exit(1)
+    filtered = filter_items_by_year(items, year_from, year_to)
+    filtered = filter_items_by_type(filtered, item_types)
+    if label:
+        for part in (
+            _year_scope_label(year_from, year_to),
+            _type_scope_label(item_types),
+        ):
+            if part:
+                scope = f"{scope}, {part}"
+    return filtered, scope
 
 
 @app.callback()
@@ -322,6 +395,9 @@ def lint(
     library: bool = typer.Option(
         False, "--library", help="Whole library instead of collections."
     ),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
     as_json: bool = typer.Option(False, "--json", help="Machine-readable findings."),
     strict: bool = typer.Option(False, "--strict", help="Exit 1 if any finding."),
@@ -339,7 +415,13 @@ def lint(
     zl = _zotero(quiet=as_json)
     backend = get_backend(cfg, zl)
     keys, scope = _scope_keys(backend, collection, library)
-    items = backend.items_in_scope(keys)
+    items, scope = _apply_item_filters(
+        backend.items_in_scope(keys),
+        scope,
+        year_from=year_from,
+        year_to=year_to,
+        item_types=_resolve_types(item_type),
+    )
     if limit:
         items = items[:limit]
     manifest = Manifest(cfg.manifest_path)
@@ -373,6 +455,9 @@ def fix_metadata(
     library: bool = typer.Option(
         False, "--library", help="Whole library instead of collections."
     ),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
     apply: bool = typer.Option(
         False, "--apply", help="Write patches to the library (default is dry-run)."
@@ -397,7 +482,13 @@ def fix_metadata(
     zl = _zotero()
     backend = get_backend(cfg, zl)
     keys, scope = _scope_keys(backend, collection, library)
-    items = backend.items_in_scope(keys)
+    items, scope = _apply_item_filters(
+        backend.items_in_scope(keys),
+        scope,
+        year_from=year_from,
+        year_to=year_to,
+        item_types=_resolve_types(item_type),
+    )
     if limit:
         items = items[:limit]
     manifest = Manifest(cfg.manifest_path)
@@ -531,6 +622,9 @@ def dedupe(
         "--phase",
         help="high_doi, medium_title_year, or all (default). Apply runs high_doi first.",
     ),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
     as_json: bool = typer.Option(
         False, "--json", help="Print pack paths and counts as JSON."
@@ -560,7 +654,13 @@ def dedupe(
     zl = _zotero(quiet=as_json)
     backend = get_backend(cfg, zl)
     keys, scope = _scope_keys(backend, collection, library)
-    items = backend.items_in_scope(keys)
+    items, scope = _apply_item_filters(
+        backend.items_in_scope(keys),
+        scope,
+        year_from=year_from,
+        year_to=year_to,
+        item_types=_resolve_types(item_type),
+    )
     if limit:
         items = items[:limit]
     try:
@@ -657,6 +757,9 @@ def gaps(
     library: bool = typer.Option(
         False, "--library", help="Whole library instead of collections."
     ),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
     as_json: bool = typer.Option(False, "--json", help="Print counts as JSON."),
     config: Path | None = ConfigOpt,
 ) -> None:
@@ -674,7 +777,14 @@ def gaps(
     zl = _zotero(quiet=as_json)
     backend = get_backend(cfg, zl)
     keys, scope = _scope_keys(backend, collection, library)
-    counts = summarize_gaps(backend.items_in_scope(keys))
+    items, scope = _apply_item_filters(
+        backend.items_in_scope(keys),
+        scope,
+        year_from=year_from,
+        year_to=year_to,
+        item_types=_resolve_types(item_type),
+    )
+    counts = summarize_gaps(items)
     payload = {
         "scope": scope,
         "items": counts.items,
@@ -719,6 +829,9 @@ def run(
     dry_run: bool = typer.Option(
         False, "--dry-run", help="List what would be fetched; no network beyond Zotero."
     ),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
     no_attach: bool = typer.Option(
         False, "--no-attach", help="Do not attach PDFs into Zotero."
@@ -764,10 +877,37 @@ def run(
     zl = _zotero()
     backend = get_backend(cfg, zl)
     keys, scope = _scope_keys(backend, collection, library)
+    types = _resolve_types(item_type)
 
     manifest = Manifest(cfg.manifest_path)
-    linked_skipped = 0 if upgrade_linked else backend.count_linked_url_only(keys)
-    items = backend.items_lacking_pdf(keys, upgrade_linked=upgrade_linked)
+    item_filter = (
+        year_from is not None or year_to is not None or types is not None
+    )
+    if item_filter:
+        # Same slice for linked-URL skip count and the PDF todo list.
+        scoped, scope = _apply_item_filters(
+            backend.items_in_scope(keys),
+            scope,
+            year_from=year_from,
+            year_to=year_to,
+            item_types=types,
+        )
+        linked_skipped = (
+            0
+            if upgrade_linked
+            else sum(1 for it in scoped if it.has_linked_url and not it.has_pdf)
+        )
+        items, _ = _apply_item_filters(
+            backend.items_lacking_pdf(keys, upgrade_linked=upgrade_linked),
+            scope,
+            year_from=year_from,
+            year_to=year_to,
+            item_types=types,
+            label=False,
+        )
+    else:
+        linked_skipped = 0 if upgrade_linked else backend.count_linked_url_only(keys)
+        items = backend.items_lacking_pdf(keys, upgrade_linked=upgrade_linked)
     todo = [it for it in items if manifest.should_process(it.key, retry_failed)]
     skipped_manifest = len(items) - len(todo)
     if limit:
@@ -820,6 +960,20 @@ def run(
             )
             attacher = None
 
+    run_flags = _run_flags(
+        dry_run=False,
+        no_attach=no_attach,
+        retry_failed=retry_failed,
+        try_all=try_all,
+        upgrade_linked=upgrade_linked,
+        scihub=scihub,
+        preset=preset,
+        sources=sources,
+        year_from=year_from,
+        year_to=year_to,
+        item_types=",".join(sorted(types)) if types else None,
+    )
+
     if not todo:
         stats = RunStats(
             skipped_manifest=skipped_manifest, linked_url_skipped=linked_skipped
@@ -831,16 +985,7 @@ def run(
             cfg,
             stats,
             scope=scope,
-            flags=_run_flags(
-                dry_run=False,
-                no_attach=no_attach,
-                retry_failed=retry_failed,
-                try_all=try_all,
-                upgrade_linked=upgrade_linked,
-                scihub=scihub,
-                preset=preset,
-                sources=sources,
-            ),
+            flags=run_flags,
         )
         return
 
@@ -871,16 +1016,7 @@ def run(
         cfg,
         stats,
         scope=scope,
-        flags=_run_flags(
-            dry_run=False,
-            no_attach=no_attach,
-            retry_failed=retry_failed,
-            try_all=try_all,
-            upgrade_linked=upgrade_linked,
-            scihub=scihub,
-            preset=preset,
-            sources=sources,
-        ),
+        flags=run_flags,
     )
 
 
@@ -1283,8 +1419,6 @@ def recover(
     config: Path | None = ConfigOpt,
 ) -> None:
     """Opt-in browser-agent PDF recovery for one or more items (not part of run)."""
-    import sys
-
     from .browser_agent import recover_start_url
     from .llm import llm_egress_is_remote
     from .llm.preflight import validate_llm_for_recover
@@ -1381,6 +1515,9 @@ def summarize(
         "--force",
         help="Summarize even when the gated PDF identity check flags the item.",
     ),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n"),
     config: Path | None = ConfigOpt,
 ) -> None:
@@ -1428,6 +1565,13 @@ def summarize(
         seen.add(it.key)
         unique.append(it)
     items = [it for it in unique if it.has_pdf]
+    items, _ = _apply_item_filters(
+        items,
+        "",
+        year_from=year_from,
+        year_to=year_to,
+        item_types=_resolve_types(item_type),
+    )
     if limit:
         items = items[:limit]
     if not items:

@@ -40,8 +40,14 @@ collection picker hint on fuzzy `--collection` miss.
 - Deterministic `lint` / `fix-metadata` (Crossref / OpenAlex / Semantic Scholar /
   PubMed, PDF-text DOI via pdftotext then pypdf) with explicit `--apply`.
   **Shipped:** verified PDF-DOI → patch; date precision guard; HTML title cleanup;
-  title hygiene findings (`title_html` / `title_all_caps` / `title_filename`).
-  ALL CAPS / filename stay findings until the optional LLM title MVP below.
+  ALL CAPS → Title Case; title hygiene findings (`title_html` / `title_all_caps` /
+  `title_filename`). Filename titles stay findings-only. De-allcaps today only keeps
+  two-letter tokens (UN, EU); longer corpus acronyms (BBNJ, FAO, OECD, …) still
+  get Title-Cased. **Next:** collection-scoped NER / acronym harvest — scan titles,
+  abstracts, and venues once, write a durable allowlist under `state/`, and feed it
+  into `title_to_title_case` so known all-caps entities stay uppercase on recase.
+  Deterministic first (freq + shape heuristics); optional LLM NER only as a later
+  assist behind the existing `[llm]` gate.
 - Collection-scoped duplicate packs: `paperful dedupe` (DOI, then title+year).
   Trash is explicit `--apply`; title+year needs `--apply-medium`. See
   [dedupe](dedupe.md).
@@ -50,7 +56,13 @@ collection picker hint on fuzzy `--collection` miss.
 
 ## Optional LLM assist (local / LiteLLM)
 
-**Status:** maybe later — useful, not required for the PDF loop.
+**Status:** MVP shipped behind `[llm].enabled = false` — Ollama loopback default,
+LiteLLM via `paperful[llm]`. Verbs: `recover` (browser agent, `paperful[browser-agent]`,
+Py 3.11+), `fix-metadata` title proposals (`[fix_metadata].llm_title`), `lint`
+`pdf_identity_mismatch` (`[lint].llm_pdf_match`), `summarize` → tagged child note.
+See [architecture § LLM layer](architecture.md#llm-layer-optional-local-first).
+Still later: Browser Use Cloud / BU2, batch `recover --from-last-run`, playbook
+mining from agent traces, venue/date cleanup.
 
 **MVP:** when a title looks wonky (ALL CAPS, truncated, HTML junk, filename-as-title,
 mojibake), propose a cleaned title using **abstract and/or first-page PDF text**
@@ -148,12 +160,13 @@ Larger product bets. Park until the ledger and core loop justify them.
 6. **Writing & export** — CSL / BibLaTeX / Quarto sync; living review / gap lists;
    git-friendly CSL-JSON dumps
 7. **Agent surface** — MCP + CLI sharing one capability API; dry-run defaults;
-   typed source/policy permissions; playbooks. **Parked spike:** opt-in
+   typed source/policy permissions; playbooks. **Shipped (opt-in):**
    [browser-use](https://github.com/browser-use/browser-use) as a *recovery*
-   lane only (`recover` / deferred+captcha items), reusing the session vault —
-   not a default source, not “AI fetch everything.” Soft bot walls may improve
-   with their Cloud stealth; hard CAPTCHAs stay human. Prefer mining successful
-   agent paths into grey playbooks so the deterministic fetcher stays primary.
+   lane only (`paperful recover --item`), reusing the session vault — never a
+   default source, not “AI fetch everything.” Soft bot walls may improve with
+   their Cloud stealth (not wired); hard CAPTCHAs stay human. Next: mine
+   successful agent paths into grey playbooks so the deterministic fetcher
+   stays primary.
 8. **Collaboration without SaaS** — shared `state/` over syncthing/git; attach
    locks; optional headless fetch node. Aligns with the house
    [quiet mirror](quiet-mirror.md) stance: Syncthing (or similar) is transport;

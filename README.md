@@ -45,6 +45,9 @@ machine; work lands on disk (`out/`, `state/`).
 - Optional: a university/library account and EZProxy URL for publisher PDFs.
 - Optional: a browser session for Google Scholar
   (`paperful session login scholar`) if you keep `scholar` enabled.
+- Optional: [Ollama](https://ollama.com) with a pulled model if you turn on
+  the LLM verbs (`[llm].enabled`); `recover` additionally needs Python 3.11+
+  and `uv sync --extra browser-agent`. See [LLM](docs/llm.md).
 
 ```sh
 git clone https://github.com/glen-w/Paperful.git
@@ -61,7 +64,13 @@ Then pick a collection and go:
 ```sh
 uv run paperful run --collection interesting --dry-run
 uv run paperful run --collection interesting
+
+# optional: narrow by year and/or Zotero item type
+uv run paperful run -C BBNJ --year-from 2023 --year-to 2026 -T journalArticle
 ```
+
+Flags `--year-from` / `--year-to` and `--type` / `-T` also work on `lint`,
+`fix-metadata`, `dedupe`, `gaps`, and `summarize`. See [Commands](docs/commands.md).
 
 Optional: [Poppler](https://poppler.freedesktop.org/) `pdftotext` on `PATH`
 for PDF-text DOI extraction (`pypdf` is the fallback; `doctor` ambers if
@@ -99,8 +108,18 @@ Reference (same corpus as the hosted guide):
 - [Docker](docs/docker.md) — optional image, not a complete install
 
 Optional local LLM (Ollama by default; off until `[llm].enabled`): grounded
-title proposals, PDF identity lint, `summarize`, and a separate `recover`
-browser-agent lane. See [Configuration](docs/config.md#llm-optional-local-first).
+title proposals in `fix-metadata`, a `pdf_identity_mismatch` lint check,
+`summarize` (HTML on disk, `--apply` for a tagged Zotero note), and a separate
+`recover` browser-agent lane that is never part of `run`. Setup, model
+guidance, privacy notes, and troubleshooting: [LLM](docs/llm.md); key table:
+[Configuration](docs/config.md#llm-optional-local-first).
+
+```sh
+ollama pull qwen2.5:7b                       # then set [llm] enabled = true in config.toml
+uv run paperful doctor                       # LLM row must be green
+uv run paperful summarize --item ITEMKEY     # writes state/summaries/ITEMKEY.html
+uv run paperful summarize --item ITEMKEY --apply
+```
 
 ## Develop
 

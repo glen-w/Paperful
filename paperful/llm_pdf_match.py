@@ -5,8 +5,8 @@ from __future__ import annotations
 from .config import Config
 from .grounding import metadata_block, pdf_text_for
 from .library import LibraryBackend
-from .llm import CompletionRequest, get_client
 from .lint import Finding
+from .llm import CompletionRequest, get_client
 from .store import Manifest
 from .zot import Item
 

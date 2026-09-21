@@ -8,8 +8,13 @@ import types
 import httpx
 import pytest
 
-from paperful.llm import OllamaClient, get_client, llm_egress_is_remote, llm_model_for_agent
-from paperful.llm.client import LLMClientError, LiteLLMClient, _parse_json_object
+from paperful.llm import (
+    OllamaClient,
+    get_client,
+    llm_egress_is_remote,
+    llm_model_for_agent,
+)
+from paperful.llm.client import LiteLLMClient, LLMClientError, _parse_json_object
 from paperful.llm.preflight import validate_llm_for_recover, validate_llm_for_verb
 from paperful.llm.validate import (
     LlmConfigError,
@@ -115,7 +120,9 @@ def test_get_client_by_provider(cfg):
 
 
 def test_ollama_check_config_ok(mock_ollama):
-    mock_ollama(lambda r: httpx.Response(200, json={"models": [{"name": "qwen2.5:7b"}]}))
+    mock_ollama(
+        lambda r: httpx.Response(200, json={"models": [{"name": "qwen2.5:7b"}]})
+    )
     ok, msg = OllamaClient("http://127.0.0.1:11434", False).check_config("qwen2.5:7b")
     assert ok and msg == "ok"
 
@@ -208,12 +215,16 @@ def test_litellm_complete_with_fake_module(monkeypatch):
         msg = types.SimpleNamespace(content='{"ok": true}')
         return types.SimpleNamespace(choices=[types.SimpleNamespace(message=msg)])
 
-    monkeypatch.setitem(sys.modules, "litellm", types.SimpleNamespace(completion=completion))
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
     from paperful.llm import CompletionRequest
 
     client = LiteLLMClient(api_base="https://proxy.example/v1")
     assert client.check_config("gpt") == (True, "ok")
-    out = client.complete_json(CompletionRequest(model="gpt", prompt="hi", max_tokens=9))
+    out = client.complete_json(
+        CompletionRequest(model="gpt", prompt="hi", max_tokens=9)
+    )
     assert out == {"ok": True}
     assert calls["api_base"] == "https://proxy.example/v1"
     assert calls["response_format"] == {"type": "json_object"}
@@ -237,7 +248,9 @@ def test_preflight_empty_model(cfg):
 
 def test_preflight_ollama_ok(cfg, mock_ollama):
     cfg.llm_enabled = True
-    mock_ollama(lambda r: httpx.Response(200, json={"models": [{"name": cfg.llm_model}]}))
+    mock_ollama(
+        lambda r: httpx.Response(200, json={"models": [{"name": cfg.llm_model}]})
+    )
     assert validate_llm_for_verb(cfg) == cfg.llm_model
 
 
