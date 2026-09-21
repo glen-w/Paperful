@@ -17,6 +17,8 @@ from ..playbooks import (
     GreyPlaybook,
     apply_rewrite,
     apply_synthesize,
+    rewrite_playbook_name,
+    synthesize_playbook_name,
     default_playbooks,
     href_matches_scrape,
     looks_like_pdf_url,
@@ -114,6 +116,23 @@ def extract_un_symbol(
 
 def undocs_pdf_url(symbol: str) -> str:
     return f"https://undocs.org/pdf?symbol={symbol}"
+
+
+def grey_playbook_name(
+    item: object, playbooks: list[GreyPlaybook] | None = None
+) -> str:
+    """Playbook that rewrote or synthesized this item, or ``""`` for a plain URL."""
+    books = _books(playbooks)
+    url = (getattr(item, "url", None) or "").strip()
+    blob = f"{getattr(item, 'extra', '') or ''}\n{getattr(item, 'title', '') or ''}"
+    if url.lower().startswith(("http://", "https://")):
+        name = rewrite_playbook_name(url, books)
+        if name:
+            return name
+        if url_is_direct_skip(url):
+            return synthesize_playbook_name(blob, books) or ""
+        return ""
+    return synthesize_playbook_name(blob, books) or ""
 
 
 def grey_target(

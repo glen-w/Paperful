@@ -82,7 +82,17 @@ and `synthesize` collection notes are posted the same way. Filename spaces are
 encoded as `%20`, not `+`.
 
 `linked_url` (including a quota workaround that only stores a URL) is not a
-stored PDF. `--upgrade-linked` adds an `imported_file` beside it.
+stored PDF. `--upgrade-linked` adds an `imported_file` beside it and does not
+remove the link:
+
+```sh
+paperful run -C COLLECTION --upgrade-linked
+```
+
+A successful Zotero attach writes a provenance note on the PDF child
+(`paperful oa:unpaywall`, `paperful campus:ezproxy`, `paperful grey:<playbook>`,
+`paperful pirate:scihub`, and so on). The manifest `source` field remains the
+record. See [Research operators](research-ops.md).
 
 ## Ghosts and quota
 

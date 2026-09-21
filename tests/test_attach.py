@@ -49,7 +49,13 @@ class ScriptedUpload:
 
     def __init__(self, zot, payload, parentid, basedir=None):
         ScriptedUpload.seen.append(
-            (parentid, payload[0]["filename"], basedir, zot.local_api_key)
+            (
+                parentid,
+                payload[0]["filename"],
+                basedir,
+                zot.local_api_key,
+                payload[0].get("note"),
+            )
         )
 
     def upload(self):
@@ -92,6 +98,40 @@ def test_attachment_payload_shape(pdf):
     assert attachment_payload(pdf)["title"] == "Full Text PDF"
 
 
+def test_attachment_note_is_provenance(pdf):
+    note = "paperful oa:unpaywall"
+    p = attachment_payload(pdf, note=note)
+    assert p["note"] == note
+    assert p["title"] == "Full Text PDF"
+
+
+def test_upload_auth_encodes_spaces_as_percent20(pdf):
+    captured: dict[str, str] = {}
+
+    class Z:
+        endpoint = "http://localhost:23119/api"
+        library_type = "users"
+        library_id = "0"
+
+        def _write(self, method, url, content, headers):
+            del method, url, headers
+            captured["body"] = content
+
+            class Resp:
+                def json(self):
+                    return {"exists": 1}
+
+            return Resp()
+
+    up = at.LocalZupload.__new__(at.LocalZupload)
+    up.zinstance = Z()
+    up._post_with_retry = lambda fn: fn()  # type: ignore[method-assign]
+    up._get_auth(str(pdf), "PARENT")
+    body = captured["body"]
+    assert "Smith%20-%202019%20-%20Title.pdf" in body
+    assert "filename=Smith+" not in body
+
+
 def test_missing_file_and_no_write_support(cfg, pdf):
     a = Attacher(cfg, StubZL(supports_write=True))
     assert "file missing" in a.attach("K", pdf.parent / "nope.pdf").reason
@@ -126,7 +166,7 @@ def test_authorises_stores_key_and_uploads(cfg, pdf, scripted):
     assert res.ok and res.attachment_key == "ATT"
     assert zl.zot.authorize_calls == 1
     assert json.loads(cfg.local_key_path.read_text()) == {"key": "KEY1"}
-    assert scripted.seen == [("PARENT", pdf.name, str(pdf.parent), "KEY1")]
+    assert scripted.seen == [("PARENT", pdf.name, str(pdf.parent), "KEY1", "")]
     assert zl.zot.client.timeout == at.DIALOG_TIMEOUT_S
 
 

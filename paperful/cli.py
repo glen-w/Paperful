@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from enum import Enum
@@ -170,6 +171,14 @@ NoAttachOpt = typer.Option(
     "--no-attach/--attach",
     help="Do not attach PDFs into Zotero. --attach turns a profile's no_attach off.",
 )
+StrictPdfDoiOpt = typer.Option(
+    None,
+    "--strict-pdf-doi/--no-strict-pdf-doi",
+    help=(
+        "Save a PDF whose DOI differs from the library item, but do not attach it. "
+        "--no-strict-pdf-doi turns a profile default off."
+    ),
+)
 SciHubOpt = typer.Option(
     None,
     "--scihub/--no-scihub",
@@ -312,7 +321,69 @@ def _zotero(*, quiet: bool = False) -> ZoteroLocal:
     return zl
 
 
-def _print_exit_ladder(cfg: Config | None = None) -> None:
+def _env_code(message: str) -> str:
+    low = message.lower()
+    if "no write support" in low or "needs zotero 10" in low:
+        return "zotero_no_write"
+    if "local api is disabled" in low or "allow other applications" in low:
+        return "zotero_api_off"
+    if "400" in low and "host" in low:
+        return "zotero_bad_host"
+    if any(
+        token in low
+        for token in (
+            "cannot reach",
+            "connection refused",
+            "unreachable",
+            "timed out",
+            "connect",
+        )
+    ):
+        return "zotero_down"
+    return ""
+
+
+def _zotero_next_steps(code: str, *, in_doctor: bool) -> list[str]:
+    host = os.environ.get("PAPERFUL_ZOTERO_HOST", "").strip()
+    host_tip = (
+        "Host Zotero must be running on this machine. The Host header is always "
+        "localhost:23119; PAPERFUL_ZOTERO_HOST is only the TCP address. "
+        "See docs/zotero.md."
+    )
+    if code == "zotero_api_off":
+        steps = [
+            "Settings → Advanced → enable “Allow other applications on this computer to communicate with Zotero”.",
+            "See docs/zotero.md.",
+        ]
+    elif code == "zotero_no_write":
+        steps = [
+            "Attach needs Zotero 10+. This build can still download PDFs to out/.",
+            "Upgrade, then run paperful attach. See docs/zotero.md.",
+        ]
+    elif code in {"zotero_down", "zotero_bad_host"}:
+        steps = ["Start Zotero on this machine."]
+        if host or code == "zotero_bad_host":
+            steps.append(host_tip)
+        steps.append("Settings → Advanced → enable the local API.")
+    else:
+        steps = [
+            "Start Zotero on this machine.",
+            "Settings → Advanced → enable the local API.",
+        ]
+        if host:
+            steps.append(host_tip)
+    if not in_doctor and code != "zotero_no_write":
+        steps.append("Run paperful doctor for a full check.")
+    if code not in {"zotero_no_write", "zotero_api_off"}:
+        steps.append(
+            "If you have no config yet: cp config.example.toml config.toml and set email."
+        )
+    return steps
+
+
+def _print_exit_ladder(
+    cfg: Config | None = None, *, code: str = "", in_doctor: bool = False
+) -> None:
     manager = (cfg.manager if cfg else "zotero") or "zotero"
     manager = manager.strip().lower()
     if manager == "mendeley":
@@ -333,18 +404,14 @@ def _print_exit_ladder(cfg: Config | None = None) -> None:
             "  3. Run [bold]paperful doctor[/].\n"
         )
         return
-    console.print(
-        "\n[bold]Next steps[/]\n"
-        "  1. Start Zotero on this machine.\n"
-        "  2. Settings → Advanced → enable the local API.\n"
-        "  3. Run [bold]paperful doctor[/] for a full check.\n"
-        "  4. If you have no config yet: [bold]cp config.example.toml config.toml[/] and set email.\n"
-    )
+    steps = _zotero_next_steps(code, in_doctor=in_doctor)
+    body = "\n".join(f"  {i}. {step}" for i, step in enumerate(steps, start=1))
+    console.print(f"\n[bold]Next steps[/]\n{body}\n")
 
 
-def _exit_env(message: str, cfg: Config | None = None) -> None:
+def _exit_env(message: str, cfg: Config | None = None, *, code: str = "") -> None:
     console.print(f"[red]{message}[/]")
-    _print_exit_ladder(cfg)
+    _print_exit_ladder(cfg, code=code or _env_code(message))
     raise typer.Exit(2)
 
 
@@ -571,10 +638,27 @@ def doctor(
         "--guide/--no-guide",
         help="Walk through amber/red fixes interactively (default: on when stdin is a TTY)",
     ),
+    as_json: bool = typer.Option(
+        False, "--json", help="Print checks as JSON (name, status, code, detail)."
+    ),
 ) -> None:
     """Check Zotero, paths, email, and optional browser sessions (green / amber / red)."""
     cfg = _cfg(config)
     checks = _collect_doctor_checks(cfg)
+    if as_json:
+        payload = [
+            {
+                "name": c.name,
+                "status": c.status,
+                "code": c.code,
+                "detail": c.detail,
+            }
+            for c in checks
+        ]
+        sys.stdout.write(json.dumps(payload, indent=2) + "\n")
+        if has_red(checks):
+            raise typer.Exit(2)
+        return
     _print_doctor_table(checks)
 
     actionable = actionable_checks(checks, cfg)
@@ -593,7 +677,8 @@ def doctor(
         )
 
     if has_red(checks):
-        _print_exit_ladder(cfg)
+        code = next((c.code for c in checks if c.status == "red" and c.code), "")
+        _print_exit_ladder(cfg, code=code, in_doctor=True)
         raise typer.Exit(2)
 
 
@@ -1202,6 +1287,7 @@ def run(
     ),
     scihub: bool | None = SciHubOpt,
     upgrade_linked: bool | None = UpgradeLinkedOpt,
+    strict_pdf_doi: bool | None = StrictPdfDoiOpt,
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
@@ -1228,6 +1314,7 @@ def run(
         preset=preset,
         scihub=scihub,
         upgrade_linked=upgrade_linked,
+        strict_pdf_doi=strict_pdf_doi,
     )
     collection, library, year_from, year_to, item_type = _take_scope(bound)
     limit = bound.limit
@@ -1238,6 +1325,7 @@ def run(
     preset = bound.preset
     scihub = bound.scihub
     upgrade_linked = bound.upgrade_linked
+    strict_pdf_doi = bound.strict_pdf_doi
     if not collection and not library:
         _refuse_missing_scope()
     _require_manager(cfg)
@@ -1344,7 +1432,9 @@ def run(
         year_from=year_from,
         year_to=year_to,
         item_types=",".join(sorted(types)) if types else None,
+        strict_pdf_doi=strict_pdf_doi,
     )
+    write_api = _library_write_api(backend)
 
     if not todo:
         stats = RunStats(
@@ -1358,6 +1448,7 @@ def run(
             stats,
             scope=scope,
             flags=run_flags,
+            write_api=write_api,
         )
         return
 
@@ -1371,6 +1462,7 @@ def run(
             attacher=attacher,
             progress=lambda: progress.advance(task_id),
             try_all=True if try_all else None,
+            strict_pdf_doi=bool(strict_pdf_doi),
         )
         try:
             stats = pipe.run(todo)
@@ -1389,16 +1481,33 @@ def run(
         stats,
         scope=scope,
         flags=run_flags,
+        write_api=write_api,
     )
     _flush(backend)
+
+
+def _library_write_api(backend: LibraryBackend) -> bool | None:
+    try:
+        return bool(backend.supports_write())
+    except Exception:
+        return None
 
 
 def _run_flags(**kwargs) -> dict:
     return {k: v for k, v in kwargs.items() if v}
 
 
-def _finish_run(cfg: Config, stats: RunStats, *, scope: str, flags: dict) -> None:
-    report = build_report(stats, cfg, command="run", scope=scope, flags=flags)
+def _finish_run(
+    cfg: Config,
+    stats: RunStats,
+    *,
+    scope: str,
+    flags: dict,
+    write_api: bool | None = None,
+) -> None:
+    report = build_report(
+        stats, cfg, command="run", scope=scope, flags=flags, write_api=write_api
+    )
     path = write_run_report(cfg, report)
     print_run_summary(console, report, path)
 
@@ -1415,6 +1524,11 @@ def _load_last_run(cfg: Config) -> dict | None:
 def attach(
     config: Path | None = ConfigOpt,
     limit: int | None = typer.Option(None, "--limit", "-n"),
+    allow_pdf_doi_mismatch: bool = typer.Option(
+        False,
+        "--allow-pdf-doi-mismatch",
+        help="Also attach PDFs that --strict-pdf-doi left on disk.",
+    ),
 ) -> None:
     """Attach already-downloaded PDFs (status ok / attach_failed) into the library."""
     cfg = _cfg(config)
@@ -1423,7 +1537,7 @@ def attach(
     manifest = Manifest(cfg.manifest_path)
     if not backend.supports_write():
         _exit_env("This library has no write support.", cfg)
-    pending = manifest.pending_attach()
+    pending = manifest.pending_attach(allow_pdf_doi_mismatch=allow_pdf_doi_mismatch)
     if limit:
         pending = pending[:limit]
     console.print(f"{len(pending)} PDFs to attach")
@@ -2765,6 +2879,7 @@ def all_cmd(
     retry_failed: bool | None = RetryFailedOpt,
     upgrade_linked: bool | None = UpgradeLinkedOpt,
     no_attach: bool | None = NoAttachOpt,
+    strict_pdf_doi: bool | None = StrictPdfDoiOpt,
     scihub: bool | None = SciHubOpt,
     sources: str | None = typer.Option(
         None, "--sources", help="Comma-separated source order override for the run step."
@@ -2812,6 +2927,7 @@ def all_cmd(
         retry_failed=retry_failed,
         upgrade_linked=upgrade_linked,
         no_attach=no_attach,
+        strict_pdf_doi=strict_pdf_doi,
         scihub=scihub,
         sources=sources,
         preset=preset,
@@ -2890,6 +3006,7 @@ def _dispatch_all_step(
             preset=bound.preset,
             scihub=bound.scihub,
             upgrade_linked=bound.upgrade_linked,
+            strict_pdf_doi=bound.strict_pdf_doi,
         )
         return
     if step == "lint":
@@ -2971,6 +3088,7 @@ def _profile_bind_kwargs(
     retry_failed: bool | None,
     upgrade_linked: bool | None,
     no_attach: bool | None,
+    strict_pdf_doi: bool | None,
     scihub: bool | None,
     sources: str | None,
     preset: str | None,
@@ -2995,6 +3113,7 @@ def _profile_bind_kwargs(
         "retry_failed": retry_failed,
         "upgrade_linked": upgrade_linked,
         "no_attach": no_attach,
+        "strict_pdf_doi": strict_pdf_doi,
         "scihub": scihub,
         "sources": sources,
         "preset": preset,
@@ -3044,6 +3163,7 @@ def profile_show(
     retry_failed: bool | None = RetryFailedOpt,
     upgrade_linked: bool | None = UpgradeLinkedOpt,
     no_attach: bool | None = NoAttachOpt,
+    strict_pdf_doi: bool | None = StrictPdfDoiOpt,
     scihub: bool | None = SciHubOpt,
     sources: str | None = typer.Option(None, "--sources"),
     preset: str | None = typer.Option(None, "--preset"),
@@ -3076,6 +3196,7 @@ def profile_show(
             retry_failed=retry_failed,
             upgrade_linked=upgrade_linked,
             no_attach=no_attach,
+            strict_pdf_doi=strict_pdf_doi,
             scihub=scihub,
             sources=sources,
             preset=preset,
@@ -3108,6 +3229,7 @@ def profile_save(
     retry_failed: bool | None = RetryFailedOpt,
     upgrade_linked: bool | None = UpgradeLinkedOpt,
     no_attach: bool | None = NoAttachOpt,
+    strict_pdf_doi: bool | None = StrictPdfDoiOpt,
     scihub: bool | None = SciHubOpt,
     sources: str | None = typer.Option(None, "--sources"),
     preset: str | None = typer.Option(None, "--preset"),
@@ -3139,6 +3261,7 @@ def profile_save(
                 retry_failed=retry_failed,
                 upgrade_linked=upgrade_linked,
                 no_attach=no_attach,
+                strict_pdf_doi=strict_pdf_doi,
                 scihub=scihub,
                 sources=sources,
                 preset=preset,

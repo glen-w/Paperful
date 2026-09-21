@@ -12,3 +12,21 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --group dev
       - run: uv run pytest
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build local image
+        run: docker compose build
+      - name: Smoke help and doctor without Zotero
+        run: |
+          data="$(mktemp -d)"
+          cp config.example.toml "$data/config.toml"
+          export PAPERFUL_DATA="$data"
+          docker compose run --rm -T paperful --help
+          set +e
+          docker compose run --rm -T paperful doctor --no-guide
+          code=$?
+          set -e
+          test "$code" -eq 2

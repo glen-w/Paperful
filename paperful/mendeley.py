@@ -617,8 +617,14 @@ class MendeleyBackend:
                 return None
         return None
 
-    def attach(self, item_key: str, pdf_path: Path, title: str | None = None) -> AttachResult:
-        del title
+    def attach(
+        self,
+        item_key: str,
+        pdf_path: Path,
+        title: str | None = None,
+        note: str | None = None,
+    ) -> AttachResult:
+        del title, note
         if not pdf_path.is_file():
             return AttachResult(False, reason=f"file missing: {pdf_path}", code="other")
         try:

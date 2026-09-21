@@ -1,18 +1,18 @@
-# Docker (optional)
+# Docker
 
-paperful is a **local CLI**. Zotero and headed browser login live on the host.
-Docker does not replace them.
+paperful is a **local CLI**. The operator install is `git clone` and
+`docker compose build`. The image is **build-local only** (`paperful:local`).
+There is no `docker pull` and no PyPI package. Zotero and headed browser
+login live on the host. Docker does not replace them.
 
 The Compose image is a **one-shot pack** — Python 3.12, paperful, Poppler
 (`pdftotext`), Playwright Chromium — for unattended commands (`run`, `lint`,
 `report`, `attach` once a write key exists). It is not a daemon and not a
-complete environment. Developers and most operators should use
-[`uv`](https://docs.astral.sh/uv/) (see the [README](https://github.com/glen-w/Paperful#readme)).
+complete environment. Contributors use [`uv`](https://docs.astral.sh/uv/)
+(see the [README](https://github.com/glen-w/Paperful#readme) Develop section).
 
-Use the image when you want a sealed fetch runtime and do not want to install
-Poppler or Playwright on the host. Durable data — config, custom playbook
-packs, `out/`, and `state/` — still lives **outside** the container (and, by
-default, outside the git root).
+Durable data — config, custom playbook packs, `out/`, and `state/` — still
+lives **outside** the container (and, by default, outside the git root).
 
 ## What still runs on the host
 

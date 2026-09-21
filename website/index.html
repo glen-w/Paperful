@@ -6,8 +6,16 @@
     <title>paperful — keep the library, the files, and control</title>
     <meta
       name="description"
-      content="A local sidecar for your research library: fill missing PDFs, lint metadata, keep a quiet copy on disk. Zotero is the well-tested catalogue. Mendeley and EndNote are seeking testers."
+      content="A local sidecar for your research library. Fills what open-access indexes, campus EZProxy, and grey playbooks can reach — not every paywalled or DOI-less item. Zotero is the well-tested catalogue."
     />
+    <link rel="icon" href="images/logo.png" type="image/png" />
+    <meta property="og:title" content="paperful — keep the library, the files, and control" />
+    <meta
+      property="og:description"
+      content="Build it locally. Fills what open-access indexes, campus EZProxy, and grey playbooks can reach — not every paywalled or DOI-less item."
+    />
+    <meta property="og:image" content="images/logo.png" />
+    <meta property="og:type" content="website" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -61,9 +69,11 @@
           <h1>Keep the library. Keep the files. Keep control.</h1>
           <p class="lede">
             A local sidecar for your research library: collections organised,
-            missing PDFs filled, metadata linted, a quiet copy on disk. Zotero
-            is the well-tested catalogue. Mendeley and EndNote adapters are
-            seeking testers. Work stays on this machine.
+            metadata linted, a quiet copy on disk. It fills what open-access
+            indexes, campus EZProxy, and grey playbooks can reach — not every
+            paywalled or DOI-less item. Zotero is the well-tested catalogue.
+            Mendeley and EndNote adapters are seeking testers. Work stays on
+            this machine.
           </p>
           <div class="cta-row">
             <a class="btn primary" href="#product">See how it works</a>
@@ -81,7 +91,16 @@
           </p>
           <div class="feature-grid">
             <div class="feature">
-              <h3>On disk first</h3>
+              <h3>
+                <span class="mark" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3.5" y="4" width="17" height="16" rx="2" />
+                    <path d="M7.5 4v5h9V4" />
+                    <circle cx="15.2" cy="15.2" r="1.15" fill="currentColor" stroke="none" />
+                  </svg>
+                </span>
+                On disk first
+              </h3>
               <p>
                 Downloads land under <code>out/</code>. Resume lives in
                 <code>state/</code>. Zotero is read in, then written back —
@@ -89,7 +108,15 @@
               </p>
             </div>
             <div class="feature">
-              <h3>A quiet copy you own</h3>
+              <h3>
+                <span class="mark" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="8" y="8" width="11" height="12" rx="1.5" />
+                    <path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4H6.5A1.5 1.5 0 0 0 5 5.5V16" />
+                  </svg>
+                </span>
+                A quiet copy you own
+              </h3>
               <p>
                 <code>snapshot</code> writes one folder per item
                 (<code>record.json</code>, optional PDF, notes).
@@ -98,7 +125,16 @@
               </p>
             </div>
             <div class="feature">
-              <h3>Routed sources</h3>
+              <h3>
+                <span class="mark" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="6" cy="6" r="2.2" />
+                    <circle cx="18" cy="18" r="2.2" />
+                    <path d="M8.1 6H13a4 4 0 0 1 4 4v5.8" />
+                  </svg>
+                </span>
+                Routed sources
+              </h3>
               <p>
                 Each item only hits sources that match its metadata unless you
                 pass <code>--try-all</code>. A circuit breaker skips blocked
@@ -106,18 +142,38 @@
               </p>
             </div>
             <div class="feature">
-              <h3>Campus when you have it</h3>
+              <h3>
+                <span class="mark" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 20.5h16" />
+                    <path d="M6.5 20.5V10.2L12 5.5l5.5 4.7v10.3" />
+                    <path d="M10.2 20.5v-4.2h3.6v4.2" />
+                  </svg>
+                </span>
+                Campus when you have it
+              </h3>
               <p>
                 Log in once in your system Chrome or Edge. EZProxy uses your
                 library entitlement. Passwords never live in TOML.
               </p>
             </div>
             <div class="feature">
-              <h3>Grey literature</h3>
+              <h3>
+                <span class="mark" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M7 3.5h7.2L19 8.2V20.5H7z" />
+                    <path d="M14 3.5V8.2h5" />
+                    <path d="M10 12.5h6M10 16h4" />
+                  </svg>
+                </span>
+                Grey literature
+              </h3>
               <p>
                 Journal PDFs ingest cleanly in Zotero. Reports and scans often
-                do not. Playbooks keep UN, FAO, ISA, and similar landings as
-                real PDFs. Optional HTML→PDF covers blogs and news. Local
+                do not. An example ocean and governance playbook keeps UN, FAO,
+                ISA, and similar landings as real PDFs. It is not a universal
+                grey-literature harvester. Optional HTML→PDF covers blogs and
+                news. Local
                 summaries need a text layer — not OCR.
               </p>
             </div>
@@ -129,7 +185,10 @@
         <div class="wrap narrow">
           <h2>What can I do with it?</h2>
           <ul class="outcomes">
-            <li>Fill a collection (or the whole library) with missing PDFs</li>
+            <li>
+              Fill a collection with PDFs that open access, campus access, and
+              your playbooks can reach
+            </li>
             <li>Keep a folder tree that matches Zotero collections</li>
             <li>Snapshot the library to disk and restore only missing items</li>
             <li>Lint DOIs and propose metadata patches on disk</li>
@@ -200,22 +259,27 @@
         <div class="wrap narrow">
           <h2>Install</h2>
           <p>
-            Python 3.10+ and
-            <a href="https://docs.astral.sh/uv/">uv</a>. Zotero running with
-            the local API enabled.
+            Build it on this machine. 0.x · build locally · no PyPI. Zotero
+            stays on the host, with the local API enabled.
           </p>
           <pre class="code"><code>git clone https://github.com/glen-w/Paperful.git
 cd Paperful
-uv sync
+cp .env.example .env
 cp config.example.toml config.toml
-uv run paperful doctor
-uv run paperful run --collection interesting --dry-run
-# optional: uv run paperful run -C BBNJ --year-from 2023 -T journalArticle</code></pre>
+docker compose build
+docker compose run --rm paperful doctor
+docker compose run --rm paperful run --collection interesting --dry-run
+# academic recipe: docker compose run --rm paperful run -C COLLECTION --preset eoi --dry-run</code></pre>
           <p class="fine">
-            Optional Docker image (Python + Poppler + Chromium) if you do not
-            want those on the host —
-            <a href="./guide/docker.html">Docker</a>.
-            Zotero and headed logins still run on this machine.
+            There is no <code>docker pull</code> and no
+            <code>pip install paperful</code>.
+            <a href="./guide/docker.html">Docker</a>
+            is the operator path.
+            <a href="./guide/zotero.html">Zotero setup</a>.
+            Contributors use
+            <a href="https://docs.astral.sh/uv/">uv</a>
+            (see the repository README). Zotero and headed logins still run
+            on this machine.
           </p>
           <p class="fine">
             Details:
@@ -233,7 +297,7 @@ uv run paperful run --collection interesting --dry-run
 
     <footer class="site-footer">
       <div class="wrap footer-inner">
-        <p>© paperful contributors. Local-first software. Version 0.5.0 (0.x — flags may still move).</p>
+        <p>© paperful contributors. Local-first software. Version 0.8.0 (0.x — flags may still move).</p>
         <p>
           <a href="https://github.com/glen-w/Paperful">GitHub</a>
           ·

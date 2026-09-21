@@ -258,7 +258,7 @@ produced which note.
 
 ## 5. Docker
 
-The optional image does **not** include `litellm` or `browser-use`; the
+The build-local image does **not** include `litellm` or `browser-use`; the
 `browser_agent` lane (`run` auto-recover and `paperful recover`) is host-only
 (it needs the headed-login vault anyway). B/C/D work inside the
 container against a host Ollama:

@@ -98,7 +98,11 @@ class LibraryBackend(Protocol):
     def ensure_collection_path(self, path: str) -> str: ...
     def create_parent(self, data: dict[str, Any]) -> str: ...
     def attach(
-        self, item_key: str, pdf_path: Path, title: str | None = None
+        self,
+        item_key: str,
+        pdf_path: Path,
+        title: str | None = None,
+        note: str | None = None,
     ) -> AttachResult: ...
     def flush_writes(self) -> Path | None: ...
 
@@ -208,11 +212,15 @@ class ZoteroBackend:
         return key
 
     def attach(
-        self, item_key: str, pdf_path: Path, title: str | None = None
+        self,
+        item_key: str,
+        pdf_path: Path,
+        title: str | None = None,
+        note: str | None = None,
     ) -> AttachResult:
         self._ensure_write()
         assert self._attacher is not None
-        return self._attacher.attach(item_key, pdf_path, title)
+        return self._attacher.attach(item_key, pdf_path, title, note=note)
 
     def flush_writes(self) -> Path | None:
         return None

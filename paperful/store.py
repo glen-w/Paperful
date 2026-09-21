@@ -34,6 +34,8 @@ STATUS_NO_IDENTIFIER = "no_identifier"  # nothing to search with (no DOI/arXiv/U
 STATUS_CAPTCHA = "captcha"  # Sci-Hub robot check could not be passed
 STATUS_ERROR = "error"  # transient / unexpected failure, retried on next run
 STATUS_ATTACH_FAILED = "attach_failed"  # PDF ok, Zotero write failed
+# Saved under --strict-pdf-doi. `paperful attach` skips these unless opted in.
+REASON_STRICT_PDF_DOI = "strict_pdf_doi"
 TERMINAL_SKIP = {STATUS_OK, STATUS_ATTACHED}
 FAILED = {STATUS_NOT_FOUND, STATUS_NO_IDENTIFIER}
 RETRY_ALWAYS = {STATUS_ERROR, STATUS_CAPTCHA, STATUS_ATTACH_FAILED}
@@ -54,6 +56,7 @@ class Record:
     doi_verified: str = ""
     pdf_doi: str | None = None
     source: str | None = None
+    playbook: str = ""
     url: str | None = None
     path: str | None = None
     extra_paths: list[str] = field(default_factory=list)
@@ -112,11 +115,15 @@ class Manifest:
             return retry_failed
         return True  # error / captcha / attach_failed
 
-    def pending_attach(self) -> list[Record]:
+    def pending_attach(self, *, allow_pdf_doi_mismatch: bool = False) -> list[Record]:
         return [
             r
             for r in self.records.values()
-            if r.status in {STATUS_OK, STATUS_ATTACH_FAILED} and r.path
+            if r.status in {STATUS_OK, STATUS_ATTACH_FAILED}
+            and r.path
+            and (
+                allow_pdf_doi_mismatch or r.reason != REASON_STRICT_PDF_DOI
+            )
         ]
 
     def counts(self) -> dict[str, int]:

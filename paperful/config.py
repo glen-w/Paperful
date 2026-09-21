@@ -60,7 +60,8 @@ DEFAULT_MIRRORS = [
 ]
 SCIHUB_DISCLAIMER = (
     "Sci-Hub occupies a legal grey zone in some jurisdictions. "
-    "You are responsible for complying with the laws that apply to you."
+    "You are responsible for complying with the laws that apply to you. "
+    "The authors and distributors of this tool do not encourage copyright infringement."
 )
 RECOVER_DISCLAIMER = (
     "Browser recovery is experimental. You are responsible for publisher terms "

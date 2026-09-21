@@ -54,6 +54,7 @@ PROFILE_KEYS = frozenset(
         "retry_failed",
         "upgrade_linked",
         "no_attach",
+        "strict_pdf_doi",
         "scihub",
         "preset",
         "sources",
@@ -73,6 +74,7 @@ RUN_KEYS = frozenset(
         "retry_failed",
         "upgrade_linked",
         "no_attach",
+        "strict_pdf_doi",
         "scihub",
         "preset",
         "sources",
@@ -91,6 +93,7 @@ _DUMP_ORDER = (
     "retry_failed",
     "upgrade_linked",
     "no_attach",
+    "strict_pdf_doi",
     "scihub",
     "preset",
     "sources",
@@ -129,6 +132,7 @@ class ResolvedRunConfig:
     retry_failed: bool = False
     upgrade_linked: bool = False
     no_attach: bool = False
+    strict_pdf_doi: bool = False
     scihub: bool = False
     preset: str | None = None
     sources: list[str] = field(default_factory=list)
@@ -202,6 +206,7 @@ def resolve_run_config(
     retry_failed: bool | None = None,
     upgrade_linked: bool | None = None,
     no_attach: bool | None = None,
+    strict_pdf_doi: bool | None = None,
     scihub: bool | None = None,
     apply: bool | None = None,
     overwrite: bool | None = None,
@@ -261,6 +266,7 @@ def resolve_run_config(
         retry_failed=retry_failed,
         upgrade_linked=upgrade_linked,
         no_attach=no_attach,
+        strict_pdf_doi=strict_pdf_doi,
         scihub=scihub,
         apply=apply,
         overwrite=overwrite,
@@ -278,6 +284,7 @@ def resolve_run_config(
             retry_failed,
             upgrade_linked,
             no_attach,
+            strict_pdf_doi,
             scihub,
             apply,
             overwrite,
@@ -310,6 +317,7 @@ def collect_save_body(
     retry_failed: bool | None = None,
     upgrade_linked: bool | None = None,
     no_attach: bool | None = None,
+    strict_pdf_doi: bool | None = None,
     scihub: bool | None = None,
     apply: bool | None = None,
     overwrite: bool | None = None,
@@ -343,6 +351,7 @@ def collect_save_body(
         retry_failed=retry_failed,
         upgrade_linked=upgrade_linked,
         no_attach=no_attach,
+        strict_pdf_doi=strict_pdf_doi,
         scihub=scihub,
         apply=apply,
         overwrite=overwrite,
@@ -423,6 +432,8 @@ def format_effective(resolved: ResolvedRunConfig) -> str:
         body["year_to"] = resolved.year_to
     if resolved.no_attach:
         body["no_attach"] = True
+    if resolved.strict_pdf_doi:
+        body["strict_pdf_doi"] = True
     if resolved.scihub:
         body["scihub"] = True
     if resolved.preset:
@@ -526,7 +537,14 @@ def _apply_cli(body: dict[str, Any], **flags: Any) -> None:
         body["types"] = [str(item) for item in item_type]
     if flags["limit"] is not None:
         body["limit"] = flags["limit"]
-    for key in ("try_all", "retry_failed", "upgrade_linked", "no_attach", "scihub"):
+    for key in (
+        "try_all",
+        "retry_failed",
+        "upgrade_linked",
+        "no_attach",
+        "strict_pdf_doi",
+        "scihub",
+    ):
         if flags[key] is not None:
             body[key] = flags[key]
     if flags["sources"] is not None:
@@ -594,6 +612,7 @@ def _finalize(body: dict[str, Any], *, for_all: bool) -> ResolvedRunConfig:
         retry_failed=bool(body.get("retry_failed")),
         upgrade_linked=bool(body.get("upgrade_linked")),
         no_attach=bool(body.get("no_attach")),
+        strict_pdf_doi=bool(body.get("strict_pdf_doi")),
         scihub=bool(body.get("scihub")),
         preset=str(preset) if preset else None,
         sources=sources,
@@ -646,6 +665,7 @@ def _normalize(raw: dict[str, Any], *, expect_name: str | None) -> dict[str, Any
         "retry_failed",
         "upgrade_linked",
         "no_attach",
+        "strict_pdf_doi",
         "scihub",
         "apply",
         "overwrite",

@@ -19,13 +19,13 @@ coverage_cmd: uv run pytest --cov=paperful --cov-report=term-missing -q
 docker_build_cmd: docker compose build
 docker_smoke_cmd: docker compose run --rm paperful doctor
 docker_operator_cmd: docker compose run --rm paperful
-preferred_deploy: uv (README); docker compose is an optional pack (docs/docker.md)
+preferred_deploy: Docker Compose build-local (docs/docker.md); uv is the contributor path
 architecture_rules:
   - CLI orchestrates only (no download/resolve logic in cli.py)
   - source adapters under sources/ must not write the manifest or out_dir
   - open-access sources before Sci-Hub; Sci-Hub stays serial
   - default tests stay offline (fixture HTML / mocks — no live Zotero or network)
-  - uv is the usual operator path; Docker is an optional fetch pack (host Zotero + headed session login stay outside); durable data via PAPERFUL_DATA when using Compose
+  - Docker Compose build is the operator path (build-local only; no docker pull, no PyPI); uv is the contributor path; host Zotero + headed session login stay outside; durable data via PAPERFUL_DATA when using Compose
 release_governance: none
 backup_hub: "$HOME/Documents/code backups"
 backup_excludes:
@@ -48,7 +48,7 @@ high_leverage_tests: Sci-Hub HTML parse and captcha/not-found classification; re
 probe_small: uv run pytest tests/test_scihub.py tests/test_resolve.py tests/test_zot_local.py tests/test_playbooks.py -q (offline fixture HTML + Docker-related unit tests)
 probe_large: uv run paperful run --collection <user-named small collection> --dry-run (requires Zotero); optional docker compose run --rm paperful run --collection <…> --dry-run; if Zotero unavailable → skipped
 probe_extra: uv run paperful doctor; optionally uv run paperful mirrors / collections; docker compose equivalents are optional; never touch sibling ports
-doc_contracts: README.md only (light parity pass; do not invent a CONTRACT tree); Docker is optional (docs/docker.md), not preferred deploy
+doc_contracts: README.md and docs/docker.md (build-local Compose is the operator install; uv is Develop)
 ```
 
 Skipped on instantiate (no surface): `streamlit.md`, `rebuild.md`.

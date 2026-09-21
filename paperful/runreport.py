@@ -87,6 +87,83 @@ def error_type_for(
     return None
 
 
+# Required on every object from build_report(). Extra keys may be added.
+RUN_REPORT_KEYS = frozenset(
+    {
+        "schema",
+        "command",
+        "started_at",
+        "finished_at",
+        "duration_s",
+        "scope",
+        "sources_configured",
+        "flags",
+        "paths",
+        "summary",
+        "items",
+    }
+)
+RUN_REPORT_SUMMARY_KEYS = frozenset(
+    {
+        "processed",
+        "pdfs_downloaded",
+        "attached",
+        "attach_failed",
+        "not_found",
+        "no_identifier",
+        "captcha",
+        "error",
+        "skipped_manifest",
+        "linked_url_skipped",
+        "fields_corrected",
+        "fields_corrected_by_kind",
+        "identifiers_verified",
+        "by_source",
+        "sources_checked",
+        "errors_by_type",
+        "attach_failed_by_code",
+        "write_api",
+    }
+)
+RUN_REPORT_PATH_KEYS = frozenset({"out_dir", "manifest", "state_dir"})
+RUN_REPORT_ITEM_KEYS = frozenset(
+    {
+        "itemKey",
+        "title",
+        "status",
+        "source",
+        "reason",
+        "doi",
+        "doi_verified",
+        "attempts",
+        "fields_corrected",
+        "path",
+        "error_type",
+    }
+)
+
+
+def outcome_banner(summary: dict[str, Any]) -> str:
+    """Locked one-line end-of-run banner."""
+    downloaded = int(summary.get("pdfs_downloaded") or 0)
+    attached = int(summary.get("attached") or 0)
+    deferred = int(summary.get("skipped_manifest") or 0) + int(
+        summary.get("linked_url_skipped") or 0
+    )
+    not_found = int(summary.get("not_found") or 0)
+    write = summary.get("write_api")
+    if write is True:
+        api = "yes"
+    elif write is False:
+        api = "no"
+    else:
+        api = "unknown"
+    return (
+        f"downloaded {downloaded} · attached {attached} · deferred {deferred} "
+        f"· not_found {not_found} · write-api {api}"
+    )
+
+
 def build_report(
     stats: Any,
     cfg: Config,
@@ -94,6 +171,7 @@ def build_report(
     command: str = "run",
     scope: str = "",
     flags: dict[str, Any] | None = None,
+    write_api: bool | None = None,
 ) -> dict[str, Any]:
     """Assemble a JSON-serialisable audit report from RunStats (or compatible)."""
     started = getattr(stats, "started_at", 0) or 0
@@ -157,6 +235,7 @@ def build_report(
             "attach_failed_by_code": dict(
                 getattr(stats, "attach_failed_by_code", {}) or {}
             ),
+            "write_api": write_api,
         },
         "items": item_dicts,
     }
@@ -224,6 +303,7 @@ def write_command_report(
     }
     if errors is not None:
         report["errors"] = errors
+    summary.setdefault("write_api", None)
     return write_run_report(cfg, report, as_last_run=False)
 
 
@@ -233,6 +313,7 @@ def print_run_summary(
     """Human-readable end-of-run / last-run summary."""
     s = report.get("summary") or {}
     console.print()
+    console.print(f"[bold]{outcome_banner(s)}[/]")
     title = Table(title="Run summary", show_header=False, box=None, padding=(0, 2))
     title.add_column("k", style="bold")
     title.add_column("v")

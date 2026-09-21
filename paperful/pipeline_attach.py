@@ -42,7 +42,11 @@ def live_parent_key(pipe: Any, rec: Record) -> str | None:
 
 
 def attach_after_remap(
-    pipe: Any, rec: Record, pdf: Path, prior_reason: str
+    pipe: Any,
+    rec: Record,
+    pdf: Path,
+    prior_reason: str,
+    note: str | None = None,
 ) -> AttachResult:
     """Retry attach when Zotero remapped the parent key (sync / restore)."""
     zl = getattr(pipe.attacher, "zl", None) if pipe.attacher else None
@@ -74,7 +78,7 @@ def attach_after_remap(
             code="unchanged",
         )
     assert pipe.attacher is not None
-    res = pipe.attacher.attach(new_key, pdf)
+    res = pipe.attacher.attach(new_key, pdf, note=note)
     if res.ok:
         rec.itemKey = new_key
         pipe._pdf_parents.add(new_key)

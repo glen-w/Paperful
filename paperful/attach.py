@@ -174,7 +174,11 @@ class Attacher:
 
     # ---- attach -----------------------------------------------------------------
     def attach(
-        self, item_key: str, pdf_path: Path, title: str | None = None
+        self,
+        item_key: str,
+        pdf_path: Path,
+        title: str | None = None,
+        note: str | None = None,
     ) -> AttachResult:
         if not pdf_path.is_file():
             return AttachResult(False, reason=f"file missing: {pdf_path}", code="other")
@@ -202,7 +206,7 @@ class Attacher:
             try:
                 # attachment_simple() needs the /items/new template endpoint, which the local
                 # API does not serve; build the stored-file attachment item ourselves.
-                payload = [attachment_payload(pdf_path, title)]
+                payload = [attachment_payload(pdf_path, title, note=note)]
                 result = LocalZupload(
                     self.zl.zot, payload, item_key, basedir=str(pdf_path.parent)
                 ).upload()
@@ -229,7 +233,9 @@ class Attacher:
         return AttachResult(False, reason="gave up", code="other")
 
 
-def attachment_payload(pdf_path: Path, title: str | None = None) -> dict:
+def attachment_payload(
+    pdf_path: Path, title: str | None = None, note: str | None = None
+) -> dict:
     """A stored-file attachment item as the Zotero write API expects it (no template needed)."""
     return {
         "itemType": "attachment",
@@ -239,7 +245,7 @@ def attachment_payload(pdf_path: Path, title: str | None = None) -> dict:
         "contentType": "application/pdf",
         "charset": "",
         "accessDate": "",
-        "note": "",
+        "note": note or "",
         "tags": [],
         "relations": {},
     }

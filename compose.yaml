@@ -1,4 +1,4 @@
-# Optional one-shot CLI pack against host Zotero + durable data outside the repo.
+# Build-local one-shot CLI (no registry image) against host Zotero.
 #   cp .env.example .env
 #   # keep repo-local data: set PAPERFUL_DATA=. in .env
 #   # or: mkdir -p ../paperful-data && cp config.example.toml ../paperful-data/config.toml

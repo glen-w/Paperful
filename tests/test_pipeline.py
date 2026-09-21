@@ -18,6 +18,7 @@ from paperful.store import (
     STATUS_ERROR,
     STATUS_NO_IDENTIFIER,
     STATUS_NOT_FOUND,
+    REASON_STRICT_PDF_DOI,
     STATUS_OK,
     Manifest,
     item_dirname,
@@ -50,10 +51,12 @@ class FakeAttacher:
         self.ok = ok
         self.by_key = by_key or {}
         self.calls = []
+        self.notes: list[str | None] = []
         self.zl = None
 
-    def attach(self, key, path, title=None):
+    def attach(self, key, path, title=None, note=None):
         self.calls.append((key, path))
+        self.notes.append(note)
         if key in self.by_key:
             return self.by_key[key]
         return AttachResult(
@@ -644,4 +647,66 @@ def test_oa_skips_same_publisher_host_after_403(pipe_factory):
     assert len(calls) == 1
     rec = manifest.get("A")
     assert any("publisher already blocked" in a for a in rec.attempts)
+
+
+def test_attach_operator_lines_for_quota_and_auth():
+    assert "out/" in pl._attach_operator_line("quota")
+    assert "paperful attach" in pl._attach_operator_line("quota")
+    assert "Always Allow" in pl._attach_operator_line("auth")
+    assert pl._attach_operator_line("other") == ""
+
+
+def test_strict_pdf_doi_saves_without_attach(cfg, monkeypatch):
+    src = StubSource(
+        "unpaywall",
+        {"A": Candidate(url="https://x.test/a.pdf", source="unpaywall")},
+    )
+    monkeypatch.setattr(pl, "REGISTRY", {"unpaywall": src})
+    monkeypatch.setattr(pl, "prepare_identifiers", lambda *a, **k: [])
+    monkeypatch.setattr(pl, "doi_from_pdf", lambda path: "10.9999/other")
+    att = FakeAttacher()
+    manifest = Manifest(cfg.manifest_path)
+    pipe = pl.Pipeline(
+        cfg,
+        manifest,
+        Console(file=io.StringIO()),
+        sources=["unpaywall"],
+        attacher=att,
+        strict_pdf_doi=True,
+    )
+    pipe.client = mock_client(lambda r: httpx.Response(200, content=PDF_BYTES))
+    pipe.ctx.client = pipe.client
+    pipe.run([make_item(key="A")])
+    assert att.calls == []
+    rec = manifest.get("A")
+    assert rec.status == STATUS_OK
+    assert rec.reason == REASON_STRICT_PDF_DOI
+    assert manifest.pending_attach() == []
+    assert [r.itemKey for r in manifest.pending_attach(allow_pdf_doi_mismatch=True)] == [
+        "A"
+    ]
+
+
+def test_pdf_doi_mismatch_attaches_with_warning_by_default(cfg, monkeypatch):
+    src = StubSource(
+        "unpaywall",
+        {"A": Candidate(url="https://x.test/a.pdf", source="unpaywall")},
+    )
+    monkeypatch.setattr(pl, "REGISTRY", {"unpaywall": src})
+    monkeypatch.setattr(pl, "prepare_identifiers", lambda *a, **k: [])
+    monkeypatch.setattr(pl, "doi_from_pdf", lambda path: "10.9999/other")
+    att = FakeAttacher()
+    manifest = Manifest(cfg.manifest_path)
+    pipe = pl.Pipeline(
+        cfg,
+        manifest,
+        Console(file=io.StringIO()),
+        sources=["unpaywall"],
+        attacher=att,
+    )
+    pipe.client = mock_client(lambda r: httpx.Response(200, content=PDF_BYTES))
+    pipe.ctx.client = pipe.client
+    pipe.run([make_item(key="A")])
+    assert len(att.calls) == 1
+    assert att.notes[0] == "paperful oa:unpaywall warn:pdf_doi_mismatch"
 

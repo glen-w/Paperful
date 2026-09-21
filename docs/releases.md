@@ -1,13 +1,17 @@
 # Releases and stability
 
-**0.x** (including tagged `v0.5`) is a first usable release. Command flags,
-config keys, and `paperful.run_report.v1` fields **may still move**.
+**0.x** (including tagged `v0.8`) is a first usable release. The operator
+install is clone plus `docker compose build`. The image is build-local only.
+There is no `docker pull` and no `pip install paperful`.
 
-**1.0** will lock:
+Required keys on `paperful.run_report.v1` from `build_report()` are frozen
+(removed or renamed required keys are a break; extra keys may still be added).
+`paperful.item.v1` may still move. This tree is not tagged 1.0.
 
-- `paperful.run_report.v1` (additive keys only after that)
-- `paperful.item.v1` and `snapshot` / `restore` behaviour (additive keys only after that)
-- attach behaviour (imported-file write-back, typed `attach_failed` reasons)
+**1.0** (not tagged) still owes a lock on `paperful.item.v1` and on
+snapshot/restore behaviour. Required `paperful.run_report.v1` keys and
+imported-file attach (typed `attach_failed`, provenance note) are already
+the contract; extra report keys may still be added.
 
 A second manager is not owed as a finished feature. Mendeley and EndNote
 adapters are in the tree and **seeking testers**; Zotero is the well-tested
@@ -44,10 +48,10 @@ before 1.0. See [LLM](llm.md).
 
 ## What 1.0 still owes operators
 
-| Outcome | Status at 0.5 |
+| Outcome | Status at 0.8 |
 | --- | --- |
-| Trust inside Zotero (attachment provenance stamp) | [Roadmap](ROADMAP.md#trust-10) |
-| One-line end-of-run banner + write-API yes/no | Summary table ships; banner not locked |
-| Locked report JSON schema | Schema named `paperful.run_report.v1`; not frozen |
+| Trust inside Zotero (attachment provenance stamp) | Shipped on Zotero attachment notes. Manifest `source` stays the record |
+| One-line end-of-run banner + write-API yes/no | Shipped (`downloaded · attached · deferred · not_found · write-api`) |
+| Locked report JSON schema | Required `paperful.run_report.v1` keys frozen; additive keys still allowed. Not tagged 1.0 |
 | Locked item record + snapshot/restore | `paperful.item.v1` named; 0.x may add keys |
 | Mendeley and EndNote adapters | In the tree. Seeking testers. Zotero is the well-tested path |

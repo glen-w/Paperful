@@ -568,6 +568,39 @@ def test_doctor_zotero_red(cfg_file, monkeypatch):
     monkeypatch.setattr(cli, "ZoteroLocal", lambda *a, **k: Down())
     res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--no-guide"])
     assert res.exit_code == 2 and "red" in res.stdout
+    assert "Allow other applications" in res.stdout
+    assert "paperful doctor" not in res.stdout.split("Next steps", 1)[-1]
+
+
+def test_doctor_json_api_off_code(cfg_file, monkeypatch):
+    class Off:
+        def ping(self):
+            raise ConnectionError("Zotero local API is disabled.")
+
+    monkeypatch.setattr(cli, "ZoteroLocal", lambda *a, **k: Off())
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--json"])
+    assert res.exit_code == 2
+    payload = json.loads(res.stdout)
+    zot = next(row for row in payload if row["name"] == "Zotero :23119")
+    assert zot["code"] == "zotero_api_off"
+
+
+def test_doctor_json_codes_when_zotero_down(cfg_file, monkeypatch):
+    class Down:
+        def ping(self):
+            raise ConnectionError("connection refused")
+
+    monkeypatch.setattr(cli, "ZoteroLocal", lambda *a, **k: Down())
+    monkeypatch.setenv("PAPERFUL_ZOTERO_HOST", "host.docker.internal")
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--json"])
+    assert res.exit_code == 2
+    payload = json.loads(res.stdout)
+    zot = next(row for row in payload if row["name"] == "Zotero :23119")
+    assert zot["status"] == "red"
+    assert zot["code"] == "zotero_down"
+    human = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--no-guide"])
+    assert "Host header is always localhost:23119" in human.stdout
+    assert "paperful doctor" not in human.stdout.split("Next steps", 1)[-1]
 
 
 def test_doctor_shows_paperful_zotero_host(cfg_file, stub_zotero, monkeypatch):
@@ -645,7 +678,7 @@ def test_attach_command_uses_pending_records(
         def supports_write(self):
             return True
 
-        def attach(self, key, path, title=None):
+        def attach(self, key, path, title=None, note=None):
             from paperful.attach import AttachResult
 
             return AttachResult(True, attachment_key="ATT", reason="success", code="success")

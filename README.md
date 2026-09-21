@@ -7,7 +7,9 @@
   A local sidecar for your research library: collections organised, missing
   PDFs filled, metadata linted, a quiet copy on disk. Zotero is the
   well-tested catalogue. Mendeley and EndNote adapters are in the tree and
-  seeking testers. Work stays on this machine.
+  seeking testers. Work stays on this machine. Fills what open-access indexes,
+  campus EZProxy, and grey playbooks can reach — not every paywalled or
+  DOI-less item.
 </p>
 
 Open access first (Unpaywall, OpenAlex, arXiv, bioRxiv/medRxiv, Europe PMC,
@@ -38,82 +40,56 @@ Live: [glenwright.earth/Paperful](https://glenwright.earth/Paperful/).
 
 ## Quick start
 
-paperful is a host-local CLI. Zotero (and headed browser login) stay on this
-machine; work lands on disk (`out/`, `state/`).
+Build the image on this machine. There is no published image and no PyPI
+package: do not `docker pull` or `pip install paperful`. Zotero and headed
+`session login` stay on the host. Work lands on disk (`out/`, `state/`).
 
 **You need**
 
-- Python 3.10+ and [uv](https://docs.astral.sh/uv/).
+- [Docker](https://docs.docker.com/get-docker/) with Compose v2.
 - Zotero running, with the local API enabled:
   Settings → Advanced → *Allow other applications on this computer to communicate with Zotero*.
 - Zotero 10+ to attach PDFs into the library. On Zotero 7–9 the tool still
   downloads to disk; attach later with `paperful attach` once upgraded.
   Host header, write keys, and ghost attachments: [Zotero](docs/zotero.md).
-- Optional (seeking testers): Mendeley via REST — register an app, then
-  `paperful session login mendeley`. [Mendeley](docs/mendeley.md).
-- Optional (seeking testers): EndNote desktop — set `[endnote].library` to
-  the `.enl`. Writes are an import bundle, not an edit of the database.
-  [EndNote](docs/endnote.md).
-- Optional: a university/library account and EZProxy URL for publisher PDFs.
-- Optional: a browser session for Google Scholar
-  (`paperful session login scholar`) if you keep `scholar` enabled.
-- Optional: [Ollama](https://ollama.com) with a pulled model if you turn on
-  the LLM verbs (`[llm].enabled`); `recover` additionally needs Python 3.11+
-  and `uv sync --extra browser-agent`. See [LLM](docs/llm.md).
+  Rate limits, campus acceptable use, and how to read provenance:
+  [Research operators](docs/research-ops.md).
 
 ```sh
 git clone https://github.com/glen-w/Paperful.git
 cd Paperful
-uv sync
-cp config.example.toml config.toml   # set email, optional ezproxy_base
-mkdir -p packs out state
-uv run paperful doctor
-uv run paperful collections
+cp .env.example .env          # PAPERFUL_DATA=. keeps data in this checkout
+cp config.example.toml config.toml
+docker compose build
+docker compose run --rm paperful doctor
+docker compose run --rm paperful collections
+docker compose run --rm paperful run --collection interesting --dry-run
+
+# academic / policy recipe: open access + campus EZProxy, no Scholar, no Sci-Hub
+docker compose run --rm paperful run --collection interesting --preset eoi --dry-run
 ```
 
-Then pick a collection and go:
+Layout and the host/container split: [Docker](docs/docker.md).
 
-```sh
-uv run paperful run --collection interesting --dry-run
-uv run paperful run --collection interesting
+Optional (seeking testers): Mendeley via REST — register an app, then
+`paperful session login mendeley` on the host. [Mendeley](docs/mendeley.md).
+EndNote desktop — set `[endnote].library` to the `.enl`. Writes are an import
+bundle. [EndNote](docs/endnote.md).
 
-# optional: narrow by year and/or Zotero item type
-uv run paperful run -C BBNJ --year-from 2023 --year-to 2026 -T journalArticle
-
-# same slice as one command (gaps → run → lint → fix-metadata → summarize)
-uv run paperful all -C BBNJ --year-from 2021 --year-to 2026 -T journalArticle
-uv run paperful all --profile bbnj-journal
-```
+If you use campus EZProxy, finish [Campus EZProxy](docs/ezproxy.md) before a
+big run. If you keep `scholar` in `sources`, log in once on the host with
+`paperful session login scholar` — see [Browser sessions](docs/sessions.md).
 
 Flags `--year-from` / `--year-to` and `--type` / `-T` also work on `lint`,
 `fix-metadata`, `dedupe`, `gaps`, `summarize`, `synthesize`, `snapshot`, and
 `restore`. Save them with `paperful profile save`. See
 [Commands](docs/commands.md) and [Workflows](docs/workflows.md).
 
-Optional: [Poppler](https://poppler.freedesktop.org/) `pdftotext` on `PATH`
-for PDF-text DOI extraction (`pypdf` is the fallback; `doctor` ambers if
-Poppler is missing). Playwright ships with a normal `uv sync`; Chromium is
-installed automatically on the first `paperful session login …`.
-
-If you use campus EZProxy, finish [Campus EZProxy](docs/ezproxy.md) before a
-big run. If you keep `scholar` in `sources`, log in once with
-`paperful session login scholar` — see [Browser sessions](docs/sessions.md).
-
-### Docker (optional)
-
-The image packs Python, Poppler, and Chromium so you can skip installing those
-on the host. It does **not** replace Zotero or headed `session login` — those
-stay on the host, sharing `out/` and `state/` via `PAPERFUL_DATA`.
-
 ```sh
-cp .env.example .env   # PAPERFUL_DATA=. to keep repo-local data
-docker compose build
-docker compose run --rm paperful doctor   # default if you omit the command
-docker compose run --rm paperful collections
-docker compose run --rm paperful run --collection interesting --dry-run
+docker compose run --rm paperful run -C BBNJ --year-from 2023 --year-to 2026 -T journalArticle
+docker compose run --rm paperful all -C BBNJ --year-from 2021 --year-to 2026 -T journalArticle
+docker compose run --rm paperful all --profile bbnj-journal
 ```
-
-Layout, Zotero networking, and the host/container split: [Docker](docs/docker.md).
 
 Reference (same corpus as the hosted guide):
 
@@ -123,7 +99,8 @@ Reference (same corpus as the hosted guide):
 - [Source routing](docs/sources.md)
 - [Architecture](docs/architecture.md)
 - [Quiet mirror](docs/quiet-mirror.md) — `out/` as a browsable collection tree
-- [Docker](docs/docker.md) — optional image, not a complete install
+- [Docker](docs/docker.md) — build-local image; Zotero stays on the host
+- [Research operators](docs/research-ops.md) — email, campus use, provenance
 
 Optional local LLM (Ollama by default; off until `[llm].enabled`): grounded
 title proposals in `fix-metadata`, a `pdf_identity_mismatch` lint check,
@@ -144,10 +121,18 @@ uv run paperful synthesize -C COLLECTION     # report from those notes
 
 ## Develop
 
+Contributors use [uv](https://docs.astral.sh/uv/) (Python 3.10+). This is not
+the operator install.
+
 ```sh
 uv sync --group dev
+cp config.example.toml config.toml
+uv run paperful doctor
 uv run pytest
 ```
+
+Playwright ships with `uv sync`; Chromium installs on the first host
+`paperful session login`. Optional LLM extras: [LLM](docs/llm.md).
 
 See [CONTRIBUTING](CONTRIBUTING.md).
 

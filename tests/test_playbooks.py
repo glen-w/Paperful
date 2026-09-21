@@ -9,9 +9,11 @@ from paperful.playbooks import (
     apply_synthesize,
     load_builtin_pack,
     merge_playbooks,
+    rewrite_playbook_name,
 )
 from paperful.sources.landing import (
     extract_pdf_urls,
+    grey_playbook_name,
     grey_target,
     rewrite_known_pdf_url,
 )
@@ -48,6 +50,8 @@ def test_undocs_unga_vme_rewrite_and_synthesize():
     )
     item = make_item(url=None, extra="UNGA A/RES/61/105", doi=None, title="VME")
     assert grey_target(item) == "https://undocs.org/pdf?symbol=A/RES/61/105"
+    assert rewrite_playbook_name("https://undocs.org/A/RES/61/105") == "undocs-unga-vme"
+    assert grey_playbook_name(item) == "undocs-unga-vme-symbol"
     assert (
         apply_synthesize("See also A/75/157 (SG report)")
         == "https://undocs.org/pdf?symbol=A/75/157"

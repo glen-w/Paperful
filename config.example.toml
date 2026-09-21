@@ -32,7 +32,7 @@ state_dir = "state"
 # Remove "scholar" / "ezproxy" / "htmlpdf" to disable. Scholar is optional (CAPTCHA-prone).
 # Sci-Hub is off by default (legal grey zone in some jurisdictions). Opt in by
 # appending "scihub" here, or pass --scihub on a run. You are responsible for
-# complying with the laws that apply to you. See README “Sci-Hub”.
+# complying with the laws that apply to you. See docs/scihub.md.
 # htmlpdf + session vault: Playwright is a core dep; Chromium installs on first
 # `paperful session login …` (or: uv run playwright install chromium)
 sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "core", "scholar", "direct", "ezproxy", "htmlpdf"]
@@ -40,9 +40,9 @@ sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticsc
 
 # Campus EZProxy (any institution that offers login?url=). Leave empty to disable.
 # Only used for DOIs and known publisher URLs (ScienceDirect, Springer, JSTOR, …),
-# never YouTube, Zotero, FAO, or other non-publisher pages. See README “What EZProxy will try”.
+# never YouTube, Zotero, FAO, or other non-publisher pages. See docs/ezproxy.md.
 #   uv run paperful session login ezproxy
-# Never put your password here. See README “Campus EZProxy”.
+# Never put your password here. Campus acceptable use: docs/research-ops.md.
 ezproxy_base = ""
 # ezproxy_cookies = "state/ezproxy-cookies.txt"  # compat dump after session login
 # scholar_cookies = "state/scholar-cookies.txt"   # compat dump; prefer session login scholar

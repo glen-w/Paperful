@@ -27,6 +27,17 @@ class Check:
     name: str
     status: Status
     detail: str
+    code: str = ""
+
+
+def zotero_failure_code(exc: BaseException) -> str:
+    """Diagnosis code for a failed local-API ping."""
+    msg = str(exc).lower()
+    if "local api is disabled" in msg or "allow other applications" in msg:
+        return "zotero_api_off"
+    if "400" in msg and "host" in msg:
+        return "zotero_bad_host"
+    return "zotero_down"
 
 
 def in_docker() -> bool:
@@ -210,10 +221,22 @@ def run_checks(
                     )
                 )
             except ConnectionError as exc:
-                checks.append(Check(_ZOTERO_CHECK, "red", f"{zot_where}: {exc}"))
+                checks.append(
+                    Check(
+                        _ZOTERO_CHECK,
+                        "red",
+                        f"{zot_where}: {exc}",
+                        code=zotero_failure_code(exc),
+                    )
+                )
             except Exception as exc:
                 checks.append(
-                    Check(_ZOTERO_CHECK, "red", f"{zot_where} unreachable: {exc}")
+                    Check(
+                        _ZOTERO_CHECK,
+                        "red",
+                        f"{zot_where} unreachable: {exc}",
+                        code=zotero_failure_code(exc),
+                    )
                 )
 
         if info is not None:
@@ -225,6 +248,7 @@ def run_checks(
                         "Write API",
                         "amber",
                         "no — attach, fix-metadata --apply, and dedupe --apply need Zotero 10+",
+                        code="zotero_no_write",
                     )
                 )
 

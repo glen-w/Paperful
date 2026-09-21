@@ -285,8 +285,14 @@ class EndNoteBackend:
         shutil.copyfile(src, dest)
         return dest
 
-    def attach(self, item_key: str, pdf_path: Path, title: str | None = None) -> AttachResult:
-        del title
+    def attach(
+        self,
+        item_key: str,
+        pdf_path: Path,
+        title: str | None = None,
+        note: str | None = None,
+    ) -> AttachResult:
+        del title, note
         if not pdf_path.is_file():
             return AttachResult(False, reason=f"file missing: {pdf_path}", code="other")
         rec = self._pending_by_key.get(item_key)

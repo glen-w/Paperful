@@ -11,9 +11,14 @@ from rich.console import Console
 
 from paperful import pipeline as pl
 from paperful.runreport import (
+    RUN_REPORT_ITEM_KEYS,
+    RUN_REPORT_KEYS,
+    RUN_REPORT_PATH_KEYS,
+    RUN_REPORT_SUMMARY_KEYS,
     build_report,
     classify_enrichment,
     error_type_for,
+    outcome_banner,
     print_run_summary,
     write_run_report,
 )
@@ -27,6 +32,47 @@ from paperful.store import (
 )
 from tests.conftest import PDF_BYTES, make_item, mock_client
 from tests.test_pipeline import FakeAttacher, StubSource
+
+
+def test_run_report_required_keys_and_banner(cfg):
+    class Stats:
+        started_at = 0
+        finished_at = 0
+        items = []
+
+    report = build_report(Stats(), cfg, command="run", scope="library", write_api=True)
+    assert RUN_REPORT_KEYS <= report.keys()
+    assert RUN_REPORT_SUMMARY_KEYS <= report["summary"].keys()
+    assert RUN_REPORT_PATH_KEYS <= report["paths"].keys()
+    assert report["summary"]["write_api"] is True
+    assert (
+        outcome_banner(report["summary"])
+        == "downloaded 0 · attached 0 · deferred 0 · not_found 0 · write-api yes"
+    )
+    report["summary"]["pdfs_downloaded"] = 2
+    report["summary"]["attached"] = 1
+    report["summary"]["skipped_manifest"] = 3
+    report["summary"]["linked_url_skipped"] = 1
+    report["summary"]["not_found"] = 4
+    report["summary"]["write_api"] = False
+    assert (
+        outcome_banner(report["summary"])
+        == "downloaded 2 · attached 1 · deferred 4 · not_found 4 · write-api no"
+    )
+    item = {
+        "itemKey": "K",
+        "title": "T",
+        "status": "ok",
+        "source": "unpaywall",
+        "reason": "",
+        "doi": None,
+        "doi_verified": "",
+        "attempts": [],
+        "fields_corrected": [],
+        "path": None,
+        "error_type": None,
+    }
+    assert RUN_REPORT_ITEM_KEYS <= item.keys()
 
 
 def test_classify_enrichment():
@@ -143,6 +189,7 @@ def test_print_run_summary_renders(cfg):
         Console(file=buf, force_terminal=False), report, cfg.state_dir / "last-run.json"
     )
     out = buf.getvalue()
+    assert "downloaded 2 · attached 1 · deferred 0 · not_found 3 · write-api unknown" in out
     assert "PDFs downloaded" in out and "2" in out
     assert "Fields corrected" in out
     assert "Sources checked" in out

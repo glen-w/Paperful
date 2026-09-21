@@ -1,10 +1,28 @@
 # Changelog
 
-All notable user-facing changes. Paperful is **0.x**: flags and report fields
-may still move. **1.0** will lock `paperful.run_report.v1`, `paperful.item.v1`,
-and attach behaviour (see [releases](docs/releases.md)).
+All notable user-facing changes. Paperful is **0.x** and is not tagged 1.0.
+Required `paperful.run_report.v1` keys are frozen; extra keys and
+`paperful.item.v1` may still move. See [releases](docs/releases.md).
 
 ## Unreleased
+
+## 0.8.0 — 2026-09-22
+
+Zotero PDF attachments carry a provenance note (`paperful oa:unpaywall`,
+`campus:ezproxy`, `grey:<playbook>`, `pirate:scihub`, …). A PDF DOI that
+differs from the library item adds `warn:pdf_doi_mismatch` and still attaches.
+`run --strict-pdf-doi` saves that file and skips attach;
+`attach --allow-pdf-doi-mismatch` attaches it later.
+
+`run` prints `downloaded N · attached M · deferred K · not_found J · write-api yes|no`
+before the summary table. `summary.write_api` is part of the required
+`paperful.run_report.v1` key set (extra keys may still be added). This is not
+a 1.0 tag.
+
+`doctor --json` prints check codes. Next steps branch on Zotero down, API off,
+a bad Host header, and Zotero 7–9. Quota and auth failures print one operator
+line. The operator install card is `docker compose build` (build-local only;
+no PyPI, no `docker pull`). `uv` is the contributor path.
 
 When `[llm].enabled` and `paperful[browser-agent]` are on, `run` appends the
 `browser_agent` lane after Scholar / EZProxy / htmlpdf and fires it only if
@@ -118,15 +136,19 @@ First usable local Zotero gap-filler: `doctor` → `collections` → `run --dry-
 
 ### Known limits (not 1.0 yet)
 
-- End-of-run **summary table** exists; a one-line banner
-  (`downloaded N · attached M · deferred K · not_found J` plus write-API yes/no)
-  is not locked yet.
-- Attachments are **not** stamped with source provenance
-  (`oa:unpaywall` / `campus:ezproxy` / `grey:undocs`) in Zotero notes.
-- `paperful.run_report.v1` is the current JSON shape; treat extra keys as
-  additive until 1.0.
+- `paperful.item.v1` and snapshot/restore keys may still move. Mendeley and
+  EndNote are seeking testers. This tree is not tagged 1.0.
+- Open-access fill is DOI-scoped. Unpaywall often returns a landing page with
+  no PDF. Grey literature is the configured playbooks only, not a universal
+  harvester. Sci-Hub is opt-in and thin after ~2021. A full Zotero file quota
+  can leave the PDF only in `out/`.
+- A mismatched PDF DOI still attaches unless `--strict-pdf-doi` is set. The
+  note then includes `warn:pdf_doi_mismatch`.
+- Required `paperful.run_report.v1` keys are frozen; extra keys may still be
+  added.
 - Collection resolve failures print the spec; they do not yet suggest closest
   paths.
+- Provenance notes are Zotero-only.
 
 ### Honest defaults
 

@@ -18,6 +18,7 @@ from rich.console import Console
 from rich.markup import escape
 
 from .attach import parent_missing
+from .provenance import provenance_stamp
 from .circuit import CircuitBreaker
 from .config import Config
 from .cookies import apply_netscape_cookies
@@ -48,6 +49,7 @@ from .store import (
     STATUS_ERROR,
     STATUS_NO_IDENTIFIER,
     STATUS_NOT_FOUND,
+    REASON_STRICT_PDF_DOI,
     STATUS_OK,
     Manifest,
     Record,
@@ -60,6 +62,20 @@ from .zot import Item
 
 # Sources that share a browser/session or are heavy — keep serial & polite.
 _SERIAL_SOURCES = frozenset({"scihub", "ezproxy", "htmlpdf", "scholar", "browser_agent"})
+
+
+def _attach_operator_line(code: str) -> str:
+    if code == "quota":
+        return (
+            "PDF is in out/; free Zotero Storage or empty the trash, then "
+            "paperful attach."
+        )
+    if code == "auth":
+        return (
+            "Click Always Allow on the host Zotero window "
+            "(Docker: the GUI is not in the container)."
+        )
+    return ""
 
 
 def make_client(cfg: Config) -> httpx.Client:
@@ -138,6 +154,7 @@ class Pipeline:
         progress: Callable[[], None] | None = None,
         try_all: bool | None = None,
         use_browser: bool = True,
+        strict_pdf_doi: bool = False,
     ):
         self.cfg = cfg
         self.manifest = manifest
@@ -145,6 +162,7 @@ class Pipeline:
         self.sources = sources or cfg.sources
         self.try_all = try_all if try_all is not None else not cfg.source_routing
         self.attacher = attacher
+        self.strict_pdf_doi = strict_pdf_doi
         self.progress = progress or (lambda: None)
         self.client = make_client(cfg)
         self.browser = BrowserSession(cfg) if use_browser else None
@@ -491,11 +509,13 @@ class Pipeline:
             fetched_url=dl.final_url,
             pdf_doi=pdf_doi,
         )
-        if pdf_doi and item.doi and pdf_doi != item.doi:
+        mismatch = bool(pdf_doi and item.doi and pdf_doi != item.doi)
+        if mismatch:
             self._log_item(
                 item,
                 f"[yellow]pdf DOI {escape(pdf_doi)} differs from {escape(item.doi)}[/]",
             )
+        defer_mismatch = mismatch and self.strict_pdf_doi
         rec = Record(
             itemKey=item.key,
             status=STATUS_OK,
@@ -506,11 +526,13 @@ class Pipeline:
             doi_verified=item.doi_verified,
             pdf_doi=pdf_doi,
             source=cand.source,
+            playbook=cand.playbook,
             url=dl.final_url,
             path=str(primary),
             extra_paths=relpaths(self.cfg.out_dir, extras),
             md5=dl.md5,
             attempts=attempts,
+            reason=REASON_STRICT_PDF_DOI if defer_mismatch else "",
         )
         self.manifest.write(rec)
         with self._stats_lock:
@@ -519,7 +541,13 @@ class Pipeline:
             item,
             f"[green]ok[/] {escape('[' + cand.source + ']')} -> {escape(str(primary.relative_to(self.cfg.out_dir)))}",
         )
-        if self.attacher:
+        if defer_mismatch:
+            self._log_item(
+                item,
+                "[yellow]saved, not attached (--strict-pdf-doi)[/]",
+            )
+            self._add_outcome(rec)
+        elif self.attacher:
             self.attach_record(rec)
         else:
             self._add_outcome(rec)
@@ -621,10 +649,15 @@ class Pipeline:
             return False
         if str(pdf) != rec.path:
             rec.path = str(pdf)
+        note = provenance_stamp(
+            rec.source,
+            playbook=rec.playbook or None,
+            pdf_doi_mismatch=bool(rec.pdf_doi and rec.doi and rec.pdf_doi != rec.doi),
+        )
         with self._attach_lock:
-            res = self.attacher.attach(rec.itemKey, pdf)
+            res = self.attacher.attach(rec.itemKey, pdf, note=note)
             if not res.ok and parent_missing(res.reason):
-                res = attach_after_remap(self, rec, pdf, res.reason)
+                res = attach_after_remap(self, rec, pdf, res.reason, note=note)
         if res.ok:
             rec.status = STATUS_ATTACHED
             rec.reason = res.reason
@@ -642,6 +675,9 @@ class Pipeline:
                 )
                 self.stats.bump(STATUS_ATTACH_FAILED)
             self._emit(f"   [yellow]attach failed[/] {rec.itemKey}: {res.reason}")
+            hint = _attach_operator_line(code)
+            if hint:
+                self._emit(f"   [yellow]{hint}[/]")
             self._add_outcome(rec, attach_code=code)
         self.manifest.write(rec)
         return res.ok

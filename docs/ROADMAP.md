@@ -24,12 +24,12 @@ Sci-Hub, no “AI fetch everything”).
 
 | Step | UX outcome | Status |
 | --- | --- | --- |
-| End-of-run **one-line** banner: `downloaded N · attached M · deferred K · not_found J` plus write-API yes/no | Trust after a run | Summary **table** ships; banner not locked |
-| Attachment **provenance stamp** (`oa:unpaywall` / `campus:ezproxy` / `grey:undocs` on notes or title prefix) | Trust inside Zotero | Not shipped |
+| End-of-run **one-line** banner: `downloaded N · attached M · deferred K · not_found J` plus write-API yes/no | Trust after a run | Shipped (table still follows the line) |
+| Attachment **provenance stamp** (`oa:unpaywall` / `campus:ezproxy` / `grey:undocs` on notes or title prefix) | Trust inside Zotero | Shipped on the Zotero attachment note |
 | `--dry-run` **Would-hit** column (sources in order) | Trust before network | Shipped |
 | Exit **2** + next-steps when Zotero is down (`collections` / `run` / `attach`) | Fresh clone never dead-ends | Shipped |
 | Slim README + [CHANGELOG](../CHANGELOG.md) known limits | Trust before install | Shipped |
-| Lock `paperful.run_report.v1` | Trust for agents | Named schema; not frozen |
+| Lock `paperful.run_report.v1` | Trust for agents | Required keys frozen; extra keys may be added. Not tagged 1.0 |
 | Lock `paperful.item.v1` and `snapshot` / `restore` (additive keys only after 1.0) | Trust for the disk ledger | Named schema; 0.x may add keys. Behaviour shipped |
 | **Mendeley and EndNote adapters** | The ledger survives a manager change | In the tree. **Seeking testers.** Zotero stays the well-tested path. See below |
 

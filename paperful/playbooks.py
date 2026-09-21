@@ -238,8 +238,9 @@ def _undocs_symbol_re(playbooks: list[GreyPlaybook]) -> re.Pattern[str] | None:
     return None
 
 
-def apply_rewrite(url: str, playbooks: list[GreyPlaybook] | None = None) -> str | None:
-    """Zero-fetch URL → PDF from rewrite playbooks (and registered parsers)."""
+def _rewrite_match(
+    url: str, playbooks: list[GreyPlaybook] | None = None
+) -> tuple[GreyPlaybook, str] | None:
     books = playbooks if playbooks is not None else default_playbooks()
     host = (urlparse(url).netloc or "").lower()
     symbol_re = _undocs_symbol_re(books)
@@ -254,24 +255,37 @@ def apply_rewrite(url: str, playbooks: list[GreyPlaybook] | None = None) -> str 
                 and "undocs.org" in host
                 and "symbol=" in url.lower()
             ):
-                return url
+                return pb, url
             symbol = _symbol_from_undocs_url(url, symbol_re)
             if symbol:
-                return f"https://undocs.org/pdf?symbol={symbol}"
+                return pb, f"https://undocs.org/pdf?symbol={symbol}"
             continue
         cre = pb.compiled_url()
         if not cre or not pb.pdf_template:
             continue
         m = cre.search(url)
         if m:
-            return _format_template(pb.pdf_template, m)
+            return pb, _format_template(pb.pdf_template, m)
     return None
 
 
-def apply_synthesize(
-    text: str, playbooks: list[GreyPlaybook] | None = None
+def apply_rewrite(url: str, playbooks: list[GreyPlaybook] | None = None) -> str | None:
+    """Zero-fetch URL → PDF from rewrite playbooks (and registered parsers)."""
+    hit = _rewrite_match(url, playbooks)
+    return None if hit is None else hit[1]
+
+
+def rewrite_playbook_name(
+    url: str, playbooks: list[GreyPlaybook] | None = None
 ) -> str | None:
-    """Extra/title (or free text) → PDF URL from synthesize playbooks."""
+    """Name of the rewrite playbook that matches ``url``, if any."""
+    hit = _rewrite_match(url, playbooks)
+    return None if hit is None else hit[0].name
+
+
+def _synthesize_match(
+    text: str, playbooks: list[GreyPlaybook] | None = None
+) -> tuple[GreyPlaybook, str] | None:
     if not text:
         return None
     books = playbooks if playbooks is not None else default_playbooks()
@@ -284,8 +298,24 @@ def apply_synthesize(
             continue
         m = cre.search(blob)
         if m:
-            return _format_template(pb.pdf_template, m)
+            return pb, _format_template(pb.pdf_template, m)
     return None
+
+
+def apply_synthesize(
+    text: str, playbooks: list[GreyPlaybook] | None = None
+) -> str | None:
+    """Extra/title (or free text) → PDF URL from synthesize playbooks."""
+    hit = _synthesize_match(text, playbooks)
+    return None if hit is None else hit[1]
+
+
+def synthesize_playbook_name(
+    text: str, playbooks: list[GreyPlaybook] | None = None
+) -> str | None:
+    """Name of the synthesize playbook that matches ``text``, if any."""
+    hit = _synthesize_match(text, playbooks)
+    return None if hit is None else hit[0].name
 
 
 def scrape_playbooks_for_host(

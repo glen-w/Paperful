@@ -137,7 +137,9 @@ folder sync is out of scope for this CLI.
 
 Zotero can show **The attached file could not be found** for a path under the data directory’s `storage/<key>/`. The attachment record is there (MD5 and storage folder) but the bytes never landed on this machine. That is a ghost, not a file moved or deleted outside Zotero.
 
-Attachments created through the API as `imported_url` open that storage slot without always finishing a local download. `linked_url` attachments (including a quota-full open-access pass) do not use that path: they open in the browser and do not raise this dialog. Paperful’s attach path is `imported_file`: the PDF is already on disk, then uploaded through the local write API. Prefer `paperful run` / `paperful attach` for gap-fills so the file is written on this machine.
+Attachments created through the API as `imported_url` open that storage slot without always finishing a local download. `linked_url` attachments (including a quota-full open-access pass) do not use that path: they open in the browser and do not raise this dialog. Paperful’s attach path is `imported_file`: the PDF is already on disk, then uploaded through the local write API. The Zotero attachment note is a provenance stamp (`paperful oa:unpaywall`, `campus:ezproxy`, `grey:<playbook>`, `pirate:scihub`, …). Title stays `Full Text PDF`. Prefer `paperful run` / `paperful attach` for gap-fills so the file is written on this machine.
+
+[`paperful/attach.py`](../paperful/attach.py) subclasses `pyzotero._upload.Zupload` so filename spaces are sent as `%20`. That module is private. The dependency is pinned to `pyzotero>=1.15.1,<1.16`. It is not vendored.
 
 A refill from the attachment’s open-access URL is only good when the downloaded bytes match the stored MD5. Publishers that return 403 to a scripted download (Cambridge, Taylor & Francis, some institutional hosts, parliamentary briefings) will not refill that way. Open those in a browser, or with Paperful and [EZProxy](ezproxy.md), and drop the PDF onto the parent item — or trash the empty attachment and re-attach.
 
@@ -160,8 +162,10 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
   (title+year also needs `--apply-medium`). See [dedupe](dedupe.md).
 - `paperful report` / `paperful report --last-run` — manifest totals plus the latest
   auditable run report (`state/last-run.json`, history under `state/runs/`).
-  Each `run` prints a **Run summary** table (downloads, attached, deferred,
-  errors). A one-line banner is a [1.0](ROADMAP.md#trust-10) tightening.
+  Each `run` prints a one-line banner
+  (`downloaded N · attached M · deferred K · not_found J · write-api yes|no`)
+  and then a **Run summary** table. `deferred` is manifest skips plus
+  linked-URL skips. `write-api` is `unknown` when the library was not probed.
 
 When Zotero is unreachable, `collections`, `run`, `attach`, `lint`,
 `fix-metadata`, `dedupe`, and `gaps` exit **2** and print next steps (start
@@ -172,7 +176,9 @@ Zotero, enable local API, `paperful doctor`).
 
 `paperful report --json` is `{ counts, by_source, no_identifier, no_doi,
 attach_failed_by_code, last_run? }`. `last_run` (when present) is the same object
-as `state/last-run.json`. **0.x may add keys**; 1.0 freezes this schema name.
+as `state/last-run.json`. The required key set below is frozen: a removed or
+renamed required key is a break. Extra keys may still be added. The package
+is not tagged 1.0 yet (`paperful.item.v1` is still open).
 
 | Field | Meaning |
 | --- | --- |
@@ -193,6 +199,7 @@ as `state/last-run.json`. **0.x may add keys**; 1.0 freezes this schema name.
 | `summary.by_source` | Hits per source name |
 | `summary.sources_checked` | Per-source outcome tallies |
 | `summary.errors_by_type` / `attach_failed_by_code` | Typed errors |
+| `summary.write_api` | `true` / `false` / `null` (null when the run did not probe write support) |
 | `items[]` | Per-item: `itemKey`, `title`, `status`, `source`, `reason`, `doi`, `doi_verified`, `attempts`, `fields_corrected`, `path`, `error_type` |
 
 Manifest `counts` keys match ledger statuses (`ok`, `attached`, `not_found`, …).
@@ -254,7 +261,7 @@ stop at `no_identifier`.
 - [dedupe.md](dedupe.md) — duplicate packs and the BBNJ hygiene loop
 - [config.md](config.md) — `config.toml` keys and grey playbooks
 - [ezproxy.md](ezproxy.md) / [sessions.md](sessions.md) — campus proxy and browser vault
-- [docker.md](docker.md) — optional image (host Zotero + headed login stay outside)
+- [docker.md](docker.md) — build-local image (host Zotero + headed login stay outside)
 - [zotero.md](zotero.md) — local API, write keys, attachment modes, ghosts
 - [mendeley.md](mendeley.md) — REST, OAuth, annotations as notes (seeking testers)
 - [endnote.md](endnote.md) — SQLite read, XML import bundle (seeking testers)

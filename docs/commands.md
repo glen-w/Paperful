@@ -1,8 +1,9 @@
 # Commands
 
-Snippets use `uv run`. Same commands work as
-`docker compose run --rm paperful …` with the [optional Docker image](docker.md).
-Headed `session login` is host-only either way.
+Snippets below use `uv run` so they stay short. The operator install is
+`docker compose run --rm paperful …` after `docker compose build`
+([Docker](docker.md)). There is no published image. Headed `session login`
+is host-only either way. Academic runs: add `--preset eoi`.
 
 ```sh
 # environment check (TTY guide for amber/red)
@@ -99,7 +100,7 @@ uv run paperful lint --library --json
 uv run paperful lint -C BBNJ --strict             # exit 1 if any finding
 uv run paperful fix-metadata --library            # dry-run → state/metadata-patches.jsonl
 uv run paperful fix-metadata --library --apply    # write DOI/title/date/venue into Zotero 10+
-uv run paperful fix-metadata --library --apply --overwrite   # also replace title/date/venue
+uv run paperful fix-metadata --library --apply --overwrite   # replaces title/date/venue you may have edited; dry-run first
 
 # duplicates, then remaining PDF gaps (review the pack before --apply)
 uv run paperful dedupe -C BBNJ --dry-run
@@ -115,11 +116,11 @@ uv run paperful pack show
 
 | Command | Purpose |
 | --- | --- |
-| `doctor` | Environment check (Zotero / Mendeley / EndNote, paths, email, sessions, pdftotext, Playwright, grey-lit packs, LLM, browser-agent extra). Green / amber / red. TTY guide for remediations (`--guide` / `--no-guide`). |
-| `run` | Find and download missing PDFs (`--dry-run`, `--preset eoi`, `--upgrade-linked`, `--try-all`, `--retry-failed`, `--sources`, `--scihub`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). When `[llm].enabled` and the browser-agent extra is installed, appends `browser_agent` after Scholar / EZProxy / htmlpdf. Never rewrites bibliographic fields. |
+| `doctor` | Environment check (Zotero / Mendeley / EndNote, paths, email, sessions, pdftotext, Playwright, grey-lit packs, LLM, browser-agent extra). Green / amber / red. TTY guide for remediations (`--guide` / `--no-guide`). `--json` prints `{name, status, code, detail}` and still exits 2 when a check is red (`zotero_down`, `zotero_api_off`, `zotero_bad_host`, `zotero_no_write`). |
+| `run` | Find and download missing PDFs (`--dry-run`, `--preset eoi`, `--upgrade-linked`, `--try-all`, `--retry-failed`, `--sources`, `--scihub`, `--strict-pdf-doi`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). When `[llm].enabled` and the browser-agent extra is installed, appends `browser_agent` after Scholar / EZProxy / htmlpdf. Never rewrites bibliographic fields. A PDF DOI that differs from the library item still attaches, with `warn:pdf_doi_mismatch` on the Zotero note. `--strict-pdf-doi` saves the file and does not attach; `paperful attach --allow-pdf-doi-mismatch` attaches those rows later. |
 | `recover` | Opt-in **browser-agent** PDF recovery (`--item KEY` repeatable, `--dry-run`, `--no-attach`). Also auto-appended as the last `run` lane when `[llm].enabled` and other vault browser lanes (Scholar, EZProxy, htmlpdf) fail. Needs Python 3.11+, `paperful[browser-agent]`, and a session vault. Manual report: `state/runs/<stamp>-recover.json`. See [LLM](llm.md#a-recover-browser-agent-pdf-recovery). |
 | `lint` | Read-only identifier / PDF-DOI / title-hygiene findings (`--json`, `--strict`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). Codes: `missing_doi`, `suspect_doi`, `swappable_doi`, `pmid_no_doi`, `pdf_doi_mismatch`, `title_html`, `title_all_caps`, `title_filename`, `no_identifier`, plus `pdf_identity_mismatch` when `[lint].llm_pdf_match` is on. Writes `state/runs/<stamp>-lint.json` (also for `--json`, before a `--strict` exit 1). |
-| `fix-metadata` | Propose patches on disk; `--apply` writes them to the library (`--overwrite` for title/date/venue; `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). Whitelist: `doi`, `title`, `date`, `publicationTitle`. HTML title cleanup, ALL CAPS → Title Case, and verified PDF-DOI adoption included; filename titles stay lint-only unless `[fix_metadata].llm_title` proposes a grounded title (`source = "llm_title"`). Dry-run and `--apply` both write `state/runs/<stamp>-fix-metadata.json` (`patches_applied` only after `--apply`). |
+| `fix-metadata` | Propose patches on disk; `--apply` writes them to the library (`--overwrite` replaces title, date, or venue even when you edited them — dry-run first; `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). Whitelist: `doi`, `title`, `date`, `publicationTitle`. HTML title cleanup, ALL CAPS → Title Case, and verified PDF-DOI adoption included; filename titles stay lint-only unless `[fix_metadata].llm_title` proposes a grounded title (`source = "llm_title"`). Dry-run and `--apply` both write `state/runs/<stamp>-fix-metadata.json` (`patches_applied` only after `--apply`). |
 | `summarize` | Grounded LLM summary from the PDF already on disk (`--item` / `-C` / `--library`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`, `--prompt FILE`, `--force`, `--to disk, zotero, or both`). Default writes `state/summaries/<key>.html` and one child note tagged `[summarize].tag`. `--to disk` skips Zotero. `--apply` requires the note and conflicts with `--to disk`. Writes `state/runs/<stamp>-summarize.json`. See [LLM](llm.md#d-summarize-grounded-summary-note). |
 | `synthesize` | Literature review from existing summary notes (`--item` / `-C` / `--library`, same year/type/`--limit` flags, `--prompt`, `--to`, `--dry-run`, `--force`, `--report-collection`). Writes `state/reports/<slug>.html` and, unless `--to disk`, a standalone note in each `-C` collection. See [LLM](llm.md#e-synthesize-summary-of-summaries). |
 | `dedupe` | Duplicate pack on disk (`high_doi`, then `title+year`). `--apply` trashes DOI extras only; title+year needs `--apply-medium`. Held when same-DOI titles diverge. Same year/type scope flags as `run`. See [dedupe](dedupe.md). |
@@ -199,7 +200,7 @@ Same flags on `run`, `lint`, `fix-metadata`, `dedupe`, `gaps`, `summarize`,
 
 Unpaywall needs a real `email`. Missing sessions: `paperful session login ezproxy` or `scholar` (system Chrome/Edge when present). Missing `pdftotext`: Poppler; `pypdf` is the fallback. Playwright is core; Chromium installs on first `session login`. An amber Write API means Zotero 7–9: fetch still works, but `attach`, `fix-metadata --apply`, and `dedupe --apply` do not.
 
-On a TTY (Compose sets `stdin_open` / `tty` for the optional image), amber/red
+On a TTY (Compose sets `stdin_open` / `tty` for the build-local image), amber/red
 checks open an interactive **Guide**: each step prints what to do, waits for
 Enter, then re-runs that check. Session logins still need a headed browser on
 the host when you run inside Docker. Force or skip with `--guide` / `--no-guide`.
