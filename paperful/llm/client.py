@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, replace
 from typing import Any, Protocol
 
 import httpx
@@ -27,6 +28,20 @@ class CompletionRequest:
     temperature: float = 0.2
     max_tokens: int | None = None
     json_mode: bool = False
+    num_ctx: int | None = None
+
+
+def ctx_tokens_for(
+    prompt: str, *, max_num_ctx: int = 32_768, reply_headroom: int = 2048
+) -> int:
+    """Context window large enough for this prompt, capped by config.
+
+    Ollama's default window is often 2048–4096 tokens and silently drops the
+    rest of the prompt. ~3 characters per token is a conservative estimate.
+    """
+    raw = math.ceil(len(prompt) / 3) + reply_headroom
+    rounded = max(1024, ((raw + 1023) // 1024) * 1024)
+    return min(rounded, max(1024, int(max_num_ctx)))
 
 
 class LLMClient(Protocol):
@@ -82,6 +97,8 @@ class OllamaClient:
         options: dict[str, Any] = {"temperature": request.temperature}
         if request.max_tokens is not None:
             options["num_predict"] = request.max_tokens
+        if request.num_ctx is not None:
+            options["num_ctx"] = request.num_ctx
         if request.json_mode:
             options["format"] = "json"
         payload: dict[str, Any] = {
@@ -99,16 +116,7 @@ class OllamaClient:
         return str(data.get("response") or "")
 
     def complete_json(self, request: CompletionRequest) -> dict[str, Any]:
-        text = self.complete(
-            CompletionRequest(
-                model=request.model,
-                prompt=request.prompt,
-                timeout_seconds=request.timeout_seconds,
-                temperature=request.temperature,
-                max_tokens=request.max_tokens,
-                json_mode=True,
-            )
-        )
+        text = self.complete(replace(request, json_mode=True))
         return _parse_json_object(text)
 
 
@@ -153,18 +161,7 @@ class LiteLLMClient:
         return str(getattr(msg, "content", None) or "")
 
     def complete_json(self, request: CompletionRequest) -> dict[str, Any]:
-        return _parse_json_object(
-            self.complete(
-                CompletionRequest(
-                    model=request.model,
-                    prompt=request.prompt,
-                    timeout_seconds=request.timeout_seconds,
-                    temperature=request.temperature,
-                    max_tokens=request.max_tokens,
-                    json_mode=True,
-                )
-            )
-        )
+        return _parse_json_object(self.complete(replace(request, json_mode=True)))
 
 
 def get_client_impl(cfg) -> LLMClient:

@@ -10,7 +10,7 @@ from pathlib import Path
 from .config import Config
 from .grounding import budget_slice, metadata_block, pdf_text_for
 from .library import LibraryBackend
-from .llm import CompletionRequest, get_client, llm_egress_is_remote
+from .llm import CompletionRequest, ctx_tokens_for, get_client, llm_egress_is_remote
 from .store import Manifest
 from .zot import Item
 
@@ -112,14 +112,15 @@ class IdentityMismatch(ValueError):
     """The gated identity check flagged this PDF; pass --force to summarize anyway."""
 
 
-def summarize_item(
+def render_summary(
     cfg: Config,
     item: Item,
     manifest: Manifest | None,
     backend: LibraryBackend | None,
     *,
     force: bool = False,
-) -> Path:
+) -> str:
+    """Grounded summary HTML, including the provenance footer. No disk or Zotero write."""
     if not item.has_pdf:
         raise ValueError("item has no PDF attachment")
     if cfg.lint_llm_pdf_match and not force:
@@ -143,6 +144,7 @@ def summarize_item(
                 model=cfg.llm_model,
                 prompt=prompt,
                 timeout_seconds=cfg.llm_timeout_s,
+                num_ctx=ctx_tokens_for(prompt, max_num_ctx=cfg.llm_max_num_ctx),
             )
         )
     )
@@ -151,16 +153,38 @@ def summarize_item(
     footer = f"<p><em>paperful · {cfg.llm_model} · {stamp} · prompt {sha}</em></p>"
     if llm_egress_is_remote(cfg):
         footer = f"<p><em>paperful · remote LLM · {cfg.llm_model} · {stamp}</em></p>"
-    html = f"{html_body}\n{footer}"
+    return f"{html_body}\n{footer}"
+
+
+def write_summary_disk(cfg: Config, item: Item, html: str) -> Path:
     out = cfg.summaries_dir / f"{item.key}.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8")
     return out
 
 
-def apply_summary_note(cfg: Config, backend: LibraryBackend, item: Item) -> str:
-    path = cfg.summaries_dir / f"{item.key}.html"
-    if not path.is_file():
-        raise FileNotFoundError(path)
-    html = path.read_text(encoding="utf-8")
+def summarize_item(
+    cfg: Config,
+    item: Item,
+    manifest: Manifest | None,
+    backend: LibraryBackend | None,
+    *,
+    force: bool = False,
+) -> Path:
+    """Render a summary and write ``state/summaries/<key>.html``."""
+    html = render_summary(cfg, item, manifest, backend, force=force)
+    return write_summary_disk(cfg, item, html)
+
+
+def apply_summary_note(
+    cfg: Config,
+    backend: LibraryBackend,
+    item: Item,
+    html: str | None = None,
+) -> str:
+    if html is None:
+        path = cfg.summaries_dir / f"{item.key}.html"
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        html = path.read_text(encoding="utf-8")
     return backend.create_or_update_note(item.key, html, cfg.summarize_tag)

@@ -10,6 +10,7 @@ from .client import (
     LLMClientError,
     NullLLMClient,
     OllamaClient,
+    ctx_tokens_for,
     get_client_impl,
 )
 from .preflight import validate_llm_for_recover, validate_llm_for_verb
@@ -22,6 +23,7 @@ from .validate import (
 
 __all__ = [
     "CompletionRequest",
+    "ctx_tokens_for",
     "LLMClient",
     "LLMClientError",
     "LiteLLMClient",

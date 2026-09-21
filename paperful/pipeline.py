@@ -7,6 +7,7 @@ import random
 import threading
 import time
 from collections.abc import Callable
+from typing import Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -16,14 +17,20 @@ import httpx
 from rich.console import Console
 from rich.markup import escape
 
-from .attach import Attacher, parent_missing
+from .attach import parent_missing
 from .circuit import CircuitBreaker
 from .config import Config
 from .cookies import apply_netscape_cookies
 from .download import Download, DownloadError, fetch_pdf, looks_like_pdf
 from .pdfid import doi_from_pdf
 from .resolve import IdentifierCache, prepare_identifiers
-from .routing import is_publisher_url, publisher_host, sources_for_item
+from .routing import (
+    BROWSER_LANES,
+    browser_lane_failed,
+    is_publisher_url,
+    publisher_host,
+    sources_for_item,
+)
 from .session import BrowserSession, vault_cookies_path
 from .sources.ezproxy import proxify
 from .runreport import (
@@ -47,6 +54,7 @@ from .store import (
     relpaths,
     resolve_pdf_path,
     save_pdf,
+    write_fetch_records,
 )
 from .zot import Item
 
@@ -126,7 +134,7 @@ class Pipeline:
         manifest: Manifest,
         console: Console,
         sources: list[str] | None = None,
-        attacher: Attacher | None = None,
+        attacher: Any = None,
         progress: Callable[[], None] | None = None,
         try_all: bool | None = None,
         use_browser: bool = True,
@@ -228,6 +236,8 @@ class Pipeline:
             for name in serial:
                 if self._stop.is_set():
                     return
+                if name == "browser_agent":
+                    self._release_browser_for_agent()
                 if name == "scihub":
                     still = self._phase_scihub(still)
                 else:
@@ -311,6 +321,9 @@ class Pipeline:
             if self._skip_source(item, name, lanes, attempts):
                 still.append((item, attempts))
                 continue
+            if self._skip_recover_without_lane_failure(name, item, attempts):
+                still.append((item, attempts))
+                continue
             self._log_item(item, f"[dim]{name}: checking...[/]")
             cand = REGISTRY[name].find(item, self.ctx)
             note = f"({cand.note})" if cand.note else ""
@@ -387,6 +400,36 @@ class Pipeline:
         else:
             routed = sources_for_item(item, self.cfg, configured)
         return [s for s in routed if not self._circuit.tripped(s)]
+
+    def _release_browser_for_agent(self) -> None:
+        """Drop Playwright so browser-use can own the vault Chromium profile."""
+        if self.browser is None:
+            return
+        self.browser.close()
+        self.browser = None
+        self.ctx.browser = None
+
+    def _skip_recover_without_lane_failure(
+        self, name: str, item: Item, attempts: list[str]
+    ) -> bool:
+        """Hold `browser_agent` on mixed runs until a vault lane has failed.
+
+        Manual ``paperful recover`` uses ``sources=["browser_agent"]`` only, so
+        the gate does not apply.
+        """
+        if name != "browser_agent":
+            return False
+        if not any(s in BROWSER_LANES for s in self.sources):
+            return False
+        if browser_lane_failed(attempts):
+            return False
+        attempts.append("browser_agent:skipped(no browser-lane failure)")
+        with self._stats_lock:
+            self.stats.note_source(name, "skipped")
+        self._log_item(
+            item, "browser_agent: [dim]skipped[/] (no browser-lane failure)"
+        )
+        return True
 
     def _skip_source(
         self, item: Item, name: str, lanes: list[str], attempts: list[str]
@@ -470,6 +513,14 @@ class Pipeline:
             return False
         primary, extras = save_pdf(self.cfg.out_dir, item, dl.content, dl.md5)
         pdf_doi = doi_from_pdf(primary)
+        write_fetch_records(
+            [primary, *extras],
+            item,
+            md5=dl.md5,
+            source=cand.source,
+            fetched_url=dl.final_url,
+            pdf_doi=pdf_doi,
+        )
         if pdf_doi and item.doi and pdf_doi != item.doi:
             self._log_item(
                 item,
@@ -629,7 +680,7 @@ class Pipeline:
         """Retry attach when Zotero remapped the parent key (sync / restore)."""
         from .attach import AttachResult
 
-        zl = self.attacher.zl if self.attacher else None
+        zl = getattr(self.attacher, "zl", None) if self.attacher else None
         if zl is None:
             return AttachResult(False, reason=prior_reason, code="parent_missing")
         new_key = self._live_parent_key(rec)
@@ -681,7 +732,7 @@ class Pipeline:
         """Map a stale manifest key to the current library item via DOI/title."""
         from .resolve import normalize_doi
 
-        zl = self.attacher.zl if self.attacher else None
+        zl = getattr(self.attacher, "zl", None) if self.attacher else None
         if zl is None:
             return None
         if self._parent_by_doi is None or self._parent_by_title is None:

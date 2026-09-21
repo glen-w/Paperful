@@ -1,4 +1,4 @@
-"""Opt-in LLM browser recovery (not in default source list)."""
+"""LLM browser recovery: last serial lane on `run` after vault browsers fail."""
 
 from __future__ import annotations
 

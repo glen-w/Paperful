@@ -1,25 +1,26 @@
 # Roadmap
 
-Guidance for contributors, not a commitment calendar. Paperful stays a
-**local CLI**: fetch missing PDFs, lint identifiers, propose metadata patches on
-disk, write back through a library adapter. See [architecture.md](architecture.md).
+Guidance for contributors, not a commitment calendar. Paperful is a **local
+research-library sidecar**: one disk ledger (`out/`, `state/`), adapters for
+citation managers, and fetch / lint / attach as the core loop. **Zotero is the
+well-tested adapter.** Mendeley and EndNote are in the tree and seeking
+testers. See [architecture.md](architecture.md) and [why.md](why.md).
 
 Surfaces like a Zotero plugin, Firefox extension, or web GUI are **not** the
 product direction. Optional thin bridges (`paperful session login`) capture a local browser
 profile; they do not rewrite the fetcher.
 
-Ambition beyond core is framed as a **local research library workbench** —
-one catalogue, one disk ledger, one write-back bus — grown as optional modules
-that speak the same adapter + `state/` protocol. Do not expand that surface
-until the fetch / lint / attach loop is boringly reliable. **1.0 is that loop
-plus the trust checklist below** — not a GUI or a second product.
+**1.0** is that loop, the trust checklist below, and a locked item record
+(`paperful.item.v1` plus `snapshot` / `restore`), proven on **Zotero**. Mendeley
+and EndNote adapters are not 1.0 until testers have exercised them. Not a GUI,
+not OCR, not a WebDAV client, and not “AI fetch everything.”
 
 (trust-10)=
-## 0.1 → 1.0 (trust)
+## 0.1 → 1.0 (trust + sidecar contract)
 
-`0.1` is a first usable gap-filler. Do not call it **1.0** until these land.
-Do **not** grow this list into a second product (no GUI, no auto Sci-Hub, no
-“AI fetch everything”).
+`0.1` is a first usable sidecar beside Zotero. Do not call it **1.0** until
+these land. Do **not** grow this list into a second product (no GUI, no auto
+Sci-Hub, no “AI fetch everything”).
 
 | Step | UX outcome | Status |
 | --- | --- | --- |
@@ -29,14 +30,45 @@ Do **not** grow this list into a second product (no GUI, no auto Sci-Hub, no
 | Exit **2** + next-steps when Zotero is down (`collections` / `run` / `attach`) | Fresh clone never dead-ends | Shipped |
 | Slim README + [CHANGELOG](../CHANGELOG.md) known limits | Trust before install | Shipped |
 | Lock `paperful.run_report.v1` | Trust for agents | Named schema; not frozen |
+| Lock `paperful.item.v1` and `snapshot` / `restore` (additive keys only after 1.0) | Trust for the disk ledger | Named schema; 0.x may add keys. Behaviour shipped |
+| **Mendeley and EndNote adapters** | The ledger survives a manager change | In the tree. **Seeking testers.** Zotero stays the well-tested path. See below |
 
 Nice-to-have (not 1.0 blockers): colour glossary next to `doctor` (documented);
 collection picker hint on fuzzy `--collection` miss.
+
+### Mendeley and EndNote (seeking testers)
+
+The code is in the tree. It has not been proven on real libraries the way
+Zotero has. Do not document either adapter as supported until testers say so.
+
+1. **Mendeley** — `MendeleyBackend` talks to `api.mendeley.com` (no official
+   SDK). OAuth via `paperful session login mendeley`. `supports_write` is true
+   in code. File download must **not** forward the Bearer token on the 303 to
+   object storage. Document `notes` (`view=all`) is read; paperful writes
+   still use annotations. Needs a real library: list, fetch a missing PDF,
+   attach, notes, and a failed auth that prints the next-steps ladder.
+2. **EndNote** — `EndNoteBackend` reads `<Library>.Data/sdb/sdb.eni` (a copy
+   if EndNote holds the lock, including `-journal`). Writes never touch that
+   database: they stage `state/endnote-import/<stamp>/` for File → Import.
+   Trash is refused. SQLite `reference_type` is **not** the XML number
+   (journal is 0 in the DB, 17 in XML). Groups come from `groups.spec` +
+   `members`, not a join table. Testers should confirm a round trip: read a
+   small library, `snapshot`, import the bundle, and check that types and
+   groups (stored only as a Label in XML) match what they expect.
+3. **Still later:** multi-manager-as-equals (conflict journal, virtual
+   collections). A tester report is not that.
 
 ## Core (keep sharpening)
 
 - Resumable missing-PDF fetch, source routing, circuit breaker, EZProxy / Scholar
   session hygiene, attach reliability, `doctor` / `report`
+- **Quiet mirror** — [quiet-mirror.md](quiet-mirror.md). **Shipped:** `snapshot`
+  writes a per-item folder (`record.json`, optional PDF, notes) plus
+  `out/_index.jsonl`, `out/_collections.json`, and `out/_history.json`.
+  `[mirror].pdfs` is `additional` (default), `all`, or `none`. `restore --apply`
+  creates missing items and does not overwrite fields already in Zotero. Dual
+  `imported_file` store; house sync (Syncthing) stays outside paperful. Not a
+  second reading UI. Not a linked-file cutover. Not a WebDAV client.
 - Deterministic `lint` / `fix-metadata` (Crossref / OpenAlex / Semantic Scholar /
   PubMed, PDF-text DOI via pdftotext then pypdf) with explicit `--apply`.
   **Shipped:** verified PDF-DOI → patch; date precision guard; HTML title cleanup;
@@ -52,14 +84,18 @@ collection picker hint on fuzzy `--collection` miss.
   Trash is explicit `--apply`; title+year needs `--apply-medium`. See
   [dedupe](dedupe.md).
 - CORE as an OA PDF source when `core_api_key` is set
-- Library adapter seam (`LibraryBackend`); Mendeley when someone needs it
+- Library adapter seam (`LibraryBackend`). **Zotero is well tested.** Mendeley
+  and EndNote are seeking testers (above).
 
 ## Optional LLM assist (local / LiteLLM)
 
 **Status:** MVP shipped behind `[llm].enabled = false` — Ollama loopback default,
-LiteLLM via `paperful[llm]`. Verbs: `recover` (browser agent, `paperful[browser-agent]`,
+LiteLLM via `paperful[llm]`. Verbs: `recover` (browser agent on `run` after
+other vault lanes fail, plus `paperful recover --item`; `paperful[browser-agent]`,
 Py 3.11+), `fix-metadata` title proposals (`[fix_metadata].llm_title`), `lint`
-`pdf_identity_mismatch` (`[lint].llm_pdf_match`), `summarize` → tagged child note.
+`pdf_identity_mismatch` (`[lint].llm_pdf_match`), `summarize` → tagged child note,
+`synthesize` → literature review from those notes (`state/reports/` and, by
+default, a collection note). Text-layer PDFs only; OCR is later.
 See [architecture § LLM layer](architecture.md#llm-layer-optional-local-first).
 Still later: Browser Use Cloud / BU2, batch `recover --from-last-run`, playbook
 mining from agent traces, venue/date cleanup.
@@ -118,17 +154,18 @@ llm_title = false            # MVP gate; requires [llm].enabled
 **Non-goals for the MVP:** chat-over-library, auto-tagging everything, rewriting
 abstracts, silent cloud defaults, applying patches without `--apply`.
 
-**Later LLM verbs (only after title MVP):** venue/date cleanup from first page;
-“is this PDF the right work?” mismatch check; grounded briefs — still proposals
-on disk.
+**Later LLM verbs:** venue/date cleanup from the first page. Title proposals,
+the PDF identity check, and grounded briefs (`summarize` / `synthesize`) are
+shipped. Still proposals on disk; never a silent library write.
 
 ## Maybe later, not core
 
-Workbench layers that would broaden paperful beyond fetch/lint. Worth keeping
-on the map; not prerequisites for 1.x usefulness.
+Workbench layers beyond the sidecar contract. Worth keeping on the map; not
+prerequisites for the fetch / lint / attach loop.
 
-1. **Catalogue unification** — multi-manager adapters as equals; conflict journal;
-   query-scoped virtual collections as run scopes
+1. **Catalogue unification** — conflict journal; query-scoped virtual collections
+   as run scopes. Mendeley and EndNote adapters exist and are seeking testers
+   (above). Treating every manager as an equal is still later.
 2. **Acquire beyond journal PDFs** — **shipped:** local session vault
    (`paperful session login`); **pluggable grey-lit PDF playbooks** in
    `direct`/`landing` with builtin packs (UNGA/undocs · BBNJ/DOALOS · ISA;
@@ -147,9 +184,10 @@ on the map; not prerequisites for 1.x usefulness.
    That backfill stays out of any scheduled bot inside Paperful.
 4. **File & attachment OS** — linked vs stored policy, rename, orphan GC,
    broken-link repair, PDF quality / wrong-paper triage (eat StorScan-class tools).
-   **Near-term direction (not a product expand):** treat `out/` as a
-   [quiet collection mirror](quiet-mirror.md) (dual bytes with Zotero
-   `imported_file`); house transport (e.g. Syncthing) stays outside paperful.
+   The quiet mirror itself is core (above), not a later bet: dual bytes with
+   Zotero `imported_file`; house transport stays outside paperful. Still not a
+   second reading UI, and still not a linked-file cutover. PDF annotations and
+   a full CSL dump are still later. OCR stays under Reading & knowledge.
 
 ## Maybe later
 
@@ -160,10 +198,14 @@ Larger product bets. Park until the ledger and core loop justify them.
 6. **Writing & export** — CSL / BibLaTeX / Quarto sync; living review / gap lists;
    git-friendly CSL-JSON dumps
 7. **Agent surface** — MCP + CLI sharing one capability API; dry-run defaults;
-   typed source/policy permissions; playbooks. **Shipped (opt-in):**
+   typed source/policy permissions; playbooks. **Shipped (CLI convenience,
+   not a GUI):** named run configs and `paperful all` repeat a collection /
+   year / type sequence (`profiles/*.toml`). Those are not grey-lit playbooks.
+   **Shipped (opt-in):**
    [browser-use](https://github.com/browser-use/browser-use) as a *recovery*
-   lane only (`paperful recover --item`), reusing the session vault — never a
-   default source, not “AI fetch everything.” Soft bot walls may improve with
+   lane: last serial source on `run` after Scholar / EZProxy / htmlpdf fail
+   (`[llm].enabled` + extra), and `paperful recover --item` for named keys.
+   Never in `DEFAULT_SOURCES`, not “AI fetch everything.” Soft bot walls may improve with
    their Cloud stealth (not wired); hard CAPTCHAs stay human. Next: mine
    successful agent paths into grey playbooks so the deterministic fetcher
    stays primary.
@@ -171,8 +213,10 @@ Larger product bets. Park until the ledger and core loop justify them.
    locks; optional headless fetch node. Aligns with the house
    [quiet mirror](quiet-mirror.md) stance: Syncthing (or similar) is transport;
    paperful stays a local CLI, not a sync product.
-9. **Compliance & provenance** — 1.0 attach stamp is listed above; later:
-   per-PDF chain of custody, more jurisdictional presets, reproducible run records
+9. **Compliance & provenance** — 1.0 attach stamp is listed above. On disk,
+   `record.json` plus `out/_history.json` are the chain-of-custody note for
+   the library and the append-only ledgers. Still later: more jurisdictional
+   presets, and PDF annotation export.
 
 ## Explicitly out of near-term scope
 
@@ -184,6 +228,7 @@ Larger product bets. Park until the ledger and core loop justify them.
 ## Related docs
 
 - [architecture.md](architecture.md) — disk-first adapters and data flow
-- [quiet-mirror.md](quiet-mirror.md) — `out/` as quiet browsable mirror (direction)
+- [why.md](why.md) — sidecar pitch; what is true today
+- [quiet-mirror.md](quiet-mirror.md) — `out/` as the copy you keep
 - [releases.md](releases.md) — 0.x vs 1.0; known limits
 - [comparison.md](comparison.md) — what paperful does and does not replace today

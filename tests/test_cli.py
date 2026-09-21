@@ -431,6 +431,12 @@ def test_session_login_unknown_slot(cfg_file):
     assert "Unknown slot" in res.stdout
 
 
+def test_session_login_mendeley_needs_app(cfg_file):
+    res = runner.invoke(cli.app, ["session", "login", "mendeley", "-c", str(cfg_file)])
+    assert res.exit_code == 2
+    assert "client_id" in res.stdout
+
+
 def test_mirrors_command(cfg_file, monkeypatch):
     from paperful.config import SCIHUB_DISCLAIMER
 
@@ -611,19 +617,19 @@ def test_attach_command_uses_pending_records(
     m.write(Record(itemKey="K1", status=STATUS_OK, path=str(pdf)))
     m.write(Record(itemKey="K2", status=STATUS_ATTACHED, path=str(pdf)))
 
-    class FakeAttacher:
-        def __init__(self, cfg, zl):
-            pass
-
+    class FakeBackend:
         def supports_write(self):
             return True
 
         def attach(self, key, path, title=None):
             from paperful.attach import AttachResult
 
-            return AttachResult(True, "ATT", "success")
+            return AttachResult(True, attachment_key="ATT", reason="success", code="success")
 
-    monkeypatch.setattr(cli, "Attacher", FakeAttacher)
+        def flush_writes(self):
+            return None
+
+    monkeypatch.setattr(cli, "_connect", lambda cfg, quiet=False: FakeBackend())
     res = runner.invoke(cli.app, ["attach", "-c", str(cfg_file)])
     assert (
         res.exit_code == 0
@@ -636,14 +642,19 @@ def test_attach_command_uses_pending_records(
     )
 
 
-def test_lint_json(cfg_file, stub_zotero, monkeypatch):
+def test_lint_json(cfg_file, stub_zotero, monkeypatch, tmp_path):
     monkeypatch.setattr("paperful.lint.lint_items", lambda *a, **k: [])
     res = runner.invoke(cli.app, ["lint", "-c", str(cfg_file), "--library", "--json"])
     assert res.exit_code == 0
     assert json.loads(res.stdout) == []
+    runs = list((tmp_path / "state" / "runs").glob("*-lint.json"))
+    assert len(runs) == 1
+    data = json.loads(runs[0].read_text())
+    assert data["summary"]["findings"] == 0
+    assert not (tmp_path / "state" / "last-run.json").exists()
 
 
-def test_lint_strict_exits_1(cfg_file, stub_zotero, monkeypatch):
+def test_lint_strict_exits_1(cfg_file, stub_zotero, monkeypatch, tmp_path):
     from paperful.lint import Finding
 
     monkeypatch.setattr(
@@ -653,6 +664,11 @@ def test_lint_strict_exits_1(cfg_file, stub_zotero, monkeypatch):
     res = runner.invoke(cli.app, ["lint", "-c", str(cfg_file), "--library", "--strict"])
     assert res.exit_code == 1
     assert "missing_doi" in res.stdout
+    runs = list((tmp_path / "state" / "runs").glob("*-lint.json"))
+    assert len(runs) == 1
+    data = json.loads(runs[0].read_text())
+    assert data["summary"]["findings"] == 1
+    assert data["items"][0]["status"] == "missing_doi"
 
 
 def test_fix_metadata_dry_run(cfg_file, stub_zotero, tmp_path, monkeypatch):
@@ -663,6 +679,12 @@ def test_fix_metadata_dry_run(cfg_file, stub_zotero, tmp_path, monkeypatch):
     assert "Dry-run" in res.stdout
     assert "0 proposed patches" in res.stdout
     assert (tmp_path / "state" / "metadata-patches.jsonl").exists()
+    runs = list((tmp_path / "state" / "runs").glob("*-fix-metadata.json"))
+    assert len(runs) == 1
+    data = json.loads(runs[0].read_text())
+    assert data["flags"]["apply"] is False
+    assert "patches_applied" not in data["summary"]
+    assert not (tmp_path / "state" / "last-run.json").exists()
 
 
 def test_fix_metadata_apply(cfg_file, stub_zotero, monkeypatch):
@@ -691,14 +713,46 @@ def test_fix_metadata_apply(cfg_file, stub_zotero, monkeypatch):
     assert seen and seen[0][0].after["doi"] == "10.1/x"
 
 
-def test_mendeley_manager_exits(cfg_file, tmp_path):
+def test_mendeley_manager_asks_for_auth(cfg_file, tmp_path):
     cfg_file.write_text(
         f'email = "t@example.org"\nout_dir = "{tmp_path / "out"}"\nstate_dir = "{tmp_path / "state"}"\n'
         'manager = "mendeley"\n'
     )
     res = runner.invoke(cli.app, ["collections", "-c", str(cfg_file)])
-    assert res.exit_code == 1
-    assert "not implemented" in res.stdout
+    assert res.exit_code == 2
+    assert "not authorised" in res.stdout.lower()
+    assert "not implemented" not in res.stdout.lower()
+
+
+def test_import_ris_dry_run(cfg_file, tmp_path):
+    ris = tmp_path / "lib.ris"
+    ris.write_text("TY  - JOUR\nTI  - Hello seas\nER  - \n", encoding="utf-8")
+    res = runner.invoke(cli.app, ["import", str(ris), "-c", str(cfg_file)])
+    assert res.exit_code == 0, res.stdout
+    assert "1 record" in res.stdout
+    assert "Dry run" in res.stdout
+
+
+def test_export_ris_library(cfg_file, stub_zotero, tmp_path):
+    dest = tmp_path / "lib.ris"
+    res = runner.invoke(
+        cli.app, ["export", str(dest), "--library", "-c", str(cfg_file)]
+    )
+    assert res.exit_code == 0, res.stdout
+    text = dest.read_text(encoding="utf-8")
+    assert "TY  - JOUR" in text
+    assert "TI  -" in text
+
+
+def test_restore_dry_run_names_the_library_not_zotero(
+    cfg_file, stub_zotero, tmp_path
+):
+    res = runner.invoke(
+        cli.app, ["restore", "--library", "--dry-run", "-c", str(cfg_file)]
+    )
+    assert res.exit_code == 0, res.stdout
+    assert "into the library" in res.stdout
+    assert "into Zotero" not in res.stdout
 
 
 # ---- LLM verbs: recover / summarize gating -----------------------------------
@@ -750,6 +804,42 @@ def test_recover_dry_run_prints_start_url(tmp_path, stub_zotero, monkeypatch):
     assert not (tmp_path / "state" / "manifest.jsonl").exists()
 
 
+def test_run_dry_run_appends_recover_lane(tmp_path, stub_zotero, monkeypatch):
+    cfg_file = _llm_cfg_file(tmp_path)
+    monkeypatch.setattr(
+        "paperful.browser_agent.browser_agent_extra_available", lambda: True
+    )
+    res = runner.invoke(
+        cli.app,
+        ["run", "-c", str(cfg_file), "--library", "--dry-run"],
+        env={"COLUMNS": "200"},
+    )
+    assert res.exit_code == 0, res.stdout
+    sources_line = res.stdout.split("Sources:")[-1].split("\n")[0]
+    assert "browser_agent" in sources_line
+    assert "htmlpdf" in sources_line
+    assert "Browser recovery is experimental" in res.stdout
+    assert sources_line.index("htmlpdf") < sources_line.index("browser_agent")
+
+
+def test_run_dry_run_skips_recover_lane_when_during_run_off(
+    tmp_path, stub_zotero, monkeypatch
+):
+    cfg_file = _llm_cfg_file(tmp_path, extra="[browser_agent]\nduring_run = false\n")
+    monkeypatch.setattr(
+        "paperful.browser_agent.browser_agent_extra_available", lambda: True
+    )
+    res = runner.invoke(
+        cli.app,
+        ["run", "-c", str(cfg_file), "--library", "--dry-run"],
+        env={"COLUMNS": "200"},
+    )
+    assert res.exit_code == 0, res.stdout
+    sources_line = res.stdout.split("Sources:")[-1].split("\n")[0]
+    assert "browser_agent" not in sources_line
+    assert "Browser recovery is experimental" not in res.stdout
+
+
 def test_recover_unknown_item(tmp_path, stub_zotero, monkeypatch):
     cfg_file = _llm_cfg_file(tmp_path)
     monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model)
@@ -768,7 +858,7 @@ def test_summarize_exits_when_llm_disabled(cfg_file, stub_zotero):
     assert res.exit_code == 1 and "llm.enabled" in res.stdout
 
 
-def test_summarize_dry_run_writes_disk_only(tmp_path, stub_zotero, monkeypatch):
+def test_summarize_default_writes_note_and_disk_only_skips_it(tmp_path, stub_zotero, monkeypatch):
     from tests.conftest import make_item
 
     cfg_file = _llm_cfg_file(tmp_path)
@@ -797,11 +887,49 @@ def test_summarize_dry_run_writes_disk_only(tmp_path, stub_zotero, monkeypatch):
     res = runner.invoke(cli.app, ["summarize", "-c", str(cfg_file), "--item", "I1"])
     assert res.exit_code == 0, res.stdout
     assert (tmp_path / "state" / "summaries" / "I1.html").is_file()
-    assert "--apply" in res.stdout and not B.applied
-
-    res = runner.invoke(cli.app, ["summarize", "-c", str(cfg_file), "--item", "I1", "--apply"])
-    assert res.exit_code == 0, res.stdout
     assert "attached note N1" in res.stdout and len(B.applied) == 1
+    assert "Dry-run" not in res.stdout
+    reports = list((tmp_path / "state" / "runs").glob("*-summarize.json"))
+    assert len(reports) == 1
+    summary = json.loads(reports[0].read_text())
+    assert summary["summary"]["summarized"] == 1
+    assert summary["summary"]["failed"] == 0
+    assert summary["summary"]["dest"] == "both"
+    assert summary["items"][0]["status"] == "summarized"
+    assert not (tmp_path / "state" / "last-run.json").exists()
+
+    res = runner.invoke(
+        cli.app, ["summarize", "-c", str(cfg_file), "--item", "I1", "--to", "disk"]
+    )
+    assert res.exit_code == 0, res.stdout
+    assert "Zotero not written" in res.stdout and len(B.applied) == 1
+
+    res = runner.invoke(
+        cli.app,
+        ["summarize", "-c", str(cfg_file), "--item", "I1", "--to", "disk", "--apply"],
+    )
+    assert res.exit_code == 1 and "--apply" in res.stdout
+
+
+def test_synthesize_report_collection_conflicts_with_disk(tmp_path, stub_zotero, monkeypatch):
+    cfg_file = _llm_cfg_file(tmp_path)
+    monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model)
+    res = runner.invoke(
+        cli.app,
+        [
+            "synthesize",
+            "-c",
+            str(cfg_file),
+            "--item",
+            "I1",
+            "--to",
+            "disk",
+            "--report-collection",
+            "BBNJ",
+        ],
+    )
+    assert res.exit_code == 1, res.stdout
+    assert "--report-collection" in res.stdout
 
 
 def test_summarize_remote_egress_notice(tmp_path, stub_zotero, monkeypatch):
@@ -843,3 +971,164 @@ def test_doctor_llm_enabled_amber_when_unreachable(tmp_path, stub_zotero, monkey
     assert res.exit_code == 0
     assert "LLM" in res.stdout and "unreachable" in res.stdout
     assert "browser-agent extra" in res.stdout
+
+
+def test_synthesize_requires_scope(cfg_file):
+    res = runner.invoke(cli.app, ["synthesize", "-c", str(cfg_file)])
+    assert res.exit_code == 1 and "--item" in res.stdout
+
+
+def test_synthesize_exits_when_llm_disabled(cfg_file, stub_zotero):
+    res = runner.invoke(cli.app, ["synthesize", "-c", str(cfg_file), "--item", "I1"])
+    assert res.exit_code == 1 and "llm.enabled" in res.stdout
+
+
+def test_synthesize_library_needs_a_collection_for_zotero(tmp_path, stub_zotero, monkeypatch):
+    cfg_file = _llm_cfg_file(tmp_path)
+    monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model)
+
+    class B:
+        def items_in_scope(self, keys):
+            return []
+
+        def read_child_note(self, *a):
+            return None
+
+    monkeypatch.setattr(cli, "get_backend", lambda cfg, zl: B())
+    res = runner.invoke(cli.app, ["synthesize", "-c", str(cfg_file), "--library"])
+    assert res.exit_code == 1, res.stdout
+    assert "--report-collection" in res.stdout
+
+
+def test_synthesize_dry_run_and_disk_report(tmp_path, stub_zotero, monkeypatch):
+    from tests.conftest import make_item
+
+    cfg_file = _llm_cfg_file(tmp_path)
+    monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model)
+    summary = tmp_path / "state" / "summaries"
+    summary.mkdir(parents=True)
+    (summary / "I1.html").write_text("<h2>Objective</h2><p>Governance.</p>", encoding="utf-8")
+    calls = []
+
+    class B:
+        notes = []
+
+        def get_item(self, k):
+            return make_item(key=k, has_pdf=True)
+
+        def read_child_note(self, *a):
+            return None
+
+        def create_or_update_collection_note(self, *a):
+            self.notes.append(a)
+            return "R1"
+
+    class Stub:
+        def complete(self, req):
+            calls.append(req.prompt)
+            return "<h2>Themes</h2><p>See [Smith 2019].</p>"
+
+    monkeypatch.setattr(cli, "get_backend", lambda cfg, zl: B())
+    monkeypatch.setattr("paperful.llm.get_client", lambda cfg: Stub())
+    res = runner.invoke(
+        cli.app, ["synthesize", "-c", str(cfg_file), "--item", "I1", "--to", "disk", "--dry-run"]
+    )
+    assert res.exit_code == 0, res.stdout
+    assert "1 on disk" in res.stdout and not calls
+    assert not (tmp_path / "state" / "reports").exists()
+
+    res = runner.invoke(
+        cli.app, ["synthesize", "-c", str(cfg_file), "--item", "I1", "--to", "disk"]
+    )
+    assert res.exit_code == 0, res.stdout
+    reports = list((tmp_path / "state" / "reports").glob("*.html"))
+    assert len(reports) == 1 and "Paperful report:" in reports[0].read_text()
+    assert list((tmp_path / "state" / "reports").glob("*.json"))
+    assert list((tmp_path / "state" / "runs").glob("*-synthesize.json"))
+    assert not B.notes and len(calls) == 1
+
+    res = runner.invoke(
+        cli.app, ["synthesize", "-c", str(cfg_file), "--item", "I1", "--to", "disk"]
+    )
+    assert res.exit_code == 0, res.stdout
+    assert "up to date" in res.stdout and len(calls) == 1
+
+
+def test_pack_second_open_exits(cfg_file, tmp_path):
+    res = runner.invoke(
+        cli.app, ["pack", "open", "-c", str(cfg_file), "--label", "bbnj"]
+    )
+    assert res.exit_code == 0, res.stdout
+    pack_id = res.stdout.strip()
+    assert (tmp_path / "state" / "packs" / "current").read_text().strip() == pack_id
+    again = runner.invoke(cli.app, ["pack", "open", "-c", str(cfg_file)])
+    assert again.exit_code == 1
+    assert "still open" in again.stdout
+
+
+def test_gaps_joins_open_pack_unless_opted_out(cfg_file, stub_zotero, tmp_path, monkeypatch):
+    opened = runner.invoke(cli.app, ["pack", "open", "-c", str(cfg_file)])
+    assert opened.exit_code == 0, opened.stdout
+    pack_id = opened.stdout.strip()
+    res = runner.invoke(
+        cli.app, ["gaps", "-c", str(cfg_file), "--library", "--json"]
+    )
+    assert res.exit_code == 0, res.stdout
+    payload = json.loads(res.stdout)
+    assert payload["items"] == 2
+    assert payload["no_stored_pdf"] == 1
+    runs = list((tmp_path / "state" / "runs").glob("*-gaps.json"))
+    assert len(runs) == 1
+    report = json.loads(runs[0].read_text())
+    assert report["command"] == "gaps"
+    assert report["items"][0]["itemKey"] == "I2"
+    pack = json.loads((tmp_path / "state" / "packs" / f"{pack_id}.json").read_text())
+    assert pack["status"] == "open"
+    assert pack["steps"][0]["command"] == "gaps"
+    assert pack["scope"]
+    assert not (tmp_path / "state" / "last-run.json").exists()
+
+    monkeypatch.setenv("PAPERFUL_PACK", "off")
+    again = runner.invoke(
+        cli.app, ["gaps", "-c", str(cfg_file), "--library", "--json"]
+    )
+    assert again.exit_code == 0, again.stdout
+    pack = json.loads((tmp_path / "state" / "packs" / f"{pack_id}.json").read_text())
+    assert len(pack["steps"]) == 1
+    assert list((tmp_path / "state" / "runs").glob("*-gaps.json"))
+
+
+def test_pack_close_and_show_json(cfg_file, stub_zotero, tmp_path):
+    runner.invoke(cli.app, ["pack", "open", "-c", str(cfg_file), "--label", "bbnj"])
+    runner.invoke(cli.app, ["gaps", "-c", str(cfg_file), "--library"])
+    closed = runner.invoke(cli.app, ["pack", "close", "-c", str(cfg_file)])
+    assert closed.exit_code == 0, closed.stdout
+    assert "Closed" in closed.stdout
+    assert not (tmp_path / "state" / "packs" / "current").exists()
+    missing = runner.invoke(cli.app, ["pack", "close", "-c", str(cfg_file)])
+    assert missing.exit_code == 1
+
+    shown = runner.invoke(cli.app, ["pack", "show", "-c", str(cfg_file), "--json"])
+    assert shown.exit_code == 0, shown.stdout
+    data = json.loads(shown.stdout)
+    assert data["status"] == "closed"
+    assert data["label"] == "bbnj"
+    assert data["steps"][0]["summary"]["items"] == 2
+    assert "itemKey" not in json.dumps(data["steps"])
+
+
+def test_pack_show_human_table_and_empty(cfg_file, stub_zotero, tmp_path):
+    empty = runner.invoke(cli.app, ["pack", "show", "-c", str(cfg_file)])
+    assert empty.exit_code == 0
+    assert "No pack yet" in empty.stdout
+
+    runner.invoke(cli.app, ["pack", "open", "-c", str(cfg_file)])
+    runner.invoke(cli.app, ["gaps", "-c", str(cfg_file), "--library"])
+    shown = runner.invoke(cli.app, ["pack", "show", "-c", str(cfg_file)])
+    assert shown.exit_code == 0, shown.stdout
+    assert "gaps" in shown.stdout
+    assert "no PDF" in shown.stdout
+    assert "missing DOI" in shown.stdout
+    assert not (tmp_path / "state" / "last-run.json").exists()
+
+

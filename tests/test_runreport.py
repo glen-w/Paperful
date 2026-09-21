@@ -6,6 +6,7 @@ import io
 import json
 
 import httpx
+import pytest
 from rich.console import Console
 
 from paperful import pipeline as pl
@@ -147,3 +148,148 @@ def test_print_run_summary_renders(cfg):
     assert "Sources checked" in out
     assert "Errors" in out
     assert "Run report:" in out
+
+
+def test_write_run_report_skips_pack_when_none_open(cfg):
+    report = {
+        "schema": "paperful.run_report.v1",
+        "command": "gaps",
+        "summary": {"items": 1},
+        "items": [],
+    }
+    path = write_run_report(cfg, report, as_last_run=False)
+    assert path is not None and path.exists()
+    assert not (cfg.state_dir / "packs").exists()
+    assert not (cfg.state_dir / "last-run.json").exists()
+
+
+def test_pack_open_append_opt_out_close_show(cfg, monkeypatch):
+    import pytest
+
+    from paperful.pack import PackError, close_pack, open_pack, show_payload
+
+    pack = open_pack(cfg, label="bbnj")
+    assert (cfg.state_dir / "packs" / "current").read_text().strip() == pack["id"]
+    report = {
+        "schema": "paperful.run_report.v1",
+        "command": "gaps",
+        "scope": "BBNJ",
+        "started_at": "2026-09-21T03:00:00+00:00",
+        "finished_at": "2026-09-21T03:00:02+00:00",
+        "summary": {
+            "items": 2,
+            "no_stored_pdf": 1,
+            "linked_url_only": 0,
+            "missing_doi": 0,
+        },
+        "items": [{"itemKey": "I2", "title": "T", "status": "no_stored_pdf"}],
+    }
+    path = write_run_report(cfg, report, as_last_run=False)
+    assert path is not None
+    saved = json.loads((cfg.state_dir / "packs" / f"{pack['id']}.json").read_text())
+    assert saved["scope"] == "BBNJ"
+    assert saved["steps"][0]["command"] == "gaps"
+    assert saved["steps"][0]["report"] == path.name
+    assert "itemKey" not in saved["steps"][0]
+
+    monkeypatch.setenv("PAPERFUL_PACK", "off")
+    write_run_report(cfg, {**report, "command": "lint"}, as_last_run=False)
+    saved = json.loads((cfg.state_dir / "packs" / f"{pack['id']}.json").read_text())
+    assert len(saved["steps"]) == 1
+
+    monkeypatch.delenv("PAPERFUL_PACK", raising=False)
+    closed = close_pack(cfg)
+    assert closed["status"] == "closed"
+    assert closed["closed_at"]
+    assert not (cfg.state_dir / "packs" / "current").exists()
+    shown = show_payload(cfg, closed)
+    assert shown["steps"][0]["summary"]["items"] == 2
+    assert "itemKey" not in shown["steps"][0]
+
+    with pytest.raises(PackError):
+        close_pack(cfg)
+    open_pack(cfg)
+    with pytest.raises(PackError):
+        open_pack(cfg)
+
+
+def test_blank_label_is_omitted_and_scope_sticks(cfg):
+    from paperful.pack import open_pack
+
+    pack = open_pack(cfg, label="   ")
+    assert "label" not in pack
+    first = {
+        "schema": "paperful.run_report.v1",
+        "command": "gaps",
+        "scope": "BBNJ",
+        "summary": {"items": 1},
+        "items": [],
+    }
+    write_run_report(cfg, first, as_last_run=False)
+    write_run_report(
+        cfg,
+        {**first, "command": "lint", "scope": "other"},
+        as_last_run=False,
+    )
+    saved = json.loads((cfg.state_dir / "packs" / f"{pack['id']}.json").read_text())
+    assert saved["scope"] == "BBNJ"
+    assert [step["command"] for step in saved["steps"]] == ["gaps", "lint"]
+
+
+def test_closed_or_corrupt_pack_does_not_append(cfg):
+    from paperful.pack import PackError, close_pack, open_pack
+
+    pack = open_pack(cfg)
+    path = cfg.state_dir / "packs" / f"{pack['id']}.json"
+    data = json.loads(path.read_text())
+    data["status"] = "closed"
+    path.write_text(json.dumps(data))
+    write_run_report(
+        cfg,
+        {"command": "lint", "scope": "X", "summary": {"findings": 1}, "items": []},
+        as_last_run=False,
+    )
+    assert json.loads(path.read_text())["steps"] == []
+
+    path.write_text("{not json")
+    write_run_report(
+        cfg,
+        {"command": "gaps", "summary": {}, "items": []},
+        as_last_run=False,
+    )
+    assert path.read_text().startswith("{not")
+
+    path.unlink()
+    with pytest.raises(PackError, match="missing"):
+        close_pack(cfg)
+    assert not (cfg.state_dir / "packs" / "current").exists()
+
+
+def test_show_payload_omits_missing_child_items(cfg):
+    from paperful.pack import headline, show_payload
+
+    pack = {
+        "schema": "paperful.pack.v1",
+        "id": "x",
+        "status": "closed",
+        "scope": "BBNJ",
+        "steps": [{"command": "gaps", "report": "missing-gaps.json"}],
+    }
+    shown = show_payload(cfg, pack)
+    assert shown["steps"][0]["summary"] == {}
+    assert shown["steps"][0]["duration_s"] is None
+    assert "items" not in shown["steps"][0]["summary"] or shown["steps"][0]["summary"] == {}
+
+    assert "findings 3" == headline("lint", {"findings": 3, "findings_by_code": {}})
+    assert "summarized 2, failed 1" == headline(
+        "summarize", {"summarized": 2, "failed": 1, "dest": "both"}
+    )
+    assert headline("fix-metadata", {"patches_proposed": 4}) == "proposed 4"
+    assert headline("fix-metadata", {"patches_proposed": 4, "patches_applied": 3}) == (
+        "applied 3/4"
+    )
+    assert "downloaded 2" in headline(
+        "run", {"pdfs_downloaded": 2, "attached": 1, "not_found": 9}
+    )
+    assert headline("synthesize", {"included": 5, "missing": 1}) == "included 5, missing 1"
+    assert headline("other", {"ok": True, "n": 2}) == "n 2"

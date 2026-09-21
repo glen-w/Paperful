@@ -34,6 +34,9 @@ _HTMLPDF_ITEM_TYPES = frozenset(
         "report",
     }
 )
+# Playwright vault lanes. `run` auto-appends `browser_agent` after the last of
+# these, and only invokes the agent when one of them was tried and failed.
+BROWSER_LANES = frozenset({"scholar", "ezproxy", "htmlpdf"})
 _BIORXIV_DOI = re.compile(r"^10\.1101/", re.IGNORECASE)
 _BIORXIV_URL = re.compile(
     r"(?:bio|med)rxiv\.org/content/(?:[^/\s]+/)*(10\.1101/\d+(?:\.\d+)*)(?:v\d+)?",
@@ -56,6 +59,49 @@ def is_block_failure(outcome: Outcome, note: str = "") -> bool:
 def sources_for_item(item: Item, cfg: Config, sources: list[str]) -> list[str]:
     """Return configured sources that look applicable to this item's metadata."""
     return [name for name in sources if source_applicable(item, cfg, name)]
+
+
+def browser_lane_failed(attempts: list[str]) -> bool:
+    """True when a vault browser lane was tried and did not yield a PDF.
+
+    ``skipped(not applicable)`` does not count: recover is a fallback after
+    Scholar / EZProxy / htmlpdf actually fail, not a substitute for them.
+    """
+    for entry in attempts:
+        name, sep, rest = entry.partition(":")
+        if not sep or name not in BROWSER_LANES:
+            continue
+        if rest.startswith("skipped(not applicable)"):
+            continue
+        return True
+    return False
+
+
+def with_recover_lane(cfg: Config, sources: list[str]) -> list[str]:
+    """Insert ``browser_agent`` after other browser lanes when recover can auto-fire.
+
+    Stays out of ``DEFAULT_SOURCES``. Opt-in is ``[llm].enabled`` (and
+    ``[browser_agent].during_run``, the extra, and Python 3.11+). Inserted
+    after the last of scholar / ezproxy / htmlpdf so Sci-Hub stays last.
+    """
+    listed = list(sources)
+    if "browser_agent" in listed:
+        return listed
+    if not cfg.llm_enabled or not cfg.browser_agent_during_run:
+        return listed
+    if not any(name in BROWSER_LANES for name in listed):
+        return listed
+    import sys
+
+    if sys.version_info < (3, 11):
+        return listed
+    from .browser_agent import browser_agent_extra_available
+
+    if not browser_agent_extra_available():
+        return listed
+    last = max(i for i, name in enumerate(listed) if name in BROWSER_LANES)
+    listed.insert(last + 1, "browser_agent")
+    return listed
 
 
 def filter_sources_for_item_types(

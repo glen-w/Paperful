@@ -17,6 +17,7 @@ def test_defaults_when_no_file(tmp_path, monkeypatch):
     assert cfg.scholar_cookie_path == cfg.state_dir / "scholar-cookies.txt"
     assert "scihub" not in cfg.sources
     assert cfg.attach is True and cfg.concurrency_oa == 4
+    assert cfg.mirror_pdfs == "additional"
 
 
 def test_load_explicit_file_resolves_relative_paths(tmp_path):
@@ -87,6 +88,41 @@ core_api_key = "abc"
     assert cfg.verify_doi is False
     assert cfg.doi_suspect_score == 0.5
     assert cfg.core_api_key == "abc"
+
+
+def test_load_mendeley_and_endnote_sections(tmp_path):
+    enl = tmp_path / "Lib.enl"
+    enl.write_bytes(b"x")
+    p = tmp_path / "config.toml"
+    p.write_text(
+        f"""
+email = "me@example.org"
+manager = "mendeley"
+[mendeley]
+client_id = "cid"
+client_secret = "csec"
+redirect_uri = "http://127.0.0.1:9999/cb"
+[endnote]
+library = "{enl}"
+"""
+    )
+    cfg = load_config(p)
+    assert cfg.manager == "mendeley"
+    assert cfg.mendeley_client_id == "cid"
+    assert cfg.mendeley_client_secret == "csec"
+    assert cfg.mendeley_redirect_uri == "http://127.0.0.1:9999/cb"
+    assert cfg.endnote_library == enl.resolve()
+
+
+def test_mirror_pdfs_mode(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text('email = "me@example.org"\n\n[mirror]\npdfs = "all"\n')
+    cfg = load_config(p)
+    assert cfg.mirror_pdfs == "all"
+    bad = tmp_path / "bad.toml"
+    bad.write_text('email = "me@example.org"\n\n[mirror]\npdfs = "everything"\n')
+    with pytest.raises(ValueError, match="pdfs"):
+        load_config(bad)
 
 
 def test_example_config_toml_parses_and_omits_scihub_by_default():

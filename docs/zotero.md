@@ -77,8 +77,8 @@ read is **412**. A missing or bad key on a write is **401**.
 
 **Paperful attaches `imported_file` only:** the PDF is already under `out/`,
 then uploaded (md5, filename, filesize, mtime) and registered. It builds the
-attachment JSON itself and does not call `/items/new`. Summary notes
-(`summarize --apply`) are posted the same way. Filename spaces are
+attachment JSON itself and does not call `/items/new`. Summary child notes
+and `synthesize` collection notes are posted the same way. Filename spaces are
 encoded as `%20`, not `+`.
 
 `linked_url` (including a quota workaround that only stores a URL) is not a
@@ -104,10 +104,11 @@ browser, or with [EZProxy](ezproxy.md), and attach the PDF — or trash the empt
 attachment and run `paperful attach`.
 
 When Zotero File Storage is full, attach can fail while the PDF remains in
-`out/`. Free space (empty the trash permanently, upgrade, or WebDAV for the
-personal library) and attach later. Linked URLs do not use file quota and are
+`out/`. That folder is the warehouse: free space in Zotero (empty the trash
+permanently, upgrade, or WebDAV for the personal library) and attach later.
+Paperful does not speak WebDAV. Linked URLs do not use file quota and are
 not a substitute. Groups cannot use linked files; group files sync only through
-Zotero Storage.
+Zotero Storage. See [Why paperful](why.md) and [Quiet mirror](quiet-mirror.md).
 
 In Zotero 10 the settings pane is **Account** (older builds still say Sync).
 Turn file sync on for this data directory, or right-click the attachment →
@@ -161,7 +162,8 @@ uv run paperful run -C BBNJ --year-from 2023 --year-to 2026 -T journalArticle
 `--type` accepts the built-in Zotero type ids (`journalArticle`, `report`,
 `preprint`, …) or friendly labels (`Journal Article`). See
 [Commands — Scope filters](commands.md#scope-filters). Year and type also
-apply to `lint`, `fix-metadata`, `dedupe`, `gaps`, and `summarize`.
+apply to `lint`, `fix-metadata`, `dedupe`, `gaps`, `summarize`, `synthesize`,
+`snapshot`, and `restore`.
 
 ## Local API vs web API
 

@@ -10,6 +10,7 @@ into the paperful profile. Use `--engine playwright` only as a fallback.
 ```sh
 uv run paperful session login scholar
 uv run paperful session login ezproxy
+uv run paperful session login mendeley   # Elsevier OAuth; not the Chromium vault
 uv run paperful session login scholar --engine chrome      # force system Chrome
 uv run paperful session login scholar --engine playwright  # Playwright window
 uv run paperful session status
@@ -23,9 +24,13 @@ so a publisher login can apply. EZProxy landing pages and publisher PDFs that
 403 on a cookie-only GET (ScienceDirect `/pdfft`, …) are fetched in this
 profile too; exported cookies remain a fallback for httpx.
 
-`paperful recover` (opt-in browser agent) launches its own Chromium on this same
-profile, so the normal `BrowserSession` is not opened during `recover`; do not run
-`run` and `recover` at the same time against one vault.
+`paperful recover` and the auto `browser_agent` lane on `run` launch Chromium on this same
+profile. `run` closes the Playwright `BrowserSession` before that lane so the
+agent can take the profile; do not run a second `run` or `recover` against the
+same vault at the same time.
+
+`session login mendeley` is **not** this vault: it opens Elsevier’s OAuth page
+and stores tokens in `state/mendeley-oauth.json`. See [Mendeley](mendeley.md).
 
 Never commit `state/sessions/` or cookie files; never paste them into chat.
 

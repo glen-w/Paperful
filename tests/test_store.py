@@ -1,5 +1,6 @@
 import hashlib
 import os
+from pathlib import Path
 
 from paperful.store import (
     STATUS_ATTACHED,
@@ -8,6 +9,8 @@ from paperful.store import (
     STATUS_OK,
     Manifest,
     Record,
+    item_dirname,
+    item_filename,
     resolve_pdf_path,
     safe_filename,
     save_pdf,
@@ -52,16 +55,77 @@ def _item(key="ABCD1234", paths=None):
 def test_save_pdf_writes_primary_and_hardlinks_extras(tmp_path):
     content = b"%PDF-1.4 fake"
     md5 = hashlib.md5(content).hexdigest()
-    primary, extras = save_pdf(tmp_path, _item(paths=["BBNJ/sub", "AO"]), content, md5)
-    assert primary == tmp_path / "BBNJ" / "sub" / "Smith - 2020 - A paper.pdf"
+    item = _item(paths=["BBNJ/sub", "AO"])
+    primary, extras = save_pdf(tmp_path, item, content, md5)
+    folder = item_dirname(item)
+    name = item_filename(item)
+    assert primary == tmp_path / "BBNJ" / "sub" / folder / name
     assert primary.read_bytes() == content
-    assert (
-        len(extras) == 1 and extras[0] == tmp_path / "AO" / "Smith - 2020 - A paper.pdf"
-    )
+    assert len(extras) == 1 and extras[0] == tmp_path / "AO" / folder / name
     assert os.stat(primary).st_ino == os.stat(extras[0]).st_ino  # hardlink
 
 
-def test_unique_path_reuses_identical_and_suffixes_different(tmp_path):
+def test_write_fetch_records_sits_beside_each_copy(tmp_path):
+    import json
+
+    from paperful.store import ITEM_SCHEMA, record_path, write_fetch_records
+
+    content = b"%PDF-1.4 fake"
+    md5 = hashlib.md5(content).hexdigest()
+    item = _item(paths=["BBNJ/sub", "AO"])
+    item.publication_title = "Marine Policy"
+    item.date = "2020-03"
+    primary, extras = save_pdf(tmp_path, item, content, md5)
+    written = write_fetch_records(
+        [primary, *extras],
+        item,
+        md5=md5,
+        source="unpaywall",
+        fetched_url="https://oa.test/a.pdf",
+        pdf_doi="10.1/x",
+    )
+    assert written == [record_path(primary.parent), record_path(extras[0].parent)]
+    cards = [json.loads(p.read_text()) for p in written]
+    assert cards[0]["schema"] == ITEM_SCHEMA
+    assert cards[0]["item_key"] == "ABCD1234"
+    assert cards[0]["fetch"]["source"] == "unpaywall"
+    assert cards[0]["fetch"]["fetched_url"] == "https://oa.test/a.pdf"
+    assert cards[0]["pdf_doi"] == "10.1/x"
+    assert cards[0]["fetch"]["md5"] == md5
+    assert cards[0]["fetch"]["pdf"] == primary.name
+    assert cards[1]["fetch"]["pdf"] == extras[0].name
+    assert cards[0]["fetch"]["fetched_at"] == cards[1]["fetch"]["fetched_at"]
+    assert cards[0]["publication_title"] == "Marine Policy"
+    write_fetch_records(
+        [primary],
+        item,
+        md5=md5,
+        source="ezproxy",
+        fetched_url="https://proxy.test/a.pdf",
+        pdf_doi=None,
+    )
+    again = json.loads(record_path(primary.parent).read_text())
+    assert again["fetch"]["source"] == "ezproxy" and again["pdf_doi"] is None
+
+
+def test_save_pdf_moves_a_flat_file_into_the_item_folder(tmp_path):
+    import json
+
+    item = _item(paths=["BBNJ/sub"])
+    content = b"%PDF-1.4 old"
+    flat = tmp_path / "BBNJ" / "sub"
+    flat.mkdir(parents=True)
+    name = item_filename(item)
+    (flat / name).write_bytes(content)
+    (flat / f"{Path(name).stem}.paperful.json").write_text(
+        json.dumps({"item_key": item.key, "source": "unpaywall", "title": item.title})
+    )
+    primary, extras = save_pdf(tmp_path, item, content, hashlib.md5(content).hexdigest())
+    assert extras == []
+    assert primary.parent.name == item_dirname(item)
+    assert not (flat / name).exists()
+    body = json.loads((primary.parent / "record.json").read_text())
+    assert body["fetch"]["source"] == "unpaywall"
     existing = tmp_path / "x.pdf"
     existing.write_bytes(b"same")
     same_md5 = hashlib.md5(b"same").hexdigest()

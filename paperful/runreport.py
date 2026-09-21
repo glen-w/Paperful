@@ -176,9 +176,55 @@ def write_run_report(
         path.write_text(text)
         if as_last_run:
             (cfg.state_dir / "last-run.json").write_text(text)
+        from .pack import note_pack_step
+
+        note_pack_step(cfg, report, path)
         return path
     except OSError:
         return None
+
+
+def write_command_report(
+    cfg: Config,
+    *,
+    command: str,
+    scope: str,
+    summary: dict[str, Any],
+    items: list[dict[str, Any]],
+    flags: dict[str, Any] | None = None,
+    started: float | None = None,
+    finished: float | None = None,
+    errors: list[str] | None = None,
+    extra_paths: dict[str, str] | None = None,
+) -> Path | None:
+    """Write a `paperful.run_report.v1` file without replacing `last-run.json`."""
+    finished_ts = finished if finished is not None else time.time()
+    paths = {
+        "out_dir": str(cfg.out_dir),
+        "manifest": str(cfg.manifest_path),
+        "state_dir": str(cfg.state_dir),
+    }
+    if extra_paths:
+        paths.update(extra_paths)
+    report: dict[str, Any] = {
+        "schema": "paperful.run_report.v1",
+        "command": command,
+        "started_at": (
+            datetime.fromtimestamp(started, tz=timezone.utc).isoformat()
+            if started
+            else None
+        ),
+        "finished_at": datetime.fromtimestamp(finished_ts, tz=timezone.utc).isoformat(),
+        "duration_s": round(finished_ts - started, 2) if started else None,
+        "scope": scope,
+        "flags": flags or {},
+        "paths": paths,
+        "summary": summary,
+        "items": items,
+    }
+    if errors is not None:
+        report["errors"] = errors
+    return write_run_report(cfg, report, as_last_run=False)
 
 
 def print_run_summary(

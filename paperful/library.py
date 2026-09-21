@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Protocol
 
-from .attach import Attacher
+from .attach import AttachResult, Attacher
 from .config import Config
 from .zot import Collection, Item, ZoteroLocal, is_pdf_attachment
 
@@ -22,6 +22,19 @@ def note_payload(html: str, tag: str, parent_item: str) -> dict[str, Any]:
         "parentItem": parent_item,
         "tags": [{"tag": tag}],
         "collections": [],
+        "relations": {},
+    }
+
+
+def collection_note_payload(
+    html: str, tags: list[str], collection_key: str
+) -> dict[str, Any]:
+    """A top-level note filed in one collection (no parent item)."""
+    return {
+        "itemType": "note",
+        "note": html,
+        "tags": [{"tag": tag} for tag in tags],
+        "collections": [collection_key],
         "relations": {},
     }
 
@@ -67,23 +80,42 @@ class LibraryBackend(Protocol):
     def items_in_scope(self, collection_keys: list[str] | None) -> list[Item]: ...
     def count_linked_url_only(self, collection_keys: list[str] | None) -> int: ...
     def get_item(self, key: str) -> Item | None: ...
+    def raw_item(self, key: str) -> dict[str, Any] | None: ...
+    def children(self, key: str) -> list[dict[str, Any]]: ...
     def export_pdf(self, item: Item, dest: Path) -> Path | None: ...
     def apply_patch(self, item_key: str, fields: dict[str, Any]) -> None: ...
     def trash_item(self, item_key: str) -> None: ...
     def find_child_note_keys(self, item_key: str, tag: str) -> list[str]: ...
+    def read_child_note(self, item_key: str, tag: str) -> str | None: ...
     def create_or_update_note(
         self, item_key: str, html: str, tag: str
     ) -> str: ...
+    def find_collection_note_keys(self, collection_key: str, tag: str) -> list[str]: ...
+    def create_or_update_collection_note(
+        self, collection_key: str, html: str, tags: list[str]
+    ) -> str: ...
     def supports_write(self) -> bool: ...
+    def ensure_collection_path(self, path: str) -> str: ...
+    def create_parent(self, data: dict[str, Any]) -> str: ...
+    def attach(
+        self, item_key: str, pdf_path: Path, title: str | None = None
+    ) -> AttachResult: ...
+    def flush_writes(self) -> Path | None: ...
 
 
 def get_backend(cfg: Config, zl: ZoteroLocal | None = None) -> LibraryBackend:
     manager = (cfg.manager or "zotero").strip().lower()
     if manager == "mendeley":
-        raise LibraryError('Mendeley is not implemented yet. Set manager = "zotero".')
+        from .mendeley import MendeleyBackend
+
+        return MendeleyBackend(cfg)
+    if manager == "endnote":
+        from .endnote import EndNoteBackend
+
+        return EndNoteBackend(cfg)
     if manager != "zotero":
         raise LibraryError(
-            f"Unknown manager {manager!r}. Known: zotero (mendeley later)."
+            f"Unknown manager {manager!r}. Known: zotero, mendeley, endnote."
         )
     return ZoteroBackend(cfg, zl)
 
@@ -136,6 +168,55 @@ class ZoteroBackend:
             if not self._attacher.authorize():
                 raise LibraryError("write authorisation denied in Zotero")
 
+    def ensure_collection_path(self, path: str) -> str:
+        """Return the key for ``path``, creating missing segments. Does not rename."""
+        self._ensure_write()
+        parts = [p for p in path.strip("/").split("/") if p]
+        if not parts:
+            raise LibraryError(f"empty collection path {path!r}")
+        parent: str | None = None
+        built: list[str] = []
+        for part in parts:
+            built.append(part)
+            sofar = "/".join(built)
+            self.zl._collections = None
+            found = next(
+                (c for c in self.collections().values() if c.path == sofar), None
+            )
+            if found is not None:
+                parent = found.key
+                continue
+            payload: dict[str, Any] = {"name": part}
+            if parent:
+                payload["parentCollection"] = parent
+            result = self.zl.zot.create_collections([payload])
+            parent = created_item_key(result)
+            if not parent:
+                raise LibraryError(f"Zotero did not return a key for collection {sofar}")
+            self.zl._collections = None
+        if parent is None:
+            raise LibraryError(f"could not resolve collection {path!r}")
+        return parent
+
+    def create_parent(self, data: dict[str, Any]) -> str:
+        """Create a top-level bibliographic item. Returns the new key."""
+        self._ensure_write()
+        result = self.zl.zot.create_items([data])
+        key = created_item_key(result)
+        if not key:
+            raise LibraryError("Zotero did not return a key for the new item")
+        return key
+
+    def attach(
+        self, item_key: str, pdf_path: Path, title: str | None = None
+    ) -> AttachResult:
+        self._ensure_write()
+        assert self._attacher is not None
+        return self._attacher.attach(item_key, pdf_path, title)
+
+    def flush_writes(self) -> Path | None:
+        return None
+
     def get_item(self, key: str) -> Item | None:
         from .zot import item_from_json
 
@@ -158,6 +239,20 @@ class ZoteroBackend:
         return item_from_json(
             raw, cols, None, has_pdf=has_pdf, has_linked_url=has_linked
         )
+
+    def raw_item(self, key: str) -> dict[str, Any] | None:
+        try:
+            raw = self.zl.zot.item(key)
+        except Exception:
+            return None
+        return raw if isinstance(raw, dict) else None
+
+    def children(self, key: str) -> list[dict[str, Any]]:
+        try:
+            kids = self.zl.zot.children(key)
+        except Exception:
+            return []
+        return [ch for ch in kids if isinstance(ch, dict)]
 
     def export_pdf(self, item: Item, dest: Path) -> Path | None:
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -222,6 +317,16 @@ class ZoteroBackend:
                     out.append(key)
         return out
 
+    def read_child_note(self, item_key: str, tag: str) -> str | None:
+        keys = self.find_child_note_keys(item_key, tag)
+        if not keys:
+            return None
+        try:
+            raw = self.zl.zot.item(keys[0])
+        except Exception:
+            return None
+        return str((raw.get("data") or {}).get("note") or "") or None
+
     def create_or_update_note(self, item_key: str, html: str, tag: str) -> str:
         self._ensure_write()
         existing = self.find_child_note_keys(item_key, tag)
@@ -233,6 +338,59 @@ class ZoteroBackend:
             return key
         # item_template() hits /items/new, which the local API does not serve.
         payload = note_payload(html, tag, item_key)
+        try:
+            created = self.zl.zot.create_items([payload])
+        except Exception as exc:
+            raise LibraryError(f"Zotero did not create note: {exc}") from exc
+        key = created_item_key(created)
+        if not key:
+            failed = ""
+            if isinstance(created, dict):
+                failed = str(created.get("failed") or created.get("failure") or "")
+            raise LibraryError(
+                f"Zotero did not create note{': ' + failed if failed else ''}"
+            )
+        return key
+
+    def find_collection_note_keys(self, collection_key: str, tag: str) -> list[str]:
+        """Top-level notes in a collection that carry ``tag``.
+
+        ``items_in_scope`` skips notes, so a report note never enters run/lint/gaps.
+        """
+        want = tag.strip().lower()
+        out: list[str] = []
+        try:
+            items = self.zl.zot.everything(
+                self.zl.zot.collection_items_top(collection_key)
+            )
+        except Exception:
+            return out
+        for it in items:
+            data = it.get("data") or {}
+            if data.get("itemType") != "note" or data.get("parentItem"):
+                continue
+            tags = [t.get("tag", "").lower() for t in data.get("tags") or []]
+            if want in tags:
+                key = it.get("key")
+                if key:
+                    out.append(key)
+        return out
+
+    def create_or_update_collection_note(
+        self, collection_key: str, html: str, tags: list[str]
+    ) -> str:
+        """Create or update a standalone note. The last tag is the idempotency key."""
+        self._ensure_write()
+        lookup = tags[-1] if tags else "paperful-report"
+        existing = self.find_collection_note_keys(collection_key, lookup)
+        if existing:
+            key = existing[0]
+            raw = self.zl.zot.item(key)
+            raw["data"]["note"] = html
+            raw["data"]["tags"] = [{"tag": tag} for tag in tags]
+            self.zl.zot.update_item(raw)
+            return key
+        payload = collection_note_payload(html, tags, collection_key)
         try:
             created = self.zl.zot.create_items([payload])
         except Exception as exc:

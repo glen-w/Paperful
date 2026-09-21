@@ -20,6 +20,9 @@ from paperful.store import (
     STATUS_NOT_FOUND,
     STATUS_OK,
     Manifest,
+    item_dirname,
+    item_filename,
+    record_path,
 )
 from tests.conftest import PDF_BYTES, make_item, mock_client
 
@@ -111,11 +114,9 @@ def test_oa_sources_run_in_order_and_scihub_only_after_all_miss(pipe_factory, cf
     assert sh.calls == ["A"]  # B was satisfied by an OA source, never reaches Sci-Hub
     assert manifest.get("B").source == "oa2" and manifest.get("A").source == "scihub"
     assert manifest.get("B").attempts == ["oa1:not_found", "oa2:found"]
-    assert (
-        cfg.out_dir
-        / "Col"
-        / "Smith - 2019 - A sufficiently long test title about marine governance.pdf"
-    ).exists()
+    saved = make_item(key="A")
+    pdf = cfg.out_dir / "Col" / item_dirname(saved) / item_filename(saved)
+    assert pdf.is_file()
 
 
 def test_alternate_urls_are_tried_after_download_failure(pipe_factory):
@@ -139,6 +140,12 @@ def test_alternate_urls_are_tried_after_download_failure(pipe_factory):
     rec = manifest.get("A")
     assert rec.status == STATUS_OK and rec.url == "https://repo.test/a.pdf"
     assert "oa:download-failed(HTTP 403)" in rec.attempts
+    saved = make_item(key="A")
+    card = record_path(pipe.cfg.out_dir / "Col" / item_dirname(saved))
+    body = card.read_text()
+    assert '"source": "oa"' in body
+    assert '"fetched_url": "https://repo.test/a.pdf"' in body
+    assert '"schema": "paperful.item.v1"' in body
 
 
 def test_miss_classification(pipe_factory):

@@ -65,7 +65,7 @@ def test_nested_tables_parse(tmp_path):
             "model": "gpt-x",
             "api_base": "https://x",
         },
-        "browser_agent": {"max_steps": 5, "model": "big"},
+        "browser_agent": {"max_steps": 5, "model": "big", "during_run": False},
         "fix_metadata": {"llm_title": True},
         "lint": {"llm_pdf_match": True, "llm_pdf_match_min_confidence": 2.0},
         "summarize": {"prompt_template": "prompts/p.md", "tag": "  "},
@@ -75,6 +75,7 @@ def test_nested_tables_parse(tmp_path):
         cfg.llm_enabled and cfg.llm_provider == "litellm" and cfg.llm_model == "gpt-x"
     )
     assert cfg.browser_agent_max_steps == 5 and cfg.browser_agent_model == "big"
+    assert cfg.browser_agent_during_run is False
     assert cfg.fix_metadata_llm_title and cfg.lint_llm_pdf_match
     assert cfg.lint_llm_pdf_match_min_confidence == 1.0  # clamped
     assert cfg.summarize_tag == "paperful-summary"  # blank falls back
@@ -458,3 +459,180 @@ def test_to_note_html_mixed_markdown_headings_with_html_paragraphs():
     assert "##" not in html
     assert "<h2>Objective</h2>" in html and "<p>This work aims.</p>" in html
     assert "<ul>" in html and "<li>one</li>" in html and html.count("<ul>") == 1
+
+
+# ---- synthesize --------------------------------------------------------------
+
+
+def test_dest_config(tmp_path):
+    from paperful.config import _from_dict
+
+    cfg = _from_dict(
+        {
+            "summarize": {"dest": " Disk "},
+            "synthesize": {"dest": "zotero", "timeout_s": 10, "tag": "  "},
+            "llm": {"timeout_s": 400},
+        },
+        tmp_path / "config.toml",
+    )
+    assert cfg.summarize_dest == "disk"
+    assert cfg.synthesize_dest == "zotero"
+    assert cfg.synthesize_tag == "paperful-report"
+    assert cfg.effective_synthesize_timeout() == 10
+    blank = _from_dict({"summarize": {"dest": "  "}}, tmp_path / "config.toml")
+    assert blank.summarize_dest == "both"
+    assert blank.effective_synthesize_timeout() == 300
+    with pytest.raises(ValueError, match="disk, zotero, or both"):
+        _from_dict({"synthesize": {"dest": "mirror"}}, tmp_path / "config.toml")
+
+
+def test_render_summary_sets_num_ctx(llm_cfg, monkeypatch):
+    _ground(monkeypatch, summarize)
+
+    class Rec(StubLLM):
+        def complete(self, request):
+            self.req = request
+            return super().complete(request)
+
+    stub = Rec(text="<p>s</p>")
+    monkeypatch.setattr(summarize, "get_client", lambda cfg: stub)
+    html = summarize.render_summary(llm_cfg, make_item(has_pdf=True), None, None)
+    assert stub.req.num_ctx >= 1024
+    path = summarize.write_summary_disk(llm_cfg, make_item(has_pdf=True), html)
+    assert path.is_file() and "paperful ·" in path.read_text()
+
+
+def test_note_text_and_pack_and_citations():
+    from paperful.synthesize import (
+        SourceNote,
+        note_text,
+        pack_chunks,
+        unmatched_citations,
+    )
+
+    text = note_text("<h2>Objective</h2><p>Hello</p><ul><li>one</li><li>two</li></ul>")
+    assert "Objective" in text and "- one" in text and "- two" in text and "<" not in text
+    assert len(pack_chunks(["a" * 10, "b" * 10], 15)) == 2
+    truncated = pack_chunks(["x" * 100], 20)[0]
+    assert truncated.endswith("[… truncated]") and len(truncated) <= 20
+    src = SourceNote(
+        key="K",
+        title="T",
+        year=2019,
+        author="Smith",
+        doi=None,
+        label="Smith (2019)",
+        body_text="body",
+        provenance="",
+        origin="disk",
+        sha256="abc",
+    )
+    assert unmatched_citations("<p>[Jones 2020] and [Smith 2019]</p>", [src]) == [
+        "[Jones 2020]"
+    ]
+
+
+def test_load_sources_prefers_disk_then_note(llm_cfg):
+    from paperful.synthesize import load_sources
+
+    llm_cfg.summaries_dir.mkdir(parents=True)
+    (llm_cfg.summaries_dir / "D.html").write_text(
+        "<p>on disk</p>\n<p><em>paperful · m · 2026-01-01 00:00 UTC · prompt aaaa1111</em></p>",
+        encoding="utf-8",
+    )
+
+    class B:
+        def read_child_note(self, key, tag):
+            if key == "N":
+                return "<p>from note</p>"
+            return None
+
+    disk = make_item(key="D")
+    note = make_item(key="N", first_author="Lee", year=2020)
+    missing = make_item(key="M")
+    sources, gone = load_sources(llm_cfg, [note, missing, disk], B())
+    assert [s.key for s in sources] == ["D", "N"]
+    assert sources[0].origin == "disk" and "paperful" not in sources[0].body_text
+    assert sources[1].origin == "note" and sources[1].body_text == "from note"
+    assert [it.key for it in gone] == ["M"]
+
+
+def test_synthesize_one_pass_and_sidecar(llm_cfg):
+    from paperful.synthesize import render_synthesis, report_is_current, write_report_files
+
+    loaded = _two_sources(llm_cfg)
+    stub = StubLLM(text="<h2>Themes</h2><p>See [Smith 2019] and [Nobody 1999].</p>")
+    html, chunks, sha = render_synthesis(
+        llm_cfg, loaded[0], loaded[1], "BBNJ, years 2019–2020", client=stub
+    )
+    assert chunks == 1 and len(stub.calls) == 1
+    assert html.startswith("<h1>Paperful report:")
+    assert "<h2>Sources</h2>" in html and "key D" in html
+    assert "Not included" in html and "key M" in html
+    assert "Unmatched citations" in html and "[Nobody 1999]" in html
+    assert f"prompt {sha}" in html and "1 chunk" in html
+    sidecar = {
+        "sources": [
+            {"key": s.key, "source": s.origin, "sha256": s.sha256} for s in loaded[0]
+        ],
+        "destinations": ["disk"],
+    }
+    write_report_files(llm_cfg, "bbnj", html, sidecar)
+    assert report_is_current(llm_cfg, "bbnj", loaded[0], dest="disk")
+    loaded[0][0].sha256 = "changed"
+    assert not report_is_current(llm_cfg, "bbnj", loaded[0], dest="disk")
+
+
+def test_synthesize_two_pass_when_over_budget(llm_cfg, monkeypatch, tmp_path):
+    from paperful.synthesize import map_reduce
+
+    prompt = tmp_path / "p.md"
+    prompt.write_text("REPORT")
+    llm_cfg.synthesize_prompt_template = str(prompt)
+    llm_cfg.synthesize_max_context_chars = 1000
+    stub = StubLLM(text="<p>batch</p>")
+    blocks = ["A" * 500, "B" * 500]
+    body, first = map_reduce(llm_cfg, stub, blocks, "REPORT")
+    assert first == 2 and len(stub.calls) == 3
+    assert "Summaries:" in stub.calls[0] and "Batch syntheses:" in stub.calls[2]
+    assert "<p>batch</p>" in body
+
+
+def test_map_reduce_raises_after_three_passes(llm_cfg, tmp_path):
+    from paperful.synthesize import ReduceCapError, map_reduce
+
+    prompt = tmp_path / "p.md"
+    prompt.write_text("T")
+    llm_cfg.synthesize_prompt_template = str(prompt)
+    llm_cfg.synthesize_max_context_chars = 1000
+
+    class Big(StubLLM):
+        def complete(self, request):
+            self.calls.append(request.prompt)
+            return "Z" * 2000
+
+    with pytest.raises(ReduceCapError, match="3 reduce passes"):
+        map_reduce(llm_cfg, Big(), ["A" * 500, "B" * 500], "T")
+
+
+def _two_sources(cfg):
+    from paperful.synthesize import load_sources
+
+    cfg.summaries_dir.mkdir(parents=True, exist_ok=True)
+    (cfg.summaries_dir / "D.html").write_text("<p>on disk</p>", encoding="utf-8")
+
+    class B:
+        def read_child_note(self, key, tag):
+            return "<p>from note</p>" if key == "N" else None
+
+    sources, missing = load_sources(
+        cfg,
+        [
+            make_item(key="D"),
+            make_item(key="N", first_author="Lee", year=2020),
+            make_item(key="M"),
+        ],
+        B(),
+    )
+    return sources, missing
+

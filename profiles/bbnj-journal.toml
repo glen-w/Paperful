@@ -1,0 +1,12 @@
+# paperful run config. Select with: paperful all --profile bbnj-journal
+name = "bbnj-journal"
+description = "BBNJ journal articles 2021–2026"
+collections = ["BBNJ"]
+library = false
+types = ["journalArticle"]
+year_from = 2021
+year_to = 2026
+try_all = true
+retry_failed = true
+upgrade_linked = true
+apply = true

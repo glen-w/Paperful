@@ -168,6 +168,25 @@ def test_ollama_complete_and_json(mock_ollama):
     assert payload["options"]["num_predict"] == 50
 
 
+def test_ctx_tokens_for_rounds_and_caps():
+    from paperful.llm import ctx_tokens_for
+
+    assert ctx_tokens_for("x" * 3, max_num_ctx=32768) == 3072
+    assert ctx_tokens_for("x" * 100_000, max_num_ctx=4096) == 4096
+
+
+def test_ollama_sends_num_ctx(mock_ollama):
+    reqs = mock_ollama(lambda r: httpx.Response(200, json={"response": "ok"}))
+    from paperful.llm import CompletionRequest
+
+    OllamaClient("http://127.0.0.1:11434", False).complete(
+        CompletionRequest(model="m", prompt="p", num_ctx=8192)
+    )
+    import json as _json
+
+    assert _json.loads(reqs[0].read())["options"]["num_ctx"] == 8192
+
+
 def test_ollama_error_payload(mock_ollama):
     mock_ollama(lambda r: httpx.Response(200, json={"error": "model not found"}))
     from paperful.llm import CompletionRequest

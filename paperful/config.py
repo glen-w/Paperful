@@ -50,7 +50,7 @@ EOI_SOURCES = [
     "htmlpdf",
 ]
 SOURCE_PRESETS: dict[str, list[str]] = {"eoi": EOI_SOURCES}
-KNOWN_MANAGERS = ("zotero", "mendeley")
+KNOWN_MANAGERS = ("zotero", "mendeley", "endnote")
 DEFAULT_MIRRORS = [
     "sci-hub.ru",
     "sci-hub.ren",
@@ -78,6 +78,10 @@ class Config:
     out_dir: Path = Path("out")
     state_dir: Path = Path("state")
     manager: str = "zotero"
+    mendeley_client_id: str = ""
+    mendeley_client_secret: str = ""
+    mendeley_redirect_uri: str = "http://127.0.0.1:8765/callback"
+    endnote_library: Path | None = None
     sources: list[str] = field(default_factory=lambda: list(DEFAULT_SOURCES))
     scihub_mirrors: list[str] = field(default_factory=lambda: list(DEFAULT_MIRRORS))
     delay_scihub_s: tuple[float, float] = (3.0, 8.0)
@@ -110,6 +114,8 @@ class Config:
     grey_playbooks_dir: Path | None = None
     grey_playbooks: list[GreyPlaybook] = field(default_factory=list)
     config_path: Path | None = None
+    # Named run configs from [profiles.*]. Not grey-lit playbooks.
+    run_profiles: dict[str, dict[str, Any]] = field(default_factory=dict)
     # LLM (local-first Ollama; LiteLLM optional via paperful[llm])
     llm_enabled: bool = False
     llm_provider: str = "ollama"  # ollama | litellm
@@ -118,15 +124,24 @@ class Config:
     llm_api_base: str = ""
     llm_allow_remote: bool = False
     llm_timeout_s: float = 120.0
+    llm_max_num_ctx: int = 32_768
+    mirror_pdfs: str = "additional"  # additional | all | none
     browser_agent_max_steps: int = 20
     browser_agent_max_wall_s: float = 300.0
     browser_agent_model: str = ""
+    browser_agent_during_run: bool = True
     fix_metadata_llm_title: bool = False
     lint_llm_pdf_match: bool = False
     lint_llm_pdf_match_min_confidence: float = 0.6
     summarize_prompt_template: str = "default"
     summarize_max_context_chars: int = 24_000
     summarize_tag: str = "paperful-summary"
+    summarize_dest: str = "both"  # disk | zotero | both
+    synthesize_prompt_template: str = "default"
+    synthesize_max_context_chars: int = 24_000
+    synthesize_tag: str = "paperful-report"
+    synthesize_dest: str = "both"  # disk | zotero | both
+    synthesize_timeout_s: float = 0.0  # 0 → max(llm.timeout_s, 300)
 
     def __post_init__(self) -> None:
         # Resolve pack+user once so Config() in tests gets the builtin examples.
@@ -164,6 +179,15 @@ class Config:
     @property
     def summaries_dir(self) -> Path:
         return self.state_dir / "summaries"
+
+    @property
+    def reports_dir(self) -> Path:
+        return self.state_dir / "reports"
+
+    def effective_synthesize_timeout(self) -> float:
+        if self.synthesize_timeout_s > 0:
+            return self.synthesize_timeout_s
+        return max(self.llm_timeout_s, 300.0)
 
 
 def _candidate_paths(explicit: Path | None) -> list[Path]:
@@ -286,8 +310,75 @@ def _from_dict(raw: dict[str, Any], source: Path) -> Config:
     cfg.grey_playbooks = merge_playbooks(
         cfg.grey_playbooks_builtin, user_playbooks, extra=extra
     )
+    cfg.run_profiles = _parse_run_profiles(raw)
     _apply_nested_tables(raw, cfg, source)
     return cfg
+
+
+def _parse_run_profiles(raw: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Raw `[profiles.*]` tables. Validated when a profile is selected, not at load."""
+    profiles = raw.get("profiles") or {}
+    if not profiles:
+        return {}
+    if not isinstance(profiles, dict):
+        warnings.warn(
+            f"config profiles ignored: expected a table, got {type(profiles).__name__}",
+            UserWarning,
+            stacklevel=2,
+        )
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for key, row in profiles.items():
+        if isinstance(row, dict):
+            out[str(key)] = dict(row)
+            continue
+        warnings.warn(
+            f"config profiles.{key} ignored: expected a table, got {type(row).__name__}",
+            UserWarning,
+            stacklevel=2,
+        )
+    return out
+
+
+_DESTS = frozenset({"disk", "zotero", "both"})
+_PDF_MODES = frozenset({"additional", "all", "none"})
+
+
+def parse_pdfs(value: str) -> str:
+    """Normalise ``[mirror].pdfs``. ``additional`` is the default."""
+    mode = str(value).strip().lower()
+    if mode not in _PDF_MODES:
+        raise ValueError(
+            f"config [mirror].pdfs {value!r} must be additional, all, or none"
+        )
+    return mode
+
+
+def parse_dest(value: str, *, key: str = "dest") -> str:
+    """Normalise a write destination. Blank means both; anything else must be known."""
+    dest = str(value).strip().lower()
+    if not dest:
+        return "both"
+    if dest not in _DESTS:
+        raise ValueError(f"config {key} {value!r} must be disk, zotero, or both")
+    return dest
+
+
+def wants_disk(dest: str) -> bool:
+    return dest in ("disk", "both")
+
+
+def wants_zotero(dest: str) -> bool:
+    return dest in ("zotero", "both")
+
+
+def _resolve_prompt_path(value: str, source: Path) -> str:
+    if not value or value == "default":
+        return "default"
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = (source.parent / path).resolve()
+    return str(path)
 
 
 def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None:
@@ -307,6 +398,8 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             cfg.llm_allow_remote = bool(llm["allow_remote"])
         if "timeout_s" in llm:
             cfg.llm_timeout_s = float(llm["timeout_s"])
+        if "max_num_ctx" in llm:
+            cfg.llm_max_num_ctx = max(1024, int(llm["max_num_ctx"]))
     ba = raw.get("browser_agent")
     if isinstance(ba, dict):
         if "max_steps" in ba:
@@ -315,6 +408,8 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             cfg.browser_agent_max_wall_s = float(ba["max_wall_s"])
         if "model" in ba:
             cfg.browser_agent_model = str(ba["model"]).strip()
+        if "during_run" in ba:
+            cfg.browser_agent_during_run = bool(ba["during_run"])
     fm = raw.get("fix_metadata")
     if isinstance(fm, dict) and "llm_title" in fm:
         cfg.fix_metadata_llm_title = bool(fm["llm_title"])
@@ -334,8 +429,42 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             cfg.summarize_max_context_chars = max(1000, int(summ["max_context_chars"]))
         if "tag" in summ:
             cfg.summarize_tag = str(summ["tag"]).strip() or "paperful-summary"
-    if cfg.summarize_prompt_template not in ("default",):
-        p = Path(cfg.summarize_prompt_template).expanduser()
-        if not p.is_absolute():
-            p = (source.parent / p).resolve()
-        cfg.summarize_prompt_template = str(p)
+        if "dest" in summ:
+            cfg.summarize_dest = parse_dest(str(summ["dest"]), key="[summarize].dest")
+    synth = raw.get("synthesize")
+    if isinstance(synth, dict):
+        if "prompt_template" in synth:
+            cfg.synthesize_prompt_template = str(synth["prompt_template"]).strip()
+        if "max_context_chars" in synth:
+            cfg.synthesize_max_context_chars = max(
+                1000, int(synth["max_context_chars"])
+            )
+        if "tag" in synth:
+            cfg.synthesize_tag = str(synth["tag"]).strip() or "paperful-report"
+        if "dest" in synth:
+            cfg.synthesize_dest = parse_dest(str(synth["dest"]), key="[synthesize].dest")
+        if "timeout_s" in synth:
+            cfg.synthesize_timeout_s = float(synth["timeout_s"])
+    mirror = raw.get("mirror")
+    if isinstance(mirror, dict) and "pdfs" in mirror:
+        cfg.mirror_pdfs = parse_pdfs(str(mirror["pdfs"]))
+    men = raw.get("mendeley")
+    if isinstance(men, dict):
+        if "client_id" in men:
+            cfg.mendeley_client_id = str(men["client_id"]).strip()
+        if "client_secret" in men:
+            cfg.mendeley_client_secret = str(men["client_secret"]).strip()
+        if "redirect_uri" in men and men["redirect_uri"]:
+            cfg.mendeley_redirect_uri = str(men["redirect_uri"]).strip()
+    en = raw.get("endnote")
+    if isinstance(en, dict) and en.get("library"):
+        lib = Path(str(en["library"])).expanduser()
+        if not lib.is_absolute():
+            lib = (source.parent / lib).resolve()
+        cfg.endnote_library = lib
+    cfg.summarize_prompt_template = _resolve_prompt_path(
+        cfg.summarize_prompt_template, source
+    )
+    cfg.synthesize_prompt_template = _resolve_prompt_path(
+        cfg.synthesize_prompt_template, source
+    )

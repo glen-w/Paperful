@@ -17,6 +17,9 @@ if TYPE_CHECKING:
 
 Status = str  # green | amber | red
 _ZOTERO_CHECK = "Zotero :23119"
+_MENDELEY_CHECK = "Mendeley API"
+_ENDNOTE_CHECK = "EndNote library"
+_LIBRARY_CHECKS = {_ZOTERO_CHECK, _MENDELEY_CHECK, _ENDNOTE_CHECK}
 
 
 @dataclass
@@ -52,6 +55,20 @@ def remediation_text(
             f"1. Start Zotero{host}.\n"
             "2. Settings → Advanced → allow other apps to talk to Zotero (local API).\n"
             "3. Confirm :23119 is reachable, then continue."
+        )
+    if check.name == _MENDELEY_CHECK:
+        return (
+            "1. Register an app at https://dev.mendeley.com/myapps.html "
+            "(redirect http://127.0.0.1:8765/callback, Authorization code flow).\n"
+            "2. Set [mendeley] client_id / client_secret (or PAPERFUL_MENDELEY_CLIENT_*).\n"
+            "3. Run: paperful session login mendeley"
+        )
+    if check.name == _ENDNOTE_CHECK:
+        return (
+            "Set [endnote] library = \"/path/to/Library.enl\". The matching "
+            ".Data folder (with sdb/sdb.eni and PDF/) must sit beside it. "
+            "If EndNote is open and the database is locked, close it or let "
+            "paperful copy the file."
         )
     if check.name == "Write API":
         return (
@@ -117,7 +134,7 @@ def remediation_text(
         if "not installed" in check.detail:
             return (
                 "Run: uv sync --extra browser-agent (Python 3.11+), "
-                "then `paperful session login scholar` before `paperful recover`."
+                "then `paperful session login scholar` before `run` / `recover`."
             )
         return (
             f"Edit {cfg_hint} [browser_agent]: model = \"<14b+ tag>\" "
@@ -134,6 +151,12 @@ def remediation_text(
         return (
             f"Builtin grey-lit packs are incomplete. Check {cfg_hint} "
             "(grey_playbooks_builtin / grey_playbooks_dir) or update paperful."
+        )
+    if check.name == "Mirror":
+        return (
+            "Flat PDFs are still beside collection folders. Run "
+            "`paperful snapshot -C …` (or `--library`) to move them into "
+            "item folders. `[mirror].pdfs` is additional, all, or none."
         )
     return None
 
@@ -168,36 +191,42 @@ def run_checks(
 ) -> list[Check]:
     checks: list[Check] = []
     info: dict | None = None
-    zot_where = zotero_local_label()
-    if zl is None:
-        checks.append(Check(_ZOTERO_CHECK, "red", f"not checked ({zot_where})"))
+    manager = (cfg.manager or "zotero").strip().lower()
+    if manager == "mendeley":
+        checks.append(_mendeley_library_check(cfg))
+    elif manager == "endnote":
+        checks.append(_endnote_library_check(cfg))
     else:
-        try:
-            info = ping() if ping else zl.ping()
-            ver = info.get("zotero_version") or "?"
-            checks.append(
-                Check(
-                    _ZOTERO_CHECK, "green", f"reachable at {zot_where} (Zotero {ver})"
-                )
-            )
-        except ConnectionError as exc:
-            checks.append(Check(_ZOTERO_CHECK, "red", f"{zot_where}: {exc}"))
-        except Exception as exc:
-            checks.append(
-                Check(_ZOTERO_CHECK, "red", f"{zot_where} unreachable: {exc}")
-            )
-
-    if info is not None:
-        if info.get("supports_write"):
-            checks.append(Check("Write API", "green", "yes (Zotero 10+)"))
+        zot_where = zotero_local_label()
+        if zl is None:
+            checks.append(Check(_ZOTERO_CHECK, "red", f"not checked ({zot_where})"))
         else:
-            checks.append(
-                Check(
-                    "Write API",
-                    "amber",
-                    "no — attach, fix-metadata --apply, and dedupe --apply need Zotero 10+",
+            try:
+                info = ping() if ping else zl.ping()
+                ver = info.get("zotero_version") or "?"
+                checks.append(
+                    Check(
+                        _ZOTERO_CHECK, "green", f"reachable at {zot_where} (Zotero {ver})"
+                    )
                 )
-            )
+            except ConnectionError as exc:
+                checks.append(Check(_ZOTERO_CHECK, "red", f"{zot_where}: {exc}"))
+            except Exception as exc:
+                checks.append(
+                    Check(_ZOTERO_CHECK, "red", f"{zot_where} unreachable: {exc}")
+                )
+
+        if info is not None:
+            if info.get("supports_write"):
+                checks.append(Check("Write API", "green", "yes (Zotero 10+)"))
+            else:
+                checks.append(
+                    Check(
+                        "Write API",
+                        "amber",
+                        "no — attach, fix-metadata --apply, and dedupe --apply need Zotero 10+",
+                    )
+                )
 
     if cfg.email.strip():
         checks.append(Check("email", "green", cfg.email))
@@ -218,6 +247,7 @@ def run_checks(
     if docker_paths is not None:
         checks.append(docker_paths)
 
+    checks.append(_mirror_check(cfg))
     checks.append(_playwright_check())
 
     cookie_path = cfg.ezproxy_cookie_path
@@ -279,6 +309,24 @@ _PARAM_SIZE = re.compile(r"(?<![0-9.])(\d+(?:\.\d+)?)b\b", re.I)
 _AGENT_FLOOR_B = 10.0
 
 
+def _mirror_check(cfg: Config) -> Check:
+    from .snapshot import count_layout
+
+    flat, item_dirs = count_layout(cfg.out_dir)
+    detail = f"pdfs={cfg.mirror_pdfs}"
+    if flat and item_dirs:
+        return Check(
+            "Mirror",
+            "amber",
+            f"{detail}; {flat} flat PDF(s) outside item folders — run snapshot",
+        )
+    if item_dirs:
+        return Check("Mirror", "green", f"{detail}; {item_dirs} item folder(s)")
+    if flat:
+        return Check("Mirror", "green", f"{detail}; {flat} flat PDF(s)")
+    return Check("Mirror", "green", detail)
+
+
 def _model_below_agent_floor(model: str) -> bool:
     """Name-pattern only (no probe): flag tags under ~10B params for the browsing agent."""
     m = _PARAM_SIZE.search(model)
@@ -297,7 +345,13 @@ def _llm_checks(cfg) -> list[Check]:
     out: list[Check] = []
     try:
         model = validate_llm_for_verb(cfg)
-        out.append(Check("LLM", "green", f"{cfg.llm_provider} · {model} — ok"))
+        out.append(
+            Check(
+                "LLM",
+                "green",
+                f"{cfg.llm_provider} · {model} — ok · num_ctx≤{cfg.llm_max_num_ctx}",
+            )
+        )
     except LlmConfigError as exc:
         out.append(Check("LLM", "amber", str(exc)))
     except Exception as exc:  # unreachable daemon etc.
@@ -407,6 +461,67 @@ def _grey_playbooks_check(cfg: Config) -> Check:
     return Check("Grey playbooks", "green", f"builtin off — no rules{pack_note}")
 
 
+def _mendeley_library_check(cfg: Config) -> Check:
+    from .mendeley import MendeleyAuthError, MendeleyClient, client_id_of, client_secret_of, token_path
+
+    if not client_id_of(cfg) or not client_secret_of(cfg):
+        return Check(
+            _MENDELEY_CHECK,
+            "red",
+            "missing client_id / client_secret — register at dev.mendeley.com/myapps.html",
+        )
+    if not token_path(cfg).is_file():
+        return Check(
+            _MENDELEY_CHECK,
+            "amber",
+            "app registered — run: paperful session login mendeley",
+        )
+    try:
+        info = MendeleyClient(cfg).ping()
+    except MendeleyAuthError as exc:
+        return Check(_MENDELEY_CHECK, "amber", str(exc))
+    except Exception as exc:
+        return Check(_MENDELEY_CHECK, "red", f"{type(exc).__name__}: {exc}")
+    who = info.get("display_name") or "?"
+    return Check(_MENDELEY_CHECK, "green", f"authorised as {who}")
+
+
+def _endnote_library_check(cfg: Config) -> Check:
+    from .endnote import connect_readonly, library_paths
+
+    if not cfg.endnote_library:
+        return Check(
+            _ENDNOTE_CHECK,
+            "red",
+            "set [endnote] library to your .enl file",
+        )
+    try:
+        enl, data, eni = library_paths(Path(cfg.endnote_library))
+    except Exception as exc:
+        return Check(_ENDNOTE_CHECK, "red", str(exc))
+    if not eni.is_file():
+        return Check(
+            _ENDNOTE_CHECK,
+            "red",
+            f"no sdb.eni at {eni} (need {enl.name} + matching .Data folder)",
+        )
+    try:
+        conn = connect_readonly(eni)
+        tables = {
+            str(r[0])
+            for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+        n = 0
+        if "refs" in tables:
+            n = int(conn.execute("SELECT COUNT(*) FROM refs").fetchone()[0])
+        conn.close()
+    except Exception as exc:
+        return Check(_ENDNOTE_CHECK, "amber", f"readable copy failed: {exc}")
+    pdfs = data / "PDF"
+    pdf_note = "PDF/" if pdfs.is_dir() else "no PDF/ folder"
+    return Check(_ENDNOTE_CHECK, "green", f"{enl.name} ({n} refs, {pdf_note})")
+
+
 def has_red(checks: list[Check]) -> bool:
-    fatal = {_ZOTERO_CHECK, "out_dir", "state_dir"}
+    fatal = _LIBRARY_CHECKS | {"out_dir", "state_dir"}
     return any(c.status == "red" and c.name in fatal for c in checks)

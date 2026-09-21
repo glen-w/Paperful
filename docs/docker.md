@@ -17,7 +17,11 @@ default, outside the git root).
 ## What still runs on the host
 
 - Zotero (GUI, local API, “Always allow”)
-- `paperful session login …` (headed Chrome/Edge on the host: campus SSO, Scholar CAPTCHA)
+- `paperful session login scholar|ezproxy` (headed Chrome/Edge on the host: campus SSO, Scholar CAPTCHA)
+- `paperful session login mendeley` (Elsevier OAuth; the localhost redirect will not
+  reach a container — see [Mendeley](mendeley.md))
+- EndNote `.enl` / `.Data` (desktop library on the host; paperful never writes SQLite —
+  see [EndNote](endnote.md))
 - Any scripts that read `out/` / `state/` as files
 
 The container talks to host Zotero over the local API (`:23119`). Session
@@ -59,7 +63,7 @@ long-term):
 
 ```sh
 cp .env.example .env   # PAPERFUL_DATA=../paperful-data
-mkdir -p ../paperful-data/packs ../paperful-data/out ../paperful-data/state
+mkdir -p ../paperful-data/packs ../paperful-data/profiles ../paperful-data/out ../paperful-data/state
 cp config.example.toml ../paperful-data/config.toml
 # edit email / ezproxy_base / grey_playbooks_dir = "packs" as needed
 # optional: move existing out/ and state/ into ../paperful-data/
@@ -94,9 +98,10 @@ that header even when the TCP peer is `host.docker.internal`.
 
 ## Optional LLM inside the image
 
-The image ships neither `litellm` nor `browser-use`, so `paperful recover` is
-host-only (it also needs the headed-login vault). `fix-metadata` title
-proposals, the `lint` identity check, and `summarize` work from the container
+The image ships neither `litellm` nor `browser-use`, so the `browser_agent` lane
+(`run` auto-recover and `paperful recover`) is host-only (it also needs the
+headed-login vault). `fix-metadata` title
+proposals, the `lint` identity check, `summarize`, and `synthesize` work from the container
 against an Ollama running on the host:
 
 ```toml
@@ -121,6 +126,20 @@ grey_playbooks_dir = "packs"
 
 Merge order: builtin pack → `packs/*.toml` → inline `[[grey_playbooks]]`
 (same `name` wins later). See [Configuration](config.md).
+
+## Run configs
+
+`profiles/` next to `config.toml` holds named run configs (`paperful all
+--profile`, `paperful profile save`). That directory is not the grey-lit
+`packs/` folder and not `state/packs/`.
+
+```sh
+mkdir -p ../paperful-data/profiles
+docker compose run --rm paperful profile list
+docker compose run --rm paperful all --profile bbnj-journal --dry-run
+```
+
+See [Workflows](workflows.md).
 
 ## After doctor is green
 

@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>paperful — fill the gaps in your Zotero library</title>
+    <title>paperful — keep the library, the files, and control</title>
     <meta
       name="description"
-      content="paperful fetches the PDFs your Zotero items are missing, keeps them in a collection-shaped folder tree, and attaches them back. Local CLI. Open access first."
+      content="A local sidecar for your research library: fill missing PDFs, lint metadata, keep a quiet copy on disk. Zotero is the well-tested catalogue. Mendeley and EndNote are seeking testers."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -58,11 +58,12 @@
             height="140"
           />
           <p class="brand-mark">paperful</p>
-          <h1>Fill the gaps in your Zotero library.</h1>
+          <h1>Keep the library. Keep the files. Keep control.</h1>
           <p class="lede">
-            Fetch the PDFs your items are missing. Keep them in a folder tree
-            that mirrors your collections. Attach them back. Work stays on
-            disk. Zotero is a library adapter, not the whole product.
+            A local sidecar for your research library: collections organised,
+            missing PDFs filled, metadata linted, a quiet copy on disk. Zotero
+            is the well-tested catalogue. Mendeley and EndNote adapters are
+            seeking testers. Work stays on this machine.
           </p>
           <div class="cta-row">
             <a class="btn primary" href="#product">See how it works</a>
@@ -73,7 +74,7 @@
 
       <section class="section" id="product">
         <div class="wrap">
-          <h2>The briefing for missing PDFs</h2>
+          <h2>The sidecar beside Zotero</h2>
           <p class="section-lead">
             Open access first. Campus EZProxy when you have a subscription.
             Sci-Hub is opt-in and off by default.
@@ -85,6 +86,15 @@
                 Downloads land under <code>out/</code>. Resume lives in
                 <code>state/</code>. Zotero is read in, then written back —
                 attach and metadata apply are separate steps.
+              </p>
+            </div>
+            <div class="feature">
+              <h3>A quiet copy you own</h3>
+              <p>
+                <code>snapshot</code> writes one folder per item
+                (<code>record.json</code>, optional PDF, notes).
+                <code>restore</code> recreates only what Zotero is missing.
+                Copy the tree; paperful is not a sync service.
               </p>
             </div>
             <div class="feature">
@@ -105,8 +115,10 @@
             <div class="feature">
               <h3>Grey literature</h3>
               <p>
-                Playbooks rewrite UN, FAO, ISA, and similar landings to PDFs.
-                Optional HTML→PDF covers blogs and news pages.
+                Journal PDFs ingest cleanly in Zotero. Reports and scans often
+                do not. Playbooks keep UN, FAO, ISA, and similar landings as
+                real PDFs. Optional HTML→PDF covers blogs and news. Local
+                summaries need a text layer — not OCR.
               </p>
             </div>
           </div>
@@ -119,8 +131,10 @@
           <ul class="outcomes">
             <li>Fill a collection (or the whole library) with missing PDFs</li>
             <li>Keep a folder tree that matches Zotero collections</li>
+            <li>Snapshot the library to disk and restore only missing items</li>
             <li>Lint DOIs and propose metadata patches on disk</li>
             <li>Find duplicate items, review a pack, then trash extras</li>
+            <li>Optionally summarise a PDF you already have, on this machine</li>
             <li>Use campus EZProxy without storing your password</li>
             <li>Opt in to Sci-Hub only when you choose to</li>
           </ul>
@@ -130,6 +144,8 @@
             ·
             <a href="./guide/dedupe.html">dedupe</a>.
             Not sure if this is the right tool?
+            <a href="./guide/why.html">why</a>
+            ·
             <a href="./guide/comparison.html">comparison</a>
             ·
             <a href="./guide/architecture.html">architecture</a>.

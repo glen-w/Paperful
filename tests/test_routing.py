@@ -242,3 +242,49 @@ def test_biorxiv_doi_helpers_are_shared(cfg):
     assert not source_applicable(
         make_item(doi="10.1000/x", url=None), cfg, "biorxiv"
     )
+
+
+def test_browser_lane_failed_ignores_not_applicable():
+    from paperful.routing import browser_lane_failed
+
+    assert not browser_lane_failed(
+        ["unpaywall:not_found", "scholar:skipped(not applicable)"]
+    )
+    assert browser_lane_failed(["scholar:not_found"])
+    assert browser_lane_failed(["htmlpdf:skipped(circuit open)"])
+    assert browser_lane_failed(["ezproxy:download-failed(HTTP 403)"])
+    assert not browser_lane_failed(["unpaywall:not_found"])
+    assert not browser_lane_failed([])
+
+
+def test_with_recover_lane_inserts_after_last_browser_lane(cfg, monkeypatch):
+    from paperful.routing import with_recover_lane
+
+    monkeypatch.setattr(
+        "paperful.browser_agent.browser_agent_extra_available", lambda: True
+    )
+    cfg.llm_enabled = True
+    listed = ["unpaywall", "scholar", "htmlpdf", "scihub"]
+    assert with_recover_lane(cfg, listed) == [
+        "unpaywall",
+        "scholar",
+        "htmlpdf",
+        "browser_agent",
+        "scihub",
+    ]
+    assert with_recover_lane(cfg, listed)[0] == "unpaywall"
+    cfg.llm_enabled = False
+    assert "browser_agent" not in with_recover_lane(cfg, listed)
+    cfg.llm_enabled = True
+    cfg.browser_agent_during_run = False
+    assert "browser_agent" not in with_recover_lane(cfg, listed)
+    cfg.browser_agent_during_run = True
+    assert with_recover_lane(cfg, ["unpaywall", "scihub"]) == ["unpaywall", "scihub"]
+    already = ["scholar", "browser_agent"]
+    assert with_recover_lane(cfg, already) == already
+    monkeypatch.setattr(
+        "paperful.browser_agent.browser_agent_extra_available", lambda: False
+    )
+    assert "browser_agent" not in with_recover_lane(
+        cfg, ["unpaywall", "scholar", "htmlpdf"]
+    )

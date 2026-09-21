@@ -38,11 +38,21 @@ uv run paperful run --collection BBNJ --retry-failed
 uv run paperful run --collection BBNJ --try-all   # ignore source_routing when metadata is unreliable
 
 # optional LLM verbs — off until [llm].enabled; setup in docs/llm.md
+# recover also auto-fires at the end of `run` when Scholar / EZProxy / htmlpdf fail
 uv run paperful recover --item ITEMKEY --dry-run     # browser agent: show start URL only
 uv run paperful recover --item ITEMKEY               # needs Python 3.11+ and paperful[browser-agent]
-uv run paperful summarize --item ITEMKEY             # → state/summaries/ITEMKEY.html (no Zotero write)
-uv run paperful summarize -C BBNJ --limit 5 --apply  # create/update tagged child notes
+uv run paperful summarize --item ITEMKEY             # disk HTML + tagged child note (default both)
+uv run paperful summarize -C BBNJ --to disk          # HTML only; Zotero tree stays clean
 uv run paperful summarize --item ITEMKEY --prompt prompts/mine.md --force
+uv run paperful synthesize -C BBNJ --dry-run         # chunk plan from existing summary notes
+uv run paperful synthesize -C BBNJ                   # report on disk and a note in the collection
+
+# thicken the on-disk mirror (per-item folders). pdfs: additional | all | none
+uv run paperful snapshot -C BBNJ --dry-run
+uv run paperful snapshot -C BBNJ --pdfs all
+uv run paperful restore -C BBNJ                 # dry-run unless --apply
+uv run paperful restore -C BBNJ --year-from 2021 --year-to 2026 -T journalArticle
+uv run paperful restore -C BBNJ --apply         # create missing items; never overwrite fields
 
 # restrict / reorder sources for one run, or cap the number of items processed
 uv run paperful run -C hoops --sources unpaywall,openalex,ezproxy
@@ -58,16 +68,31 @@ uv run paperful run -C BBNJ -T journalArticle --year-from 2023 --year-to 2026
 uv run paperful run -C BBNJ -T "Journal Article" -T report
 uv run paperful lint -C BBNJ --type journalArticle,preprint
 
+# the same slice as one command, or saved beside config.toml
+#   gaps → run --try-all --retry-failed --upgrade-linked → lint → fix-metadata --apply → summarize --apply
+uv run paperful all -C BBNJ -T journalArticle --year-from 2021 --year-to 2026
+uv run paperful all -C BBNJ -T journalArticle --year-from 2021 --year-to 2026 --dry-run
+uv run paperful profile save bbnj-journal -C BBNJ -T journalArticle --year-from 2021 --year-to 2026 --try-all --apply
+uv run paperful all --profile bbnj-journal
+uv run paperful profile list
+uv run paperful profile show bbnj-journal
+
 # Sci-Hub is off unless you opt in (config `sources`, or this flag)
 uv run paperful run --library --scihub
 
 # session (optional)
 uv run paperful session login ezproxy   # system Chrome/Edge when present; campus SSO
 uv run paperful session login scholar    # same; --engine playwright to force Playwright
+uv run paperful session login mendeley  # Elsevier OAuth (host-only localhost redirect)
 uv run paperful session status
 uv run paperful ezproxy --no-open       # probe the EZProxy session
 uv run paperful scholar --no-open       # probe Scholar
 uv run paperful mirrors                  # which Sci-Hub mirrors are up (Sci-Hub itself stays off)
+
+# interchange (RIS / BibTeX / EndNote XML)
+uv run paperful export library.ris --library
+uv run paperful import other.bib                 # dry-run
+uv run paperful import other.bib --apply
 
 # identifiers vs PDFs (read-only); metadata writes are a separate step
 uv run paperful lint --library --json
@@ -80,22 +105,36 @@ uv run paperful fix-metadata --library --apply --overwrite   # also replace titl
 uv run paperful dedupe -C BBNJ --dry-run
 uv run paperful dedupe -C BBNJ --apply          # high_doi only; add --apply-medium for title+year
 uv run paperful gaps -C BBNJ
+
+# one witness for a sequence (child reports still land in state/runs/)
+uv run paperful pack open --label bbnj-journal-2021-2026
+uv run paperful gaps -C BBNJ
+uv run paperful pack close
+uv run paperful pack show
 ```
 
 | Command | Purpose |
 | --- | --- |
-| `doctor` | Environment check (Zotero, paths, email, sessions, pdftotext, Playwright, grey-lit packs, LLM, browser-agent extra). Green / amber / red. TTY guide for remediations (`--guide` / `--no-guide`). |
-| `run` | Find and download missing PDFs (`--dry-run`, `--preset eoi`, `--upgrade-linked`, `--try-all`, `--retry-failed`, `--sources`, `--scihub`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). Never rewrites bibliographic fields. |
-| `recover` | Opt-in **browser-agent** PDF recovery for named items (`--item KEY` repeatable, `--dry-run`, `--no-attach`). Only the `browser_agent` source; never part of `run`. Needs `[llm].enabled`, Python 3.11+, `paperful[browser-agent]`, and a session vault. Report: `state/runs/<stamp>-recover.json`. See [LLM](llm.md#a-recover-browser-agent-pdf-recovery). |
-| `lint` | Read-only identifier / PDF-DOI / title-hygiene findings (`--json`, `--strict`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). Codes: `missing_doi`, `suspect_doi`, `swappable_doi`, `pmid_no_doi`, `pdf_doi_mismatch`, `title_html`, `title_all_caps`, `title_filename`, `no_identifier`, plus `pdf_identity_mismatch` when `[lint].llm_pdf_match` is on |
-| `fix-metadata` | Propose patches on disk; `--apply` writes them to the library (`--overwrite` for title/date/venue; `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). Whitelist: `doi`, `title`, `date`, `publicationTitle`. HTML title cleanup, ALL CAPS → Title Case, and verified PDF-DOI adoption included; filename titles stay lint-only unless `[fix_metadata].llm_title` proposes a grounded title (`source = "llm_title"`). |
-| `summarize` | Grounded LLM summary from the PDF already on disk (`--item` / `-C` / `--library`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`, `--prompt FILE`, `--force`). Always writes `state/summaries/<key>.html`; `--apply` creates or updates one child note tagged `[summarize].tag`. See [LLM](llm.md#d-summarize-grounded-summary-note). |
+| `doctor` | Environment check (Zotero / Mendeley / EndNote, paths, email, sessions, pdftotext, Playwright, grey-lit packs, LLM, browser-agent extra). Green / amber / red. TTY guide for remediations (`--guide` / `--no-guide`). |
+| `run` | Find and download missing PDFs (`--dry-run`, `--preset eoi`, `--upgrade-linked`, `--try-all`, `--retry-failed`, `--sources`, `--scihub`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). When `[llm].enabled` and the browser-agent extra is installed, appends `browser_agent` after Scholar / EZProxy / htmlpdf. Never rewrites bibliographic fields. |
+| `recover` | Opt-in **browser-agent** PDF recovery (`--item KEY` repeatable, `--dry-run`, `--no-attach`). Also auto-appended as the last `run` lane when `[llm].enabled` and other vault browser lanes (Scholar, EZProxy, htmlpdf) fail. Needs Python 3.11+, `paperful[browser-agent]`, and a session vault. Manual report: `state/runs/<stamp>-recover.json`. See [LLM](llm.md#a-recover-browser-agent-pdf-recovery). |
+| `lint` | Read-only identifier / PDF-DOI / title-hygiene findings (`--json`, `--strict`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). Codes: `missing_doi`, `suspect_doi`, `swappable_doi`, `pmid_no_doi`, `pdf_doi_mismatch`, `title_html`, `title_all_caps`, `title_filename`, `no_identifier`, plus `pdf_identity_mismatch` when `[lint].llm_pdf_match` is on. Writes `state/runs/<stamp>-lint.json` (also for `--json`, before a `--strict` exit 1). |
+| `fix-metadata` | Propose patches on disk; `--apply` writes them to the library (`--overwrite` for title/date/venue; `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). Whitelist: `doi`, `title`, `date`, `publicationTitle`. HTML title cleanup, ALL CAPS → Title Case, and verified PDF-DOI adoption included; filename titles stay lint-only unless `[fix_metadata].llm_title` proposes a grounded title (`source = "llm_title"`). Dry-run and `--apply` both write `state/runs/<stamp>-fix-metadata.json` (`patches_applied` only after `--apply`). |
+| `summarize` | Grounded LLM summary from the PDF already on disk (`--item` / `-C` / `--library`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`, `--prompt FILE`, `--force`, `--to disk, zotero, or both`). Default writes `state/summaries/<key>.html` and one child note tagged `[summarize].tag`. `--to disk` skips Zotero. `--apply` requires the note and conflicts with `--to disk`. Writes `state/runs/<stamp>-summarize.json`. See [LLM](llm.md#d-summarize-grounded-summary-note). |
+| `synthesize` | Literature review from existing summary notes (`--item` / `-C` / `--library`, same year/type/`--limit` flags, `--prompt`, `--to`, `--dry-run`, `--force`, `--report-collection`). Writes `state/reports/<slug>.html` and, unless `--to disk`, a standalone note in each `-C` collection. See [LLM](llm.md#e-synthesize-summary-of-summaries). |
 | `dedupe` | Duplicate pack on disk (`high_doi`, then `title+year`). `--apply` trashes DOI extras only; title+year needs `--apply-medium`. Held when same-DOI titles diverge. Same year/type scope flags as `run`. See [dedupe](dedupe.md). |
-| `gaps` | Counts: no stored PDF, linked PDF URL only, missing DOI. Read-only. Year/type scope flags apply. Next steps are `run` and `lint`. |
+| `gaps` | Counts: no stored PDF, linked PDF URL only, missing DOI. Read-only. Year/type scope flags apply. Next steps are `run` and `lint`. Writes `state/runs/<stamp>-gaps.json`. |
+| `all` | `gaps` → `run --try-all --retry-failed --upgrade-linked` → `lint` → `fix-metadata --apply` → `summarize --apply`. Stops on the first failure. `--dry-run` skips `summarize` and does not apply metadata. `--profile` / `-f` load a saved run config. Opens a pack when none is open. See [Workflows](workflows.md). |
+| `profile` | `list` / `show` / `save` — named run configs beside `config.toml` (`profiles/<name>.toml` or `[profiles.*]`). `show` prints the merge `all` would use. `save` does not edit `config.toml`. |
+| `pack` | `open` / `close` / `show` — group the run reports from one operator sequence into `state/packs/<id>.json` (`paperful.pack.v1`). `show` does not open the library. `PAPERFUL_PACK=off` keeps a command out of the open pack. |
 | `collections` | Collection tree with “No PDF” counts |
 | `report` | Manifest summary + latest run report (`--last-run`, `--json`, `--not-found`, `--status`) |
-| `attach` | Attach already-downloaded PDFs into Zotero |
-| `session` | Local browser vault: `login scholar|ezproxy` (`--engine auto|chrome|playwright`), `status`, `export` |
+| `attach` | Attach already-downloaded PDFs into the configured manager |
+| `snapshot` | Write a per-item restore folder under `out/` (`record.json`, optional PDF, notes) plus index, collection tree, and ledger pointers. `--pdfs additional\|all\|none`. `--dry-run` counts without writing. Year/type scope flags apply. |
+| `restore` | Recreate missing library items from those folders. Dry-run unless `--apply`. `--apply` creates missing items, attaches a local PDF when the live item has none, and adds missing notes. Does not overwrite bibliographic fields. Year/type scope flags apply. |
+| `import` | Load RIS, BibTeX, or EndNote XML into the configured manager. Dry-run unless `--apply`. |
+| `export` | Write the scoped library to RIS, BibTeX, or EndNote XML (`--pdfs` copies files for XML). |
+| `session` | Local browser vault: `login scholar\|ezproxy\|mendeley` (`--engine` is for the browser slots), `status`, `export` |
 | `ezproxy` | Wrapper: headed login (or Netscape fallback) / `--no-open` probe |
 | `scholar` | Wrapper: headed login (or Netscape fallback) / `--no-open` probe |
 | `mirrors` | Ping configured Sci-Hub mirrors |
@@ -110,6 +149,11 @@ collections are written once and hard-linked into the other folders.
 After collection / `--library` selection, these optional filters shrink the
 item list further (applied before `--limit`). They appear in the Scope line
 (e.g. `BBNJ, years 2023–2026, types journalArticle`).
+
+`--profile NAME` loads that slice from a run config so you do not repeat
+`-C` / years / `-T` on every verb. `-f` / `--run-config FILE` overlays it.
+Flags you pass still win. See [Workflows](workflows.md) and
+[Configuration](config.md#run-configs-profiles).
 
 | Flag | Effect |
 | --- | --- |
@@ -140,8 +184,8 @@ uv run paperful gaps -C BBNJ -T "Journal Article" -T report
 uv run paperful lint -C BBNJ --type journalArticle,preprint --strict
 ```
 
-Same flags on `run`, `lint`, `fix-metadata`, `dedupe`, `gaps`, and
-`summarize`.
+Same flags on `run`, `lint`, `fix-metadata`, `dedupe`, `gaps`, `summarize`,
+`synthesize`, `snapshot`, and `restore`.
 
 ## Doctor
 
@@ -151,7 +195,7 @@ Same flags on `run`, `lint`, `fix-metadata`, `dedupe`, `gaps`, and
 | --- | --- |
 | **green** | Ready |
 | **amber** | Degraded but you can continue (empty `email`, missing EZProxy/Scholar session, no `pdftotext`, Playwright/Chromium not ready, Zotero without write API, LLM enabled but daemon/model/extra not ready, small model for the browser agent) |
-| **red** | Fatal if the check is `Zotero :23119`, `out_dir`, or `state_dir` |
+| **red** | Fatal if the check is `Zotero :23119`, `Mendeley API`, `EndNote library`, `out_dir`, or `state_dir` |
 
 Unpaywall needs a real `email`. Missing sessions: `paperful session login ezproxy` or `scholar` (system Chrome/Edge when present). Missing `pdftotext`: Poppler; `pypdf` is the fallback. Playwright is core; Chromium installs on first `session login`. An amber Write API means Zotero 7–9: fetch still works, but `attach`, `fix-metadata --apply`, and `dedupe --apply` do not.
 
@@ -176,8 +220,8 @@ Inside Docker, `docker compose run --rm paperful` with no extra args is `doctor`
 | Code | When |
 | --- | --- |
 | 0 | Success (including empty dry-run) |
-| 1 | User error (unknown collection, bad preset, unknown `--phase`, `--dry-run` together with `--apply`, `--year-from` > `--year-to`, unknown `--type`, `--strict` lint findings, unknown `--item` key, LLM not enabled/misconfigured for `recover` / `summarize`, `recover` on Python < 3.11, note write refused) |
-| 2 | Environment: Zotero unreachable on `collections`, `run`, `attach`, `lint`, `fix-metadata`, `dedupe`, `gaps`, `recover`, or `summarize`. Prints **Next steps** (start Zotero, enable local API, `paperful doctor`) |
+| 1 | User error (unknown collection, bad preset, unknown `--phase`, `--dry-run` together with `--apply`, `--year-from` > `--year-to`, unknown `--type`, `--strict` lint findings, unknown `--item` key, LLM not enabled/misconfigured for `recover` / `summarize` / `synthesize`, `recover` on Python < 3.11, note write refused, `--to disk` together with `--apply` or `--report-collection`, `synthesize` still over budget after 3 reduce passes, `pack open` while one is open, `pack close` when none is open, unknown `--pdfs`) |
+| 2 | Environment: library unreachable on `collections`, `run`, `attach`, `lint`, `fix-metadata`, `dedupe`, `gaps`, `recover`, `summarize`, `synthesize`, `snapshot`, `restore`, `import --apply`, or `export`. Prints **Next steps** (Zotero local API, or Mendeley login, or EndNote `.enl`; then `paperful doctor`) |
 
 ## Run summary
 
@@ -187,7 +231,27 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
 
 ## Output
 
-- `out/<collection path>/Author - Year - Title.pdf`
+- `out/<collection>/<Author - Year - Title -- KEY>/record.json` — restore
+  record (`paperful.item.v1`). Identity, full creators, abstract, tags, Extra,
+  type-specific fields, collection membership, attachment rows, fetch
+  provenance, and note filenames. **0.x may add keys.** `run` writes this when
+  it saves a PDF. `snapshot` writes one for every scoped item, including items
+  with no PDF.
+- `out/<collection>/<Author - Year - Title -- KEY>/<file>.pdf` — the PDF, when
+  there is one. `run` always writes downloads here. `snapshot --pdfs all` also
+  exports a PDF already stored in Zotero (`origin: zotero_export`). `additional`
+  (the default) does not. `none` writes records and notes only and does not
+  delete PDFs already on disk.
+- `out/<collection>/…/notes/` — child-note HTML. A `state/summaries/<key>.html`
+  file is copied as `paperful-summary.html`.
+- `out/_index.jsonl` — one line per item key (`dirs`, `has_pdf`, `md5`).
+- `out/_collections.json` — collection tree.
+- `out/_history.json` — pointers at the append-only ledgers under `state/`
+  (manifest, patches, dedupe, runs). Sessions, cookies, and the local API key
+  are not copied.
+- A flat `Author - Year - Title.pdf` plus `*.paperful.json` left from an older
+  run is moved into the item folder on `snapshot` or the next `run` that saves
+  that file. The legacy card is folded into `record.json`.
 - `state/manifest.jsonl` — one line per item attempt; the latest line per item
   key wins. Statuses: `ok` (on disk), `attached` (on disk + in Zotero),
   `not_found`, `no_identifier`, `captcha`, `error`, `attach_failed`. `ok` /
@@ -207,14 +271,21 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
   `dedupe --apply`.
 - `state/pdf-cache/` — PDFs exported from the manager so lint can read text
   on disk (`pdftotext`, then `pypdf`).
-- `state/last-run.json` — latest auditable `run` report (summary + per-item
-  outcomes). Historical copies land in `state/runs/<timestamp>-<command>.json`
-  (`run`, or `fix-metadata` after `--apply`). `fix-metadata --apply` does
-  not overwrite `last-run.json`.
-- `state/summaries/` — HTML summaries from `summarize` before optional `--apply`
-  to Zotero.
+- `state/last-run.json` — latest auditable `run` or `recover` report (summary + per-item
+  outcomes). Other commands do not replace it. Historical copies land in
+  `state/runs/<timestamp>-<command>.json` (`run`, `recover`, `gaps`, `lint`,
+  `fix-metadata` for dry-run and `--apply`, `summarize`, `synthesize`).
+- `state/packs/<id>.json` — parent witness for one `pack open` … `pack close`
+  sequence (`paperful.pack.v1`). Steps point at filenames under `state/runs/`.
+  `state/packs/current` is the open id; `PAPERFUL_PACK=off` skips appending.
+- `state/summaries/` — HTML summaries from `summarize` when dest includes disk.
+- `state/reports/` — `synthesize` HTML report plus a JSON sidecar of source hashes.
 - `state/sessions/` — Chromium profile (`chromium/`) plus `meta.json` (no
   passwords). Gitignored; `chmod 700`. Netscape dumps also land here and as
   `ezproxy-cookies.txt` / `scholar-cookies.txt` for httpx.
 - `state/zotero-local-api-key.json` — the Zotero write key if you chose
   "Always Allow".
+- `state/mendeley-oauth.json` — Mendeley access/refresh tokens after
+  `session login mendeley` (mode `0600`).
+- `state/endnote-import/<stamp>/` — staged XML+PDF bundle for EndNote
+  File → Import. Paperful never edits the `.enl` database.

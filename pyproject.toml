@@ -1,7 +1,7 @@
 [project]
 name = "paperful"
 version = "0.5.0"
-description = "Fill the gaps in your Zotero library: fetch missing PDFs, save them in a collection-shaped folder tree, attach them back."
+description = "Local sidecar for a research library: fill missing PDFs, lint metadata, keep a quiet copy on disk. Zotero is the well-tested adapter; Mendeley and EndNote are seeking testers."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

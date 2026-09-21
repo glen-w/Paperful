@@ -3,7 +3,7 @@
 Vendor-by-vendor notes and longer capability tables. Most readers only need
 [How paperful compares](comparison.md).
 
-**Last reviewed:** 2026-09-10. Feature lists for other products are based on public
+**Last reviewed:** 2026-09-21. Feature lists for other products are based on public
 docs and positioning — not paid pilots.
 
 ## Capability snapshot
@@ -23,9 +23,14 @@ Legend: **Yes** · **Partial** · **No**.
 | Metadata lint / verify DOI | Yes | No | Yes | No | Yes | Yes | Partial |
 | Metadata apply | Yes | No | Yes | No | Yes | Yes | Partial |
 | Attachment / disk repair | No | Partial | Partial | Yes | No | Partial | No |
-| Dedupe / merge items | No | Partial | No | Partial | No | Yes | Partial |
+| Dedupe / merge items | Partial (`dedupe --apply` trashes extras; no field merge) | Partial | No | Partial | No | Yes | Partial |
 | CLI / automation | Yes | No | No | No | No | Yes | Yes (MCP) |
 | Disk-first then write-back | Yes | No | No | Partial | No | Partial | No |
+| Per-item folder you can restore from | Yes | No | No | No | No | No | No |
+| Copy PDFs **already in** Zotero onto disk | Partial (`snapshot --pdfs all`) | Partial (File → Export PDFs) | No | No | No | No (`export` is bibliography; `get_item_pdf_path` is a path) | Partial (`get_pdf_path`) |
+| Grey-literature landing playbooks | Yes | No | No | No | No | No | No |
+| Grounded summary / collection review | Partial (opt-in `summarize` / `synthesize`; text layer) | No | No | No | No | Partial (README: summarize PDFs into notes) | Yes (chat reads PDF text; the model writes the summary) |
+| OCR for scanned PDFs | No | No | No | No | No | Partial (`pdf-prep`, OCRmyPDF) | Partial (some forks, e.g. Docling OCR pre-step) |
 
 ### Zotero version and attach (indicative)
 
@@ -66,15 +71,15 @@ Verify against each project’s latest release before upgrading Zotero.
 ### paperful
 
 - **Sites:** [GitHub](https://github.com/glen-w/Paperful) · this repo
-- **Fit:** CLI gap-filler. Routed OA stack (including CORE with API key), optional EZProxy and Scholar cookies, opt-in Sci-Hub, collection-mirrored `out/` tree, `manifest.jsonl`, attach on Zotero 10+. Identifier verify (Crossref/OpenAlex/PubMed) + lint + `fix-metadata` on disk, then adapter write-back. `dedupe` writes a review pack and, with `--apply`, trashes extra parents (DOI, then title+year). `gaps` counts missing PDFs and DOIs.
-- **With others:** StorScan or Attanger when paths and linked files are wrong; zotero-agent when you need a real merge (children, notes), not only trash.
-- **Not a substitute for:** In-app plugin UX, or `.bib` hygiene tools.
+- **Fit:** Local library sidecar. Routed OA stack (including CORE with API key), optional EZProxy and Scholar cookies, opt-in Sci-Hub, grey-literature landing playbooks, collection-mirrored `out/` tree (`snapshot` / `restore`, including `snapshot --pdfs all` for PDFs already in Zotero, `manifest.jsonl`), attach on Zotero 10+. Identifier verify (Crossref/OpenAlex/PubMed) + lint + `fix-metadata` on disk, then adapter write-back. `dedupe` writes a review pack and, with `--apply`, trashes extra parents (DOI, then title+year). `gaps` counts missing PDFs and DOIs. Optional local `summarize` / `synthesize` and `recover` (last `run` lane after Scholar / EZProxy / htmlpdf fail, or `recover --item`; text layer; no OCR; not a chat agent). **Zotero is the well-tested adapter.** Mendeley (REST) and EndNote (read-only database plus an import bundle) are seeking testers.
+- **With others:** StorScan or Attanger when paths and linked files are wrong; zotero-agent when you need a real merge (children, notes), disk GC, or OCR of scans; zotero-mcp when the work is a conversation.
+- **Not a substitute for:** In-app plugin UX, `.bib` hygiene tools, or scan OCR.
 
 ### Zotero built-in
 
 - **Sites:** [Zotero](https://www.zotero.org/) · [custom PDF resolvers](https://www.zotero.org/support/kb/custom_pdf_resolvers)
-- **Fit:** Per-item **Find Available PDF**, identifier lookup, duplicate merge UI.
-- **With paperful:** Built-in capture on save; paperful for batch backfill.
+- **Fit:** Per-item **Find Available PDF**, identifier lookup, duplicate merge UI, File → Export PDFs (a one-off dump of files already on disk, not a restore ledger).
+- **With paperful:** Built-in capture on save; paperful for batch backfill and for `snapshot` / `restore` when Zotero file storage is the wrong warehouse.
 
 ### zotero-zotadata
 
@@ -103,14 +108,14 @@ Verify against each project’s latest release before upgrading Zotero.
 ### zotero-agent
 
 - **Sites:** [GitHub](https://github.com/alex-roc/zotero-agent)
-- **Fit:** Local-first CLI and MCP via bridge plugin — search, dedupe, merge, enrich, `pdf-fetch`.
-- **With paperful:** Agent for hygiene; paperful for collection runs with manifest and folder mirror.
+- **Fit:** Local-first CLI and MCP via bridge plugin — search, dedupe, merge, enrich, `pdf-fetch`, PDF notes, and `pdf-prep` OCR (OCRmyPDF) for scans. `export` writes bibliography formats, not a PDF folder tree.
+- **With paperful:** Agent for hygiene, merge, and scans; paperful for collection runs with a manifest, EZProxy, grey-lit playbooks, and a folder you can restore from.
 
 ### zotero-mcp ecosystem
 
 - **Sites:** [richardjlyon/zotero-mcp](https://github.com/richardjlyon/zotero-mcp) · [cookjohn/zotero-mcp](https://github.com/cookjohn/zotero-mcp) · [mcp-zotero](https://github.com/Xevos117/mcp-zotero)
-- **Fit:** LLM-facing search, PDF text, create items, sometimes Unpaywall attach.
-- **With paperful:** MCP for interactive research; paperful for unattended gap fills.
+- **Fit:** LLM-facing search, PDF text, create items, sometimes Unpaywall attach. Some forks OCR scans (Docling) or write reading notes from chat.
+- **With paperful:** MCP when a person is in the loop, or when the PDF is a scan; paperful for unattended collection runs, the disk ledger, and batch `summarize` / `synthesize` on a text layer.
 
 ### ZotFile (legacy)
 
@@ -132,7 +137,7 @@ Verify against each project’s latest release before upgrading Zotero.
 
 ### Mendeley
 
-- **Fit:** Reference Manager **Duplicates** smart collection; Desktop merge UI. paperful’s `manager = "mendeley"` is not implemented yet — import or sync into Zotero first.
+- **Fit:** Reference Manager **Duplicates** smart collection; Desktop merge UI. paperful can set `manager = "mendeley"` (REST, OAuth). That adapter is **seeking testers**. Zotero is the well-tested path.
 
 ### paperscraper
 
@@ -143,14 +148,20 @@ Verify against each project’s latest release before upgrading Zotero.
 ## Choosing in one glance
 
 ```text
-Need to export PDFs already in Zotero storage to a folder?
-  → pyzotero dump (not paperful)
+Need PDFs already in Zotero copied into a collection-shaped tree, with a record per item?
+  → paperful snapshot --pdfs all
+
+Need a one-off dump of those PDFs from the Zotero UI?
+  → File → Export PDFs
 
 Need tablet send/get after ZotFile died?
   → ZotMoov custom menus (+ Attanger)
 
-Need LLM to fix one paper’s metadata while writing?
-  → zotero-mcp
+Need LLM to fix one paper’s metadata while writing, or to read a scan?
+  → zotero-mcp (some forks OCR); zotero-agent `pdf-prep` for a local OCR pass
+
+Need a grounded summary of many text-layer PDFs, then one collection review?
+  → paperful summarize, then synthesize
 
 Need reproducible .bib for a paper submission?
   → bibcite fix / bibtex-tidy

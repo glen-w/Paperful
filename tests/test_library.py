@@ -9,6 +9,7 @@ import pytest
 from paperful.library import (
     LibraryError,
     ZoteroBackend,
+    collection_note_payload,
     created_item_key,
     get_backend,
     note_payload,
@@ -21,14 +22,30 @@ def test_get_backend_zotero_default(cfg):
     assert isinstance(backend, ZoteroBackend)
 
 
-def test_get_backend_mendeley_not_implemented(cfg):
+def test_get_backend_mendeley_returns_backend(cfg):
+    from paperful.mendeley import MendeleyBackend
+
     cfg.manager = "mendeley"
-    with pytest.raises(LibraryError, match="Mendeley"):
+    backend = get_backend(cfg)
+    assert isinstance(backend, MendeleyBackend)
+
+
+def test_get_backend_endnote_needs_a_library(cfg):
+    cfg.manager = "endnote"
+    with pytest.raises(LibraryError, match="[Ee]ndnote"):
         get_backend(cfg)
 
 
-def test_get_backend_unknown(cfg):
+def test_get_backend_endnote(cfg, tmp_path):
+    from paperful.endnote import EndNoteBackend
+
     cfg.manager = "endnote"
+    cfg.endnote_library = tmp_path / "Lib.enl"
+    assert isinstance(get_backend(cfg), EndNoteBackend)
+
+
+def test_get_backend_unknown(cfg):
+    cfg.manager = "jabref"
     with pytest.raises(LibraryError, match="Unknown"):
         get_backend(cfg)
 
@@ -188,3 +205,118 @@ def test_create_or_update_note_updates_existing(cfg):
     key = backend.create_or_update_note("ITEM0001", "<p>new</p>", "paperful-summary")
     assert key == "NOTE1"
     assert backend.zl.zot.updated["data"]["note"] == "<p>new</p>"
+
+
+def test_collection_note_payload_has_no_parent():
+    payload = collection_note_payload("<p>r</p>", ["paperful-report", "paperful-report:bbnj"], "COL1")
+    assert payload["itemType"] == "note"
+    assert "parentItem" not in payload
+    assert payload["collections"] == ["COL1"]
+    assert payload["tags"] == [{"tag": "paperful-report"}, {"tag": "paperful-report:bbnj"}]
+
+
+def test_read_child_note_returns_html(cfg):
+    class FakeZot:
+        def children(self, key):
+            return [
+                {
+                    "key": "NOTE1",
+                    "data": {
+                        "itemType": "note",
+                        "tags": [{"tag": "paperful-summary"}],
+                    },
+                }
+            ]
+
+        def item(self, key):
+            return {"data": {"note": "<p>from zotero</p>"}}
+
+    class ZL:
+        def __init__(self):
+            self.zot = FakeZot()
+
+    backend = ZoteroBackend(cfg, ZL())
+    assert backend.read_child_note("ITEM0001", "paperful-summary") == "<p>from zotero</p>"
+    assert backend.read_child_note("ITEM0001", "other") is None
+
+
+def test_create_collection_note_then_update(cfg):
+    class FakeZot:
+        def __init__(self):
+            self.created = None
+            self.updated = None
+            self.local_api_key = "k"
+            self._notes = []
+
+        def everything(self, items):
+            return items
+
+        def collection_items_top(self, key):
+            return list(self._notes)
+
+        def create_items(self, payload):
+            self.created = payload
+            self._notes.append(
+                {
+                    "key": "R1",
+                    "data": {
+                        "itemType": "note",
+                        "note": payload[0]["note"],
+                        "tags": payload[0]["tags"],
+                        "collections": payload[0]["collections"],
+                    },
+                }
+            )
+            return {"success": {"0": "R1"}}
+
+        def item(self, key):
+            return {"key": key, "data": {"note": "<p>old</p>", "tags": [], "version": 1}}
+
+        def update_item(self, raw):
+            self.updated = raw
+
+    class ZL:
+        def __init__(self):
+            self.zot = FakeZot()
+
+    backend = ZoteroBackend(cfg, ZL())
+    backend._ensure_write = lambda: None
+    tags = ["paperful-report", "paperful-report:bbnj"]
+    assert backend.create_or_update_collection_note("COL1", "<p>v1</p>", tags) == "R1"
+    assert backend.zl.zot.created[0]["collections"] == ["COL1"]
+    assert "parentItem" not in backend.zl.zot.created[0]
+    assert backend.create_or_update_collection_note("COL1", "<p>v2</p>", tags) == "R1"
+    assert backend.zl.zot.updated["data"]["note"] == "<p>v2</p>"
+    assert backend.zl.zot.created[0]["note"] == "<p>v1</p>"
+
+
+def test_collection_note_search_skips_child_notes(cfg):
+    class FakeZot:
+        def everything(self, items):
+            return items
+
+        def collection_items_top(self, key):
+            return [
+                {
+                    "key": "CHILD",
+                    "data": {
+                        "itemType": "note",
+                        "parentItem": "ITEM1",
+                        "tags": [{"tag": "paperful-report:bbnj"}],
+                    },
+                },
+                {
+                    "key": "TOP",
+                    "data": {
+                        "itemType": "note",
+                        "tags": [{"tag": "paperful-report:bbnj"}],
+                    },
+                },
+            ]
+
+    class ZL:
+        def __init__(self):
+            self.zot = FakeZot()
+
+    backend = ZoteroBackend(cfg, ZL())
+    assert backend.find_collection_note_keys("COL1", "paperful-report:bbnj") == ["TOP"]

@@ -5,9 +5,20 @@
 # Required by Unpaywall.
 email = "you@example.org"
 
-# Library adapter. zotero is implemented; mendeley is reserved for a later write-back.
+# Library adapter. zotero is well tested — use that.
+# mendeley and endnote are in the tree and seeking testers. Do not treat them as proven.
+# Mendeley: register an app at https://dev.mendeley.com/myapps.html
+#   (redirect http://127.0.0.1:8765/callback), then: paperful session login mendeley
+# EndNote: point library at the .enl. Writes land in state/endnote-import/ for File → Import.
+#   paperful does not edit the EndNote database.
 # Work (fetch, lint, patches) happens on disk; the manager is only read/write at the edges.
 manager = "zotero"
+# [mendeley]
+# client_id = ""
+# client_secret = ""
+# # redirect_uri = "http://127.0.0.1:8765/callback"
+# [endnote]
+# library = "/path/to/Library.enl"
 
 # Where PDFs land. Sub-folders mirror the Zotero collection path.
 # Prefer relative paths (resolved against this config's folder; Compose mounts that folder at /data).
@@ -95,7 +106,7 @@ mirror_failures_before_skip = 3
 # Setup, model advice, and troubleshooting: docs/llm.md
 #   ollama pull qwen2.5:7b          # local default; no Python extra needed
 #   uv sync --extra llm             # LiteLLM for paid / OpenAI-compatible APIs (keys via env)
-#   uv sync --extra browser-agent   # `paperful recover` (Python 3.11+)
+#   uv sync --extra browser-agent   # last `run` lane + `paperful recover` (Python 3.11+)
 # [llm]
 # enabled = false
 # provider = "ollama"            # ollama | litellm
@@ -104,6 +115,7 @@ mirror_failures_before_skip = 3
 # # api_base = ""                # LiteLLM / OpenAI-compatible base URL
 # # allow_remote = false         # true for a non-loopback Ollama (Docker: host.docker.internal)
 # timeout_s = 120
+# max_num_ctx = 32768             # cap for Ollama num_ctx on summarize / synthesize
 # [fix_metadata]
 # llm_title = false              # grounded title proposals → metadata-patches.jsonl
 # [lint]
@@ -112,8 +124,39 @@ mirror_failures_before_skip = 3
 # [summarize]
 # prompt_template = "default"    # or "prompts/summary.md"
 # max_context_chars = 24000
-# tag = "paperful-summary"       # child-note tag; --apply updates, never duplicates
+# tag = "paperful-summary"       # child-note tag; re-runs update, never duplicate
+# dest = "both"                  # disk | zotero | both. disk keeps the Zotero tree clean
+# [synthesize]
+# prompt_template = "default"
+# max_context_chars = 24000
+# tag = "paperful-report"
+# dest = "both"
+# # timeout_s = 300              # default max(llm.timeout_s, 300)
 # [browser_agent]
 # max_steps = 20
 # max_wall_s = 300
+# during_run = true              # last serial lane after Scholar / EZProxy / htmlpdf fail
 # # model = "qwen2.5:14b"        # larger model for browsing only
+
+# Named run configs (not grey-lit playbooks). Same keys work in profiles/<name>.toml
+# beside this file. Select with: paperful all --profile bbnj-journal
+# See docs/workflows.md.
+# [profiles.bbnj-journal]
+# description = "BBNJ journal articles 2021–2026"
+# collections = ["BBNJ"]
+# types = ["journalArticle"]
+# year_from = 2021
+# year_to = 2026
+# try_all = true
+# retry_failed = true
+# upgrade_linked = true
+# apply = true
+# steps = ["gaps", "run", "lint", "fix-metadata", "summarize"]
+
+# Quiet mirror. snapshot copies existing Zotero PDFs only when pdfs = "all".
+# additional — keep PDFs paperful fetched; do not export files already in Zotero
+# all        — also export imported/linked-file PDFs into the item folder
+# none       — records and notes only; do not delete PDFs already on disk
+# run always writes PDFs it downloads, whatever this is set to.
+[mirror]
+pdfs = "additional"

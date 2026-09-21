@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import sys
 import time
+from enum import Enum
 from pathlib import Path
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -21,8 +23,17 @@ from rich.progress import (
 from rich.table import Table
 
 from . import __version__
-from .attach import Attacher
-from .config import RECOVER_DISCLAIMER, SCIHUB_DISCLAIMER, SOURCE_PRESETS, Config, load_config
+from .config import (
+    KNOWN_MANAGERS,
+    RECOVER_DISCLAIMER,
+    SCIHUB_DISCLAIMER,
+    SOURCE_PRESETS,
+    Config,
+    load_config,
+    parse_pdfs,
+    wants_disk,
+    wants_zotero,
+)
 from .doctor import (
     Check,
     actionable_checks,
@@ -32,9 +43,31 @@ from .doctor import (
     run_checks,
 )
 from .library import LibraryBackend, LibraryError, get_backend
+from .pack import PackError, close_pack, current_id, open_pack, pack_join_disabled
 from .pipeline import Pipeline, RunStats, make_client
-from .routing import filter_sources_for_item_types, filter_sources_for_year_scope, sources_for_item
-from .runreport import build_report, print_run_summary, write_run_report
+from .routing import (
+    filter_sources_for_item_types,
+    filter_sources_for_year_scope,
+    sources_for_item,
+    with_recover_lane,
+)
+from .run_config import (
+    ProfileListing,
+    ResolvedRunConfig,
+    RunConfigError,
+    collect_save_body,
+    format_effective,
+    list_profiles,
+    resolve_run_config,
+    save_profile,
+)
+from .runreport import (
+    ItemOutcome,
+    build_report,
+    print_run_summary,
+    write_command_report,
+    write_run_report,
+)
 from .sources import Context
 from .sources.scihub import ping_mirrors
 from .store import STATUS_ATTACHED, STATUS_NOT_FOUND, Manifest
@@ -48,7 +81,7 @@ from .zot import (
 app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
-    help="Fetch missing PDFs for Zotero items.",
+    help="Local sidecar for your research library: fill missing PDFs, lint metadata, keep a disk copy. Zotero is the well-tested adapter. Mendeley and EndNote are seeking testers.",
 )
 session_app = typer.Typer(
     add_completion=False,
@@ -56,10 +89,40 @@ session_app = typer.Typer(
     help="Local browser session vault for Scholar, EZProxy, and publishers.",
 )
 app.add_typer(session_app, name="session")
+pack_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Group command reports from one operator sequence.",
+)
+app.add_typer(pack_app, name="pack")
+profile_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Named run configs (SCOPE + policy). Not grey-lit playbooks.",
+)
+app.add_typer(profile_app, name="profile")
 console = Console(highlight=False)
 
 ConfigOpt = typer.Option(
     None, "--config", "-c", help="Path to config.toml", exists=True, dir_okay=False
+)
+ProfileOpt = typer.Option(
+    None,
+    "--profile",
+    help="Named run config from [profiles.*] or profiles/<name>.toml beside config.toml.",
+)
+RunConfigFileOpt = typer.Option(
+    None,
+    "--run-config",
+    "-f",
+    help="Run-config TOML file. Overlays --profile when both are set.",
+    exists=True,
+    dir_okay=False,
+)
+LibraryOpt = typer.Option(
+    None,
+    "--library/--no-library",
+    help="Whole library instead of --collection. --no-library clears library = true on a profile.",
 )
 YearFromOpt = typer.Option(
     None,
@@ -80,6 +143,100 @@ ItemTypeOpt = typer.Option(
         "e.g. journalArticle, 'Journal Article', report)."
     ),
 )
+TryAllOpt = typer.Option(
+    None,
+    "--try-all/--no-try-all",
+    help=(
+        "Try every configured source even when item metadata looks inapplicable. "
+        "--no-try-all turns a profile default off."
+    ),
+)
+RetryFailedOpt = typer.Option(
+    None,
+    "--retry-failed/--no-retry-failed",
+    help="Retry items previously marked not_found. --no-retry-failed turns a profile default off.",
+)
+UpgradeLinkedOpt = typer.Option(
+    None,
+    "--upgrade-linked/--no-upgrade-linked",
+    help=(
+        "Also fetch items that only have a linked PDF URL. "
+        "--no-upgrade-linked turns a profile default off."
+    ),
+)
+NoAttachOpt = typer.Option(
+    None,
+    "--no-attach/--attach",
+    help="Do not attach PDFs into Zotero. --attach turns a profile's no_attach off.",
+)
+SciHubOpt = typer.Option(
+    None,
+    "--scihub/--no-scihub",
+    help=(
+        "Opt in to Sci-Hub for this run (off by default; legal grey zone in some jurisdictions). "
+        "--no-scihub turns a profile default off."
+    ),
+)
+ApplyOpt = typer.Option(
+    None,
+    "--apply/--no-apply",
+    help="Write changes (metadata, summaries, or optional steps). --no-apply keeps the dry-run.",
+)
+OverwriteOpt = typer.Option(
+    None,
+    "--overwrite/--no-overwrite",
+    help="Replace title/date/venue even when already set.",
+)
+StepsOpt = typer.Option(
+    None,
+    "--steps",
+    help="Comma-separated commands, replacing the profile step list.",
+)
+SkipOpt = typer.Option(
+    [],
+    "--skip",
+    help="Omit this step (repeatable or comma-separated).",
+)
+
+
+def _bind_run(cfg: Config, **kwargs: Any) -> ResolvedRunConfig:
+    try:
+        return resolve_run_config(cfg, **kwargs)
+    except RunConfigError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+
+
+def _scope_unset(
+    collection: list[str],
+    library: bool | None,
+    profile: str | None,
+    run_config: Path | None,
+) -> bool:
+    return not profile and run_config is None and not collection and library is None
+
+
+def _refuse_missing_scope() -> None:
+    console.print("[red]Give --collection PATH (repeatable) or --library.[/]")
+    raise typer.Exit(1)
+
+
+def _take_scope(
+    bound: ResolvedRunConfig,
+) -> tuple[list[str], bool, int | None, int | None, list[str]]:
+    return (
+        bound.collections,
+        bound.library,
+        bound.year_from,
+        bound.year_to,
+        bound.types,
+    )
+
+
+class WriteDest(str, Enum):
+    disk = "disk"
+    zotero = "zotero"
+    both = "both"
 
 
 def _item_progress() -> Progress:
@@ -97,7 +254,11 @@ def _item_progress() -> Progress:
 
 
 def _cfg(path: Path | None) -> Config:
-    cfg = load_config(path)
+    try:
+        cfg = load_config(path)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
     cfg.out_dir.mkdir(parents=True, exist_ok=True)
     cfg.state_dir.mkdir(parents=True, exist_ok=True)
     return cfg
@@ -150,7 +311,27 @@ def _zotero(*, quiet: bool = False) -> ZoteroLocal:
     return zl
 
 
-def _print_exit_ladder() -> None:
+def _print_exit_ladder(cfg: Config | None = None) -> None:
+    manager = (cfg.manager if cfg else "zotero") or "zotero"
+    manager = manager.strip().lower()
+    if manager == "mendeley":
+        console.print(
+            "\n[bold]Next steps[/]\n"
+            "  1. Register an app at https://dev.mendeley.com/myapps.html\n"
+            "     (redirect http://127.0.0.1:8765/callback).\n"
+            "  2. Set [mendeley] client_id / client_secret in config.toml.\n"
+            "  3. Run [bold]paperful session login mendeley[/].\n"
+            "  4. Run [bold]paperful doctor[/].\n"
+        )
+        return
+    if manager == "endnote":
+        console.print(
+            "\n[bold]Next steps[/]\n"
+            "  1. Set [endnote] library = \"/path/to/Library.enl\".\n"
+            "  2. Confirm the matching .Data folder (sdb/sdb.eni, PDF/) is beside it.\n"
+            "  3. Run [bold]paperful doctor[/].\n"
+        )
+        return
     console.print(
         "\n[bold]Next steps[/]\n"
         "  1. Start Zotero on this machine.\n"
@@ -160,9 +341,9 @@ def _print_exit_ladder() -> None:
     )
 
 
-def _exit_env(message: str) -> None:
+def _exit_env(message: str, cfg: Config | None = None) -> None:
     console.print(f"[red]{message}[/]")
-    _print_exit_ladder()
+    _print_exit_ladder(cfg)
     raise typer.Exit(2)
 
 
@@ -171,13 +352,56 @@ def _warn_if_scihub(source_list: list[str]) -> None:
         console.print(f"[yellow]{SCIHUB_DISCLAIMER}[/]")
 
 
+def _warn_if_recover(source_list: list[str]) -> None:
+    if "browser_agent" in source_list:
+        console.print(f"[yellow]{RECOVER_DISCLAIMER}[/]")
+
+
 def _require_manager(cfg: Config) -> None:
-    if (cfg.manager or "zotero").strip().lower() != "zotero":
+    manager = (cfg.manager or "zotero").strip().lower()
+    if manager not in KNOWN_MANAGERS:
         console.print(
-            f'[red]manager={cfg.manager!r} is not implemented.[/] Set manager = "zotero" '
-            "(Mendeley write-back comes later)."
+            f"[red]Unknown manager={manager!r}.[/] Known: zotero, mendeley, endnote."
         )
         raise typer.Exit(1)
+
+
+def _connect(cfg: Config, *, quiet: bool = False) -> LibraryBackend:
+    manager = (cfg.manager or "zotero").strip().lower()
+    if manager == "zotero":
+        zl = _zotero(quiet=quiet)
+        return get_backend(cfg, zl)
+    try:
+        backend = get_backend(cfg)
+        info = backend.ping()
+    except LibraryError as exc:
+        _exit_env(str(exc), cfg)
+    except Exception as exc:
+        _exit_env(f"Cannot reach {manager}: {exc}", cfg)
+    if not quiet:
+        if manager == "mendeley":
+            who = info.get("display_name") or "?"
+            console.print(f"[dim]Mendeley {who}, write support: yes[/]")
+        elif manager == "endnote":
+            console.print(
+                f"[dim]EndNote {info.get('library') or '?'}, "
+                f"{info.get('refs', '?')} refs, writes via import bundle[/]"
+            )
+    return backend
+
+
+def _flush(backend: LibraryBackend) -> None:
+    fn = getattr(backend, "flush_writes", None)
+    if not callable(fn):
+        return
+    path = fn()
+    if path is None:
+        return
+    console.print(f"[green]EndNote import bundle[/] {path}")
+    console.print(
+        "[dim]In EndNote: File → Import → File → paperful.xml "
+        "(import option: EndNote Generated XML).[/]"
+    )
 
 
 def _scope_keys(
@@ -362,7 +586,7 @@ def doctor(
         )
 
     if has_red(checks):
-        _print_exit_ladder()
+        _print_exit_ladder(cfg)
         raise typer.Exit(2)
 
 
@@ -371,11 +595,10 @@ def collections(config: Path | None = ConfigOpt) -> None:
     """Show the collection tree with item counts and how many lack a PDF."""
     cfg = _cfg(config)
     _require_manager(cfg)
-    zl = _zotero()
-    backend = get_backend(cfg, zl)
+    backend = _connect(cfg)
     cols = backend.collections()
     counts = backend.collection_counts()
-    table = Table(title="Zotero collections (counts include subcollections)")
+    table = Table(title=f"{cfg.manager} collections (counts include subcollections)")
     table.add_column("Path")
     table.add_column("Items", justify="right")
     table.add_column("No PDF", justify="right")
@@ -392,28 +615,41 @@ def lint(
     collection: list[str] = typer.Option(
         [], "--collection", "-C", help="Collection path/name/key (repeatable)."
     ),
-    library: bool = typer.Option(
-        False, "--library", help="Whole library instead of collections."
-    ),
+    library: bool | None = LibraryOpt,
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
     as_json: bool = typer.Option(False, "--json", help="Machine-readable findings."),
     strict: bool = typer.Option(False, "--strict", help="Exit 1 if any finding."),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Read-only check of identifiers vs APIs and PDF text on disk. Does not write to the manager."""
     from .lint import lint_items
     from .pipeline import make_client
 
-    if not collection and not library:
-        console.print("[red]Give --collection PATH (repeatable) or --library.[/]")
-        raise typer.Exit(1)
+    if _scope_unset(collection, library, profile, run_config):
+        _refuse_missing_scope()
     cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=limit,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    limit = bound.limit
+    if not collection and not library:
+        _refuse_missing_scope()
     _require_manager(cfg)
-    zl = _zotero(quiet=as_json)
-    backend = get_backend(cfg, zl)
+    backend = _connect(cfg, quiet=as_json)
     keys, scope = _scope_keys(backend, collection, library)
     items, scope = _apply_item_filters(
         backend.items_in_scope(keys),
@@ -427,8 +663,29 @@ def lint(
     manifest = Manifest(cfg.manifest_path)
     if not as_json:
         console.print(f"Scope: [bold]{scope}[/] — linting {len(items)} items")
+    started = time.time()
     findings = lint_items(
         make_client(cfg), cfg, items, backend=backend, manifest=manifest
+    )
+    by_code: dict[str, int] = {}
+    for finding in findings:
+        by_code[finding.code] = by_code.get(finding.code, 0) + 1
+    write_command_report(
+        cfg,
+        command="lint",
+        scope=scope,
+        summary={"findings": len(findings), "findings_by_code": by_code},
+        items=[
+            {
+                "itemKey": finding.itemKey,
+                "title": finding.title,
+                "status": finding.code,
+                "reason": finding.detail,
+            }
+            for finding in findings
+        ],
+        flags={"strict": strict},
+        started=started,
     )
     if as_json:
         console.print(json.dumps([f.__dict__ for f in findings], indent=2))
@@ -452,19 +709,15 @@ def fix_metadata(
     collection: list[str] = typer.Option(
         [], "--collection", "-C", help="Collection path/name/key (repeatable)."
     ),
-    library: bool = typer.Option(
-        False, "--library", help="Whole library instead of collections."
-    ),
+    library: bool | None = LibraryOpt,
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
-    apply: bool = typer.Option(
-        False, "--apply", help="Write patches to the library (default is dry-run)."
-    ),
-    overwrite: bool = typer.Option(
-        False, "--overwrite", help="Replace title/date/venue even when already set."
-    ),
+    apply: bool | None = ApplyOpt,
+    overwrite: bool | None = OverwriteOpt,
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Propose bibliographic patches on disk; --apply writes them through the library adapter.
@@ -474,13 +727,31 @@ def fix_metadata(
     from .metadata import apply_patches, collect_patches, write_patches
     from .pipeline import make_client
 
-    if not collection and not library:
-        console.print("[red]Give --collection PATH (repeatable) or --library.[/]")
-        raise typer.Exit(1)
+    if _scope_unset(collection, library, profile, run_config):
+        _refuse_missing_scope()
     cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        use_apply=True,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=limit,
+        apply=apply,
+        overwrite=overwrite,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    limit = bound.limit
+    apply = bound.apply
+    overwrite = bound.overwrite
+    if not collection and not library:
+        _refuse_missing_scope()
     _require_manager(cfg)
-    zl = _zotero()
-    backend = get_backend(cfg, zl)
+    backend = _connect(cfg)
     keys, scope = _scope_keys(backend, collection, library)
     items, scope = _apply_item_filters(
         backend.items_in_scope(keys),
@@ -493,6 +764,7 @@ def fix_metadata(
         items = items[:limit]
     manifest = Manifest(cfg.manifest_path)
     client = make_client(cfg)
+    started = time.time()
     patches = collect_patches(
         client, cfg, items, backend=backend, manifest=manifest, overwrite=overwrite
     )
@@ -520,17 +792,35 @@ def fix_metadata(
         console.print(
             "Dry-run. Pass [bold]--apply[/] to write these fields into the library."
         )
+        _write_fix_report(
+            cfg,
+            scope,
+            patches,
+            field_counts,
+            applied=None,
+            errors=[],
+            apply=False,
+            started=started,
+        )
         return
     if not backend.supports_write():
-        _exit_env(
-            "This Zotero has no local write API. Upgrade to Zotero 10+ to apply metadata."
-        )
+        _exit_env("This library has no write support.", cfg)
     try:
         ok, errors = apply_patches(backend, patches)
     except LibraryError as exc:
-        _exit_env(str(exc))
+        _exit_env(str(exc), cfg)
+    _flush(backend)
     _print_fix_summary(len(patches), field_counts, applied=ok, errors=errors)
-    _write_fix_report(cfg, scope, patches, field_counts, applied=ok, errors=errors)
+    _write_fix_report(
+        cfg,
+        scope,
+        patches,
+        field_counts,
+        applied=ok,
+        errors=errors,
+        apply=True,
+        started=started,
+    )
 
 
 def _print_fix_summary(
@@ -559,25 +849,27 @@ def _write_fix_report(
     patches: list,
     field_counts: dict[str, int],
     *,
-    applied: int,
+    applied: int | None,
     errors: list[str],
+    apply: bool,
+    started: float | None = None,
 ) -> None:
-    from .runreport import write_run_report
-
-    report = {
-        "schema": "paperful.run_report.v1",
-        "command": "fix-metadata",
-        "scope": scope,
-        "summary": {
-            "fields_corrected": sum(field_counts.values()),
-            "fields_corrected_by_kind": field_counts,
-            "patches_proposed": len(patches),
-            "patches_applied": applied,
-            "errors_by_type": {"apply_failed": len(errors)} if errors else {},
-            "pdfs_downloaded": 0,
-            "sources_checked": {},
-        },
-        "items": [
+    summary: dict = {
+        "fields_corrected": sum(field_counts.values()),
+        "fields_corrected_by_kind": field_counts,
+        "patches_proposed": len(patches),
+        "errors_by_type": {"apply_failed": len(errors)} if errors else {},
+        "pdfs_downloaded": 0,
+        "sources_checked": {},
+    }
+    if applied is not None:
+        summary["patches_applied"] = applied
+    write_command_report(
+        cfg,
+        command="fix-metadata",
+        scope=scope,
+        summary=summary,
+        items=[
             {
                 "itemKey": p.itemKey,
                 "title": p.title,
@@ -588,10 +880,11 @@ def _write_fix_report(
             }
             for p in patches
         ],
-        "errors": errors,
-        "paths": {"state_dir": str(cfg.state_dir), "patches": str(cfg.patches_path)},
-    }
-    write_run_report(cfg, report, as_last_run=False)
+        flags={"apply": apply},
+        started=started,
+        errors=errors,
+        extra_paths={"patches": str(cfg.patches_path)},
+    )
 
 
 @app.command()
@@ -599,17 +892,15 @@ def dedupe(
     collection: list[str] = typer.Option(
         [], "--collection", "-C", help="Collection path/name/key (repeatable)."
     ),
-    library: bool = typer.Option(
-        False, "--library", help="Whole library instead of collections."
-    ),
+    library: bool | None = LibraryOpt,
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
         help="Write the pack only. This is the default; do not combine with --apply.",
     ),
-    apply: bool = typer.Option(
-        False,
-        "--apply",
+    apply: bool | None = typer.Option(
+        None,
+        "--apply/--no-apply",
         help="Trash high_doi extras (Zotero 10+). Title+year needs --apply-medium.",
     ),
     apply_medium: bool = typer.Option(
@@ -629,30 +920,48 @@ def dedupe(
     as_json: bool = typer.Option(
         False, "--json", help="Print pack paths and counts as JSON."
     ),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Find duplicate parents and write a review pack. Trash only with --apply.
 
     Default is classify-only. Same-DOI groups whose titles diverge are held.
+    A profile's ``apply`` flag does not trash; pass --apply on this command.
     """
     from .dedupe import PHASES, apply_trash, classify, pack_counts, write_pack
 
-    if dry_run and apply:
-        console.print("[red]Pass either --dry-run or --apply, not both.[/]")
-        raise typer.Exit(1)
     phase_name = phase.strip().lower()
     if phase_name not in PHASES:
         console.print(
             f"[red]Unknown phase '{phase}'.[/] Known: {', '.join(PHASES)}"
         )
         raise typer.Exit(1)
-    if not collection and not library:
-        console.print("[red]Give --collection PATH (repeatable) or --library.[/]")
-        raise typer.Exit(1)
+    if _scope_unset(collection, library, profile, run_config):
+        _refuse_missing_scope()
     cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=limit,
+        apply=apply,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    limit = bound.limit
+    apply = bound.apply
+    if dry_run and apply:
+        console.print("[red]Pass either --dry-run or --apply, not both.[/]")
+        raise typer.Exit(1)
+    if not collection and not library:
+        _refuse_missing_scope()
     _require_manager(cfg)
-    zl = _zotero(quiet=as_json)
-    backend = get_backend(cfg, zl)
+    backend = _connect(cfg, quiet=as_json)
     keys, scope = _scope_keys(backend, collection, library)
     items, scope = _apply_item_filters(
         backend.items_in_scope(keys),
@@ -676,9 +985,7 @@ def dedupe(
     errors: list[str] = []
     if apply:
         if not backend.supports_write():
-            _exit_env(
-                "This Zotero has no local write API. Upgrade to Zotero 10+ to dedupe --apply."
-            )
+            _exit_env("This library has no write support.", cfg)
         try:
             applied, errors = apply_trash(
                 backend,
@@ -754,13 +1061,13 @@ def gaps(
     collection: list[str] = typer.Option(
         [], "--collection", "-C", help="Collection path/name/key (repeatable)."
     ),
-    library: bool = typer.Option(
-        False, "--library", help="Whole library instead of collections."
-    ),
+    library: bool | None = LibraryOpt,
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
     as_json: bool = typer.Option(False, "--json", help="Print counts as JSON."),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Count items with no stored PDF, a linked PDF URL only, or no DOI.
@@ -769,13 +1076,24 @@ def gaps(
     """
     from .dedupe import summarize_gaps
 
-    if not collection and not library:
-        console.print("[red]Give --collection PATH (repeatable) or --library.[/]")
-        raise typer.Exit(1)
+    if _scope_unset(collection, library, profile, run_config):
+        _refuse_missing_scope()
     cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    if not collection and not library:
+        _refuse_missing_scope()
     _require_manager(cfg)
-    zl = _zotero(quiet=as_json)
-    backend = get_backend(cfg, zl)
+    backend = _connect(cfg, quiet=as_json)
     keys, scope = _scope_keys(backend, collection, library)
     items, scope = _apply_item_filters(
         backend.items_in_scope(keys),
@@ -784,6 +1102,7 @@ def gaps(
         year_to=year_to,
         item_types=_resolve_types(item_type),
     )
+    started = time.time()
     counts = summarize_gaps(items)
     payload = {
         "scope": scope,
@@ -792,6 +1111,32 @@ def gaps(
         "linked_url_only": counts.linked_url_only,
         "missing_doi": counts.missing_doi,
     }
+    rows = []
+    for it in items:
+        codes: list[str] = []
+        if not it.has_pdf:
+            codes.append("no_stored_pdf")
+        if it.has_linked_url and not it.has_pdf:
+            codes.append("linked_url_only")
+        if not it.doi:
+            codes.append("missing_doi")
+        if codes:
+            rows.append(
+                {"itemKey": it.key, "title": it.title, "status": ",".join(codes)}
+            )
+    write_command_report(
+        cfg,
+        command="gaps",
+        scope=scope,
+        summary={
+            "items": counts.items,
+            "no_stored_pdf": counts.no_stored_pdf,
+            "linked_url_only": counts.linked_url_only,
+            "missing_doi": counts.missing_doi,
+        },
+        items=rows,
+        started=started,
+    )
     if as_json:
         console.print(
             json.dumps(payload, indent=2), soft_wrap=True, highlight=False, markup=False
@@ -823,9 +1168,7 @@ def run(
         "-C",
         help="Collection path/name/key (repeatable). Subcollections included.",
     ),
-    library: bool = typer.Option(
-        False, "--library", help="Whole library instead of collections."
-    ),
+    library: bool | None = LibraryOpt,
     dry_run: bool = typer.Option(
         False, "--dry-run", help="List what would be fetched; no network beyond Zotero."
     ),
@@ -833,17 +1176,9 @@ def run(
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
-    no_attach: bool = typer.Option(
-        False, "--no-attach", help="Do not attach PDFs into Zotero."
-    ),
-    retry_failed: bool = typer.Option(
-        False, "--retry-failed", help="Retry items previously marked not_found."
-    ),
-    try_all: bool = typer.Option(
-        False,
-        "--try-all",
-        help="Try every configured source even when item metadata looks inapplicable (overrides source_routing).",
-    ),
+    no_attach: bool | None = NoAttachOpt,
+    retry_failed: bool | None = RetryFailedOpt,
+    try_all: bool | None = TryAllOpt,
     sources: str | None = typer.Option(
         None,
         "--sources",
@@ -854,27 +1189,49 @@ def run(
         "--preset",
         help="Named source preset (eoi = OA + EZProxy, no Scholar or Sci-Hub).",
     ),
-    scihub: bool = typer.Option(
-        False,
-        "--scihub",
-        help="Opt in to Sci-Hub for this run (off by default; legal grey zone in some jurisdictions).",
-    ),
-    upgrade_linked: bool = typer.Option(
-        False,
-        "--upgrade-linked",
-        help="Also fetch items that only have a linked PDF URL in Zotero (adds imported_file).",
-    ),
+    scihub: bool | None = SciHubOpt,
+    upgrade_linked: bool | None = UpgradeLinkedOpt,
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Find and download PDFs for items lacking one, then attach them."""
-    if not collection and not library:
-        console.print("[red]Give --collection PATH (repeatable) or --library.[/]")
-        raise typer.Exit(1)
+    if _scope_unset(collection, library, profile, run_config):
+        _refuse_missing_scope()
     cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        use_run_policy=True,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=limit,
+        no_attach=no_attach,
+        retry_failed=retry_failed,
+        try_all=try_all,
+        sources=sources,
+        preset=preset,
+        scihub=scihub,
+        upgrade_linked=upgrade_linked,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    limit = bound.limit
+    no_attach = bound.no_attach
+    retry_failed = bound.retry_failed
+    try_all = bound.try_all
+    sources = bound.sources_csv
+    preset = bound.preset
+    scihub = bound.scihub
+    upgrade_linked = bound.upgrade_linked
+    if not collection and not library:
+        _refuse_missing_scope()
     _require_manager(cfg)
     source_list = _source_list(cfg, sources, scihub, preset)
-    zl = _zotero()
-    backend = get_backend(cfg, zl)
+    backend = _connect(cfg)
     keys, scope = _scope_keys(backend, collection, library)
     types = _resolve_types(item_type)
     # Drop sources that can never hit this -T / year scope (e.g. htmlpdf on
@@ -882,7 +1239,9 @@ def run(
     # under --try-all.
     source_list = filter_sources_for_item_types(source_list, types)
     source_list = filter_sources_for_year_scope(source_list, year_from)
+    source_list = with_recover_lane(cfg, source_list)
     _warn_if_scihub(source_list)
+    _warn_if_recover(source_list)
 
     manifest = Manifest(cfg.manifest_path)
     item_filter = (
@@ -956,12 +1315,12 @@ def run(
         console.print(table)
         raise typer.Exit(0)
 
-    attacher: Attacher | None = None
+    attacher = None
     if cfg.attach and not no_attach:
-        attacher = Attacher(cfg, zl)
-        if not attacher.supports_write():
+        attacher = backend
+        if not backend.supports_write():
             console.print(
-                "[yellow]Attach disabled: this Zotero has no local write API (upgrade to Zotero 10+). PDFs still saved to disk.[/]"
+                "[yellow]Attach disabled: this library has no write support. PDFs still saved to disk.[/]"
             )
             attacher = None
 
@@ -1023,6 +1382,7 @@ def run(
         scope=scope,
         flags=run_flags,
     )
+    _flush(backend)
 
 
 def _run_flags(**kwargs) -> dict:
@@ -1048,15 +1408,13 @@ def attach(
     config: Path | None = ConfigOpt,
     limit: int | None = typer.Option(None, "--limit", "-n"),
 ) -> None:
-    """Attach already-downloaded PDFs (status ok / attach_failed) into Zotero."""
+    """Attach already-downloaded PDFs (status ok / attach_failed) into the library."""
     cfg = _cfg(config)
-    zl = _zotero()
+    _require_manager(cfg)
+    backend = _connect(cfg)
     manifest = Manifest(cfg.manifest_path)
-    attacher = Attacher(cfg, zl)
-    if not attacher.supports_write():
-        _exit_env(
-            "This Zotero has no local write API. Upgrade to Zotero 10+ to attach."
-        )
+    if not backend.supports_write():
+        _exit_env("This library has no write support.", cfg)
     pending = manifest.pending_attach()
     if limit:
         pending = pending[:limit]
@@ -1064,7 +1422,7 @@ def attach(
     if not pending:
         console.print("[bold]Attached 0/0[/]")
         return
-    pipe = Pipeline(cfg, manifest, console, attacher=attacher)
+    pipe = Pipeline(cfg, manifest, console, attacher=backend)
     done = 0
     try:
         with _item_progress() as progress:
@@ -1075,7 +1433,377 @@ def attach(
                 progress.advance(task_id)
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted.[/]")
+    _flush(backend)
     console.print(f"[bold]Attached {done}/{len(pending)}[/]")
+
+
+@app.command()
+def snapshot(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Count what would be written. Still reads Zotero."
+    ),
+    pdfs: str | None = typer.Option(
+        None,
+        "--pdfs",
+        help="additional (fetched PDFs only), all (also export Zotero PDFs), or none.",
+    ),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Write per-item restore folders under out/ for the scoped library."""
+    from .snapshot import run_snapshot, snapshot_report
+
+    if _scope_unset(collection, library, profile, run_config):
+        _refuse_missing_scope()
+    cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=limit,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    limit = bound.limit
+    if not collection and not library:
+        _refuse_missing_scope()
+    _require_manager(cfg)
+    try:
+        mode = parse_pdfs(pdfs) if pdfs else cfg.mirror_pdfs
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    backend = _connect(cfg)
+    keys, scope = _scope_keys(backend, collection, library)
+    items, scope = _apply_item_filters(
+        backend.items_in_scope(keys),
+        scope,
+        year_from=year_from,
+        year_to=year_to,
+        item_types=_resolve_types(item_type),
+    )
+    if limit:
+        items = items[:limit]
+    manifest = Manifest(cfg.manifest_path)
+    verb = "Would write" if dry_run else "Writing"
+    console.print(
+        f"{verb} restore folders for [bold]{len(items)}[/] items "
+        f"in [bold]{scope}[/] (pdfs={mode})"
+    )
+    stats = run_snapshot(cfg, backend, items, pdfs=mode, dry_run=dry_run, manifest=manifest)
+    report = snapshot_report(cfg, scope, mode, dry_run, stats)
+    if not dry_run:
+        write_run_report(cfg, report, as_last_run=False)
+    console.print(
+        f"[bold]records {stats.records}[/] · pdf exports {stats.pdf_exports} · "
+        f"notes {stats.notes} · migrations {stats.migrations}"
+    )
+
+
+@app.command()
+def restore(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool | None = typer.Option(
+        None,
+        "--library/--no-library",
+        help="Whole out/ tree instead of one collection. --no-library clears a profile.",
+    ),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N folders."),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be created. Does not write the library."
+    ),
+    apply: bool | None = typer.Option(
+        None,
+        "--apply/--no-apply",
+        help="Create missing items, attach local PDFs, and add missing notes.",
+    ),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Recreate missing library items from out/ restore folders. Never overwrites fields."""
+    from .restore import apply_restore, iter_records, plan_restore, record_in_scope
+
+    if _scope_unset(collection, library, profile, run_config):
+        _refuse_missing_scope()
+    cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=limit,
+        apply=apply,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    limit = bound.limit
+    apply = bound.apply
+    if dry_run and apply:
+        console.print("[red]Pass either --dry-run or --apply, not both.[/]")
+        raise typer.Exit(1)
+    if not collection and not library:
+        _refuse_missing_scope()
+    _require_manager(cfg)
+    backend = _connect(cfg)
+    prefixes: list[str] | None = None
+    if not library:
+        prefixes = []
+        for spec in collection:
+            try:
+                root = backend.resolve_collection(spec)
+            except LookupError as exc:
+                console.print(f"[red]{exc}[/]")
+                raise typer.Exit(1) from exc
+            prefixes.append(root.path)
+    paths = iter_records(cfg.out_dir, prefixes)
+    records = []
+    for path in paths:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if isinstance(data, dict):
+            records.append((path, data))
+    types = _resolve_types(item_type)
+    if year_from is not None and year_to is not None and year_from > year_to:
+        console.print("[red]--year-from must be ≤ --year-to.[/]")
+        raise typer.Exit(1)
+    records = [
+        pair
+        for pair in records
+        if record_in_scope(
+            pair[1], year_from=year_from, year_to=year_to, item_types=types
+        )
+    ]
+    if limit:
+        records = records[:limit]
+    keys, _scope = _scope_keys(backend, collection, library)
+    library_items = backend.items_in_scope(keys)
+    note_tags: dict[str, set[str]] = {}
+    for it in library_items:
+        tags: set[str] = set()
+        for ch in backend.children(it.key):
+            data = ch.get("data") or {}
+            if data.get("itemType") != "note":
+                continue
+            for tag in data.get("tags") or []:
+                if isinstance(tag, dict) and tag.get("tag"):
+                    tags.add(str(tag["tag"]))
+        if tags:
+            note_tags[it.key] = tags
+    planned = plan_restore(records, library_items, note_tags_for=note_tags)
+    counts = planned.counts()
+    console.print(
+        f"{len(records)} restore folder(s) · "
+        f"create {counts.get('create_item', 0)} · "
+        f"exists {counts.get('exists', 0)} · "
+        f"attach {counts.get('attach_pdf', 0)} · "
+        f"notes {counts.get('create_note', 0)}"
+    )
+    if not apply:
+        console.print("[dim]Dry run. Pass --apply to write missing items into the library.[/]")
+        return
+    done = apply_restore(planned, backend, backend)
+    console.print(
+        f"[bold]created {done['create_item']}[/] · "
+        f"attached {done['attach_pdf']} · notes {done['create_note']}"
+    )
+    _flush(backend)
+
+
+@app.command("import")
+def import_library(
+    path: Path = typer.Argument(
+        ..., exists=True, dir_okay=False, help="RIS, BibTeX, or EndNote XML file."
+    ),
+    fmt: str | None = typer.Option(
+        None,
+        "--format",
+        help="ris, bibtex, or endnote-xml. Default: detect from the file.",
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Write into the current manager. Default is a dry-run count.",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Import a bibliography file into the configured manager (Zotero / Mendeley / EndNote bundle)."""
+    from .interop.load import load_records
+    from .xfer import apply_import
+
+    cfg = _cfg(config)
+    _require_manager(cfg)
+    try:
+        records = load_records(path, fmt)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1)
+    console.print(f"{len(records)} record(s) in {path.name}")
+    if not apply:
+        n_pdf = sum(1 for r in records if r.get("pdfs"))
+        n_notes = sum(len(r.get("notes") or []) for r in records)
+        console.print(
+            f"[dim]Dry run. Pass --apply to create {len(records)} items, "
+            f"attach {n_pdf} PDF path(s), add {n_notes} note(s).[/]"
+        )
+        return
+    backend = _connect(cfg)
+    if not backend.supports_write():
+        _exit_env("This library has no write support.", cfg)
+    done = apply_import(records, backend, dry_run=False)
+    console.print(
+        f"[bold]created {done['create']}[/] · attached {done['attach']} · "
+        f"notes {done['notes']}"
+        + (f" · missing PDFs {done['skipped_pdf']}" if done.get("skipped_pdf") else "")
+    )
+    _flush(backend)
+
+
+@app.command("export")
+def export_library(
+    dest: Path = typer.Argument(..., help="Output .ris / .bib / .xml file (or a folder for EndNote XML)."),
+    fmt: str | None = typer.Option(
+        None, "--format", help="ris, bibtex, or endnote-xml. Default: from the file suffix."
+    ),
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool = typer.Option(False, "--library", help="Whole library."),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    limit: int | None = typer.Option(None, "--limit", "-n"),
+    pdfs: bool = typer.Option(
+        False, "--pdfs/--no-pdfs", help="Copy PDFs next to the export (needed for EndNote XML)."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Export the scoped library to RIS, BibTeX, or EndNote XML."""
+    from .interop.load import dump_records, record_from_item_json
+    from .store import item_dirname, item_filename, load_json, record_path
+
+    if not collection and not library:
+        console.print("[red]Give --collection PATH (repeatable) or --library.[/]")
+        raise typer.Exit(1)
+    cfg = _cfg(config)
+    _require_manager(cfg)
+    kind = (fmt or dest.suffix.lstrip(".") or "").lower().replace("_", "-")
+    if kind in {"bib", "biblatex"}:
+        kind = "bibtex"
+    if kind in {"xml", "enw"}:
+        kind = "endnote-xml"
+    if kind not in {"ris", "bibtex", "endnote-xml"}:
+        console.print("[red]--format must be ris, bibtex, or endnote-xml.[/]")
+        raise typer.Exit(1)
+    backend = _connect(cfg)
+    keys, scope = _scope_keys(backend, collection, library)
+    items, scope = _apply_item_filters(
+        backend.items_in_scope(keys),
+        scope,
+        year_from=year_from,
+        year_to=year_to,
+        item_types=_resolve_types(item_type),
+    )
+    if limit:
+        items = items[:limit]
+    bundle_dir: Path | None = None
+    pdf_dir: Path | None = None
+    if kind == "endnote-xml" or pdfs:
+        bundle_dir = dest if dest.suffix == "" else dest.parent / dest.stem
+        pdf_dir = bundle_dir / "PDF"
+        pdf_dir.mkdir(parents=True, exist_ok=True)
+    records = []
+    copied = 0
+    for it in items:
+        rec_json = None
+        for folder in it.collection_paths or ["_uncollected"]:
+            rec_json = load_json(record_path(cfg.out_dir / folder / item_dirname(it)))
+            if rec_json:
+                break
+        rec = record_from_item_json(rec_json or {}, None)
+        rec["item_type"] = it.item_type
+        rec["title"] = it.title
+        rec["doi"] = it.doi
+        rec["year"] = it.year
+        rec["date"] = it.date or rec.get("date") or (str(it.year) if it.year else "")
+        rec["publication_title"] = it.publication_title or rec.get("publication_title")
+        rec["url"] = it.url
+        rec["pmid"] = it.pmid
+        rec["abstract"] = it.abstract or rec.get("abstract")
+        rec["collection_paths"] = [p for p in it.collection_paths if p != "_uncollected"]
+        rec["item_key"] = it.key
+        pdf_list: list[str] = []
+        if pdf_dir is not None and it.has_pdf:
+            target = pdf_dir / item_filename(it)
+            exported = backend.export_pdf(it, target)
+            if exported is not None and Path(exported).is_file():
+                pdf_list.append(str(exported))
+                copied += 1
+        rec["pdfs"] = pdf_list
+        notes = []
+        for ch in backend.children(it.key):
+            data = ch.get("data") or {}
+            if data.get("itemType") != "note":
+                continue
+            html = str(data.get("note") or "")
+            if not html:
+                continue
+            tags = [
+                t.get("tag")
+                for t in (data.get("tags") or [])
+                if isinstance(t, dict) and t.get("tag")
+            ]
+            notes.append(
+                {
+                    "file": f"{ch.get('key') or 'note'}.html",
+                    "html": html,
+                    "tag": tags[0] if tags else "paperful-exported",
+                }
+            )
+        if notes:
+            rec["notes"] = notes
+        records.append(rec)
+    text = dump_records(records, kind)
+    if kind == "endnote-xml" and bundle_dir is not None:
+        bundle_dir.mkdir(parents=True, exist_ok=True)
+        xml_path = bundle_dir / "paperful.xml"
+        xml_path.write_text(text, encoding="utf-8")
+        (bundle_dir / "README.txt").write_text(
+            "Import paperful.xml in EndNote: File → Import → File, "
+            "option EndNote Generated XML. PDFs are in PDF/.\n",
+            encoding="utf-8",
+        )
+        console.print(
+            f"[green]Wrote[/] {xml_path} ({len(records)} records, {copied} PDFs) for {scope}"
+        )
+        return
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(text, encoding="utf-8")
+    extra = f", {copied} PDFs" if copied else ""
+    console.print(f"[green]Wrote[/] {dest} ({len(records)} records{extra}) for {scope}")
 
 
 @app.command()
@@ -1147,6 +1875,87 @@ def report(
                 ),
             )
         console.print(t)
+
+
+def _fmt_pack_duration(seconds: float | None) -> str:
+    if seconds is None:
+        return "-"
+    return f"{seconds:g}s"
+
+
+@pack_app.command("open")
+def pack_open(
+    label: str | None = typer.Option(None, "--label", help="Name stored on the pack."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Start a pack. Later commands append their run reports until `pack close`."""
+    from .pack import PackError, open_pack
+
+    cfg = _cfg(config)
+    try:
+        pack = open_pack(cfg, label=label)
+    except PackError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1)
+    console.print(pack["id"])
+
+
+@pack_app.command("close")
+def pack_close(config: Path | None = ConfigOpt) -> None:
+    """Close the open pack and drop the current pointer."""
+    from .pack import PackError, close_pack
+
+    cfg = _cfg(config)
+    try:
+        pack = close_pack(cfg)
+    except PackError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1)
+    n = len(pack.get("steps") or [])
+    console.print(f"Closed {pack['id']} ({n} steps)")
+
+
+@pack_app.command("show")
+def pack_show(
+    as_json: bool = typer.Option(
+        False, "--json", help="Parent pack plus each step's summary."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Print the open pack, or the latest closed one. Does not open the library."""
+    from .pack import headline, latest_pack, show_payload
+
+    cfg = _cfg(config)
+    pack = latest_pack(cfg)
+    if pack is None:
+        console.print("No pack yet. Run [bold]paperful pack open[/] first.")
+        raise typer.Exit(0)
+    payload = show_payload(cfg, pack)
+    if as_json:
+        console.print(
+            json.dumps(payload, indent=2),
+            soft_wrap=True,
+            highlight=False,
+            markup=False,
+        )
+        return
+    title = pack.get("label") or pack["id"]
+    console.print(f"Pack [bold]{pack['id']}[/] ({pack.get('status')})")
+    if pack.get("label"):
+        console.print(pack["label"], markup=False)
+    if pack.get("scope"):
+        console.print(f"Scope: {pack['scope']}")
+    table = Table(title=str(title))
+    table.add_column("Command")
+    table.add_column("Duration", justify="right")
+    table.add_column("Counts")
+    for step in payload.get("steps") or []:
+        table.add_row(
+            str(step.get("command") or ""),
+            _fmt_pack_duration(step.get("duration_s")),
+            headline(str(step.get("command") or ""), step.get("summary") or {}),
+        )
+    console.print(table)
 
 
 @app.command()
@@ -1250,7 +2059,7 @@ def _probe_slot(cfg: Config, slot: str) -> None:
 
 @session_app.command("login")
 def session_login(
-    slot: str = typer.Argument(..., help="scholar or ezproxy"),
+    slot: str = typer.Argument(..., help="scholar, ezproxy, or mendeley"),
     config: Path | None = ConfigOpt,
     engine: str = typer.Option(
         "auto",
@@ -1263,8 +2072,26 @@ def session_login(
 
     cfg = _cfg(config)
     key = slot.strip().lower()
+    if key == "mendeley":
+        from .mendeley import MendeleyAuthError, MendeleyClient
+
+        console.print(
+            "Opening Mendeley / Elsevier authorization in your browser.\n"
+            "[dim]Redirect URI must match the app at "
+            f"{cfg.mendeley_redirect_uri}[/]"
+        )
+        try:
+            MendeleyClient(cfg).login()
+        except MendeleyAuthError as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(2)
+        console.print(
+            "[green]Mendeley authorised.[/] Tokens in "
+            f"{cfg.state_dir / 'mendeley-oauth.json'} (mode 0600)."
+        )
+        return
     if key not in sess.SLOTS:
-        console.print(f"[red]Unknown slot {slot!r}.[/] Use scholar or ezproxy.")
+        console.print(f"[red]Unknown slot {slot!r}.[/] Use scholar, ezproxy, or mendeley.")
         raise typer.Exit(1)
     eng = engine.strip().lower()
     if eng not in ("auto", "chrome", "playwright"):
@@ -1423,7 +2250,7 @@ def recover(
     ),
     config: Path | None = ConfigOpt,
 ) -> None:
-    """Opt-in browser-agent PDF recovery for one or more items (not part of run)."""
+    """Browser-agent PDF recovery for named items (also auto-fires at the end of run)."""
     from .browser_agent import recover_start_url
     from .llm import llm_egress_is_remote
     from .llm.preflight import validate_llm_for_recover
@@ -1450,8 +2277,7 @@ def recover(
         console.print(
             "[yellow]Remote LLM provider — page text may leave this machine.[/]"
         )
-    zl = _zotero()
-    backend = get_backend(cfg, zl)
+    backend = _connect(cfg)
     manifest = Manifest(cfg.manifest_path)
     todo: list = []
     for key in item:
@@ -1472,9 +2298,9 @@ def recover(
         todo.append(it)
     if dry_run or not todo:
         raise typer.Exit(0)
-    attacher = None if no_attach else Attacher(cfg, zl)
-    if attacher and not attacher.supports_write():
-        _exit_env("Zotero 10+ write API required to attach.")
+    attacher = None if no_attach else backend
+    if attacher and not backend.supports_write():
+        _exit_env("Write support required to attach.", cfg)
     with _item_progress() as progress:
         task_id = progress.add_task("Recovering PDFs", total=len(todo))
         pipe = Pipeline(
@@ -1500,6 +2326,7 @@ def recover(
     )
     path = write_run_report(cfg, report)
     print_run_summary(console, report, path)
+    _flush(backend)
 
 
 @app.command()
@@ -1508,9 +2335,16 @@ def summarize(
     collection: list[str] = typer.Option(
         [], "--collection", "-C", help="Collection scope (repeatable)."
     ),
-    library: bool = typer.Option(False, "--library"),
-    apply: bool = typer.Option(
-        False, "--apply", help="Create or update tagged Zotero child note."
+    library: bool | None = LibraryOpt,
+    apply: bool | None = typer.Option(
+        None,
+        "--apply/--no-apply",
+        help="Require a Zotero child note (conflicts with --to disk). Default dest already includes Zotero.",
+    ),
+    to: WriteDest | None = typer.Option(
+        None,
+        "--to",
+        help="Where to write: disk, zotero, or both. Default is config, or both.",
     ),
     prompt: Path | None = typer.Option(
         None, "--prompt", help="Override summary prompt file for this run."
@@ -1524,18 +2358,43 @@ def summarize(
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n"),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
-    """Grounded LLM summary from local PDF text; writes state/summaries/ first."""
+    """Grounded LLM summary from local PDF text. Default writes disk and a Zotero note."""
     from .llm import llm_egress_is_remote
     from .llm.preflight import validate_llm_for_verb
     from .llm.validate import LlmConfigError
-    from .summarize import apply_summary_note, summarize_item
+    from .summarize import apply_summary_note, render_summary, write_summary_disk
 
-    if not item and not collection and not library:
+    if not item and _scope_unset(collection, library, profile, run_config):
         console.print("[red]Give --item KEY and/or --collection / --library.[/]")
         raise typer.Exit(1)
     cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        use_apply=True,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=limit,
+        apply=apply,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    limit = bound.limit
+    apply = bound.apply
+    if not item and not collection and not library:
+        console.print("[red]Give --item KEY and/or --collection / --library.[/]")
+        raise typer.Exit(1)
+    dest = to.value if to is not None else cfg.summarize_dest
+    if apply and dest == "disk":
+        console.print("[red]--apply writes a Zotero note; it conflicts with --to disk.[/]")
+        raise typer.Exit(1)
     _require_manager(cfg)
     try:
         validate_llm_for_verb(cfg)
@@ -1548,8 +2407,7 @@ def summarize(
         )
     if prompt is not None:
         cfg.summarize_prompt_template = str(prompt.expanduser().resolve())
-    zl = _zotero()
-    backend = get_backend(cfg, zl)
+    backend = _connect(cfg)
     manifest = Manifest(cfg.manifest_path)
     items = []
     if item:
@@ -1570,35 +2428,844 @@ def summarize(
         seen.add(it.key)
         unique.append(it)
     items = [it for it in unique if it.has_pdf]
-    items, _ = _apply_item_filters(
+    if library:
+        scope = "whole library"
+    elif collection:
+        scope = ", ".join(collection)
+    else:
+        scope = "items " + ",".join(item)
+    items, scope = _apply_item_filters(
         items,
-        "",
+        scope,
         year_from=year_from,
         year_to=year_to,
         item_types=_resolve_types(item_type),
     )
     if limit:
         items = items[:limit]
+    started = time.time()
+
+    def _finish(outcomes: list[dict], summarized: int, failed: int) -> None:
+        write_command_report(
+            cfg,
+            command="summarize",
+            scope=scope,
+            summary={"summarized": summarized, "failed": failed, "dest": dest},
+            items=outcomes,
+            flags={"to": dest},
+            started=started,
+        )
+
     if not items:
         console.print("[yellow]No items with PDFs in scope.[/]")
+        _finish([], 0, 0)
         raise typer.Exit(0)
     ok = 0
+    failed = 0
+    outcomes: list[dict] = []
     for it in items:
         try:
-            path = summarize_item(cfg, it, manifest, backend, force=force)
-            console.print(f"[green]Wrote[/] {path}")
-            ok += 1
-            if apply:
-                note_key = apply_summary_note(cfg, backend, it)
+            html = render_summary(cfg, it, manifest, backend, force=force)
+            if wants_disk(dest):
+                path = write_summary_disk(cfg, it, html)
+                console.print(f"[green]Wrote[/] {path}")
+            if wants_zotero(dest):
+                note_key = apply_summary_note(cfg, backend, it, html)
                 console.print(f"  attached note {note_key}")
+            ok += 1
+            outcomes.append(
+                {"itemKey": it.key, "title": it.title, "status": "summarized"}
+            )
         except (ValueError, OSError) as exc:
+            failed += 1
+            outcomes.append(
+                {
+                    "itemKey": it.key,
+                    "title": it.title,
+                    "status": "failed",
+                    "reason": str(exc),
+                }
+            )
             console.print(f"[yellow]{it.key}[/]: {exc}")
+        except LibraryError as exc:
+            failed += 1
+            outcomes.append(
+                {
+                    "itemKey": it.key,
+                    "title": it.title,
+                    "status": "failed",
+                    "reason": str(exc),
+                }
+            )
+            _finish(outcomes, ok, failed)
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(1)
+    _finish(outcomes, ok, failed)
+    where = cfg.summaries_dir if wants_disk(dest) else "Zotero"
+    console.print(f"Summarized {ok}/{len(items)} items under {where}")
+    if dest == "disk":
+        console.print("Zotero not written (dest=disk).")
+    _flush(backend)
+
+
+def _dedupe_items(items: list) -> list:
+    seen: set[str] = set()
+    unique = []
+    for it in items:
+        if it.key in seen:
+            continue
+        seen.add(it.key)
+        unique.append(it)
+    return unique
+
+
+def _scoped_items(
+    backend,
+    item: list[str],
+    collection: list[str],
+    library: bool,
+):
+    """Union of --item and collection/library scope. Returns (items, scope label)."""
+    items = []
+    if item:
+        for key in item:
+            it = backend.get_item(key)
+            if it is None:
+                console.print(f"[red]Unknown item {key}[/]")
+                raise typer.Exit(1)
+            items.append(it)
+    if library:
+        scope = "whole library"
+        items.extend(backend.items_in_scope(None))
+    elif collection:
+        keys, scope = _scope_keys(backend, collection, False)
+        items.extend(backend.items_in_scope(keys))
+    else:
+        scope = "items " + ",".join(item)
+    return _dedupe_items(items), scope
+
+
+@app.command()
+def synthesize(
+    item: list[str] = typer.Option([], "--item", help="Item key (repeatable)."),
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection scope (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    to: WriteDest | None = typer.Option(
+        None,
+        "--to",
+        help="Where to write the report: disk, zotero, or both. Default is config, or both.",
+    ),
+    report_collection: str | None = typer.Option(
+        None,
+        "--report-collection",
+        help="Collection that receives the Zotero report note. Defaults to each -C root.",
+    ),
+    prompt: Path | None = typer.Option(
+        None, "--prompt", help="Override the report prompt file for this run."
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show source counts and the chunk plan. No model call."
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Regenerate even when the saved report used the same summary notes.",
+    ),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    limit: int | None = typer.Option(None, "--limit", "-n"),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Literature review from summary notes already saved by summarize."""
+    from .llm import llm_egress_is_remote
+    from .llm.preflight import validate_llm_for_verb
+    from .llm.validate import LlmConfigError
+    from .synthesize import (
+        ReduceCapError,
+        chunk_plan,
+        load_sources,
+        render_synthesis,
+        report_is_current,
+        report_tags,
+        synthesis_slug,
+        write_report_files,
+    )
+
+    if not item and _scope_unset(collection, library, profile, run_config):
+        console.print("[red]Give --item KEY and/or --collection / --library.[/]")
+        raise typer.Exit(1)
+    cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=limit,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    limit = bound.limit
+    if not item and not collection and not library:
+        console.print("[red]Give --item KEY and/or --collection / --library.[/]")
+        raise typer.Exit(1)
+    dest = to.value if to is not None else cfg.synthesize_dest
+    if report_collection and not wants_zotero(dest):
+        console.print(
+            "[red]--report-collection files a Zotero note; it conflicts with --to disk.[/]"
+        )
+        raise typer.Exit(1)
+    _require_manager(cfg)
+    try:
+        validate_llm_for_verb(cfg)
+    except LlmConfigError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1)
+    if llm_egress_is_remote(cfg) and not dry_run:
+        console.print(
+            "[yellow]Remote LLM — summary text may leave this machine for this run.[/]"
+        )
+    if prompt is not None:
+        cfg.synthesize_prompt_template = str(prompt.expanduser().resolve())
+    backend = _connect(cfg)
+    items, scope = _scoped_items(backend, item, collection, library)
+    items, scope = _apply_item_filters(
+        items,
+        scope,
+        year_from=year_from,
+        year_to=year_to,
+        item_types=_resolve_types(item_type),
+    )
+    items.sort(key=lambda it: (it.year or 9999, (it.first_author or "").lower(), it.key))
+    if limit:
+        items = items[:limit]
+    targets = []
+    if wants_zotero(dest):
+        if report_collection:
+            try:
+                targets = [backend.resolve_collection(report_collection)]
+            except LookupError as exc:
+                console.print(f"[red]{exc}[/]")
+                raise typer.Exit(1)
+        elif collection:
+            seen_keys: set[str] = set()
+            for spec in collection:
+                try:
+                    root = backend.resolve_collection(spec)
+                except LookupError as exc:
+                    console.print(f"[red]{exc}[/]")
+                    raise typer.Exit(1)
+                if root.key not in seen_keys:
+                    seen_keys.add(root.key)
+                    targets.append(root)
+        else:
+            console.print(
+                "[red]Pass -C or --report-collection to file the Zotero note, or --to disk.[/]"
+            )
+            raise typer.Exit(1)
+    sources, missing = load_sources(cfg, items, backend)
+    on_disk = sum(1 for src in sources if src.origin == "disk")
+    from_note = sum(1 for src in sources if src.origin == "note")
+    slug_parts = []
+    if library:
+        slug_parts.append("library")
+    slug_parts.extend(collection)
+    slug_parts.extend(item)
+    if year_from is not None or year_to is not None:
+        slug_parts.append(f"{year_from or ''}-{year_to or ''}")
+    types = _resolve_types(item_type)
+    if types:
+        slug_parts.extend(sorted(types))
+    slug = synthesis_slug(*slug_parts)
+    plan = chunk_plan(cfg, sources) if sources else []
+    if dry_run:
+        console.print(
+            f"Sources: {on_disk} on disk, {from_note} from Zotero notes, {len(missing)} missing"
+        )
+        if plan:
+            sizes = ", ".join(str(n) for n in plan)
+            console.print(f"Chunks: {len(plan)} ({sizes} chars)")
+        else:
+            console.print("[yellow]No summary notes in scope.[/]")
+        if wants_disk(dest):
+            console.print(f"Disk: {cfg.reports_dir / (slug + '.html')}")
+        for root in targets:
+            console.print(f"Zotero: {root.path} ({root.key})")
+        raise typer.Exit(0)
+    if not sources:
+        console.print(
+            "[yellow]No summary notes in scope.[/] Run [bold]paperful summarize[/] first."
+        )
+        raise typer.Exit(0)
+    if not force and report_is_current(cfg, slug, sources, dest=dest):
+        console.print(
+            f"Report up to date ({len(sources)} summaries unchanged). Pass [bold]--force[/] to regenerate."
+        )
+        raise typer.Exit(0)
+    started = time.time()
+    try:
+        from .llm import get_client
+
+        report_html, n_chunks, prompt_sha = render_synthesis(
+            cfg,
+            sources,
+            missing,
+            scope,
+            client=get_client(cfg),
+            log=lambda line: console.print(f"[dim]{line}[/]"),
+        )
+    except ReduceCapError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1)
+    except (OSError, ValueError) as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1)
+    note_keys: dict[str, str] = {}
+    if wants_disk(dest):
+        cfg.reports_dir.mkdir(parents=True, exist_ok=True)
+        html_path = cfg.reports_dir / f"{slug}.html"
+        html_path.write_text(report_html, encoding="utf-8")
+        console.print(f"[green]Wrote[/] {html_path}")
+    if wants_zotero(dest):
+        tags = report_tags(cfg, slug)
+        try:
+            for root in targets:
+                note_keys[root.key] = backend.create_or_update_collection_note(
+                    root.key, report_html, tags
+                )
+                console.print(f"  attached note {note_keys[root.key]} in {root.path}")
         except LibraryError as exc:
             console.print(f"[red]{exc}[/]")
             raise typer.Exit(1)
-    console.print(f"Summarized {ok}/{len(items)} items under {cfg.summaries_dir}")
-    if not apply:
-        console.print("Dry-run on Zotero. Pass [bold]--apply[/] to attach notes.")
+    if wants_disk(dest):
+        sidecar = _synthesis_sidecar(
+            cfg,
+            scope=scope,
+            slug=slug,
+            prompt_sha=prompt_sha,
+            n_chunks=n_chunks,
+            sources=sources,
+            missing=missing,
+            dest=dest,
+            note_keys=note_keys,
+        )
+        _html_path, json_path = write_report_files(cfg, slug, report_html, sidecar)
+        console.print(f"[green]Wrote[/] {json_path}")
+    outcomes = [
+        ItemOutcome(
+            itemKey=src.key, title=src.title, status="summarized", reason=src.origin
+        )
+        for src in sources
+    ]
+    outcomes.extend(
+        ItemOutcome(itemKey=it.key, title=it.title, status="missing_summary")
+        for it in missing
+    )
+
+    class _Stats:
+        pass
+
+    stats = _Stats()
+    stats.started_at = started
+    stats.finished_at = time.time()
+    stats.items = outcomes
+    stats.scope = scope
+    report = build_report(
+        stats,
+        cfg,
+        command="synthesize",
+        scope=scope,
+        flags={
+            "to": dest,
+            "chunks": n_chunks,
+            "included": len(sources),
+            "missing": len(missing),
+            "slug": slug,
+        },
+    )
+    report["summary"]["included"] = len(sources)
+    report["summary"]["missing"] = len(missing)
+    report["summary"]["chunks"] = n_chunks
+    path = write_run_report(cfg, report, as_last_run=False)
+    console.print(
+        f"Synthesized {len(sources)} summaries ({len(missing)} not included) → {path}"
+    )
+    _flush(backend)
+
+
+def _synthesis_sidecar(
+    cfg,
+    *,
+    scope: str,
+    slug: str,
+    prompt_sha: str,
+    n_chunks: int,
+    sources,
+    missing,
+    dest: str,
+    note_keys: dict[str, str],
+) -> dict:
+    from datetime import datetime, timezone
+
+    from .synthesize import SCHEMA, destination_names, fingerprint
+
+    return {
+        "schema": SCHEMA,
+        "scope": scope,
+        "slug": slug,
+        "created_at": datetime.now(tz=timezone.utc).isoformat(),
+        "model": cfg.llm_model,
+        "prompt_sha": prompt_sha,
+        "chunks": n_chunks,
+        "sources": fingerprint(sources),
+        "missing": [it.key for it in missing],
+        "destinations": destination_names(dest),
+        "note_keys": note_keys,
+    }
+
+
+def _call_step(fn, /, **kwargs: Any) -> None:
+    """Run one verb. ``typer.Exit(0)`` (dry-run tables) does not stop the chain."""
+    try:
+        fn(**kwargs)
+    except typer.Exit as exc:
+        if exc.exit_code not in (0, None):
+            raise
+
+
+def _all_scope(bound: ResolvedRunConfig, config: Path | None) -> dict[str, Any]:
+    return {
+        "collection": list(bound.collections),
+        "library": bound.library,
+        "year_from": bound.year_from,
+        "year_to": bound.year_to,
+        "item_type": list(bound.types),
+        "profile": None,
+        "run_config": None,
+        "config": config,
+    }
+
+
+@app.command("all")
+def all_cmd(
+    collection: list[str] = typer.Option(
+        [],
+        "--collection",
+        "-C",
+        help="Collection path/name/key (repeatable). Subcollections included.",
+    ),
+    library: bool | None = LibraryOpt,
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items in each step."),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="gaps, run --dry-run, lint, and fix-metadata without --apply. Skips summarize.",
+    ),
+    try_all: bool | None = TryAllOpt,
+    retry_failed: bool | None = RetryFailedOpt,
+    upgrade_linked: bool | None = UpgradeLinkedOpt,
+    no_attach: bool | None = NoAttachOpt,
+    scihub: bool | None = SciHubOpt,
+    sources: str | None = typer.Option(
+        None, "--sources", help="Comma-separated source order override for the run step."
+    ),
+    preset: str | None = typer.Option(
+        None, "--preset", help="Named source preset for the run step (eoi)."
+    ),
+    apply: bool | None = ApplyOpt,
+    overwrite: bool | None = OverwriteOpt,
+    steps: str | None = StepsOpt,
+    skip: list[str] = SkipOpt,
+    require_summarize: bool | None = typer.Option(
+        None,
+        "--require-summarize/--no-require-summarize",
+        help="Exit 1 instead of skipping summarize when llm.enabled is false.",
+    ),
+    label: str | None = typer.Option(
+        None, "--label", help="Pack label when this command opens a pack."
+    ),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Run gaps, then fetch, lint, fix-metadata --apply, and summarize --apply.
+
+    Stops on the first failing step, same as chaining the commands with ``&&``.
+    """
+    if _scope_unset(collection, library, profile, run_config):
+        _refuse_missing_scope()
+    cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        for_all=True,
+        use_run_policy=True,
+        use_apply=True,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=limit,
+        try_all=try_all,
+        retry_failed=retry_failed,
+        upgrade_linked=upgrade_linked,
+        no_attach=no_attach,
+        scihub=scihub,
+        sources=sources,
+        preset=preset,
+        apply=apply,
+        overwrite=overwrite,
+        steps=steps,
+        skip=skip,
+        require_summarize=require_summarize,
+    )
+    if not bound.collections and not bound.library:
+        _refuse_missing_scope()
+    opened = False
+    if pack_join_disabled():
+        console.print("[dim]PAPERFUL_PACK=off — reports are not grouped.[/]")
+    elif current_id(cfg) is None:
+        try:
+            pack = open_pack(cfg, label=label or bound.name or "all")
+        except PackError as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(1) from exc
+        opened = True
+        console.print(f"[dim]Pack {pack['id']} opened.[/]")
+    else:
+        console.print(f"[dim]Pack {current_id(cfg)} joined.[/]")
+    scope = _all_scope(bound, config)
+    try:
+        for step in bound.steps:
+            if step == "summarize" and dry_run:
+                console.print(
+                    "[yellow]Skipping summarize — dry-run does not write summary notes.[/]"
+                )
+                continue
+            if step == "summarize" and not cfg.llm_enabled:
+                if bound.require_summarize:
+                    console.print(
+                        "[red]summarize needs llm.enabled = true "
+                        "(--require-summarize).[/]"
+                    )
+                    raise typer.Exit(1)
+                console.print(
+                    "[yellow]Skipping summarize — llm.enabled is false.[/]"
+                )
+                continue
+            console.print(f"\n[bold]all[/] · {step}")
+            _dispatch_all_step(step, bound, scope, dry_run=dry_run)
+    finally:
+        if opened:
+            try:
+                closed = close_pack(cfg)
+            except PackError:
+                closed = None
+            if closed is not None:
+                console.print(f"[dim]Pack {closed['id']} closed.[/]")
+
+
+def _dispatch_all_step(
+    step: str,
+    bound: ResolvedRunConfig,
+    scope: dict[str, Any],
+    *,
+    dry_run: bool,
+) -> None:
+    if step == "gaps":
+        _call_step(gaps, **scope, as_json=False)
+        return
+    if step == "run":
+        _call_step(
+            run,
+            **scope,
+            dry_run=dry_run,
+            limit=bound.limit,
+            no_attach=bound.no_attach,
+            retry_failed=bound.retry_failed,
+            try_all=bound.try_all,
+            sources=bound.sources_csv,
+            preset=bound.preset,
+            scihub=bound.scihub,
+            upgrade_linked=bound.upgrade_linked,
+        )
+        return
+    if step == "lint":
+        _call_step(lint, **scope, limit=bound.limit, as_json=False, strict=False)
+        return
+    if step == "fix-metadata":
+        _call_step(
+            fix_metadata,
+            **scope,
+            limit=bound.limit,
+            apply=False if dry_run else bound.apply,
+            overwrite=bound.overwrite,
+        )
+        return
+    if step == "summarize":
+        _call_step(
+            summarize,
+            **scope,
+            item=[],
+            limit=bound.limit,
+            apply=bound.apply,
+            to=None,
+            prompt=None,
+            force=False,
+        )
+        return
+    if step == "snapshot":
+        _call_step(
+            snapshot, **scope, limit=bound.limit, dry_run=dry_run, pdfs=None
+        )
+        return
+    if step == "dedupe":
+        _call_step(
+            dedupe,
+            **scope,
+            limit=bound.limit,
+            dry_run=dry_run,
+            apply=False if dry_run else bound.apply,
+            apply_medium=False,
+            phase="all",
+            as_json=False,
+        )
+        return
+    if step == "restore":
+        _call_step(
+            restore,
+            **scope,
+            limit=bound.limit,
+            dry_run=dry_run,
+            apply=False if dry_run else bound.apply,
+        )
+        return
+    if step == "synthesize":
+        _call_step(
+            synthesize,
+            **scope,
+            item=[],
+            to=None,
+            report_collection=None,
+            prompt=None,
+            dry_run=dry_run,
+            force=False,
+            limit=bound.limit,
+        )
+        return
+    console.print(f"[red]Unknown step {step!r}.[/]")
+    raise typer.Exit(1)
+
+
+def _profile_bind_kwargs(
+    *,
+    collection: list[str],
+    library: bool | None,
+    year_from: int | None,
+    year_to: int | None,
+    item_type: list[str],
+    limit: int | None,
+    try_all: bool | None,
+    retry_failed: bool | None,
+    upgrade_linked: bool | None,
+    no_attach: bool | None,
+    scihub: bool | None,
+    sources: str | None,
+    preset: str | None,
+    apply: bool | None,
+    overwrite: bool | None,
+    steps: str | None,
+    skip: list[str],
+    require_summarize: bool | None,
+    profile: str | None,
+    run_config: Path | None,
+) -> dict[str, Any]:
+    return {
+        "profile": profile,
+        "run_config": run_config,
+        "collection": collection,
+        "library": library,
+        "year_from": year_from,
+        "year_to": year_to,
+        "item_type": item_type,
+        "limit": limit,
+        "try_all": try_all,
+        "retry_failed": retry_failed,
+        "upgrade_linked": upgrade_linked,
+        "no_attach": no_attach,
+        "scihub": scihub,
+        "sources": sources,
+        "preset": preset,
+        "apply": apply,
+        "overwrite": overwrite,
+        "steps": steps,
+        "skip": skip,
+        "require_summarize": require_summarize,
+    }
+
+
+@profile_app.command("list")
+def profile_list(config: Path | None = ConfigOpt) -> None:
+    """List saved run configs. The builtin ``all`` policy is not a named profile."""
+    cfg = _cfg(config)
+    rows: list[ProfileListing] = list_profiles(cfg)
+    if not rows:
+        console.print("No saved profiles.")
+        console.print(
+            "[dim]Builtin all: gaps → run → lint → fix-metadata → summarize. "
+            "Save one with[/] [bold]paperful profile save NAME -C …[/]"
+        )
+        return
+    table = Table(title="Run profiles")
+    table.add_column("Name")
+    table.add_column("Source")
+    table.add_column("Description")
+    for row in rows:
+        table.add_row(row.name, row.source, row.description)
+    console.print(table)
+    console.print(
+        "[dim]paperful profile show NAME[/] prints the merge [bold]paperful all[/] would use."
+    )
+
+
+@profile_app.command("show")
+def profile_show(
+    name: str | None = typer.Argument(None, help="Profile name. Omit to show builtin all defaults."),
+    collection: list[str] = typer.Option([], "--collection", "-C"),
+    library: bool | None = LibraryOpt,
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    limit: int | None = typer.Option(None, "--limit", "-n"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Note that summarize would be skipped."),
+    try_all: bool | None = TryAllOpt,
+    retry_failed: bool | None = RetryFailedOpt,
+    upgrade_linked: bool | None = UpgradeLinkedOpt,
+    no_attach: bool | None = NoAttachOpt,
+    scihub: bool | None = SciHubOpt,
+    sources: str | None = typer.Option(None, "--sources"),
+    preset: str | None = typer.Option(None, "--preset"),
+    apply: bool | None = ApplyOpt,
+    overwrite: bool | None = OverwriteOpt,
+    steps: str | None = StepsOpt,
+    skip: list[str] = SkipOpt,
+    require_summarize: bool | None = typer.Option(None, "--require-summarize/--no-require-summarize"),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Print the effective ``paperful all`` config after profile and flag merge."""
+    chosen = name or profile
+    if name and profile and name != profile:
+        console.print("[red]Pass the profile name once, as an argument or --profile.[/]")
+        raise typer.Exit(1)
+    cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        for_all=True,
+        **_profile_bind_kwargs(
+            collection=collection,
+            library=library,
+            year_from=year_from,
+            year_to=year_to,
+            item_type=item_type,
+            limit=limit,
+            try_all=try_all,
+            retry_failed=retry_failed,
+            upgrade_linked=upgrade_linked,
+            no_attach=no_attach,
+            scihub=scihub,
+            sources=sources,
+            preset=preset,
+            apply=apply,
+            overwrite=overwrite,
+            steps=steps,
+            skip=skip,
+            require_summarize=require_summarize,
+            profile=chosen,
+            run_config=run_config,
+        ),
+    )
+    where = ", ".join(bound.origins) or "builtin all"
+    console.print(f"[dim]Effective paperful all configuration ({where})[/]")
+    console.print(format_effective(bound), markup=False, highlight=False)
+    if dry_run and "summarize" in bound.steps:
+        console.print("[yellow]dry-run skips summarize.[/]")
+
+
+@profile_app.command("save")
+def profile_save(
+    name: str = typer.Argument(..., help="Profile name. Written to profiles/<name>.toml."),
+    collection: list[str] = typer.Option([], "--collection", "-C"),
+    library: bool | None = LibraryOpt,
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    limit: int | None = typer.Option(None, "--limit", "-n"),
+    try_all: bool | None = TryAllOpt,
+    retry_failed: bool | None = RetryFailedOpt,
+    upgrade_linked: bool | None = UpgradeLinkedOpt,
+    no_attach: bool | None = NoAttachOpt,
+    scihub: bool | None = SciHubOpt,
+    sources: str | None = typer.Option(None, "--sources"),
+    preset: str | None = typer.Option(None, "--preset"),
+    apply: bool | None = ApplyOpt,
+    overwrite: bool | None = OverwriteOpt,
+    steps: str | None = StepsOpt,
+    skip: list[str] = SkipOpt,
+    require_summarize: bool | None = typer.Option(None, "--require-summarize/--no-require-summarize"),
+    description: str | None = typer.Option(None, "--description", help="One-line note stored in the file."),
+    force: bool = typer.Option(False, "--force", help="Overwrite an existing profile file."),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Write profiles/<name>.toml beside config.toml. Does not edit config.toml."""
+    cfg = _cfg(config)
+    try:
+        body = collect_save_body(
+            cfg,
+            description=description,
+            **_profile_bind_kwargs(
+                collection=collection,
+                library=library,
+                year_from=year_from,
+                year_to=year_to,
+                item_type=item_type,
+                limit=limit,
+                try_all=try_all,
+                retry_failed=retry_failed,
+                upgrade_linked=upgrade_linked,
+                no_attach=no_attach,
+                scihub=scihub,
+                sources=sources,
+                preset=preset,
+                apply=apply,
+                overwrite=overwrite,
+                steps=steps,
+                skip=skip,
+                require_summarize=require_summarize,
+                profile=profile,
+                run_config=run_config,
+            ),
+        )
+        path = save_profile(cfg, name, body, force=force)
+    except RunConfigError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    console.print(f"Wrote [bold]{path}[/]")
 
 
 if __name__ == "__main__":

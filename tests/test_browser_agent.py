@@ -11,9 +11,9 @@ from paperful.config import DEFAULT_SOURCES
 from paperful.pipeline import _SERIAL_SOURCES
 from paperful.routing import source_applicable
 from paperful.sources import REGISTRY
-from paperful.sources.base import Outcome
+from paperful.sources.base import Candidate, Outcome
 from paperful.sources.browser_agent import find, set_runner
-from tests.conftest import PDF_BYTES, make_item
+from tests.conftest import PDF_BYTES, make_item, mock_client
 
 
 class _StubRunner:
@@ -215,6 +215,156 @@ def test_pipeline_records_browser_agent_source(cfg, stub_runner, monkeypatch):
     assert rec.status == STATUS_OK and rec.source == "browser_agent"
     assert rec.path and rec.path.endswith(".pdf")
     assert stats.by_source.get("browser_agent") == 1
+
+
+def test_pipeline_recover_after_scholar_miss(cfg, monkeypatch):
+    import io
+
+    from rich.console import Console
+
+    from paperful.pipeline import Pipeline
+    from paperful.store import STATUS_OK, Manifest
+    from tests.test_pipeline import StubSource
+
+    cfg.llm_enabled = True
+    scholar = StubSource("scholar", default=Outcome.NOT_FOUND)
+    agent = StubSource(
+        "browser_agent",
+        {"A": Candidate(url="", source="browser_agent", content=PDF_BYTES)},
+    )
+    monkeypatch.setattr(
+        "paperful.pipeline.REGISTRY",
+        {"unpaywall": StubSource("unpaywall"), "scholar": scholar, "browser_agent": agent},
+    )
+    monkeypatch.setattr("paperful.pipeline.prepare_identifiers", lambda *a, **k: [])
+    pipe = Pipeline(
+        cfg,
+        Manifest(cfg.manifest_path),
+        Console(file=io.StringIO()),
+        sources=["unpaywall", "scholar", "browser_agent"],
+        try_all=True,
+        use_browser=False,
+    )
+    stats = pipe.run([make_item(key="A")])
+    rec = pipe.manifest.get("A")
+    assert scholar.calls == ["A"] and agent.calls == ["A"]
+    assert stats.ok == 1 and rec is not None and rec.source == "browser_agent"
+    assert rec.status == STATUS_OK
+
+
+def test_pipeline_recover_skipped_without_browser_lane_failure(cfg, monkeypatch):
+    import io
+
+    from rich.console import Console
+
+    from paperful.pipeline import Pipeline
+    from paperful.store import Manifest
+    from tests.test_pipeline import StubSource
+
+    cfg.llm_enabled = True
+    scholar = StubSource("scholar")
+    agent = StubSource(
+        "browser_agent",
+        {"N": Candidate(url="", source="browser_agent", content=PDF_BYTES)},
+    )
+    monkeypatch.setattr(
+        "paperful.pipeline.REGISTRY",
+        {"unpaywall": StubSource("unpaywall"), "scholar": scholar, "browser_agent": agent},
+    )
+    monkeypatch.setattr("paperful.pipeline.prepare_identifiers", lambda *a, **k: [])
+    pipe = Pipeline(
+        cfg,
+        Manifest(cfg.manifest_path),
+        Console(file=io.StringIO()),
+        sources=["unpaywall", "scholar", "browser_agent"],
+        try_all=False,
+        use_browser=False,
+    )
+    item = make_item(key="N", doi=None, title="x", url="https://x.test/p")
+    pipe.run([item])
+    rec = pipe.manifest.get("N")
+    assert scholar.calls == []
+    assert agent.calls == []
+    assert rec is not None
+    assert "browser_agent:skipped(no browser-lane failure)" in rec.attempts
+
+
+def test_pipeline_releases_browser_before_agent(cfg, monkeypatch):
+    import io
+
+    from rich.console import Console
+
+    from paperful.pipeline import Pipeline
+    from paperful.store import Manifest
+    from tests.test_pipeline import StubSource
+
+    class FakeBrowser:
+        def __init__(self):
+            self.closed = 0
+
+        def close(self):
+            self.closed += 1
+
+        def available(self):
+            return True
+
+    scholar = StubSource("scholar", default=Outcome.NOT_FOUND)
+    agent = StubSource("browser_agent", default=Outcome.NOT_FOUND)
+    monkeypatch.setattr(
+        "paperful.pipeline.REGISTRY",
+        {"scholar": scholar, "browser_agent": agent},
+    )
+    monkeypatch.setattr("paperful.pipeline.prepare_identifiers", lambda *a, **k: [])
+    pipe = Pipeline(
+        cfg,
+        Manifest(cfg.manifest_path),
+        Console(file=io.StringIO()),
+        sources=["scholar", "browser_agent"],
+        try_all=True,
+        use_browser=False,
+    )
+    fake = FakeBrowser()
+    pipe.browser = fake
+    pipe.ctx.browser = fake
+    pipe.run([make_item(key="A")])
+    assert fake.closed == 1
+    assert pipe.browser is None
+    assert agent.calls == ["A"]
+
+
+def test_pipeline_oa_hit_never_calls_recover(cfg, monkeypatch):
+    import io
+
+    from rich.console import Console
+
+    from paperful.pipeline import Pipeline
+    from paperful.store import Manifest
+    from tests.test_pipeline import StubSource
+
+    oa = StubSource(
+        "unpaywall",
+        {"A": Candidate(url="https://x.test/a.pdf", source="unpaywall")},
+    )
+    scholar = StubSource("scholar")
+    agent = StubSource("browser_agent")
+    monkeypatch.setattr(
+        "paperful.pipeline.REGISTRY",
+        {"unpaywall": oa, "scholar": scholar, "browser_agent": agent},
+    )
+    monkeypatch.setattr("paperful.pipeline.prepare_identifiers", lambda *a, **k: [])
+    pipe = Pipeline(
+        cfg,
+        Manifest(cfg.manifest_path),
+        Console(file=io.StringIO()),
+        sources=["unpaywall", "scholar", "browser_agent"],
+        try_all=True,
+        use_browser=False,
+    )
+    pipe.client = mock_client(lambda r: httpx.Response(200, content=PDF_BYTES))
+    pipe.ctx.client = pipe.client
+    pipe.run([make_item(key="A")])
+    assert scholar.calls == [] and agent.calls == []
+    assert pipe.manifest.get("A").source == "unpaywall"
 
 
 # ---- doctor floor pattern ----------------------------------------------------

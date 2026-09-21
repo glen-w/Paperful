@@ -1,13 +1,18 @@
 # Paperful architecture
 
-Paperful is a **local CLI**. Fetch, identifier checks, and proposed metadata
-patches happen **on disk** (`out/`, `state/`). A **library adapter** reads the
-catalogue and, separately, writes PDFs or field patches back. Zotero (local API
-on `localhost:23119`) is the first adapter; `manager = "mendeley"` is reserved.
+Paperful is a **local CLI sidecar**. Fetch, identifier checks, proposed
+metadata patches, and the per-item restore folder happen **on disk** (`out/`,
+`state/`). A **library adapter** reads the catalogue and, separately, writes
+PDFs or field patches back. **Zotero** (local API on `localhost:23119`) is the
+well-tested adapter. `manager = "mendeley"` talks to the Mendeley REST API;
+`manager = "endnote"` reads a local `.enl` library and stages an XML import
+bundle instead of editing the database. Both are **seeking testers** — do not
+treat them as proven. The disk ledger is what you keep if the manager changes.
+See [Why paperful](why.md).
 
-`run` never rewrites bibliographic fields. Attach, `fix-metadata --apply`, and
-`dedupe --apply` use the Zotero 10+ write API. Dedupe moves extras to the
-Zotero trash; it does not delete files under `out/`.
+`run` never rewrites bibliographic fields. On Zotero, attach,
+`fix-metadata --apply`, and `dedupe --apply` use the Zotero 10+ write API.
+Dedupe moves extras to the Zotero trash; it does not delete files under `out/`.
 
 ## Data flow
 
@@ -27,8 +32,11 @@ flowchart LR
    default skip items with only a `linked_url` PDF).
 2. **Prepare identifiers** — verify library DOI; optional in-memory swap; PubMed PMID→DOI; title→DOI via Crossref / OpenAlex / Semantic Scholar. Skipped for web/blog/forum types.
 3. **Sources** — ordered list (Unpaywall, OpenAlex, arXiv, …, CORE, EZProxy, HTML→PDF); per-item routing skips inapplicable sources unless `--try-all`.
-4. **Download** — validate PDF size; write under `out_dir`; extract PDF DOI (`pdftotext`, then `pypdf`); append to `state/manifest.jsonl`.
-5. **Attach** — optional `imported_file` upload via local write API; failures recorded as `attach_failed` with typed reasons.
+4. **Download** — validate PDF size; write under `out_dir` inside
+   `<Author - Year - Title -- KEY>/`; write or refresh `record.json`; extract PDF DOI (`pdftotext`, then `pypdf`); append to `state/manifest.jsonl`.
+5. **Attach** — optional write-back through the adapter (Zotero `imported_file`
+   upload; Mendeley `POST /files`; EndNote stages a bundle until `flush_writes`).
+   Failures recorded as `attach_failed` with typed reasons.
 
 `paperful lint` runs step 2 (and PDF-text DOI) for items **with and without** PDFs. `paperful fix-metadata` writes `state/metadata-patches.jsonl` then, with `--apply`, pushes patches through the adapter.
 
@@ -36,22 +44,32 @@ flowchart LR
 
 | Path | Role |
 | --- | --- |
-| `out/<collection>/…pdf` | Collection-mirrored downloads |
+| `out/<collection>/<stem -- KEY>/` | Per-item restore folder |
+| `out/<collection>/<stem -- KEY>/record.json` | `paperful.item.v1`. Catalogue fields plus fetch provenance. 0.x may add keys |
+| `out/<collection>/<stem -- KEY>/*.pdf` | PDF when `run` downloaded it, or when `snapshot --pdfs all` exported it |
+| `out/<collection>/<stem -- KEY>/notes/` | Child-note HTML, including a copied summary when one exists |
+| `out/_index.jsonl` | Lookup rollup: item key, dirs, has_pdf, md5 |
+| `out/_collections.json` | Collection tree (`paperful.collections.v1`) |
+| `out/_history.json` | Pointers at `state/` ledgers. Not a copy of sessions or keys |
 | `state/manifest.jsonl` | Append-only resume ledger. Latest line per item key wins. Fields include `doi` (used this attempt), `library_doi`, `doi_verified`, `pdf_doi` |
 | `state/metadata-patches.jsonl` | Proposed patches (`doi`, `title`, `date`, `publicationTitle`) |
 | `state/dedupe-packs/` | Duplicate review packs from `dedupe` (JSON + Markdown) |
 | `state/dedupe-applied.jsonl` | Trash audit; appended only on `dedupe --apply` |
 | `state/pdf-cache/` | Manager PDFs exported so lint reads text on disk |
-| `state/summaries/<key>.html` | `summarize` output; `--apply` pushes it as a tagged child note |
+| `state/summaries/<key>.html` | `summarize` output when dest includes disk; the Zotero child note is the other copy |
+| `state/reports/<slug>.html` | `synthesize` literature review; sibling `<slug>.json` records source hashes |
 | `state/sessions/` | Chromium profile + `meta.json` (login timestamps, no secrets). Netscape dumps for httpx |
-| `state/last-run.json` | Latest `run` report (`paperful.run_report.v1`) |
-| `state/runs/<stamp>-<command>.json` | Historical `run` and `fix-metadata` reports |
+| `state/last-run.json` | Latest `run` or `recover` report (`paperful.run_report.v1`). Other verbs do not replace it |
+| `state/runs/<stamp>-<command>.json` | One report per `run`, `recover`, `gaps`, `lint`, `fix-metadata` (dry-run and `--apply`), `summarize`, `synthesize`, and `snapshot` |
+| `state/packs/<id>.json` | Parent witness (`paperful.pack.v1`) listing those reports for one `pack open` … `pack close` sequence. `state/packs/current` names the open id |
+| `state/mendeley-oauth.json` | Mendeley tokens after `session login mendeley` (mode `0600`) |
+| `state/endnote-import/<stamp>/` | EndNote XML+PDF bundle for File → Import. Never an edit of `.enl` |
 
 `doi_verified` is `ok` (≥ `crossref_min_score`), `suspect` (< `doi_suspect_score`), `swapped` (in-memory replacement), `unknown` (API down, mid-range match, or `verify_doi = false`), or `missing`. `unknown` never swaps.
 
 ## Library adapter
 
-[`paperful/library.py`](../paperful/library.py) defines `LibraryBackend`: list items, fetch one item by key (`get_item`), export a PDF **onto disk**, apply a field patch, trash a duplicate parent, attach a file, and create-or-update a **tagged child note** (`create_or_update_note`, used by `summarize --apply`; the tag makes re-runs update instead of duplicate). Notes are posted as a dict (the local API has no `/items/new` template), same idea as stored-file attachments. Identifier and dedupe logic (`resolve`, `lint`, `pdfid`, `metadata`, `dedupe`) must not import Zotero except through this protocol. `trash_item` sets `deleted` and updates the item; it does not call a permanent delete.
+[`paperful/library.py`](../paperful/library.py) defines `LibraryBackend`: list items, fetch one item by key (`get_item`), export a PDF **onto disk**, apply a field patch, trash a duplicate parent, attach a file, create-or-update a **tagged child note** (`create_or_update_note`, used by `summarize`), create-or-update a **standalone collection note** (`create_or_update_collection_note`, used by `synthesize`), and `flush_writes()` (EndNote stages `state/endnote-import/<stamp>/`; others no-op). The tag makes re-runs update instead of duplicate. Identifier and dedupe logic (`resolve`, `lint`, `pdfid`, `metadata`, `dedupe`) must not import a manager except through this protocol. Notes are skipped by `items_in_scope`, so a report note never enters `run` / `lint` / `gaps`. Canonical item types are Zotero ids; [`paperful/interop/`](../paperful/interop/) maps RIS / BibTeX / EndNote XML at the edge. `paperful import` / `export` use that layer. **Zotero is well tested.** [Mendeley](mendeley.md) and [EndNote](endnote.md) are seeking testers.
 
 ## LLM layer (optional, local-first)
 
@@ -59,12 +77,13 @@ flowchart LR
 
 | Verb | Gate | Output | Library write |
 | --- | --- | --- | --- |
-| `recover --item` | `llm.enabled` + `paperful[browser-agent]` (Py 3.11+) | PDF in `out/`, manifest `source=browser_agent` | existing attach |
+| `run` (`browser_agent`) / `recover --item` | `llm.enabled` + `paperful[browser-agent]` (Py 3.11+) | PDF in `out/`, manifest `source=browser_agent` | existing attach |
 | `fix-metadata` title proposals | `[fix_metadata].llm_title` | `Patch(source="llm_title")` | `--apply` |
 | `lint` identity check | `[lint].llm_pdf_match` | finding `pdf_identity_mismatch` | none |
-| `summarize` | `llm.enabled` | `state/summaries/<key>.html` | `--apply` note |
+| `summarize` | `llm.enabled` | `state/summaries/<key>.html` when dest includes disk | child note unless `--to disk` |
+| `synthesize` | `llm.enabled` | `state/reports/<slug>.html` when dest includes disk | standalone note in the scoped collection unless `--to disk` |
 
-`browser_agent` is a registered **serial** source but never in `DEFAULT_SOURCES`; `recover` builds the pipeline with `use_browser=False` so the agent owns the vault Chromium profile (no double lock). Hard CAPTCHAs end as `captcha`, not auto-solved. `summarize` refuses items the gated identity check flags unless `--force`.
+`browser_agent` is a registered **serial** source but never in `DEFAULT_SOURCES`. `run` auto-appends it after Scholar / EZProxy / htmlpdf when `[llm].enabled` and `[browser_agent].during_run` (default on) and the extra is importable; the agent runs only if one of those vault lanes was tried and failed. Before that phase the pipeline closes `BrowserSession` so browser-use can own the vault Chromium profile. `paperful recover --item` builds the pipeline with `use_browser=False` and only that source. Hard CAPTCHAs end as `captcha`, not auto-solved. `summarize` refuses items the gated identity check flags unless `--force`.
 
 ## Identifiers and lint
 
@@ -105,10 +124,14 @@ Sci-Hub is **never** in the default source list; opt in via config, `--scihub`, 
 
 When Zotero cloud storage is full, attachments may fail with quota errors; PDFs still land on disk and can be attached later. Linked PDF URLs in Zotero are treated as “already covered” unless `--upgrade-linked` is set.
 
-**Quiet mirror:** `out/<collection>/…` is also an intentional browsable tree
-(dual store with Zotero `storage/` after `imported_file` attach). Stance and
-non-goals: [quiet-mirror.md](quiet-mirror.md). House folder sync is out of
-scope for this CLI.
+**Quiet mirror:** `out/<collection>/<stem -- KEY>/` is a browsable restore
+folder (dual store with Zotero `storage/` after `imported_file` attach).
+`snapshot` fills a folder for every scoped item. `[mirror].pdfs` chooses
+whether existing Zotero PDFs are copied (`all`), left in Zotero
+(`additional`, the default), or omitted (`none`). `paperful restore --apply`
+creates missing items from those folders and does not overwrite fields that
+are already in Zotero. Stance: [quiet-mirror.md](quiet-mirror.md). House
+folder sync is out of scope for this CLI.
 
 ## Ghost attachments
 
@@ -154,7 +177,7 @@ as `state/last-run.json`. **0.x may add keys**; 1.0 freezes this schema name.
 | Field | Meaning |
 | --- | --- |
 | `schema` | Always `paperful.run_report.v1` on run reports |
-| `command` | `run`, `recover`, or `fix-metadata` (apply reports under `state/runs/`) |
+| `command` | `run`, `recover`, `gaps`, `lint`, `fix-metadata`, `summarize`, or `synthesize` |
 | `started_at` / `finished_at` | ISO-8601 UTC |
 | `duration_s` | Wall time, or `null` if start unknown |
 | `scope` | Collection path(s) or library |
@@ -173,6 +196,26 @@ as `state/last-run.json`. **0.x may add keys**; 1.0 freezes this schema name.
 | `items[]` | Per-item: `itemKey`, `title`, `status`, `source`, `reason`, `doi`, `doi_verified`, `attempts`, `fields_corrected`, `path`, `error_type` |
 
 Manifest `counts` keys match ledger statuses (`ok`, `attached`, `not_found`, …).
+
+`gaps`, `lint`, `summarize`, and `fix-metadata` (dry-run and `--apply`) write the same schema under `state/runs/` and do not replace `last-run.json`. Their `summary` adds command-specific keys (`no_stored_pdf`, `findings` / `findings_by_code`, `summarized` / `failed`, `patches_proposed`). A dry-run `fix-metadata` report omits `patches_applied`.
+
+(pack-v1)=
+## Run packs (`paperful.pack.v1`)
+
+`paperful pack open` writes `state/packs/<id>.json` and `state/packs/current`. Each later command that writes a run report appends a step `{command, started_at, finished_at, report}` — `report` is the child filename under `state/runs/`. The first step that has a scope copies it onto the parent. `paperful pack close` sets `status` to `closed` and deletes `current`. A second `open` while one is open exits 1.
+
+`PAPERFUL_PACK=off` writes the child report and does not append. Commands that exit before a report (bad flags, Zotero down, `run --dry-run`) are absent. `paperful pack show` reads disk only: the open pack, or the latest closed one. `--json` inlines each step's `summary`, not the child `items` array.
+
+## Run configs
+
+A profile is the *input* you can run again (`paperful all --profile`, or
+`--profile` on one verb). A pack is the *output* of one sequence. Grey-lit
+playbooks are URL → PDF rules. None of the three replaces the others.
+
+Profiles are `[profiles.*]` in `config.toml` and `profiles/*.toml` beside
+that file. They are not stored under `state/`. `paperful all` opens a pack
+when none is open, runs the default chain (or the profile's `steps`), and
+closes the pack it opened. See [Workflows](workflows.md).
 
 ## Grey literature
 
@@ -213,3 +256,5 @@ stop at `no_identifier`.
 - [ezproxy.md](ezproxy.md) / [sessions.md](sessions.md) — campus proxy and browser vault
 - [docker.md](docker.md) — optional image (host Zotero + headed login stay outside)
 - [zotero.md](zotero.md) — local API, write keys, attachment modes, ghosts
+- [mendeley.md](mendeley.md) — REST, OAuth, annotations as notes (seeking testers)
+- [endnote.md](endnote.md) — SQLite read, XML import bundle (seeking testers)

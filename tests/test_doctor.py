@@ -22,6 +22,13 @@ def test_remediation_write_api_names_dedupe(cfg):
     assert "fix-metadata --apply" in text
 
 
+def test_remediation_mendeley_and_endnote(cfg):
+    men = remediation_text(Check("Mendeley API", "red", "missing"), cfg)
+    assert men and "dev.mendeley.com" in men and "session login mendeley" in men
+    en = remediation_text(Check("EndNote library", "red", "missing"), cfg)
+    assert en and ".enl" in en and "sdb.eni" in en
+
+
 def test_remediation_skips_green(cfg):
     assert remediation_text(Check("email", "green", "x@y.z"), cfg) is None
 
