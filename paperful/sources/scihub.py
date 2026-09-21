@@ -16,10 +16,13 @@ from urllib.parse import urljoin
 import httpx
 from bs4 import BeautifulSoup
 
+from ..routing import SCIHUB_COVERAGE_THROUGH_YEAR
 from ..zot import Item
 from .base import Candidate, Context, Outcome
 
 NAME = "scihub"
+# Alias kept next to the source for callers that import from here.
+COVERAGE_THROUGH_YEAR = SCIHUB_COVERAGE_THROUGH_YEAR
 _ALTCHA_HASHES = {
     "SHA-256": hashlib.sha256,
     "SHA-1": hashlib.sha1,
@@ -155,6 +158,12 @@ def solve_altcha(challenge: dict) -> str:
 def find(item: Item, ctx: Context) -> Candidate:
     if not item.doi:
         return Candidate.miss(NAME, Outcome.SKIPPED, "no DOI")
+    if item.year is not None and item.year > COVERAGE_THROUGH_YEAR:
+        return Candidate.miss(
+            NAME,
+            Outcome.SKIPPED,
+            f"year {item.year} after Sci-Hub coverage (~{COVERAGE_THROUGH_YEAR})",
+        )
     notes: list[str] = []
     saw_captcha = False
     for mirror in ctx.config.scihub_mirrors:

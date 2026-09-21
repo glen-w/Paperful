@@ -20,3 +20,4 @@ ezproxy-cookies.txt
 .env
 compose.override.yaml
 docker-compose.override.yml
+assessments/

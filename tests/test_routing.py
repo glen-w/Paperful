@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from paperful.circuit import CircuitBreaker
 from paperful.routing import (
+    SCIHUB_COVERAGE_THROUGH_YEAR,
     doi_from_biorxiv_url,
     ezproxy_target,
+    filter_sources_for_item_types,
+    filter_sources_for_year_scope,
     is_block_failure,
     is_cshl_doi,
     is_publisher_url,
@@ -25,6 +28,11 @@ def test_source_applicable_by_metadata(cfg):
     assert source_applicable(no_doi, cfg, "direct")
     assert not source_applicable(no_doi, cfg, "scihub")
     assert source_applicable(with_doi, cfg, "scihub")
+    assert source_applicable(make_item(doi="10.1000/x", year=2021), cfg, "scihub")
+    assert not source_applicable(
+        make_item(doi="10.1000/x", year=SCIHUB_COVERAGE_THROUGH_YEAR + 1), cfg, "scihub"
+    )
+    assert source_applicable(make_item(doi="10.1000/x", year=None), cfg, "scihub")
     cfg.core_api_key = "k"
     assert source_applicable(with_doi, cfg, "core")
     cfg.core_api_key = ""
@@ -90,6 +98,32 @@ def test_sources_for_item_preserves_config_order(cfg):
         "scihub",
         "direct",
     ]
+
+
+def test_filter_sources_for_item_types_drops_htmlpdf_on_journals():
+    sources = ["unpaywall", "direct", "ezproxy", "htmlpdf", "scihub"]
+    assert filter_sources_for_item_types(sources, None) == sources
+    assert filter_sources_for_item_types(sources, frozenset()) == sources
+    assert filter_sources_for_item_types(
+        sources, frozenset({"journalArticle"})
+    ) == ["unpaywall", "direct", "ezproxy", "scihub"]
+    assert filter_sources_for_item_types(
+        sources, frozenset({"journalArticle", "report"})
+    ) == sources
+    assert filter_sources_for_item_types(
+        sources, frozenset({"webpage"})
+    ) == sources
+
+
+def test_filter_sources_for_year_scope_drops_scihub_past_coverage():
+    sources = ["unpaywall", "ezproxy", "scihub"]
+    assert filter_sources_for_year_scope(sources, None) == sources
+    assert filter_sources_for_year_scope(sources, SCIHUB_COVERAGE_THROUGH_YEAR) == sources
+    assert filter_sources_for_year_scope(sources, 2019) == sources
+    assert filter_sources_for_year_scope(
+        sources, SCIHUB_COVERAGE_THROUGH_YEAR + 1
+    ) == ["unpaywall", "ezproxy"]
+    assert filter_sources_for_year_scope(sources, 2023) == ["unpaywall", "ezproxy"]
 
 
 def test_is_block_failure():

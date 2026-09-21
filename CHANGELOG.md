@@ -6,12 +6,19 @@ may still move. **1.0** will lock `paperful.run_report.v1` and attach behaviour
 
 ## Unreleased
 
+Browser session Playwright work runs on a dedicated thread so parallel OA
+downloads no longer trip ``Cannot switch to a different thread`` (which left
+Scholar/EZProxy as immediate ``browser (error)`` misses).
+
 `--year-from` / `--year-to` and `--type` / `-T` restrict collection-scoped
 commands (`run`, `lint`, `fix-metadata`, `dedupe`, `gaps`, `summarize`) by
 publication year and Zotero item type. `summarize --apply` creates child notes
 without pyzotero's `item_template()` (the Zotero local API has no `/items/new`).
 `fix-metadata` recases ALL CAPS scholarly titles to Title Case; filename
 titles stay lint-only.
+
+Sci-Hub skips items dated after 2021 (and drops from the run when
+`--year-from` is past that coverage year), matching thin post-2021 ingest.
 
 ## 0.5.0 — 2026-09-21
 

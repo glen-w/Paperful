@@ -22,4 +22,21 @@ automatically; if it still cannot be passed the item is marked `captcha` and
 retried next run. Repeated CAPTCHAs also trip the run-wide
 [circuit breaker](sources.md) for `scihub`. A
 definitive "not found" is final for the run since all mirrors share one
-database. Coverage after ~2021 is thin.
+database.
+
+## Coverage cutoff (~2021)
+
+Sci-Hub largely stopped routine ingestion of new articles around late 2020 /
+early 2021 (India court undertaking, then publisher 2FA making bulk fetch
+impractical). Their own "article not in database" pages say items published
+**after 2021** are usually absent; occasional older gaps and rare later hits
+exist, but coverage after that year is thin.
+
+paperful therefore **does not call Sci-Hub** when:
+
+- the item has a parsed year **greater than 2021**, or
+- the run uses `--year-from` **strictly after 2021** (Sci-Hub is dropped from
+  the run-level source list, including under `--try-all`).
+
+Undated items are still tried. Prefer campus [EZProxy](ezproxy.md) for recent
+paywalled papers when your library has a subscription.

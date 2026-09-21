@@ -598,6 +598,33 @@ def test_scihub_not_found_is_terminal_across_mirrors(ctx_factory):
     assert cand.outcome is Outcome.NOT_FOUND and calls == ["m1.test"]
 
 
+def test_scihub_skips_years_after_coverage_without_network(ctx_factory):
+    calls = []
+
+    def handler(req):
+        calls.append(str(req.url))
+        return httpx.Response(500)
+
+    cand = scihub.find(
+        make_item(year=scihub.COVERAGE_THROUGH_YEAR + 1),
+        ctx_factory(handler),
+    )
+    assert cand.outcome is Outcome.SKIPPED
+    assert "after Sci-Hub coverage" in cand.note
+    assert calls == []
+    # Boundary year and undated items still reach the network layer.
+    assert (
+        scihub.find(
+            make_item(year=scihub.COVERAGE_THROUGH_YEAR), ctx_factory(handler)
+        ).outcome
+        is Outcome.ERROR
+    )
+    assert (
+        scihub.find(make_item(year=None), ctx_factory(handler)).outcome is Outcome.ERROR
+    )
+    assert len(calls) >= 2
+
+
 def test_scihub_fails_over_and_circuit_breaks(ctx_factory):
     html = (FIX / "scihub_found.html").read_text()
     ctx = ctx_factory(

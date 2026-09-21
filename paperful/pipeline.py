@@ -347,13 +347,13 @@ class Pipeline:
             if self._stop.is_set():
                 still.extend(queue[idx:])
                 return still
-            if not first:
-                time.sleep(random.uniform(lo, hi))
-            first = False
             lanes = self._lanes_for(item)
             if self._skip_source(item, "scihub", lanes, attempts):
                 still.append((item, attempts))
                 continue
+            if not first:
+                time.sleep(random.uniform(lo, hi))
+            first = False
             self._log_item(item, "[dim]scihub: checking...[/]")
             cand = REGISTRY["scihub"].find(item, self.ctx)
             attempts.append(

@@ -249,6 +249,14 @@ def test_scihub_skipped_for_items_without_doi(pipe_factory):
     assert manifest.get("U").status == STATUS_NOT_FOUND
 
 
+def test_scihub_skipped_for_items_after_coverage_year(pipe_factory):
+    sh = StubSource("scihub")
+    pipe, manifest = pipe_factory({"scihub": sh}, ["scihub"])
+    pipe.run([make_item(key="Y", year=2024)])
+    assert sh.calls == []
+    assert manifest.get("Y").status == STATUS_NOT_FOUND
+
+
 def test_attach_after_download_success_and_failure(pipe_factory):
     src = StubSource("oa", {"A": Candidate(url="https://x.test/a.pdf", source="oa")})
     ok_attacher = FakeAttacher(ok=True)

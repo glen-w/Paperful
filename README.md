@@ -15,9 +15,10 @@ default** — it occupies a legal grey zone in some jurisdictions; see
 [Sci-Hub](docs/scihub.md).
 
 By default each item only hits sources that match its metadata (DOI, arXiv
-id, URL, …); `--try-all` disables that. Sci-Hub coverage after ~2021 is thin;
-recent paywalled papers are best fetched via EZProxy when your library has a
-subscription.
+id, URL, …); `--try-all` disables that. Sci-Hub coverage after ~2021 is thin —
+paperful skips Sci-Hub for items dated after 2021 (and drops it from the run
+when `--year-from` is past that year). Recent paywalled papers are best fetched
+via EZProxy when your library has a subscription.
 
 Work happens **on disk** (`out/`, `state/`). Zotero is a library adapter:
 read the catalogue in, write PDFs and metadata patches back. Mendeley is

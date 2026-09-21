@@ -33,7 +33,7 @@ from .doctor import (
 )
 from .library import LibraryBackend, LibraryError, get_backend
 from .pipeline import Pipeline, RunStats, make_client
-from .routing import sources_for_item
+from .routing import filter_sources_for_item_types, filter_sources_for_year_scope, sources_for_item
 from .runreport import build_report, print_run_summary, write_run_report
 from .sources import Context
 from .sources.scihub import ping_mirrors
@@ -873,11 +873,16 @@ def run(
     cfg = _cfg(config)
     _require_manager(cfg)
     source_list = _source_list(cfg, sources, scihub, preset)
-    _warn_if_scihub(source_list)
     zl = _zotero()
     backend = get_backend(cfg, zl)
     keys, scope = _scope_keys(backend, collection, library)
     types = _resolve_types(item_type)
+    # Drop sources that can never hit this -T / year scope (e.g. htmlpdf on
+    # journals, Sci-Hub when --year-from is past its ~2021 coverage), including
+    # under --try-all.
+    source_list = filter_sources_for_item_types(source_list, types)
+    source_list = filter_sources_for_year_scope(source_list, year_from)
+    _warn_if_scihub(source_list)
 
     manifest = Manifest(cfg.manifest_path)
     item_filter = (

@@ -49,6 +49,8 @@ Leave `ezproxy_base` empty (or remove `ezproxy` from `sources`) if you do not
 use a library proxy. Remove `scholar` from `sources` if Google Scholar
 CAPTCHAs add noise even after `session login scholar`. Sci-Hub is off until
 you add `"scihub"` to `sources` or pass `--scihub` — see [Sci-Hub](scihub.md).
+Items dated after 2021 are not sent to Sci-Hub; a `--year-from` past that
+year drops it from the run list.
 Set `source_routing = false` (or pass `--try-all`) when Zotero fields are
 untrustworthy and you want every configured source tried anyway.
 

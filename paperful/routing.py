@@ -14,8 +14,25 @@ from .zot import Item
 if TYPE_CHECKING:
     from .sources.base import Outcome
 
+# Sci-Hub largely stopped routine ingestion after ~2021 (India court pause +
+# 2FA; their own "not in database" copy says post-2021 articles are mostly
+# absent). Years through this value are still tried; later dated items skip.
+SCIHUB_COVERAGE_THROUGH_YEAR = 2021
+
 _ARXIV_TYPES = frozenset(
     {"preprint", "journalArticle", "conferencePaper", "report", "manuscript"}
+)
+# Item types htmlpdf can ever print (web/news, or DOI-less document/report).
+_HTMLPDF_ITEM_TYPES = frozenset(
+    {
+        "webpage",
+        "blogPost",
+        "forumPost",
+        "newspaperArticle",
+        "magazineArticle",
+        "document",
+        "report",
+    }
 )
 _BIORXIV_DOI = re.compile(r"^10\.1101/", re.IGNORECASE)
 _BIORXIV_URL = re.compile(
@@ -39,6 +56,38 @@ def is_block_failure(outcome: Outcome, note: str = "") -> bool:
 def sources_for_item(item: Item, cfg: Config, sources: list[str]) -> list[str]:
     """Return configured sources that look applicable to this item's metadata."""
     return [name for name in sources if source_applicable(item, cfg, name)]
+
+
+def filter_sources_for_item_types(
+    sources: list[str], item_types: frozenset[str] | None
+) -> list[str]:
+    """Drop sources that can never apply under a CLI ``-T`` / ``--item-type`` scope.
+
+    Unlike per-item ``source_routing``, this trims the run-level source list so
+    ``--try-all`` on a journal-only scope does not check ``htmlpdf`` on every item.
+    """
+    if not item_types:
+        return list(sources)
+    out: list[str] = []
+    for name in sources:
+        if name == "htmlpdf" and not (item_types & _HTMLPDF_ITEM_TYPES):
+            continue
+        out.append(name)
+    return out
+
+
+def filter_sources_for_year_scope(
+    sources: list[str], year_from: int | None
+) -> list[str]:
+    """Drop Sci-Hub when the CLI ``--year-from`` floor is past its coverage.
+
+    Sci-Hub largely stopped ingesting after ~2021; a run scoped entirely after
+    that year would only burn serial delays on not-found pages. Per-item routing
+    still skips post-cutoff years when the run is unscoped or mixed.
+    """
+    if year_from is None or year_from <= SCIHUB_COVERAGE_THROUGH_YEAR:
+        return list(sources)
+    return [name for name in sources if name != "scihub"]
 
 
 def source_applicable(item: Item, cfg: Config, name: str) -> bool:
@@ -77,15 +126,11 @@ def source_applicable(item: Item, cfg: Config, name: str) -> bool:
             return False
         if url_is_direct_skip(url):
             return False
-        if item.item_type in {
-            "webpage",
-            "blogPost",
-            "forumPost",
-            "newspaperArticle",
-            "magazineArticle",
-        }:
-            return True
-        return item.item_type in {"document", "report"} and not item.doi
+        if item.item_type not in _HTMLPDF_ITEM_TYPES:
+            return False
+        if item.item_type in {"document", "report"}:
+            return not item.doi
+        return True
     if name == "ezproxy":
         if not cfg.ezproxy_base:
             return False
@@ -101,7 +146,12 @@ def source_applicable(item: Item, cfg: Config, name: str) -> bool:
             return False
         return bool(ezproxy_target(item))
     if name == "scihub":
-        return bool(item.doi)
+        if not item.doi:
+            return False
+        # Undated items are still tried; dated ones past coverage are not.
+        if item.year is not None and item.year > SCIHUB_COVERAGE_THROUGH_YEAR:
+            return False
+        return True
     if name == "browser_agent":
         url = (item.url or "").strip().lower()
         return bool(cfg.llm_enabled and (item.doi or url.startswith(("http://", "https://"))))

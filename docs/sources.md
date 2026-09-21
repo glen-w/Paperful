@@ -7,7 +7,8 @@ lists that lane, not the full `sources` list.
 | Source | Tried when |
 | --- | --- |
 | `unpaywall` | DOI and `email` are set |
-| `openalex` / `europepmc` / `scihub` | DOI |
+| `openalex` / `europepmc` | DOI |
+| `scihub` | DOI, and either undated or year ≤ 2021 (Sci-Hub largely stopped ingesting after ~2021; see [Sci-Hub](scihub.md#coverage-cutoff-2021)) |
 | `arxiv` | arXiv id, `10.48550/arxiv.…` DOI, or a scholarly item type with a long title |
 | `biorxiv` | `10.1101/…` DOI (including from a bioRxiv/medRxiv URL) |
 | `semanticscholar` | DOI or arXiv id |
@@ -34,6 +35,12 @@ of those filters. Use that when library records have missing or wrong
 identifiers. EZProxy still refuses YouTube, Zotero, FAO, and other
 non-publisher URLs: wrapping them in the campus proxy cannot produce a
 subscription PDF.
+
+When `run` is scoped with `-T` / `--type`, sources that can never apply to those
+item types are dropped from the run list entirely (e.g. `htmlpdf` on a
+`journalArticle`-only scope), including under `--try-all`. Likewise, when
+`--year-from` is after Sci-Hub's ~2021 coverage, `scihub` is dropped from the
+run list even if you opted in.
 
 Independently, a **circuit breaker** skips a source for the rest of the run
 after `circuit_breaker_threshold` (default 3) CAPTCHA or block-like errors

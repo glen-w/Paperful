@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import shutil
 import socket
 import subprocess
@@ -535,16 +536,67 @@ def collect_pdf_from_page(
 
 
 class BrowserSession:
-    """Lazy persistent Chromium for Scholar fetches, htmlpdf, and publisher PDFs (one lock)."""
+    """Lazy persistent Chromium for Scholar fetches, htmlpdf, and publisher PDFs.
+
+    Playwright's sync API is greenlet-bound to the thread that starts it. OA
+    workers share one session via a dedicated browser thread + job queue so
+    concurrent ``fetch_*`` calls never cross threads.
+    """
 
     def __init__(self, cfg: Config):
         self.cfg = cfg
-        self._lock = threading.Lock()
+        self._jobs: queue.Queue[Callable[[], None] | None] = queue.Queue()
+        self._thread: threading.Thread | None = None
+        self._start_lock = threading.Lock()
+        self._closed = False
         self._pw: Any = None
         self._ctx: Any = None
+        self._owner_tid: int | None = None
 
     def available(self) -> bool:
         return playwright_available() and profile_ready(self.cfg)
+
+    def _ensure_thread(self) -> None:
+        with self._start_lock:
+            if self._closed:
+                raise SessionError("browser session is closed")
+            if self._thread is not None and self._thread.is_alive():
+                return
+            self._thread = threading.Thread(
+                target=self._worker,
+                name="paperful-browser",
+                daemon=True,
+            )
+            self._thread.start()
+
+    def _worker(self) -> None:
+        self._owner_tid = threading.get_ident()
+        while True:
+            job = self._jobs.get()
+            if job is None:
+                self._shutdown_playwright()
+                return
+            job()
+
+    def _run(self, fn: Callable[[], Any]) -> Any:
+        """Run ``fn`` on the browser thread; re-raise its exception here."""
+        self._ensure_thread()
+        box: dict[str, Any] = {}
+        done = threading.Event()
+
+        def job() -> None:
+            try:
+                box["result"] = fn()
+            except BaseException as exc:  # noqa: BLE001 — ferry to caller
+                box["error"] = exc
+            finally:
+                done.set()
+
+        self._jobs.put(job)
+        done.wait()
+        if "error" in box:
+            raise box["error"]
+        return box["result"]
 
     def _ensure(self) -> None:
         if self._ctx is not None:
@@ -565,8 +617,22 @@ class BrowserSession:
         assert self._ctx is not None
         return self._ctx.pages[0] if self._ctx.pages else self._ctx.new_page()
 
+    def _shutdown_playwright(self) -> None:
+        if self._ctx is not None:
+            try:
+                self._ctx.close()
+            except Exception:
+                pass
+            self._ctx = None
+        if self._pw is not None:
+            try:
+                self._pw.stop()
+            except Exception:
+                pass
+            self._pw = None
+
     def fetch_html(self, url: str, timeout_ms: int = 45_000) -> tuple[str, str]:
-        with self._lock:
+        def _do() -> tuple[str, str]:
             self._ensure()
             page = self._page()
             page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
@@ -576,15 +642,20 @@ class BrowserSession:
                 pass
             return page.content(), str(page.url)
 
+        return self._run(_do)
+
     def fetch_pdf(self, url: str, timeout_ms: int = 60_000) -> tuple[bytes, str]:
         """Navigate in the vault profile and return PDF bytes + final URL.
 
         ScienceDirect / Wiley / T&F often 403 a cookie-only GET; the same URL
         in this profile (campus SSO cookies + a real Chromium) can download.
         """
-        with self._lock:
+
+        def _do() -> tuple[bytes, str]:
             self._ensure()
             return collect_pdf_from_page(self._page(), url, timeout_ms=timeout_ms)
+
+        return self._run(_do)
 
     def render_pdf(
         self,
@@ -592,7 +663,7 @@ class BrowserSession:
         paywall_hints: tuple[str, ...],
         timeout_ms: int = 45_000,
     ) -> tuple[bytes, str, str]:
-        with self._lock:
+        def _do() -> tuple[bytes, str, str]:
             self._ensure()
             page = self._page()
             page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
@@ -619,17 +690,17 @@ class BrowserSession:
             )
             return pdf, str(page.url), "chromium print"
 
+        return self._run(_do)
+
     def close(self) -> None:
-        with self._lock:
-            if self._ctx is not None:
-                try:
-                    self._ctx.close()
-                except Exception:
-                    pass
-                self._ctx = None
-            if self._pw is not None:
-                try:
-                    self._pw.stop()
-                except Exception:
-                    pass
-                self._pw = None
+        with self._start_lock:
+            if self._closed:
+                return
+            self._closed = True
+            thread = self._thread
+        if thread is None:
+            return
+        self._jobs.put(None)
+        thread.join(timeout=60)
+        self._thread = None
+        self._owner_tid = None

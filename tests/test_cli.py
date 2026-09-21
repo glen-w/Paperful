@@ -234,6 +234,32 @@ def test_run_scihub_opt_in_appends_and_prints_disclaimer(cfg_file, stub_zotero):
     assert SCIHUB_DISCLAIMER in res.stdout
 
 
+def test_run_drops_scihub_when_year_from_past_coverage(cfg_file, stub_zotero):
+    from paperful.config import SCIHUB_DISCLAIMER
+    from paperful.routing import SCIHUB_COVERAGE_THROUGH_YEAR
+
+    res = runner.invoke(
+        cli.app,
+        [
+            "run",
+            "-c",
+            str(cfg_file),
+            "--library",
+            "--dry-run",
+            "--scihub",
+            "--year-from",
+            str(SCIHUB_COVERAGE_THROUGH_YEAR + 1),
+            "--year-to",
+            "2026",
+        ],
+        env={"COLUMNS": "200"},
+    )
+    assert res.exit_code == 0, res.stdout
+    sources_line = res.stdout.split("Sources:")[-1].split("\n")[0]
+    assert "scihub" not in sources_line
+    assert SCIHUB_DISCLAIMER not in res.stdout
+
+
 def test_run_scihub_via_sources_override_prints_disclaimer(cfg_file, stub_zotero):
     from paperful.config import SCIHUB_DISCLAIMER
 

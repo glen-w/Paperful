@@ -224,3 +224,51 @@ def test_collect_pdf_from_page_raises_when_html_only():
         raise AssertionError("expected SessionError")
     except SessionError as exc:
         assert "PDF" in str(exc)
+
+
+def test_browser_session_runs_on_dedicated_thread(cfg):
+    """OA workers share one session; Playwright sync must stay on one thread."""
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    from paperful.session import BrowserSession
+
+    browser = BrowserSession(cfg)
+    tids: list[int] = []
+    caller_tids: list[int] = []
+
+    def fake_ensure() -> None:
+        if browser._ctx is None:
+            browser._ctx = object()
+
+    class _Page:
+        url = "https://x.test/"
+
+        def goto(self, *args, **kwargs):
+            tids.append(threading.get_ident())
+
+        def wait_for_load_state(self, *args, **kwargs):
+            pass
+
+        def content(self):
+            return "<html/>"
+
+    browser._ensure = fake_ensure  # type: ignore[method-assign]
+    browser._page = lambda: _Page()  # type: ignore[method-assign]
+    browser.available = lambda: True  # type: ignore[method-assign]
+
+    def call() -> str:
+        caller_tids.append(threading.get_ident())
+        body, _ = browser.fetch_html("https://x.test/")
+        return body
+
+    try:
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            bodies = list(pool.map(lambda _: call(), range(24)))
+        assert bodies == ["<html/>"] * 24
+        assert len(tids) == 24
+        assert len(set(tids)) == 1
+        assert tids[0] not in set(caller_tids)
+        assert browser._owner_tid == tids[0]
+    finally:
+        browser.close()
