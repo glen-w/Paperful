@@ -134,7 +134,10 @@ on the map; not prerequisites for 1.x usefulness.
    (create items by DOI, tag `crossref-backfill`, hand off to `run` for PDFs).
    That backfill stays out of any scheduled bot inside Paperful.
 4. **File & attachment OS** — linked vs stored policy, rename, orphan GC,
-   broken-link repair, PDF quality / wrong-paper triage (eat StorScan-class tools)
+   broken-link repair, PDF quality / wrong-paper triage (eat StorScan-class tools).
+   **Near-term direction (not a product expand):** treat `out/` as a
+   [quiet collection mirror](quiet-mirror.md) (dual bytes with Zotero
+   `imported_file`); house transport (e.g. Syncthing) stays outside paperful.
 
 ## Maybe later
 
@@ -145,9 +148,16 @@ Larger product bets. Park until the ledger and core loop justify them.
 6. **Writing & export** — CSL / BibLaTeX / Quarto sync; living review / gap lists;
    git-friendly CSL-JSON dumps
 7. **Agent surface** — MCP + CLI sharing one capability API; dry-run defaults;
-   typed source/policy permissions; playbooks
+   typed source/policy permissions; playbooks. **Parked spike:** opt-in
+   [browser-use](https://github.com/browser-use/browser-use) as a *recovery*
+   lane only (`recover` / deferred+captcha items), reusing the session vault —
+   not a default source, not “AI fetch everything.” Soft bot walls may improve
+   with their Cloud stealth; hard CAPTCHAs stay human. Prefer mining successful
+   agent paths into grey playbooks so the deterministic fetcher stays primary.
 8. **Collaboration without SaaS** — shared `state/` over syncthing/git; attach
-   locks; optional headless fetch node
+   locks; optional headless fetch node. Aligns with the house
+   [quiet mirror](quiet-mirror.md) stance: Syncthing (or similar) is transport;
+   paperful stays a local CLI, not a sync product.
 9. **Compliance & provenance** — 1.0 attach stamp is listed above; later:
    per-PDF chain of custody, more jurisdictional presets, reproducible run records
 
@@ -161,5 +171,6 @@ Larger product bets. Park until the ledger and core loop justify them.
 ## Related docs
 
 - [architecture.md](architecture.md) — disk-first adapters and data flow
+- [quiet-mirror.md](quiet-mirror.md) — `out/` as quiet browsable mirror (direction)
 - [releases.md](releases.md) — 0.x vs 1.0; known limits
 - [comparison.md](comparison.md) — what paperful does and does not replace today

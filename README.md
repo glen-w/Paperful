@@ -95,7 +95,12 @@ Reference (same corpus as the hosted guide):
 - [Configuration](docs/config.md)
 - [Source routing](docs/sources.md)
 - [Architecture](docs/architecture.md)
+- [Quiet mirror](docs/quiet-mirror.md) — `out/` as a browsable collection tree
 - [Docker](docs/docker.md) — optional image, not a complete install
+
+Optional local LLM (Ollama by default; off until `[llm].enabled`): grounded
+title proposals, PDF identity lint, `summarize`, and a separate `recover`
+browser-agent lane. See [Configuration](docs/config.md#llm-optional-local-first).
 
 ## Develop
 

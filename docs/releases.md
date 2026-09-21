@@ -1,6 +1,6 @@
 # Releases and stability
 
-**0.x** (including tagged `v0.3`) is a first usable release. Command flags,
+**0.x** (including tagged `v0.5`) is a first usable release. Command flags,
 config keys, and `paperful.run_report.v1` fields **may still move**.
 
 **1.0** will lock:
@@ -27,7 +27,7 @@ When Zotero is down, `collections`, `run`, `attach`, `lint`, `fix-metadata`,
 
 ## What 1.0 still owes operators
 
-| Outcome | Status at 0.3 |
+| Outcome | Status at 0.5 |
 | --- | --- |
 | Trust inside Zotero (attachment provenance stamp) | [Roadmap](ROADMAP.md#trust-10) |
 | One-line end-of-run banner + write-API yes/no | Summary table ships; banner not locked |

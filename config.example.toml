@@ -90,3 +90,23 @@ mirror_failures_before_skip = 3
 # kind = "synthesize"
 # match_re = '\\b(DOC-\\d{4}-\\d+)\\b'
 # pdf_template = "https://docs.example.org/pdf?id={0}"
+
+# Optional LLM (off by default). Local Ollama unless you opt into LiteLLM.
+# uv sync --extra llm            # paid / OpenAI-compatible APIs
+# uv sync --extra browser-agent  # paperful recover (Python 3.11+)
+# [llm]
+# enabled = false
+# provider = "ollama"          # ollama | litellm
+# model = "qwen2.5:7b"
+# base_url = "http://127.0.0.1:11434"
+# # api_base = ""
+# # allow_remote = false
+# [fix_metadata]
+# llm_title = false
+# [lint]
+# llm_pdf_match = false
+# [summarize]
+# prompt_template = "default"
+# tag = "paperful-summary"
+# [browser_agent]
+# max_steps = 20

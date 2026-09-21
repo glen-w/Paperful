@@ -15,8 +15,11 @@ def pdftotext_available() -> bool:
     return bool(_PDFTOTEXT)
 
 
-def text_from_pdf(path: Path, *, max_pages: int = 2) -> str:
-    """Return extracted text. Empty string if nothing could be read."""
+def text_from_pdf(path: Path, *, max_pages: int | None = 2) -> str:
+    """Return extracted text. Empty string if nothing could be read.
+
+    ``max_pages=None`` reads the whole document (for summarize).
+    """
     if not path.is_file():
         return ""
     text = _pdftotext(path, max_pages)
@@ -44,13 +47,16 @@ def doi_from_pdf_bytes(content: bytes, tmp_dir: Path) -> str | None:
     return doi_from_pdf(dest)
 
 
-def _pdftotext(path: Path, max_pages: int) -> str:
+def _pdftotext(path: Path, max_pages: int | None) -> str:
     exe = _PDFTOTEXT or shutil.which("pdftotext")
     if not exe:
         return ""
+    cmd = [exe, "-f", "1", "-enc", "UTF-8", str(path), "-"]
+    if max_pages is not None:
+        cmd = [exe, "-f", "1", "-l", str(max_pages), "-enc", "UTF-8", str(path), "-"]
     try:
         proc = subprocess.run(
-            [exe, "-f", "1", "-l", str(max_pages), "-enc", "UTF-8", str(path), "-"],
+            cmd,
             capture_output=True,
             timeout=30,
             check=False,
@@ -62,7 +68,7 @@ def _pdftotext(path: Path, max_pages: int) -> str:
     return (proc.stdout or b"").decode("utf-8", errors="replace")
 
 
-def _pypdf_text(path: Path, max_pages: int) -> str:
+def _pypdf_text(path: Path, max_pages: int | None) -> str:
     try:
         from pypdf import PdfReader
     except ImportError:
@@ -72,7 +78,8 @@ def _pypdf_text(path: Path, max_pages: int) -> str:
     except Exception:
         return ""
     chunks: list[str] = []
-    for page in reader.pages[:max_pages]:
+    pages = reader.pages if max_pages is None else reader.pages[:max_pages]
+    for page in pages:
         try:
             chunks.append(page.extract_text() or "")
         except Exception:

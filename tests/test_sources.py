@@ -38,6 +38,7 @@ def test_registry_has_every_planned_source_and_scihub_is_opt_in():
     from paperful.config import DEFAULT_SOURCES
 
     assert set(REGISTRY) == {
+        "browser_agent",
         "unpaywall",
         "openalex",
         "arxiv",

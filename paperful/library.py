@@ -25,9 +25,14 @@ class LibraryBackend(Protocol):
     ) -> list[Item]: ...
     def items_in_scope(self, collection_keys: list[str] | None) -> list[Item]: ...
     def count_linked_url_only(self, collection_keys: list[str] | None) -> int: ...
+    def get_item(self, key: str) -> Item | None: ...
     def export_pdf(self, item: Item, dest: Path) -> Path | None: ...
     def apply_patch(self, item_key: str, fields: dict[str, Any]) -> None: ...
     def trash_item(self, item_key: str) -> None: ...
+    def find_child_note_keys(self, item_key: str, tag: str) -> list[str]: ...
+    def create_or_update_note(
+        self, item_key: str, html: str, tag: str
+    ) -> str: ...
     def supports_write(self) -> bool: ...
 
 
@@ -90,6 +95,29 @@ class ZoteroBackend:
             if not self._attacher.authorize():
                 raise LibraryError("write authorisation denied in Zotero")
 
+    def get_item(self, key: str) -> Item | None:
+        from .zot import item_from_json
+
+        try:
+            raw = self.zl.zot.item(key)
+        except Exception:
+            return None
+        cols = self.collections()
+        has_pdf = False
+        has_linked = False
+        try:
+            for ch in self.zl.zot.children(key):
+                data = ch.get("data") or {}
+                if is_pdf_attachment(data):
+                    has_pdf = True
+                    if (data.get("linkMode") or "") == "linked_url":
+                        has_linked = True
+        except Exception:
+            pass
+        return item_from_json(
+            raw, cols, None, has_pdf=has_pdf, has_linked_url=has_linked
+        )
+
     def export_pdf(self, item: Item, dest: Path) -> Path | None:
         dest.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -134,3 +162,42 @@ class ZoteroBackend:
         raw = self.zl.zot.item(item_key)
         raw["data"]["deleted"] = True
         self.zl.zot.update_item(raw)
+
+    def find_child_note_keys(self, item_key: str, tag: str) -> list[str]:
+        want = tag.strip().lower()
+        out: list[str] = []
+        try:
+            children = self.zl.zot.children(item_key)
+        except Exception:
+            return out
+        for ch in children:
+            data = ch.get("data") or {}
+            if data.get("itemType") != "note":
+                continue
+            tags = [t.get("tag", "").lower() for t in data.get("tags") or []]
+            if want in tags:
+                key = ch.get("key")
+                if key:
+                    out.append(key)
+        return out
+
+    def create_or_update_note(self, item_key: str, html: str, tag: str) -> str:
+        self._ensure_write()
+        existing = self.find_child_note_keys(item_key, tag)
+        if existing:
+            key = existing[0]
+            raw = self.zl.zot.item(key)
+            raw["data"]["note"] = html
+            self.zl.zot.update_item(raw)
+            return key
+        template = self.zl.zot.item_template("note")
+        template["note"] = html
+        template["parentItem"] = item_key
+        template["tags"] = [{"tag": tag}]
+        created = self.zl.zot.create_items([template])
+        if not created:
+            raise LibraryError("Zotero did not create note")
+        first = created[0]
+        if isinstance(first, dict):
+            return str(first.get("key") or first.get("data", {}).get("key") or "")
+        return str(first)

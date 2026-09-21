@@ -51,7 +51,7 @@ from .store import (
 from .zot import Item
 
 # Sources that share a browser/session or are heavy — keep serial & polite.
-_SERIAL_SOURCES = frozenset({"scihub", "ezproxy", "htmlpdf", "scholar"})
+_SERIAL_SOURCES = frozenset({"scihub", "ezproxy", "htmlpdf", "scholar", "browser_agent"})
 
 
 def make_client(cfg: Config) -> httpx.Client:
@@ -129,6 +129,7 @@ class Pipeline:
         attacher: Attacher | None = None,
         progress: Callable[[], None] | None = None,
         try_all: bool | None = None,
+        use_browser: bool = True,
     ):
         self.cfg = cfg
         self.manifest = manifest
@@ -138,7 +139,7 @@ class Pipeline:
         self.attacher = attacher
         self.progress = progress or (lambda: None)
         self.client = make_client(cfg)
-        self.browser = BrowserSession(cfg)
+        self.browser = BrowserSession(cfg) if use_browser else None
         self.ctx = Context(config=cfg, client=self.client, browser=self.browser)
         self.stats = RunStats()
         self.stats.sources_configured = list(self.sources)
@@ -181,7 +182,8 @@ class Pipeline:
                     )
                 self._run_batch(batch)
         finally:
-            self.browser.close()
+            if self.browser is not None:
+                self.browser.close()
         self.stats.finished_at = time.time()
         return self.stats
 

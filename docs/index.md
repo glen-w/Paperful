@@ -23,6 +23,7 @@ commands
 dedupe
 config
 architecture
+quiet-mirror
 releases
 ```
 

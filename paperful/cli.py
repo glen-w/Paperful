@@ -22,7 +22,7 @@ from rich.table import Table
 
 from . import __version__
 from .attach import Attacher
-from .config import SCIHUB_DISCLAIMER, SOURCE_PRESETS, Config, load_config
+from .config import RECOVER_DISCLAIMER, SCIHUB_DISCLAIMER, SOURCE_PRESETS, Config, load_config
 from .doctor import (
     Check,
     actionable_checks,
@@ -1267,6 +1267,189 @@ def scholar_cmd(
         console.print("Then re-run: [bold]uv run paperful scholar --no-open[/]")
         raise typer.Exit(2)
     _probe_slot(cfg, "scholar")
+
+
+@app.command()
+def recover(
+    item: list[str] = typer.Option(
+        [], "--item", help="Zotero item key to recover (repeatable)."
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show start URL only; no browser agent."
+    ),
+    no_attach: bool = typer.Option(
+        False, "--no-attach", help="Download to out/ only; do not attach in Zotero."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Opt-in browser-agent PDF recovery for one or more items (not part of run)."""
+    import sys
+
+    from .browser_agent import recover_start_url
+    from .llm import llm_egress_is_remote
+    from .llm.preflight import validate_llm_for_recover
+    from .llm.validate import LlmConfigError
+
+    if not item:
+        console.print("[red]Give at least one --item KEY.[/]")
+        raise typer.Exit(1)
+    if sys.version_info < (3, 11):
+        console.print(
+            "[red]recover requires Python 3.11+ for browser-use.[/] "
+            f"This interpreter is {sys.version_info.major}.{sys.version_info.minor}."
+        )
+        raise typer.Exit(1)
+    cfg = _cfg(config)
+    _require_manager(cfg)
+    try:
+        validate_llm_for_recover(cfg)
+    except LlmConfigError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1)
+    console.print(f"[yellow]{RECOVER_DISCLAIMER}[/]")
+    if llm_egress_is_remote(cfg):
+        console.print(
+            "[yellow]Remote LLM provider — page text may leave this machine.[/]"
+        )
+    zl = _zotero()
+    backend = get_backend(cfg, zl)
+    manifest = Manifest(cfg.manifest_path)
+    todo: list = []
+    for key in item:
+        it = backend.get_item(key)
+        if it is None:
+            console.print(f"[red]Unknown item key {key}[/]")
+            raise typer.Exit(1)
+        if it.has_pdf and not dry_run:
+            console.print(f"[dim]Skipping {key} — already has PDF[/]")
+            continue
+        url = recover_start_url(it)
+        if not url:
+            console.print(f"[red]{key}: no DOI or URL[/]")
+            raise typer.Exit(1)
+        if dry_run:
+            console.print(f"[bold]{key}[/] would recover from {url}")
+            continue
+        todo.append(it)
+    if dry_run or not todo:
+        raise typer.Exit(0)
+    attacher = None if no_attach else Attacher(cfg, zl)
+    if attacher and not attacher.supports_write():
+        _exit_env("Zotero 10+ write API required to attach.")
+    with _item_progress() as progress:
+        task_id = progress.add_task("Recovering PDFs", total=len(todo))
+        pipe = Pipeline(
+            cfg,
+            manifest,
+            console,
+            sources=["browser_agent"],
+            attacher=attacher,
+            progress=lambda: progress.advance(task_id),
+            try_all=True,
+            use_browser=False,
+        )
+        try:
+            stats = pipe.run(todo)
+        except KeyboardInterrupt:
+            stats = pipe.stats
+    report = build_report(
+        stats,
+        cfg,
+        command="recover",
+        scope=f"items:{','.join(item)}",
+        flags=_run_flags(no_attach=no_attach),
+    )
+    path = write_run_report(cfg, report)
+    print_run_summary(console, report, path)
+
+
+@app.command()
+def summarize(
+    item: list[str] = typer.Option([], "--item", help="Item key (repeatable)."),
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection scope (repeatable)."
+    ),
+    library: bool = typer.Option(False, "--library"),
+    apply: bool = typer.Option(
+        False, "--apply", help="Create or update tagged Zotero child note."
+    ),
+    prompt: Path | None = typer.Option(
+        None, "--prompt", help="Override summary prompt file for this run."
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Summarize even when the gated PDF identity check flags the item.",
+    ),
+    limit: int | None = typer.Option(None, "--limit", "-n"),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Grounded LLM summary from local PDF text; writes state/summaries/ first."""
+    from .llm import llm_egress_is_remote
+    from .llm.preflight import validate_llm_for_verb
+    from .llm.validate import LlmConfigError
+    from .summarize import apply_summary_note, summarize_item
+
+    if not item and not collection and not library:
+        console.print("[red]Give --item KEY and/or --collection / --library.[/]")
+        raise typer.Exit(1)
+    cfg = _cfg(config)
+    _require_manager(cfg)
+    try:
+        validate_llm_for_verb(cfg)
+    except LlmConfigError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1)
+    if llm_egress_is_remote(cfg):
+        console.print(
+            "[yellow]Remote LLM — PDF text may leave this machine for this run.[/]"
+        )
+    if prompt is not None:
+        cfg.summarize_prompt_template = str(prompt.expanduser().resolve())
+    zl = _zotero()
+    backend = get_backend(cfg, zl)
+    manifest = Manifest(cfg.manifest_path)
+    items = []
+    if item:
+        for key in item:
+            it = backend.get_item(key)
+            if it is None:
+                console.print(f"[red]Unknown item {key}[/]")
+                raise typer.Exit(1)
+            items.append(it)
+    if collection or library:
+        keys, _scope = _scope_keys(backend, collection, library)
+        items.extend(backend.items_in_scope(keys))
+    seen: set[str] = set()
+    unique = []
+    for it in items:
+        if it.key in seen:
+            continue
+        seen.add(it.key)
+        unique.append(it)
+    items = [it for it in unique if it.has_pdf]
+    if limit:
+        items = items[:limit]
+    if not items:
+        console.print("[yellow]No items with PDFs in scope.[/]")
+        raise typer.Exit(0)
+    ok = 0
+    for it in items:
+        try:
+            path = summarize_item(cfg, it, manifest, backend, force=force)
+            console.print(f"[green]Wrote[/] {path}")
+            ok += 1
+            if apply:
+                note_key = apply_summary_note(cfg, backend, it)
+                console.print(f"  attached note {note_key}")
+        except (ValueError, OSError) as exc:
+            console.print(f"[yellow]{it.key}[/]: {exc}")
+        except LibraryError as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(1)
+    console.print(f"Summarized {ok}/{len(items)} items under {cfg.summaries_dir}")
+    if not apply:
+        console.print("Dry-run on Zotero. Pass [bold]--apply[/] to attach notes.")
 
 
 if __name__ == "__main__":

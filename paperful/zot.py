@@ -71,6 +71,8 @@ class Item:
     has_linked_url: bool = False  # PDF attachment is a linked URL, not a stored file
     date_added: str | None = None  # Zotero dateAdded; older wins keep ties
     creator_count: int = 0
+    abstract: str | None = None
+    creator_surnames: list[str] = field(default_factory=list)
 
     @property
     def label(self) -> str:
@@ -416,6 +418,13 @@ def item_from_json(
     pub = (data.get("publicationTitle") or "").strip() or None
     date = (data.get("date") or "").strip() or None
     creators = data.get("creators") or []
+    surnames = [
+        str(c.get("lastName") or c.get("name") or "").strip()
+        for c in creators
+        if isinstance(c, dict)
+    ]
+    surnames = [s for s in surnames if s]
+    abstract = (data.get("abstractNote") or "").strip() or None
     date_added = (data.get("dateAdded") or "").strip() or None
     return Item(
         key=it["key"],
@@ -437,6 +446,8 @@ def item_from_json(
         has_linked_url=has_linked_url and not has_pdf,
         date_added=date_added,
         creator_count=len(creators),
+        abstract=abstract,
+        creator_surnames=surnames,
     )
 
 

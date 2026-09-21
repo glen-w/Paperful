@@ -85,3 +85,24 @@ hosts = ["example.org"]
 url_re = '(?i)example\\.org/docs/(?P<code>[a-z0-9]+)/?'
 pdf_template = "https://example.org/docs/{code}/{code}.pdf"
 ```
+
+## LLM (optional, local-first)
+
+Off by default. Install extras: `uv sync --extra llm` (LiteLLM for paid APIs),
+`uv sync --extra browser-agent` (Python 3.11+ only, for `recover`).
+
+| Table / key | Default | Role |
+| --- | --- | --- |
+| `[llm].enabled` | `false` | Master gate |
+| `[llm].provider` | `ollama` | `ollama` or `litellm` |
+| `[llm].model` | `qwen2.5:7b` | Model id |
+| `[llm].base_url` | `http://127.0.0.1:11434` | Ollama API |
+| `[llm].api_base` | `""` | OpenAI-compatible base when `provider = litellm` |
+| `[llm].allow_remote` | `false` | Allow non-loopback Ollama |
+| `[fix_metadata].llm_title` | `false` | Grounded title proposals in `fix-metadata` |
+| `[lint].llm_pdf_match` | `false` | `pdf_identity_mismatch` finding |
+| `[summarize].prompt_template` | `default` | Or path to a custom prompt file |
+| `[summarize].tag` | `paperful-summary` | Zotero note tag for idempotent updates |
+| `[browser_agent].max_steps` | `20` | Agent step cap for `recover` |
+
+API keys stay in the environment (never in `config.toml`).

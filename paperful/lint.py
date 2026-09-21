@@ -161,6 +161,11 @@ def lint_item(
             working = (item.doi or "").lower()
             if pdf_doi != lib and pdf_doi != working:
                 add("pdf_doi_mismatch", f"PDF DOI {pdf_doi}", pdf_doi=pdf_doi)
+    from .llm_pdf_match import pdf_identity_finding
+
+    extra = pdf_identity_finding(cfg, item, manifest, backend)
+    if extra:
+        findings.append(extra)
     return findings
 
 

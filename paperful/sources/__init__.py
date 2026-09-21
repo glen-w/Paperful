@@ -5,6 +5,7 @@ from __future__ import annotations
 from . import (
     arxiv,
     biorxiv,
+    browser_agent,
     core,
     direct,
     europepmc,
@@ -31,6 +32,7 @@ REGISTRY: dict[str, Source] = {
     "ezproxy": ezproxy,
     "htmlpdf": htmlpdf,
     "scihub": scihub,
+    "browser_agent": browser_agent,
 }
 
 __all__ = ["Candidate", "Context", "Outcome", "Source", "REGISTRY"]

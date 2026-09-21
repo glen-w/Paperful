@@ -224,6 +224,12 @@ def collect_patches(
         )
         if patch:
             patches.append(patch)
+        from .llm_title import propose_llm_title
+
+        codes = {f.code for f in findings}
+        llm_patch = propose_llm_title(cfg, item, codes, manifest, backend)
+        if llm_patch:
+            patches.append(llm_patch)
     return dedupe_patches(patches)
 
 

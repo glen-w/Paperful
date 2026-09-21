@@ -37,6 +37,13 @@ uv run paperful run --library --retry-failed
 uv run paperful run --collection BBNJ --retry-failed
 uv run paperful run --collection BBNJ --try-all   # ignore source_routing when metadata is unreliable
 
+# opt-in LLM browser recovery (needs llm.enabled, Python 3.11+, paperful[browser-agent])
+uv run paperful recover --item ITEMKEY
+
+# grounded summary from local PDF text (state/summaries/; --apply writes a tagged child note)
+uv run paperful summarize --item ITEMKEY
+uv run paperful summarize -C BBNJ --apply
+
 # restrict / reorder sources for one run, or cap the number of items processed
 uv run paperful run -C hoops --sources unpaywall,openalex,ezproxy
 uv run paperful run --library --limit 50
@@ -154,6 +161,8 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
   outcomes). Historical copies land in `state/runs/<timestamp>-<command>.json`
   (`run`, or `fix-metadata` after `--apply`). `fix-metadata --apply` does
   not overwrite `last-run.json`.
+- `state/summaries/` — HTML summaries from `summarize` before optional `--apply`
+  to Zotero.
 - `state/sessions/` — Chromium profile (`chromium/`) plus `meta.json` (no
   passwords). Gitignored; `chmod 700`. Netscape dumps also land here and as
   `ezproxy-cookies.txt` / `scholar-cookies.txt` for httpx.

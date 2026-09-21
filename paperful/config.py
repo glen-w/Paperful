@@ -62,6 +62,10 @@ SCIHUB_DISCLAIMER = (
     "Sci-Hub occupies a legal grey zone in some jurisdictions. "
     "You are responsible for complying with the laws that apply to you."
 )
+RECOVER_DISCLAIMER = (
+    "Browser recovery is experimental. You are responsible for publisher terms "
+    "and applicable law. Page content may be sent to your configured LLM."
+)
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
@@ -106,6 +110,23 @@ class Config:
     grey_playbooks_dir: Path | None = None
     grey_playbooks: list[GreyPlaybook] = field(default_factory=list)
     config_path: Path | None = None
+    # LLM (local-first Ollama; LiteLLM optional via paperful[llm])
+    llm_enabled: bool = False
+    llm_provider: str = "ollama"  # ollama | litellm
+    llm_model: str = "qwen2.5:7b"
+    llm_base_url: str = "http://127.0.0.1:11434"
+    llm_api_base: str = ""
+    llm_allow_remote: bool = False
+    llm_timeout_s: float = 120.0
+    browser_agent_max_steps: int = 20
+    browser_agent_max_wall_s: float = 300.0
+    browser_agent_model: str = ""
+    fix_metadata_llm_title: bool = False
+    lint_llm_pdf_match: bool = False
+    lint_llm_pdf_match_min_confidence: float = 0.6
+    summarize_prompt_template: str = "default"
+    summarize_max_context_chars: int = 24_000
+    summarize_tag: str = "paperful-summary"
 
     def __post_init__(self) -> None:
         # Resolve pack+user once so Config() in tests gets the builtin examples.
@@ -139,6 +160,10 @@ class Config:
     @property
     def scholar_cookie_path(self) -> Path:
         return self.scholar_cookies or (self.state_dir / "scholar-cookies.txt")
+
+    @property
+    def summaries_dir(self) -> Path:
+        return self.state_dir / "summaries"
 
 
 def _candidate_paths(explicit: Path | None) -> list[Path]:
@@ -261,4 +286,56 @@ def _from_dict(raw: dict[str, Any], source: Path) -> Config:
     cfg.grey_playbooks = merge_playbooks(
         cfg.grey_playbooks_builtin, user_playbooks, extra=extra
     )
+    _apply_nested_tables(raw, cfg, source)
     return cfg
+
+
+def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None:
+    llm = raw.get("llm")
+    if isinstance(llm, dict):
+        if "enabled" in llm:
+            cfg.llm_enabled = bool(llm["enabled"])
+        if "provider" in llm:
+            cfg.llm_provider = str(llm["provider"]).strip().lower() or "ollama"
+        if "model" in llm:
+            cfg.llm_model = str(llm["model"]).strip()
+        if "base_url" in llm:
+            cfg.llm_base_url = str(llm["base_url"]).strip()
+        if "api_base" in llm:
+            cfg.llm_api_base = str(llm["api_base"]).strip()
+        if "allow_remote" in llm:
+            cfg.llm_allow_remote = bool(llm["allow_remote"])
+        if "timeout_s" in llm:
+            cfg.llm_timeout_s = float(llm["timeout_s"])
+    ba = raw.get("browser_agent")
+    if isinstance(ba, dict):
+        if "max_steps" in ba:
+            cfg.browser_agent_max_steps = max(1, int(ba["max_steps"]))
+        if "max_wall_s" in ba:
+            cfg.browser_agent_max_wall_s = float(ba["max_wall_s"])
+        if "model" in ba:
+            cfg.browser_agent_model = str(ba["model"]).strip()
+    fm = raw.get("fix_metadata")
+    if isinstance(fm, dict) and "llm_title" in fm:
+        cfg.fix_metadata_llm_title = bool(fm["llm_title"])
+    lint = raw.get("lint")
+    if isinstance(lint, dict):
+        if "llm_pdf_match" in lint:
+            cfg.lint_llm_pdf_match = bool(lint["llm_pdf_match"])
+        if "llm_pdf_match_min_confidence" in lint:
+            cfg.lint_llm_pdf_match_min_confidence = min(
+                1.0, max(0.0, float(lint["llm_pdf_match_min_confidence"]))
+            )
+    summ = raw.get("summarize")
+    if isinstance(summ, dict):
+        if "prompt_template" in summ:
+            cfg.summarize_prompt_template = str(summ["prompt_template"]).strip()
+        if "max_context_chars" in summ:
+            cfg.summarize_max_context_chars = max(1000, int(summ["max_context_chars"]))
+        if "tag" in summ:
+            cfg.summarize_tag = str(summ["tag"]).strip() or "paperful-summary"
+    if cfg.summarize_prompt_template not in ("default",):
+        p = Path(cfg.summarize_prompt_template).expanduser()
+        if not p.is_absolute():
+            p = (source.parent / p).resolve()
+        cfg.summarize_prompt_template = str(p)

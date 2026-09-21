@@ -102,6 +102,9 @@ def source_applicable(item: Item, cfg: Config, name: str) -> bool:
         return bool(ezproxy_target(item))
     if name == "scihub":
         return bool(item.doi)
+    if name == "browser_agent":
+        url = (item.url or "").strip().lower()
+        return bool(cfg.llm_enabled and (item.doi or url.startswith(("http://", "https://"))))
     return True
 
 

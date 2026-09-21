@@ -6,12 +6,21 @@ may still move. **1.0** will lock `paperful.run_report.v1` and attach behaviour
 
 ## Unreleased
 
+## 0.5.0 — 2026-09-21
+
+Optional local-first LLM is off by default (Ollama on loopback; LiteLLM via
+`paperful[llm]`). `fix-metadata` can propose grounded titles; `lint` can flag
+PDF identity mismatches; `summarize` writes `state/summaries/` and `--apply`
+updates a tagged Zotero child note. `recover` is a separate browser-agent
+lane (`paperful[browser-agent]`, Python 3.11+), not part of `run`. `out/` is
+documented as a quiet collection-shaped PDF mirror; house sync stays outside
+paperful.
+
 `paperful dedupe` writes a collection-scoped duplicate pack (normalised DOI,
 then title+year) and trashes only on `--apply`. Same-DOI groups with divergent
 titles are held. Title+year groups need `--apply-medium`. `paperful gaps`
 counts missing PDFs, linked-URL-only items, and missing DOIs. Crossref
-year-backfill ingest, summary notes, and CRM contact scans stay outside this
-tool.
+year-backfill ingest and CRM contact scans stay outside this tool.
 
 Publisher PDF URLs that Unpaywall / OpenAlex / Semantic Scholar “find” often
 403 on a cookie-only GET (Elsevier ScienceDirect especially). `run` now

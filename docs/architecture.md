@@ -87,6 +87,11 @@ Sci-Hub is **never** in the default source list; opt in via config, `--scihub`, 
 
 When Zotero cloud storage is full, attachments may fail with quota errors; PDFs still land on disk and can be attached later. Linked PDF URLs in Zotero are treated as “already covered” unless `--upgrade-linked` is set.
 
+**Quiet mirror:** `out/<collection>/…` is also an intentional browsable tree
+(dual store with Zotero `storage/` after `imported_file` attach). Stance and
+non-goals: [quiet-mirror.md](quiet-mirror.md). House folder sync is out of
+scope for this CLI.
+
 ## Ghost attachments
 
 Zotero can show **The attached file could not be found** for a path under the data directory’s `storage/<key>/`. The attachment record is there (MD5 and storage folder) but the bytes never landed on this machine. That is a ghost, not a file moved or deleted outside Zotero.
@@ -181,6 +186,7 @@ stop at `no_identifier`.
 ## Related docs
 
 - [ROADMAP.md](ROADMAP.md) — 0.1→1.0 trust; core vs maybe-later
+- [quiet-mirror.md](quiet-mirror.md) — `out/` as quiet browsable mirror (direction)
 - [releases.md](releases.md) — 0.x vs 1.0
 - [comparison.md](comparison.md) — where paperful sits next to plugins and bib tools
 - [commands.md](commands.md) — CLI and disk artifacts

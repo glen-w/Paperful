@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -105,6 +106,22 @@ def remediation_text(
             "Chromium is not installed yet. Run:\n"
             "  uv run paperful session login ezproxy\n"
             "(or: uv run playwright install chromium), then continue."
+        )
+    if check.name == "LLM":
+        return (
+            f"Edit {cfg_hint} [llm]: start Ollama (ollama serve) and pull the model "
+            "(ollama pull <model>), or set provider = \"litellm\" after "
+            "`uv sync --extra llm` with keys in the environment. Then continue."
+        )
+    if check.name == "browser-agent extra":
+        if "not installed" in check.detail:
+            return (
+                "Run: uv sync --extra browser-agent (Python 3.11+), "
+                "then `paperful session login scholar` before `paperful recover`."
+            )
+        return (
+            f"Edit {cfg_hint} [browser_agent]: model = \"<14b+ tag>\" "
+            "(small models loop on publisher pages), then continue."
         )
     if check.name == "Docker paths":
         cfg_hint = str(cfg.config_path) if cfg.config_path else "config.toml"
@@ -253,8 +270,60 @@ def run_checks(
         )
 
     checks.append(_grey_playbooks_check(cfg))
+    checks.extend(_llm_checks(cfg))
 
     return checks
+
+
+_PARAM_SIZE = re.compile(r"(?<![0-9.])(\d+(?:\.\d+)?)b\b", re.I)
+_AGENT_FLOOR_B = 10.0
+
+
+def _model_below_agent_floor(model: str) -> bool:
+    """Name-pattern only (no probe): flag tags under ~10B params for the browsing agent."""
+    m = _PARAM_SIZE.search(model)
+    if not m:
+        return False
+    return float(m.group(1)) < _AGENT_FLOOR_B
+
+
+def _llm_checks(cfg) -> list[Check]:
+    from .browser_agent import browser_agent_extra_available
+    from .llm.preflight import validate_llm_for_verb
+    from .llm.validate import LlmConfigError
+
+    if not cfg.llm_enabled:
+        return [Check("LLM", "green", "disabled (llm.enabled false)")]
+    out: list[Check] = []
+    try:
+        model = validate_llm_for_verb(cfg)
+        out.append(Check("LLM", "green", f"{cfg.llm_provider} · {model} — ok"))
+    except LlmConfigError as exc:
+        out.append(Check("LLM", "amber", str(exc)))
+    except Exception as exc:  # unreachable daemon etc.
+        out.append(Check("LLM", "amber", f"{type(exc).__name__}: {exc}"))
+    if browser_agent_extra_available():
+        agent_model = (cfg.browser_agent_model or cfg.llm_model).strip()
+        if _model_below_agent_floor(agent_model):
+            out.append(
+                Check(
+                    "browser-agent extra",
+                    "amber",
+                    f"browser-use ok; {agent_model!r} is small for browsing — "
+                    "set [browser_agent].model to a 14b+ class model",
+                )
+            )
+        else:
+            out.append(Check("browser-agent extra", "green", "browser-use importable"))
+    else:
+        out.append(
+            Check(
+                "browser-agent extra",
+                "amber",
+                "not installed — uv sync --extra browser-agent (Python 3.11+)",
+            )
+        )
+    return out
 
 
 def _playwright_check() -> Check:
