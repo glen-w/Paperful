@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .config import Config
+from .config import Config, wants_disk, wants_zotero
 from .grounding import budget_slice, metadata_block, pdf_text_for
-from .library import LibraryBackend
+from .library import LibraryBackend, LibraryError
 from .llm import CompletionRequest, ctx_tokens_for, get_client, llm_egress_is_remote
 from .store import Manifest
 from .zot import Item
@@ -174,6 +176,88 @@ def summarize_item(
     """Render a summary and write ``state/summaries/<key>.html``."""
     html = render_summary(cfg, item, manifest, backend, force=force)
     return write_summary_disk(cfg, item, html)
+
+
+@dataclass
+class SummaryRow:
+    key: str
+    title: str
+    status: str
+    reason: str = ""
+    disk_path: str = ""
+    note_key: str = ""
+    fatal: bool = False
+
+
+@dataclass
+class SummaryBatch:
+    rows: list[SummaryRow]
+    summarized: int
+    failed: int
+
+    @property
+    def fatal(self) -> str | None:
+        for row in self.rows:
+            if row.fatal:
+                return row.reason
+        return None
+
+
+def summarize_items(
+    cfg: Config,
+    items: list[Item],
+    manifest: Manifest | None,
+    backend: LibraryBackend | None,
+    *,
+    dest: str,
+    force: bool = False,
+    on_row: Callable[[SummaryRow], None] | None = None,
+) -> SummaryBatch:
+    """Summarize each item. A library write error stops the batch after that row."""
+    rows: list[SummaryRow] = []
+    ok = 0
+    failed = 0
+    for it in items:
+        try:
+            html = render_summary(cfg, it, manifest, backend, force=force)
+            disk_path = ""
+            note_key = ""
+            if wants_disk(dest):
+                disk_path = str(write_summary_disk(cfg, it, html))
+            if wants_zotero(dest):
+                if backend is None:
+                    raise LibraryError("No library backend for a Zotero note.")
+                note_key = apply_summary_note(cfg, backend, it, html)
+            ok += 1
+            row = SummaryRow(
+                key=it.key,
+                title=it.title,
+                status="summarized",
+                disk_path=disk_path,
+                note_key=note_key,
+            )
+        except (ValueError, OSError) as exc:
+            failed += 1
+            row = SummaryRow(
+                key=it.key, title=it.title, status="failed", reason=str(exc)
+            )
+        except LibraryError as exc:
+            failed += 1
+            row = SummaryRow(
+                key=it.key,
+                title=it.title,
+                status="failed",
+                reason=str(exc),
+                fatal=True,
+            )
+            rows.append(row)
+            if on_row is not None:
+                on_row(row)
+            return SummaryBatch(rows=rows, summarized=ok, failed=failed)
+        rows.append(row)
+        if on_row is not None:
+            on_row(row)
+    return SummaryBatch(rows=rows, summarized=ok, failed=failed)
 
 
 def apply_summary_note(

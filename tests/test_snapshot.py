@@ -226,6 +226,89 @@ def test_restore_matches_and_does_not_overwrite(tmp_path):
     assert other["title"] == "Different"
 
 
+def test_apply_restore_creates_attaches_notes_and_skips_existing(tmp_path):
+    from paperful.restore import RestoreAction, RestorePlan, apply_restore
+
+    record_dir = tmp_path / "item"
+    record_dir.mkdir()
+    (record_dir / "record.json").write_text(
+        json.dumps({"collection_paths": ["BBNJ"], "title": "A paper"}),
+        encoding="utf-8",
+    )
+    pdf = record_dir / "a.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+    plan = RestorePlan(
+        actions=[
+            RestoreAction(
+                kind="exists",
+                item_key="KEEP",
+                title="A paper",
+                detail="matched; fields left unchanged",
+                record_dir=record_dir,
+            ),
+            RestoreAction(
+                kind="create_item",
+                item_key="",
+                title="New",
+                detail="no live match",
+                record_dir=record_dir,
+                payload={"title": "New", "itemType": "journalArticle"},
+            ),
+            RestoreAction(
+                kind="attach_pdf",
+                item_key="",
+                title="New",
+                detail="a.pdf",
+                record_dir=record_dir,
+                pdf=pdf,
+            ),
+            RestoreAction(
+                kind="create_note",
+                item_key="",
+                title="New",
+                detail="n.html",
+                record_dir=record_dir,
+                note_html="<p>n</p>",
+                note_tag="paperful-restored",
+            ),
+        ]
+    )
+
+    class Backend:
+        def __init__(self):
+            self.parents: list[dict] = []
+            self.notes: list[tuple] = []
+
+        def ensure_collection_path(self, path):
+            assert path == "BBNJ"
+            return "COL1"
+
+        def create_parent(self, payload):
+            self.parents.append(payload)
+            return "NEWKEY"
+
+        def create_or_update_note(self, key, html, tag):
+            self.notes.append((key, html, tag))
+            return "NOTE1"
+
+    class Attacher:
+        def __init__(self):
+            self.calls: list[tuple] = []
+
+        def attach(self, key, path, title):
+            self.calls.append((key, path, title))
+
+    backend = Backend()
+    attacher = Attacher()
+    done = apply_restore(plan, backend, attacher)
+    assert done == {"create_item": 1, "attach_pdf": 1, "create_note": 1}
+    assert len(backend.parents) == 1
+    assert backend.parents[0]["title"] == "New"
+    assert backend.parents[0]["collections"] == ["COL1"]
+    assert attacher.calls == [("NEWKEY", pdf, "New")]
+    assert backend.notes == [("NEWKEY", "<p>n</p>", "paperful-restored")]
+
+
 def test_match_prefers_doi_over_a_different_key():
     from paperful.restore import match_item
 

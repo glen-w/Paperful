@@ -118,6 +118,18 @@ def test_collections_table(cfg_file, stub_zotero):
 
 
 def test_run_dry_run_lists_items_and_writes_nothing(cfg_file, stub_zotero, tmp_path):
+    from tests.conftest import make_item
+
+    stub_zotero.items_in_scope = lambda keys: [
+        make_item(key="I1", year=2024, collection_paths=["BBNJ"]),
+        make_item(
+            key="I2",
+            year=2019,
+            doi=None,
+            collection_paths=["BBNJ/EIA _ SEA"],
+            has_linked_url=True,
+        ),
+    ]
     res = runner.invoke(
         cli.app,
         ["run", "-c", str(cfg_file), "--collection", "BBNJ/EIA / SEA", "--dry-run"],
@@ -125,7 +137,7 @@ def test_run_dry_run_lists_items_and_writes_nothing(cfg_file, stub_zotero, tmp_p
     )
     assert res.exit_code == 0, res.stdout
     assert (
-        "2 items without PDF" in res.stdout
+        "1 items without PDF" in res.stdout
         and "I1" in res.stdout
         and "10.1000/test.doi" in res.stdout
     )
@@ -137,6 +149,12 @@ def test_run_dry_run_lists_items_and_writes_nothing(cfg_file, stub_zotero, tmp_p
 
 
 def test_run_year_range_filters_items(cfg_file, stub_zotero):
+    from tests.conftest import make_item
+
+    stub_zotero.items_in_scope = lambda keys: [
+        make_item(key="I1", year=2024, collection_paths=["BBNJ"]),
+        make_item(key="I2", year=2019, doi=None, collection_paths=["BBNJ"]),
+    ]
     res = runner.invoke(
         cli.app,
         [
@@ -163,7 +181,7 @@ def test_run_year_range_filters_items(cfg_file, stub_zotero):
 def test_run_type_filter(cfg_file, stub_zotero):
     from tests.conftest import make_item
 
-    stub_zotero.items_lacking_pdf = lambda keys, upgrade_linked=False: [
+    stub_zotero.items_in_scope = lambda keys: [
         make_item(
             key="I1", year=2024, item_type="journalArticle", collection_paths=["BBNJ"]
         ),
@@ -303,6 +321,12 @@ def test_run_unknown_collection(cfg_file, stub_zotero):
 
 
 def test_run_skips_already_handled_items(cfg_file, stub_zotero, tmp_path):
+    from tests.conftest import make_item
+
+    stub_zotero.items_in_scope = lambda keys: [
+        make_item(key="I1", year=2024, collection_paths=["BBNJ"]),
+        make_item(key="I2", year=2019, doi=None, collection_paths=["BBNJ"]),
+    ]
     m = Manifest(tmp_path / "state" / "manifest.jsonl")
     m.write(Record(itemKey="I1", status=STATUS_ATTACHED))
     m.write(Record(itemKey="I2", status=STATUS_NOT_FOUND))

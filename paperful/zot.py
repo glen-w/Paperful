@@ -243,75 +243,18 @@ class ZoteroLocal:
 
     def count_linked_url_only(self, collection_keys: list[str] | None) -> int:
         """Items in scope that only have a linked PDF URL (skipped unless --upgrade-linked)."""
-        cols = self.collections()
-        imported, linked_only = self._pdf_parent_sets()
-        if collection_keys is None:
-            raw = self.zot.everything(self.zot.top())
-            selected: set[str] | None = None
-        else:
-            raw_by_key: dict[str, dict[str, Any]] = {}
-            for ck in collection_keys:
-                for it in self.zot.everything(self.zot.collection_items_top(ck)):
-                    raw_by_key[it["key"]] = it
-            raw = list(raw_by_key.values())
-            selected = set(collection_keys)
-        n = 0
-        for it in raw:
-            data = it["data"]
-            if data.get("itemType") in SKIP_TYPES or data.get("deleted"):
-                continue
-            key = it["key"]
-            if key in imported or key not in linked_only:
-                continue
-            if selected is not None:
-                item = item_from_json(it, cols, selected)
-                if not item.collection_paths:
-                    continue
-            n += 1
-        return n
+        return linked_url_only_count(
+            self.items_in_scope(collection_keys),
+            skip_empty_paths=collection_keys is not None,
+        )
 
     def items_lacking_pdf(
         self, collection_keys: list[str] | None, upgrade_linked: bool = False
     ) -> list[Item]:
         """Top-level regular items in the selected collections (or library) without a PDF child."""
-        cols = self.collections()
-        imported, linked_only = self._pdf_parent_sets()
-        if collection_keys is None:
-            raw = self.zot.everything(self.zot.top())
-            selected: set[str] | None = None
-        else:
-            raw_by_key: dict[str, dict[str, Any]] = {}
-            for ck in collection_keys:
-                for it in self.zot.everything(self.zot.collection_items_top(ck)):
-                    raw_by_key[it["key"]] = it
-            raw = list(raw_by_key.values())
-            selected = set(collection_keys)
-        items: list[Item] = []
-        for it in raw:
-            data = it["data"]
-            if data.get("itemType") in SKIP_TYPES or data.get("deleted"):
-                continue
-            key = it["key"]
-            if key in imported:
-                continue
-            if key in linked_only and not upgrade_linked:
-                continue
-            items.append(
-                item_from_json(
-                    it,
-                    cols,
-                    selected,
-                    has_pdf=key in imported,
-                    has_linked_url=key in linked_only,
-                )
-            )
-        items.sort(
-            key=lambda i: (
-                i.collection_paths[0] if i.collection_paths else "~",
-                i.label.lower(),
-            )
+        return items_without_stored_pdf(
+            self.items_in_scope(collection_keys), upgrade_linked=upgrade_linked
         )
-        return items
 
     def items_in_scope(self, collection_keys: list[str] | None) -> list[Item]:
         """All top-level regular items in the selected collections (or library)."""
@@ -574,6 +517,36 @@ def filter_items_by_type(
     if not types:
         return list(items)
     return [it for it in items if it.item_type in types]
+
+
+def items_without_stored_pdf(
+    items: list[Item], *, upgrade_linked: bool = False
+) -> list[Item]:
+    """Items with no imported PDF. Linked-URL-only rows drop unless ``upgrade_linked``."""
+    out: list[Item] = []
+    for it in items:
+        if it.has_pdf:
+            continue
+        if it.has_linked_url and not upgrade_linked:
+            continue
+        out.append(it)
+    return out
+
+
+def linked_url_only_count(items: list[Item], *, skip_empty_paths: bool = False) -> int:
+    """Items whose only PDF is a linked URL.
+
+    When ``skip_empty_paths`` is set, rows with no collection path are ignored.
+    That matches a collection-scoped count against the local API.
+    """
+    n = 0
+    for it in items:
+        if it.has_pdf or not it.has_linked_url:
+            continue
+        if skip_empty_paths and not it.collection_paths:
+            continue
+        n += 1
+    return n
 
 
 def first_author(creators: list[dict[str, Any]]) -> str | None:

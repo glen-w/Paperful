@@ -6,6 +6,7 @@ import hashlib
 import html
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -395,6 +396,138 @@ def write_report_files(
     html_path.write_text(report_html, encoding="utf-8")
     json_path.write_text(json.dumps(sidecar, indent=2) + "\n", encoding="utf-8")
     return html_path, json_path
+
+
+@dataclass
+class SynthesisPrep:
+    sources: list[SourceNote]
+    missing: list[Item]
+    slug: str
+    chunks: list[int]
+
+
+def prepare_synthesis(
+    cfg: Config,
+    items: list[Item],
+    backend: LibraryBackend,
+    slug_parts: list[str],
+) -> SynthesisPrep:
+    """Load summary notes, the report slug, and the chunk plan. No model call."""
+    sources, missing = load_sources(cfg, items, backend)
+    slug = synthesis_slug(*slug_parts)
+    chunks = chunk_plan(cfg, sources) if sources else []
+    return SynthesisPrep(sources=sources, missing=missing, slug=slug, chunks=chunks)
+
+
+@dataclass
+class SynthesisEvent:
+    kind: str  # html | note | json
+    path: str = ""
+    note_key: str = ""
+    collection_path: str = ""
+
+
+@dataclass
+class SynthesisWritten:
+    html: str
+    n_chunks: int
+    prompt_sha: str
+    note_keys: dict[str, str]
+
+
+def build_sidecar(
+    cfg: Config,
+    *,
+    scope: str,
+    slug: str,
+    prompt_sha: str,
+    n_chunks: int,
+    sources: list[SourceNote],
+    missing: list[Item],
+    dest: str,
+    note_keys: dict[str, str],
+) -> dict:
+    return {
+        "schema": SCHEMA,
+        "scope": scope,
+        "slug": slug,
+        "created_at": datetime.now(tz=timezone.utc).isoformat(),
+        "model": cfg.llm_model,
+        "prompt_sha": prompt_sha,
+        "chunks": n_chunks,
+        "sources": fingerprint(sources),
+        "missing": [it.key for it in missing],
+        "destinations": destination_names(dest),
+        "note_keys": note_keys,
+    }
+
+
+def write_synthesis(
+    cfg: Config,
+    *,
+    sources: list[SourceNote],
+    missing: list[Item],
+    scope: str,
+    slug: str,
+    dest: str,
+    targets: list,
+    backend: LibraryBackend,
+    client,
+    log=None,
+    announce: Callable[[SynthesisEvent], None] | None = None,
+) -> SynthesisWritten:
+    """Render the review and write disk and/or collection notes.
+
+    ``announce`` fires as each file or note lands. A later library error still
+    leaves the disk HTML that was already announced.
+    """
+    report_html, n_chunks, prompt_sha = render_synthesis(
+        cfg, sources, missing, scope, client=client, log=log
+    )
+    note_keys: dict[str, str] = {}
+
+    def told(event: SynthesisEvent) -> None:
+        if announce is not None:
+            announce(event)
+
+    if wants_disk(dest):
+        cfg.reports_dir.mkdir(parents=True, exist_ok=True)
+        html_path = cfg.reports_dir / f"{slug}.html"
+        html_path.write_text(report_html, encoding="utf-8")
+        told(SynthesisEvent(kind="html", path=str(html_path)))
+    if wants_zotero(dest):
+        tags = report_tags(cfg, slug)
+        for root in targets:
+            note_keys[root.key] = backend.create_or_update_collection_note(
+                root.key, report_html, tags
+            )
+            told(
+                SynthesisEvent(
+                    kind="note",
+                    note_key=note_keys[root.key],
+                    collection_path=root.path,
+                )
+            )
+    if wants_disk(dest):
+        sidecar = build_sidecar(
+            cfg,
+            scope=scope,
+            slug=slug,
+            prompt_sha=prompt_sha,
+            n_chunks=n_chunks,
+            sources=sources,
+            missing=missing,
+            dest=dest,
+            note_keys=note_keys,
+        )
+        _html_path, json_path = write_report_files(cfg, slug, report_html, sidecar)
+        told(SynthesisEvent(kind="json", path=str(json_path)))
+    return SynthesisWritten(
+        html=report_html,
+        n_chunks=n_chunks,
+        prompt_sha=prompt_sha,
+        note_keys=note_keys,
+    )
 
 
 def destination_names(dest: str) -> list[str]:

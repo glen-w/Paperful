@@ -68,13 +68,14 @@ from .runreport import (
     write_command_report,
     write_run_report,
 )
+from .scope import ScopeError, filter_scope_items, load_scope, resolve_keys
 from .sources import Context
 from .sources.scihub import ping_mirrors
 from .store import STATUS_ATTACHED, STATUS_NOT_FOUND, Manifest
 from .zot import (
     ZoteroLocal,
-    filter_items_by_type,
-    filter_items_by_year,
+    items_without_stored_pdf,
+    linked_url_only_count,
     resolve_item_types,
 )
 
@@ -404,36 +405,18 @@ def _flush(backend: LibraryBackend) -> None:
     )
 
 
+def _scope_error(exc: ScopeError) -> None:
+    console.print(f"[red]{exc}[/]")
+    raise typer.Exit(1) from exc
+
+
 def _scope_keys(
     backend: LibraryBackend, collection: list[str], library: bool
 ) -> tuple[list[str] | None, str]:
-    if library:
-        return None, "whole library"
-    keys: list[str] = []
-    for spec in collection:
-        try:
-            root = backend.resolve_collection(spec)
-        except LookupError as exc:
-            console.print(f"[red]{exc}[/]")
-            raise typer.Exit(1)
-        keys.extend(backend.subtree_keys(root))
-    return keys, ", ".join(collection)
-
-
-def _year_scope_label(year_from: int | None, year_to: int | None) -> str | None:
-    if year_from is None and year_to is None:
-        return None
-    if year_from is not None and year_to is not None:
-        return f"years {year_from}–{year_to}"
-    if year_from is not None:
-        return f"years ≥{year_from}"
-    return f"years ≤{year_to}"
-
-
-def _type_scope_label(types: frozenset[str] | None) -> str | None:
-    if not types:
-        return None
-    return "types " + ", ".join(sorted(types))
+    try:
+        return resolve_keys(backend, collection, library)
+    except ScopeError as exc:
+        _scope_error(exc)
 
 
 def _resolve_types(item_type: list[str]) -> frozenset[str] | None:
@@ -454,19 +437,43 @@ def _apply_item_filters(
     label: bool = True,
 ) -> tuple[list, str]:
     """Filter by year and/or item type; optionally append labels to scope."""
-    if year_from is not None and year_to is not None and year_from > year_to:
-        console.print("[red]--year-from must be ≤ --year-to.[/]")
-        raise typer.Exit(1)
-    filtered = filter_items_by_year(items, year_from, year_to)
-    filtered = filter_items_by_type(filtered, item_types)
-    if label:
-        for part in (
-            _year_scope_label(year_from, year_to),
-            _type_scope_label(item_types),
-        ):
-            if part:
-                scope = f"{scope}, {part}"
-    return filtered, scope
+    try:
+        return filter_scope_items(
+            items,
+            scope,
+            year_from=year_from,
+            year_to=year_to,
+            item_types=item_types,
+            annotate=label,
+        )
+    except ScopeError as exc:
+        _scope_error(exc)
+
+
+def _loaded_scope(
+    backend: LibraryBackend,
+    *,
+    collection: list[str],
+    library: bool,
+    year_from: int | None,
+    year_to: int | None,
+    item_type: list[str],
+    item_keys: list[str] | None = None,
+    pdfs_only: bool = False,
+):
+    try:
+        return load_scope(
+            backend,
+            item_keys=item_keys,
+            collections=collection,
+            library=library,
+            year_from=year_from,
+            year_to=year_to,
+            item_types=_resolve_types(item_type),
+            pdfs_only=pdfs_only,
+        )
+    except ScopeError as exc:
+        _scope_error(exc)
 
 
 @app.callback()
@@ -650,14 +657,15 @@ def lint(
         _refuse_missing_scope()
     _require_manager(cfg)
     backend = _connect(cfg, quiet=as_json)
-    keys, scope = _scope_keys(backend, collection, library)
-    items, scope = _apply_item_filters(
-        backend.items_in_scope(keys),
-        scope,
+    loaded = _loaded_scope(
+        backend,
+        collection=collection,
+        library=library,
         year_from=year_from,
         year_to=year_to,
-        item_types=_resolve_types(item_type),
+        item_type=item_type,
     )
+    items, scope = loaded.items, loaded.label
     if limit:
         items = items[:limit]
     manifest = Manifest(cfg.manifest_path)
@@ -752,14 +760,15 @@ def fix_metadata(
         _refuse_missing_scope()
     _require_manager(cfg)
     backend = _connect(cfg)
-    keys, scope = _scope_keys(backend, collection, library)
-    items, scope = _apply_item_filters(
-        backend.items_in_scope(keys),
-        scope,
+    loaded = _loaded_scope(
+        backend,
+        collection=collection,
+        library=library,
         year_from=year_from,
         year_to=year_to,
-        item_types=_resolve_types(item_type),
+        item_type=item_type,
     )
+    items, scope = loaded.items, loaded.label
     if limit:
         items = items[:limit]
     manifest = Manifest(cfg.manifest_path)
@@ -962,14 +971,15 @@ def dedupe(
         _refuse_missing_scope()
     _require_manager(cfg)
     backend = _connect(cfg, quiet=as_json)
-    keys, scope = _scope_keys(backend, collection, library)
-    items, scope = _apply_item_filters(
-        backend.items_in_scope(keys),
-        scope,
+    loaded = _loaded_scope(
+        backend,
+        collection=collection,
+        library=library,
         year_from=year_from,
         year_to=year_to,
-        item_types=_resolve_types(item_type),
+        item_type=item_type,
     )
+    items, scope = loaded.items, loaded.label
     if limit:
         items = items[:limit]
     try:
@@ -1094,14 +1104,15 @@ def gaps(
         _refuse_missing_scope()
     _require_manager(cfg)
     backend = _connect(cfg, quiet=as_json)
-    keys, scope = _scope_keys(backend, collection, library)
-    items, scope = _apply_item_filters(
-        backend.items_in_scope(keys),
-        scope,
+    loaded = _loaded_scope(
+        backend,
+        collection=collection,
+        library=library,
         year_from=year_from,
         year_to=year_to,
-        item_types=_resolve_types(item_type),
+        item_type=item_type,
     )
+    items, scope = loaded.items, loaded.label
     started = time.time()
     counts = summarize_gaps(items)
     payload = {
@@ -1247,31 +1258,28 @@ def run(
     item_filter = (
         year_from is not None or year_to is not None or types is not None
     )
+    # One library listing. Year and type filters, the linked-URL skip count,
+    # and the PDF todo all come from that list.
+    catalog = backend.items_in_scope(keys)
     if item_filter:
-        # Same slice for linked-URL skip count and the PDF todo list.
         scoped, scope = _apply_item_filters(
-            backend.items_in_scope(keys),
+            catalog,
             scope,
             year_from=year_from,
             year_to=year_to,
             item_types=types,
         )
         linked_skipped = (
-            0
-            if upgrade_linked
-            else sum(1 for it in scoped if it.has_linked_url and not it.has_pdf)
-        )
-        items, _ = _apply_item_filters(
-            backend.items_lacking_pdf(keys, upgrade_linked=upgrade_linked),
-            scope,
-            year_from=year_from,
-            year_to=year_to,
-            item_types=types,
-            label=False,
+            0 if upgrade_linked else linked_url_only_count(scoped)
         )
     else:
-        linked_skipped = 0 if upgrade_linked else backend.count_linked_url_only(keys)
-        items = backend.items_lacking_pdf(keys, upgrade_linked=upgrade_linked)
+        scoped = catalog
+        linked_skipped = (
+            0
+            if upgrade_linked
+            else linked_url_only_count(scoped, skip_empty_paths=keys is not None)
+        )
+    items = items_without_stored_pdf(scoped, upgrade_linked=upgrade_linked)
     todo = [it for it in items if manifest.should_process(it.key, retry_failed)]
     skipped_manifest = len(items) - len(todo)
     if limit:
@@ -1487,14 +1495,15 @@ def snapshot(
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1) from exc
     backend = _connect(cfg)
-    keys, scope = _scope_keys(backend, collection, library)
-    items, scope = _apply_item_filters(
-        backend.items_in_scope(keys),
-        scope,
+    loaded = _loaded_scope(
+        backend,
+        collection=collection,
+        library=library,
         year_from=year_from,
         year_to=year_to,
-        item_types=_resolve_types(item_type),
+        item_type=item_type,
     )
+    items, scope = loaded.items, loaded.label
     if limit:
         items = items[:limit]
     manifest = Manifest(cfg.manifest_path)
@@ -1719,14 +1728,15 @@ def export_library(
         console.print("[red]--format must be ris, bibtex, or endnote-xml.[/]")
         raise typer.Exit(1)
     backend = _connect(cfg)
-    keys, scope = _scope_keys(backend, collection, library)
-    items, scope = _apply_item_filters(
-        backend.items_in_scope(keys),
-        scope,
+    loaded = _loaded_scope(
+        backend,
+        collection=collection,
+        library=library,
         year_from=year_from,
         year_to=year_to,
-        item_types=_resolve_types(item_type),
+        item_type=item_type,
     )
+    items, scope = loaded.items, loaded.label
     if limit:
         items = items[:limit]
     bundle_dir: Path | None = None
@@ -2366,7 +2376,7 @@ def summarize(
     from .llm import llm_egress_is_remote
     from .llm.preflight import validate_llm_for_verb
     from .llm.validate import LlmConfigError
-    from .summarize import apply_summary_note, render_summary, write_summary_disk
+    from .summarize import SummaryRow, summarize_items
 
     if not item and _scope_unset(collection, library, profile, run_config):
         console.print("[red]Give --item KEY and/or --collection / --library.[/]")
@@ -2409,38 +2419,17 @@ def summarize(
         cfg.summarize_prompt_template = str(prompt.expanduser().resolve())
     backend = _connect(cfg)
     manifest = Manifest(cfg.manifest_path)
-    items = []
-    if item:
-        for key in item:
-            it = backend.get_item(key)
-            if it is None:
-                console.print(f"[red]Unknown item {key}[/]")
-                raise typer.Exit(1)
-            items.append(it)
-    if collection or library:
-        keys, _scope = _scope_keys(backend, collection, library)
-        items.extend(backend.items_in_scope(keys))
-    seen: set[str] = set()
-    unique = []
-    for it in items:
-        if it.key in seen:
-            continue
-        seen.add(it.key)
-        unique.append(it)
-    items = [it for it in unique if it.has_pdf]
-    if library:
-        scope = "whole library"
-    elif collection:
-        scope = ", ".join(collection)
-    else:
-        scope = "items " + ",".join(item)
-    items, scope = _apply_item_filters(
-        items,
-        scope,
+    loaded = _loaded_scope(
+        backend,
+        collection=collection,
+        library=bool(library),
         year_from=year_from,
         year_to=year_to,
-        item_types=_resolve_types(item_type),
+        item_type=item_type,
+        item_keys=item,
+        pdfs_only=True,
     )
+    items, scope = loaded.items, loaded.label
     if limit:
         items = items[:limit]
     started = time.time()
@@ -2456,93 +2445,40 @@ def summarize(
             started=started,
         )
 
+    def _show(row: SummaryRow) -> None:
+        if row.status == "summarized":
+            if row.disk_path:
+                console.print(f"[green]Wrote[/] {row.disk_path}")
+            if row.note_key:
+                console.print(f"  attached note {row.note_key}")
+        elif not row.fatal:
+            console.print(f"[yellow]{row.key}[/]: {row.reason}")
+
     if not items:
         console.print("[yellow]No items with PDFs in scope.[/]")
         _finish([], 0, 0)
         raise typer.Exit(0)
-    ok = 0
-    failed = 0
-    outcomes: list[dict] = []
-    for it in items:
-        try:
-            html = render_summary(cfg, it, manifest, backend, force=force)
-            if wants_disk(dest):
-                path = write_summary_disk(cfg, it, html)
-                console.print(f"[green]Wrote[/] {path}")
-            if wants_zotero(dest):
-                note_key = apply_summary_note(cfg, backend, it, html)
-                console.print(f"  attached note {note_key}")
-            ok += 1
-            outcomes.append(
-                {"itemKey": it.key, "title": it.title, "status": "summarized"}
-            )
-        except (ValueError, OSError) as exc:
-            failed += 1
-            outcomes.append(
-                {
-                    "itemKey": it.key,
-                    "title": it.title,
-                    "status": "failed",
-                    "reason": str(exc),
-                }
-            )
-            console.print(f"[yellow]{it.key}[/]: {exc}")
-        except LibraryError as exc:
-            failed += 1
-            outcomes.append(
-                {
-                    "itemKey": it.key,
-                    "title": it.title,
-                    "status": "failed",
-                    "reason": str(exc),
-                }
-            )
-            _finish(outcomes, ok, failed)
-            console.print(f"[red]{exc}[/]")
-            raise typer.Exit(1)
-    _finish(outcomes, ok, failed)
+    batch = summarize_items(
+        cfg, items, manifest, backend, dest=dest, force=force, on_row=_show
+    )
+    outcomes = [
+        {
+            "itemKey": row.key,
+            "title": row.title,
+            "status": row.status,
+            **({"reason": row.reason} if row.reason else {}),
+        }
+        for row in batch.rows
+    ]
+    _finish(outcomes, batch.summarized, batch.failed)
+    if batch.fatal:
+        console.print(f"[red]{batch.fatal}[/]")
+        raise typer.Exit(1)
     where = cfg.summaries_dir if wants_disk(dest) else "Zotero"
-    console.print(f"Summarized {ok}/{len(items)} items under {where}")
+    console.print(f"Summarized {batch.summarized}/{len(items)} items under {where}")
     if dest == "disk":
         console.print("Zotero not written (dest=disk).")
     _flush(backend)
-
-
-def _dedupe_items(items: list) -> list:
-    seen: set[str] = set()
-    unique = []
-    for it in items:
-        if it.key in seen:
-            continue
-        seen.add(it.key)
-        unique.append(it)
-    return unique
-
-
-def _scoped_items(
-    backend,
-    item: list[str],
-    collection: list[str],
-    library: bool,
-):
-    """Union of --item and collection/library scope. Returns (items, scope label)."""
-    items = []
-    if item:
-        for key in item:
-            it = backend.get_item(key)
-            if it is None:
-                console.print(f"[red]Unknown item {key}[/]")
-                raise typer.Exit(1)
-            items.append(it)
-    if library:
-        scope = "whole library"
-        items.extend(backend.items_in_scope(None))
-    elif collection:
-        keys, scope = _scope_keys(backend, collection, False)
-        items.extend(backend.items_in_scope(keys))
-    else:
-        scope = "items " + ",".join(item)
-    return _dedupe_items(items), scope
 
 
 @app.command()
@@ -2585,15 +2521,13 @@ def synthesize(
     from .llm import llm_egress_is_remote
     from .llm.preflight import validate_llm_for_verb
     from .llm.validate import LlmConfigError
+    from .llm import get_client
     from .synthesize import (
         ReduceCapError,
-        chunk_plan,
-        load_sources,
-        render_synthesis,
+        SynthesisEvent,
+        prepare_synthesis,
         report_is_current,
-        report_tags,
-        synthesis_slug,
-        write_report_files,
+        write_synthesis,
     )
 
     if not item and _scope_unset(collection, library, profile, run_config):
@@ -2635,14 +2569,16 @@ def synthesize(
     if prompt is not None:
         cfg.synthesize_prompt_template = str(prompt.expanduser().resolve())
     backend = _connect(cfg)
-    items, scope = _scoped_items(backend, item, collection, library)
-    items, scope = _apply_item_filters(
-        items,
-        scope,
+    loaded = _loaded_scope(
+        backend,
+        collection=collection,
+        library=bool(library),
         year_from=year_from,
         year_to=year_to,
-        item_types=_resolve_types(item_type),
+        item_type=item_type,
+        item_keys=item,
     )
+    items, scope = loaded.items, loaded.label
     items.sort(key=lambda it: (it.year or 9999, (it.first_author or "").lower(), it.key))
     if limit:
         items = items[:limit]
@@ -2670,9 +2606,6 @@ def synthesize(
                 "[red]Pass -C or --report-collection to file the Zotero note, or --to disk.[/]"
             )
             raise typer.Exit(1)
-    sources, missing = load_sources(cfg, items, backend)
-    on_disk = sum(1 for src in sources if src.origin == "disk")
-    from_note = sum(1 for src in sources if src.origin == "note")
     slug_parts = []
     if library:
         slug_parts.append("library")
@@ -2683,8 +2616,11 @@ def synthesize(
     types = _resolve_types(item_type)
     if types:
         slug_parts.extend(sorted(types))
-    slug = synthesis_slug(*slug_parts)
-    plan = chunk_plan(cfg, sources) if sources else []
+    prepared = prepare_synthesis(cfg, items, backend, slug_parts)
+    sources, missing, slug = prepared.sources, prepared.missing, prepared.slug
+    plan = prepared.chunks
+    on_disk = sum(1 for src in sources if src.origin == "disk")
+    from_note = sum(1 for src in sources if src.origin == "note")
     if dry_run:
         console.print(
             f"Sources: {on_disk} on disk, {from_note} from Zotero notes, {len(missing)} missing"
@@ -2710,54 +2646,39 @@ def synthesize(
         )
         raise typer.Exit(0)
     started = time.time()
-    try:
-        from .llm import get_client
 
-        report_html, n_chunks, prompt_sha = render_synthesis(
+    def _announce(event: SynthesisEvent) -> None:
+        if event.kind == "html":
+            console.print(f"[green]Wrote[/] {event.path}")
+        elif event.kind == "note":
+            console.print(f"  attached note {event.note_key} in {event.collection_path}")
+        elif event.kind == "json":
+            console.print(f"[green]Wrote[/] {event.path}")
+
+    try:
+        written = write_synthesis(
             cfg,
-            sources,
-            missing,
-            scope,
+            sources=sources,
+            missing=missing,
+            scope=scope,
+            slug=slug,
+            dest=dest,
+            targets=targets,
+            backend=backend,
             client=get_client(cfg),
             log=lambda line: console.print(f"[dim]{line}[/]"),
+            announce=_announce,
         )
     except ReduceCapError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1)
+    except LibraryError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1)
     except (OSError, ValueError) as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1)
-    note_keys: dict[str, str] = {}
-    if wants_disk(dest):
-        cfg.reports_dir.mkdir(parents=True, exist_ok=True)
-        html_path = cfg.reports_dir / f"{slug}.html"
-        html_path.write_text(report_html, encoding="utf-8")
-        console.print(f"[green]Wrote[/] {html_path}")
-    if wants_zotero(dest):
-        tags = report_tags(cfg, slug)
-        try:
-            for root in targets:
-                note_keys[root.key] = backend.create_or_update_collection_note(
-                    root.key, report_html, tags
-                )
-                console.print(f"  attached note {note_keys[root.key]} in {root.path}")
-        except LibraryError as exc:
-            console.print(f"[red]{exc}[/]")
-            raise typer.Exit(1)
-    if wants_disk(dest):
-        sidecar = _synthesis_sidecar(
-            cfg,
-            scope=scope,
-            slug=slug,
-            prompt_sha=prompt_sha,
-            n_chunks=n_chunks,
-            sources=sources,
-            missing=missing,
-            dest=dest,
-            note_keys=note_keys,
-        )
-        _html_path, json_path = write_report_files(cfg, slug, report_html, sidecar)
-        console.print(f"[green]Wrote[/] {json_path}")
+    n_chunks = written.n_chunks
     outcomes = [
         ItemOutcome(
             itemKey=src.key, title=src.title, status="summarized", reason=src.origin
@@ -2798,37 +2719,6 @@ def synthesize(
         f"Synthesized {len(sources)} summaries ({len(missing)} not included) → {path}"
     )
     _flush(backend)
-
-
-def _synthesis_sidecar(
-    cfg,
-    *,
-    scope: str,
-    slug: str,
-    prompt_sha: str,
-    n_chunks: int,
-    sources,
-    missing,
-    dest: str,
-    note_keys: dict[str, str],
-) -> dict:
-    from datetime import datetime, timezone
-
-    from .synthesize import SCHEMA, destination_names, fingerprint
-
-    return {
-        "schema": SCHEMA,
-        "scope": scope,
-        "slug": slug,
-        "created_at": datetime.now(tz=timezone.utc).isoformat(),
-        "model": cfg.llm_model,
-        "prompt_sha": prompt_sha,
-        "chunks": n_chunks,
-        "sources": fingerprint(sources),
-        "missing": [it.key for it in missing],
-        "destinations": destination_names(dest),
-        "note_keys": note_keys,
-    }
 
 
 def _call_step(fn, /, **kwargs: Any) -> None:

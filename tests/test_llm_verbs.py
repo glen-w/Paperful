@@ -345,6 +345,31 @@ def test_summarize_custom_prompt_changes_sha(llm_cfg, monkeypatch, tmp_path):
     assert sha_default != sha_custom
 
 
+def test_summarize_items_records_failures_and_stops_on_library_error(llm_cfg, monkeypatch):
+    from paperful.library import LibraryError
+
+    _ground(monkeypatch, summarize)
+    monkeypatch.setattr(summarize, "get_client", lambda cfg: StubLLM(text="<p>s</p>"))
+    ok = make_item(key="OKITEM01", has_pdf=True)
+    bad = make_item(key="BADITEM1", has_pdf=False)
+    blocked = make_item(key="BLOCKED1", has_pdf=True)
+
+    class Boom:
+        def create_or_update_note(self, item_key, html, tag):
+            if item_key == "BLOCKED1":
+                raise LibraryError("write denied")
+            return "NOTE1"
+
+    batch = summarize.summarize_items(
+        llm_cfg, [ok, bad, blocked], None, Boom(), dest="both"
+    )
+    assert [row.key for row in batch.rows] == ["OKITEM01", "BADITEM1", "BLOCKED1"]
+    assert batch.rows[0].status == "summarized" and batch.rows[0].note_key == "NOTE1"
+    assert batch.rows[1].status == "failed" and "PDF" in batch.rows[1].reason
+    assert batch.rows[2].fatal and batch.fatal == "write denied"
+    assert batch.summarized == 1 and batch.failed == 2
+
+
 def test_summarize_apply_note_is_idempotent(llm_cfg, monkeypatch):
     _ground(monkeypatch, summarize)
     monkeypatch.setattr(summarize, "get_client", lambda cfg: StubLLM(text="<p>s</p>"))
@@ -581,6 +606,44 @@ def test_synthesize_one_pass_and_sidecar(llm_cfg):
     assert report_is_current(llm_cfg, "bbnj", loaded[0], dest="disk")
     loaded[0][0].sha256 = "changed"
     assert not report_is_current(llm_cfg, "bbnj", loaded[0], dest="disk")
+
+
+def test_prepare_and_write_synthesis_disk_only(llm_cfg):
+    from paperful.synthesize import prepare_synthesis, write_synthesis
+
+    class B:
+        def read_child_note(self, key, tag):
+            return None
+
+        def create_or_update_collection_note(self, *args):
+            raise AssertionError("disk dest must not write a collection note")
+
+    llm_cfg.summaries_dir.mkdir(parents=True, exist_ok=True)
+    (llm_cfg.summaries_dir / "D.html").write_text("<p>on disk</p>", encoding="utf-8")
+    items = [make_item(key="D", year=2019), make_item(key="M", year=2020)]
+    prepared = prepare_synthesis(llm_cfg, items, B(), ["BBNJ"])
+    assert [src.key for src in prepared.sources] == ["D"]
+    assert [it.key for it in prepared.missing] == ["M"]
+    assert prepared.slug
+    assert prepared.chunks
+    events = []
+    written = write_synthesis(
+        llm_cfg,
+        sources=prepared.sources,
+        missing=prepared.missing,
+        scope="BBNJ",
+        slug=prepared.slug,
+        dest="disk",
+        targets=[],
+        backend=B(),
+        client=StubLLM(text="<h2>Themes</h2><p>See [Smith 2019].</p>"),
+        announce=events.append,
+    )
+    assert written.n_chunks >= 1
+    assert written.note_keys == {}
+    assert [event.kind for event in events] == ["html", "json"]
+    assert (llm_cfg.reports_dir / f"{prepared.slug}.html").is_file()
+    assert (llm_cfg.reports_dir / f"{prepared.slug}.json").is_file()
 
 
 def test_synthesize_two_pass_when_over_budget(llm_cfg, monkeypatch, tmp_path):

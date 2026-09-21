@@ -23,10 +23,10 @@ from .config import Config
 from .cookies import apply_netscape_cookies
 from .download import Download, DownloadError, fetch_pdf, looks_like_pdf
 from .pdfid import doi_from_pdf
+from .pipeline_attach import attach_after_remap
+from .pipeline_browser import release_browser_for_agent, skip_recover_without_lane_failure
 from .resolve import IdentifierCache, prepare_identifiers
 from .routing import (
-    BROWSER_LANES,
-    browser_lane_failed,
     is_publisher_url,
     publisher_host,
     sources_for_item,
@@ -237,7 +237,7 @@ class Pipeline:
                 if self._stop.is_set():
                     return
                 if name == "browser_agent":
-                    self._release_browser_for_agent()
+                    release_browser_for_agent(self)
                 if name == "scihub":
                     still = self._phase_scihub(still)
                 else:
@@ -321,7 +321,7 @@ class Pipeline:
             if self._skip_source(item, name, lanes, attempts):
                 still.append((item, attempts))
                 continue
-            if self._skip_recover_without_lane_failure(name, item, attempts):
+            if skip_recover_without_lane_failure(self, name, item, attempts):
                 still.append((item, attempts))
                 continue
             self._log_item(item, f"[dim]{name}: checking...[/]")
@@ -400,36 +400,6 @@ class Pipeline:
         else:
             routed = sources_for_item(item, self.cfg, configured)
         return [s for s in routed if not self._circuit.tripped(s)]
-
-    def _release_browser_for_agent(self) -> None:
-        """Drop Playwright so browser-use can own the vault Chromium profile."""
-        if self.browser is None:
-            return
-        self.browser.close()
-        self.browser = None
-        self.ctx.browser = None
-
-    def _skip_recover_without_lane_failure(
-        self, name: str, item: Item, attempts: list[str]
-    ) -> bool:
-        """Hold `browser_agent` on mixed runs until a vault lane has failed.
-
-        Manual ``paperful recover`` uses ``sources=["browser_agent"]`` only, so
-        the gate does not apply.
-        """
-        if name != "browser_agent":
-            return False
-        if not any(s in BROWSER_LANES for s in self.sources):
-            return False
-        if browser_lane_failed(attempts):
-            return False
-        attempts.append("browser_agent:skipped(no browser-lane failure)")
-        with self._stats_lock:
-            self.stats.note_source(name, "skipped")
-        self._log_item(
-            item, "browser_agent: [dim]skipped[/] (no browser-lane failure)"
-        )
-        return True
 
     def _skip_source(
         self, item: Item, name: str, lanes: list[str], attempts: list[str]
@@ -654,7 +624,7 @@ class Pipeline:
         with self._attach_lock:
             res = self.attacher.attach(rec.itemKey, pdf)
             if not res.ok and parent_missing(res.reason):
-                res = self._attach_after_remap(rec, pdf, res.reason)
+                res = attach_after_remap(self, rec, pdf, res.reason)
         if res.ok:
             rec.status = STATUS_ATTACHED
             rec.reason = res.reason
@@ -675,86 +645,6 @@ class Pipeline:
             self._add_outcome(rec, attach_code=code)
         self.manifest.write(rec)
         return res.ok
-
-    def _attach_after_remap(self, rec: Record, pdf: Path, prior_reason: str):
-        """Retry attach when Zotero remapped the parent key (sync / restore)."""
-        from .attach import AttachResult
-
-        zl = getattr(self.attacher, "zl", None) if self.attacher else None
-        if zl is None:
-            return AttachResult(False, reason=prior_reason, code="parent_missing")
-        new_key = self._live_parent_key(rec)
-        if not new_key or new_key == rec.itemKey:
-            return AttachResult(False, reason=prior_reason, code="parent_missing")
-        old_key = rec.itemKey
-        if self._pdf_parents is None:
-            self._pdf_parents = zl._pdf_parent_keys()
-        if new_key in self._pdf_parents:
-            rec.itemKey = new_key
-            self.manifest.write(
-                Record(
-                    itemKey=old_key,
-                    status=STATUS_ATTACHED,
-                    title=rec.title,
-                    doi=rec.doi,
-                    path=rec.path,
-                    source=rec.source,
-                    reason=f"remapped to {new_key} (PDF already present)",
-                    md5=rec.md5,
-                )
-            )
-            return AttachResult(
-                True,
-                reason=f"remapped {old_key}→{new_key} (already attached)",
-                code="unchanged",
-            )
-        assert self.attacher is not None
-        res = self.attacher.attach(new_key, pdf)
-        if res.ok:
-            rec.itemKey = new_key
-            self._pdf_parents.add(new_key)
-            self.manifest.write(
-                Record(
-                    itemKey=old_key,
-                    status=STATUS_ATTACHED,
-                    title=rec.title,
-                    doi=rec.doi,
-                    path=rec.path,
-                    source=rec.source,
-                    reason=f"remapped to {new_key}",
-                    md5=rec.md5,
-                )
-            )
-            res.reason = f"remapped {old_key}→{new_key} ({res.reason})"
-        return res
-
-    def _live_parent_key(self, rec: Record) -> str | None:
-        """Map a stale manifest key to the current library item via DOI/title."""
-        from .resolve import normalize_doi
-
-        zl = getattr(self.attacher, "zl", None) if self.attacher else None
-        if zl is None:
-            return None
-        if self._parent_by_doi is None or self._parent_by_title is None:
-            by_doi: dict[str, str] = {}
-            by_title: dict[str, str] = {}
-            for it in zl.items_in_scope(None):
-                if it.doi:
-                    nd = normalize_doi(it.doi)
-                    if nd and nd not in by_doi:
-                        by_doi[nd] = it.key
-                title = (it.title or "").strip().lower()
-                if title and title not in by_title:
-                    by_title[title] = it.key
-            self._parent_by_doi = by_doi
-            self._parent_by_title = by_title
-        nd = normalize_doi(rec.doi)
-        if nd and nd in self._parent_by_doi:
-            return self._parent_by_doi[nd]
-        title = (rec.title or "").strip().lower()
-        if title and title in self._parent_by_title:
-            return self._parent_by_title[title]
-        return None
 
     def _finish_miss(self, item: Item, attempts: list[str]) -> None:
         if not item.doi and not item.arxiv_id and not item.url:

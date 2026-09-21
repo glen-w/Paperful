@@ -198,7 +198,7 @@ class StubZL:
         from tests.conftest import make_item
 
         return [
-            make_item(key="I1", year=2024, collection_paths=["BBNJ"], has_pdf=True),
+            make_item(key="I1", year=2024, collection_paths=["BBNJ"]),
             make_item(key="I2", year=2019, doi=None, collection_paths=["BBNJ"]),
         ]
 
