@@ -1,0 +1,4 @@
+{
+  "name": "paperful",
+  "install": "bash .cursor/install.sh"
+}
