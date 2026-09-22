@@ -191,7 +191,7 @@ walkthrough, model advice, Docker networking, and troubleshooting: [LLM](llm.md)
 | `[synthesize].tag` | `paperful-report` | Base tag on the collection note. A second tag `tag:<slug>` makes re-runs update |
 | `[synthesize].dest` | `both` | `disk` (`state/reports/`), `zotero` (standalone note in the collection), or `both` |
 | `[synthesize].timeout_s` | `max([llm].timeout_s, 300)` | Per-completion timeout for the report |
-| `[browser_agent].max_steps` / `max_wall_s` | `20` / `300` | Step and wall-clock caps for `recover` |
+| `[browser_agent].max_steps` / `max_wall_s` | `20` / `300` | Step and wall-clock caps for `recover` (agent stops early once a valid PDF lands) |
 | `[browser_agent].during_run` | `true` | When `[llm].enabled` and the extra is installed, `run` appends `browser_agent` after Scholar / EZProxy / htmlpdf |
 | `[browser_agent].model` | (`[llm].model`) | Larger model for browsing only; `doctor` warns under ~10B |
 

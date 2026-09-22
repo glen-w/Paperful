@@ -150,6 +150,9 @@ uv run paperful recover --item K1 --item K2 --no-attach
 - One item at a time, on the session vault profile. Never in `DEFAULT_SOURCES`.
 - Hard CAPTCHAs are not solved: the item ends as `captcha` and is retried on a
   later `run` / `recover`. Timeouts / no download → `not_found`.
+- As soon as a valid PDF lands in the recover download folder (size stable
+  across two polls), paperful calls `agent.stop()` so the step budget does not
+  keep running after the click already succeeded.
 - Success lands like any other source: PDF under `out/`, manifest line with
   `source = "browser_agent"`, attach through the normal path. A dedicated
   `recover` writes `state/runs/<stamp>-recover.json`; auto-recover on `run`

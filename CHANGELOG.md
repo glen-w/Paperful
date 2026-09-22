@@ -6,6 +6,10 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+`recover` / `browser_agent` stop the browser-use agent as soon as a valid PDF
+is on disk (size stable across two polls), instead of burning the remaining
+step budget after a successful click.
+
 ## 0.9.0 — 2026-09-22
 
 Google Scholar is opt-in: dropped from `DEFAULT_SOURCES` and

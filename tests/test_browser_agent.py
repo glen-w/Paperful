@@ -208,6 +208,83 @@ def test_largest_pdf_in_folder(tmp_path):
     assert ba._largest_pdf_in(tmp_path / "missing", 1000) is None
 
 
+def test_stable_largest_pdf_waits_for_unchanged_size(tmp_path):
+    path = tmp_path / "growing.pdf"
+    path.write_bytes(PDF_BYTES)
+    sizes: dict[str, int] = {}
+    assert ba._stable_largest_pdf(tmp_path, 1000, sizes) is None
+    assert ba._stable_largest_pdf(tmp_path, 1000, sizes) == PDF_BYTES
+    path.write_bytes(PDF_BYTES + b"x" * 100)
+    assert ba._stable_largest_pdf(tmp_path, 1000, sizes) is None
+    assert ba._stable_largest_pdf(tmp_path, 1000, sizes) == PDF_BYTES + b"x" * 100
+
+
+def test_result_from_downloads_prefers_pdf_over_miss(tmp_path):
+    (tmp_path / "a.pdf").write_bytes(PDF_BYTES)
+    got = ba._result_from_downloads(tmp_path, 1000, miss="timeout", captcha=False)
+    assert got.pdf_bytes == PDF_BYTES and got.note == "browser_agent download"
+    empty = ba._result_from_downloads(tmp_path / "none", 1000, miss="timeout")
+    assert empty.pdf_bytes is None and empty.note == "timeout"
+
+
+def test_run_until_pdf_stops_agent_when_file_lands(tmp_path):
+    import asyncio
+
+    class FakeAgent:
+        def __init__(self):
+            self.stopped = False
+            self.steps = 0
+
+        def stop(self):
+            self.stopped = True
+
+        async def run(self, max_steps=20, on_step_end=None):
+            for _ in range(max_steps):
+                if self.stopped:
+                    return
+                self.steps += 1
+                if self.steps == 1:
+                    (tmp_path / "hit.pdf").write_bytes(PDF_BYTES)
+                if on_step_end is not None:
+                    await on_step_end(self)
+                await asyncio.sleep(0.05)
+
+    agent = FakeAgent()
+    asyncio.run(
+        ba._run_until_pdf(
+            agent,
+            tmp_path,
+            1000,
+            max_steps=20,
+            max_wall_s=5.0,
+            interval_s=0.05,
+        )
+    )
+    assert agent.stopped
+    assert agent.steps < 20
+
+
+def test_stop_when_pdf_lands_calls_stop(tmp_path):
+    import asyncio
+
+    class Stub:
+        def __init__(self):
+            self.stopped = False
+
+        def stop(self):
+            self.stopped = True
+
+    agent = Stub()
+    (tmp_path / "a.pdf").write_bytes(PDF_BYTES)
+    asyncio.run(
+        asyncio.wait_for(
+            ba._stop_when_pdf_lands(agent, tmp_path, 1000, interval_s=0.05),
+            timeout=2.0,
+        )
+    )
+    assert agent.stopped
+
+
 # ---- pipeline integration: content candidate lands in manifest ---------------
 
 

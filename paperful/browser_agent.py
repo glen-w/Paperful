@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import shutil
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from .config import Config
 from .download import looks_like_pdf
@@ -155,33 +156,143 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
         # "Multimodal data provided".
         agent = Agent(task=task, llm=llm, browser=browser, use_vision=False)
         try:
-            await asyncio.wait_for(
-                agent.run(max_steps=cfg.browser_agent_max_steps),
-                timeout=cfg.browser_agent_max_wall_s,
+            await _run_until_pdf(
+                agent,
+                downloads,
+                cfg.min_pdf_bytes,
+                max_steps=cfg.browser_agent_max_steps,
+                max_wall_s=cfg.browser_agent_max_wall_s,
             )
         except asyncio.TimeoutError:
-            return RecoverResult(None, "timeout", captcha=False)
+            return _result_from_downloads(downloads, cfg.min_pdf_bytes, miss="timeout")
         except Exception as exc:
-            msg = str(exc).lower()
-            if "captcha" in msg:
-                return RecoverResult(None, "captcha", captcha=True)
-            return RecoverResult(None, type(exc).__name__, captcha=False)
+            miss = "captcha" if "captcha" in str(exc).lower() else type(exc).__name__
+            return _result_from_downloads(
+                downloads,
+                cfg.min_pdf_bytes,
+                miss=miss,
+                captcha=miss == "captcha",
+            )
+        return _result_from_downloads(
+            downloads, cfg.min_pdf_bytes, miss="no PDF in download folder"
+        )
 
-        pdf_bytes = _largest_pdf_in(downloads, cfg.min_pdf_bytes)
-        if pdf_bytes:
-            return RecoverResult(pdf_bytes, "browser_agent download")
-        return RecoverResult(None, "no PDF in download folder", captcha=False)
+
+_WATCH_INTERVAL_S = 0.4
+
+
+async def _run_until_pdf(
+    agent: Any,
+    downloads: Path,
+    min_bytes: int,
+    *,
+    max_steps: int,
+    max_wall_s: float,
+    interval_s: float = _WATCH_INTERVAL_S,
+) -> None:
+    """Run the agent, stopping as soon as a valid PDF is on disk.
+
+    browser-use only checks ``state.stopped`` between steps, so a file that
+    lands on click still burns the rest of the budget unless we call
+    ``agent.stop()``. A watch task covers mid-step downloads; ``on_step_end``
+    covers files that appear right after an action. Both wait for the file
+    size to stay unchanged across two polls so a still-writing ``.pdf`` is
+    not accepted early.
+    """
+    sizes: dict[str, int] = {}
+
+    async def on_step_end(current: Any) -> None:
+        if _stable_largest_pdf(downloads, min_bytes, sizes) is not None:
+            current.stop()
+
+    watch = asyncio.create_task(
+        _stop_when_pdf_lands(
+            agent, downloads, min_bytes, sizes=sizes, interval_s=interval_s
+        )
+    )
+    try:
+        await asyncio.wait_for(
+            agent.run(max_steps=max_steps, on_step_end=on_step_end),
+            timeout=max_wall_s,
+        )
+    finally:
+        watch.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await watch
+
+
+async def _stop_when_pdf_lands(
+    agent: Any,
+    downloads: Path,
+    min_bytes: int,
+    *,
+    sizes: dict[str, int] | None = None,
+    interval_s: float = _WATCH_INTERVAL_S,
+) -> None:
+    tracked = sizes if sizes is not None else {}
+    while True:
+        if _stable_largest_pdf(downloads, min_bytes, tracked) is not None:
+            agent.stop()
+            return
+        await asyncio.sleep(interval_s)
+
+
+def _result_from_downloads(
+    downloads: Path,
+    min_bytes: int,
+    *,
+    miss: str,
+    captcha: bool = False,
+) -> RecoverResult:
+    pdf_bytes = _largest_pdf_in(downloads, min_bytes)
+    if pdf_bytes:
+        return RecoverResult(pdf_bytes, "browser_agent download")
+    return RecoverResult(None, miss, captcha=captcha)
+
+
+def _pdf_bytes_from_path(path: Path, min_bytes: int) -> bytes | None:
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return None
+    if not looks_like_pdf(data) or len(data) < min_bytes:
+        return None
+    return data
 
 
 def _largest_pdf_in(folder: Path, min_bytes: int) -> bytes | None:
     best: bytes | None = None
     for path in folder.rglob("*.pdf"):
-        try:
-            data = path.read_bytes()
-        except OSError:
-            continue
-        if not looks_like_pdf(data) or len(data) < min_bytes:
+        data = _pdf_bytes_from_path(path, min_bytes)
+        if data is None:
             continue
         if best is None or len(data) > len(best):
             best = data
+    return best
+
+
+def _stable_largest_pdf(
+    folder: Path, min_bytes: int, sizes: dict[str, int]
+) -> bytes | None:
+    """Accept a PDF only after its size is unchanged across two polls.
+
+    Chrome often writes a ``.pdf`` that is still growing; the header is
+    already ``%PDF-`` so a single snapshot would stop too early.
+    """
+    current: dict[str, int] = {}
+    best: bytes | None = None
+    for path in folder.rglob("*.pdf"):
+        try:
+            n = path.stat().st_size
+        except OSError:
+            continue
+        key = str(path)
+        current[key] = n
+        if sizes.get(key) != n:
+            continue
+        data = _pdf_bytes_from_path(path, min_bytes)
+        if data is not None and (best is None or len(data) > len(best)):
+            best = data
+    sizes.clear()
+    sizes.update(current)
     return best
