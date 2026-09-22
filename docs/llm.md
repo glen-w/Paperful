@@ -151,7 +151,9 @@ uv run paperful recover --item K1 --item K2 --no-attach
 - Hard CAPTCHAs are not solved: the item ends as `captcha` and is retried on a
   later `run` / `recover`. Timeouts / no download → `not_found`.
 - Access blocks (403 / "Request blocked" / paywall with no free PDF) are
-  instructed as immediate stop — the agent must not open search engines.
+  instructed as immediate stop — the agent must not open search engines or
+  support/help pages. If it navigates to Google/Bing/etc. or a support/contact
+  path anyway, paperful force-stops that attempt.
 - As soon as a valid PDF lands in the recover download folder (size stable
   across two polls), paperful calls `agent.stop()` so the step budget does not
   keep running after the click already succeeded.

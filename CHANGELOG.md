@@ -8,10 +8,11 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 `recover` / `browser_agent` stop the browser-use agent as soon as a valid PDF
 is on disk (size stable across two polls), instead of burning the remaining
-step budget after a successful click. The recover task also tells the agent to
-quit immediately on access blocks (403 / "Request blocked" / paywall) and not
-to open search engines — Google wander after a blocked DOI burned the wall
-budget in batch runs.
+step budget after a successful click. The recover task tells the agent to quit
+immediately on access blocks (403 / "Request blocked" / paywall) and never open
+search engines or support/help pages; paperful also force-stops if the page URL
+becomes Google/Bing/DuckDuckGo or a support/contact path, so ignored
+instructions cannot burn the wall budget.
 
 ## 0.9.0 — 2026-09-22
 

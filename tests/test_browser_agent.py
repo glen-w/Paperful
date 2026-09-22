@@ -203,9 +203,84 @@ def test_recover_task_forbids_search_after_block():
     task = ba._recover_task(item, "https://doi.org/10.1000/x")
     assert "https://doi.org/10.1000/x" in task
     assert "Example Paper" in task
-    assert "search engines" in task
+    assert "Never open Google" in task
     assert "403" in task
+    assert "support" in task
     assert "When a PDF is downloaded, finish." in task
+
+
+@pytest.mark.parametrize(
+    ("url", "blocked"),
+    [
+        ("https://www.google.com/search?q=x", True),
+        ("https://scholar.google.com/scholar?q=x", True),
+        ("https://www.bing.com/", True),
+        ("https://duckduckgo.com/?q=x", True),
+        ("https://www.sciencedirect.com/science/article/pii/x", False),
+        ("https://doi.org/10.1000/x", False),
+        ("", False),
+    ],
+)
+def test_is_search_engine_url(url, blocked):
+    assert ba._is_search_engine_url(url) is blocked
+
+
+@pytest.mark.parametrize(
+    ("url", "miss"),
+    [
+        ("https://www.google.com/", "left landing page (search engine)"),
+        (
+            "https://service.elsevier.com/app/contact/supporthub/",
+            "left landing page (support/help)",
+        ),
+        ("https://www.sciencedirect.com/science/article/pii/x", None),
+    ],
+)
+def test_abort_miss_for_url(url, miss):
+    assert ba._abort_miss_for_url(url) == miss
+
+
+def test_run_until_pdf_stops_on_search_engine(tmp_path):
+    import asyncio
+
+    class FakeSession:
+        async def get_current_page_url(self) -> str:
+            return "https://www.google.com/"
+
+    class FakeAgent:
+        def __init__(self):
+            self.stopped = False
+            self.steps = 0
+            self.browser_session = FakeSession()
+
+        def stop(self):
+            self.stopped = True
+
+        async def run(self, max_steps=20, on_step_end=None):
+            for _ in range(max_steps):
+                if self.stopped:
+                    return
+                self.steps += 1
+                if on_step_end is not None:
+                    await on_step_end(self)
+                await asyncio.sleep(0.01)
+
+    agent = FakeAgent()
+    reasons: dict[str, str] = {}
+    asyncio.run(
+        ba._run_until_pdf(
+            agent,
+            tmp_path,
+            1000,
+            max_steps=20,
+            max_wall_s=5.0,
+            interval_s=0.05,
+            stop_reason=reasons,
+        )
+    )
+    assert agent.stopped
+    assert agent.steps < 5
+    assert reasons.get("miss") == "left landing page (search engine)"
 
 
 def test_largest_pdf_in_folder(tmp_path):

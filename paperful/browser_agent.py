@@ -149,7 +149,28 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
         # DOM + element tree only unless [browser_agent] points at a vision tag.
         # browser-use defaults use_vision=True; text-only Ollama models 400 on
         # "Multimodal data provided".
-        agent = Agent(task=task, llm=llm, browser=browser, use_vision=False)
+        stop_reason: dict[str, str] = {}
+        agent_ref: dict[str, Any] = {}
+
+        async def should_stop() -> bool:
+            current = agent_ref.get("agent")
+            if current is None:
+                return False
+            miss = await _agent_abort_miss(current)
+            if miss:
+                stop_reason["miss"] = miss
+                return True
+            return False
+
+        agent = Agent(
+            task=task,
+            llm=llm,
+            browser=browser,
+            use_vision=False,
+            extend_system_message=_RECOVER_SYSTEM_EXT,
+            register_should_stop_callback=should_stop,
+        )
+        agent_ref["agent"] = agent
         try:
             await _run_until_pdf(
                 agent,
@@ -157,9 +178,15 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
                 cfg.min_pdf_bytes,
                 max_steps=cfg.browser_agent_max_steps,
                 max_wall_s=cfg.browser_agent_max_wall_s,
+                stop_reason=stop_reason,
             )
         except asyncio.TimeoutError:
             return _result_from_downloads(downloads, cfg.min_pdf_bytes, miss="timeout")
+        except InterruptedError:
+            miss = stop_reason.get("miss") or "stopped"
+            return _result_from_downloads(
+                downloads, cfg.min_pdf_bytes, miss=miss, captcha="captcha" in miss
+            )
         except Exception as exc:
             miss = "captcha" if "captcha" in str(exc).lower() else type(exc).__name__
             return _result_from_downloads(
@@ -168,12 +195,106 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
                 miss=miss,
                 captcha=miss == "captcha",
             )
+        if stop_reason.get("miss"):
+            return _result_from_downloads(
+                downloads, cfg.min_pdf_bytes, miss=stop_reason["miss"]
+            )
         return _result_from_downloads(
             downloads, cfg.min_pdf_bytes, miss="no PDF in download folder"
         )
 
 
 _WATCH_INTERVAL_S = 0.4
+
+_RECOVER_SYSTEM_EXT = (
+    "Never navigate to Google, Bing, DuckDuckGo, Scholar search, or any other "
+    "search engine. If the DOI/publisher landing page has no free PDF (paywall, "
+    "403, Request blocked, Cloudflare challenge, 'content not available'), call "
+    "done immediately. Do not use the publisher's site search. Do not open new "
+    "tabs or sites. Do not click support, contact, help, or cookie-settings links."
+)
+
+_SEARCH_ENGINE_SUFFIXES = (
+    "google.com",
+    "bing.com",
+    "duckduckgo.com",
+    "yahoo.com",
+    "baidu.com",
+    "yandex.com",
+    "yandex.ru",
+)
+
+# Path fragments that mean the agent left the article for a dead-end UI.
+_DEAD_END_PATH_MARKERS = (
+    "/support",
+    "/contact",
+    "/help",
+    "/customer-support",
+    "cookie",
+    "consent",
+)
+
+
+def _is_search_engine_url(url: str) -> bool:
+    """True for Google/Bing/etc. — agent wander that burns the step budget."""
+    from urllib.parse import urlparse
+
+    host = (urlparse(url).hostname or "").lower()
+    if not host:
+        return False
+    return any(host == s or host.endswith("." + s) for s in _SEARCH_ENGINE_SUFFIXES)
+
+
+def _is_dead_end_url(url: str) -> bool:
+    """True for support/help/cookie pages the agent opens instead of quitting."""
+    from urllib.parse import urlparse
+
+    path = (urlparse(url).path or "").lower()
+    return any(m in path for m in _DEAD_END_PATH_MARKERS)
+
+
+def _abort_miss_for_url(url: str) -> str | None:
+    if _is_search_engine_url(url):
+        return "left landing page (search engine)"
+    if _is_dead_end_url(url):
+        return "left landing page (support/help)"
+    return None
+
+
+def _agent_page_url_sync_probe(getter: Any) -> Any:
+    """Call ``get_current_page_url``; may return a str or awaitable."""
+    try:
+        return getter()
+    except Exception:
+        return None
+
+
+async def _agent_page_url(agent: Any) -> str | None:
+    session = getattr(agent, "browser_session", None)
+    if session is None:
+        return None
+    getter = getattr(session, "get_current_page_url", None)
+    if getter is None:
+        return None
+    raw = _agent_page_url_sync_probe(getter)
+    if hasattr(raw, "__await__"):
+        try:
+            raw = await raw
+        except Exception:
+            return None
+    return raw if isinstance(raw, str) and raw else None
+
+
+async def _agent_on_search_engine(agent: Any) -> bool:
+    """Backward-compatible name: any URL that should abort recover."""
+    return (await _agent_abort_miss(agent)) is not None
+
+
+async def _agent_abort_miss(agent: Any) -> str | None:
+    url = await _agent_page_url(agent)
+    if not url:
+        return None
+    return _abort_miss_for_url(url)
 
 
 def _recover_task(item: Item, url: str) -> str:
@@ -187,9 +308,12 @@ def _recover_task(item: Item, url: str) -> str:
         f"{item.title!r}. Dismiss cookie banners if needed. "
         "If you see a CAPTCHA or robot check you cannot pass, stop immediately. "
         "If access is blocked (HTTP 403, 'Request blocked', Cloudflare/CloudFront "
-        "error, or a paywall with no free PDF), stop immediately — do not open "
-        "search engines or other websites. Stay on the publisher/landing page "
-        "from this URL (or its DOI redirect). "
+        "error, 'content not available', or a paywall with no free PDF), stop "
+        "immediately after that observation — do not keep clicking around. "
+        "Never open Google, Bing, DuckDuckGo, or any search engine. "
+        "Do not use the publisher site's search. Do not open new tabs. "
+        "Do not click support, contact, help, or cookie-settings links. "
+        "Stay on this URL's landing page (or its DOI redirect) only. "
         "Do not purchase access. When a PDF is downloaded, finish."
     )
 
@@ -202,6 +326,7 @@ async def _run_until_pdf(
     max_steps: int,
     max_wall_s: float,
     interval_s: float = _WATCH_INTERVAL_S,
+    stop_reason: dict[str, str] | None = None,
 ) -> None:
     """Run the agent, stopping as soon as a valid PDF is on disk.
 
@@ -210,17 +335,28 @@ async def _run_until_pdf(
     ``agent.stop()``. A watch task covers mid-step downloads; ``on_step_end``
     covers files that appear right after an action. Both wait for the file
     size to stay unchanged across two polls so a still-writing ``.pdf`` is
-    not accepted early.
+    not accepted early. Leaving for a search engine also stops the agent.
     """
     sizes: dict[str, int] = {}
+    reasons = stop_reason if stop_reason is not None else {}
 
     async def on_step_end(current: Any) -> None:
         if _stable_largest_pdf(downloads, min_bytes, sizes) is not None:
             current.stop()
+            return
+        miss = await _agent_abort_miss(current)
+        if miss:
+            reasons["miss"] = miss
+            current.stop()
 
     watch = asyncio.create_task(
         _stop_when_pdf_lands(
-            agent, downloads, min_bytes, sizes=sizes, interval_s=interval_s
+            agent,
+            downloads,
+            min_bytes,
+            sizes=sizes,
+            interval_s=interval_s,
+            stop_reason=reasons,
         )
     )
     try:
@@ -241,10 +377,17 @@ async def _stop_when_pdf_lands(
     *,
     sizes: dict[str, int] | None = None,
     interval_s: float = _WATCH_INTERVAL_S,
+    stop_reason: dict[str, str] | None = None,
 ) -> None:
     tracked = sizes if sizes is not None else {}
+    reasons = stop_reason if stop_reason is not None else {}
     while True:
         if _stable_largest_pdf(downloads, min_bytes, tracked) is not None:
+            agent.stop()
+            return
+        miss = await _agent_abort_miss(agent)
+        if miss:
+            reasons["miss"] = miss
             agent.stop()
             return
         await asyncio.sleep(interval_s)
