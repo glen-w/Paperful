@@ -1,6 +1,6 @@
 # Releases and stability
 
-**0.x** (including tagged `v0.8`) is a first usable release. The operator
+**0.x** (including tagged `v0.9`) is a first usable release. The operator
 install is clone plus `docker compose build`. The image is build-local only.
 There is no `docker pull` and no `pip install paperful`.
 
@@ -48,10 +48,11 @@ before 1.0. See [LLM](llm.md).
 
 ## What 1.0 still owes operators
 
-| Outcome | Status at 0.8 |
+| Outcome | Status at 0.9 |
 | --- | --- |
 | Trust inside Zotero (attachment provenance stamp) | Shipped on Zotero attachment notes. Manifest `source` stays the record |
 | One-line end-of-run banner + write-API yes/no | Shipped (`downloaded · attached · deferred · not_found · write-api`) |
 | Locked report JSON schema | Required `paperful.run_report.v1` keys frozen; additive keys still allowed. Not tagged 1.0 |
 | Locked item record + snapshot/restore | `paperful.item.v1` named; 0.x may add keys |
 | Mendeley and EndNote adapters | In the tree. Seeking testers. Zotero is the well-tested path |
+| Fresh-clone doctor stays quiet without Scholar | Shipped (0.9): `scholar` opt-in like `scihub` |

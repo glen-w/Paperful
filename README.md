@@ -13,10 +13,10 @@
 </p>
 
 Open access first (Unpaywall, OpenAlex, arXiv, bioRxiv/medRxiv, Europe PMC,
-Semantic Scholar, CORE, optional Google Scholar, the item's own URL). Campus
-**EZProxy** when you have a subscription. **Sci-Hub is opt-in and off by
-default** — it occupies a legal grey zone in some jurisdictions; see
-[Sci-Hub](docs/scihub.md).
+Semantic Scholar, CORE, the item's own URL). Campus **EZProxy** when you have
+a subscription. **Google Scholar** and **Sci-Hub** are opt-in and off by
+default (Scholar needs a session login; Sci-Hub occupies a legal grey zone in
+some jurisdictions — see [Sci-Hub](docs/scihub.md)).
 
 By default each item only hits sources that match its metadata (DOI, arXiv
 id, URL, …); `--try-all` disables that. Sci-Hub coverage after ~2021 is thin —

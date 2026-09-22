@@ -23,6 +23,8 @@ else:  # pragma: no cover
 
 # Sci-Hub is opt-in (legal grey zone in some jurisdictions). Add "scihub" to
 # `sources` or pass --scihub; it is not in the default list.
+# Google Scholar is also opt-in: CAPTCHA / session login ambers first-run doctor
+# when it sits in the default list. Add "scholar" to `sources` when you want it.
 DEFAULT_SOURCES = [
     "unpaywall",
     "openalex",
@@ -31,7 +33,6 @@ DEFAULT_SOURCES = [
     "europepmc",
     "semanticscholar",
     "core",
-    "scholar",
     "direct",
     "ezproxy",
     "htmlpdf",

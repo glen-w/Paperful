@@ -5,6 +5,32 @@ from __future__ import annotations
 from paperful.doctor import Check, actionable_checks, remediation_text
 
 
+def test_remediation_zotero_branches_on_code(cfg, monkeypatch):
+    down = remediation_text(
+        Check("Zotero :23119", "red", "refused", code="zotero_down"), cfg, docker=False
+    )
+    assert down and "Start Zotero" in down
+    assert "Allow other applications" in down or "enable the local API" in down
+
+    api_off = remediation_text(
+        Check("Zotero :23119", "red", "403", code="zotero_api_off"), cfg, docker=False
+    )
+    assert api_off and "Allow other applications" in api_off
+    assert "Start Zotero" not in api_off
+
+    bad = remediation_text(
+        Check("Zotero :23119", "red", "400", code="zotero_bad_host"), cfg, docker=False
+    )
+    assert bad and "PAPERFUL_ZOTERO_HOST" in bad and "Host header" in bad
+
+    monkeypatch.setenv("PAPERFUL_ZOTERO_HOST", "host.docker.internal")
+    down_host = remediation_text(
+        Check("Zotero :23119", "red", "refused", code="zotero_down"), cfg, docker=True
+    )
+    assert down_host and "not inside this container" in down_host
+    assert "PAPERFUL_ZOTERO_HOST" in down_host
+
+
 def test_remediation_scholar_host_vs_docker(cfg):
     ch = Check("Scholar session", "amber", "missing")
     host = remediation_text(ch, cfg, docker=False)

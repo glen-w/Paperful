@@ -28,14 +28,17 @@ out_dir = "out"
 # state/runs/, sessions/, and the Zotero local-API key live.
 state_dir = "state"
 
-# Source order. Open-access first, then Scholar, then EZProxy, then HTML→PDF.
-# Remove "scholar" / "ezproxy" / "htmlpdf" to disable. Scholar is optional (CAPTCHA-prone).
+# Source order. Open-access first, then EZProxy, then HTML→PDF.
+# Google Scholar is opt-in (CAPTCHA / session login). Append "scholar" when you
+# want it, after `paperful session login scholar`. Remove "ezproxy" / "htmlpdf"
+# to disable those lanes.
 # Sci-Hub is off by default (legal grey zone in some jurisdictions). Opt in by
 # appending "scihub" here, or pass --scihub on a run. You are responsible for
 # complying with the laws that apply to you. See docs/scihub.md.
 # htmlpdf + session vault: Playwright is a core dep; Chromium installs on first
 # `paperful session login …` (or: uv run playwright install chromium)
-sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "core", "scholar", "direct", "ezproxy", "htmlpdf"]
+sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "core", "direct", "ezproxy", "htmlpdf"]
+# sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "core", "scholar", "direct", "ezproxy", "htmlpdf"]
 # sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "core", "scholar", "direct", "ezproxy", "htmlpdf", "scihub"]
 
 # Campus EZProxy (any institution that offers login?url=). Leave empty to disable.

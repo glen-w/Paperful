@@ -439,6 +439,11 @@ def test_session_status_empty_vault(cfg_file):
 
 
 def test_session_status_probe_scholar(cfg_file, tmp_path, monkeypatch):
+    text = cfg_file.read_text()
+    cfg_file.write_text(
+        text
+        + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
+    )
     cookie_file = tmp_path / "state" / "scholar-cookies.txt"
     cookie_file.parent.mkdir(parents=True, exist_ok=True)
     cookie_file.write_text(".google.com\tTRUE\t/\tTRUE\t0\tSID\ttest\n")
@@ -485,7 +490,21 @@ def test_doctor_ok(cfg_file, stub_zotero):
     assert "UNGA/undocs" in res.stdout
 
 
+def test_doctor_scholar_not_in_default_sources(cfg_file, stub_zotero):
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--no-guide"])
+    assert res.exit_code == 0
+    assert "Scholar" in res.stdout
+    assert "not in sources" in res.stdout
+    assert "Scholar session" not in res.stdout
+    assert "session login scholar" not in res.stdout
+
+
 def test_doctor_scholar_session_amber_without_vault(cfg_file, stub_zotero):
+    text = cfg_file.read_text()
+    cfg_file.write_text(
+        text
+        + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
+    )
     res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--no-guide"])
     assert res.exit_code == 0
     assert "Scholar session" in res.stdout
@@ -497,6 +516,11 @@ def test_doctor_scholar_session_amber_without_vault(cfg_file, stub_zotero):
 def test_doctor_guide_greens_scholar_after_host_login(
     cfg_file, tmp_path, stub_zotero, monkeypatch
 ):
+    text = cfg_file.read_text()
+    cfg_file.write_text(
+        text
+        + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
+    )
     monkeypatch.setattr("paperful.doctor.shutil.which", lambda name: "/bin/pdftotext")
     # CI has the Playwright package but no Chromium: that amber step would come
     # first in the guide and consume the input stub. Pin it green.
@@ -523,6 +547,11 @@ def test_doctor_guide_greens_scholar_after_host_login(
 
 
 def test_doctor_guide_docker_hints_host_login(cfg_file, stub_zotero, monkeypatch):
+    text = cfg_file.read_text()
+    cfg_file.write_text(
+        text
+        + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
+    )
     monkeypatch.setattr("paperful.doctor.shutil.which", lambda name: "/bin/pdftotext")
     monkeypatch.setattr("paperful.cli.in_docker", lambda: True)
     monkeypatch.setattr("builtins.input", lambda _p="": "")
@@ -533,6 +562,11 @@ def test_doctor_guide_docker_hints_host_login(cfg_file, stub_zotero, monkeypatch
 
 
 def test_doctor_auto_guides_in_docker(cfg_file, stub_zotero, monkeypatch):
+    text = cfg_file.read_text()
+    cfg_file.write_text(
+        text
+        + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
+    )
     monkeypatch.setattr("paperful.doctor.shutil.which", lambda name: "/bin/pdftotext")
     monkeypatch.setattr("paperful.cli.in_docker", lambda: True)
     monkeypatch.setattr("builtins.input", lambda _p="": "")
@@ -543,6 +577,11 @@ def test_doctor_auto_guides_in_docker(cfg_file, stub_zotero, monkeypatch):
 
 
 def test_doctor_scholar_session_green_with_cookies(cfg_file, tmp_path, stub_zotero):
+    text = cfg_file.read_text()
+    cfg_file.write_text(
+        text
+        + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
+    )
     cookie = tmp_path / "state" / "scholar-cookies.txt"
     cookie.parent.mkdir(parents=True, exist_ok=True)
     cookie.write_text(".google.com\tTRUE\t/\tTRUE\t0\tSID\ttest\n")

@@ -53,6 +53,7 @@ def test_registry_has_every_planned_source_and_scihub_is_opt_in():
         "scihub",
     }
     assert "scihub" not in DEFAULT_SOURCES
+    assert "scholar" not in DEFAULT_SOURCES
     assert DEFAULT_SOURCES[-1] == "htmlpdf"
     assert DEFAULT_SOURCES.index("core") == DEFAULT_SOURCES.index("semanticscholar") + 1
     assert DEFAULT_SOURCES.index("ezproxy") < DEFAULT_SOURCES.index("htmlpdf")
@@ -60,6 +61,7 @@ def test_registry_has_every_planned_source_and_scihub_is_opt_in():
     assert DEFAULT_SOURCES.index("europepmc") < DEFAULT_SOURCES.index("semanticscholar")
     assert all(s in REGISTRY for s in DEFAULT_SOURCES)
     assert "scihub" in REGISTRY
+    assert "scholar" in REGISTRY
 
 
 # ---- unpaywall ---------------------------------------------------------------

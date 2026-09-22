@@ -6,6 +6,25 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+## 0.9.0 — 2026-09-22
+
+Google Scholar is opt-in: dropped from `DEFAULT_SOURCES` and
+`config.example.toml` so a fresh `doctor` stays green without a Scholar
+session. Add `"scholar"` to `sources` (and usually `session login scholar`)
+when you want that lane. `doctor --guide` remediation for a red Zotero row
+now matches the exit-ladder diagnosis codes (`zotero_down` /
+`zotero_api_off` / `zotero_bad_host`, including the Host vs
+`PAPERFUL_ZOTERO_HOST` tip). Sphinx Start here lists Docker and Zotero
+setup before Commands.
+
+`recover` / browser-use launch with system Chrome (`channel="chrome"`) so the
+agent matches `session login`. Default browser-use extensions stay on (popup /
+cookie helpers); empty cached ``.crx`` files are dropped so a failed download
+is retried instead of breaking extraction.
+
+Shared 1.0 review leftovers that stay deferred: freeze `paperful.item.v1` +
+snapshot/restore lock (still the SemVer gate for calling **1.0**).
+
 ## 0.8.0 — 2026-09-22
 
 Zotero PDF attachments carry a provenance note (`paperful oa:unpaywall`,

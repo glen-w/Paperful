@@ -57,6 +57,30 @@ def test_routing_requires_llm_and_identifier(cfg):
     assert not source_applicable(make_item(doi=None, url=None), cfg, "browser_agent")
 
 
+def test_recover_uses_system_chrome_not_bundled_chromium():
+    kwargs = ba._browser_launch_kwargs()
+    assert kwargs["channel"] == "chrome"
+    assert kwargs["enable_default_extensions"] is True
+
+
+def test_empty_extension_cache_is_dropped(tmp_path):
+    (tmp_path / "good.crx").write_bytes(b"Cr24")
+    (tmp_path / "empty.crx").write_bytes(b"")
+    broken = tmp_path / "empty"
+    broken.mkdir()
+    (broken / "leftover.txt").write_text("x", encoding="utf-8")
+    kept = tmp_path / "good"
+    kept.mkdir()
+    (kept / "manifest.json").write_text("{}", encoding="utf-8")
+
+    ba._drop_empty_extension_cache(tmp_path)
+
+    assert (tmp_path / "good.crx").is_file()
+    assert (kept / "manifest.json").is_file()
+    assert not (tmp_path / "empty.crx").exists()
+    assert not broken.exists()
+
+
 def test_recover_start_url_prefers_doi():
     assert (
         recover_start_url(make_item(doi="10.1/a", url="https://x"))

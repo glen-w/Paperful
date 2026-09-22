@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 from collections.abc import Callable
@@ -62,11 +63,37 @@ def remediation_text(
     )
 
     if check.name == _ZOTERO_CHECK:
-        return (
-            f"1. Start Zotero{host}.\n"
-            "2. Settings → Advanced → allow other apps to talk to Zotero (local API).\n"
-            "3. Confirm :23119 is reachable, then continue."
-        )
+        code = (check.code or "").strip() or "zotero_down"
+        if code == "zotero_api_off":
+            return (
+                "Settings → Advanced → enable “Allow other applications on this "
+                "computer to communicate with Zotero”.\n"
+                "See docs/zotero.md, then continue."
+            )
+        if code == "zotero_bad_host":
+            return (
+                f"1. Start Zotero{host}.\n"
+                "2. Host Zotero must be running on this machine. The Host header "
+                "is always localhost:23119; PAPERFUL_ZOTERO_HOST is only the TCP "
+                "address. See docs/zotero.md.\n"
+                "3. Settings → Advanced → enable the local API, then continue."
+            )
+        # zotero_down (and any unknown code): connection refused / unreachable
+        lines = [f"1. Start Zotero{host}."]
+        if os.environ.get("PAPERFUL_ZOTERO_HOST", "").strip():
+            lines.append(
+                "2. Host Zotero must be running on this machine. The Host header "
+                "is always localhost:23119; PAPERFUL_ZOTERO_HOST is only the TCP "
+                "address. See docs/zotero.md."
+            )
+            lines.append(
+                "3. Settings → Advanced → enable the local API, then continue."
+            )
+        else:
+            lines.append(
+                "2. Settings → Advanced → enable the local API, then continue."
+            )
+        return "\n".join(lines)
     if check.name == _MENDELEY_CHECK:
         return (
             "1. Register an app at https://dev.mendeley.com/myapps.html "

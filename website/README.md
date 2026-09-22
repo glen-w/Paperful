@@ -5,7 +5,7 @@ front door: hero → what the app does → outcomes → local-first → install.
 
 - Open `index.html` locally, or deploy via GitHub Pages (`.github/workflows/pages.yml`).
 - Logo lives in [images/](images/) (copied from `docs/logo.png`).
-- Footer version should match [pyproject.toml](../pyproject.toml) `version` (currently **0.8.0**).
+- Footer version should match [pyproject.toml](../pyproject.toml) `version` (currently **0.9.0**).
 - **0.x** is called out in the footer; stability story is [docs/releases.md](../docs/releases.md).
 - Install snippet matches README: `docker compose build`, then `doctor`, then a dry-run.
   The image is build-local only (no `docker pull`, no PyPI). `uv` is the contributor path.

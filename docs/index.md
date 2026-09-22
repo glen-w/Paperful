@@ -34,6 +34,8 @@ first-run story. **0.x** flags may still move; see [releases](releases.md).
 :caption: Start here
 
 why
+docker
+zotero
 commands
 workflows
 dedupe
@@ -47,7 +49,6 @@ releases
 :maxdepth: 2
 :caption: Using paperful
 
-zotero
 mendeley
 endnote
 sources
@@ -56,7 +57,6 @@ research-ops
 sessions
 scihub
 llm
-docker
 ```
 
 ```{toctree}

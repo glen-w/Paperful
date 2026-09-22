@@ -76,12 +76,13 @@ ezproxy_base = "https://YOUR-PREFIX.idm.oclc.org/login?url="
 
 sources = [
   "unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar",
-  "core", "scholar", "direct", "ezproxy", "htmlpdf",
+  "core", "direct", "ezproxy", "htmlpdf",
 ]
 ```
 
-If you later opt in to Sci-Hub, keep `ezproxy` **before** `"scihub"` so
-institutional access is preferred when both could work.
+If you later opt in to Scholar or Sci-Hub, keep `ezproxy` **before** `"scihub"`
+so institutional access is preferred when both could work. Append `"scholar"`
+only after `paperful session login scholar`.
 
 ## 3. Log in (session vault)
 

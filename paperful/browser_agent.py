@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import shutil
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -52,6 +53,48 @@ def default_runner() -> RecoverRunner:
     return _BrowserUseRunner()
 
 
+def _browser_launch_kwargs() -> dict[str, object]:
+    """Launch the same Chrome that wrote the session vault.
+
+    ``session login`` prefers the system Chrome channel. browser-use's default
+    is Playwright's bundled Chromium, which here is Chromium 120 and exits
+    before the debug port opens on current macOS. ``channel="chrome"`` selects
+    Google Chrome and falls back to other installed browsers if it is absent.
+    Default extensions stay on. uBlock Origin Lite and the cookie-banner
+    extension clear popups the agent would otherwise spend steps dismissing.
+    browser-use has no per-extension switch, so Force Background Tab loads
+    with them. A zero-byte cached ``.crx`` is skipped and re-downloaded.
+    """
+    return {"channel": "chrome", "enable_default_extensions": True}
+
+
+def _drop_empty_extension_cache(cache: Path | None = None) -> None:
+    """Delete zero-byte ``.crx`` files so browser-use downloads them again.
+
+    browser-use treats any existing ``.crx`` as a finished download, including
+    an empty file from a failed fetch. Those then fail extraction and the
+    popup and cookie extensions never load.
+    """
+    if cache is None:
+        try:
+            from browser_use.config import CONFIG
+        except ImportError:
+            return
+        cache = Path(CONFIG.BROWSER_USE_EXTENSIONS_DIR)
+    if not cache.is_dir():
+        return
+    for crx in cache.glob("*.crx"):
+        try:
+            if crx.stat().st_size > 0:
+                continue
+            crx.unlink()
+        except OSError:
+            continue
+        extracted = cache / crx.stem
+        if extracted.is_dir() and not (extracted / "manifest.json").is_file():
+            shutil.rmtree(extracted, ignore_errors=True)
+
+
 def run_recover(
     cfg: Config,
     item: Item,
@@ -93,11 +136,13 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
     with tempfile.TemporaryDirectory(prefix="paperful-recover-") as tmp:
         downloads = Path(tmp)
         profile = chromium_dir(cfg)
+        _drop_empty_extension_cache()
         browser = Browser(
             user_data_dir=profile,
             downloads_path=downloads,
             auto_download_pdfs=True,
             headless=True,
+            **_browser_launch_kwargs(),
         )
         task = (
             f"Open {url} and download the full-text PDF for this work: "
