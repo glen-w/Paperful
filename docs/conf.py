@@ -67,6 +67,7 @@ suppress_warnings = ["myst.xref_missing", "misc.highlighting_failure"]
 
 html_theme = "furo"
 html_title = "paperful"
+html_favicon = "favicon.ico"
 # Shared public-site chrome (header nav) lives under website/chrome/ so the
 # marketing landing and /guide/ share one sticky header.
 html_static_path = ["_static", "../website/chrome"]
