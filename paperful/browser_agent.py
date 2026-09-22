@@ -150,7 +150,10 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
             "If you see a CAPTCHA or robot check you cannot pass, stop immediately. "
             "Do not purchase access. When a PDF is downloaded, finish."
         )
-        agent = Agent(task=task, llm=llm, browser=browser)
+        # DOM + element tree only unless [browser_agent] points at a vision tag.
+        # browser-use defaults use_vision=True; text-only Ollama models 400 on
+        # "Multimodal data provided".
+        agent = Agent(task=task, llm=llm, browser=browser, use_vision=False)
         try:
             await asyncio.wait_for(
                 agent.run(max_steps=cfg.browser_agent_max_steps),
