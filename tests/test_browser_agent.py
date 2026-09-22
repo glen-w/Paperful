@@ -198,6 +198,16 @@ def test_run_recover_uses_injected_runner(cfg, monkeypatch):
     )
 
 
+def test_recover_task_forbids_search_after_block():
+    item = make_item(title="Example Paper")
+    task = ba._recover_task(item, "https://doi.org/10.1000/x")
+    assert "https://doi.org/10.1000/x" in task
+    assert "Example Paper" in task
+    assert "search engines" in task
+    assert "403" in task
+    assert "When a PDF is downloaded, finish." in task
+
+
 def test_largest_pdf_in_folder(tmp_path):
     (tmp_path / "a.pdf").write_bytes(PDF_BYTES)
     (tmp_path / "b.pdf").write_bytes(PDF_BYTES + b"x" * 500)

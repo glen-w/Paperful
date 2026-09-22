@@ -145,12 +145,7 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
             headless=True,
             **_browser_launch_kwargs(),
         )
-        task = (
-            f"Open {url} and download the full-text PDF for this work: "
-            f"{item.title!r}. Dismiss cookie banners if needed. "
-            "If you see a CAPTCHA or robot check you cannot pass, stop immediately. "
-            "Do not purchase access. When a PDF is downloaded, finish."
-        )
+        task = _recover_task(item, url)
         # DOM + element tree only unless [browser_agent] points at a vision tag.
         # browser-use defaults use_vision=True; text-only Ollama models 400 on
         # "Multimodal data provided".
@@ -179,6 +174,24 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
 
 
 _WATCH_INTERVAL_S = 0.4
+
+
+def _recover_task(item: Item, url: str) -> str:
+    """Build the browser-use task for one recover attempt.
+
+    Keep the agent on the DOI/landing page. Searching Google after a 403 burned
+    step and wall budget without PDFs in batch runs.
+    """
+    return (
+        f"Open {url} and download the full-text PDF for this work: "
+        f"{item.title!r}. Dismiss cookie banners if needed. "
+        "If you see a CAPTCHA or robot check you cannot pass, stop immediately. "
+        "If access is blocked (HTTP 403, 'Request blocked', Cloudflare/CloudFront "
+        "error, or a paywall with no free PDF), stop immediately — do not open "
+        "search engines or other websites. Stay on the publisher/landing page "
+        "from this URL (or its DOI redirect). "
+        "Do not purchase access. When a PDF is downloaded, finish."
+    )
 
 
 async def _run_until_pdf(
