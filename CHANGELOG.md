@@ -14,6 +14,10 @@ search engines or support/help pages; paperful also force-stops if the page URL
 becomes Google/Bing/DuckDuckGo or a support/contact path, so ignored
 instructions cannot burn the wall budget.
 
+Importing browser-use no longer prints pyzotero's per-request log
+(`INFO [httpx2] HTTP Request: GET http://localhost:23119/...`). Those lines
+were appearing while the library was listed and over the fetch progress bar.
+
 ## 0.9.0 — 2026-09-22
 
 Google Scholar is opt-in: dropped from `DEFAULT_SOURCES` and

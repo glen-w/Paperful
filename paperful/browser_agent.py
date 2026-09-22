@@ -35,10 +35,27 @@ class RecoverRunner(Protocol):
 def browser_agent_extra_available() -> bool:
     try:
         import browser_use  # noqa: F401
-
-        return True
     except ImportError:
         return False
+    # Importing browser-use sets the root logger to INFO. Do this after the
+    # import so pyzotero's client does not print every local API call.
+    _quiet_pyzotero_http_logs()
+    return True
+
+
+def _quiet_pyzotero_http_logs() -> None:
+    """Drop pyzotero's per-request INFO lines.
+
+    browser-use silences ``httpx`` but pyzotero vendors that client as
+    ``httpx2``. Those ``INFO [httpx2] HTTP Request:`` lines show up while the
+    library is listed and overwrite the fetch progress bar.
+    """
+    import logging
+
+    for name in ("httpx2", "httpcore2"):
+        log = logging.getLogger(name)
+        log.setLevel(logging.ERROR)
+        log.propagate = False
 
 
 def recover_start_url(item: Item) -> str | None:

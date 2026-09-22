@@ -370,6 +370,33 @@ def test_summarize_items_records_failures_and_stops_on_library_error(llm_cfg, mo
     assert batch.summarized == 1 and batch.failed == 2
 
 
+def test_summarize_items_continues_after_llm_timeout(llm_cfg, monkeypatch):
+    _ground(monkeypatch, summarize)
+
+    class Flaky:
+        def __init__(self):
+            self.n = 0
+
+        def complete(self, request):
+            self.n += 1
+            if self.n == 2:
+                raise LLMClientError("Ollama timed out after 300s")
+            return "<p>s</p>"
+
+    flaky = Flaky()
+    monkeypatch.setattr(summarize, "get_client", lambda cfg: flaky)
+    items = [
+        make_item(key="FIRST001", has_pdf=True),
+        make_item(key="SLOW0001", has_pdf=True),
+        make_item(key="LAST0001", has_pdf=True),
+    ]
+    batch = summarize.summarize_items(llm_cfg, items, None, None, dest="disk")
+    assert [row.status for row in batch.rows] == ["summarized", "failed", "summarized"]
+    assert "timed out" in batch.rows[1].reason
+    assert not batch.rows[1].fatal
+    assert batch.summarized == 2 and batch.failed == 1
+
+
 def test_summarize_apply_note_is_idempotent(llm_cfg, monkeypatch):
     _ground(monkeypatch, summarize)
     monkeypatch.setattr(summarize, "get_client", lambda cfg: StubLLM(text="<p>s</p>"))

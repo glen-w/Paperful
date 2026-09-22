@@ -46,6 +46,21 @@ def test_browser_agent_registered_serial_not_default():
     assert "browser_agent" in _SERIAL_SOURCES
 
 
+def test_browser_use_import_hides_pyzotero_request_logs(caplog):
+    """browser-use raises the root logger; pyzotero's httpx2 must stay quiet."""
+    import logging
+
+    pytest.importorskip("browser_use")
+    assert ba.browser_agent_extra_available()
+    httpx2 = logging.getLogger("httpx2")
+    assert not httpx2.isEnabledFor(logging.INFO)
+    with caplog.at_level(logging.DEBUG):
+        httpx2.info(
+            'HTTP Request: GET http://localhost:23119/api/ "HTTP/1.0 200 OK"'
+        )
+    assert "localhost:23119" not in caplog.text
+
+
 def test_routing_requires_llm_and_identifier(cfg):
     item = make_item()
     assert not source_applicable(item, cfg, "browser_agent")

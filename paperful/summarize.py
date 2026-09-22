@@ -12,7 +12,13 @@ from pathlib import Path
 from .config import Config, wants_disk, wants_zotero
 from .grounding import budget_slice, metadata_block, pdf_text_for
 from .library import LibraryBackend, LibraryError
-from .llm import CompletionRequest, ctx_tokens_for, get_client, llm_egress_is_remote
+from .llm import (
+    CompletionRequest,
+    LLMClientError,
+    ctx_tokens_for,
+    get_client,
+    llm_egress_is_remote,
+)
 from .store import Manifest
 from .zot import Item
 
@@ -213,7 +219,11 @@ def summarize_items(
     force: bool = False,
     on_row: Callable[[SummaryRow], None] | None = None,
 ) -> SummaryBatch:
-    """Summarize each item. A library write error stops the batch after that row."""
+    """Summarize each item.
+
+    A model timeout or other item error fails that row and the batch continues.
+    A library write error stops the batch after that row.
+    """
     rows: list[SummaryRow] = []
     ok = 0
     failed = 0
@@ -236,7 +246,7 @@ def summarize_items(
                 disk_path=disk_path,
                 note_key=note_key,
             )
-        except (ValueError, OSError) as exc:
+        except (ValueError, OSError, LLMClientError) as exc:
             failed += 1
             row = SummaryRow(
                 key=it.key, title=it.title, status="failed", reason=str(exc)

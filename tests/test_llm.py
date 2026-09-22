@@ -151,7 +151,7 @@ def test_ollama_strips_v1_suffix(mock_ollama):
 def test_ollama_complete_and_json(mock_ollama):
     def handler(r):
         body = r.read().decode()
-        assert '"stream": false' in body or '"stream":false' in body
+        assert '"stream": true' in body or '"stream":true' in body
         return httpx.Response(200, json={"response": '{"title": "Clean"}'})
 
     reqs = mock_ollama(handler)
@@ -185,6 +185,44 @@ def test_ollama_sends_num_ctx(mock_ollama):
     import json as _json
 
     assert _json.loads(reqs[0].read())["options"]["num_ctx"] == 8192
+
+
+def test_ollama_complete_joins_stream_and_skips_thinking(mock_ollama):
+    body = "\n".join(
+        [
+            '{"response":"","thinking":"plan the summary","done":false}',
+            '{"response":"<p>Hi","done":false}',
+            '{"response":"</p>","done":true}',
+        ]
+    )
+    seen: dict[str, str] = {}
+
+    def handler(r):
+        seen["body"] = r.read().decode()
+        return httpx.Response(200, text=body)
+
+    mock_ollama(handler)
+    from paperful.llm import CompletionRequest
+
+    text = OllamaClient("http://127.0.0.1:11434", False).complete(
+        CompletionRequest(model="m", prompt="p")
+    )
+    assert text == "<p>Hi</p>"
+    assert '"stream": true' in seen["body"] or '"stream":true' in seen["body"]
+    assert "plan the summary" not in text
+
+
+def test_ollama_timeout_is_llm_client_error(mock_ollama):
+    def boom(r):
+        raise httpx.ReadTimeout("timed out")
+
+    mock_ollama(boom)
+    from paperful.llm import CompletionRequest
+
+    with pytest.raises(LLMClientError, match="timed out after 300s"):
+        OllamaClient("http://127.0.0.1:11434", False).complete(
+            CompletionRequest(model="m", prompt="p", timeout_seconds=300)
+        )
 
 
 def test_ollama_error_payload(mock_ollama):
@@ -248,6 +286,19 @@ def test_litellm_complete_with_fake_module(monkeypatch):
     assert calls["api_base"] == "https://proxy.example/v1"
     assert calls["response_format"] == {"type": "json_object"}
     assert calls["max_tokens"] == 9
+
+
+def test_litellm_complete_wraps_transport_errors(monkeypatch):
+    def completion(**kw):
+        raise TimeoutError("timed out")
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    from paperful.llm import CompletionRequest
+
+    with pytest.raises(LLMClientError, match="timed out"):
+        LiteLLMClient(api_base=None).complete(CompletionRequest(model="m", prompt="p"))
 
 
 # ---- preflight ---------------------------------------------------------------

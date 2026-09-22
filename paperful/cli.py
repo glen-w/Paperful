@@ -2632,10 +2632,9 @@ def synthesize(
     config: Path | None = ConfigOpt,
 ) -> None:
     """Literature review from summary notes already saved by summarize."""
-    from .llm import llm_egress_is_remote
+    from .llm import LLMClientError, get_client, llm_egress_is_remote
     from .llm.preflight import validate_llm_for_verb
     from .llm.validate import LlmConfigError
-    from .llm import get_client
     from .synthesize import (
         ReduceCapError,
         SynthesisEvent,
@@ -2789,7 +2788,7 @@ def synthesize(
     except LibraryError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1)
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, LLMClientError) as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1)
     n_chunks = written.n_chunks

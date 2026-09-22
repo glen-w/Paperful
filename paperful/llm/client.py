@@ -104,16 +104,28 @@ class OllamaClient:
         payload: dict[str, Any] = {
             "model": request.model,
             "prompt": request.prompt,
-            "stream": False,
+            "stream": True,
             "options": options,
         }
-        with httpx.Client(timeout=request.timeout_seconds) as client:
-            resp = client.post(f"{self._api_root()}/api/generate", json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-        if data.get("error"):
-            raise LLMClientError(str(data["error"]))
-        return str(data.get("response") or "")
+        # Stream so a long local completion (prefill + thinking) is not one
+        # read against the whole answer. The timeout is the gap between chunks.
+        parts: list[str] = []
+        url = f"{self._api_root()}/api/generate"
+        try:
+            with httpx.Client(timeout=request.timeout_seconds) as client:
+                with client.stream("POST", url, json=payload) as resp:
+                    resp.raise_for_status()
+                    for line in resp.iter_lines():
+                        piece = _ollama_response_piece(line)
+                        if piece:
+                            parts.append(piece)
+        except httpx.TimeoutException as exc:
+            raise LLMClientError(
+                f"Ollama timed out after {request.timeout_seconds:g}s"
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise LLMClientError(f"Ollama request failed: {exc}") from exc
+        return "".join(parts)
 
     def complete_json(self, request: CompletionRequest) -> dict[str, Any]:
         text = self.complete(replace(request, json_mode=True))
@@ -153,7 +165,10 @@ class LiteLLMClient:
             kwargs["max_tokens"] = request.max_tokens
         if request.json_mode:
             kwargs["response_format"] = {"type": "json_object"}
-        resp = litellm.completion(**kwargs)
+        try:
+            resp = litellm.completion(**kwargs)
+        except Exception as exc:
+            raise LLMClientError(f"LiteLLM request failed: {exc}") from exc
         choice = (resp.choices or [None])[0]
         if choice is None:
             return ""
@@ -174,6 +189,21 @@ def get_client_impl(cfg) -> LLMClient:
     if cfg.llm_provider == "litellm":
         return LiteLLMClient(api_base=cfg.llm_api_base or None)
     return OllamaClient(base_url=cfg.llm_base_url, allow_remote=cfg.llm_allow_remote)
+
+
+def _ollama_response_piece(line: str) -> str:
+    """One streamed `/api/generate` line. Thinking text is not part of the answer."""
+    if not line.strip():
+        return ""
+    try:
+        chunk = json.loads(line)
+    except json.JSONDecodeError as exc:
+        raise LLMClientError(f"invalid Ollama stream: {exc}") from exc
+    if not isinstance(chunk, dict):
+        raise LLMClientError("expected JSON object from Ollama")
+    if chunk.get("error"):
+        raise LLMClientError(str(chunk["error"]))
+    return str(chunk.get("response") or "")
 
 
 def _parse_json_object(text: str) -> dict[str, Any]:
