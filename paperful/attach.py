@@ -236,13 +236,20 @@ class Attacher:
 def attachment_payload(
     pdf_path: Path, title: str | None = None, note: str | None = None
 ) -> dict:
-    """A stored-file attachment item as the Zotero write API expects it (no template needed)."""
+    """A stored-file attachment item as the Zotero write API expects it (no template needed).
+
+    ``contentType`` is guessed from the filename so image thumbnails (``image/jpeg``)
+    work the same path as PDFs. Default title stays ``Full Text PDF`` for PDF
+    attachers; pass ``title=\"thumbnail\"`` for library preview images.
+    """
+    guessed = mimetypes.guess_type(pdf_path.name)[0] or "application/pdf"
+    default_title = "Full Text PDF" if guessed == "application/pdf" else pdf_path.stem
     return {
         "itemType": "attachment",
         "linkMode": "imported_file",
-        "title": title or "Full Text PDF",
+        "title": title or default_title,
         "filename": pdf_path.name,
-        "contentType": "application/pdf",
+        "contentType": guessed,
         "charset": "",
         "accessDate": "",
         "note": note or "",

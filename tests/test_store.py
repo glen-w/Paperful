@@ -197,6 +197,12 @@ def test_attachment_payload_is_stored_file_with_basename():
     assert p["itemType"] == "attachment" and p["linkMode"] == "imported_file"
     assert p["filename"] == "Smith - 2020 - A paper.pdf"
     assert p["contentType"] == "application/pdf"
+    assert p["title"] == "Full Text PDF"
+
+    img = attachment_payload(Path("/x/y/thumbnail.jpg"), title="thumbnail")
+    assert img["contentType"] == "image/jpeg"
+    assert img["title"] == "thumbnail"
+    assert img["filename"] == "thumbnail.jpg"
 
 
 def test_resolve_pdf_path_rewrites_docker_data_prefix(tmp_path):
