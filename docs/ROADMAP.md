@@ -151,12 +151,47 @@ base_url = "http://127.0.0.1:11434"
 llm_title = false            # MVP gate; requires [llm].enabled
 ```
 
-**Non-goals for the MVP:** chat-over-library, auto-tagging everything, rewriting
-abstracts, silent cloud defaults, applying patches without `--apply`.
+**Non-goals for the MVP:** chat-over-library, blank-slate auto-tagging of the
+whole library, rewriting abstracts, silent cloud defaults, applying patches
+without `--apply`. Staged tagging (below) is **later**, not part of the title /
+PDF-identity MVP.
 
 **Later LLM verbs:** venue/date cleanup from the first page. Title proposals,
 the PDF identity check, and grounded briefs (`summarize` / `synthesize`) are
 shipped. Still proposals on disk; never a silent library write.
+
+### Auto-tagging library items (later; not 1.0)
+
+**Status:** roadmap only — do not implement until the fetch / lint / attach loop
+and 1.0 trust checklist are solid. Suggestions-only + human `--apply`, same
+patch posture as `fix-metadata`.
+
+Goal: durable domain / topic tags on items (Zotero tags and/or fields that
+survive into `record.json`), so catalogues stay filterable and downstream
+surfaces can use them. One consumer already named: a **domain-engagement
+timeline** on the public site (`glen-w.github.io`) — distinct from that site’s
+career timeline (type/role over years). Site plan:
+`/Users/89298/Documents/website/glen-w.github.io/docs/dev/career-timeline-plan.md`
+(section *Later: domain engagement timeline*).
+
+Staged approach (ship in order; each stage can stop without the next):
+
+1. **Built-in keywords** — harvest BibTeX `keywords`, existing Zotero tags, and
+   any collection/label hints already on the item. Normalise casing/slugs into
+   a reviewable patch set; no model calls. Write only on explicit `--apply`.
+2. **Extraction from abstract / title** — rules, frequency heuristics, and/or
+   light NLP keyword harvest grounded in local title + abstract (and optional
+   first-page text). Prefer deterministic allowlists under `state/` (same spirit
+   as the collection-scoped acronym harvest under Core `lint` / `fix-metadata`).
+   Still findings → patches → human apply.
+3. **LLM pass** — optional enrichment / normalisation behind `[llm].enabled`
+   (and a dedicated gate, e.g. `fix_metadata.llm_tags`). Ground proposals in
+   title/abstract/PDF excerpt; reject ungrounded tags; never silent library
+   writes. Reuse the existing LiteLLM/Ollama client patterns above.
+
+**Non-goals for this lane:** chat-over-library tagging UI; replacing Zotero’s
+tag UI; publishing tags straight to the website without a review path; treating
+LLM tags as source of truth without stage 1–2 anchors.
 
 ## Maybe later, not core
 
@@ -182,6 +217,13 @@ prerequisites for the fetch / lint / attach loop.
    `paperful ingest-dois --from-file dois.txt -C BBNJ --dry-run` then `--apply`
    (create items by DOI, tag `crossref-backfill`, hand off to `run` for PDFs).
    That backfill stays out of any scheduled bot inside Paperful.
+   **Snowball from a seed DOI** (same graph idea as the site citation network in
+   `glen-w.github.io` / OpenAlex `referenced_works` + citing works): user passes
+   one DOI; Paperful resolves neighbours — papers it cites and papers that cite
+   it — at a configurable depth (and caps so depth 2 does not explode). Dry-run
+   lists proposed DOIs; `--apply` creates items into a collection, then the
+   usual `run` / attach path fills PDFs. Not a scheduled crawler; not a second
+   reading UI.
 4. **File & attachment OS** — linked vs stored policy, rename, orphan GC,
    broken-link repair, PDF quality / wrong-paper triage (eat StorScan-class tools).
    The quiet mirror itself is core (above), not a later bet: dual bytes with
@@ -232,3 +274,5 @@ Larger product bets. Park until the ledger and core loop justify them.
 - [quiet-mirror.md](quiet-mirror.md) — `out/` as the copy you keep
 - [releases.md](releases.md) — 0.x vs 1.0; known limits
 - [comparison.md](comparison.md) — what paperful does and does not replace today
+- Site career / domain timeline plan (consumer of durable tags):
+  `/Users/89298/Documents/website/glen-w.github.io/docs/dev/career-timeline-plan.md`
