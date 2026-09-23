@@ -223,7 +223,26 @@ def test_collect_pdf_from_page_raises_when_html_only():
         collect_pdf_from_page(page, "https://x.test/article")
         raise AssertionError("expected SessionError")
     except SessionError as exc:
-        assert "PDF" in str(exc)
+        assert "no download control" in str(exc)
+
+
+def test_collect_pdf_from_page_names_paywall():
+    class Page(_FakePage):
+        url = "https://www.wiley.com/doi/abs/10.1/x"
+
+        def inner_text(self, selector):
+            return "Subscribe to continue reading this article"
+
+    try:
+        collect_pdf_from_page(
+            Page(
+                resp=_FakeResp(b"<html>", "https://www.wiley.com/doi/abs/10.1/x")
+            ),
+            "https://doi.org/10.1/x",
+        )
+        raise AssertionError("expected SessionError")
+    except SessionError as exc:
+        assert "paywall @wiley.com" in str(exc)
 
 
 def test_browser_session_runs_on_dedicated_thread(cfg):

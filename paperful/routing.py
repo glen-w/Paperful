@@ -61,6 +61,24 @@ def sources_for_item(item: Item, cfg: Config, sources: list[str]) -> list[str]:
     return [name for name in sources if source_applicable(item, cfg, name)]
 
 
+def prior_playwright_miss(attempts: list[str]) -> str | None:
+    """Last Playwright vault miss, for comparison when ``browser_agent`` hits.
+
+    Matches Scholar/EZProxy ``browser-failed`` and htmlpdf not-found/error.
+    Skips do not count.
+    """
+    found: str | None = None
+    for entry in attempts:
+        name, sep, rest = entry.partition(":")
+        if not sep or name not in BROWSER_LANES:
+            continue
+        if rest.startswith("skipped"):
+            continue
+        if rest.startswith(("browser-failed(", "not_found(", "error(", "captcha(")):
+            found = entry
+    return found
+
+
 def browser_lane_failed(attempts: list[str]) -> bool:
     """True when a vault browser lane was tried and did not yield a PDF.
 

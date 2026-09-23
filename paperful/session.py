@@ -26,6 +26,7 @@ from typing import Any, Literal
 from .config import Config
 from .cookies import split_playwright_cookies, write_netscape
 from .download import looks_like_pdf
+from .page_signals import classify_page_block, format_miss
 from .sources.ezproxy import proxify
 
 SLOTS = ("scholar", "ezproxy")
@@ -451,6 +452,28 @@ _PDF_CLICK_SELECTORS = (
 )
 
 
+def _playwright_pdf_miss(page: Any, url: str, *, clicked: bool) -> str:
+    """Why the click-and-download pass left without a PDF."""
+    final = url
+    try:
+        current = getattr(page, "url", None)
+        if current:
+            final = str(current)
+    except Exception:
+        final = url
+    text = ""
+    try:
+        text = page.inner_text("body")[:4000]
+    except Exception:
+        text = ""
+    label = classify_page_block(text)
+    if label is None:
+        label = (
+            "clicked download control, no PDF" if clicked else "no download control"
+        )
+    return format_miss(label, final)
+
+
 def collect_pdf_from_page(
     page: Any, url: str, timeout_ms: int = 60_000
 ) -> tuple[bytes, str]:
@@ -513,12 +536,14 @@ def collect_pdf_from_page(
                 time.sleep(0.2)
             if found:
                 return found[0]
+        clicked = False
         for selector in _PDF_CLICK_SELECTORS:
             loc = page.locator(selector)
             try:
                 if loc.count() == 0:
                     continue
                 loc.first.click(timeout=5_000)
+                clicked = True
             except Exception:
                 continue
             click_deadline = time.time() + 10.0
@@ -526,7 +551,7 @@ def collect_pdf_from_page(
                 time.sleep(0.2)
             if found:
                 return found[0]
-        raise SessionError("browser did not receive a PDF")
+        raise SessionError(_playwright_pdf_miss(page, url, clicked=clicked))
     finally:
         for event, handler in (("download", on_download), ("response", on_response)):
             try:

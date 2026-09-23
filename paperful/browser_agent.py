@@ -13,6 +13,7 @@ from typing import Any, Protocol
 from .config import Config
 from .download import looks_like_pdf
 from .llm import llm_model_for_agent
+from .page_signals import classify_page_block, format_miss, host_label
 from .session import chromium_dir, profile_ready
 from .zot import Item
 
@@ -198,26 +199,47 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
                 stop_reason=stop_reason,
             )
         except asyncio.TimeoutError:
-            return _result_from_downloads(downloads, cfg.min_pdf_bytes, miss="timeout")
+            return _finish_recover(
+                agent,
+                downloads,
+                cfg.min_pdf_bytes,
+                "timeout",
+                cfg.browser_agent_max_steps,
+            )
         except InterruptedError:
             miss = stop_reason.get("miss") or "stopped"
-            return _result_from_downloads(
-                downloads, cfg.min_pdf_bytes, miss=miss, captcha="captcha" in miss
+            return _finish_recover(
+                agent,
+                downloads,
+                cfg.min_pdf_bytes,
+                miss,
+                cfg.browser_agent_max_steps,
+                captcha="captcha" in miss,
             )
         except Exception as exc:
             miss = "captcha" if "captcha" in str(exc).lower() else type(exc).__name__
-            return _result_from_downloads(
+            return _finish_recover(
+                agent,
                 downloads,
                 cfg.min_pdf_bytes,
-                miss=miss,
+                miss,
+                cfg.browser_agent_max_steps,
                 captcha=miss == "captcha",
             )
         if stop_reason.get("miss"):
-            return _result_from_downloads(
-                downloads, cfg.min_pdf_bytes, miss=stop_reason["miss"]
+            return _finish_recover(
+                agent,
+                downloads,
+                cfg.min_pdf_bytes,
+                stop_reason["miss"],
+                cfg.browser_agent_max_steps,
             )
-        return _result_from_downloads(
-            downloads, cfg.min_pdf_bytes, miss="no PDF in download folder"
+        return _finish_recover(
+            agent,
+            downloads,
+            cfg.min_pdf_bytes,
+            "no PDF in download folder",
+            cfg.browser_agent_max_steps,
         )
 
 
@@ -408,6 +430,126 @@ async def _stop_when_pdf_lands(
             agent.stop()
             return
         await asyncio.sleep(interval_s)
+
+
+def _finish_recover(
+    agent: Any,
+    downloads: Path,
+    min_bytes: int,
+    miss: str,
+    max_steps: int,
+    *,
+    captcha: bool = False,
+) -> RecoverResult:
+    """Attach page, step, and download context to a generic miss or a hit."""
+    result = _result_from_downloads(
+        downloads, min_bytes, miss=miss, captcha=captcha
+    )
+    if result.pdf_bytes:
+        how = _success_how(agent)
+        if how:
+            result.note = f"{result.note}; {how}"
+        return result
+    if miss not in {"no PDF in download folder", "stopped", "timeout"}:
+        return result
+    page_url, final_text, steps = _agent_observation(agent)
+    label = classify_page_block(final_text)
+    debris = _download_debris(downloads, min_bytes)
+    if debris:
+        base = debris
+    elif label:
+        base = label
+    elif steps is not None and max_steps and steps >= max_steps:
+        base = "step budget"
+    else:
+        base = "no downloadable pdf"
+    result.note = format_miss(base, page_url, extra=_agent_snippet(final_text))
+    if miss == "timeout":
+        result.note = f"timeout; {result.note}"
+    if steps is not None and max_steps:
+        result.note = f"{result.note}; steps {steps}/{max_steps}"
+    return result
+
+
+def _agent_observation(agent: Any) -> tuple[str | None, str | None, int | None]:
+    history = getattr(agent, "history", None)
+    if history is None:
+        return None, None, None
+    final = _call(history, "final_result")
+    steps = _call(history, "number_of_steps")
+    urls = _call(history, "urls") or []
+    page_url = None
+    if isinstance(urls, list):
+        for url in reversed(urls):
+            if isinstance(url, str) and url:
+                page_url = url
+                break
+    text = final if isinstance(final, str) else None
+    count = steps if isinstance(steps, int) else None
+    return page_url, text, count
+
+
+def _call(obj: Any, name: str) -> Any:
+    fn = getattr(obj, name, None)
+    if not callable(fn):
+        return None
+    try:
+        return fn()
+    except Exception:
+        return None
+
+
+def _agent_snippet(text: str | None) -> str:
+    if not text:
+        return ""
+    line = " ".join(text.split())
+    return line
+
+
+def _success_how(agent: Any) -> str | None:
+    history = getattr(agent, "history", None)
+    if history is None:
+        return None
+    names = _call(history, "action_names") or []
+    if not isinstance(names, list) or not names:
+        return None
+    last = str(names[-1])
+    page_url, _, _ = _agent_observation(agent)
+    host = host_label(page_url)
+    where = f" @{host}" if host else ""
+    if any(token in last.lower() for token in ("click", "download")):
+        return f"via {last}{where}"
+    return None
+
+
+def _download_debris(folder: Path, min_bytes: int) -> str | None:
+    if not folder.is_dir():
+        return None
+    partial = False
+    tiny = False
+    try:
+        paths = list(folder.iterdir())
+    except OSError:
+        return None
+    for path in paths:
+        name = path.name.lower()
+        if name.endswith(".crdownload") or name.endswith(".tmp"):
+            partial = True
+            continue
+        if not name.endswith(".pdf"):
+            continue
+        try:
+            size = path.stat().st_size
+        except OSError:
+            continue
+        data = _pdf_bytes_from_path(path, min_bytes)
+        if data is None and size > 0:
+            tiny = True
+    if partial:
+        return "incomplete download"
+    if tiny:
+        return "download too small"
+    return None
 
 
 def _result_from_downloads(

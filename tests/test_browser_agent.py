@@ -9,7 +9,7 @@ from paperful import browser_agent as ba
 from paperful.browser_agent import BrowserAgentError, RecoverResult, recover_start_url
 from paperful.config import DEFAULT_SOURCES
 from paperful.pipeline import _SERIAL_SOURCES
-from paperful.routing import source_applicable
+from paperful.routing import prior_playwright_miss, source_applicable
 from paperful.sources import REGISTRY
 from paperful.sources.base import Candidate, Outcome
 from paperful.sources.browser_agent import find, set_runner
@@ -59,6 +59,20 @@ def test_browser_use_import_hides_pyzotero_request_logs(caplog):
             'HTTP Request: GET http://localhost:23119/api/ "HTTP/1.0 200 OK"'
         )
     assert "localhost:23119" not in caplog.text
+
+
+def test_prior_playwright_miss_keeps_the_last_vault_failure():
+    attempts = [
+        "unpaywall:not_found",
+        "htmlpdf:skipped(not a web/news item)",
+        "scholar:browser-failed(no download control @wiley.com)",
+        "ezproxy:not_found(paywall @onlinelibrary.wiley.com)",
+    ]
+    assert (
+        prior_playwright_miss(attempts)
+        == "ezproxy:not_found(paywall @onlinelibrary.wiley.com)"
+    )
+    assert prior_playwright_miss(["scihub:not_found"]) is None
 
 
 def test_routing_requires_llm_and_identifier(cfg):
@@ -317,6 +331,52 @@ def test_stable_largest_pdf_waits_for_unchanged_size(tmp_path):
     path.write_bytes(PDF_BYTES + b"x" * 100)
     assert ba._stable_largest_pdf(tmp_path, 1000, sizes) is None
     assert ba._stable_largest_pdf(tmp_path, 1000, sizes) == PDF_BYTES + b"x" * 100
+
+
+def test_finish_recover_names_paywall_and_steps(tmp_path):
+    class Hist:
+        def final_result(self):
+            return "Subscription required. Buy article PDF."
+
+        def urls(self):
+            return ["https://link.springer.com/article/10.1000/x"]
+
+        def number_of_steps(self):
+            return 4
+
+    class Agent:
+        history = Hist()
+
+    got = ba._finish_recover(Agent(), tmp_path, 1000, "no PDF in download folder", 8)
+    assert got.pdf_bytes is None
+    assert got.note.startswith("paywall @link.springer.com")
+    assert "steps 4/8" in got.note
+    assert "Buy article PDF" in got.note
+
+
+def test_finish_recover_notes_how_a_download_was_clicked(tmp_path):
+    (tmp_path / "a.pdf").write_bytes(PDF_BYTES)
+
+    class Hist:
+        def action_names(self):
+            return ["click"]
+
+        def urls(self):
+            return ["https://utpjournals.press/doi/pdf/10.1/x"]
+
+        def final_result(self):
+            return ""
+
+        def number_of_steps(self):
+            return 3
+
+    class Agent:
+        history = Hist()
+
+    got = ba._finish_recover(Agent(), tmp_path, 1000, "no PDF in download folder", 8)
+    assert got.pdf_bytes == PDF_BYTES
+    assert got.note.startswith("browser_agent download")
+    assert "via click @utpjournals.press" in got.note
 
 
 def test_result_from_downloads_prefers_pdf_over_miss(tmp_path):

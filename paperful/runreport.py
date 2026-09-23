@@ -14,6 +14,7 @@ from rich.console import Console
 from rich.table import Table
 
 from .config import Config
+from .page_signals import miss_label
 
 _ENRICH_MATCH = re.compile(
     r"^(?P<source>crossref|openalex|semanticscholar|pubmed|url|meta|arxiv):matched"
@@ -143,6 +144,36 @@ RUN_REPORT_ITEM_KEYS = frozenset(
 )
 
 
+def _attempt_note(attempt: str, prefix: str) -> str | None:
+    if not attempt.startswith(prefix) or not attempt.endswith(")"):
+        return None
+    return attempt[len(prefix) : -1]
+
+
+def _browser_miss_counts(items: list[dict[str, Any]]) -> dict[str, int]:
+    """Bucket ``browser_agent:not_found(...)`` notes by page label."""
+    counts: dict[str, int] = {}
+    for item in items:
+        for attempt in item.get("attempts") or []:
+            note = _attempt_note(attempt, "browser_agent:not_found(")
+            if note is None:
+                continue
+            label = miss_label(note)
+            counts[label] = counts.get(label, 0) + 1
+    return counts
+
+
+def _agent_after_playwright(items: list[dict[str, Any]]) -> int:
+    """Hits where the agent note records a prior Playwright miss."""
+    n = 0
+    for item in items:
+        for attempt in item.get("attempts") or []:
+            note = _attempt_note(attempt, "browser_agent:found(")
+            if note and "; after " in note:
+                n += 1
+    return n
+
+
 def outcome_banner(summary: dict[str, Any]) -> str:
     """Locked one-line end-of-run banner."""
     downloaded = int(summary.get("pdfs_downloaded") or 0)
@@ -235,6 +266,8 @@ def build_report(
             "attach_failed_by_code": dict(
                 getattr(stats, "attach_failed_by_code", {}) or {}
             ),
+            "browser_misses": _browser_miss_counts(item_dicts),
+            "agent_after_playwright": _agent_after_playwright(item_dicts),
             "write_api": write_api,
         },
         "items": item_dicts,
@@ -353,6 +386,19 @@ def print_run_summary(
         ),
     )
     console.print(title)
+
+    misses = s.get("browser_misses") or {}
+    if misses:
+        console.print(
+            "Browser misses: "
+            + ", ".join(
+                f"{k}={v}"
+                for k, v in sorted(misses.items(), key=lambda kv: (-kv[1], kv[0]))
+            )
+        )
+    after = int(s.get("agent_after_playwright") or 0)
+    if after:
+        console.print(f"Agent PDFs after a Playwright miss: {after}")
 
     by_src = s.get("by_source") or {}
     if by_src:

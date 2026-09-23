@@ -29,6 +29,7 @@ from .pipeline_browser import release_browser_for_agent, skip_recover_without_la
 from .resolve import IdentifierCache, prepare_identifiers
 from .routing import (
     is_publisher_url,
+    prior_playwright_miss,
     publisher_host,
     sources_for_item,
 )
@@ -344,6 +345,8 @@ class Pipeline:
                 continue
             self._log_item(item, f"[dim]{name}: checking...[/]")
             cand = REGISTRY[name].find(item, self.ctx)
+            if name == "browser_agent" and cand.outcome is Outcome.FOUND:
+                self._note_agent_after_playwright(item, cand, attempts)
             note = f"({cand.note})" if cand.note else ""
             attempts.append(f"{name}:{cand.outcome.value}{note}")
             with self._stats_lock:
@@ -773,6 +776,19 @@ class Pipeline:
 
     def _log_item(self, item: Item, message: str) -> None:
         self._emit(f"\\[{self._item_tag(item)}] {message}")
+
+    def _note_agent_after_playwright(
+        self, item: Item, cand: Candidate, attempts: list[str]
+    ) -> None:
+        """Record which Playwright miss the agent just beat, on the hit note."""
+        prior = prior_playwright_miss(attempts)
+        if not prior:
+            return
+        cand.note = f"{cand.note}; after {prior}" if cand.note else f"after {prior}"
+        self._log_item(
+            item,
+            f"browser_agent: [green]succeeded after Playwright miss[/] ({escape(prior)})",
+        )
 
     def _log_source_result(self, item: Item, name: str, cand: Candidate) -> None:
         colours = {

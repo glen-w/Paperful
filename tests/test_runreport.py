@@ -15,6 +15,7 @@ from paperful.runreport import (
     RUN_REPORT_KEYS,
     RUN_REPORT_PATH_KEYS,
     RUN_REPORT_SUMMARY_KEYS,
+    ItemOutcome,
     build_report,
     classify_enrichment,
     error_type_for,
@@ -129,6 +130,8 @@ def test_pipeline_populates_run_stats(cfg, monkeypatch):
     assert report["summary"]["pdfs_downloaded"] == 1
     assert report["summary"]["fields_corrected"] >= 1
     assert "oa" in report["summary"]["sources_checked"]
+    assert report["summary"]["browser_misses"] == {}
+    assert report["summary"]["agent_after_playwright"] == 0
 
     path = write_run_report(cfg, report)
     assert path is not None and path.exists()
@@ -175,6 +178,36 @@ def test_error_types_recorded(cfg, monkeypatch):
         or "error" in stats.errors_by_type
     )
     assert stats.items[0].status == STATUS_ERROR
+
+
+def test_browser_miss_rollup(cfg):
+    stats = pl.RunStats()
+    stats.items = [
+        ItemOutcome(
+            itemKey="A",
+            title="t",
+            status="not_found",
+            attempts=["browser_agent:not_found(paywall @springer.com; steps 3/8)"],
+        ),
+        ItemOutcome(
+            itemKey="B",
+            title="t",
+            status="not_found",
+            attempts=["browser_agent:not_found(paywall @wiley.com)"],
+        ),
+        ItemOutcome(
+            itemKey="C",
+            title="t",
+            status="attached",
+            attempts=[
+                "scholar:browser-failed(no download control @x.test)",
+                "browser_agent:found(browser_agent download; after scholar:browser-failed(no download control @x.test))",
+            ],
+        ),
+    ]
+    report = build_report(stats, cfg)
+    assert report["summary"]["browser_misses"] == {"paywall": 2}
+    assert report["summary"]["agent_after_playwright"] == 1
 
 
 def test_print_run_summary_renders(cfg):
