@@ -251,7 +251,6 @@ Smoke collections (dry-run): `HKF7T7EI` (UNGA/VME), `7R77ZJFH` / `XFD86ZFP` (BBN
 Items with no DOI, arXiv id, PMID, URL, or matching synthesize playbook still
 stop at `no_identifier`.
 
-
 ## Related docs
 
 - [ROADMAP.md](ROADMAP.md) — 0.1→1.0 trust; core vs maybe-later
