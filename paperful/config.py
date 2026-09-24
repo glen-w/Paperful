@@ -144,6 +144,10 @@ class Config:
     synthesize_tag: str = "paperful-report"
     synthesize_dest: str = "both"  # disk | zotero | both
     synthesize_timeout_s: float = 0.0  # 0 → max(llm.timeout_s, 300)
+    snowball_depth: int = 1
+    snowball_max_nodes: int = 80
+    snowball_max_per_hop: int = 25
+    snowball_direction: str = "both"  # both | references | citations
 
     def __post_init__(self) -> None:
         # Resolve pack+user once so Config() in tests gets the builtin examples.
@@ -450,6 +454,16 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
     mirror = raw.get("mirror")
     if isinstance(mirror, dict) and "pdfs" in mirror:
         cfg.mirror_pdfs = parse_pdfs(str(mirror["pdfs"]))
+    snow = raw.get("snowball")
+    if isinstance(snow, dict):
+        if "depth" in snow:
+            cfg.snowball_depth = int(snow["depth"])
+        if "max_nodes" in snow:
+            cfg.snowball_max_nodes = int(snow["max_nodes"])
+        if "max_per_hop" in snow:
+            cfg.snowball_max_per_hop = int(snow["max_per_hop"])
+        if "direction" in snow and snow["direction"]:
+            cfg.snowball_direction = str(snow["direction"]).strip().lower()
     men = raw.get("mendeley")
     if isinstance(men, dict):
         if "client_id" in men:

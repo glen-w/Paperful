@@ -251,6 +251,14 @@ Smoke collections (dry-run): `HKF7T7EI` (UNGA/VME), `7R77ZJFH` / `XFD86ZFP` (BBN
 Items with no DOI, arXiv id, PMID, URL, or matching synthesize playbook still
 stop at `no_identifier`.
 
+## Snowball
+
+`paperful snowball` expands one DOI through OpenAlex (`referenced_works` and
+`filter=cites`). The CLI only calls [`paperful/snowball.py`](../paperful/snowball.py).
+Dry-run writes `state/runs/<stamp>-snowball.json`. `--apply` creates parent
+items in one collection (tag `openalex-snowball`) and does not download or
+attach PDFs. Caps (`--max-nodes`, `--max-per-hop`) bound depth 2. Not scheduled.
+
 ## Related docs
 
 - [ROADMAP.md](ROADMAP.md) — 0.1→1.0 trust; core vs maybe-later

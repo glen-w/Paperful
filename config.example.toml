@@ -156,6 +156,15 @@ mirror_failures_before_skip = 3
 # apply = true
 # steps = ["gaps", "run", "lint", "fix-metadata", "summarize"]
 
+# Seed-DOI snowball (OpenAlex references + citations). Not a crawler.
+# paperful snowball 10.xxxx/yyyy --depth 1
+# paperful snowball 10.xxxx/yyyy -C snowball/topic --apply
+# [snowball]
+# depth = 1
+# max_nodes = 80
+# max_per_hop = 25
+# direction = "both"   # both | references | citations
+
 # Quiet mirror. snapshot copies existing Zotero PDFs only when pdfs = "all".
 # additional — keep PDFs paperful fetched; do not export files already in Zotero
 # all        — also export imported/linked-file PDFs into the item folder

@@ -1805,6 +1805,217 @@ def import_library(
     _flush(backend)
 
 
+@app.command()
+def snowball(
+    doi: str = typer.Argument(..., help="Seed DOI. Neighbours come from OpenAlex."),
+    depth: int | None = typer.Option(
+        None,
+        "--depth",
+        min=1,
+        max=3,
+        help="Hops from the seed. Default 1. Depth 2 is capped by --max-nodes.",
+    ),
+    direction: str | None = typer.Option(
+        None,
+        "--direction",
+        help="both (default), references (papers it cites), or citations (papers that cite it).",
+    ),
+    max_nodes: int | None = typer.Option(
+        None,
+        "--max-nodes",
+        help="Stop after this many works, including the seed. Default 80.",
+    ),
+    max_per_hop: int | None = typer.Option(
+        None,
+        "--max-per-hop",
+        help="References and citations kept per work. Default 25.",
+    ),
+    collection: str | None = typer.Option(
+        None,
+        "--collection",
+        "-C",
+        help="Collection path for --apply. Created if missing. Not a PDF fetch.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="List proposed DOIs only. This is the default; do not combine with --apply.",
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Create missing items in --collection. Does not download PDFs.",
+    ),
+    include_seed: bool = typer.Option(
+        True,
+        "--include-seed/--no-include-seed",
+        help="Also propose the seed when it is not already in the library.",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Print the proposal list as JSON."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """List papers a DOI cites and papers that cite it. ``--apply`` creates items only.
+
+    OpenAlex ``referenced_works`` and citing works. Caps keep depth 2 from
+    exploding. PDFs stay on ``paperful run``. Not a scheduled crawler.
+    """
+    from .resolve import normalize_doi
+    from .snowball import SnowballError, apply_snowball, expand, openalex_fetch, proposals
+
+    if dry_run and apply:
+        console.print("[red]Pass either --dry-run or --apply, not both.[/]")
+        raise typer.Exit(1)
+    cfg = _cfg(config)
+    seed = normalize_doi(doi)
+    if not seed:
+        console.print(f"[red]Not a DOI:[/] {doi}")
+        raise typer.Exit(1)
+    depth_n = cfg.snowball_depth if depth is None else depth
+    hop_n = cfg.snowball_max_per_hop if max_per_hop is None else max_per_hop
+    nodes_n = cfg.snowball_max_nodes if max_nodes is None else max_nodes
+    direction_n = (direction or cfg.snowball_direction or "both").strip().lower()
+    if apply and not collection:
+        console.print("[red]--apply needs --collection PATH (items are not created in the whole library).[/]")
+        raise typer.Exit(1)
+    started = time.time()
+    try:
+        plan = expand(
+            seed,
+            openalex_fetch(cfg),
+            depth=depth_n,
+            max_nodes=nodes_n,
+            max_per_hop=hop_n,
+            direction=direction_n,
+            mailto=cfg.email,
+        )
+    except SnowballError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    backend = None
+    known: dict[str, str] = {}
+    library_note = ""
+    if apply:
+        _require_manager(cfg)
+        backend = _connect(cfg, quiet=as_json)
+        if not backend.supports_write():
+            _exit_env("This library has no write support.", cfg)
+    else:
+        backend, known, library_note = _snowball_library(cfg)
+    if apply and backend is not None:
+        for it in backend.items_in_scope(None):
+            found = normalize_doi(it.doi)
+            if found and found not in known:
+                known[found] = it.key
+    rows = proposals(plan, known, include_seed=include_seed)
+    new_rows = [row for row in rows if row["status"] == "new"]
+    held = [row for row in rows if row["status"] == "in_library"]
+    created = 0
+    if apply and backend is not None and collection:
+        done = apply_snowball(
+            plan, backend, collection, known, include_seed=include_seed
+        )
+        created = done["created"]
+        for row in new_rows:
+            row["status"] = "created"
+        _flush(backend)
+    summary = {
+        "seed": plan.seed_doi,
+        "depth": depth_n,
+        "direction": direction_n,
+        "proposed": len(new_rows),
+        "already_in_library": len(held),
+        "created": created,
+        "skipped_no_doi": plan.skipped_no_doi,
+        "truncated": plan.truncated,
+        "errors": len(plan.errors),
+        "write_api": None if backend is None else bool(backend.supports_write()),
+    }
+    write_command_report(
+        cfg,
+        command="snowball",
+        scope=collection or plan.seed_doi,
+        summary=summary,
+        items=rows,
+        flags={
+            "dry_run": not apply,
+            "apply": apply,
+            "depth": depth_n,
+            "direction": direction_n,
+            "max_nodes": nodes_n,
+            "max_per_hop": hop_n,
+            "include_seed": include_seed,
+            "collection": collection or "",
+        },
+        started=started,
+        errors=plan.errors or None,
+    )
+    payload = {"summary": summary, "items": rows, "errors": plan.errors}
+    if as_json:
+        console.print(json.dumps(payload, indent=2), soft_wrap=True, highlight=False, markup=False)
+        return
+    if library_note and not apply:
+        console.print(f"[yellow]Library not read ({library_note}). Every DOI is listed as new.[/]")
+    console.print(
+        f"seed [bold]{plan.seed_doi}[/] · depth {depth_n} · {direction_n} · "
+        f"proposed {len(new_rows)} · already {len(held)} · "
+        f"no DOI {plan.skipped_no_doi}"
+        + (" · truncated" if plan.truncated else "")
+    )
+    if plan.errors:
+        for err in plan.errors:
+            console.print(f"[yellow]{err}[/]")
+    table = Table(title="Snowball")
+    table.add_column("Depth", justify="right")
+    table.add_column("Via")
+    table.add_column("DOI")
+    table.add_column("Status")
+    table.add_column("Title")
+    for row in rows:
+        table.add_row(
+            str(row["depth"]),
+            str(row["via"]),
+            str(row["doi"]),
+            str(row["status"]),
+            str(row["title"]),
+        )
+    console.print(table)
+    if apply:
+        console.print(
+            f"[bold]created {created}[/] · already in library {len(held)}"
+            + (f" in {collection}" if collection else "")
+        )
+        if created and collection:
+            console.print(f"[dim]Next: paperful run -C {collection}[/]")
+    else:
+        target = f" -C {collection}" if collection else " -C <collection>"
+        console.print(f"[dim]Dry run. Pass --apply{target} to create {len(new_rows)} item(s). PDFs stay on run.[/]")
+
+
+def _snowball_library(cfg: Config) -> tuple[Any, dict[str, str], str]:
+    """Best-effort DOI index. Dry-run continues when the manager is down."""
+    from .resolve import normalize_doi
+
+    manager = (cfg.manager or "zotero").strip().lower()
+    if manager not in KNOWN_MANAGERS:
+        return None, {}, f"unknown manager {manager!r}"
+    try:
+        if manager == "zotero":
+            zl = ZoteroLocal()
+            zl.ping()
+            backend = get_backend(cfg, zl)
+        else:
+            backend = get_backend(cfg)
+            backend.ping()
+        known: dict[str, str] = {}
+        for it in backend.items_in_scope(None):
+            found = normalize_doi(it.doi)
+            if found and found not in known:
+                known[found] = it.key
+        return backend, known, ""
+    except Exception as exc:
+        return None, {}, str(exc)
+
+
 @app.command("export")
 def export_library(
     dest: Path = typer.Argument(..., help="Output .ris / .bib / .xml file (or a folder for EndNote XML)."),

@@ -39,6 +39,7 @@ zotero
 commands
 workflows
 dedupe
+snowball
 config
 architecture
 quiet-mirror

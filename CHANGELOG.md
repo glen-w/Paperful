@@ -6,6 +6,12 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+`paperful snowball <DOI>` lists OpenAlex neighbours (papers the seed cites and
+papers that cite it). Depth defaults to 1 (max 3). `--max-nodes` (80) and
+`--max-per-hop` (25) cap a depth-2 expansion. Dry-run is the default;
+`--apply -C PATH` creates missing items tagged `openalex-snowball` and does
+not download PDFs. See [snowball](docs/snowball.md).
+
 `recover` / `browser_agent` stop the browser-use agent as soon as a valid PDF
 is on disk (size stable across two polls), instead of burning the remaining
 step budget after a successful click. The recover task tells the agent to quit

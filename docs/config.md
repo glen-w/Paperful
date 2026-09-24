@@ -48,6 +48,10 @@ and [architecture](architecture.md).
 | `attach` | `true` | Attach into Zotero after download (`--no-attach` overrides) |
 | `app_name` | `paperful` | Name shown in Zotero's authorisation dialog |
 | `user_agent` | Chrome-like string | HTTP `User-Agent` for source and download requests |
+| `[snowball].depth` | `1` | Hops from the seed DOI (`paperful snowball`). Max 3 on the CLI |
+| `[snowball].max_nodes` | `80` | Works kept in one expansion, including the seed |
+| `[snowball].max_per_hop` | `25` | References and citing works taken from each work |
+| `[snowball].direction` | `both` | `both`, `references` (cited by the seed), or `citations` (citing the seed) |
 
 Leave `ezproxy_base` empty (or remove `ezproxy` from `sources`) if you do not
 use a library proxy. Google Scholar is off until you add `scholar` to

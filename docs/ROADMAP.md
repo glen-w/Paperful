@@ -217,13 +217,13 @@ prerequisites for the fetch / lint / attach loop.
    `paperful ingest-dois --from-file dois.txt -C BBNJ --dry-run` then `--apply`
    (create items by DOI, tag `crossref-backfill`, hand off to `run` for PDFs).
    That backfill stays out of any scheduled bot inside Paperful.
-   **Snowball from a seed DOI** (same graph idea as the site citation network in
-   `glen-w.github.io` / OpenAlex `referenced_works` + citing works): user passes
-   one DOI; Paperful resolves neighbours — papers it cites and papers that cite
-   it — at a configurable depth (and caps so depth 2 does not explode). Dry-run
-   lists proposed DOIs; `--apply` creates items into a collection, then the
-   usual `run` / attach path fills PDFs. Not a scheduled crawler; not a second
-   reading UI.
+   **Snowball from a seed DOI** — **shipped (wave 2):** `paperful snowball <DOI>`
+   reads OpenAlex `referenced_works` and citing works (`--direction both`,
+   `references`, or `citations`). `--depth` defaults to 1 (max 3). `--max-nodes`
+   (80) and `--max-per-hop` (25) stop depth 2 from exploding. Dry-run lists
+   proposed DOIs; `--apply -C PATH` creates missing items tagged
+   `openalex-snowball` and does not download PDFs (`paperful run` does that).
+   Not a scheduled crawler; not a second reading UI. See [snowball](snowball.md).
 4. **File & attachment OS** — linked vs stored policy, rename, orphan GC,
    broken-link repair, PDF quality / wrong-paper triage (eat StorScan-class tools).
    The quiet mirror itself is core (above), not a later bet: dual bytes with
