@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+import httpx
 from typer.testing import CliRunner
 
 from paperful import cli
@@ -11,10 +12,14 @@ from paperful.config import load_config
 from paperful.snowball import (
     SNOWBALL_TAG,
     SnowballError,
+    abstract_from_inverted,
     apply_snowball,
     expand,
+    node_from_work,
+    openalex_fetch,
     parent_payload,
     proposals,
+    short_openalex_id,
 )
 
 runner = CliRunner()
@@ -224,3 +229,172 @@ def test_cli_apply_needs_collection(tmp_path):
     )
     assert result.exit_code == 1
     assert "--collection" in result.output
+
+
+def test_helpers_and_node_edges():
+    assert short_openalex_id(None) == ""
+    assert short_openalex_id("https://openalex.org/W1/") == "W1"
+    assert abstract_from_inverted(None) == ""
+    assert abstract_from_inverted({"a": "bad"}) == ""
+    assert abstract_from_inverted({"Hi": [1], "there": "x", "yo": [0]}) == "yo Hi"
+    assert node_from_work({"id": ""}, depth=0, via="seed", from_doi=None) is None
+    node = node_from_work(
+        {
+            "id": "https://openalex.org/W9",
+            "doi": "https://doi.org/10.1/x",
+            "display_name": "Solo",
+            "publication_year": "2017",
+            "type": "book",
+            "authorships": [
+                "skip",
+                {"author": {"display_name": ""}},
+                {"author": {"display_name": "Cher"}},
+                {"author": {"display_name": "Ada Lovelace"}},
+            ],
+            "primary_location": {},
+            "referenced_works": [],
+        },
+        depth=0,
+        via="seed",
+        from_doi=None,
+    )
+    assert node is not None
+    assert node.year == 2017
+    assert node.item_type == "book"
+    assert node.creators[0] == {"creatorType": "author", "name": "Cher"}
+    assert node.creators[1]["lastName"] == "Lovelace"
+
+
+def test_limit_errors_and_fetch_failures():
+    api = _graph()
+    for kwargs in (
+        {"depth": 0},
+        {"max_nodes": 0},
+        {"max_per_hop": 0},
+        {"direction": "sideways"},
+        {"seed": "not-doi"},
+    ):
+        seed = kwargs.pop("seed", "10.1000/seed")
+        try:
+            expand(seed, api, **kwargs)
+            raise AssertionError(kwargs)
+        except SnowballError:
+            pass
+
+    def flaky(url, params):
+        filt = str(params.get("filter") or "")
+        if filt.startswith("openalex:") or filt.startswith("cites:"):
+            return None
+        return api(url, params)
+
+    plan = expand("10.1000/seed", flaky, depth=1, max_per_hop=2)
+    assert plan.errors
+    assert len(plan.nodes) == 1  # seed only
+
+
+def test_seed_without_id_and_max_nodes_before_expand():
+    def seed_no_id(url, params):
+        if "/works/https://doi.org/" in url:
+            return {"id": "", "doi": "https://doi.org/10.1000/seed", "display_name": "x"}
+        return None
+
+    try:
+        expand("10.1000/seed", seed_no_id)
+        raise AssertionError("expected no id")
+    except SnowballError as exc:
+        assert "no id" in str(exc)
+
+    api = _graph()
+    plan = expand("10.1000/seed", api, depth=2, max_nodes=1)
+    assert len(plan.nodes) == 1
+    assert plan.truncated
+
+
+def test_openalex_fetch_with_mock(monkeypatch, cfg):
+    state = {"n": 0}
+    real_client = httpx.Client
+
+    def fake_client(*_a, **_k):
+        def handler(request: httpx.Request) -> httpx.Response:
+            state["n"] += 1
+            if state["n"] == 1:
+                return httpx.Response(
+                    429, headers={"Retry-After": "not-a-number"}, request=request
+                )
+            if "missing" in str(request.url):
+                return httpx.Response(404, request=request)
+            if "badjson" in str(request.url):
+                return httpx.Response(200, content=b"[]", request=request)
+            return httpx.Response(200, json={"ok": True}, request=request)
+
+        return real_client(transport=httpx.MockTransport(handler))
+
+    monkeypatch.setattr("paperful.snowball.httpx.Client", fake_client)
+    monkeypatch.setattr("paperful.snowball.time.sleep", lambda _s: None)
+    fetch = openalex_fetch(cfg)
+    assert fetch("https://api.openalex.org/works/ok", {}) == {"ok": True}
+    assert fetch("https://api.openalex.org/works/missing", {}) is None
+    assert fetch("https://api.openalex.org/works/badjson", {}) is None
+
+
+def test_cli_apply_creates_with_stub(tmp_path, monkeypatch):
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{tmp_path / "out"}"\nstate_dir = "{tmp_path / "state"}"\n'
+    )
+    api = _graph()
+    monkeypatch.setattr(
+        "paperful.snowball.expand",
+        lambda seed, fetch, **kwargs: expand(seed, api, **kwargs),
+    )
+
+    class Backend:
+        def __init__(self):
+            self.created = []
+
+        def supports_write(self):
+            return True
+
+        def items_in_scope(self, _keys):
+            from tests.conftest import make_item
+
+            return [make_item(key="HAVE", doi="10.1000/ref-a")]
+
+        def ensure_collection_path(self, path):
+            assert path == "snowball/nature"
+            return "COL"
+
+        def create_parent(self, data):
+            self.created.append(data["DOI"])
+            return "NEW"
+
+        def flush_writes(self):
+            return None
+
+        def ping(self):
+            return {"supports_write": True}
+
+    backend = Backend()
+    monkeypatch.setattr(cli, "_require_manager", lambda cfg: None)
+    monkeypatch.setattr(cli, "_connect", lambda cfg, quiet=False: backend)
+    monkeypatch.setattr(cli, "_flush", lambda b: None)
+    result = runner.invoke(
+        cli.app,
+        [
+            "snowball",
+            "10.1000/seed",
+            "--apply",
+            "-C",
+            "snowball/nature",
+            "--no-include-seed",
+            "--json",
+            "--config",
+            str(cfg_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert payload["summary"]["created"] >= 1
+    assert "10.1000/ref-a" not in backend.created
+    assert any(row["status"] == "created" for row in payload["items"])
+    assert any(row["status"] == "in_library" for row in payload["items"])
