@@ -195,16 +195,19 @@ LLM tags as source of truth without stage 1–2 anchors.
 
 ## Snowball
 
-**Status:** dry-run search, one-hop DOI references, `--gate auto` creates, and
-`fetch_pdfs` are in the tree. Contract: [snowball.md](snowball.md). ORCID,
-approve-batch, cited-by, and depth above 1 are still planned.
+**Status:** keyword search, DOI / ORCID / collection seeds, refs and cited-by,
+depth under caps, gates `dry-run` / `approve-batch` / `auto`, and `fetch_pdfs`
+are in the tree. Contract: [snowball.md](snowball.md). Still later:
+`approve-each`, multi-seed overlap ranking, hybrid profiles, and `[llm]`
+queue suggestions.
 
-Snowball grows a library outward from a keyword, one or more DOIs, or an
-ORCID. It writes a candidate queue on disk, then creates items only under an
-explicit gate. `run` still fills PDFs. With `fetch_pdfs`, snowball calls that
-same `run` in-process on the keys it just created, so one command can go from
-a keyword to a collection with PDFs. The stranger default is a dry-run: candidates
-only, no library writes, no downloads.
+Snowball grows a library outward from a keyword, one or more DOIs, an ORCID,
+or DOIs already in a collection. It writes a candidate queue on disk, then
+creates items only under an explicit gate. `run` still fills PDFs. With
+`fetch_pdfs`, snowball calls that same `run` in-process on the keys it just
+created, so one command can go from a keyword to a collection with PDFs. The
+stranger default is a dry-run: candidates only, no library writes, no
+downloads.
 
 The mechanic to port is the personal-site citation crawl
 (`glen-w.github.io` `processing/library/citations.py`): a fixed one-hop
@@ -214,17 +217,15 @@ graph, hard-coded ego slug, and Scholar scrape stay on the site.
 
 Phases, in order. Each can stop without the next.
 
-1. **Dry-run. Shipped.** `snowball doi` (one-hop references) and `snowball search`
-   (depth 0: the hit list only) write `paperful.snowball.candidate.v1` under
-   `state/snowball/<run-id>/`. Depth above 1 is clamped.
-2. **Writing gates and the one-shot library.** **Shipped:** `--gate auto` and
-   `fetch_pdfs` (existing `run` on the new keys only), with a
-   `paperful-snowball` tag and a child note. Still later: `approve-batch` /
-   `snowball apply`, ORCID works plus the references those works cite, and a
-   collection’s DOIs as seeds.
-3. **Optional expansion.** Cited-by, depth 2 under the same caps, multi-seed
-   overlap ranking, a hybrid profile (keyword, then one hop from the top
-   DOIs), optional query refinement behind `[llm]` as queue suggestions.
+1. **Dry-run. Shipped.** `snowball doi` / `search` write
+   `paperful.snowball.candidate.v1` under `state/snowball/<run-id>/`.
+2. **Writing gates and the one-shot library. Shipped:** `--gate auto` and
+   `fetch_pdfs`, plus `approve-batch` / `snowball apply`, ORCID works (plus
+   OpenAlex author fill), and collection DOI seeds.
+3. **Optional expansion. Shipped for this wave:** cited-by (`direction`),
+   depth above 1 under the same caps. Still later: multi-seed overlap
+   ranking, a hybrid profile (keyword, then one hop from the top DOIs),
+   optional query refinement behind `[llm]` as queue suggestions.
 
 Still outside this lane: every paper by every cited author; a snowball step
 inside `paperful all`; cron; a review UI; systematic-review screening; a
@@ -306,6 +307,6 @@ Larger product bets. Park until the ledger and core loop justify them.
 - [quiet-mirror.md](quiet-mirror.md) — `out/` as the copy you keep
 - [releases.md](releases.md) — 0.x vs 1.0; known limits
 - [comparison.md](comparison.md) — what paperful does and does not replace today
-- [snowball.md](snowball.md) — planned library-building from a keyword, DOI, or ORCID
+- [snowball.md](snowball.md) — library-building from a keyword, DOI, ORCID, or collection
 - Site career / domain timeline plan (consumer of durable tags):
   `/Users/89298/Documents/website/glen-w.github.io/docs/dev/career-timeline-plan.md`

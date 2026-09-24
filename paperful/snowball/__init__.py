@@ -1,5 +1,19 @@
-"""Snowball: grow a library from a keyword or a DOI bibliography."""
+"""Snowball package: grow a library from keyword, DOI, ORCID, or collection seeds."""
 
-from .command import SnowballError, run_doi, run_orcid, run_search
+from .command import (
+    SnowballError,
+    run_apply,
+    run_collection,
+    run_doi,
+    run_orcid,
+    run_search,
+)
 
-__all__ = ["SnowballError", "run_doi", "run_orcid", "run_search"]
+__all__ = [
+    "SnowballError",
+    "run_apply",
+    "run_collection",
+    "run_doi",
+    "run_orcid",
+    "run_search",
+]

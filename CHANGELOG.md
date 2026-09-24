@@ -6,6 +6,11 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+Snowball wave 3: ORCID and collection seeds, `--direction cites|both`, depth
+above 1 (soft ceiling 5) under the existing caps, `approve-batch` queues with
+`keep` plus `paperful snowball apply <run-id>`, and profiles for `orcid` /
+`collection` modes.
+
 `recover` / `browser_agent` stop the browser-use agent as soon as a valid PDF
 is on disk (size stable across two polls), instead of burning the remaining
 step budget after a successful click. The recover task tells the agent to quit

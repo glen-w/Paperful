@@ -129,6 +129,61 @@ class OpenAlexClient:
             out.extend(payload.get("results") or [])
         return out
 
+    def works_citing(
+        self,
+        openalex_id: str,
+        *,
+        limit: int,
+        year_from: int | None = None,
+        year_to: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Works that cite ``openalex_id`` (OpenAlex ``filter=cites:``)."""
+        oa = short_id(openalex_id)
+        if not oa:
+            return []
+        filters = [f"cites:{oa}"]
+        if year_from is not None:
+            filters.append(f"from_publication_date:{year_from}-01-01")
+        if year_to is not None:
+            filters.append(f"to_publication_date:{year_to}-12-31")
+        payload = self.get(
+            "/works",
+            {
+                "filter": ",".join(filters),
+                "per_page": max(1, min(limit, 200)),
+                "select": SELECT,
+            },
+        )
+        return list(payload.get("results") or [])
+
+    def works_by_author_orcid(
+        self,
+        orcid: str,
+        *,
+        limit: int,
+        year_from: int | None = None,
+        year_to: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """OpenAlex works for an ORCID (fills gaps left by the ORCID public API)."""
+        cleaned = normalize_orcid(orcid)
+        if not cleaned:
+            return []
+        filters = [f"author.orcid:{cleaned}"]
+        if year_from is not None:
+            filters.append(f"from_publication_date:{year_from}-01-01")
+        if year_to is not None:
+            filters.append(f"to_publication_date:{year_to}-12-31")
+        payload = self.get(
+            "/works",
+            {
+                "filter": ",".join(filters),
+                "per_page": max(1, min(limit, 200)),
+                "select": SELECT,
+            },
+        )
+        return list(payload.get("results") or [])
+
+
 
 def short_id(url: str) -> str:
     return (url or "").rstrip("/").split("/")[-1]
@@ -187,3 +242,21 @@ def work_to_candidate(
 def referenced_ids(work: dict[str, Any], per_hop_limit: int) -> list[str]:
     raw = [short_id(str(ref)) for ref in (work.get("referenced_works") or [])]
     return cap_ids([item for item in raw if item], per_hop_limit)
+
+
+def normalize_orcid(raw: str) -> str:
+    """Strip URL wrapper; return XXXX-XXXX-XXXX-XXXX or empty."""
+    text = (raw or "").strip()
+    if not text:
+        return ""
+    text = text.rstrip("/")
+    if "/" in text:
+        text = text.rsplit("/", 1)[-1]
+    text = text.upper()
+    if len(text) == 19 and text.count("-") == 3:
+        return text
+    digits = text.replace("-", "")
+    if len(digits) == 16 and digits[:15].isdigit() and (digits[15].isdigit() or digits[15] == "X"):
+        return f"{digits[0:4]}-{digits[4:8]}-{digits[8:12]}-{digits[12:16]}"
+    return ""
+

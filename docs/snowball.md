@@ -1,26 +1,30 @@
 # Snowball
 
-**Status:** dry-run search, dry-run DOI references, `--gate auto` creates, and
-`--fetch-pdfs` are implemented. ORCID, approve-batch, cited-by, and depth above
-1 are not. Phases live in [ROADMAP](ROADMAP.md#snowball).
+**Status:** keyword search, DOI / ORCID / collection seeds, refs and cited-by,
+depth up to 5 under caps, gates `dry-run` / `approve-batch` / `auto`, and
+`--fetch-pdfs` are implemented. `approve-each`, multi-seed overlap ranking,
+hybrid profiles, and `[llm]` query refine are still later. Phases live in
+[ROADMAP](ROADMAP.md#snowball).
 
-Snowball grows a library outward from a keyword, a DOI, or a person. It
-proposes works, then creates items under an explicit gate. [`run`](commands.md)
-fills PDFs for items that already exist. With `fetch_pdfs`, snowball calls
-that same `run` in the same process, limited to the keys it just created, so
-one command can turn a keyword into a collection with PDFs.
+Snowball grows a library outward from a keyword, a DOI, a person, or an
+existing collection. It proposes works, then creates items under an explicit
+gate. [`run`](commands.md) fills PDFs for items that already exist. With
+`fetch_pdfs`, snowball calls that same `run` in the same process, limited to
+the keys it just created, so one command can turn a keyword into a collection
+with PDFs.
 
 ```text
 paperful snowball search "area based management tools" --year-from 2018
-paperful snowball doi 10.1038/s41586-021-03819-2 --depth 1
+paperful snowball doi 10.1038/s41586-021-03819-2 --depth 2 --direction both
 paperful snowball orcid 0000-0002-9162-9618
+paperful snowball collection "Inbox/Seeds" --direction refs
 paperful snowball run --profile doi-refs-gated
-paperful snowball apply <run-id>
+paperful snowball apply <run-id> -C "Inbox/Snowball"
 paperful snowball search "high seas EIA" --gate auto --fetch-pdfs -C "Inbox/Snowball"
 ```
 
-`search`, `doi`, and `orcid` are seeds under one verb. There is no separate
-top-level `harvest`, `crawl`, or `discover`.
+`search`, `doi`, `orcid`, and `collection` are seeds under one verb. There is
+no separate top-level `harvest`, `crawl`, or `discover`.
 
 ## Snowball and run
 
@@ -41,9 +45,9 @@ A snowball profile is a named job in `profiles/`. `paperful run` and
 | Seed | What it collects | Default depth |
 | --- | --- | --- |
 | Keyword | OpenAlex title/abstract search | **0** — the hit list. Depth 1+ expands those hits and must be set explicitly. A global `depth = 1` does not expand every keyword hit |
-| DOI | The work, then its bibliography (`referenced_works`) | **1**, direction `refs`. Cited-by stays off until `direction` includes `cites` |
-| ORCID | That person’s works (ORCID public API), then the works those papers cite (OpenAlex) | **1**. A name with no ORCID prints a disambiguation list and does not pick |
-| Collection | DOIs already in `-C`, then the same one-hop expander | Same as DOI. Lands with the writing phase |
+| DOI | The work’s neighbours (`referenced_works` and/or works that cite it) | **1**, direction `refs` by default. Use `--direction cites` or `both` for cited-by |
+| ORCID | That person’s works (ORCID public API, filled by OpenAlex author filter), then the same expander | **1** |
+| Collection | DOIs already in the seed collection path, then the same expander | **1**. `-C` is the write target (defaults to the seed path) |
 
 `expand = cited_authors` (every paper by every cited author) stays off. It
 is a later, capped switch.
@@ -91,10 +95,10 @@ Example profile `keyword-library`: `gate = auto`, `fetch_pdfs = true`,
 
 | Knob | Default | Meaning |
 | --- | --- | --- |
-| `depth` | 0 for keyword, 1 for DOI and ORCID | Hops from the seed. The first implementation clamps anything above 1 and warns. Depth 2 still has to obey `max_candidates` |
-| `direction` | `refs` | `refs`, `cites`, or `both`. Cited-by is a later phase |
+| `depth` | 0 for keyword, 1 for DOI / ORCID / collection | Hops from the seed. Soft ceiling 5; `max_candidates` and `per_hop_limit` still bind |
+| `direction` | `refs` | `refs`, `cites`, or `both` |
 | `max_candidates` | 200 | Stops after this many `new` + `exists` rows |
-| `per_hop_limit` | 50 | Fan-out per seed, not a global pool |
+| `per_hop_limit` | 50 | Fan-out per seed work per hop, not a global pool |
 | `year_from` / `year_to` | unset | Drop candidates outside the window |
 | `types` | journal-article-shaped | OpenAlex / Zotero types |
 | `oa_only` | false | Metadata filter only. It does not change the PDF chain |
