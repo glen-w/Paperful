@@ -633,6 +633,10 @@ def _optional_int(body: dict[str, Any], key: str) -> int | None:
 def _normalize(raw: dict[str, Any], *, expect_name: str | None) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise RunConfigError("Run config must be a TOML table.")
+    if str(raw.get("kind") or "") == "snowball":
+        raise RunConfigError(
+            "This is a snowball profile. Run it with: paperful snowball run --profile NAME"
+        )
     unknown = sorted(set(raw) - PROFILE_KEYS)
     if unknown:
         known = ", ".join(sorted(PROFILE_KEYS))

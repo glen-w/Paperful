@@ -65,5 +65,6 @@ llm
 
 comparison
 comparison-reference
+snowball
 ROADMAP
 ```

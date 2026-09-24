@@ -71,6 +71,7 @@ repeat on the command line. It is not a grey-lit playbook and not a
 | `--preset eoi` | Source list only (OA + EZProxy; no Scholar, no Sci-Hub) |
 | Playbook | Grey-lit URL → PDF rule |
 | Pack | Witness of one executed sequence under `state/packs/` |
+| Snowball profile | `kind = "snowball"`. `run` and `all` refuse it. Use `paperful snowball` |
 
 **Where files live.** Beside `config.toml`:
 

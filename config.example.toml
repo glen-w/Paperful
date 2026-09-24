@@ -163,3 +163,19 @@ mirror_failures_before_skip = 3
 # run always writes PDFs it downloads, whatever this is set to.
 [mirror]
 pdfs = "additional"
+
+# Snowball grows a library from a keyword or a DOI bibliography.
+# Off until you set enabled. Dry-run writes state/snowball/ and does not create items.
+# gate = "auto" plus target_collection creates parents. fetch_pdfs then runs the
+# existing PDF pipeline on those new items only.
+# OPENALEX_API_KEY belongs in the environment, not in this file.
+# [snowball]
+# enabled = false
+# max_candidates = 200
+# per_hop_limit = 50
+# depth = 1
+# direction = "refs"
+# gate = "dry-run"
+# target_collection = ""
+# fetch_pdfs = false
+

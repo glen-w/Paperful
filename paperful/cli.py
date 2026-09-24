@@ -103,6 +103,12 @@ profile_app = typer.Typer(
     help="Named run configs (SCOPE + policy). Not grey-lit playbooks.",
 )
 app.add_typer(profile_app, name="profile")
+snowball_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Grow a library from a keyword or a DOI bibliography. Dry-run unless --gate auto.",
+)
+app.add_typer(snowball_app, name="snowball")
 console = Console(highlight=False)
 
 ConfigOpt = typer.Option(
@@ -3278,6 +3284,150 @@ def profile_save(
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1) from exc
     console.print(f"Wrote [bold]{path}[/]")
+
+
+def _snowball_request(
+    cfg: Config,
+    *,
+    gate: str | None,
+    collection: str | None,
+    fetch_pdfs: bool | None,
+    depth: int | None,
+    max_candidates: int | None,
+    year_from: int | None,
+    year_to: int | None,
+) -> Any:
+    from .snowball.command import SnowballRequest
+
+    return SnowballRequest(
+        gate=gate or cfg.snowball_gate,
+        collection=(collection or cfg.snowball_target_collection or ""),
+        fetch_pdfs=cfg.snowball_fetch_pdfs if fetch_pdfs is None else fetch_pdfs,
+        depth=depth,
+        max_candidates=max_candidates,
+        year_from=year_from,
+        year_to=year_to,
+    )
+
+
+def _run_snowball(cfg: Config, action: Any) -> None:
+    from .snowball.command import SnowballError
+
+    try:
+        result = action(cfg)
+    except SnowballError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(exc.code) from exc
+    if result.exit_code:
+        raise typer.Exit(result.exit_code)
+
+
+@snowball_app.command("search")
+def snowball_search(
+    query: str = typer.Argument(..., help="Keyword query."),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    depth: int | None = typer.Option(None, "--depth", help="0 = hits only. Above 1 is clamped."),
+    max_candidates: int | None = typer.Option(None, "--max-candidates"),
+    gate: str | None = typer.Option(None, "--gate", help="dry-run or auto. Default: config, else dry-run."),
+    collection: str = typer.Option("", "--collection", "-C", help="Target collection for --gate auto."),
+    fetch_pdfs: bool | None = typer.Option(
+        None, "--fetch-pdfs", help="After auto-create, fill PDFs for the new items."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Search OpenAlex and write a candidate queue. Creates items only with --gate auto."""
+    cfg = _cfg(config)
+    request = _snowball_request(
+        cfg,
+        gate=gate,
+        collection=collection,
+        fetch_pdfs=fetch_pdfs,
+        depth=depth,
+        max_candidates=max_candidates,
+        year_from=year_from,
+        year_to=year_to,
+    )
+    from .snowball.command import run_search
+
+    _run_snowball(cfg, lambda c: run_search(c, query, request, console=console))
+
+
+@snowball_app.command("doi")
+def snowball_doi(
+    dois: list[str] = typer.Argument(..., help="One or more seed DOIs."),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    depth: int | None = typer.Option(1, "--depth", help="Reference hops. Above 1 is clamped to 1."),
+    max_candidates: int | None = typer.Option(None, "--max-candidates"),
+    gate: str | None = typer.Option(None, "--gate", help="dry-run or auto. Default: config, else dry-run."),
+    collection: str = typer.Option("", "--collection", "-C", help="Target collection for --gate auto."),
+    fetch_pdfs: bool | None = typer.Option(
+        None, "--fetch-pdfs", help="After auto-create, fill PDFs for the new items."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """One-hop bibliography of each DOI. Creates items only with --gate auto."""
+    cfg = _cfg(config)
+    request = _snowball_request(
+        cfg,
+        gate=gate,
+        collection=collection,
+        fetch_pdfs=fetch_pdfs,
+        depth=depth,
+        max_candidates=max_candidates,
+        year_from=year_from,
+        year_to=year_to,
+    )
+    from .snowball.command import run_doi
+
+    _run_snowball(cfg, lambda c: run_doi(c, dois, request, console=console))
+
+
+@snowball_app.command("orcid")
+def snowball_orcid(
+    orcid: str = typer.Argument(..., help="ORCID iD."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """ORCID seeds are the next wave."""
+    _cfg(config)
+    from .snowball.command import SnowballError, run_orcid
+
+    try:
+        run_orcid()
+    except SnowballError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(exc.code) from exc
+
+
+@snowball_app.command("run")
+def snowball_run(
+    profile: str = typer.Option(..., "--profile", help="profiles/<name>.toml with kind = snowball."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Run a saved snowball profile (keyword or DOI)."""
+    cfg = _cfg(config)
+    from .snowball.command import SnowballError, run_doi, run_search
+    from .snowball.profile import load_profile, request_from_profile
+
+    try:
+        raw = load_profile(cfg, profile)
+        request = request_from_profile(raw, cfg)
+        mode = str(raw.get("mode") or "")
+        if mode == "search":
+            query = str(raw.get("query") or "").strip()
+            if not query:
+                raise SnowballError(f"Profile {profile!r} needs query.")
+            action = lambda c: run_search(c, query, request, console=console)
+        elif mode == "doi":
+            dois = [str(item) for item in (raw.get("dois") or [])]
+            action = lambda c: run_doi(c, dois, request, console=console)
+        else:
+            raise SnowballError(f"Profile {profile!r} mode must be search or doi.")
+    except SnowballError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(exc.code) from exc
+    _run_snowball(cfg, action)
 
 
 if __name__ == "__main__":
