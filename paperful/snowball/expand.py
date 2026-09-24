@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from .candidate import Candidate
 
+# Soft ceiling so a typo does not walk the whole graph. Caps still bind first.
+MAX_DEPTH = 5
+
 
 def clamp_depth(depth: int) -> tuple[int, str | None]:
-    """Depth above 1 is not honored yet. Returns the depth to use and a warning."""
-    if depth > 1:
-        return 1, "depth clamped to 1"
+    """Normalize depth. Returns the depth to use and an optional warning."""
     if depth < 0:
         return 0, None
+    if depth > MAX_DEPTH:
+        return MAX_DEPTH, f"depth clamped to {MAX_DEPTH}"
     return depth, None
 
 
@@ -46,3 +49,15 @@ def cap_ids(ids: list[str], per_hop_limit: int) -> list[str]:
         if len(seen) >= limit:
             break
     return seen
+
+
+def normalize_direction(raw: str) -> str:
+    """Return refs, cites, or both. Raises ValueError for anything else."""
+    value = (raw or "refs").strip().lower()
+    if value in {"refs", "references", "ref"}:
+        return "refs"
+    if value in {"cites", "cited-by", "cited_by", "citations"}:
+        return "cites"
+    if value in {"both", "refs+cites", "all"}:
+        return "both"
+    raise ValueError(f"direction must be refs, cites, or both (got {raw!r})")

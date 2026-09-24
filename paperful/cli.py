@@ -3294,8 +3294,10 @@ def _snowball_request(
     fetch_pdfs: bool | None,
     depth: int | None,
     max_candidates: int | None,
+    per_hop_limit: int | None = None,
     year_from: int | None,
     year_to: int | None,
+    direction: str | None = None,
 ) -> Any:
     from .snowball.command import SnowballRequest
 
@@ -3305,8 +3307,10 @@ def _snowball_request(
         fetch_pdfs=cfg.snowball_fetch_pdfs if fetch_pdfs is None else fetch_pdfs,
         depth=depth,
         max_candidates=max_candidates,
+        per_hop_limit=per_hop_limit,
         year_from=year_from,
         year_to=year_to,
+        direction=direction or cfg.snowball_direction or "refs",
     )
 
 
@@ -3327,9 +3331,13 @@ def snowball_search(
     query: str = typer.Argument(..., help="Keyword query."),
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
-    depth: int | None = typer.Option(None, "--depth", help="0 = hits only. Above 1 is clamped."),
+    depth: int | None = typer.Option(None, "--depth", help="0 = hits only. Expand hits when >= 1."),
     max_candidates: int | None = typer.Option(None, "--max-candidates"),
-    gate: str | None = typer.Option(None, "--gate", help="dry-run or auto. Default: config, else dry-run."),
+    per_hop_limit: int | None = typer.Option(None, "--per-hop-limit"),
+    direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both (when depth >= 1)."),
+    gate: str | None = typer.Option(
+        None, "--gate", help="dry-run, approve-batch, or auto. Default: config, else dry-run."
+    ),
     collection: str = typer.Option("", "--collection", "-C", help="Target collection for --gate auto."),
     fetch_pdfs: bool | None = typer.Option(
         None, "--fetch-pdfs", help="After auto-create, fill PDFs for the new items."
@@ -3345,8 +3353,10 @@ def snowball_search(
         fetch_pdfs=fetch_pdfs,
         depth=depth,
         max_candidates=max_candidates,
+        per_hop_limit=per_hop_limit,
         year_from=year_from,
         year_to=year_to,
+        direction=direction,
     )
     from .snowball.command import run_search
 
@@ -3358,16 +3368,20 @@ def snowball_doi(
     dois: list[str] = typer.Argument(..., help="One or more seed DOIs."),
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
-    depth: int | None = typer.Option(1, "--depth", help="Reference hops. Above 1 is clamped to 1."),
+    depth: int | None = typer.Option(1, "--depth", help="Graph hops from each seed (default 1)."),
     max_candidates: int | None = typer.Option(None, "--max-candidates"),
-    gate: str | None = typer.Option(None, "--gate", help="dry-run or auto. Default: config, else dry-run."),
+    per_hop_limit: int | None = typer.Option(None, "--per-hop-limit"),
+    direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both."),
+    gate: str | None = typer.Option(
+        None, "--gate", help="dry-run, approve-batch, or auto. Default: config, else dry-run."
+    ),
     collection: str = typer.Option("", "--collection", "-C", help="Target collection for --gate auto."),
     fetch_pdfs: bool | None = typer.Option(
         None, "--fetch-pdfs", help="After auto-create, fill PDFs for the new items."
     ),
     config: Path | None = ConfigOpt,
 ) -> None:
-    """One-hop bibliography of each DOI. Creates items only with --gate auto."""
+    """Bibliography and/or citing works of each DOI. Creates items only with --gate auto."""
     cfg = _cfg(config)
     request = _snowball_request(
         cfg,
@@ -3376,8 +3390,10 @@ def snowball_doi(
         fetch_pdfs=fetch_pdfs,
         depth=depth,
         max_candidates=max_candidates,
+        per_hop_limit=per_hop_limit,
         year_from=year_from,
         year_to=year_to,
+        direction=direction,
     )
     from .snowball.command import run_doi
 
@@ -3387,17 +3403,109 @@ def snowball_doi(
 @snowball_app.command("orcid")
 def snowball_orcid(
     orcid: str = typer.Argument(..., help="ORCID iD."),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    depth: int | None = typer.Option(1, "--depth", help="Graph hops from the person's works."),
+    max_candidates: int | None = typer.Option(None, "--max-candidates"),
+    per_hop_limit: int | None = typer.Option(None, "--per-hop-limit"),
+    direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both."),
+    gate: str | None = typer.Option(
+        None, "--gate", help="dry-run, approve-batch, or auto. Default: config, else dry-run."
+    ),
+    collection: str = typer.Option("", "--collection", "-C", help="Target collection for --gate auto."),
+    fetch_pdfs: bool | None = typer.Option(
+        None, "--fetch-pdfs", help="After auto-create, fill PDFs for the new items."
+    ),
     config: Path | None = ConfigOpt,
 ) -> None:
-    """ORCID seeds are the next wave."""
-    _cfg(config)
-    from .snowball.command import SnowballError, run_orcid
+    """Person's works (ORCID + OpenAlex), then references/citations those works expand to."""
+    cfg = _cfg(config)
+    request = _snowball_request(
+        cfg,
+        gate=gate,
+        collection=collection,
+        fetch_pdfs=fetch_pdfs,
+        depth=depth,
+        max_candidates=max_candidates,
+        per_hop_limit=per_hop_limit,
+        year_from=year_from,
+        year_to=year_to,
+        direction=direction,
+    )
+    from .snowball.command import run_orcid
 
-    try:
-        run_orcid()
-    except SnowballError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(exc.code) from exc
+    _run_snowball(cfg, lambda c: run_orcid(c, orcid, request, console=console))
+
+
+@snowball_app.command("collection")
+def snowball_collection(
+    seed_collection: str = typer.Argument(..., help="Existing library collection whose DOIs seed the crawl."),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    depth: int | None = typer.Option(1, "--depth", help="Graph hops from each seed DOI."),
+    max_candidates: int | None = typer.Option(None, "--max-candidates"),
+    per_hop_limit: int | None = typer.Option(None, "--per-hop-limit"),
+    direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both."),
+    gate: str | None = typer.Option(
+        None, "--gate", help="dry-run, approve-batch, or auto. Default: config, else dry-run."
+    ),
+    collection: str = typer.Option(
+        "",
+        "--collection",
+        "-C",
+        help="Target collection for --gate auto (defaults to the seed collection).",
+    ),
+    fetch_pdfs: bool | None = typer.Option(
+        None, "--fetch-pdfs", help="After auto-create, fill PDFs for the new items."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Expand DOIs already in a collection. Creates items only with --gate auto."""
+    cfg = _cfg(config)
+    target = collection or seed_collection
+    request = _snowball_request(
+        cfg,
+        gate=gate,
+        collection=target,
+        fetch_pdfs=fetch_pdfs,
+        depth=depth,
+        max_candidates=max_candidates,
+        per_hop_limit=per_hop_limit,
+        year_from=year_from,
+        year_to=year_to,
+        direction=direction,
+    )
+    from .snowball.command import run_collection
+
+    _run_snowball(
+        cfg, lambda c: run_collection(c, seed_collection, request, console=console)
+    )
+
+
+@snowball_app.command("apply")
+def snowball_apply(
+    run_id: str = typer.Argument(..., help="Run id under state/snowball/<run-id>/."),
+    collection: str = typer.Option("", "--collection", "-C", help="Target collection."),
+    fetch_pdfs: bool | None = typer.Option(
+        None, "--fetch-pdfs", help="After create, fill PDFs for the new items."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Create keep=true rows from a prior queue (approve-batch or edited dry-run)."""
+    cfg = _cfg(config)
+    request = _snowball_request(
+        cfg,
+        gate="auto",
+        collection=collection,
+        fetch_pdfs=fetch_pdfs,
+        depth=None,
+        max_candidates=None,
+        year_from=None,
+        year_to=None,
+    )
+    from .snowball.command import run_apply
+
+    _run_snowball(cfg, lambda c: run_apply(c, run_id, request, console=console))
 
 
 @snowball_app.command("run")
@@ -3405,9 +3513,15 @@ def snowball_run(
     profile: str = typer.Option(..., "--profile", help="profiles/<name>.toml with kind = snowball."),
     config: Path | None = ConfigOpt,
 ) -> None:
-    """Run a saved snowball profile (keyword or DOI)."""
+    """Run a saved snowball profile (keyword, DOI, ORCID, or collection)."""
     cfg = _cfg(config)
-    from .snowball.command import SnowballError, run_doi, run_search
+    from .snowball.command import (
+        SnowballError,
+        run_collection,
+        run_doi,
+        run_orcid,
+        run_search,
+    )
     from .snowball.profile import load_profile, request_from_profile
 
     try:
@@ -3422,8 +3536,22 @@ def snowball_run(
         elif mode == "doi":
             dois = [str(item) for item in (raw.get("dois") or [])]
             action = lambda c: run_doi(c, dois, request, console=console)
+        elif mode == "orcid":
+            orcid = str(raw.get("orcid") or "").strip()
+            if not orcid:
+                raise SnowballError(f"Profile {profile!r} needs orcid.")
+            action = lambda c: run_orcid(c, orcid, request, console=console)
+        elif mode == "collection":
+            seed = str(raw.get("seed_collection") or raw.get("collection") or "").strip()
+            if not seed:
+                raise SnowballError(f"Profile {profile!r} needs seed_collection.")
+            if not request.collection.strip():
+                request.collection = seed
+            action = lambda c: run_collection(c, seed, request, console=console)
         else:
-            raise SnowballError(f"Profile {profile!r} mode must be search or doi.")
+            raise SnowballError(
+                f"Profile {profile!r} mode must be search, doi, orcid, or collection."
+            )
     except SnowballError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc

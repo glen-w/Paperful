@@ -28,6 +28,7 @@ def write_queue(
     by_status = Counter(row.status for row in rows)
     by_hop = Counter(str(row.hop) for row in rows)
     by_backend = Counter(row.provenance.get("backend") or "" for row in rows)
+    by_direction = Counter(row.direction for row in rows)
     summary: dict[str, Any] = {
         "run_id": run_id,
         "requests": client.requests,
@@ -36,6 +37,7 @@ def write_queue(
         "by_status": dict(by_status),
         "by_hop": dict(by_hop),
         "by_backend": dict(by_backend),
+        "by_direction": dict(by_direction),
         "library_unread": library_unread,
     }
     (dest / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
@@ -46,3 +48,18 @@ def write_report(dest: Path, report: dict[str, Any]) -> None:
     (dest / "write_report.json").write_text(
         json.dumps(report, indent=2) + "\n", encoding="utf-8"
     )
+
+
+def load_queue(state_dir: Path, run_id: str) -> tuple[Path, list[Candidate]]:
+    dest = state_dir / "snowball" / run_id
+    path = dest / "candidates.jsonl"
+    if not path.is_file():
+        raise FileNotFoundError(str(path))
+    rows: list[Candidate] = []
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            rows.append(Candidate.from_dict(json.loads(line)))
+    return dest, rows
