@@ -95,7 +95,6 @@ Reference (same corpus as the hosted guide):
 
 - [Commands and output](docs/commands.md)
 - [Duplicate packs](docs/dedupe.md)
-- [Snowball](docs/snowball.md) — seed DOI → neighbour items, then `run` for PDFs
 - [Configuration](docs/config.md)
 - [Source routing](docs/sources.md)
 - [Architecture](docs/architecture.md)

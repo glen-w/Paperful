@@ -1,400 +1,351 @@
-"""Offline snowball: fake OpenAlex responses, no Zotero, no network."""
+"""Snowball dry-run, creates, and PDF handoff. No live network."""
 
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
-import httpx
+import pytest
+from rich.console import Console
 from typer.testing import CliRunner
 
 from paperful import cli
-from paperful.config import load_config
-from paperful.snowball import (
-    SNOWBALL_TAG,
-    SnowballError,
-    abstract_from_inverted,
-    apply_snowball,
-    expand,
-    node_from_work,
-    openalex_fetch,
-    parent_payload,
-    proposals,
-    short_openalex_id,
-)
+from paperful.config import Config, load_config
+from paperful.run_config import RunConfigError, resolve_run_config
+from paperful.snowball.command import SnowballError, SnowballRequest, run_doi, run_orcid, run_search
+from paperful.snowball.expand import cap_ids, clamp_depth, keyword_depth, truncate
+from paperful.snowball.candidate import Candidate
+from paperful.snowball.openalex import OpenAlexClient
+from paperful.zot import Item
 
 runner = CliRunner()
 
 
-def _work(
-    wid: str,
-    doi: str | None,
-    title: str,
-    *,
-    refs: list[str] | None = None,
-    year: int = 2020,
-    cited: int = 1,
-    kind: str = "article",
-) -> dict:
+def _work(oa: str, doi: str, title: str, year: int, cites: int, refs: list[str] | None = None) -> dict:
     return {
-        "id": f"https://openalex.org/{wid}",
-        "doi": f"https://doi.org/{doi}" if doi else None,
+        "id": f"https://openalex.org/{oa}",
+        "doi": f"https://doi.org/{doi}",
         "display_name": title,
         "publication_year": year,
-        "type": kind,
-        "cited_by_count": cited,
+        "type": "article",
+        "cited_by_count": cites,
+        "referenced_works": [f"https://openalex.org/{ref}" for ref in (refs or [])],
         "authorships": [{"author": {"display_name": "Ada Lovelace"}}],
-        "primary_location": {
-            "landing_page_url": f"https://example.org/{wid}",
-            "source": {"display_name": "Nature"},
-        },
-        "abstract_inverted_index": {"Hello": [0], "world": [1]},
-        "referenced_works": [f"https://openalex.org/{r}" for r in (refs or [])],
+        "primary_location": {"source": {"display_name": "Marine Policy"}, "landing_page_url": "https://example.test/a"},
     }
 
 
-class FakeOpenAlex:
-    def __init__(self, works: dict[str, dict], citing: dict[str, list[dict]]):
-        self.works = works
-        self.citing = citing
-        self.calls: list[tuple[str, dict]] = []
-
-    def __call__(self, url: str, params: dict):
-        self.calls.append((url, dict(params)))
-        if "/works/https://doi.org/" in url:
-            doi = url.rsplit("/doi.org/", 1)[-1]
-            for work in self.works.values():
-                if work.get("doi") and doi in str(work["doi"]):
+def _client(works: dict[str, dict]) -> OpenAlexClient:
+    def getter(path: str, params: dict) -> dict:
+        if path.startswith("/works/https://doi.org/"):
+            doi = path.split("/works/https://doi.org/", 1)[1]
+            for work in works.values():
+                if work["doi"].endswith(doi):
                     return work
-            return None
+            return {}
         filt = str(params.get("filter") or "")
         if filt.startswith("openalex:"):
             ids = filt.split(":", 1)[1].split("|")
-            return {"results": [self.works[i] for i in ids if i in self.works]}
-        if filt.startswith("cites:"):
-            wid = filt.split(":", 1)[1]
-            rows = self.citing.get(wid, [])
-            return {"meta": {"count": len(rows)}, "results": rows}
-        return None
+            return {"results": [works[i] for i in ids if i in works]}
+        if "search" in params:
+            return {"results": list(works.values())}
+        return {"results": []}
+
+    return OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
 
 
-def _graph():
-    works = {
-        "W0": _work("W0", "10.1000/seed", "Seed paper", refs=["W1", "W2", "W3"], cited=9),
-        "W1": _work("W1", "10.1000/ref-a", "Ref A", refs=["W4"], year=2018),
-        "W2": _work("W2", "10.1000/ref-b", "Ref B", refs=[]),
-        "W3": _work("W3", None, "No DOI ref", refs=["W4"]),
-        "W4": _work("W4", "10.1000/deep", "Depth 2", refs=[]),
-        "WC": _work("WC", "10.1000/cite", "Citer", refs=[], cited=4),
-    }
-    citing = {"W0": [works["WC"], works["W3"]]}
-    return FakeOpenAlex(works, citing)
-
-
-def test_depth_one_keeps_hop_cap_and_skips_doi_less():
-    api = _graph()
-    plan = expand("https://doi.org/10.1000/seed", api, depth=1, max_per_hop=2, max_nodes=80)
-    dois = [n.doi for n in plan.nodes]
-    assert plan.seed_doi == "10.1000/seed"
-    assert "10.1000/ref-a" in dois
-    assert "10.1000/ref-b" in dois
-    assert "10.1000/cite" in dois
-    assert "10.1000/deep" not in dois
-    assert plan.skipped_no_doi == 1
-    assert plan.truncated  # three refs, cap 2; citer list is within cap
-    ref_calls = [c for c in api.calls if str(c[1].get("filter", "")).startswith("openalex:")]
-    assert ref_calls
-    assert "W3" not in ref_calls[0][1]["filter"]
-
-
-def test_direction_references_does_not_ask_for_citations():
-    api = _graph()
-    plan = expand("10.1000/seed", api, depth=1, direction="references", max_per_hop=25)
-    assert all(not str(c[1].get("filter", "")).startswith("cites:") for c in api.calls)
-    assert "10.1000/cite" not in plan.by_doi()
-    assert "10.1000/ref-a" in plan.by_doi()
-
-
-def test_hop_cap_still_expands_kept_neighbours():
-    api = _graph()
-    plan = expand("10.1000/seed", api, depth=2, max_per_hop=1, max_nodes=80, direction="references")
-    assert plan.truncated
-    assert "10.1000/ref-a" in plan.by_doi()
-    assert "10.1000/deep" in plan.by_doi()
-    assert "10.1000/ref-b" not in plan.by_doi()
-
-
-def test_depth_two_stops_at_max_nodes():
-    api = _graph()
-    plan = expand("10.1000/SEED", api, depth=2, max_nodes=2, max_per_hop=25)
-    assert len(plan.nodes) == 2
-    assert plan.truncated
-    assert plan.nodes[0].depth == 0
-
-
-def test_missing_seed_and_bad_limits():
-    api = _graph()
-    try:
-        expand("10.1000/missing", api)
-        raise AssertionError("expected missing seed")
-    except SnowballError as exc:
-        assert "no work" in str(exc)
-    try:
-        expand("10.1000/seed", api, depth=4)
-        raise AssertionError("expected depth error")
-    except SnowballError:
-        pass
-
-
-def test_payload_and_apply_skip_known_dois():
-    api = _graph()
-    plan = expand("10.1000/seed", api, depth=1, max_per_hop=25)
-    seed = plan.nodes[0]
-    payload = parent_payload(seed, ["COL"], seed_doi=plan.seed_doi)
-    assert payload["DOI"] == "10.1000/seed"
-    assert payload["tags"] == [{"tag": SNOWBALL_TAG}]
-    assert payload["abstractNote"] == "Hello world"
-    assert payload["creators"][0]["lastName"] == "Lovelace"
-    assert "snowball seed=10.1000/seed" in payload["extra"]
-
-    class Backend:
-        def __init__(self):
-            self.created = []
-
-        def ensure_collection_path(self, path):
-            assert path == "snowball/nature"
-            return "COL"
-
-        def create_parent(self, data):
-            self.created.append(data["DOI"])
-            return "NEW"
-
-    known = {"10.1000/ref-a": "HAVE"}
-    rows = proposals(plan, known, include_seed=True)
-    assert any(r["doi"] == "10.1000/ref-a" and r["status"] == "in_library" for r in rows)
-    backend = Backend()
-    done = apply_snowball(plan, backend, "snowball/nature", known, include_seed=False)
-    assert "10.1000/seed" not in backend.created
-    assert "10.1000/ref-a" not in backend.created
-    assert "10.1000/cite" in backend.created
-    assert done["skipped_in_library"] >= 1
-    assert done["created"] == len(backend.created)
-
-
-def test_config_snowball_table(tmp_path):
+def _cfg(tmp_path: Path, **extra: str) -> Config:
+    body = f'email = "t@example.org"\nout_dir = "{tmp_path / "out"}"\nstate_dir = "{tmp_path / "state"}"\n'
+    body += "[snowball]\nenabled = true\n"
+    body += extra.get("more", "")
     path = tmp_path / "config.toml"
-    path.write_text(
-        '[snowball]\ndepth = 2\nmax_nodes = 10\nmax_per_hop = 3\ndirection = "citations"\n'
+    path.write_text(body)
+    return load_config(path)
+
+
+def test_stop_rules_clamp_and_cap():
+    assert clamp_depth(2) == (1, "depth clamped to 1")
+    assert keyword_depth(None) == 0
+    assert keyword_depth(2) == 1
+    assert cap_ids(["b", "a", "b", "c"], 2) == ["b", "a"]
+    rows = [
+        Candidate("r", {"type": "doi", "value": "x"}, 1, "refs", {"doi": "10.1/b"}, {}, "w", "new", {}, "dry-run", score=1),
+        Candidate("r", {"type": "doi", "value": "x"}, 1, "refs", {"doi": "10.1/a"}, {}, "w", "new", {}, "dry-run", score=5),
+        Candidate("r", {"type": "doi", "value": "x"}, 1, "refs", {"doi": "10.1/c"}, {}, "w", "exists", {}, "dry-run", score=5),
+    ]
+    kept = truncate(rows, 2)
+    assert [row.ids["doi"] for row in kept] == ["10.1/a", "10.1/c"]
+
+
+def test_doi_refs_and_keyword_hits(tmp_path: Path):
+    works = {
+        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 3, ["W2", "W3"]),
+        "W2": _work("W2", "10.1000/b", "Bee", 2019, 1),
+        "W3": _work("W3", "10.1000/a", "Aye", 2018, 9),
+    }
+    cfg = _cfg(tmp_path)
+    console = Console(highlight=False, width=200)
+    client = _client(works)
+    result = run_doi(
+        cfg,
+        ["10.1000/seed"],
+        SnowballRequest(depth=2),
+        console=console,
+        client=client,
+        lookup=lambda doi, title: "EXIST" if doi == "10.1000/a" else None,
     )
-    cfg = load_config(path)
-    assert cfg.snowball_depth == 2
-    assert cfg.snowball_max_nodes == 10
-    assert cfg.snowball_max_per_hop == 3
-    assert cfg.snowball_direction == "citations"
+    assert result.exit_code == 0
+    lines = (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    rows = [json.loads(line) for line in lines]
+    assert {row["ids"]["doi"] for row in rows} == {"10.1000/a", "10.1000/b"}
+    by_doi = {row["ids"]["doi"]: row for row in rows}
+    assert by_doi["10.1000/a"]["hop"] == 1
+    assert by_doi["10.1000/a"]["direction"] == "refs"
+    assert by_doi["10.1000/a"]["provenance"]["backend"] == "openalex"
+    assert by_doi["10.1000/a"]["status"] == "exists"
+    assert by_doi["10.1000/b"]["status"] == "new"
+    again = run_doi(
+        cfg,
+        ["10.1000/seed"],
+        SnowballRequest(),
+        console=console,
+        client=_client(works),
+        lookup=lambda doi, title: None,
+    )
+    again_rows = [json.loads(line) for line in (again.run_dir / "candidates.jsonl").read_text().splitlines()]
+    assert [row["ids"]["doi"] for row in again_rows] == [row["ids"]["doi"] for row in rows]
+
+    search = run_search(
+        cfg,
+        "bbnj",
+        SnowballRequest(),
+        console=console,
+        client=_client({"W9": _work("W9", "10.1000/hit", "Hit", 2021, 2)}),
+        lookup=lambda doi, title: None,
+    )
+    hit = json.loads((search.run_dir / "candidates.jsonl").read_text().splitlines()[0])
+    assert hit["hop"] == 0
+    assert hit["direction"] == "search"
 
 
-def test_cli_dry_run_json(tmp_path, monkeypatch):
+class _Lib:
+    def __init__(self):
+        self.created: list[dict] = []
+        self.notes: list[tuple[str, str]] = []
+
+    def ensure_collection_path(self, path: str) -> str:
+        assert path == "Inbox/Snowball"
+        return "COL1"
+
+    def create_parent(self, data: dict) -> str:
+        self.created.append(data)
+        return f"ITEM{len(self.created)}"
+
+    def create_or_update_note(self, item_key: str, html: str, tag: str) -> str:
+        self.notes.append((item_key, html, tag))
+        return "NOTE"
+
+
+def test_auto_creates_only_new_and_fetch_pdfs_uses_those_keys(tmp_path: Path, monkeypatch):
+    works = {
+        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 1, ["W2"]),
+        "W2": _work("W2", "10.1000/new", "New paper", 2019, 4),
+    }
+    cfg = _cfg(tmp_path)
+    lib = _Lib()
+    seen: list[Item] = []
+
+    def fake_fill(cfg, backend, items, console):
+        seen.extend(items)
+
+        class Stats:
+            attached = 1
+            attach_failed = 0
+            not_found = 0
+
+        return Stats()
+
+    monkeypatch.setattr("paperful.snowball.command.fill_pdfs", fake_fill)
+    result = run_doi(
+        cfg,
+        ["10.1000/seed"],
+        SnowballRequest(gate="auto", collection="Inbox/Snowball", fetch_pdfs=True),
+        console=Console(highlight=False, width=200),
+        client=_client(works),
+        lookup=lambda doi, title: None,
+        backend=lib,
+    )
+    assert result.exit_code == 0
+    assert len(lib.created) == 1
+    assert lib.created[0]["DOI"] == "10.1000/new"
+    assert lib.created[0]["collections"] == ["COL1"]
+    assert {tag["tag"] for tag in lib.created[0]["tags"]} >= {"paperful-snowball", "paperful-snowball:openalex"}
+    assert lib.notes[0][0] == "ITEM1"
+    assert "mailto" not in lib.notes[0][1]
+    assert "OPENALEX" not in lib.notes[0][1]
+    assert "10.1000/seed" in lib.notes[0][1]
+    assert [item.key for item in seen] == ["ITEM1"]
+    report = json.loads((result.run_dir / "write_report.json").read_text())
+    assert report["created"] == 1
+    assert report["attach_ok"] == 1
+
+    lib2 = _Lib()
+    monkeypatch.setattr("paperful.snowball.command.fill_pdfs", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no pdf")))
+    run_doi(
+        cfg,
+        ["10.1000/seed"],
+        SnowballRequest(gate="auto", collection="Inbox/Snowball", fetch_pdfs=False),
+        console=Console(highlight=False, width=200),
+        client=_client(works),
+        lookup=lambda doi, title: "HAVE" if doi == "10.1000/new" else None,
+        backend=lib2,
+    )
+    assert lib2.created == []
+
+
+def test_dry_run_does_not_create(tmp_path: Path):
+    works = {
+        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 1, ["W2"]),
+        "W2": _work("W2", "10.1000/new", "New paper", 2019, 1),
+    }
+    lib = _Lib()
+    run_doi(
+        _cfg(tmp_path),
+        ["10.1000/seed"],
+        SnowballRequest(fetch_pdfs=False),
+        console=Console(highlight=False, width=120),
+        client=_client(works),
+        lookup=lambda doi, title: None,
+        backend=lib,
+    )
+    assert lib.created == []
+
+
+def test_cli_refusals(tmp_path: Path):
+    off = tmp_path / "off.toml"
+    off.write_text(f'email = "t@example.org"\nstate_dir = "{tmp_path / "state"}"\n')
+    assert runner.invoke(cli.app, ["snowball", "search", "bbnj", "-c", str(off)]).exit_code == 2
+    assert runner.invoke(cli.app, ["snowball", "orcid", "0000-0002-9162-9618", "-c", str(off)]).exit_code == 2
+    on = tmp_path / "on.toml"
+    on.write_text(off.read_text() + "\n[snowball]\nenabled = true\n")
+    refused = runner.invoke(
+        cli.app, ["snowball", "doi", "10.1/x", "--gate", "approve-batch", "-c", str(on)]
+    )
+    assert refused.exit_code == 2
+    with pytest.raises(SnowballError):
+        run_orcid()
+
+
+def test_run_refuses_snowball_profile(tmp_path: Path):
     cfg_path = tmp_path / "config.toml"
-    cfg_path.write_text(
-        f'email = "t@example.org"\nout_dir = "{tmp_path / "out"}"\nstate_dir = "{tmp_path / "state"}"\n'
+    cfg_path.write_text('email = "t@example.org"\n')
+    profiles = tmp_path / "profiles"
+    profiles.mkdir()
+    (profiles / "doi-refs.toml").write_text('kind = "snowball"\ngate = "dry-run"\n')
+    cfg = load_config(cfg_path)
+    with pytest.raises(RunConfigError, match="paperful snowball"):
+        resolve_run_config(cfg, profile="doi-refs", use_run_policy=True)
+
+
+def test_snowball_profile_loads_gate(tmp_path: Path):
+    from paperful.snowball.profile import load_profile, request_from_profile
+
+    cfg = _cfg(tmp_path)
+    profiles = tmp_path / "profiles"
+    profiles.mkdir()
+    (profiles / "scout.toml").write_text(
+        'kind = "snowball"\nmode = "search"\nquery = "bbnj"\ngate = "auto"\n'
+        'target_collection = "Inbox/Snowball"\n'
     )
-    api = _graph()
-
-    def _expand(seed, fetch, **kwargs):
-        return expand(seed, api, **kwargs)
-
-    monkeypatch.setattr("paperful.snowball.expand", _expand)
-    monkeypatch.setattr(cli, "_snowball_library", lambda cfg: (None, {"10.1000/cite": "C1"}, ""))
-    result = runner.invoke(
-        cli.app,
-        ["snowball", "10.1000/seed", "--json", "--config", str(cfg_path), "--no-include-seed"],
-    )
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.stdout)
-    assert payload["summary"]["proposed"] >= 1
-    assert payload["summary"]["created"] == 0
-    assert all(row["doi"] != "10.1000/seed" for row in payload["items"])
-    cite = next(row for row in payload["items"] if row["doi"] == "10.1000/cite")
-    assert cite["status"] == "in_library"
-    reports = list((tmp_path / "state" / "runs").glob("*-snowball.json"))
-    assert len(reports) == 1
+    raw = load_profile(cfg, "scout")
+    request = request_from_profile(raw, cfg)
+    assert request.gate == "auto"
+    assert request.collection == "Inbox/Snowball"
+    assert raw["query"] == "bbnj"
 
 
-def test_cli_apply_needs_collection(tmp_path):
-    cfg_path = tmp_path / "config.toml"
-    cfg_path.write_text(
-        f'email = "t@example.org"\nout_dir = "{tmp_path / "out"}"\nstate_dir = "{tmp_path / "state"}"\n'
-    )
-    result = runner.invoke(
-        cli.app, ["snowball", "10.1000/seed", "--apply", "--config", str(cfg_path)]
+def test_failed_seed_exits_nonzero_and_summary(tmp_path: Path):
+    cfg = _cfg(tmp_path)
+    console = Console(highlight=False, width=160)
+    result = run_doi(
+        cfg,
+        ["10.1000/missing"],
+        SnowballRequest(),
+        console=console,
+        client=_client({}),
+        lookup=lambda doi, title: None,
     )
     assert result.exit_code == 1
-    assert "--collection" in result.output
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    assert rows[0]["status"] == "error"
+    summary = json.loads((result.run_dir / "summary.json").read_text())
+    assert summary["by_status"]["error"] == 1
+    assert summary["requests"] >= 1
+    assert "library_unread" in summary
 
 
-def test_helpers_and_node_edges():
-    assert short_openalex_id(None) == ""
-    assert short_openalex_id("https://openalex.org/W1/") == "W1"
-    assert abstract_from_inverted(None) == ""
-    assert abstract_from_inverted({"a": "bad"}) == ""
-    assert abstract_from_inverted({"Hi": [1], "there": "x", "yo": [0]}) == "yo Hi"
-    assert node_from_work({"id": ""}, depth=0, via="seed", from_doi=None) is None
-    node = node_from_work(
-        {
-            "id": "https://openalex.org/W9",
-            "doi": "https://doi.org/10.1/x",
-            "display_name": "Solo",
-            "publication_year": "2017",
-            "type": "book",
-            "authorships": [
-                "skip",
-                {"author": {"display_name": ""}},
-                {"author": {"display_name": "Cher"}},
-                {"author": {"display_name": "Ada Lovelace"}},
-            ],
-            "primary_location": {},
-            "referenced_works": [],
-        },
-        depth=0,
-        via="seed",
-        from_doi=None,
-    )
-    assert node is not None
-    assert node.year == 2017
-    assert node.item_type == "book"
-    assert node.creators[0] == {"creatorType": "author", "name": "Cher"}
-    assert node.creators[1]["lastName"] == "Lovelace"
+def test_cites_and_auto_without_collection_exit(tmp_path: Path):
+    cfg = _cfg(tmp_path)
+    console = Console(highlight=False, width=120)
+    with pytest.raises(SnowballError, match="Cited-by"):
+        run_doi(cfg, ["10.1000/seed"], SnowballRequest(direction="cites"), console=console, client=_client({}))
+    with pytest.raises(SnowballError, match="target collection"):
+        run_doi(cfg, ["10.1000/seed"], SnowballRequest(gate="auto"), console=console, client=_client({}))
 
 
-def test_limit_errors_and_fetch_failures():
-    api = _graph()
-    for kwargs in (
-        {"depth": 0},
-        {"max_nodes": 0},
-        {"max_per_hop": 0},
-        {"direction": "sideways"},
-        {"seed": "not-doi"},
-    ):
-        seed = kwargs.pop("seed", "10.1000/seed")
-        try:
-            expand(seed, api, **kwargs)
-            raise AssertionError(kwargs)
-        except SnowballError:
-            pass
-
-    def flaky(url, params):
-        filt = str(params.get("filter") or "")
-        if filt.startswith("openalex:") or filt.startswith("cites:"):
-            return None
-        return api(url, params)
-
-    plan = expand("10.1000/seed", flaky, depth=1, max_per_hop=2)
-    assert plan.errors
-    assert len(plan.nodes) == 1  # seed only
-
-
-def test_seed_without_id_and_max_nodes_before_expand():
-    def seed_no_id(url, params):
-        if "/works/https://doi.org/" in url:
-            return {"id": "", "doi": "https://doi.org/10.1000/seed", "display_name": "x"}
-        return None
-
-    try:
-        expand("10.1000/seed", seed_no_id)
-        raise AssertionError("expected no id")
-    except SnowballError as exc:
-        assert "no id" in str(exc)
-
-    api = _graph()
-    plan = expand("10.1000/seed", api, depth=2, max_nodes=1)
-    assert len(plan.nodes) == 1
-    assert plan.truncated
-
-
-def test_openalex_fetch_with_mock(monkeypatch, cfg):
-    state = {"n": 0}
-    real_client = httpx.Client
-
-    def fake_client(*_a, **_k):
-        def handler(request: httpx.Request) -> httpx.Response:
-            state["n"] += 1
-            if state["n"] == 1:
-                return httpx.Response(
-                    429, headers={"Retry-After": "not-a-number"}, request=request
-                )
-            if "missing" in str(request.url):
-                return httpx.Response(404, request=request)
-            if "badjson" in str(request.url):
-                return httpx.Response(200, content=b"[]", request=request)
-            return httpx.Response(200, json={"ok": True}, request=request)
-
-        return real_client(transport=httpx.MockTransport(handler))
-
-    monkeypatch.setattr("paperful.snowball.httpx.Client", fake_client)
-    monkeypatch.setattr("paperful.snowball.time.sleep", lambda _s: None)
-    fetch = openalex_fetch(cfg)
-    assert fetch("https://api.openalex.org/works/ok", {}) == {"ok": True}
-    assert fetch("https://api.openalex.org/works/missing", {}) is None
-    assert fetch("https://api.openalex.org/works/badjson", {}) is None
-
-
-def test_cli_apply_creates_with_stub(tmp_path, monkeypatch):
-    cfg_path = tmp_path / "config.toml"
-    cfg_path.write_text(
-        f'email = "t@example.org"\nout_dir = "{tmp_path / "out"}"\nstate_dir = "{tmp_path / "state"}"\n'
-    )
-    api = _graph()
+def test_dry_run_ignores_fetch_pdfs(tmp_path: Path, monkeypatch):
+    works = {
+        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 1, ["W2"]),
+        "W2": _work("W2", "10.1000/new", "New paper", 2019, 1),
+    }
     monkeypatch.setattr(
-        "paperful.snowball.expand",
-        lambda seed, fetch, **kwargs: expand(seed, api, **kwargs),
+        "paperful.snowball.command.fill_pdfs",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("downloaded")),
     )
-
-    class Backend:
-        def __init__(self):
-            self.created = []
-
-        def supports_write(self):
-            return True
-
-        def items_in_scope(self, _keys):
-            from tests.conftest import make_item
-
-            return [make_item(key="HAVE", doi="10.1000/ref-a")]
-
-        def ensure_collection_path(self, path):
-            assert path == "snowball/nature"
-            return "COL"
-
-        def create_parent(self, data):
-            self.created.append(data["DOI"])
-            return "NEW"
-
-        def flush_writes(self):
-            return None
-
-        def ping(self):
-            return {"supports_write": True}
-
-    backend = Backend()
-    monkeypatch.setattr(cli, "_require_manager", lambda cfg: None)
-    monkeypatch.setattr(cli, "_connect", lambda cfg, quiet=False: backend)
-    monkeypatch.setattr(cli, "_flush", lambda b: None)
-    result = runner.invoke(
-        cli.app,
-        [
-            "snowball",
-            "10.1000/seed",
-            "--apply",
-            "-C",
-            "snowball/nature",
-            "--no-include-seed",
-            "--json",
-            "--config",
-            str(cfg_path),
-        ],
+    result = run_doi(
+        _cfg(tmp_path),
+        ["10.1000/seed"],
+        SnowballRequest(fetch_pdfs=True),
+        console=Console(highlight=False, width=120),
+        client=_client(works),
+        lookup=lambda doi, title: None,
     )
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.stdout)
-    assert payload["summary"]["created"] >= 1
-    assert "10.1000/ref-a" not in backend.created
-    assert any(row["status"] == "created" for row in payload["items"])
-    assert any(row["status"] == "in_library" for row in payload["items"])
+    assert result.exit_code == 0
+    assert "write_report.json" not in [p.name for p in result.run_dir.iterdir()]
+
+
+def test_auto_refuses_when_library_unread(tmp_path: Path, monkeypatch):
+    works = {
+        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 1, ["W2"]),
+        "W2": _work("W2", "10.1000/new", "New paper", 2019, 1),
+    }
+
+    def boom(cfg):
+        raise RuntimeError("zotero down")
+
+    monkeypatch.setattr("paperful.snowball.command.get_backend", boom)
+    with pytest.raises(SnowballError, match="Refusing to create"):
+        run_doi(
+            _cfg(tmp_path),
+            ["10.1000/seed"],
+            SnowballRequest(gate="auto", collection="Inbox/Snowball"),
+            console=Console(highlight=False, width=120),
+            client=_client(works),
+        )
+
+
+def test_doctor_snowball_row(monkeypatch):
+    from paperful.doctor import _snowball_check
+
+    off = _snowball_check(Config())
+    assert off.name == "snowball" and off.detail == "off"
+    enabled = Config(snowball_enabled=True, email="")
+    assert _snowball_check(enabled).status == "amber"
+    monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
+    ready = _snowball_check(Config(snowball_enabled=True, email="a@b.c"))
+    assert "no OpenAlex key" in ready.detail
+    monkeypatch.setenv("OPENALEX_API_KEY", "secret-key")
+    keyed = _snowball_check(Config(snowball_enabled=True, email="a@b.c"))
+    assert keyed.detail == "enabled (key set)"
+    assert "secret-key" not in keyed.detail
+

@@ -144,10 +144,14 @@ class Config:
     synthesize_tag: str = "paperful-report"
     synthesize_dest: str = "both"  # disk | zotero | both
     synthesize_timeout_s: float = 0.0  # 0 → max(llm.timeout_s, 300)
+    snowball_enabled: bool = False
+    snowball_max_candidates: int = 200
+    snowball_per_hop_limit: int = 50
     snowball_depth: int = 1
-    snowball_max_nodes: int = 80
-    snowball_max_per_hop: int = 25
-    snowball_direction: str = "both"  # both | references | citations
+    snowball_direction: str = "refs"
+    snowball_gate: str = "dry-run"
+    snowball_target_collection: str = ""
+    snowball_fetch_pdfs: bool = False
 
     def __post_init__(self) -> None:
         # Resolve pack+user once so Config() in tests gets the builtin examples.
@@ -317,8 +321,30 @@ def _from_dict(raw: dict[str, Any], source: Path) -> Config:
         cfg.grey_playbooks_builtin, user_playbooks, extra=extra
     )
     cfg.run_profiles = _parse_run_profiles(raw)
+    _apply_snowball(raw.get("snowball"), cfg)
     _apply_nested_tables(raw, cfg, source)
     return cfg
+
+
+def _apply_snowball(raw: Any, cfg: Config) -> None:
+    if not isinstance(raw, dict):
+        return
+    if "enabled" in raw:
+        cfg.snowball_enabled = bool(raw["enabled"])
+    if "max_candidates" in raw:
+        cfg.snowball_max_candidates = int(raw["max_candidates"])
+    if "per_hop_limit" in raw:
+        cfg.snowball_per_hop_limit = int(raw["per_hop_limit"])
+    if "depth" in raw:
+        cfg.snowball_depth = int(raw["depth"])
+    if "direction" in raw and raw["direction"]:
+        cfg.snowball_direction = str(raw["direction"]).strip()
+    if "gate" in raw and raw["gate"]:
+        cfg.snowball_gate = str(raw["gate"]).strip()
+    if "target_collection" in raw and raw["target_collection"]:
+        cfg.snowball_target_collection = str(raw["target_collection"]).strip()
+    if "fetch_pdfs" in raw:
+        cfg.snowball_fetch_pdfs = bool(raw["fetch_pdfs"])
 
 
 def _parse_run_profiles(raw: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -454,16 +480,6 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
     mirror = raw.get("mirror")
     if isinstance(mirror, dict) and "pdfs" in mirror:
         cfg.mirror_pdfs = parse_pdfs(str(mirror["pdfs"]))
-    snow = raw.get("snowball")
-    if isinstance(snow, dict):
-        if "depth" in snow:
-            cfg.snowball_depth = int(snow["depth"])
-        if "max_nodes" in snow:
-            cfg.snowball_max_nodes = int(snow["max_nodes"])
-        if "max_per_hop" in snow:
-            cfg.snowball_max_per_hop = int(snow["max_per_hop"])
-        if "direction" in snow and snow["direction"]:
-            cfg.snowball_direction = str(snow["direction"]).strip().lower()
     men = raw.get("mendeley")
     if isinstance(men, dict):
         if "client_id" in men:

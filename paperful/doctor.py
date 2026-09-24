@@ -352,8 +352,18 @@ def run_checks(
 
     checks.append(_grey_playbooks_check(cfg))
     checks.extend(_llm_checks(cfg))
+    checks.append(_snowball_check(cfg))
 
     return checks
+
+
+def _snowball_check(cfg: Config) -> Check:
+    if not cfg.snowball_enabled:
+        return Check("snowball", "green", "off")
+    if not cfg.email.strip():
+        return Check("snowball", "amber", "enabled — set email for the OpenAlex polite pool")
+    key = "key set" if os.environ.get("OPENALEX_API_KEY") else "no OpenAlex key"
+    return Check("snowball", "green", f"enabled ({key})")
 
 
 _PARAM_SIZE = re.compile(r"(?<![0-9.])(\d+(?:\.\d+)?)b\b", re.I)

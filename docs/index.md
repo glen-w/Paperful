@@ -39,7 +39,6 @@ zotero
 commands
 workflows
 dedupe
-snowball
 config
 architecture
 quiet-mirror
@@ -66,5 +65,6 @@ llm
 
 comparison
 comparison-reference
+snowball
 ROADMAP
 ```

@@ -107,10 +107,6 @@ uv run paperful dedupe -C BBNJ --dry-run
 uv run paperful dedupe -C BBNJ --apply          # high_doi only; add --apply-medium for title+year
 uv run paperful gaps -C BBNJ
 
-# neighbours of one DOI (OpenAlex). Dry-run lists DOIs; --apply creates items only
-uv run paperful snowball 10.1038/nature12373 --depth 1
-uv run paperful snowball 10.1038/nature12373 -C snowball/nature --apply
-
 # one witness for a sequence (child reports still land in state/runs/)
 uv run paperful pack open --label bbnj-journal-2021-2026
 uv run paperful gaps -C BBNJ
@@ -128,7 +124,6 @@ uv run paperful pack show
 | `summarize` | Grounded LLM summary from the PDF already on disk (`--item` / `-C` / `--library`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`, `--prompt FILE`, `--force`, `--to disk, zotero, or both`). Default writes `state/summaries/<key>.html` and one child note tagged `[summarize].tag`. `--to disk` skips Zotero. `--apply` requires the note and conflicts with `--to disk`. Writes `state/runs/<stamp>-summarize.json`. See [LLM](llm.md#d-summarize-grounded-summary-note). |
 | `synthesize` | Literature review from existing summary notes (`--item` / `-C` / `--library`, same year/type/`--limit` flags, `--prompt`, `--to`, `--dry-run`, `--force`, `--report-collection`). Writes `state/reports/<slug>.html` and, unless `--to disk`, a standalone note in each `-C` collection. See [LLM](llm.md#e-synthesize-summary-of-summaries). |
 | `dedupe` | Duplicate pack on disk (`high_doi`, then `title+year`). `--apply` trashes DOI extras only; title+year needs `--apply-medium`. Held when same-DOI titles diverge. Same year/type scope flags as `run`. See [dedupe](dedupe.md). |
-| `snowball` | Neighbours of one seed DOI via OpenAlex (papers it cites and papers that cite it). `--depth` 1–3, `--max-nodes`, `--max-per-hop`, `--direction both\|references\|citations`. Dry-run unless `--apply -C PATH`, which creates missing items tagged `openalex-snowball` and does not download PDFs. See [snowball](snowball.md). |
 | `gaps` | Counts: no stored PDF, linked PDF URL only, missing DOI. Read-only. Year/type scope flags apply. Next steps are `run` and `lint`. Writes `state/runs/<stamp>-gaps.json`. |
 | `all` | `gaps` → `run --try-all --retry-failed --upgrade-linked` → `lint` → `fix-metadata --apply` → `summarize --apply`. Stops on the first failure. `--dry-run` skips `summarize` and does not apply metadata. `--profile` / `-f` load a saved run config. Opens a pack when none is open. See [Workflows](workflows.md). |
 | `profile` | `list` / `show` / `save` — named run configs beside `config.toml` (`profiles/<name>.toml` or `[profiles.*]`). `show` prints the merge `all` would use. `save` does not edit `config.toml`. |
