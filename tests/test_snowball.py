@@ -538,3 +538,271 @@ def test_doctor_snowball_row(monkeypatch):
     keyed = _snowball_check(Config(snowball_enabled=True, email="a@b.c"))
     assert keyed.detail == "enabled (key set)"
     assert "secret-key" not in keyed.detail
+
+
+def test_year_window_and_direction_both(tmp_path: Path):
+    works = {
+        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 3, ["W2", "W3"]),
+        "W2": _work("W2", "10.1000/old", "Old", 2010, 1),
+        "W3": _work("W3", "10.1000/new", "New", 2019, 1),
+        "W4": _work("W4", "10.1000/cite", "Citer", 2021, 2),
+    }
+    cfg = _cfg(tmp_path)
+    console = Console(highlight=False, width=160)
+    filtered = run_doi(
+        cfg,
+        ["10.1000/seed"],
+        SnowballRequest(year_from=2018, year_to=2020),
+        console=console,
+        client=_client(works),
+        lookup=lambda doi, title: None,
+    )
+    dois = {json.loads(line)["ids"]["doi"] for line in (filtered.run_dir / "candidates.jsonl").read_text().splitlines()}
+    assert dois == {"10.1000/new"}
+
+    both = run_doi(
+        cfg,
+        ["10.1000/seed"],
+        SnowballRequest(direction="both", depth=1, per_hop_limit=5),
+        console=console,
+        client=_client(works, citing={"W1": ["W4"]}),
+        lookup=lambda doi, title: None,
+    )
+    rows = [json.loads(line) for line in (both.run_dir / "candidates.jsonl").read_text().splitlines()]
+    dirs = {row["direction"] for row in rows}
+    assert dirs >= {"refs", "cites"}
+    assert {row["ids"]["doi"] for row in rows} >= {"10.1000/old", "10.1000/new", "10.1000/cite"}
+
+
+def test_keyword_depth_expand_and_soft_ceiling(tmp_path: Path):
+    from paperful.snowball.expand import normalize_direction
+
+    assert normalize_direction("references") == "refs"
+    assert normalize_direction("citations") == "cites"
+    assert clamp_depth(-3) == (0, None)
+    assert truncate([], -1) == []
+
+    works = {
+        "W9": _work("W9", "10.1000/hit", "Hit", 2021, 2, ["W2"]),
+        "W2": _work("W2", "10.1000/ref", "Ref", 2019, 1),
+    }
+
+    def getter(path: str, params: dict) -> dict:
+        if "search" in params:
+            return {"results": [works["W9"]]}
+        filt = str(params.get("filter") or "")
+        if filt.startswith("openalex:"):
+            ids = filt.split(":", 1)[1].split("|")
+            return {"results": [works[i] for i in ids if i in works]}
+        if path.startswith("/works/https://doi.org/"):
+            doi = path.split("/works/https://doi.org/", 1)[1]
+            for work in works.values():
+                if work["doi"].endswith(doi):
+                    return work
+            return {}
+        return {"results": []}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    cfg = _cfg(tmp_path)
+    console = Console(highlight=False, width=120)
+    search = run_search(
+        cfg,
+        "bbnj",
+        SnowballRequest(depth=1),
+        console=console,
+        client=client,
+        lookup=lambda doi, title: None,
+    )
+    rows = [json.loads(line) for line in (search.run_dir / "candidates.jsonl").read_text().splitlines()]
+    assert {row["hop"] for row in rows} == {0, 1}
+
+    # Soft ceiling: request above MAX_DEPTH still runs at MAX_DEPTH.
+    capped = run_doi(
+        cfg,
+        ["10.1000/hit"],
+        SnowballRequest(depth=MAX_DEPTH + 2),
+        console=console,
+        client=_client(works),
+        lookup=lambda doi, title: None,
+    )
+    assert capped.exit_code == 0
+
+
+def test_orcid_openalex_fill_and_list_payload(tmp_path: Path):
+    from paperful.snowball.orcid import orcid_dois
+    from paperful.snowball.openalex import normalize_orcid, short_id
+
+    assert normalize_orcid("https://orcid.org/0000-0002-9162-9618") == "0000-0002-9162-9618"
+    assert normalize_orcid("0000000291629618") == "0000-0002-9162-9618"
+    assert short_id("https://openalex.org/W1") == "W1"
+    assert orcid_dois(
+        "0000-0002-9162-9618",
+        getter=lambda _o: [
+            {
+                "work-summary": [
+                    {
+                        "external-ids": {
+                            "external-id": [
+                                {"external-id-type": "doi", "external-id-value": "10.1000/list"}
+                            ]
+                        }
+                    }
+                ]
+            }
+        ],
+    ) == ["10.1000/list"]
+
+    works = {
+        "W1": _work("W1", "10.1000/ego", "Ego", 2020, 1, ["W2"]),
+        "W2": _work("W2", "10.1000/ref", "Ref", 2019, 1),
+        "W9": _work("W9", "10.1000/oa-only", "OA only", 2018, 1),
+    }
+
+    def getter(path: str, params: dict) -> dict:
+        filt = str(params.get("filter") or "")
+        if "author.orcid:" in filt:
+            return {"results": [works["W9"]]}
+        if path.startswith("/works/https://doi.org/"):
+            doi = path.split("/works/https://doi.org/", 1)[1]
+            for work in works.values():
+                if work["doi"].endswith(doi):
+                    return work
+            return {}
+        if filt.startswith("openalex:"):
+            ids = filt.split(":", 1)[1].split("|")
+            return {"results": [works[i] for i in ids if i in works]}
+        return {"results": []}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    result = run_orcid(
+        _cfg(tmp_path),
+        "0000-0002-9162-9618",
+        SnowballRequest(depth=1),
+        console=Console(highlight=False, width=120),
+        client=client,
+        lookup=lambda doi, title: None,
+        orcid_getter=lambda _o: {"group": []},
+    )
+    dois = {json.loads(line)["ids"]["doi"] for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()}
+    assert "10.1000/oa-only" in dois
+
+
+def test_collection_empty_and_apply_skips_exists(tmp_path: Path):
+    cfg = _cfg(tmp_path)
+    console = Console(highlight=False, width=120)
+    empty = _Lib(items=[])
+    with pytest.raises(SnowballError, match="No DOIs"):
+        run_collection(cfg, "Inbox/Seeds", SnowballRequest(), console=console, backend=empty, client=_client({}))
+
+    works = {
+        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 1, ["W2"]),
+        "W2": _work("W2", "10.1000/keep", "Keep", 2019, 1),
+    }
+    queued = run_doi(
+        cfg,
+        ["10.1000/seed"],
+        SnowballRequest(gate="approve-batch"),
+        console=console,
+        client=_client(works),
+        lookup=lambda doi, title: None,
+    )
+    rows = [json.loads(line) for line in (queued.run_dir / "candidates.jsonl").read_text().splitlines()]
+    for row in rows:
+        row["keep"] = True
+    (queued.run_dir / "candidates.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+
+    # First apply creates; second apply sees exists and creates nothing.
+    lib = _Lib()
+    run_apply(
+        cfg,
+        queued.run_dir.name,
+        SnowballRequest(collection="Inbox/Snowball"),
+        console=console,
+        lookup=lambda doi, title: None,
+        backend=lib,
+    )
+    assert len(lib.created) == 1
+    lib2 = _Lib()
+    again = run_apply(
+        cfg,
+        queued.run_dir.name,
+        SnowballRequest(collection="Inbox/Snowball"),
+        console=console,
+        lookup=lambda doi, title: "HAVE",
+        backend=lib2,
+    )
+    assert lib2.created == []
+    report = json.loads((again.run_dir / "write_report.json").read_text())
+    assert report["created"] == 0
+    assert report["skipped_exists"] >= 1
+
+
+def test_openalex_cites_and_ingest_types(tmp_path: Path):
+    from paperful.snowball.ingest import _creators, _item_type
+    from paperful.snowball.candidate import Candidate
+    from paperful.snowball.queue import load_queue
+    from paperful.snowball.profile import profile_path
+
+    assert _item_type("posted-content") == "preprint"
+    assert _item_type("book-chapter") == "bookSection"
+    assert _item_type("book") == "book"
+    assert _item_type("other") == "document"
+    assert _creators(["Cher"]) == [{"creatorType": "author", "name": "Cher"}]
+    assert _creators(["Ada Lovelace"])[0]["lastName"] == "Lovelace"
+
+    row = Candidate(
+        "r",
+        {"type": "doi", "value": "x"},
+        0,
+        "refs",
+        {"openalex": "W9"},
+        {"title": "T", "year": 2020, "authors": [], "venue": "", "type": ""},
+        "w",
+        "new",
+        {},
+        "dry-run",
+    )
+    assert row.identity == "openalex:W9"
+
+    client = _client(
+        {"W1": _work("W1", "10.1000/seed", "Seed", 2020, 1), "W4": _work("W4", "10.1000/c", "C", 2021, 1)},
+        citing={"W1": ["W4"]},
+    )
+    citing = client.works_citing("W1", limit=5)
+    assert citing and citing[0]["id"].endswith("W4")
+    assert client.works_citing("", limit=5) == []
+
+    cfg = _cfg(tmp_path)
+    with pytest.raises(FileNotFoundError):
+        load_queue(cfg.state_dir, "no-such-run")
+    assert profile_path(cfg, "scout").name == "scout.toml"
+
+    # Keyword soft-ceiling warning path (depth request above MAX_DEPTH).
+    run_search(
+        cfg,
+        "bbnj",
+        SnowballRequest(depth=MAX_DEPTH + 1),
+        console=Console(highlight=False, width=80),
+        client=_client({"W9": _work("W9", "10.1000/hit", "Hit", 2021, 2)}),
+        lookup=lambda doi, title: None,
+    )
+
+    with pytest.raises(SnowballError, match="target collection"):
+        run_apply(cfg, "x", SnowballRequest(), console=Console())
+
+    # DOI seed that raises inside the client still records an error row.
+    class Boom(OpenAlexClient):
+        def work_by_doi(self, doi: str):
+            raise RuntimeError("boom")
+
+    boom = Boom(email="t@example.org", api_key="", sleep_s=0, getter=lambda *a, **k: {})
+    failed = run_doi(
+        cfg,
+        ["10.1000/x"],
+        SnowballRequest(),
+        console=Console(highlight=False, width=80),
+        client=boom,
+        lookup=lambda doi, title: None,
+    )
+    assert failed.exit_code == 1
+    assert json.loads((failed.run_dir / "candidates.jsonl").read_text().splitlines()[0])["status"] == "error"
