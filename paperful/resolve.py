@@ -856,6 +856,9 @@ def version_from_arxiv_xml(xml_text: str, query_doi: str | None = None) -> Versi
     doi_el = root.find(f".//{{{_ARXIV_NS}}}doi")
     published = normalize_doi(doi_el.text if doi_el is not None else None)
     if not published or is_preprint_doi(published):
+        journal_ref = root.findtext(f".//{{{_ARXIV_NS}}}journal_ref") or ""
+        published = normalize_doi(journal_ref)
+    if not published or is_preprint_doi(published):
         return None
     ident = root.findtext(f".//{{{_ARXIV_ATOM}}}id") or ""
     m = ARXIV_NEW_RE.search(ident) or ARXIV_OLD_RE.search(ident)
