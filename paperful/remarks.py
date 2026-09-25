@@ -30,12 +30,18 @@ def say(backend: Any, item_key: str, kind: str, sentence: str, *, surface: str) 
         writer = getattr(backend, "replace_prefixed_tag", None)
         if writer is None:
             return
-        writer(item_key, prefix, f"{prefix} {text}")
+        try:
+            writer(item_key, prefix, f"{prefix} {text}")
+        except Exception:
+            return
         return
     writer = getattr(backend, "create_or_update_note", None)
     if writer is None:
         return
-    writer(item_key, f"<p>{html.escape(text)}</p>", note_tag)
+    try:
+        writer(item_key, f"<p>{html.escape(text)}</p>", note_tag)
+    except Exception:
+        return
 
 
 def spare_sentence(keeper: Item) -> str:

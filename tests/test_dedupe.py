@@ -514,7 +514,30 @@ def _cfg_and_stub(tmp_path, monkeypatch, items, *, write=True):
         f'state_dir = "{tmp_path / "state"}"\n'
     )
 
+    class _Zot:
+        local_api_key = "test"
+
+        def __init__(self):
+            self.items = {}
+
+        def children(self, key):
+            return []
+
+        def item(self, key):
+            return self.items.setdefault(
+                key, {"key": key, "data": {"key": key, "tags": [], "note": ""}}
+            )
+
+        def update_item(self, raw):
+            self.items[raw.get("key") or ""] = raw
+
+        def create_items(self, payload):
+            return {"success": {"0": "NOTE1"}}
+
     class Stub:
+        def __init__(self):
+            self.zot = _Zot()
+
         def ping(self):
             return {
                 "zotero_version": "10.0.1",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from paperful.attach import AttachResult
@@ -254,6 +255,25 @@ def test_snowball_marks_version_and_does_not_create(tmp_path: Path):
     _items, counts = create_new(Backend(), [row], "Inbox")
     assert counts["created"] == 0
     assert counts["skipped_exists"] == 1
+
+
+def test_version_pack_schema(tmp_path: Path):
+    from paperful.versions import SCHEMA, write_pack
+
+    preprint = _item()
+    rows = classify_versions([preprint], lambda _doi: _link())
+    json_path, md_path = write_pack(tmp_path, "BBNJ", rows, n_items=1, stamp="20260925T120000Z")
+    pack = json.loads(json_path.read_text())
+    assert pack["schema"] == SCHEMA == "paperful.version_pack.v1"
+    row = pack["proposals"][0]
+    assert row["item_key"] == "PRE1"
+    assert row["published_doi"] == "10.1038/s41586-020-2649-2"
+    assert row["preprint_doi"] == "10.1101/2020.01.01.123456"
+    assert row["primary_pdf"] == "published"
+    assert row["after"]["doi"] == row["published_doi"]
+    assert "Preprint DOI:" in row["after"]["extra"]
+    assert md_path.is_file()
+    assert "10.1038/s41586-020-2649-2" in md_path.read_text()
 
 
 def test_merge_preprint_extra_is_idempotent():

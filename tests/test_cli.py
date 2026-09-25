@@ -376,15 +376,24 @@ def test_jobs_command_names_snowball_and_run():
 
 
 def test_dedupe_dry_run_skips_the_duplicate_line(cfg_file, stub_zotero, monkeypatch):
+    from paperful.library import ZoteroBackend
+
     calls = []
     monkeypatch.setattr(
         "paperful.remarks.remark_duplicates",
         lambda *a, **k: calls.append(k.get("surface")),
     )
+    monkeypatch.setattr(
+        ZoteroBackend, "merge_into", lambda self, keep, drop: {"moved": [], "fields": []}
+    )
     dry = runner.invoke(cli.app, ["dedupe", "-c", str(cfg_file), "-C", "BBNJ", "--dry-run"])
     assert dry.exit_code == 0, dry.stdout
+    plain = runner.invoke(cli.app, ["dedupe", "-c", str(cfg_file), "-C", "BBNJ"])
+    assert plain.exit_code == 0, plain.stdout
     assert calls == []
-    live = runner.invoke(cli.app, ["dedupe", "-c", str(cfg_file), "-C", "BBNJ"])
+    live = runner.invoke(
+        cli.app, ["dedupe", "-c", str(cfg_file), "-C", "BBNJ", "--apply"]
+    )
     assert live.exit_code == 0, live.stdout
     assert calls == ["note"]
 

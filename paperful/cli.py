@@ -1133,7 +1133,7 @@ def dedupe(
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
-        help="Write the pack only. Skips the duplicate line. Do not combine with --apply.",
+        help="Write the pack only. This is the default; do not combine with --apply.",
     ),
     apply: bool | None = typer.Option(
         None,
@@ -1163,10 +1163,9 @@ def dedupe(
 ) -> None:
     """Find duplicate parents and write a review pack. Merge only with --apply.
 
-    Default writes the pack and a plain-language line on each spare copy.
-    ``--dry-run`` writes the pack only. Same-DOI groups whose titles diverge
-    are held. A profile's ``apply`` flag does not merge; pass --apply on this
-    command.
+    Default is classify-only. ``--apply`` writes a plain-language line on each
+    spare copy, then merges. Same-DOI groups whose titles diverge are held.
+    A profile's ``apply`` flag does not merge; pass --apply on this command.
     """
     from .dedupe import (
         PHASES,
@@ -1231,13 +1230,12 @@ def dedupe(
     counts = pack_counts(groups, len(items))
     applied = 0
     errors: list[str] = []
-    if not dry_run:
-        from .remarks import remark_duplicates
-
-        remark_duplicates(backend, groups, items, surface=cfg.remarks_surface)
     if apply:
         if not backend.supports_write():
             _exit_env("This library has no write support.", cfg)
+        from .remarks import remark_duplicates
+
+        remark_duplicates(backend, groups, items, surface=cfg.remarks_surface)
         try:
             applied, errors = apply_merge(
                 backend,
