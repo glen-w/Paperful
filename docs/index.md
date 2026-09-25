@@ -1,74 +1,87 @@
-# paperful documentation
+# Paperful documentation
 
 Paperful cleans a reference library, finds missing PDFs, and summarises
 papers, then keeps a platform-agnostic mirror you can back up and move.
 Five jobs: **library**, **find**, **completeness**, **mirror**, **control**.
-See [Why paperful](why.md).
+See [Why Paperful](start/why.md).
 
 The live catalogue is an adapter. **Zotero is well tested.** Mendeley and
-EndNote adapters are in the tree and seeking testers. Open access first;
-campus EZProxy when you have a subscription; playbooks you write, and an
-opt-in AI browser, cover grey literature and field-specific sites. Paperful
-does not fetch every paywalled or DOI-less item. **Sci-Hub is opt-in and off
-by default.**
+EndNote adapters are seeking testers. Open access first; campus EZProxy when
+you have a subscription; playbooks and an opt-in AI browser cover grey
+literature. **Sci-Hub is opt-in and off by default.**
 
-Work happens **on disk** (`out/`, `state/`). `snapshot` / `restore` write
-that mirror and recreate only missing items. An optional **local-first LLM**
-(Ollama or LiteLLM; off until you enable it) adds grounded title proposals,
-a PDF identity check, `summarize` notes, a `synthesize` report over those
-notes, and `recover` (last `run` lane after other browser lanes fail, or
-`paperful recover --item`) — see [LLM](llm.md).
+**Operators** clone the repo and run `docker compose build` — no `docker pull`,
+no PyPI. **Contributors** use [`uv`](https://docs.astral.sh/uv/). Details:
+[Quick start](start/quickstart.md) and [Contributing](../CONTRIBUTING.md).
 
-Narrow a run with `--collection` / `--library`, plus optional `--year-from` /
-`--year-to` and `--type` / `-T`. Save that slice as a profile and repeat it
-with `paperful all`. Details in [Commands](commands.md#scope-filters) and
-[Workflows](workflows.md).
+## Paths to results
 
-Operators clone the repo and run `docker compose build`. The image is
-build-local only: no `docker pull`, no PyPI. [Docker](docker.md) packs Python,
-Poppler, and Chromium; Zotero and headed session login still run on the host.
-Contributors use [`uv`](https://docs.astral.sh/uv/) (see the GitHub
-[README](https://github.com/glen-w/Paperful#readme) Develop section).
+Finish [Quick start](start/quickstart.md) once (`doctor` green), then choose:
 
-The GitHub [README](https://github.com/glen-w/Paperful#readme) is the same
-first-run story. **0.x** flags may still move; see [releases](releases.md).
+1. **[Fill missing PDFs](paths/fill-pdfs.md)** — fetch and attach for a Zotero collection (open access first; campus EZProxy as a fork).
+2. **[Quiet mirror](paths/quiet-mirror.md)** — snapshot a browsable `out/` tree; restore only what is missing later.
+3. **[Snowball discovery](paths/snowball.md)** — grow a collection from a keyword, DOI, ORCID, or seed set.
+
+How-to, reference, and architecture pages sit below for depth. **0.x** flags
+may still move — [Releases](start/releases.md).
 
 ```{toctree}
 :maxdepth: 2
 :caption: Start here
 
-why
-docker
-zotero
-commands
-workflows
-dedupe
-config
-architecture
-quiet-mirror
-releases
+start/quickstart
+start/why
+start/releases
 ```
 
 ```{toctree}
 :maxdepth: 2
-:caption: Using paperful
+:caption: Paths to results
 
-mendeley
-endnote
-sources
-ezproxy
-research-ops
-sessions
-scihub
-llm
+paths/fill-pdfs
+paths/quiet-mirror
+paths/snowball
 ```
 
 ```{toctree}
-:maxdepth: 1
-:caption: Product
+:maxdepth: 2
+:caption: How-to
 
-comparison
-comparison-reference
-snowball
-ROADMAP
+howto/docker
+howto/zotero
+howto/workflows
+howto/dedupe
+howto/ezproxy
+howto/sessions
+howto/research-ops
+howto/scihub
+howto/llm
+howto/mendeley
+howto/endnote
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Reference
+
+reference/commands
+reference/config
+reference/sources
+reference/comparison-reference
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Concepts
+
+explain/architecture
+explain/comparison
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Contribute
+
+contribute/docs-guide
+contribute/ROADMAP
 ```

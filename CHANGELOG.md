@@ -6,9 +6,15 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+Documentation sweep: Diataxis layout under `docs/` (`start/`, `paths/`,
+`howto/`, `reference/`, `explain/`, `contribute/`), a slim Quick start, and
+three paths to results (fill PDFs, quiet mirror, snowball). Flat
+`docs/<page>.md` stubs keep old GitHub and CLI links working. Operator install
+stays Docker Compose; `uv` is the contributor path.
+
 Public pitch is the five jobs — library, find, completeness, mirror, control —
 rather than a Zotero sidecar. The catalogue stays an adapter: Zotero is well
-tested; Mendeley and EndNote are seeking testers. See [Why paperful](docs/why.md).
+tested; Mendeley and EndNote are seeking testers. See [Why Paperful](docs/why.md).
 
 Snowball wave 3: ORCID and collection seeds, `--direction cites|both`, depth
 above 1 (soft ceiling 5) under the existing caps, `approve-batch` queues with
@@ -19,7 +25,7 @@ above 1 (soft ceiling 5) under the existing caps, `approve-batch` queues with
 is on disk (size stable across two polls), instead of burning the remaining
 step budget after a successful click. The recover task tells the agent to quit
 immediately on access blocks (403 / "Request blocked" / paywall) and never open
-search engines or support/help pages; paperful also force-stops if the page URL
+search engines or support/help pages; Paperful also force-stops if the page URL
 becomes Google/Bing/DuckDuckGo or a support/contact path, so ignored
 instructions cannot burn the wall budget.
 
@@ -82,7 +88,7 @@ pack. See [Workflows](docs/workflows.md).
 Public pitch is a local library sidecar: disk ledger first, Zotero as the
 live catalogue. **Zotero is the well-tested adapter.** Mendeley and EndNote
 are in the tree and seeking testers — not the supported path. See
-[Why paperful](docs/why.md), [Mendeley](docs/mendeley.md), and
+[Why Paperful](docs/why.md), [Mendeley](docs/mendeley.md), and
 [EndNote](docs/endnote.md). `paperful import` / `export` move RIS, BibTeX,
 and EndNote XML. Mendeley PDF download follows the 303 to object storage
 without the API token. EndNote reads SQLite `reference_type` (not XML

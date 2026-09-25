@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>paperful — clean the library, find the PDFs, keep a mirror</title>
+    <title>Paperful — clean the library, find the PDFs, keep a mirror</title>
     <meta
       name="description"
       content="A research helper that cleans a reference library, finds missing PDFs, and summarises papers. Open access and campus access, playbooks and an opt-in AI browser for the rest, and a platform-agnostic mirror for backup."
     />
     <link rel="icon" href="images/logo.png" type="image/png" />
-    <meta property="og:title" content="paperful — clean the library, find the PDFs, keep a mirror" />
+    <meta property="og:title" content="Paperful — clean the library, find the PDFs, keep a mirror" />
     <meta
       property="og:description"
       content="Clean a reference library, find missing PDFs, summarise papers, and keep a platform-agnostic mirror. Python, Zotero API, Ollama or LiteLLM, Docker."
@@ -34,7 +34,7 @@
     <a class="skip" href="#main">Skip to content</a>
     <header class="site-header pf-site-chrome">
       <div class="wrap header-inner">
-        <a class="brand" href="./">paperful</a>
+        <a class="brand" href="./">Paperful</a>
         <button
           class="nav-toggle"
           type="button"
@@ -46,8 +46,8 @@
         </button>
         <nav id="site-nav" class="site-nav" data-nav>
           <a href="#product">See how it works</a>
-          <a href="./guide/comparison.html">Compare</a>
-          <a href="./guide/">Docs</a>
+          <a href="./guide/explain/comparison.html">Compare</a>
+          <a href="./guide/start/quickstart.html">Docs</a>
           <a href="#install">Install</a>
           <a href="https://github.com/glen-w/Paperful">GitHub</a>
         </nav>
@@ -65,7 +65,7 @@
             width="140"
             height="140"
           />
-          <p class="brand-mark">paperful</p>
+          <p class="brand-mark">Paperful</p>
           <h1>Clean the library. Find the PDFs. Keep a mirror.</h1>
           <p class="lede">
             A research helper that tidies a reference library, finds missing
@@ -161,7 +161,7 @@
                 <code>snapshot</code> writes one folder per item
                 (<code>record.json</code>, optional PDF, notes).
                 <code>restore</code> recreates only what the live catalogue is
-                missing. Copy the tree; paperful is not a sync service.
+                missing. Copy the tree; Paperful is not a sync service.
               </p>
             </div>
             <div class="feature">
@@ -201,16 +201,22 @@
             <li>Leave Scholar, Sci-Hub, and the local model off until you opt in</li>
           </ul>
           <p>
-            Walkthrough:
-            <a href="./guide/commands.html">commands</a>
+            Paths to results:
+            <a href="./guide/paths/fill-pdfs.html">fill PDFs</a>
             ·
-            <a href="./guide/dedupe.html">dedupe</a>.
+            <a href="./guide/paths/quiet-mirror.html">quiet mirror</a>
+            ·
+            <a href="./guide/paths/snowball.html">snowball</a>.
+            Reference:
+            <a href="./guide/reference/commands.html">commands</a>
+            ·
+            <a href="./guide/howto/dedupe.html">dedupe</a>.
             Not sure if this is the right tool?
-            <a href="./guide/why.html">why</a>
+            <a href="./guide/start/why.html">why</a>
             ·
-            <a href="./guide/comparison.html">comparison</a>
+            <a href="./guide/explain/comparison.html">comparison</a>
             ·
-            <a href="./guide/architecture.html">architecture</a>.
+            <a href="./guide/explain/architecture.html">architecture</a>.
           </p>
         </div>
       </section>
@@ -219,7 +225,7 @@
         <div class="wrap narrow">
           <h2>On your machine</h2>
           <p>
-            paperful is a local CLI. The catalogue is read through an adapter
+            Paperful is a local CLI. The catalogue is read through an adapter
             (Zotero’s local API is the one that is well tested). Session
             cookies stay under <code>state/sessions/</code>. Sci-Hub stays off
             until you add it to <code>sources</code> or pass
@@ -249,13 +255,15 @@
             </li>
           </ol>
           <p>
-            <a href="./guide/commands.html">Commands</a>
+            <a href="./guide/start/quickstart.html">Quick start</a>
             ·
-            <a href="./guide/config.html">Config</a>
+            <a href="./guide/reference/commands.html">Commands</a>
             ·
-            <a href="./guide/ezproxy.html">EZProxy</a>
+            <a href="./guide/reference/config.html">Config</a>
             ·
-            <a href="./guide/sessions.html">Sessions</a>
+            <a href="./guide/howto/ezproxy.html">EZProxy</a>
+            ·
+            <a href="./guide/howto/sessions.html">Sessions</a>
           </p>
         </div>
       </section>
@@ -278,9 +286,11 @@ docker compose run --rm paperful run --collection interesting --dry-run
           <p class="fine">
             There is no <code>docker pull</code> and no
             <code>pip install paperful</code>.
-            <a href="./guide/docker.html">Docker</a>
+            <a href="./guide/start/quickstart.html">Quick start</a>
+            ·
+            <a href="./guide/howto/docker.html">Docker</a>
             is the operator path.
-            <a href="./guide/zotero.html">Zotero setup</a>.
+            <a href="./guide/howto/zotero.html">Zotero setup</a>.
             Contributors use
             <a href="https://docs.astral.sh/uv/">uv</a>
             (see the repository README). Zotero and headed logins still run
@@ -290,7 +300,13 @@ docker compose run --rm paperful run --collection interesting --dry-run
             Details:
             <a href="./guide/">Documentation</a>
             ·
-            <a href="./guide/releases.html">0.x / 1.0</a>
+            <a href="./guide/paths/fill-pdfs.html">Fill PDFs</a>
+            ·
+            <a href="./guide/paths/quiet-mirror.html">Quiet mirror</a>
+            ·
+            <a href="./guide/paths/snowball.html">Snowball</a>
+            ·
+            <a href="./guide/start/releases.html">0.x / 1.0</a>
             ·
             <a href="https://github.com/glen-w/Paperful/blob/main/README.md"
               >README</a
@@ -302,7 +318,7 @@ docker compose run --rm paperful run --collection interesting --dry-run
 
     <footer class="site-footer">
       <div class="wrap footer-inner">
-        <p>© paperful contributors. Local-first software. Version 0.9.0 (0.x — flags may still move).</p>
+        <p>© Paperful contributors. Local-first software. Version 0.9.0 (0.x — flags may still move).</p>
         <p>
           <a href="https://github.com/glen-w/Paperful">GitHub</a>
           ·
