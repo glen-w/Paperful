@@ -184,4 +184,11 @@ pdfs = "additional"
 # oa_only = false
 # venue_include = []
 # venue_exclude = []
+# languages = []
+# min_seed_citations = 0
+# note_provenance = true
+# backends = ["openalex", "crossref", "semanticscholar", "orcid"]
+# approve_each_max = 20
+# hybrid_seeds = 5
+# refine = false
 

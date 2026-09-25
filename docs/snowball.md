@@ -1,12 +1,13 @@
 # Snowball
 
-**Status:** keyword search, DOI / ORCID / collection seeds, refs and cited-by,
-depth up to 5 under caps, gates `dry-run` / `approve-batch` / `auto`, and
+**Status:** keyword search, DOI / ORCID / collection seeds, `hybrid` (keyword
+hits, then one hop), refs and cited-by, depth up to 5 under caps, gates
+`dry-run` / `approve-each` / `approve-batch` / `auto`, overlap ranking, and
 `--fetch-pdfs` are implemented. Config honors `dedupe_scope`, `tag_prefix`,
-`types`, `oa_only`, and venue include/exclude. `snowball profile save` writes
-seeds and knobs only. `approve-each`, multi-seed overlap ranking, hybrid
-profiles, and `[llm]` query refine are still later. Phases live in
-[ROADMAP](ROADMAP.md#snowball).
+`types`, `oa_only`, venues, `languages`, `min_seed_citations`,
+`note_provenance`, and `backends`. `--refine` writes query suggestions when
+`[llm]` is on and does not create items. `expand = cited_authors` stays off.
+Phases live in [ROADMAP](ROADMAP.md#snowball).
 
 Snowball grows a library outward from a keyword, a DOI, a person, or an
 existing collection. It proposes works, then creates items under an explicit
@@ -22,11 +23,13 @@ paperful snowball orcid 0000-0002-9162-9618
 paperful snowball collection "Inbox/Seeds" --direction refs
 paperful snowball run --profile doi-refs-gated
 paperful snowball apply <run-id> -C "Inbox/Snowball"
+paperful snowball hybrid "high seas EIA" --hybrid-seeds 5 --direction refs
 paperful snowball search "high seas EIA" --gate auto --fetch-pdfs -C "Inbox/Snowball"
 ```
 
-`search`, `doi`, `orcid`, and `collection` are seeds under one verb. There is
-no separate top-level `harvest`, `crawl`, or `discover`.
+`search`, `hybrid`, `doi`, `orcid`, and `collection` are seeds under one verb.
+`hybrid` is the keyword-then-hop job. There is no separate top-level
+`harvest`, `crawl`, or `discover`.
 
 ## Snowball and run
 
@@ -132,7 +135,7 @@ Schema `paperful.snowball.candidate.v1`:
 | `exists_match` | When `exists`: `item_key` and `doi` or `title_year` |
 | `provenance` | Backend, endpoint, `retrieved_at` |
 | `gate` | The gate for this run |
-| `score` | Optional rank. The summary states the formula |
+| `score` | `overlap * 1000 + cited_by_count` for neighbours. Search hits stay on `cited_by_count` |
 
 The dry-run table shows title, year, DOI, why, in library, hop/direction,
 and backend, with `new` rows first. Created items are tagged

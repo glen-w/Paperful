@@ -6,6 +6,11 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+Snowball wave 5: `hybrid` (keyword hits, then one hop), `approve-each` for short
+lists, overlap ranking, Crossref and Semantic Scholar metadata fill, and
+`languages`, `min_seed_citations`, `note_provenance`, and `backends`. Optional
+`--refine` writes query suggestions and does not create items.
+
 Snowball wave 3: ORCID and collection seeds, `--direction cites|both`, depth
 above 1 (soft ceiling 5) under the existing caps, `approve-batch` queues with
 `keep` plus `paperful snowball apply <run-id>`, and profiles for `orcid` /

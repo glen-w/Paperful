@@ -64,11 +64,13 @@ def apply_filters(
     oa_only: bool,
     venue_include: tuple[str, ...],
     venue_exclude: tuple[str, ...],
+    languages: tuple[str, ...] = (),
 ) -> list[Candidate]:
     """Mark rejects ``filtered``. Drop rows with no DOI and no OpenAlex id."""
     allowed = {item.lower() for item in types} if types else set(JOURNAL_SHAPED)
     include = {item.lower() for item in venue_include}
     exclude = {item.lower() for item in venue_exclude}
+    langs = {item.lower() for item in languages}
     out: list[Candidate] = []
     for row in rows:
         if row.status == "error":
@@ -96,6 +98,9 @@ def apply_filters(
             reasons.append("venue")
         if venue and venue in exclude:
             reasons.append("venue")
+        lang = str(row.biblio.get("language") or "").lower()
+        if langs and lang and lang not in langs:
+            reasons.append("language")
         if reasons:
             row.status = "filtered"
             note = ",".join(reasons)

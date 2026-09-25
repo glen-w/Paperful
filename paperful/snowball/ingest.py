@@ -50,6 +50,7 @@ def create_new(
     collection: str,
     *,
     tag_prefix: str = TAG,
+    note_provenance: bool = True,
 ) -> tuple[list[Item], dict[str, int]]:
     """Create status=new rows. One LibraryError does not abort the rest."""
     collection_key = backend.ensure_collection_path(collection)
@@ -62,7 +63,7 @@ def create_new(
         if row.status == "exists":
             skipped_exists += 1
             continue
-        if row.status != "new":
+        if row.status != "new" or row.keep is False:
             continue
         biblio = row.biblio
         year = biblio.get("year")
@@ -75,7 +76,7 @@ def create_new(
             "doi": row.ids.get("doi") or "",
             "url": biblio.get("oa_url") or "",
             "publication_title": biblio.get("venue") or "",
-            "tags": [{"tag": prefix}, {"tag": f"{prefix}:openalex"}],
+            "tags": [{"tag": prefix}, {"tag": f"{prefix}:{row.provenance.get('backend') or 'openalex'}"}],
         }
         payload = parent_payload(record, [collection_key])
         try:
@@ -93,7 +94,8 @@ def create_new(
             f"why: {row.why}<br>"
             f"run: {row.run_id}</p>"
         )
-        backend.create_or_update_note(key, note, prefix)
+        if note_provenance:
+            backend.create_or_update_note(key, note, prefix)
         first = authors[0].split()[-1] if authors else None
         created_items.append(
             Item(

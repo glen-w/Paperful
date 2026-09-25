@@ -16,8 +16,8 @@ from .expand import cap_ids
 
 API = "https://api.openalex.org"
 SELECT = (
-    "id,doi,display_name,publication_year,type,cited_by_count,"
-    "referenced_works,authorships,primary_location"
+    "id,doi,display_name,publication_year,type,cited_by_count,language,"
+    "referenced_works,authorships,primary_location,open_access"
 )
 Getter = Callable[[str, dict[str, Any]], dict[str, Any]]
 
@@ -261,6 +261,8 @@ def work_to_candidate(
             "type": work.get("type") or "",
             "oa_url": (loc.get("pdf_url") or loc.get("landing_page_url") or ""),
             "is_oa": bool((work.get("open_access") or {}).get("is_oa")),
+            "language": str(work.get("language") or ""),
+            "cited_by_count": int(work.get("cited_by_count") or 0),
         },
         why=why,
         status="new",

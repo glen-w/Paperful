@@ -3298,6 +3298,12 @@ def _snowball_request(
     year_from: int | None,
     year_to: int | None,
     direction: str | None = None,
+    languages: str | None = None,
+    min_seed_citations: int | None = None,
+    note_provenance: bool | None = None,
+    backends: str | None = None,
+    hybrid_seeds: int | None = None,
+    refine: bool | None = None,
 ) -> Any:
     from .snowball.command import SnowballRequest
 
@@ -3311,7 +3317,17 @@ def _snowball_request(
         year_from=year_from,
         year_to=year_to,
         direction=direction or cfg.snowball_direction or "refs",
+        languages=_csv(languages) if languages else None,
+        min_seed_citations=min_seed_citations,
+        note_provenance=note_provenance,
+        backends=_csv(backends) if backends else None,
+        hybrid_seeds=hybrid_seeds,
+        refine=refine,
     )
+
+
+def _csv(raw: str | None) -> tuple[str, ...]:
+    return tuple(part.strip() for part in (raw or "").split(",") if part.strip())
 
 
 def _run_snowball(cfg: Config, action: Any) -> None:
@@ -3336,12 +3352,17 @@ def snowball_search(
     per_hop_limit: int | None = typer.Option(None, "--per-hop-limit"),
     direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both (when depth >= 1)."),
     gate: str | None = typer.Option(
-        None, "--gate", help="dry-run, approve-batch, or auto. Default: config, else dry-run."
+        None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
     ),
     collection: str = typer.Option("", "--collection", "-C", help="Target collection for --gate auto."),
     fetch_pdfs: bool | None = typer.Option(
         None, "--fetch-pdfs", help="After auto-create, fill PDFs for the new items."
     ),
+    languages: str | None = typer.Option(None, "--languages", help="Comma-separated language codes."),
+    min_seed_citations: int | None = typer.Option(None, "--min-seed-citations"),
+    note_provenance: bool | None = typer.Option(None, "--note-provenance/--no-note-provenance"),
+    backends: str | None = typer.Option(None, "--backends", help="Comma-separated backend names."),
+    refine: bool | None = typer.Option(None, "--refine/--no-refine", help="Ask the LLM for query suggestions."),
     config: Path | None = ConfigOpt,
 ) -> None:
     """Search OpenAlex and write a candidate queue. Creates items only with --gate auto."""
@@ -3357,10 +3378,55 @@ def snowball_search(
         year_from=year_from,
         year_to=year_to,
         direction=direction,
+        languages=languages,
+        min_seed_citations=min_seed_citations,
+        note_provenance=note_provenance,
+        backends=backends,
+        refine=refine,
     )
     from .snowball.command import run_search
 
     _run_snowball(cfg, lambda c: run_search(c, query, request, console=console))
+
+
+@snowball_app.command("hybrid")
+def snowball_hybrid(
+    query: str = typer.Argument(..., help="Keyword query. Top hits then get one hop."),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    max_candidates: int | None = typer.Option(None, "--max-candidates"),
+    per_hop_limit: int | None = typer.Option(None, "--per-hop-limit"),
+    hybrid_seeds: int | None = typer.Option(None, "--hybrid-seeds", help="How many top DOI hits to expand."),
+    direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both."),
+    gate: str | None = typer.Option(None, "--gate", help="dry-run, approve-each, approve-batch, or auto."),
+    collection: str = typer.Option("", "--collection", "-C", help="Target collection for a writing gate."),
+    fetch_pdfs: bool | None = typer.Option(None, "--fetch-pdfs"),
+    languages: str | None = typer.Option(None, "--languages"),
+    min_seed_citations: int | None = typer.Option(None, "--min-seed-citations"),
+    refine: bool | None = typer.Option(None, "--refine/--no-refine"),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Keyword hits, then one hop from the top DOIs. Not a separate harvest command."""
+    cfg = _cfg(config)
+    request = _snowball_request(
+        cfg,
+        gate=gate,
+        collection=collection,
+        fetch_pdfs=fetch_pdfs,
+        depth=None,
+        max_candidates=max_candidates,
+        per_hop_limit=per_hop_limit,
+        year_from=year_from,
+        year_to=year_to,
+        direction=direction,
+        languages=languages,
+        min_seed_citations=min_seed_citations,
+        hybrid_seeds=hybrid_seeds,
+        refine=refine,
+    )
+    from .snowball.command import run_hybrid
+
+    _run_snowball(cfg, lambda c: run_hybrid(c, query, request, console=console))
 
 
 @snowball_app.command("doi")
@@ -3373,7 +3439,7 @@ def snowball_doi(
     per_hop_limit: int | None = typer.Option(None, "--per-hop-limit"),
     direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both."),
     gate: str | None = typer.Option(
-        None, "--gate", help="dry-run, approve-batch, or auto. Default: config, else dry-run."
+        None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
     ),
     collection: str = typer.Option("", "--collection", "-C", help="Target collection for --gate auto."),
     fetch_pdfs: bool | None = typer.Option(
@@ -3410,7 +3476,7 @@ def snowball_orcid(
     per_hop_limit: int | None = typer.Option(None, "--per-hop-limit"),
     direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both."),
     gate: str | None = typer.Option(
-        None, "--gate", help="dry-run, approve-batch, or auto. Default: config, else dry-run."
+        None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
     ),
     collection: str = typer.Option("", "--collection", "-C", help="Target collection for --gate auto."),
     fetch_pdfs: bool | None = typer.Option(
@@ -3447,7 +3513,7 @@ def snowball_collection(
     per_hop_limit: int | None = typer.Option(None, "--per-hop-limit"),
     direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both."),
     gate: str | None = typer.Option(
-        None, "--gate", help="dry-run, approve-batch, or auto. Default: config, else dry-run."
+        None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
     ),
     collection: str = typer.Option(
         "",
@@ -3519,6 +3585,7 @@ def snowball_run(
         SnowballError,
         run_collection,
         run_doi,
+        run_hybrid,
         run_orcid,
         run_search,
     )
@@ -3536,6 +3603,11 @@ def snowball_run(
             if not query:
                 raise SnowballError(f"Profile {profile!r} needs query.")
             action = lambda c: run_search(c, query, request, console=console)
+        elif mode == "hybrid":
+            query = str(raw.get("query") or "").strip()
+            if not query:
+                raise SnowballError(f"Profile {profile!r} needs query.")
+            action = lambda c: run_hybrid(c, query, request, console=console)
         elif mode == "doi":
             dois = [str(item) for item in (raw.get("dois") or [])]
             action = lambda c: run_doi(c, dois, request, console=console)
@@ -3553,7 +3625,7 @@ def snowball_run(
             action = lambda c: run_collection(c, seed, request, console=console)
         else:
             raise SnowballError(
-                f"Profile {profile!r} mode must be search, doi, orcid, or collection."
+                f"Profile {profile!r} mode must be search, hybrid, doi, orcid, or collection."
             )
     except SnowballError as exc:
         console.print(f"[red]{exc}[/]")
@@ -3588,6 +3660,13 @@ def snowball_profile_save(
     year_to: int | None = YearToOpt,
     dedupe_scope: str = typer.Option("", "--dedupe-scope"),
     oa_only: bool = typer.Option(False, "--oa-only"),
+    hybrid: bool = typer.Option(False, "--hybrid", help="With --query, save mode = hybrid."),
+    languages: str = typer.Option("", "--languages"),
+    min_seed_citations: int | None = typer.Option(None, "--min-seed-citations"),
+    note_provenance: bool | None = typer.Option(None, "--note-provenance/--no-note-provenance"),
+    backends: str = typer.Option("", "--backends"),
+    hybrid_seeds: int | None = typer.Option(None, "--hybrid-seeds"),
+    refine: bool = typer.Option(False, "--refine"),
     force: bool = typer.Option(False, "--force", help="Overwrite, or save a writing gate."),
     config: Path | None = ConfigOpt,
 ) -> None:
@@ -3601,7 +3680,10 @@ def snowball_profile_save(
         console.print("[red]Pass exactly one of --query, --doi, --orcid, or --seed-collection.[/]")
         raise typer.Exit(2)
     body: dict[str, Any] = {"gate": gate}
-    if query.strip():
+    if query.strip() and hybrid:
+        body["mode"] = "hybrid"
+        body["query"] = query.strip()
+    elif query.strip():
         body["mode"] = "search"
         body["query"] = query.strip()
     elif doi:
@@ -3635,6 +3717,18 @@ def snowball_profile_save(
         body["dedupe_scope"] = dedupe_scope.strip()
     if oa_only:
         body["oa_only"] = True
+    if languages.strip():
+        body["languages"] = _csv(languages)
+    if min_seed_citations is not None:
+        body["min_seed_citations"] = min_seed_citations
+    if note_provenance is not None:
+        body["note_provenance"] = note_provenance
+    if backends.strip():
+        body["backends"] = _csv(backends)
+    if hybrid_seeds is not None:
+        body["hybrid_seeds"] = hybrid_seeds
+    if refine:
+        body["refine"] = True
     try:
         path = save_snowball_profile(cfg, name, body, force=force)
     except SnowballError as exc:
