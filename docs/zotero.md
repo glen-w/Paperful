@@ -153,8 +153,9 @@ articles since **7.0.31**; older items and other types still keep
 DOI, PMID, arXiv id, and ADS bibcode. There is no dedicated arXiv field in the
 item-types reference.
 
-Item lists omit the trash. Paperful trashes duplicates with `deleted: true`
-and does not permanently delete. Collection **keys** are the stable ids; the
+Item lists omit the trash. Paperful merges a duplicate onto the keeper, then
+sets `deleted: true` on the emptied parent. It does not permanently delete.
+Collection **keys** are the stable ids; the
 same display name can appear more than once.
 
 ## Scoping runs (paperful)

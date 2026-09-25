@@ -35,8 +35,8 @@ problem when your library has the subscription. See
 the duplicate has been reviewed, a PDF is attached when one could be found,
 and — if you want it — a grounded summary sits on the item. `gaps` counts
 what is missing. `lint` and `fix-metadata` propose patches on disk;
-`--apply` writes them. `dedupe` writes a review pack and, with `--apply`,
-merges the extra parent's PDF, notes, and better fields onto the keeper
+`--apply` writes them. `dedupe` writes a review pack and, with `--apply`, writes a spare-copy line,
+then merges the extra parent's PDF, notes, and better fields onto the keeper
 before trashing that parent. `summarize` writes one note from a text-layer PDF;
 `synthesize` reviews those notes for a collection. `paperful all` runs the
 usual chain: gaps, find, lint, fix, summarise. The model is off until

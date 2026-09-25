@@ -56,6 +56,8 @@ flowchart LR
 | `state/metadata-patches.jsonl` | Proposed patches (`doi`, `title`, `date`, `publicationTitle`) |
 | `state/dedupe-packs/` | Duplicate review packs from `dedupe` (JSON + Markdown) |
 | `state/dedupe-applied.jsonl` | Merge audit; appended only on `dedupe --apply` |
+| `state/version-packs/` | Preprint/published review packs (`paperful.version_pack.v1`) |
+| `state/versions-applied.jsonl` | One line per work updated by `versions --apply` |
 | `state/pdf-cache/` | Manager PDFs exported so lint reads text on disk |
 | `state/summaries/<key>.html` | `summarize` output when dest includes disk; the Zotero child note is the other copy |
 | `state/reports/<slug>.html` | `synthesize` literature review; sibling `<slug>.json` records source hashes |
@@ -162,7 +164,9 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
 - `paperful lint` / `paperful fix-metadata` — identifier hygiene; apply is explicit.
 - `paperful dedupe` / `paperful gaps` — duplicate packs and PDF/DOI counts.
   `dedupe` writes `state/dedupe-packs/` and merges only with `--apply`
-  (title+year also needs `--apply-medium`). See [dedupe](dedupe.md).
+  (the spare-copy line is written then; title+year also needs `--apply-medium`).
+  `versions` writes `state/version-packs/` and updates a preprint only with
+  `--apply`. See [dedupe](dedupe.md).
 - `paperful report` / `paperful report --last-run` — manifest totals plus the latest
   auditable run report (`state/last-run.json`, history under `state/runs/`).
   Each `run` prints a one-line banner
