@@ -1,19 +1,23 @@
 # paperful documentation
 
-paperful is a local sidecar for your research library: keep collections
-organised, fill missing PDFs, lint metadata, and keep a quiet copy on disk.
-It fills what open-access indexes, campus EZProxy, and grey playbooks can
-reach — not every paywalled or DOI-less item.
-Zotero is the well-tested catalogue. Mendeley and EndNote adapters are in
-the tree and seeking testers. See [Why paperful](why.md).
+Paperful cleans a reference library, finds missing PDFs, and summarises
+papers, then keeps a platform-agnostic mirror you can back up and move.
+Five jobs: **library**, **find**, **completeness**, **mirror**, **control**.
+See [Why paperful](why.md).
 
-Work happens **on disk** (`out/`, `state/`). Open access first; campus
-EZProxy when you have a subscription; **Sci-Hub is opt-in and off by
-default**. `snapshot` / `restore` thicken that disk copy and recreate only
-missing items. An optional **local-first LLM** (Ollama; off until you enable
-it) adds grounded title proposals, a PDF identity check, `summarize` notes,
-a `synthesize` report over those notes, and `recover` (last `run` lane after
-other browser lanes fail, or `paperful recover --item`) — see [LLM](llm.md).
+The live catalogue is an adapter. **Zotero is well tested.** Mendeley and
+EndNote adapters are in the tree and seeking testers. Open access first;
+campus EZProxy when you have a subscription; playbooks you write, and an
+opt-in AI browser, cover grey literature and field-specific sites. Paperful
+does not fetch every paywalled or DOI-less item. **Sci-Hub is opt-in and off
+by default.**
+
+Work happens **on disk** (`out/`, `state/`). `snapshot` / `restore` write
+that mirror and recreate only missing items. An optional **local-first LLM**
+(Ollama or LiteLLM; off until you enable it) adds grounded title proposals,
+a PDF identity check, `summarize` notes, a `synthesize` report over those
+notes, and `recover` (last `run` lane after other browser lanes fail, or
+`paperful recover --item`) — see [LLM](llm.md).
 
 Narrow a run with `--collection` / `--library`, plus optional `--year-from` /
 `--year-to` and `--type` / `-T`. Save that slice as a profile and repeat it
