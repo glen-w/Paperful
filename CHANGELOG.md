@@ -6,6 +6,10 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+Public pitch is the five jobs — library, find, completeness, mirror, control —
+rather than a Zotero sidecar. The catalogue stays an adapter: Zotero is well
+tested; Mendeley and EndNote are seeking testers. See [Why paperful](docs/why.md).
+
 Snowball wave 5: `hybrid` (keyword hits, then one hop), `approve-each` for short
 lists, overlap ranking, Crossref and Semantic Scholar metadata fill, and
 `languages`, `min_seed_citations`, `note_provenance`, and `backends`. Optional

@@ -83,7 +83,7 @@ from .zot import (
 app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
-    help="Local sidecar for your research library: fill missing PDFs, lint metadata, keep a disk copy. Zotero is the well-tested adapter. Mendeley and EndNote are seeking testers.",
+    help="Research helper for a reference library: clean records, find missing PDFs, summarise papers, keep a platform-agnostic mirror. Zotero is the well-tested adapter. Mendeley and EndNote are seeking testers.",
 )
 session_app = typer.Typer(
     add_completion=False,

@@ -3,35 +3,54 @@
 </h1>
 
 <p align="center">
-  <strong>Keep the library. Keep the files. Keep control.</strong><br>
-  A local sidecar for your research library: collections organised, missing
-  PDFs filled, metadata linted, a quiet copy on disk. Zotero is the
-  well-tested catalogue. Mendeley and EndNote adapters are in the tree and
-  seeking testers. Work stays on this machine. Fills what open-access indexes,
-  campus EZProxy, and grey playbooks can reach — not every paywalled or
-  DOI-less item.
+  <strong>Clean the library. Find the PDFs. Keep a mirror.</strong><br>
+  A research helper that tidies a reference library, finds missing PDFs, and
+  summarises papers. Open-access indexes first, campus access when you have
+  it; playbooks you write, and an AI browser when you turn it on, cover
+  grey literature and field-specific sites. A platform-agnostic mirror is the
+  backup and the way out. Work stays on this machine.
 </p>
 
-Open access first (Unpaywall, OpenAlex, arXiv, bioRxiv/medRxiv, Europe PMC,
-Semantic Scholar, CORE, the item's own URL). Campus **EZProxy** when you have
-a subscription. **Google Scholar** and **Sci-Hub** are opt-in and off by
-default (Scholar needs a session login; Sci-Hub occupies a legal grey zone in
-some jurisdictions — see [Sci-Hub](docs/scihub.md)).
+Five jobs: **library**, **find**, **completeness**, **mirror**, **control**.
+The live catalogue is an adapter. Zotero’s local API is the one that is well
+tested. Mendeley and EndNote are in the tree and seeking testers — do not
+treat them as proven. Why this shape: [Why paperful](docs/why.md). Not sure
+this is the right tool? [How paperful compares](docs/comparison.md).
 
-By default each item only hits sources that match its metadata (DOI, arXiv
-id, URL, …); `--try-all` disables that. Sci-Hub coverage after ~2021 is thin —
-paperful skips Sci-Hub for items dated after 2021 (and drops it from the run
-when `--year-from` is past that year). Recent paywalled papers are best fetched
-via EZProxy when your library has a subscription.
+**Library.** Collections, years, and item types are the scope. `snowball`
+proposes new works from a keyword, a DOI, an ORCID, or a seed collection, and
+creates items only when the gate says so. `import` and `export` speak RIS,
+BibTeX, and EndNote XML.
 
-Work happens **on disk** (`out/`, `state/`). Zotero is the well-tested
-catalogue: read items in, write PDFs and metadata patches back. `snapshot`
-writes a restore folder for every scoped item; `restore --apply` recreates
-only what is missing. Mendeley (REST) and EndNote (read the local library;
-writes are an import bundle, not an edit of the `.enl` file) are seeking
-testers — do not treat them as proven. Why this shape:
-[Why paperful](docs/why.md). Not sure if this is the right tool?
-[How paperful compares](docs/comparison.md).
+**Find.** Open access first (Unpaywall, OpenAlex, arXiv, bioRxiv/medRxiv,
+Europe PMC, Semantic Scholar, CORE, the item's own URL). Campus **EZProxy**
+when you have a subscription. User playbooks, then an opt-in AI browser, take
+the landings those indexes miss. **Google Scholar** and **Sci-Hub** are
+opt-in and off by default (Scholar needs a session login; Sci-Hub occupies a
+legal grey zone in some jurisdictions — see [Sci-Hub](docs/scihub.md)). Each
+item only hits sources that match its metadata (DOI, arXiv id, URL, …);
+`--try-all` disables that. Sci-Hub coverage after ~2021 is thin — paperful
+skips Sci-Hub for items dated after 2021 (and drops it from the run when
+`--year-from` is past that year). Recent paywalled papers are a campus-access
+problem when your library has the subscription. Paperful does not fetch every
+paywalled or DOI-less item.
+
+**Completeness.** `gaps` counts what is missing. `lint` and `fix-metadata`
+propose patches on disk; `--apply` writes them. `dedupe` reviews duplicates,
+then trashes extras only when you say so. `summarize` writes a grounded note
+from a text-layer PDF; `synthesize` reviews those notes. `paperful all` runs
+gaps → find → lint → fix → summarise. The model is off until `[llm].enabled`.
+OCR is not in scope.
+
+**Mirror.** Work happens **on disk** (`out/`, `state/`). `snapshot` writes one
+folder per scoped item (`record.json`, optional PDF, notes). `restore --apply`
+recreates only what the live catalogue is missing and does not overwrite
+fields already there. Copy `out/` yourself; paperful is not a sync service.
+
+**Control.** Downloads and proposals land on disk first. Write-back is a
+separate step. Dry-run before a big fetch. Docker runs the tool; Zotero and
+headed `session login` stay on the host. Python, the Zotero local API, Ollama
+or LiteLLM.
 
 Hosted site (GitHub Pages): landing in [`website/`](website/) plus Sphinx HTML
 from this `docs/` tree at `/guide/`. Preview locally with

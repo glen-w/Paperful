@@ -1,48 +1,73 @@
 # Why paperful
 
-A local sidecar beside your citation manager. The job is to keep the library
-organised, the PDFs complete, the metadata honest, and a folder tree you own
-under `out/` and `state/`. **Zotero is the well-tested catalogue. Use that.**
-Mendeley and EndNote adapters are in the tree and **seeking testers**. They
-are not the supported path.
+Paperful is a research helper for a reference library you already keep. It
+cleans the records, finds missing PDFs, and summarises papers, then keeps a
+platform-agnostic mirror you can back up and move. The work stays on this
+machine.
 
-## Three jobs
+Zotero is the catalogue that is well tested. Mendeley and EndNote adapters
+are in the tree and seeking testers. The mirror does not depend on which of
+those you open tomorrow.
 
-**Complete.** Fill missing PDFs (open access first, campus EZProxy when you
-have a subscription, Sci-Hub only if you opt in). Lint identifiers and
-propose metadata patches on disk; apply them only when you say so. Review
-duplicates, then trash extras.
+## Five jobs
 
-**Portable.** `snapshot` writes one folder per item: `record.json`
-(`paperful.item.v1`), an optional PDF, and notes. `restore --apply` creates
-only what Zotero is missing and does not overwrite fields already there.
-Copy `out/` (or sync it with something like Syncthing). That sync is house
-transport, not a paperful service. See [Quiet mirror](quiet-mirror.md).
+**Library.** The object is the reference library: collections, years, item
+types. `collections` shows what you have. `snowball` proposes new works from
+a keyword, a DOI, an ORCID, or a seed collection, and creates items only when
+the gate says so. `import` and `export` speak RIS, BibTeX, and EndNote XML.
+The live catalogue is an adapter. Zotero’s local API is the one to use.
+Mendeley (REST) and EndNote (read the `.enl`; writes are an import bundle)
+are seeking testers.
 
-**Grey literature.** Zotero’s PDF ingest is fine for a structured journal
-article. Reports, scans, and landing-page junk often come back with a
-garbled title or no usable text. Paperful keeps the original file, uses
-[grey-lit playbooks](sources.md) for UN, FAO, ISA, and similar landings, and
-can ask a local model for a grounded title, an identity check, or a summary
-— from a text layer. OCR is not in scope.
+**Find.** Missing PDFs are searched. Open-access indexes come first
+(Unpaywall, OpenAlex, arXiv, bioRxiv/medRxiv, Europe PMC, Semantic Scholar,
+CORE). Campus EZProxy is next, when you have a subscription. Sites that do
+not fit that pattern — grey literature, field-specific hosts, odd landing
+pages — use playbooks you write, and, if you turn it on, an AI browser after
+the scripted lanes fail. Google Scholar and Sci-Hub stay off until you opt
+in. Paperful does not fetch every paywalled or DOI-less item. Sci-Hub
+coverage after ~2021 is thin; recent paywalled papers are a campus-access
+problem when your library has the subscription. See
+[Sci-Hub](scihub.md).
 
-## Storage, not WebDAV
+**Completeness.** A record is in good shape when the identifier is honest,
+the duplicate has been reviewed, a PDF is attached when one could be found,
+and — if you want it — a grounded summary sits on the item. `gaps` counts
+what is missing. `lint` and `fix-metadata` propose patches on disk;
+`--apply` writes them. `dedupe` writes a review pack and trashes extras only
+with `--apply`. `summarize` writes one note from a text-layer PDF;
+`synthesize` reviews those notes for a collection. `paperful all` runs the
+usual chain: gaps, find, lint, fix, summarise. The model is off until
+`[llm].enabled`. OCR is not in scope.
 
-Zotero cloud storage is small. WebDAV works, and it is more ops than most
-people want. Paperful’s answer is the folder tree: attach into Zotero when
-you want the citation UI; if the quota is full, the PDF is still under
-`out/` and `attach` can retry later. Paperful is not a WebDAV client. Phone
-and WebDAV sync stay Zotero’s job. See [Zotero](zotero.md).
+**Mirror.** `out/` is a copy of the library that is not a citation manager:
+one folder per item (`record.json`, optional PDF, notes) plus a collection
+tree. `snapshot` writes it. `restore --apply` creates only what the live
+catalogue is missing and does not overwrite fields already there. That tree
+is the backup. RIS, BibTeX, and EndNote XML are the interchange. Copy `out/`
+with your own sync; paperful is not a sync service and not a WebDAV client.
+Phone sync stays with the catalogue. See [Quiet mirror](quiet-mirror.md).
+
+**Control.** Downloads, patches, and summaries land on disk first.
+Write-back is a separate step you ask for. Dry-run before a big fetch.
+Scholar, Sci-Hub, and the local model are opt-in. Session passwords are not
+stored in the config. Attachments carry a provenance stamp. Docker runs the
+tool; the catalogue and a headed login stay on the host.
+
+Python, the Zotero local API, Ollama or LiteLLM, Docker.
 
 ## What is true today
 
 | Claim | Status |
 | --- | --- |
 | Zotero read, fetch, lint, attach, snapshot, restore | Well tested. This is the adapter to use |
-| Disk ledger you can copy without the manager | Shipped (`out/` + `state/`) |
+| Open-access find, campus EZProxy, user playbooks | Shipped. Each item hits sources that match its metadata unless `--try-all` |
+| AI browser for lanes the scripts miss | Opt-in. `[llm].enabled` plus `paperful[browser-agent]` (Python 3.11+). Last lane on `run`, or `recover --item` |
+| Summaries and a collection review | Opt-in local model. Text layer only. Off until you enable it |
+| Disk mirror you can copy without the manager | Shipped (`out/` + `state/`). `import` / `export` for RIS, BibTeX, EndNote XML |
 | Mendeley (`manager = "mendeley"`, REST at api.mendeley.com) | Seeking testers. Needs an app at dev.mendeley.com and `paperful session login mendeley`. Not proven against a real library here |
 | EndNote (`manager = "endnote"`, local `.enl`) | Seeking testers. Reads `sdb.eni`. Writes stage `state/endnote-import/` for File → Import. paperful does not edit the EndNote database, and it cannot trash items there |
-| OCR, linked-file cutover, hosted multi-user service | Not the product |
+| OCR, linked-file cutover, hosted multi-user service, a second reading app | Not the product |
 
 ## Related
 

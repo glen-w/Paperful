@@ -13,7 +13,7 @@ Prefer this page for “is this the right tool?”
 
 | If you need… | Look at… |
 |--------------|----------|
-| A disk copy of the library you keep if the citation manager changes. **Zotero is well tested.** Mendeley and EndNote adapters are seeking testers | **paperful** `snapshot` / `restore` — [quiet mirror](quiet-mirror.md). Do not treat the other adapters as proven |
+| A platform-agnostic **mirror** of the library (backup, and a way out if the citation manager changes). **Zotero is well tested.** Mendeley and EndNote adapters are seeking testers | **paperful** `snapshot` / `restore` — [quiet mirror](quiet-mirror.md). Do not treat the other adapters as proven |
 | Bulk **missing-PDF** fetch for a Zotero library (OA → campus proxy → optional Sci-Hub), collection-shaped folders, resumable CLI | **paperful** (this repo) |
 | **In-Zotero** “find OA PDF” plus optional grey-zone sources in one plugin UI | [zotero-zotadata](https://github.com/ydeng11/zotero-zotadata) |
 | **Attachment hygiene** (broken links, rename, linked-file layout, merge duplicate files) | [StorScan](https://github.com/brian-j-griffith/StorScan), [Attanger](https://github.com/MuiseDestiny/zotero-attanger), [ZotMoov](https://github.com/wileyyugioh/zotmoov) |
@@ -26,12 +26,13 @@ Prefer this page for “is this the right tool?”
 | **`.bib` normalize / dedupe / upgrade preprints** (no Zotero required) | [bibcite](https://github.com/leo1oel/bibcite), [bibtex-tidy](https://github.com/FlamingTempura/bibtex-tidy), [bibmanager](https://bibmanager.readthedocs.io/) |
 | **Mendeley** dedup inside the app; clean **exported** BibTeX | Mendeley Duplicates smart collection; export cleaners such as [mendeley_bibtex_cleaner](https://gist.github.com/alexandrehuat/6d3263f73ccae87d0107977978316c02) |
 | **DOI-list PDF batch** without Zotero | [paperscraper](https://github.com/jannisborn/paperscraper) |
-| **Build a Zotero collection** from a keyword, a DOI’s references, an ORCID, or a hybrid hop, then optionally fill PDFs | **paperful snowball** — dry-run, `approve-each`, `approve-batch`, `--gate auto`, and `--fetch-pdfs` ([snowball](snowball.md)). In-app one-hop browsers stay separate ([zotero-snowball](https://github.com/socratic-irony/zotero-snowball), [Citegeist](https://github.com/phdemotions/zotero-citegeist)). General harvesters without the sidecar: [findpapers](https://github.com/jonatasgrosman/findpapers), [opencite](https://github.com/neuromechanist/opencite) |
+| **Grow the library** from a keyword, a DOI’s references, an ORCID, or a hybrid hop, then optionally fill PDFs | **paperful snowball** — dry-run, `approve-each`, `approve-batch`, `--gate auto`, and `--fetch-pdfs` ([snowball](snowball.md)). In-app one-hop browsers stay separate ([zotero-snowball](https://github.com/socratic-irony/zotero-snowball), [Citegeist](https://github.com/phdemotions/zotero-citegeist)). General harvesters without the mirror: [findpapers](https://github.com/jonatasgrosman/findpapers), [opencite](https://github.com/neuromechanist/opencite) |
 | “Just use what ships in Zotero” | Built-in **Find Available PDF** plus [custom PDF resolvers](https://www.zotero.org/support/kb/custom_pdf_resolvers) |
 
 paperful does **not** replace a full metadata editor, an attachment reorganiser,
-or a `.bib` linter. Fetch and lint run on disk; the manager is a write-back
-adapter (`manager = "zotero"` is well tested; Mendeley and EndNote are seeking testers).
+or a `.bib` linter. The jobs are library, find, completeness, mirror, and
+control. Fetch and lint run on disk; the manager is a write-back adapter
+(`manager = "zotero"` is well tested; Mendeley and EndNote are seeking testers).
 
 Architecture: [architecture.md](architecture.md).
 
@@ -45,17 +46,21 @@ Most tools in this space optimise one or more of:
 4. **Fix `.bib` / exports** — keys, duplicates, Mendeley-specific fields
 5. **Automate / agent** — MCP, CLI, batch undo
 
-paperful is built for **(1)** and for a **portable disk copy** of the catalogue
+Those map onto paperful’s jobs. **Find** is **(1)**: open access, campus
+proxy, playbooks, and an opt-in AI browser after the scripted lanes fail.
+**Completeness** is **(2)** (`lint` / `fix-metadata`, patches on disk,
+`--apply` to the adapter) plus duplicate review (`dedupe`) and opt-in
+`summarize` / `synthesize`. **Mirror** is the portable disk copy
 (`snapshot` / `restore`; `snapshot --pdfs all` also copies PDFs already in
-Zotero). **(2)** is `lint` / `fix-metadata` (patches on disk, `--apply` to the
-adapter; PubMed PMID→DOI, Crossref/OpenAlex verify). Disk layout is a
-collection mirror plus attach — not in-library reorganisation (**(3)**).
-**(4)** is other tools. **(5)** is partial here: opt-in `summarize`,
-`synthesize`, and one-item `recover`. A chat agent, and OCR of scans, stay
-with zotero-mcp and zotero-agent.
+Zotero) — a collection tree plus attach, not in-library reorganisation
+(**(3)**). **(4)** is other tools. **(5)** is partial here: the same opt-in
+summaries, plus one-item `recover`. A chat agent, and OCR of scans, stay
+with zotero-mcp and zotero-agent. **Library** is the catalogue you already
+have, grown with `snowball` when you ask. **Control** is disk-first
+write-back and opt-in sources.
 
 ```text
-Zotero library  →  paperful snapshot  →  out/<collection>/<stem -- KEY>/
+Reference library  →  paperful snapshot  →  out/<collection>/<stem -- KEY>/
                  →  paperful run       →  same folder (PDF)  →  attach (Zotero 10+)
                  →  paperful restore --apply  →  missing items only
                       ↑
@@ -146,7 +151,7 @@ More branches: [comparison reference](comparison-reference.md#choosing-in-one-gl
 ## Related docs
 
 - [architecture.md](architecture.md) — disk-first adapters, circuit breaker, Sci-Hub
-- [ROADMAP.md](ROADMAP.md) — sidecar 1.0; optional LLM; snowball phases
+- [ROADMAP.md](ROADMAP.md) — mirror contract toward 1.0; optional LLM; snowball phases
 - [snowball.md](snowball.md) — keyword, DOI, ORCID, collection, and hybrid library building
 - [comparison-reference.md](comparison-reference.md) — vendor notes and extra tables
 - [commands.md](commands.md) — CLI and disk artifacts

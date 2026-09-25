@@ -134,7 +134,14 @@ a {
   line-height: 1.25;
   margin: 0 0 1rem;
   color: var(--ink-soft);
-  max-width: 22ch;
+  max-width: 22em;
+}
+
+.stack {
+  margin: -0.75rem 0 1.5rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+  color: var(--ink-soft);
 }
 
 .lede {
@@ -204,8 +211,20 @@ a {
 
 .feature-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(6, 1fr);
   gap: 1.75rem 2rem;
+}
+
+.feature {
+  grid-column: span 2;
+}
+
+.feature:nth-child(4) {
+  grid-column: 2 / span 2;
+}
+
+.feature:nth-child(5) {
+  grid-column: 4 / span 2;
 }
 
 .feature h3 {
@@ -297,5 +316,11 @@ a {
 
   .feature-grid {
     grid-template-columns: 1fr;
+  }
+
+  .feature,
+  .feature:nth-child(4),
+  .feature:nth-child(5) {
+    grid-column: auto;
   }
 }

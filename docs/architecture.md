@@ -1,14 +1,15 @@
 # Paperful architecture
 
-Paperful is a **local CLI sidecar**. Fetch, identifier checks, proposed
-metadata patches, and the per-item restore folder happen **on disk** (`out/`,
-`state/`). A **library adapter** reads the catalogue and, separately, writes
-PDFs or field patches back. **Zotero** (local API on `localhost:23119`) is the
-well-tested adapter. `manager = "mendeley"` talks to the Mendeley REST API;
-`manager = "endnote"` reads a local `.enl` library and stages an XML import
-bundle instead of editing the database. Both are **seeking testers** — do not
-treat them as proven. The disk ledger is what you keep if the manager changes.
-See [Why paperful](why.md).
+Paperful does five jobs — **library**, **find**, **completeness**,
+**mirror**, **control** — as a **local CLI**. Fetch, identifier checks,
+proposed metadata patches, summaries, and the per-item mirror happen **on
+disk** (`out/`, `state/`). A **library adapter** reads the catalogue and,
+separately, writes PDFs or field patches back. **Zotero** (local API on
+`localhost:23119`) is the well-tested adapter. `manager = "mendeley"` talks
+to the Mendeley REST API; `manager = "endnote"` reads a local `.enl` library
+and stages an XML import bundle instead of editing the database. Both are
+**seeking testers** — do not treat them as proven. The disk mirror is what
+you keep if the manager changes. See [Why paperful](why.md).
 
 `run` never rewrites bibliographic fields. On Zotero, attach,
 `fix-metadata --apply`, and `dedupe --apply` use the Zotero 10+ write API.
