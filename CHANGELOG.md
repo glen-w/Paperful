@@ -12,6 +12,10 @@ three paths to results (fill PDFs, quiet mirror, snowball). Flat
 `docs/<page>.md` stubs keep old GitHub and CLI links working. Operator install
 stays Docker Compose; `uv` is the contributor path.
 
+Public pitch is the five jobs — library, find, completeness, mirror, control —
+rather than a Zotero sidecar. The catalogue stays an adapter: Zotero is well
+tested; Mendeley and EndNote are seeking testers. See [Why Paperful](docs/why.md).
+
 Snowball wave 3: ORCID and collection seeds, `--direction cites|both`, depth
 above 1 (soft ceiling 5) under the existing caps, `approve-batch` queues with
 `keep` plus `paperful snowball apply <run-id>`, and profiles for `orcid` /

@@ -3,16 +3,16 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Paperful — keep the library, the files, and control</title>
+    <title>Paperful — clean the library, find the PDFs, keep a mirror</title>
     <meta
       name="description"
-      content="A local sidecar for your research library. Fills what open-access indexes, campus EZProxy, and grey playbooks can reach — not every paywalled or DOI-less item. Zotero is the well-tested catalogue."
+      content="A research helper that cleans a reference library, finds missing PDFs, and summarises papers. Open access and campus access, playbooks and an opt-in AI browser for the rest, and a platform-agnostic mirror for backup."
     />
     <link rel="icon" href="images/logo.png" type="image/png" />
-    <meta property="og:title" content="Paperful — keep the library, the files, and control" />
+    <meta property="og:title" content="Paperful — clean the library, find the PDFs, keep a mirror" />
     <meta
       property="og:description"
-      content="Build it locally. Fills what open-access indexes, campus EZProxy, and grey playbooks can reach — not every paywalled or DOI-less item."
+      content="Clean a reference library, find missing PDFs, summarise papers, and keep a platform-agnostic mirror. Python, Zotero API, Ollama or LiteLLM, Docker."
     />
     <meta property="og:image" content="images/logo.png" />
     <meta property="og:type" content="website" />
@@ -66,15 +66,16 @@
             height="140"
           />
           <p class="brand-mark">Paperful</p>
-          <h1>Keep the library. Keep the files. Keep control.</h1>
+          <h1>Clean the library. Find the PDFs. Keep a mirror.</h1>
           <p class="lede">
-            A local sidecar for your research library: collections organised,
-            metadata linted, a quiet copy on disk. It fills what open-access
-            indexes, campus EZProxy, and grey playbooks can reach — not every
-            paywalled or DOI-less item. Zotero is the well-tested catalogue.
-            Mendeley and EndNote adapters are seeking testers. Work stays on
-            this machine.
+            A research helper that tidies a reference library, finds missing
+            PDFs, and summarises papers. Open-access indexes first, campus
+            access when you have it. Playbooks you write, and an AI browser
+            when you turn it on, cover grey literature and field-specific
+            sites. A platform-agnostic mirror is the backup and the way out.
+            Work stays on this machine.
           </p>
+          <p class="stack">Python · Zotero API · Ollama / LiteLLM · Docker</p>
           <div class="cta-row">
             <a class="btn primary" href="#product">See how it works</a>
             <a class="btn ghost" href="#install">Install</a>
@@ -84,10 +85,11 @@
 
       <section class="section" id="product">
         <div class="wrap">
-          <h2>The sidecar beside Zotero</h2>
+          <h2>Library, find, completeness, mirror, control</h2>
           <p class="section-lead">
-            Open access first. Campus EZProxy when you have a subscription.
-            Sci-Hub is opt-in and off by default.
+            The catalogue is an adapter. Zotero’s local API is the one that
+            is well tested. Mendeley and EndNote are seeking testers. Sci-Hub
+            is opt-in and off by default. Not every paywalled paper comes back.
           </p>
           <div class="feature-grid">
             <div class="feature">
@@ -99,12 +101,50 @@
                     <circle cx="15.2" cy="15.2" r="1.15" fill="currentColor" stroke="none" />
                   </svg>
                 </span>
-                On disk first
+                Library
               </h3>
               <p>
-                Downloads land under <code>out/</code>. Resume lives in
-                <code>state/</code>. Zotero is read in, then written back —
-                attach and metadata apply are separate steps.
+                Collections, years, and item types are the scope.
+                <code>snowball</code> proposes new works and creates them only
+                when the gate says so. RIS, BibTeX, and EndNote XML go in and
+                out. The catalogue is read, then written back.
+              </p>
+            </div>
+            <div class="feature">
+              <h3>
+                <span class="mark" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="10.5" cy="10.5" r="5.5" />
+                    <path d="M14.8 14.8 19.5 19.5" />
+                  </svg>
+                </span>
+                Find
+              </h3>
+              <p>
+                Open access first, then campus EZProxy when you have a
+                subscription. Playbooks you write, and an opt-in AI browser,
+                cover grey literature and odd landings. Each item only hits
+                sources that match its metadata unless you pass
+                <code>--try-all</code>.
+              </p>
+            </div>
+            <div class="feature">
+              <h3>
+                <span class="mark" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12.5 9.2 17 19 7" />
+                    <path d="M4 5h16M4 19h10" />
+                  </svg>
+                </span>
+                Completeness
+              </h3>
+              <p>
+                <code>gaps</code>, <code>lint</code>, and
+                <code>fix-metadata</code> tidy identifiers.
+                <code>dedupe</code> reviews duplicates before anything is
+                trashed. <code>summarize</code> writes a note from a text-layer
+                PDF. <code>paperful all</code> runs the chain. The model stays
+                off until you enable it.
               </p>
             </div>
             <div class="feature">
@@ -115,66 +155,30 @@
                     <path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4H6.5A1.5 1.5 0 0 0 5 5.5V16" />
                   </svg>
                 </span>
-                A quiet copy you own
+                Mirror
               </h3>
               <p>
                 <code>snapshot</code> writes one folder per item
                 (<code>record.json</code>, optional PDF, notes).
-                <code>restore</code> recreates only what Zotero is missing.
-                Copy the tree; Paperful is not a sync service.
+                <code>restore</code> recreates only what the live catalogue is
+                missing. Copy the tree; Paperful is not a sync service.
               </p>
             </div>
             <div class="feature">
               <h3>
                 <span class="mark" aria-hidden="true">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="6" cy="6" r="2.2" />
-                    <circle cx="18" cy="18" r="2.2" />
-                    <path d="M8.1 6H13a4 4 0 0 1 4 4v5.8" />
+                    <rect x="6" y="11" width="12" height="8.5" rx="1.5" />
+                    <path d="M8.5 11V8.2a3.5 3.5 0 0 1 7 0V11" />
                   </svg>
                 </span>
-                Routed sources
+                Control
               </h3>
               <p>
-                Each item only hits sources that match its metadata unless you
-                pass <code>--try-all</code>. A circuit breaker skips blocked
-                sources for the rest of the run.
-              </p>
-            </div>
-            <div class="feature">
-              <h3>
-                <span class="mark" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 20.5h16" />
-                    <path d="M6.5 20.5V10.2L12 5.5l5.5 4.7v10.3" />
-                    <path d="M10.2 20.5v-4.2h3.6v4.2" />
-                  </svg>
-                </span>
-                Campus when you have it
-              </h3>
-              <p>
-                Log in once in your system Chrome or Edge. EZProxy uses your
-                library entitlement. Passwords never live in TOML.
-              </p>
-            </div>
-            <div class="feature">
-              <h3>
-                <span class="mark" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M7 3.5h7.2L19 8.2V20.5H7z" />
-                    <path d="M14 3.5V8.2h5" />
-                    <path d="M10 12.5h6M10 16h4" />
-                  </svg>
-                </span>
-                Grey literature
-              </h3>
-              <p>
-                Journal PDFs ingest cleanly in Zotero. Reports and scans often
-                do not. An example ocean and governance playbook keeps UN, FAO,
-                ISA, and similar landings as real PDFs. It is not a universal
-                grey-literature harvester. Optional HTML→PDF covers blogs and
-                news. Local
-                summaries need a text layer — not OCR.
+                Downloads and proposals land on disk first. Write-back is a
+                step you ask for. Dry-run before a big fetch. Scholar, Sci-Hub,
+                and the model are opt-in. Passwords never live in the config.
+                Summaries need a text layer — not OCR.
               </p>
             </div>
           </div>
@@ -185,17 +189,16 @@
         <div class="wrap narrow">
           <h2>What can I do with it?</h2>
           <ul class="outcomes">
+            <li>Tidy a collection: identifiers, duplicates, then a summary if you want one</li>
             <li>
-              Fill a collection with PDFs that open access, campus access, and
-              your playbooks can reach
+              Find PDFs that open access, campus access, and your playbooks can
+              reach
             </li>
-            <li>Keep a folder tree that matches Zotero collections</li>
+            <li>Grow the library from a keyword, a DOI, or an ORCID, behind a gate</li>
             <li>Snapshot the library to disk and restore only missing items</li>
-            <li>Lint DOIs and propose metadata patches on disk</li>
-            <li>Find duplicate items, review a pack, then trash extras</li>
-            <li>Optionally summarise a PDF you already have, on this machine</li>
+            <li>Hand the mirror to another tool as RIS, BibTeX, or EndNote XML</li>
             <li>Use campus EZProxy without storing your password</li>
-            <li>Opt in to Sci-Hub only when you choose to</li>
+            <li>Leave Scholar, Sci-Hub, and the local model off until you opt in</li>
           </ul>
           <p>
             Paths to results:
@@ -222,10 +225,12 @@
         <div class="wrap narrow">
           <h2>On your machine</h2>
           <p>
-            Paperful is a local CLI. Catalogue reads and PDF writes go through
-            Zotero’s local API. Session cookies stay under
-            <code>state/sessions/</code>. Sci-Hub stays off until you add it
-            to <code>sources</code> or pass <code>--scihub</code>.
+            Paperful is a local CLI. The catalogue is read through an adapter
+            (Zotero’s local API is the one that is well tested). Session
+            cookies stay under <code>state/sessions/</code>. Sci-Hub stays off
+            until you add it to <code>sources</code> or pass
+            <code>--scihub</code>. The mirror under <code>out/</code> is yours
+            to copy.
           </p>
         </div>
       </section>

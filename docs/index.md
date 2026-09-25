@@ -1,9 +1,14 @@
 # Paperful documentation
 
-Paperful is a local sidecar for your research library: keep collections
-organised, fill missing PDFs, lint metadata, and keep a quiet copy on disk.
-Zotero is the well-tested catalogue. Mendeley and EndNote adapters are seeking
-testers. See [Why Paperful](start/why.md).
+Paperful cleans a reference library, finds missing PDFs, and summarises
+papers, then keeps a platform-agnostic mirror you can back up and move.
+Five jobs: **library**, **find**, **completeness**, **mirror**, **control**.
+See [Why Paperful](start/why.md).
+
+The live catalogue is an adapter. **Zotero is well tested.** Mendeley and
+EndNote adapters are seeking testers. Open access first; campus EZProxy when
+you have a subscription; playbooks and an opt-in AI browser cover grey
+literature. **Sci-Hub is opt-in and off by default.**
 
 **Operators** clone the repo and run `docker compose build` — no `docker pull`,
 no PyPI. **Contributors** use [`uv`](https://docs.astral.sh/uv/). Details:

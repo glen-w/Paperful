@@ -3,19 +3,38 @@
 </h1>
 
 <p align="center">
-  <strong>Keep the library. Keep the files. Keep control.</strong><br>
-  A local sidecar for your research library: collections organised, missing
-  PDFs filled, metadata linted, a quiet copy on disk. Zotero is the
-  well-tested catalogue. Mendeley and EndNote adapters are in the tree and
-  seeking testers. Work stays on this machine. Fills what open-access indexes,
-  campus EZProxy, and grey playbooks can reach — not every paywalled or
-  DOI-less item.
+  <strong>Clean the library. Find the PDFs. Keep a mirror.</strong><br>
+  A research helper that tidies a reference library, finds missing PDFs, and
+  summarises papers. Open-access indexes first, campus access when you have
+  it; playbooks you write, and an AI browser when you turn it on, cover
+  grey literature and field-specific sites. A platform-agnostic mirror is the
+  backup and the way out. Work stays on this machine.
 </p>
 
-Open access first. Campus **EZProxy** when you have a subscription.
-**Google Scholar** and **Sci-Hub** are opt-in and off by default (see
-[Sci-Hub](docs/scihub.md)). Why this shape: [Why Paperful](docs/why.md).
-Not sure if this is the right tool? [How Paperful compares](docs/comparison.md).
+Five jobs: **library**, **find**, **completeness**, **mirror**, **control**.
+The live catalogue is an adapter. Zotero’s local API is the one that is well
+tested. Mendeley and EndNote are seeking testers — do not treat them as
+proven. Why this shape: [Why Paperful](docs/why.md). Not sure this is the
+right tool? [How Paperful compares](docs/comparison.md).
+
+**Library.** Collections, years, and item types are the scope. `snowball`
+grows the library behind a gate. `import` / `export` speak RIS, BibTeX, and
+EndNote XML.
+
+**Find.** Open access first; campus **EZProxy** when you have a subscription;
+playbooks and an opt-in AI browser for the rest. **Google Scholar** and
+**Sci-Hub** are opt-in and off by default (see [Sci-Hub](docs/scihub.md)).
+
+**Completeness.** `gaps`, `lint`, `fix-metadata`, `dedupe`, and optional
+`summarize` / `synthesize`. `paperful all` runs the usual chain. OCR is not
+in scope.
+
+**Mirror.** Work lands on disk (`out/`, `state/`). `snapshot` / `restore`
+write a platform-agnostic copy. Copy `out/` yourself; Paperful is not a sync
+service.
+
+**Control.** Disk-first write-back, dry-run, opt-in Scholar / Sci-Hub / LLM.
+Docker runs the tool; Zotero and headed `session login` stay on the host.
 
 Hosted site: [glenwright.earth/Paperful](https://glenwright.earth/Paperful/)
 (landing in [`website/`](website/) + Sphinx guide at `/guide/`). Preview:

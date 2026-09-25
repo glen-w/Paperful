@@ -1,10 +1,11 @@
 # Roadmap
 
-Guidance for contributors, not a commitment calendar. Paperful is a **local
-research-library sidecar**: one disk ledger (`out/`, `state/`), adapters for
-citation managers, and fetch / lint / attach as the core loop. **Zotero is the
-well-tested adapter.** Mendeley and EndNote are in the tree and seeking
-testers. See [architecture.md](../explain/architecture.md) and [why.md](../start/why.md).
+Guidance for contributors, not a commitment calendar. Paperful's jobs are
+**library**, **find**, **completeness**, **mirror**, and **control**: one
+disk mirror (`out/`, `state/`), adapters for citation managers, and fetch /
+lint / attach / summarise as the core loop. **Zotero is the well-tested
+adapter.** Mendeley and EndNote are in the tree and seeking testers. See
+[architecture.md](../explain/architecture.md) and [why.md](../start/why.md).
 
 Surfaces like a Zotero plugin, Firefox extension, or web GUI are **not** the
 product direction. Optional thin bridges (`paperful session login`) capture a local browser
@@ -16,11 +17,11 @@ and EndNote adapters are not 1.0 until testers have exercised them. Not a GUI,
 not OCR, not a WebDAV client, and not “AI fetch everything.”
 
 (trust-10)=
-## 0.1 → 1.0 (trust + sidecar contract)
+## 0.1 → 1.0 (trust + mirror contract)
 
-`0.1` is a first usable sidecar beside Zotero. Do not call it **1.0** until
-these land. Do **not** grow this list into a second product (no GUI, no auto
-Sci-Hub, no “AI fetch everything”).
+`0.1` is a first usable helper for a reference library. Do not call it **1.0**
+until these land. Do **not** grow this list into a second product (no GUI, no
+auto Sci-Hub, no “AI fetch everything”).
 
 | Step | UX outcome | Status |
 | --- | --- | --- |

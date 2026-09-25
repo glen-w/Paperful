@@ -1,8 +1,14 @@
 # Quiet mirror (`out/`)
 
-**Who:** you want a browsable, syncable folder tree, or restore insurance.  
+**Who:** you want a browsable, syncable folder tree, restore insurance, or a
+way to leave the citation manager.  
 **Goal:** one folder per item under `out/`; later recreate only missing
 catalogue rows with `restore --apply`.
+
+The folder tree under `out/` is the platform-agnostic copy of the library:
+backup, and a way out. One folder per item (`record.json`, optional PDF,
+notes), plus a collection tree. RIS, BibTeX, and EndNote XML
+(`import` / `export`) are the other door.
 
 Finish [Quick start](../start/quickstart.md) first. Filling PDFs first is
 optional — `snapshot --pdfs all` can export files already in Zotero.
@@ -46,10 +52,10 @@ docker compose run --rm paperful restore --collection interesting --apply
 Linked-file cutover is not a 0.x goal.
 
 ```text
-Zotero library  →  paperful snapshot  →  out/<collection>/<stem -- KEY>/
+Reference library  →  paperful snapshot  →  out/<collection>/<stem -- KEY>/
                  →  paperful run       →  same folder (PDF + record.json)
                                       →  attach (imported_file)
-out/  →  paperful restore --apply  →  missing Zotero items only
+out/  →  paperful restore --apply  →  missing catalogue items only
 ```
 
 ## Item folder
