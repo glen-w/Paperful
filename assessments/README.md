@@ -26,4 +26,7 @@ Each assessment is dated (`YYYY-MM-DD-brief-description.md`) and includes:
 
 ---
 
-**Latest:** [2026-09-25-critical-review-usability-docs-features.md](./2026-09-25-critical-review-usability-docs-features.md)
+## Files
+
+- **[2026-09-25-critical-review-usability-docs-features.md](./2026-09-25-critical-review-usability-docs-features.md)** — Comprehensive usability, documentation, and features assessment (Researcher lane; 5 P0s, 20 findings total)
+- **[2026-09-25-ux-operator-first-hour.md](./2026-09-25-ux-operator-first-hour.md)** — UX lane: operator first-hour journey (zero → first PDF), docs-as-product for CLI, feature discoverability, snowball vs run job-split clarity
