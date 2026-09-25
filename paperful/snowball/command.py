@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable
@@ -10,16 +11,23 @@ from rich.console import Console
 from rich.table import Table
 
 from ..config import Config
-from ..library import get_backend
+from ..dedupe import normalize_dedupe_title
+from ..library import LibraryError, get_backend
+from ..resolve import normalize_doi
 from .candidate import Candidate
-from .crawl import doi_candidates, orcid_candidates, search_candidates
-from .expand import clamp_depth, keyword_depth, normalize_direction, truncate
+from .crawl import doi_candidates, hybrid_candidates, orcid_candidates, search_candidates
+from .expand import apply_filters, clamp_depth, keyword_depth, normalize_direction, truncate
+from .fill import crossref_work, fill_crossref, fill_semanticscholar, s2_api_key, s2_paper
 from .ingest import create_new, fill_pdfs
 from .openalex import OpenAlexClient, normalize_orcid
 from .orcid import OrcidError, orcid_dois
 from .queue import load_queue, write_queue, write_report
+from .rank import FORMULA, apply_overlap
+from .refine import llm_suggester, suggestions_for
 
 Lookup = Callable[[str | None, str | None], str | None]
+Decider = Callable[[Candidate], bool]
+KNOWN_BACKENDS = ("openalex", "crossref", "semanticscholar", "orcid")
 
 
 class SnowballError(Exception):
@@ -39,6 +47,19 @@ class SnowballRequest:
     year_from: int | None = None
     year_to: int | None = None
     direction: str = "refs"
+    dedupe_scope: str | None = None
+    tag_prefix: str | None = None
+    types: tuple[str, ...] | None = None
+    oa_only: bool | None = None
+    venue_include: tuple[str, ...] | None = None
+    venue_exclude: tuple[str, ...] | None = None
+    languages: tuple[str, ...] | None = None
+    min_seed_citations: int | None = None
+    note_provenance: bool | None = None
+    backends: tuple[str, ...] | None = None
+    hybrid_seeds: int | None = None
+    approve_each_max: int | None = None
+    refine: bool | None = None
 
 
 @dataclass
@@ -56,6 +77,10 @@ def run_search(
     client: OpenAlexClient | None = None,
     lookup: Lookup | None = None,
     backend: Any = None,
+    decider: Decider | None = None,
+    crossref_getter: Any = None,
+    s2_getter: Any = None,
+    suggester: Any = None,
 ) -> PathResult:
     _guard(cfg, request)
     depth = keyword_depth(request.depth)
@@ -74,6 +99,11 @@ def run_search(
         lookup=lookup,
         backend=backend,
         warning=warning,
+        decider=decider,
+        crossref_getter=crossref_getter,
+        s2_getter=s2_getter,
+        suggester=suggester,
+        refine_query=query,
         crawl=lambda oa, run_id, gate, caps: search_candidates(
             oa,
             query,
@@ -85,7 +115,66 @@ def run_search(
             per_hop_limit=caps[1],
             year_from=request.year_from,
             year_to=request.year_to,
+            min_seed_citations=_min_cites(cfg, request),
         ),
+    )
+
+
+def run_hybrid(
+    cfg: Config,
+    query: str,
+    request: SnowballRequest,
+    *,
+    console: Console,
+    client: OpenAlexClient | None = None,
+    lookup: Lookup | None = None,
+    backend: Any = None,
+    decider: Decider | None = None,
+    crossref_getter: Any = None,
+    s2_getter: Any = None,
+    suggester: Any = None,
+) -> PathResult:
+    """Keyword hits, then one hop from the top DOI hits."""
+    _guard(cfg, request)
+    text = query.strip()
+    if not text:
+        raise SnowballError("Pass a keyword query.")
+    try:
+        direction = normalize_direction(request.direction)
+    except ValueError as exc:
+        raise SnowballError(str(exc)) from exc
+    seeds = request.hybrid_seeds if request.hybrid_seeds is not None else cfg.snowball_hybrid_seeds
+
+    def crawl(oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int]) -> tuple[list[Candidate], list[str]]:
+        return hybrid_candidates(
+            oa,
+            text,
+            run_id=run_id,
+            gate=gate,
+            direction=direction,
+            max_candidates=caps[0],
+            per_hop_limit=caps[1],
+            year_from=request.year_from,
+            year_to=request.year_to,
+            hybrid_seeds=seeds,
+            min_seed_citations=_min_cites(cfg, request),
+        )
+
+    return _execute(
+        cfg,
+        request,
+        console=console,
+        client=client,
+        lookup=lookup,
+        backend=backend,
+        warning=None,
+        crawl=crawl,
+        expect_failures=True,
+        decider=decider,
+        crossref_getter=crossref_getter,
+        s2_getter=s2_getter,
+        suggester=suggester,
+        refine_query=text,
     )
 
 
@@ -98,13 +187,17 @@ def run_doi(
     client: OpenAlexClient | None = None,
     lookup: Lookup | None = None,
     backend: Any = None,
+    decider: Decider | None = None,
+    crossref_getter: Any = None,
+    s2_getter: Any = None,
+    suggester: Any = None,
 ) -> PathResult:
     _guard(cfg, request)
     try:
         direction = normalize_direction(request.direction)
     except ValueError as exc:
         raise SnowballError(str(exc)) from exc
-    depth, warning = clamp_depth(1 if request.depth is None else request.depth)
+    depth, warning = clamp_depth(_graph_depth(cfg, request))
     cleaned = [d.strip() for d in dois if d.strip()]
     if not cleaned:
         raise SnowballError("Pass at least one DOI.")
@@ -121,6 +214,7 @@ def run_doi(
             per_hop_limit=caps[1],
             year_from=request.year_from,
             year_to=request.year_to,
+            min_seed_citations=_min_cites(cfg, request),
         )
 
     return _execute(
@@ -133,6 +227,10 @@ def run_doi(
         warning=warning,
         crawl=crawl,
         expect_failures=True,
+        decider=decider,
+        crossref_getter=crossref_getter,
+        s2_getter=s2_getter,
+        suggester=suggester,
     )
 
 
@@ -155,11 +253,16 @@ def run_orcid(
         direction = normalize_direction(request.direction)
     except ValueError as exc:
         raise SnowballError(str(exc)) from exc
-    depth, warning = clamp_depth(1 if request.depth is None else request.depth)
-    try:
-        dois = orcid_dois(cleaned, getter=orcid_getter)
-    except OrcidError as exc:
-        raise SnowballError(str(exc)) from exc
+    depth, warning = clamp_depth(_graph_depth(cfg, request))
+    backends = _backends(cfg, request)
+    if "orcid" in backends:
+        try:
+            dois = orcid_dois(cleaned, getter=orcid_getter)
+        except OrcidError as exc:
+            raise SnowballError(str(exc)) from exc
+    else:
+        dois = []
+        console.print("[yellow]orcid backend off; using OpenAlex author filter only[/]")
 
     def crawl(oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int]) -> tuple[list[Candidate], list[str]]:
         return orcid_candidates(
@@ -174,6 +277,7 @@ def run_orcid(
             per_hop_limit=caps[1],
             year_from=request.year_from,
             year_to=request.year_to,
+            min_seed_citations=_min_cites(cfg, request),
         )
 
     return _execute(
@@ -205,7 +309,7 @@ def run_collection(
         direction = normalize_direction(request.direction)
     except ValueError as exc:
         raise SnowballError(str(exc)) from exc
-    depth, warning = clamp_depth(1 if request.depth is None else request.depth)
+    depth, warning = clamp_depth(_graph_depth(cfg, request))
     lib = backend
     try:
         lib = lib or get_backend(cfg)
@@ -230,6 +334,7 @@ def run_collection(
             per_hop_limit=caps[1],
             year_from=request.year_from,
             year_to=request.year_to,
+            min_seed_citations=_min_cites(cfg, request),
         )
 
     return _execute(
@@ -276,7 +381,7 @@ def run_apply(
     if finder is None:
         try:
             lib = lib or get_backend(cfg)
-            finder = _library_lookup(lib)
+            finder = _library_lookup(lib, scope="library", collection=collection)
         except Exception as exc:
             raise SnowballError(f"Library was not read. Refusing to create items. {exc}") from exc
     assert lib is not None and finder is not None
@@ -287,7 +392,16 @@ def run_apply(
         write_report(dest, {"created": 0, "skipped_exists": len(kept), "attach_ok": 0, "attach_deferred": 0})
         return PathResult(dest, 0)
 
-    items, counts = create_new(lib, creatable, collection)
+    note = cfg.snowball_note_provenance if request.note_provenance is None else request.note_provenance
+    items, counts = create_new(
+        lib,
+        creatable,
+        collection,
+        tag_prefix=request.tag_prefix or cfg.snowball_tag_prefix,
+        note_provenance=note,
+    )
+    if counts.get("failed"):
+        console.print(f"[yellow]{counts['failed']} create(s) failed; other rows continued[/]")
     report = {
         "created": counts["created"],
         "skipped_exists": counts["skipped_exists"] + (len(kept) - len(creatable)),
@@ -307,18 +421,29 @@ def run_apply(
     else:
         console.print(f"items created (metadata only): {counts['created']}")
     write_report(dest, report)
-    return PathResult(dest, 0)
+    return PathResult(dest, 1 if counts.get("failed") else 0)
 
 
 def _guard(cfg: Config, request: SnowballRequest) -> None:
     if not cfg.snowball_enabled:
         raise SnowballError("Snowball is off. Set [snowball] enabled = true in config.toml.")
-    if request.gate not in {"dry-run", "auto", "approve-batch"}:
+    if request.gate not in {"dry-run", "auto", "approve-batch", "approve-each"}:
+        raise SnowballError("gate must be dry-run, approve-each, approve-batch, or auto.")
+    scope = (request.dedupe_scope or cfg.snowball_dedupe_scope or "library").strip()
+    if scope not in {"library", "collection", "none"}:
+        raise SnowballError("dedupe_scope must be library, collection, or none.")
+    _backends(cfg, request)
+    if request.gate in {"auto", "approve-batch", "approve-each"} and not request.collection.strip():
         raise SnowballError(
-            "gate must be dry-run, approve-batch, or auto. approve-each is later."
+            f"gate {request.gate} needs a target collection (-C / target_collection)."
         )
-    if request.gate == "auto" and not request.collection.strip():
-        raise SnowballError("gate auto needs a target collection (-C / target_collection).")
+
+
+def _graph_depth(cfg: Config, request: SnowballRequest) -> int:
+    """DOI, ORCID, and collection hops. Omitted depth uses [snowball] depth."""
+    if request.depth is None:
+        return cfg.snowball_depth
+    return request.depth
 
 
 def _execute(
@@ -332,6 +457,11 @@ def _execute(
     warning: str | None,
     crawl: Callable,
     expect_failures: bool = False,
+    decider: Decider | None = None,
+    crossref_getter: Any = None,
+    s2_getter: Any = None,
+    suggester: Any = None,
+    refine_query: str = "",
 ) -> PathResult:
     if warning:
         console.print(f"[yellow]{warning}[/]")
@@ -350,6 +480,43 @@ def _execute(
         rows, failed = produced
     else:
         rows = produced
+    scope = (request.dedupe_scope or cfg.snowball_dedupe_scope or "library").strip()
+    types = cfg.snowball_types if request.types is None else request.types
+    oa_only = cfg.snowball_oa_only if request.oa_only is None else request.oa_only
+    venue_include = cfg.snowball_venue_include if request.venue_include is None else request.venue_include
+    venue_exclude = cfg.snowball_venue_exclude if request.venue_exclude is None else request.venue_exclude
+    languages = cfg.snowball_languages if request.languages is None else request.languages
+    tag_prefix = request.tag_prefix or cfg.snowball_tag_prefix
+    note_provenance = cfg.snowball_note_provenance if request.note_provenance is None else request.note_provenance
+    backends = _backends(cfg, request)
+    try:
+        direction = normalize_direction(request.direction)
+    except ValueError:
+        direction = "refs"
+    apply_overlap(rows)
+    rows = _fill_metadata(
+        cfg,
+        request,
+        rows,
+        backends=backends,
+        console=console,
+        live=client is None,
+        crossref_getter=crossref_getter,
+        s2_getter=s2_getter,
+        per_hop_limit=caps[1],
+        direction=direction,
+    )
+    apply_overlap(rows)
+    rows = apply_filters(
+        rows,
+        year_from=request.year_from,
+        year_to=request.year_to,
+        types=types,
+        oa_only=oa_only,
+        venue_include=venue_include,
+        venue_exclude=venue_exclude,
+        languages=languages,
+    )
     rows = truncate(rows, caps[0])
     if gate == "approve-batch":
         for row in rows:
@@ -359,24 +526,53 @@ def _execute(
     finder = lookup
     lib = backend
     _unread_error: BaseException | None = None
-    if finder is None:
+    if scope == "none":
+        console.print("[yellow]dedupe_scope none: not checking the library[/]")
+        finder = None
+        if gate in {"auto", "approve-each"} and lib is None:
+            try:
+                lib = get_backend(cfg)
+            except Exception as exc:
+                lib = None
+                _unread_error = exc
+                library_unread = True
+    elif finder is None:
         try:
             lib = lib or get_backend(cfg)
-            finder = _library_lookup(lib)
+            finder = _library_lookup(lib, scope=scope, collection=request.collection)
         except Exception as exc:
             library_unread = True
             finder = None
-            if gate == "auto":
+            if gate in {"auto", "approve-each"}:
                 lib = None
                 _unread_error = exc
-    if finder is not None:
+    if scope != "none" and finder is not None:
         try:
             _mark_exists(rows, finder)
         except Exception:
             library_unread = True
-    else:
+    elif scope != "none":
         library_unread = True
-    dest = write_queue(cfg.state_dir, run_id, rows, oa, library_unread=library_unread)
+    if gate == "approve-each":
+        _approve_each(rows, request, cfg, console, decider, run_id)
+    filtered = sum(1 for row in rows if row.status == "filtered")
+    dest = write_queue(
+        cfg.state_dir,
+        run_id,
+        rows,
+        oa,
+        library_unread=library_unread,
+        meta=_summary_meta(
+            cfg,
+            request,
+            caps=caps,
+            filtered=filtered,
+            scope=scope,
+            refine_query=refine_query,
+            suggester=suggester,
+            console=console,
+        ),
+    )
     _print_table(console, rows)
     exit_code = 1 if failed else 0
     if gate in {"dry-run", "approve-batch"}:
@@ -391,7 +587,17 @@ def _execute(
     if library_unread or lib is None:
         detail = f" { _unread_error }" if _unread_error else ""
         raise SnowballError(f"Library was not read. Refusing to create items.{detail}")
-    items, counts = create_new(lib, rows, request.collection)
+    try:
+        items, counts = create_new(
+            lib,
+            rows,
+            request.collection,
+            tag_prefix=tag_prefix,
+            note_provenance=note_provenance,
+        )
+    except LibraryError as exc:
+        raise SnowballError(str(exc)) from exc
+    exit_code = 1 if failed or counts.get("failed") else exit_code
     report = {
         "created": counts["created"],
         "skipped_exists": counts["skipped_exists"],
@@ -415,10 +621,43 @@ def _execute(
     return PathResult(dest, exit_code)
 
 
-def _library_lookup(backend: Any) -> Lookup:
+def _library_lookup(backend: Any, *, scope: str, collection: str) -> Lookup:
+    items = None
+    if hasattr(backend, "items_in_scope"):
+        try:
+            items = list(backend.items_in_scope(None))
+        except Exception:
+            items = None
+    if items is not None:
+        if scope == "collection":
+            want = collection.strip()
+            items = [item for item in items if want and want in (item.collection_paths or [])]
+        by_doi: dict[str, str] = {}
+        by_title_year: dict[tuple[str, int], str] = {}
+        for item in items:
+            doi = normalize_doi(item.doi) if getattr(item, "doi", None) else None
+            if doi:
+                by_doi.setdefault(doi, item.key)
+            title = normalize_dedupe_title(getattr(item, "title", None))
+            year = getattr(item, "year", None)
+            if title and year is not None:
+                by_title_year.setdefault((title, int(year)), item.key)
+
+        def indexed(doi: str | None, title: str | None, year: int | None = None) -> Any:
+            found = normalize_doi(doi) if doi else None
+            if found and found in by_doi:
+                return by_doi[found], "doi"
+            key = normalize_dedupe_title(title)
+            if key and year is not None and (key, int(year)) in by_title_year:
+                return by_title_year[(key, int(year))], "title_year"
+            return None
+
+        return indexed
+
     zl = getattr(backend, "zl", None)
 
-    def lookup(doi: str | None, title: str | None) -> str | None:
+    def lookup(doi: str | None, title: str | None, year: int | None = None) -> str | None:
+        del year
         if zl is None:
             return None
         return zl.find_top_item_key(doi=doi, title=title)
@@ -428,15 +667,29 @@ def _library_lookup(backend: Any) -> Lookup:
 
 def _mark_exists(rows: list[Candidate], lookup: Lookup) -> None:
     for row in rows:
-        if row.status == "error":
+        if row.status in {"error", "filtered"}:
             continue
-        key = lookup(row.ids.get("doi") or None, row.biblio.get("title") or None)
-        if key:
-            row.status = "exists"
+        doi = row.ids.get("doi") or None
+        title = row.biblio.get("title") or None
+        year = row.biblio.get("year")
+        try:
+            found = lookup(doi, title, year)
+        except TypeError:
+            found = lookup(doi, title)
+        if not found:
+            continue
+        if isinstance(found, tuple):
+            key, kind = found
+        else:
+            key, kind = found, ("doi" if doi else "title_year")
+        row.status = "exists"
+        if kind == "title_year":
             row.exists_match = {
                 "item_key": key,
-                "match": "doi" if row.ids.get("doi") else "title_year",
+                "title_year": f"{normalize_dedupe_title(title)}|{year}",
             }
+        else:
+            row.exists_match = {"item_key": key, "doi": normalize_doi(doi) or (doi or "")}
 
 
 def _print_table(console: Console, rows: list[Candidate]) -> None:
@@ -455,3 +708,126 @@ def _print_table(console: Console, rows: list[Candidate]) -> None:
             row.provenance.get("backend") or "",
         )
     console.print(table)
+
+
+def _min_cites(cfg: Config, request: SnowballRequest) -> int:
+    if request.min_seed_citations is None:
+        return cfg.snowball_min_seed_citations
+    return request.min_seed_citations
+
+
+def _backends(cfg: Config, request: SnowballRequest) -> tuple[str, ...]:
+    names = cfg.snowball_backends if request.backends is None else request.backends
+    cleaned = tuple(part.strip().lower() for part in names if str(part).strip())
+    if not cleaned:
+        cleaned = KNOWN_BACKENDS
+    unknown = [name for name in cleaned if name not in KNOWN_BACKENDS]
+    if unknown:
+        raise SnowballError(f"Unknown snowball backend {unknown[0]!r}.")
+    if "openalex" not in cleaned:
+        raise SnowballError("snowball backends must include openalex.")
+    return cleaned
+
+
+def _approve_each(
+    rows: list[Candidate],
+    request: SnowballRequest,
+    cfg: Config,
+    console: Console,
+    decider: Decider | None,
+    run_id: str,
+) -> None:
+    pending = [row for row in rows if row.status == "new"]
+    limit = request.approve_each_max if request.approve_each_max is not None else cfg.snowball_approve_each_max
+    if len(pending) > limit:
+        raise SnowballError(
+            f"{len(pending)} new rows exceeds approve_each_max ({limit}). Use --gate approve-batch."
+        )
+    if decider is None and not sys.stdin.isatty():
+        raise SnowballError(
+            f"approve-each needs a terminal. Queue {run_id} is on disk. Use --gate approve-batch."
+        )
+    for row in pending:
+        if decider is not None:
+            yes = bool(decider(row))
+        else:
+            title = row.biblio.get("title") or row.ids.get("doi") or "untitled"
+            answer = console.input(f"Keep {title}? [y/N] ").strip().lower()
+            yes = answer in {"y", "yes"}
+        row.keep = yes
+
+
+def _fill_metadata(
+    cfg: Config,
+    request: SnowballRequest,
+    rows: list[Candidate],
+    *,
+    backends: tuple[str, ...],
+    console: Console,
+    live: bool,
+    crossref_getter: Any,
+    s2_getter: Any,
+    per_hop_limit: int,
+    direction: str,
+) -> list[Candidate]:
+    if "crossref" in backends:
+        getter = crossref_getter
+        if getter is None and live:
+            getter = lambda doi: crossref_work(doi, email=cfg.email)
+        if getter is not None:
+            fill_crossref(rows, getter)
+    if "semanticscholar" in backends:
+        key = s2_api_key()
+        if not key:
+            console.print("[yellow]semantic scholar key absent; skipping that backend[/]")
+        else:
+            getter = s2_getter
+            if getter is None and live:
+                cache = cfg.state_dir / "snowball" / "cache"
+                getter = lambda doi: s2_paper(doi, cache_dir=cache, api_key=key)
+            if getter is not None:
+                rows = list(rows) + fill_semanticscholar(
+                    rows, getter, per_hop_limit=per_hop_limit, direction=direction
+                )
+    return rows
+
+
+def _summary_meta(
+    cfg: Config,
+    request: SnowballRequest,
+    *,
+    caps: tuple[int, int],
+    filtered: int,
+    scope: str,
+    refine_query: str,
+    suggester: Any,
+    console: Console,
+) -> dict[str, Any]:
+    meta: dict[str, Any] = {
+        "score": FORMULA,
+        "max_candidates": caps[0],
+        "per_hop_limit": caps[1],
+        "filtered": filtered,
+        "dedupe_scope": scope,
+    }
+    refine = cfg.snowball_refine if request.refine is None else request.refine
+    if not refine:
+        return meta
+    if suggester is None and not cfg.llm_enabled:
+        meta["suggestions_error"] = "llm disabled"
+        console.print("[yellow]refine ignored: llm disabled[/]")
+        return meta
+    if suggester is None:
+        try:
+            suggester = llm_suggester(cfg)
+        except Exception as exc:
+            meta["suggestions_error"] = str(exc)
+            return meta
+    found, error = suggestions_for(refine_query, suggester)
+    if error:
+        meta["suggestions_error"] = error
+    else:
+        meta["suggestions"] = found
+        if found:
+            console.print("suggestions: " + "; ".join(found))
+    return meta

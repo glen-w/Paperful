@@ -10,6 +10,11 @@ Public pitch is the five jobs â€” library, find, completeness, mirror, control â
 rather than a Zotero sidecar. The catalogue stays an adapter: Zotero is well
 tested; Mendeley and EndNote are seeking testers. See [Why paperful](docs/why.md).
 
+Snowball wave 5: `hybrid` (keyword hits, then one hop), `approve-each` for short
+lists, overlap ranking, Crossref and Semantic Scholar metadata fill, and
+`languages`, `min_seed_citations`, `note_provenance`, and `backends`. Optional
+`--refine` writes query suggestions and does not create items.
+
 Snowball wave 3: ORCID and collection seeds, `--direction cites|both`, depth
 above 1 (soft ceiling 5) under the existing caps, `approve-batch` queues with
 `keep` plus `paperful snowball apply <run-id>`, and profiles for `orcid` /

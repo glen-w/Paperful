@@ -18,6 +18,7 @@ def write_queue(
     client: OpenAlexClient,
     *,
     library_unread: bool,
+    meta: dict[str, Any] | None = None,
 ) -> Path:
     dest = state_dir / "snowball" / run_id
     dest.mkdir(parents=True, exist_ok=True)
@@ -39,7 +40,10 @@ def write_queue(
         "by_backend": dict(by_backend),
         "by_direction": dict(by_direction),
         "library_unread": library_unread,
+        "score": "cited_by_count",
     }
+    if meta:
+        summary.update(meta)
     (dest / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     return dest
 

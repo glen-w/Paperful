@@ -1,0 +1,9 @@
+# paperful snowball profile. Select with: paperful snowball run --profile doi-refs-gated
+kind = "snowball"
+mode = "doi"
+dois = ["10.1038/s41586-021-03819-2"]
+description = "DOI references, approve-batch"
+gate = "approve-batch"
+target_collection = "Inbox/Snowball"
+direction = "refs"
+depth = 1

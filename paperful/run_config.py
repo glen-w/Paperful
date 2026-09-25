@@ -182,7 +182,11 @@ def list_profiles(cfg: Config) -> list[ProfileListing]:
             layer = _named_layer(cfg, name)
             description = str(layer.get("description") or "")
         except RunConfigError as exc:
-            description = f"invalid: {exc}"
+            text = str(exc)
+            if "snowball profile" in text:
+                description = "snowball profile — paperful snowball run --profile"
+            else:
+                description = f"invalid: {exc}"
         listings.append(
             ProfileListing(name=name, source=source, description=description, path=path)
         )

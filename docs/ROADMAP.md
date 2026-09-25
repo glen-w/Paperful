@@ -196,11 +196,10 @@ LLM tags as source of truth without stage 1–2 anchors.
 
 ## Snowball
 
-**Status:** keyword search, DOI / ORCID / collection seeds, refs and cited-by,
-depth under caps, gates `dry-run` / `approve-batch` / `auto`, and `fetch_pdfs`
-are in the tree. Contract: [snowball.md](snowball.md). Still later:
-`approve-each`, multi-seed overlap ranking, hybrid profiles, and `[llm]`
-queue suggestions.
+**Status:** keyword, DOI, ORCID, and collection seeds, hybrid keyword-then-hop,
+gates including `approve-each`, overlap ranking, and optional `[llm]` query
+suggestions are in the tree. Contract: [snowball.md](snowball.md). Still
+outside: `expand = cited_authors`.
 
 Snowball grows a library outward from a keyword, one or more DOIs, an ORCID,
 or DOIs already in a collection. It writes a candidate queue on disk, then
@@ -223,10 +222,11 @@ Phases, in order. Each can stop without the next.
 2. **Writing gates and the one-shot library. Shipped:** `--gate auto` and
    `fetch_pdfs`, plus `approve-batch` / `snowball apply`, ORCID works (plus
    OpenAlex author fill), and collection DOI seeds.
-3. **Optional expansion. Shipped for this wave:** cited-by (`direction`),
-   depth above 1 under the same caps. Still later: multi-seed overlap
-   ranking, a hybrid profile (keyword, then one hop from the top DOIs),
-   optional query refinement behind `[llm]` as queue suggestions.
+3. **Optional expansion. Shipped:** cited-by (`direction`), depth above 1
+   under the same caps.
+4. **Config. Shipped:** dedupe scope, type and venue filters, profile save.
+5. **Last pass. Shipped:** `hybrid`, `approve-each`, overlap ranking,
+   Crossref / Semantic Scholar fill, and `[llm]` suggestions on the queue.
 
 Still outside this lane: every paper by every cited author; a snowball step
 inside `paperful all`; cron; a review UI; systematic-review screening; a

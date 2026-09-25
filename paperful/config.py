@@ -152,6 +152,24 @@ class Config:
     snowball_gate: str = "dry-run"
     snowball_target_collection: str = ""
     snowball_fetch_pdfs: bool = False
+    snowball_dedupe_scope: str = "library"  # library | collection | none
+    snowball_tag_prefix: str = "paperful-snowball"
+    snowball_types: tuple[str, ...] = ()
+    snowball_oa_only: bool = False
+    snowball_venue_include: tuple[str, ...] = ()
+    snowball_venue_exclude: tuple[str, ...] = ()
+    snowball_languages: tuple[str, ...] = ()
+    snowball_min_seed_citations: int = 0
+    snowball_note_provenance: bool = True
+    snowball_backends: tuple[str, ...] = (
+        "openalex",
+        "crossref",
+        "semanticscholar",
+        "orcid",
+    )
+    snowball_approve_each_max: int = 20
+    snowball_hybrid_seeds: int = 5
+    snowball_refine: bool = False
 
     def __post_init__(self) -> None:
         # Resolve pack+user once so Config() in tests gets the builtin examples.
@@ -345,6 +363,40 @@ def _apply_snowball(raw: Any, cfg: Config) -> None:
         cfg.snowball_target_collection = str(raw["target_collection"]).strip()
     if "fetch_pdfs" in raw:
         cfg.snowball_fetch_pdfs = bool(raw["fetch_pdfs"])
+    if "dedupe_scope" in raw and raw["dedupe_scope"]:
+        cfg.snowball_dedupe_scope = str(raw["dedupe_scope"]).strip()
+    if "tag_prefix" in raw and raw["tag_prefix"]:
+        cfg.snowball_tag_prefix = str(raw["tag_prefix"]).strip()
+    if "types" in raw:
+        cfg.snowball_types = _snowball_strs(raw["types"])
+    if "oa_only" in raw:
+        cfg.snowball_oa_only = bool(raw["oa_only"])
+    if "venue_include" in raw:
+        cfg.snowball_venue_include = _snowball_strs(raw["venue_include"])
+    if "venue_exclude" in raw:
+        cfg.snowball_venue_exclude = _snowball_strs(raw["venue_exclude"])
+    if "languages" in raw:
+        cfg.snowball_languages = _snowball_strs(raw["languages"])
+    if "min_seed_citations" in raw:
+        cfg.snowball_min_seed_citations = int(raw["min_seed_citations"])
+    if "note_provenance" in raw:
+        cfg.snowball_note_provenance = bool(raw["note_provenance"])
+    if "backends" in raw:
+        cfg.snowball_backends = _snowball_strs(raw["backends"])
+    if "approve_each_max" in raw:
+        cfg.snowball_approve_each_max = int(raw["approve_each_max"])
+    if "hybrid_seeds" in raw:
+        cfg.snowball_hybrid_seeds = int(raw["hybrid_seeds"])
+    if "refine" in raw:
+        cfg.snowball_refine = bool(raw["refine"])
+
+
+def _snowball_strs(raw: Any) -> tuple[str, ...]:
+    if isinstance(raw, str):
+        return tuple(part.strip() for part in raw.split(",") if part.strip())
+    if isinstance(raw, list):
+        return tuple(str(part).strip() for part in raw if str(part).strip())
+    return ()
 
 
 def _parse_run_profiles(raw: dict[str, Any]) -> dict[str, dict[str, Any]]:

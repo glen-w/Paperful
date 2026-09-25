@@ -357,13 +357,42 @@ def run_checks(
     return checks
 
 
-def _snowball_check(cfg: Config) -> Check:
+def _snowball_check(cfg: Config, *, probe: Callable[[str], str] | None = None) -> Check:
     if not cfg.snowball_enabled:
         return Check("snowball", "green", "off")
     if not cfg.email.strip():
         return Check("snowball", "amber", "enabled — set email for the OpenAlex polite pool")
-    key = "key set" if os.environ.get("OPENALEX_API_KEY") else "no OpenAlex key"
-    return Check("snowball", "green", f"enabled ({key})")
+    reach = (probe or _probe_openalex)(cfg.email)
+    oa = "key set" if os.environ.get("OPENALEX_API_KEY") else "no OpenAlex key"
+    s2 = (
+        "semantic scholar key set"
+        if os.environ.get("SEMANTIC_SCHOLAR_API_KEY")
+        else "semantic scholar key absent"
+    )
+    detail = f"enabled ({oa}; {s2}; openalex {reach})"
+    amber = reach != "ok" or oa.startswith("no ") or "absent" in s2
+    return Check("snowball", "amber" if amber else "green", detail)
+
+
+def _probe_openalex(email: str) -> str:
+    """Short reachability ping. Never includes the API key or mailto in the result."""
+    try:
+        import httpx
+
+        params = {"per_page": "1", "select": "id"}
+        if email:
+            params["mailto"] = email
+        resp = httpx.get(
+            "https://api.openalex.org/works",
+            params=params,
+            timeout=5.0,
+            headers={"User-Agent": "paperful-doctor"},
+        )
+        if resp.status_code < 500:
+            return "ok"
+    except Exception:
+        pass
+    return "unreachable"
 
 
 _PARAM_SIZE = re.compile(r"(?<![0-9.])(\d+(?:\.\d+)?)b\b", re.I)

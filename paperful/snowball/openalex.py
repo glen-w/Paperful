@@ -16,8 +16,8 @@ from .expand import cap_ids
 
 API = "https://api.openalex.org"
 SELECT = (
-    "id,doi,display_name,publication_year,type,cited_by_count,"
-    "referenced_works,authorships,primary_location"
+    "id,doi,display_name,publication_year,type,cited_by_count,language,"
+    "referenced_works,authorships,primary_location,open_access"
 )
 Getter = Callable[[str, dict[str, Any]], dict[str, Any]]
 
@@ -43,6 +43,7 @@ class OpenAlexClient:
         self.retries = 0
         self.status_429 = 0
         self._last = 0.0
+        self._http_client: httpx.Client | None = None
 
     def get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         query = dict(params or {})
@@ -64,24 +65,58 @@ class OpenAlexClient:
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
         url = f"{API}{path}"
-        with httpx.Client(timeout=60.0, follow_redirects=True) as client:
-            for attempt in range(6):
+        client = self._client()
+        for attempt in range(6):
+            try:
                 resp = client.get(url, params=query, headers=headers)
-                self._last = time.monotonic()
-                if resp.status_code == 429 or resp.status_code >= 500:
-                    self.status_429 += int(resp.status_code == 429)
-                    self.retries += 1
-                    if attempt < 5:
-                        time.sleep(min(2.0 * (attempt + 1), 30.0))
-                        continue
-                if resp.status_code == 404:
-                    return {}
-                resp.raise_for_status()
-                data = resp.json()
-                if not isinstance(data, dict):
-                    raise OpenAlexError("OpenAlex response was not an object")
-                return data
+            except (httpx.TransportError, httpx.TimeoutException):
+                self.retries += 1
+                if attempt < 5:
+                    time.sleep(min(2.0 * (attempt + 1), 30.0))
+                    continue
+                raise OpenAlexError(f"OpenAlex failed for {path}") from None
+            self._last = time.monotonic()
+            if resp.status_code == 429 or resp.status_code >= 500:
+                self.status_429 += int(resp.status_code == 429)
+                self.retries += 1
+                if attempt < 5:
+                    time.sleep(min(2.0 * (attempt + 1), 30.0))
+                    continue
+            if resp.status_code == 404:
+                return {}
+            resp.raise_for_status()
+            data = resp.json()
+            if not isinstance(data, dict):
+                raise OpenAlexError("OpenAlex response was not an object")
+            return data
         raise OpenAlexError(f"OpenAlex failed for {path}")
+
+    def _client(self) -> httpx.Client:
+        if self._http_client is None:
+            self._http_client = httpx.Client(timeout=60.0, follow_redirects=True)
+        return self._http_client
+
+    def _collect(self, path: str, params: dict[str, Any], limit: int) -> list[dict[str, Any]]:
+        """Page while OpenAlex reports more hits. A response without meta is one page."""
+        out: list[dict[str, Any]] = []
+        page = 1
+        while len(out) < limit and page <= 50:
+            query = dict(params)
+            query["per_page"] = max(1, min(200, limit - len(out)))
+            query["page"] = page
+            payload = self.get(path, query)
+            batch = list(payload.get("results") or [])
+            if not batch:
+                break
+            out.extend(batch)
+            meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else None
+            if not meta:
+                break
+            count = int(meta.get("count") or 0)
+            if len(out) >= count or len(out) >= limit or len(batch) < int(query["per_page"]):
+                break
+            page += 1
+        return out[:limit]
 
     def search(
         self,
@@ -96,15 +131,10 @@ class OpenAlexClient:
             filters.append(f"from_publication_date:{year_from}-01-01")
         if year_to is not None:
             filters.append(f"to_publication_date:{year_to}-12-31")
-        params: dict[str, Any] = {
-            "search": query,
-            "per_page": max(1, min(limit, 200)),
-            "select": SELECT,
-        }
+        params: dict[str, Any] = {"search": query, "select": SELECT}
         if filters:
             params["filter"] = ",".join(filters)
-        payload = self.get("/works", params)
-        return list(payload.get("results") or [])
+        return self._collect("/works", params, limit)
 
     def work_by_doi(self, doi: str) -> dict[str, Any] | None:
         payload = self.get(f"/works/https://doi.org/{doi}", {"select": SELECT})
@@ -230,6 +260,9 @@ def work_to_candidate(
             "venue": venue,
             "type": work.get("type") or "",
             "oa_url": (loc.get("pdf_url") or loc.get("landing_page_url") or ""),
+            "is_oa": bool((work.get("open_access") or {}).get("is_oa")),
+            "language": str(work.get("language") or ""),
+            "cited_by_count": int(work.get("cited_by_count") or 0),
         },
         why=why,
         status="new",

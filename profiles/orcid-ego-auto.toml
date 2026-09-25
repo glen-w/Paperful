@@ -1,0 +1,10 @@
+# paperful snowball profile. Select with: paperful snowball run --profile orcid-ego-auto
+kind = "snowball"
+mode = "orcid"
+orcid = "0000-0002-9162-9618"
+description = "ORCID works, metadata only"
+gate = "auto"
+target_collection = "Inbox/Snowball"
+fetch_pdfs = false
+direction = "refs"
+depth = 1

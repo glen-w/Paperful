@@ -25,8 +25,14 @@ def keyword_depth(explicit: int | None) -> int:
     return used
 
 
+# OpenAlex types treated as journal-article-shaped when [snowball] types is unset.
+JOURNAL_SHAPED = frozenset(
+    {"article", "journal-article", "review", "preprint", "posted-content"}
+)
+
+
 def truncate(rows: list[Candidate], max_candidates: int) -> list[Candidate]:
-    """Keep the highest-scoring rows. DOI, then OpenAlex id, breaks ties."""
+    """Cap ``new`` and ``exists`` rows. ``error`` and ``filtered`` stay in the queue."""
     ranked = sorted(
         rows,
         key=lambda row: (
@@ -35,8 +41,73 @@ def truncate(rows: list[Candidate], max_candidates: int) -> list[Candidate]:
         ),
     )
     if max_candidates < 0:
-        return []
-    return ranked[:max_candidates]
+        return [row for row in ranked if row.status in {"error", "filtered"}]
+    kept: list[Candidate] = []
+    budget = max_candidates
+    for row in ranked:
+        if row.status in {"error", "filtered"}:
+            kept.append(row)
+            continue
+        if budget <= 0:
+            continue
+        kept.append(row)
+        budget -= 1
+    return kept
+
+
+def apply_filters(
+    rows: list[Candidate],
+    *,
+    year_from: int | None,
+    year_to: int | None,
+    types: tuple[str, ...],
+    oa_only: bool,
+    venue_include: tuple[str, ...],
+    venue_exclude: tuple[str, ...],
+    languages: tuple[str, ...] = (),
+) -> list[Candidate]:
+    """Mark rejects ``filtered``. Drop rows with no DOI and no OpenAlex id."""
+    allowed = {item.lower() for item in types} if types else set(JOURNAL_SHAPED)
+    include = {item.lower() for item in venue_include}
+    exclude = {item.lower() for item in venue_exclude}
+    langs = {item.lower() for item in languages}
+    out: list[Candidate] = []
+    for row in rows:
+        if row.status == "error":
+            out.append(row)
+            continue
+        if not row.identity:
+            continue
+        if row.status != "new":
+            out.append(row)
+            continue
+        reasons: list[str] = []
+        year = row.biblio.get("year")
+        if year is not None:
+            if year_from is not None and int(year) < year_from:
+                reasons.append("year")
+            if year_to is not None and int(year) > year_to:
+                reasons.append("year")
+        kind = str(row.biblio.get("type") or "").lower()
+        if kind not in allowed:
+            reasons.append("type")
+        if oa_only and not row.biblio.get("is_oa"):
+            reasons.append("oa")
+        venue = str(row.biblio.get("venue") or "").lower()
+        if include and venue not in include:
+            reasons.append("venue")
+        if venue and venue in exclude:
+            reasons.append("venue")
+        lang = str(row.biblio.get("language") or "").lower()
+        if langs and lang and lang not in langs:
+            reasons.append("language")
+        if reasons:
+            row.status = "filtered"
+            note = ",".join(reasons)
+            if note not in row.why:
+                row.why = f"{row.why} ({note})"
+        out.append(row)
+    return out
 
 
 def cap_ids(ids: list[str], per_hop_limit: int) -> list[str]:

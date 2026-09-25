@@ -15,7 +15,6 @@ from ..zot import Item
 from .candidate import Candidate
 
 TAG = "paperful-snowball"
-NOTE_TAG = "paperful-snowball"
 
 
 def _creators(names: list[str]) -> list[dict[str, str]]:
@@ -49,17 +48,22 @@ def create_new(
     backend: LibraryBackend,
     rows: list[Candidate],
     collection: str,
+    *,
+    tag_prefix: str = TAG,
+    note_provenance: bool = True,
 ) -> tuple[list[Item], dict[str, int]]:
-    """Create status=new rows. Returns items for the PDF pipeline and counts."""
+    """Create status=new rows. One LibraryError does not abort the rest."""
     collection_key = backend.ensure_collection_path(collection)
     created_items: list[Item] = []
     created = 0
     skipped_exists = 0
+    failed = 0
+    prefix = tag_prefix or TAG
     for row in rows:
         if row.status == "exists":
             skipped_exists += 1
             continue
-        if row.status != "new":
+        if row.status != "new" or row.keep is False:
             continue
         biblio = row.biblio
         year = biblio.get("year")
@@ -72,13 +76,16 @@ def create_new(
             "doi": row.ids.get("doi") or "",
             "url": biblio.get("oa_url") or "",
             "publication_title": biblio.get("venue") or "",
-            "tags": [{"tag": TAG}, {"tag": f"{TAG}:openalex"}],
+            "tags": [{"tag": prefix}, {"tag": f"{prefix}:{row.provenance.get('backend') or 'openalex'}"}],
         }
         payload = parent_payload(record, [collection_key])
         try:
             key = backend.create_parent(payload)
-        except LibraryError:
-            raise
+        except LibraryError as exc:
+            failed += 1
+            row.status = "error"
+            row.why = str(exc)
+            continue
         created += 1
         note = (
             f"<p>snowball {row.schema}<br>"
@@ -87,7 +94,8 @@ def create_new(
             f"why: {row.why}<br>"
             f"run: {row.run_id}</p>"
         )
-        backend.create_or_update_note(key, note, NOTE_TAG)
+        if note_provenance:
+            backend.create_or_update_note(key, note, prefix)
         first = authors[0].split()[-1] if authors else None
         created_items.append(
             Item(
@@ -103,7 +111,7 @@ def create_new(
                 doi_source="crossref" if record["doi"] else "none",
             )
         )
-    return created_items, {"created": created, "skipped_exists": skipped_exists}
+    return created_items, {"created": created, "skipped_exists": skipped_exists, "failed": failed}
 
 
 def fill_pdfs(cfg: Config, backend: Any, items: list[Item], console: Console) -> Any:
