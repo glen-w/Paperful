@@ -168,18 +168,19 @@ class ZoteroBackend:
         return "user"
 
     def attachment_has_bytes(self, key: str) -> bool:
-        """True when the local API returns a non-empty file for this attachment."""
-        zot = self.zl.zot
-        url = f"{zot.endpoint}/{zot.library_type}/{zot.library_id}/items/{key}/file"
+        """True when the local API returns a non-empty file for this attachment.
+
+        Uses pyzotero's file fetch. A raw client stream misses the local API
+        transport and reports every stored PDF as missing.
+        """
         try:
-            with zot.client.stream("GET", url) as resp:
-                if resp.status_code != 200:
-                    return False
-                for chunk in resp.iter_bytes():
-                    if chunk:
-                        return True
+            payload = self.zl.zot.file(key)
         except Exception:
             return False
+        if isinstance(payload, (bytes, bytearray)):
+            return len(payload) > 0
+        if isinstance(payload, str):
+            return bool(payload)
         return False
 
     def relink_file(self, attachment_key: str, pdf_path: Path) -> None:

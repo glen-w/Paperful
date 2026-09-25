@@ -202,3 +202,24 @@ def test_apply_refuses_a_path_outside_out(tmp_path):
     assert apply_refusal(manager="mendeley", library_type="user", link=False)
     assert apply_refusal(manager="zotero", library_type="group", link=True)
     assert apply_refusal(manager="zotero", library_type="user", link=True) is None
+
+
+def test_attachment_has_bytes_uses_the_file_fetch():
+    from paperful.library import ZoteroBackend
+
+    class FakeZot:
+        def file(self, key):
+            if key == "ok":
+                return b"%PDF"
+            if key == "empty":
+                return b""
+            raise OSError("missing")
+
+    class FakeLocal:
+        zot = FakeZot()
+
+    backend = ZoteroBackend.__new__(ZoteroBackend)
+    backend.zl = FakeLocal()
+    assert backend.attachment_has_bytes("ok") is True
+    assert backend.attachment_has_bytes("empty") is False
+    assert backend.attachment_has_bytes("missing") is False
