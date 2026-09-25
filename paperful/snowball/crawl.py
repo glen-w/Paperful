@@ -5,8 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 from ..resolve import normalize_doi
+from .bibliography import recover_referenced_works
 from .candidate import Candidate
 from .expand import direction_sides, sample_ids, select_works_by_citations, truncate, unique_ids
+from .fill import FillPaused
 from .openalex import (
     OpenAlexBudgetExceeded,
     OpenAlexClient,
@@ -748,10 +750,41 @@ def _expand_hops(
             per_work_ids: list[list[str]] = []
             fetch_ids: list[str] = []
             fetch_set: set[str] = set()
-            for work in frontier:
+            recovered_by_index: dict[int, list[dict[str, Any]]] = {}
+            for index, work in enumerate(frontier):
                 unseen = unique_ids(
                     [item for item in referenced_ids(work, 0) if item not in seen_oa]
                 )
+                if not unseen:
+                    client.stage = f"hop {hop}/{depth} references recover"
+                    try:
+                        recovered = recover_referenced_works(client, work)
+                    except FillPaused as exc:
+                        _defer(
+                            client,
+                            exc,
+                            kind="fill",
+                            backend=str(getattr(exc, "backend", "") or "semanticscholar"),
+                            remaining_ids=[],
+                            hop=hop,
+                            depth=depth,
+                            direction=direction,
+                            run_id=run_id,
+                            seed=seed,
+                            gate=gate,
+                            per_hop_limit=per_hop_limit,
+                            per_hop_rank=rank,
+                            year_from=year_from,
+                            year_to=year_to,
+                            why_prefix=why_prefix,
+                            min_seed_citations=min_seed_citations,
+                        )
+                        _emit(client, rows)
+                        return rows
+                    if recovered:
+                        recovered_by_index[index] = recovered
+                    per_work_ids.append([])
+                    continue
                 if rank == "random" and per_hop_limit > 0:
                     unseen = sample_ids(unseen, per_hop_limit)
                 per_work_ids.append(unseen)
@@ -759,6 +792,7 @@ def _expand_hops(
                     if ref_id not in fetch_set:
                         fetch_set.add(ref_id)
                         fetch_ids.append(ref_id)
+            by_id: dict[str, dict[str, Any]] = {}
             if fetch_ids:
                 client.stage = f"hop {hop}/{depth} references · {len(fetch_ids)} ids"
                 client.note(client.stage)
@@ -789,7 +823,43 @@ def _expand_hops(
                     for child in children
                     if child.get("id")
                 }
-                for ids in per_work_ids:
+            if fetch_ids or recovered_by_index:
+                for index, ids in enumerate(per_work_ids):
+                    if index in recovered_by_index:
+                        resolved = list(recovered_by_index[index])
+                        if rank == "random":
+                            resolved = select_works_by_citations(resolved, per_hop_limit, "random")
+                        else:
+                            resolved = select_works_by_citations(
+                                resolved,
+                                per_hop_limit,
+                                rank,
+                                id_of=lambda work: short_id(str(work.get("id") or "")),
+                            )
+                        source_why = {
+                            "semanticscholar": f"s2 ref of {why_prefix}",
+                            "pdf": f"pdf ref of {why_prefix}",
+                        }
+                        for child in resolved:
+                            child_id = short_id(str(child.get("id") or ""))
+                            if not child_id or child_id in seen_oa:
+                                continue
+                            seen_oa.add(child_id)
+                            recovery = str(child.get("_recovery") or "pdf")
+                            row = work_to_candidate(
+                                child,
+                                run_id=run_id,
+                                seed=seed,
+                                hop=hop,
+                                direction="refs",
+                                why=source_why.get(recovery, f"ref of {why_prefix}"),
+                                gate=gate,
+                            )
+                            row.provenance["backend"] = recovery
+                            if _mark_year(row, year_from, year_to):
+                                next_works.append(child)
+                            rows.append(row)
+                        continue
                     resolved = [by_id[item] for item in ids if item in by_id]
                     if rank != "random":
                         resolved = select_works_by_citations(

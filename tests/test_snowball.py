@@ -742,6 +742,35 @@ def test_s2_rejected_key_is_not_a_miss(tmp_path: Path, monkeypatch):
         s2_paper("10.1000/denied", cache_dir=tmp_path / "cache", api_key="bad-key")
 
 
+def test_s2_short_429_retries_then_returns(tmp_path: Path, monkeypatch):
+    from paperful.snowball.fill import s2_paper
+    import paperful.snowball.fill as fill
+
+    fill._s2_next_ok = 0.0
+    calls = {"n": 0}
+
+    class Resp:
+        def __init__(self, status: int):
+            self.status_code = status
+            self.headers = {"Retry-After": "0"}
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"title": "After retry"}
+
+    def fake_get(url, params=None, headers=None, timeout=None):
+        calls["n"] += 1
+        return Resp(429 if calls["n"] == 1 else 200)
+
+    monkeypatch.setattr("httpx.get", fake_get)
+    monkeypatch.setattr(fill.time, "sleep", lambda _s: None)
+    paper = s2_paper("10.1000/burst", cache_dir=tmp_path / "cache", api_key="test-key")
+    assert paper is not None and paper["title"] == "After retry"
+    assert calls["n"] == 2
+
+
 def test_year_window_and_direction_both(tmp_path: Path):
     works = {
         "W1": _work("W1", "10.1000/seed", "Seed", 2020, 3, ["W2", "W3"]),
@@ -1884,3 +1913,142 @@ def test_works_by_keywords_refuses_unbounded_limit():
     client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=lambda path, params: {})
     with pytest.raises(OpenAlexError, match="keyword_hop_limit"):
         client.works_by_keywords(["alpha"], limit=0)
+
+
+def test_empty_refs_recover_from_semanticscholar(tmp_path: Path):
+    seed = _work("W1", "10.1000/seed", "Seed empty refs", 2024, 0, refs=[])
+    neighbour = _work("W2", "10.1000/s2-ref", "S2 neighbour", 2020, 5)
+    works = {"W1": seed, "W2": neighbour}
+    pdf_calls: list[str] = []
+
+    def s2(doi: str) -> dict:
+        if doi != "10.1000/seed":
+            return {}
+        return {
+            "title": "Seed empty refs",
+            "references": [
+                {"title": "S2 neighbour", "year": 2020, "externalIds": {"DOI": "10.1000/s2-ref"}},
+            ],
+        }
+
+    client = _client(works)
+    client.pdf_fetcher = lambda url: pdf_calls.append(url) or ""
+    cfg = _cfg(tmp_path)
+    result = run_doi(
+        cfg,
+        ["10.1000/seed"],
+        SnowballRequest(direction="refs", depth=1),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=client,
+        lookup=lambda doi, title: None,
+        s2_getter=s2,
+    )
+    assert result.exit_code == 0
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    by_doi = {row["ids"]["doi"]: row for row in rows}
+    assert "10.1000/s2-ref" in by_doi
+    assert by_doi["10.1000/s2-ref"]["provenance"]["backend"] == "semanticscholar"
+    assert by_doi["10.1000/s2-ref"]["why"].startswith("s2 ref")
+    assert pdf_calls == []
+
+
+def test_empty_refs_recover_from_open_pdf(tmp_path: Path):
+    seed = _work("W1", "10.1000/seed", "Seed empty refs", 2024, 0, refs=[])
+    seed["open_access"] = {
+        "is_oa": True,
+        "oa_status": "bronze",
+        "oa_url": "https://example.test/seed.pdf",
+    }
+    doi_hit = _work("W2", "10.1000/doi-ref", "DOI bibliography hit", 2019, 4)
+    title_hit = _work("W3", "10.1000/title-ref", "Exact title match paper", 2021, 3)
+    miss = _work("W4", "10.1000/other", "Completely different topic", 2018, 2)
+    works = {"W1": seed, "W2": doi_hit, "W3": title_hit, "W4": miss}
+
+    pdf_text = """
+Body text.
+
+References
+[1] Ada Lovelace. (2019). DOI bibliography hit. Marine Policy.
+https://doi.org/10.1000/doi-ref
+[2] Someone. (2021). Exact title match paper. Marine Policy.
+[3] Other. (2018). Unrelated phantom title never in OpenAlex. Fantasy Journal.
+"""
+
+    def getter(path: str, params: dict) -> dict:
+        if path.startswith("/works/https://doi.org/"):
+            doi = path.split("/works/https://doi.org/", 1)[1]
+            for work in works.values():
+                if work["doi"].endswith(doi):
+                    return work
+            return {}
+        if "search" in params:
+            query = str(params.get("search") or "").lower()
+            hits = []
+            if "exact title match paper" in query:
+                hits.append(title_hit)
+            elif "unrelated phantom" in query:
+                hits.append(miss)
+            return {"results": hits, "meta": {"count": len(hits)}}
+        filt = str(params.get("filter") or "")
+        if filt.startswith("openalex:"):
+            ids = filt.split(":", 1)[1].split("|")
+            return {"results": [works[i] for i in ids if i in works]}
+        return {"results": []}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    client.pdf_fetcher = lambda url: pdf_text if url.endswith(".pdf") else ""
+    cfg = _cfg(tmp_path)
+    result = run_doi(
+        cfg,
+        ["10.1000/seed"],
+        SnowballRequest(direction="refs", depth=1),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=client,
+        lookup=lambda doi, title: None,
+        s2_getter=lambda doi: {},
+    )
+    assert result.exit_code == 0
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    by_doi = {row["ids"]["doi"]: row for row in rows}
+    assert "10.1000/doi-ref" in by_doi
+    assert "10.1000/title-ref" in by_doi
+    assert "10.1000/other" not in by_doi
+    assert by_doi["10.1000/doi-ref"]["provenance"]["backend"] == "pdf"
+    assert by_doi["10.1000/doi-ref"]["why"].startswith("pdf ref")
+    assert by_doi["10.1000/title-ref"]["provenance"]["backend"] == "pdf"
+
+
+def test_nonempty_openalex_refs_skip_recovery(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    seed = _work("W1", "10.1000/seed", "Seed with refs", 2020, 1, refs=["W2"])
+    neighbour = _work("W2", "10.1000/oa-ref", "OpenAlex neighbour", 2019, 2)
+    works = {"W1": seed, "W2": neighbour}
+    pdf_calls: list[str] = []
+    recover_calls: list[str] = []
+
+    client = _client(works)
+    client.pdf_fetcher = lambda url: pdf_calls.append(url) or ""
+
+    import paperful.snowball.crawl as crawl_mod
+
+    import paperful.snowball.bibliography as bib
+
+    def wrapped(client_arg, work, **kwargs):
+        recover_calls.append(str(work.get("id") or ""))
+        return bib.recover_referenced_works(client_arg, work, **kwargs)
+
+    monkeypatch.setattr(crawl_mod, "recover_referenced_works", wrapped)
+    cfg = _cfg(tmp_path)
+    result = run_doi(
+        cfg,
+        ["10.1000/seed"],
+        SnowballRequest(direction="refs", depth=1),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=client,
+        lookup=lambda doi, title: None,
+    )
+    assert result.exit_code == 0
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    dois = {row["ids"]["doi"] for row in rows}
+    assert "10.1000/oa-ref" in dois
+    assert recover_calls == []
+    assert pdf_calls == []

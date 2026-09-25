@@ -716,6 +716,16 @@ def _execute(
     oa.tally = tally
     if oa.progress is None:
         oa.progress = lambda message: console.print(paint(message))
+    backends_early = _backends(cfg, request)
+    if "semanticscholar" in backends_early:
+        if s2_getter is not None:
+            oa.s2_getter = s2_getter
+        elif client is None:
+            key = s2_api_key()
+            oa.s2_cache_dir = cfg.state_dir / "snowball" / "cache"
+            oa.s2_getter = lambda doi, _cache=oa.s2_cache_dir, _key=key: s2_paper(
+                doi, cache_dir=_cache, api_key=_key
+            )
     tally.start()
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     gate = request.gate

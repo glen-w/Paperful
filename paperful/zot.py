@@ -6,6 +6,7 @@ import os
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from pyzotero import zotero
@@ -63,10 +64,16 @@ _ITEM_TYPE_BY_NORM = {t.lower(): t for t in ITEM_TYPES}
 
 
 def zotero_local_host() -> str:
-    """Host for the Zotero local API (override with PAPERFUL_ZOTERO_HOST for Docker)."""
-    return (
-        os.environ.get("PAPERFUL_ZOTERO_HOST") or "localhost"
-    ).strip() or "localhost"
+    """Host for the Zotero local API (override with PAPERFUL_ZOTERO_HOST for Docker).
+
+    ``.env.example`` sets ``host.docker.internal`` so Compose can reach Zotero on
+    the host. The CLI also loads that file. Outside a container the name often
+    does not resolve, so use localhost unless this process is in Docker.
+    """
+    host = (os.environ.get("PAPERFUL_ZOTERO_HOST") or "localhost").strip() or "localhost"
+    if host == "host.docker.internal" and not Path("/.dockerenv").exists():
+        return "localhost"
+    return host
 
 
 def zotero_local_endpoint() -> str:

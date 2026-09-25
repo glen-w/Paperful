@@ -185,10 +185,12 @@ def test_paperful_zotero_host_overrides_endpoint(monkeypatch):
     )
 
     monkeypatch.setenv("PAPERFUL_ZOTERO_HOST", "host.docker.internal")
-    assert zotero_local_endpoint() == "http://host.docker.internal:23119/api"
-    assert zotero_local_label() == "host.docker.internal:23119"
+    assert zotero_local_endpoint() == "http://localhost:23119/api"
+    assert zotero_local_label() == "localhost:23119"
+    monkeypatch.setenv("PAPERFUL_ZOTERO_HOST", "zotero.internal")
+    assert zotero_local_endpoint() == "http://zotero.internal:23119/api"
     zl = ZoteroLocal()
-    assert zl.zot.endpoint == "http://host.docker.internal:23119/api"
+    assert zl.zot.endpoint == "http://zotero.internal:23119/api"
     hooks = zl.zot.client.event_hooks.get("request") or []
     assert hooks, "expected Host header request hook"
 

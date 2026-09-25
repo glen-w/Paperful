@@ -755,10 +755,10 @@ def test_doctor_json_codes_when_zotero_down(cfg_file, monkeypatch):
 
 
 def test_doctor_shows_paperful_zotero_host(cfg_file, stub_zotero, monkeypatch):
-    monkeypatch.setenv("PAPERFUL_ZOTERO_HOST", "host.docker.internal")
+    monkeypatch.setenv("PAPERFUL_ZOTERO_HOST", "zotero.internal")
     res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--no-guide"])
     assert res.exit_code == 0
-    assert "host.docker.internal:23119" in res.stdout
+    assert "zotero.internal:23119" in res.stdout
 
 
 def test_report_json(cfg_file, tmp_path):

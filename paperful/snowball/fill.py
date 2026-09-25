@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any, Callable
 
@@ -227,6 +228,30 @@ def crossref_work(doi: str, *, email: str = "") -> dict[str, Any] | None:
     }
 
 
+_S2_MIN_INTERVAL_S = 1.1
+_S2_MAX_RETRIES = 5
+_S2_BACKOFF_CAP_S = 30.0
+_s2_next_ok = 0.0
+
+
+def _s2_pace() -> None:
+    """Keyed Semantic Scholar allows about one request per second."""
+    global _s2_next_ok
+    wait = _s2_next_ok - time.monotonic()
+    if wait > 0:
+        time.sleep(wait)
+    _s2_next_ok = time.monotonic() + _S2_MIN_INTERVAL_S
+
+
+def _retry_after_s(header: str | None) -> float | None:
+    if not header:
+        return None
+    try:
+        return float(header)
+    except ValueError:
+        return None
+
+
 def s2_paper(doi: str, *, cache_dir: Path, api_key: str) -> dict[str, Any] | None:
     cache_dir.mkdir(parents=True, exist_ok=True)
     path = cache_dir / f"{doi.replace('/', '_')}.json"
@@ -239,30 +264,41 @@ def s2_paper(doi: str, *, cache_dir: Path, api_key: str) -> dict[str, Any] | Non
             return loaded
     import httpx
 
-    try:
-        headers = {"x-api-key": api_key} if api_key else None
-        resp = httpx.get(
-            f"https://api.semanticscholar.org/graph/v1/paper/DOI:{doi}",
-            params={"fields": "title,year,venue,authors,references.externalIds,references.title,references.year"},
-            headers=headers,
-            timeout=30,
-        )
+    headers = {"x-api-key": api_key} if api_key else None
+    url = f"https://api.semanticscholar.org/graph/v1/paper/DOI:{doi}"
+    params = {"fields": "title,year,venue,authors,references.externalIds,references.title,references.year"}
+    for attempt in range(_S2_MAX_RETRIES + 1):
+        _s2_pace()
+        try:
+            resp = httpx.get(url, params=params, headers=headers, timeout=30)
+        except (httpx.HTTPError, ValueError):
+            if attempt < _S2_MAX_RETRIES:
+                time.sleep(min(_S2_BACKOFF_CAP_S, 1.0 * (2**attempt)))
+                continue
+            return None
         if resp.status_code in (401, 403) and api_key:
             raise ApiKeyRejected("Semantic Scholar API key was rejected")
         if resp.status_code == 404:
             return None
         if resp.status_code == 429 or resp.status_code >= 500:
+            wait = _retry_after_s(resp.headers.get("Retry-After"))
+            if wait is not None and wait >= 60:
+                raise FillPaused("semanticscholar")
+            if attempt < _S2_MAX_RETRIES:
+                delay = wait if wait is not None and wait >= 0 else min(_S2_BACKOFF_CAP_S, 1.0 * (2**attempt))
+                time.sleep(min(_S2_BACKOFF_CAP_S, delay))
+                continue
             raise FillPaused("semanticscholar")
-        resp.raise_for_status()
-        data = resp.json()
-    except (FillPaused, ApiKeyRejected):
-        raise
-    except (httpx.HTTPError, ValueError):
-        return None
-    if not isinstance(data, dict):
-        return None
-    path.write_text(json.dumps(data), encoding="utf-8")
-    return data
+        try:
+            resp.raise_for_status()
+            data = resp.json()
+        except (httpx.HTTPError, ValueError):
+            return None
+        if not isinstance(data, dict):
+            return None
+        path.write_text(json.dumps(data), encoding="utf-8")
+        return data
+    raise FillPaused("semanticscholar")
 
 
 def s2_api_key() -> str:

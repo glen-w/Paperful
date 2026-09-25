@@ -299,6 +299,13 @@ under `state/snowball/cache/`. `backends` must include `openalex`. An unknown
 name is a config error. Dropping `orcid` skips the public works list and keeps
 the OpenAlex author filter.
 
+When OpenAlex lists no `referenced_works` for a seed (and Crossref / Semantic
+Scholar are empty too), a refs hop does not treat that as “cites nothing”. It
+asks Semantic Scholar for DOI references first, then — only if that is still
+empty and the work has an open PDF URL — reads the PDF bibliography and resolves
+entries back to OpenAlex (DOI match, or a strict title match). Cited-by stays
+OpenAlex-only.
+
 `snowball run --profile NAME` prints that profile’s one-line description
 before any request. `mode` is `search`, `hybrid`, `doi`, `orcid`, or
 `collection`. `snowball profile save --query … --hybrid` stores `mode = "hybrid"`.
