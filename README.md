@@ -51,13 +51,16 @@ item only hits sources that match its metadata (DOI, arXiv id, URL, …);
 skips Sci-Hub for items dated after 2021 (and drops it from the run when
 `--year-from` is past that year). Recent paywalled papers are a campus-access
 problem when your library has the subscription. Paperful does not fetch every
-paywalled or DOI-less item. Attachments carry a provenance note
-(`paperful oa:unpaywall`, `campus:ezproxy`, `grey:undocs`) so you can see
-where a PDF came from.
+paywalled or DOI-less item. The PDF keeps a provenance stamp
+(`paperful oa:unpaywall`, `campus:ezproxy`, `grey:undocs`). The parent item
+also gets a readable line ("Free copy from Unpaywall."), as a note unless
+`[remarks].surface` is `tag` or `off`.
 
 **Completeness.** `gaps` counts what is missing. `lint` and `fix-metadata`
-propose patches on disk; `--apply` writes them. `dedupe` reviews duplicates, then merges the extra parent's PDF, notes,
-and better fields onto the keeper only when you say so. `summarize` writes a grounded note
+propose patches on disk; `--apply` writes them. `dedupe` reviews duplicates.
+`--apply` writes "Same paper as Smith 2019, which already has the PDF." on
+the spare copy, then merges that parent's PDF, notes, and better fields onto
+the keeper. `summarize` writes a grounded note
 from a text-layer PDF; `synthesize` reviews those notes. `paperful all` runs
 gaps → find → lint → fix → summarise. The model is off until `[llm].enabled`.
 `paperful ocr --apply` adds a text layer to scanned PDFs on disk.

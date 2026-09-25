@@ -226,8 +226,21 @@ Schema `paperful.snowball.candidate.v1`:
 The dry-run table shows title, year, DOI, why, in library, hop/direction,
 and backend, with `new` rows first. Created items are tagged
 `paperful-snowball` and `paperful-snowball:<backend>`. A child note holds the
-seed, direction, hop, why, run id, and schema version. API keys and the
-mailto address never go in that note.
+seed, direction, hop, why, run id, and schema version when `note_provenance`
+is on. API keys and the mailto address never go in that note.
+
+A separate readable line follows `[remarks].surface` (a child note tagged
+`paperful-linked` by default):
+
+- "Cited by 4 papers in this collection." when at least one item already in
+  the target collection lists this work in its references. Paperful fetches
+  those OpenAlex reference lists once, caches them under `state/cites/`, and
+  reuses the cache while the collection's DOIs stay the same. If the OpenAlex
+  budget runs out, the item is still created and this sentence is skipped.
+- When the hop is at least 1 and at least two seeds from this run point at
+  the work: "In the bibliography of 2 of the papers you started from.",
+  "Cites 2 of the papers you started from.", or "Linked to 2 of the papers
+  you started from." Search hits (hop 0) get only the collection sentence.
 
 ## Config
 

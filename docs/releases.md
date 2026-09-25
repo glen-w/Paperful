@@ -64,7 +64,7 @@ before 1.0. See [LLM](llm.md).
 
 | Outcome | Status at 0.9 |
 | --- | --- |
-| Trust inside Zotero (attachment provenance stamp) | Shipped on Zotero attachment notes. Manifest `source` stays the record |
+| Trust inside Zotero (attachment provenance stamp) | Shipped on Zotero attachment notes. A readable parent line follows `[remarks].surface`. Manifest `source` stays the record |
 | One-line end-of-run banner + write-API yes/no | Shipped (`downloaded · attached · deferred · not_found · write-api`) |
 | Locked report JSON schema | Required `paperful.run_report.v1` keys frozen; additive keys still allowed. Not tagged 1.0 |
 | Locked item record + snapshot/restore | `paperful.item.v1` named; 0.x may add keys |

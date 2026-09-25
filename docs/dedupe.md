@@ -57,7 +57,7 @@ placeholder, and missing years are skipped. These groups are marked
 | Flag | Effect |
 | --- | --- |
 | `--dry-run` | Write the pack only. This is the default. Do not combine with `--apply`. |
-| `--apply` | Write a spare-copy line on each extra parent, then merge `high_doi` extras onto the keeper and trash the emptied parent. A failed remark does not stop the merge. Needs Zotero 10+ (same gate as attach). |
+| `--apply` | Write a spare-copy line on each extra parent, then merge `high_doi` extras onto the keeper and trash the emptied parent. If that line cannot be written, the merge does not run. Needs Zotero 10+ (same gate as attach). |
 | `--apply-medium` | Also merge title+year extras. |
 | `--phase` | `high_doi`, `medium_title_year`, or `all`. |
 | `--limit` / `-n` | Only the first N items in scope. |

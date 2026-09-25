@@ -27,7 +27,7 @@ auto Sci-Hub, no “AI fetch everything”).
 | Step | UX outcome | Status |
 | --- | --- | --- |
 | End-of-run **one-line** banner: `downloaded N · attached M · deferred K · not_found J` plus write-API yes/no | Trust after a run | Shipped (table still follows the line) |
-| Attachment **provenance stamp** (`oa:unpaywall` / `campus:ezproxy` / `grey:undocs` on notes or title prefix) | Trust inside Zotero | Shipped on the Zotero attachment note |
+| Attachment **provenance stamp** (`oa:unpaywall` / `campus:ezproxy` / `grey:undocs` on notes or title prefix) | Trust inside Zotero | Shipped on the Zotero attachment note. A readable parent line follows `[remarks].surface` |
 | `--dry-run` **Would-hit** column (sources in order) | Trust before network | Shipped |
 | Exit **2** + next-steps when Zotero is down (`collections` / `run` / `attach`) | Fresh clone never dead-ends | Shipped |
 | Slim README + [CHANGELOG](../CHANGELOG.md) known limits | Trust before install | Shipped |

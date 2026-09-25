@@ -6,6 +6,15 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+A readable line sits on the parent item beside the PDF provenance stamp.
+`[remarks].surface` is `note` (default), `tag`, or `off`. Attach writes
+"Free copy from Unpaywall." (and a DOI-mismatch sentence when that applies).
+`dedupe --apply` writes "Same paper as Smith 2019, which already has the
+PDF." on the spare copy before the merge. Snowball, when it creates an item,
+can write "Cited by N papers in this collection." from OpenAlex reference
+lists cached under `state/cites/`, plus a seed-overlap sentence when at
+least two seeds from that run point at the work.
+
 `paperful ocr` adds an OCRmyPDF text layer to scanned PDFs under `out/`
 (`--apply`; dry-run lists them). `--attach` uploads that file beside the
 scan. It is an optional `all` step, not in the default chain. Summarize,

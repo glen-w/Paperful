@@ -54,7 +54,9 @@ Phone sync stays with the catalogue. See [Quiet mirror](quiet-mirror.md).
 **Control.** Downloads, patches, and summaries land on disk first.
 Write-back is a separate step you ask for. Dry-run before a big fetch.
 Scholar, Sci-Hub, and the local model are opt-in. Session passwords are not
-stored in the config. Attachments carry a provenance stamp. Docker runs the
+stored in the config. Attachments carry a provenance stamp. The parent item
+also gets a readable line ("Free copy from Unpaywall.") unless
+`[remarks].surface` is `off`. Docker runs the
 tool; the catalogue and a headed login stay on the host.
 
 Python, the Zotero local API, Ollama or LiteLLM, Docker.

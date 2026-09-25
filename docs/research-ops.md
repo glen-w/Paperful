@@ -28,9 +28,11 @@ campus, no Scholar, no Sci-Hub), keep batches small, and do not share
 
 On a successful Zotero attach, the child PDF’s note is a stamp such as
 `paperful oa:unpaywall` or `paperful grey:undocs-unga-vme`. A DOI that does
-not match the library item adds `warn:pdf_doi_mismatch`. The note is the
-Zotero-visible copy. The source of record remains the manifest `source` field
-(and `attempts`).
+not match the library item adds `warn:pdf_doi_mismatch`. That stamp stays on
+the PDF. The parent item also gets a readable line ("Free copy from
+Unpaywall.", or "This PDF's DOI does not match the record.").
+`[remarks].surface` chooses a child note (default), a parent tag, or `off`.
+The source of record remains the manifest `source` field (and `attempts`).
 
 Until you are looking at that note, reconstruct origin from disk:
 
@@ -41,7 +43,9 @@ jq -c 'select(.itemKey=="ITEMKEY") | {source, attempts, pdf_doi, doi}' state/man
 ```
 
 `paperful attach` after `--no-attach` stamps from the manifest `source`.
-Mendeley and EndNote do not get this note.
+Mendeley and EndNote do not get the PDF stamp. They do get the readable
+parent line, as an annotation or an import-bundle note, or as a tag when
+`[remarks].surface` is `tag`.
 
 ## Wrong-work PDFs
 

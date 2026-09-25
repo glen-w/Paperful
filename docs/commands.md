@@ -132,7 +132,7 @@ uv run paperful pack show
 | `ocr` | Text layer for scanned PDFs (`ocrmypdf`). Dry-run unless `--apply`. Rewrites the PDF under `out/` (exports a manager-only file there first). `--attach` uploads that file as a new attachment and does not trash the scan. Languages: `[ocr].languages` (default `eng`). Not in the default `all` chain; add it with `--steps`. |
 | `summarize` | Grounded LLM summary from the PDF already on disk (`--item` / `-C` / `--library`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`, `--prompt FILE`, `--force`, `--to disk, zotero, or both`). Default writes `state/summaries/<key>.html` and one child note tagged `[summarize].tag`. `--to disk` skips Zotero. `--apply` requires the note and conflicts with `--to disk`. Writes `state/runs/<stamp>-summarize.json`. See [LLM](llm.md#d-summarize-grounded-summary-note). |
 | `synthesize` | Literature review from existing summary notes (`--item` / `-C` / `--library`, same year/type/`--limit` flags, `--prompt`, `--to`, `--dry-run`, `--force`, `--report-collection`). Writes `state/reports/<slug>.html` and, unless `--to disk`, a standalone note in each `-C` collection. See [LLM](llm.md#e-synthesize-summary-of-summaries). |
-| `dedupe` | Duplicate pack on disk (`high_doi`, then `title+year`). Classify-only until `--apply`, which writes a spare-copy line, then merges DOI extras onto the keeper and trashes the emptied parent. A failed remark does not stop the merge. Title+year needs `--apply-medium`. Held when same-DOI titles diverge. Same year/type scope flags as `run`. See [dedupe](dedupe.md). |
+| `dedupe` | Duplicate pack on disk (`high_doi`, then `title+year`). Classify-only until `--apply`, which writes a spare-copy line, then merges DOI extras onto the keeper and trashes the emptied parent. If that line cannot be written, the merge does not run. Title+year needs `--apply-medium`. Held when same-DOI titles diverge. Same year/type scope flags as `run`. See [dedupe](dedupe.md). |
 | `versions` | Preprint and published paper as one work. Dry-run writes `state/version-packs/` (`paperful.version_pack.v1`). `--apply` puts the published citation and PDF on the older parent, keeps the preprint id and PDF, and trashes a sibling only after that PDF is attached. Title-only pairs are listed and not applied. |
 | `gaps` | Counts: no stored PDF, linked PDF URL only, missing DOI. Read-only. Year/type scope flags apply. Next steps are `run` and `lint`. Writes `state/runs/<stamp>-gaps.json`. |
 | `all` | `gaps` → `run --try-all --retry-failed --upgrade-linked` → `lint` → `fix-metadata --apply` → `summarize --apply`. Stops on the first failure. `--dry-run` skips `summarize` and does not apply metadata. `--profile` / `-f` load a saved run config. Opens a pack when none is open. See [Workflows](workflows.md). |
@@ -281,6 +281,9 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
   until `--apply`.
 - `state/dedupe-applied.jsonl` — one line per parent merged by
   `dedupe --apply` (children and better fields land on the keeper first).
+- `state/cites/` — cached OpenAlex reference lists for the snowball
+  "Cited by N papers in this collection." line. Keyed by the set of DOIs
+  already in the target collection.
 - `state/version-packs/` — `versions` review packs (`.json` and `.md`, `paperful.version_pack.v1`).
 - `state/versions-applied.jsonl` — one line per work updated by
   `versions --apply`.
