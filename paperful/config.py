@@ -38,6 +38,7 @@ DEFAULT_SOURCES = [
     "htmlpdf",
 ]
 # Open access + campus EZProxy only (no Scholar, no Sci-Hub) — suitable for EOI / policy-sensitive runs.
+# Same list as DEFAULT_SOURCES today: Scholar and Sci-Hub are already opt-in.
 EOI_SOURCES = [
     "unpaywall",
     "openalex",
@@ -50,7 +51,9 @@ EOI_SOURCES = [
     "ezproxy",
     "htmlpdf",
 ]
-SOURCE_PRESETS: dict[str, list[str]] = {"eoi": EOI_SOURCES}
+# No campus login. Drops ezproxy; htmlpdf stays (it does not need EZProxy).
+OA_SOURCES = [name for name in DEFAULT_SOURCES if name != "ezproxy"]
+SOURCE_PRESETS: dict[str, list[str]] = {"eoi": EOI_SOURCES, "oa": OA_SOURCES}
 KNOWN_MANAGERS = ("zotero", "mendeley", "endnote")
 DEFAULT_MIRRORS = [
     "sci-hub.ru",
@@ -147,11 +150,12 @@ class Config:
     snowball_enabled: bool = False
     snowball_max_candidates: int = 200
     snowball_per_hop_limit: int = 50
+    snowball_per_hop_rank: str = "most-cited"  # most-cited | least-cited | random
     snowball_depth: int = 1
     snowball_direction: str = "refs"
     snowball_gate: str = "dry-run"
     snowball_target_collection: str = ""
-    snowball_fetch_pdfs: bool = False
+    snowball_fetch_pdfs: str = "off"  # off | fast | full
     snowball_dedupe_scope: str = "library"  # library | collection | none
     snowball_tag_prefix: str = "paperful-snowball"
     snowball_types: tuple[str, ...] = ()
@@ -344,15 +348,64 @@ def _from_dict(raw: dict[str, Any], source: Path) -> Config:
     return cfg
 
 
+def parse_fetch_pdfs(value: Any) -> str:
+    """Snowball PDF mode: off (metadata only), fast (first pass), or full (then the run stack)."""
+    if value is None or value is False:
+        return "off"
+    if value is True:
+        return "fast"
+    text = str(value).strip().lower()
+    if text in {"", "0", "false", "no", "off", "none"}:
+        return "off"
+    if text in {"1", "true", "yes", "on", "fast"}:
+        return "fast"
+    if text == "full":
+        return "full"
+    raise ValueError("fetch_pdfs must be off, fast, or full.")
+
+
+def parse_cap(value: Any) -> int:
+    """Snowball numeric cap. ``all`` / ``unlimited`` / ``0`` → 0 (no cap)."""
+    if value is None:
+        raise ValueError("cap is required")
+    if isinstance(value, bool):
+        raise ValueError("cap must be a number or all")
+    if isinstance(value, int):
+        return 0 if value <= 0 else value
+    if isinstance(value, float):
+        return 0 if value <= 0 else int(value)
+    text = str(value).strip().lower()
+    if text in {"all", "unlimited", "0"}:
+        return 0
+    if text.isdigit():
+        number = int(text)
+        return 0 if number <= 0 else number
+    raise ValueError("cap must be a positive number or all")
+
+
+def parse_per_hop_rank(value: Any) -> str:
+    """How a numeric per_hop_limit picks neighbours."""
+    text = str(value or "most-cited").strip().lower().replace("_", "-")
+    if text in {"most-cited", "most", "cited", "top"}:
+        return "most-cited"
+    if text in {"least-cited", "least", "bottom"}:
+        return "least-cited"
+    if text in {"random", "sample", "shuffle"}:
+        return "random"
+    raise ValueError("per_hop_rank must be most-cited, least-cited, or random")
+
+
 def _apply_snowball(raw: Any, cfg: Config) -> None:
     if not isinstance(raw, dict):
         return
     if "enabled" in raw:
         cfg.snowball_enabled = bool(raw["enabled"])
     if "max_candidates" in raw:
-        cfg.snowball_max_candidates = int(raw["max_candidates"])
+        cfg.snowball_max_candidates = parse_cap(raw["max_candidates"])
     if "per_hop_limit" in raw:
-        cfg.snowball_per_hop_limit = int(raw["per_hop_limit"])
+        cfg.snowball_per_hop_limit = parse_cap(raw["per_hop_limit"])
+    if "per_hop_rank" in raw and raw["per_hop_rank"]:
+        cfg.snowball_per_hop_rank = parse_per_hop_rank(raw["per_hop_rank"])
     if "depth" in raw:
         cfg.snowball_depth = int(raw["depth"])
     if "direction" in raw and raw["direction"]:
@@ -362,7 +415,7 @@ def _apply_snowball(raw: Any, cfg: Config) -> None:
     if "target_collection" in raw and raw["target_collection"]:
         cfg.snowball_target_collection = str(raw["target_collection"]).strip()
     if "fetch_pdfs" in raw:
-        cfg.snowball_fetch_pdfs = bool(raw["fetch_pdfs"])
+        cfg.snowball_fetch_pdfs = parse_fetch_pdfs(raw["fetch_pdfs"])
     if "dedupe_scope" in raw and raw["dedupe_scope"]:
         cfg.snowball_dedupe_scope = str(raw["dedupe_scope"]).strip()
     if "tag_prefix" in raw and raw["tag_prefix"]:

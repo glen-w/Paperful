@@ -166,18 +166,23 @@ pdfs = "additional"
 
 # Snowball grows a library from a keyword, DOI, ORCID, or collection.
 # Off until you set enabled. Dry-run / approve-batch write state/snowball/.
-# gate = "auto" plus target_collection creates parents. fetch_pdfs then runs the
-# existing PDF pipeline on those new items only. direction = refs|cites|both.
+# gate = "auto" plus target_collection creates parents. fetch_pdfs is
+# off (metadata only), fast (first pass), or full (then the run stack).
+# true means fast. direction = refs|cites|both.
 # OPENALEX_API_KEY belongs in the environment, not in this file.
+# Snowball tries OpenAlex without a key first (enough for a small search; the
+# allowance is shared by IP, including a VPN exit). A configured key takes over
+# when that allowance is spent. mailto does not raise either budget.
 # [snowball]
 # enabled = false
-# max_candidates = 200
-# per_hop_limit = 50
+# max_candidates = 200     # all keeps every new+exists row
+# per_hop_limit = 50       # neighbours per seed per hop. all keeps every one
+# per_hop_rank = "most-cited"  # most-cited | least-cited | random
 # depth = 1
 # direction = "refs"
 # gate = "dry-run"
 # target_collection = ""
-# fetch_pdfs = false
+# fetch_pdfs = "off"     # off | fast | full. true means fast
 # dedupe_scope = "library"   # library | collection | none
 # tag_prefix = "paperful-snowball"
 # types = ["article", "review"]  # empty = journal-article-shaped

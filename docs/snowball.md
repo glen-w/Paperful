@@ -11,10 +11,9 @@ Phases live in [ROADMAP](ROADMAP.md#snowball).
 
 Snowball grows a library outward from a keyword, a DOI, a person, or an
 existing collection. It proposes works, then creates items under an explicit
-gate. [`run`](commands.md) fills PDFs for items that already exist. With
-`fetch_pdfs`, snowball calls that same `run` in the same process, limited to
-the keys it just created, so one command can turn a keyword into a collection
-with PDFs.
+gate. [`run`](commands.md) fills PDFs for items that already exist. `fetch_pdfs`
+can do that in the same process, limited to the keys just created. How far
+one command reaches is [drawn below](#how-a-hop-is-cut).
 
 ```text
 paperful snowball search "area based management tools" --year-from 2018
@@ -24,7 +23,8 @@ paperful snowball collection "Inbox/Seeds" --direction refs
 paperful snowball run --profile doi-refs-gated
 paperful snowball apply <run-id> -C "Inbox/Snowball"
 paperful snowball hybrid "high seas EIA" --hybrid-seeds 5 --direction refs
-paperful snowball search "high seas EIA" --gate auto --fetch-pdfs -C "Inbox/Snowball"
+paperful snowball search "high seas EIA" --gate auto --fetch-pdfs fast -C "Inbox/Snowball"
+paperful snowball orcid 0000-0002-9162-9618 --gate auto --fetch-pdfs full -C "Snowball/0000-0002-9162-9618"
 ```
 
 `search`, `hybrid`, `doi`, `orcid`, and `collection` are seeds under one verb.
@@ -38,9 +38,9 @@ paperful snowball search "high seas EIA" --gate auto --fetch-pdfs -C "Inbox/Snow
 | Build | `paperful snowball …` | Find works and, if the gate says so, create parents |
 | Fill | `paperful run` | PDFs and attach for items already in the library |
 
-A dry-run ends with “candidates ready”. A writing gate without `fetch_pdfs`
+A dry-run ends with “candidates ready”. A writing gate with `fetch_pdfs = off`
 ends with “items created (metadata only)”. Downloaded and attached appear in
-the summary only after `fetch_pdfs` has actually run `run`.
+the summary only after `fast` or `full` has run.
 
 A snowball profile is a named job in `profiles/`. `paperful run` and
 `paperful all` refuse it. Fetch profiles stay fetch profiles.
@@ -52,11 +52,51 @@ A snowball profile is a named job in `profiles/`. `paperful run` and
 | Keyword | OpenAlex title/abstract search | **0** — the hit list. Depth 1+ expands those hits and must be set explicitly. A global `depth = 1` does not expand every keyword hit |
 | Hybrid | That hit list, then one hop from the top `hybrid_seeds` DOIs (default 5) | The hop is always 1. `--depth` does not add further hops |
 | DOI | The work’s neighbours (`referenced_works` and/or works that cite it) | **1**, direction `refs` by default. Use `--direction cites` or `both` for cited-by |
-| ORCID | That person’s works (ORCID public API, filled by OpenAlex author filter), then the same expander | **1** |
+| ORCID | That person’s works (ORCID public API, filled by OpenAlex author filter), then the same expander | **1**. [One hop out](#how-a-hop-is-cut) from those works |
 | Collection | DOIs already in the seed collection path, then the same expander | **1**. `-C` is the write target (defaults to the seed path) |
 
 `expand = cited_authors` (every paper by every cited author) stays off. It
 is a later, capped switch.
+
+## How a hop is cut
+
+An ORCID run starts at that person’s own works (hop 0). `--depth 1` takes
+one hop out from those works and stops. It does not walk the neighbours’
+neighbours. `--direction both` takes references and citing works. Each side
+is capped on its own: `--per-hop-limit 25` keeps 25 references and 25 citing
+works per paper. `--per-hop-rank` chooses which ones: `most-cited` (default),
+`least-cited`, or `random`. Use `all` (or `0`) on either cap for every
+neighbour or every row. After that hop, `max_candidates` (default 200) can
+still cut the `new` + `exists` list.
+
+```text
+paperful snowball orcid 0000-0002-9162-9618 --depth 1 --direction both --per-hop-limit 25 --per-hop-rank most-cited --max-candidates all
+```
+
+```mermaid
+flowchart TB
+  person["ORCID"]
+  own["Own works · hop 0"]
+  person --> own
+  paper["Each of those papers"]
+  own --> paper
+  refs["References · 25 kept"]
+  cites["Citing works · 25 kept"]
+  paper -->|"direction both"| refs
+  paper -->|"direction both"| cites
+  list["Own works plus that hop"]
+  own --> list
+  refs --> list
+  cites --> list
+  trimmed["Cut to 200 new and exists"]
+  kept["Every new and exists row"]
+  list -->|"max-candidates 200"| trimmed
+  list -->|"max-candidates 0"| kept
+```
+
+DOI and collection seeds use the same hop. The centre is the seed papers,
+not a person’s works. Keyword search stays on the hit list unless you set
+depth. The usual numbers are in [Stop rules](#stop-rules).
 
 ## Gates
 
@@ -80,32 +120,39 @@ title+year fingerprint. Only `status = new` rows can become parents.
 
 ## One-shot PDFs
 
-`fetch_pdfs` defaults to false. Set it on the command or in a profile when
-the goal is a library, not a review file:
+`fetch_pdfs` is a mode. The default is `off`.
+
+| Mode | What happens after create |
+| --- | --- |
+| `off` | Metadata only. Fetch later with `paperful run -C` on that collection |
+| `fast` | First pass on the new keys: configured sources, no vault browser. `true` means this |
+| `full` | That first pass, then the same stack as `run` (browser lanes, and the recover agent when `[llm]` is on) for keys that still have no PDF |
 
 ```text
-paperful snowball search "BBNJ EIA" --gate auto --fetch-pdfs -C "Inbox/Snowball"
+paperful snowball search "BBNJ EIA" --gate auto --fetch-pdfs fast -C "Inbox/Snowball"
+paperful snowball orcid 0000-0002-9162-9618 --gate auto --fetch-pdfs full -C "Snowball/me"
 ```
 
-After create, snowball calls the existing `run` pipeline on those new item
-keys. The rest of the library is out of scope. Sci-Hub and the other `run`
-opt-ins stay as configured for `run`; snowball does not turn them on. If
-attach fails, the parent remains, the report counts `attach_deferred`, and
-the usual attach message is printed. The [quiet mirror](quiet-mirror.md) is
-unchanged.
+Both modes stay on the keys snowball just created. Sci-Hub and Scholar run
+only when they are already in `sources`. `full` prints the Sci-Hub and
+browser-recovery lines when those lanes are in the second pass. If attach
+fails, the parent remains and the report counts `attach_deferred`.
 
-Example profile `keyword-library`: `gate = auto`, `fetch_pdfs = true`,
+Example profile `keyword-library`: `gate = auto`, `fetch_pdfs = true` (fast),
 `target_collection` set. `keyword-scout` is the dry-run twin.
 `doi-refs-gated` is approve-batch. `orcid-ego-auto` creates metadata only.
 
 ## Stop rules
 
+The picture is [How a hop is cut](#how-a-hop-is-cut).
+
 | Knob | Default | Meaning |
 | --- | --- | --- |
-| `depth` | 0 for keyword, 1 for DOI / ORCID / collection | Hops from the seed. Soft ceiling 5; `max_candidates` and `per_hop_limit` still bind |
+| `depth` | 0 for keyword, 1 for DOI / ORCID / collection | Hops from the seed. Soft ceiling 5 |
 | `direction` | `refs` | `refs`, `cites`, or `both` |
-| `max_candidates` | 200 | Stops after this many `new` + `exists` rows |
-| `per_hop_limit` | 50 | Fan-out per seed work per hop, not a global pool |
+| `max_candidates` | 200 | Stops after this many `new` + `exists` rows. `all` (or `0`) keeps every row |
+| `per_hop_limit` | 50 | Neighbours kept per seed work per hop (references and cited-by). `all` (or `0`) keeps every one OpenAlex returns |
+| `per_hop_rank` | `most-cited` | How a numeric `per_hop_limit` picks neighbours: `most-cited`, `least-cited`, or `random` |
 | `year_from` / `year_to` | unset | Drop candidates outside the window |
 | `types` | journal-article-shaped | OpenAlex / Zotero types |
 | `oa_only` | false | Metadata filter only. It does not change the PDF chain |
@@ -118,6 +165,19 @@ Example profile `keyword-library`: `gate = auto`, `fetch_pdfs = true`,
 A seed that fails to resolve is `status = error`. Other seeds continue. The
 process exits non-zero if any seed failed, using the existing exit ladder
 (`2` for config / doctor).
+
+## Progress
+
+A long crawl keeps a progress bar at the bottom of the terminal, the same bar `run` and `attach` use. The label is coloured by step: cyan for hops and references, blue for cited-by, magenta for Crossref and Semantic Scholar, green while items are created, cyan while PDFs are fetched. When the step has a known length (reference ids, cited-by seeds, rows to fill, items to create, PDFs to fetch) the bar shows done/total. Otherwise it spins. A stage line is printed when the step changes (`hop 1/2 · 40 seeds · both`). When the run finishes, one summary line remains:
+
+```text
+hop 1/2 references · 80 ids · 40 searches · 800 papers
+crossref · 30 searches · 15 fields updated
+fetching PDFs · 4 PDFs
+creating · 12 created
+```
+
+Counts start over when the step changes, so a references hop does not repeat fill or PDF totals. `searches` counts reads in that step (OpenAlex, Crossref, or Semantic Scholar). `papers` counts OpenAlex works returned. `fields updated` counts empty title, year, venue, or author fields filled. `PDFs` counts files saved while `fetch_pdfs` runs. `created` counts items written while they are created.
 
 ## Candidate record
 
@@ -160,11 +220,12 @@ enabled = false          # doctor and the CLI refuse snowball until true
 depth = 1                # keyword runs still default to depth 0
 direction = "refs"
 max_candidates = 200
-per_hop_limit = 50
+per_hop_limit = 50         # all keeps every neighbour of a seed
+per_hop_rank = "most-cited"  # most-cited | least-cited | random
 gate = "dry-run"         # dry-run | approve-each | approve-batch | auto
 target_collection = ""
 dedupe_scope = "library" # library | collection | none
-fetch_pdfs = false
+fetch_pdfs = "off"       # off | fast | full. true means fast
 tag_prefix = "paperful-snowball"
 note_provenance = true
 backends = ["openalex", "crossref", "semanticscholar", "orcid"]
@@ -179,8 +240,18 @@ refine = false           # suggestions only; needs [llm].enabled
 reports that flag, whether keys are present, and whether a backend answers.
 A missing optional key warns. It does not abort the other backends.
 
-`email` at the top of `config.toml` is the mailto for OpenAlex and Crossref.
-`OPENALEX_API_KEY` and `SEMANTIC_SCHOLAR_API_KEY` come from the environment.
+`email` at the top of `config.toml` is the contact address for Unpaywall and Crossref.
+OpenAlex ignores `mailto`. Snowball calls OpenAlex without an API key first, so a small search needs no account. That free allowance is shared by everyone on the same public address (a campus network or VPN exit included) and is about a tenth of a free key. When it runs out, a configured `OPENALEX_API_KEY` takes over for the rest of the crawl. With no key, the partial queue is kept and `paperful snowball resume` continues after you add one. One key only: a second free key or a `user+tag@gmail.com` alias does not add budget. A free key is about $1/day. `SEMANTIC_SCHOLAR_API_KEY` also comes from the environment.
+
+Each crawl writes `state/snowball/<run-id>/candidates.jsonl` as it goes, for OpenAlex, Crossref, Semantic Scholar, and ORCID alike. A rate limit, outage, or interrupt keeps that file and `deferred.json`. Continue with:
+
+```sh
+paperful snowball resume <run-id>
+```
+
+A list call that hits the daily budget of the key already in use stops the same way. The reset is midnight UTC, or sooner if you add prepaid credit on that key.
+
+Short 429s and 5xx responses retry with exponential backoff. A reset of a minute or more does not keep polling until midnight.
 `snowball profile save` writes seeds and knobs only, after a successful
 dry-run, or with `--force`. It refuses to store a key.
 

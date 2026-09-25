@@ -216,6 +216,7 @@ def test_print_run_summary_renders(cfg):
     stats.sources_checked = {"unpaywall": {"found": 2, "not_found": 1}}
     stats.fields_corrected = {"doi_swap": 1}
     stats.errors_by_type = {"error:only_transient_failures": 1}
+    stats.attach_failed_by_code = {"quota": 2}
     report = build_report(stats, cfg, command="run", scope="BBNJ")
     buf = io.StringIO()
     print_run_summary(
@@ -228,6 +229,8 @@ def test_print_run_summary_renders(cfg):
     assert "Sources checked" in out
     assert "Errors" in out
     assert "Run report:" in out
+    flat = " ".join(out.split())
+    assert "Quota:" in flat and "paperful attach" in flat
 
 
 def test_write_run_report_skips_pack_when_none_open(cfg):

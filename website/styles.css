@@ -144,10 +144,35 @@ a {
   color: var(--ink-soft);
 }
 
+.collision {
+  margin: 0 0 1rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--ink);
+  max-width: 28em;
+}
+
 .lede {
-  margin: 0 0 1.75rem;
+  margin: 0 0 1rem;
   font-size: 1.125rem;
   color: var(--ink-soft);
+}
+
+.scene-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+.scene-grid .feature h3 {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  margin: 0 0 0.5rem;
+}
+
+.scene-grid .code {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
 }
 
 .cta-row {
@@ -306,6 +331,12 @@ a {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+@media (min-width: 900px) {
+  .scene-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 @media (max-width: 720px) {

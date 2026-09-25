@@ -6,25 +6,48 @@
     <title>paperful — clean the library, find the PDFs, keep a mirror</title>
     <meta
       name="description"
-      content="A research helper that cleans a reference library, finds missing PDFs, and summarises papers. Open access and campus access, playbooks and an opt-in AI browser for the rest, and a platform-agnostic mirror for backup."
+      content="Local Zotero sidecar (not paperful.io). Fill reachable PDFs, keep an on-disk mirror. Clone and Compose; no pull, no pip. Not a sync service."
     />
-    <link rel="icon" href="images/logo.png" type="image/png" />
+    <link rel="icon" href="images/favicon.ico" sizes="any" />
+    <link rel="icon" href="images/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="canonical" href="https://glenwright.earth/Paperful/" />
     <meta property="og:title" content="paperful — clean the library, find the PDFs, keep a mirror" />
     <meta
       property="og:description"
-      content="Clean a reference library, find missing PDFs, summarise papers, and keep a platform-agnostic mirror. Python, Zotero API, Ollama or LiteLLM, Docker."
+      content="Local Zotero sidecar (not paperful.io): reachable PDFs, on-disk mirror, not a sync service. Clone and Compose — no docker pull, no pip."
     />
-    <meta property="og:image" content="images/logo.png" />
+    <meta property="og:image" content="https://glenwright.earth/Paperful/images/logo.png" />
+    <meta property="og:url" content="https://glenwright.earth/Paperful/" />
     <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://glenwright.earth/Paperful/images/logo.png" />
+    <meta name="twitter:title" content="paperful — clean the library, find the PDFs, keep a mirror" />
+    <meta
+      name="twitter:description"
+      content="Local Zotero sidecar (not paperful.io): reachable PDFs, on-disk mirror, not a sync service. Clone and Compose — no docker pull, no pip."
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap"
       rel="stylesheet"
     />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "paperful",
+        "description": "Local Zotero sidecar (not paperful.io). Fill reachable PDFs and keep an on-disk mirror. Clone and Compose; not a sync service.",
+        "url": "https://glenwright.earth/Paperful/",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Linux, macOS, Windows",
+        "softwareVersion": "0.9.0",
+        "license": "https://opensource.org/licenses/MIT"
+      }
+    </script>
     <link rel="stylesheet" href="chrome/site_chrome.css" />
     <link rel="stylesheet" href="styles.css" />
-      <script
+    <script
       defer
       src="https://analytics.glenwright.earth/script.js"
       data-website-id="0d469b3b-e2f4-4b92-a23f-c6f0693fe042"
@@ -66,16 +89,20 @@
             height="140"
           />
           <p class="brand-mark">paperful</p>
+          <p class="collision">
+            Not affiliated with paperful.io. Local Compose sidecar, not a
+            document service.
+          </p>
           <h1>Clean the library. Find the PDFs. Keep a mirror.</h1>
           <p class="lede">
-            A research helper that tidies a reference library, finds missing
-            PDFs, and summarises papers. Open-access indexes first, campus
-            access when you have it. Playbooks you write, and an AI browser
-            when you turn it on, cover grey literature and field-specific
-            sites. A platform-agnostic mirror is the backup and the way out.
-            Work stays on this machine.
+            Local Zotero sidecar. Open access first, campus access when you
+            have it. The mirror is a folder on this machine, not a sync
+            service. Not every paywalled paper comes back.
           </p>
-          <p class="stack">Python · Zotero API · Ollama / LiteLLM · Docker</p>
+          <p class="stack">
+            Zotero is well tested. Mendeley and EndNote are seeking testers.
+            Clone and Compose — no docker pull, no pip. 0.9.0.
+          </p>
           <div class="cta-row">
             <a class="btn primary" href="#product">See how it works</a>
             <a class="btn ghost" href="#install">Install</a>
@@ -85,102 +112,43 @@
 
       <section class="section" id="product">
         <div class="wrap">
-          <h2>Library, find, completeness, mirror, control</h2>
+          <h2>Three moves</h2>
           <p class="section-lead">
-            The catalogue is an adapter. Zotero’s local API is the one that
-            is well tested. Mendeley and EndNote are seeking testers. Sci-Hub
-            is opt-in and off by default. Not every paywalled paper comes back.
+            Five jobs sit under these: library, find, completeness, mirror,
+            control. <code>snowball</code> grows the library.
+            <code>run</code> fills PDFs already in it. Sci-Hub stays off until
+            you opt in. Attachments note where the file came from
+            (<code>paperful oa:unpaywall</code>).
           </p>
-          <div class="feature-grid">
-            <div class="feature">
-              <h3>
-                <span class="mark" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3.5" y="4" width="17" height="16" rx="2" />
-                    <path d="M7.5 4v5h9V4" />
-                    <circle cx="15.2" cy="15.2" r="1.15" fill="currentColor" stroke="none" />
-                  </svg>
-                </span>
-                Library
-              </h3>
+          <div class="scene-grid">
+            <article class="feature">
+              <h3>1. Build on this machine</h3>
               <p>
-                Collections, years, and item types are the scope.
-                <code>snowball</code> proposes new works and creates them only
-                when the gate says so. RIS, BibTeX, and EndNote XML go in and
-                out. The catalogue is read, then written back.
+                <code>git clone</code>, then <code>docker compose build</code>.
+                There is no published image and no PyPI package. Zotero stays
+                on the host. Zotero 10+ attaches; 7–9 still saves PDFs to disk.
               </p>
-            </div>
-            <div class="feature">
-              <h3>
-                <span class="mark" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="10.5" cy="10.5" r="5.5" />
-                    <path d="M14.8 14.8 19.5 19.5" />
-                  </svg>
-                </span>
-                Find
-              </h3>
+            </article>
+            <article class="feature">
+              <h3>2. Doctor, then a dry-run</h3>
+              <pre class="code"><code>docker compose run --rm paperful doctor
+docker compose run --rm paperful run -C interesting --preset oa --dry-run</code></pre>
               <p>
-                Open access first, then campus EZProxy when you have a
-                subscription. Playbooks you write, and an opt-in AI browser,
-                cover grey literature and odd landings. Each item only hits
-                sources that match its metadata unless you pass
-                <code>--try-all</code>.
+                No campus login: <code>--preset oa</code>. Campus EZProxy:
+                <code>--preset eoi</code>, after
+                <code>uv run paperful session login ezproxy</code> on the host.
+                Empty <code>email</code> with Unpaywall in sources is a red
+                doctor row.
               </p>
-            </div>
-            <div class="feature">
-              <h3>
-                <span class="mark" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M5 12.5 9.2 17 19 7" />
-                    <path d="M4 5h16M4 19h10" />
-                  </svg>
-                </span>
-                Completeness
-              </h3>
+            </article>
+            <article class="feature">
+              <h3>3. What this is not</h3>
               <p>
-                <code>gaps</code>, <code>lint</code>, and
-                <code>fix-metadata</code> tidy identifiers.
-                <code>dedupe</code> reviews duplicates before anything is
-                trashed. <code>summarize</code> writes a note from a text-layer
-                PDF. <code>paperful all</code> runs the chain. The model stays
-                off until you enable it.
+                Not paperful.io. Not a sync service. Not a GUI. Not OCR. Not
+                every paywall. Scholar and Sci-Hub are opt-in. Mendeley and
+                EndNote are seeking testers, not a proven switch.
               </p>
-            </div>
-            <div class="feature">
-              <h3>
-                <span class="mark" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="8" y="8" width="11" height="12" rx="1.5" />
-                    <path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4H6.5A1.5 1.5 0 0 0 5 5.5V16" />
-                  </svg>
-                </span>
-                Mirror
-              </h3>
-              <p>
-                <code>snapshot</code> writes one folder per item
-                (<code>record.json</code>, optional PDF, notes).
-                <code>restore</code> recreates only what the live catalogue is
-                missing. Copy the tree; paperful is not a sync service.
-              </p>
-            </div>
-            <div class="feature">
-              <h3>
-                <span class="mark" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="6" y="11" width="12" height="8.5" rx="1.5" />
-                    <path d="M8.5 11V8.2a3.5 3.5 0 0 1 7 0V11" />
-                  </svg>
-                </span>
-                Control
-              </h3>
-              <p>
-                Downloads and proposals land on disk first. Write-back is a
-                step you ask for. Dry-run before a big fetch. Scholar, Sci-Hub,
-                and the model are opt-in. Passwords never live in the config.
-                Summaries need a text layer — not OCR.
-              </p>
-            </div>
+            </article>
           </div>
         </div>
       </section>
@@ -234,8 +202,9 @@
           <h2>From a checkout to a filled collection</h2>
           <ol class="steps">
             <li>
-              Copy <code>config.example.toml</code>, set <code>email</code> and
-              <code>out_dir</code>, then run <code>paperful doctor</code>.
+              Copy <code>config.minimal.toml</code>, set <code>email</code>,
+              then run <code>paperful doctor</code>. No campus access:
+              <code>--preset oa</code>.
             </li>
             <li>
               List collections with “No PDF” counts:
@@ -270,21 +239,22 @@
           <pre class="code"><code>git clone https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
-cp config.example.toml config.toml
+cp config.minimal.toml config.toml
 docker compose build
 docker compose run --rm paperful doctor
-docker compose run --rm paperful run --collection interesting --dry-run
-# academic recipe: docker compose run --rm paperful run -C COLLECTION --preset eoi --dry-run</code></pre>
+docker compose run --rm paperful run --collection interesting --preset oa --dry-run
+# campus: --preset eoi, after uv run paperful session login ezproxy on the host</code></pre>
           <p class="fine">
-            There is no <code>docker pull</code> and no
+            Tagged v0.9 is clone and build. There is no
+            <code>docker pull</code> and no
             <code>pip install paperful</code>.
             <a href="./guide/docker.html">Docker</a>
-            is the operator path.
+            is the operator path. Zotero 10+ attaches;
             <a href="./guide/zotero.html">Zotero setup</a>.
-            Contributors use
+            Headed <code>session login</code> uses
             <a href="https://docs.astral.sh/uv/">uv</a>
-            (see the repository README). Zotero and headed logins still run
-            on this machine.
+            on the host. Full guide:
+            <a href="./guide/">/guide/</a>.
           </p>
           <p class="fine">
             Details:

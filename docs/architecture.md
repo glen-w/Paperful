@@ -119,7 +119,7 @@ Open-access sources run in parallel (`concurrency_oa`). Block-like outcomes (CAP
 
 ## Sci-Hub and presets
 
-Sci-Hub is **never** in the default source list; opt in via config, `--scihub`, or `--sources`. The `eoi` preset (`--preset eoi`) limits runs to open access plus campus EZProxy (no Scholar, no Sci-Hub). CORE is in the default list but skipped until `core_api_key` is set.
+Sci-Hub is **never** in the default source list; opt in via config, `--scihub`, or `--sources`. `--preset oa` drops EZProxy. `--preset eoi` is open access plus campus EZProxy (no Scholar, no Sci-Hub), which matches the default list today. CORE is in the default list but skipped until `core_api_key` is set.
 
 ## Disk mirror vs cloud quota
 

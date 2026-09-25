@@ -311,6 +311,53 @@ def test_source_list_override_and_scihub_flag():
     assert _source_list(cfg, "unpaywall,scihub", True) == ["unpaywall", "scihub"]
     assert _source_list(cfg, None, False, preset="eoi") == EOI_SOURCES
     assert "scholar" not in _source_list(cfg, "eoi", False)
+    from paperful.config import OA_SOURCES
+
+    assert _source_list(cfg, None, False, preset="oa") == OA_SOURCES
+    assert "ezproxy" not in OA_SOURCES
+
+
+def test_jobs_matches_registered_commands():
+    from typer.main import get_command
+
+    from paperful.cli import JOBS
+
+    names = set(get_command(cli.app).commands)
+    listed = {verb for verbs in JOBS.values() for verb in verbs}
+    assert listed == names
+
+
+def test_jobs_command_names_snowball_and_run():
+    res = runner.invoke(cli.app, ["jobs"])
+    assert res.exit_code == 0
+    assert "snowball" in res.stdout
+    assert "run" in res.stdout
+    assert "grows" in res.stdout.lower() or "Snowball" in res.stdout
+
+
+def test_mutating_commands_name_the_write_gate():
+    tokens = {
+        "run": "--dry-run",
+        "fix-metadata": "--apply",
+        "dedupe": "--apply",
+        "restore": "--apply",
+        "import": "--apply",
+        "attach": "dry-run",
+        "snapshot": "--dry-run",
+        "snowball": "dry-run",
+    }
+    for name, token in tokens.items():
+        res = runner.invoke(cli.app, [name, "--help"])
+        assert res.exit_code == 0, name
+        assert token in res.stdout, name
+
+
+def test_doctor_email_red_when_unpaywall_and_empty(cfg_file, stub_zotero):
+    text = cfg_file.read_text().replace('email = "t@example.org"', 'email = ""')
+    cfg_file.write_text(text)
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--no-guide", "--json"])
+    assert res.exit_code == 2
+    assert "unpaywall_email" in res.stdout
 
 
 def test_run_unknown_collection(cfg_file, stub_zotero):

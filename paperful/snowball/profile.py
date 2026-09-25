@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from ..config import Config
+from ..config import Config, parse_cap, parse_fetch_pdfs, parse_per_hop_rank
 from ..run_config import profiles_dir
 from .command import SnowballError, SnowballRequest
 
@@ -35,6 +35,27 @@ def load_profile(cfg: Config, name: str) -> dict[str, Any]:
     return raw
 
 
+def _profile_pdf_mode(value: Any) -> str:
+    try:
+        return parse_fetch_pdfs(value)
+    except ValueError as exc:
+        raise SnowballError(str(exc)) from exc
+
+
+def _profile_cap(value: Any) -> int:
+    try:
+        return parse_cap(value)
+    except ValueError as exc:
+        raise SnowballError(str(exc)) from exc
+
+
+def _profile_rank(value: Any) -> str:
+    try:
+        return parse_per_hop_rank(value)
+    except ValueError as exc:
+        raise SnowballError(str(exc)) from exc
+
+
 def request_from_profile(raw: dict[str, Any], cfg: Config) -> SnowballRequest:
     depth = raw.get("depth")
     max_candidates = raw.get("max_candidates")
@@ -42,10 +63,15 @@ def request_from_profile(raw: dict[str, Any], cfg: Config) -> SnowballRequest:
     return SnowballRequest(
         gate=str(raw.get("gate") or cfg.snowball_gate),
         collection=str(raw.get("target_collection") or cfg.snowball_target_collection or ""),
-        fetch_pdfs=bool(raw.get("fetch_pdfs", cfg.snowball_fetch_pdfs)),
+        fetch_pdfs=(
+            _profile_pdf_mode(raw["fetch_pdfs"])
+            if "fetch_pdfs" in raw
+            else cfg.snowball_fetch_pdfs
+        ),
         depth=int(depth) if depth is not None else None,
-        max_candidates=int(max_candidates) if max_candidates is not None else None,
-        per_hop_limit=int(per_hop) if per_hop is not None else None,
+        max_candidates=_profile_cap(max_candidates) if max_candidates is not None else None,
+        per_hop_limit=_profile_cap(per_hop) if per_hop is not None else None,
+        per_hop_rank=_profile_rank(raw["per_hop_rank"]) if raw.get("per_hop_rank") else None,
         year_from=int(raw["year_from"]) if raw.get("year_from") is not None else None,
         year_to=int(raw["year_to"]) if raw.get("year_to") is not None else None,
         direction=str(raw.get("direction") or cfg.snowball_direction or "refs"),

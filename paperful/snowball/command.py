@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -10,18 +11,20 @@ from typing import Any, Callable
 from rich.console import Console
 from rich.table import Table
 
-from ..config import Config
+from ..config import Config, parse_cap, parse_fetch_pdfs, parse_per_hop_rank
 from ..dedupe import normalize_dedupe_title
 from ..library import LibraryError, get_backend
 from ..resolve import normalize_doi
 from .candidate import Candidate
 from .crawl import doi_candidates, hybrid_candidates, orcid_candidates, search_candidates
 from .expand import apply_filters, clamp_depth, keyword_depth, normalize_direction, truncate
-from .fill import crossref_work, fill_crossref, fill_semanticscholar, s2_api_key, s2_paper
+from .fill import FillPaused, crossref_work, fill_crossref, fill_semanticscholar, s2_api_key, s2_paper
 from .ingest import create_new, fill_pdfs
-from .openalex import OpenAlexClient, normalize_orcid
+from .openalex import OpenAlexBudgetExceeded, OpenAlexClient, keyless_limit_message, normalize_orcid
 from .orcid import OrcidError, orcid_dois
 from .queue import load_queue, write_queue, write_report
+from ..progress import item_progress
+from .tally import Tally, paint
 from .rank import FORMULA, apply_overlap
 from .refine import llm_suggester, suggestions_for
 
@@ -40,10 +43,11 @@ class SnowballError(Exception):
 class SnowballRequest:
     gate: str = "dry-run"
     collection: str = ""
-    fetch_pdfs: bool = False
+    fetch_pdfs: bool | str = False
     depth: int | None = None
-    max_candidates: int | None = None
-    per_hop_limit: int | None = None
+    max_candidates: int | str | None = None
+    per_hop_limit: int | str | None = None
+    per_hop_rank: str | None = None
     year_from: int | None = None
     year_to: int | None = None
     direction: str = "refs"
@@ -113,6 +117,7 @@ def run_search(
             direction=direction,
             max_candidates=caps[0],
             per_hop_limit=caps[1],
+            per_hop_rank=caps[2],
             year_from=request.year_from,
             year_to=request.year_to,
             min_seed_citations=_min_cites(cfg, request),
@@ -145,7 +150,7 @@ def run_hybrid(
         raise SnowballError(str(exc)) from exc
     seeds = request.hybrid_seeds if request.hybrid_seeds is not None else cfg.snowball_hybrid_seeds
 
-    def crawl(oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int]) -> tuple[list[Candidate], list[str]]:
+    def crawl(oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int, str]) -> tuple[list[Candidate], list[str]]:
         return hybrid_candidates(
             oa,
             text,
@@ -154,6 +159,7 @@ def run_hybrid(
             direction=direction,
             max_candidates=caps[0],
             per_hop_limit=caps[1],
+            per_hop_rank=caps[2],
             year_from=request.year_from,
             year_to=request.year_to,
             hybrid_seeds=seeds,
@@ -202,7 +208,7 @@ def run_doi(
     if not cleaned:
         raise SnowballError("Pass at least one DOI.")
 
-    def crawl(oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int]) -> tuple[list[Candidate], list[str]]:
+    def crawl(oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int, str]) -> tuple[list[Candidate], list[str]]:
         return doi_candidates(
             oa,
             cleaned,
@@ -212,6 +218,7 @@ def run_doi(
             direction=direction,
             max_candidates=caps[0],
             per_hop_limit=caps[1],
+            per_hop_rank=caps[2],
             year_from=request.year_from,
             year_to=request.year_to,
             min_seed_citations=_min_cites(cfg, request),
@@ -264,7 +271,7 @@ def run_orcid(
         dois = []
         console.print("[yellow]orcid backend off; using OpenAlex author filter only[/]")
 
-    def crawl(oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int]) -> tuple[list[Candidate], list[str]]:
+    def crawl(oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int, str]) -> tuple[list[Candidate], list[str]]:
         return orcid_candidates(
             oa,
             cleaned,
@@ -275,6 +282,7 @@ def run_orcid(
             direction=direction,
             max_candidates=caps[0],
             per_hop_limit=caps[1],
+            per_hop_rank=caps[2],
             year_from=request.year_from,
             year_to=request.year_to,
             min_seed_citations=_min_cites(cfg, request),
@@ -322,7 +330,7 @@ def run_collection(
     if not dois:
         raise SnowballError(f"No DOIs in collection {seed_collection!r}.")
 
-    def crawl(oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int]) -> tuple[list[Candidate], list[str]]:
+    def crawl(oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int, str]) -> tuple[list[Candidate], list[str]]:
         return doi_candidates(
             oa,
             dois,
@@ -332,6 +340,7 @@ def run_collection(
             direction=direction,
             max_candidates=caps[0],
             per_hop_limit=caps[1],
+            per_hop_rank=caps[2],
             year_from=request.year_from,
             year_to=request.year_to,
             min_seed_citations=_min_cites(cfg, request),
@@ -348,6 +357,116 @@ def run_collection(
         crawl=crawl,
         expect_failures=True,
     )
+
+
+def run_resume(
+    cfg: Config,
+    run_id: str,
+    request: SnowballRequest,
+    *,
+    console: Console,
+    client: OpenAlexClient | None = None,
+    backend: Any = None,
+) -> PathResult:
+    """Continue a crawl that stopped because the OpenAlex daily budget was spent."""
+    if not cfg.snowball_enabled:
+        raise SnowballError("Snowball is off. Set [snowball] enabled = true in config.toml.")
+    import json
+    from datetime import datetime, timezone
+
+    from .crawl import _dedupe, continue_deferred
+
+    dest = cfg.state_dir / "snowball" / run_id
+    path = dest / "deferred.json"
+    if not path.is_file():
+        raise SnowballError(f"No deferred OpenAlex work for run {run_id!r}.")
+    deferred = json.loads(path.read_text(encoding="utf-8"))
+    reset_at = deferred.get("reset_at")
+    if isinstance(reset_at, str) and reset_at:
+        when = datetime.fromisoformat(reset_at)
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)
+        key_ready = bool((client.api_key if client is not None else "") or os.environ.get("OPENALEX_API_KEY"))
+        if when > datetime.now(timezone.utc) and (deferred.get("keyed") or not key_ready):
+            if deferred.get("keyed"):
+                console.print(f"[yellow]OpenAlex budget still spent[/] · resume after {reset_at}")
+            else:
+                console.print("[yellow]" + keyless_limit_message(has_key=False, reset_at=reset_at) + "[/]")
+            return PathResult(dest, 1)
+    try:
+        _, rows = load_queue(cfg.state_dir, run_id)
+    except FileNotFoundError as exc:
+        raise SnowballError(f"No snowball queue for run {run_id!r}.") from exc
+    oa = client or OpenAlexClient(email=cfg.email, sleep_s=0.15)
+    tally = _live_tally(console)
+    oa.tally = tally
+    oa.progress = lambda message: console.print(paint(message))
+    tally.start()
+    if deferred.get("kind") == "fill":
+        added = []
+        try:
+            rows = _fill_metadata(
+                cfg,
+                request,
+                rows,
+                backends=_backends(cfg, request),
+                console=console,
+                live=client is None,
+                crossref_getter=None,
+                s2_getter=None,
+                per_hop_limit=int(deferred.get("per_hop_limit") or cfg.snowball_per_hop_limit),
+                direction=str(deferred.get("direction") or request.direction or "refs"),
+                tally=tally,
+            )
+        except FillPaused as exc:
+            oa.deferred = {
+                **deferred,
+                "backend": exc.backend,
+                "remaining_ids": list(exc.remaining),
+                "error": str(exc),
+            }
+        merged = rows
+    else:
+        added = continue_deferred(oa, deferred)
+        merged = _dedupe(list(rows) + added)
+    write_queue(
+        cfg.state_dir,
+        run_id,
+        merged,
+        oa,
+        library_unread=False,
+        meta={"resumed": True, "resume_added": len(added)},
+    )
+    if oa.deferred is None and path.is_file():
+        path.unlink()
+    _print_table(console, added)
+    if oa.deferred:
+        when = oa.deferred.get("reset_at") or "the daily reset"
+        console.print(
+            f"[yellow]OpenAlex budget spent[/] · resume after {when}: "
+            f"paperful snowball resume {run_id}"
+        )
+        tally.stop()
+        return PathResult(dest, 1)
+    console.print(f"resumed · {len(added)} rows added")
+    tally.stop()
+    if request.gate == "auto" and request.collection.strip() and added:
+        lib = backend
+        try:
+            lib = lib or get_backend(cfg)
+            create_new(
+                lib,
+                added,
+                request.collection,
+                tag_prefix=request.tag_prefix or cfg.snowball_tag_prefix,
+                note_provenance=cfg.snowball_note_provenance
+                if request.note_provenance is None
+                else request.note_provenance,
+                console=console,
+            )
+        except (LibraryError, SnowballError) as exc:
+            raise SnowballError(str(exc)) from exc
+    return PathResult(dest, 0)
 
 
 def run_apply(
@@ -399,6 +518,7 @@ def run_apply(
         collection,
         tag_prefix=request.tag_prefix or cfg.snowball_tag_prefix,
         note_provenance=note,
+        console=console,
     )
     if counts.get("failed"):
         console.print(f"[yellow]{counts['failed']} create(s) failed; other rows continued[/]")
@@ -408,8 +528,9 @@ def run_apply(
         "attach_ok": 0,
         "attach_deferred": 0,
     }
-    if request.fetch_pdfs and items:
-        stats = fill_pdfs(cfg, lib, items, console)
+    mode = _pdf_mode(request)
+    if mode != "off" and items:
+        stats = fill_pdfs(cfg, lib, items, console, mode=mode)
         downloaded = int(getattr(stats, "ok", 0)) + int(getattr(stats, "attached", 0))
         report["downloaded"] = downloaded
         report["attach_ok"] = int(getattr(stats, "attached", 0))
@@ -424,11 +545,41 @@ def run_apply(
     return PathResult(dest, 1 if counts.get("failed") else 0)
 
 
+def _pdf_mode(request: SnowballRequest) -> str:
+    try:
+        return parse_fetch_pdfs(request.fetch_pdfs)
+    except ValueError as exc:
+        raise SnowballError(str(exc)) from exc
+
+
+def _cap(value: int | str | None, default: int) -> int:
+    raw = default if value is None else value
+    try:
+        return parse_cap(raw)
+    except ValueError as exc:
+        raise SnowballError(str(exc)) from exc
+
+
+def _rank(value: str | None, default: str) -> str:
+    raw = default if value is None else value
+    try:
+        return parse_per_hop_rank(raw)
+    except ValueError as exc:
+        raise SnowballError(str(exc)) from exc
+
+
 def _guard(cfg: Config, request: SnowballRequest) -> None:
     if not cfg.snowball_enabled:
         raise SnowballError("Snowball is off. Set [snowball] enabled = true in config.toml.")
     if request.gate not in {"dry-run", "auto", "approve-batch", "approve-each"}:
         raise SnowballError("gate must be dry-run, approve-each, approve-batch, or auto.")
+    _pdf_mode(request)
+    if request.max_candidates is not None:
+        _cap(request.max_candidates, 0)
+    if request.per_hop_limit is not None:
+        _cap(request.per_hop_limit, 0)
+    if request.per_hop_rank is not None:
+        _rank(request.per_hop_rank, "most-cited")
     scope = (request.dedupe_scope or cfg.snowball_dedupe_scope or "library").strip()
     if scope not in {"library", "collection", "none"}:
         raise SnowballError("dedupe_scope must be library, collection, or none.")
@@ -444,6 +595,17 @@ def _graph_depth(cfg: Config, request: SnowballRequest) -> int:
     if request.depth is None:
         return cfg.snowball_depth
     return request.depth
+
+
+def _live_tally(console: Console) -> Tally:
+    """Minute log on a captured console. A live bar when the user is at a terminal."""
+    tally = Tally(lambda message: console.print(message))
+    file = getattr(console, "file", None)
+    if bool(getattr(file, "isatty", lambda: False)()):
+        bar = item_progress(console)
+        bar.start()
+        tally.bind_bar(bar, bar.add_task("snowball", total=None))
+    return tally
 
 
 def _execute(
@@ -465,17 +627,56 @@ def _execute(
 ) -> PathResult:
     if warning:
         console.print(f"[yellow]{warning}[/]")
-    if request.fetch_pdfs and request.gate in {"dry-run", "approve-batch"}:
+    mode = _pdf_mode(request)
+    if mode != "off" and request.gate in {"dry-run", "approve-batch"}:
         console.print("[yellow]fetch_pdfs ignored until create (auto / apply)[/]")
     oa = client or OpenAlexClient(email=cfg.email, sleep_s=0.0 if client else 0.15)
+    tally = _live_tally(console)
+    oa.tally = tally
+    if oa.progress is None:
+        oa.progress = lambda message: console.print(paint(message))
+    tally.start()
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     gate = request.gate
     caps = (
-        request.max_candidates if request.max_candidates is not None else cfg.snowball_max_candidates,
-        request.per_hop_limit if request.per_hop_limit is not None else cfg.snowball_per_hop_limit,
+        _cap(request.max_candidates, cfg.snowball_max_candidates),
+        _cap(request.per_hop_limit, cfg.snowball_per_hop_limit),
+        _rank(request.per_hop_rank, cfg.snowball_per_hop_rank),
     )
     failed: list[str] = []
-    produced = crawl(oa, run_id, gate, caps)
+    saved: list[Candidate] = []
+    seen: set[str] = set()
+
+    def emit(batch: list[Candidate]) -> None:
+        changed = False
+        for row in batch:
+            key = row.identity or f"row:{id(row)}"
+            if key in seen:
+                continue
+            seen.add(key)
+            saved.append(row)
+            changed = True
+        if changed:
+            write_queue(cfg.state_dir, run_id, saved, oa, library_unread=True)
+
+    oa.emit = emit
+    try:
+        produced = crawl(oa, run_id, gate, caps)
+    except (Exception, KeyboardInterrupt) as exc:
+        if oa.deferred is None:
+            remaining = list(getattr(exc, "remaining", []) or [])
+            oa.deferred = {
+                "kind": "fill" if isinstance(exc, FillPaused) else "interrupted",
+                "backend": getattr(exc, "backend", ""),
+                "reset_at": getattr(exc, "reset_at", None),
+                "reset_in_s": getattr(exc, "reset_in_s", None),
+                "remaining_ids": remaining,
+                "keyed": bool(oa._using_key and oa.api_key),
+                "error": str(exc),
+            }
+        produced = (list(saved), []) if expect_failures else list(saved)
+        if isinstance(exc, KeyboardInterrupt) and not saved:
+            raise
     if expect_failures:
         rows, failed = produced
     else:
@@ -494,18 +695,30 @@ def _execute(
     except ValueError:
         direction = "refs"
     apply_overlap(rows)
-    rows = _fill_metadata(
-        cfg,
-        request,
-        rows,
-        backends=backends,
-        console=console,
-        live=client is None,
-        crossref_getter=crossref_getter,
-        s2_getter=s2_getter,
-        per_hop_limit=caps[1],
-        direction=direction,
-    )
+    try:
+        rows = _fill_metadata(
+            cfg,
+            request,
+            rows,
+            backends=backends,
+            console=console,
+            live=client is None,
+            crossref_getter=crossref_getter,
+            s2_getter=s2_getter,
+            per_hop_limit=caps[1],
+            direction=direction,
+            tally=tally,
+        )
+    except FillPaused as exc:
+        if oa.deferred is None:
+            oa.deferred = {
+                "kind": "fill",
+                "backend": exc.backend,
+                "remaining_ids": list(exc.remaining),
+                "error": str(exc),
+                "keyed": bool(oa._using_key and oa.api_key),
+            }
+        rows = list(saved) or rows
     apply_overlap(rows)
     rows = apply_filters(
         rows,
@@ -574,7 +787,10 @@ def _execute(
         ),
     )
     _print_table(console, rows)
-    exit_code = 1 if failed else 0
+    exit_code = 1 if failed or oa.deferred else 0
+    if oa.deferred:
+        when = oa.deferred.get("reset_at") or "the daily reset"
+        console.print(f"[yellow]Partial queue kept[/] · paperful snowball resume {run_id}")
     if gate in {"dry-run", "approve-batch"}:
         if gate == "approve-batch":
             console.print(
@@ -583,9 +799,11 @@ def _execute(
             )
         else:
             console.print("candidates ready")
+        tally.stop()
         return PathResult(dest, exit_code)
     if library_unread or lib is None:
         detail = f" { _unread_error }" if _unread_error else ""
+        tally.stop()
         raise SnowballError(f"Library was not read. Refusing to create items.{detail}")
     try:
         items, counts = create_new(
@@ -594,8 +812,11 @@ def _execute(
             request.collection,
             tag_prefix=tag_prefix,
             note_provenance=note_provenance,
+            console=console,
+            tally=tally,
         )
     except LibraryError as exc:
+        tally.stop()
         raise SnowballError(str(exc)) from exc
     exit_code = 1 if failed or counts.get("failed") else exit_code
     report = {
@@ -604,20 +825,21 @@ def _execute(
         "attach_ok": 0,
         "attach_deferred": 0,
     }
-    if request.fetch_pdfs and items:
-        stats = fill_pdfs(cfg, lib, items, console)
+    if mode != "off" and items:
+        stats = fill_pdfs(cfg, lib, items, console, tally=tally, mode=mode)
         downloaded = int(getattr(stats, "ok", 0)) + int(getattr(stats, "attached", 0))
         report["downloaded"] = downloaded
         report["attach_ok"] = int(getattr(stats, "attached", 0))
         report["attach_deferred"] = int(getattr(stats, "attach_failed", 0))
     write_report(dest, report)
-    if request.fetch_pdfs:
+    if mode != "off":
         console.print(
             f"downloaded {report.get('downloaded', 0)} · attached {report['attach_ok']} · "
             f"deferred {report['attach_deferred']}"
         )
     else:
         console.print(f"items created (metadata only): {counts['created']}")
+    tally.stop()
     return PathResult(dest, exit_code)
 
 
@@ -769,13 +991,14 @@ def _fill_metadata(
     s2_getter: Any,
     per_hop_limit: int,
     direction: str,
+    tally: Tally | None = None,
 ) -> list[Candidate]:
     if "crossref" in backends:
         getter = crossref_getter
         if getter is None and live:
             getter = lambda doi: crossref_work(doi, email=cfg.email)
         if getter is not None:
-            fill_crossref(rows, getter)
+            fill_crossref(rows, getter, tally=tally)
     if "semanticscholar" in backends:
         key = s2_api_key()
         if not key:
@@ -787,7 +1010,7 @@ def _fill_metadata(
                 getter = lambda doi: s2_paper(doi, cache_dir=cache, api_key=key)
             if getter is not None:
                 rows = list(rows) + fill_semanticscholar(
-                    rows, getter, per_hop_limit=per_hop_limit, direction=direction
+                    rows, getter, per_hop_limit=per_hop_limit, direction=direction, tally=tally
                 )
     return rows
 
@@ -796,7 +1019,7 @@ def _summary_meta(
     cfg: Config,
     request: SnowballRequest,
     *,
-    caps: tuple[int, int],
+    caps: tuple[int, int, str],
     filtered: int,
     scope: str,
     refine_query: str,
@@ -807,6 +1030,7 @@ def _summary_meta(
         "score": FORMULA,
         "max_candidates": caps[0],
         "per_hop_limit": caps[1],
+        "per_hop_rank": caps[2],
         "filtered": filtered,
         "dedupe_scope": scope,
     }

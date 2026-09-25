@@ -1,12 +1,15 @@
-"""Polite OpenAlex reads for snowball. PDF lookup stays in sources/openalex.py."""
+"""OpenAlex reads for snowball. PDF lookup stays in sources/openalex.py."""
 
 from __future__ import annotations
 
 import os
+import random
 import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
+
+Progress = Callable[[str], None]
 
 import httpx
 
@@ -15,6 +18,7 @@ from .candidate import Candidate
 from .expand import cap_ids
 
 API = "https://api.openalex.org"
+KEY_URL = "https://openalex.org/settings/api"
 SELECT = (
     "id,doi,display_name,publication_year,type,cited_by_count,language,"
     "referenced_works,authorships,primary_location,open_access"
@@ -26,6 +30,25 @@ class OpenAlexError(RuntimeError):
     pass
 
 
+class OpenAlexBudgetExceeded(OpenAlexError):
+    """Daily budget or a long reset. Burst 429s retry inside the client instead."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        reset_at: str | None = None,
+        reset_in_s: int | None = None,
+        pending_ids: list[str] | None = None,
+        partial: list[dict[str, Any]] | None = None,
+    ):
+        super().__init__(message)
+        self.reset_at = reset_at
+        self.reset_in_s = reset_in_s
+        self.pending_ids = list(pending_ids or [])
+        self.partial = list(partial or [])
+
+
 class OpenAlexClient:
     def __init__(
         self,
@@ -34,54 +57,90 @@ class OpenAlexClient:
         api_key: str | None = None,
         sleep_s: float = 0.15,
         getter: Getter | None = None,
+        progress: Progress | None = None,
+        max_retries: int = 5,
+        backoff_base_s: float = 1.0,
+        backoff_cap_s: float = 60.0,
+        budget_wait_s: float = 0.0,
     ):
         self.email = email
         self.api_key = api_key if api_key is not None else os.environ.get("OPENALEX_API_KEY", "")
         self.sleep_s = sleep_s
+        self.max_retries = max_retries
+        self.backoff_base_s = backoff_base_s
+        self.backoff_cap_s = backoff_cap_s
+        self.budget_wait_s = budget_wait_s
+        self.progress = progress
+        self.stage = ""
+        self.tally: Any = None
+        self.deferred: dict[str, Any] | None = None
+        self.emit: Callable[[list[Any]], None] | None = None
         self._getter = getter
         self.requests = 0
         self.retries = 0
         self.status_429 = 0
         self._last = 0.0
+        self._budget: OpenAlexBudgetExceeded | None = None
+        self._using_key = False
         self._http_client: httpx.Client | None = None
 
     def get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        if self._budget is not None:
+            raise self._budget
         query = dict(params or {})
         if self.email:
             query["mailto"] = self.email
         self.requests += 1
-        if self._getter is not None:
-            return self._getter(path, query)
-        return self._http(path, query)
+        try:
+            data = self._getter(path, query) if self._getter is not None else self._http(path, query)
+        except OpenAlexBudgetExceeded as exc:
+            self._budget = exc
+            raise
+        self._tally_works(data)
+        return data
 
     def _http(self, path: str, query: dict[str, Any]) -> dict[str, Any]:
         elapsed = time.monotonic() - self._last
         if self.sleep_s and elapsed < self.sleep_s:
             time.sleep(self.sleep_s - elapsed)
-        headers = {
-            "Accept": "application/json",
-            "User-Agent": f"paperful-snowball/0.1 (mailto:{self.email})",
-        }
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
         url = f"{API}{path}"
         client = self._client()
-        for attempt in range(6):
+        attempts = max(1, self.max_retries + 1)
+        for attempt in range(attempts):
             try:
-                resp = client.get(url, params=query, headers=headers)
+                resp = client.get(url, params=query, headers=self._headers())
             except (httpx.TransportError, httpx.TimeoutException):
                 self.retries += 1
-                if attempt < 5:
-                    time.sleep(min(2.0 * (attempt + 1), 30.0))
+                if attempt < attempts - 1:
+                    time.sleep(self._delay(attempt, None))
                     continue
                 raise OpenAlexError(f"OpenAlex failed for {path}") from None
             self._last = time.monotonic()
             if resp.status_code == 429 or resp.status_code >= 500:
                 self.status_429 += int(resp.status_code == 429)
                 self.retries += 1
-                if attempt < 5:
-                    time.sleep(min(2.0 * (attempt + 1), 30.0))
+                reset_at, reset_in_s = _reset(resp)
+                if (
+                    resp.status_code == 429
+                    and _is_budget(resp, self.budget_wait_s)
+                    and self._promote_key()
+                ):
                     continue
+                if resp.status_code == 429 and _is_budget(resp, self.budget_wait_s):
+                    raise OpenAlexBudgetExceeded(
+                        "OpenAlex daily budget is spent",
+                        reset_at=reset_at,
+                        reset_in_s=reset_in_s,
+                    )
+                if attempt < attempts - 1:
+                    time.sleep(self._delay(attempt, resp.headers.get("Retry-After")))
+                    continue
+                if resp.status_code == 429:
+                    raise OpenAlexBudgetExceeded(
+                        "OpenAlex daily budget is spent",
+                        reset_at=reset_at,
+                        reset_in_s=reset_in_s,
+                    )
             if resp.status_code == 404:
                 return {}
             resp.raise_for_status()
@@ -91,18 +150,69 @@ class OpenAlexClient:
             return data
         raise OpenAlexError(f"OpenAlex failed for {path}")
 
+    def _headers(self) -> dict[str, str]:
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": f"paperful-snowball/0.1 (mailto:{self.email})",
+        }
+        if self._using_key and self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        return headers
+
+    def _promote_key(self) -> bool:
+        """Switch a keyless crawl onto the one configured key. Once only."""
+        if self._using_key or not self.api_key:
+            return False
+        self._using_key = True
+        self.note(keyless_limit_message(has_key=True))
+        return True
+
+    def _delay(self, attempt: int, retry_after: str | None) -> float:
+        parsed = _header_float(retry_after)
+        if parsed is not None and parsed >= 0:
+            return min(parsed, self.backoff_cap_s)
+        base = self.backoff_base_s * (2**attempt)
+        return min(self.backoff_cap_s, base * (0.5 + random.random() / 2))
+
+    def note(self, message: str) -> None:
+        """Print a milestone. The live bar updates on every note."""
+        if self.tally is not None:
+            self.tally.stage = self.stage or message
+        if self.progress is not None:
+            self.progress(message)
+        self.touch()
+
+    def touch(self) -> None:
+        if self.tally is None:
+            return
+        self.tally.stage = self.stage or self.tally.stage
+        self.tally.refresh()
+
+    def _tally_works(self, data: dict[str, Any]) -> None:
+        if self.tally is None:
+            return
+        self.tally.searches += 1
+        results = data.get("results")
+        if isinstance(results, list):
+            self.tally.papers += len(results)
+        elif data.get("id") or data.get("doi"):
+            self.tally.papers += 1
+        self.tally.refresh()
+
     def _client(self) -> httpx.Client:
         if self._http_client is None:
             self._http_client = httpx.Client(timeout=60.0, follow_redirects=True)
         return self._http_client
 
     def _collect(self, path: str, params: dict[str, Any], limit: int) -> list[dict[str, Any]]:
-        """Page while OpenAlex reports more hits. A response without meta is one page."""
+        """Page while OpenAlex reports more hits. ``limit <= 0`` keeps every page (up to 50)."""
+        uncapped = limit <= 0
         out: list[dict[str, Any]] = []
         page = 1
-        while len(out) < limit and page <= 50:
+        while page <= 50 and (uncapped or len(out) < limit):
+            room = 200 if uncapped else limit - len(out)
             query = dict(params)
-            query["per_page"] = max(1, min(200, limit - len(out)))
+            query["per_page"] = max(1, min(100, room))
             query["page"] = page
             payload = self.get(path, query)
             batch = list(payload.get("results") or [])
@@ -113,10 +223,12 @@ class OpenAlexClient:
             if not meta:
                 break
             count = int(meta.get("count") or 0)
-            if len(out) >= count or len(out) >= limit or len(batch) < int(query["per_page"]):
+            if len(out) >= count or len(batch) < int(query["per_page"]):
+                break
+            if not uncapped and len(out) >= limit:
                 break
             page += 1
-        return out[:limit]
+        return out if uncapped else out[:limit]
 
     def search(
         self,
@@ -144,19 +256,29 @@ class OpenAlexClient:
 
     def works_by_ids(self, openalex_ids: list[str]) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
-        for start in range(0, len(openalex_ids), 50):
-            batch = openalex_ids[start : start + 50]
+        ids = list(openalex_ids)
+        if self.tally is not None and ids:
+            self.tally.track(len(ids))
+        for start in range(0, len(ids), 100):
+            batch = ids[start : start + 100]
             if not batch:
                 continue
-            payload = self.get(
-                "/works",
-                {
-                    "filter": "openalex:" + "|".join(batch),
-                    "per_page": len(batch),
-                    "select": SELECT,
-                },
-            )
+            try:
+                payload = self.get(
+                    "/works",
+                    {
+                        "filter": "openalex:" + "|".join(batch),
+                        "per_page": len(batch),
+                        "select": SELECT,
+                    },
+                )
+            except OpenAlexBudgetExceeded as exc:
+                exc.pending_ids = ids[start:]
+                exc.partial = out
+                raise
             out.extend(payload.get("results") or [])
+            if self.tally is not None:
+                self.tally.advance(len(batch))
         return out
 
     def works_citing(
@@ -166,6 +288,7 @@ class OpenAlexClient:
         limit: int,
         year_from: int | None = None,
         year_to: int | None = None,
+        sort: str | None = None,
     ) -> list[dict[str, Any]]:
         """Works that cite ``openalex_id`` (OpenAlex ``filter=cites:``)."""
         oa = short_id(openalex_id)
@@ -176,15 +299,10 @@ class OpenAlexClient:
             filters.append(f"from_publication_date:{year_from}-01-01")
         if year_to is not None:
             filters.append(f"to_publication_date:{year_to}-12-31")
-        payload = self.get(
-            "/works",
-            {
-                "filter": ",".join(filters),
-                "per_page": max(1, min(limit, 200)),
-                "select": SELECT,
-            },
-        )
-        return list(payload.get("results") or [])
+        params: dict[str, Any] = {"filter": ",".join(filters), "select": SELECT}
+        if sort:
+            params["sort"] = sort
+        return self._collect("/works", params, limit)
 
     def works_by_author_orcid(
         self,
@@ -203,16 +321,62 @@ class OpenAlexClient:
             filters.append(f"from_publication_date:{year_from}-01-01")
         if year_to is not None:
             filters.append(f"to_publication_date:{year_to}-12-31")
-        payload = self.get(
+        self.stage = self.stage or f"OpenAlex author {cleaned}"
+        return self._collect(
             "/works",
-            {
-                "filter": ",".join(filters),
-                "per_page": max(1, min(limit, 200)),
-                "select": SELECT,
-            },
+            {"filter": ",".join(filters), "select": SELECT},
+            limit,
         )
-        return list(payload.get("results") or [])
 
+
+
+def keyless_limit_message(*, has_key: bool, reset_at: str | None = None) -> str:
+    """Shown when the no-key allowance for this public address is spent."""
+    text = (
+        "OpenAlex's free no-key allowance for this network address is used up. "
+        "It is shared by everyone on the same public IP, which is common on a VPN. "
+        f"The reliable fix is a free API key: {KEY_URL}"
+    )
+    if has_key:
+        return text + " Continuing with your API key."
+    wait = f" Or wait until {reset_at}." if reset_at else ""
+    return (
+        text
+        + " Set OPENALEX_API_KEY, then run paperful snowball resume."
+        + wait
+        + " Changing VPN server can reach a fresh allowance, but an API key is more reliable."
+    )
+
+
+def _header_float(value: str | None) -> float | None:
+    if value is None or not str(value).strip():
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def _reset(resp: httpx.Response) -> tuple[str | None, int | None]:
+    raw = _header_float(resp.headers.get("X-RateLimit-Reset"))
+    if raw is None:
+        return None, None
+    seconds = max(0, int(raw))
+    when = datetime.now(timezone.utc) + timedelta(seconds=seconds)
+    return when.replace(microsecond=0).isoformat(), seconds
+
+
+def _is_budget(resp: httpx.Response, budget_wait_s: float) -> bool:
+    """True when waiting would sit on a daily reset rather than a short burst."""
+    remaining = _header_float(resp.headers.get("X-RateLimit-Remaining"))
+    if remaining is not None and remaining <= 0:
+        return True
+    reset_s = _header_float(resp.headers.get("X-RateLimit-Reset"))
+    retry_s = _header_float(resp.headers.get("Retry-After"))
+    wait = reset_s if reset_s is not None else retry_s
+    if wait is None:
+        return False
+    return wait > budget_wait_s and wait >= 60
 
 
 def short_id(url: str) -> str:
@@ -272,7 +436,8 @@ def work_to_candidate(
     )
 
 
-def referenced_ids(work: dict[str, Any], per_hop_limit: int) -> list[str]:
+def referenced_ids(work: dict[str, Any], per_hop_limit: int = 0) -> list[str]:
+    """OpenAlex reference ids for a work. ``per_hop_limit <= 0`` keeps every id."""
     raw = [short_id(str(ref)) for ref in (work.get("referenced_works") or [])]
     return cap_ids([item for item in raw if item], per_hop_limit)
 

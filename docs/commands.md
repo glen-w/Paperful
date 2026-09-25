@@ -1,9 +1,13 @@
 # Commands
 
 Snippets below use `uv run` so they stay short. The operator install is
-`docker compose run --rm paperful …` after `docker compose build`
-([Docker](docker.md)). There is no published image. Headed `session login`
-is host-only either way. Academic runs: add `--preset eoi`.
+clone plus `docker compose build`, then
+`docker compose run --rm paperful …` ([Docker](docker.md)). CI builds that
+image and expects `doctor` to exit 2 without Zotero. There is no published
+image and no PyPI package. Headed `session login` is host-only
+(`uv run paperful session login …`). No campus access: `--preset oa`.
+Campus EZProxy: `--preset eoi`. `paperful jobs` lists verbs by job.
+The public grow verb is `snowball` (there is no `harvest` command).
 
 ```sh
 # environment check (TTY guide for amber/red)
@@ -116,8 +120,8 @@ uv run paperful pack show
 
 | Command | Purpose |
 | --- | --- |
-| `doctor` | Environment check (Zotero / Mendeley / EndNote, paths, email, sessions, pdftotext, Playwright, grey-lit packs, LLM, browser-agent extra). Green / amber / red. TTY guide for remediations (`--guide` / `--no-guide`). `--json` prints `{name, status, code, detail}` and still exits 2 when a check is red (`zotero_down`, `zotero_api_off`, `zotero_bad_host`, `zotero_no_write`). |
-| `run` | Find and download missing PDFs (`--dry-run`, `--preset eoi`, `--upgrade-linked`, `--try-all`, `--retry-failed`, `--sources`, `--scihub`, `--strict-pdf-doi`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). When `[llm].enabled` and the browser-agent extra is installed, appends `browser_agent` after Scholar / EZProxy / htmlpdf. Never rewrites bibliographic fields. A PDF DOI that differs from the library item still attaches, with `warn:pdf_doi_mismatch` on the Zotero note. `--strict-pdf-doi` saves the file and does not attach; `paperful attach --allow-pdf-doi-mismatch` attaches those rows later. |
+| `doctor` | Environment check (Zotero / Mendeley / EndNote, paths, email, sessions, pdftotext, Playwright, grey-lit packs, LLM, browser-agent extra). Green / amber / red. TTY guide for remediations (`--guide` / `--no-guide`). `--json` prints `{name, status, code, detail}` and still exits 2 when a check is red (`zotero_down`, `zotero_api_off`, `zotero_bad_host`, `zotero_no_write`, `unpaywall_email`). Empty email is red only when `unpaywall` is in `sources`. LLM disabled stays green. |
+| `run` | Fill PDFs for items already in the library. Default attaches on Zotero 10+ (`--dry-run` does not). `--preset oa` drops EZProxy; `--preset eoi` is OA + EZProxy (`--upgrade-linked`, `--try-all`, `--retry-failed`, `--sources`, `--scihub`, `--strict-pdf-doi`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). When `[llm].enabled` and the browser-agent extra is installed, appends `browser_agent` after Scholar / EZProxy / htmlpdf. Never rewrites bibliographic fields. A PDF DOI that differs from the library item still attaches, with `warn:pdf_doi_mismatch` on the Zotero note. `--strict-pdf-doi` saves the file and does not attach; `paperful attach --allow-pdf-doi-mismatch` attaches those rows later. |
 | `recover` | Opt-in **browser-agent** PDF recovery (`--item KEY` repeatable, `--dry-run`, `--no-attach`). Also auto-appended as the last `run` lane when `[llm].enabled` and other vault browser lanes (Scholar, EZProxy, htmlpdf) fail. Needs Python 3.11+, `paperful[browser-agent]`, and a session vault. Manual report: `state/runs/<stamp>-recover.json`. See [LLM](llm.md#a-recover-browser-agent-pdf-recovery). |
 | `lint` | Read-only identifier / PDF-DOI / title-hygiene findings (`--json`, `--strict`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). Codes: `missing_doi`, `suspect_doi`, `swappable_doi`, `pmid_no_doi`, `pdf_doi_mismatch`, `title_html`, `title_all_caps`, `title_filename`, `no_identifier`, plus `pdf_identity_mismatch` when `[lint].llm_pdf_match` is on. Writes `state/runs/<stamp>-lint.json` (also for `--json`, before a `--strict` exit 1). |
 | `fix-metadata` | Propose patches on disk; `--apply` writes them to the library (`--overwrite` replaces title, date, or venue even when you edited them — dry-run first; `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). Whitelist: `doi`, `title`, `date`, `publicationTitle`. HTML title cleanup, ALL CAPS → Title Case, and verified PDF-DOI adoption included; filename titles stay lint-only unless `[fix_metadata].llm_title` proposes a grounded title (`source = "llm_title"`). Dry-run and `--apply` both write `state/runs/<stamp>-fix-metadata.json` (`patches_applied` only after `--apply`). |
@@ -127,7 +131,7 @@ uv run paperful pack show
 | `gaps` | Counts: no stored PDF, linked PDF URL only, missing DOI. Read-only. Year/type scope flags apply. Next steps are `run` and `lint`. Writes `state/runs/<stamp>-gaps.json`. |
 | `all` | `gaps` → `run --try-all --retry-failed --upgrade-linked` → `lint` → `fix-metadata --apply` → `summarize --apply`. Stops on the first failure. `--dry-run` skips `summarize` and does not apply metadata. `--profile` / `-f` load a saved run config. Opens a pack when none is open. See [Workflows](workflows.md). |
 | `profile` | `list` / `show` / `save` — named run configs beside `config.toml` (`profiles/<name>.toml` or `[profiles.*]`). `show` prints the merge `all` would use. `save` does not edit `config.toml`. |
-| `snowball` | Grow a library from a keyword, DOI, ORCID, or collection (`search`, `hybrid`, `doi`, `orcid`, `collection`, `apply`, `run --profile`, `profile save`). `hybrid` is keyword hits then one hop. Dry-run unless a writing gate is set. `approve-each` is for short lists. `fetch_pdfs` calls `run` on the new keys only. `run` and `all` refuse `kind = snowball` profiles. |
+| `snowball` | Grow a library from a keyword, DOI, ORCID, or collection (`search`, `hybrid`, `doi`, `orcid`, `collection`, `apply`, `run --profile`, `profile save`). `hybrid` is keyword hits then one hop. Dry-run unless a writing gate is set. `approve-each` is for short lists. `fetch_pdfs` is `off`, `fast`, or `full` on the new keys only. `run` and `all` refuse `kind = snowball` profiles. [How a hop is cut](snowball.md#how-a-hop-is-cut). |
 | `pack` | `open` / `close` / `show` — group the run reports from one operator sequence into `state/packs/<id>.json` (`paperful.pack.v1`). `show` does not open the library. `PAPERFUL_PACK=off` keeps a command out of the open pack. |
 | `collections` | Collection tree with “No PDF” counts |
 | `report` | Manifest summary + latest run report (`--last-run`, `--json`, `--not-found`, `--status`) |

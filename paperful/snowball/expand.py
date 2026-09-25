@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import random
+from typing import Any, Callable
+
 from .candidate import Candidate
 
 # Soft ceiling so a typo does not walk the whole graph. Caps still bind first.
 MAX_DEPTH = 5
+PER_HOP_RANKS = frozenset({"most-cited", "least-cited", "random"})
 
 
 def clamp_depth(depth: int) -> tuple[int, str | None]:
@@ -32,7 +36,10 @@ JOURNAL_SHAPED = frozenset(
 
 
 def truncate(rows: list[Candidate], max_candidates: int) -> list[Candidate]:
-    """Cap ``new`` and ``exists`` rows. ``error`` and ``filtered`` stay in the queue."""
+    """Cap ``new`` and ``exists`` rows. ``error`` and ``filtered`` stay in the queue.
+
+    ``max_candidates <= 0`` keeps every row. ``per_hop_limit <= 0`` keeps every neighbour of a seed.
+    """
     ranked = sorted(
         rows,
         key=lambda row: (
@@ -40,8 +47,8 @@ def truncate(rows: list[Candidate], max_candidates: int) -> list[Candidate]:
             (row.ids.get("doi") or row.ids.get("openalex") or ""),
         ),
     )
-    if max_candidates < 0:
-        return [row for row in ranked if row.status in {"error", "filtered"}]
+    if max_candidates <= 0:
+        return ranked
     kept: list[Candidate] = []
     budget = max_candidates
     for row in ranked:
@@ -111,15 +118,65 @@ def apply_filters(
 
 
 def cap_ids(ids: list[str], per_hop_limit: int) -> list[str]:
-    """Fan-out per seed, stable order."""
+    """Fan-out per seed, stable order. ``per_hop_limit <= 0`` keeps every id."""
     seen: list[str] = []
-    limit = max(0, per_hop_limit)
     for raw in ids:
         if raw and raw not in seen:
             seen.append(raw)
-        if len(seen) >= limit:
+        if per_hop_limit > 0 and len(seen) >= per_hop_limit:
             break
     return seen
+
+
+def unique_ids(ids: list[str]) -> list[str]:
+    """Deduplicate while keeping the first occurrence of each id."""
+    seen: list[str] = []
+    for raw in ids:
+        if raw and raw not in seen:
+            seen.append(raw)
+    return seen
+
+
+def sample_ids(ids: list[str], limit: int, *, rng: random.Random | None = None) -> list[str]:
+    """Keep ``limit`` ids at random. ``limit <= 0`` keeps every id."""
+    cleaned = unique_ids(ids)
+    if limit <= 0 or len(cleaned) <= limit:
+        return cleaned
+    picker = rng or random.Random()
+    return picker.sample(cleaned, limit)
+
+
+def select_works_by_citations(
+    works: list[dict[str, Any]],
+    limit: int,
+    rank: str,
+    *,
+    id_of: Callable[[dict[str, Any]], str] | None = None,
+    rng: random.Random | None = None,
+) -> list[dict[str, Any]]:
+    """Keep ``limit`` works by citation rank or a random sample.
+
+    ``rank`` is most-cited, least-cited, or random. ``limit <= 0`` keeps every work.
+    """
+    if limit <= 0 or len(works) <= limit:
+        return list(works)
+    mode = (rank or "most-cited").strip().lower()
+    if mode == "random":
+        picker = rng or random.Random()
+        return picker.sample(list(works), limit)
+    reverse = mode != "least-cited"
+
+    def key(work: dict[str, Any]) -> tuple[int, str]:
+        cited = int(work.get("cited_by_count") or 0)
+        identity = ""
+        if id_of is not None:
+            identity = id_of(work)
+        else:
+            identity = str(work.get("id") or work.get("doi") or "")
+        return (cited, identity)
+
+    ordered = sorted(works, key=key, reverse=reverse)
+    return ordered[:limit]
 
 
 def normalize_direction(raw: str) -> str:

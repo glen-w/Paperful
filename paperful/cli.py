@@ -12,15 +12,7 @@ from typing import Any
 
 import typer
 from rich.console import Console
-from rich.progress import (
-    BarColumn,
-    MofNCompleteColumn,
-    Progress,
-    SpinnerColumn,
-    TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
-)
+from .progress import item_progress
 from rich.table import Table
 
 from . import __version__
@@ -80,10 +72,38 @@ from .zot import (
     resolve_item_types,
 )
 
+
+def _load_dotenv() -> None:
+    """Fill unset variables from a gitignored .env in the working directory."""
+    path = Path.cwd() / ".env"
+    if not path.is_file():
+        return
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+    for line in lines:
+        text = line.strip()
+        if not text or text.startswith("#") or "=" not in text:
+            continue
+        key, value = text.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+_load_dotenv()
+
 app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
-    help="Research helper for a reference library: clean records, find missing PDFs, summarise papers, keep a platform-agnostic mirror. Zotero is the well-tested adapter. Mendeley and EndNote are seeking testers.",
+    help=(
+        "Research helper for a reference library: clean records, find missing PDFs, "
+        "summarise papers, keep an on-disk mirror. Zotero is the well-tested adapter. "
+        "Mendeley and EndNote are seeking testers. Not paperful.io. "
+        "`paperful jobs` lists the five jobs."
+    ),
 )
 session_app = typer.Typer(
     add_completion=False,
@@ -106,13 +126,56 @@ app.add_typer(profile_app, name="profile")
 snowball_app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
-    help="Grow a library from a keyword or a DOI bibliography. Dry-run unless --gate auto.",
+    help=(
+        "Grow a library: find works and create metadata parents from a keyword, DOI, "
+        "ORCID, or seed collection. Dry-run unless --gate auto. Does not fill PDFs "
+        "unless --fetch-pdfs. Use `paperful run` to fill items already in the library. "
+        "The public verb is snowball (there is no harvest command)."
+    ),
 )
 app.add_typer(snowball_app, name="snowball")
+
+# Canonical top-level verbs. tests/test_cli.py asserts this matches `paperful --help`.
+JOBS: dict[str, tuple[str, ...]] = {
+    "library": ("collections", "import", "export", "snowball"),
+    "find": ("run", "attach", "recover", "gaps"),
+    "completeness": (
+        "lint",
+        "fix-metadata",
+        "dedupe",
+        "summarize",
+        "synthesize",
+        "all",
+    ),
+    "mirror": ("snapshot", "restore"),
+    "control": ("doctor", "session", "mirrors", "ezproxy", "scholar", "pack", "profile"),
+    "utility": ("report", "version", "jobs"),
+}
+
 console = Console(highlight=False)
 
 ConfigOpt = typer.Option(
     None, "--config", "-c", help="Path to config.toml", exists=True, dir_okay=False
+)
+FetchPdfsOpt = typer.Option(
+    None,
+    "--fetch-pdfs",
+    help="PDF mode after create: off, fast, or full. true means fast. Default: config, else off.",
+)
+MaxCandidatesOpt = typer.Option(
+    None,
+    "--max-candidates",
+    help="Stop after this many new+exists rows. Use all for every row.",
+)
+PerHopLimitOpt = typer.Option(
+    None,
+    "--per-hop-limit",
+    help="Neighbours per seed per hop. Use all for every neighbour.",
+)
+PerHopRankOpt = typer.Option(
+    None,
+    "--per-hop-rank",
+    help="Which neighbours a numeric limit keeps: most-cited, least-cited, or random.",
 )
 ProfileOpt = typer.Option(
     None,
@@ -255,18 +318,9 @@ class WriteDest(str, Enum):
     both = "both"
 
 
-def _item_progress() -> Progress:
+def _item_progress():
     """Live bar that stays below scrolling per-item logs."""
-    return Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        MofNCompleteColumn(),
-        TimeElapsedColumn(),
-        TimeRemainingColumn(),
-        console=console,
-        transient=False,
-    )
+    return item_progress(console)
 
 
 def _cfg(path: Path | None) -> Config:
@@ -552,6 +606,17 @@ def _loaded_scope(
 @app.callback()
 def _main() -> None:
     """paperful."""
+
+
+@app.command()
+def jobs() -> None:
+    """List canonical verbs for the five jobs (library, find, completeness, mirror, control)."""
+    for name, verbs in JOBS.items():
+        console.print(f"[bold]{name}[/]: {', '.join(verbs)}")
+    console.print(
+        "Snowball grows the library (metadata parents). "
+        "Run fills PDFs for items already there."
+    )
 
 
 @app.command()
@@ -1284,12 +1349,15 @@ def run(
     sources: str | None = typer.Option(
         None,
         "--sources",
-        help="Comma-separated source order override (or preset name eoi).",
+        help="Comma-separated source order override (or a preset name: oa, eoi).",
     ),
     preset: str | None = typer.Option(
         None,
         "--preset",
-        help="Named source preset (eoi = OA + EZProxy, no Scholar or Sci-Hub).",
+        help=(
+            "Source preset. oa = open-access sources only (no EZProxy). "
+            "eoi = OA + EZProxy, no Scholar or Sci-Hub (same as the default list)."
+        ),
     ),
     scihub: bool | None = SciHubOpt,
     upgrade_linked: bool | None = UpgradeLinkedOpt,
@@ -1298,7 +1366,7 @@ def run(
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
-    """Find and download PDFs for items lacking one, then attach them."""
+    """Fill PDFs for items already in the library. Default attaches on Zotero 10+; --dry-run does not write."""
     if _scope_unset(collection, library, profile, run_config):
         _refuse_missing_scope()
     cfg = _cfg(config)
@@ -1536,7 +1604,7 @@ def attach(
         help="Also attach PDFs that --strict-pdf-doi left on disk.",
     ),
 ) -> None:
-    """Attach already-downloaded PDFs (status ok / attach_failed) into the library."""
+    """Write already-downloaded PDFs into the library. This command attaches; it is not a dry-run."""
     cfg = _cfg(config)
     _require_manager(cfg)
     backend = _connect(cfg)
@@ -1587,7 +1655,7 @@ def snapshot(
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
-    """Write per-item restore folders under out/ for the scoped library."""
+    """Write per-item restore folders under out/. --dry-run counts and does not write."""
     from .snapshot import run_snapshot, snapshot_report
 
     if _scope_unset(collection, library, profile, run_config):
@@ -1668,7 +1736,7 @@ def restore(
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
-    """Recreate missing library items from out/ restore folders. Never overwrites fields."""
+    """Recreate missing library items from out/. Dry-run unless --apply. Never overwrites fields."""
     from .restore import apply_restore, iter_records, plan_restore, record_in_scope
 
     if _scope_unset(collection, library, profile, run_config):
@@ -1779,7 +1847,7 @@ def import_library(
     ),
     config: Path | None = ConfigOpt,
 ) -> None:
-    """Import a bibliography file into the configured manager (Zotero / Mendeley / EndNote bundle)."""
+    """Import a bibliography file. Default is a dry-run count; --apply writes the library."""
     from .interop.load import load_records
     from .xfer import apply_import
 
@@ -3291,10 +3359,11 @@ def _snowball_request(
     *,
     gate: str | None,
     collection: str | None,
-    fetch_pdfs: bool | None,
+    fetch_pdfs: str | bool | None,
     depth: int | None,
-    max_candidates: int | None,
-    per_hop_limit: int | None = None,
+    max_candidates: str | int | None,
+    per_hop_limit: str | int | None = None,
+    per_hop_rank: str | None = None,
     year_from: int | None,
     year_to: int | None,
     direction: str | None = None,
@@ -3314,6 +3383,7 @@ def _snowball_request(
         depth=depth,
         max_candidates=max_candidates,
         per_hop_limit=per_hop_limit,
+        per_hop_rank=per_hop_rank,
         year_from=year_from,
         year_to=year_to,
         direction=direction or cfg.snowball_direction or "refs",
@@ -3348,16 +3418,15 @@ def snowball_search(
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     depth: int | None = typer.Option(None, "--depth", help="0 = hits only. Expand hits when >= 1."),
-    max_candidates: int | None = typer.Option(None, "--max-candidates"),
-    per_hop_limit: int | None = typer.Option(None, "--per-hop-limit"),
+    max_candidates: str | None = MaxCandidatesOpt,
+    per_hop_limit: str | None = PerHopLimitOpt,
+    per_hop_rank: str | None = PerHopRankOpt,
     direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both (when depth >= 1)."),
     gate: str | None = typer.Option(
         None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
     ),
     collection: str = typer.Option("", "--collection", "-C", help="Target collection for --gate auto."),
-    fetch_pdfs: bool | None = typer.Option(
-        None, "--fetch-pdfs", help="After auto-create, fill PDFs for the new items."
-    ),
+    fetch_pdfs: str | None = FetchPdfsOpt,
     languages: str | None = typer.Option(None, "--languages", help="Comma-separated language codes."),
     min_seed_citations: int | None = typer.Option(None, "--min-seed-citations"),
     note_provenance: bool | None = typer.Option(None, "--note-provenance/--no-note-provenance"),
@@ -3375,6 +3444,7 @@ def snowball_search(
         depth=depth,
         max_candidates=max_candidates,
         per_hop_limit=per_hop_limit,
+        per_hop_rank=per_hop_rank,
         year_from=year_from,
         year_to=year_to,
         direction=direction,
@@ -3394,13 +3464,14 @@ def snowball_hybrid(
     query: str = typer.Argument(..., help="Keyword query. Top hits then get one hop."),
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
-    max_candidates: int | None = typer.Option(None, "--max-candidates"),
-    per_hop_limit: int | None = typer.Option(None, "--per-hop-limit"),
+    max_candidates: str | None = MaxCandidatesOpt,
+    per_hop_limit: str | None = PerHopLimitOpt,
+    per_hop_rank: str | None = PerHopRankOpt,
     hybrid_seeds: int | None = typer.Option(None, "--hybrid-seeds", help="How many top DOI hits to expand."),
     direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both."),
     gate: str | None = typer.Option(None, "--gate", help="dry-run, approve-each, approve-batch, or auto."),
     collection: str = typer.Option("", "--collection", "-C", help="Target collection for a writing gate."),
-    fetch_pdfs: bool | None = typer.Option(None, "--fetch-pdfs"),
+    fetch_pdfs: str | None = FetchPdfsOpt,
     languages: str | None = typer.Option(None, "--languages"),
     min_seed_citations: int | None = typer.Option(None, "--min-seed-citations"),
     refine: bool | None = typer.Option(None, "--refine/--no-refine"),
@@ -3416,6 +3487,7 @@ def snowball_hybrid(
         depth=None,
         max_candidates=max_candidates,
         per_hop_limit=per_hop_limit,
+        per_hop_rank=per_hop_rank,
         year_from=year_from,
         year_to=year_to,
         direction=direction,
@@ -3435,16 +3507,15 @@ def snowball_doi(
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     depth: int | None = typer.Option(None, "--depth", help="Graph hops. Default: [snowball] depth, else 1."),
-    max_candidates: int | None = typer.Option(None, "--max-candidates"),
-    per_hop_limit: int | None = typer.Option(None, "--per-hop-limit"),
+    max_candidates: str | None = MaxCandidatesOpt,
+    per_hop_limit: str | None = PerHopLimitOpt,
+    per_hop_rank: str | None = PerHopRankOpt,
     direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both."),
     gate: str | None = typer.Option(
         None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
     ),
     collection: str = typer.Option("", "--collection", "-C", help="Target collection for --gate auto."),
-    fetch_pdfs: bool | None = typer.Option(
-        None, "--fetch-pdfs", help="After auto-create, fill PDFs for the new items."
-    ),
+    fetch_pdfs: str | None = FetchPdfsOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Bibliography and/or citing works of each DOI. Creates items only with --gate auto."""
@@ -3457,6 +3528,7 @@ def snowball_doi(
         depth=depth,
         max_candidates=max_candidates,
         per_hop_limit=per_hop_limit,
+        per_hop_rank=per_hop_rank,
         year_from=year_from,
         year_to=year_to,
         direction=direction,
@@ -3472,16 +3544,15 @@ def snowball_orcid(
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     depth: int | None = typer.Option(None, "--depth", help="Graph hops. Default: [snowball] depth, else 1."),
-    max_candidates: int | None = typer.Option(None, "--max-candidates"),
-    per_hop_limit: int | None = typer.Option(None, "--per-hop-limit"),
+    max_candidates: str | None = MaxCandidatesOpt,
+    per_hop_limit: str | None = PerHopLimitOpt,
+    per_hop_rank: str | None = PerHopRankOpt,
     direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both."),
     gate: str | None = typer.Option(
         None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
     ),
     collection: str = typer.Option("", "--collection", "-C", help="Target collection for --gate auto."),
-    fetch_pdfs: bool | None = typer.Option(
-        None, "--fetch-pdfs", help="After auto-create, fill PDFs for the new items."
-    ),
+    fetch_pdfs: str | None = FetchPdfsOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Person's works (ORCID + OpenAlex), then references/citations those works expand to."""
@@ -3494,6 +3565,7 @@ def snowball_orcid(
         depth=depth,
         max_candidates=max_candidates,
         per_hop_limit=per_hop_limit,
+        per_hop_rank=per_hop_rank,
         year_from=year_from,
         year_to=year_to,
         direction=direction,
@@ -3509,8 +3581,9 @@ def snowball_collection(
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     depth: int | None = typer.Option(None, "--depth", help="Graph hops. Default: [snowball] depth, else 1."),
-    max_candidates: int | None = typer.Option(None, "--max-candidates"),
-    per_hop_limit: int | None = typer.Option(None, "--per-hop-limit"),
+    max_candidates: str | None = MaxCandidatesOpt,
+    per_hop_limit: str | None = PerHopLimitOpt,
+    per_hop_rank: str | None = PerHopRankOpt,
     direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both."),
     gate: str | None = typer.Option(
         None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
@@ -3521,9 +3594,7 @@ def snowball_collection(
         "-C",
         help="Target collection for --gate auto (defaults to the seed collection).",
     ),
-    fetch_pdfs: bool | None = typer.Option(
-        None, "--fetch-pdfs", help="After auto-create, fill PDFs for the new items."
-    ),
+    fetch_pdfs: str | None = FetchPdfsOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Expand DOIs already in a collection. Creates items only with --gate auto."""
@@ -3537,6 +3608,7 @@ def snowball_collection(
         depth=depth,
         max_candidates=max_candidates,
         per_hop_limit=per_hop_limit,
+        per_hop_rank=per_hop_rank,
         year_from=year_from,
         year_to=year_to,
         direction=direction,
@@ -3548,13 +3620,35 @@ def snowball_collection(
     )
 
 
+@snowball_app.command("resume")
+def snowball_resume(
+    run_id: str = typer.Argument(..., help="Run id under state/snowball/<run-id>/ with deferred.json."),
+    collection: str = typer.Option("", "--collection", "-C", help="Target collection when the saved gate is auto."),
+    gate: str | None = typer.Option(None, "--gate", help="dry-run or auto. Default: config."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Continue OpenAlex work saved when the daily budget was spent. Same API key."""
+    cfg = _cfg(config)
+    request = _snowball_request(
+        cfg,
+        gate=gate,
+        collection=collection,
+        fetch_pdfs=None,
+        depth=None,
+        max_candidates=None,
+        year_from=None,
+        year_to=None,
+    )
+    from .snowball.command import run_resume
+
+    _run_snowball(cfg, lambda c: run_resume(c, run_id, request, console=console))
+
+
 @snowball_app.command("apply")
 def snowball_apply(
     run_id: str = typer.Argument(..., help="Run id under state/snowball/<run-id>/."),
     collection: str = typer.Option("", "--collection", "-C", help="Target collection."),
-    fetch_pdfs: bool | None = typer.Option(
-        None, "--fetch-pdfs", help="After create, fill PDFs for the new items."
-    ),
+    fetch_pdfs: str | None = FetchPdfsOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Create keep=true rows from a prior queue (approve-batch or edited dry-run)."""
@@ -3651,10 +3745,11 @@ def snowball_profile_save(
     description: str = typer.Option("", "--description"),
     gate: str = typer.Option("dry-run", "--gate"),
     collection: str = typer.Option("", "--collection", "-C", help="Target collection."),
-    fetch_pdfs: bool = typer.Option(False, "--fetch-pdfs"),
+    fetch_pdfs: str = typer.Option("", "--fetch-pdfs", help="off, fast, or full."),
     depth: int | None = typer.Option(None, "--depth"),
-    max_candidates: int | None = typer.Option(None, "--max-candidates"),
-    per_hop_limit: int | None = typer.Option(None, "--per-hop-limit"),
+    max_candidates: str | None = MaxCandidatesOpt,
+    per_hop_limit: str | None = PerHopLimitOpt,
+    per_hop_rank: str | None = PerHopRankOpt,
     direction: str = typer.Option("", "--direction"),
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
@@ -3699,14 +3794,36 @@ def snowball_profile_save(
         body["description"] = description.strip()
     if collection.strip():
         body["target_collection"] = collection.strip()
-    if fetch_pdfs:
-        body["fetch_pdfs"] = True
+    if fetch_pdfs.strip():
+        from .config import parse_fetch_pdfs
+
+        try:
+            body["fetch_pdfs"] = parse_fetch_pdfs(fetch_pdfs)
+        except ValueError as exc:
+            raise SnowballError(str(exc)) from exc
     if depth is not None:
         body["depth"] = depth
     if max_candidates is not None:
-        body["max_candidates"] = max_candidates
+        from .config import parse_cap
+
+        try:
+            body["max_candidates"] = parse_cap(max_candidates)
+        except ValueError as exc:
+            raise SnowballError(str(exc)) from exc
     if per_hop_limit is not None:
-        body["per_hop_limit"] = per_hop_limit
+        from .config import parse_cap
+
+        try:
+            body["per_hop_limit"] = parse_cap(per_hop_limit)
+        except ValueError as exc:
+            raise SnowballError(str(exc)) from exc
+    if per_hop_rank:
+        from .config import parse_per_hop_rank
+
+        try:
+            body["per_hop_rank"] = parse_per_hop_rank(per_hop_rank)
+        except ValueError as exc:
+            raise SnowballError(str(exc)) from exc
     if direction.strip():
         body["direction"] = direction.strip()
     if year_from is not None:

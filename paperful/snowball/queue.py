@@ -42,6 +42,11 @@ def write_queue(
         "library_unread": library_unread,
         "score": "cited_by_count",
     }
+    if client.deferred:
+        summary["deferred"] = True
+        (dest / "deferred.json").write_text(
+            json.dumps(client.deferred, indent=2) + "\n", encoding="utf-8"
+        )
     if meta:
         summary.update(meta)
     (dest / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")

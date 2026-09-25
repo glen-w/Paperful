@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from io import StringIO
 from pathlib import Path
 
 import pytest
@@ -20,11 +21,12 @@ from paperful.snowball.command import (
     run_doi,
     run_hybrid,
     run_orcid,
+    run_resume,
     run_search,
 )
 from paperful.snowball.expand import MAX_DEPTH, cap_ids, clamp_depth, keyword_depth, truncate
 from paperful.snowball.candidate import Candidate
-from paperful.snowball.openalex import OpenAlexClient
+from paperful.snowball.openalex import OpenAlexBudgetExceeded, OpenAlexClient, _is_budget, keyless_limit_message
 from paperful.zot import Item
 
 runner = CliRunner()
@@ -89,6 +91,29 @@ def test_stop_rules_clamp_and_cap():
     assert keyword_depth(None) == 0
     assert keyword_depth(2) == 2
     assert cap_ids(["b", "a", "b", "c"], 2) == ["b", "a"]
+    assert cap_ids(["b", "a", "b", "c"], 0) == ["b", "a", "c"]
+    from paperful.config import parse_cap, parse_per_hop_rank
+    from paperful.snowball.expand import sample_ids, select_works_by_citations
+    import random
+
+    assert parse_cap("all") == 0
+    assert parse_cap("unlimited") == 0
+    assert parse_cap(25) == 25
+    assert parse_per_hop_rank("least-cited") == "least-cited"
+    works = [
+        {"id": "W1", "cited_by_count": 10},
+        {"id": "W2", "cited_by_count": 2},
+        {"id": "W3", "cited_by_count": 50},
+    ]
+    top = select_works_by_citations(works, 2, "most-cited", id_of=lambda w: w["id"])
+    assert [w["id"] for w in top] == ["W3", "W1"]
+    low = select_works_by_citations(works, 2, "least-cited", id_of=lambda w: w["id"])
+    assert [w["id"] for w in low] == ["W2", "W1"]
+    assert len(select_works_by_citations(works, 0, "most-cited")) == 3
+    assert sample_ids(["a", "b", "c"], 2, rng=random.Random(0)) == sample_ids(
+        ["a", "b", "c"], 2, rng=random.Random(0)
+    )
+    assert len(sample_ids(["a", "b", "c"], 2, rng=random.Random(1))) == 2
     rows = [
         Candidate("r", {"type": "doi", "value": "x"}, 1, "refs", {"doi": "10.1/b"}, {}, "w", "new", {}, "dry-run", score=1),
         Candidate("r", {"type": "doi", "value": "x"}, 1, "refs", {"doi": "10.1/a"}, {}, "w", "new", {}, "dry-run", score=5),
@@ -96,6 +121,103 @@ def test_stop_rules_clamp_and_cap():
     ]
     kept = truncate(rows, 2)
     assert [row.ids["doi"] for row in kept] == ["10.1/a", "10.1/c"]
+    assert len(truncate(rows, 0)) == 3
+
+
+def test_tally_line_names_the_totals():
+    from paperful.snowball.tally import Tally
+
+    lines: list[str] = []
+    tally = Tally(lines.append, interval_s=60)
+    tally.stage = "hop 2/2 references · 80 ids"
+    tally.searches = 12
+    tally.papers = 40
+    tally.fields = 3
+    tally.report()
+    assert lines == ["hop 2/2 references · 80 ids · 12 searches · 40 papers"]
+    tally.stage = "hop 2/2 cited-by 2/9 W2"
+    tally.searches = 14
+    tally.papers = 55
+    tally.report()
+    assert lines[-1] == "hop 2/2 cited-by 2/9 W2 · 2 searches · 15 papers"
+    tally.stage = "crossref"
+    tally.searches = 16
+    tally.fields = 7
+    tally.report()
+    assert lines[-1] == "crossref · 2 searches · 4 fields updated"
+    tally.stage = "creating"
+    tally.created = 4
+    tally.report()
+    assert lines[-1] == "creating · 4 created"
+    tally.stage = "fetching PDFs"
+    tally.bind_pdfs(lambda: 2)
+    assert tally.line() == "fetching PDFs · 2 PDFs"
+    tally.stop()
+    assert len(lines) == 4
+
+    class _Bar:
+        def __init__(self) -> None:
+            self.updates: list[dict] = []
+            self.stopped = False
+
+        def update(self, task_id: int, **kwargs) -> None:
+            self.updates.append(kwargs)
+
+        def stop(self) -> None:
+            self.stopped = True
+
+    bar = _Bar()
+    live = Tally(lines.append, interval_s=60)
+    live.stage = "hop 2/2 references · 10 ids"
+    live.bind_bar(bar, 1)
+    live.track(10)
+    live.advance(4)
+    assert bar.updates[-1]["completed"] == 4
+    assert bar.updates[-1]["total"] == 10
+    assert "[cyan]" in bar.updates[-1]["description"]
+    assert "searches" in bar.updates[-1]["description"]
+    live.stage = "creating"
+    live.created = 1
+    live.track(3)
+    live.advance(1)
+    assert "[green]" in bar.updates[-1]["description"]
+    live.stop()
+    assert bar.stopped
+
+    counted = Tally(lines.append, interval_s=60)
+    client = OpenAlexClient(
+        email="t@example.org",
+        api_key="",
+        sleep_s=0,
+        getter=lambda _path, _params: {"results": [{"id": "W1"}, {"id": "W2"}]},
+    )
+    client.tally = counted
+    client.get("/works", {})
+    assert counted.searches == 1
+    assert counted.papers == 2
+
+    from paperful.snowball.fill import fill_crossref
+
+    row = Candidate(
+        "r",
+        {"type": "doi", "value": "x"},
+        1,
+        "refs",
+        {"doi": "10.1/b"},
+        {},
+        "w",
+        "new",
+        {},
+        "dry-run",
+    )
+    fill_crossref(
+        [row],
+        lambda _doi: {"title": "T", "year": 2020, "venue": "V", "authors": ["A"]},
+        tally=counted,
+    )
+    assert counted.searches == 2
+    assert counted.fields == 4
+    assert row.biblio["title"] == "T"
 
 
 def test_doi_refs_and_keyword_hits(tmp_path: Path):
@@ -105,7 +227,8 @@ def test_doi_refs_and_keyword_hits(tmp_path: Path):
         "W3": _work("W3", "10.1000/a", "Aye", 2018, 9),
     }
     cfg = _cfg(tmp_path)
-    console = Console(highlight=False, width=200)
+    buf = StringIO()
+    console = Console(file=buf, highlight=False, width=200, force_terminal=False)
     client = _client(works)
     result = run_doi(
         cfg,
@@ -119,6 +242,10 @@ def test_doi_refs_and_keyword_hits(tmp_path: Path):
     lines = (result.run_dir / "candidates.jsonl").read_text().splitlines()
     rows = [json.loads(line) for line in lines]
     assert {row["ids"]["doi"] for row in rows} == {"10.1000/a", "10.1000/b"}
+    text = buf.getvalue()
+    assert "hop 1/1" in text
+    assert "searches" in text and "papers" in text
+    assert "fields updated" not in text and "PDFs" not in text
     by_doi = {row["ids"]["doi"]: row for row in rows}
     assert by_doi["10.1000/a"]["hop"] == 1
     assert by_doi["10.1000/a"]["direction"] == "refs"
@@ -230,7 +357,7 @@ def test_auto_creates_only_new_and_fetch_pdfs_uses_those_keys(tmp_path: Path, mo
     lib = _Lib()
     seen: list[Item] = []
 
-    def fake_fill(cfg, backend, items, console):
+    def fake_fill(cfg, backend, items, console, **_kwargs):
         seen.extend(items)
 
         class Stats:
@@ -1308,3 +1435,195 @@ def test_deep_refine_hybrid_orcid_and_cli(tmp_path: Path):
     )
     assert refused.exit_code == 2
     assert "target collection" in refused.output
+
+
+def test_parse_fetch_pdfs_modes():
+    from paperful.config import parse_fetch_pdfs
+
+    assert parse_fetch_pdfs(False) == "off"
+    assert parse_fetch_pdfs(True) == "fast"
+    assert parse_fetch_pdfs("full") == "full"
+    with pytest.raises(ValueError):
+        parse_fetch_pdfs("sometimes")
+
+
+def test_fill_pdfs_full_retries_only_misses(tmp_path: Path, monkeypatch):
+    from paperful.snowball.ingest import fill_pdfs
+    from paperful.store import STATUS_OK, Manifest, Record
+
+    cfg = Config(
+        email="t@example.org",
+        out_dir=tmp_path / "out",
+        state_dir=tmp_path / "state",
+        sources=["unpaywall", "scihub"],
+    )
+    cfg.state_dir.mkdir()
+    seen: list[tuple[bool, list[str]]] = []
+
+    class Pipe:
+        def __init__(self, cfg, manifest, console, sources=None, attacher=None, use_browser=True, progress=None):
+            self.use_browser = use_browser
+            self._keys: list[str] = []
+            self.stats = type("S", (), {"ok": 0, "attached": 0, "attach_failed": 0})()
+
+        def run(self, items):
+            keys = [it.key for it in items]
+            seen.append((self.use_browser, keys))
+            if not self.use_browser:
+                Manifest(cfg.manifest_path).write(Record(itemKey="A", status=STATUS_OK))
+                self.stats.ok = 1
+            else:
+                self.stats.ok = 1
+            return self.stats
+
+    monkeypatch.setattr("paperful.snowball.ingest.Pipeline", Pipe)
+    monkeypatch.setattr(
+        "paperful.snowball.ingest.with_recover_lane",
+        lambda cfg, sources: [*sources, "browser_agent"],
+    )
+    items = [
+        Item("A", "journalArticle", "Hit", "10.1/a", None, None, 2020, "A"),
+        Item("B", "journalArticle", "Miss", "10.1/b", None, None, 2024, "B"),
+    ]
+    stats = fill_pdfs(cfg, object(), items, Console(highlight=False, width=120), mode="full")
+    assert seen == [(False, ["A", "B"]), (True, ["B"])]
+    assert stats.ok == 2
+
+
+def test_auto_full_mode_reaches_fill(tmp_path: Path, monkeypatch):
+    works = {"W1": _work("W1", "10.1000/seed", "Seed", 2020, 1, ["W2"]), "W2": _work("W2", "10.1000/new", "New", 2019, 1)}
+    modes: list[str] = []
+
+    def fake_fill(cfg, backend, items, console, **kwargs):
+        modes.append(kwargs.get("mode"))
+
+        class Stats:
+            ok = 1
+            attached = 0
+            attach_failed = 0
+
+        return Stats()
+
+    monkeypatch.setattr("paperful.snowball.command.fill_pdfs", fake_fill)
+    run_doi(
+        _cfg(tmp_path),
+        ["10.1000/seed"],
+        SnowballRequest(gate="auto", collection="Inbox/Snowball", fetch_pdfs="full"),
+        console=Console(highlight=False, width=200),
+        client=_client(works),
+        lookup=lambda doi, title: None,
+        backend=_Lib(),
+    )
+    assert modes == ["full"]
+
+
+def test_api_error_keeps_a_restorable_queue(tmp_path: Path):
+    from paperful.snowball.openalex import OpenAlexError
+
+    works = {"W1": _work("W1", "10.1000/seed", "Seed", 2020, 5)}
+
+    def getter(path: str, params: dict) -> dict:
+        if path.startswith("/works/https://doi.org/"):
+            return works["W1"]
+        if "cites:" in str(params.get("filter") or ""):
+            raise OpenAlexError("openalex down")
+        return {"results": []}
+
+    console = Console(file=StringIO(), highlight=False, width=120)
+    result = run_doi(
+        _cfg(tmp_path),
+        ["10.1000/seed"],
+        SnowballRequest(gate="dry-run", direction="cites", depth=1),
+        console=console,
+        client=OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter),
+    )
+    assert result.exit_code == 1
+    assert (result.run_dir / "candidates.jsonl").is_file()
+    deferred = json.loads((result.run_dir / "deferred.json").read_text())
+    assert deferred["kind"] == "cites"
+    assert deferred["remaining_ids"] == ["W1"]
+    assert "Crawl paused" in console.file.getvalue()
+
+
+def test_keyless_promotes_to_one_key():
+    bare = OpenAlexClient(email="a@b.c", api_key="", sleep_s=0)
+    assert bare._promote_key() is False
+    assert "Authorization" not in bare._headers()
+    keyed = OpenAlexClient(email="a@b.c", api_key="k", sleep_s=0)
+    assert "Authorization" not in keyed._headers()
+    assert keyed._promote_key() is True
+    assert keyed._headers()["Authorization"] == "Bearer k"
+    assert keyed._promote_key() is False
+    notice = keyless_limit_message(has_key=False, reset_at="2099-01-01T00:00:00+00:00")
+    assert "https://openalex.org/settings/api" in notice
+    assert "VPN" in notice
+    assert "more reliable" in notice
+
+
+def test_budget_stop_keeps_partial_rows_and_resume(tmp_path: Path):
+    import httpx
+
+    spent = httpx.Response(429, headers={"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "40000"})
+    burst = httpx.Response(429, headers={"Retry-After": "1", "X-RateLimit-Remaining": "10"})
+    assert _is_budget(spent, 0.0)
+    assert not _is_budget(burst, 0.0)
+
+    works = {
+        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 5),
+        "W2": _work("W2", "10.1000/cite", "Citer", 2021, 1),
+    }
+    calls = {"cites": 0}
+
+    def getter(path: str, params: dict) -> dict:
+        if path.startswith("/works/https://doi.org/"):
+            return works["W1"]
+        filt = str(params.get("filter") or "")
+        if "cites:" in filt:
+            calls["cites"] += 1
+            if calls["cites"] == 1:
+                raise OpenAlexBudgetExceeded("spent", reset_at="2099-01-01T00:00:00+00:00", reset_in_s=999)
+            return {"results": [works["W2"]]}
+        return {"results": []}
+
+    client = OpenAlexClient(email="t@example.org", api_key="k", sleep_s=0, getter=getter)
+    client._using_key = True
+    console = Console(file=StringIO(), highlight=False, width=120)
+    result = run_doi(
+        _cfg(tmp_path),
+        ["10.1000/seed"],
+        SnowballRequest(gate="dry-run", direction="cites", depth=1, per_hop_limit=10),
+        console=console,
+        client=client,
+    )
+    assert result.exit_code == 1
+    deferred_path = result.run_dir / "deferred.json"
+    deferred = json.loads(deferred_path.read_text())
+    assert deferred["kind"] == "cites"
+    assert deferred["remaining_ids"] == ["W1"]
+    assert "paperful snowball resume" in console.file.getvalue()
+
+    early = Console(file=StringIO(), highlight=False, width=120)
+    held = run_resume(
+        _cfg(tmp_path),
+        result.run_dir.name,
+        SnowballRequest(gate="dry-run"),
+        console=early,
+        client=OpenAlexClient(email="t@example.org", api_key="k", sleep_s=0, getter=getter),
+    )
+    assert held.exit_code == 1
+    assert "still spent" in early.file.getvalue()
+    assert calls["cites"] == 1
+
+    deferred["reset_at"] = "2000-01-01T00:00:00+00:00"
+    deferred_path.write_text(json.dumps(deferred))
+    resumed = run_resume(
+        _cfg(tmp_path),
+        result.run_dir.name,
+        SnowballRequest(gate="dry-run"),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=OpenAlexClient(email="t@example.org", api_key="k", sleep_s=0, getter=getter),
+    )
+    assert resumed.exit_code == 0
+    assert not deferred_path.exists()
+    saved = (resumed.run_dir / "candidates.jsonl").read_text()
+    assert "10.1000/cite" in saved

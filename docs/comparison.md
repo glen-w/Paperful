@@ -147,6 +147,7 @@ Scanned PDFs with no text layer, or you want a chat agent in the loop?
 ```
 
 More branches: [comparison reference](comparison-reference.md#choosing-in-one-glance).
+How far a snowball hop reaches: [How a hop is cut](snowball.md#how-a-hop-is-cut).
 
 ## Related docs
 

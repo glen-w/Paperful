@@ -116,7 +116,8 @@ def remediation_text(
     if check.name == "email":
         return (
             f'Edit {cfg_hint}: set email = "you@example.org" '
-            "(Unpaywall and polite-pool APIs need it), save, then continue."
+            "(Unpaywall will not be called without it; polite-pool APIs need it), "
+            "save, then continue."
         )
     if check.name in ("out_dir", "state_dir"):
         path = cfg.out_dir if check.name == "out_dir" else cfg.state_dir
@@ -281,10 +282,21 @@ def run_checks(
 
     if cfg.email.strip():
         checks.append(Check("email", "green", cfg.email))
+    elif "unpaywall" in cfg.sources:
+        checks.append(
+            Check(
+                "email",
+                "red",
+                "empty — Unpaywall is in sources and will not be called without an email",
+                code="unpaywall_email",
+            )
+        )
     else:
         checks.append(
             Check(
-                "email", "amber", "empty — Unpaywall and polite-pool APIs need an email"
+                "email",
+                "amber",
+                "empty — polite-pool APIs need an email",
             )
         )
 
@@ -361,9 +373,17 @@ def _snowball_check(cfg: Config, *, probe: Callable[[str], str] | None = None) -
     if not cfg.snowball_enabled:
         return Check("snowball", "green", "off")
     if not cfg.email.strip():
-        return Check("snowball", "amber", "enabled — set email for the OpenAlex polite pool")
+        return Check(
+            "snowball",
+            "amber",
+            "enabled — set email for Unpaywall and Crossref; OpenAlex quota follows OPENALEX_API_KEY",
+        )
     reach = (probe or _probe_openalex)(cfg.email)
-    oa = "key set" if os.environ.get("OPENALEX_API_KEY") else "no OpenAlex key"
+    oa = (
+        "key set"
+        if os.environ.get("OPENALEX_API_KEY")
+        else "no OpenAlex key — keyless is enough for a small search"
+    )
     s2 = (
         "semantic scholar key set"
         if os.environ.get("SEMANTIC_SCHOLAR_API_KEY")
@@ -613,5 +633,5 @@ def _endnote_library_check(cfg: Config) -> Check:
 
 
 def has_red(checks: list[Check]) -> bool:
-    fatal = _LIBRARY_CHECKS | {"out_dir", "state_dir"}
+    fatal = _LIBRARY_CHECKS | {"out_dir", "state_dir", "email"}
     return any(c.status == "red" and c.name in fatal for c in checks)

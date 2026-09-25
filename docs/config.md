@@ -1,7 +1,7 @@
 # Configuration (`config.toml`)
 
-Copy `config.example.toml` to `config.toml` and edit locally; the example file
-is tracked in git, personal config is not.
+Copy `config.minimal.toml` for a first run (email, paths, open-access sources)
+or `config.example.toml` for the full file. Both are tracked; `config.toml` is not.
 
 **Docker:** prefer relative `out_dir` / `state_dir` (`"out"` / `"state"`). Paths
 with `~/…` expand to the container user's home (not the Compose `/data` mount),
@@ -20,7 +20,7 @@ and [architecture](architecture.md).
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `email` | `""` | Sent as `mailto` to Unpaywall/OpenAlex/Crossref and as `email` to NCBI ID Converter (required by Unpaywall) |
+| `email` | `""` | Contact address for Unpaywall, Crossref, and NCBI. OpenAlex ignores `mailto`; its daily budget follows `OPENALEX_API_KEY`, or the client IP when that is unset |
 | `manager` | `zotero` | Library adapter. **`zotero` is well tested — use that.** `mendeley` and `endnote` are in the tree and seeking testers. EndNote writes are an import bundle, not an edit of the `.enl` file |
 | `[mendeley].client_id` / `client_secret` | `""` | Elsevier OAuth app from [dev.mendeley.com/myapps.html](https://dev.mendeley.com/myapps.html). Or `PAPERFUL_MENDELEY_CLIENT_*`. See [Mendeley](mendeley.md) |
 | `[mendeley].redirect_uri` | `http://127.0.0.1:8765/callback` | Must match the app. Host-only (`session login mendeley`) |
@@ -68,7 +68,8 @@ repeat on the command line. It is not a grey-lit playbook and not a
 | --- | --- |
 | Profile / run config | Named SCOPE + policy (`collections`, years, types, `try_all`, …) |
 | `paperful all` | `gaps` → `run` → `lint` → `fix-metadata` → `summarize` |
-| `--preset eoi` | Source list only (OA + EZProxy; no Scholar, no Sci-Hub) |
+| `--preset oa` | Open-access sources only (the default list without `ezproxy`). CLI flag or `preset` on a profile. `config.minimal.toml` is this list |
+| `--preset eoi` | OA + EZProxy; no Scholar, no Sci-Hub. Same names as the default `sources` list today |
 | Playbook | Grey-lit URL → PDF rule |
 | Pack | Witness of one executed sequence under `state/packs/` |
 | Snowball profile | `kind = "snowball"`. `run` and `all` refuse it. Use `paperful snowball run --profile` or `paperful snowball profile save` |

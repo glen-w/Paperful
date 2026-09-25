@@ -1,9 +1,15 @@
 # paperful documentation
 
+New here? The landing page is
+[glenwright.earth/Paperful](https://glenwright.earth/Paperful/). This guide
+is the reference. **Not affiliated with paperful.io.**
+
 Paperful cleans a reference library, finds missing PDFs, and summarises
-papers, then keeps a platform-agnostic mirror you can back up and move.
-Five jobs: **library**, **find**, **completeness**, **mirror**, **control**.
-See [Why paperful](why.md).
+papers, then keeps an on-disk mirror you can back up and move. It is not a
+sync service. Five jobs: **library**, **find**, **completeness**, **mirror**,
+**control**. `snowball` grows the library (metadata parents). `run` fills
+PDFs for items already there. See [Why paperful](why.md),
+[Snowball](snowball.md), and [how a hop is cut](snowball.md#how-a-hop-is-cut).
 
 The live catalogue is an adapter. **Zotero is well tested.** Mendeley and
 EndNote adapters are in the tree and seeking testers. Open access first;

@@ -6,6 +6,13 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+Front door names the paperful.io collision. First run copies
+`config.minimal.toml`. `--preset oa` drops EZProxy. Empty `email` with
+Unpaywall in `sources` is a red `doctor` row (`unpaywall_email`, exit 2).
+`paperful jobs` lists verbs by job. `run` fills items already in the library;
+`snowball` grows it. A quota on the run summary says the PDF is in `out/`
+and to run `attach` after freeing Storage.
+
 Public pitch is the five jobs — library, find, completeness, mirror, control —
 rather than a Zotero sidecar. The catalogue stays an adapter: Zotero is well
 tested; Mendeley and EndNote are seeking testers. See [Why paperful](docs/why.md).

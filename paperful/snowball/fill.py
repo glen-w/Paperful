@@ -13,17 +13,49 @@ CrossrefGet = Callable[[str], dict[str, Any] | None]
 S2Get = Callable[[str], dict[str, Any] | None]
 
 
-def fill_crossref(rows: list[Candidate], getter: CrossrefGet) -> None:
-    for row in rows:
-        if row.status == "error":
-            continue
+class FillPaused(RuntimeError):
+    """A fill API asked us to stop and resume the remaining DOIs later."""
+
+    def __init__(self, backend: str, remaining: list[str] | None = None):
+        super().__init__(backend)
+        self.backend = backend
+        self.remaining = list(remaining or [])
+
+
+def fill_crossref(
+    rows: list[Candidate],
+    getter: CrossrefGet,
+    *,
+    progress: Callable[[str], None] | None = None,
+    tally: Any = None,
+) -> None:
+    pending = [
+        row
+        for row in rows
+        if row.status != "error" and (row.ids.get("doi") or "") and not _complete(row)
+    ]
+    if tally is not None and pending:
+        tally.stage = "crossref"
+        tally.track(len(pending))
+    for row in pending:
         doi = row.ids.get("doi") or ""
-        if not doi or _complete(row):
-            continue
-        payload = getter(doi)
+        if progress is not None:
+            progress(f"crossref · {doi}")
+        if tally is not None:
+            tally.searches += 1
+        try:
+            payload = getter(doi)
+        except FillPaused as exc:
+            raise FillPaused("crossref", _remaining_dois(rows, row)) from exc
         if not payload:
+            if tally is not None:
+                tally.advance(1)
             continue
-        _fill_empty(row, payload, backend="crossref")
+        if tally is not None:
+            tally.fields += _fill_empty(row, payload, backend="crossref")
+            tally.advance(1)
+        else:
+            _fill_empty(row, payload, backend="crossref")
 
 
 def fill_semanticscholar(
@@ -32,19 +64,29 @@ def fill_semanticscholar(
     *,
     per_hop_limit: int,
     direction: str,
+    tally: Any = None,
 ) -> list[Candidate]:
     """Fill holes and append reference neighbours OpenAlex did not already emit."""
     added: list[Candidate] = []
     known = {row.identity for row in rows if row.identity}
     want_refs = direction in {"refs", "both"}
-    for row in list(rows):
+    pending = [row for row in rows if (row.ids.get("doi") or "") and row.status != "error"]
+    if tally is not None and pending:
+        tally.stage = "semantic scholar"
+        tally.track(len(pending))
+    for row in pending:
         doi = row.ids.get("doi") or ""
-        if not doi or row.status == "error":
-            continue
-        payload = getter(doi)
+        if tally is not None:
+            tally.searches += 1
+        try:
+            payload = getter(doi)
+        except FillPaused as exc:
+            raise FillPaused("semanticscholar", _remaining_dois(rows, row)) from exc
         if not payload:
+            if tally is not None:
+                tally.advance(1)
             continue
-        _fill_empty(
+        filled = _fill_empty(
             row,
             {
                 "title": payload.get("title") or "",
@@ -58,11 +100,14 @@ def fill_semanticscholar(
             },
             backend="semanticscholar",
         )
+        if tally is not None:
+            tally.fields += filled
+            tally.advance(1)
         if not want_refs:
             continue
         kept = 0
         for ref in payload.get("references") or []:
-            if kept >= per_hop_limit:
+            if per_hop_limit > 0 and kept >= per_hop_limit:
                 break
             if not isinstance(ref, dict):
                 continue
@@ -102,26 +147,45 @@ def fill_semanticscholar(
     return added
 
 
+def _remaining_dois(rows: list[Candidate], start: Candidate) -> list[str]:
+    pending: list[str] = []
+    seen = False
+    for row in rows:
+        if row is start:
+            seen = True
+        if seen:
+            doi = row.ids.get("doi") or ""
+            if doi:
+                pending.append(doi)
+    return pending
+
+
 def _complete(row: Candidate) -> bool:
     biblio = row.biblio
     return bool(biblio.get("title") and biblio.get("year") and biblio.get("venue") and biblio.get("authors"))
 
 
-def _fill_empty(row: Candidate, payload: dict[str, Any], *, backend: str) -> None:
+def _fill_empty(row: Candidate, payload: dict[str, Any], *, backend: str) -> int:
     biblio = row.biblio
+    filled = 0
     if not biblio.get("title") and payload.get("title"):
         biblio["title"] = payload["title"]
         row.provenance["filled_by"] = backend
+        filled += 1
     if not biblio.get("year") and payload.get("year"):
         biblio["year"] = int(payload["year"])
         row.provenance["filled_by"] = backend
+        filled += 1
     if not biblio.get("venue") and payload.get("venue"):
         biblio["venue"] = payload["venue"]
         row.provenance["filled_by"] = backend
+        filled += 1
     authors = payload.get("authors") or []
     if not biblio.get("authors") and authors:
         biblio["authors"] = [str(name) for name in authors if name]
         row.provenance["filled_by"] = backend
+        filled += 1
+    return filled
 
 
 def crossref_work(doi: str, *, email: str = "") -> dict[str, Any] | None:
@@ -132,8 +196,12 @@ def crossref_work(doi: str, *, email: str = "") -> dict[str, Any] | None:
         resp = httpx.get(f"https://api.crossref.org/works/{doi}", params=params, timeout=30)
         if resp.status_code == 404:
             return None
+        if resp.status_code == 429 or resp.status_code >= 500:
+            raise FillPaused("crossref")
         resp.raise_for_status()
         message = resp.json().get("message") or {}
+    except FillPaused:
+        raise
     except (httpx.HTTPError, ValueError):
         return None
     titles = message.get("title") or []
@@ -176,8 +244,12 @@ def s2_paper(doi: str, *, cache_dir: Path, api_key: str) -> dict[str, Any] | Non
         )
         if resp.status_code == 404:
             return None
+        if resp.status_code == 429 or resp.status_code >= 500:
+            raise FillPaused("semanticscholar")
         resp.raise_for_status()
         data = resp.json()
+    except FillPaused:
+        raise
     except (httpx.HTTPError, ValueError):
         return None
     if not isinstance(data, dict):

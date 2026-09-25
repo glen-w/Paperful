@@ -14,7 +14,8 @@ those you open tomorrow.
 **Library.** The object is the reference library: collections, years, item
 types. `collections` shows what you have. `snowball` proposes new works from
 a keyword, a DOI, an ORCID, or a seed collection, and creates items only when
-the gate says so. `import` and `export` speak RIS, BibTeX, and EndNote XML.
+the gate says so. [How a hop is cut](snowball.md#how-a-hop-is-cut) shows depth,
+direction, and the two caps. `import` and `export` speak RIS, BibTeX, and EndNote XML.
 The live catalogue is an adapter. Zotero’s local API is the one to use.
 Mendeley (REST) and EndNote (read the `.enl`; writes are an import bundle)
 are seeking testers.

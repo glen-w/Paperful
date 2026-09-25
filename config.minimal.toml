@@ -1,0 +1,14 @@
+# First run. Copy and set email:
+#   cp config.minimal.toml config.toml
+# Full file (EZProxy, LLM, grey-lit, snowball): config.example.toml
+
+# Unpaywall will not be called until this is your real address.
+email = ""
+
+manager = "zotero"
+out_dir = "out"
+state_dir = "state"
+
+# Open access only. No campus EZProxy. Scholar and Sci-Hub stay off.
+# Same list as `paperful run --preset oa`.
+sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "core", "direct", "htmlpdf"]

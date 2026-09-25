@@ -415,6 +415,16 @@ def print_run_summary(
             "Attach failures: "
             + ", ".join(f"{k}={v}" for k, v in sorted(attach_codes.items()))
         )
+    if int(attach_codes.get("quota") or 0) > 0:
+        console.print(
+            "Quota: PDFs are in out/. Free Zotero Storage or empty the trash, "
+            "then paperful attach."
+        )
+    if int(misses.get("ezproxy") or 0) > 0:
+        console.print(
+            "EZProxy misses: run `uv run paperful session login ezproxy` on the host "
+            "(not inside the container), then retry."
+        )
     if report.get("command") == "run" and s.get("fields_corrected"):
         console.print(
             "[dim]Field corrections above are in-memory DOI enrichments for this run; "
