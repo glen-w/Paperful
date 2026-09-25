@@ -680,7 +680,7 @@ def test_doctor_snowball_row(monkeypatch):
     probe = lambda email: "ok"
     ready = _snowball_check(Config(snowball_enabled=True, email="a@b.c"), probe=probe)
     assert "no OpenAlex key" in ready.detail
-    assert "semantic scholar key absent" in ready.detail
+    assert "semantic scholar public (no key)" in ready.detail
     assert ready.status == "amber"
     monkeypatch.setenv("OPENALEX_API_KEY", "secret-key")
     keyed = _snowball_check(Config(snowball_enabled=True, email="a@b.c"), probe=probe)
@@ -690,6 +690,56 @@ def test_doctor_snowball_row(monkeypatch):
     down = _snowball_check(Config(snowball_enabled=True, email="a@b.c"), probe=lambda email: "unreachable")
     assert down.status == "amber"
     assert "unreachable" in down.detail
+    from paperful.doctor import _openalex_probe_status
+
+    assert _openalex_probe_status(401, keyed=True) == "key rejected"
+    assert _openalex_probe_status(401, keyed=False) == "unauthorized"
+    assert _openalex_probe_status(429, keyed=True) == "rate limited"
+    assert _openalex_probe_status(200, keyed=True) == "ok"
+
+
+def test_s2_paper_sends_key_only_when_set(tmp_path: Path, monkeypatch):
+    from paperful.snowball.fill import s2_paper
+
+    captured: dict = {}
+
+    class Resp:
+        status_code = 200
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"title": "Live"}
+
+    def fake_get(url, params=None, headers=None, timeout=None):
+        captured["headers"] = headers
+        return Resp()
+
+    monkeypatch.setattr("httpx.get", fake_get)
+    cache = tmp_path / "cache"
+    assert s2_paper("10.1000/live", cache_dir=cache, api_key="")["title"] == "Live"
+    assert captured["headers"] is None
+    (cache / "10.1000_live.json").unlink()
+    assert s2_paper("10.1000/live", cache_dir=cache, api_key="test-key")["title"] == "Live"
+    assert captured["headers"] == {"x-api-key": "test-key"}
+
+
+def test_s2_rejected_key_is_not_a_miss(tmp_path: Path, monkeypatch):
+    from paperful.snowball.fill import ApiKeyRejected, s2_paper
+
+    class Resp:
+        status_code = 401
+
+        def raise_for_status(self) -> None:
+            raise AssertionError("401 must not be treated as a normal HTTP miss")
+
+        def json(self) -> dict:
+            return {}
+
+    monkeypatch.setattr("httpx.get", lambda *a, **k: Resp())
+    with pytest.raises(ApiKeyRejected, match="rejected"):
+        s2_paper("10.1000/denied", cache_dir=tmp_path / "cache", api_key="bad-key")
 
 
 def test_year_window_and_direction_both(tmp_path: Path):
@@ -1153,7 +1203,7 @@ def test_hybrid_and_overlap(tmp_path: Path):
     assert shared["score"] == 2004
 
 
-def test_crossref_fills_empty_and_s2_skipped(tmp_path: Path):
+def test_crossref_fills_empty_and_s2_does_not_overwrite(tmp_path: Path):
     works = {
         "W1": _work("W1", "10.1000/seed", "Seed", 2020, 1, refs=["W2"]),
         "W2": _work("W2", "10.1000/new", "", 2021, 0),
@@ -1185,7 +1235,7 @@ def test_crossref_fills_empty_and_s2_skipped(tmp_path: Path):
     filled = next(row for row in rows if row["ids"]["doi"] == "10.1000/new")
     assert filled["biblio"]["title"] == "Filled"
     assert filled["biblio"]["venue"] == "Nature"
-    assert called["s2"] == 0
+    assert called["s2"] == 1
 
 
 def test_approve_each_yes_no_and_cap(tmp_path: Path):
@@ -1314,7 +1364,7 @@ def test_deep_gates_backends_and_fill(tmp_path: Path, monkeypatch: pytest.Monkey
     titles = {row["ids"]["doi"]: row["biblio"]["title"] for row in rows}
     assert titles["10.1000/new"] == "Kept title"
 
-    monkeypatch.setenv("SEMANTIC_SCHOLAR_API_KEY", "test-key")
+    monkeypatch.delenv("SEMANTIC_SCHOLAR_API_KEY", raising=False)
 
     def s2(doi: str) -> dict:
         if doi != "10.1000/new":
@@ -1558,6 +1608,23 @@ def test_keyless_promotes_to_one_key():
     assert "https://openalex.org/settings/api" in notice
     assert "VPN" in notice
     assert "more reliable" in notice
+
+
+def test_openalex_rejected_key_is_not_a_budget_stop():
+    import httpx
+
+    from paperful.snowball.openalex import OpenAlexError
+
+    client = OpenAlexClient(email="a@b.c", api_key="k", sleep_s=0, max_retries=0)
+    client._using_key = True
+
+    class Fake:
+        def get(self, url, params=None, headers=None):
+            return httpx.Response(401, request=httpx.Request("GET", url))
+
+    client._http_client = Fake()  # type: ignore[assignment]
+    with pytest.raises(OpenAlexError, match="API key was rejected"):
+        client.get("/works", {})
 
 
 def test_budget_stop_keeps_partial_rows_and_resume(tmp_path: Path):

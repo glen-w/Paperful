@@ -671,6 +671,12 @@ class MendeleyBackend:
         )
         self._docs = None
 
+    def merge_into(self, keep_key: str, drop_key: str) -> dict[str, Any]:
+        raise LibraryError(
+            "Mendeley cannot merge items through paperful. "
+            "dedupe --apply needs Zotero so the PDF and notes stay on one item."
+        )
+
     def trash_item(self, item_key: str) -> None:
         self.client.post(
             f"/documents/{item_key}/trash",

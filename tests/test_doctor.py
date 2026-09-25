@@ -10,6 +10,13 @@ def test_remediation_zotero_branches_on_code(cfg, monkeypatch):
         Check("Zotero :23119", "red", "refused", code="zotero_down"), cfg, docker=False
     )
     assert down and "Start Zotero" in down
+    unresolved = remediation_text(
+        Check("Zotero :23119", "red", "nodename", code="zotero_host_unresolved"),
+        cfg,
+        docker=False,
+    )
+    assert unresolved and "does not resolve" in unresolved
+    assert "Start Zotero" not in unresolved
     assert "Allow other applications" in down or "enable the local API" in down
 
     api_off = remediation_text(

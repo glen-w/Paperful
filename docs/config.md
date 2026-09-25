@@ -109,7 +109,7 @@ Omitted `try_all` stays off unless the profile sets it.
 | `sources` | `--sources` (comma-separated; TOML is an array of strings) |
 | `apply` | `--apply` / `--no-apply` on `all`, `fix-metadata`, and `summarize` |
 | `overwrite` | `--overwrite` / `--no-overwrite` on `fix-metadata` |
-| `steps` | `--steps` (comma-separated). Optional extras: `snapshot`, `dedupe`, `synthesize` |
+| `steps` | `--steps` (comma-separated). Optional extras: `snapshot`, `dedupe`, `synthesize`, `ocr` |
 | `require_summarize` | `--require-summarize` — exit 1 if `summarize` cannot run because the LLM is off |
 | `description` | `profile save --description` |
 
@@ -194,6 +194,8 @@ walkthrough, model advice, Docker networking, and troubleshooting: [LLM](llm.md)
 | `[synthesize].dest` | `both` | `disk` (`state/reports/`), `zotero` (standalone note in the collection), or `both` |
 | `[synthesize].timeout_s` | `max([llm].timeout_s, 300)` | Per-completion timeout for the report |
 | `[browser_agent].max_steps` / `max_wall_s` | `20` / `300` | Step and wall-clock caps for `recover` (agent stops early once a valid PDF lands) |
+| `[ocr].languages` | `eng` | Tesseract languages for `paperful ocr` (`eng+fra` or `eng fra`) |
+| `[ocr].timeout_s` | `600` | Seconds allowed per PDF |
 | `[browser_agent].during_run` | `true` | When `[llm].enabled` and the extra is installed, `run` appends `browser_agent` after Scholar / EZProxy / htmlpdf |
 | `[browser_agent].model` | (`[llm].model`) | Larger model for browsing only; `doctor` warns under ~10B |
 

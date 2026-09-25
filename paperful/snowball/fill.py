@@ -13,6 +13,10 @@ CrossrefGet = Callable[[str], dict[str, Any] | None]
 S2Get = Callable[[str], dict[str, Any] | None]
 
 
+class ApiKeyRejected(RuntimeError):
+    """The server refused a key that was sent. This is not an empty result."""
+
+
 class FillPaused(RuntimeError):
     """A fill API asked us to stop and resume the remaining DOIs later."""
 
@@ -236,19 +240,22 @@ def s2_paper(doi: str, *, cache_dir: Path, api_key: str) -> dict[str, Any] | Non
     import httpx
 
     try:
+        headers = {"x-api-key": api_key} if api_key else None
         resp = httpx.get(
             f"https://api.semanticscholar.org/graph/v1/paper/DOI:{doi}",
             params={"fields": "title,year,venue,authors,references.externalIds,references.title,references.year"},
-            headers={"x-api-key": api_key},
+            headers=headers,
             timeout=30,
         )
+        if resp.status_code in (401, 403) and api_key:
+            raise ApiKeyRejected("Semantic Scholar API key was rejected")
         if resp.status_code == 404:
             return None
         if resp.status_code == 429 or resp.status_code >= 500:
             raise FillPaused("semanticscholar")
         resp.raise_for_status()
         data = resp.json()
-    except FillPaused:
+    except (FillPaused, ApiKeyRejected):
         raise
     except (httpx.HTTPError, ValueError):
         return None

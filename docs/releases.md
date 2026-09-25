@@ -54,7 +54,7 @@ next-steps ladder (`paperful doctor`, enable local API, copy
 Off by default and additive: with `[llm].enabled = false` nothing in the PDF
 loop changes. Known limits: `recover` needs Python 3.11+ and a 14B-class
 local model to be useful; the Docker image does not include the LLM extras;
-identity/title verbs need a text-layer PDF (no OCR). `summarize` and
+identity/title verbs need a text layer (`paperful ocr` adds one to scans). `summarize` and
 `synthesize` default to writing both a disk file and a Zotero note
 (`--to disk` keeps the library tree clean). Config keys under `[llm]`,
 `[browser_agent]`, `[summarize]`, `[synthesize]`, `[lint]`, `[fix_metadata]` may still move

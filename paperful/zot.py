@@ -78,6 +78,17 @@ def zotero_local_label() -> str:
     return f"{zotero_local_host()}:{_ZOTERO_PORT}"
 
 
+def zotero_supports_write(version: str | None, server_id: str | None) -> bool:
+    """Local writes exist on Zotero 10+. Server-ID is the usual signal; the version is enough."""
+    if server_id:
+        return True
+    major = (version or "").split(".", 1)[0]
+    try:
+        return int(major) >= 10
+    except ValueError:
+        return False
+
+
 # Zotero's local server rejects requests unless Host is exactly localhost:23119
 # (even when reached via host.docker.internal from a container).
 _ZOTERO_LOCAL_HOST_HEADER = f"localhost:{_ZOTERO_PORT}"
@@ -149,12 +160,14 @@ class ZoteroLocal:
                 "'Allow other applications on this computer to communicate with Zotero'."
             )
         resp.raise_for_status()
+        version = resp.headers.get("X-Zotero-Version")
+        server_id = resp.headers.get("Zotero-Server-ID")
         return {
-            "zotero_version": resp.headers.get("X-Zotero-Version"),
+            "zotero_version": version,
             "api_version": resp.headers.get("Zotero-API-Version"),
-            "server_id": resp.headers.get("Zotero-Server-ID"),
+            "server_id": server_id,
             "schema_version": resp.headers.get("Zotero-Schema-Version"),
-            "supports_write": bool(resp.headers.get("Zotero-Server-ID")),
+            "supports_write": zotero_supports_write(version, server_id),
         }
 
     # ---- collections --------------------------------------------------

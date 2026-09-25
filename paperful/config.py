@@ -153,6 +153,9 @@ class Config:
     snowball_per_hop_rank: str = "most-cited"  # most-cited | least-cited | random
     snowball_depth: int = 1
     snowball_direction: str = "refs"
+    snowball_keyword_limit: int = 3
+    snowball_keyword_hop_limit: int = 50
+    snowball_keyword_min_score: float = 0.0
     snowball_gate: str = "dry-run"
     snowball_target_collection: str = ""
     snowball_fetch_pdfs: str = "off"  # off | fast | full
@@ -174,6 +177,9 @@ class Config:
     snowball_approve_each_max: int = 20
     snowball_hybrid_seeds: int = 5
     snowball_refine: bool = False
+    # OCRmyPDF text layer for scanned PDFs. languages is a Tesseract -l list.
+    ocr_languages: str = "eng"
+    ocr_timeout_s: float = 600.0
 
     def __post_init__(self) -> None:
         # Resolve pack+user once so Config() in tests gets the builtin examples.
@@ -410,6 +416,18 @@ def _apply_snowball(raw: Any, cfg: Config) -> None:
         cfg.snowball_depth = int(raw["depth"])
     if "direction" in raw and raw["direction"]:
         cfg.snowball_direction = str(raw["direction"]).strip()
+    if "keyword_limit" in raw:
+        from .snowball.expand import parse_keyword_limit
+
+        cfg.snowball_keyword_limit = parse_keyword_limit(raw["keyword_limit"])
+    if "keyword_hop_limit" in raw:
+        from .snowball.expand import parse_keyword_hop_limit
+
+        cfg.snowball_keyword_hop_limit = parse_keyword_hop_limit(raw["keyword_hop_limit"])
+    if "keyword_min_score" in raw:
+        from .snowball.expand import parse_keyword_min_score
+
+        cfg.snowball_keyword_min_score = parse_keyword_min_score(raw["keyword_min_score"])
     if "gate" in raw and raw["gate"]:
         cfg.snowball_gate = str(raw["gate"]).strip()
     if "target_collection" in raw and raw["target_collection"]:
@@ -585,6 +603,12 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
     mirror = raw.get("mirror")
     if isinstance(mirror, dict) and "pdfs" in mirror:
         cfg.mirror_pdfs = parse_pdfs(str(mirror["pdfs"]))
+    ocr = raw.get("ocr")
+    if isinstance(ocr, dict):
+        if "languages" in ocr:
+            cfg.ocr_languages = str(ocr["languages"]).strip() or "eng"
+        if "timeout_s" in ocr:
+            cfg.ocr_timeout_s = max(1.0, float(ocr["timeout_s"]))
     men = raw.get("mendeley")
     if isinstance(men, dict):
         if "client_id" in men:

@@ -23,14 +23,14 @@ Legend: **Yes** · **Partial** · **No**.
 | Metadata lint / verify DOI | Yes | No | Yes | No | Yes | Yes | Partial |
 | Metadata apply | Yes | No | Yes | No | Yes | Yes | Partial |
 | Attachment / disk repair | No | Partial | Partial | Yes | No | Partial | No |
-| Dedupe / merge items | Partial (`dedupe --apply` trashes extras; no field merge) | Partial | No | Partial | No | Yes | Partial |
+| Dedupe / merge items | Yes (`dedupe --apply` merges children and better fields, then trashes the extra; Zotero only) | Partial | No | Partial | No | Yes | Partial |
 | CLI / automation | Yes | No | No | No | No | Yes | Yes (MCP) |
 | Disk-first then write-back | Yes | No | No | Partial | No | Partial | No |
 | Per-item folder you can restore from | Yes | No | No | No | No | No | No |
 | Copy PDFs **already in** Zotero onto disk | Partial (`snapshot --pdfs all`) | Partial (File → Export PDFs) | No | No | No | No (`export` is bibliography; `get_item_pdf_path` is a path) | Partial (`get_pdf_path`) |
 | Grey-literature landing playbooks | Yes | No | No | No | No | No | No |
 | Grounded summary / collection review | Partial (opt-in `summarize` / `synthesize`; text layer) | No | No | No | No | Partial (README: summarize PDFs into notes) | Yes (chat reads PDF text; the model writes the summary) |
-| OCR for scanned PDFs | No | No | No | No | No | Partial (`pdf-prep`, OCRmyPDF) | Partial (some forks, e.g. Docling OCR pre-step) |
+| OCR for scanned PDFs | Partial (`paperful ocr`, OCRmyPDF text layer on disk) | No | No | No | No | Partial (`pdf-prep`, OCRmyPDF) | Partial (some forks, e.g. Docling OCR pre-step) |
 
 ### Zotero version and attach (indicative)
 
@@ -71,9 +71,9 @@ Verify against each project’s latest release before upgrading Zotero.
 ### paperful
 
 - **Sites:** [GitHub](https://github.com/glen-w/Paperful) · this repo
-- **Fit:** Research helper for a reference library: clean records, find missing PDFs, summarise papers, keep a platform-agnostic mirror. Routed OA stack (including CORE with API key), campus EZProxy, optional Scholar cookies, opt-in Sci-Hub, user playbooks for grey literature and field-specific hosts, and an opt-in AI browser after scripted lanes fail. Collection-mirrored `out/` tree (`snapshot` / `restore`, including `snapshot --pdfs all` for PDFs already in Zotero, `manifest.jsonl`), attach on Zotero 10+. Identifier verify (Crossref/OpenAlex/PubMed) + lint + `fix-metadata` on disk, then adapter write-back. `dedupe` writes a review pack and, with `--apply`, trashes extra parents (DOI, then title+year). `gaps` counts missing PDFs and DOIs. Optional local `summarize` / `synthesize` and `recover` (last `run` lane after Scholar / EZProxy / htmlpdf fail, or `recover --item`; text layer; no OCR; not a chat agent). **Zotero is the well-tested adapter.** Mendeley (REST) and EndNote (read-only database plus an import bundle) are seeking testers.
-- **With others:** StorScan or Attanger when paths and linked files are wrong; zotero-agent when you need a real merge (children, notes), disk GC, or OCR of scans; zotero-mcp when the work is a conversation.
-- **Not a substitute for:** In-app plugin UX, `.bib` hygiene tools, or scan OCR.
+- **Fit:** Research helper for a reference library: clean records, find missing PDFs, summarise papers, keep a platform-agnostic mirror. Routed OA stack (including CORE with API key), campus EZProxy, optional Scholar cookies, opt-in Sci-Hub, user playbooks for grey literature and field-specific hosts, and an opt-in AI browser after scripted lanes fail. Collection-mirrored `out/` tree (`snapshot` / `restore`, including `snapshot --pdfs all` for PDFs already in Zotero, `manifest.jsonl`), attach on Zotero 10+. Identifier verify (Crossref/OpenAlex/PubMed) + lint + `fix-metadata` on disk, then adapter write-back. `dedupe` writes a review pack and, with `--apply`, merges the extra parent's PDF, notes, and better fields onto the keeper, then trashes that parent (DOI, then title+year; Zotero only). `gaps` counts missing PDFs and DOIs. Optional local `summarize` / `synthesize` and `recover` (last `run` lane after Scholar / EZProxy / htmlpdf fail, or `recover --item`; text layer from the PDF or from `paperful ocr`; not a chat agent). **Zotero is the well-tested adapter.** Mendeley (REST) and EndNote (read-only database plus an import bundle) are seeking testers.
+- **With others:** StorScan or Attanger when paths and linked files are wrong; zotero-agent for disk GC or a two-up scan split; zotero-mcp when the work is a conversation.
+- **Not a substitute for:** In-app plugin UX, `.bib` hygiene tools, or two-up scan splitting.
 
 ### Zotero built-in
 
@@ -109,13 +109,13 @@ Verify against each project’s latest release before upgrading Zotero.
 
 - **Sites:** [GitHub](https://github.com/alex-roc/zotero-agent)
 - **Fit:** Local-first CLI and MCP via bridge plugin — search, dedupe, merge, enrich, `pdf-fetch`, PDF notes, and `pdf-prep` OCR (OCRmyPDF) for scans. `export` writes bibliography formats, not a PDF folder tree.
-- **With paperful:** Agent for hygiene, merge, and scans; paperful for collection runs with a manifest, EZProxy, grey-lit playbooks, and a folder you can restore from.
+- **With paperful:** Agent for hygiene and merge; paperful for collection runs with a manifest, a disk text layer (`ocr`), EZProxy, grey-lit playbooks, and a folder you can restore from. zotero-agent `pdf-prep` still owns two-up page splits.
 
 ### zotero-mcp ecosystem
 
 - **Sites:** [richardjlyon/zotero-mcp](https://github.com/richardjlyon/zotero-mcp) · [cookjohn/zotero-mcp](https://github.com/cookjohn/zotero-mcp) · [mcp-zotero](https://github.com/Xevos117/mcp-zotero)
 - **Fit:** LLM-facing search, PDF text, create items, sometimes Unpaywall attach. Some forks OCR scans (Docling) or write reading notes from chat.
-- **With paperful:** MCP when a person is in the loop, or when the PDF is a scan; paperful for unattended collection runs, the disk ledger, and batch `summarize` / `synthesize` on a text layer.
+- **With paperful:** MCP when a person is in the loop; paperful for unattended collection runs, the disk ledger, `ocr` on image PDFs, and batch `summarize` / `synthesize`.
 
 ### ZotFile (legacy)
 
@@ -157,8 +157,11 @@ Need a one-off dump of those PDFs from the Zotero UI?
 Need tablet send/get after ZotFile died?
   → ZotMoov custom menus (+ Attanger)
 
-Need LLM to fix one paper’s metadata while writing, or to read a scan?
-  → zotero-mcp (some forks OCR); zotero-agent `pdf-prep` for a local OCR pass
+Need a text layer on a scanned PDF?
+  → paperful ocr. Two-up books: zotero-agent `pdf-prep`
+
+Need LLM to fix one paper’s metadata while writing?
+  → zotero-mcp
 
 Need a grounded summary of many text-layer PDFs, then one collection review?
   → paperful summarize, then synthesize

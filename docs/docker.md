@@ -6,8 +6,8 @@ There is no `docker pull` and no PyPI package. Zotero and headed browser
 login live on the host. Docker does not replace them.
 
 The Compose image is a **one-shot pack** — Python 3.12, paperful, Poppler
-(`pdftotext`), Playwright Chromium — for unattended commands (`run`, `lint`,
-`report`, `attach` once a write key exists). It is not a daemon and not a
+(`pdftotext`), OCRmyPDF and Tesseract (`eng`), Playwright Chromium — for unattended commands (`run`, `lint`,
+`ocr`, `report`, `attach` once a write key exists). It is not a daemon and not a
 complete environment. Contributors use [`uv`](https://docs.astral.sh/uv/)
 (see the [README](https://github.com/glen-w/Paperful#readme) Develop section).
 

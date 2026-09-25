@@ -38,6 +38,11 @@ def zotero_failure_code(exc: BaseException) -> str:
         return "zotero_api_off"
     if "400" in msg and "host" in msg:
         return "zotero_bad_host"
+    if any(
+        token in msg
+        for token in ("nodename", "name or service not known", "name resolution")
+    ):
+        return "zotero_host_unresolved"
     return "zotero_down"
 
 
@@ -69,6 +74,13 @@ def remediation_text(
                 "Settings → Advanced → enable “Allow other applications on this "
                 "computer to communicate with Zotero”.\n"
                 "See docs/zotero.md, then continue."
+            )
+        if code == "zotero_host_unresolved":
+            configured = os.environ.get("PAPERFUL_ZOTERO_HOST", "").strip() or "the configured host"
+            return (
+                f"1. {configured} does not resolve on this machine. Unset "
+                "PAPERFUL_ZOTERO_HOST when running outside Docker.\n"
+                "2. The Host header is always localhost:23119. See docs/zotero.md, then continue."
             )
         if code == "zotero_bad_host":
             return (
@@ -151,6 +163,19 @@ def remediation_text(
         return (
             "Install Poppler so pdftotext is on PATH (e.g. brew install poppler / "
             "apt install poppler-utils). pypdf remains the fallback."
+        )
+    if check.name == "ocrmypdf":
+        if docker:
+            return (
+                "This image should ship OCRmyPDF. Rebuild the image "
+                "(docker compose build) or install ocrmypdf and tesseract-ocr-eng "
+                "in a custom image."
+            )
+        return (
+            "Install OCRmyPDF so scanned PDFs can gain a text layer "
+            "(brew install ocrmypdf tesseract-lang / "
+            "apt install ocrmypdf tesseract-ocr-eng). "
+            "Then: paperful ocr -C … --apply"
         )
     if check.name == "Playwright":
         if "missing" in check.detail:
@@ -362,6 +387,18 @@ def run_checks(
             )
         )
 
+    if shutil.which("ocrmypdf"):
+        checks.append(Check("ocrmypdf", "green", "on PATH"))
+    else:
+        checks.append(
+            Check(
+                "ocrmypdf",
+                "amber",
+                "missing — brew install ocrmypdf tesseract-lang / "
+                "apt install ocrmypdf tesseract-ocr-eng",
+            )
+        )
+
     checks.append(_grey_playbooks_check(cfg))
     checks.extend(_llm_checks(cfg))
     checks.append(_snowball_check(cfg))
@@ -386,12 +423,23 @@ def _snowball_check(cfg: Config, *, probe: Callable[[str], str] | None = None) -
     )
     s2 = (
         "semantic scholar key set"
-        if os.environ.get("SEMANTIC_SCHOLAR_API_KEY")
-        else "semantic scholar key absent"
+        if os.environ.get("SEMANTIC_SCHOLAR_API_KEY", "").strip()
+        else "semantic scholar public (no key)"
     )
     detail = f"enabled ({oa}; {s2}; openalex {reach})"
-    amber = reach != "ok" or oa.startswith("no ") or "absent" in s2
+    amber = reach != "ok" or oa.startswith("no ")
     return Check("snowball", "amber" if amber else "green", detail)
+
+
+def _openalex_probe_status(status: int, *, keyed: bool) -> str:
+    """Classify a probe response. Never names the key."""
+    if status in (401, 403):
+        return "key rejected" if keyed else "unauthorized"
+    if status == 429:
+        return "rate limited"
+    if status < 500:
+        return "ok"
+    return "unreachable"
 
 
 def _probe_openalex(email: str) -> str:
@@ -402,14 +450,17 @@ def _probe_openalex(email: str) -> str:
         params = {"per_page": "1", "select": "id"}
         if email:
             params["mailto"] = email
+        headers = {"User-Agent": "paperful-doctor"}
+        key = os.environ.get("OPENALEX_API_KEY", "").strip()
+        if key:
+            headers["Authorization"] = f"Bearer {key}"
         resp = httpx.get(
             "https://api.openalex.org/works",
             params=params,
             timeout=5.0,
-            headers={"User-Agent": "paperful-doctor"},
+            headers=headers,
         )
-        if resp.status_code < 500:
-            return "ok"
+        return _openalex_probe_status(resp.status_code, keyed=bool(key))
     except Exception:
         pass
     return "unreachable"

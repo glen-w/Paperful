@@ -172,7 +172,7 @@ uv run paperful run -C BBNJ --year-from 2023 --year-to 2026 -T journalArticle
 `--type` accepts the built-in Zotero type ids (`journalArticle`, `report`,
 `preprint`, …) or friendly labels (`Journal Article`). See
 [Commands — Scope filters](commands.md#scope-filters). Year and type also
-apply to `lint`, `fix-metadata`, `dedupe`, `gaps`, `summarize`, `synthesize`,
+apply to `lint`, `fix-metadata`, `dedupe`, `gaps`, `ocr`, `summarize`, `synthesize`,
 `snapshot`, and `restore`.
 
 ## Local API vs web API

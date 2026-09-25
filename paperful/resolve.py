@@ -318,6 +318,7 @@ class IdentifierCache:
     def __init__(self) -> None:
         self.works: dict[str, WorkMeta | None] = {}
         self.pmids: dict[str, str | None] = {}
+        self.versions: dict[str, VersionLink | None] = {}
 
 
 def enrich_identifiers(
@@ -773,6 +774,279 @@ def _author_hint_ok(author: str, authorships: list | None) -> bool:
         if needle in display:
             return True
     return False
+
+
+PREPRINT_DOI_PREFIXES = ("10.48550/arxiv.", "10.1101/")
+_CROSSREF_ITEM_TYPE = {
+    "journal-article": "journalArticle",
+    "proceedings-article": "conferencePaper",
+    "book-chapter": "bookSection",
+    "book": "book",
+    "posted-content": "preprint",
+    "report": "report",
+    "dissertation": "thesis",
+}
+_ARXIV_ATOM = "http://www.w3.org/2005/Atom"
+_ARXIV_NS = "http://arxiv.org/schemas/atom"
+
+
+@dataclass
+class VersionLink:
+    """High-confidence preprint ↔ version-of-record edge. OpenAlex is not a source."""
+
+    preprint_doi: str | None
+    published_doi: str
+    source: str  # crossref | arxiv | biorxiv
+    arxiv_id: str | None = None
+    item_type: str = "journalArticle"
+    published: WorkMeta | None = None
+
+
+def is_preprint_doi(doi: str | None) -> bool:
+    key = normalize_doi(doi) or ""
+    return key.startswith(PREPRINT_DOI_PREFIXES)
+
+
+def arxiv_id_from_doi(doi: str | None) -> str | None:
+    key = normalize_doi(doi) or ""
+    prefix = "10.48550/arxiv."
+    if not key.startswith(prefix):
+        return None
+    return key[len(prefix) :] or None
+
+
+def version_from_crossref(message: dict[str, Any], query_doi: str) -> VersionLink | None:
+    """Read Crossref ``is-preprint-of`` / ``has-preprint``. Other relations are ignored."""
+    query = normalize_doi(query_doi)
+    if not query or not isinstance(message, dict):
+        return None
+    relation = message.get("relation") or {}
+    if not isinstance(relation, dict):
+        return None
+    preprint_of = _relation_doi(relation.get("is-preprint-of"), query)
+    has_preprint = _relation_doi(relation.get("has-preprint"), query)
+    if preprint_of:
+        preprint, published = query, preprint_of
+        item_type = "journalArticle"
+        published_meta = None
+    elif has_preprint:
+        preprint, published = has_preprint, query
+        item_type = _zotero_type(message.get("type"))
+        published_meta = _work_from_crossref_message(message, published)
+    else:
+        return None
+    return VersionLink(
+        preprint_doi=preprint,
+        published_doi=published,
+        source="crossref",
+        arxiv_id=arxiv_id_from_doi(preprint),
+        item_type=item_type,
+        published=published_meta,
+    )
+
+
+def version_from_arxiv_xml(xml_text: str, query_doi: str | None = None) -> VersionLink | None:
+    """Read ``arxiv:doi`` from an Atom entry. A missing DOI is not a link."""
+    import xml.etree.ElementTree as ET
+
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return None
+    doi_el = root.find(f".//{{{_ARXIV_NS}}}doi")
+    published = normalize_doi(doi_el.text if doi_el is not None else None)
+    if not published or is_preprint_doi(published):
+        return None
+    ident = root.findtext(f".//{{{_ARXIV_ATOM}}}id") or ""
+    m = ARXIV_NEW_RE.search(ident) or ARXIV_OLD_RE.search(ident)
+    arxiv_id = m.group(1) if m else arxiv_id_from_doi(query_doi)
+    preprint = f"10.48550/arxiv.{arxiv_id}" if arxiv_id else normalize_doi(query_doi)
+    if preprint and normalize_doi(preprint) == published:
+        return None
+    return VersionLink(
+        preprint_doi=preprint,
+        published_doi=published,
+        source="arxiv",
+        arxiv_id=arxiv_id,
+        item_type="journalArticle",
+    )
+
+
+def version_from_biorxiv(payload: dict[str, Any], query_doi: str) -> VersionLink | None:
+    """Read bioRxiv/medRxiv ``published``. ``NA`` and the preprint DOI itself are not links."""
+    query = normalize_doi(query_doi)
+    collection = payload.get("collection") if isinstance(payload, dict) else None
+    if not query or not isinstance(collection, list):
+        return None
+    published = None
+    for record in collection:
+        if not isinstance(record, dict):
+            continue
+        candidate = normalize_doi(str(record.get("published") or ""))
+        if candidate and candidate not in {"na"} and candidate != query and not is_preprint_doi(candidate):
+            published = candidate
+    if not published:
+        return None
+    return VersionLink(
+        preprint_doi=query,
+        published_doi=published,
+        source="biorxiv",
+        item_type="journalArticle",
+    )
+
+
+def version_from_openalex(payload: dict[str, Any]) -> VersionLink | None:
+    """OpenAlex ``related_works`` and locations are not version edges."""
+    del payload
+    return None
+
+
+def version_link(
+    client: httpx.Client,
+    doi: str,
+    email: str = "",
+    cache: IdentifierCache | None = None,
+) -> VersionLink | None:
+    """High-confidence preprint ↔ published DOI. None when no Crossref, arXiv, or bioRxiv edge."""
+    key = normalize_doi(doi)
+    if not key:
+        return None
+    if cache is not None and key in cache.versions:
+        return cache.versions[key]
+    link = _version_link_uncached(client, key, email)
+    if link and link.published is None:
+        link.published = work_by_doi(client, link.published_doi, email, cache)
+        if link.item_type == "journalArticle" and link.published is None:
+            link.item_type = "journalArticle"
+    if cache is not None:
+        cache.versions[key] = link
+        if link is not None:
+            cache.versions.setdefault(link.published_doi, link)
+            if link.preprint_doi:
+                cache.versions.setdefault(link.preprint_doi, link)
+    return link
+
+
+def _version_link_uncached(
+    client: httpx.Client,
+    doi: str,
+    email: str,
+) -> VersionLink | None:
+    message = _crossref_message(client, doi, email)
+    if message:
+        link = version_from_crossref(message, doi)
+        if link:
+            if link.published is None:
+                published_msg = _crossref_message(client, link.published_doi, email)
+                if published_msg:
+                    link.item_type = _zotero_type(published_msg.get("type"))
+                    link.published = _work_from_crossref_message(
+                        published_msg, link.published_doi
+                    )
+            return link
+    arxiv_id = arxiv_id_from_doi(doi)
+    if arxiv_id:
+        xml_text = _arxiv_atom(client, arxiv_id)
+        if xml_text:
+            link = version_from_arxiv_xml(xml_text, doi)
+            if link:
+                return link
+    if doi.startswith("10.1101/"):
+        for server in ("biorxiv", "medrxiv"):
+            payload = _get_json(client, f"https://api.biorxiv.org/details/{server}/{doi}")
+            if not payload:
+                continue
+            link = version_from_biorxiv(payload, doi)
+            if link:
+                return link
+    return None
+
+
+def _relation_doi(entries: Any, query: str) -> str | None:
+    if not isinstance(entries, list):
+        return None
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        id_type = str(entry.get("id-type") or "doi").lower()
+        if id_type != "doi":
+            continue
+        other = normalize_doi(str(entry.get("id") or ""))
+        if other and other != query:
+            return other
+    return None
+
+
+def _zotero_type(crossref_type: Any) -> str:
+    return _CROSSREF_ITEM_TYPE.get(str(crossref_type or ""), "journalArticle")
+
+
+def _work_from_crossref_message(msg: dict[str, Any], doi: str) -> WorkMeta:
+    titles = msg.get("title") or []
+    title = titles[0] if titles else ""
+    authors = msg.get("author") or []
+    first = None
+    if authors and isinstance(authors[0], dict):
+        first = authors[0].get("family") or authors[0].get("name")
+    venue_list = msg.get("container-title") or []
+    parts = _best_date_parts(msg)
+    year = None
+    if parts and parts[0] is not None:
+        try:
+            year = int(parts[0])
+        except (TypeError, ValueError):
+            year = None
+    return WorkMeta(
+        doi=normalize_doi(msg.get("DOI") or doi) or doi.lower(),
+        title=title,
+        year=year,
+        date=format_date_parts(parts),
+        first_author=first,
+        venue=venue_list[0] if venue_list else None,
+        source="crossref",
+    )
+
+
+def _crossref_message(client: httpx.Client, doi: str, email: str) -> dict[str, Any] | None:
+    params: dict[str, Any] = {}
+    if email:
+        params["mailto"] = email
+    payload = _get_json(client, f"https://api.crossref.org/works/{doi}", params=params or None)
+    if not payload:
+        return None
+    msg = payload.get("message")
+    return msg if isinstance(msg, dict) else None
+
+
+def _arxiv_atom(client: httpx.Client, arxiv_id: str) -> str | None:
+    try:
+        resp = client.get(
+            "https://export.arxiv.org/api/query",
+            params={"id_list": arxiv_id},
+            timeout=30,
+        )
+        if resp.status_code >= 400:
+            return None
+        text = resp.text or ""
+    except (httpx.HTTPError, ValueError):
+        return None
+    if "doi" not in text.lower():
+        return None
+    return text
+
+
+def _get_json(
+    client: httpx.Client, url: str, params: dict[str, Any] | None = None
+) -> dict[str, Any] | None:
+    try:
+        resp = client.get(url, params=params, timeout=30)
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        data = resp.json()
+    except (httpx.HTTPError, ValueError, TypeError):
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def _ss_author_ok(author: str, authors: list | None) -> bool:

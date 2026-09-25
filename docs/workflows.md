@@ -111,7 +111,7 @@ uv run paperful all -C BBNJ --skip summarize
 
 `--steps` replaces the list. `--skip` removes names from it. Unknown names
 exit 1. Optional names you can add, which are **not** in the default chain:
-`snapshot`, `dedupe`, `synthesize`.
+`snapshot`, `dedupe`, `synthesize`, `ocr`.
 
 `dedupe` and `restore` honor `apply` only when `all` is running them. A
 direct `paperful dedupe --profile …` does not trash unless you also pass
@@ -175,7 +175,7 @@ uv run paperful all -f ./bbnj-journal.toml
 ### Use the profile on one verb
 
 `--profile` works on `gaps`, `run`, `lint`, `fix-metadata`, `summarize`,
-`dedupe`, `snapshot`, `restore`, and `synthesize`. A profile that only stores
+`ocr`, `dedupe`, `snapshot`, `restore`, and `synthesize`. A profile that only stores
 SCOPE does not turn on `try_all` for a bare `run`:
 
 ```sh

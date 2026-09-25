@@ -143,6 +143,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "lint",
         "fix-metadata",
         "dedupe",
+        "ocr",
         "summarize",
         "synthesize",
         "all",
@@ -176,6 +177,25 @@ PerHopRankOpt = typer.Option(
     None,
     "--per-hop-rank",
     help="Which neighbours a numeric limit keeps: most-cited, least-cited, or random.",
+)
+KeywordLimitOpt = typer.Option(
+    None,
+    "--keyword-limit",
+    help="How many of a work's OpenAlex keywords to expand (1–5). 5 uses every stored keyword. all is refused.",
+)
+KeywordHopLimitOpt = typer.Option(
+    None,
+    "--keyword-hop-limit",
+    help="Works kept per seed on the keyword side. A positive integer. all is refused.",
+)
+KeywordMinScoreOpt = typer.Option(
+    None,
+    "--keyword-min-score",
+    help="Drop seed keywords below this similarity. 0 keeps whatever OpenAlex assigned.",
+)
+DIRECTION_HELP = (
+    "refs, cites, both, keywords, refs+keywords, cites+keywords, or refs+cites+keywords. "
+    "both stays references plus cited-by."
 )
 ProfileOpt = typer.Option(
     None,
@@ -391,6 +411,11 @@ def _env_code(message: str) -> str:
         return "zotero_bad_host"
     if any(
         token in low
+        for token in ("nodename", "name or service not known", "name resolution")
+    ):
+        return "zotero_host_unresolved"
+    if any(
+        token in low
         for token in (
             "cannot reach",
             "connection refused",
@@ -419,6 +444,12 @@ def _zotero_next_steps(code: str, *, in_doctor: bool) -> list[str]:
         steps = [
             "Attach needs Zotero 10+. This build can still download PDFs to out/.",
             "Upgrade, then run paperful attach. See docs/zotero.md.",
+        ]
+    elif code == "zotero_host_unresolved":
+        configured = host or "the configured host"
+        steps = [
+            f"{configured} does not resolve on this machine. Unset PAPERFUL_ZOTERO_HOST when running outside Docker.",
+            "The Host header is always localhost:23119. See docs/zotero.md.",
         ]
     elif code in {"zotero_down", "zotero_bad_host"}:
         steps = ["Start Zotero on this machine."]
@@ -1066,12 +1097,12 @@ def dedupe(
     apply: bool | None = typer.Option(
         None,
         "--apply/--no-apply",
-        help="Trash high_doi extras (Zotero 10+). Title+year needs --apply-medium.",
+        help="Merge high_doi extras onto the keeper, then trash them (Zotero 10+). Title+year needs --apply-medium.",
     ),
     apply_medium: bool = typer.Option(
         False,
         "--apply-medium",
-        help="Also trash title+year extras. Off by default.",
+        help="Also merge title+year extras. Off by default.",
     ),
     phase: str = typer.Option(
         "all",
@@ -1089,12 +1120,19 @@ def dedupe(
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
-    """Find duplicate parents and write a review pack. Trash only with --apply.
+    """Find duplicate parents and write a review pack. Merge only with --apply.
 
     Default is classify-only. Same-DOI groups whose titles diverge are held.
-    A profile's ``apply`` flag does not trash; pass --apply on this command.
+    A profile's ``apply`` flag does not merge; pass --apply on this command.
     """
-    from .dedupe import PHASES, apply_trash, classify, pack_counts, write_pack
+    from .dedupe import (
+        PHASES,
+        apply_merge,
+        attach_merge_previews,
+        classify,
+        pack_counts,
+        write_pack,
+    )
 
     phase_name = phase.strip().lower()
     if phase_name not in PHASES:
@@ -1143,6 +1181,7 @@ def dedupe(
     except ValueError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1)
+    attach_merge_previews(backend, groups)
     json_path, md_path = write_pack(
         cfg.state_dir, scope, groups, phase=phase_name, n_items=len(items)
     )
@@ -1153,7 +1192,7 @@ def dedupe(
         if not backend.supports_write():
             _exit_env("This library has no write support.", cfg)
         try:
-            applied, errors = apply_trash(
+            applied, errors = apply_merge(
                 backend,
                 groups,
                 apply_medium=apply_medium,
@@ -1180,16 +1219,16 @@ def dedupe(
         console.print(f"[dim]Wrote {json_path}[/]")
         console.print(f"[dim]Wrote {md_path}[/]")
         if apply:
-            console.print(f"Trashed: {applied}")
+            console.print(f"Merged: {applied}")
             if apply_medium:
                 console.print("[dim]Included medium_title_year groups.[/]")
             elif any(g.phase == "medium_title_year" and g.trash for g in groups):
                 console.print(
-                    "Title+year groups were not trashed. Pass [bold]--apply-medium[/] to include them."
+                    "Title+year groups were not merged. Pass [bold]--apply-medium[/] to include them."
                 )
         else:
             console.print(
-                "Dry-run. Pass [bold]--apply[/] to trash high_doi extras "
+                "Dry-run. Pass [bold]--apply[/] to merge high_doi extras onto the keeper "
                 "(title+year needs [bold]--apply-medium[/])."
             )
         if errors:
@@ -1207,7 +1246,7 @@ def _print_dedupe_table(groups: list) -> None:
     table = Table(title=f"{len(groups)} duplicate groups")
     table.add_column("Phase")
     table.add_column("Keep", style="dim")
-    table.add_column("Trash")
+    table.add_column("Merge")
     table.add_column("Note")
     for group in groups:
         if group.held:
@@ -2528,6 +2567,139 @@ def recover(
 
 
 @app.command()
+def ocr(
+    item: list[str] = typer.Option([], "--item", help="Item key (repeatable)."),
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection scope (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    apply: bool = typer.Option(
+        False, "--apply", help="Run OCRmyPDF and replace the on-disk PDF."
+    ),
+    attach: bool = typer.Option(
+        False,
+        "--attach",
+        help="After --apply, upload the text-layer PDF as a new attachment. The scan stays.",
+    ),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    limit: int | None = typer.Option(None, "--limit", "-n"),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Add a text layer to scanned PDFs on disk. Dry-run unless --apply."""
+    from .ocr import OcrUnavailable, ocr_items
+
+    if not item and _scope_unset(collection, library, profile, run_config):
+        console.print("[red]Give --item KEY and/or --collection / --library.[/]")
+        raise typer.Exit(1)
+    if attach and not apply:
+        console.print("[red]--attach needs --apply.[/]")
+        raise typer.Exit(1)
+    cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=limit,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    limit = bound.limit
+    if not item and not collection and not library:
+        console.print("[red]Give --item KEY and/or --collection / --library.[/]")
+        raise typer.Exit(1)
+    _require_manager(cfg)
+    backend = _connect(cfg)
+    if attach and not backend.supports_write():
+        _exit_env("Write support required to attach.", cfg)
+    manifest = Manifest(cfg.manifest_path)
+    loaded = _loaded_scope(
+        backend,
+        collection=collection,
+        library=bool(library),
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        item_keys=item,
+        pdfs_only=True,
+    )
+    items, scope = loaded.items, loaded.label
+    if limit:
+        items = items[:limit]
+    started = time.time()
+    if not items:
+        console.print("[yellow]No items with PDFs in scope.[/]")
+        write_command_report(
+            cfg,
+            command="ocr",
+            scope=scope,
+            summary={"ocr": 0, "skipped": 0, "failed": 0, "would": 0},
+            items=[],
+            flags={"apply": apply, "attach": attach},
+            started=started,
+        )
+        raise typer.Exit(0)
+    try:
+        batch = ocr_items(cfg, items, manifest, backend, apply=apply, attach=attach)
+    except OcrUnavailable as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    table = Table(title="paperful ocr" + ("" if apply else " (dry-run)"))
+    table.add_column("Key")
+    table.add_column("Title")
+    table.add_column("Path")
+    table.add_column("Why")
+    for row in batch.rows:
+        if row.status == "skip":
+            continue
+        title = row.title if len(row.title) <= 60 else row.title[:57] + "…"
+        table.add_row(row.key, title, row.path, row.reason or row.status)
+    if batch.would or batch.ocr or batch.failed:
+        console.print(table)
+    outcomes = [
+        {
+            "itemKey": row.key,
+            "title": row.title,
+            "status": row.status,
+            "reason": row.reason,
+            "path": row.path,
+        }
+        for row in batch.rows
+    ]
+    write_command_report(
+        cfg,
+        command="ocr",
+        scope=scope,
+        summary={
+            "ocr": batch.ocr,
+            "skipped": batch.skipped,
+            "failed": batch.failed,
+            "would": batch.would,
+        },
+        items=outcomes,
+        flags={"apply": apply, "attach": attach},
+        started=started,
+    )
+    if apply:
+        console.print(
+            f"OCR {batch.ocr}, skipped {batch.skipped}, failed {batch.failed}."
+        )
+    else:
+        console.print(
+            f"Would OCR {batch.would}, skip {batch.skipped} "
+            f"(already have text). Pass --apply to write the text layer."
+        )
+    _flush(backend)
+
+
+@app.command()
 def summarize(
     item: list[str] = typer.Option([], "--item", help="Item key (repeatable)."),
     collection: list[str] = typer.Option(
@@ -3094,6 +3266,16 @@ def _dispatch_all_step(
             overwrite=bound.overwrite,
         )
         return
+    if step == "ocr":
+        _call_step(
+            ocr,
+            **scope,
+            item=[],
+            limit=bound.limit,
+            apply=False if dry_run else bound.apply,
+            attach=False,
+        )
+        return
     if step == "summarize":
         _call_step(
             summarize,
@@ -3367,6 +3549,9 @@ def _snowball_request(
     year_from: int | None,
     year_to: int | None,
     direction: str | None = None,
+    keyword_limit: str | int | None = None,
+    keyword_hop_limit: str | int | None = None,
+    keyword_min_score: float | None = None,
     languages: str | None = None,
     min_seed_citations: int | None = None,
     note_provenance: bool | None = None,
@@ -3387,6 +3572,9 @@ def _snowball_request(
         year_from=year_from,
         year_to=year_to,
         direction=direction or cfg.snowball_direction or "refs",
+        keyword_limit=keyword_limit,
+        keyword_hop_limit=keyword_hop_limit,
+        keyword_min_score=keyword_min_score,
         languages=_csv(languages) if languages else None,
         min_seed_citations=min_seed_citations,
         note_provenance=note_provenance,
@@ -3421,7 +3609,10 @@ def snowball_search(
     max_candidates: str | None = MaxCandidatesOpt,
     per_hop_limit: str | None = PerHopLimitOpt,
     per_hop_rank: str | None = PerHopRankOpt,
-    direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both (when depth >= 1)."),
+    direction: str | None = typer.Option(None, "--direction", help=DIRECTION_HELP + " Used when depth >= 1."),
+    keyword_limit: str | None = KeywordLimitOpt,
+    keyword_hop_limit: str | None = KeywordHopLimitOpt,
+    keyword_min_score: float | None = KeywordMinScoreOpt,
     gate: str | None = typer.Option(
         None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
     ),
@@ -3448,6 +3639,9 @@ def snowball_search(
         year_from=year_from,
         year_to=year_to,
         direction=direction,
+        keyword_limit=keyword_limit,
+        keyword_hop_limit=keyword_hop_limit,
+        keyword_min_score=keyword_min_score,
         languages=languages,
         min_seed_citations=min_seed_citations,
         note_provenance=note_provenance,
@@ -3468,7 +3662,10 @@ def snowball_hybrid(
     per_hop_limit: str | None = PerHopLimitOpt,
     per_hop_rank: str | None = PerHopRankOpt,
     hybrid_seeds: int | None = typer.Option(None, "--hybrid-seeds", help="How many top DOI hits to expand."),
-    direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both."),
+    direction: str | None = typer.Option(None, "--direction", help=DIRECTION_HELP),
+    keyword_limit: str | None = KeywordLimitOpt,
+    keyword_hop_limit: str | None = KeywordHopLimitOpt,
+    keyword_min_score: float | None = KeywordMinScoreOpt,
     gate: str | None = typer.Option(None, "--gate", help="dry-run, approve-each, approve-batch, or auto."),
     collection: str = typer.Option("", "--collection", "-C", help="Target collection for a writing gate."),
     fetch_pdfs: str | None = FetchPdfsOpt,
@@ -3491,6 +3688,9 @@ def snowball_hybrid(
         year_from=year_from,
         year_to=year_to,
         direction=direction,
+        keyword_limit=keyword_limit,
+        keyword_hop_limit=keyword_hop_limit,
+        keyword_min_score=keyword_min_score,
         languages=languages,
         min_seed_citations=min_seed_citations,
         hybrid_seeds=hybrid_seeds,
@@ -3510,7 +3710,10 @@ def snowball_doi(
     max_candidates: str | None = MaxCandidatesOpt,
     per_hop_limit: str | None = PerHopLimitOpt,
     per_hop_rank: str | None = PerHopRankOpt,
-    direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both."),
+    direction: str | None = typer.Option(None, "--direction", help=DIRECTION_HELP),
+    keyword_limit: str | None = KeywordLimitOpt,
+    keyword_hop_limit: str | None = KeywordHopLimitOpt,
+    keyword_min_score: float | None = KeywordMinScoreOpt,
     gate: str | None = typer.Option(
         None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
     ),
@@ -3532,6 +3735,9 @@ def snowball_doi(
         year_from=year_from,
         year_to=year_to,
         direction=direction,
+        keyword_limit=keyword_limit,
+        keyword_hop_limit=keyword_hop_limit,
+        keyword_min_score=keyword_min_score,
     )
     from .snowball.command import run_doi
 
@@ -3547,7 +3753,10 @@ def snowball_orcid(
     max_candidates: str | None = MaxCandidatesOpt,
     per_hop_limit: str | None = PerHopLimitOpt,
     per_hop_rank: str | None = PerHopRankOpt,
-    direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both."),
+    direction: str | None = typer.Option(None, "--direction", help=DIRECTION_HELP),
+    keyword_limit: str | None = KeywordLimitOpt,
+    keyword_hop_limit: str | None = KeywordHopLimitOpt,
+    keyword_min_score: float | None = KeywordMinScoreOpt,
     gate: str | None = typer.Option(
         None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
     ),
@@ -3569,6 +3778,9 @@ def snowball_orcid(
         year_from=year_from,
         year_to=year_to,
         direction=direction,
+        keyword_limit=keyword_limit,
+        keyword_hop_limit=keyword_hop_limit,
+        keyword_min_score=keyword_min_score,
     )
     from .snowball.command import run_orcid
 
@@ -3584,7 +3796,10 @@ def snowball_collection(
     max_candidates: str | None = MaxCandidatesOpt,
     per_hop_limit: str | None = PerHopLimitOpt,
     per_hop_rank: str | None = PerHopRankOpt,
-    direction: str | None = typer.Option(None, "--direction", help="refs, cites, or both."),
+    direction: str | None = typer.Option(None, "--direction", help=DIRECTION_HELP),
+    keyword_limit: str | None = KeywordLimitOpt,
+    keyword_hop_limit: str | None = KeywordHopLimitOpt,
+    keyword_min_score: float | None = KeywordMinScoreOpt,
     gate: str | None = typer.Option(
         None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
     ),
@@ -3612,6 +3827,9 @@ def snowball_collection(
         year_from=year_from,
         year_to=year_to,
         direction=direction,
+        keyword_limit=keyword_limit,
+        keyword_hop_limit=keyword_hop_limit,
+        keyword_min_score=keyword_min_score,
     )
     from .snowball.command import run_collection
 
@@ -3671,6 +3889,10 @@ def snowball_apply(
 @snowball_app.command("run")
 def snowball_run(
     profile: str = typer.Option(..., "--profile", help="profiles/<name>.toml with kind = snowball."),
+    direction: str = typer.Option("", "--direction", help=DIRECTION_HELP),
+    keyword_limit: str | None = KeywordLimitOpt,
+    keyword_hop_limit: str | None = KeywordHopLimitOpt,
+    keyword_min_score: float | None = KeywordMinScoreOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Run a saved snowball profile (keyword, DOI, ORCID, or collection)."""
@@ -3688,6 +3910,14 @@ def snowball_run(
     try:
         raw = load_profile(cfg, profile)
         request = request_from_profile(raw, cfg)
+        if direction.strip():
+            request.direction = direction.strip()
+        if keyword_limit is not None:
+            request.keyword_limit = keyword_limit
+        if keyword_hop_limit is not None:
+            request.keyword_hop_limit = keyword_hop_limit
+        if keyword_min_score is not None:
+            request.keyword_min_score = keyword_min_score
         description = str(raw.get("description") or "").strip()
         if description:
             console.print(description)
@@ -3750,7 +3980,10 @@ def snowball_profile_save(
     max_candidates: str | None = MaxCandidatesOpt,
     per_hop_limit: str | None = PerHopLimitOpt,
     per_hop_rank: str | None = PerHopRankOpt,
-    direction: str = typer.Option("", "--direction"),
+    direction: str = typer.Option("", "--direction", help=DIRECTION_HELP),
+    keyword_limit: str | None = KeywordLimitOpt,
+    keyword_hop_limit: str | None = KeywordHopLimitOpt,
+    keyword_min_score: float | None = KeywordMinScoreOpt,
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     dedupe_scope: str = typer.Option("", "--dedupe-scope"),
@@ -3826,6 +4059,22 @@ def snowball_profile_save(
             raise SnowballError(str(exc)) from exc
     if direction.strip():
         body["direction"] = direction.strip()
+    if keyword_limit is not None:
+        from .snowball.expand import parse_keyword_limit
+
+        try:
+            body["keyword_limit"] = parse_keyword_limit(keyword_limit)
+        except ValueError as exc:
+            raise SnowballError(str(exc)) from exc
+    if keyword_hop_limit is not None:
+        from .snowball.expand import parse_keyword_hop_limit
+
+        try:
+            body["keyword_hop_limit"] = parse_keyword_hop_limit(keyword_hop_limit)
+        except ValueError as exc:
+            raise SnowballError(str(exc)) from exc
+    if keyword_min_score is not None:
+        body["keyword_min_score"] = keyword_min_score
     if year_from is not None:
         body["year_from"] = year_from
     if year_to is not None:

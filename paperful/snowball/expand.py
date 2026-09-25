@@ -9,7 +9,21 @@ from .candidate import Candidate
 
 # Soft ceiling so a typo does not walk the whole graph. Caps still bind first.
 MAX_DEPTH = 5
+# OpenAlex assigns at most five keywords to a work.
+MAX_KEYWORD_LIMIT = 5
 PER_HOP_RANKS = frozenset({"most-cited", "least-cited", "random"})
+_DIRECTION_PARTS = {
+    "ref": "refs",
+    "refs": "refs",
+    "references": "refs",
+    "cites": "cites",
+    "cited-by": "cites",
+    "cited_by": "cites",
+    "citations": "cites",
+    "keyword": "keywords",
+    "keywords": "keywords",
+    "tags": "keywords",
+}
 
 
 def clamp_depth(depth: int) -> tuple[int, str | None]:
@@ -179,13 +193,81 @@ def select_works_by_citations(
     return ordered[:limit]
 
 
-def normalize_direction(raw: str) -> str:
-    """Return refs, cites, or both. Raises ValueError for anything else."""
-    value = (raw or "refs").strip().lower()
-    if value in {"refs", "references", "ref"}:
-        return "refs"
-    if value in {"cites", "cited-by", "cited_by", "citations"}:
-        return "cites"
-    if value in {"both", "refs+cites", "all"}:
+def parse_keyword_limit(value: Any) -> int:
+    """How many of a work's keywords to expand. 1–5. ``all`` and ``0`` are refused."""
+    if isinstance(value, str) and value.strip().lower() in {"all", "unlimited"}:
+        raise ValueError(
+            "keyword_limit must be 1–5. all is not allowed; 5 uses every keyword OpenAlex stored."
+        )
+    try:
+        number = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("keyword_limit must be an integer from 1 to 5") from exc
+    if number < 1 or number > MAX_KEYWORD_LIMIT:
+        raise ValueError(
+            "keyword_limit must be 1–5. all is not allowed; 5 uses every keyword OpenAlex stored."
+        )
+    return number
+
+
+def parse_keyword_hop_limit(value: Any) -> int:
+    """Works kept per seed on the keyword side. Positive integer only."""
+    if isinstance(value, str) and value.strip().lower() in {"all", "unlimited", "0"}:
+        raise ValueError(
+            "keyword_hop_limit must be a positive integer. "
+            "all is not allowed; a keyword filter is an open query."
+        )
+    try:
+        number = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "keyword_hop_limit must be a positive integer. "
+            "all is not allowed; a keyword filter is an open query."
+        ) from exc
+    if number <= 0:
+        raise ValueError(
+            "keyword_hop_limit must be a positive integer. "
+            "all is not allowed; a keyword filter is an open query."
+        )
+    return number
+
+
+def parse_keyword_min_score(value: Any) -> float:
+    """Drop seed keywords below this similarity. 0 keeps OpenAlex's own assignment."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("keyword_min_score must be 0 or greater") from exc
+    if number < 0:
+        raise ValueError("keyword_min_score must be 0 or greater")
+    return number
+
+
+def direction_sides(raw: str) -> frozenset[str]:
+    """Sides named by a direction string. ``both`` and ``all`` stay refs plus cites."""
+    value = (raw or "refs").strip().lower().replace(" ", "")
+    if value in {"both", "refs+cites", "cites+refs", "all"}:
+        return frozenset({"refs", "cites"})
+    if value in {"both+keywords", "keywords+both", "refs+cites+keywords", "cites+refs+keywords"}:
+        return frozenset({"refs", "cites", "keywords"})
+    parts = [part for part in value.split("+") if part]
+    if not parts or any(part not in _DIRECTION_PARTS for part in parts):
+        raise ValueError(
+            "direction must be refs, cites, both, keywords, "
+            "refs+keywords, cites+keywords, or refs+cites+keywords "
+            f"(got {raw!r})"
+        )
+    return frozenset(_DIRECTION_PARTS[part] for part in parts)
+
+
+def format_direction(sides: frozenset[str]) -> str:
+    """Canonical direction string. refs+cites stays ``both``."""
+    if sides == frozenset({"refs", "cites"}):
         return "both"
-    raise ValueError(f"direction must be refs, cites, or both (got {raw!r})")
+    ordered = [side for side in ("refs", "cites", "keywords") if side in sides]
+    return "+".join(ordered)
+
+
+def normalize_direction(raw: str) -> str:
+    """Return a canonical direction. Raises ValueError for anything else."""
+    return format_direction(direction_sides(raw))

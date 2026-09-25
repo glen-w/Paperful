@@ -296,7 +296,7 @@ and start Ollama bound to all interfaces on the host
 | `recover` ends `not_found` quickly | Model too small for browsing; try a 14B+ tag via `[browser_agent].model` |
 | `recover` never starts during `run` | Extra missing, `[llm].enabled` false, or `[browser_agent].during_run = false` |
 | Summary note shows raw `##` | Update paperful (0.5+ converts Markdown); re-run `summarize` |
-| `could not extract PDF text` | Scanned PDF without a text layer; OCR is out of scope |
+| `could not extract PDF text` | Scanned PDF. Run `paperful ocr -C …` then `--apply`, and summarize again |
 | Report seems to ignore half the notes | Ollama truncated the prompt. Lower `[synthesize].max_context_chars` or raise `[llm].max_num_ctx`, and confirm the model supports that window |
 | **Not included** list is long | Those items have no summary yet. Run `summarize` for them, then `synthesize` again |
 

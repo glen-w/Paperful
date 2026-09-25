@@ -1,4 +1,4 @@
-"""Collection-scoped duplicate packs. Classify on disk; trash only with --apply.
+"""Collection-scoped duplicate packs. Classify on disk; merge only with --apply.
 
 Keep rule (high_doi and proposed medium keeps), highest first:
 
@@ -7,10 +7,11 @@ Keep rule (high_doi and proposed medium keeps), highest first:
 3. richer metadata: non-placeholder title, then a date/year, then more creators
 4. older `dateAdded` (missing sorts last), then item key
 
-Same normalised DOI with titles below `TITLE_DIVERGE_BELOW` is held
-(`held_divergent_title`) and never trashed. Title+year groups are
-`needs_review` and are skipped on `--apply` unless the caller passes
-`apply_medium`.
+`--apply` copies the extra parent's PDF, notes, and better fields onto the
+keeper, then trashes the emptied parent. Same normalised DOI with titles
+below `TITLE_DIVERGE_BELOW` is held (`held_divergent_title`) and never
+merged. Title+year groups are `needs_review` and are skipped on `--apply`
+unless the caller passes `apply_medium`.
 """
 
 from __future__ import annotations
@@ -24,12 +25,36 @@ from pathlib import Path
 from typing import Any
 
 from .resolve import normalize_doi, normalize_title, title_similarity
-from .zot import Item
+from .zot import Item, is_linked_url_pdf, is_pdf_attachment
 
 TITLE_DIVERGE_BELOW = 0.60
 PHASES = ("high_doi", "medium_title_year", "all")
 SCHEMA = "paperful.dedupe_pack.v1"
 _SCOPE_UNSAFE = re.compile(r"[^A-Za-z0-9]+")
+_FILENAME_TITLE = re.compile(r"\.pdf$", re.IGNORECASE)
+# Zotero stores the abstract as abstractNote.
+_LONGER_WINS = ("abstractNote", "extra")
+_FILL_BLANK = (
+    "date",
+    "publicationTitle",
+    "url",
+    "pages",
+    "volume",
+    "issue",
+    "publisher",
+    "ISBN",
+    "ISSN",
+    "language",
+    "accessDate",
+    "shortTitle",
+    "archive",
+    "archiveLocation",
+    "libraryCatalog",
+    "callNumber",
+    "rights",
+    "series",
+    "seriesTitle",
+)
 
 
 @dataclass
@@ -44,6 +69,7 @@ class DedupeGroup:
     title_key: str | None = None
     year: int | None = None
     members: list[dict[str, Any]] = field(default_factory=list)
+    merge_preview: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -157,7 +183,7 @@ def actionable_groups(
     return chosen
 
 
-def apply_trash(
+def apply_merge(
     backend: Any,
     groups: list[DedupeGroup],
     *,
@@ -166,23 +192,29 @@ def apply_trash(
     scope: str,
     pack: Path,
 ) -> tuple[int, list[str]]:
-    """Trash extras. Returns (trashed count, per-item errors). Appends the audit jsonl."""
+    """Merge extras onto the keeper, then trash them.
+
+    Returns (merged count, per-item errors). A failed child move does not
+    trash that donor. Appends the audit jsonl.
+    """
     from .library import LibraryError
 
-    trashed = 0
+    merged = 0
     errors: list[str] = []
     lines: list[str] = []
     now = datetime.now(tz=timezone.utc).isoformat()
     for group in actionable_groups(groups, apply_medium=apply_medium):
         for key in group.trash:
             try:
-                backend.trash_item(key)
+                result = backend.merge_into(group.keep, key)
             except LibraryError:
                 raise
             except Exception as exc:
                 errors.append(f"{key}: {exc}")
                 continue
-            trashed += 1
+            if not isinstance(result, dict):
+                result = {}
+            merged += 1
             lines.append(
                 json.dumps(
                     {
@@ -190,7 +222,9 @@ def apply_trash(
                         "scope": scope,
                         "phase": group.phase,
                         "keep": group.keep,
-                        "trash": key,
+                        "drop": key,
+                        "moved": list(result.get("moved") or []),
+                        "fields": list(result.get("fields") or []),
                         "reason": group.reason,
                         "pack": str(pack),
                     },
@@ -202,7 +236,267 @@ def apply_trash(
         audit_path.parent.mkdir(parents=True, exist_ok=True)
         with audit_path.open("a", encoding="utf-8") as handle:
             handle.writelines(lines)
-    return trashed, errors
+    return merged, errors
+
+
+def attach_merge_previews(backend: Any, groups: list[DedupeGroup]) -> None:
+    """Fill ``merge_preview`` on non-held groups. Missing items stay empty."""
+    preview = getattr(backend, "preview_merge", None)
+    if not callable(preview):
+        return
+    for group in groups:
+        if group.held or not group.keep or not group.trash:
+            continue
+        rows: list[dict[str, Any]] = []
+        for key in group.trash:
+            try:
+                row = preview(group.keep, key)
+            except Exception:
+                continue
+            if isinstance(row, dict):
+                rows.append(row)
+        group.merge_preview = rows
+
+
+def merge_parent_patch(keep: dict[str, Any], drop: dict[str, Any]) -> dict[str, Any]:
+    """Fields, collections, tags, and relations to write onto the keeper.
+
+    The keeper wins a real conflict. A donor value replaces it only when the
+    donor value is clearly better (blank fill, longer abstract/extra, a
+    filename title, or a creator list that contains the keeper's surnames).
+    """
+    fields: dict[str, Any] = {}
+    title = _better_title(keep.get("title"), drop.get("title"))
+    if title is not None:
+        fields["title"] = title
+    doi = _better_doi(keep.get("DOI"), drop.get("DOI"))
+    if doi is not None:
+        fields["DOI"] = doi
+    creators = _better_creators(keep.get("creators"), drop.get("creators"))
+    if creators is not None:
+        fields["creators"] = creators
+    for name in _LONGER_WINS:
+        chosen = _longer_text(keep.get(name), drop.get(name))
+        if chosen is not None:
+            fields[name] = chosen
+    for name in _FILL_BLANK:
+        if _is_blank(keep.get(name)) and not _is_blank(drop.get(name)):
+            fields[name] = drop.get(name)
+    collections = _union_list(keep.get("collections"), drop.get("collections"))
+    tags = _merge_tags(keep.get("tags"), drop.get("tags"))
+    relations = _merge_relations(keep.get("relations"), drop.get("relations"))
+    date_added = _earlier_date(keep.get("dateAdded"), drop.get("dateAdded"))
+    return {
+        "fields": fields,
+        "collections": collections,
+        "tags": tags,
+        "relations": relations,
+        "date_added": date_added,
+    }
+
+
+def plan_child_moves(
+    keep_children: list[dict[str, Any]],
+    drop_children: list[dict[str, Any]],
+    annotation_counts: dict[str, int] | None = None,
+) -> list[dict[str, str]]:
+    """How to combine children. ``reparent`` moves onto the keeper; ``trash`` drops a duplicate file."""
+    counts = annotation_counts or {}
+    moves: list[dict[str, str]] = []
+    live_pdfs: dict[str, str] = {}
+    for child in keep_children:
+        data = child.get("data") or {}
+        key = _child_key(child)
+        digest = _imported_md5(data)
+        if key and digest:
+            live_pdfs.setdefault(digest, key)
+    keep_urls = {
+        (child.get("data") or {}).get("url", "").strip()
+        for child in keep_children
+        if is_linked_url_pdf(child.get("data") or {})
+        and (child.get("data") or {}).get("url", "").strip()
+    }
+    for child in drop_children:
+        data = child.get("data") or {}
+        key = _child_key(child)
+        if not key:
+            continue
+        if data.get("itemType") == "note":
+            moves.append({"key": key, "action": "reparent", "kind": "note"})
+            continue
+        if is_linked_url_pdf(data):
+            url = (data.get("url") or "").strip()
+            if url and url in keep_urls:
+                moves.append({"key": key, "action": "trash", "kind": "linked_url"})
+            else:
+                if url:
+                    keep_urls.add(url)
+                moves.append({"key": key, "action": "reparent", "kind": "linked_url"})
+            continue
+        digest = _imported_md5(data)
+        if digest and digest in live_pdfs:
+            survivor = live_pdfs[digest]
+            drop_notes = counts.get(key, 0)
+            keep_notes = counts.get(survivor, 0)
+            if drop_notes > 0 and keep_notes > 0:
+                moves.append({"key": key, "action": "reparent", "kind": "pdf"})
+            elif drop_notes > 0 and keep_notes == 0:
+                moves.append({"key": survivor, "action": "trash", "kind": "pdf"})
+                moves.append({"key": key, "action": "reparent", "kind": "pdf"})
+                live_pdfs[digest] = key
+            else:
+                moves.append({"key": key, "action": "trash", "kind": "pdf"})
+            continue
+        if digest:
+            live_pdfs[digest] = key
+        kind = "pdf" if is_pdf_attachment(data) else "attachment"
+        moves.append({"key": key, "action": "reparent", "kind": kind})
+    return moves
+
+
+def _is_blank(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        text = value.strip()
+        return not text or text == "(untitled)"
+    if isinstance(value, list):
+        return len(value) == 0
+    return False
+
+
+def _better_title(keep: Any, drop: Any) -> str | None:
+    if _is_blank(keep) and isinstance(drop, str) and not _is_blank(drop):
+        return drop
+    if isinstance(keep, str) and _FILENAME_TITLE.search(keep.strip()):
+        if isinstance(drop, str) and not _is_blank(drop) and not _FILENAME_TITLE.search(drop.strip()):
+            return drop
+    return None
+
+
+def _better_doi(keep: Any, drop: Any) -> str | None:
+    """Copy a DOI only into a blank. Differing DOIs stay on the keeper."""
+    if _is_blank(drop) or not isinstance(drop, str):
+        return None
+    if _is_blank(keep):
+        return drop
+    return None
+
+
+def _better_creators(keep: Any, drop: Any) -> list[Any] | None:
+    keep_list = keep if isinstance(keep, list) else []
+    drop_list = drop if isinstance(drop, list) else []
+    if not drop_list:
+        return None
+    if not keep_list:
+        return drop_list
+    if len(drop_list) <= len(keep_list):
+        return None
+    keep_names = {_surname(c) for c in keep_list if isinstance(c, dict)}
+    keep_names.discard("")
+    drop_names = {_surname(c) for c in drop_list if isinstance(c, dict)}
+    if keep_names and keep_names <= drop_names:
+        return drop_list
+    return None
+
+
+def _surname(creator: dict[str, Any]) -> str:
+    return str(creator.get("lastName") or creator.get("name") or "").strip().casefold()
+
+
+def _longer_text(keep: Any, drop: Any) -> str | None:
+    if not isinstance(drop, str) or _is_blank(drop):
+        return None
+    if _is_blank(keep):
+        return drop
+    if isinstance(keep, str) and len(drop.strip()) > len(keep.strip()):
+        return drop
+    return None
+
+
+def _union_list(keep: Any, drop: Any) -> list[Any] | None:
+    keep_list = [x for x in keep if x] if isinstance(keep, list) else []
+    drop_list = [x for x in drop if x] if isinstance(drop, list) else []
+    extra = [x for x in drop_list if x not in keep_list]
+    if not extra:
+        return None
+    return keep_list + extra
+
+
+def _merge_tags(keep: Any, drop: Any) -> list[dict[str, Any]] | None:
+    """Union tags. A manual tag (type 0) wins over an automatic one."""
+    keep_list = [t for t in keep if isinstance(t, dict)] if isinstance(keep, list) else []
+    drop_list = [t for t in drop if isinstance(t, dict)] if isinstance(drop, list) else []
+    by: dict[str, int] = {}
+    order: list[str] = []
+    for tag in keep_list + drop_list:
+        name = str(tag.get("tag") or "").strip()
+        if not name:
+            continue
+        typ = _tag_type(tag)
+        if name not in by:
+            by[name] = typ
+            order.append(name)
+        elif by[name] != 0 and typ == 0:
+            by[name] = 0
+    merged = [{"tag": name, "type": by[name]} for name in order]
+    keep_norm = [{"tag": str(t.get("tag") or "").strip(), "type": _tag_type(t)} for t in keep_list if str(t.get("tag") or "").strip()]
+    if merged == keep_norm:
+        return None
+    return merged
+
+
+def _tag_type(tag: dict[str, Any]) -> int:
+    if tag.get("type") == 1:
+        return 1
+    return 0
+
+
+def _merge_relations(keep: Any, drop: Any) -> dict[str, list[str]] | None:
+    keep_rel = keep if isinstance(keep, dict) else {}
+    drop_rel = drop if isinstance(drop, dict) else {}
+    if not drop_rel:
+        return None
+    merged: dict[str, list[str]] = {}
+    for pred, val in list(keep_rel.items()) + list(drop_rel.items()):
+        bucket = merged.setdefault(str(pred), [])
+        for item in _relation_values(val):
+            if item not in bucket:
+                bucket.append(item)
+    if merged == {str(k): _relation_values(v) for k, v in keep_rel.items()}:
+        return None
+    return merged
+
+
+def _relation_values(val: Any) -> list[str]:
+    if isinstance(val, str) and val:
+        return [val]
+    if isinstance(val, list):
+        return [str(item) for item in val if item]
+    return []
+
+
+def _earlier_date(keep: Any, drop: Any) -> str | None:
+    if not isinstance(drop, str) or not drop.strip():
+        return None
+    if not isinstance(keep, str) or not keep.strip():
+        return drop
+    if drop < keep:
+        return drop
+    return None
+
+
+def _child_key(child: dict[str, Any]) -> str:
+    return str(child.get("key") or (child.get("data") or {}).get("key") or "")
+
+
+def _imported_md5(data: dict[str, Any]) -> str | None:
+    if data.get("linkMode") not in {"imported_file", "imported_url"}:
+        return None
+    if not is_pdf_attachment(data):
+        return None
+    digest = str(data.get("md5") or "").strip().lower()
+    return digest or None
 
 
 def _high_doi(items: list[Item]) -> list[DedupeGroup]:
@@ -349,7 +643,9 @@ def _markdown(
         f"- Held: {counts['held']}",
         f"- Trash candidates: {counts['trash_candidates']}",
         "",
-        "Nothing is trashed until `paperful dedupe --apply`. "
+        "Nothing is merged until `paperful dedupe --apply`. "
+        "`--apply` copies the extra parent's PDF, notes, and better fields "
+        "onto the keeper, then trashes the emptied parent. "
         "Title+year groups need `--apply-medium`.",
         "",
     ]
@@ -373,8 +669,20 @@ def _markdown(
         lines.append("")
         for group in subset:
             review = " (needs review)" if group.needs_review else ""
-            trash = ", ".join(f"`{key}`" for key in group.trash) or "none"
-            lines.append(f"- Keep `{group.keep}` — trash {trash}{review}")
+            donors = ", ".join(f"`{key}`" for key in group.trash) or "none"
+            lines.append(f"- Keep `{group.keep}` — merge {donors}{review}")
+            for preview in group.merge_preview:
+                fields = ", ".join(preview.get("fields") or []) or "none"
+                moves = preview.get("move") or []
+                bits = [
+                    f"{row['kind']} `{row['key']}` ({row['action']})"
+                    for row in moves
+                    if row.get("key")
+                ]
+                moved = ", ".join(bits) or "no children"
+                lines.append(
+                    f"  - From `{preview.get('drop')}`: fields {fields}; {moved}"
+                )
             for member in group.members:
                 flags = []
                 if member["has_pdf"]:

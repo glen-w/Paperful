@@ -11,8 +11,10 @@ from paperful import cli
 from paperful.dedupe import (
     DedupeGroup,
     actionable_groups,
-    apply_trash,
+    apply_merge,
     classify,
+    merge_parent_patch,
+    plan_child_moves,
     summarize_gaps,
     write_pack,
 )
@@ -159,10 +161,11 @@ def test_apply_skips_medium_and_held(tmp_path):
     trashed: list[str] = []
 
     class Backend:
-        def trash_item(self, key: str) -> None:
-            trashed.append(key)
+        def merge_into(self, keep: str, drop: str) -> dict:
+            trashed.append(drop)
+            return {"moved": [], "fields": []}
 
-    n, errors = apply_trash(
+    n, errors = apply_merge(
         Backend(),
         groups,
         apply_medium=False,
@@ -187,10 +190,11 @@ def test_apply_medium_trashes_and_audits(tmp_path):
     trashed: list[str] = []
 
     class Backend:
-        def trash_item(self, key: str) -> None:
-            trashed.append(key)
+        def merge_into(self, keep: str, drop: str) -> dict:
+            trashed.append(drop)
+            return {"moved": [], "fields": []}
 
-    n, errors = apply_trash(
+    n, errors = apply_merge(
         Backend(),
         groups,
         apply_medium=True,
@@ -201,7 +205,7 @@ def test_apply_medium_trashes_and_audits(tmp_path):
     assert n == 1 and errors == []
     assert trashed == ["M2"]
     line = json.loads(audit.read_text().strip())
-    assert line["trash"] == "M2" and line["keep"] == "M1"
+    assert line["drop"] == "M2" and line["keep"] == "M1"
     assert line["phase"] == "medium_title_year"
 
 
@@ -374,7 +378,9 @@ def test_cli_apply_trashes_only_high_doi(tmp_path, monkeypatch):
 
     monkeypatch.setattr(cli, "ZoteroLocal", lambda *a, **k: Stub())
     monkeypatch.setattr(
-        ZoteroBackend, "trash_item", lambda self, key: trashed.append(key)
+        ZoteroBackend,
+        "merge_into",
+        lambda self, keep, drop: trashed.append(drop) or {"moved": [], "fields": []},
     )
     kept = tmp_path / "out" / "BBNJ" / "keep.pdf"
     kept.parent.mkdir(parents=True)
@@ -464,11 +470,12 @@ def test_apply_records_item_errors_and_reraises_library_error(tmp_path):
     audit = tmp_path / "dedupe-applied.jsonl"
 
     class Flaky:
-        def trash_item(self, key: str) -> None:
-            if key == "BAD":
+        def merge_into(self, keep: str, drop: str) -> dict:
+            if drop == "BAD":
                 raise RuntimeError("nope")
+            return {"moved": [], "fields": []}
 
-    n, errors = apply_trash(
+    n, errors = apply_merge(
         Flaky(),
         groups,
         apply_medium=False,
@@ -482,11 +489,11 @@ def test_apply_records_item_errors_and_reraises_library_error(tmp_path):
     assert "DROP" in audit.read_text()
 
     class Denied:
-        def trash_item(self, key: str) -> None:
+        def merge_into(self, keep: str, drop: str) -> dict:
             raise LibraryError("write authorisation denied in Zotero")
 
     try:
-        apply_trash(
+        apply_merge(
             Denied(),
             groups,
             apply_medium=False,
@@ -535,10 +542,10 @@ def test_cli_omitting_apply_is_a_dry_run(tmp_path, monkeypatch):
         [_pair(key="KEEP", has_pdf=True), _pair(key="DROP")],
     )
 
-    def boom(self, key):
-        raise AssertionError(f"trashed {key}")
+    def boom(self, keep, drop):
+        raise AssertionError(f"merged {drop}")
 
-    monkeypatch.setattr(ZoteroBackend, "trash_item", boom)
+    monkeypatch.setattr(ZoteroBackend, "merge_into", boom)
     res = runner.invoke(cli.app, ["dedupe", "-c", str(cfg_file), "-C", "BBNJ"])
     assert res.exit_code == 0, res.stdout
     assert "Dry-run" in res.stdout
@@ -623,4 +630,236 @@ def test_cli_gaps_json(tmp_path, monkeypatch):
     assert payload["linked_url_only"] == 1
     assert payload["missing_doi"] == 1
     assert "run" not in res.stdout  # json only, no table
+
+
+def test_merge_fields_fill_blanks_and_better_text():
+    patch = merge_parent_patch(
+        {
+            "title": "scan.pdf",
+            "abstractNote": "short",
+            "DOI": "",
+            "creators": [{"creatorType": "author", "lastName": "Ada"}],
+            "publicationTitle": "",
+            "dateAdded": "2020-02-01T00:00:00Z",
+            "collections": ["A"],
+            "tags": [{"tag": "auto", "type": 1}],
+            "relations": {},
+        },
+        {
+            "title": "The real title",
+            "abstractNote": "a much longer abstract",
+            "DOI": "10.1000/x",
+            "creators": [
+                {"creatorType": "author", "lastName": "Ada"},
+                {"creatorType": "author", "lastName": "Byron"},
+            ],
+            "publicationTitle": "Nature",
+            "dateAdded": "2019-01-01T00:00:00Z",
+            "collections": ["B"],
+            "tags": [{"tag": "auto", "type": 0}, {"tag": "review", "type": 0}],
+            "relations": {"dc:relation": ["http://example.test/items/DROP"]},
+        },
+    )
+    assert patch["fields"]["title"] == "The real title"
+    assert patch["fields"]["abstractNote"] == "a much longer abstract"
+    assert patch["fields"]["DOI"] == "10.1000/x"
+    assert len(patch["fields"]["creators"]) == 2
+    assert patch["fields"]["publicationTitle"] == "Nature"
+    assert patch["date_added"] == "2019-01-01T00:00:00Z"
+    assert patch["collections"] == ["A", "B"]
+    assert {t["tag"]: t["type"] for t in patch["tags"]}["auto"] == 0
+    assert "review" in {t["tag"] for t in patch["tags"]}
+
+
+def test_merge_fields_leave_conflicting_doi_and_unrelated_creators():
+    patch = merge_parent_patch(
+        {
+            "title": "Same title",
+            "DOI": "10.1000/keep",
+            "creators": [{"creatorType": "author", "lastName": "Ada"}],
+            "abstractNote": "keeper abstract wins when longer than donor",
+        },
+        {
+            "title": "Same title",
+            "DOI": "10.1000/drop",
+            "creators": [{"creatorType": "author", "lastName": "Other"}],
+            "abstractNote": "short",
+        },
+    )
+    assert "DOI" not in patch["fields"]
+    assert "creators" not in patch["fields"]
+    assert "abstractNote" not in patch["fields"]
+    assert "title" not in patch["fields"]
+
+
+def test_plan_child_moves_reparents_notes_and_collapses_same_pdf():
+    keep = [
+        {
+            "key": "KPDF",
+            "data": {
+                "itemType": "attachment",
+                "contentType": "application/pdf",
+                "linkMode": "imported_file",
+                "md5": "abc",
+            },
+        }
+    ]
+    drop = [
+        {
+            "key": "NOTE",
+            "data": {"itemType": "note", "note": "hello"},
+        },
+        {
+            "key": "DPDF",
+            "data": {
+                "itemType": "attachment",
+                "contentType": "application/pdf",
+                "linkMode": "imported_file",
+                "md5": "abc",
+            },
+        },
+        {
+            "key": "URL",
+            "data": {
+                "itemType": "attachment",
+                "contentType": "application/pdf",
+                "linkMode": "linked_url",
+                "url": "https://example.test/a.pdf",
+            },
+        },
+    ]
+    moves = plan_child_moves(keep, drop, {"KPDF": 0, "DPDF": 0})
+    by_key = {row["key"]: row["action"] for row in moves}
+    assert by_key["NOTE"] == "reparent"
+    assert by_key["DPDF"] == "trash"
+    assert by_key["URL"] == "reparent"
+
+    annotated = plan_child_moves(keep, drop[:2], {"KPDF": 0, "DPDF": 2})
+    actions = [(row["key"], row["action"]) for row in annotated]
+    assert ("KPDF", "trash") in actions
+    assert ("DPDF", "reparent") in actions
+
+
+def test_merge_into_moves_children_then_deletes_donor(cfg):
+    items = {
+        "KEEP": {
+            "key": "KEEP",
+            "data": {
+                "key": "KEEP",
+                "title": "file.pdf",
+                "abstractNote": "",
+                "DOI": "",
+                "creators": [],
+                "collections": ["A"],
+                "tags": [],
+                "relations": {},
+                "version": 1,
+            },
+        },
+        "DROP": {
+            "key": "DROP",
+            "data": {
+                "key": "DROP",
+                "title": "Real title",
+                "abstractNote": "The abstract",
+                "DOI": "10.1000/x",
+                "creators": [{"creatorType": "author", "lastName": "Ada"}],
+                "collections": ["B"],
+                "tags": [{"tag": "oa", "type": 0}],
+                "relations": {},
+                "version": 2,
+            },
+        },
+        "NOTE": {
+            "key": "NOTE",
+            "data": {
+                "key": "NOTE",
+                "itemType": "note",
+                "parentItem": "DROP",
+                "note": "hi",
+            },
+        },
+        "PDF": {
+            "key": "PDF",
+            "data": {
+                "key": "PDF",
+                "itemType": "attachment",
+                "contentType": "application/pdf",
+                "linkMode": "imported_file",
+                "parentItem": "DROP",
+                "md5": "abc",
+            },
+        },
+    }
+
+    class FakeZot:
+        def item(self, key):
+            return items[key]
+
+        def children(self, key):
+            return [
+                row
+                for row in items.values()
+                if (row.get("data") or {}).get("parentItem") == key
+            ]
+
+        def update_item(self, raw):
+            items[raw["data"]["key"]] = raw
+
+    class ZL:
+        def __init__(self):
+            self.zot = FakeZot()
+
+    backend = ZoteroBackend(cfg, ZL())
+    backend._ensure_write = lambda: None
+    result = backend.merge_into("KEEP", "DROP")
+    assert result["moved"] == ["NOTE", "PDF"]
+    assert "title" in result["fields"]
+    assert items["NOTE"]["data"]["parentItem"] == "KEEP"
+    assert items["PDF"]["data"]["parentItem"] == "KEEP"
+    assert items["DROP"]["data"]["deleted"] is True
+    assert items["KEEP"]["data"]["title"] == "Real title"
+    assert items["KEEP"]["data"]["abstractNote"] == "The abstract"
+    assert items["KEEP"]["data"]["collections"] == ["A", "B"]
+
+
+def test_merge_into_does_not_trash_when_child_move_fails(cfg):
+    items = {
+        "KEEP": {"key": "KEEP", "data": {"key": "KEEP", "title": "Keep", "version": 1}},
+        "DROP": {"key": "DROP", "data": {"key": "DROP", "title": "Drop", "version": 1}},
+        "NOTE": {
+            "key": "NOTE",
+            "data": {"key": "NOTE", "itemType": "note", "parentItem": "DROP", "note": "x"},
+        },
+    }
+
+    class FakeZot:
+        def item(self, key):
+            return items[key]
+
+        def children(self, key):
+            return [
+                row
+                for row in items.values()
+                if (row.get("data") or {}).get("parentItem") == key
+            ]
+
+        def update_item(self, raw):
+            if raw["data"].get("key") == "NOTE":
+                raise RuntimeError("child move failed")
+            items[raw["data"]["key"]] = raw
+
+    class ZL:
+        def __init__(self):
+            self.zot = FakeZot()
+
+    backend = ZoteroBackend(cfg, ZL())
+    backend._ensure_write = lambda: None
+    try:
+        backend.merge_into("KEEP", "DROP")
+    except RuntimeError as exc:
+        assert "child move" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError")
+    assert items["DROP"]["data"].get("deleted") is not True
 

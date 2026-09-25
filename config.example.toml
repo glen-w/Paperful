@@ -168,11 +168,17 @@ pdfs = "additional"
 # Off until you set enabled. Dry-run / approve-batch write state/snowball/.
 # gate = "auto" plus target_collection creates parents. fetch_pdfs is
 # off (metadata only), fast (first pass), or full (then the run stack).
-# true means fast. direction = refs|cites|both.
+# true means fast. direction = refs|cites|both|keywords|refs+keywords|cites+keywords|refs+cites+keywords.
+# both stays references plus cited-by. keyword_limit is 1–5 (all is refused).
+# keyword_hop_limit is a positive integer (all is refused; a keyword is an open query).
+# About 12% of works have no topic and therefore no keywords. Those seeds are
+# reported at the start of a keyword hop and skipped on that side.
 # OPENALEX_API_KEY belongs in the environment, not in this file.
 # Snowball tries OpenAlex without a key first (enough for a small search; the
 # allowance is shared by IP, including a VPN exit). A configured key takes over
 # when that allowance is spent. mailto does not raise either budget.
+# SEMANTIC_SCHOLAR_API_KEY is optional and also stays in the environment.
+# The public API is enough until heavy use; request a key, it is not self-serve.
 # [snowball]
 # enabled = false
 # max_candidates = 200     # all keeps every new+exists row
@@ -180,6 +186,12 @@ pdfs = "additional"
 # per_hop_rank = "most-cited"  # most-cited | least-cited | random
 # depth = 1
 # direction = "refs"
+# keyword_limit = 3       # 1–5. 5 uses every keyword OpenAlex stored. all is refused
+# keyword_hop_limit = 50  # works per seed on the keyword side. all is refused
+# keyword_min_score = 0   # 0 keeps whatever OpenAlex assigned
+# keyword_limit = 3       # 1–5. 5 uses every keyword OpenAlex stored. all is refused
+# keyword_hop_limit = 50  # works per seed on the keyword side. all is refused
+# keyword_min_score = 0   # 0 keeps whatever OpenAlex assigned
 # gate = "dry-run"
 # target_collection = ""
 # fetch_pdfs = "off"     # off | fast | full. true means fast
@@ -196,4 +208,10 @@ pdfs = "additional"
 # approve_each_max = 20
 # hybrid_seeds = 5
 # refine = false
+
+# Text layer for scanned PDFs (paperful ocr). Needs ocrmypdf on PATH.
+# The Compose image ships English. Add tesseract language packs for the rest.
+# [ocr]
+# languages = "eng"       # eng+fra or "eng fra"
+# timeout_s = 600
 

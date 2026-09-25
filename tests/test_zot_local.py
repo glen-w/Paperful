@@ -5,7 +5,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from paperful.zot import UNCOLLECTED, ZoteroLocal
+from paperful.zot import UNCOLLECTED, ZoteroLocal, zotero_supports_write
 
 
 def _col(key, name, parent=None):
@@ -111,6 +111,15 @@ def test_ping_reports_version_and_write_support(zl, monkeypatch):
     )
     monkeypatch.setattr("paperful.zot.zotero.Zotero", lambda *a, **k: old)
     assert ZoteroLocal().ping()["supports_write"] is False
+    ten = FakeZot(
+        httpx.Response(
+            200, headers={"X-Zotero-Version": "10.0.4", "Zotero-API-Version": "3"}
+        )
+    )
+    monkeypatch.setattr("paperful.zot.zotero.Zotero", lambda *a, **k: ten)
+    assert ZoteroLocal().ping()["supports_write"] is True
+    assert zotero_supports_write("10.0.4", None) is True
+    assert zotero_supports_write("7.0.15", None) is False
     disabled = FakeZot(httpx.Response(403))
     monkeypatch.setattr("paperful.zot.zotero.Zotero", lambda *a, **k: disabled)
     with pytest.raises(ConnectionError, match="disabled"):

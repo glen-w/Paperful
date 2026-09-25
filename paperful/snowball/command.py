@@ -16,8 +16,17 @@ from ..dedupe import normalize_dedupe_title
 from ..library import LibraryError, get_backend
 from ..resolve import normalize_doi
 from .candidate import Candidate
-from .crawl import doi_candidates, hybrid_candidates, orcid_candidates, search_candidates
-from .expand import apply_filters, clamp_depth, keyword_depth, normalize_direction, truncate
+from .crawl import NoKeywordSeeds, doi_candidates, hybrid_candidates, orcid_candidates, search_candidates
+from .expand import (
+    apply_filters,
+    clamp_depth,
+    keyword_depth,
+    normalize_direction,
+    parse_keyword_hop_limit,
+    parse_keyword_limit,
+    parse_keyword_min_score,
+    truncate,
+)
 from .fill import FillPaused, crossref_work, fill_crossref, fill_semanticscholar, s2_api_key, s2_paper
 from .ingest import create_new, fill_pdfs
 from .openalex import OpenAlexBudgetExceeded, OpenAlexClient, keyless_limit_message, normalize_orcid
@@ -51,6 +60,9 @@ class SnowballRequest:
     year_from: int | None = None
     year_to: int | None = None
     direction: str = "refs"
+    keyword_limit: int | str | None = None
+    keyword_hop_limit: int | str | None = None
+    keyword_min_score: float | None = None
     dedupe_scope: str | None = None
     tag_prefix: str | None = None
     types: tuple[str, ...] | None = None
@@ -95,6 +107,7 @@ def run_search(
         direction = normalize_direction(request.direction)
     except ValueError as exc:
         raise SnowballError(str(exc)) from exc
+    keywords = _keyword_caps(cfg, request)
     return _execute(
         cfg,
         request,
@@ -121,6 +134,9 @@ def run_search(
             year_from=request.year_from,
             year_to=request.year_to,
             min_seed_citations=_min_cites(cfg, request),
+            keyword_limit=keywords[0],
+            keyword_hop_limit=keywords[1],
+            keyword_min_score=keywords[2],
         ),
     )
 
@@ -148,6 +164,7 @@ def run_hybrid(
         direction = normalize_direction(request.direction)
     except ValueError as exc:
         raise SnowballError(str(exc)) from exc
+    keywords = _keyword_caps(cfg, request)
     seeds = request.hybrid_seeds if request.hybrid_seeds is not None else cfg.snowball_hybrid_seeds
 
     def crawl(oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int, str]) -> tuple[list[Candidate], list[str]]:
@@ -164,6 +181,9 @@ def run_hybrid(
             year_to=request.year_to,
             hybrid_seeds=seeds,
             min_seed_citations=_min_cites(cfg, request),
+            keyword_limit=keywords[0],
+            keyword_hop_limit=keywords[1],
+            keyword_min_score=keywords[2],
         )
 
     return _execute(
@@ -203,6 +223,7 @@ def run_doi(
         direction = normalize_direction(request.direction)
     except ValueError as exc:
         raise SnowballError(str(exc)) from exc
+    keywords = _keyword_caps(cfg, request)
     depth, warning = clamp_depth(_graph_depth(cfg, request))
     cleaned = [d.strip() for d in dois if d.strip()]
     if not cleaned:
@@ -222,6 +243,9 @@ def run_doi(
             year_from=request.year_from,
             year_to=request.year_to,
             min_seed_citations=_min_cites(cfg, request),
+            keyword_limit=keywords[0],
+            keyword_hop_limit=keywords[1],
+            keyword_min_score=keywords[2],
         )
 
     return _execute(
@@ -260,6 +284,7 @@ def run_orcid(
         direction = normalize_direction(request.direction)
     except ValueError as exc:
         raise SnowballError(str(exc)) from exc
+    keywords = _keyword_caps(cfg, request)
     depth, warning = clamp_depth(_graph_depth(cfg, request))
     backends = _backends(cfg, request)
     if "orcid" in backends:
@@ -286,6 +311,9 @@ def run_orcid(
             year_from=request.year_from,
             year_to=request.year_to,
             min_seed_citations=_min_cites(cfg, request),
+            keyword_limit=keywords[0],
+            keyword_hop_limit=keywords[1],
+            keyword_min_score=keywords[2],
         )
 
     return _execute(
@@ -317,6 +345,7 @@ def run_collection(
         direction = normalize_direction(request.direction)
     except ValueError as exc:
         raise SnowballError(str(exc)) from exc
+    keywords = _keyword_caps(cfg, request)
     depth, warning = clamp_depth(_graph_depth(cfg, request))
     lib = backend
     try:
@@ -344,6 +373,9 @@ def run_collection(
             year_from=request.year_from,
             year_to=request.year_to,
             min_seed_citations=_min_cites(cfg, request),
+            keyword_limit=keywords[0],
+            keyword_hop_limit=keywords[1],
+            keyword_min_score=keywords[2],
         )
 
     return _execute(
@@ -560,6 +592,28 @@ def _cap(value: int | str | None, default: int) -> int:
         raise SnowballError(str(exc)) from exc
 
 
+def _keyword_caps(cfg: Config, request: SnowballRequest) -> tuple[int, int, float]:
+    try:
+        limit = (
+            cfg.snowball_keyword_limit
+            if request.keyword_limit is None
+            else parse_keyword_limit(request.keyword_limit)
+        )
+        hop = (
+            cfg.snowball_keyword_hop_limit
+            if request.keyword_hop_limit is None
+            else parse_keyword_hop_limit(request.keyword_hop_limit)
+        )
+        score = (
+            cfg.snowball_keyword_min_score
+            if request.keyword_min_score is None
+            else parse_keyword_min_score(request.keyword_min_score)
+        )
+    except ValueError as exc:
+        raise SnowballError(str(exc)) from exc
+    return limit, hop, score
+
+
 def _rank(value: str | None, default: str) -> str:
     raw = default if value is None else value
     try:
@@ -580,6 +634,7 @@ def _guard(cfg: Config, request: SnowballRequest) -> None:
         _cap(request.per_hop_limit, 0)
     if request.per_hop_rank is not None:
         _rank(request.per_hop_rank, "most-cited")
+    _keyword_caps(cfg, request)
     scope = (request.dedupe_scope or cfg.snowball_dedupe_scope or "library").strip()
     if scope not in {"library", "collection", "none"}:
         raise SnowballError("dedupe_scope must be library, collection, or none.")
@@ -662,6 +717,8 @@ def _execute(
     oa.emit = emit
     try:
         produced = crawl(oa, run_id, gate, caps)
+    except NoKeywordSeeds as exc:
+        raise SnowballError(str(exc)) from exc
     except (Exception, KeyboardInterrupt) as exc:
         if oa.deferred is None:
             remaining = list(getattr(exc, "remaining", []) or [])
@@ -1000,18 +1057,15 @@ def _fill_metadata(
         if getter is not None:
             fill_crossref(rows, getter, tally=tally)
     if "semanticscholar" in backends:
-        key = s2_api_key()
-        if not key:
-            console.print("[yellow]semantic scholar key absent; skipping that backend[/]")
-        else:
-            getter = s2_getter
-            if getter is None and live:
-                cache = cfg.state_dir / "snowball" / "cache"
-                getter = lambda doi: s2_paper(doi, cache_dir=cache, api_key=key)
-            if getter is not None:
-                rows = list(rows) + fill_semanticscholar(
-                    rows, getter, per_hop_limit=per_hop_limit, direction=direction, tally=tally
-                )
+        getter = s2_getter
+        if getter is None and live:
+            key = s2_api_key()
+            cache = cfg.state_dir / "snowball" / "cache"
+            getter = lambda doi: s2_paper(doi, cache_dir=cache, api_key=key)
+        if getter is not None:
+            rows = list(rows) + fill_semanticscholar(
+                rows, getter, per_hop_limit=per_hop_limit, direction=direction, tally=tally
+            )
     return rows
 
 
@@ -1031,6 +1085,9 @@ def _summary_meta(
         "max_candidates": caps[0],
         "per_hop_limit": caps[1],
         "per_hop_rank": caps[2],
+        "keyword_limit": _keyword_caps(cfg, request)[0],
+        "keyword_hop_limit": _keyword_caps(cfg, request)[1],
+        "keyword_min_score": _keyword_caps(cfg, request)[2],
         "filtered": filtered,
         "dedupe_scope": scope,
     }

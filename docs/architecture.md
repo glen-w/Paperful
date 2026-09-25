@@ -13,7 +13,7 @@ you keep if the manager changes. See [Why paperful](why.md).
 
 `run` never rewrites bibliographic fields. On Zotero, attach,
 `fix-metadata --apply`, and `dedupe --apply` use the Zotero 10+ write API.
-Dedupe moves extras to the Zotero trash; it does not delete files under `out/`.
+Dedupe merges the extra parent's PDF, notes, and better fields onto the keeper, then moves that parent to the Zotero trash. It does not delete files under `out/`.
 
 ## Data flow
 
@@ -55,7 +55,7 @@ flowchart LR
 | `state/manifest.jsonl` | Append-only resume ledger. Latest line per item key wins. Fields include `doi` (used this attempt), `library_doi`, `doi_verified`, `pdf_doi` |
 | `state/metadata-patches.jsonl` | Proposed patches (`doi`, `title`, `date`, `publicationTitle`) |
 | `state/dedupe-packs/` | Duplicate review packs from `dedupe` (JSON + Markdown) |
-| `state/dedupe-applied.jsonl` | Trash audit; appended only on `dedupe --apply` |
+| `state/dedupe-applied.jsonl` | Merge audit; appended only on `dedupe --apply` |
 | `state/pdf-cache/` | Manager PDFs exported so lint reads text on disk |
 | `state/summaries/<key>.html` | `summarize` output when dest includes disk; the Zotero child note is the other copy |
 | `state/reports/<slug>.html` | `synthesize` literature review; sibling `<slug>.json` records source hashes |
@@ -70,7 +70,7 @@ flowchart LR
 
 ## Library adapter
 
-[`paperful/library.py`](../paperful/library.py) defines `LibraryBackend`: list items, fetch one item by key (`get_item`), export a PDF **onto disk**, apply a field patch, trash a duplicate parent, attach a file, create-or-update a **tagged child note** (`create_or_update_note`, used by `summarize`), create-or-update a **standalone collection note** (`create_or_update_collection_note`, used by `synthesize`), and `flush_writes()` (EndNote stages `state/endnote-import/<stamp>/`; others no-op). The tag makes re-runs update instead of duplicate. Identifier and dedupe logic (`resolve`, `lint`, `pdfid`, `metadata`, `dedupe`) must not import a manager except through this protocol. Notes are skipped by `items_in_scope`, so a report note never enters `run` / `lint` / `gaps`. Canonical item types are Zotero ids; [`paperful/interop/`](../paperful/interop/) maps RIS / BibTeX / EndNote XML at the edge. `paperful import` / `export` use that layer. **Zotero is well tested.** [Mendeley](mendeley.md) and [EndNote](endnote.md) are seeking testers.
+[`paperful/library.py`](../paperful/library.py) defines `LibraryBackend`: list items, fetch one item by key (`get_item`), export a PDF **onto disk**, apply a field patch, merge a duplicate parent (children and better fields, then trash), attach a file, create-or-update a **tagged child note** (`create_or_update_note`, used by `summarize`), create-or-update a **standalone collection note** (`create_or_update_collection_note`, used by `synthesize`), and `flush_writes()` (EndNote stages `state/endnote-import/<stamp>/`; others no-op). The tag makes re-runs update instead of duplicate. Identifier and dedupe logic (`resolve`, `lint`, `pdfid`, `metadata`, `dedupe`) must not import a manager except through this protocol. Notes are skipped by `items_in_scope`, so a report note never enters `run` / `lint` / `gaps`. Canonical item types are Zotero ids; [`paperful/interop/`](../paperful/interop/) maps RIS / BibTeX / EndNote XML at the edge. `paperful import` / `export` use that layer. **Zotero is well tested.** [Mendeley](mendeley.md) and [EndNote](endnote.md) are seeking testers.
 
 ## LLM layer (optional, local-first)
 
@@ -112,6 +112,8 @@ flowchart LR
 ## PDF text
 
 [`paperful/pdfid.py`](../paperful/pdfid.py): `pdftotext` (Poppler) if on `PATH`, else `pypdf` (first two pages + `/Title`; `max_pages=None` reads the whole file for `summarize`). Manager fulltext is last-resort: export the file to `state/pdf-cache/` first. `paperful doctor` reports amber if `pdftotext` is missing.
+
+[`paperful/ocr.py`](../paperful/ocr.py): `paperful ocr` (dry-run unless `--apply`) runs `ocrmypdf` on image PDFs and replaces the file under `out/`. A manager-only PDF is exported into the item folder first; `state/pdf-cache/` is never the file that gets the layer, because the next export would overwrite it. `--attach` uploads that file as a new attachment and leaves the scan in place. `doctor` is amber when `ocrmypdf` is missing. The step is optional on `paperful all` (`--steps`), not in the default chain.
 
 ## Circuit breaker
 
@@ -159,7 +161,7 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
   routed source list in order (full `sources` when `--try-all`).
 - `paperful lint` / `paperful fix-metadata` — identifier hygiene; apply is explicit.
 - `paperful dedupe` / `paperful gaps` — duplicate packs and PDF/DOI counts.
-  `dedupe` writes `state/dedupe-packs/` and trashes only with `--apply`
+  `dedupe` writes `state/dedupe-packs/` and merges only with `--apply`
   (title+year also needs `--apply-medium`). See [dedupe](dedupe.md).
 - `paperful report` / `paperful report --last-run` — manifest totals plus the latest
   auditable run report (`state/last-run.json`, history under `state/runs/`).

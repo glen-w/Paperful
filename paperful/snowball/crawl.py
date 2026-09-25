@@ -6,16 +6,21 @@ from typing import Any
 
 from ..resolve import normalize_doi
 from .candidate import Candidate
-from .expand import sample_ids, select_works_by_citations, truncate, unique_ids
+from .expand import direction_sides, sample_ids, select_works_by_citations, truncate, unique_ids
 from .openalex import (
     OpenAlexBudgetExceeded,
     OpenAlexClient,
     OpenAlexError,
+    chosen_keywords,
     keyless_limit_message,
     referenced_ids,
     short_id,
     work_to_candidate,
 )
+
+
+class NoKeywordSeeds(Exception):
+    """Keyword expansion was requested and every seed lacks keywords."""
 
 
 def _mark_year(row: Candidate, year_from: int | None, year_to: int | None) -> bool:
@@ -69,15 +74,23 @@ def _dedupe(rows: list[Candidate]) -> list[Candidate]:
         for token in incoming:
             if token not in keys:
                 keys.append(token)
+        incoming_overlap = int(row.biblio.get("keyword_overlap") or 0)
+        kept_overlap = int(existing.biblio.get("keyword_overlap") or 0)
+        if incoming_overlap > kept_overlap:
+            existing.biblio["keyword_overlap"] = incoming_overlap
     return out
 
 
 def _wants_refs(direction: str) -> bool:
-    return direction in {"refs", "both"}
+    return "refs" in direction_sides(direction)
 
 
 def _wants_cites(direction: str) -> bool:
-    return direction in {"cites", "both"}
+    return "cites" in direction_sides(direction)
+
+
+def _wants_keywords(direction: str) -> bool:
+    return "keywords" in direction_sides(direction)
 
 
 def _cite_sort(rank: str) -> str | None:
@@ -112,7 +125,16 @@ def search_candidates(
     year_to: int | None,
     min_seed_citations: int = 0,
     per_hop_rank: str = "most-cited",
+    keyword_limit: int = 3,
+    keyword_hop_limit: int = 50,
+    keyword_min_score: float = 0.0,
 ) -> list[Candidate]:
+    _remember_keywords(
+        client,
+        keyword_limit=keyword_limit,
+        keyword_hop_limit=keyword_hop_limit,
+        keyword_min_score=keyword_min_score,
+    )
     seed = {"type": "keyword", "value": query}
     client.stage = "OpenAlex search"
     client.note(client.stage)
@@ -186,8 +208,18 @@ def doi_candidates(
     year_to: int | None,
     min_seed_citations: int = 0,
     per_hop_rank: str = "most-cited",
+    keyword_limit: int = 3,
+    keyword_hop_limit: int = 50,
+    keyword_min_score: float = 0.0,
 ) -> tuple[list[Candidate], list[str]]:
     """Return neighbours of each DOI and DOIs that failed to resolve."""
+    _remember_keywords(
+        client,
+        keyword_limit=keyword_limit,
+        keyword_hop_limit=keyword_hop_limit,
+        keyword_min_score=keyword_min_score,
+    )
+    client.keyword_defer_empty_raise = True
     rows: list[Candidate] = []
     failed: list[str] = []
     for raw in dois:
@@ -267,6 +299,8 @@ def doi_candidates(
         _emit(client, rows)
         if client.deferred:
             break
+    if not client.deferred:
+        _keyword_finish(client, direction)
     return truncate(_dedupe(rows), max_candidates), failed
 
 
@@ -285,8 +319,17 @@ def orcid_candidates(
     year_to: int | None,
     min_seed_citations: int = 0,
     per_hop_rank: str = "most-cited",
+    keyword_limit: int = 3,
+    keyword_hop_limit: int = 50,
+    keyword_min_score: float = 0.0,
 ) -> tuple[list[Candidate], list[str]]:
     """Person's works (hop 0), then the same expander as DOI seeds."""
+    _remember_keywords(
+        client,
+        keyword_limit=keyword_limit,
+        keyword_hop_limit=keyword_hop_limit,
+        keyword_min_score=keyword_min_score,
+    )
     seed = {"type": "orcid", "value": orcid}
     rows: list[Candidate] = []
     failed: list[str] = []
@@ -465,9 +508,33 @@ def _emit(client: OpenAlexClient, rows: list[Candidate]) -> None:
         emit(rows)
 
 
+def _remember_keywords(
+    client: OpenAlexClient,
+    *,
+    keyword_limit: int,
+    keyword_hop_limit: int,
+    keyword_min_score: float,
+) -> None:
+    client.keyword_limit = keyword_limit
+    client.keyword_hop_limit = keyword_hop_limit
+    client.keyword_min_score = keyword_min_score
+
+
+def _keyword_settings(client: OpenAlexClient) -> tuple[int, int, float]:
+    return (
+        int(getattr(client, "keyword_limit", 3) or 3),
+        int(getattr(client, "keyword_hop_limit", 50) or 50),
+        float(getattr(client, "keyword_min_score", 0.0) or 0.0),
+    )
+
+
 def _defer(client: OpenAlexClient, exc: BaseException, **fields: Any) -> None:
     if client.deferred is not None:
         return
+    limit, hop_limit, min_score = _keyword_settings(client)
+    fields.setdefault("keyword_limit", limit)
+    fields.setdefault("keyword_hop_limit", hop_limit)
+    fields.setdefault("keyword_min_score", min_score)
     client.deferred = {
         "reset_at": getattr(exc, "reset_at", None),
         "reset_in_s": getattr(exc, "reset_in_s", None),
@@ -486,6 +553,155 @@ def _defer(client: OpenAlexClient, exc: BaseException, **fields: Any) -> None:
         client.note(f"Crawl paused ({exc}). Partial queue kept. paperful snowball resume")
 
 
+def _keyword_sentence(empty: int, total: int) -> str:
+    return f"{empty} of {total} seeds have no OpenAlex keywords and will not expand on that side."
+
+
+def _keyword_prelude(client: OpenAlexClient, seeds: list[dict[str, Any]], direction: str) -> None:
+    """Count seeds with no usable keywords. Raise when this batch is the whole run."""
+    limit, _hop_limit, min_score = _keyword_settings(client)
+    empty = sum(
+        1 for work in seeds if not chosen_keywords(work, limit=limit, min_score=min_score)
+    )
+    total = len(seeds)
+    client.keyword_seed_total = int(getattr(client, "keyword_seed_total", 0) or 0) + total
+    client.keyword_seed_empty = int(getattr(client, "keyword_seed_empty", 0) or 0) + empty
+    keywords_only = not _wants_refs(direction) and not _wants_cites(direction)
+    if keywords_only and total and empty == total and not getattr(client, "keyword_defer_empty_raise", False):
+        raise NoKeywordSeeds(_keyword_sentence(empty, total))
+    if empty and not (keywords_only and empty == total):
+        client.note(_keyword_sentence(empty, total))
+
+
+def _keyword_finish(client: OpenAlexClient, direction: str) -> None:
+    """One exit for a DOI list whose seeds were expanded one at a time."""
+    if not getattr(client, "keyword_defer_empty_raise", False):
+        return
+    if not _wants_keywords(direction) or _wants_refs(direction) or _wants_cites(direction):
+        return
+    total = int(getattr(client, "keyword_seed_total", 0) or 0)
+    empty = int(getattr(client, "keyword_seed_empty", 0) or 0)
+    if total and empty == total:
+        raise NoKeywordSeeds(_keyword_sentence(empty, total))
+
+
+def _keyword_fetch_limit(hop_limit: int, rank: str) -> int:
+    """Finite page size. Random draws from a bounded window, never an open crawl."""
+    if hop_limit <= 0:
+        raise OpenAlexError(
+            "keyword_hop_limit must be a positive integer. "
+            "all is not allowed; a keyword filter is an open query."
+        )
+    if (rank or "").strip().lower() == "random":
+        return min(200, hop_limit * 4)
+    return hop_limit
+
+
+def _keyword_neighbours(
+    client: OpenAlexClient,
+    frontier: list[dict[str, Any]],
+    rows: list[Candidate],
+    next_works: list[dict[str, Any]],
+    seen_oa: set[str],
+    *,
+    hop: int,
+    depth: int,
+    direction: str,
+    run_id: str,
+    seed: dict[str, str],
+    gate: str,
+    per_hop_limit: int,
+    rank: str,
+    year_from: int | None,
+    year_to: int | None,
+    why_prefix: str,
+    min_seed_citations: int,
+) -> bool:
+    """One OR query per seed. Returns True when the crawl must stop and resume."""
+    keyword_limit, hop_limit, min_score = _keyword_settings(client)
+    tagged = []
+    for work in frontier:
+        slugs = chosen_keywords(work, limit=keyword_limit, min_score=min_score)
+        oa = short_id(str(work.get("id") or ""))
+        if slugs and oa:
+            tagged.append((work, oa, slugs))
+    if not tagged:
+        return False
+    client.stage = f"hop {hop}/{depth} keywords"
+    client.note(f"hop {hop}/{depth} keywords · {len(tagged)} seeds")
+    if client.tally is not None:
+        client.tally.track(len(tagged))
+    fetch_limit = _keyword_fetch_limit(hop_limit, rank)
+    sort = _cite_sort(rank)
+    for index, (work, oa, slugs) in enumerate(tagged, start=1):
+        client.stage = f"hop {hop}/{depth} keywords {index}/{len(tagged)} {oa}"
+        client.touch()
+        try:
+            hits = client.works_by_keywords(
+                slugs,
+                limit=fetch_limit,
+                year_from=year_from,
+                year_to=year_to,
+                sort=sort,
+            )
+        except Exception as exc:
+            remaining = [item[1] for item in tagged[index - 1 :]]
+            _defer(
+                client,
+                exc,
+                kind="keywords",
+                remaining_ids=remaining,
+                keyword_slugs=slugs,
+                hop=hop,
+                depth=depth,
+                direction=direction,
+                run_id=run_id,
+                seed=seed,
+                gate=gate,
+                per_hop_limit=per_hop_limit,
+                per_hop_rank=rank,
+                year_from=year_from,
+                year_to=year_to,
+                why_prefix=why_prefix,
+                min_seed_citations=min_seed_citations,
+            )
+            _emit(client, rows)
+            return True
+        if rank == "random":
+            hits = select_works_by_citations(hits, hop_limit, "random")
+        else:
+            hits = hits[:hop_limit]
+        label = normalize_doi(str(work.get("doi") or "")) or why_prefix
+        kept = 0
+        for child in hits:
+            child_id = short_id(str(child.get("id") or ""))
+            if not child_id or child_id in seen_oa:
+                continue
+            seen_oa.add(child_id)
+            child_slugs = set(chosen_keywords(child, limit=0, min_score=0.0))
+            shared = [slug for slug in slugs if slug in child_slugs] or list(slugs)
+            row = work_to_candidate(
+                child,
+                run_id=run_id,
+                seed=seed,
+                hop=hop,
+                direction="keywords",
+                why=f"keywords {', '.join(shared)} of {label}",
+                gate=gate,
+            )
+            row.biblio["keyword_overlap"] = len(shared)
+            if _mark_year(row, year_from, year_to):
+                next_works.append(child)
+                kept += 1
+            rows.append(row)
+            if kept >= hop_limit:
+                break
+        if client.tally is not None:
+            client.tally.advance(1)
+        _emit(client, rows)
+    return False
+
+
 def _expand_hops(
     client: OpenAlexClient,
     seeds: list[dict[str, Any]],
@@ -502,14 +718,17 @@ def _expand_hops(
     min_seed_citations: int = 0,
     per_hop_rank: str = "most-cited",
 ) -> list[Candidate]:
-    """BFS from seed works through refs and/or cites up to ``depth`` hops."""
+    """BFS from seed works through refs, cites, and/or keywords up to ``depth`` hops."""
     if depth < 1:
         return []
     want_refs = _wants_refs(direction)
     want_cites = _wants_cites(direction)
-    if not want_refs and not want_cites:
+    want_keywords = _wants_keywords(direction)
+    if not want_refs and not want_cites and not want_keywords:
         return []
     rank = (per_hop_rank or "most-cited").strip().lower()
+    if want_keywords:
+        _keyword_prelude(client, seeds, direction)
 
     rows: list[Candidate] = []
     frontier = list(seeds)
@@ -604,80 +823,97 @@ def _expand_hops(
                     and int(work.get("cited_by_count") or 0) < min_seed_citations
                 )
             ]
-            if not citing_seeds:
-                frontier = next_works
-                if not frontier:
-                    break
-                continue
-            client.stage = f"hop {hop}/{depth} cited-by"
-            client.note(f"hop {hop}/{depth} cited-by · {len(citing_seeds)} seeds")
-            if client.tally is not None:
-                client.tally.track(len(citing_seeds))
-            cite_limit = _cite_fetch_limit(per_hop_limit, rank)
-            cite_sort = _cite_sort(rank)
-            for index, work in enumerate(citing_seeds, start=1):
-                oa = short_id(str(work.get("id") or ""))
-                client.stage = f"hop {hop}/{depth} cited-by {index}/{len(citing_seeds)} {oa}"
-                client.touch()
-                try:
-                    citing = client.works_citing(
-                        oa,
-                        limit=cite_limit,
-                        year_from=year_from,
-                        year_to=year_to,
-                        sort=cite_sort,
-                    )
-                except Exception as exc:
-                    remaining = [
-                        short_id(str(item.get("id") or ""))
-                        for item in citing_seeds[index - 1 :]
-                    ]
-                    _defer(
-                        client,
-                        exc,
-                        kind="cites",
-                        remaining_ids=[item for item in remaining if item],
-                        hop=hop,
-                        depth=depth,
-                        direction=direction,
-                        run_id=run_id,
-                        seed=seed,
-                        gate=gate,
-                        per_hop_limit=per_hop_limit,
-                        per_hop_rank=rank,
-                        year_from=year_from,
-                        year_to=year_to,
-                        why_prefix=why_prefix,
-                        min_seed_citations=min_seed_citations,
-                    )
-                    _emit(client, rows)
-                    return rows
-                if rank == "random":
-                    citing = select_works_by_citations(citing, per_hop_limit, "random")
-                kept = 0
-                for child in citing:
-                    child_id = short_id(str(child.get("id") or ""))
-                    if not child_id or child_id in seen_oa:
-                        continue
-                    seen_oa.add(child_id)
-                    row = work_to_candidate(
-                        child,
-                        run_id=run_id,
-                        seed=seed,
-                        hop=hop,
-                        direction="cites",
-                        why=f"cites {why_prefix}",
-                        gate=gate,
-                    )
-                    if _mark_year(row, year_from, year_to):
-                        next_works.append(child)
-                        kept += 1
-                    rows.append(row)
-                    if per_hop_limit > 0 and kept >= per_hop_limit:
-                        break
+            if citing_seeds:
+                client.stage = f"hop {hop}/{depth} cited-by"
+                client.note(f"hop {hop}/{depth} cited-by · {len(citing_seeds)} seeds")
                 if client.tally is not None:
-                    client.tally.advance(1)
-                _emit(client, rows)
+                    client.tally.track(len(citing_seeds))
+                cite_limit = _cite_fetch_limit(per_hop_limit, rank)
+                cite_sort = _cite_sort(rank)
+                for index, work in enumerate(citing_seeds, start=1):
+                    oa = short_id(str(work.get("id") or ""))
+                    client.stage = f"hop {hop}/{depth} cited-by {index}/{len(citing_seeds)} {oa}"
+                    client.touch()
+                    try:
+                        citing = client.works_citing(
+                            oa,
+                            limit=cite_limit,
+                            year_from=year_from,
+                            year_to=year_to,
+                            sort=cite_sort,
+                        )
+                    except Exception as exc:
+                        remaining = [
+                            short_id(str(item.get("id") or ""))
+                            for item in citing_seeds[index - 1 :]
+                        ]
+                        _defer(
+                            client,
+                            exc,
+                            kind="cites",
+                            remaining_ids=[item for item in remaining if item],
+                            hop=hop,
+                            depth=depth,
+                            direction=direction,
+                            run_id=run_id,
+                            seed=seed,
+                            gate=gate,
+                            per_hop_limit=per_hop_limit,
+                            per_hop_rank=rank,
+                            year_from=year_from,
+                            year_to=year_to,
+                            why_prefix=why_prefix,
+                            min_seed_citations=min_seed_citations,
+                        )
+                        _emit(client, rows)
+                        return rows
+                    if rank == "random":
+                        citing = select_works_by_citations(citing, per_hop_limit, "random")
+                    kept = 0
+                    for child in citing:
+                        child_id = short_id(str(child.get("id") or ""))
+                        if not child_id or child_id in seen_oa:
+                            continue
+                        seen_oa.add(child_id)
+                        row = work_to_candidate(
+                            child,
+                            run_id=run_id,
+                            seed=seed,
+                            hop=hop,
+                            direction="cites",
+                            why=f"cites {why_prefix}",
+                            gate=gate,
+                        )
+                        if _mark_year(row, year_from, year_to):
+                            next_works.append(child)
+                            kept += 1
+                        rows.append(row)
+                        if per_hop_limit > 0 and kept >= per_hop_limit:
+                            break
+                    if client.tally is not None:
+                        client.tally.advance(1)
+                    _emit(client, rows)
+        if want_keywords:
+            if _keyword_neighbours(
+                client,
+                frontier,
+                rows,
+                next_works,
+                seen_oa,
+                hop=hop,
+                depth=depth,
+                direction=direction,
+                run_id=run_id,
+                seed=seed,
+                gate=gate,
+                per_hop_limit=per_hop_limit,
+                rank=rank,
+                year_from=year_from,
+                year_to=year_to,
+                why_prefix=why_prefix,
+                min_seed_citations=min_seed_citations,
+            ):
+                return rows
         frontier = next_works
         if not frontier:
             break
@@ -698,6 +934,9 @@ def hybrid_candidates(
     hybrid_seeds: int,
     min_seed_citations: int = 0,
     per_hop_rank: str = "most-cited",
+    keyword_limit: int = 3,
+    keyword_hop_limit: int = 50,
+    keyword_min_score: float = 0.0,
 ) -> tuple[list[Candidate], list[str]]:
     """Keyword hits, then one hop from the top DOI hits."""
     hits = search_candidates(
@@ -713,6 +952,9 @@ def hybrid_candidates(
         year_to=year_to,
         min_seed_citations=min_seed_citations,
         per_hop_rank=per_hop_rank,
+        keyword_limit=keyword_limit,
+        keyword_hop_limit=keyword_hop_limit,
+        keyword_min_score=keyword_min_score,
     )
     ranked = sorted(
         [row for row in hits if row.ids.get("doi") and row.status != "error"],
@@ -735,6 +977,9 @@ def hybrid_candidates(
         year_to=year_to,
         min_seed_citations=min_seed_citations,
         per_hop_rank=per_hop_rank,
+        keyword_limit=keyword_limit,
+        keyword_hop_limit=keyword_hop_limit,
+        keyword_min_score=keyword_min_score,
     )
     return truncate(_dedupe(hits + neighbours), max_candidates), failed
 
@@ -765,6 +1010,55 @@ def continue_deferred(client: OpenAlexClient, deferred: dict[str, Any]) -> list[
             gate=gate,
         )
 
+    _remember_keywords(
+        client,
+        keyword_limit=int(deferred.get("keyword_limit") or 3),
+        keyword_hop_limit=int(deferred.get("keyword_hop_limit") or 50),
+        keyword_min_score=float(deferred.get("keyword_min_score") or 0.0),
+    )
+    if kind == "keywords":
+        client.stage = "resume keywords"
+        client.note(f"resume keywords · {len(remaining)} seeds")
+        hop_limit = int(deferred.get("keyword_hop_limit") or 50)
+        keyword_limit = int(deferred.get("keyword_limit") or 3)
+        min_score = float(deferred.get("keyword_min_score") or 0.0)
+        fetch_limit = _keyword_fetch_limit(hop_limit, rank)
+        sort = _cite_sort(rank)
+        if client.tally is not None and remaining:
+            client.tally.track(len(remaining))
+        for index, oa in enumerate(remaining, start=1):
+            client.stage = f"resume keywords {index}/{len(remaining)} {oa}"
+            client.touch()
+            try:
+                found = client.works_by_ids([oa])
+                slugs = chosen_keywords(found[0], limit=keyword_limit, min_score=min_score) if found else []
+                hits = (
+                    client.works_by_keywords(
+                        slugs,
+                        limit=fetch_limit,
+                        year_from=year_from,
+                        year_to=year_to,
+                        sort=sort,
+                    )
+                    if slugs
+                    else []
+                )
+            except OpenAlexBudgetExceeded as exc:
+                _defer(client, exc, **{**deferred, "remaining_ids": remaining[index - 1 :]})
+                return rows
+            if rank == "random":
+                hits = select_works_by_citations(hits, hop_limit, "random")
+            else:
+                hits = hits[:hop_limit]
+            for child in hits:
+                child_slugs = set(chosen_keywords(child, limit=0, min_score=0.0))
+                shared = [slug for slug in slugs if slug in child_slugs] or list(slugs)
+                row = _row(child, "keywords", f"keywords {', '.join(shared)} of {why}")
+                row.biblio["keyword_overlap"] = len(shared)
+                rows.append(row)
+            if client.tally is not None:
+                client.tally.advance(1)
+        return rows
     if kind == "cites":
         client.stage = "resume cited-by"
         client.note(f"resume cited-by · {len(remaining)} seeds")

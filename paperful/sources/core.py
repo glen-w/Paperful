@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..zot import Item
-from .base import Candidate, Context, Outcome, http_json
+from .base import ApiKeyRejected, Candidate, Context, Outcome, http_json
 from .landing import looks_like_pdf_url, resolve_landings
 
 NAME = "core"
@@ -16,12 +16,15 @@ def find(item: Item, ctx: Context) -> Candidate:
     key = ctx.config.core_api_key
     if not key:
         return Candidate.miss(NAME, Outcome.SKIPPED, "no CORE API key")
-    data = http_json(
-        ctx,
-        _API,
-        params={"q": f'doi:"{item.doi}"', "limit": 5},
-        headers={"Authorization": f"Bearer {key}"},
-    )
+    try:
+        data = http_json(
+            ctx,
+            _API,
+            params={"q": f'doi:"{item.doi}"', "limit": 5},
+            headers={"Authorization": f"Bearer {key}"},
+        )
+    except ApiKeyRejected as exc:
+        return Candidate.miss(NAME, Outcome.ERROR, str(exc))
     if data is None:
         return Candidate.miss(NAME, Outcome.NOT_FOUND)
     results = data.get("results") or []

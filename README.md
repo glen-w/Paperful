@@ -60,7 +60,7 @@ propose patches on disk; `--apply` writes them. `dedupe` reviews duplicates,
 then trashes extras only when you say so. `summarize` writes a grounded note
 from a text-layer PDF; `synthesize` reviews those notes. `paperful all` runs
 gaps → find → lint → fix → summarise. The model is off until `[llm].enabled`.
-OCR is not in scope.
+`paperful ocr --apply` adds a text layer to scanned PDFs on disk.
 
 **Mirror.** Work happens **on disk** (`out/`, `state/`). `snapshot` writes one
 folder per scoped item (`record.json`, optional PDF, notes). `restore --apply`

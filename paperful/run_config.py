@@ -28,7 +28,7 @@ DEFAULT_ALL_STEPS: tuple[str, ...] = (
     "fix-metadata",
     "summarize",
 )
-OPTIONAL_STEPS: tuple[str, ...] = ("snapshot", "synthesize", "dedupe")
+OPTIONAL_STEPS: tuple[str, ...] = ("snapshot", "synthesize", "dedupe", "ocr")
 KNOWN_STEPS: tuple[str, ...] = DEFAULT_ALL_STEPS + OPTIONAL_STEPS
 
 # Filled in only for `paperful all` / `profile show`, and only when the profile omits them.

@@ -35,11 +35,13 @@ problem when your library has the subscription. See
 the duplicate has been reviewed, a PDF is attached when one could be found,
 and — if you want it — a grounded summary sits on the item. `gaps` counts
 what is missing. `lint` and `fix-metadata` propose patches on disk;
-`--apply` writes them. `dedupe` writes a review pack and trashes extras only
-with `--apply`. `summarize` writes one note from a text-layer PDF;
+`--apply` writes them. `dedupe` writes a review pack and, with `--apply`,
+merges the extra parent's PDF, notes, and better fields onto the keeper
+before trashing that parent. `summarize` writes one note from a text-layer PDF;
 `synthesize` reviews those notes for a collection. `paperful all` runs the
 usual chain: gaps, find, lint, fix, summarise. The model is off until
-`[llm].enabled`. OCR is not in scope.
+`[llm].enabled`. `paperful ocr --apply` adds a text layer to scanned PDFs
+on disk so those commands can read them.
 
 **Mirror.** `out/` is a copy of the library that is not a citation manager:
 one folder per item (`record.json`, optional PDF, notes) plus a collection
@@ -64,11 +66,12 @@ Python, the Zotero local API, Ollama or LiteLLM, Docker.
 | Zotero read, fetch, lint, attach, snapshot, restore | Well tested. This is the adapter to use |
 | Open-access find, campus EZProxy, user playbooks | Shipped. Each item hits sources that match its metadata unless `--try-all` |
 | AI browser for lanes the scripts miss | Opt-in. `[llm].enabled` plus `paperful[browser-agent]` (Python 3.11+). Last lane on `run`, or `recover --item` |
-| Summaries and a collection review | Opt-in local model. Text layer only. Off until you enable it |
+| Summaries and a collection review | Opt-in local model. Needs a text layer. Off until you enable it |
 | Disk mirror you can copy without the manager | Shipped (`out/` + `state/`). `import` / `export` for RIS, BibTeX, EndNote XML |
 | Mendeley (`manager = "mendeley"`, REST at api.mendeley.com) | Seeking testers. Needs an app at dev.mendeley.com and `paperful session login mendeley`. Not proven against a real library here |
 | EndNote (`manager = "endnote"`, local `.enl`) | Seeking testers. Reads `sdb.eni`. Writes stage `state/endnote-import/` for File → Import. paperful does not edit the EndNote database, and it cannot trash items there |
-| OCR, linked-file cutover, hosted multi-user service, a second reading app | Not the product |
+| Text layer for scanned PDFs | `paperful ocr` (OCRmyPDF on the disk file). Two-up page split stays with zotero-agent |
+| Linked-file cutover, hosted multi-user service, a second reading app | Not the product |
 
 ## Related
 

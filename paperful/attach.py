@@ -115,6 +115,7 @@ class Attacher:
         if stored and not self.zl.zot.local_api_key:
             self.zl.zot.local_api_key = stored
         self._checked_write_support: bool | None = None
+        self._write_block_reason = ""
         # The authorisation dialog blocks the HTTP response until the user clicks;
         # uploads of big PDFs also take a while. Reads are local and unaffected.
         try:
@@ -127,11 +128,27 @@ class Attacher:
     # ---- capability -------------------------------------------------------
     def supports_write(self) -> bool:
         if self._checked_write_support is None:
+            self._write_block_reason = ""
             try:
-                self._checked_write_support = bool(self.zl.ping().get("supports_write"))
-            except Exception:
+                info = self.zl.ping()
+                self._checked_write_support = bool(info.get("supports_write"))
+                if not self._checked_write_support:
+                    version = info.get("zotero_version") or "unknown"
+                    self._write_block_reason = (
+                        f"Zotero {version} local API has no write support (needs Zotero 10+)"
+                    )
+            except Exception as exc:
                 self._checked_write_support = False
+                self._write_block_reason = (
+                    f"Could not check Zotero write support: {type(exc).__name__}: {exc}"
+                )
         return self._checked_write_support
+
+    def write_block_reason(self) -> str:
+        self.supports_write()
+        return self._write_block_reason or (
+            "Zotero local API has no write support (needs Zotero 10+)"
+        )
 
     # ---- key persistence --------------------------------------------------
     def _load_key(self) -> str | None:
@@ -183,10 +200,11 @@ class Attacher:
         if not pdf_path.is_file():
             return AttachResult(False, reason=f"file missing: {pdf_path}", code="other")
         if not self.supports_write():
+            reason = self.write_block_reason()
             return AttachResult(
                 False,
-                reason="Zotero local API has no write support (needs Zotero 10+)",
-                code="no_write_api",
+                reason=reason,
+                code=attach_failure_code(reason),
             )
         for attempt in range(2):
             if not self.zl.zot.local_api_key:

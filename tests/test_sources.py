@@ -738,6 +738,15 @@ def test_core_skipped_without_key(ctx_factory):
     assert cand.outcome is Outcome.SKIPPED
 
 
+def test_core_rejected_key_is_not_a_miss(ctx_factory):
+    ctx = ctx_factory(lambda r: httpx.Response(401))
+    ctx.config.core_api_key = "bad-key"
+    cand = core.find(make_item(), ctx)
+    assert cand.outcome is Outcome.ERROR
+    assert "rejected" in cand.note
+    assert "bad-key" not in cand.note
+
+
 def test_core_finds_download_url(ctx_factory, cfg):
     cfg.core_api_key = "test-key"
 

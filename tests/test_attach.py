@@ -217,4 +217,7 @@ def test_supports_write_swallows_ping_errors(cfg):
         def ping(self):
             raise ConnectionError("down")
 
-    assert Attacher(cfg, Broken()).supports_write() is False
+    attacher = Attacher(cfg, Broken())
+    assert attacher.supports_write() is False
+    assert "Could not check Zotero write support" in attacher.write_block_reason()
+    assert "Zotero 10+" not in attacher.write_block_reason()

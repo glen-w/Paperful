@@ -85,6 +85,7 @@ class LibraryBackend(Protocol):
     def export_pdf(self, item: Item, dest: Path) -> Path | None: ...
     def apply_patch(self, item_key: str, fields: dict[str, Any]) -> None: ...
     def trash_item(self, item_key: str) -> None: ...
+    def merge_into(self, keep_key: str, drop_key: str) -> dict[str, Any]: ...
     def find_child_note_keys(self, item_key: str, tag: str) -> list[str]: ...
     def read_child_note(self, item_key: str, tag: str) -> str | None: ...
     def create_or_update_note(
@@ -165,9 +166,7 @@ class ZoteroBackend:
         if self._attacher is None:
             self._attacher = Attacher(self.cfg, self.zl)
         if not self._attacher.supports_write():
-            raise LibraryError(
-                "Zotero local API has no write support (needs Zotero 10+)"
-            )
+            raise LibraryError(self._attacher.write_block_reason())
         if not self.zl.zot.local_api_key:
             if not self._attacher.authorize():
                 raise LibraryError("write authorisation denied in Zotero")
@@ -306,6 +305,97 @@ class ZoteroBackend:
         raw = self.zl.zot.item(item_key)
         raw["data"]["deleted"] = True
         self.zl.zot.update_item(raw)
+
+    def preview_merge(self, keep_key: str, drop_key: str) -> dict[str, Any]:
+        """What ``merge_into`` would copy. Empty when either item is missing."""
+        from .dedupe import merge_parent_patch, plan_child_moves
+
+        keep_raw = self.raw_item(keep_key)
+        drop_raw = self.raw_item(drop_key)
+        if not keep_raw or not drop_raw:
+            return {"drop": drop_key, "fields": [], "move": []}
+        keep_kids = self.children(keep_key)
+        drop_kids = self.children(drop_key)
+        patch = merge_parent_patch(keep_raw.get("data") or {}, drop_raw.get("data") or {})
+        moves = plan_child_moves(
+            keep_kids, drop_kids, self._annotation_counts(keep_kids + drop_kids)
+        )
+        return {
+            "drop": drop_key,
+            "fields": sorted(patch["fields"]),
+            "move": moves,
+        }
+
+    def merge_into(self, keep_key: str, drop_key: str) -> dict[str, Any]:
+        """Move children and better fields onto ``keep_key``, then trash ``drop_key``.
+
+        A failed child update leaves the donor in place. Does not touch ``out/``.
+        """
+        from .dedupe import merge_parent_patch, plan_child_moves
+
+        self._ensure_write()
+        keep_raw = self.zl.zot.item(keep_key)
+        drop_raw = self.zl.zot.item(drop_key)
+        keep_kids = self.children(keep_key)
+        drop_kids = self.children(drop_key)
+        moves = plan_child_moves(
+            keep_kids, drop_kids, self._annotation_counts(keep_kids + drop_kids)
+        )
+        moved: list[str] = []
+        for move in moves:
+            raw = self.zl.zot.item(move["key"])
+            if move["action"] == "reparent":
+                raw["data"]["parentItem"] = keep_key
+            elif move["action"] == "trash":
+                raw["data"]["deleted"] = True
+            else:
+                continue
+            self.zl.zot.update_item(raw)
+            if move["action"] == "reparent":
+                moved.append(move["key"])
+        patch = merge_parent_patch(keep_raw.get("data") or {}, drop_raw.get("data") or {})
+        fresh = self.zl.zot.item(keep_key)
+        data = fresh["data"]
+        for name, value in patch["fields"].items():
+            data[name] = value
+        if patch["collections"] is not None:
+            data["collections"] = patch["collections"]
+        if patch["tags"] is not None:
+            data["tags"] = patch["tags"]
+        if patch["relations"] is not None:
+            data["relations"] = patch["relations"]
+        previous_added = data.get("dateAdded")
+        if patch["date_added"]:
+            data["dateAdded"] = patch["date_added"]
+        try:
+            self.zl.zot.update_item(fresh)
+        except Exception:
+            if patch["date_added"] and data.get("dateAdded") == patch["date_added"]:
+                if previous_added is None:
+                    data.pop("dateAdded", None)
+                else:
+                    data["dateAdded"] = previous_added
+                self.zl.zot.update_item(fresh)
+            else:
+                raise
+        self.trash_item(drop_key)
+        return {"moved": moved, "fields": sorted(patch["fields"])}
+
+    def _annotation_counts(self, children: list[dict[str, Any]]) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for child in children:
+            data = child.get("data") or {}
+            if data.get("itemType") != "attachment":
+                continue
+            key = str(child.get("key") or data.get("key") or "")
+            if not key:
+                continue
+            counts[key] = sum(
+                1
+                for note in self.children(key)
+                if (note.get("data") or {}).get("itemType") == "annotation"
+            )
+        return counts
 
     def find_child_note_keys(self, item_key: str, tag: str) -> list[str]:
         want = tag.strip().lower()

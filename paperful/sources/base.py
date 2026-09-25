@@ -17,6 +17,14 @@ if TYPE_CHECKING:
     from ..session import BrowserSession
 
 
+class ApiKeyRejected(Exception):
+    """A request sent a key and the server refused it. This is not a missing paper."""
+
+    def __init__(self, service: str):
+        self.service = service
+        super().__init__(f"{service} API key was rejected")
+
+
 class Outcome(str, Enum):
     FOUND = "found"
     NOT_FOUND = "not_found"
@@ -82,6 +90,26 @@ class Source(Protocol):
     def find(self, item: Item, ctx: Context) -> Candidate: ...
 
 
+def _sent_api_key(headers: dict[str, str] | None) -> bool:
+    if not headers:
+        return False
+    for name, value in headers.items():
+        if name.lower() in {"authorization", "x-api-key"} and str(value).strip():
+            return True
+    return False
+
+
+def _service_name(url: str) -> str:
+    host = url.split("/")[2] if "://" in url else url
+    if "core.ac.uk" in host:
+        return "CORE"
+    if "openalex.org" in host:
+        return "OpenAlex"
+    if "semanticscholar.org" in host:
+        return "Semantic Scholar"
+    return host
+
+
 def http_json(
     ctx: Context,
     url: str,
@@ -99,6 +127,8 @@ def http_json(
                 delay = 5.0
             time.sleep(delay)
             resp = ctx.client.get(url, params=params, timeout=timeout, headers=headers)
+        if resp.status_code in (401, 403) and _sent_api_key(headers):
+            raise ApiKeyRejected(_service_name(url))
         if resp.status_code == 404:
             return None
         resp.raise_for_status()

@@ -6,6 +6,11 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+`paperful ocr` adds an OCRmyPDF text layer to scanned PDFs under `out/`
+(`--apply`; dry-run lists them). `--attach` uploads that file beside the
+scan. It is an optional `all` step, not in the default chain. Summarize,
+lint PDF-DOI, and synthesize then read the text that was already there.
+
 Front door names the paperful.io collision. First run copies
 `config.minimal.toml`. `--preset oa` drops EZProxy. Empty `email` with
 Unpaywall in `sources` is a red `doctor` row (`unpaywall_email`, exit 2).

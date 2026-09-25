@@ -18,10 +18,10 @@ Prefer this page for “is this the right tool?”
 | **In-Zotero** “find OA PDF” plus optional grey-zone sources in one plugin UI | [zotero-zotadata](https://github.com/ydeng11/zotero-zotadata) |
 | **Attachment hygiene** (broken links, rename, linked-file layout, merge duplicate files) | [StorScan](https://github.com/brian-j-griffith/StorScan), [Attanger](https://github.com/MuiseDestiny/zotero-attanger), [ZotMoov](https://github.com/wileyyugioh/zotmoov) |
 | **Metadata repair** (DOI/ISBN/arXiv bulk update, parent-from-PDF) | paperful `lint` / `fix-metadata`, or [ZotMeta](https://github.com/RoadToDream/ZotMeta) |
-| **Duplicate parents** in one collection (DOI, then title+year). Review a pack, then trash extras. No field merge. | **paperful** `dedupe` |
+| **Duplicate parents** in one collection (DOI, then title+year). Review a pack, then merge the PDF, notes, and better fields onto one item. | **paperful** `dedupe` |
 | **Grey literature** landings (UN, FAO, ISA, and similar) kept as real PDFs | **paperful** playbooks in `direct` / `landing`. Journal-style OA fetch is the row above |
-| **Batch notes** from PDFs you already have: one grounded summary per item, then a collection review. Local model, off by default, text layer only | **paperful** `summarize` / `synthesize` |
-| **Scriptable library surgery** (merge, enrich, disk GC, OCR of scans) via CLI/MCP | [zotero-agent](https://github.com/alex-roc/zotero-agent) |
+| **Batch notes** from PDFs you already have: one grounded summary per item, then a collection review. Local model, off by default. Scans need `ocr` first | **paperful** `summarize` / `synthesize` |
+| **Scriptable library surgery** (merge, enrich, disk GC, two-up scan split) via CLI/MCP | [zotero-agent](https://github.com/alex-roc/zotero-agent) |
 | **AI assistant** read/write over the library, including chat and (on some forks) OCR of scans | zotero-mcp forks ([richardjlyon](https://github.com/richardjlyon/zotero-mcp), [cookjohn](https://github.com/cookjohn/zotero-mcp), [mcp-zotero](https://github.com/Xevos117/mcp-zotero)) |
 | **`.bib` normalize / dedupe / upgrade preprints** (no Zotero required) | [bibcite](https://github.com/leo1oel/bibcite), [bibtex-tidy](https://github.com/FlamingTempura/bibtex-tidy), [bibmanager](https://bibmanager.readthedocs.io/) |
 | **Mendeley** dedup inside the app; clean **exported** BibTeX | Mendeley Duplicates smart collection; export cleaners such as [mendeley_bibtex_cleaner](https://gist.github.com/alexandrehuat/6d3263f73ccae87d0107977978316c02) |
@@ -54,8 +54,9 @@ proxy, playbooks, and an opt-in AI browser after the scripted lanes fail.
 (`snapshot` / `restore`; `snapshot --pdfs all` also copies PDFs already in
 Zotero) — a collection tree plus attach, not in-library reorganisation
 (**(3)**). **(4)** is other tools. **(5)** is partial here: the same opt-in
-summaries, plus one-item `recover`. A chat agent, and OCR of scans, stay
-with zotero-mcp and zotero-agent. **Library** is the catalogue you already
+summaries, plus one-item `recover`. A chat agent stays with zotero-mcp.
+Scanned PDFs get a text layer from `paperful ocr`; two-up split and shrink
+stay with zotero-agent `pdf-prep`. **Library** is the catalogue you already
 have, grown with `snowball` when you ask. **Control** is disk-first
 write-back and opt-in sources.
 
@@ -66,14 +67,15 @@ Reference library  →  paperful snapshot  →  out/<collection>/<stem -- KEY>/
                       ↑
         OA / CORE / arXiv / EZProxy / Scholar / htmlpdf / grey playbooks / (opt-in Sci-Hub)
 
-Optional, off until [llm].enabled (text layer; no OCR):
+Optional, off until [llm].enabled (needs a text layer; `paperful ocr` adds one):
   summarize · synthesize · recover (browser agent; last run lane after vault browsers fail)
 
 Parallel tracks:
   Metadata: paperful lint/fix-metadata, ZotMeta, zotero-agent
-  Duplicates: paperful dedupe (trash the extra; no field merge), Zotero’s duplicate UI, zotero-agent
+  Duplicates: paperful dedupe (merge onto the keeper, then trash the extra), Zotero’s duplicate UI, zotero-agent
   Attachment plugins (StorScan, Attanger)
-  Chat / OCR: zotero-mcp, zotero-agent pdf-prep
+  Chat: zotero-mcp. Two-up scan split: zotero-agent pdf-prep
+  Text layer for image PDFs: paperful ocr
   Bib CLI (bibcite, bibtex-tidy)
 ```
 
@@ -92,14 +94,14 @@ Legend: **Yes** = first-class · **Partial** = adjacent or lighter · **No** = a
 | Metadata verify / lint | Yes | No | Yes | No | Yes | Yes |
 | Metadata **apply** to library | Yes (`fix-metadata --apply`) | No | Yes | No | Yes | Yes |
 | Broken link / file layout repair | No | Partial | Partial | Yes | No | Partial |
-| Dedupe / merge items | Partial (`dedupe --apply` trashes extras; no field merge) | Partial | No | Partial | No | Yes |
+| Dedupe / merge items | Yes (`dedupe --apply` merges children and better fields, then trashes the extra; Zotero only) | Partial | No | Partial | No | Yes |
 | Runs **outside** Zotero UI (CLI) | Yes | No | No | No | No | Yes |
 | Work on disk, then write-back | Yes | No | No | Partial | No | Partial |
 | Per-item folder you can restore from | Yes (`snapshot` / `restore`; does not overwrite fields) | No | No | No | No | No |
 | Copy PDFs **already in** Zotero onto disk | Partial (`snapshot --pdfs all`) | Partial (File → Export PDFs) | No | No | No | No |
 | Grey-literature landing playbooks | Yes | No | No | No | No | No |
 | Grounded summary / collection review | Partial (opt-in, local, text layer) | No | No | No | No | Partial (public README: summarize PDFs into notes) |
-| OCR for scanned PDFs | No | No | No | No | No | Partial (`pdf-prep`, OCRmyPDF) |
+| OCR for scanned PDFs | Partial (`ocr`, OCRmyPDF text layer on disk) | No | No | No | No | Partial (`pdf-prep`, OCRmyPDF) |
 
 zotero-mcp and BibTeX-cluster columns: [comparison reference](comparison-reference.md#capability-snapshot).
 
@@ -107,8 +109,8 @@ zotero-mcp and BibTeX-cluster columns: [comparison reference](comparison-referen
 
 - Mendeley and EndNote adapters exist and are **seeking testers**. Zotero is the well-tested path. EndNote writes are an import bundle (File → Import); paperful does not edit the `.enl` database
 - Attachment path surgery (author folders, stored→linked conversion)
-- Item field-merge (dedupe trashes the extra parent; it does not merge children or notes)
-- OCR, or a chat agent over the library (`summarize` / `synthesize` / `recover` are opt-in and local; scans need a text layer)
+- Mendeley and EndNote item merge (`dedupe --apply` is Zotero-only)
+- Two-up scan split, or a chat agent over the library (`ocr` adds a text layer; it does not split pages. `summarize` / `synthesize` / `recover` are opt-in and local)
 - Hosted multi-user service
 - Jeffersonian transcription or qualitative coding
 
@@ -142,8 +144,11 @@ Want a new collection from a keyword, a paper’s bibliography, someone’s ORCI
 Just a list of DOIs, no Zotero?
   → paperscraper
 
-Scanned PDFs with no text layer, or you want a chat agent in the loop?
-  → zotero-agent (pdf-prep) or a zotero-mcp fork; not paperful
+Scanned PDFs with no text layer?
+  → paperful ocr (disk text layer). Two-up books: zotero-agent pdf-prep
+
+Want a chat agent in the loop?
+  → a zotero-mcp fork
 ```
 
 More branches: [comparison reference](comparison-reference.md#choosing-in-one-glance).

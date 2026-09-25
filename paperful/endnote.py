@@ -312,6 +312,12 @@ class EndNoteBackend:
         for name, value in fields.items():
             rec[mapping.get(name, name)] = value
 
+    def merge_into(self, keep_key: str, drop_key: str) -> dict[str, Any]:
+        raise LibraryError(
+            "EndNote cannot merge items through paperful. "
+            "dedupe --apply needs Zotero so the PDF and notes stay on one item."
+        )
+
     def trash_item(self, item_key: str) -> None:
         raise LibraryError(
             "EndNote cannot trash items through paperful. Delete in EndNote, or omit "

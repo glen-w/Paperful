@@ -1,8 +1,11 @@
 # Dedupe
 
 `paperful dedupe` finds duplicate parent items in a collection (or the whole
-library) and writes a review pack on disk. It does not trash anything unless
-you pass `--apply`. It does not delete files under `out/`.
+library) and writes a review pack on disk. It does not change the library
+unless you pass `--apply`. `--apply` copies the extra parent's PDF, notes,
+and better fields onto the keeper, then moves that emptied parent to the
+trash. It does not delete files under `out/`. Mendeley and EndNote cannot
+merge, so `--apply` is refused there.
 
 Monday literature ingest stays outside Paperful. After that ingest, the local
 hygiene loop is:
@@ -41,7 +44,7 @@ Keep rank, highest first:
 
 If any pair of titles in the group scores below 0.60 after HTML-unescape and
 punctuation stripping, the group is **held** (`held_divergent_title`). Nothing
-in that group is trashed. Review it by hand — the same DOI string is attached
+in that group is merged. Review it by hand — the same DOI string is attached
 to different works.
 
 **medium_title_year.** Items that were not already in a multi-item DOI group.
@@ -54,8 +57,8 @@ placeholder, and missing years are skipped. These groups are marked
 | Flag | Effect |
 | --- | --- |
 | `--dry-run` | Write the pack only. This is the default. Do not combine with `--apply`. |
-| `--apply` | Trash `high_doi` extras. Needs Zotero 10+ (same gate as attach). |
-| `--apply-medium` | Also trash title+year extras. |
+| `--apply` | Merge `high_doi` extras onto the keeper, then trash the emptied parent. Needs Zotero 10+ (same gate as attach). |
+| `--apply-medium` | Also merge title+year extras. |
 | `--phase` | `high_doi`, `medium_title_year`, or `all`. |
 | `--limit` / `-n` | Only the first N items in scope. |
 | `--year-from` / `--year-to` | Inclusive publication-year range; undated items excluded. |
@@ -72,7 +75,9 @@ run.
 
 - `state/dedupe-packs/<timestamp>-<scope>.json` — groups, keep, trash, reason, scores
 - `state/dedupe-packs/<timestamp>-<scope>.md` — the same pack for reading
-- `state/dedupe-applied.jsonl` — one line per trashed key, only after `--apply`
+- `state/dedupe-applied.jsonl` — one line per merged parent (`keep`, `drop`, moved children, fields filled), only after `--apply`
+
+Better fields: a blank, `(untitled)`, or a `.pdf` filename title loses to a real value. A longer abstract or Extra wins. A longer creator list wins only when it already contains the keeper's surnames. A DOI is copied only into a blank. Other fields fill blanks only. The keeper keeps a real conflict. Identical imported PDFs (same MD5) collapse to one file, preferring the copy that has annotations; both copies stay if both are annotated.
 
 ## Gaps
 

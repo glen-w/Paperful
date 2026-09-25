@@ -14,7 +14,8 @@ profile; they do not rewrite the fetcher.
 **1.0** is that loop, the trust checklist below, and a locked item record
 (`paperful.item.v1` plus `snapshot` / `restore`), proven on **Zotero**. Mendeley
 and EndNote adapters are not 1.0 until testers have exercised them. Not a GUI,
-not OCR, not a WebDAV client, and not “AI fetch everything.”
+not a full-text reading index, not a WebDAV client, and not “AI fetch everything.”
+`paperful ocr` is the optional text layer for scans.
 
 (trust-10)=
 ## 0.1 → 1.0 (trust + mirror contract)
@@ -96,7 +97,7 @@ other vault lanes fail, plus `paperful recover --item`; `paperful[browser-agent]
 Py 3.11+), `fix-metadata` title proposals (`[fix_metadata].llm_title`), `lint`
 `pdf_identity_mismatch` (`[lint].llm_pdf_match`), `summarize` → tagged child note,
 `synthesize` → literature review from those notes (`state/reports/` and, by
-default, a collection note). Text-layer PDFs only; OCR is later.
+default, a collection note). Image PDFs need `paperful ocr --apply` first.
 See [architecture § LLM layer](architecture.md#llm-layer-optional-local-first).
 Still later: Browser Use Cloud / BU2, batch `recover --from-last-run`, playbook
 mining from agent traces, venue/date cleanup.
@@ -263,13 +264,13 @@ prerequisites for the fetch / lint / attach loop.
    The quiet mirror itself is core (above), not a later bet: dual bytes with
    Zotero `imported_file`; house transport stays outside paperful. Still not a
    second reading UI, and still not a linked-file cutover. PDF annotations and
-   a full CSL dump are still later. OCR stays under Reading & knowledge.
+   a full CSL dump are still later. A text layer for scans is `paperful ocr`.
 
 ## Maybe later
 
 Larger product bets. Park until the ledger and core loop justify them.
 
-5. **Reading & knowledge** — local full-text index / OCR; annotation sync;
+5. **Reading & knowledge** — local full-text index; annotation sync;
    evidence packs; briefs grounded only in local PDFs
 6. **Writing & export** — CSL / BibLaTeX / Quarto sync; living review / gap lists;
    git-friendly CSL-JSON dumps

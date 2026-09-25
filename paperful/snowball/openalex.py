@@ -21,7 +21,7 @@ API = "https://api.openalex.org"
 KEY_URL = "https://openalex.org/settings/api"
 SELECT = (
     "id,doi,display_name,publication_year,type,cited_by_count,language,"
-    "referenced_works,authorships,primary_location,open_access"
+    "referenced_works,authorships,primary_location,open_access,keywords"
 )
 Getter = Callable[[str, dict[str, Any]], dict[str, Any]]
 
@@ -116,6 +116,8 @@ class OpenAlexClient:
                     continue
                 raise OpenAlexError(f"OpenAlex failed for {path}") from None
             self._last = time.monotonic()
+            if resp.status_code in (401, 403) and self._using_key and self.api_key:
+                raise OpenAlexError("OpenAlex API key was rejected")
             if resp.status_code == 429 or resp.status_code >= 500:
                 self.status_429 += int(resp.status_code == 429)
                 self.retries += 1
@@ -304,6 +306,34 @@ class OpenAlexClient:
             params["sort"] = sort
         return self._collect("/works", params, limit)
 
+    def works_by_keywords(
+        self,
+        slugs: list[str],
+        *,
+        limit: int,
+        year_from: int | None = None,
+        year_to: int | None = None,
+        sort: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Works carrying any of ``slugs``. ``limit`` must be a positive integer."""
+        if limit <= 0:
+            raise OpenAlexError(
+                "keyword_hop_limit must be a positive integer. "
+                "all is not allowed; a keyword filter is an open query."
+            )
+        cleaned = [slug for slug in slugs if slug]
+        if not cleaned:
+            return []
+        filters = ["keywords.id:" + "|".join(cleaned)]
+        if year_from is not None:
+            filters.append(f"from_publication_date:{year_from}-01-01")
+        if year_to is not None:
+            filters.append(f"to_publication_date:{year_to}-12-31")
+        params: dict[str, Any] = {"filter": ",".join(filters), "select": SELECT}
+        if sort:
+            params["sort"] = sort
+        return self._collect("/works", params, limit)
+
     def works_by_author_orcid(
         self,
         orcid: str,
@@ -434,6 +464,44 @@ def work_to_candidate(
         gate=gate,
         score=float(work.get("cited_by_count") or 0),
     )
+
+
+def keyword_slug(raw: str) -> str:
+    """OpenAlex keyword id as a slug (``machine-learning``)."""
+    text = str(raw or "").strip()
+    if "/keywords/" in text:
+        text = text.rsplit("/keywords/", 1)[-1]
+    return text.strip().strip("/").lower().replace(" ", "-")
+
+
+def keyword_slugs(work: dict[str, Any]) -> list[str]:
+    """Every keyword slug on a work, highest score first."""
+    return chosen_keywords(work, limit=0, min_score=0.0)
+
+
+def chosen_keywords(work: dict[str, Any], *, limit: int, min_score: float) -> list[str]:
+    """Top ``limit`` keyword slugs at or above ``min_score``. ``limit <= 0`` keeps every one."""
+    ranked: list[tuple[float, str]] = []
+    for item in work.get("keywords") or []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            score = float(item.get("score") or 0)
+        except (TypeError, ValueError):
+            score = 0.0
+        if score < min_score:
+            continue
+        slug = keyword_slug(str(item.get("id") or item.get("display_name") or ""))
+        if slug:
+            ranked.append((score, slug))
+    ranked.sort(key=lambda pair: (-pair[0], pair[1]))
+    out: list[str] = []
+    for _score, slug in ranked:
+        if slug not in out:
+            out.append(slug)
+        if limit > 0 and len(out) >= limit:
+            break
+    return out
 
 
 def referenced_ids(work: dict[str, Any], per_hop_limit: int = 0) -> list[str]:

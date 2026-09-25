@@ -98,6 +98,24 @@ DOI and collection seeds use the same hop. The centre is the seed papers,
 not a person’s works. Keyword search stays on the hit list unless you set
 depth. The usual numbers are in [Stop rules](#stop-rules).
 
+`direction` including `keywords` adds another side. OpenAlex stores at most
+five scored keywords on a work. The hop takes the top `keyword_limit` (default
+3) at or above `keyword_min_score` and requests works with any of those slugs
+(`keywords.id:a|b|c`), then keeps `keyword_hop_limit` of them. `all` is refused
+on both keyword caps: the matching literature is not a closed neighbour list.
+
+Works with no topic have no keywords. That is about 12% of OpenAlex. When
+keywords are in the direction, the run says how many seeds have none and will
+not expand on that side:
+
+```text
+2 of 5 seeds have no OpenAlex keywords and will not expand on that side.
+```
+
+Those seeds are skipped on the keyword side only. References and cited-by
+still run. If keywords is the only side and every seed lacks keywords, the
+command exits 2 with that sentence and does not query.
+
 ## Gates
 
 The gate is a config value. The default for a new user is `dry-run`.
@@ -149,7 +167,10 @@ The picture is [How a hop is cut](#how-a-hop-is-cut).
 | Knob | Default | Meaning |
 | --- | --- | --- |
 | `depth` | 0 for keyword, 1 for DOI / ORCID / collection | Hops from the seed. Soft ceiling 5 |
-| `direction` | `refs` | `refs`, `cites`, or `both` |
+| `direction` | `refs` | `refs`, `cites`, `both`, `keywords`, `refs+keywords`, `cites+keywords`, or `refs+cites+keywords`. `both` stays references plus cited-by |
+| `keyword_limit` | 3 | How many of a work's OpenAlex keywords to expand. Integer 1–5. `all` and `0` are errors. 5 uses every keyword OpenAlex stored (at most five) |
+| `keyword_hop_limit` | 50 | Works kept per seed on the keyword side. A positive integer. `all` and `0` are errors. A keyword filter is an open query, so it never pages without a cap. Citation `per_hop_limit = all` still applies on a mixed run |
+| `keyword_min_score` | 0 | Drop seed keywords below this similarity. 0 keeps whatever OpenAlex already assigned |
 | `max_candidates` | 200 | Stops after this many `new` + `exists` rows. `all` (or `0`) keeps every row |
 | `per_hop_limit` | 50 | Neighbours kept per seed work per hop (references and cited-by). `all` (or `0`) keeps every one OpenAlex returns |
 | `per_hop_rank` | `most-cited` | How a numeric `per_hop_limit` picks neighbours: `most-cited`, `least-cited`, or `random` |
@@ -192,7 +213,7 @@ Schema `paperful.snowball.candidate.v1`:
 | `schema`, `run_id` | Version and run id |
 | `seed` | `{type, value}` — keyword, doi, orcid, or openalex |
 | `hop` | Integer. Search hits are 0. References of a seed are 1 |
-| `direction` | `search`, `refs`, `cites`, or `orcid` (the person’s own works) |
+| `direction` | `search`, `refs`, `cites`, `keywords`, or `orcid` (the person’s own works) |
 | `ids` | Normalized doi, openalex, s2, pmid, orcid, when known |
 | `biblio` | Title, year, authors, venue, type, optional OA url |
 | `why` | Short reason, for example `ref of 10.xxxx/yyyy` |
@@ -238,10 +259,12 @@ refine = false           # suggestions only; needs [llm].enabled
 
 `enabled = false` until you opt in, the same posture as `[llm]`. `doctor`
 reports that flag, whether keys are present, and whether a backend answers.
-A missing optional key warns. It does not abort the other backends.
+A missing OpenAlex key warns. A missing Semantic Scholar key does not, and neither missing key aborts the other backends.
 
 `email` at the top of `config.toml` is the contact address for Unpaywall and Crossref.
-OpenAlex ignores `mailto`. Snowball calls OpenAlex without an API key first, so a small search needs no account. That free allowance is shared by everyone on the same public address (a campus network or VPN exit included) and is about a tenth of a free key. When it runs out, a configured `OPENALEX_API_KEY` takes over for the rest of the crawl. With no key, the partial queue is kept and `paperful snowball resume` continues after you add one. One key only: a second free key or a `user+tag@gmail.com` alias does not add budget. A free key is about $1/day. `SEMANTIC_SCHOLAR_API_KEY` also comes from the environment.
+OpenAlex ignores `mailto`. Snowball calls OpenAlex without an API key first, so a small search needs no account. That free allowance is shared by everyone on the same public address (a campus network or VPN exit included) and is about a tenth of a free key. When it runs out, a configured `OPENALEX_API_KEY` takes over for the rest of the crawl. With no key, the partial queue is kept and `paperful snowball resume` continues after you add one. One key only: a second free key or a `user+tag@gmail.com` alias does not add budget. A free key is about $1/day.
+
+Semantic Scholar’s Academic Graph is public, so snowball calls it with no key. That unauthenticated pool is shared and can be throttled. Heavier use needs a private key: [request one](https://www.semanticscholar.org/product/api#api-key-form) (it arrives by email; the introductory limit is 1 request per second). Put it in `SEMANTIC_SCHOLAR_API_KEY`. Like `OPENALEX_API_KEY`, it stays in the environment, never in `config.toml`.
 
 Each crawl writes `state/snowball/<run-id>/candidates.jsonl` as it goes, for OpenAlex, Crossref, Semantic Scholar, and ORCID alike. A rate limit, outage, or interrupt keeps that file and `deferred.json`. Continue with:
 
@@ -256,8 +279,8 @@ Short 429s and 5xx responses retry with exponential backoff. A reset of a minute
 dry-run, or with `--force`. It refuses to store a key.
 
 Backends resolve in order and emit each work once, keyed by DOI: OpenAlex
-first, Crossref fills empty metadata fields, Semantic Scholar when a key is
-set, ORCID for the person’s own work list. OpenAlex wins when it and Crossref
+first, Crossref fills empty metadata fields, Semantic Scholar fills reference
+gaps with or without a key, ORCID for the person’s own work list. OpenAlex wins when it and Crossref
 disagree on a field that both filled. Semantic Scholar responses are cached
 under `state/snowball/cache/`. `backends` must include `openalex`. An unknown
 name is a config error. Dropping `orcid` skips the public works list and keeps
@@ -292,7 +315,7 @@ outputs, and `scholar_citations.py`.
 OpenAlex is the graph (search, author, `referenced_works`, `cites:`). The
 ORCID public API is the person’s own works; those lists are often incomplete,
 so OpenAlex expands them. Semantic Scholar references and citations fill gaps
-when a key is set. Crossref, already used to verify DOIs, fills metadata
+on the public API; a key is only for heavier use. Crossref, already used to verify DOIs, fills metadata
 gaps. It is not the forward-citation graph.
 
 Adjacent tools, and the piece worth copying:

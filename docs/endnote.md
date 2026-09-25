@@ -63,9 +63,9 @@ If PDFs do not attach automatically, File → Import → Folder on `PDF/`, or
 drag files onto the matching references.
 
 **Groups are not in EndNote XML.** Collection paths are stored in the Label
-field so you can rebuild groups after import. `dedupe --apply` is refused
-(`trash_item` errors): delete in EndNote, or omit the extra from the next
-bundle.
+field so you can rebuild groups after import. `dedupe --apply` is refused:
+EndNote cannot move a PDF or note onto the keeper. Delete the extra in
+EndNote, or omit it from the next bundle.
 
 ## Paperful rules
 

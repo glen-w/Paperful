@@ -52,7 +52,7 @@ Duplicate file uploads return **400**; paperful treats that as unchanged.
 
 - Item keys are UUIDs. `out/` folder names keep the hyphens.
 - Folders map to collection paths. There is no Zotero-style `linked_url` PDF.
-- `dedupe --apply` trashes via `/trash`.
+- `dedupe --apply` is refused. Mendeley cannot move a PDF or note onto the keeper.
 - Docker: headed OAuth must run on the host so the localhost redirect hits the
   CLI. Do not put client secrets in the image.
 - Moving a library: `snapshot --pdfs all` here, switch `manager`, then
