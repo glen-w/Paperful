@@ -3,7 +3,7 @@
 Clarivate has **no public API**. Paperful reads the desktop library and never
 writes the SQLite file. Official write-back is EndNote’s own **File → Import**.
 Schema notes below are from inspecting EndNote 20/21 library folders
-(**2026-09-21**). Lines marked **paperful** are client rules.
+(**2026-09-21**). Lines marked **Paperful** are client rules.
 
 **This adapter is seeking testers.** Zotero remains the well-tested path.
 Do not treat a first EndNote run as proven.

@@ -183,7 +183,7 @@ insensitive. Unknown tokens exit 1. Common scholarly types:
 `patent`, `presentation`, …
 
 Attachments, notes, and annotations are never in scope (Zotero skips them
-already). Full list: Zotero’s item-types reference; paperful rejects anything
+already). Full list: Zotero’s item-types reference; Paperful rejects anything
 not in that set.
 
 ```sh

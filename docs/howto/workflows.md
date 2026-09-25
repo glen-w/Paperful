@@ -131,7 +131,7 @@ uv run paperful profile save bbnj-journal \
 ```
 
 That writes `profiles/bbnj-journal.toml` next to the config file in use
-(`--config` if you passed it, otherwise the file paperful loaded). It does
+(`--config` if you passed it, otherwise the file Paperful loaded). It does
 not rewrite `config.toml`. A second save exits 1 until `--force`.
 
 The same keys can live in config instead of a file:

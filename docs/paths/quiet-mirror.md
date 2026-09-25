@@ -24,7 +24,7 @@ docker compose run --rm paperful snapshot --collection interesting --pdfs all
 4. Browse `out/<collection>/<stem -- KEY>/` (`record.json`, optional PDF,
    `notes/`).
 5. Copy or sync `out/` with house tools (Syncthing, rsync, …). That sync is
-   **outside** this repo — paperful does not run a sync daemon.
+   **outside** this repo — Paperful does not run a sync daemon.
 6. Later, dry-run then apply restore (creates missing items only; never
    overwrites bibliographic fields):
 
@@ -104,7 +104,7 @@ exported yet.
 
 ## Related
 
-- [Why paperful](../start/why.md) — portable job
+- [Why Paperful](../start/why.md) — portable job
 - [Architecture](../explain/architecture.md) — disk-first adapters
 - [Zotero](../howto/zotero.md) — attachment modes
 - [Commands](../reference/commands.md) — `snapshot` / `restore`

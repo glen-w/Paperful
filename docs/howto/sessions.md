@@ -5,7 +5,7 @@ for the headless fallback installs automatically on first need.
 
 `session login` **prefers your system Chrome/Edge** (launched without Playwright
 automation flags) so Google SSO works, then attaches over CDP to save cookies
-into the paperful profile. Use `--engine playwright` only as a fallback.
+into the Paperful profile. Use `--engine playwright` only as a fallback.
 
 ```sh
 uv run paperful session login scholar

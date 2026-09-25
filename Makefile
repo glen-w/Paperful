@@ -1,17 +1,17 @@
-# paperful maintainer docs + optional Docker targets.
+# Paperful maintainer docs + optional Docker targets.
 
 .DEFAULT_GOAL := help
 
 .PHONY: help docs docs-clean pages-site docker-build docker-doctor
 
 help:
-	@echo "paperful Makefile"
+	@echo "Paperful Makefile"
 	@echo ""
 	@echo "Operator install: docker compose build && docker compose run --rm paperful <cmd>"
 	@echo "Contributor path:  uv run paperful <cmd>  (see CONTRIBUTING.md)"
 	@echo ""
 	@echo "Docker (operator):"
-	@echo "  docker-build      Build the paperful image via Compose"
+	@echo "  docker-build      Build the Paperful image via Compose"
 	@echo "  docker-doctor     Run paperful doctor in the container"
 	@echo ""
 	@echo "Docs:"

@@ -44,7 +44,7 @@ Zotero has. Do not document either adapter as supported until testers say so.
 1. **Mendeley** — `MendeleyBackend` talks to `api.mendeley.com` (no official
    SDK). OAuth via `paperful session login mendeley`. `supports_write` is true
    in code. File download must **not** forward the Bearer token on the 303 to
-   object storage. Document `notes` (`view=all`) is read; paperful writes
+   object storage. Document `notes` (`view=all`) is read; Paperful writes
    still use annotations. Needs a real library: list, fetch a missing PDF,
    attach, notes, and a failed auth that prints the next-steps ladder.
 2. **EndNote** — `EndNoteBackend` reads `<Library>.Data/sdb/sdb.eni` (a copy
@@ -287,7 +287,7 @@ Larger product bets. Park until the ledger and core loop justify them.
 8. **Collaboration without SaaS** — shared `state/` over syncthing/git; attach
    locks; optional headless fetch node. Aligns with the house
    [quiet mirror](../paths/quiet-mirror.md) stance: Syncthing (or similar) is transport;
-   paperful stays a local CLI, not a sync product.
+   Paperful stays a local CLI, not a sync product.
 9. **Compliance & provenance** — 1.0 attach stamp is listed above. On disk,
    `record.json` plus `out/_history.json` are the chain-of-custody note for
    the library and the append-only ledgers. Still later: more jurisdictional
@@ -306,7 +306,7 @@ Larger product bets. Park until the ledger and core loop justify them.
 - [why.md](../start/why.md) — sidecar pitch; what is true today
 - [quiet-mirror.md](../paths/quiet-mirror.md) — `out/` as the copy you keep
 - [releases.md](../start/releases.md) — 0.x vs 1.0; known limits
-- [comparison.md](../explain/comparison.md) — what paperful does and does not replace today
+- [comparison.md](../explain/comparison.md) — what Paperful does and does not replace today
 - [snowball.md](../paths/snowball.md) — library-building from a keyword, DOI, ORCID, or collection
 - Site career / domain timeline plan (consumer of durable tags):
   `/Users/89298/Documents/website/glen-w.github.io/docs/dev/career-timeline-plan.md`

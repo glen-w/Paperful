@@ -1,4 +1,4 @@
-# Why paperful
+# Why Paperful
 
 A local sidecar beside your citation manager. The job is to keep the library
 organised, the PDFs complete, the metadata honest, and a folder tree you own
@@ -17,7 +17,7 @@ duplicates, then trash extras.
 (`paperful.item.v1`), an optional PDF, and notes. `restore --apply` creates
 only what Zotero is missing and does not overwrite fields already there.
 Copy `out/` (or sync it with something like Syncthing). That sync is house
-transport, not a paperful service. See [Quiet mirror](../paths/quiet-mirror.md).
+transport, not a Paperful service. See [Quiet mirror](../paths/quiet-mirror.md).
 
 **Grey literature.** Zotero’s PDF ingest is fine for a structured journal
 article. Reports, scans, and landing-page junk often come back with a
@@ -41,11 +41,11 @@ and WebDAV sync stay Zotero’s job. See [Zotero](../howto/zotero.md).
 | Zotero read, fetch, lint, attach, snapshot, restore | Well tested. This is the adapter to use |
 | Disk ledger you can copy without the manager | Shipped (`out/` + `state/`) |
 | Mendeley (`manager = "mendeley"`, REST at api.mendeley.com) | Seeking testers. Needs an app at dev.mendeley.com and `paperful session login mendeley`. Not proven against a real library here |
-| EndNote (`manager = "endnote"`, local `.enl`) | Seeking testers. Reads `sdb.eni`. Writes stage `state/endnote-import/` for File → Import. paperful does not edit the EndNote database, and it cannot trash items there |
+| EndNote (`manager = "endnote"`, local `.enl`) | Seeking testers. Reads `sdb.eni`. Writes stage `state/endnote-import/` for File → Import. Paperful does not edit the EndNote database, and it cannot trash items there |
 | OCR, linked-file cutover, hosted multi-user service | Not the product |
 
 ## Related
 
 - [Quiet mirror](../paths/quiet-mirror.md) — folder contract
-- [How paperful compares](../explain/comparison.md)
+- [How Paperful compares](../explain/comparison.md)
 - [Roadmap](../contribute/ROADMAP.md) — Zotero is the tested path; Mendeley and EndNote are seeking testers

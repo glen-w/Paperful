@@ -1,7 +1,7 @@
-# How paperful compares — reference
+# How Paperful compares — reference
 
 Vendor-by-vendor notes and longer capability tables. Most readers only need
-[How paperful compares](../explain/comparison.md).
+[How Paperful compares](../explain/comparison.md).
 
 **Last reviewed:** 2026-09-21. Feature lists for other products are based on public
 docs and positioning — not paid pilots.
@@ -12,7 +12,7 @@ docs and positioning — not paid pilots.
 
 Legend: **Yes** · **Partial** · **No**.
 
-| Capability | paperful | Zotero built-in | zotero-zotadata | StorScan | ZotMeta | zotero-agent | zotero-mcp (typical) |
+| Capability | Paperful | Zotero built-in | zotero-zotadata | StorScan | ZotMeta | zotero-agent | zotero-mcp (typical) |
 |------------|----------|-----------------|-----------------|----------|---------|--------------|----------------------|
 | Bulk fetch **missing** PDFs | Yes | Partial | Yes | Partial | No | Partial (`pdf-fetch`) | Partial (Unpaywall attach) |
 | Collection-scoped batch runs | Yes | No | Partial | Partial | Partial | Yes | Partial |
@@ -38,7 +38,7 @@ Verify against each project’s latest release before upgrading Zotero.
 
 | Tool | Typical Zotero | Notes |
 |------|----------------|-------|
-| paperful | 7–9 download; **10+** attach and `fix-metadata --apply` | Local HTTP API |
+| Paperful | 7–9 download; **10+** attach and `fix-metadata --apply` | Local HTTP API |
 | StorScan, Attanger, ZotMeta 2.0, zotodata | **7–9** (per upstream READMEs) | Plugin `.xpi` |
 | zotero-agent | **7+** | Bridge plugin + CLI |
 | ZotFile | **≤6** | [Not maintained for Zotero 7+](https://github.com/jlegewie/zotfile/issues/674) |
@@ -58,7 +58,7 @@ Verify against each project’s latest release before upgrading Zotero.
 
 ### DOI-centric downloaders
 
-| Capability | paperful | paperscraper | pyzotero + custom scripts |
+| Capability | Paperful | paperscraper | pyzotero + custom scripts |
 |------------|----------|--------------|----------------------------|
 | Needs a library manager | Adapter (Zotero now) | No | Optional |
 | Input | Library items / collections | DOI JSONL / dict | API keys or local DB |
@@ -68,7 +68,7 @@ Verify against each project’s latest release before upgrading Zotero.
 
 ## Complementary: Zotero plugins and built-ins
 
-### paperful
+### Paperful
 
 - **Sites:** [GitHub](https://github.com/glen-w/Paperful) · this repo
 - **Fit:** Local library sidecar. Routed OA stack (including CORE with API key), optional EZProxy and Scholar cookies, opt-in Sci-Hub, grey-literature landing playbooks, collection-mirrored `out/` tree (`snapshot` / `restore`, including `snapshot --pdfs all` for PDFs already in Zotero, `manifest.jsonl`), attach on Zotero 10+. Identifier verify (Crossref/OpenAlex/PubMed) + lint + `fix-metadata` on disk, then adapter write-back. `dedupe` writes a review pack and, with `--apply`, trashes extra parents (DOI, then title+year). `gaps` counts missing PDFs and DOIs. Optional local `summarize` / `synthesize` and `recover` (last `run` lane after Scholar / EZProxy / htmlpdf fail, or `recover --item`; text layer; no OCR; not a chat agent). **Zotero is the well-tested adapter.** Mendeley (REST) and EndNote (read-only database plus an import bundle) are seeking testers.
@@ -79,43 +79,43 @@ Verify against each project’s latest release before upgrading Zotero.
 
 - **Sites:** [Zotero](https://www.zotero.org/) · [custom PDF resolvers](https://www.zotero.org/support/kb/custom_pdf_resolvers)
 - **Fit:** Per-item **Find Available PDF**, identifier lookup, duplicate merge UI, File → Export PDFs (a one-off dump of files already on disk, not a restore ledger).
-- **With paperful:** Built-in capture on save; paperful for batch backfill and for `snapshot` / `restore` when Zotero file storage is the wrong warehouse.
+- **With Paperful:** Built-in capture on save; Paperful for batch backfill and for `snapshot` / `restore` when Zotero file storage is the wrong warehouse.
 
 ### zotero-zotadata
 
 - **Sites:** [GitHub](https://github.com/ydeng11/zotero-zotadata)
 - **Fit:** Plugin combining attachment validation, multi-source PDF retrieval, and metadata updates.
-- **With paperful:** Overlapping PDF mission; zotodata stays in Zotero.
+- **With Paperful:** Overlapping PDF mission; zotodata stays in Zotero.
 
 ### StorScan
 
 - **Sites:** [GitHub](https://github.com/brian-j-griffith/StorScan)
 - **Fit:** Attachment operations — scan, fix misplaced linked files, merge duplicate files.
-- **With paperful:** paperful fills missing PDFs; StorScan repairs layout.
+- **With Paperful:** Paperful fills missing PDFs; StorScan repairs layout.
 
 ### ZotMeta
 
 - **Sites:** [GitHub](https://github.com/RoadToDream/ZotMeta)
 - **Fit:** Bulk metadata from DOI, ISBN, arXiv; PDF cache identifier extraction.
-- **With paperful:** Overlaps `lint` / `fix-metadata`; ZotMeta is in-app.
+- **With Paperful:** Overlaps `lint` / `fix-metadata`; ZotMeta is in-app.
 
 ### Attanger and ZotMoov
 
 - **Sites:** [Attanger](https://github.com/MuiseDestiny/zotero-attanger) · [ZotMoov](https://github.com/wileyyugioh/zotmoov)
 - **Fit:** ZotFile-era workflows on Zotero 7+ — match downloads, rename/move linked files.
-- **With paperful:** Incoming-file organisation vs remote PDF hunt.
+- **With Paperful:** Incoming-file organisation vs remote PDF hunt.
 
 ### zotero-agent
 
 - **Sites:** [GitHub](https://github.com/alex-roc/zotero-agent)
 - **Fit:** Local-first CLI and MCP via bridge plugin — search, dedupe, merge, enrich, `pdf-fetch`, PDF notes, and `pdf-prep` OCR (OCRmyPDF) for scans. `export` writes bibliography formats, not a PDF folder tree.
-- **With paperful:** Agent for hygiene, merge, and scans; paperful for collection runs with a manifest, EZProxy, grey-lit playbooks, and a folder you can restore from.
+- **With Paperful:** Agent for hygiene, merge, and scans; Paperful for collection runs with a manifest, EZProxy, grey-lit playbooks, and a folder you can restore from.
 
 ### zotero-mcp ecosystem
 
 - **Sites:** [richardjlyon/zotero-mcp](https://github.com/richardjlyon/zotero-mcp) · [cookjohn/zotero-mcp](https://github.com/cookjohn/zotero-mcp) · [mcp-zotero](https://github.com/Xevos117/mcp-zotero)
 - **Fit:** LLM-facing search, PDF text, create items, sometimes Unpaywall attach. Some forks OCR scans (Docling) or write reading notes from chat.
-- **With paperful:** MCP when a person is in the loop, or when the PDF is a scan; paperful for unattended collection runs, the disk ledger, and batch `summarize` / `synthesize` on a text layer.
+- **With Paperful:** MCP when a person is in the loop, or when the PDF is a scan; Paperful for unattended collection runs, the disk ledger, and batch `summarize` / `synthesize` on a text layer.
 
 ### ZotFile (legacy)
 
@@ -128,7 +128,7 @@ Verify against each project’s latest release before upgrading Zotero.
 
 - **Sites:** [bibcite](https://github.com/leo1oel/bibcite) · [bibtex-tidy](https://flamingtempura.github.io/bibtex-tidy/)
 - **Fit:** Resolve papers to canonical BibTeX, dedupe, tidy, upgrade preprints.
-- **With paperful:** Orthogonal until a bib-file `LibraryBackend` exists.
+- **With Paperful:** Orthogonal until a bib-file `LibraryBackend` exists.
 
 ### bibmanager
 
@@ -137,13 +137,13 @@ Verify against each project’s latest release before upgrading Zotero.
 
 ### Mendeley
 
-- **Fit:** Reference Manager **Duplicates** smart collection; Desktop merge UI. paperful can set `manager = "mendeley"` (REST, OAuth). That adapter is **seeking testers**. Zotero is the well-tested path.
+- **Fit:** Reference Manager **Duplicates** smart collection; Desktop merge UI. Paperful can set `manager = "mendeley"` (REST, OAuth). That adapter is **seeking testers**. Zotero is the well-tested path.
 
 ### paperscraper
 
 - **Sites:** [GitHub](https://github.com/jannisborn/paperscraper)
 - **Fit:** Python metadata + `save_pdf` from DOIs; publisher TDM API keys.
-- **With paperful:** paperscraper when the input is a DOI list, not a collection tree.
+- **With Paperful:** paperscraper when the input is a DOI list, not a collection tree.
 
 ## Choosing in one glance
 
@@ -170,5 +170,5 @@ Need reproducible .bib for a paper submission?
 ## Related docs
 
 - [comparison.md](../explain/comparison.md) — short routing tables
-- [architecture.md](../explain/architecture.md) — paperful internals
+- [architecture.md](../explain/architecture.md) — Paperful internals
 - [config.md](config.md) — configuration and operations

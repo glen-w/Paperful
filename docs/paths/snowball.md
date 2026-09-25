@@ -250,7 +250,7 @@ Adjacent tools, and the piece worth copying:
 | [litsearch](https://pypi.org/project/litsearch/), [lit-review-mcp](https://github.com/Bethww/lit-review-mcp), [CoLRev](https://colrev-environment.github.io/colrev/) | Flag ideas | The review project, the report, the screener |
 | [Citation Gecko](https://github.com/CitationGecko/gecko-react) | Later: rank works cited by many seeds, or citing many seeds | The network UI |
 | [zotero-snowball](https://github.com/socratic-irony/zotero-snowball), [Citegeist](https://github.com/phdemotions/zotero-citegeist) | — | In-Zotero one-hop dialogs |
-| [pyalex](https://github.com/J535D165/pyalex) | — | A second HTTP client. Snowball extends the client paperful already uses for OpenAlex (mailto, sleep, backoff) |
+| [pyalex](https://github.com/J535D165/pyalex) | — | A second HTTP client. Snowball extends the client Paperful already uses for OpenAlex (mailto, sleep, backoff) |
 
 ResearchRabbit, Litmaps, Connected Papers, Inciteful, Elicit, Consensus,
 Scite, and Lens.org stay outside. A later “question → seed DOIs” assist can

@@ -8,7 +8,7 @@ well-tested adapter. `manager = "mendeley"` talks to the Mendeley REST API;
 `manager = "endnote"` reads a local `.enl` library and stages an XML import
 bundle instead of editing the database. Both are **seeking testers** — do not
 treat them as proven. The disk ledger is what you keep if the manager changes.
-See [Why paperful](../start/why.md).
+See [Why Paperful](../start/why.md).
 
 `run` never rewrites bibliographic fields. On Zotero, attach,
 `fix-metadata --apply`, and `dedupe --apply` use the Zotero 10+ write API.
@@ -256,7 +256,7 @@ stop at `no_identifier`.
 - [ROADMAP.md](../contribute/ROADMAP.md) — 0.1→1.0 trust; core vs maybe-later
 - [quiet-mirror.md](../paths/quiet-mirror.md) — `out/` as quiet browsable mirror (direction)
 - [releases.md](../start/releases.md) — 0.x vs 1.0
-- [comparison.md](comparison.md) — where paperful sits next to plugins and bib tools
+- [comparison.md](comparison.md) — where Paperful sits next to plugins and bib tools
 - [commands.md](../reference/commands.md) — CLI and disk artifacts
 - [dedupe.md](../howto/dedupe.md) — duplicate packs and the BBNJ hygiene loop
 - [config.md](../reference/config.md) — `config.toml` keys and grey playbooks

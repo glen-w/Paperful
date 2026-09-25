@@ -2,7 +2,7 @@
 
 Publisher sites (Elsevier ScienceDirect, Springer Nature, Wiley, JSTOR, …)
 normally require a subscription. If your university or research library
-offers **EZProxy** (or a similar “login?url=” redirector), paperful can
+offers **EZProxy** (or a similar “login?url=” redirector), Paperful can
 download those PDFs **using your existing library entitlement**. Bulk
 download can still violate an acceptable-use policy; see
 [Research operators](research-ops.md).

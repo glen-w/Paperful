@@ -17,7 +17,7 @@ A second manager is not owed as a finished feature. Mendeley and EndNote
 adapters are in the tree and **seeking testers**; Zotero is the well-tested
 path. Until 1.0, pin a git tag or commit if you script against JSON. See the
 [changelog](https://github.com/glen-w/Paperful/blob/main/CHANGELOG.md) for
-known limits. See [Why paperful](why.md).
+known limits. See [Why Paperful](why.md).
 
 ## Ladder
 

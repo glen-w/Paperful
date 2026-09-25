@@ -1,6 +1,6 @@
 # Research operators
 
-Short notes for people running paperful against a real library. Setup of the
+Short notes for people running Paperful against a real library. Setup of the
 local API, the Host header, and ghost attachments is in [Zotero](zotero.md).
 
 ## Unpaywall email

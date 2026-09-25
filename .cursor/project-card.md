@@ -1,4 +1,4 @@
-# Project card — paperful
+# Project card — Paperful
 
 Single place to edit instantiate values. Slash commands still need the values inlined
 (Cursor injects only the command file). Re-run `/instantiate` from `cursor_commands`

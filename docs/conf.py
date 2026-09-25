@@ -1,4 +1,4 @@
-# Sphinx configuration for paperful hosted docs.
+# Sphinx configuration for Paperful hosted docs.
 # Build: make docs | sphinx-build -b html docs docs/_build/html
 # Corpus: the same Markdown under docs/ (no second tree).
 
@@ -22,8 +22,8 @@ def _release() -> str:
         return match.group(1) if match else "dev"
 
 
-project = "paperful"
-author = "paperful contributors"
+project = "Paperful"
+author = "Paperful contributors"
 copyright = f"{date.today().year}, {author}"
 
 release = _release()
@@ -66,7 +66,7 @@ myst_fence_as_directive = ["mermaid"]
 suppress_warnings = ["myst.xref_missing", "misc.highlighting_failure"]
 
 html_theme = "furo"
-html_title = "paperful"
+html_title = "Paperful"
 html_favicon = "favicon.ico"
 # Shared public-site chrome (header nav) lives under website/chrome/ so the
 # marketing landing and /guide/ share one sticky header.

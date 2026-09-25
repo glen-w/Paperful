@@ -33,7 +33,7 @@ ollama pull qwen2.5:7b        # title / identity / summaries
 ollama pull qwen2.5:14b       # recommended floor for `recover` (browsing agent)
 ```
 
-No Python extra is needed for Ollama: paperful talks HTTP to the daemon.
+No Python extra is needed for Ollama: Paperful talks HTTP to the daemon.
 
 | Verb | Works well with | Notes |
 | --- | --- | --- |
@@ -131,7 +131,7 @@ LiteLLM by import only. The TTY guide prints the fix for each amber row.
 ### A. `recover` — browser-agent PDF recovery
 
 On `run`, when `[llm].enabled` and `paperful[browser-agent]` are available,
-paperful appends `browser_agent` after Scholar / EZProxy / htmlpdf. The agent
+Paperful appends `browser_agent` after Scholar / EZProxy / htmlpdf. The agent
 fires only if one of those vault lanes was tried and failed (not merely
 skipped as inapplicable). Playwright releases the session profile first.
 `[browser_agent].during_run = false` turns that auto-lane off. Sci-Hub, when
@@ -153,9 +153,9 @@ uv run paperful recover --item K1 --item K2 --no-attach
 - Access blocks (403 / "Request blocked" / paywall with no free PDF) are
   instructed as immediate stop — the agent must not open search engines or
   support/help pages. If it navigates to Google/Bing/etc. or a support/contact
-  path anyway, paperful force-stops that attempt.
+  path anyway, Paperful force-stops that attempt.
 - As soon as a valid PDF lands in the recover download folder (size stable
-  across two polls), paperful calls `agent.stop()` so the step budget does not
+  across two polls), Paperful calls `agent.stop()` so the step budget does not
   keep running after the click already succeeded.
 - Success lands like any other source: PDF under `out/`, manifest line with
   `source = "browser_agent"`, attach through the normal path. A dedicated
@@ -199,7 +199,7 @@ uv run paperful summarize --item ABCD1234 --prompt prompts/one-liner.md
   `max_context_chars` as head + detected headings + tail.
 - The builtin prompt asks for Objective / Methods / Key findings /
   Limitations in simple HTML. Local models often answer in Markdown anyway;
-  paperful converts headings, bullets, bold, and code fences so the Zotero
+  Paperful converts headings, bullets, bold, and code fences so the Zotero
   note renders cleanly.
 - Every summary ends with a provenance footer:
   `paperful · <model> · <UTC date> · prompt <sha8>` (prefixed `remote LLM`
@@ -232,13 +232,13 @@ uv run paperful synthesize -C BBNJ --force            # ignore the up-to-date si
   included** and are not sent to the model.
 - Notes are packed under `[synthesize].max_context_chars`. One chunk is one
   completion. Several chunks are synthesised in batches, then combined.
-  If that still overflows, paperful reduces again, at most three times, then
+  If that still overflows, Paperful reduces again, at most three times, then
   exits 1 and asks you to narrow the scope or raise the budget.
 - The builtin prompt asks for Corpus / Themes / Points of agreement /
   Disagreements and tensions / Gaps and open questions / Suggested reading
   order, citing only `[Surname Year]`. `--prompt FILE` overrides it; its SHA
   is stamped in the footer.
-- After the model text, paperful appends a **Sources** list (key, DOI, and
+- After the model text, Paperful appends a **Sources** list (key, DOI, and
   the source note’s model and date), the **Not included** list, and any
   `[Surname Year]` token that matches no source.
 - Disk output is `state/reports/<slug>.html` plus a `<slug>.json` sidecar
@@ -295,7 +295,7 @@ and start Ollama bound to all interfaces on the host
 | `session vault not ready` | `paperful session login scholar` (headed, on the host) |
 | `recover` ends `not_found` quickly | Model too small for browsing; try a 14B+ tag via `[browser_agent].model` |
 | `recover` never starts during `run` | Extra missing, `[llm].enabled` false, or `[browser_agent].during_run = false` |
-| Summary note shows raw `##` | Update paperful (0.5+ converts Markdown); re-run `summarize` |
+| Summary note shows raw `##` | Update Paperful (0.5+ converts Markdown); re-run `summarize` |
 | `could not extract PDF text` | Scanned PDF without a text layer; OCR is out of scope |
 | Report seems to ignore half the notes | Ollama truncated the prompt. Lower `[synthesize].max_context_chars` or raise `[llm].max_num_ctx`, and confirm the model supports that window |
 | **Not included** list is long | Those items have no summary yet. Run `summarize` for them, then `synthesize` again |

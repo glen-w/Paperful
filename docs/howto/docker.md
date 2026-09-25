@@ -1,11 +1,11 @@
 # Docker
 
-paperful is a **local CLI**. The operator install is `git clone` and
+Paperful is a **local CLI**. The operator install is `git clone` and
 `docker compose build`. The image is **build-local only** (`paperful:local`).
 There is no `docker pull` and no PyPI package. Zotero and headed browser
 login live on the host. Docker does not replace them.
 
-The Compose image is a **one-shot pack** — Python 3.12, paperful, Poppler
+The Compose image is a **one-shot pack** — Python 3.12, Paperful, Poppler
 (`pdftotext`), Playwright Chromium — for unattended commands (`run`, `lint`,
 `report`, `attach` once a write key exists). It is not a daemon and not a
 complete environment. Contributors use [`uv`](https://docs.astral.sh/uv/)
@@ -20,7 +20,7 @@ lives **outside** the container (and, by default, outside the git root).
 - `paperful session login scholar|ezproxy` (headed Chrome/Edge on the host: campus SSO, Scholar CAPTCHA)
 - `paperful session login mendeley` (Elsevier OAuth; the localhost redirect will not
   reach a container — see [Mendeley](mendeley.md))
-- EndNote `.enl` / `.Data` (desktop library on the host; paperful never writes SQLite —
+- EndNote `.enl` / `.Data` (desktop library on the host; Paperful never writes SQLite —
   see [EndNote](endnote.md))
 - Any scripts that read `out/` / `state/` as files
 
@@ -93,7 +93,7 @@ git root.
 `PAPERFUL_ZOTERO_HOST` defaults to `host.docker.internal` so Docker Desktop
 (macOS/Windows) can reach host Zotero. Compose also adds
 `extra_hosts: host.docker.internal:host-gateway` for Linux Docker Engine.
-paperful always sends `Host: localhost:23119` — Zotero’s local API requires
+Paperful always sends `Host: localhost:23119` — Zotero’s local API requires
 that header even when the TCP peer is `host.docker.internal`.
 
 ## Optional LLM inside the image
@@ -181,7 +181,7 @@ instead of `uv run paperful`. Headed `session login` is still host-only.
 
 ## Image contents
 
-- Python 3.12, paperful + Playwright Chromium (htmlpdf / session vault reuse)
+- Python 3.12, Paperful + Playwright Chromium (htmlpdf / session vault reuse)
 - Poppler (`pdftotext`)
 - Non-root user `paperful` (uid 1000)
 

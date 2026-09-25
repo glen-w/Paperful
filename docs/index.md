@@ -1,9 +1,9 @@
-# paperful documentation
+# Paperful documentation
 
-paperful is a local sidecar for your research library: keep collections
+Paperful is a local sidecar for your research library: keep collections
 organised, fill missing PDFs, lint metadata, and keep a quiet copy on disk.
 Zotero is the well-tested catalogue. Mendeley and EndNote adapters are seeking
-testers. See [Why paperful](start/why.md).
+testers. See [Why Paperful](start/why.md).
 
 **Operators** clone the repo and run `docker compose build` — no `docker pull`,
 no PyPI. **Contributors** use [`uv`](https://docs.astral.sh/uv/). Details:

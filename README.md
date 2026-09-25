@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="docs/logo.png" alt="paperful" width="280">
+  <img src="docs/logo.png" alt="Paperful" width="280">
 </h1>
 
 <p align="center">
@@ -14,8 +14,8 @@
 
 Open access first. Campus **EZProxy** when you have a subscription.
 **Google Scholar** and **Sci-Hub** are opt-in and off by default (see
-[Sci-Hub](docs/scihub.md)). Why this shape: [Why paperful](docs/why.md).
-Not sure if this is the right tool? [How paperful compares](docs/comparison.md).
+[Sci-Hub](docs/scihub.md)). Why this shape: [Why Paperful](docs/why.md).
+Not sure if this is the right tool? [How Paperful compares](docs/comparison.md).
 
 Hosted site: [glenwright.earth/Paperful](https://glenwright.earth/Paperful/)
 (landing in [`website/`](website/) + Sphinx guide at `/guide/`). Preview:
