@@ -98,6 +98,7 @@ class SnowballRequest:
     approve_each_max: int | None = None
     refine: bool | None = None
     link_versions: bool = False
+    from_created_date: str | None = None
 
 
 @dataclass
@@ -457,7 +458,7 @@ def run_resume(
     oa.progress = lambda message: console.print(paint(message))
     tally.start()
     if deferred.get("kind") == "fill":
-        added = []
+        known = {row.identity for row in rows}
         try:
             rows = _fill_metadata(
                 cfg,
@@ -479,6 +480,7 @@ def run_resume(
                 "remaining_ids": list(exc.remaining),
                 "error": str(exc),
             }
+        added = [row for row in rows if row.identity not in known]
         merged = rows
     else:
         added = continue_deferred(oa, deferred)
@@ -714,6 +716,8 @@ def _execute(
     oa = client or OpenAlexClient(email=cfg.email, sleep_s=0.0 if client else 0.15)
     tally = _live_tally(console)
     oa.tally = tally
+    if request.from_created_date:
+        oa.from_created_date = request.from_created_date.strip() or None
     if oa.progress is None:
         oa.progress = lambda message: console.print(paint(message))
     backends_early = _backends(cfg, request)

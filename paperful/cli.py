@@ -4342,5 +4342,65 @@ def snowball_profile_save(
     console.print(f"Wrote [bold]{path}[/]")
 
 
+snowball_watch_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help=(
+        "Pull-only watch: re-run a snowball profile, remember seen works, "
+        "propose new arrivals on disk. Never creates library items. "
+        "Paperful does not schedule watches; call watch run yourself."
+    ),
+)
+snowball_app.add_typer(snowball_watch_app, name="watch")
+
+
+@snowball_watch_app.command("save")
+def snowball_watch_save(
+    name: str = typer.Argument(..., help="Watch name under state/snowball/watches/<name>/."),
+    profile: str = typer.Option(..., "--profile", help="Existing kind=snowball profile."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Point a watch at a saved snowball profile. No API keys."""
+    cfg = _cfg(config)
+    from .snowball.command import SnowballError
+    from .snowball.watch import save_watch
+
+    try:
+        path = save_watch(cfg, name, profile)
+    except SnowballError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(exc.code) from exc
+    console.print(f"Wrote [bold]{path}[/] · profile {profile}")
+
+
+@snowball_watch_app.command("run")
+def snowball_watch_run(
+    name: str = typer.Argument(..., help="Watch name."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Baseline on first run; later runs write only unseen new works to the inbox."""
+    cfg = _cfg(config)
+    from .snowball.watch import run_watch
+
+    _run_snowball(cfg, lambda c: run_watch(c, name, console=console))
+
+
+@snowball_watch_app.command("show")
+def snowball_watch_show(
+    name: str = typer.Argument(..., help="Watch name."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Inbox count and latest run id. Does not open the library."""
+    cfg = _cfg(config)
+    from .snowball.command import SnowballError
+    from .snowball.watch import show_watch
+
+    try:
+        show_watch(cfg, name, console=console)
+    except SnowballError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(exc.code) from exc
+
+
 if __name__ == "__main__":
     app()

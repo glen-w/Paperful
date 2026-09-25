@@ -771,6 +771,63 @@ def test_s2_short_429_retries_then_returns(tmp_path: Path, monkeypatch):
     assert calls["n"] == 2
 
 
+def test_fill_resume_creates_rows_the_fill_added(tmp_path: Path, monkeypatch):
+    from paperful.snowball.queue import write_queue
+
+    cfg = _cfg(tmp_path)
+    seed = Candidate(
+        "r",
+        {"type": "doi", "value": "10.1000/seed"},
+        1,
+        "refs",
+        {"doi": "10.1000/seed"},
+        {"title": "Seed"},
+        "seed",
+        "new",
+        {"backend": "openalex"},
+        "auto",
+    )
+    child = Candidate(
+        "r",
+        {"type": "doi", "value": "10.1000/seed"},
+        2,
+        "refs",
+        {"doi": "10.1000/child"},
+        {"title": "Child"},
+        "s2 ref of 10.1000/seed",
+        "new",
+        {"backend": "semanticscholar"},
+        "auto",
+    )
+    client = OpenAlexClient(email="t@example.org", sleep_s=0)
+    dest = write_queue(cfg.state_dir, "run1", [seed], client, library_unread=False)
+    (dest / "deferred.json").write_text(
+        json.dumps({"kind": "fill", "direction": "refs", "per_hop_limit": 15}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "paperful.snowball.command._fill_metadata",
+        lambda *a, **k: [seed, child],
+    )
+    monkeypatch.setattr("paperful.snowball.command.get_backend", lambda cfg: object())
+    seen: dict[str, list[str]] = {}
+
+    def create_new(lib, rows, collection, **kwargs):
+        seen["dois"] = [row.ids.get("doi") for row in rows]
+        return [], {"created": len(rows), "skipped_exists": 0, "failed": 0}
+
+    monkeypatch.setattr("paperful.snowball.command.create_new", create_new)
+    result = run_resume(
+        cfg,
+        "run1",
+        SnowballRequest(gate="auto", collection="Snowball/bbnj-hop-test"),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=client,
+    )
+    assert result.exit_code == 0
+    assert seen["dois"] == ["10.1000/child"]
+
+
 def test_year_window_and_direction_both(tmp_path: Path):
     works = {
         "W1": _work("W1", "10.1000/seed", "Seed", 2020, 3, ["W2", "W3"]),
@@ -2052,3 +2109,333 @@ def test_nonempty_openalex_refs_skip_recovery(tmp_path: Path, monkeypatch: pytes
     assert "10.1000/oa-ref" in dois
     assert recover_calls == []
     assert pdf_calls == []
+
+
+def test_watch_baseline_then_propose(tmp_path: Path):
+    from paperful.snowball.profile import save_profile
+    from paperful.snowball.watch import inbox_count, load_seen, run_watch, save_watch
+
+    cfg = _cfg(tmp_path)
+    profiles = tmp_path / "profiles"
+    profiles.mkdir()
+    save_profile(
+        cfg,
+        "keyword-scout",
+        {"mode": "search", "query": "bbnj", "gate": "dry-run"},
+        force=False,
+    )
+    save_watch(cfg, "bbnj", "keyword-scout")
+    works = {
+        "W1": _work("W1", "10.1000/a", "Alpha", 2020, 1),
+        "W2": _work("W2", "10.1000/b", "Beta", 2021, 2),
+    }
+    lib = _Lib()
+    console = Console(file=StringIO(), highlight=False, width=120)
+    first = run_watch(
+        cfg,
+        "bbnj",
+        console=console,
+        client=_client(works),
+        lookup=lambda doi, title: None,
+        backend=lib,
+    )
+    assert first.baseline is True
+    assert first.proposed == 0
+    assert first.baseline_count == 2
+    assert lib.created == []
+    assert inbox_count(cfg, "bbnj") == 0
+    assert (first.run_dir / "candidates.jsonl").read_text().strip() == ""
+    assert load_seen(cfg, "bbnj") == {"doi:10.1000/a", "doi:10.1000/b"}
+
+    works["W3"] = _work("W3", "10.1000/c", "Gamma", 2022, 3)
+    second = run_watch(
+        cfg,
+        "bbnj",
+        console=console,
+        client=_client(works),
+        lookup=lambda doi, title: None,
+        backend=lib,
+    )
+    assert second.baseline is False
+    assert second.proposed == 1
+    assert second.already_seen == 2
+    assert lib.created == []
+    assert inbox_count(cfg, "bbnj") == 1
+    rows = [json.loads(line) for line in (second.run_dir / "candidates.jsonl").read_text().splitlines()]
+    assert len(rows) == 1
+    assert rows[0]["ids"]["doi"] == "10.1000/c"
+    assert rows[0]["keep"] is True
+    assert rows[0]["status"] == "new"
+
+    third = run_watch(
+        cfg,
+        "bbnj",
+        console=console,
+        client=_client(works),
+        lookup=lambda doi, title: None,
+        backend=lib,
+    )
+    assert third.proposed == 0
+    assert third.already_seen == 3
+    assert inbox_count(cfg, "bbnj") == 1
+    assert lib.created == []
+
+
+def test_watch_auto_profile_never_creates(tmp_path: Path):
+    from paperful.snowball.profile import save_profile
+    from paperful.snowball.watch import run_watch, save_watch
+
+    cfg = _cfg(tmp_path)
+    (tmp_path / "profiles").mkdir()
+    save_profile(
+        cfg,
+        "auto-scout",
+        {
+            "mode": "search",
+            "query": "bbnj",
+            "gate": "auto",
+            "target_collection": "Inbox/Snowball",
+            "fetch_pdfs": "fast",
+        },
+        force=True,
+    )
+    save_watch(cfg, "auto", "auto-scout")
+    works = {"W1": _work("W1", "10.1000/a", "Alpha", 2020, 1)}
+    lib = _Lib()
+    console = Console(file=StringIO(), highlight=False, width=120)
+    run_watch(
+        cfg,
+        "auto",
+        console=console,
+        client=_client(works),
+        lookup=lambda doi, title: None,
+        backend=lib,
+    )
+    works["W2"] = _work("W2", "10.1000/b", "Beta", 2021, 1)
+    result = run_watch(
+        cfg,
+        "auto",
+        console=console,
+        client=_client(works),
+        lookup=lambda doi, title: None,
+        backend=lib,
+    )
+    assert result.proposed == 1
+    assert lib.created == []
+    assert not (result.run_dir / "write_report.json").is_file()
+
+
+def test_watch_passes_from_created_date_after_baseline(tmp_path: Path):
+    from paperful.snowball.profile import save_profile
+    from paperful.snowball.watch import run_watch, save_watch
+
+    cfg = _cfg(tmp_path)
+    (tmp_path / "profiles").mkdir()
+    save_profile(
+        cfg,
+        "scout",
+        {"mode": "search", "query": "bbnj", "gate": "dry-run"},
+        force=False,
+    )
+    save_watch(cfg, "w", "scout")
+    works = {"W1": _work("W1", "10.1000/a", "Alpha", 2020, 1)}
+    filters: list[str] = []
+
+    def getter(path: str, params: dict) -> dict:
+        filt = str(params.get("filter") or "")
+        if "search" in params or filt:
+            filters.append(filt)
+        if "search" in params:
+            return {"results": list(works.values())}
+        return {"results": []}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    console = Console(file=StringIO(), highlight=False, width=120)
+    run_watch(cfg, "w", console=console, client=client, lookup=lambda doi, title: None)
+    assert all("from_created_date:" not in f for f in filters)
+    filters.clear()
+    works["W2"] = _work("W2", "10.1000/b", "Beta", 2021, 1)
+    run_watch(cfg, "w", console=console, client=client, lookup=lambda doi, title: None)
+    assert any("from_created_date:" in f for f in filters)
+
+
+def test_cli_watch_save_show(tmp_path: Path):
+    cfg = _cfg(tmp_path)
+    profiles = tmp_path / "profiles"
+    profiles.mkdir()
+    (profiles / "scout.toml").write_text(
+        'kind = "snowball"\nmode = "search"\nquery = "bbnj"\ngate = "dry-run"\n'
+    )
+    result = runner.invoke(
+        cli.app,
+        ["snowball", "watch", "save", "bbnj", "--profile", "scout", "--config", str(cfg.config_path)],
+    )
+    assert result.exit_code == 0, result.output
+    show = runner.invoke(
+        cli.app,
+        ["snowball", "watch", "show", "bbnj", "--config", str(cfg.config_path)],
+    )
+    assert show.exit_code == 0, show.output
+    assert "baseline · not yet" in show.output
+    assert "inbox · 0" in show.output
+
+
+def test_watch_hybrid_stays_on_keyword_hits(tmp_path: Path):
+    """Hybrid profiles watch depth 0 only; refs of hits are not proposed."""
+    from paperful.snowball.profile import save_profile
+    from paperful.snowball.watch import load_seen, run_watch, save_watch
+
+    cfg = _cfg(tmp_path)
+    (tmp_path / "profiles").mkdir()
+    save_profile(
+        cfg,
+        "hybrid-scout",
+        {
+            "mode": "hybrid",
+            "query": "bbnj",
+            "gate": "dry-run",
+            "direction": "refs",
+            "hybrid_seeds": 5,
+            "depth": 2,
+        },
+        force=False,
+    )
+    save_watch(cfg, "hy", "hybrid-scout")
+    hit = _work("W1", "10.1000/hit", "Hit", 2020, 5, ["W2"])
+    ref = _work("W2", "10.1000/ref", "Ref only", 2019, 1)
+    new_hit = _work("W3", "10.1000/newhit", "New hit", 2022, 2, ["W2"])
+    works = {"W1": hit, "W2": ref}
+    search_ids = {"W1"}
+
+    def getter(path: str, params: dict) -> dict:
+        if path.startswith("/works/https://doi.org/"):
+            doi = path.split("/works/https://doi.org/", 1)[1]
+            for work in works.values():
+                if work["doi"].endswith(doi):
+                    return work
+            return {}
+        filt = str(params.get("filter") or "")
+        if filt.startswith("openalex:"):
+            ids = filt.split(":", 1)[1].split("|")
+            return {"results": [works[i] for i in ids if i in works]}
+        if "search" in params:
+            return {"results": [works[i] for i in search_ids if i in works]}
+        return {"results": []}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    console = Console(file=StringIO(), highlight=False, width=120)
+    first = run_watch(
+        cfg,
+        "hy",
+        console=console,
+        client=client,
+        lookup=lambda doi, title: None,
+        backend=_Lib(),
+    )
+    assert first.baseline is True
+    assert load_seen(cfg, "hy") == {"doi:10.1000/hit"}
+    works["W3"] = new_hit
+    search_ids.add("W3")
+    second = run_watch(
+        cfg,
+        "hy",
+        console=console,
+        client=OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter),
+        lookup=lambda doi, title: None,
+        backend=_Lib(),
+    )
+    assert second.proposed == 1
+    rows = [json.loads(line) for line in (second.run_dir / "candidates.jsonl").read_text().splitlines()]
+    assert {row["ids"]["doi"] for row in rows} == {"10.1000/newhit"}
+    assert "10.1000/ref" not in load_seen(cfg, "hy")
+
+
+def test_watch_exists_marked_seen_not_proposed(tmp_path: Path):
+    from paperful.snowball.profile import save_profile
+    from paperful.snowball.watch import inbox_count, load_seen, run_watch, save_watch
+
+    cfg = _cfg(tmp_path)
+    (tmp_path / "profiles").mkdir()
+    save_profile(
+        cfg,
+        "scout",
+        {"mode": "search", "query": "bbnj", "gate": "dry-run"},
+        force=False,
+    )
+    save_watch(cfg, "ex", "scout")
+    works = {"W1": _work("W1", "10.1000/a", "Alpha", 2020, 1)}
+    console = Console(file=StringIO(), highlight=False, width=120)
+    run_watch(
+        cfg,
+        "ex",
+        console=console,
+        client=_client(works),
+        lookup=lambda doi, title: None,
+        backend=_Lib(),
+    )
+    works["W2"] = _work("W2", "10.1000/inlib", "Already here", 2021, 1)
+    works["W3"] = _work("W3", "10.1000/fresh", "Fresh", 2022, 1)
+
+    def lookup(doi, title):
+        return "HAVE" if doi == "10.1000/inlib" else None
+
+    second = run_watch(
+        cfg,
+        "ex",
+        console=console,
+        client=_client(works),
+        lookup=lookup,
+        backend=_Lib(),
+    )
+    assert second.proposed == 1
+    assert inbox_count(cfg, "ex") == 1
+    rows = [json.loads(line) for line in (second.run_dir / "candidates.jsonl").read_text().splitlines()]
+    assert rows[0]["ids"]["doi"] == "10.1000/fresh"
+    assert "doi:10.1000/inlib" in load_seen(cfg, "ex")
+    assert "doi:10.1000/fresh" in load_seen(cfg, "ex")
+
+
+def test_watch_apply_creates_from_proposed_queue(tmp_path: Path):
+    from paperful.snowball.profile import save_profile
+    from paperful.snowball.watch import run_watch, save_watch
+
+    cfg = _cfg(tmp_path)
+    (tmp_path / "profiles").mkdir()
+    save_profile(
+        cfg,
+        "scout",
+        {"mode": "search", "query": "bbnj", "gate": "dry-run"},
+        force=False,
+    )
+    save_watch(cfg, "ap", "scout")
+    works = {"W1": _work("W1", "10.1000/a", "Alpha", 2020, 1)}
+    console = Console(file=StringIO(), highlight=False, width=120)
+    run_watch(
+        cfg,
+        "ap",
+        console=console,
+        client=_client(works),
+        lookup=lambda doi, title: None,
+        backend=_Lib(),
+    )
+    works["W2"] = _work("W2", "10.1000/b", "Beta", 2021, 1)
+    second = run_watch(
+        cfg,
+        "ap",
+        console=console,
+        client=_client(works),
+        lookup=lambda doi, title: None,
+        backend=_Lib(),
+    )
+    lib = _Lib()
+    applied = run_apply(
+        cfg,
+        second.run_dir.name,
+        SnowballRequest(gate="auto", collection="Inbox/Snowball", fetch_pdfs=False),
+        console=console,
+        lookup=lambda doi, title: None,
+        backend=lib,
+    )
+    assert applied.exit_code == 0
+    assert len(lib.created) == 1
+    assert lib.created[0]["DOI"] == "10.1000/b"

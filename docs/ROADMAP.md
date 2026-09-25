@@ -228,9 +228,14 @@ Phases, in order. Each can stop without the next.
 4. **Config. Shipped:** dedupe scope, type and venue filters, profile save.
 5. **Last pass. Shipped:** `hybrid`, `approve-each`, overlap ranking,
    Crossref / Semantic Scholar fill, and `[llm]` suggestions on the queue.
+6. **Watch. Shipped:** `snowball watch save` / `run` / `show` re-runs a saved
+   profile, baselines the frontier on the first run, and proposes only unseen
+   arrivals into `state/snowball/watches/<name>/inbox.jsonl` plus a normal
+   run queue. Always dry-run / no PDFs. Paperful does not schedule it; your
+   own launchd or cron may call `watch run`. See [snowball.md](snowball.md#watch).
 
 Still outside this lane: every paper by every cited author; a snowball step
-inside `paperful all`; cron; a review UI; systematic-review screening; a
+inside `paperful all`; a built-in scheduler; a review UI; systematic-review screening; a
 citation-graph canvas; Sci-Hub or Google Scholar as snowball sources.
 
 ## Maybe later, not core
@@ -245,7 +250,7 @@ prerequisites for the fetch / lint / attach loop.
    (`paperful session login`); **pluggable grey-lit PDF playbooks** in
    `direct`/`landing` with builtin packs (UNGA/undocs · BBNJ/DOALOS · ISA;
    plus FAO/OECD/IEA/WHO — extend via `[[grey_playbooks]]`). Still
-   parked: SI/dataset/code siblings; watch/alert → propose items;
+   parked: SI/dataset/code siblings;
    **opt-in LibGen** for `book` / `bookSection` gap-fill (title or ISBN routing;
    unofficial scrapers only — spike
    [libgen-api](https://pypi.org/project/libgen-api/) /

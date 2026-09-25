@@ -75,6 +75,7 @@ class OpenAlexClient:
         self.tally: Any = None
         self.deferred: dict[str, Any] | None = None
         self.emit: Callable[[list[Any]], None] | None = None
+        self.from_created_date: str | None = None
         self._getter = getter
         self.requests = 0
         self.retries = 0
@@ -83,6 +84,11 @@ class OpenAlexClient:
         self._budget: OpenAlexBudgetExceeded | None = None
         self._using_key = False
         self._http_client: httpx.Client | None = None
+
+    def _created_filter(self, from_created_date: str | None = None) -> str | None:
+        """OpenAlex ``from_created_date`` (YYYY-MM-DD). Watch cursor, or an override."""
+        value = (from_created_date or self.from_created_date or "").strip()
+        return value or None
 
     def get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         if self._budget is not None:
@@ -239,12 +245,16 @@ class OpenAlexClient:
         limit: int,
         year_from: int | None,
         year_to: int | None,
+        from_created_date: str | None = None,
     ) -> list[dict[str, Any]]:
         filters: list[str] = []
         if year_from is not None:
             filters.append(f"from_publication_date:{year_from}-01-01")
         if year_to is not None:
             filters.append(f"to_publication_date:{year_to}-12-31")
+        created = self._created_filter(from_created_date)
+        if created:
+            filters.append(f"from_created_date:{created}")
         params: dict[str, Any] = {"search": query, "select": SELECT}
         if filters:
             params["filter"] = ",".join(filters)
@@ -312,6 +322,7 @@ class OpenAlexClient:
         year_from: int | None = None,
         year_to: int | None = None,
         sort: str | None = None,
+        from_created_date: str | None = None,
     ) -> list[dict[str, Any]]:
         """Works that cite ``openalex_id`` (OpenAlex ``filter=cites:``)."""
         oa = short_id(openalex_id)
@@ -322,6 +333,9 @@ class OpenAlexClient:
             filters.append(f"from_publication_date:{year_from}-01-01")
         if year_to is not None:
             filters.append(f"to_publication_date:{year_to}-12-31")
+        created = self._created_filter(from_created_date)
+        if created:
+            filters.append(f"from_created_date:{created}")
         params: dict[str, Any] = {"filter": ",".join(filters), "select": SELECT}
         if sort:
             params["sort"] = sort
@@ -335,6 +349,7 @@ class OpenAlexClient:
         year_from: int | None = None,
         year_to: int | None = None,
         sort: str | None = None,
+        from_created_date: str | None = None,
     ) -> list[dict[str, Any]]:
         """Works carrying any of ``slugs``. ``limit`` must be a positive integer."""
         if limit <= 0:
@@ -350,6 +365,9 @@ class OpenAlexClient:
             filters.append(f"from_publication_date:{year_from}-01-01")
         if year_to is not None:
             filters.append(f"to_publication_date:{year_to}-12-31")
+        created = self._created_filter(from_created_date)
+        if created:
+            filters.append(f"from_created_date:{created}")
         params: dict[str, Any] = {"filter": ",".join(filters), "select": SELECT}
         if sort:
             params["sort"] = sort
@@ -362,6 +380,7 @@ class OpenAlexClient:
         limit: int,
         year_from: int | None = None,
         year_to: int | None = None,
+        from_created_date: str | None = None,
     ) -> list[dict[str, Any]]:
         """OpenAlex works for an ORCID (fills gaps left by the ORCID public API)."""
         cleaned = normalize_orcid(orcid)
@@ -372,6 +391,9 @@ class OpenAlexClient:
             filters.append(f"from_publication_date:{year_from}-01-01")
         if year_to is not None:
             filters.append(f"to_publication_date:{year_to}-12-31")
+        created = self._created_filter(from_created_date)
+        if created:
+            filters.append(f"from_created_date:{created}")
         self.stage = self.stage or f"OpenAlex author {cleaned}"
         return self._collect(
             "/works",

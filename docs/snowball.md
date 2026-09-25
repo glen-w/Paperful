@@ -2,8 +2,9 @@
 
 **Status:** keyword search, DOI / ORCID / collection seeds, `hybrid` (keyword
 hits, then one hop), refs, cited-by, and OpenAlex keywords, depth up to 5 under caps, gates
-`dry-run` / `approve-each` / `approve-batch` / `auto`, overlap ranking, and
-`--fetch-pdfs` are implemented. Config honors `dedupe_scope`, `tag_prefix`,
+`dry-run` / `approve-each` / `approve-batch` / `auto`, overlap ranking,
+`--fetch-pdfs`, and pull-only `watch` (baseline then propose new arrivals) are
+implemented. Config honors `dedupe_scope`, `tag_prefix`,
 `types`, `oa_only`, venues, `languages`, `min_seed_citations`,
 `note_provenance`, and `backends`. `--refine` writes query suggestions when
 `[llm]` is on and does not create items. `expand = cited_authors` stays off.
@@ -25,11 +26,49 @@ paperful snowball apply <run-id> -C "Inbox/Snowball"
 paperful snowball hybrid "high seas EIA" --hybrid-seeds 5 --direction refs
 paperful snowball search "high seas EIA" --gate auto --fetch-pdfs fast -C "Inbox/Snowball"
 paperful snowball orcid 0000-0002-9162-9618 --gate auto --fetch-pdfs full -C "Snowball/0000-0002-9162-9618"
+paperful snowball watch save bbnj --profile keyword-scout
+paperful snowball watch run bbnj
 ```
-
 `search`, `hybrid`, `doi`, `orcid`, and `collection` are seeds under one verb.
 `hybrid` is the keyword-then-hop job. There is no separate top-level
-`harvest`, `crawl`, or `discover`.
+`harvest`, `crawl`, or `discover`. `watch` re-runs a saved profile on a
+schedule you choose; see [Watch](#watch).
+
+## Watch
+
+A watch is a saved snowball profile plus a seen-set on disk. You run it when
+you want. Paperful does not schedule it (your own launchd or cron may call
+`watch run`). The first run records the current frontier and proposes nothing.
+Later runs write only works that were not in that set. Creating items stays on
+`snowball apply` (or a separate writing-gate crawl). Watch always forces
+`gate = dry-run` and `fetch_pdfs = off`, so a profile with `gate = auto` cannot
+create parents or download PDFs from a watch.
+
+```text
+paperful snowball watch save bbnj --profile keyword-scout
+paperful snowball watch run bbnj          # first time: baseline, inbox empty
+paperful snowball watch run bbnj          # later: N new in the inbox
+paperful snowball watch show bbnj
+paperful snowball apply <run-id> -C Inbox/Snowball   # only if you want parents
+```
+
+Ledger under `state/snowball/watches/<name>/`:
+
+| File | Role |
+| --- | --- |
+| `watch.json` | `paperful.snowball.watch.v1` — profile name, `baseline_at`, `last_run_at`, `last_run_id` |
+| `seen.json` | Identities already recorded (`doi:` or `openalex:`) |
+| `inbox.jsonl` | Append-only proposed `status = new` rows |
+
+Each `watch run` also writes a normal `state/snowball/<run-id>/` queue. After
+baseline, that queue is empty (`baseline N · proposed 0`). After a later run,
+it holds only the new proposals (`proposed N · already seen M`), with
+`keep = true` so `snowball apply` can create them. OpenAlex keyword and
+cited-by calls pass `from_created_date` from the cursor (YYYY-MM-DD of the
+last run) so a work indexed after the last check can show up even when its
+publication year is old. The seen set still drops overlaps. A `hybrid` profile
+watches the keyword hit list only (depth 0); a refs hop of those hits stays a
+separate `snowball` run.
 
 ## Snowball and run
 
@@ -359,7 +398,7 @@ BibTeX citekeys still make sense. Snowball does not depend on that plugin.
 ## Out of this lane
 
 - A hosted discovery service, a force-directed graph, or a second OpenAlex browser
-- Cron, or a snowball step inside `paperful all`
+- A built-in scheduler or cron helper (call `watch run` yourself), or a snowball step inside `paperful all`
 - A TUI or local web reviewer
 - Sci-Hub or Scholar as ways to discover works
 - Pulling every publication of every cited author, until an explicit capped switch exists

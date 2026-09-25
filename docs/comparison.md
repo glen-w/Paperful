@@ -26,7 +26,7 @@ Prefer this page for “is this the right tool?”
 | **`.bib` normalize / dedupe / upgrade preprints** (no Zotero required) | [bibcite](https://github.com/leo1oel/bibcite), [bibtex-tidy](https://github.com/FlamingTempura/bibtex-tidy), [bibmanager](https://bibmanager.readthedocs.io/) |
 | **Mendeley** dedup inside the app; clean **exported** BibTeX | Mendeley Duplicates smart collection; export cleaners such as [mendeley_bibtex_cleaner](https://gist.github.com/alexandrehuat/6d3263f73ccae87d0107977978316c02) |
 | **DOI-list PDF batch** without Zotero | [paperscraper](https://github.com/jannisborn/paperscraper) |
-| **Grow the library** from a keyword, a DOI’s references, an ORCID, or a hybrid hop, then optionally fill PDFs | **paperful snowball** — dry-run, `approve-each`, `approve-batch`, `--gate auto`, and `--fetch-pdfs` ([snowball](snowball.md)). In-app one-hop browsers stay separate ([zotero-snowball](https://github.com/socratic-irony/zotero-snowball), [Citegeist](https://github.com/phdemotions/zotero-citegeist)). General harvesters without the mirror: [findpapers](https://github.com/jonatasgrosman/findpapers), [opencite](https://github.com/neuromechanist/opencite) |
+| **Grow the library** from a keyword, a DOI’s references, an ORCID, or a hybrid hop, then optionally fill PDFs. Re-check later with **watch** (baseline once, then propose new arrivals on disk; you schedule `watch run`) | **paperful snowball** — dry-run, `approve-each`, `approve-batch`, `--gate auto`, `--fetch-pdfs`, and `watch` ([snowball](snowball.md)). In-app one-hop browsers stay separate ([zotero-snowball](https://github.com/socratic-irony/zotero-snowball), [Citegeist](https://github.com/phdemotions/zotero-citegeist)). General harvesters without the mirror: [findpapers](https://github.com/jonatasgrosman/findpapers), [opencite](https://github.com/neuromechanist/opencite) |
 | “Just use what ships in Zotero” | Built-in **Find Available PDF** plus [custom PDF resolvers](https://www.zotero.org/support/kb/custom_pdf_resolvers) |
 
 paperful does **not** replace a full metadata editor, an attachment reorganiser,
@@ -140,6 +140,9 @@ Only a .bib from Mendeley/Zotero export?
 
 Want a new collection from a keyword, a paper’s bibliography, someone’s ORCID, or one hop from the top hits?
   → paperful snowball (see snowball.md). One-shot PDF fill is --fetch-pdfs with --gate auto
+
+Want new works matching a saved snowball profile, without a discovery daemon?
+  → paperful snowball watch (baseline once, then propose; schedule watch run yourself)
 
 Just a list of DOIs, no Zotero?
   → paperscraper
