@@ -1,10 +1,11 @@
 # Roadmap
 
-Guidance for contributors, not a commitment calendar. Paperful is a **local
-research-library sidecar**: one disk ledger (`out/`, `state/`), adapters for
-citation managers, and fetch / lint / attach as the core loop. **Zotero is the
-well-tested adapter.** Mendeley and EndNote are in the tree and seeking
-testers. See [architecture.md](architecture.md) and [why.md](why.md).
+Guidance for contributors, not a commitment calendar. Paperful’s jobs are
+**library**, **find**, **completeness**, **mirror**, and **control**: one
+disk mirror (`out/`, `state/`), adapters for citation managers, and fetch /
+lint / attach / summarise as the core loop. **Zotero is the well-tested
+adapter.** Mendeley and EndNote are in the tree and seeking testers. See
+[architecture.md](architecture.md) and [why.md](why.md).
 
 Surfaces like a Zotero plugin, Firefox extension, or web GUI are **not** the
 product direction. Optional thin bridges (`paperful session login`) capture a local browser
@@ -16,11 +17,11 @@ and EndNote adapters are not 1.0 until testers have exercised them. Not a GUI,
 not OCR, not a WebDAV client, and not “AI fetch everything.”
 
 (trust-10)=
-## 0.1 → 1.0 (trust + sidecar contract)
+## 0.1 → 1.0 (trust + mirror contract)
 
-`0.1` is a first usable sidecar beside Zotero. Do not call it **1.0** until
-these land. Do **not** grow this list into a second product (no GUI, no auto
-Sci-Hub, no “AI fetch everything”).
+`0.1` is a first usable helper for a reference library. Do not call it **1.0**
+until these land. Do **not** grow this list into a second product (no GUI, no
+auto Sci-Hub, no “AI fetch everything”).
 
 | Step | UX outcome | Status |
 | --- | --- | --- |
@@ -233,7 +234,7 @@ citation-graph canvas; Sci-Hub or Google Scholar as snowball sources.
 
 ## Maybe later, not core
 
-Workbench layers beyond the sidecar contract. Worth keeping on the map; not
+Workbench layers beyond the mirror contract. Worth keeping on the map; not
 prerequisites for the fetch / lint / attach loop.
 
 1. **Catalogue unification** — conflict journal; query-scoped virtual collections
@@ -303,7 +304,7 @@ Larger product bets. Park until the ledger and core loop justify them.
 ## Related docs
 
 - [architecture.md](architecture.md) — disk-first adapters and data flow
-- [why.md](why.md) — sidecar pitch; what is true today
+- [why.md](why.md) — library, find, completeness, mirror, control; what is true today
 - [quiet-mirror.md](quiet-mirror.md) — `out/` as the copy you keep
 - [releases.md](releases.md) — 0.x vs 1.0; known limits
 - [comparison.md](comparison.md) — what paperful does and does not replace today

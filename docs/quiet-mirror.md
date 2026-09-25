@@ -1,15 +1,19 @@
 # Quiet mirror (`out/`)
 
-The folder tree under `out/` is the copy of the library you keep. Zotero cloud
-storage is small, and WebDAV is more ops than most people want. A co-author
-on Mendeley or EndNote is why those adapters exist — they are **seeking
-testers**, and Zotero remains the well-tested catalogue. `snapshot` writes
-every scoped item; `restore` puts back only what the live catalogue is missing.
+The folder tree under `out/` is the platform-agnostic copy of the library:
+backup, and a way to leave the citation manager. One folder per item
+(`record.json`, optional PDF, notes), plus a collection tree. `snapshot`
+writes every scoped item; `restore` puts back only what the live catalogue
+is missing and does not overwrite fields already there. RIS, BibTeX, and
+EndNote XML (`import` / `export`) are the other door.
 
-Zotero stays the bibliographic catalogue and attach target. This is a product
-stance, not a new daemon. paperful remains a **local CLI**. House sync of
-`out/` (and careful use of `state/`) lives outside this repo (e.g. Syncthing
-on a homeserver). See the Toast Heaven ops plan
+Zotero cloud storage is small, and WebDAV is more ops than most people want.
+Zotero stays the bibliographic catalogue and attach target that is well
+tested. Mendeley and EndNote adapters exist for a co-author on another
+manager — they are **seeking testers**. This is a product stance, not a new
+daemon. paperful remains a **local CLI**. House sync of `out/` (and careful
+use of `state/`) lives outside this repo (e.g. Syncthing on a homeserver).
+See the Toast Heaven ops plan
 `docs/operations/syncthing-personal-and-research.md` in the `server` repo when
 that tree is nearby. Why this shape: [Why paperful](why.md).
 

@@ -1,7 +1,8 @@
 # paperful website
 
 Modest public landing (plain HTML/CSS, minimal JS for mobile nav). Product
-front door: hero → what the app does → outcomes → local-first → install.
+front door: hero (library, find, mirror) → the five jobs → outcomes →
+on your machine → install.
 
 - Open `index.html` locally, or deploy via GitHub Pages (`.github/workflows/pages.yml`).
 - Logo lives in [images/](images/) (copied from `docs/logo.png`).
