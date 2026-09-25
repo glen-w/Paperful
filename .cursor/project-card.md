@@ -19,7 +19,7 @@ coverage_cmd: uv run pytest --cov=paperful --cov-report=term-missing -q
 docker_build_cmd: docker compose build
 docker_smoke_cmd: docker compose run --rm paperful doctor
 docker_operator_cmd: docker compose run --rm paperful
-preferred_deploy: Docker Compose build-local (docs/docker.md); uv is the contributor path
+preferred_deploy: Docker Compose build-local (docs/howto/docker.md); uv is the contributor path
 architecture_rules:
   - CLI orchestrates only (no download/resolve logic in cli.py)
   - source adapters under sources/ must not write the manifest or out_dir
@@ -48,7 +48,7 @@ high_leverage_tests: Sci-Hub HTML parse and captcha/not-found classification; re
 probe_small: uv run pytest tests/test_scihub.py tests/test_resolve.py tests/test_zot_local.py tests/test_playbooks.py -q (offline fixture HTML + Docker-related unit tests)
 probe_large: uv run paperful run --collection <user-named small collection> --dry-run (requires Zotero); optional docker compose run --rm paperful run --collection <…> --dry-run; if Zotero unavailable → skipped
 probe_extra: uv run paperful doctor; optionally uv run paperful mirrors / collections; docker compose equivalents are optional; never touch sibling ports
-doc_contracts: README.md and docs/docker.md (build-local Compose is the operator install; uv is Develop)
+doc_contracts: README.md and docs/start/quickstart.md + docs/howto/docker.md (build-local Compose is the operator install; uv is Develop/Contribute)
 ```
 
 Skipped on instantiate (no surface): `streamlit.md`, `rebuild.md`.

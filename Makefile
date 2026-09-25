@@ -7,9 +7,10 @@
 help:
 	@echo "paperful Makefile"
 	@echo ""
-	@echo "Usual path: uv run paperful <cmd>  (see README)"
+	@echo "Operator install: docker compose build && docker compose run --rm paperful <cmd>"
+	@echo "Contributor path:  uv run paperful <cmd>  (see CONTRIBUTING.md)"
 	@echo ""
-	@echo "Docker (optional pack):"
+	@echo "Docker (operator):"
 	@echo "  docker-build      Build the paperful image via Compose"
 	@echo "  docker-doctor     Run paperful doctor in the container"
 	@echo ""
@@ -18,8 +19,8 @@ help:
 	@echo "  docs-clean        Remove Sphinx build artifacts"
 	@echo "  pages-site        Assemble website/ + Sphinx guide into _site/ (GitHub Pages)"
 	@echo ""
-	@echo "Usage: uv run paperful <cmd>"
-	@echo "       docker compose run --rm paperful <cmd>   # optional image"
+	@echo "Usage: docker compose run --rm paperful <cmd>"
+	@echo "       uv run paperful <cmd>                    # contributors"
 	@echo "       uv sync --extra docs && make docs"
 
 docker-build:

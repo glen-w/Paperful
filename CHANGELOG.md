@@ -6,6 +6,12 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+Documentation sweep: Diataxis layout under `docs/` (`start/`, `paths/`,
+`howto/`, `reference/`, `explain/`, `contribute/`), a slim Quick start, and
+three paths to results (fill PDFs, quiet mirror, snowball). Flat
+`docs/<page>.md` stubs keep old GitHub and CLI links working. Operator install
+stays Docker Compose; `uv` is the contributor path.
+
 Snowball wave 3: ORCID and collection seeds, `--direction cites|both`, depth
 above 1 (soft ceiling 5) under the existing caps, `approve-batch` queues with
 `keep` plus `paperful snowball apply <run-id>`, and profiles for `orcid` /
