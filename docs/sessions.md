@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Browser sessions
 
 This page moved to [Browser sessions](howto/sessions.md).

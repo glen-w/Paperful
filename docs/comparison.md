@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # How paperful compares
 
 This page moved to [How paperful compares](explain/comparison.md).

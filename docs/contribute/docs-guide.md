@@ -20,10 +20,11 @@ link to it from the guide, do not duplicate the full setup here.
 
 ## Stubs and redirects
 
-Flat files at `docs/<name>.md` (for example `docs/zotero.md`) are **stubs**.
-They exist so CLI messages, CHANGELOG links, and old bookmarks keep working.
-Put new prose only in the canonical folder path. When you move a page, update
-the stub to point at the new file.
+Flat files at `docs/<name>.md` (for example `docs/zotero.md`) are **stubs**
+marked `orphan: true`. They exist so CLI messages, CHANGELOG links, and old
+bookmarks keep working, and they are not listed in the sidebar. Put new prose
+only in the canonical folder path. When you move a page, update the stub to
+point at the new file.
 
 Hosted HTML for old names (`/guide/zotero.html`) is built from those stubs.
 

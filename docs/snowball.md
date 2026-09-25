@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Snowball
 
 This page moved to [Snowball](paths/snowball.md).

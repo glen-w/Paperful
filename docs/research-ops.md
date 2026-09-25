@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Research operators
 
 This page moved to [Research operators](howto/research-ops.md).

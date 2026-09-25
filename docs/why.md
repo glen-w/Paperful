@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Why paperful
 
 This page moved to [Why paperful](start/why.md).

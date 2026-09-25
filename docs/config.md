@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Configuration
 
 This page moved to [Configuration](reference/config.md).

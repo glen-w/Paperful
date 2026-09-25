@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Campus EZProxy
 
 This page moved to [Campus EZProxy](howto/ezproxy.md).

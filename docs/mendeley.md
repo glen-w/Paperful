@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Mendeley
 
 This page moved to [Mendeley](howto/mendeley.md).

@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Roadmap
 
 This page moved to [Roadmap](contribute/ROADMAP.md).

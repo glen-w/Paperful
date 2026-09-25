@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Sources
 
 This page moved to [Sources](reference/sources.md).

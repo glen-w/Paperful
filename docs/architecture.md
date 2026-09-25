@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Architecture
 
 This page moved to [Architecture](explain/architecture.md).

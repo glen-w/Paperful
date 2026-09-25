@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Docker
 
 This page moved to [Docker](howto/docker.md).

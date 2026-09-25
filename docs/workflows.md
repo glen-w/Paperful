@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Workflows
 
 This page moved to [Workflows](howto/workflows.md).

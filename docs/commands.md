@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Commands
 
 This page moved to [Commands](reference/commands.md).

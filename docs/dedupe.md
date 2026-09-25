@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Dedupe
 
 This page moved to [Dedupe](howto/dedupe.md).

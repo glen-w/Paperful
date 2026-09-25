@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Quiet mirror
 
 This page moved to [Quiet mirror](paths/quiet-mirror.md).

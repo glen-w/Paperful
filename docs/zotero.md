@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Zotero
 
 This page moved to [Zotero](howto/zotero.md).

@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # EndNote
 
 This page moved to [EndNote](howto/endnote.md).

@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Releases
 
 This page moved to [Releases](start/releases.md).

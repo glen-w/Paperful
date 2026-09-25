@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Sci-Hub
 
 This page moved to [Sci-Hub](howto/scihub.md).

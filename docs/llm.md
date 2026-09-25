@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # LLM
 
 This page moved to [LLM](howto/llm.md).

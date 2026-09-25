@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Comparison reference
 
 This page moved to [Comparison reference](reference/comparison-reference.md).
