@@ -114,6 +114,22 @@ library = "{enl}"
     assert cfg.endnote_library == enl.resolve()
 
 
+def test_attachments_flags_default_off(tmp_path):
+    from paperful.config import Config
+
+    p = tmp_path / "config.toml"
+    p.write_text(
+        'email = "me@example.org"\n\n[attachments]\n'
+        "fix_broken = true\nmerge_files = true\nrename = true\nlink = true\n"
+    )
+    cfg = load_config(p)
+    assert cfg.attachments_fix_broken is True
+    assert cfg.attachments_merge_files is True
+    assert cfg.attachments_rename is True
+    assert cfg.attachments_link is True
+    assert Config().attachments_link is False
+
+
 def test_mirror_pdfs_mode(tmp_path):
     p = tmp_path / "config.toml"
     p.write_text('email = "me@example.org"\n\n[mirror]\npdfs = "all"\n')

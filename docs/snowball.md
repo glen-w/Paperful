@@ -301,7 +301,7 @@ dedupe_scope = "library" # library | collection | none
 fetch_pdfs = "off"       # off | fast | full. true means fast
 tag_prefix = "paperful-snowball"
 note_provenance = true
-backends = ["openalex", "crossref", "semanticscholar", "orcid"]
+backends = ["openalex", "crossref", "semanticscholar", "orcid", "europepmc", "pdf"]
 languages = []           # empty = do not filter; a missing language is kept
 min_seed_citations = 0
 hybrid_seeds = 5
@@ -318,7 +318,7 @@ OpenAlex ignores `mailto`. Snowball calls OpenAlex without an API key first, so 
 
 Semantic Scholar’s Academic Graph is public, so snowball calls it with no key. That unauthenticated pool is shared and can be throttled. Heavier use needs a private key: [request one](https://www.semanticscholar.org/product/api#api-key-form) (it arrives by email; the introductory limit is 1 request per second). Put it in `SEMANTIC_SCHOLAR_API_KEY`. Like `OPENALEX_API_KEY`, it stays in the environment, never in `config.toml`.
 
-Each crawl writes `state/snowball/<run-id>/candidates.jsonl` as it goes, for OpenAlex, Crossref, Semantic Scholar, and ORCID alike. A rate limit, outage, or interrupt keeps that file and `deferred.json`. Continue with:
+Each crawl writes `state/snowball/<run-id>/candidates.jsonl` as it goes, for every configured backend. A rate limit, outage, or interrupt keeps that file and `deferred.json`. Continue with:
 
 ```sh
 paperful snowball resume <run-id>
@@ -330,20 +330,25 @@ Short 429s and 5xx responses retry with exponential backoff. A reset of a minute
 `snowball profile save` writes seeds and knobs only, after a successful
 dry-run, or with `--force`. It refuses to store a key.
 
-Backends resolve in order and emit each work once, keyed by DOI: OpenAlex
-first, Crossref fills empty metadata fields, Semantic Scholar fills reference
-gaps with or without a key, ORCID for the person’s own work list. OpenAlex wins when it and Crossref
-disagree on a field that both filled. Semantic Scholar responses are cached
-under `state/snowball/cache/`. `backends` must include `openalex`. An unknown
-name is a config error. Dropping `orcid` skips the public works list and keeps
-the OpenAlex author filter.
+Backends resolve in the configured order and emit each work once, keyed by DOI.
+The default is OpenAlex, then Crossref (empty fields and DOI references), Semantic Scholar
+(reference gaps, with or without a key), ORCID (the person’s own work list), Europe PMC
+citations, then an open-PDF bibliography. Reorder `backends` when a key or proxy makes
+a later source the better first try. OpenAlex wins when it and a later backend
+disagree on a field that both filled. A 429 or 5xx pauses that backend and the pass
+continues with the next one. After the pass, each paused backend is tried once more
+on only its remaining DOIs. DOIs still blocked stay in `deferred.json`. Items no
+paused backend still lists are created, and their PDFs are fetched when `fetch_pdfs`
+is `fast` or `full`. An open PDF already downloaded for the bibliography is written
+onto the item. Semantic Scholar responses are cached under `state/snowball/cache/`.
+`backends` must include `openalex`. An unknown name is a config error. Dropping
+`orcid` skips the public works list and keeps the OpenAlex author filter.
 
-When OpenAlex lists no `referenced_works` for a seed (and Crossref / Semantic
-Scholar are empty too), a refs hop does not treat that as “cites nothing”. It
-asks Semantic Scholar for DOI references first, then — only if that is still
-empty and the work has an open PDF URL — reads the PDF bibliography and resolves
-entries back to OpenAlex (DOI match, or a strict title match). Cited-by stays
-OpenAlex-only.
+When OpenAlex lists no `referenced_works` for a seed, a refs hop does not treat
+that as “cites nothing”. It asks Semantic Scholar, then Europe PMC, then an open
+PDF bibliography, and resolves entries back to OpenAlex (DOI match, or a strict
+title match). A pause on one of those sources does not stop the hop. Cited-by
+stays OpenAlex-only.
 
 `snowball run --profile NAME` prints that profile’s one-line description
 before any request. `mode` is `search`, `hybrid`, `doi`, `orcid`, or

@@ -197,6 +197,10 @@ walkthrough, model advice, Docker networking, and troubleshooting: [LLM](llm.md)
 | `[browser_agent].max_steps` / `max_wall_s` | `20` / `300` | Step and wall-clock caps for `recover` (agent stops early once a valid PDF lands) |
 | `[ocr].languages` | `eng` | Tesseract languages for `paperful ocr` (`eng+fra` or `eng fra`) |
 | `[ocr].timeout_s` | `600` | Seconds allowed per PDF |
+| `[attachments].fix_broken` | `false` | With `attachments --apply`, refill a ghost or broken link from `out/` when the MD5 matches |
+| `[attachments].merge_files` | `false` | With `--apply`, trash extra PDF children on the same parent that share an MD5 |
+| `[attachments].rename` | `false` | With `--apply`, rename files under `out/` to the mirror stem |
+| `[attachments].link` | `false` | With `--apply`, stored-to-linked under `out/` (personal Zotero library only) |
 | `[browser_agent].during_run` | `true` | When `[llm].enabled` and the extra is installed, `run` appends `browser_agent` after Scholar / EZProxy / htmlpdf |
 | `[browser_agent].model` | (`[llm].model`) | Larger model for browsing only; `doctor` warns under ~10B |
 

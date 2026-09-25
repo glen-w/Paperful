@@ -64,7 +64,7 @@ flowchart LR
 | `state/reports/<slug>.html` | `synthesize` literature review; sibling `<slug>.json` records source hashes |
 | `state/sessions/` | Chromium profile + `meta.json` (login timestamps, no secrets). Netscape dumps for httpx |
 | `state/last-run.json` | Latest `run` or `recover` report (`paperful.run_report.v1`). Other verbs do not replace it |
-| `state/runs/<stamp>-<command>.json` | One report per `run`, `recover`, `gaps`, `lint`, `fix-metadata` (dry-run and `--apply`), `summarize`, `synthesize`, and `snapshot` |
+| `state/runs/<stamp>-<command>.json` | One report per `run`, `recover`, `gaps`, `lint`, `fix-metadata` (dry-run and `--apply`), `attachments` (dry-run and `--apply`), `summarize`, `synthesize`, and `snapshot` |
 | `state/packs/<id>.json` | Parent witness (`paperful.pack.v1`) listing those reports for one `pack open` … `pack close` sequence. `state/packs/current` names the open id |
 | `state/mendeley-oauth.json` | Mendeley tokens after `session login mendeley` (mode `0600`) |
 | `state/endnote-import/<stamp>/` | EndNote XML+PDF bundle for File → Import. Never an edit of `.enl` |
@@ -141,7 +141,7 @@ folder sync is out of scope for this CLI.
 
 ## Ghost attachments
 
-Zotero can show **The attached file could not be found** for a path under the data directory’s `storage/<key>/`. The attachment record is there (MD5 and storage folder) but the bytes never landed on this machine. That is a ghost, not a file moved or deleted outside Zotero.
+Zotero can show **The attached file could not be found** for a path under the data directory’s `storage/<key>/`. The attachment record is there (MD5 and storage folder) but the bytes never landed on this machine. That is a ghost, not a file moved or deleted outside Zotero. `paperful attachments` reports it. `--fix-broken --apply` refills the row only when `out/` already has a PDF with the same MD5.
 
 Attachments created through the API as `imported_url` open that storage slot without always finishing a local download. `linked_url` attachments (including a quota-full open-access pass) do not use that path: they open in the browser and do not raise this dialog. Paperful’s attach path is `imported_file`: the PDF is already on disk, then uploaded through the local write API. The Zotero attachment note is a provenance stamp (`paperful oa:unpaywall`, `campus:ezproxy`, `grey:<playbook>`, `pirate:scihub`, …). Title stays `Full Text PDF`. The parent also gets a readable line ("Free copy from Unpaywall.") unless `[remarks].surface` is `off`. Prefer `paperful run` / `paperful attach` for gap-fills so the file is written on this machine.
 

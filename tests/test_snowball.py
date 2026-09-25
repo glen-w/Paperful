@@ -807,7 +807,7 @@ def test_fill_resume_creates_rows_the_fill_added(tmp_path: Path, monkeypatch):
     )
     monkeypatch.setattr(
         "paperful.snowball.command._fill_metadata",
-        lambda *a, **k: [seed, child],
+        lambda *a, **k: ([seed, child], {}),
     )
     monkeypatch.setattr("paperful.snowball.command.get_backend", lambda cfg: object())
     seen: dict[str, list[str]] = {}
@@ -2439,3 +2439,160 @@ def test_watch_apply_creates_from_proposed_queue(tmp_path: Path):
     assert applied.exit_code == 0
     assert len(lib.created) == 1
     assert lib.created[0]["DOI"] == "10.1000/b"
+
+
+def test_fill_pause_continues_and_retries_then_writes_settled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from paperful.snowball.fill import FillPaused, run_fill_pass
+    from paperful.snowball.candidate import Candidate
+
+    calls: list[str] = []
+
+    def s2(doi: str) -> dict:
+        calls.append(f"s2:{doi}")
+        raise FillPaused("semanticscholar", [doi])
+
+    def epmc(doi: str) -> dict:
+        calls.append(f"epmc:{doi}")
+        if doi in {"10.1000/seed", "10.1000/new"}:
+            return {"references": [{"doi": "10.1000/from-epmc", "title": "From PMC", "year": 2020}]}
+        return {}
+
+    def pdf(doi: str) -> dict:
+        calls.append(f"pdf:{doi}")
+        return {"references": [{"doi": "10.1000/from-pdf", "title": "From PDF", "year": 2019}]}
+
+    seed = Candidate(
+        "r",
+        {"type": "doi", "value": "10.1000/seed"},
+        0,
+        "refs",
+        {"doi": "10.1000/seed"},
+        {"title": "Seed"},
+        "seed",
+        "new",
+        {"backend": "openalex"},
+        "auto",
+    )
+    order_seen: list[str] = []
+
+    def tracking_s2(doi: str) -> dict:
+        order_seen.append("semanticscholar")
+        return s2(doi)
+
+    def tracking_epmc(doi: str) -> dict:
+        order_seen.append("europepmc")
+        return epmc(doi)
+
+    def tracking_pdf(doi: str) -> dict:
+        order_seen.append("pdf")
+        return pdf(doi)
+
+    rows = [seed]
+    paused = run_fill_pass(
+        rows,
+        ("openalex", "semanticscholar", "europepmc", "pdf"),
+        crossref_getter=None,
+        s2_getter=tracking_s2,
+        europepmc_getter=tracking_epmc,
+        pdf_getter=tracking_pdf,
+        per_hop_limit=15,
+        direction="refs",
+    )
+    assert paused.get("semanticscholar")
+    assert "10.1000/seed" in paused["semanticscholar"]
+    assert order_seen[:3] == ["semanticscholar", "europepmc", "pdf"]
+    assert calls.count("s2:10.1000/seed") == 2
+    dois = {row.ids["doi"] for row in rows}
+    assert "10.1000/from-epmc" in dois
+    assert "10.1000/from-pdf" in dois
+
+    works = {
+        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 1, refs=["W2"]),
+        "W2": _work("W2", "10.1000/new", "New", 2021, 1),
+    }
+    fetched: list[str] = []
+
+    def fake_fill_pdfs(cfg, backend, items, console, **kwargs):
+        fetched.extend(item.doi or "" for item in items)
+        return type("S", (), {"ok": len(items), "attached": 0})()
+
+    monkeypatch.setattr("paperful.snowball.command.fill_pdfs", fake_fill_pdfs)
+    client = _client(works)
+    client.epmc_getter = epmc
+    client.pdf_getter = lambda doi: {}
+    lib = _CreateLib()
+    result = run_doi(
+        _cfg(tmp_path),
+        ["10.1000/seed"],
+        SnowballRequest(gate="auto", collection="Inbox/Snowball", fetch_pdfs="fast", backends=("openalex", "semanticscholar", "europepmc", "pdf")),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=client,
+        lookup=lambda doi, title: None,
+        backend=lib,
+        s2_getter=s2,
+    )
+    assert result.exit_code == 1
+    assert (result.run_dir / "deferred.json").is_file()
+    created = set(lib.created)
+    assert "10.1000/new" not in created
+    assert "10.1000/from-epmc" in created
+    assert "10.1000/new" not in fetched
+    assert "10.1000/from-epmc" in fetched
+
+
+def test_fill_order_follows_backends_and_cached_pdf_is_written(tmp_path: Path):
+    from paperful.snowball.command import _write_cached_pdfs
+    from paperful.snowball.fill import run_fill_pass
+    from paperful.zot import Item
+
+    seen: list[str] = []
+
+    def pdf(doi: str) -> dict:
+        seen.append("pdf")
+        return {}
+
+    def epmc(doi: str) -> dict:
+        seen.append("europepmc")
+        return {}
+
+    row = Candidate(
+        "r",
+        {"type": "doi", "value": "10.1000/seed"},
+        0,
+        "refs",
+        {"doi": "10.1000/seed"},
+        {"title": "Seed"},
+        "seed",
+        "new",
+        {"backend": "openalex"},
+        "auto",
+    )
+    run_fill_pass(
+        [row],
+        ("pdf", "europepmc"),
+        crossref_getter=None,
+        s2_getter=None,
+        europepmc_getter=epmc,
+        pdf_getter=pdf,
+        per_hop_limit=5,
+        direction="refs",
+    )
+    assert seen == ["pdf", "europepmc"]
+
+    blob = tmp_path / "open.pdf"
+    blob.write_bytes(b"%PDF-1.4 cached")
+    row.biblio["cached_pdf"] = str(blob)
+    item = Item(
+        key="ITEM",
+        item_type="journalArticle",
+        title="Seed",
+        doi="10.1000/seed",
+        arxiv_id=None,
+        url=None,
+        year=2020,
+        first_author="Ada",
+        collection_paths=["Inbox"],
+    )
+    _write_cached_pdfs(_cfg(tmp_path), [item], [row])
+    written = list((tmp_path / "out").rglob("*.pdf"))
+    assert written and written[0].read_bytes() == b"%PDF-1.4 cached"

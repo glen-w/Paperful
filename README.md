@@ -60,7 +60,9 @@ also gets a readable line ("Free copy from Unpaywall."), as a note unless
 propose patches on disk; `--apply` writes them. `dedupe` reviews duplicates.
 `--apply` writes "Same paper as Smith 2019, which already has the PDF." on
 the spare copy, then merges that parent's PDF, notes, and better fields onto
-the keeper. `summarize` writes a grounded note
+the keeper. `attachments` reports broken links, ghosts, and duplicate PDFs
+and does not change Zotero unless you pass a surgery flag with `--apply`.
+`summarize` writes a grounded note
 from a text-layer PDF; `synthesize` reviews those notes. `paperful all` runs
 gaps → find → lint → fix → summarise. The model is off until `[llm].enabled`.
 `paperful ocr --apply` adds a text layer to scanned PDFs on disk.
@@ -138,7 +140,7 @@ big run. If you keep `scholar` in `sources`, log in once on the host with
 `paperful session login scholar` — see [Browser sessions](docs/sessions.md).
 
 Flags `--year-from` / `--year-to` and `--type` / `-T` also work on `lint`,
-`fix-metadata`, `dedupe`, `gaps`, `summarize`, `synthesize`, `snapshot`, and
+`fix-metadata`, `dedupe`, `attachments`, `gaps`, `summarize`, `synthesize`, `snapshot`, and
 `restore`. Save them with `paperful profile save`. See
 [Commands](docs/commands.md) and [Workflows](docs/workflows.md).
 

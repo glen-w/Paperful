@@ -33,12 +33,17 @@ def fill_crossref(
     *,
     progress: Callable[[str], None] | None = None,
     tally: Any = None,
-) -> None:
+    per_hop_limit: int = 0,
+    direction: str = "refs",
+    only_dois: set[str] | None = None,
+) -> list[Candidate]:
     pending = [
         row
         for row in rows
-        if row.status != "error" and (row.ids.get("doi") or "") and not _complete(row)
+        if row.status != "error" and (row.ids.get("doi") or "") and _wanted(row, only_dois)
     ]
+    added: list[Candidate] = []
+    known = {row.identity for row in rows if row.identity}
     if tally is not None and pending:
         tally.stage = "crossref"
         tally.track(len(pending))
@@ -51,16 +56,19 @@ def fill_crossref(
         try:
             payload = getter(doi)
         except FillPaused as exc:
-            raise FillPaused("crossref", _remaining_dois(rows, row)) from exc
+            raise FillPaused("crossref", _remaining_dois(pending, row)) from exc
         if not payload:
             if tally is not None:
                 tally.advance(1)
             continue
+        filled = _fill_empty(row, payload, backend="crossref") if not _complete(row) else 0
+        added.extend(
+            _neighbor_rows(row, _ref_dicts(payload), known, backend="crossref", per_hop_limit=per_hop_limit, direction=direction)
+        )
         if tally is not None:
-            tally.fields += _fill_empty(row, payload, backend="crossref")
+            tally.fields += filled
             tally.advance(1)
-        else:
-            _fill_empty(row, payload, backend="crossref")
+    return added
 
 
 def fill_semanticscholar(
@@ -70,12 +78,17 @@ def fill_semanticscholar(
     per_hop_limit: int,
     direction: str,
     tally: Any = None,
+    only_dois: set[str] | None = None,
 ) -> list[Candidate]:
     """Fill holes and append reference neighbours OpenAlex did not already emit."""
     added: list[Candidate] = []
     known = {row.identity for row in rows if row.identity}
     want_refs = direction in {"refs", "both"}
-    pending = [row for row in rows if (row.ids.get("doi") or "") and row.status != "error"]
+    pending = [
+        row
+        for row in rows
+        if (row.ids.get("doi") or "") and row.status != "error" and _wanted(row, only_dois)
+    ]
     if tally is not None and pending:
         tally.stage = "semantic scholar"
         tally.track(len(pending))
@@ -86,7 +99,7 @@ def fill_semanticscholar(
         try:
             payload = getter(doi)
         except FillPaused as exc:
-            raise FillPaused("semanticscholar", _remaining_dois(rows, row)) from exc
+            raise FillPaused("semanticscholar", _remaining_dois(pending, row)) from exc
         if not payload:
             if tally is not None:
                 tally.advance(1)
@@ -110,45 +123,17 @@ def fill_semanticscholar(
             tally.advance(1)
         if not want_refs:
             continue
-        kept = 0
-        for ref in payload.get("references") or []:
-            if per_hop_limit > 0 and kept >= per_hop_limit:
-                break
-            if not isinstance(ref, dict):
-                continue
-            ref_doi = str((ref.get("externalIds") or {}).get("DOI") or "").lower()
-            if not ref_doi:
-                continue
-            ident = f"doi:{ref_doi}"
-            if ident in known:
-                continue
-            known.add(ident)
-            child = Candidate(
-                run_id=row.run_id,
-                seed=dict(row.seed),
-                hop=row.hop + 1 if row.hop else 1,
-                direction="refs",
-                ids={"doi": ref_doi},
-                biblio={
-                    "title": ref.get("title") or "",
-                    "year": ref.get("year"),
-                    "authors": [],
-                    "venue": "",
-                    "type": "article",
-                    "cited_by_count": 0,
-                    "seed_keys": [f"{row.seed.get('type')}:{row.seed.get('value')}"],
-                },
-                why=f"s2 ref of {doi}",
-                status="new",
-                provenance={
-                    "backend": "semanticscholar",
-                    "endpoint": "/graph/v1/paper",
-                    "retrieved_at": "",
-                },
-                gate=row.gate,
+        added.extend(
+            _neighbor_rows(
+                row,
+                _s2_refs(payload),
+                known,
+                backend="semanticscholar",
+                per_hop_limit=per_hop_limit,
+                direction=direction,
+                why_prefix="s2 ref of",
             )
-            added.append(child)
-            kept += 1
+        )
     return added
 
 
@@ -163,6 +148,87 @@ def _remaining_dois(rows: list[Candidate], start: Candidate) -> list[str]:
             if doi:
                 pending.append(doi)
     return pending
+
+
+def _wanted(row: Candidate, only_dois: set[str] | None) -> bool:
+    if only_dois is None:
+        return True
+    return (row.ids.get("doi") or "").lower() in only_dois
+
+
+def _ref_dicts(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    refs = []
+    for ref in payload.get("references") or []:
+        if isinstance(ref, dict) and (ref.get("doi") or ref.get("title")):
+            refs.append(ref)
+    return refs
+
+
+def _s2_refs(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    refs = []
+    for ref in payload.get("references") or []:
+        if not isinstance(ref, dict):
+            continue
+        refs.append(
+            {
+                "doi": str((ref.get("externalIds") or {}).get("DOI") or ""),
+                "title": ref.get("title") or "",
+                "year": ref.get("year"),
+            }
+        )
+    return refs
+
+
+def _neighbor_rows(
+    row: Candidate,
+    refs: list[dict[str, Any]],
+    known: set[str],
+    *,
+    backend: str,
+    per_hop_limit: int,
+    direction: str,
+    why_prefix: str = "",
+) -> list[Candidate]:
+    if direction not in {"refs", "both"}:
+        return []
+    added: list[Candidate] = []
+    kept = 0
+    prefix = why_prefix or f"{backend} ref of"
+    parent = row.ids.get("doi") or ""
+    for ref in refs:
+        if per_hop_limit > 0 and kept >= per_hop_limit:
+            break
+        ref_doi = str(ref.get("doi") or "").strip().lower()
+        if not ref_doi:
+            continue
+        ident = f"doi:{ref_doi}"
+        if ident in known:
+            continue
+        known.add(ident)
+        added.append(
+            Candidate(
+                run_id=row.run_id,
+                seed=dict(row.seed),
+                hop=row.hop + 1 if row.hop else 1,
+                direction="refs",
+                ids={"doi": ref_doi},
+                biblio={
+                    "title": ref.get("title") or "",
+                    "year": ref.get("year"),
+                    "authors": [],
+                    "venue": "",
+                    "type": "article",
+                    "cited_by_count": 0,
+                    "seed_keys": [f"{row.seed.get('type')}:{row.seed.get('value')}"],
+                },
+                why=f"{prefix} {parent}".strip(),
+                status="new",
+                provenance={"backend": backend, "endpoint": backend, "retrieved_at": ""},
+                gate=row.gate,
+            )
+        )
+        kept += 1
+    return added
 
 
 def _complete(row: Candidate) -> bool:
@@ -225,6 +291,15 @@ def crossref_work(doi: str, *, email: str = "") -> dict[str, Any] | None:
         "year": year,
         "venue": venues[0] if venues else "",
         "authors": authors,
+        "references": [
+            {
+                "doi": str(ref.get("DOI") or ref.get("doi") or ""),
+                "title": str(ref.get("article-title") or ref.get("unstructured") or ""),
+                "year": ref.get("year"),
+            }
+            for ref in (message.get("reference") or [])
+            if isinstance(ref, dict)
+        ],
     }
 
 
@@ -303,3 +378,130 @@ def s2_paper(doi: str, *, cache_dir: Path, api_key: str) -> dict[str, Any] | Non
 
 def s2_api_key() -> str:
     return os.environ.get("SEMANTIC_SCHOLAR_API_KEY", "").strip()
+
+
+def _has_outgoing(row: Candidate, rows: list[Candidate]) -> bool:
+    doi = (row.ids.get("doi") or "").lower()
+    if not doi:
+        return False
+    return any(doi in (child.why or "").lower() for child in rows if child is not row)
+
+
+def fill_payload_backend(
+    rows: list[Candidate],
+    getter: CrossrefGet,
+    *,
+    backend: str,
+    per_hop_limit: int,
+    direction: str,
+    tally: Any = None,
+    only_dois: set[str] | None = None,
+    only_without_refs: bool = False,
+) -> list[Candidate]:
+    added: list[Candidate] = []
+    known = {row.identity for row in rows if row.identity}
+    pending = [
+        row
+        for row in rows
+        if (row.ids.get("doi") or "")
+        and row.status != "error"
+        and _wanted(row, only_dois)
+        and not (only_without_refs and _has_outgoing(row, rows))
+    ]
+    if tally is not None and pending:
+        tally.stage = backend
+        tally.track(len(pending))
+    for row in pending:
+        doi = row.ids.get("doi") or ""
+        if tally is not None:
+            tally.searches += 1
+        try:
+            payload = getter(doi)
+        except FillPaused as exc:
+            raise FillPaused(backend, _remaining_dois(pending, row)) from exc
+        if not payload:
+            if tally is not None:
+                tally.advance(1)
+            continue
+        if payload.get("cached_pdf"):
+            row.biblio["cached_pdf"] = str(payload["cached_pdf"])
+        cached = str(payload.get("cached_pdf") or "")
+        if cached:
+            row.biblio["cached_pdf"] = cached
+        if tally is not None:
+            tally.fields += _fill_empty(row, payload, backend=backend)
+            tally.advance(1)
+        else:
+            _fill_empty(row, payload, backend=backend)
+        added.extend(
+            _neighbor_rows(
+                row,
+                _ref_dicts(payload),
+                known,
+                backend=backend,
+                per_hop_limit=per_hop_limit,
+                direction=direction,
+            )
+        )
+    return added
+
+
+def run_fill_pass(
+    rows: list[Candidate],
+    backends: tuple[str, ...],
+    *,
+    crossref_getter: CrossrefGet | None,
+    s2_getter: S2Get | None,
+    europepmc_getter: CrossrefGet | None,
+    pdf_getter: CrossrefGet | None,
+    per_hop_limit: int,
+    direction: str,
+    tally: Any = None,
+) -> dict[str, list[str]]:
+    """Walk citation backends in order. A pause continues the pass, then one retry."""
+    paused: dict[str, list[str]] = {}
+    order = [name for name in backends if name in {"crossref", "semanticscholar", "europepmc", "pdf"}]
+
+    def once(names: list[str], *, retry: bool) -> None:
+        for name in names:
+            only = {doi.lower() for doi in paused.get(name, [])} if retry else None
+            if retry and not only:
+                continue
+            getter = {
+                "crossref": crossref_getter,
+                "semanticscholar": s2_getter,
+                "europepmc": europepmc_getter,
+                "pdf": pdf_getter,
+            }[name]
+            if getter is None:
+                continue
+            try:
+                if name == "crossref":
+                    added = fill_crossref(
+                        rows, getter, per_hop_limit=per_hop_limit, direction=direction, tally=tally, only_dois=only
+                    )
+                elif name == "semanticscholar":
+                    added = fill_semanticscholar(
+                        rows, getter, per_hop_limit=per_hop_limit, direction=direction, tally=tally, only_dois=only
+                    )
+                else:
+                    added = fill_payload_backend(
+                        rows,
+                        getter,
+                        backend=name,
+                        per_hop_limit=per_hop_limit,
+                        direction=direction,
+                        tally=tally,
+                        only_dois=only,
+                        only_without_refs=name == "pdf",
+                    )
+            except FillPaused as exc:
+                paused[exc.backend] = list(exc.remaining)
+                continue
+            rows.extend(added)
+            paused.pop(name, None)
+
+    once(order, retry=False)
+    if paused:
+        once([name for name in order if name in paused], retry=True)
+    return paused

@@ -143,6 +143,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "lint",
         "fix-metadata",
         "dedupe",
+        "attachments",
         "versions",
         "ocr",
         "summarize",
@@ -1280,8 +1281,273 @@ def dedupe(
             console.print(f"Errors: {len(errors)}")
             for err in errors[:20]:
                 console.print(f"[yellow]{err}[/]")
-    if errors:
+        if errors:
+            raise typer.Exit(1)
+
+
+@app.command()
+def attachments(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Report only. This is the default; do not combine with --apply.",
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Run the named surgery flags. With no flags, this still only writes the report.",
+    ),
+    fix_broken: bool | None = typer.Option(
+        None,
+        "--fix-broken/--no-fix-broken",
+        help="Refill a ghost or broken link from out/ when the MD5 matches.",
+    ),
+    merge_files: bool | None = typer.Option(
+        None,
+        "--merge-files/--no-merge-files",
+        help="Trash extra PDF children on the same parent that share an MD5.",
+    ),
+    rename: bool | None = typer.Option(
+        None,
+        "--rename/--no-rename",
+        help="Rename attachment files under out/ to the mirror stem.",
+    ),
+    link: bool | None = typer.Option(
+        None,
+        "--link/--no-link",
+        help="Turn a stored PDF into a linked file under out/. Personal library only.",
+    ),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
+    as_json: bool = typer.Option(False, "--json", help="Print the summary as JSON."),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Compare Zotero attachments to the out/ mirror. Surgery needs a flag and --apply.
+
+    The default writes a report and does not change the library. ``--link`` is
+    refused for group libraries. Paths outside out/ are never moved or deleted.
+    """
+    from .attachments import (
+        SurgeryFlags,
+        apply_actions,
+        apply_refusal,
+        mirror_pdfs_for,
+        pdf_children,
+        plan_actions,
+        stem_filename,
+        summarize,
+    )
+
+    if _scope_unset(collection, library, profile, run_config):
+        _refuse_missing_scope()
+    cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=limit,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    limit = bound.limit
+    if dry_run and apply:
+        console.print("[red]Pass either --dry-run or --apply, not both.[/]")
         raise typer.Exit(1)
+    if not collection and not library:
+        _refuse_missing_scope()
+    flags = SurgeryFlags(
+        fix_broken=_opt_bool(fix_broken, cfg.attachments_fix_broken),
+        merge_files=_opt_bool(merge_files, cfg.attachments_merge_files),
+        rename=_opt_bool(rename, cfg.attachments_rename),
+        link=_opt_bool(link, cfg.attachments_link),
+    )
+    _require_manager(cfg)
+    backend = _connect(cfg, quiet=as_json)
+    loaded = _loaded_scope(
+        backend,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    items, scope = loaded.items, loaded.label
+    if limit:
+        items = items[:limit]
+    started = time.time()
+    children = []
+    mirrors: dict = {}
+    stems: dict = {}
+    for item in items:
+        raw = []
+        try:
+            raw = backend.children(item.key) or []
+        except Exception:
+            raw = []
+        present = {
+            str(ch.get("key") or (ch.get("data") or {}).get("key") or ""): _child_bytes(
+                backend, ch
+            )
+            for ch in raw
+            if isinstance(ch, dict)
+        }
+        kids = pdf_children(item.key, raw, present=present)
+        children.extend(kids)
+        mirrors[item.key] = mirror_pdfs_for(cfg.out_dir, item)
+        stems[item.key] = stem_filename(item)
+    scan = plan_actions(
+        children,
+        mirrors,
+        stems,
+        flags,
+        out_dir=cfg.out_dir,
+        library_type=str(getattr(backend, "library_type", "user")),
+    )
+    applied = 0
+    errors: list[str] = list(scan.refusals)
+    if apply and flags.any:
+        refusal = apply_refusal(
+            manager=cfg.manager,
+            library_type=str(getattr(backend, "library_type", "user")),
+            link=flags.link,
+        )
+        if refusal:
+            errors.append(refusal)
+        elif not backend.supports_write():
+            _exit_env("This library has no write support.", cfg)
+        else:
+            try:
+                applied, apply_errors = apply_actions(
+                    backend, scan.actions, out_dir=cfg.out_dir
+                )
+            except LibraryError as exc:
+                _exit_env(str(exc))
+            errors.extend(apply_errors)
+    counts = summarize(scan.findings)
+    report_items = [
+        {
+            "kind": f.kind,
+            "parent": f.parent_key,
+            "attachment": f.attachment_key,
+            "detail": f.detail,
+            "md5": f.md5,
+        }
+        for f in scan.findings
+        if f.kind != "ok"
+    ]
+    write_command_report(
+        cfg,
+        command="attachments",
+        scope=scope,
+        summary={
+            "items": len(items),
+            "findings": counts,
+            "actions": len(scan.actions) if apply and flags.any else 0,
+            "applied": applied,
+        },
+        items=report_items,
+        flags={
+            "apply": apply,
+            "dry_run": dry_run or not apply,
+            "fix_broken": flags.fix_broken,
+            "merge_files": flags.merge_files,
+            "rename": flags.rename,
+            "link": flags.link,
+        },
+        started=started,
+        errors=errors,
+    )
+    payload = {
+        "scope": scope,
+        "items": len(items),
+        "findings": counts,
+        "actions": [
+            {"op": a.op, "parent": a.parent_key, "attachment": a.attachment_key}
+            for a in scan.actions
+        ],
+        "applied": applied,
+        "errors": errors,
+    }
+    if as_json:
+        console.print(
+            json.dumps(payload, indent=2), soft_wrap=True, highlight=False, markup=False
+        )
+    else:
+        console.print(f"Scope: [bold]{scope}[/] — {len(items)} items")
+        _print_attachment_table(counts)
+        if apply and flags.any and not errors:
+            console.print(f"Applied: {applied}")
+        elif flags.any and not apply:
+            console.print(
+                f"Would apply {len(scan.actions)} change(s). Pass [bold]--apply[/] to write them."
+            )
+        else:
+            console.print(
+                "Report only. Pass [bold]--fix-broken[/], [bold]--merge-files[/], "
+                "[bold]--rename[/], or [bold]--link[/] with [bold]--apply[/] to change Zotero."
+            )
+        if errors:
+            console.print(f"Errors: {len(errors)}")
+            for err in errors[:20]:
+                console.print(f"[yellow]{err}[/]")
+    if errors and apply:
+        raise typer.Exit(1)
+
+
+def _opt_bool(flag: bool | None, configured: bool) -> bool:
+    return configured if flag is None else flag
+
+
+def _child_bytes(backend: Any, child: dict[str, Any]) -> bool:
+    data = child.get("data") or {}
+    key = str(child.get("key") or data.get("key") or "")
+    if data.get("linkMode") == "linked_file":
+        path = data.get("path")
+        return bool(path) and Path(str(path)).is_file()
+    probe = getattr(backend, "attachment_has_bytes", None)
+    if probe is None or not key:
+        return True
+    try:
+        return bool(probe(key))
+    except Exception:
+        return False
+
+
+def _print_attachment_table(counts: dict[str, int]) -> None:
+    table = Table(title="Attachments")
+    table.add_column("Finding")
+    table.add_column("Count", justify="right")
+    order = (
+        "ok",
+        "ghost",
+        "broken_link",
+        "unrepairable",
+        "duplicate_file",
+        "cross_parent",
+        "rename_drift",
+        "stored",
+    )
+    shown = set()
+    for kind in order:
+        if kind in counts:
+            table.add_row(kind, str(counts[kind]))
+            shown.add(kind)
+    for kind, count in sorted(counts.items()):
+        if kind not in shown:
+            table.add_row(kind, str(count))
+    console.print(table)
 
 
 @app.command()

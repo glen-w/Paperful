@@ -72,7 +72,7 @@ Verify against each project’s latest release before upgrading Zotero.
 
 - **Sites:** [GitHub](https://github.com/glen-w/Paperful) · this repo
 - **Fit:** Research helper for a reference library: clean records, find missing PDFs, summarise papers, keep a platform-agnostic mirror. Routed OA stack (including CORE with API key), campus EZProxy, optional Scholar cookies, opt-in Sci-Hub, user playbooks for grey literature and field-specific hosts, and an opt-in AI browser after scripted lanes fail. Collection-mirrored `out/` tree (`snapshot` / `restore`, including `snapshot --pdfs all` for PDFs already in Zotero, `manifest.jsonl`), attach on Zotero 10+. Identifier verify (Crossref/OpenAlex/PubMed) + lint + `fix-metadata` on disk, then adapter write-back. `dedupe` writes a review pack and, with `--apply`, merges the extra parent's PDF, notes, and better fields onto the keeper, then trashes that parent (DOI, then title+year; Zotero only). `gaps` counts missing PDFs and DOIs. Optional local `summarize` / `synthesize` and `recover` (last `run` lane after Scholar / EZProxy / htmlpdf fail, or `recover --item`; text layer from the PDF or from `paperful ocr`; not a chat agent). **Zotero is the well-tested adapter.** Mendeley (REST) and EndNote (read-only database plus an import bundle) are seeking testers.
-- **With others:** StorScan or Attanger when paths and linked files are wrong; zotero-agent for disk GC or a two-up scan split; zotero-mcp when the work is a conversation.
+- **With others:** `paperful attachments` for a CLI report (and flagged repairs from `out/`); StorScan or Attanger when you want the work inside Zotero, including incoming downloads; zotero-agent for disk GC or a two-up scan split; zotero-mcp when the work is a conversation.
 - **Not a substitute for:** In-app plugin UX, `.bib` hygiene tools, or two-up scan splitting.
 
 ### Zotero built-in
@@ -91,7 +91,7 @@ Verify against each project’s latest release before upgrading Zotero.
 
 - **Sites:** [GitHub](https://github.com/brian-j-griffith/StorScan)
 - **Fit:** Attachment operations — scan, fix misplaced linked files, merge duplicate files.
-- **With paperful:** paperful fills missing PDFs; StorScan repairs layout.
+- **With paperful:** paperful `attachments` reports broken links, ghosts, and same-file duplicates, and can repair them from `out/` when you pass a flag and `--apply`. StorScan is the in-app scan.
 
 ### ZotMeta
 
@@ -103,7 +103,7 @@ Verify against each project’s latest release before upgrading Zotero.
 
 - **Sites:** [Attanger](https://github.com/MuiseDestiny/zotero-attanger) · [ZotMoov](https://github.com/wileyyugioh/zotmoov)
 - **Fit:** ZotFile-era workflows on Zotero 7+ — match downloads, rename/move linked files.
-- **With paperful:** Incoming-file organisation vs remote PDF hunt.
+- **With paperful:** Incoming-file organisation and tablet send/get. `paperful attachments --rename` and `--link` cover the mirror-stem rename and a stored-to-linked cutover under `out/`, and they stay off until `--apply`.
 
 ### zotero-agent
 

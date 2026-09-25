@@ -210,7 +210,7 @@ pdfs = "additional"
 # languages = []
 # min_seed_citations = 0
 # note_provenance = true
-# backends = ["openalex", "crossref", "semanticscholar", "orcid"]
+# backends = ["openalex", "crossref", "semanticscholar", "orcid", "europepmc", "pdf"]
 # approve_each_max = 20
 # hybrid_seeds = 5
 # refine = false
@@ -220,4 +220,11 @@ pdfs = "additional"
 # [ocr]
 # languages = "eng"       # eng+fra or "eng fra"
 # timeout_s = 600
+
+# Attachment layout. Off until `paperful attachments --apply`.
+# [attachments]
+# fix_broken = false
+# merge_files = false
+# rename = false
+# link = false
 

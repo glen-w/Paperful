@@ -26,8 +26,12 @@ that tree is nearby. Why this shape: [Why paperful](why.md).
 | **`state/`** | Append-only history (manifest, patches, dedupe, runs) plus secrets. `out/_history.json` points at the ledgers and does not copy sessions, cookies, or the API key |
 
 **Dual store for now.** Attach stays **`imported_file`**: bytes land under `out/`,
-then upload into Zotero `storage/`. Duplicate bytes are acceptable. Do **not**
-treat linked-file cutover (warehouse-as-only-bytes) as a 0.x goal.
+then upload into Zotero `storage/`. Duplicate bytes are acceptable.
+`paperful attachments` reports ghosts, broken links, and same-file duplicates
+and does not change that default. `--link` with `--apply` is the opt-in
+cutover: a personal library can point at the PDF under `out/` and drop the
+stored child. Group libraries cannot use linked files, so `--link` refuses
+them. Tablet send/get stays with Zotero.
 
 ```text
 Zotero library  →  paperful snapshot  →  out/<collection>/<stem -- KEY>/
@@ -93,7 +97,7 @@ exported yet.
 ## Non-goals (near term)
 
 - Not a second Zotero
-- Not linked-file migration in 0.x
+- Not a linked-file cutover unless you pass `attachments --link --apply`
 - Not a hosted multi-user warehouse
 - Not auto Sci-Hub or silent cloud defaults
 

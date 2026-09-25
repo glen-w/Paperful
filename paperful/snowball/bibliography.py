@@ -38,8 +38,8 @@ def recover_referenced_works(
 ) -> list[dict[str, Any]]:
     """OpenAlex works this seed cites when ``referenced_works`` is empty.
 
-    Tries Semantic Scholar DOI references first, then an open PDF bibliography.
-    Each returned work carries ``_recovery`` = ``semanticscholar`` or ``pdf``.
+    Tries Semantic Scholar, then Europe PMC, then an open PDF bibliography.
+    A pause does not abort the hop. Each returned work carries ``_recovery``.
     """
     if referenced_work_ids(work):
         return []
@@ -56,7 +56,7 @@ def recover_referenced_works(
         try:
             payload = getter(doi)
         except FillPaused:
-            raise
+            payload = None
         except Exception:
             payload = None
         works = _works_from_s2(client, payload)
@@ -65,7 +65,26 @@ def recover_referenced_works(
             client.note(f"recovered {len(works)} refs via Semantic Scholar · {label}")
             return works
 
-    text = _pdf_bibliography_text(work, fetcher)
+    epmc_getter = getattr(client, "epmc_getter", None)
+    if doi and epmc_getter is not None:
+        try:
+            epmc = epmc_getter(doi)
+        except FillPaused:
+            epmc = None
+        except Exception:
+            epmc = None
+        epmc_dois = [
+            str(ref.get("doi") or "")
+            for ref in ((epmc or {}).get("references") or [])
+            if isinstance(ref, dict) and ref.get("doi")
+        ]
+        works = _resolve_dois(client, epmc_dois, source="europepmc")
+        if works:
+            label = doi or short_id(str(work.get("id") or "")) or "seed"
+            client.note(f"recovered {len(works)} refs via Europe PMC · {label}")
+            return works
+
+    text, pdf_path = _pdf_bibliography_text(work, fetcher)
     if not text:
         label = doi or short_id(str(work.get("id") or "")) or "seed"
         client.note(f"no remote refs and no open PDF bibliography · {label}")
@@ -229,12 +248,12 @@ def _match_title(client: OpenAlexClient, title: str, year: int | None) -> dict[s
     return best
 
 
-def _pdf_bibliography_text(work: dict[str, Any], fetcher: PdfFetcher | None) -> str:
+def _pdf_bibliography_text(work: dict[str, Any], fetcher: PdfFetcher | None) -> tuple[str, str]:
     url = open_pdf_url(work)
     if not url:
-        return ""
+        return "", ""
     if fetcher is not None:
-        return fetcher(url) or ""
+        return fetcher(url) or "", ""
     return _download_pdf_text(url)
 
 
@@ -263,17 +282,59 @@ def _looks_like_pdf_url(url: str) -> bool:
     return path.endswith(".pdf") or "/pdf" in path
 
 
-def _download_pdf_text(url: str) -> str:
+def pdf_payload_for_row(row: Any) -> dict[str, Any] | None:
+    """Bibliography payload for one candidate, keeping a downloaded open PDF."""
+    biblio = getattr(row, "biblio", None) or {}
+    work = {
+        "doi": (getattr(row, "ids", None) or {}).get("doi") or "",
+        "open_access": {"oa_url": biblio.get("oa_url") or ""},
+        "primary_location": {"pdf_url": biblio.get("pdf_url") or ""},
+    }
+    text, path = _pdf_bibliography_text(work, None)
+    if not text:
+        return None
+    payload: dict[str, Any] = {
+        "references": [
+            {"doi": entry.get("doi") or "", "title": entry.get("title") or "", "year": entry.get("year")}
+            for entry in parse_bibliography_entries(text)
+        ]
+    }
+    if path:
+        payload["cached_pdf"] = path
+    return payload
+
+
+def pdf_payload(doi: str, *, cache_dir: Path | None = None) -> dict[str, Any] | None:
+    """Open-PDF bibliography as a fill payload. Saves the PDF when one is downloaded."""
+    work = {"doi": doi, "open_access": {}, "primary_location": {}}
+    text, path = _pdf_bibliography_text(work, None)
+    if not text:
+        return None
+    refs = [
+        {"doi": entry.get("doi") or "", "title": entry.get("title") or "", "year": entry.get("year")}
+        for entry in parse_bibliography_entries(text)
+    ]
+    payload: dict[str, Any] = {"references": refs}
+    if path:
+        payload["cached_pdf"] = path
+    if cache_dir is not None and path:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        dest = cache_dir / f"{doi.replace('/', '_')}.pdf"
+        dest.write_bytes(Path(path).read_bytes())
+        payload["cached_pdf"] = str(dest)
+    return payload
+
+
+def _download_pdf_text(url: str) -> tuple[str, str]:
     try:
         with httpx.Client(follow_redirects=True, timeout=60.0) as client:
             resp = client.get(url, headers={"User-Agent": "paperful-snowball/0.1"})
             resp.raise_for_status()
             data = resp.content
     except (httpx.HTTPError, OSError, ValueError):
-        return ""
+        return "", ""
     if not data or data[:4] != b"%PDF":
-        return ""
-    with tempfile.TemporaryDirectory(prefix="paperful-bib-") as tmp:
-        path = Path(tmp) / "paper.pdf"
-        path.write_bytes(data)
-        return text_from_pdf(path, max_pages=None)
+        return "", ""
+    path = Path(tempfile.mkdtemp(prefix="paperful-bib-")) / "paper.pdf"
+    path.write_bytes(data)
+    return text_from_pdf(path, max_pages=None), str(path)

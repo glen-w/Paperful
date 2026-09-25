@@ -89,9 +89,7 @@ class LibraryBackend(Protocol):
     def merge_into(self, keep_key: str, drop_key: str) -> dict[str, Any]: ...
     def find_child_note_keys(self, item_key: str, tag: str) -> list[str]: ...
     def read_child_note(self, item_key: str, tag: str) -> str | None: ...
-    def create_or_update_note(
-        self, item_key: str, html: str, tag: str
-    ) -> str: ...
+    def create_or_update_note(self, item_key: str, html: str, tag: str) -> str: ...
     def replace_prefixed_tag(self, item_key: str, prefix: str, tag: str) -> None: ...
     def find_collection_note_keys(self, collection_key: str, tag: str) -> list[str]: ...
     def create_or_update_collection_note(
@@ -164,6 +162,66 @@ class ZoteroBackend:
     def supports_write(self) -> bool:
         return bool(self.ping().get("supports_write"))
 
+    @property
+    def library_type(self) -> str:
+        """Personal library. Group libraries are not this adapter."""
+        return "user"
+
+    def attachment_has_bytes(self, key: str) -> bool:
+        """True when the local API returns a non-empty file for this attachment."""
+        zot = self.zl.zot
+        url = f"{zot.endpoint}/{zot.library_type}/{zot.library_id}/items/{key}/file"
+        try:
+            with zot.client.stream("GET", url) as resp:
+                if resp.status_code != 200:
+                    return False
+                for chunk in resp.iter_bytes():
+                    if chunk:
+                        return True
+        except Exception:
+            return False
+        return False
+
+    def relink_file(self, attachment_key: str, pdf_path: Path) -> None:
+        """Point a linked attachment at a file. Does not delete the file."""
+        self._ensure_write()
+        if not pdf_path.is_file():
+            raise LibraryError(f"file missing: {pdf_path}")
+        raw = self.zl.zot.item(attachment_key)
+        data = raw["data"]
+        data["linkMode"] = "linked_file"
+        data["path"] = str(pdf_path)
+        data["filename"] = pdf_path.name
+        self.zl.zot.update_item(raw)
+
+    def create_linked_file(self, parent_key: str, pdf_path: Path) -> str:
+        """Create a linked_file child. Does not delete the stored copy or the file."""
+        self._ensure_write()
+        if not pdf_path.is_file():
+            raise LibraryError(f"file missing: {pdf_path}")
+        payload = {
+            "itemType": "attachment",
+            "parentItem": parent_key,
+            "linkMode": "linked_file",
+            "title": "Full Text PDF",
+            "path": str(pdf_path),
+            "filename": pdf_path.name,
+            "contentType": "application/pdf",
+            "charset": "",
+            "accessDate": "",
+            "note": "",
+            "tags": [],
+            "relations": {},
+        }
+        try:
+            created = self.zl.zot.create_items([payload])
+        except Exception as exc:
+            raise LibraryError(f"Zotero did not create linked file: {exc}") from exc
+        key = created_item_key(created)
+        if not key:
+            raise LibraryError("Zotero did not create linked file")
+        return key
+
     def _ensure_write(self) -> None:
         if self._attacher is None:
             self._attacher = Attacher(self.cfg, self.zl)
@@ -197,7 +255,9 @@ class ZoteroBackend:
             result = self.zl.zot.create_collections([payload])
             parent = created_item_key(result)
             if not parent:
-                raise LibraryError(f"Zotero did not return a key for collection {sofar}")
+                raise LibraryError(
+                    f"Zotero did not return a key for collection {sofar}"
+                )
             self.zl._collections = None
         if parent is None:
             raise LibraryError(f"could not resolve collection {path!r}")
@@ -339,7 +399,9 @@ class ZoteroBackend:
             return {"drop": drop_key, "fields": [], "move": []}
         keep_kids = self.children(keep_key)
         drop_kids = self.children(drop_key)
-        patch = merge_parent_patch(keep_raw.get("data") or {}, drop_raw.get("data") or {})
+        patch = merge_parent_patch(
+            keep_raw.get("data") or {}, drop_raw.get("data") or {}
+        )
         moves = plan_child_moves(
             keep_kids, drop_kids, self._annotation_counts(keep_kids + drop_kids)
         )
@@ -379,7 +441,9 @@ class ZoteroBackend:
                 moved.append(move["key"])
             elif move["action"] == "trash":
                 trashed_children.append(move["key"])
-        patch = merge_parent_patch(keep_raw.get("data") or {}, drop_raw.get("data") or {})
+        patch = merge_parent_patch(
+            keep_raw.get("data") or {}, drop_raw.get("data") or {}
+        )
         fresh = self.zl.zot.item(keep_key)
         data = fresh["data"]
         for name, value in patch["fields"].items():

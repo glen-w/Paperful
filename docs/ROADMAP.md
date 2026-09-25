@@ -266,11 +266,14 @@ prerequisites for the fetch / lint / attach loop.
    That backfill stays out of any scheduled bot inside Paperful.
    Growing a library from a keyword, a DOI bibliography, or an ORCID is the
    [Snowball](snowball.md) section above, not a line item inside this graph.
-4. **File & attachment OS** — linked vs stored policy, rename, orphan GC,
-   broken-link repair, PDF quality / wrong-paper triage (eat StorScan-class tools).
-   The quiet mirror itself is core (above), not a later bet: dual bytes with
-   Zotero `imported_file`; house transport stays outside paperful. Still not a
-   second reading UI, and still not a linked-file cutover. PDF annotations and
+4. **File & attachment OS** — **shipped (Zotero):** `paperful attachments`
+   reports ghosts, broken links, same-file duplicates, and filename drift.
+   `--fix-broken`, `--merge-files`, `--rename`, and `--link` write only with
+   `--apply`, and only from files already under `out/`. `--link` is the
+   stored-to-linked cutover and is refused for group libraries. The quiet
+   mirror stays a dual `imported_file` store unless you pass `--link`. Still
+   parked: PDF quality / wrong-paper triage, orphan GC of unreferenced
+   `storage/` files, author folders, and tablet send/get. PDF annotations and
    a full CSL dump are still later. A text layer for scans is `paperful ocr`.
 
 ## Maybe later

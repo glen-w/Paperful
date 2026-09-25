@@ -173,6 +173,8 @@ class Config:
         "crossref",
         "semanticscholar",
         "orcid",
+        "europepmc",
+        "pdf",
     )
     snowball_approve_each_max: int = 20
     snowball_hybrid_seeds: int = 5
@@ -182,6 +184,11 @@ class Config:
     # OCRmyPDF text layer for scanned PDFs. languages is a Tesseract -l list.
     ocr_languages: str = "eng"
     ocr_timeout_s: float = 600.0
+    # Attachment hygiene. Off until `paperful attachments --apply`.
+    attachments_fix_broken: bool = False
+    attachments_merge_files: bool = False
+    attachments_rename: bool = False
+    attachments_link: bool = False
 
     def __post_init__(self) -> None:
         # Resolve pack+user once so Config() in tests gets the builtin examples.
@@ -623,6 +630,16 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
     remarks = raw.get("remarks")
     if isinstance(remarks, dict) and remarks.get("surface") not in (None, ""):
         cfg.remarks_surface = parse_remarks_surface(str(remarks["surface"]))
+    attached = raw.get("attachments")
+    if isinstance(attached, dict):
+        if "fix_broken" in attached:
+            cfg.attachments_fix_broken = bool(attached["fix_broken"])
+        if "merge_files" in attached:
+            cfg.attachments_merge_files = bool(attached["merge_files"])
+        if "rename" in attached:
+            cfg.attachments_rename = bool(attached["rename"])
+        if "link" in attached:
+            cfg.attachments_link = bool(attached["link"])
     ocr = raw.get("ocr")
     if isinstance(ocr, dict):
         if "languages" in ocr:

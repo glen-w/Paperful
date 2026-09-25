@@ -6,6 +6,12 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+`paperful attachments` compares PDF attachments to `out/` and writes a report.
+It does not change Zotero unless you also pass `--fix-broken`, `--merge-files`,
+`--rename`, or `--link` with `--apply`. Repairs use a file already in the
+mirror. `--link` points a personal library at that file and is refused for
+groups. Tablet send/get stays outside this command.
+
 A readable line sits on the parent item beside the PDF provenance stamp.
 `[remarks].surface` is `note` (default), `tag`, or `off`. Attach writes
 "Free copy from Unpaywall." (and a DOI-mismatch sentence when that applies).

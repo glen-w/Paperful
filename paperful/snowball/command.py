@@ -28,7 +28,7 @@ from .expand import (
     parse_keyword_min_score,
     truncate,
 )
-from .fill import FillPaused, crossref_work, fill_crossref, fill_semanticscholar, s2_api_key, s2_paper
+from .fill import FillPaused, crossref_work, run_fill_pass, s2_api_key, s2_paper
 from .ingest import create_new, fill_pdfs
 from .local_cites import load_local_cites
 from .openalex import OpenAlexBudgetExceeded, OpenAlexClient, keyless_limit_message, normalize_orcid
@@ -42,7 +42,7 @@ from .refine import llm_suggester, suggestions_for
 Lookup = Callable[[str | None, str | None], str | None]
 _PREPRINT_DOI_LINE = re.compile(r"(?im)^Preprint DOI:\s*(\S+)")
 Decider = Callable[[Candidate], bool]
-KNOWN_BACKENDS = ("openalex", "crossref", "semanticscholar", "orcid")
+KNOWN_BACKENDS = ("openalex", "crossref", "semanticscholar", "orcid", "europepmc", "pdf")
 
 
 def _local_cites(cfg: Config, backend: Any, collection: str) -> Any:
@@ -457,28 +457,29 @@ def run_resume(
     oa.tally = tally
     oa.progress = lambda message: console.print(paint(message))
     tally.start()
+    paused: dict[str, list[str]] = {}
     if deferred.get("kind") == "fill":
         known = {row.identity for row in rows}
-        try:
-            rows = _fill_metadata(
-                cfg,
-                request,
-                rows,
-                backends=_backends(cfg, request),
-                console=console,
-                live=client is None,
-                crossref_getter=None,
-                s2_getter=None,
-                per_hop_limit=int(deferred.get("per_hop_limit") or cfg.snowball_per_hop_limit),
-                direction=str(deferred.get("direction") or request.direction or "refs"),
-                tally=tally,
-            )
-        except FillPaused as exc:
+        rows, paused = _fill_metadata(
+            cfg,
+            request,
+            rows,
+            backends=_backends(cfg, request),
+            console=console,
+            live=client is None,
+            crossref_getter=None,
+            s2_getter=None,
+            per_hop_limit=int(deferred.get("per_hop_limit") or cfg.snowball_per_hop_limit),
+            direction=str(deferred.get("direction") or request.direction or "refs"),
+            tally=tally,
+        )
+        if paused:
             oa.deferred = {
                 **deferred,
-                "backend": exc.backend,
-                "remaining_ids": list(exc.remaining),
-                "error": str(exc),
+                "backend": next(iter(paused)),
+                "remaining_ids": sorted(_blocked_dois(paused)),
+                "pauses": paused,
+                "error": next(iter(paused)),
             }
         added = [row for row in rows if row.identity not in known]
         merged = rows
@@ -510,9 +511,10 @@ def run_resume(
         lib = backend
         try:
             lib = lib or get_backend(cfg)
-            create_new(
+            settled = _settled_rows(added, _blocked_dois(paused))
+            items, _counts = create_new(
                 lib,
-                added,
+                settled,
                 request.collection,
                 tag_prefix=request.tag_prefix or cfg.snowball_tag_prefix,
                 note_provenance=cfg.snowball_note_provenance
@@ -522,6 +524,9 @@ def run_resume(
                 local_cites=_local_cites(cfg, lib, request.collection),
                 console=console,
             )
+            _write_cached_pdfs(cfg, items, settled)
+            if _pdf_mode(request) != "off" and items:
+                fill_pdfs(cfg, lib, items, console, mode=_pdf_mode(request))
         except (LibraryError, SnowballError) as exc:
             raise SnowballError(str(exc)) from exc
     return PathResult(dest, 0)
@@ -730,6 +735,14 @@ def _execute(
             oa.s2_getter = lambda doi, _cache=oa.s2_cache_dir, _key=key: s2_paper(
                 doi, cache_dir=_cache, api_key=_key
             )
+    if "europepmc" in backends_early and client is None:
+        from .europepmc import europepmc_work
+
+        oa.epmc_getter = europepmc_work
+    if "europepmc" in backends_early and client is None:
+        from .europepmc import europepmc_work
+
+        oa.epmc_getter = europepmc_work
     tally.start()
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     gate = request.gate
@@ -792,30 +805,33 @@ def _execute(
     except ValueError:
         direction = "refs"
     apply_overlap(rows)
-    try:
-        rows = _fill_metadata(
-            cfg,
-            request,
-            rows,
-            backends=backends,
-            console=console,
-            live=client is None,
-            crossref_getter=crossref_getter,
-            s2_getter=s2_getter,
-            per_hop_limit=caps[1],
-            direction=direction,
-            tally=tally,
-        )
-    except FillPaused as exc:
-        if oa.deferred is None:
-            oa.deferred = {
-                "kind": "fill",
-                "backend": exc.backend,
-                "remaining_ids": list(exc.remaining),
-                "error": str(exc),
-                "keyed": bool(oa._using_key and oa.api_key),
-            }
-        rows = list(saved) or rows
+    rows, paused = _fill_metadata(
+        cfg,
+        request,
+        rows,
+        backends=backends,
+        console=console,
+        live=client is None,
+        crossref_getter=crossref_getter,
+        s2_getter=s2_getter,
+        europepmc_getter=getattr(oa, "epmc_getter", None),
+        pdf_getter=getattr(oa, "pdf_getter", None),
+        per_hop_limit=caps[1],
+        direction=direction,
+        tally=tally,
+    )
+    if paused and oa.deferred is None:
+        remaining = _blocked_dois(paused)
+        oa.deferred = {
+            "kind": "fill",
+            "backend": next(iter(paused)),
+            "remaining_ids": sorted(remaining),
+            "pauses": paused,
+            "error": next(iter(paused)),
+            "keyed": bool(oa._using_key and oa.api_key),
+            "per_hop_limit": caps[1],
+            "direction": direction,
+        }
     apply_overlap(rows)
     rows = apply_filters(
         rows,
@@ -886,7 +902,6 @@ def _execute(
     _print_table(console, rows)
     exit_code = 1 if failed or oa.deferred else 0
     if oa.deferred:
-        when = oa.deferred.get("reset_at") or "the daily reset"
         console.print(f"[yellow]Partial queue kept[/] · paperful snowball resume {run_id}")
     if gate in {"dry-run", "approve-batch"}:
         if gate == "approve-batch":
@@ -903,9 +918,10 @@ def _execute(
         tally.stop()
         raise SnowballError(f"Library was not read. Refusing to create items.{detail}")
     try:
+        creatable = _settled_rows(rows, _blocked_dois(paused))
         items, counts = create_new(
             lib,
-            rows,
+            creatable,
             request.collection,
             tag_prefix=tag_prefix,
             note_provenance=note_provenance,
@@ -924,6 +940,7 @@ def _execute(
         "attach_ok": 0,
         "attach_deferred": 0,
     }
+    _write_cached_pdfs(cfg, items, rows)
     if mode != "off" and items:
         stats = fill_pdfs(cfg, lib, items, console, tally=tally, mode=mode)
         downloaded = int(getattr(stats, "ok", 0)) + int(getattr(stats, "attached", 0))
@@ -1155,6 +1172,14 @@ def _approve_each(
         row.keep = yes
 
 
+def _blocked_dois(paused: dict[str, list[str]]) -> set[str]:
+    return {doi.lower() for ids in paused.values() for doi in ids if doi}
+
+
+def _settled_rows(rows: list[Candidate], blocked: set[str]) -> list[Candidate]:
+    return [row for row in rows if (row.ids.get("doi") or "").lower() not in blocked]
+
+
 def _fill_metadata(
     cfg: Config,
     request: SnowballRequest,
@@ -1168,24 +1193,66 @@ def _fill_metadata(
     per_hop_limit: int,
     direction: str,
     tally: Tally | None = None,
-) -> list[Candidate]:
-    if "crossref" in backends:
-        getter = crossref_getter
-        if getter is None and live:
-            getter = lambda doi: crossref_work(doi, email=cfg.email)
-        if getter is not None:
-            fill_crossref(rows, getter, tally=tally)
-    if "semanticscholar" in backends:
-        getter = s2_getter
-        if getter is None and live:
-            key = s2_api_key()
-            cache = cfg.state_dir / "snowball" / "cache"
-            getter = lambda doi: s2_paper(doi, cache_dir=cache, api_key=key)
-        if getter is not None:
-            rows = list(rows) + fill_semanticscholar(
-                rows, getter, per_hop_limit=per_hop_limit, direction=direction, tally=tally
-            )
-    return rows
+    europepmc_getter: Any = None,
+    pdf_getter: Any = None,
+) -> tuple[list[Candidate], dict[str, list[str]]]:
+    del console, request
+    if crossref_getter is None and live and "crossref" in backends:
+
+        def crossref_getter(doi: str, _email: str = cfg.email) -> dict | None:
+            return crossref_work(doi, email=_email)
+
+    if s2_getter is None and live and "semanticscholar" in backends:
+        key = s2_api_key()
+        cache = cfg.state_dir / "snowball" / "cache"
+
+        def s2_getter(doi: str, _cache: Any = cache, _key: str = key) -> dict | None:
+            return s2_paper(doi, cache_dir=_cache, api_key=_key)
+    if europepmc_getter is None and live and "europepmc" in backends:
+        from .europepmc import europepmc_work
+
+        europepmc_getter = europepmc_work
+    if pdf_getter is None and live and "pdf" in backends:
+        from .bibliography import pdf_payload_for_row
+
+        def pdf_getter(doi: str, _rows: list[Candidate] = rows) -> dict | None:  # type: ignore[no-redef]
+            match = next((row for row in _rows if (row.ids.get("doi") or "").lower() == doi.lower()), None)
+            return pdf_payload_for_row(match) if match is not None else None
+
+    paused = run_fill_pass(
+        rows,
+        backends,
+        crossref_getter=crossref_getter,
+        s2_getter=s2_getter,
+        europepmc_getter=europepmc_getter,
+        pdf_getter=pdf_getter,
+        per_hop_limit=per_hop_limit,
+        direction=direction,
+        tally=tally,
+    )
+    return rows, paused
+
+
+def _write_cached_pdfs(cfg: Config, items: list[Any], rows: list[Candidate]) -> None:
+    import hashlib
+
+    from pathlib import Path
+
+    from ..store import save_pdf
+
+    by_doi = {(row.ids.get("doi") or "").lower(): row for row in rows}
+    for item in items:
+        row = by_doi.get((getattr(item, "doi", None) or "").lower())
+        if row is None:
+            continue
+        raw = str(row.biblio.get("cached_pdf") or "")
+        if not raw:
+            continue
+        path = Path(raw)
+        if not path.is_file():
+            continue
+        content = path.read_bytes()
+        save_pdf(cfg.out_dir, item, content, hashlib.md5(content).hexdigest())
 
 
 def _summary_meta(
