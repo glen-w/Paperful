@@ -57,13 +57,15 @@ placeholder, and missing years are skipped. These groups are marked
 | Flag | Effect |
 | --- | --- |
 | `--dry-run` | Write the pack only. This is the default. Do not combine with `--apply`. |
-| `--apply` | Merge `high_doi` extras onto the keeper, then trash the emptied parent. Needs Zotero 10+ (same gate as attach). |
+| `--apply` | Write a spare-copy line on each extra parent, then merge `high_doi` extras onto the keeper and trash the emptied parent. A failed remark does not stop the merge. Needs Zotero 10+ (same gate as attach). |
 | `--apply-medium` | Also merge title+year extras. |
 | `--phase` | `high_doi`, `medium_title_year`, or `all`. |
 | `--limit` / `-n` | Only the first N items in scope. |
 | `--year-from` / `--year-to` | Inclusive publication-year range; undated items excluded. |
 | `--type` / `-T` | Only these Zotero item types (repeatable or comma-separated). |
 | `--json` | Pack paths and counts on stdout (`dedupe`), or the four gap counts (`gaps`). |
+
+The spare-copy line ("Same paper as …") is written only with `--apply`, on each extra parent. `[remarks].surface` chooses a child note, a parent tag, or `off`. Omitting `--apply` and passing `--dry-run` both leave the library untouched.
 
 Pack JSON is `paperful.dedupe_pack.v1`. Both commands exit 2 if Zotero is
 unreachable. `--apply` also needs the Zotero 10+ write API; without it, the
