@@ -8,7 +8,7 @@ local API, the Host header, and ghost attachments is in [Zotero](zotero.md).
 `email` in `config.toml` is a contact address for Unpaywall, Crossref, and NCBI.
 It is not a login and it does not raise the OpenAlex quota. Use a real address
 you read. OpenAlex meters a free API key (`OPENALEX_API_KEY`, about $1/day) or,
-with no key, the public IP. A VPN exit shares that keyless budget with everyone
+with no key, the public IP. Heavier use is [pay-as-you-go or a subscription](https://openalex.org/pricing). A VPN exit shares that keyless budget with everyone
 else on it.
 `doctor` ambers when it is missing. Unpaywall only covers items that have a
 DOI and an open-access location; a hit is often a landing page with no PDF

@@ -262,7 +262,7 @@ reports that flag, whether keys are present, and whether a backend answers.
 A missing OpenAlex key warns. A missing Semantic Scholar key does not, and neither missing key aborts the other backends.
 
 `email` at the top of `config.toml` is the contact address for Unpaywall and Crossref.
-OpenAlex ignores `mailto`. Snowball calls OpenAlex without an API key first, so a small search needs no account. That free allowance is shared by everyone on the same public address (a campus network or VPN exit included) and is about a tenth of a free key. When it runs out, a configured `OPENALEX_API_KEY` takes over for the rest of the crawl. With no key, the partial queue is kept and `paperful snowball resume` continues after you add one. One key only: a second free key or a `user+tag@gmail.com` alias does not add budget. A free key is about $1/day.
+OpenAlex ignores `mailto`. Snowball calls OpenAlex without an API key first, so a small search needs no account. That free allowance is shared by everyone on the same public address (a campus network or VPN exit included) and is about a tenth of a free key. When it runs out, a configured `OPENALEX_API_KEY` takes over for the rest of the crawl. With no key, the partial queue is kept and `paperful snowball resume` continues after you add one. One key only: a second free key or a `user+tag@gmail.com` alias does not add budget. A free key is about $1/day. Past that, OpenAlex sells [pay-as-you-go credit and subscriptions](https://openalex.org/pricing).
 
 Semantic Scholar’s Academic Graph is public, so snowball calls it with no key. That unauthenticated pool is shared and can be throttled. Heavier use needs a private key: [request one](https://www.semanticscholar.org/product/api#api-key-form) (it arrives by email; the introductory limit is 1 request per second). Put it in `SEMANTIC_SCHOLAR_API_KEY`. Like `OPENALEX_API_KEY`, it stays in the environment, never in `config.toml`.
 
@@ -272,7 +272,7 @@ Each crawl writes `state/snowball/<run-id>/candidates.jsonl` as it goes, for Ope
 paperful snowball resume <run-id>
 ```
 
-A list call that hits the daily budget of the key already in use stops the same way. The reset is midnight UTC, or sooner if you add prepaid credit on that key.
+A list call that hits the daily budget of the key already in use stops the same way. The reset is midnight UTC, or sooner if you add [pay-as-you-go credit or a subscription](https://openalex.org/pricing) on that key.
 
 Short 429s and 5xx responses retry with exponential backoff. A reset of a minute or more does not keep polling until midnight.
 `snowball profile save` writes seeds and knobs only, after a successful
