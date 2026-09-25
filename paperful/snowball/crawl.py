@@ -35,15 +35,32 @@ def _keep_year(row: Candidate, year_from: int | None, year_to: int | None) -> bo
     return True
 
 
+def _seed_key(row: Candidate) -> str:
+    return f"{row.seed.get('type')}:{row.seed.get('value')}"
+
+
 def _dedupe(rows: list[Candidate]) -> list[Candidate]:
-    seen: set[str] = set()
+    """One row per work. Neighbours remember every seed that pointed at them."""
+    first: dict[str, Candidate] = {}
     out: list[Candidate] = []
     for row in rows:
         key = row.identity
-        if not key or key in seen:
+        if not key:
             continue
-        seen.add(key)
-        out.append(row)
+        if key not in first:
+            if row.hop >= 1 and not row.biblio.get("seed_keys"):
+                row.biblio["seed_keys"] = [_seed_key(row)]
+            first[key] = row
+            out.append(row)
+            continue
+        if row.hop < 1:
+            continue
+        existing = first[key]
+        keys = existing.biblio.setdefault("seed_keys", [])
+        incoming = list(row.biblio.get("seed_keys") or [_seed_key(row)])
+        for token in incoming:
+            if token not in keys:
+                keys.append(token)
     return out
 
 
@@ -67,6 +84,7 @@ def search_candidates(
     per_hop_limit: int,
     year_from: int | None,
     year_to: int | None,
+    min_seed_citations: int = 0,
 ) -> list[Candidate]:
     seed = {"type": "keyword", "value": query}
     works = client.search(query, limit=max_candidates, year_from=year_from, year_to=year_to)
@@ -99,6 +117,7 @@ def search_candidates(
                 year_from=year_from,
                 year_to=year_to,
                 why_prefix="search hit",
+                min_seed_citations=min_seed_citations,
             )
         )
     return truncate(_dedupe(rows), max_candidates)
@@ -116,6 +135,7 @@ def doi_candidates(
     per_hop_limit: int,
     year_from: int | None,
     year_to: int | None,
+    min_seed_citations: int = 0,
 ) -> tuple[list[Candidate], list[str]]:
     """Return neighbours of each DOI and DOIs that failed to resolve."""
     rows: list[Candidate] = []
@@ -151,6 +171,7 @@ def doi_candidates(
                     year_from=year_from,
                     year_to=year_to,
                     why_prefix=doi,
+                    min_seed_citations=min_seed_citations,
                 )
             )
     return truncate(_dedupe(rows), max_candidates), failed
@@ -169,6 +190,7 @@ def orcid_candidates(
     per_hop_limit: int,
     year_from: int | None,
     year_to: int | None,
+    min_seed_citations: int = 0,
 ) -> tuple[list[Candidate], list[str]]:
     """Person's works (hop 0), then the same expander as DOI seeds."""
     seed = {"type": "orcid", "value": orcid}
@@ -250,6 +272,7 @@ def orcid_candidates(
                 year_from=year_from,
                 year_to=year_to,
                 why_prefix=f"ORCID {orcid}",
+                min_seed_citations=min_seed_citations,
             )
         )
     return truncate(_dedupe(rows), max_candidates), failed
@@ -290,6 +313,7 @@ def _expand_hops(
     year_from: int | None,
     year_to: int | None,
     why_prefix: str,
+    min_seed_citations: int = 0,
 ) -> list[Candidate]:
     """BFS from seed works through refs and/or cites up to ``depth`` hops."""
     if depth < 1:
@@ -330,6 +354,9 @@ def _expand_hops(
                     rows.append(row)
         if want_cites:
             for work in frontier:
+                cited = int(work.get("cited_by_count") or 0)
+                if min_seed_citations and cited < min_seed_citations:
+                    continue
                 oa = short_id(str(work.get("id") or ""))
                 if not oa:
                     continue
@@ -364,3 +391,55 @@ def _expand_hops(
         if not frontier:
             break
     return rows
+
+
+def hybrid_candidates(
+    client: OpenAlexClient,
+    query: str,
+    *,
+    run_id: str,
+    gate: str,
+    direction: str,
+    max_candidates: int,
+    per_hop_limit: int,
+    year_from: int | None,
+    year_to: int | None,
+    hybrid_seeds: int,
+    min_seed_citations: int = 0,
+) -> tuple[list[Candidate], list[str]]:
+    """Keyword hits, then one hop from the top DOI hits."""
+    hits = search_candidates(
+        client,
+        query,
+        run_id=run_id,
+        gate=gate,
+        depth=0,
+        direction=direction,
+        max_candidates=max_candidates,
+        per_hop_limit=per_hop_limit,
+        year_from=year_from,
+        year_to=year_to,
+        min_seed_citations=min_seed_citations,
+    )
+    ranked = sorted(
+        [row for row in hits if row.ids.get("doi") and row.status != "error"],
+        key=lambda row: (-row.score, row.ids.get("doi") or ""),
+    )
+    limit = max(0, min(hybrid_seeds, max_candidates))
+    seeds = [row.ids["doi"] for row in ranked[:limit]]
+    if not seeds:
+        return hits, []
+    neighbours, failed = doi_candidates(
+        client,
+        seeds,
+        run_id=run_id,
+        gate=gate,
+        depth=1,
+        direction=direction,
+        max_candidates=max_candidates,
+        per_hop_limit=per_hop_limit,
+        year_from=year_from,
+        year_to=year_to,
+        min_seed_citations=min_seed_citations,
+    )
+    return truncate(_dedupe(hits + neighbours), max_candidates), failed

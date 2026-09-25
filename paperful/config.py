@@ -158,6 +158,18 @@ class Config:
     snowball_oa_only: bool = False
     snowball_venue_include: tuple[str, ...] = ()
     snowball_venue_exclude: tuple[str, ...] = ()
+    snowball_languages: tuple[str, ...] = ()
+    snowball_min_seed_citations: int = 0
+    snowball_note_provenance: bool = True
+    snowball_backends: tuple[str, ...] = (
+        "openalex",
+        "crossref",
+        "semanticscholar",
+        "orcid",
+    )
+    snowball_approve_each_max: int = 20
+    snowball_hybrid_seeds: int = 5
+    snowball_refine: bool = False
 
     def __post_init__(self) -> None:
         # Resolve pack+user once so Config() in tests gets the builtin examples.
@@ -363,6 +375,20 @@ def _apply_snowball(raw: Any, cfg: Config) -> None:
         cfg.snowball_venue_include = _snowball_strs(raw["venue_include"])
     if "venue_exclude" in raw:
         cfg.snowball_venue_exclude = _snowball_strs(raw["venue_exclude"])
+    if "languages" in raw:
+        cfg.snowball_languages = _snowball_strs(raw["languages"])
+    if "min_seed_citations" in raw:
+        cfg.snowball_min_seed_citations = int(raw["min_seed_citations"])
+    if "note_provenance" in raw:
+        cfg.snowball_note_provenance = bool(raw["note_provenance"])
+    if "backends" in raw:
+        cfg.snowball_backends = _snowball_strs(raw["backends"])
+    if "approve_each_max" in raw:
+        cfg.snowball_approve_each_max = int(raw["approve_each_max"])
+    if "hybrid_seeds" in raw:
+        cfg.snowball_hybrid_seeds = int(raw["hybrid_seeds"])
+    if "refine" in raw:
+        cfg.snowball_refine = bool(raw["refine"])
 
 
 def _snowball_strs(raw: Any) -> tuple[str, ...]:

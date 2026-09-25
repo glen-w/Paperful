@@ -55,6 +55,13 @@ def request_from_profile(raw: dict[str, Any], cfg: Config) -> SnowballRequest:
         oa_only=bool(raw["oa_only"]) if "oa_only" in raw else None,
         venue_include=_strs(raw.get("venue_include")) if "venue_include" in raw else None,
         venue_exclude=_strs(raw.get("venue_exclude")) if "venue_exclude" in raw else None,
+        languages=_strs(raw.get("languages")) if "languages" in raw else None,
+        min_seed_citations=int(raw["min_seed_citations"]) if raw.get("min_seed_citations") is not None else None,
+        note_provenance=bool(raw["note_provenance"]) if "note_provenance" in raw else None,
+        backends=_strs(raw.get("backends")) if "backends" in raw else None,
+        hybrid_seeds=int(raw["hybrid_seeds"]) if raw.get("hybrid_seeds") is not None else None,
+        approve_each_max=int(raw["approve_each_max"]) if raw.get("approve_each_max") is not None else None,
+        refine=bool(raw["refine"]) if "refine" in raw else None,
     )
 
 
