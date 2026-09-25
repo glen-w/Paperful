@@ -669,6 +669,7 @@ def test_merge_fields_fill_blanks_and_better_text():
     assert patch["collections"] == ["A", "B"]
     assert {t["tag"]: t["type"] for t in patch["tags"]}["auto"] == 0
     assert "review" in {t["tag"] for t in patch["tags"]}
+    assert patch["relations"]["dc:relation"] == ["http://example.test/items/DROP"]
 
 
 def test_merge_fields_leave_conflicting_doi_and_unrelated_creators():
@@ -738,6 +739,28 @@ def test_plan_child_moves_reparents_notes_and_collapses_same_pdf():
     actions = [(row["key"], row["action"]) for row in annotated]
     assert ("KPDF", "trash") in actions
     assert ("DPDF", "reparent") in actions
+
+    both = plan_child_moves(keep, drop[:2], {"KPDF": 1, "DPDF": 1})
+    both_actions = {row["key"]: row["action"] for row in both}
+    assert both_actions["DPDF"] == "reparent"
+    assert "KPDF" not in both_actions
+
+    same_url = plan_child_moves(
+        [
+            {
+                "key": "KURL",
+                "data": {
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "linkMode": "linked_url",
+                    "url": "https://example.test/a.pdf",
+                },
+            }
+        ],
+        [drop[2]],
+        {},
+    )
+    assert same_url == [{"key": "URL", "action": "trash", "kind": "linked_url"}]
 
 
 def test_merge_into_moves_children_then_deletes_donor(cfg):
@@ -862,4 +885,51 @@ def test_merge_into_does_not_trash_when_child_move_fails(cfg):
     else:
         raise AssertionError("expected RuntimeError")
     assert items["DROP"]["data"].get("deleted") is not True
+
+
+def test_merge_into_retries_without_date_added(cfg):
+    items = {
+        "KEEP": {
+            "key": "KEEP",
+            "data": {
+                "key": "KEEP",
+                "title": "Keep",
+                "dateAdded": "2020-01-01T00:00:00Z",
+                "version": 1,
+            },
+        },
+        "DROP": {
+            "key": "DROP",
+            "data": {
+                "key": "DROP",
+                "title": "Keep",
+                "dateAdded": "2019-01-01T00:00:00Z",
+                "version": 1,
+            },
+        },
+    }
+    calls = {"n": 0}
+
+    class FakeZot:
+        def item(self, key):
+            return items[key]
+
+        def children(self, key):
+            return []
+
+        def update_item(self, raw):
+            calls["n"] += 1
+            if calls["n"] == 1 and raw["data"].get("dateAdded") == "2019-01-01T00:00:00Z":
+                raise RuntimeError("dateAdded rejected")
+            items[raw["data"]["key"]] = raw
+
+    class ZL:
+        def __init__(self):
+            self.zot = FakeZot()
+
+    backend = ZoteroBackend(cfg, ZL())
+    backend._ensure_write = lambda: None
+    backend.merge_into("KEEP", "DROP")
+    assert items["KEEP"]["data"]["dateAdded"] == "2020-01-01T00:00:00Z"
+    assert items["DROP"]["data"]["deleted"] is True
 

@@ -156,6 +156,12 @@ def test_endnote_refuses_trash(cfg, tmp_path):
         backend.trash_item("1")
 
 
+def test_endnote_refuses_merge(cfg, tmp_path):
+    backend = _backend(cfg, make_endnote_library(tmp_path))
+    with pytest.raises(LibraryError, match="merge"):
+        backend.merge_into("1", "2")
+
+
 def test_endnote_registers_collations(cfg, tmp_path):
     backend = _backend(cfg, make_endnote_library(tmp_path))
     conn = backend._db()

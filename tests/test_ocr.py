@@ -241,3 +241,161 @@ def test_attach_uploads_without_removing_the_disk_file(tmp_path, monkeypatch):
     assert "attached" in batch.rows[0].reason
     assert backend.calls == [("FAO2019A", "PDF (OCR)", "paperful ocr", True)]
     assert pdf.read_bytes() == b"%PDF-1.4 attached"
+
+
+def test_no_text_uses_skip_text(tmp_path, monkeypatch):
+    pdf = _blank_pdf(tmp_path / "scan.pdf")
+    monkeypatch.setattr("paperful.ocr.text_from_pdf", lambda *a, **k: "")
+    monkeypatch.setattr("paperful.ocr.shutil.which", lambda name: "/usr/bin/ocrmypdf")
+    seen: list[list[str]] = []
+
+    def fake_run(cmd, **kwargs):
+        seen.append(list(cmd))
+        Path(cmd[-1]).write_bytes(b"%PDF-1.4 skip")
+
+        class Proc:
+            returncode = 0
+            stderr = b""
+            stdout = b""
+
+        return Proc()
+
+    monkeypatch.setattr("paperful.ocr.subprocess.run", fake_run)
+    cfg = _cfg(tmp_path)
+    cfg.ocr_languages = "eng fra"
+    batch = ocr_items(
+        cfg, [_item(pdf)], Manifest(tmp_path / "state" / "manifest.jsonl"), None, apply=True
+    )
+    assert batch.ocr == 1
+    assert "--skip-text" in seen[0]
+    assert "--redo-ocr" not in seen[0]
+    assert seen[0][seen[0].index("-l") + 1] == "eng+fra"
+
+
+def test_one_failure_does_not_stop_the_batch(tmp_path, monkeypatch):
+    bad = _blank_pdf(tmp_path / "bad.pdf")
+    good = _blank_pdf(tmp_path / "good.pdf")
+    monkeypatch.setattr("paperful.ocr.text_from_pdf", lambda *a, **k: "")
+    monkeypatch.setattr("paperful.ocr.shutil.which", lambda name: "/usr/bin/ocrmypdf")
+
+    def fake_run(cmd, **kwargs):
+        if "bad.pdf" in cmd[-2]:
+            class Proc:
+                returncode = 1
+                stderr = b"page failed"
+                stdout = b""
+
+            return Proc()
+        Path(cmd[-1]).write_bytes(b"%PDF-1.4 ok")
+
+        class Proc:
+            returncode = 0
+            stderr = b""
+            stdout = b""
+
+        return Proc()
+
+    monkeypatch.setattr("paperful.ocr.subprocess.run", fake_run)
+    batch = ocr_items(
+        _cfg(tmp_path),
+        [_item(bad, key="BADKEY01"), _item(good, key="GOODKEY1")],
+        Manifest(tmp_path / "state" / "manifest.jsonl"),
+        None,
+        apply=True,
+    )
+    assert [row.status for row in batch.rows] == ["failed", "ocr"]
+    assert batch.failed == 1
+    assert batch.ocr == 1
+    assert "page failed" in batch.rows[0].reason
+    assert good.read_bytes() == b"%PDF-1.4 ok"
+    assert bad.read_bytes() != b"%PDF-1.4 ok"
+
+
+def test_timeout_is_recorded_per_item(tmp_path, monkeypatch):
+    import subprocess
+
+    slow = _blank_pdf(tmp_path / "slow.pdf")
+    nxt = _blank_pdf(tmp_path / "next.pdf")
+    monkeypatch.setattr("paperful.ocr.text_from_pdf", lambda *a, **k: "")
+    monkeypatch.setattr("paperful.ocr.shutil.which", lambda name: "/usr/bin/ocrmypdf")
+
+    def fake_run(cmd, **kwargs):
+        if "slow.pdf" in cmd[-2]:
+            raise subprocess.TimeoutExpired(cmd, kwargs.get("timeout", 1))
+        Path(cmd[-1]).write_bytes(b"%PDF-1.4 next")
+
+        class Proc:
+            returncode = 0
+            stderr = b""
+            stdout = b""
+
+        return Proc()
+
+    monkeypatch.setattr("paperful.ocr.subprocess.run", fake_run)
+    cfg = _cfg(tmp_path)
+    cfg.ocr_timeout_s = 5
+    batch = ocr_items(
+        cfg,
+        [_item(slow, key="SLOWKEY1"), _item(nxt, key="NEXTKEY1")],
+        Manifest(tmp_path / "state" / "manifest.jsonl"),
+        None,
+        apply=True,
+    )
+    assert batch.rows[0].status == "failed"
+    assert "timed out after 5s" in batch.rows[0].reason
+    assert batch.rows[1].status == "ocr"
+    assert nxt.read_bytes() == b"%PDF-1.4 next"
+
+
+class _ExportBackend:
+    def export_pdf(self, item, dest):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(b"%PDF-1.4 from-library")
+        return dest
+
+
+def test_manager_only_pdf_is_exported_into_out(tmp_path, monkeypatch):
+    monkeypatch.setattr("paperful.ocr.text_from_pdf", lambda *a, **k: "")
+    monkeypatch.setattr("paperful.ocr.shutil.which", lambda name: "/usr/bin/ocrmypdf")
+
+    def fake_run(cmd, **kwargs):
+        Path(cmd[-1]).write_bytes(b"%PDF-1.4 layered")
+
+        class Proc:
+            returncode = 0
+            stderr = b""
+            stdout = b""
+
+        return Proc()
+
+    monkeypatch.setattr("paperful.ocr.subprocess.run", fake_run)
+    cfg = _cfg(tmp_path)
+    item = _item(None)
+    manifest = Manifest(cfg.manifest_path)
+    batch = ocr_items(cfg, [item], manifest, _ExportBackend(), apply=True)
+    assert batch.ocr == 1
+    written = Path(manifest.get("FAO2019A").path)
+    assert written.is_file()
+    assert cfg.out_dir in written.parents
+    assert cfg.pdf_cache_dir not in written.parents
+    assert written.read_bytes() == b"%PDF-1.4 layered"
+    cached = cfg.pdf_cache_dir / "FAO2019A.pdf"
+    assert cached.is_file()
+    assert cached.read_bytes() == b"%PDF-1.4 from-library"
+
+
+def test_ocr_is_optional_on_all():
+    from paperful.run_config import DEFAULT_ALL_STEPS, OPTIONAL_STEPS
+
+    assert "ocr" not in DEFAULT_ALL_STEPS
+    assert "ocr" in OPTIONAL_STEPS
+
+
+def test_attach_without_apply_exits():
+    from typer.testing import CliRunner
+
+    from paperful.cli import app
+
+    res = CliRunner().invoke(app, ["ocr", "--item", "FAO2019A", "--attach"])
+    assert res.exit_code == 1
+    assert "needs --apply" in res.stdout

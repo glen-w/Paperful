@@ -213,6 +213,70 @@ def is_item_dirname(name: str) -> bool:
     return item_key_from_dirname(name) is not None
 
 
+def items_from_mirror(
+    out_dir: Path, collection_prefixes: list[str] | None = None
+) -> list[Item]:
+    """Catalogue rows already on disk. The live manager is not required."""
+    if not out_dir.is_dir():
+        return []
+    prefixes = [p.strip("/") for p in (collection_prefixes or []) if p and p.strip("/")]
+    items: list[Item] = []
+    seen: set[str] = set()
+    for rec_path in sorted(out_dir.rglob("record.json")):
+        if not is_item_dirname(rec_path.parent.name):
+            continue
+        try:
+            rel = rec_path.parent.relative_to(out_dir).as_posix()
+        except ValueError:
+            continue
+        collection = "" if "/" not in rel else rel.rsplit("/", 1)[0]
+        if prefixes and not any(
+            collection == pre or collection.startswith(pre + "/") for pre in prefixes
+        ):
+            continue
+        rec = load_json(rec_path)
+        if rec is None:
+            continue
+        key = str(rec.get("item_key") or item_key_from_dirname(rec_path.parent.name) or "")
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        pdfs = sorted(p for p in rec_path.parent.glob("*.pdf") if p.is_file())
+        creators = rec.get("creators") if isinstance(rec.get("creators"), list) else []
+        first = None
+        if creators and isinstance(creators[0], dict):
+            first = creators[0].get("lastName") or creators[0].get("name")
+        year = rec.get("year")
+        if not isinstance(year, int):
+            year = None
+        paths = rec.get("collection_paths")
+        if not isinstance(paths, list) or not paths:
+            paths = [collection] if collection else []
+        items.append(
+            Item(
+                key=key,
+                item_type=str(rec.get("item_type") or "document"),
+                title=str(rec.get("title") or ""),
+                doi=rec.get("doi") or None,
+                arxiv_id=rec.get("arxiv_id") or None,
+                url=rec.get("url") or None,
+                year=year,
+                first_author=str(first) if first else None,
+                collection_paths=[str(p) for p in paths if p],
+                doi_source=str(rec.get("doi_source") or "none"),
+                library_doi=rec.get("library_doi") or None,
+                extra=str(rec.get("extra") or ""),
+                publication_title=rec.get("publication_title") or None,
+                date=str(rec.get("date") or "") or None,
+                pdf_path=str(pdfs[0]) if pdfs else None,
+                has_pdf=bool(pdfs),
+                date_added=rec.get("date_added") or None,
+                abstract=rec.get("abstract") or None,
+            )
+        )
+    return items
+
+
 def unique_path(directory: Path, filename: str, md5: str) -> Path:
     """Avoid clobbering a different file with the same name; reuse identical ones."""
     import hashlib

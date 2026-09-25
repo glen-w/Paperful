@@ -1694,3 +1694,193 @@ def test_budget_stop_keeps_partial_rows_and_resume(tmp_path: Path):
     assert not deferred_path.exists()
     saved = (resumed.run_dir / "candidates.jsonl").read_text()
     assert "10.1000/cite" in saved
+
+
+def _keyword(slug: str, score: float) -> dict:
+    return {
+        "id": f"https://openalex.org/keywords/{slug}",
+        "display_name": slug,
+        "score": score,
+    }
+
+
+def _keyword_client(works: dict[str, dict]) -> tuple[OpenAlexClient, dict]:
+    seen: dict[str, str] = {}
+
+    def getter(path: str, params: dict) -> dict:
+        if path.startswith("/works/https://doi.org/"):
+            doi = path.split("/works/https://doi.org/", 1)[1]
+            for work in works.values():
+                if str(work.get("doi") or "").endswith(doi):
+                    return work
+            return {}
+        filt = str(params.get("filter") or "")
+        if filt.startswith("openalex:"):
+            ids = filt.split(":", 1)[1].split("|")
+            return {"results": [works[item] for item in ids if item in works]}
+        if filt.startswith("keywords.id:"):
+            seen["filter"] = filt.split(",", 1)[0]
+            slugs = set(seen["filter"].split(":", 1)[1].split("|"))
+            hits = []
+            for work in works.values():
+                owned = {
+                    str(item.get("id") or "").rsplit("/", 1)[-1]
+                    for item in (work.get("keywords") or [])
+                    if isinstance(item, dict)
+                }
+                if owned & slugs and not str(work.get("doi") or "").endswith("10.1000/seed"):
+                    hits.append(work)
+            hits.sort(key=lambda work: -int(work.get("cited_by_count") or 0))
+            return {"results": hits}
+        return {"results": []}
+
+    return OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter), seen
+
+
+def test_keyword_hop_uses_top_slugs_and_finite_cap(tmp_path: Path):
+    from paperful.snowball.expand import normalize_direction, parse_keyword_hop_limit, parse_keyword_limit
+
+    assert normalize_direction("refs+keywords") == "refs+keywords"
+    assert normalize_direction("all") == "both"
+    with pytest.raises(ValueError, match="keyword_limit"):
+        parse_keyword_limit("all")
+    with pytest.raises(ValueError, match="keyword_hop_limit"):
+        parse_keyword_hop_limit(0)
+    with pytest.raises(ValueError, match="keyword_hop_limit"):
+        parse_keyword_hop_limit("all")
+
+    seed = _work("W1", "10.1000/seed", "Seed", 2020, 4)
+    seed["keywords"] = [
+        _keyword("alpha", 0.9),
+        _keyword("beta", 0.8),
+        _keyword("gamma", 0.7),
+        _keyword("delta", 0.2),
+    ]
+    wide = _work("H1", "10.1000/wide", "Wide", 2021, 1)
+    wide["keywords"] = [_keyword("alpha", 0.5), _keyword("beta", 0.5), _keyword("gamma", 0.5)]
+    narrow = _work("H2", "10.1000/narrow", "Narrow", 2021, 50)
+    narrow["keywords"] = [_keyword("alpha", 0.4)]
+    extra = _work("H3", "10.1000/extra", "Extra", 2021, 9)
+    extra["keywords"] = [_keyword("alpha", 0.4), _keyword("beta", 0.4)]
+    works = {"W1": seed, "H1": wide, "H2": narrow, "H3": extra}
+    cfg = _cfg(tmp_path)
+    buf = StringIO()
+    console = Console(file=buf, highlight=False, width=200, force_terminal=False)
+    client, seen = _keyword_client(works)
+    result = run_doi(
+        cfg,
+        ["10.1000/seed"],
+        SnowballRequest(direction="keywords", depth=1, keyword_limit=3, keyword_hop_limit=2),
+        console=console,
+        client=client,
+        lookup=lambda doi, title: None,
+    )
+    assert result.exit_code == 0
+    assert seen["filter"] == "keywords.id:alpha|beta|gamma"
+    lines = (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    rows = [json.loads(line) for line in lines if json.loads(line)["direction"] == "keywords"]
+    assert len(rows) == 2
+    by_doi = {row["ids"]["doi"]: row for row in rows}
+    assert set(by_doi) == {"10.1000/narrow", "10.1000/extra"}
+    assert by_doi["10.1000/extra"]["biblio"]["overlap"] == 2
+    assert by_doi["10.1000/narrow"]["biblio"]["overlap"] == 1
+    assert by_doi["10.1000/extra"]["score"] > by_doi["10.1000/narrow"]["score"]
+    assert "keywords alpha, beta of 10.1000/seed" in by_doi["10.1000/extra"]["why"]
+
+
+def test_keywords_only_empty_seeds_exit(tmp_path: Path):
+    seed = _work("W1", "10.1000/seed", "Seed", 2020, 4)
+    seed["keywords"] = []
+    cfg = _cfg(tmp_path)
+    client, seen = _keyword_client({"W1": seed})
+    with pytest.raises(SnowballError, match="1 of 1 seeds have no OpenAlex keywords") as exc:
+        run_doi(
+            cfg,
+            ["10.1000/seed"],
+            SnowballRequest(direction="keywords", depth=1),
+            console=Console(file=StringIO(), highlight=False, width=120),
+            client=client,
+            lookup=lambda doi, title: None,
+        )
+    assert exc.value.code == 2
+    assert "filter" not in seen
+
+
+def test_mixed_direction_keeps_refs_when_keywords_missing(tmp_path: Path):
+    seed = _work("W1", "10.1000/seed", "Seed", 2020, 4, ["W2"])
+    seed["keywords"] = []
+    child = _work("W2", "10.1000/ref", "Ref", 2019, 2)
+    cfg = _cfg(tmp_path)
+    buf = StringIO()
+    client, _seen = _keyword_client({"W1": seed, "W2": child})
+    result = run_doi(
+        cfg,
+        ["10.1000/seed"],
+        SnowballRequest(direction="refs+keywords", depth=1, per_hop_limit="all"),
+        console=Console(file=buf, highlight=False, width=200, force_terminal=False),
+        client=client,
+        lookup=lambda doi, title: None,
+    )
+    assert result.exit_code == 0
+    text = buf.getvalue()
+    assert "1 of 1 seeds have no OpenAlex keywords" in text
+    lines = (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    rows = [json.loads(line) for line in lines]
+    assert {row["direction"] for row in rows} == {"refs"}
+    assert rows[0]["ids"]["doi"] == "10.1000/ref"
+
+
+def test_keyword_notice_counts_the_whole_doi_list(tmp_path: Path):
+    bare = _work("W1", "10.1000/bare", "Bare", 2020, 2, ["W3"])
+    bare["keywords"] = []
+    tagged = _work("W2", "10.1000/tagged", "Tagged", 2020, 3)
+    tagged["keywords"] = [_keyword("alpha", 0.9)]
+    neighbour = _work("H1", "10.1000/hit", "Hit", 2021, 4)
+    neighbour["keywords"] = [_keyword("alpha", 0.5)]
+    ref = _work("W3", "10.1000/ref", "Ref", 2019, 1)
+    works = {"W1": bare, "W2": tagged, "H1": neighbour, "W3": ref}
+    cfg = _cfg(tmp_path)
+    buf = StringIO()
+    client, seen = _keyword_client(works)
+    result = run_doi(
+        cfg,
+        ["10.1000/bare", "10.1000/tagged"],
+        SnowballRequest(direction="keywords", depth=1, keyword_limit=3, keyword_hop_limit=5),
+        console=Console(file=buf, highlight=False, width=200, force_terminal=False),
+        client=client,
+        lookup=lambda doi, title: None,
+    )
+    assert result.exit_code == 0
+    text = buf.getvalue()
+    assert text.count("1 of 2 seeds have no OpenAlex keywords") == 1
+    assert seen["filter"] == "keywords.id:alpha"
+    lines = (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    rows = [json.loads(line) for line in lines]
+    assert {row["ids"]["doi"] for row in rows} == {"10.1000/hit"}
+
+
+def test_keyword_min_score_drops_weak_slugs(tmp_path: Path):
+    seed = _work("W1", "10.1000/seed", "Seed", 2020, 4)
+    seed["keywords"] = [_keyword("alpha", 0.9), _keyword("beta", 0.2)]
+    hit = _work("H1", "10.1000/hit", "Hit", 2021, 3)
+    hit["keywords"] = [_keyword("alpha", 0.5)]
+    cfg = _cfg(tmp_path)
+    client, seen = _keyword_client({"W1": seed, "H1": hit})
+    result = run_doi(
+        cfg,
+        ["10.1000/seed"],
+        SnowballRequest(direction="keywords", depth=1, keyword_min_score=0.5),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=client,
+        lookup=lambda doi, title: None,
+    )
+    assert result.exit_code == 0
+    assert seen["filter"] == "keywords.id:alpha"
+
+
+def test_works_by_keywords_refuses_unbounded_limit():
+    from paperful.snowball.openalex import OpenAlexError
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=lambda path, params: {})
+    with pytest.raises(OpenAlexError, match="keyword_hop_limit"):
+        client.works_by_keywords(["alpha"], limit=0)

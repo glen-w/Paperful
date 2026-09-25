@@ -1,7 +1,7 @@
 # Snowball
 
 **Status:** keyword search, DOI / ORCID / collection seeds, `hybrid` (keyword
-hits, then one hop), refs and cited-by, depth up to 5 under caps, gates
+hits, then one hop), refs, cited-by, and OpenAlex keywords, depth up to 5 under caps, gates
 `dry-run` / `approve-each` / `approve-batch` / `auto`, overlap ranking, and
 `--fetch-pdfs` are implemented. Config honors `dedupe_scope`, `tag_prefix`,
 `types`, `oa_only`, venues, `languages`, `min_seed_citations`,

@@ -649,7 +649,24 @@ class MendeleyBackend:
             "date": "year",
             "publicationTitle": "source",
         }
+        # Mendeley has no extra field. Preprint ids stay on the Zotero/EndNote item.
+        mendeley_type = {
+            "journalArticle": "journal",
+            "preprint": "working_paper",
+            "conferencePaper": "conference_proceedings",
+            "book": "book",
+            "bookSection": "book_section",
+            "report": "report",
+            "thesis": "thesis",
+        }
         for name, value in fields.items():
+            if name == "extra":
+                continue
+            if name == "itemType":
+                mapped = mendeley_type.get(str(value))
+                if mapped:
+                    body["type"] = mapped
+                continue
             dest = mapping.get(name, name)
             if dest == "doi":
                 ids = {"doi": value}
@@ -675,6 +692,14 @@ class MendeleyBackend:
         raise LibraryError(
             "Mendeley cannot merge items through paperful. "
             "dedupe --apply needs Zotero so the PDF and notes stay on one item."
+        )
+
+    def relate_items(self, left_key: str, right_key: str) -> None:
+        self.create_or_update_note(
+            left_key, f"<p>paperful version of {right_key}</p>", "paperful-version"
+        )
+        self.create_or_update_note(
+            right_key, f"<p>paperful version of {left_key}</p>", "paperful-version"
         )
 
     def trash_item(self, item_key: str) -> None:
@@ -734,6 +759,25 @@ class MendeleyBackend:
         if isinstance(created, dict) and created.get("id"):
             return str(created["id"])
         raise LibraryError("Mendeley did not create a note annotation")
+
+    def replace_prefixed_tag(self, item_key: str, prefix: str, tag: str) -> None:
+        """Replace document tags that start with ``prefix``. Other tags stay."""
+        want = prefix.strip().lower()
+        existing: list[str] = []
+        raw = self.raw_item(item_key)
+        if raw:
+            for row in (raw.get("data") or {}).get("tags") or []:
+                text = str(row.get("tag") or "") if isinstance(row, dict) else str(row)
+                if text and not text.strip().lower().startswith(want):
+                    existing.append(text)
+        existing.append(tag)
+        self.client.patch(
+            f"/documents/{item_key}",
+            accept=ACCEPT_DOC,
+            content_type=ACCEPT_DOC,
+            body={"tags": existing},
+        )
+        self._docs = None
 
     def find_collection_note_keys(self, collection_key: str, tag: str) -> list[str]:
         want = tag.strip().lower()

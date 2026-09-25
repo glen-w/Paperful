@@ -18,7 +18,8 @@ from rich.console import Console
 from rich.markup import escape
 
 from .attach import parent_missing
-from .provenance import provenance_stamp
+from .provenance import provenance_sentence, provenance_stamp
+from .remarks import say
 from .circuit import CircuitBreaker
 from .config import Config
 from .cookies import apply_netscape_cookies
@@ -668,6 +669,21 @@ class Pipeline:
                 self.stats.bump(STATUS_ATTACHED)
             self._emit(f"   [cyan]attached[/] {rec.itemKey} ({res.reason})")
             self._add_outcome(rec)
+            mismatch = bool(rec.pdf_doi and rec.doi and rec.pdf_doi != rec.doi)
+            try:
+                say(
+                    self.attacher,
+                    rec.itemKey,
+                    "found",
+                    provenance_sentence(
+                        rec.source,
+                        playbook=rec.playbook or None,
+                        pdf_doi_mismatch=mismatch,
+                    ),
+                    surface=self.cfg.remarks_surface,
+                )
+            except Exception as exc:
+                self._emit(f"   [dim]remark skipped[/] {rec.itemKey}: {exc}")
         else:
             rec.status = STATUS_ATTACH_FAILED
             rec.reason = res.reason

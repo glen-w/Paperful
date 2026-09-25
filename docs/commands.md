@@ -133,6 +133,7 @@ uv run paperful pack show
 | `summarize` | Grounded LLM summary from the PDF already on disk (`--item` / `-C` / `--library`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`, `--prompt FILE`, `--force`, `--to disk, zotero, or both`). Default writes `state/summaries/<key>.html` and one child note tagged `[summarize].tag`. `--to disk` skips Zotero. `--apply` requires the note and conflicts with `--to disk`. Writes `state/runs/<stamp>-summarize.json`. See [LLM](llm.md#d-summarize-grounded-summary-note). |
 | `synthesize` | Literature review from existing summary notes (`--item` / `-C` / `--library`, same year/type/`--limit` flags, `--prompt`, `--to`, `--dry-run`, `--force`, `--report-collection`). Writes `state/reports/<slug>.html` and, unless `--to disk`, a standalone note in each `-C` collection. See [LLM](llm.md#e-synthesize-summary-of-summaries). |
 | `dedupe` | Duplicate pack on disk (`high_doi`, then `title+year`). `--apply` merges DOI extras onto the keeper, then trashes the emptied parent; title+year needs `--apply-medium`. Held when same-DOI titles diverge. Same year/type scope flags as `run`. See [dedupe](dedupe.md). |
+| `versions` | Preprint and published paper as one work. Dry-run writes `state/version-packs/`. `--apply` puts the published citation and PDF on the older parent, keeps the preprint id and PDF, and trashes a sibling only after that PDF is attached. Title-only pairs are listed and not applied. |
 | `gaps` | Counts: no stored PDF, linked PDF URL only, missing DOI. Read-only. Year/type scope flags apply. Next steps are `run` and `lint`. Writes `state/runs/<stamp>-gaps.json`. |
 | `all` | `gaps` → `run --try-all --retry-failed --upgrade-linked` → `lint` → `fix-metadata --apply` → `summarize --apply`. Stops on the first failure. `--dry-run` skips `summarize` and does not apply metadata. `--profile` / `-f` load a saved run config. Opens a pack when none is open. See [Workflows](workflows.md). |
 | `profile` | `list` / `show` / `save` — named run configs beside `config.toml` (`profiles/<name>.toml` or `[profiles.*]`). `show` prints the merge `all` would use. `save` does not edit `config.toml`. |
@@ -280,6 +281,9 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
   until `--apply`.
 - `state/dedupe-applied.jsonl` — one line per parent merged by
   `dedupe --apply` (children and better fields land on the keeper first).
+- `state/version-packs/` — `versions` review packs (`.json` and `.md`).
+- `state/versions-applied.jsonl` — one line per work updated by
+  `versions --apply`.
 - `state/pdf-cache/` — PDFs exported from the manager so lint can read text
   on disk (`pdftotext`, then `pypdf`).
 - `state/last-run.json` — latest auditable `run` or `recover` report (summary + per-item

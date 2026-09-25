@@ -177,6 +177,8 @@ class Config:
     snowball_approve_each_max: int = 20
     snowball_hybrid_seeds: int = 5
     snowball_refine: bool = False
+    # Where plain-language lines are written. note | tag | off.
+    remarks_surface: str = "note"
     # OCRmyPDF text layer for scanned PDFs. languages is a Tesseract -l list.
     ocr_languages: str = "eng"
     ocr_timeout_s: float = 600.0
@@ -197,6 +199,10 @@ class Config:
     @property
     def dedupe_applied_path(self) -> Path:
         return self.state_dir / "dedupe-applied.jsonl"
+
+    @property
+    def versions_applied_path(self) -> Path:
+        return self.state_dir / "versions-applied.jsonl"
 
     @property
     def pdf_cache_dir(self) -> Path:
@@ -497,6 +503,17 @@ def _parse_run_profiles(raw: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 _DESTS = frozenset({"disk", "zotero", "both"})
 _PDF_MODES = frozenset({"additional", "all", "none"})
+_REMARK_SURFACES = frozenset({"note", "tag", "off"})
+
+
+def parse_remarks_surface(value: str) -> str:
+    """Normalise ``[remarks].surface``. ``note`` is the default."""
+    surface = str(value).strip().lower()
+    if surface not in _REMARK_SURFACES:
+        raise ValueError(
+            f"config [remarks].surface {value!r} must be note, tag, or off"
+        )
+    return surface
 
 
 def parse_pdfs(value: str) -> str:
@@ -603,6 +620,9 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
     mirror = raw.get("mirror")
     if isinstance(mirror, dict) and "pdfs" in mirror:
         cfg.mirror_pdfs = parse_pdfs(str(mirror["pdfs"]))
+    remarks = raw.get("remarks")
+    if isinstance(remarks, dict) and remarks.get("surface") not in (None, ""):
+        cfg.remarks_surface = parse_remarks_surface(str(remarks["surface"]))
     ocr = raw.get("ocr")
     if isinstance(ocr, dict):
         if "languages" in ocr:

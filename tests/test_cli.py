@@ -102,6 +102,46 @@ def test_version():
     assert res.exit_code == 0 and res.stdout.strip()
 
 
+def test_run_uses_mirror_when_manager_is_down(cfg_file, tmp_path, monkeypatch):
+    class Down:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def ping(self):
+            raise ConnectionError("connection refused")
+
+    monkeypatch.setattr(cli, "ZoteroLocal", Down)
+    folder = tmp_path / "out" / "BBNJ" / "Smith - 2019 - Title -- ITEM0001"
+    folder.mkdir(parents=True)
+    (folder / "record.json").write_text(
+        json.dumps(
+            {
+                "item_key": "ITEM0001",
+                "item_type": "journalArticle",
+                "title": "Mirror title",
+                "doi": "10.1000/mirror",
+                "year": 2019,
+                "collection_paths": ["BBNJ"],
+            }
+        )
+    )
+    held = folder.parent / "Held - 2020 - Done -- ITEM0002"
+    held.mkdir()
+    (held / "record.json").write_text(json.dumps({"item_key": "ITEM0002", "title": "Has PDF"}))
+    (held / "paper.pdf").write_bytes(b"%PDF-1.4")
+    res = runner.invoke(
+        cli.app,
+        ["run", "-c", str(cfg_file), "--library", "--dry-run"],
+        env={"COLUMNS": "200"},
+    )
+    assert res.exit_code == 0, res.stdout
+    assert "not reachable" in res.stdout
+    assert "ITEM0001" in res.stdout
+    assert "ITEM0002" not in res.stdout
+    assert "Not copied to zotero yet" in res.stdout
+    assert "Next steps" not in res.stdout
+
+
 def test_run_requires_scope(cfg_file):
     res = runner.invoke(cli.app, ["run", "-c", str(cfg_file)])
     assert res.exit_code == 1 and "--collection" in res.stdout
@@ -333,6 +373,20 @@ def test_jobs_command_names_snowball_and_run():
     assert "snowball" in res.stdout
     assert "run" in res.stdout
     assert "grows" in res.stdout.lower() or "Snowball" in res.stdout
+
+
+def test_dedupe_dry_run_skips_the_duplicate_line(cfg_file, stub_zotero, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        "paperful.remarks.remark_duplicates",
+        lambda *a, **k: calls.append(k.get("surface")),
+    )
+    dry = runner.invoke(cli.app, ["dedupe", "-c", str(cfg_file), "-C", "BBNJ", "--dry-run"])
+    assert dry.exit_code == 0, dry.stdout
+    assert calls == []
+    live = runner.invoke(cli.app, ["dedupe", "-c", str(cfg_file), "-C", "BBNJ"])
+    assert live.exit_code == 0, live.stdout
+    assert calls == ["note"]
 
 
 def test_mutating_commands_name_the_write_gate():
@@ -643,6 +697,8 @@ def test_doctor_pdftotext_amber(cfg_file, stub_zotero, monkeypatch):
     res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--no-guide"])
     assert res.exit_code == 0
     assert "pdftotext" in res.stdout
+    assert "ocrmypdf" in res.stdout
+    assert "tesseract" in res.stdout
     assert "amber" in res.stdout
 
 

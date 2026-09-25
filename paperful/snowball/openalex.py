@@ -256,6 +256,27 @@ class OpenAlexClient:
             return payload
         return None
 
+    def works_by_dois(self, dois: list[str]) -> list[dict[str, Any]]:
+        """Works for these DOIs. Select is id, doi, and referenced_works only."""
+        out: list[dict[str, Any]] = []
+        ids = [doi for doi in dois if doi]
+        for start in range(0, len(ids), 50):
+            batch = ids[start : start + 50]
+            try:
+                payload = self.get(
+                    "/works",
+                    {
+                        "filter": "doi:" + "|".join(batch),
+                        "per_page": len(batch),
+                        "select": "id,doi,referenced_works",
+                    },
+                )
+            except OpenAlexBudgetExceeded as exc:
+                exc.partial = out + list(exc.partial or [])
+                raise
+            out.extend(payload.get("results") or [])
+        return out
+
     def works_by_ids(self, openalex_ids: list[str]) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         ids = list(openalex_ids)

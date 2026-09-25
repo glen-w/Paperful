@@ -33,7 +33,7 @@ Default `--phase all` classifies both. `--apply` always does `high_doi` before
 `medium_title_year`.
 
 **high_doi.** Parents that share a normalised DOI (casefold, strip
-`https://doi.org/`). One keep, the rest are trash candidates.
+`https://doi.org/`). One keep, the rest are merge candidates.
 
 Keep rank, highest first:
 

@@ -308,6 +308,8 @@ class EndNoteBackend:
             "title": "title",
             "date": "date",
             "publicationTitle": "publication_title",
+            "itemType": "item_type",
+            "extra": "extra",
         }
         for name, value in fields.items():
             rec[mapping.get(name, name)] = value
@@ -316,6 +318,14 @@ class EndNoteBackend:
         raise LibraryError(
             "EndNote cannot merge items through paperful. "
             "dedupe --apply needs Zotero so the PDF and notes stay on one item."
+        )
+
+    def relate_items(self, left_key: str, right_key: str) -> None:
+        self.create_or_update_note(
+            left_key, f"<p>paperful version of {right_key}</p>", "paperful-version"
+        )
+        self.create_or_update_note(
+            right_key, f"<p>paperful version of {left_key}</p>", "paperful-version"
         )
 
     def trash_item(self, item_key: str) -> None:
@@ -352,6 +362,20 @@ class EndNoteBackend:
         fname = f"{tag}.html"
         notes.append({"file": fname, "html": html, "tag": tag})
         return fname
+
+    def replace_prefixed_tag(self, item_key: str, prefix: str, tag: str) -> None:
+        """Replace keywords that start with ``prefix`` on the staged import record."""
+        rec = self._pending_by_key.get(item_key) or self._stage_from_live(item_key)
+        want = prefix.strip().lower()
+        kept: list[dict[str, str]] = []
+        for row in rec.get("tags") or []:
+            text = str(row.get("tag") or "") if isinstance(row, dict) else str(row)
+            if text.strip().lower().startswith(want):
+                continue
+            if text:
+                kept.append({"tag": text})
+        kept.append({"tag": tag})
+        rec["tags"] = kept
 
     def find_collection_note_keys(self, collection_key: str, tag: str) -> list[str]:
         del collection_key, tag

@@ -64,7 +64,7 @@ from .runreport import (
 from .scope import ScopeError, filter_scope_items, load_scope, resolve_keys
 from .sources import Context
 from .sources.scihub import ping_mirrors
-from .store import STATUS_ATTACHED, STATUS_NOT_FOUND, Manifest
+from .store import STATUS_ATTACHED, STATUS_NOT_FOUND, Manifest, items_from_mirror
 from .zot import (
     ZoteroLocal,
     items_without_stored_pdf,
@@ -143,6 +143,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "lint",
         "fix-metadata",
         "dedupe",
+        "versions",
         "ocr",
         "summarize",
         "synthesize",
@@ -452,14 +453,18 @@ def _zotero_next_steps(code: str, *, in_doctor: bool) -> list[str]:
             "The Host header is always localhost:23119. See docs/zotero.md.",
         ]
     elif code in {"zotero_down", "zotero_bad_host"}:
-        steps = ["Start Zotero on this machine."]
+        steps = [
+            "The local mirror does not need Zotero. This command reads the live library, which is not reachable.",
+        ]
         if host or code == "zotero_bad_host":
             steps.append(host_tip)
-        steps.append("Settings → Advanced → enable the local API.")
+        steps.append(
+            "When you want this command to use the library, start Zotero and enable the local API."
+        )
     else:
         steps = [
-            "Start Zotero on this machine.",
-            "Settings → Advanced → enable the local API.",
+            "The local mirror does not need Zotero. This command reads the live library, which is not reachable.",
+            "When you want this command to use the library, start Zotero and enable the local API.",
         ]
         if host:
             steps.append(host_tip)
@@ -523,6 +528,42 @@ def _require_manager(cfg: Config) -> None:
             f"[red]Unknown manager={manager!r}.[/] Known: zotero, mendeley, endnote."
         )
         raise typer.Exit(1)
+
+
+def _manager_name(cfg: Config) -> str:
+    return (cfg.manager or "zotero").strip().lower() or "zotero"
+
+
+def _open_library(cfg: Config) -> tuple[LibraryBackend | None, str]:
+    """Live library, or (None, reason) when it is not reachable.
+
+    A missing manager does not stop work that can stay on the local mirror.
+    """
+    manager = _manager_name(cfg)
+    try:
+        if manager == "zotero":
+            zl = ZoteroLocal()
+            info = zl.ping()
+            console.print(
+                f"[dim]Zotero {info.get('zotero_version') or '?'}, "
+                f"local API v{info.get('api_version')}, write support: "
+                f"{'yes' if info.get('supports_write') else 'no'}[/]"
+            )
+            return get_backend(cfg, zl), ""
+        backend = get_backend(cfg)
+        info = backend.ping()
+        if manager == "mendeley":
+            console.print(
+                f"[dim]Mendeley {info.get('display_name') or '?'}, write support: yes[/]"
+            )
+        elif manager == "endnote":
+            console.print(
+                f"[dim]EndNote {info.get('library') or '?'}, "
+                f"{info.get('refs', '?')} refs, writes via import bundle[/]"
+            )
+        return backend, ""
+    except Exception as exc:
+        return None, str(exc)
 
 
 def _connect(cfg: Config, *, quiet: bool = False) -> LibraryBackend:
@@ -1092,7 +1133,7 @@ def dedupe(
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
-        help="Write the pack only. This is the default; do not combine with --apply.",
+        help="Write the pack only. Skips the duplicate line. Do not combine with --apply.",
     ),
     apply: bool | None = typer.Option(
         None,
@@ -1122,8 +1163,10 @@ def dedupe(
 ) -> None:
     """Find duplicate parents and write a review pack. Merge only with --apply.
 
-    Default is classify-only. Same-DOI groups whose titles diverge are held.
-    A profile's ``apply`` flag does not merge; pass --apply on this command.
+    Default writes the pack and a plain-language line on each spare copy.
+    ``--dry-run`` writes the pack only. Same-DOI groups whose titles diverge
+    are held. A profile's ``apply`` flag does not merge; pass --apply on this
+    command.
     """
     from .dedupe import (
         PHASES,
@@ -1188,6 +1231,10 @@ def dedupe(
     counts = pack_counts(groups, len(items))
     applied = 0
     errors: list[str] = []
+    if not dry_run:
+        from .remarks import remark_duplicates
+
+        remark_duplicates(backend, groups, items, surface=cfg.remarks_surface)
     if apply:
         if not backend.supports_write():
             _exit_env("This library has no write support.", cfg)
@@ -1237,6 +1284,170 @@ def dedupe(
                 console.print(f"[yellow]{err}[/]")
     if errors:
         raise typer.Exit(1)
+
+
+@app.command()
+def versions(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Write the pack only. This is the default; do not combine with --apply.",
+    ),
+    apply: bool | None = typer.Option(
+        None,
+        "--apply/--no-apply",
+        help="Write the published citation onto the existing parent and keep the preprint as a version.",
+    ),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
+    as_json: bool = typer.Option(
+        False, "--json", help="Print pack paths and counts as JSON."
+    ),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Link a preprint and its published paper as one work. Write only with --apply.
+
+    The older parent keeps the citation key. Its fields become the version of
+    record and the published PDF is attached beside the preprint PDF. A later
+    sibling is trashed only after that PDF is on the survivor. Title-only
+    matches are listed and not applied.
+    """
+    import httpx
+
+    from .versions import (
+        apply_versions,
+        classify_versions,
+        http_fetch_published,
+        pack_counts,
+        resolver_for,
+        write_pack,
+    )
+
+    if _scope_unset(collection, library, profile, run_config):
+        _refuse_missing_scope()
+    cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=limit,
+        apply=apply,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    limit = bound.limit
+    apply = bound.apply
+    if dry_run and apply:
+        console.print("[red]Pass either --dry-run or --apply, not both.[/]")
+        raise typer.Exit(1)
+    if not collection and not library:
+        _refuse_missing_scope()
+    _require_manager(cfg)
+    backend = _connect(cfg, quiet=as_json)
+    loaded = _loaded_scope(
+        backend,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    items, scope = loaded.items, loaded.label
+    if limit:
+        items = items[:limit]
+    client = httpx.Client(follow_redirects=True, timeout=30)
+    errors: list[str] = []
+    try:
+        try:
+            proposals = classify_versions(items, resolver_for(client, cfg.email))
+        except Exception as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(1)
+        json_path, md_path = write_pack(
+            cfg.state_dir, scope, proposals, n_items=len(items)
+        )
+        counts = pack_counts(proposals, len(items))
+        applied = 0
+        if apply:
+            if not backend.supports_write():
+                _exit_env("This library has no write support.", cfg)
+            try:
+                applied, errors = apply_versions(
+                    backend,
+                    proposals,
+                    fetch_published=http_fetch_published(client, cfg.email),
+                    audit_path=cfg.versions_applied_path,
+                    scope=scope,
+                    pack=json_path,
+                )
+            except LibraryError as exc:
+                _exit_env(str(exc))
+        payload = {
+            "pack": str(json_path),
+            "markdown": str(md_path),
+            "counts": counts,
+            "applied": applied,
+            "errors": errors,
+        }
+        if as_json:
+            console.print(
+                json.dumps(payload, indent=2),
+                soft_wrap=True,
+                highlight=False,
+                markup=False,
+            )
+        else:
+            console.print(f"Scope: [bold]{scope}[/] — {len(items)} items")
+            _print_version_table(proposals)
+            console.print(f"[dim]Wrote {json_path}[/]")
+            console.print(f"[dim]Wrote {md_path}[/]")
+            if apply:
+                console.print(f"Updated: {applied}")
+            else:
+                console.print(
+                    "Dry-run. Pass [bold]--apply[/] to keep the published citation and PDF "
+                    "on the existing item. The preprint stays as a version."
+                )
+            if errors:
+                console.print(f"Errors: {len(errors)}")
+                for err in errors[:20]:
+                    console.print(f"[yellow]{err}[/]")
+    finally:
+        client.close()
+    if errors:
+        raise typer.Exit(1)
+
+
+def _print_version_table(proposals: list) -> None:
+    if not proposals:
+        console.print("[green]No preprint / published pairs.[/]")
+        return
+    table = Table(title=f"{len(proposals)} version pairs")
+    table.add_column("Keep", style="dim")
+    table.add_column("Published DOI")
+    table.add_column("Sibling")
+    table.add_column("Note")
+    for row in proposals:
+        note = "needs review" if row.needs_review else row.source
+        table.add_row(
+            row.item_key,
+            row.published_doi,
+            row.sibling_key or "-",
+            note,
+        )
+    console.print(table)
 
 
 def _print_dedupe_table(groups: list) -> None:
@@ -1405,7 +1616,7 @@ def run(
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
-    """Fill PDFs for items already in the library. Default attaches on Zotero 10+; --dry-run does not write."""
+    """Fill PDFs into the local mirror. Copies into the library when it is reachable. --dry-run does not write."""
     if _scope_unset(collection, library, profile, run_config):
         _refuse_missing_scope()
     cfg = _cfg(config)
@@ -1443,8 +1654,19 @@ def run(
         _refuse_missing_scope()
     _require_manager(cfg)
     source_list = _source_list(cfg, sources, scihub, preset)
-    backend = _connect(cfg)
-    keys, scope = _scope_keys(backend, collection, library)
+    backend, offline_reason = _open_library(cfg)
+    mirror_only = backend is None
+    if mirror_only:
+        manager = _manager_name(cfg)
+        console.print(
+            f"[yellow]{manager} is not reachable ({offline_reason}). "
+            "Continuing from the local mirror. Nothing will be copied to the library.[/]"
+        )
+        catalog = items_from_mirror(cfg.out_dir, None if library else collection)
+        scope = "library" if library else ", ".join(collection)
+        keys = None
+    else:
+        keys, scope = _scope_keys(backend, collection, library)
     types = _resolve_types(item_type)
     # Drop sources that can never hit this -T / year scope (e.g. htmlpdf on
     # journals, Sci-Hub when --year-from is past its ~2021 coverage), including
@@ -1461,7 +1683,9 @@ def run(
     )
     # One library listing. Year and type filters, the linked-URL skip count,
     # and the PDF todo all come from that list.
-    catalog = backend.items_in_scope(keys)
+    if not mirror_only:
+        assert backend is not None
+        catalog = backend.items_in_scope(keys)
     if item_filter:
         scoped, scope = _apply_item_filters(
             catalog,
@@ -1522,10 +1746,12 @@ def run(
                 "; ".join(it.collection_paths),
             )
         console.print(table)
+        if mirror_only:
+            _mirror_deferred(cfg)
         raise typer.Exit(0)
 
     attacher = None
-    if cfg.attach and not no_attach:
+    if backend is not None and cfg.attach and not no_attach:
         attacher = backend
         if not backend.supports_write():
             console.print(
@@ -1547,7 +1773,7 @@ def run(
         item_types=",".join(sorted(types)) if types else None,
         strict_pdf_doi=strict_pdf_doi,
     )
-    write_api = _library_write_api(backend)
+    write_api = None if mirror_only else _library_write_api(backend)
 
     if not todo:
         stats = RunStats(
@@ -1563,6 +1789,8 @@ def run(
             flags=run_flags,
             write_api=write_api,
         )
+        if mirror_only:
+            _mirror_deferred(cfg)
         return
 
     with _item_progress() as progress:
@@ -1596,7 +1824,19 @@ def run(
         flags=run_flags,
         write_api=write_api,
     )
-    _flush(backend)
+    if backend is not None:
+        _flush(backend)
+    if mirror_only:
+        _mirror_deferred(cfg)
+
+
+def _mirror_deferred(cfg: Config) -> None:
+    manager = _manager_name(cfg)
+    console.print(
+        f"[yellow]Saved to the local mirror ({cfg.out_dir}). "
+        f"Not copied to {manager} yet — it was not reachable. "
+        f"When it is, run paperful attach.[/]"
+    )
 
 
 def _library_write_api(backend: LibraryBackend) -> bool | None:
@@ -3581,6 +3821,7 @@ def _snowball_request(
         backends=_csv(backends) if backends else None,
         hybrid_seeds=hybrid_seeds,
         refine=refine,
+        link_versions=True,
     )
 
 

@@ -253,7 +253,9 @@ prerequisites for the fetch / lint / attach loop.
    opt-in + disclaimer bar as Sci-Hub; no third-party HTTP gateways).
 3. **Identity / resolver graph** — work ↔ version ↔ preprint; scored patches with
    undo; citation ingest; manifestation-aware dedupe. Collection DOI / title+year
-   trash is already `paperful dedupe`. Still later:
+   trash is already `paperful dedupe`. Preprint ↔ version of record is
+   `paperful versions`: the older parent keeps the published citation and PDF,
+   and the preprint stays as a version. Still later:
    `paperful ingest-dois --from-file dois.txt -C BBNJ --dry-run` then `--apply`
    (create items by DOI, tag `crossref-backfill`, hand off to `run` for PDFs).
    That backfill stays out of any scheduled bot inside Paperful.

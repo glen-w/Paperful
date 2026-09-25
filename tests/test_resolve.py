@@ -1,3 +1,5 @@
+import httpx
+
 from paperful.resolve import (
     extract_arxiv_id,
     extract_doi,
@@ -85,6 +87,121 @@ def test_short_title_splits_on_sentence_or_colon():
     assert (
         short_title("Dr. Smith and the long title with no subtitle") is None
     )  # 'Dr.' not a sentence end (uppercase before dot)
+
+
+def test_crossref_preprint_relations():
+    from paperful.resolve import version_from_crossref
+
+    preprint = version_from_crossref(
+        {
+            "relation": {
+                "is-preprint-of": [{"id-type": "doi", "id": "10.1038/s41586-020-2649-2"}]
+            }
+        },
+        "10.1101/2020.01.01.123456",
+    )
+    assert preprint is not None
+    assert preprint.preprint_doi == "10.1101/2020.01.01.123456"
+    assert preprint.published_doi == "10.1038/s41586-020-2649-2"
+    assert preprint.source == "crossref"
+
+    published = version_from_crossref(
+        {
+            "type": "journal-article",
+            "DOI": "10.1038/s41586-020-2649-2",
+            "title": ["Attention is all you need"],
+            "container-title": ["Nature"],
+            "issued": {"date-parts": [[2020, 6, 1]]},
+            "relation": {
+                "has-preprint": [{"id-type": "doi", "id": "10.48550/arxiv.1706.03762"}]
+            },
+        },
+        "10.1038/s41586-020-2649-2",
+    )
+    assert published is not None
+    assert published.preprint_doi == "10.48550/arxiv.1706.03762"
+    assert published.arxiv_id == "1706.03762"
+    assert published.item_type == "journalArticle"
+    assert published.published is not None
+    assert published.published.venue == "Nature"
+
+
+def test_arxiv_and_biorxiv_published_doi():
+    from paperful.resolve import version_from_arxiv_xml, version_from_biorxiv
+
+    xml = """<?xml version="1.0"?>
+    <feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
+      <entry>
+        <id>http://arxiv.org/abs/1706.03762v5</id>
+        <arxiv:doi>10.1038/s41586-020-2649-2</arxiv:doi>
+      </entry>
+    </feed>
+    """
+    link = version_from_arxiv_xml(xml, "10.48550/arxiv.1706.03762")
+    assert link is not None
+    assert link.published_doi == "10.1038/s41586-020-2649-2"
+    assert link.arxiv_id == "1706.03762"
+    assert link.source == "arxiv"
+
+    journal_only = """<?xml version="1.0"?>
+    <feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
+      <entry>
+        <id>http://arxiv.org/abs/1706.03762v5</id>
+        <arxiv:journal_ref>Nature 583, 10.1038/s41586-020-2649-2 (2020)</arxiv:journal_ref>
+      </entry>
+    </feed>
+    """
+    via_journal = version_from_arxiv_xml(journal_only, "10.48550/arxiv.1706.03762")
+    assert via_journal is not None
+    assert via_journal.published_doi == "10.1038/s41586-020-2649-2"
+
+    bio = version_from_biorxiv(
+        {
+            "collection": [
+                {"doi": "10.1101/2020.01.01.123456", "version": "1", "published": "NA"},
+                {
+                    "doi": "10.1101/2020.01.01.123456",
+                    "version": "2",
+                    "published": "10.1038/s41586-020-2649-2",
+                },
+            ]
+        },
+        "10.1101/2020.01.01.123456",
+    )
+    assert bio is not None
+    assert bio.published_doi == "10.1038/s41586-020-2649-2"
+    assert bio.source == "biorxiv"
+    assert (
+        version_from_biorxiv(
+            {"collection": [{"published": "NA"}]}, "10.1101/2020.01.01.123456"
+        )
+        is None
+    )
+
+
+def test_openalex_related_works_do_not_link():
+    from paperful.resolve import version_from_crossref, version_from_openalex, version_link
+
+    payload = {
+        "related_works": ["https://openalex.org/W123"],
+        "locations": [{"pdf_url": "https://example.org/a.pdf"}],
+    }
+    assert version_from_openalex(payload) is None
+    assert (
+        version_from_crossref(
+            {"DOI": "10.1000/vor", "related_works": payload["related_works"]},
+            "10.1000/vor",
+        )
+        is None
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "api.crossref.org" in str(request.url):
+            return httpx.Response(200, json={"message": {"DOI": "10.1000/vor"}})
+        return httpx.Response(200, json=payload)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    assert version_link(client, "10.1000/vor", "t@example.org") is None
 
 
 def test_normalize_doi_keeps_parentheses_inside_old_elsevier_dois():

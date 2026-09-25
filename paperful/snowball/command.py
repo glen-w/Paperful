@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -29,6 +30,7 @@ from .expand import (
 )
 from .fill import FillPaused, crossref_work, fill_crossref, fill_semanticscholar, s2_api_key, s2_paper
 from .ingest import create_new, fill_pdfs
+from .local_cites import load_local_cites
 from .openalex import OpenAlexBudgetExceeded, OpenAlexClient, keyless_limit_message, normalize_orcid
 from .orcid import OrcidError, orcid_dois
 from .queue import load_queue, write_queue, write_report
@@ -38,8 +40,27 @@ from .rank import FORMULA, apply_overlap
 from .refine import llm_suggester, suggestions_for
 
 Lookup = Callable[[str | None, str | None], str | None]
+_PREPRINT_DOI_LINE = re.compile(r"(?im)^Preprint DOI:\s*(\S+)")
 Decider = Callable[[Candidate], bool]
 KNOWN_BACKENDS = ("openalex", "crossref", "semanticscholar", "orcid")
+
+
+def _local_cites(cfg: Config, backend: Any, collection: str) -> Any:
+    """In-collection cite index. A failure leaves creation to proceed without it."""
+    if (cfg.remarks_surface or "note").strip().lower() == "off":
+        return None
+    if backend is None or not collection.strip():
+        return None
+    try:
+        client = OpenAlexClient(email=cfg.email)
+        return load_local_cites(
+            backend,
+            collection,
+            state_dir=cfg.state_dir,
+            client=client,
+        )
+    except Exception:
+        return None
 
 
 class SnowballError(Exception):
@@ -76,6 +97,7 @@ class SnowballRequest:
     hybrid_seeds: int | None = None
     approve_each_max: int | None = None
     refine: bool | None = None
+    link_versions: bool = False
 
 
 @dataclass
@@ -494,6 +516,8 @@ def run_resume(
                 note_provenance=cfg.snowball_note_provenance
                 if request.note_provenance is None
                 else request.note_provenance,
+                remarks_surface=cfg.remarks_surface,
+                local_cites=_local_cites(cfg, lib, request.collection),
                 console=console,
             )
         except (LibraryError, SnowballError) as exc:
@@ -536,7 +560,7 @@ def run_apply(
         except Exception as exc:
             raise SnowballError(f"Library was not read. Refusing to create items. {exc}") from exc
     assert lib is not None and finder is not None
-    _mark_exists(kept, finder)
+    _mark_exists(kept, finder, version_of=_version_of(cfg, request))
     creatable = [row for row in kept if row.status == "new"]
     if not creatable:
         console.print("nothing to create (all keep rows already in library)")
@@ -551,6 +575,8 @@ def run_apply(
         tag_prefix=request.tag_prefix or cfg.snowball_tag_prefix,
         note_provenance=note,
         console=console,
+        remarks_surface=cfg.remarks_surface,
+        local_cites=_local_cites(cfg, lib, collection),
     )
     if counts.get("failed"):
         console.print(f"[yellow]{counts['failed']} create(s) failed; other rows continued[/]")
@@ -818,7 +844,7 @@ def _execute(
                 _unread_error = exc
     if scope != "none" and finder is not None:
         try:
-            _mark_exists(rows, finder)
+            _mark_exists(rows, finder, version_of=_version_of(cfg, request))
         except Exception:
             library_unread = True
     elif scope != "none":
@@ -871,6 +897,8 @@ def _execute(
             note_provenance=note_provenance,
             console=console,
             tally=tally,
+            remarks_surface=cfg.remarks_surface,
+            local_cites=_local_cites(cfg, lib, request.collection),
         )
     except LibraryError as exc:
         tally.stop()
@@ -917,6 +945,17 @@ def _library_lookup(backend: Any, *, scope: str, collection: str) -> Lookup:
             doi = normalize_doi(item.doi) if getattr(item, "doi", None) else None
             if doi:
                 by_doi.setdefault(doi, item.key)
+            arxiv_id = getattr(item, "arxiv_id", None)
+            if arxiv_id:
+                arxiv_doi = normalize_doi(f"10.48550/arxiv.{arxiv_id}")
+                if arxiv_doi:
+                    by_doi.setdefault(arxiv_doi, item.key)
+            extra = getattr(item, "extra", "") or ""
+            preprint_line = _PREPRINT_DOI_LINE.search(extra)
+            if preprint_line:
+                preprint = normalize_doi(preprint_line.group(1))
+                if preprint:
+                    by_doi.setdefault(preprint, item.key)
             title = normalize_dedupe_title(getattr(item, "title", None))
             year = getattr(item, "year", None)
             if title and year is not None:
@@ -944,31 +983,97 @@ def _library_lookup(backend: Any, *, scope: str, collection: str) -> Lookup:
     return lookup
 
 
-def _mark_exists(rows: list[Candidate], lookup: Lookup) -> None:
+def _mark_exists(
+    rows: list[Candidate],
+    lookup: Lookup,
+    version_of: Callable[[str], Any] | None = None,
+) -> None:
     for row in rows:
         if row.status in {"error", "filtered"}:
             continue
         doi = row.ids.get("doi") or None
         title = row.biblio.get("title") or None
         year = row.biblio.get("year")
-        try:
-            found = lookup(doi, title, year)
-        except TypeError:
-            found = lookup(doi, title)
-        if not found:
+        found = _call_lookup(lookup, doi, title, year)
+        if found:
+            _set_exists(row, found, doi=doi, title=title, year=year)
             continue
-        if isinstance(found, tuple):
-            key, kind = found
-        else:
-            key, kind = found, ("doi" if doi else "title_year")
-        row.status = "exists"
-        if kind == "title_year":
-            row.exists_match = {
-                "item_key": key,
-                "title_year": f"{normalize_dedupe_title(title)}|{year}",
-            }
-        else:
-            row.exists_match = {"item_key": key, "doi": normalize_doi(doi) or (doi or "")}
+        if not version_of or not doi:
+            continue
+        try:
+            link = version_of(doi)
+        except Exception:
+            link = None
+        if link is None:
+            continue
+        other = _other_version_doi(doi, link)
+        hit = _call_lookup(lookup, other, None, None) if other else None
+        if not hit and getattr(link, "arxiv_id", None):
+            hit = _call_lookup(
+                lookup, f"10.48550/arxiv.{link.arxiv_id}", None, None
+            )
+        if not hit:
+            continue
+        key = hit[0] if isinstance(hit, tuple) else hit
+        row.status = "version"
+        row.exists_match = {
+            "item_key": key,
+            "version_of": normalize_doi(getattr(link, "published_doi", "") or "")
+            or str(getattr(link, "published_doi", "") or ""),
+        }
+
+
+def _version_of(cfg: Config, request: SnowballRequest) -> Callable[[str], Any] | None:
+    if not request.link_versions:
+        return None
+    import httpx
+
+    from ..versions import resolver_for
+
+    client = httpx.Client(follow_redirects=True, timeout=30)
+    return resolver_for(client, cfg.email)
+
+
+def _call_lookup(
+    lookup: Lookup, doi: str | None, title: str | None, year: int | None
+) -> Any:
+    try:
+        return lookup(doi, title, year)  # type: ignore[call-arg]
+    except TypeError:
+        return lookup(doi, title)
+
+
+def _set_exists(
+    row: Candidate,
+    found: Any,
+    *,
+    doi: str | None,
+    title: str | None,
+    year: int | None,
+) -> None:
+    if isinstance(found, tuple):
+        key, kind = found
+    else:
+        key, kind = found, ("doi" if doi else "title_year")
+    row.status = "exists"
+    if kind == "title_year":
+        row.exists_match = {
+            "item_key": key,
+            "title_year": f"{normalize_dedupe_title(title)}|{year}",
+        }
+    else:
+        row.exists_match = {"item_key": key, "doi": normalize_doi(doi) or (doi or "")}
+
+
+def _other_version_doi(doi: str, link: Any) -> str | None:
+    query = normalize_doi(doi)
+    published = normalize_doi(getattr(link, "published_doi", None))
+    preprint = normalize_doi(getattr(link, "preprint_doi", None))
+    if query and published and query != published:
+        return published
+    if query and preprint and query != preprint:
+        return preprint
+    return published or preprint
 
 
 def _print_table(console: Console, rows: list[Candidate]) -> None:

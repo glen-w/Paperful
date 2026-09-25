@@ -9,7 +9,7 @@ def test_remediation_zotero_branches_on_code(cfg, monkeypatch):
     down = remediation_text(
         Check("Zotero :23119", "red", "refused", code="zotero_down"), cfg, docker=False
     )
-    assert down and "Start Zotero" in down
+    assert down and "local mirror does not need Zotero" in down
     unresolved = remediation_text(
         Check("Zotero :23119", "red", "nodename", code="zotero_host_unresolved"),
         cfg,

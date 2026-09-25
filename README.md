@@ -56,8 +56,8 @@ paywalled or DOI-less item. Attachments carry a provenance note
 where a PDF came from.
 
 **Completeness.** `gaps` counts what is missing. `lint` and `fix-metadata`
-propose patches on disk; `--apply` writes them. `dedupe` reviews duplicates,
-then trashes extras only when you say so. `summarize` writes a grounded note
+propose patches on disk; `--apply` writes them. `dedupe` reviews duplicates, then merges the extra parent's PDF, notes,
+and better fields onto the keeper only when you say so. `summarize` writes a grounded note
 from a text-layer PDF; `synthesize` reviews those notes. `paperful all` runs
 gaps → find → lint → fix → summarise. The model is off until `[llm].enabled`.
 `paperful ocr --apply` adds a text layer to scanned PDFs on disk.

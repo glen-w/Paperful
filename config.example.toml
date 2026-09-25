@@ -28,6 +28,12 @@ out_dir = "out"
 # state/runs/, sessions/, and the Zotero local-API key live.
 state_dir = "state"
 
+# Plain-language lines on the item (where a PDF came from, which duplicate to
+# keep, why a snowball hit belongs). note is a child note; tag is a parent tag.
+# The attachment stamp (paperful oa:unpaywall) stays either way.
+# [remarks]
+# surface = "note"   # note | tag | off
+
 # Source order. Open-access first, then EZProxy, then HTML→PDF.
 # Google Scholar is opt-in (CAPTCHA / session login). Append "scholar" when you
 # want it, after `paperful session login scholar`. Remove "ezproxy" / "htmlpdf"

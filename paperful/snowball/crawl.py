@@ -567,9 +567,10 @@ def _keyword_prelude(client: OpenAlexClient, seeds: list[dict[str, Any]], direct
     client.keyword_seed_total = int(getattr(client, "keyword_seed_total", 0) or 0) + total
     client.keyword_seed_empty = int(getattr(client, "keyword_seed_empty", 0) or 0) + empty
     keywords_only = not _wants_refs(direction) and not _wants_cites(direction)
-    if keywords_only and total and empty == total and not getattr(client, "keyword_defer_empty_raise", False):
+    held = bool(getattr(client, "keyword_defer_empty_raise", False))
+    if keywords_only and total and empty == total and not held:
         raise NoKeywordSeeds(_keyword_sentence(empty, total))
-    if empty and not (keywords_only and empty == total):
+    if empty and not held and not (keywords_only and empty == total):
         client.note(_keyword_sentence(empty, total))
 
 
@@ -577,12 +578,16 @@ def _keyword_finish(client: OpenAlexClient, direction: str) -> None:
     """One exit for a DOI list whose seeds were expanded one at a time."""
     if not getattr(client, "keyword_defer_empty_raise", False):
         return
-    if not _wants_keywords(direction) or _wants_refs(direction) or _wants_cites(direction):
+    if not _wants_keywords(direction):
         return
     total = int(getattr(client, "keyword_seed_total", 0) or 0)
     empty = int(getattr(client, "keyword_seed_empty", 0) or 0)
-    if total and empty == total:
-        raise NoKeywordSeeds(_keyword_sentence(empty, total))
+    if not total or not empty:
+        return
+    sentence = _keyword_sentence(empty, total)
+    if not _wants_refs(direction) and not _wants_cites(direction) and empty == total:
+        raise NoKeywordSeeds(sentence)
+    client.note(sentence)
 
 
 def _keyword_fetch_limit(hop_limit: int, rank: str) -> int:

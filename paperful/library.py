@@ -84,6 +84,7 @@ class LibraryBackend(Protocol):
     def children(self, key: str) -> list[dict[str, Any]]: ...
     def export_pdf(self, item: Item, dest: Path) -> Path | None: ...
     def apply_patch(self, item_key: str, fields: dict[str, Any]) -> None: ...
+    def relate_items(self, left_key: str, right_key: str) -> None: ...
     def trash_item(self, item_key: str) -> None: ...
     def merge_into(self, keep_key: str, drop_key: str) -> dict[str, Any]: ...
     def find_child_note_keys(self, item_key: str, tag: str) -> list[str]: ...
@@ -91,6 +92,7 @@ class LibraryBackend(Protocol):
     def create_or_update_note(
         self, item_key: str, html: str, tag: str
     ) -> str: ...
+    def replace_prefixed_tag(self, item_key: str, prefix: str, tag: str) -> None: ...
     def find_collection_note_keys(self, collection_key: str, tag: str) -> list[str]: ...
     def create_or_update_collection_note(
         self, collection_key: str, html: str, tags: list[str]
@@ -299,6 +301,27 @@ class ZoteroBackend:
             data[mapping.get(name, name)] = value
         self.zl.zot.update_item(raw)
 
+    def relate_items(self, left_key: str, right_key: str) -> None:
+        """Record ``dc:relation`` both ways so the preprint stays a version of the work."""
+        self._ensure_write()
+        self._add_relation(left_key, right_key)
+        self._add_relation(right_key, left_key)
+
+    def _add_relation(self, item_key: str, other_key: str) -> None:
+        raw = self.zl.zot.item(item_key)
+        data = raw["data"]
+        relations = data.setdefault("relations", {})
+        uri = f"http://zotero.org/users/0/items/{other_key}"
+        current = relations.get("dc:relation")
+        if current is None or current == "":
+            relations["dc:relation"] = uri
+        elif isinstance(current, list):
+            if uri not in current:
+                current.append(uri)
+        elif current != uri:
+            relations["dc:relation"] = [current, uri]
+        self.zl.zot.update_item(raw)
+
     def trash_item(self, item_key: str) -> None:
         """Move a parent item to the Zotero trash. Does not delete files under out/."""
         self._ensure_write()
@@ -342,6 +365,7 @@ class ZoteroBackend:
             keep_kids, drop_kids, self._annotation_counts(keep_kids + drop_kids)
         )
         moved: list[str] = []
+        trashed_children: list[str] = []
         for move in moves:
             raw = self.zl.zot.item(move["key"])
             if move["action"] == "reparent":
@@ -353,6 +377,8 @@ class ZoteroBackend:
             self.zl.zot.update_item(raw)
             if move["action"] == "reparent":
                 moved.append(move["key"])
+            elif move["action"] == "trash":
+                trashed_children.append(move["key"])
         patch = merge_parent_patch(keep_raw.get("data") or {}, drop_raw.get("data") or {})
         fresh = self.zl.zot.item(keep_key)
         data = fresh["data"]
@@ -379,7 +405,11 @@ class ZoteroBackend:
             else:
                 raise
         self.trash_item(drop_key)
-        return {"moved": moved, "fields": sorted(patch["fields"])}
+        return {
+            "moved": moved,
+            "fields": sorted(patch["fields"]),
+            "trashed_children": trashed_children,
+        }
 
     def _annotation_counts(self, children: list[dict[str, Any]]) -> dict[str, int]:
         counts: dict[str, int] = {}
@@ -449,6 +479,22 @@ class ZoteroBackend:
                 f"Zotero did not create note{': ' + failed if failed else ''}"
             )
         return key
+
+    def replace_prefixed_tag(self, item_key: str, prefix: str, tag: str) -> None:
+        """Replace parent tags that start with ``prefix``. Other tags stay."""
+        self._ensure_write()
+        raw = self.zl.zot.item(item_key)
+        data = raw.setdefault("data", {})
+        want = prefix.strip().lower()
+        kept: list[dict[str, str]] = []
+        for row in data.get("tags") or []:
+            text = str(row.get("tag") or "") if isinstance(row, dict) else str(row)
+            if text.strip().lower().startswith(want):
+                continue
+            kept.append({"tag": text} if text else row)
+        kept.append({"tag": tag})
+        data["tags"] = [row for row in kept if row.get("tag")]
+        self.zl.zot.update_item(raw)
 
     def find_collection_note_keys(self, collection_key: str, tag: str) -> list[str]:
         """Top-level notes in a collection that carry ``tag``.

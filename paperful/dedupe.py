@@ -224,6 +224,7 @@ def apply_merge(
                         "keep": group.keep,
                         "drop": key,
                         "moved": list(result.get("moved") or []),
+                        "trashed_children": list(result.get("trashed_children") or []),
                         "fields": list(result.get("fields") or []),
                         "reason": group.reason,
                         "pack": str(pack),
@@ -670,7 +671,7 @@ def _markdown(
         for group in subset:
             review = " (needs review)" if group.needs_review else ""
             donors = ", ".join(f"`{key}`" for key in group.trash) or "none"
-            lines.append(f"- Keep `{group.keep}` — merge {donors}{review}")
+            lines.append(f"- Keep `{group.keep}` — merge into keeper from {donors}{review}")
             for preview in group.merge_preview:
                 fields = ", ".join(preview.get("fields") or []) or "none"
                 moves = preview.get("move") or []

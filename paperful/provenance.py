@@ -39,6 +39,51 @@ def provenance_label(source: str | None, *, playbook: str | None = None) -> str:
     return "web:unknown"
 
 
+_SOURCE_NAMES = {
+    "unpaywall": "Unpaywall",
+    "openalex": "OpenAlex",
+    "arxiv": "arXiv",
+    "biorxiv": "bioRxiv",
+    "europepmc": "Europe PMC",
+    "semanticscholar": "Semantic Scholar",
+    "core": "CORE",
+}
+
+
+def provenance_sentence(
+    source: str | None,
+    *,
+    playbook: str | None = None,
+    pdf_doi_mismatch: bool = False,
+) -> str:
+    """Plain-language line for the parent. The attachment note stays the token."""
+    src = (source or "").strip().lower()
+    book = (playbook or "").strip()
+    if src in _SOURCE_NAMES:
+        line = f"Free copy from {_SOURCE_NAMES[src]}."
+    elif src == "ezproxy":
+        line = "Downloaded through your library login."
+    elif src == "scihub":
+        line = "Downloaded from Sci-Hub."
+    elif src == "direct" and book:
+        line = f"Saved from {book}."
+    elif src == "scholar":
+        line = "Found via Google Scholar."
+    elif src == "htmlpdf":
+        line = "Printed from the web page."
+    elif src == "browser_agent":
+        line = "Found by the browser recovery."
+    elif src == "direct":
+        line = "Saved from the web page."
+    elif src:
+        line = f"Saved from {src}."
+    else:
+        line = "Saved from the web."
+    if pdf_doi_mismatch:
+        line = f"{line} This PDF's DOI does not match the record."
+    return line
+
+
 def provenance_stamp(
     source: str | None,
     *,

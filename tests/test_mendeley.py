@@ -6,7 +6,9 @@ import json
 import time
 
 import httpx
+import pytest
 
+from paperful.library import LibraryError
 from paperful.mendeley import (
     MendeleyBackend,
     MendeleyClient,
@@ -361,6 +363,8 @@ def test_mendeley_trash_posts_to_trash_not_delete(cfg):
     )
     backend = MendeleyBackend(cfg, MendeleyClient(cfg, http=mock_client(handler)))
     backend.trash_item(DOC_ID)
+    with pytest.raises(LibraryError, match="merge"):
+        backend.merge_into(DOC_ID, "other")
     assert ("POST", f"/documents/{DOC_ID}/trash") in calls
     assert not any(method == "DELETE" for method, _ in calls)
     assert DOC_ID not in fake.docs

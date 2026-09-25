@@ -157,6 +157,8 @@ def _toml(value: Any) -> str:
         return "true" if value else "false"
     if isinstance(value, int):
         return str(value)
+    if isinstance(value, float):
+        return str(value)
     if isinstance(value, (list, tuple)):
         inner = ", ".join(_toml(item) for item in value)
         return f"[{inner}]"

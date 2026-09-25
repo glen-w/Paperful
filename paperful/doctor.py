@@ -91,7 +91,10 @@ def remediation_text(
                 "3. Settings → Advanced → enable the local API, then continue."
             )
         # zotero_down (and any unknown code): connection refused / unreachable
-        lines = [f"1. Start Zotero{host}."]
+        lines = [
+            "1. The local mirror does not need Zotero. "
+            f"This check is the live library, which is not reachable{host}."
+        ]
         if os.environ.get("PAPERFUL_ZOTERO_HOST", "").strip():
             lines.append(
                 "2. Host Zotero must be running on this machine. The Host header "

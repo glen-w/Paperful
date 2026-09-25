@@ -92,7 +92,9 @@ paperful run -C COLLECTION --upgrade-linked
 A successful Zotero attach writes a provenance note on the PDF child
 (`paperful oa:unpaywall`, `paperful campus:ezproxy`, `paperful grey:<playbook>`,
 `paperful pirate:scihub`, and so on). The manifest `source` field remains the
-record. See [Research operators](research-ops.md).
+record. A readable line ("Free copy from Unpaywall.") is also written on the
+parent, as a child note unless `[remarks].surface` is `tag` or `off`. See
+[Research operators](research-ops.md).
 
 ## Ghosts and quota
 

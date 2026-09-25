@@ -10,6 +10,7 @@ from ..config import RECOVER_DISCLAIMER, SCIHUB_DISCLAIMER, Config, parse_fetch_
 from ..interop.load import parent_payload
 from ..library import LibraryBackend, LibraryError
 from ..pipeline import Pipeline, RunStats
+from ..remarks import linked_sentence, say
 from ..routing import with_recover_lane
 from ..store import Manifest
 from ..zot import Item
@@ -54,6 +55,8 @@ def create_new(
     note_provenance: bool = True,
     console: Console | None = None,
     tally: Any = None,
+    remarks_surface: str = "note",
+    local_cites: Any = None,
 ) -> tuple[list[Item], dict[str, int]]:
     """Create status=new rows. One LibraryError does not abort the rest."""
     collection_key = backend.ensure_collection_path(collection)
@@ -68,8 +71,12 @@ def create_new(
     if tally is not None:
         tally.stage = "creating"
         tally.track(pending)
+    if local_cites is not None and getattr(local_cites, "prepare", None):
+        client = getattr(local_cites, "client", None)
+        if client is not None:
+            local_cites.prepare(rows, client)
     for row in rows:
-        if row.status == "exists":
+        if row.status in {"exists", "version"}:
             skipped_exists += 1
             continue
         if row.status != "new" or row.keep is False:
@@ -110,6 +117,21 @@ def create_new(
         )
         if note_provenance:
             backend.create_or_update_note(key, note, prefix)
+        cite_count = 0
+        if local_cites is not None:
+            cite_count = local_cites.count(
+                openalex=str(row.ids.get("openalex") or ""),
+                doi=str(row.ids.get("doi") or ""),
+            )
+        line = linked_sentence(
+            hop=row.hop,
+            direction=row.direction,
+            overlap=int(row.biblio.get("overlap") or 0),
+            cite_count=cite_count,
+            library=bool(getattr(local_cites, "library", False)),
+        )
+        if line:
+            say(backend, key, "linked", line, surface=remarks_surface)
         first = authors[0].split()[-1] if authors else None
         created_items.append(
             Item(
