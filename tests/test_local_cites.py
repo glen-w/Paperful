@@ -76,3 +76,25 @@ def test_budget_miss_keeps_partial_index(tmp_path):
     )
     assert index.count(openalex="W9") == 2
     assert not (tmp_path / "cites").exists()
+
+
+def test_library_scope_does_not_resolve_a_collection(tmp_path):
+    class Lib(_Lib):
+        def resolve_collection(self, spec):
+            raise AssertionError(spec)
+
+    items = [make_item(key="A", doi="10.1000/a")]
+    client = _Client(
+        [
+            {
+                "id": "https://openalex.org/W1",
+                "doi": "https://doi.org/10.1000/a",
+                "referenced_works": ["https://openalex.org/W9"],
+            }
+        ]
+    )
+    index = load_local_cites(
+        Lib(items), "ignored", state_dir=tmp_path, client=client, library=True
+    )
+    assert index.library is True
+    assert index.count(openalex="W9") == 1

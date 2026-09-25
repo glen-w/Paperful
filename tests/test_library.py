@@ -320,3 +320,35 @@ def test_collection_note_search_skips_child_notes(cfg):
 
     backend = ZoteroBackend(cfg, ZL())
     assert backend.find_collection_note_keys("COL1", "paperful-report:bbnj") == ["TOP"]
+
+
+def test_replace_prefixed_tag_keeps_other_tags(cfg):
+    class FakeZot:
+        def __init__(self):
+            self.raw = {
+                "key": "ITEM1",
+                "data": {
+                    "key": "ITEM1",
+                    "tags": [{"tag": "reading"}, {"tag": "paperful found: old"}],
+                },
+            }
+            self.local_api_key = "k"
+
+        def item(self, key):
+            return self.raw
+
+        def update_item(self, raw):
+            self.raw = raw
+
+    class ZL:
+        def __init__(self):
+            self.zot = FakeZot()
+
+        def ping(self):
+            return {"supports_write": True}
+
+    backend = ZoteroBackend(cfg, ZL())
+    backend._ensure_write = lambda: None
+    backend.replace_prefixed_tag("ITEM1", "paperful found:", "paperful found: Free copy from Unpaywall.")
+    tags = [row["tag"] for row in backend.zl.zot.raw["data"]["tags"]]
+    assert tags == ["reading", "paperful found: Free copy from Unpaywall."]

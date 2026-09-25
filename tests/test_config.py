@@ -125,6 +125,15 @@ def test_mirror_pdfs_mode(tmp_path):
         load_config(bad)
 
 
+def test_remarks_surface(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text('email = "me@example.org"\n\n[remarks]\nsurface = "tag"\n')
+    assert load_config(p).remarks_surface == "tag"
+    p.write_text('email = "me@example.org"\n\n[remarks]\nsurface = "poster"\n')
+    with pytest.raises(ValueError, match="surface"):
+        load_config(p)
+
+
 def test_example_config_toml_parses_and_omits_scihub_by_default():
     repo_cfg = Path(__file__).resolve().parent.parent / "config.example.toml"
     cfg = load_config(repo_cfg)
