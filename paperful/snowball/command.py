@@ -489,7 +489,10 @@ def _execute(
     tag_prefix = request.tag_prefix or cfg.snowball_tag_prefix
     note_provenance = cfg.snowball_note_provenance if request.note_provenance is None else request.note_provenance
     backends = _backends(cfg, request)
-    direction = request.direction
+    try:
+        direction = normalize_direction(request.direction)
+    except ValueError:
+        direction = "refs"
     apply_overlap(rows)
     rows = _fill_metadata(
         cfg,

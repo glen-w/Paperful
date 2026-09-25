@@ -50,6 +50,7 @@ A snowball profile is a named job in `profiles/`. `paperful run` and
 | Seed | What it collects | Default depth |
 | --- | --- | --- |
 | Keyword | OpenAlex title/abstract search | **0** — the hit list. Depth 1+ expands those hits and must be set explicitly. A global `depth = 1` does not expand every keyword hit |
+| Hybrid | That hit list, then one hop from the top `hybrid_seeds` DOIs (default 5) | The hop is always 1. `--depth` does not add further hops |
 | DOI | The work’s neighbours (`referenced_works` and/or works that cite it) | **1**, direction `refs` by default. Use `--direction cites` or `both` for cited-by |
 | ORCID | That person’s works (ORCID public API, filled by OpenAlex author filter), then the same expander | **1** |
 | Collection | DOIs already in the seed collection path, then the same expander | **1**. `-C` is the write target (defaults to the seed path) |
@@ -65,12 +66,13 @@ The gate is a config value. The default for a new user is `dry-run`.
 | --- | --- | --- |
 | `dry-run` | None | Always safe. `fetch_pdfs` is ignored |
 | `approve-batch` | Only `keep = true` rows | `snowball apply <run-id>`. A second apply skips DOIs already created |
-| `approve-each` | Each yes | Short lists. Not the path the docs teach first |
+| `approve-each` | Each yes on `status = new` | Short lists, at most `approve_each_max` (default 20), and only on a terminal. No rows stay `keep = false`. Over the cap, or without a terminal, the command exits 2 and points at `approve-batch` |
 | `auto` | Every `status = new` row under the caps | A named profile, after you have dry-run that job once |
 
-A writing gate requires a target collection and stops before the crawl if it
-is missing. Paperful may create that collection path. It does not invent a
-silent default collection. `auto` is not a scheduler.
+`dry-run`, `approve-batch`, `approve-each`, and `auto` are the gates. A writing
+gate (`approve-batch`, `approve-each`, `auto`) requires a target collection and
+stops before the crawl if it is missing. Paperful may create that collection
+path. It does not invent a silent default collection. `auto` is not a scheduler.
 
 Dedupe runs before create: normalized DOI against `dedupe_scope` (`library`
 by default, or `collection`, or `none` logged loudly), then the existing
@@ -108,7 +110,10 @@ Example profile `keyword-library`: `gate = auto`, `fetch_pdfs = true`,
 | `types` | journal-article-shaped | OpenAlex / Zotero types |
 | `oa_only` | false | Metadata filter only. It does not change the PDF chain |
 | `min_seed_citations` | 0 | Skip cited-by expansion when the seed is below this count |
-| `languages`, `venue_include`, `venue_exclude` | unset | Applied when the source has the field |
+| `languages`, `venue_include`, `venue_exclude` | unset | Applied when the source has the field. A missing language does not drop the row |
+| `hybrid_seeds` | 5 | How many top DOI hits `hybrid` expands |
+| `approve_each_max` | 20 | Largest `approve-each` list. Above this, use `approve-batch` |
+| `refine` | false | With `[llm].enabled`, write up to five query suggestions. They do not start a second crawl |
 
 A seed that fails to resolve is `status = error`. Other seeds continue. The
 process exits non-zero if any seed failed, using the existing exit ladder
@@ -127,7 +132,7 @@ Schema `paperful.snowball.candidate.v1`:
 | `schema`, `run_id` | Version and run id |
 | `seed` | `{type, value}` — keyword, doi, orcid, or openalex |
 | `hop` | Integer. Search hits are 0. References of a seed are 1 |
-| `direction` | `search`, `refs`, `cites`, or `author_work` |
+| `direction` | `search`, `refs`, `cites`, or `orcid` (the person’s own works) |
 | `ids` | Normalized doi, openalex, s2, pmid, orcid, when known |
 | `biblio` | Title, year, authors, venue, type, optional OA url |
 | `why` | Short reason, for example `ref of 10.xxxx/yyyy` |
@@ -163,6 +168,11 @@ fetch_pdfs = false
 tag_prefix = "paperful-snowball"
 note_provenance = true
 backends = ["openalex", "crossref", "semanticscholar", "orcid"]
+languages = []           # empty = do not filter; a missing language is kept
+min_seed_citations = 0
+hybrid_seeds = 5
+approve_each_max = 20
+refine = false           # suggestions only; needs [llm].enabled
 ```
 
 `enabled = false` until you opt in, the same posture as `[llm]`. `doctor`
@@ -177,10 +187,19 @@ dry-run, or with `--force`. It refuses to store a key.
 Backends resolve in order and emit each work once, keyed by DOI: OpenAlex
 first, Crossref fills empty metadata fields, Semantic Scholar when a key is
 set, ORCID for the person’s own work list. OpenAlex wins when it and Crossref
-disagree on a field that both filled.
+disagree on a field that both filled. Semantic Scholar responses are cached
+under `state/snowball/cache/`. `backends` must include `openalex`. An unknown
+name is a config error. Dropping `orcid` skips the public works list and keeps
+the OpenAlex author filter.
 
 `snowball run --profile NAME` prints that profile’s one-line description
-before any request.
+before any request. `mode` is `search`, `hybrid`, `doi`, `orcid`, or
+`collection`. `snowball profile save --query … --hybrid` stores `mode = "hybrid"`.
+
+`--refine` (or `refine = true` on a profile) asks the configured model for
+query strings and prints them. If `[llm]` is off, or the call fails, the crawl
+still finishes and `summary.json` records `suggestions_error`. Suggestions are
+not seeds.
 
 ## Where the crawl comes from
 
@@ -212,13 +231,13 @@ Adjacent tools, and the piece worth copying:
 | [findpapers](https://github.com/jonatasgrosman/findpapers), [opencite](https://github.com/neuromechanist/opencite) | `direction`, `depth`, per-hop cap, dedupe before emit | The package, and any Scopus / Web of Science / IEEE requirement |
 | [paperscraper](https://github.com/jannisborn/paperscraper) | — | DOI-list PDFs when you have no Zotero. See [comparison](comparison.md) |
 | [litsearch](https://pypi.org/project/litsearch/), [lit-review-mcp](https://github.com/Bethww/lit-review-mcp), [CoLRev](https://colrev-environment.github.io/colrev/) | Flag ideas | The review project, the report, the screener |
-| [Citation Gecko](https://github.com/CitationGecko/gecko-react) | Later: rank works cited by many seeds, or citing many seeds | The network UI |
+| [Citation Gecko](https://github.com/CitationGecko/gecko-react) | Overlap rank: neighbours score `overlap * 1000 + cited_by_count` | The network UI |
 | [zotero-snowball](https://github.com/socratic-irony/zotero-snowball), [Citegeist](https://github.com/phdemotions/zotero-citegeist) | — | In-Zotero one-hop dialogs |
 | [pyalex](https://github.com/J535D165/pyalex) | — | A second HTTP client. Snowball extends the client paperful already uses for OpenAlex (mailto, sleep, backoff) |
 
 ResearchRabbit, Litmaps, Connected Papers, Inciteful, Elicit, Consensus,
-Scite, and Lens.org stay outside. A later “question → seed DOIs” assist can
-sit behind `[llm]` as suggestions on the queue. Google Scholar stays the
+Scite, and Lens.org stay outside. `--refine` can suggest further queries behind
+`[llm]`; it does not pick seed DOIs. Google Scholar stays the
 existing PDF lane. It is not a snowball source. Screening a RIS file stays
 with ASReview. Created items keep clean creators, DOI, and date so Better
 BibTeX citekeys still make sense. Snowball does not depend on that plugin.

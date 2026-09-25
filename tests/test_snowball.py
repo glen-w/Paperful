@@ -1112,3 +1112,199 @@ def test_refine_suggestions_do_not_create(tmp_path: Path):
     assert summary["suggestions"] == ["bbnj EIA", "bbnj"]
     assert result.exit_code == 0
     assert not (result.run_dir / "write_report.json").exists()
+
+
+def test_deep_gates_backends_and_fill(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from paperful.snowball.expand import normalize_direction
+    from paperful.snowball.fill import s2_paper
+
+    works = {
+        "W1": _work("W1", "10.1000/seed", "Seed title stays", 2020, 1, refs=["W2"]),
+        "W2": _work("W2", "10.1000/new", "Kept title", 2021, 2),
+        "C1": _work("C1", "10.1000/cite", "Cite", 2022, 3),
+    }
+    works["W2"]["language"] = ""
+    console = Console(highlight=False, width=160)
+    cfg = _cfg(tmp_path)
+
+    def boom(path: str, params: dict) -> dict:
+        raise AssertionError("crawl should not start")
+
+    with pytest.raises(SnowballError, match="target collection"):
+        run_doi(
+            cfg,
+            ["10.1000/seed"],
+            SnowballRequest(gate="approve-batch"),
+            console=console,
+            client=OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=boom),
+        )
+    with pytest.raises(SnowballError, match="Unknown"):
+        run_doi(cfg, ["10.1000/seed"], SnowballRequest(backends=("nope",)), console=console, client=_client(works))
+    with pytest.raises(SnowballError, match="openalex"):
+        run_doi(cfg, ["10.1000/seed"], SnowballRequest(backends=("crossref",)), console=console, client=_client(works))
+
+    class Stdin:
+        def isatty(self) -> bool:
+            return False
+
+    monkeypatch.setattr("paperful.snowball.command.sys.stdin", Stdin())
+    with pytest.raises(SnowballError, match="terminal"):
+        run_doi(
+            cfg,
+            ["10.1000/seed"],
+            SnowballRequest(gate="approve-each", collection="Inbox/Snowball"),
+            console=console,
+            client=_client(works),
+            lookup=lambda doi, title: None,
+        )
+
+    kept_lang = run_doi(
+        cfg,
+        ["10.1000/seed"],
+        SnowballRequest(languages=("en",), direction="both", min_seed_citations=0),
+        console=console,
+        client=_client(works, citing={"W1": ["C1"]}),
+        lookup=lambda doi, title: None,
+    )
+    rows = [json.loads(line) for line in (kept_lang.run_dir / "candidates.jsonl").read_text().splitlines()]
+    by = {row["ids"]["doi"]: row for row in rows}
+    assert by["10.1000/new"]["status"] == "new"
+    assert by["10.1000/cite"]["direction"] == "cites"
+
+    def crossref(doi: str) -> dict:
+        return {"title": "Overwrite", "year": 1999, "venue": "Other", "authors": ["Other"]}
+
+    filled = run_doi(
+        cfg,
+        ["10.1000/seed"],
+        SnowballRequest(direction="references"),
+        console=console,
+        client=_client(works),
+        lookup=lambda doi, title: None,
+        crossref_getter=crossref,
+    )
+    rows = [json.loads(line) for line in (filled.run_dir / "candidates.jsonl").read_text().splitlines()]
+    titles = {row["ids"]["doi"]: row["biblio"]["title"] for row in rows}
+    assert titles["10.1000/new"] == "Kept title"
+
+    monkeypatch.setenv("SEMANTIC_SCHOLAR_API_KEY", "test-key")
+
+    def s2(doi: str) -> dict:
+        if doi != "10.1000/new":
+            return {}
+        return {
+            "title": "Should not replace",
+            "references": [{"title": "Extra", "year": 2017, "externalIds": {"DOI": "10.1000/s2"}}],
+        }
+
+    s2_run = run_doi(
+        cfg,
+        ["10.1000/seed"],
+        SnowballRequest(direction="both"),
+        console=console,
+        client=_client(works, citing={"W1": ["C1"]}),
+        lookup=lambda doi, title: None,
+        s2_getter=s2,
+    )
+    s2_rows = [json.loads(line) for line in (s2_run.run_dir / "candidates.jsonl").read_text().splitlines()]
+    extra = next(row for row in s2_rows if row["ids"]["doi"] == "10.1000/s2")
+    assert extra["provenance"]["backend"] == "semanticscholar"
+    assert extra["why"].startswith("s2 ref")
+    assert normalize_direction("all") == "both"
+
+    cache = tmp_path / "cache"
+    (cache).mkdir()
+    (cache / "10.1000_cached.json").write_text('{"title": "Cached"}', encoding="utf-8")
+    assert s2_paper("10.1000/cached", cache_dir=cache, api_key="test-key")["title"] == "Cached"
+
+    lib = _CreateLib()
+    noted = run_doi(
+        cfg,
+        ["10.1000/seed"],
+        SnowballRequest(gate="auto", collection="Inbox/Snowball", note_provenance=True),
+        console=console,
+        client=_client(works),
+        lookup=lambda doi, title: None,
+        backend=lib,
+    )
+    assert noted.exit_code == 0
+    assert lib.created
+    assert "seed:" in lib.notes[0]
+    assert "api_key" not in lib.notes[0]
+    assert "@" not in lib.notes[0]
+
+
+def test_deep_refine_hybrid_orcid_and_cli(tmp_path: Path):
+    works = {"A": _work("A", "10.1000/a", "Alpha", 2020, 4, refs=["R"]), "R": _work("R", "10.1000/r", "Ref", 2019, 1)}
+    console = Console(highlight=False, width=160)
+    cfg = _cfg(tmp_path)
+    disabled = run_search(
+        cfg,
+        "bbnj",
+        SnowballRequest(refine=True),
+        console=console,
+        client=_client(works),
+        lookup=lambda doi, title: None,
+    )
+    summary = json.loads((disabled.run_dir / "summary.json").read_text())
+    assert summary["suggestions_error"] == "llm disabled"
+    assert "suggestions" not in summary
+
+    failed = run_search(
+        cfg,
+        "bbnj",
+        SnowballRequest(refine=True),
+        console=console,
+        client=_client(works),
+        lookup=lambda doi, title: None,
+        suggester=lambda query: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+    err = json.loads((failed.run_dir / "summary.json").read_text())["suggestions_error"]
+    assert "boom" in err
+
+    with pytest.raises(SnowballError, match="keyword"):
+        run_hybrid(cfg, "  ", SnowballRequest(), console=console, client=_client(works))
+
+    nodoi = {"A": _work("A", "10.1000/a", "Alpha", 2020, 4)}
+    nodoi["A"]["doi"] = ""
+    bare = run_hybrid(
+        cfg,
+        "abmt",
+        SnowballRequest(hybrid_seeds=3),
+        console=console,
+        client=_client(nodoi),
+        lookup=lambda doi, title: None,
+    )
+    bare_rows = [json.loads(line) for line in (bare.run_dir / "candidates.jsonl").read_text().splitlines()]
+    assert bare_rows
+    assert all(row["hop"] == 0 for row in bare_rows)
+
+    def orcid_boom(_orcid: str) -> list[str]:
+        raise AssertionError("orcid api")
+
+    skipped = run_orcid(
+        cfg,
+        "0000-0002-9162-9618",
+        SnowballRequest(backends=("openalex", "crossref")),
+        console=console,
+        client=_client({}),
+        lookup=lambda doi, title: None,
+        orcid_getter=orcid_boom,
+    )
+    assert skipped.exit_code == 0
+
+    cfg_path = tmp_path / "config.toml"
+    saved = runner.invoke(
+        cli.app,
+        ["snowball", "profile", "save", "hy", "--query", "bbnj", "--hybrid", "--hybrid-seeds", "3", "-c", str(cfg_path)],
+    )
+    assert saved.exit_code == 0
+    text = (tmp_path / "profiles" / "hy.toml").read_text()
+    assert 'mode = "hybrid"' in text
+    assert "hybrid_seeds = 3" in text
+    refused = runner.invoke(
+        cli.app,
+        ["snowball", "hybrid", "bbnj", "--gate", "auto", "-c", str(cfg_path)],
+    )
+    assert refused.exit_code == 2
+    assert "target collection" in refused.output
