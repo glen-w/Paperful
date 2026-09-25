@@ -426,6 +426,22 @@ def test_cli_refusals(tmp_path: Path):
         run_orcid(_cfg(tmp_path), "not-an-orcid", SnowballRequest(), console=Console())
 
 
+def test_profile_list_labels_snowball(tmp_path: Path):
+    from paperful.run_config import list_profiles
+
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text('email = "t@example.org"\n')
+    profiles = tmp_path / "profiles"
+    profiles.mkdir()
+    (profiles / "doi-refs.toml").write_text(
+        'kind = "snowball"\ndescription = "gated"\ngate = "approve-batch"\n'
+    )
+    listings = list_profiles(load_config(cfg_path))
+    assert listings[0].name == "doi-refs"
+    assert listings[0].description.startswith("snowball profile")
+    assert "invalid" not in listings[0].description
+
+
 def test_run_refuses_snowball_profile(tmp_path: Path):
     cfg_path = tmp_path / "config.toml"
     cfg_path.write_text('email = "t@example.org"\n')
@@ -532,12 +548,20 @@ def test_doctor_snowball_row(monkeypatch):
     enabled = Config(snowball_enabled=True, email="")
     assert _snowball_check(enabled).status == "amber"
     monkeypatch.delenv("OPENALEX_API_KEY", raising=False)
-    ready = _snowball_check(Config(snowball_enabled=True, email="a@b.c"))
+    monkeypatch.delenv("SEMANTIC_SCHOLAR_API_KEY", raising=False)
+    probe = lambda email: "ok"
+    ready = _snowball_check(Config(snowball_enabled=True, email="a@b.c"), probe=probe)
     assert "no OpenAlex key" in ready.detail
+    assert "semantic scholar key absent" in ready.detail
+    assert ready.status == "amber"
     monkeypatch.setenv("OPENALEX_API_KEY", "secret-key")
-    keyed = _snowball_check(Config(snowball_enabled=True, email="a@b.c"))
-    assert keyed.detail == "enabled (key set)"
+    keyed = _snowball_check(Config(snowball_enabled=True, email="a@b.c"), probe=probe)
+    assert "key set" in keyed.detail
     assert "secret-key" not in keyed.detail
+    assert "a@b.c" not in keyed.detail
+    down = _snowball_check(Config(snowball_enabled=True, email="a@b.c"), probe=lambda email: "unreachable")
+    assert down.status == "amber"
+    assert "unreachable" in down.detail
 
 
 def test_year_window_and_direction_both(tmp_path: Path):
@@ -557,8 +581,10 @@ def test_year_window_and_direction_both(tmp_path: Path):
         client=_client(works),
         lookup=lambda doi, title: None,
     )
-    dois = {json.loads(line)["ids"]["doi"] for line in (filtered.run_dir / "candidates.jsonl").read_text().splitlines()}
-    assert dois == {"10.1000/new"}
+    window = [json.loads(line) for line in (filtered.run_dir / "candidates.jsonl").read_text().splitlines()]
+    by_doi = {row["ids"]["doi"]: row for row in window}
+    assert by_doi["10.1000/new"]["status"] == "new"
+    assert by_doi["10.1000/old"]["status"] == "filtered"
 
     both = run_doi(
         cfg,
@@ -806,3 +832,96 @@ def test_openalex_cites_and_ingest_types(tmp_path: Path):
     )
     assert failed.exit_code == 1
     assert json.loads((failed.run_dir / "candidates.jsonl").read_text().splitlines()[0])["status"] == "error"
+
+
+def test_filters_dedupe_scope_and_partial_create(tmp_path: Path):
+    from paperful.library import LibraryError
+    from paperful.zot import Item
+
+    book = _work("W2", "10.1000/book", "A Book", 2019, 3)
+    book["type"] = "book"
+    works = {
+        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 1, ["W2", "W3", "W4"]),
+        "W2": book,
+        "W3": _work("W3", "10.1000/same", "Same Title", 2018, 2),
+        "W4": _work("W4", "10.1000/fail", "Fail", 2019, 1),
+    }
+    cfg = _cfg(tmp_path, more='dedupe_scope = "collection"\ntag_prefix = "sb"\n')
+    held = Item(
+        key="HAVE",
+        item_type="journalArticle",
+        title="Same Title",
+        doi=None,
+        arxiv_id=None,
+        url=None,
+        year=2018,
+        first_author="Lovelace",
+        collection_paths=["Inbox/Snowball"],
+    )
+
+    class Catalog(_Lib):
+        def items_in_scope(self, keys):
+            return [held]
+
+        def create_parent(self, data):
+            if data.get("DOI") == "10.1000/fail":
+                raise LibraryError("write failed")
+            return super().create_parent(data)
+
+    lib = Catalog()
+    result = run_doi(
+        cfg,
+        ["https://doi.org/10.1000/seed", "not-a-doi"],
+        SnowballRequest(gate="auto", collection="Inbox/Snowball", dedupe_scope="collection"),
+        console=Console(highlight=False, width=160),
+        client=_client(works),
+        backend=lib,
+    )
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    by = {row["ids"]["doi"]: row for row in rows}
+    assert by["not-a-doi"]["status"] == "error"
+    assert by["10.1000/book"]["status"] == "filtered"
+    assert by["10.1000/same"]["status"] == "exists"
+    assert by["10.1000/same"]["exists_match"]["title_year"].startswith("same title|")
+    assert result.exit_code == 1
+    summary = json.loads((result.run_dir / "summary.json").read_text())
+    assert summary["score"] == "cited_by_count"
+    assert summary["filtered"] >= 1
+    assert summary["dedupe_scope"] == "collection"
+
+
+def test_profile_save_refuses_secrets(tmp_path: Path):
+    from paperful.snowball.profile import save_profile
+
+    cfg = _cfg(tmp_path)
+    with pytest.raises(SnowballError, match="key"):
+        save_profile(cfg, "scout", {"mode": "search", "query": "bbnj", "api_key": "secret"}, force=False)
+    with pytest.raises(SnowballError, match="force"):
+        save_profile(
+            cfg,
+            "lib",
+            {"mode": "search", "query": "bbnj", "gate": "auto", "target_collection": "Inbox"},
+            force=False,
+        )
+    path = save_profile(cfg, "scout", {"mode": "search", "query": "bbnj", "description": "Scout"}, force=False)
+    assert "api_key" not in path.read_text()
+    assert 'kind = "snowball"' in path.read_text()
+
+
+def test_cli_profile_save_and_per_hop(tmp_path: Path):
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nstate_dir = "{tmp_path / "state"}"\n[snowball]\nenabled = true\n'
+    )
+    saved = runner.invoke(
+        cli.app,
+        ["snowball", "profile", "save", "keyword-scout", "--query", "bbnj", "--description", "Scout", "-c", str(cfg_path)],
+    )
+    assert saved.exit_code == 0
+    text = (tmp_path / "profiles" / "keyword-scout.toml").read_text()
+    assert "bbnj" in text
+    refused = runner.invoke(
+        cli.app,
+        ["snowball", "profile", "save", "lib", "--query", "bbnj", "--gate", "auto", "-c", str(cfg_path)],
+    )
+    assert refused.exit_code == 2

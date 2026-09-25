@@ -1,0 +1,11 @@
+# paperful snowball profile. Select with: paperful snowball run --profile keyword-library
+# Writing gate. Dry-run keyword-scout first. snowball profile save needs --force for this gate.
+kind = "snowball"
+mode = "search"
+query = "BBNJ EIA"
+description = "Keyword library with PDFs"
+gate = "auto"
+target_collection = "Inbox/Snowball"
+fetch_pdfs = true
+year_from = 2018
+max_candidates = 50

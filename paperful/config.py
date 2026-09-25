@@ -152,6 +152,12 @@ class Config:
     snowball_gate: str = "dry-run"
     snowball_target_collection: str = ""
     snowball_fetch_pdfs: bool = False
+    snowball_dedupe_scope: str = "library"  # library | collection | none
+    snowball_tag_prefix: str = "paperful-snowball"
+    snowball_types: tuple[str, ...] = ()
+    snowball_oa_only: bool = False
+    snowball_venue_include: tuple[str, ...] = ()
+    snowball_venue_exclude: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         # Resolve pack+user once so Config() in tests gets the builtin examples.
@@ -345,6 +351,26 @@ def _apply_snowball(raw: Any, cfg: Config) -> None:
         cfg.snowball_target_collection = str(raw["target_collection"]).strip()
     if "fetch_pdfs" in raw:
         cfg.snowball_fetch_pdfs = bool(raw["fetch_pdfs"])
+    if "dedupe_scope" in raw and raw["dedupe_scope"]:
+        cfg.snowball_dedupe_scope = str(raw["dedupe_scope"]).strip()
+    if "tag_prefix" in raw and raw["tag_prefix"]:
+        cfg.snowball_tag_prefix = str(raw["tag_prefix"]).strip()
+    if "types" in raw:
+        cfg.snowball_types = _snowball_strs(raw["types"])
+    if "oa_only" in raw:
+        cfg.snowball_oa_only = bool(raw["oa_only"])
+    if "venue_include" in raw:
+        cfg.snowball_venue_include = _snowball_strs(raw["venue_include"])
+    if "venue_exclude" in raw:
+        cfg.snowball_venue_exclude = _snowball_strs(raw["venue_exclude"])
+
+
+def _snowball_strs(raw: Any) -> tuple[str, ...]:
+    if isinstance(raw, str):
+        return tuple(part.strip() for part in raw.split(",") if part.strip())
+    if isinstance(raw, list):
+        return tuple(str(part).strip() for part in raw if str(part).strip())
+    return ()
 
 
 def _parse_run_profiles(raw: dict[str, Any]) -> dict[str, dict[str, Any]]:

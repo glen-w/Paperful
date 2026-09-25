@@ -2,8 +2,10 @@
 
 **Status:** keyword search, DOI / ORCID / collection seeds, refs and cited-by,
 depth up to 5 under caps, gates `dry-run` / `approve-batch` / `auto`, and
-`--fetch-pdfs` are implemented. `approve-each`, multi-seed overlap ranking,
-hybrid profiles, and `[llm]` query refine are still later. Phases live in
+`--fetch-pdfs` are implemented. Config honors `dedupe_scope`, `tag_prefix`,
+`types`, `oa_only`, and venue include/exclude. `snowball profile save` writes
+seeds and knobs only. `approve-each`, multi-seed overlap ranking, hybrid
+profiles, and `[llm]` query refine are still later. Phases live in
 [ROADMAP](ROADMAP.md#snowball).
 
 Snowball grows a library outward from a keyword, a DOI, a person, or an

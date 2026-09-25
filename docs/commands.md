@@ -127,6 +127,7 @@ uv run paperful pack show
 | `gaps` | Counts: no stored PDF, linked PDF URL only, missing DOI. Read-only. Year/type scope flags apply. Next steps are `run` and `lint`. Writes `state/runs/<stamp>-gaps.json`. |
 | `all` | `gaps` → `run --try-all --retry-failed --upgrade-linked` → `lint` → `fix-metadata --apply` → `summarize --apply`. Stops on the first failure. `--dry-run` skips `summarize` and does not apply metadata. `--profile` / `-f` load a saved run config. Opens a pack when none is open. See [Workflows](workflows.md). |
 | `profile` | `list` / `show` / `save` — named run configs beside `config.toml` (`profiles/<name>.toml` or `[profiles.*]`). `show` prints the merge `all` would use. `save` does not edit `config.toml`. |
+| `snowball` | Grow a library from a keyword, DOI, ORCID, or collection (`search`, `doi`, `orcid`, `collection`, `apply`, `run --profile`, `profile save`). Dry-run unless `--gate auto`. `fetch_pdfs` calls `run` on the new keys only, with the same sources and attach flag. `run` and `all` refuse `kind = snowball` profiles. |
 | `pack` | `open` / `close` / `show` — group the run reports from one operator sequence into `state/packs/<id>.json` (`paperful.pack.v1`). `show` does not open the library. `PAPERFUL_PACK=off` keeps a command out of the open pack. |
 | `collections` | Collection tree with “No PDF” counts |
 | `report` | Manifest summary + latest run report (`--last-run`, `--json`, `--not-found`, `--status`) |

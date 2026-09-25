@@ -4,9 +4,24 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..resolve import normalize_doi
 from .candidate import Candidate
 from .expand import truncate
 from .openalex import OpenAlexClient, referenced_ids, short_id, work_to_candidate
+
+
+def _mark_year(row: Candidate, year_from: int | None, year_to: int | None) -> bool:
+    """True when the row stays expandable. Out-of-window rows are kept as filtered."""
+    if _keep_year(row, year_from, year_to):
+        return True
+    row.status = "filtered"
+    if "(year)" not in row.why:
+        row.why = f"{row.why} (year)"
+    return False
+
+
+def _seed_doi(doi: str) -> str | None:
+    return normalize_doi(doi)
 
 
 def _keep_year(row: Candidate, year_from: int | None, year_to: int | None) -> bool:
@@ -55,8 +70,10 @@ def search_candidates(
 ) -> list[Candidate]:
     seed = {"type": "keyword", "value": query}
     works = client.search(query, limit=max_candidates, year_from=year_from, year_to=year_to)
-    rows = [
-        work_to_candidate(
+    rows: list[Candidate] = []
+    expandable: list[dict[str, Any]] = []
+    for work in works:
+        row = work_to_candidate(
             work,
             run_id=run_id,
             seed=seed,
@@ -65,14 +82,14 @@ def search_candidates(
             why="OpenAlex search",
             gate=gate,
         )
-        for work in works
-    ]
-    rows = [row for row in rows if _keep_year(row, year_from, year_to)]
+        if _mark_year(row, year_from, year_to):
+            expandable.append(work)
+        rows.append(row)
     if depth >= 1:
         rows.extend(
             _expand_hops(
                 client,
-                works,
+                expandable,
                 run_id=run_id,
                 seed=seed,
                 gate=gate,
@@ -103,8 +120,13 @@ def doi_candidates(
     """Return neighbours of each DOI and DOIs that failed to resolve."""
     rows: list[Candidate] = []
     failed: list[str] = []
-    for doi in dois:
-        seed = {"type": "doi", "value": doi}
+    for raw in dois:
+        doi = _seed_doi(raw) or ""
+        seed = {"type": "doi", "value": doi or raw}
+        if not doi:
+            failed.append(raw)
+            rows.append(_error_row(run_id, seed, raw, f"invalid DOI {raw}", gate, direction))
+            continue
         try:
             work = client.work_by_doi(doi)
         except Exception as exc:
@@ -155,7 +177,12 @@ def orcid_candidates(
     seed_works: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
 
-    for doi in dois:
+    for raw in dois:
+        doi = _seed_doi(raw) or ""
+        if not doi:
+            failed.append(raw)
+            rows.append(_error_row(run_id, seed, raw, f"invalid DOI {raw}", gate, direction))
+            continue
         try:
             work = client.work_by_doi(doi)
         except Exception as exc:
@@ -206,7 +233,9 @@ def orcid_candidates(
             )
         )
 
-    rows = [row for row in rows if row.status == "error" or _keep_year(row, year_from, year_to)]
+    for row in rows:
+        if row.status != "error":
+            _mark_year(row, year_from, year_to)
     if depth >= 1 and seed_works:
         rows.extend(
             _expand_hops(
@@ -296,9 +325,9 @@ def _expand_hops(
                         why=f"ref of {why_prefix}",
                         gate=gate,
                     )
-                    if _keep_year(row, year_from, year_to):
-                        rows.append(row)
+                    if _mark_year(row, year_from, year_to):
                         next_works.append(child)
+                    rows.append(row)
         if want_cites:
             for work in frontier:
                 oa = short_id(str(work.get("id") or ""))
@@ -325,10 +354,10 @@ def _expand_hops(
                         why=f"cites {why_prefix}",
                         gate=gate,
                     )
-                    if _keep_year(row, year_from, year_to):
-                        rows.append(row)
+                    if _mark_year(row, year_from, year_to):
                         next_works.append(child)
                         kept += 1
+                    rows.append(row)
                     if kept >= per_hop_limit:
                         break
         frontier = next_works

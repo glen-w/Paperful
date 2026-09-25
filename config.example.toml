@@ -178,4 +178,10 @@ pdfs = "additional"
 # gate = "dry-run"
 # target_collection = ""
 # fetch_pdfs = false
+# dedupe_scope = "library"   # library | collection | none
+# tag_prefix = "paperful-snowball"
+# types = ["article", "review"]  # empty = journal-article-shaped
+# oa_only = false
+# venue_include = []
+# venue_exclude = []
 

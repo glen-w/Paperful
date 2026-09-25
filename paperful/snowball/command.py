@@ -10,10 +10,12 @@ from rich.console import Console
 from rich.table import Table
 
 from ..config import Config
-from ..library import get_backend
+from ..dedupe import normalize_dedupe_title
+from ..library import LibraryError, get_backend
+from ..resolve import normalize_doi
 from .candidate import Candidate
 from .crawl import doi_candidates, orcid_candidates, search_candidates
-from .expand import clamp_depth, keyword_depth, normalize_direction, truncate
+from .expand import apply_filters, clamp_depth, keyword_depth, normalize_direction, truncate
 from .ingest import create_new, fill_pdfs
 from .openalex import OpenAlexClient, normalize_orcid
 from .orcid import OrcidError, orcid_dois
@@ -39,6 +41,12 @@ class SnowballRequest:
     year_from: int | None = None
     year_to: int | None = None
     direction: str = "refs"
+    dedupe_scope: str | None = None
+    tag_prefix: str | None = None
+    types: tuple[str, ...] | None = None
+    oa_only: bool | None = None
+    venue_include: tuple[str, ...] | None = None
+    venue_exclude: tuple[str, ...] | None = None
 
 
 @dataclass
@@ -104,7 +112,7 @@ def run_doi(
         direction = normalize_direction(request.direction)
     except ValueError as exc:
         raise SnowballError(str(exc)) from exc
-    depth, warning = clamp_depth(1 if request.depth is None else request.depth)
+    depth, warning = clamp_depth(_graph_depth(cfg, request))
     cleaned = [d.strip() for d in dois if d.strip()]
     if not cleaned:
         raise SnowballError("Pass at least one DOI.")
@@ -155,7 +163,7 @@ def run_orcid(
         direction = normalize_direction(request.direction)
     except ValueError as exc:
         raise SnowballError(str(exc)) from exc
-    depth, warning = clamp_depth(1 if request.depth is None else request.depth)
+    depth, warning = clamp_depth(_graph_depth(cfg, request))
     try:
         dois = orcid_dois(cleaned, getter=orcid_getter)
     except OrcidError as exc:
@@ -205,7 +213,7 @@ def run_collection(
         direction = normalize_direction(request.direction)
     except ValueError as exc:
         raise SnowballError(str(exc)) from exc
-    depth, warning = clamp_depth(1 if request.depth is None else request.depth)
+    depth, warning = clamp_depth(_graph_depth(cfg, request))
     lib = backend
     try:
         lib = lib or get_backend(cfg)
@@ -276,7 +284,7 @@ def run_apply(
     if finder is None:
         try:
             lib = lib or get_backend(cfg)
-            finder = _library_lookup(lib)
+            finder = _library_lookup(lib, scope="library", collection=collection)
         except Exception as exc:
             raise SnowballError(f"Library was not read. Refusing to create items. {exc}") from exc
     assert lib is not None and finder is not None
@@ -287,7 +295,9 @@ def run_apply(
         write_report(dest, {"created": 0, "skipped_exists": len(kept), "attach_ok": 0, "attach_deferred": 0})
         return PathResult(dest, 0)
 
-    items, counts = create_new(lib, creatable, collection)
+    items, counts = create_new(lib, creatable, collection, tag_prefix=request.tag_prefix or cfg.snowball_tag_prefix)
+    if counts.get("failed"):
+        console.print(f"[yellow]{counts['failed']} create(s) failed; other rows continued[/]")
     report = {
         "created": counts["created"],
         "skipped_exists": counts["skipped_exists"] + (len(kept) - len(creatable)),
@@ -307,7 +317,7 @@ def run_apply(
     else:
         console.print(f"items created (metadata only): {counts['created']}")
     write_report(dest, report)
-    return PathResult(dest, 0)
+    return PathResult(dest, 1 if counts.get("failed") else 0)
 
 
 def _guard(cfg: Config, request: SnowballRequest) -> None:
@@ -317,8 +327,18 @@ def _guard(cfg: Config, request: SnowballRequest) -> None:
         raise SnowballError(
             "gate must be dry-run, approve-batch, or auto. approve-each is later."
         )
+    scope = (request.dedupe_scope or cfg.snowball_dedupe_scope or "library").strip()
+    if scope not in {"library", "collection", "none"}:
+        raise SnowballError("dedupe_scope must be library, collection, or none.")
     if request.gate == "auto" and not request.collection.strip():
         raise SnowballError("gate auto needs a target collection (-C / target_collection).")
+
+
+def _graph_depth(cfg: Config, request: SnowballRequest) -> int:
+    """DOI, ORCID, and collection hops. Omitted depth uses [snowball] depth."""
+    if request.depth is None:
+        return cfg.snowball_depth
+    return request.depth
 
 
 def _execute(
@@ -350,6 +370,21 @@ def _execute(
         rows, failed = produced
     else:
         rows = produced
+    scope = (request.dedupe_scope or cfg.snowball_dedupe_scope or "library").strip()
+    types = cfg.snowball_types if request.types is None else request.types
+    oa_only = cfg.snowball_oa_only if request.oa_only is None else request.oa_only
+    venue_include = cfg.snowball_venue_include if request.venue_include is None else request.venue_include
+    venue_exclude = cfg.snowball_venue_exclude if request.venue_exclude is None else request.venue_exclude
+    tag_prefix = request.tag_prefix or cfg.snowball_tag_prefix
+    rows = apply_filters(
+        rows,
+        year_from=request.year_from,
+        year_to=request.year_to,
+        types=types,
+        oa_only=oa_only,
+        venue_include=venue_include,
+        venue_exclude=venue_exclude,
+    )
     rows = truncate(rows, caps[0])
     if gate == "approve-batch":
         for row in rows:
@@ -359,24 +394,48 @@ def _execute(
     finder = lookup
     lib = backend
     _unread_error: BaseException | None = None
-    if finder is None:
+    if scope == "none":
+        console.print("[yellow]dedupe_scope none: not checking the library[/]")
+        finder = None
+        if gate == "auto" and lib is None:
+            try:
+                lib = get_backend(cfg)
+            except Exception as exc:
+                lib = None
+                _unread_error = exc
+                library_unread = True
+    elif finder is None:
         try:
             lib = lib or get_backend(cfg)
-            finder = _library_lookup(lib)
+            finder = _library_lookup(lib, scope=scope, collection=request.collection)
         except Exception as exc:
             library_unread = True
             finder = None
             if gate == "auto":
                 lib = None
                 _unread_error = exc
-    if finder is not None:
+    if scope != "none" and finder is not None:
         try:
             _mark_exists(rows, finder)
         except Exception:
             library_unread = True
-    else:
+    elif scope != "none":
         library_unread = True
-    dest = write_queue(cfg.state_dir, run_id, rows, oa, library_unread=library_unread)
+    filtered = sum(1 for row in rows if row.status == "filtered")
+    dest = write_queue(
+        cfg.state_dir,
+        run_id,
+        rows,
+        oa,
+        library_unread=library_unread,
+        meta={
+            "score": "cited_by_count",
+            "max_candidates": caps[0],
+            "per_hop_limit": caps[1],
+            "filtered": filtered,
+            "dedupe_scope": scope,
+        },
+    )
     _print_table(console, rows)
     exit_code = 1 if failed else 0
     if gate in {"dry-run", "approve-batch"}:
@@ -391,7 +450,11 @@ def _execute(
     if library_unread or lib is None:
         detail = f" { _unread_error }" if _unread_error else ""
         raise SnowballError(f"Library was not read. Refusing to create items.{detail}")
-    items, counts = create_new(lib, rows, request.collection)
+    try:
+        items, counts = create_new(lib, rows, request.collection, tag_prefix=tag_prefix)
+    except LibraryError as exc:
+        raise SnowballError(str(exc)) from exc
+    exit_code = 1 if failed or counts.get("failed") else exit_code
     report = {
         "created": counts["created"],
         "skipped_exists": counts["skipped_exists"],
@@ -415,10 +478,43 @@ def _execute(
     return PathResult(dest, exit_code)
 
 
-def _library_lookup(backend: Any) -> Lookup:
+def _library_lookup(backend: Any, *, scope: str, collection: str) -> Lookup:
+    items = None
+    if hasattr(backend, "items_in_scope"):
+        try:
+            items = list(backend.items_in_scope(None))
+        except Exception:
+            items = None
+    if items is not None:
+        if scope == "collection":
+            want = collection.strip()
+            items = [item for item in items if want and want in (item.collection_paths or [])]
+        by_doi: dict[str, str] = {}
+        by_title_year: dict[tuple[str, int], str] = {}
+        for item in items:
+            doi = normalize_doi(item.doi) if getattr(item, "doi", None) else None
+            if doi:
+                by_doi.setdefault(doi, item.key)
+            title = normalize_dedupe_title(getattr(item, "title", None))
+            year = getattr(item, "year", None)
+            if title and year is not None:
+                by_title_year.setdefault((title, int(year)), item.key)
+
+        def indexed(doi: str | None, title: str | None, year: int | None = None) -> Any:
+            found = normalize_doi(doi) if doi else None
+            if found and found in by_doi:
+                return by_doi[found], "doi"
+            key = normalize_dedupe_title(title)
+            if key and year is not None and (key, int(year)) in by_title_year:
+                return by_title_year[(key, int(year))], "title_year"
+            return None
+
+        return indexed
+
     zl = getattr(backend, "zl", None)
 
-    def lookup(doi: str | None, title: str | None) -> str | None:
+    def lookup(doi: str | None, title: str | None, year: int | None = None) -> str | None:
+        del year
         if zl is None:
             return None
         return zl.find_top_item_key(doi=doi, title=title)
@@ -428,15 +524,29 @@ def _library_lookup(backend: Any) -> Lookup:
 
 def _mark_exists(rows: list[Candidate], lookup: Lookup) -> None:
     for row in rows:
-        if row.status == "error":
+        if row.status in {"error", "filtered"}:
             continue
-        key = lookup(row.ids.get("doi") or None, row.biblio.get("title") or None)
-        if key:
-            row.status = "exists"
+        doi = row.ids.get("doi") or None
+        title = row.biblio.get("title") or None
+        year = row.biblio.get("year")
+        try:
+            found = lookup(doi, title, year)
+        except TypeError:
+            found = lookup(doi, title)
+        if not found:
+            continue
+        if isinstance(found, tuple):
+            key, kind = found
+        else:
+            key, kind = found, ("doi" if doi else "title_year")
+        row.status = "exists"
+        if kind == "title_year":
             row.exists_match = {
                 "item_key": key,
-                "match": "doi" if row.ids.get("doi") else "title_year",
+                "title_year": f"{normalize_dedupe_title(title)}|{year}",
             }
+        else:
+            row.exists_match = {"item_key": key, "doi": normalize_doi(doi) or (doi or "")}
 
 
 def _print_table(console: Console, rows: list[Candidate]) -> None:

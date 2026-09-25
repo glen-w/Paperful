@@ -1,0 +1,8 @@
+# paperful snowball profile. Select with: paperful snowball run --profile keyword-scout
+kind = "snowball"
+mode = "search"
+query = "area based management tools"
+description = "Dry-run keyword scout"
+gate = "dry-run"
+year_from = 2018
+max_candidates = 50
