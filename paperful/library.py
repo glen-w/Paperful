@@ -223,6 +223,10 @@ class ZoteroBackend:
             raise LibraryError("Zotero did not create linked file")
         return key
 
+    def trash_attachment(self, attachment_key: str) -> None:
+        """Trash one attachment child. Does not delete the file under out/."""
+        self.trash_item(attachment_key)
+
     def _ensure_write(self) -> None:
         if self._attacher is None:
             self._attacher = Attacher(self.cfg, self.zl)

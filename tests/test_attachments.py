@@ -199,7 +199,13 @@ def test_apply_refuses_a_path_outside_out(tmp_path):
     assert done == 0
     assert errors and "outside out/" in errors[0]
     assert action.op == "trash"
-    assert apply_refusal(manager="mendeley", library_type="user", link=False)
+    assert apply_refusal(manager="mendeley", library_type="user", link=False) is None
+    assert "Zotero personal library" in (
+        apply_refusal(manager="mendeley", library_type="user", link=True) or ""
+    )
+    assert "not written into the library" in (
+        apply_refusal(manager="endnote", library_type="user", link=False) or ""
+    )
     assert apply_refusal(manager="zotero", library_type="group", link=True)
     assert apply_refusal(manager="zotero", library_type="user", link=True) is None
 

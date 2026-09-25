@@ -80,7 +80,7 @@ or LiteLLM.
 Hosted site (GitHub Pages): landing in [`website/`](website/) plus Sphinx HTML
 from this `docs/` tree at `/guide/`. Preview locally with
 `uv sync --extra docs && make pages-site`, then open `_site/index.html`.
-Live: [glenwright.earth/Paperful](https://glenwright.earth/Paperful/).
+Live: [paperful.app](https://paperful.app/).
 
 ## Is this the right tool?
 

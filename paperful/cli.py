@@ -1330,10 +1330,11 @@ def attachments(
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
-    """Compare Zotero attachments to the out/ mirror. Surgery needs a flag and --apply.
+    """Compare attachments to the out/ mirror. Surgery needs a flag and --apply.
 
-    The default writes a report and does not change the library. ``--link`` is
-    refused for group libraries. Paths outside out/ are never moved or deleted.
+    Zotero can repair, rename, and link. Mendeley can upload and delete cloud
+    files. EndNote only writes the report. ``--link`` is Zotero only.
+    Paths outside out/ are never moved or deleted.
     """
     from .attachments import (
         SurgeryFlags,

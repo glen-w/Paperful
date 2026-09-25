@@ -5,8 +5,7 @@ locked) is the live catalogue. Writes never touch that database: they stage
 ``state/endnote-import/<stamp>/`` for File → Import inside EndNote.
 """
 
-from __future__ import annotations
-
+import hashlib
 import re
 import shutil
 import sqlite3
@@ -231,17 +230,12 @@ class EndNoteBackend:
         selected = set(collection_keys) if collection_keys is not None else None
         items = [_item_from_ref(row, self) for row in self._iter_refs()]
         if selected is not None:
-            allowed_paths = {
-                cols[k].path for k in selected if k in cols
-            }
+            allowed_paths = {cols[k].path for k in selected if k in cols}
             items = [
                 it
                 for it in items
                 if any(p in allowed_paths for p in it.collection_paths)
-                or (
-                    UNCOLLECTED in it.collection_paths
-                    and not allowed_paths
-                )
+                or (UNCOLLECTED in it.collection_paths and not allowed_paths)
             ]
         items.sort(
             key=lambda i: (
@@ -299,7 +293,9 @@ class EndNoteBackend:
         if rec is None:
             rec = self._stage_from_live(item_key)
         rec.setdefault("pdfs", []).append(str(pdf_path))
-        return AttachResult(True, attachment_key=pdf_path.name, reason="staged", code="success")
+        return AttachResult(
+            True, attachment_key=pdf_path.name, reason="staged", code="success"
+        )
 
     def apply_patch(self, item_key: str, fields: dict[str, Any]) -> None:
         rec = self._pending_by_key.get(item_key) or self._stage_from_live(item_key)
@@ -334,6 +330,13 @@ class EndNoteBackend:
             "the reference from the next import bundle."
         )
 
+    def trash_attachment(self, attachment_key: str) -> None:
+        del attachment_key
+        raise LibraryError(
+            "EndNote cannot remove a PDF through paperful. The attachment report "
+            "is the list to clean up in EndNote."
+        )
+
     def find_child_note_keys(self, item_key: str, tag: str) -> list[str]:
         want = tag.strip().lower()
         out: list[str] = []
@@ -356,7 +359,10 @@ class EndNoteBackend:
         rec = self._pending_by_key.get(item_key) or self._stage_from_live(item_key)
         notes = rec.setdefault("notes", [])
         for note in notes:
-            if isinstance(note, dict) and str(note.get("tag") or "").lower() == tag.lower():
+            if (
+                isinstance(note, dict)
+                and str(note.get("tag") or "").lower() == tag.lower()
+            ):
                 note["html"] = html
                 return str(note.get("file") or tag)
         fname = f"{tag}.html"
@@ -410,7 +416,9 @@ class EndNoteBackend:
         parent = None
         if parent_path:
             parent = self.ensure_collection_path(parent_path)
-        cols[key] = Collection(key=key, name=name, parent=parent, path=path, raw_path=path)
+        cols[key] = Collection(
+            key=key, name=name, parent=parent, path=path, raw_path=path
+        )
         return key
 
     def create_parent(self, data: dict[str, Any]) -> str:
@@ -461,7 +469,9 @@ class EndNoteBackend:
                 rec_uri = f"internal-pdf://{target.name}"
                 copied.append(rec_uri)
             rec["pdfs"] = copied or rec.get("pdfs") or []
-        xml = records_to_endnote_xml(self._pending, database=self.enl.name or "paperful")
+        xml = records_to_endnote_xml(
+            self._pending, database=self.enl.name or "paperful"
+        )
         (dest / "paperful.xml").write_text(xml, encoding="utf-8")
         (dest / "README.txt").write_text(_readme(dest), encoding="utf-8")
         self._pending = []
@@ -497,9 +507,7 @@ class EndNoteBackend:
             "tags": data.get("tags") or [],
             "notes": [],
             "pdfs": [],
-            "collection_paths": [
-                p for p in item.collection_paths if p != UNCOLLECTED
-            ],
+            "collection_paths": [p for p in item.collection_paths if p != UNCOLLECTED],
             "pmid": item.pmid,
         }
         pdf = self._pdf_for(item_key)
@@ -543,14 +551,104 @@ class EndNoteBackend:
         row = _fetchone(conn, f"SELECT * FROM refs WHERE {id_col} = ?", key)
         return dict(row) if row is not None else None
 
+    def attachment_children(
+        self, key: str, row: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        """One row per PDF path. A missing file stays in the list so the report can see it."""
+        stored_paths: list[str] = []
+        conn = self._db()
+        tables = _tables(conn)
+        if "file_res" in tables:
+            cols = _columns(conn, "file_res")
+            ref_col = (
+                "refs_id" if "refs_id" in cols else ("id" if "id" in cols else None)
+            )
+            path_col = (
+                "file_path"
+                if "file_path" in cols
+                else ("path" if "path" in cols else None)
+            )
+            if ref_col and path_col:
+                for d in (
+                    dict(r)
+                    for r in _fetchall(
+                        conn, f"SELECT * FROM file_res WHERE {ref_col} = ?", key
+                    )
+                ):
+                    stored = d.get(path_col)
+                    if not stored:
+                        continue
+                    text = str(stored)
+                    ftype = d.get("file_type")
+                    if ftype not in (
+                        1,
+                        4,
+                        "1",
+                        "4",
+                        None,
+                    ) and not text.lower().endswith(".pdf"):
+                        continue
+                    stored_paths.append(text)
+        for field in ("file_attachments", "urls", "url"):
+            text = str(row.get(field) or "")
+            stored_paths.extend(re.findall(r"internal-pdf://[^\s<>]+", text))
+        out: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for index, stored in enumerate(stored_paths):
+            found = _resolve_data_file(self.data_dir, stored)
+            identity = str(found.resolve()) if found else stored
+            if identity in seen:
+                continue
+            seen.add(identity)
+            filename = (
+                found.name
+                if found
+                else Path(stored.replace("internal-pdf://", "")).name
+            )
+            out.append(
+                {
+                    "key": f"{key}-pdf-{index}",
+                    "data": {
+                        "itemType": "attachment",
+                        "contentType": "application/pdf",
+                        "linkMode": "linked_file",
+                        "filename": filename or stored,
+                        "path": str(found) if found else stored,
+                        "md5": _file_md5(found) if found else None,
+                    },
+                }
+            )
+        if out:
+            return out
+        pdf = self._pdf_for(key)
+        if pdf is None:
+            return []
+        return [
+            {
+                "key": f"{key}-pdf",
+                "data": {
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "linkMode": "linked_file",
+                    "filename": pdf.name,
+                    "path": str(pdf),
+                    "md5": _file_md5(pdf),
+                },
+            }
+        ]
+
     def _pdf_for(self, key: str) -> Path | None:
         conn = self._db()
         tables = _tables(conn)
         if "file_res" in tables:
             cols = _columns(conn, "file_res")
-            ref_col = "refs_id" if "refs_id" in cols else ("id" if "id" in cols else None)
-            path_col = "file_path" if "file_path" in cols else (
-                "path" if "path" in cols else None
+            ref_col = (
+                "refs_id" if "refs_id" in cols else ("id" if "id" in cols else None)
+            )
+            path_col = (
+                "file_path"
+                if "file_path" in cols
+                else ("path" if "path" in cols else None)
             )
             if ref_col and path_col:
                 rows = _fetchall(
@@ -741,6 +839,14 @@ def _endnote_member_ids(blob: bytes) -> list[int]:
     return []
 
 
+def _file_md5(path: Path) -> str:
+    digest = hashlib.md5()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(8192), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _resolve_data_file(data_dir: Path, stored: str) -> Path | None:
     text = stored.replace("internal-pdf://", "").replace("file://", "").lstrip("/")
     candidates = [
@@ -784,7 +890,9 @@ def _split_authors(raw: str) -> list[dict[str, str]]:
             last, first = [p.strip() for p in name.split(",", 1)]
         else:
             bits = name.split()
-            last, first = (bits[-1], " ".join(bits[:-1])) if len(bits) >= 2 else (name, "")
+            last, first = (
+                (bits[-1], " ".join(bits[:-1])) if len(bits) >= 2 else (name, "")
+            )
         out.append({"creatorType": "author", "lastName": last, "firstName": first})
     return out
 
@@ -816,7 +924,11 @@ def _item_from_ref(row: dict[str, Any], backend: EndNoteBackend) -> Item:
     pmid = extract_pmid(extra) or extract_pmid(
         str(_ref_get(row, "accession_number", "accession_num", "accession") or "")
     )
-    url = str(_ref_get(row, "url", "urls") or "").split()[0] if _ref_get(row, "url", "urls") else None
+    url = (
+        str(_ref_get(row, "url", "urls") or "").split()[0]
+        if _ref_get(row, "url", "urls")
+        else None
+    )
     if url and url.startswith("internal-pdf:"):
         url = None
     type_name = str(_ref_get(row, "ref_type_name", "type_name") or "")
@@ -845,7 +957,9 @@ def _item_from_ref(row: dict[str, Any], backend: EndNoteBackend) -> Item:
         library_doi=doi,
         pmid=pmid,
         extra=extra,
-        publication_title=str(_ref_get(row, "secondary_title", "journal", "alt_title") or "")
+        publication_title=str(
+            _ref_get(row, "secondary_title", "journal", "alt_title") or ""
+        )
         or None,
         date=str(year) if year else None,
         has_pdf=pdf is not None,
@@ -879,23 +993,11 @@ def _raw_from_ref(row: dict[str, Any], backend: EndNoteBackend) -> dict[str, Any
     return {"key": item.key, "data": data}
 
 
-def _children_from_ref(row: dict[str, Any], backend: EndNoteBackend) -> list[dict[str, Any]]:
+def _children_from_ref(
+    row: dict[str, Any], backend: EndNoteBackend
+) -> list[dict[str, Any]]:
     item = _item_from_ref(row, backend)
-    out: list[dict[str, Any]] = []
-    pdf = backend._pdf_for(item.key)
-    if pdf is not None:
-        out.append(
-            {
-                "key": f"{item.key}-pdf",
-                "data": {
-                    "itemType": "attachment",
-                    "contentType": "application/pdf",
-                    "linkMode": "imported_file",
-                    "filename": pdf.name,
-                    "md5": None,
-                },
-            }
-        )
+    out: list[dict[str, Any]] = backend.attachment_children(item.key, row)
     research = str(_ref_get(row, "research_notes", "researchNotes") or "")
     notes = str(_ref_get(row, "notes") or "")
     if research:
@@ -939,7 +1041,9 @@ def _item_from_pending(rec: dict[str, Any]) -> Item:
         doi=rec.get("doi"),
         arxiv_id=None,
         url=rec.get("url"),
-        year=rec.get("year") if isinstance(rec.get("year"), int) else parse_year(str(rec.get("date") or "")),
+        year=rec.get("year")
+        if isinstance(rec.get("year"), int)
+        else parse_year(str(rec.get("date") or "")),
         first_author=first,
         collection_paths=list(rec.get("collection_paths") or [UNCOLLECTED]),
         doi_source="field" if rec.get("doi") else "none",

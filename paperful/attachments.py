@@ -80,11 +80,27 @@ def inside_out(out_dir: Path, path: str | None) -> bool:
 
 
 def apply_refusal(*, manager: str, library_type: str, link: bool) -> str | None:
-    """Why ``--apply`` must stop. ``None`` means the write is allowed."""
-    if manager != "zotero":
-        return "Attachment surgery is Zotero-only. This run only wrote the report."
+    """Why ``--apply`` must stop. ``None`` means the write is allowed.
+
+    Mendeley can upload and delete cloud files. EndNote is report-only: paperful
+    does not edit the library database. ``--link`` is a Zotero personal library.
+    """
+    if link and manager != "zotero":
+        return (
+            "Stored-to-linked is a Zotero personal library only. "
+            "Mendeley files stay in Mendeley cloud. EndNote files stay under "
+            "Library.Data/PDF. The report was written; nothing was linked."
+        )
     if link and library_type != "user":
         return "Stored-to-linked is refused for a group library. Groups cannot use linked files."
+    if manager == "endnote":
+        return (
+            "EndNote attachment changes are not written into the library. "
+            "The report lists missing files, duplicate PDFs, and filename drift. "
+            "Nothing was staged."
+        )
+    if manager not in {"zotero", "mendeley"}:
+        return "Attachment surgery is not available for this manager. The report was written."
     return None
 
 
@@ -390,9 +406,19 @@ def apply_actions(
     return done, errors
 
 
+def _trash_attachment(backend: Any, key: str | None) -> None:
+    if not key:
+        raise RuntimeError("missing attachment key")
+    fn = getattr(backend, "trash_attachment", None)
+    if callable(fn):
+        fn(key)
+        return
+    backend.trash_item(key)
+
+
 def _apply_one(backend: Any, action: Action, out_dir: Path) -> None:
     if action.op == "trash":
-        backend.trash_item(action.attachment_key)
+        _trash_attachment(backend, action.attachment_key)
         return
     if action.op == "rename_file":
         _rename_inside(out_dir, action.source_path or "", action.filename or "")
@@ -411,7 +437,7 @@ def _apply_one(backend: Any, action: Action, out_dir: Path) -> None:
         if not result.ok:
             raise RuntimeError(result.reason or "attach failed")
         for key in action.trash_keys:
-            backend.trash_item(key)
+            _trash_attachment(backend, key)
         return
     if action.op == "rename_upload":
         path = _require_inside(out_dir, action.source_path)
@@ -419,7 +445,7 @@ def _apply_one(backend: Any, action: Action, out_dir: Path) -> None:
         if not result.ok:
             raise RuntimeError(result.reason or "attach failed")
         for key in action.trash_keys:
-            backend.trash_item(key)
+            _trash_attachment(backend, key)
         return
     if action.op == "link":
         path = _require_inside(out_dir, action.source_path)
@@ -427,7 +453,7 @@ def _apply_one(backend: Any, action: Action, out_dir: Path) -> None:
             raise RuntimeError(f"file missing: {path}")
         backend.create_linked_file(action.parent_key, path)
         for key in action.trash_keys:
-            backend.trash_item(key)
+            _trash_attachment(backend, key)
         return
     raise RuntimeError(f"unknown action {action.op}")
 

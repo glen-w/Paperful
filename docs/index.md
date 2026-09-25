@@ -1,7 +1,7 @@
 # paperful documentation
 
 New here? The landing page is
-[glenwright.earth/Paperful](https://glenwright.earth/Paperful/). This guide
+[paperful.app](https://paperful.app/). This guide
 is the reference. **Not affiliated with paperful.io.**
 
 Paperful cleans a reference library, finds missing PDFs, and summarises

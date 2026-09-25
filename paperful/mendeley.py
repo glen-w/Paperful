@@ -711,6 +711,10 @@ class MendeleyBackend:
         )
         self._docs = None
 
+    def trash_attachment(self, file_id: str) -> None:
+        """Delete one cloud file. Does not trash the document or the copy under out/."""
+        self.client.delete(f"/files/{file_id}", accept=ACCEPT_FILE)
+
     def find_child_note_keys(self, item_key: str, tag: str) -> list[str]:
         want = tag.strip().lower()
         out: list[str] = []

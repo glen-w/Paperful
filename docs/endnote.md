@@ -67,6 +67,12 @@ field so you can rebuild groups after import. `dedupe --apply` is refused:
 EndNote cannot move a PDF or note onto the keeper. Delete the extra in
 EndNote, or omit it from the next bundle.
 
+`attachments` reads every PDF path (`file_res` and `internal-pdf://`). A path
+that does not resolve is a broken link in the report, with an MD5 when the
+file is on disk. `--apply` does not stage a bundle and does not edit the
+library. `--link` is refused. Clean the files up in EndNote, or keep the
+copy under `out/` via `snapshot`.
+
 ## Paperful rules
 
 - Never point this adapter at a library you have not copied. The reader is

@@ -53,6 +53,7 @@ Duplicate file uploads return **400**; paperful treats that as unchanged.
 - Item keys are UUIDs. `out/` folder names keep the hyphens.
 - Folders map to collection paths. There is no Zotero-style `linked_url` PDF.
 - `dedupe --apply` is refused. Mendeley cannot move a PDF or note onto the keeper.
+- `attachments` reports filename drift and duplicate cloud files (same `filehash`, which Mendeley documents as MD5). `--fix-broken`, `--merge-files`, and `--rename` with `--apply` upload from `out/` and delete the extra cloud file. They do not trash the document. `--link` is refused: Mendeley has no linked-file mode. A document with no file row is a missing PDF (`run` / `attach`), not a ghost attachment.
 - Docker: headed OAuth must run on the host so the localhost redirect hits the
   CLI. Do not put client secrets in the image.
 - Moving a library: `snapshot --pdfs all` here, switch `manager`, then
