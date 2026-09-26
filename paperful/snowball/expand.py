@@ -76,6 +76,23 @@ def truncate(rows: list[Candidate], max_candidates: int) -> list[Candidate]:
     return kept
 
 
+def publication_year(value: object) -> int | None:
+    """Calendar year, or None when the field is blank or not a whole number."""
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        return None
+
+
 def apply_filters(
     rows: list[Candidate],
     *,
@@ -103,11 +120,11 @@ def apply_filters(
             out.append(row)
             continue
         reasons: list[str] = []
-        year = row.biblio.get("year")
+        year = publication_year(row.biblio.get("year"))
         if year is not None:
-            if year_from is not None and int(year) < year_from:
+            if year_from is not None and year < year_from:
                 reasons.append("year")
-            if year_to is not None and int(year) > year_to:
+            if year_to is not None and year > year_to:
                 reasons.append("year")
         kind = str(row.biblio.get("type") or "").lower()
         if kind not in allowed:

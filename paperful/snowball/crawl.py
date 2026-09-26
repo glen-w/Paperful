@@ -7,7 +7,14 @@ from typing import Any
 from ..resolve import normalize_doi
 from .bibliography import recover_referenced_works
 from .candidate import Candidate
-from .expand import direction_sides, sample_ids, select_works_by_citations, truncate, unique_ids
+from .expand import (
+    direction_sides,
+    publication_year,
+    sample_ids,
+    select_works_by_citations,
+    truncate,
+    unique_ids,
+)
 from .fill import FillPaused
 from .openalex import (
     OpenAlexBudgetExceeded,
@@ -40,12 +47,12 @@ def _seed_doi(doi: str) -> str | None:
 
 
 def _keep_year(row: Candidate, year_from: int | None, year_to: int | None) -> bool:
-    year = row.biblio.get("year")
+    year = publication_year(row.biblio.get("year"))
     if year is None:
         return True
-    if year_from is not None and int(year) < year_from:
+    if year_from is not None and year < year_from:
         return False
-    if year_to is not None and int(year) > year_to:
+    if year_to is not None and year > year_to:
         return False
     return True
 

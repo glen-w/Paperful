@@ -26,6 +26,7 @@ from .expand import (
     parse_keyword_hop_limit,
     parse_keyword_limit,
     parse_keyword_min_score,
+    publication_year,
     truncate,
 )
 from .fill import FillPaused, crossref_work, run_fill_pass, s2_api_key, s2_paper
@@ -986,17 +987,18 @@ def _library_lookup(backend: Any, *, scope: str, collection: str) -> Lookup:
                 if preprint:
                     by_doi.setdefault(preprint, item.key)
             title = normalize_dedupe_title(getattr(item, "title", None))
-            year = getattr(item, "year", None)
+            year = publication_year(getattr(item, "year", None))
             if title and year is not None:
-                by_title_year.setdefault((title, int(year)), item.key)
+                by_title_year.setdefault((title, year), item.key)
 
         def indexed(doi: str | None, title: str | None, year: int | None = None) -> Any:
             found = normalize_doi(doi) if doi else None
             if found and found in by_doi:
                 return by_doi[found], "doi"
             key = normalize_dedupe_title(title)
-            if key and year is not None and (key, int(year)) in by_title_year:
-                return by_title_year[(key, int(year))], "title_year"
+            parsed = publication_year(year)
+            if key and parsed is not None and (key, parsed) in by_title_year:
+                return by_title_year[(key, parsed)], "title_year"
             return None
 
         return indexed

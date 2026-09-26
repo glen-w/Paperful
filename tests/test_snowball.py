@@ -24,7 +24,7 @@ from paperful.snowball.command import (
     run_resume,
     run_search,
 )
-from paperful.snowball.expand import MAX_DEPTH, cap_ids, clamp_depth, keyword_depth, truncate
+from paperful.snowball.expand import MAX_DEPTH, apply_filters, cap_ids, clamp_depth, keyword_depth, truncate
 from paperful.snowball.candidate import Candidate
 from paperful.snowball.openalex import OpenAlexBudgetExceeded, OpenAlexClient, _is_budget, keyless_limit_message
 from paperful.zot import Item
@@ -83,6 +83,78 @@ def _cfg(tmp_path: Path, **extra: str) -> Config:
     path = tmp_path / "config.toml"
     path.write_text(body)
     return load_config(path)
+
+
+def _apply_filter_row(**biblio: object) -> Candidate:
+    base: dict[str, object] = {"type": "article", "venue": "marine policy", "language": "en"}
+    base.update(biblio)
+    return Candidate(
+        "r",
+        {"type": "doi", "value": "x"},
+        1,
+        "refs",
+        {"doi": "10.1234/filter-test"},
+        base,
+        "w",
+        "new",
+        {},
+        "dry-run",
+    )
+
+
+def test_apply_filters_tolerates_empty_biblio_year():
+    row = _apply_filter_row(year="")
+    out = apply_filters(
+        [row],
+        year_from=2023,
+        year_to=2026,
+        types=(),
+        oa_only=False,
+        venue_include=(),
+        venue_exclude=(),
+    )
+    assert len(out) == 1
+    assert out[0].status == "new"
+
+
+def test_library_lookup_tolerates_blank_year():
+    from types import SimpleNamespace
+
+    from paperful.snowball.command import _library_lookup
+
+    class Lib:
+        def items_in_scope(self, keys):
+            del keys
+            return [
+                SimpleNamespace(
+                    key="K1",
+                    doi=None,
+                    title="Basketball tactics",
+                    year="",
+                    arxiv_id=None,
+                    extra="",
+                    collection_paths=[],
+                )
+            ]
+
+    lookup = _library_lookup(Lib(), scope="library", collection="")
+    assert lookup(None, "Basketball tactics", "") is None
+    assert lookup("10.1000/missing", "Basketball tactics", "") is None
+
+
+def test_apply_filters_still_filters_numeric_year():
+    row = _apply_filter_row(year=2010)
+    out = apply_filters(
+        [row],
+        year_from=2023,
+        year_to=2026,
+        types=(),
+        oa_only=False,
+        venue_include=(),
+        venue_exclude=(),
+    )
+    assert out[0].status == "filtered"
+    assert "year" in out[0].why
 
 
 def test_stop_rules_clamp_and_cap():
