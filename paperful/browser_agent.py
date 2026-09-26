@@ -14,6 +14,7 @@ from .config import Config
 from .download import looks_like_pdf
 from .llm import llm_model_for_agent
 from .page_signals import classify_page_block, format_miss, host_label
+from .quotes import price_token, quoted_price
 from .session import chromium_dir, profile_ready
 from .zot import Item
 
@@ -214,7 +215,7 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
                 cfg.min_pdf_bytes,
                 miss,
                 cfg.browser_agent_max_steps,
-                captcha="captcha" in miss,
+                captcha=_miss_is_bot_wall(miss),
             )
         except Exception as exc:
             miss = "captcha" if "captcha" in str(exc).lower() else type(exc).__name__
@@ -227,12 +228,14 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
                 captcha=miss == "captcha",
             )
         if stop_reason.get("miss"):
+            miss = stop_reason["miss"]
             return _finish_recover(
                 agent,
                 downloads,
                 cfg.min_pdf_bytes,
-                stop_reason["miss"],
+                miss,
                 cfg.browser_agent_max_steps,
+                captcha=_miss_is_bot_wall(miss),
             )
         return _finish_recover(
             agent,
@@ -246,11 +249,14 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
 _WATCH_INTERVAL_S = 0.4
 
 _RECOVER_SYSTEM_EXT = (
+    "This Chrome does not solve CAPTCHAs. A robot check, Cloudflare security "
+    "verification, or a page that says it cannot provide the content is a hard "
+    "stop: call done immediately with success=false. Do not wait for a solver. "
     "Never navigate to Google, Bing, DuckDuckGo, Scholar search, or any other "
     "search engine. If the DOI/publisher landing page has no free PDF (paywall, "
-    "403, Request blocked, Cloudflare challenge, 'content not available'), call "
-    "done immediately. Do not use the publisher's site search. Do not open new "
-    "tabs or sites. Do not click support, contact, help, or cookie-settings links."
+    "403, or content not available), call done immediately. Do not use the "
+    "publisher's site search. Do not open new tabs or sites. Do not click "
+    "support, contact, help, or cookie-settings links."
 )
 
 _SEARCH_ENGINE_SUFFIXES = (
@@ -292,12 +298,77 @@ def _is_dead_end_url(url: str) -> bool:
     return any(m in path for m in _DEAD_END_PATH_MARKERS)
 
 
+# Page labels that end this attempt. Bot walls also pause the lane for the run.
+_ABORT_PAGE_LABELS = frozenset({"captcha", "cloudflare", "blocked", "paywall"})
+_BOT_WALL_LABELS = frozenset({"captcha", "cloudflare", "blocked"})
+
+
+def _miss_is_bot_wall(miss: str) -> bool:
+    """True when this miss should pause ``browser_agent`` for the rest of the run."""
+    head = miss.split(";", 1)[0].split(" @", 1)[0].strip().lower()
+    return head in _BOT_WALL_LABELS
+
+
+def _is_cloudflare_challenge_url(url: str) -> bool:
+    from urllib.parse import urlparse
+
+    host = (urlparse(url).hostname or "").lower()
+    return host == "challenges.cloudflare.com" or host.endswith(
+        ".challenges.cloudflare.com"
+    )
+
+
 def _abort_miss_for_url(url: str) -> str | None:
+    if _is_cloudflare_challenge_url(url):
+        return "cloudflare"
     if _is_search_engine_url(url):
         return "left landing page (search engine)"
     if _is_dead_end_url(url):
         return "left landing page (support/help)"
     return None
+
+
+def _abort_miss_for_text(text: str | None) -> str | None:
+    """Stop on a challenge, bot wall, or paywall already visible to the model.
+
+    ``login`` is ignored: ordinary article pages say "sign in".
+    """
+    label = classify_page_block(text)
+    if label in _ABORT_PAGE_LABELS:
+        return label
+    return None
+
+
+def _page_text_for_abort(message: str) -> str:
+    """DOM text from a browser-use state message, without the task preamble.
+
+    The state message repeats the task, and the task names Cloudflare and
+    blocks. Classifying that preamble would stop every attempt.
+    """
+    low = message.lower()
+    start = low.find("<browser_state>")
+    end = low.find("</browser_state>")
+    if start != -1 and end > start:
+        return message[start + len("<browser_state>") : end]
+    if "<user_request>" in low:
+        return ""
+    return message
+
+
+def _agent_visible_text(agent: Any) -> str:
+    """Title, URL, and DOM text from the latest history step."""
+    history = getattr(agent, "history", None)
+    items = getattr(history, "history", None) if history is not None else None
+    if not items:
+        return ""
+    last = items[-1]
+    state = getattr(last, "state", None)
+    parts = [
+        getattr(state, "title", "") or "",
+        getattr(state, "url", "") or "",
+        _page_text_for_abort(getattr(last, "state_message", "") or ""),
+    ]
+    return "\n".join(part for part in parts if part)
 
 
 def _agent_page_url_sync_probe(getter: Any) -> Any:
@@ -331,9 +402,11 @@ async def _agent_on_search_engine(agent: Any) -> bool:
 
 async def _agent_abort_miss(agent: Any) -> str | None:
     url = await _agent_page_url(agent)
-    if not url:
-        return None
-    return _abort_miss_for_url(url)
+    if url:
+        miss = _abort_miss_for_url(url)
+        if miss:
+            return miss
+    return _abort_miss_for_text(_agent_visible_text(agent))
 
 
 def _recover_task(item: Item, url: str) -> str:
@@ -345,10 +418,11 @@ def _recover_task(item: Item, url: str) -> str:
     return (
         f"Open {url} and download the full-text PDF for this work: "
         f"{item.title!r}. Dismiss cookie banners if needed. "
-        "If you see a CAPTCHA or robot check you cannot pass, stop immediately. "
-        "If access is blocked (HTTP 403, 'Request blocked', Cloudflare/CloudFront "
-        "error, 'content not available', or a paywall with no free PDF), stop "
-        "immediately after that observation — do not keep clicking around. "
+        "This browser does not solve CAPTCHAs. If you see a robot check or a "
+        "security verification, stop immediately. "
+        "If access is blocked (HTTP 403, content not available, or a paywall "
+        "with no free PDF), stop immediately after that observation — do not "
+        "keep clicking around. "
         "Never open Google, Bing, DuckDuckGo, or any search engine. "
         "Do not use the publisher site's search. Do not open new tabs. "
         "Do not click support, contact, help, or cookie-settings links. "
@@ -450,7 +524,10 @@ def _finish_recover(
         if how:
             result.note = f"{result.note}; {how}"
         return result
+    token = _history_price_token(agent)
     if miss not in {"no PDF in download folder", "stopped", "timeout"}:
+        if token:
+            result.note = f"{result.note}; {token}" if result.note else token
         return result
     page_url, final_text, steps = _agent_observation(agent)
     label = classify_page_block(final_text)
@@ -463,12 +540,55 @@ def _finish_recover(
         base = "step budget"
     else:
         base = "no downloadable pdf"
-    result.note = format_miss(base, page_url, extra=_agent_snippet(final_text))
+    extra = _agent_snippet(final_text)
+    if token:
+        extra = f"{token}; {extra}" if extra else token
+    result.note = format_miss(base, page_url, extra=extra)
     if miss == "timeout":
         result.note = f"timeout; {result.note}"
     if steps is not None and max_steps:
         result.note = f"{result.note}; steps {steps}/{max_steps}"
     return result
+
+
+def _history_price_token(agent: Any) -> str | None:
+    """``price 39.95 EUR`` from a buy-button or memory line, if the agent saw one."""
+    for blob in _history_blobs(agent):
+        quote = quoted_price(blob)
+        if quote is not None:
+            return price_token(*quote)
+    return None
+
+
+def _history_blobs(agent: Any) -> list[str]:
+    """Click results first, then the agent's own memory, then its final line."""
+    history = getattr(agent, "history", None)
+    if history is None:
+        return []
+    blobs: list[str] = []
+    clicks: list[str] = []
+    for result in _call(history, "action_results") or []:
+        for attr in ("extracted_content", "long_term_memory"):
+            val = getattr(result, attr, None)
+            if isinstance(val, str) and val:
+                clicks.append(val)
+    extracted = _call(history, "extracted_content") or []
+    if isinstance(extracted, list):
+        clicks.extend(str(item) for item in extracted if item)
+    if clicks:
+        blobs.append("\n".join(clicks))
+    thoughts: list[str] = []
+    for thought in _call(history, "model_thoughts") or []:
+        for attr in ("memory", "next_goal", "evaluation_previous_goal", "thinking"):
+            val = getattr(thought, attr, None)
+            if isinstance(val, str) and val:
+                thoughts.append(val)
+    if thoughts:
+        blobs.append("\n".join(thoughts))
+    final = _call(history, "final_result")
+    if isinstance(final, str) and final:
+        blobs.append(final)
+    return blobs
 
 
 def _agent_observation(agent: Any) -> tuple[str | None, str | None, int | None]:

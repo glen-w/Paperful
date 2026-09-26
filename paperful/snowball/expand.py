@@ -23,6 +23,8 @@ _DIRECTION_PARTS = {
     "keyword": "keywords",
     "keywords": "keywords",
     "tags": "keywords",
+    "similar": "similar",
+    "similars": "similar",
 }
 
 
@@ -263,15 +265,14 @@ def parse_keyword_min_score(value: Any) -> float:
 def direction_sides(raw: str) -> frozenset[str]:
     """Sides named by a direction string. ``both`` and ``all`` stay refs plus cites."""
     value = (raw or "refs").strip().lower().replace(" ", "")
-    if value in {"both", "refs+cites", "cites+refs", "all"}:
+    if value == "all":
         return frozenset({"refs", "cites"})
-    if value in {"both+keywords", "keywords+both", "refs+cites+keywords", "cites+refs+keywords"}:
-        return frozenset({"refs", "cites", "keywords"})
+    value = value.replace("both", "refs+cites")
     parts = [part for part in value.split("+") if part]
     if not parts or any(part not in _DIRECTION_PARTS for part in parts):
         raise ValueError(
-            "direction must be refs, cites, both, keywords, "
-            "refs+keywords, cites+keywords, or refs+cites+keywords "
+            "direction must be refs, cites, both, keywords, similar, "
+            "or a combination such as refs+similar "
             f"(got {raw!r})"
         )
     return frozenset(_DIRECTION_PARTS[part] for part in parts)
@@ -281,7 +282,7 @@ def format_direction(sides: frozenset[str]) -> str:
     """Canonical direction string. refs+cites stays ``both``."""
     if sides == frozenset({"refs", "cites"}):
         return "both"
-    ordered = [side for side in ("refs", "cites", "keywords") if side in sides]
+    ordered = [side for side in ("refs", "cites", "keywords", "similar") if side in sides]
     return "+".join(ordered)
 
 

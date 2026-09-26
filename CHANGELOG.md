@@ -6,6 +6,19 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+The run summary counts items that did not yield a PDF by reason — captcha, cloudflare, paywall, and a plain not-found — one reason per item. When the browser agent reads a publisher price on an unsaved article, that price is logged on the item and the summary totals it (`€79.90 for 2 articles`).
+
+Long PDF runs pause a blocked source instead of dropping it for the rest of the process, and a 429 does not open that circuit. An expired EZProxy session stops the proxy lane for the run; those items are `retryable` on the next `run`. A miss from every source stays `not_found` with reason `closed`. Europe PMC tries the PMC render URL when a PMCID is present. OpenAIRE is a DOI source for repository copies. A preprint that misses open access is tried once against its published DOI, without changing the library DOI.
+
+`snowball --direction similar` adds one ranked hop: works that share the seed's references, then Semantic Scholar recommendations. A saved queue with no `deferred.json` resumes into create and PDF fetch without searching OpenAlex again.
+
+A depth-0 snowball search stays on the hit list. Citation backends fill empty
+fields on those hits and do not import their references. A reference title is
+the structured article title, never the raw citation. A blank or citation-shaped
+title is filled from the OpenAlex work before the year filter; if that still
+is not a work title, the row is not created. `fix-metadata` replaces a blank
+or citation-shaped title from the DOI without `--overwrite`.
+
 `paperful attachments` compares PDF attachments to `out/` and writes a report.
 It does not change Zotero unless you also pass `--fix-broken`, `--merge-files`,
 `--rename`, or `--link` with `--apply`. Repairs use a file already in the
@@ -26,7 +39,7 @@ least two seeds from that run point at the work.
 scan. It is an optional `all` step, not in the default chain. Summarize,
 lint PDF-DOI, and synthesize then read the text that was already there.
 
-Front door names the paperful.io collision. First run copies
+First run copies
 `config.minimal.toml`. `--preset oa` drops EZProxy. Empty `email` with
 Unpaywall in `sources` is a red `doctor` row (`unpaywall_email`, exit 2).
 `paperful jobs` lists verbs by job. `run` fills items already in the library;

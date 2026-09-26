@@ -148,8 +148,14 @@ uv run paperful recover --item K1 --item K2 --no-attach
 
 - Start URL is `https://doi.org/<DOI>` when the item has a DOI, else its URL.
 - One item at a time, on the session vault profile. Never in `DEFAULT_SOURCES`.
-- Hard CAPTCHAs are not solved: the item ends as `captcha` and is retried on a
-  later `run` / `recover`. Timeouts / no download → `not_found`.
+- Hard CAPTCHAs are not solved. Local Chrome does not solve publisher
+  Cloudflare or Turnstile; that solver is a Browser Use Cloud feature, and
+  this install does not use it. When the page is a robot check, a Cloudflare
+  verification, or a publisher bot wall, paperful stops that attempt, marks
+  it `captcha`, and skips `browser_agent` for the rest of the process. Later
+  items stay `retryable`. A paywall stops that item only. Sci-Hub's ALTCHA
+  check is separate and still completed when it can be. Timeouts / no
+  download → `not_found`.
 - Access blocks (403 / "Request blocked" / paywall with no free PDF) are
   instructed as immediate stop — the agent must not open search engines or
   support/help pages. If it navigates to Google/Bing/etc. or a support/contact

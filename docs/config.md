@@ -28,7 +28,7 @@ and [architecture](architecture.md).
 | `out_dir` / `state_dir` | `out` / `state` | PDF tree; manifest, patches, PDF cache, run reports, and write key |
 | `[mirror].pdfs` | `additional` | `snapshot` PDF policy: `additional` (fetched files only), `all` (also export Zotero PDFs), `none` (records and notes only). `run` always writes PDFs it downloads |
 | `[remarks].surface` | `note` | Where the readable lines go: where a PDF came from, which duplicate to keep, and why a snowball hit belongs. `note` (child note), `tag` (parent tag), or `off`. The PDF attachment stamp stays the machine token |
-| `sources` | `unpaywall` → `openalex` → `arxiv` → `biorxiv` → `europepmc` → `semanticscholar` → `core` → `direct` → `ezproxy` → `htmlpdf` | Source order; `--sources` overrides per run. `scholar` and `scihub` are **not** included unless you opt in. `core` is skipped until `core_api_key` is set |
+| `sources` | `unpaywall` → `openalex` → `arxiv` → `biorxiv` → `europepmc` → `semanticscholar` → `core` → `openaire` → `direct` → `ezproxy` → `htmlpdf` | Source order; `--sources` overrides per run. `scholar` and `scihub` are **not** included unless you opt in. `core` is skipped until `core_api_key` is set. `openaire` looks up repository copies by DOI |
 | `verify_doi` | `true` | Check library DOIs against Crossref/OpenAlex before fetching; may swap DOI **in memory** for that run. `false` leaves an existing DOI as `doi_verified=unknown` and does not swap |
 | `doi_suspect_score` | `0.70` | Title similarity below this marks a library DOI as suspect (eligible for in-memory swap). API failure is `unknown` and **keeps** the original DOI |
 | `core_api_key` | `""` | CORE API bearer token; empty skips the `core` source |
@@ -45,7 +45,7 @@ and [architecture](architecture.md).
 | `crossref_min_score` | `0.90` | Title-similarity threshold for accepting a title→DOI match (Crossref, then OpenAlex, then Semantic Scholar) |
 | `mirror_failures_before_skip` | `3` | Network failures before a Sci-Hub mirror is skipped for the run |
 | `source_routing` | `true` | Skip sources that look inapplicable from item metadata; use `--try-all` to override per run |
-| `circuit_breaker_threshold` | `3` | Block-like failures (CAPTCHA, rate limits) before a source is skipped for the rest of the run |
+| `circuit_breaker_threshold` | `3` | Captcha or block-page failures before a source pauses. A 429 does not count. After the pause, one item is tried again |
 | `attach` | `true` | Attach into Zotero after download (`--no-attach` overrides) |
 | `app_name` | `paperful` | Name shown in Zotero's authorisation dialog |
 | `user_agent` | Chrome-like string | HTTP `User-Agent` for source and download requests |

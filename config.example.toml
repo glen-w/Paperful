@@ -43,9 +43,9 @@ state_dir = "state"
 # complying with the laws that apply to you. See docs/scihub.md.
 # htmlpdf + session vault: Playwright is a core dep; Chromium installs on first
 # `paperful session login …` (or: uv run playwright install chromium)
-sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "core", "direct", "ezproxy", "htmlpdf"]
-# sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "core", "scholar", "direct", "ezproxy", "htmlpdf"]
-# sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "core", "scholar", "direct", "ezproxy", "htmlpdf", "scihub"]
+sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "core", "openaire", "direct", "ezproxy", "htmlpdf"]
+# sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "core", "openaire", "scholar", "direct", "ezproxy", "htmlpdf"]
+# sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "core", "openaire", "scholar", "direct", "ezproxy", "htmlpdf", "scihub"]
 
 # Campus EZProxy (any institution that offers login?url=). Leave empty to disable.
 # Only used for DOIs and known publisher URLs (ScienceDirect, Springer, JSTOR, …),

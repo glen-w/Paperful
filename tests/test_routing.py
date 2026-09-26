@@ -207,6 +207,24 @@ def test_circuit_breaker_trips_after_threshold():
     assert cb.tripped("scholar")
 
 
+def test_circuit_breaker_ignores_rate_limits_and_probes_after_cooldown():
+    cb = CircuitBreaker(3, cooldown_items=1)
+    for _ in range(3):
+        cb.note("scholar", Outcome.ERROR, "HTTP 429")
+    assert not cb.tripped("scholar")
+    paused = CircuitBreaker(3, cooldown_items=1)
+    for _ in range(3):
+        paused.note("scholar", Outcome.CAPTCHA, "blocked")
+    assert paused.tripped("scholar")
+    paused.consume_skip("scholar")
+    assert not paused.tripped("scholar")
+    assert not paused.note("scholar", Outcome.NOT_FOUND, "")
+    assert not paused.tripped("scholar")
+    for _ in range(3):
+        paused.note("scholar", Outcome.CAPTCHA, "sorry")
+    assert paused.tripped("scholar")
+
+
 def test_publisher_host_groups_rewritten_ezproxy_hosts():
     assert publisher_host(
         "https://www.sciencedirect.com/science/article/pii/S1/pdfft"

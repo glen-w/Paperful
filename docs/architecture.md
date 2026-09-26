@@ -105,12 +105,13 @@ flowchart LR
 | `title_html` | Scholarly title contains HTML tags or entities |
 | `title_all_caps` | Scholarly title is mostly ALL CAPS (`fix-metadata` recases to Title Case) |
 | `title_filename` | Scholarly title looks like a filename or path (finding only) |
+| `title_unusable` | Scholarly title is blank or a citation string, not the work title |
 | `no_identifier` | No DOI, arXiv id, PMID, or URL |
 | `pdf_identity_mismatch` | Opt-in LLM says first pages do not match the record (or low confidence) |
 
 `--json` prints only findings. Exit 0 unless `--strict`. Lint prefers a file already on disk (`item.pdf_path` or manifest `path`) and calls `export_pdf` only when `has_pdf` and nothing is on disk.
 
-[`paperful/metadata.py`](../paperful/metadata.py) whitelist: `doi`, `title`, `date`, `publicationTitle`. Default fills empty venue/date (richest Crossref/OpenAlex date available). `--overwrite` may replace title/date/venue when the candidate is at least as precise. Verified `pdf_doi_mismatch` can propose a DOI (`source=pdf`). HTML markup in titles is stripped into a title patch; ALL CAPS titles are recased to Title Case (`source=title_case`); filename titles stay lint-only. Never invents creators. `state/metadata-patches.jsonl` is an append-only audit log (one patch per item key per invocation); not a curated re-apply queue.
+[`paperful/metadata.py`](../paperful/metadata.py) whitelist: `doi`, `title`, `date`, `publicationTitle`. Default fills empty venue/date (richest Crossref/OpenAlex date available) and replaces a blank or citation-shaped title from the DOI work. `--overwrite` may replace title/date/venue when the candidate is at least as precise. Verified `pdf_doi_mismatch` can propose a DOI (`source=pdf`). HTML markup in titles is stripped into a title patch; ALL CAPS titles are recased to Title Case (`source=title_case`); filename titles stay lint-only. Never invents creators. `state/metadata-patches.jsonl` is an append-only audit log (one patch per item key per invocation); not a curated re-apply queue.
 
 ## PDF text
 
@@ -120,7 +121,7 @@ flowchart LR
 
 ## Circuit breaker
 
-Open-access sources run in parallel (`concurrency_oa`). Block-like outcomes (CAPTCHA, 429, “sorry”, …) increment a per-source counter; after `circuit_breaker_threshold` the source is skipped for the rest of the run. Scholar, Sci-Hub, EZProxy, and HTML→PDF stay serial (they share one Chromium profile lock). Publisher PDF URLs that 403 on httpx are retried in that profile (EZProxy-wrapped when configured).
+Open-access sources run in parallel (`concurrency_oa`). Captcha and block pages increment a per-source counter; after `circuit_breaker_threshold` the source pauses, then one later item is probed. A 429 does not open the circuit. Scholar, Sci-Hub, EZProxy, and HTML→PDF stay serial (they share one Chromium profile lock). An expired EZProxy session stops further proxy calls for that run; those items are `retryable`. Publisher PDF URLs that 403 on httpx are retried in that profile (EZProxy-wrapped when configured). Direct PDF URLs are tried before landing pages.
 
 ## Sci-Hub and presets
 
@@ -201,6 +202,8 @@ is not tagged 1.0 yet (`paperful.item.v1` is still open).
 | `summary.pdfs_downloaded` | Successful downloads (`ok` bumps) |
 | `summary.attached` / `attach_failed` | Write-back counts |
 | `summary.not_found` / `no_identifier` / `captcha` / `error` | Item outcomes |
+| `summary.not_downloaded` | Items with no PDF, one reason each. A page block (captcha, cloudflare, blocked, paywall, login) wins over a plain miss. Other reasons: session expired, paused, download failed, step budget, no identifier, error, not found |
+| `summary.paywall_prices` | Publisher prices the browser agent noted on items that were not saved, summed per currency (`articles`, `total`) |
 | `summary.skipped_manifest` / `linked_url_skipped` | Not attempted this run |
 | `summary.fields_corrected` / `fields_corrected_by_kind` | In-memory DOI enrichments (not library writes) |
 | `summary.identifiers_verified` | `verify:ok` count |

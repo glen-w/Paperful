@@ -24,9 +24,11 @@ class _Client:
         self.works = works
         self.calls = 0
         self.boom = boom
+        self.batches: list[list[str]] = []
 
     def works_by_dois(self, dois):
         self.calls += 1
+        self.batches.append(list(dois))
         if self.boom:
             raise OpenAlexBudgetExceeded("budget", partial=list(self.works))
         return list(self.works)
@@ -76,6 +78,35 @@ def test_budget_miss_keeps_partial_index(tmp_path):
     )
     assert index.count(openalex="W9") == 2
     assert not (tmp_path / "cites").exists()
+
+
+def test_prepare_skips_filtered_rows(tmp_path):
+    from paperful.snowball.candidate import Candidate
+
+    def row(doi: str, status: str) -> Candidate:
+        return Candidate(
+            "r",
+            {"type": "keyword", "value": "basketball"},
+            1,
+            "refs",
+            {"doi": doi},
+            {},
+            "ref",
+            status,
+            {},
+            "auto",
+        )
+
+    client = _Client([])
+    index = load_local_cites(_Lib([]), "Inbox", state_dir=tmp_path, client=client)
+    index.prepare(
+        [
+            row("10.11138/mltj/2017.7.1.119.pmid:28717619;pmcid:pmc5505579", "filtered"),
+            row("10.1000/new", "new"),
+        ],
+        client,
+    )
+    assert client.batches == [["10.1000/new"]]
 
 
 def test_library_scope_does_not_resolve_a_collection(tmp_path):

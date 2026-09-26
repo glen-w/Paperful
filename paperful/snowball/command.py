@@ -36,7 +36,9 @@ from .openalex import OpenAlexBudgetExceeded, OpenAlexClient, keyless_limit_mess
 from .orcid import OrcidError, orcid_dois
 from .queue import load_queue, write_queue, write_report
 from ..progress import item_progress
+from ..runreport import low_download_advice
 from .tally import Tally, paint
+from .titles import repair_reference_titles
 from .rank import FORMULA, apply_overlap
 from .refine import llm_suggester, suggestions_for
 
@@ -145,6 +147,7 @@ def run_search(
         s2_getter=s2_getter,
         suggester=suggester,
         refine_query=query,
+        expand_neighbors=depth >= 1,
         crawl=lambda oa, run_id, gate, caps: search_candidates(
             oa,
             query,
@@ -225,6 +228,7 @@ def run_hybrid(
         s2_getter=s2_getter,
         suggester=suggester,
         refine_query=text,
+        expand_neighbors=True,
     )
 
 
@@ -286,6 +290,7 @@ def run_doi(
         crossref_getter=crossref_getter,
         s2_getter=s2_getter,
         suggester=suggester,
+        expand_neighbors=depth >= 1,
     )
 
 
@@ -350,6 +355,7 @@ def run_orcid(
         warning=warning,
         crawl=crawl,
         expect_failures=True,
+        expand_neighbors=depth >= 1,
     )
 
 
@@ -412,6 +418,7 @@ def run_collection(
         warning=warning,
         crawl=crawl,
         expect_failures=True,
+        expand_neighbors=depth >= 1,
     )
 
 
@@ -435,7 +442,9 @@ def run_resume(
     dest = cfg.state_dir / "snowball" / run_id
     path = dest / "deferred.json"
     if not path.is_file():
-        raise SnowballError(f"No deferred OpenAlex work for run {run_id!r}.")
+        if not (dest / "candidates.jsonl").is_file():
+            raise SnowballError(f"No snowball queue for run {run_id!r}.")
+        return _resume_saved_queue(cfg, run_id, request, console=console, backend=backend)
     deferred = json.loads(path.read_text(encoding="utf-8"))
     reset_at = deferred.get("reset_at")
     if isinstance(reset_at, str) and reset_at:
@@ -473,7 +482,9 @@ def run_resume(
             per_hop_limit=int(deferred.get("per_hop_limit") or cfg.snowball_per_hop_limit),
             direction=str(deferred.get("direction") or request.direction or "refs"),
             tally=tally,
+            expand_neighbors=bool(deferred.get("expand_neighbors", True)),
         )
+        repair_reference_titles(rows, oa, tally=tally)
         if paused:
             oa.deferred = {
                 **deferred,
@@ -531,6 +542,59 @@ def run_resume(
         except (LibraryError, SnowballError) as exc:
             raise SnowballError(str(exc)) from exc
     return PathResult(dest, 0)
+
+
+def _resume_saved_queue(
+    cfg: Config,
+    run_id: str,
+    request: SnowballRequest,
+    *,
+    console: Console,
+    backend: Any = None,
+) -> PathResult:
+    """Continue create and PDF fetch from a finished queue. Does not search again."""
+    from ..store import Manifest
+
+    from .ingest import create_new, fill_pdfs, pending_pdf_items
+
+    dest, rows = load_queue(cfg.state_dir, run_id)
+    console.print(
+        f"queue on disk · {len(rows)} rows · continuing without another OpenAlex search"
+    )
+    mode = _pdf_mode(request)
+    if request.gate != "auto" or not request.collection.strip():
+        if mode != "off":
+            console.print("[yellow]fetch_pdfs needs --gate auto and -C to continue[/]")
+        return PathResult(dest, 0)
+    lib = backend
+    try:
+        lib = lib or get_backend(cfg)
+    except Exception as exc:
+        raise SnowballError(f"Library was not read. Refusing to create items. {exc}") from exc
+    lookup = _library_lookup(lib, scope="library", collection=request.collection)
+    _mark_exists(rows, lookup)
+    creatable = [row for row in rows if row.status == "new" and row.keep is not False]
+    items: list[Any] = []
+    failed = 0
+    if creatable:
+        items, counts = create_new(
+            lib,
+            creatable,
+            request.collection,
+            tag_prefix=request.tag_prefix or cfg.snowball_tag_prefix,
+            note_provenance=cfg.snowball_note_provenance
+            if request.note_provenance is None
+            else request.note_provenance,
+            remarks_surface=cfg.remarks_surface,
+            console=console,
+        )
+        failed = int(counts.get("failed") or 0)
+    if mode != "off":
+        manifest = Manifest(cfg.manifest_path)
+        pending = pending_pdf_items(rows, items, manifest)
+        if pending:
+            fill_pdfs(cfg, lib, pending, console, mode=mode)
+    return PathResult(dest, 1 if failed else 0)
 
 
 def run_apply(
@@ -601,14 +665,27 @@ def run_apply(
         report["downloaded"] = downloaded
         report["attach_ok"] = int(getattr(stats, "attached", 0))
         report["attach_deferred"] = int(getattr(stats, "attach_failed", 0))
-        console.print(
-            f"downloaded {report.get('downloaded', 0)} · attached {report['attach_ok']} · "
-            f"deferred {report['attach_deferred']}"
-        )
+        _print_fetch_result(console, report, sought=len(items), collection=collection)
     else:
         console.print(f"items created (metadata only): {counts['created']}")
     write_report(dest, report)
     return PathResult(dest, 1 if counts.get("failed") else 0)
+
+
+def _print_fetch_result(
+    console: Console, report: dict[str, Any], *, sought: int, collection: str
+) -> None:
+    console.print(
+        f"downloaded {report.get('downloaded', 0)} · attached {report['attach_ok']} · "
+        f"deferred {report['attach_deferred']}"
+    )
+    advice = low_download_advice(
+        downloaded=int(report.get("attach_ok") or 0),
+        sought=sought,
+        collection=collection,
+    )
+    if advice:
+        console.print(f"[yellow]{advice}[/]")
 
 
 def _pdf_mode(request: SnowballRequest) -> str:
@@ -713,6 +790,7 @@ def _execute(
     s2_getter: Any = None,
     suggester: Any = None,
     refine_query: str = "",
+    expand_neighbors: bool = True,
 ) -> PathResult:
     if warning:
         console.print(f"[yellow]{warning}[/]")
@@ -781,6 +859,7 @@ def _execute(
                 "remaining_ids": remaining,
                 "keyed": bool(oa._using_key and oa.api_key),
                 "error": str(exc),
+                "expand_neighbors": expand_neighbors,
             }
         produced = (list(saved), []) if expect_failures else list(saved)
         if isinstance(exc, KeyboardInterrupt) and not saved:
@@ -818,7 +897,9 @@ def _execute(
         per_hop_limit=caps[1],
         direction=direction,
         tally=tally,
+        expand_neighbors=expand_neighbors,
     )
+    repair_reference_titles(rows, oa, tally=tally)
     if paused and oa.deferred is None:
         remaining = _blocked_dois(paused)
         oa.deferred = {
@@ -830,6 +911,7 @@ def _execute(
             "keyed": bool(oa._using_key and oa.api_key),
             "per_hop_limit": caps[1],
             "direction": direction,
+            "expand_neighbors": expand_neighbors,
         }
     apply_overlap(rows)
     rows = apply_filters(
@@ -948,9 +1030,8 @@ def _execute(
         report["attach_deferred"] = int(getattr(stats, "attach_failed", 0))
     write_report(dest, report)
     if mode != "off":
-        console.print(
-            f"downloaded {report.get('downloaded', 0)} · attached {report['attach_ok']} · "
-            f"deferred {report['attach_deferred']}"
+        _print_fetch_result(
+            console, report, sought=len(items), collection=request.collection
         )
     else:
         console.print(f"items created (metadata only): {counts['created']}")
@@ -1196,6 +1277,7 @@ def _fill_metadata(
     europepmc_getter: Any = None,
     europepmc_cache: Any = None,
     pdf_getter: Any = None,
+    expand_neighbors: bool = True,
 ) -> tuple[list[Candidate], dict[str, list[str]]]:
     del console, request
     if crossref_getter is None and live and "crossref" in backends:
@@ -1236,6 +1318,7 @@ def _fill_metadata(
         direction=direction,
         tally=tally,
         europepmc_cache=europepmc_cache if live and "europepmc" in backends else None,
+        expand_neighbors=expand_neighbors,
     )
     return rows, paused
 

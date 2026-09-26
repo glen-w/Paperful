@@ -14,7 +14,6 @@
 </p>
 
 <p align="center">
-  <strong>Not affiliated with paperful.io.</strong>
   Local Compose sidecar, not a document-infra service.
   Not a sync service. Not every paywalled or DOI-less item comes back.
   Zotero is the well-tested adapter. Mendeley and EndNote are seeking testers.

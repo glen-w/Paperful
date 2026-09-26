@@ -101,7 +101,7 @@ app = typer.Typer(
     help=(
         "Research helper for a reference library: clean records, find missing PDFs, "
         "summarise papers, keep an on-disk mirror. Zotero is the well-tested adapter. "
-        "Mendeley and EndNote are seeking testers. Not paperful.io. "
+        "Mendeley and EndNote are seeking testers. "
         "`paperful jobs` lists the five jobs."
     ),
 )
@@ -196,8 +196,8 @@ KeywordMinScoreOpt = typer.Option(
     help="Drop seed keywords below this similarity. 0 keeps whatever OpenAlex assigned.",
 )
 DIRECTION_HELP = (
-    "refs, cites, both, keywords, refs+keywords, cites+keywords, or refs+cites+keywords. "
-    "both stays references plus cited-by."
+    "refs, cites, both, keywords, similar, refs+keywords, cites+keywords, "
+    "refs+similar, or refs+cites+keywords. both stays references plus cited-by."
 )
 ProfileOpt = typer.Option(
     None,

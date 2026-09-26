@@ -15,6 +15,7 @@ _OA = frozenset(
         "europepmc",
         "semanticscholar",
         "core",
+        "openaire",
     }
 )
 _WEB = frozenset({"htmlpdf", "scholar", "browser_agent", "direct"})

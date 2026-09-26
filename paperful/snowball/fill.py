@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, NoReturn
 
+from ..lint import usable_work_title
 from .candidate import Candidate
 
 CrossrefGet = Callable[[str], dict[str, Any] | None]
@@ -37,8 +38,9 @@ def fill_crossref(
     per_hop_limit: int = 0,
     direction: str = "refs",
     only_dois: set[str] | None = None,
+    expand_neighbors: bool = True,
 ) -> list[Candidate]:
-    pending = _gap_rows(rows, only_dois)
+    pending = _gap_rows(rows, only_dois, expand_neighbors=expand_neighbors)
     added: list[Candidate] = []
     known = {row.identity for row in rows if row.identity}
     if tally is not None and pending:
@@ -59,9 +61,17 @@ def fill_crossref(
                 tally.advance(1)
             continue
         filled = _fill_empty(row, payload, backend="crossref") if not _complete(row) else 0
-        added.extend(
-            _neighbor_rows(row, _ref_dicts(payload), known, backend="crossref", per_hop_limit=per_hop_limit, direction=direction)
-        )
+        if expand_neighbors:
+            added.extend(
+                _neighbor_rows(
+                    row,
+                    _ref_dicts(payload),
+                    known,
+                    backend="crossref",
+                    per_hop_limit=per_hop_limit,
+                    direction=direction,
+                )
+            )
         if tally is not None:
             tally.fields += filled
             tally.advance(1)
@@ -76,12 +86,13 @@ def fill_semanticscholar(
     direction: str,
     tally: Any = None,
     only_dois: set[str] | None = None,
+    expand_neighbors: bool = True,
 ) -> list[Candidate]:
     """Fill holes and append reference neighbours for seeds that still cite nothing."""
     added: list[Candidate] = []
     known = {row.identity for row in rows if row.identity}
     want_refs = direction in {"refs", "both"}
-    pending = _gap_rows(rows, only_dois)
+    pending = _gap_rows(rows, only_dois, expand_neighbors=expand_neighbors)
     if tally is not None and pending:
         tally.stage = "semantic scholar"
         tally.track(len(pending))
@@ -114,7 +125,7 @@ def fill_semanticscholar(
         if tally is not None:
             tally.fields += filled
             tally.advance(1)
-        if not want_refs:
+        if not want_refs or not expand_neighbors:
             continue
         added.extend(
             _neighbor_rows(
@@ -206,7 +217,7 @@ def _neighbor_rows(
                 direction="refs",
                 ids={"doi": ref_doi},
                 biblio={
-                    "title": ref.get("title") or "",
+                    "title": _reference_title(ref.get("title")),
                     "year": ref.get("year"),
                     "authors": [],
                     "venue": "",
@@ -284,16 +295,21 @@ def crossref_work(doi: str, *, email: str = "") -> dict[str, Any] | None:
         "year": year,
         "venue": venues[0] if venues else "",
         "authors": authors,
-        "references": [
-            {
-                "doi": str(ref.get("DOI") or ref.get("doi") or ""),
-                "title": str(ref.get("article-title") or ref.get("unstructured") or ""),
-                "year": ref.get("year"),
-            }
-            for ref in (message.get("reference") or [])
-            if isinstance(ref, dict)
-        ],
+        "references": crossref_references(message),
     }
+
+
+def crossref_references(message: dict[str, Any]) -> list[dict[str, Any]]:
+    """DOI references from a Crossref work. Unstructured citation text is not a title."""
+    return [
+        {
+            "doi": str(ref.get("DOI") or ref.get("doi") or ""),
+            "title": _reference_title(ref.get("article-title")),
+            "year": ref.get("year"),
+        }
+        for ref in (message.get("reference") or [])
+        if isinstance(ref, dict)
+    ]
 
 
 _S2_MIN_INTERVAL_S = 1.1
@@ -373,13 +389,26 @@ def s2_api_key() -> str:
     return os.environ.get("SEMANTIC_SCHOLAR_API_KEY", "").strip()
 
 
-def _gap_rows(rows: list[Candidate], only_dois: set[str] | None) -> list[Candidate]:
+def _reference_title(value: object) -> str:
+    """Structured title only. A citation string stays blank until the work is resolved."""
+    text = str(value or "").strip()
+    return text if usable_work_title(text) else ""
+
+
+def _gap_rows(
+    rows: list[Candidate],
+    only_dois: set[str] | None,
+    *,
+    expand_neighbors: bool = True,
+) -> list[Candidate]:
     """Hop-0 works that still have no outgoing references.
 
     Neighbours and citing works are not asked. A reference added by an earlier
-    backend closes the gap for the next one.
+    backend closes the gap for the next one. When this crawl is not hopping,
+    only an incomplete hit is asked, and only so its own empty fields can be
+    filled.
     """
-    return [
+    pending = [
         row
         for row in rows
         if row.hop == 0
@@ -389,6 +418,9 @@ def _gap_rows(rows: list[Candidate], only_dois: set[str] | None) -> list[Candida
         and _wanted(row, only_dois)
         and not _has_outgoing(row, rows)
     ]
+    if expand_neighbors:
+        return pending
+    return [row for row in pending if not _complete(row)]
 
 
 def _raise_paused(added: list[Candidate], remaining: list[str], cause: BaseException) -> NoReturn:
@@ -412,10 +444,11 @@ def fill_payload_backend(
     direction: str,
     tally: Any = None,
     only_dois: set[str] | None = None,
+    expand_neighbors: bool = True,
 ) -> list[Candidate]:
     added: list[Candidate] = []
     known = {row.identity for row in rows if row.identity}
-    pending = _gap_rows(rows, only_dois)
+    pending = _gap_rows(rows, only_dois, expand_neighbors=expand_neighbors)
     if tally is not None and pending:
         tally.stage = backend
         tally.track(len(pending))
@@ -441,13 +474,17 @@ def fill_payload_backend(
             tally.advance(1)
         else:
             _fill_empty(row, payload, backend=backend)
-        new_rows = _neighbor_rows(
-            row,
-            _ref_dicts(payload),
-            known,
-            backend=backend,
-            per_hop_limit=per_hop_limit,
-            direction=direction,
+        new_rows = (
+            _neighbor_rows(
+                row,
+                _ref_dicts(payload),
+                known,
+                backend=backend,
+                per_hop_limit=per_hop_limit,
+                direction=direction,
+            )
+            if expand_neighbors
+            else []
         )
         if tally is not None and backend == "europepmc":
             tally.papers += len(new_rows)
@@ -463,6 +500,7 @@ def fill_europepmc(
     direction: str,
     tally: Any = None,
     only_dois: set[str] | None = None,
+    expand_neighbors: bool = True,
 ) -> list[Candidate]:
     """Batch Europe PMC over hop-0 works that still have no outgoing references.
 
@@ -470,7 +508,7 @@ def fill_europepmc(
     """
     from .europepmc import BATCH_SIZE, PROBE_SIZE, cached_payload, lookup_dois, spread_dois
 
-    pending = _gap_rows(rows, only_dois)
+    pending = _gap_rows(rows, only_dois, expand_neighbors=expand_neighbors)
     if tally is not None and pending:
         tally.stage = "europepmc"
         tally.track(len(pending))
@@ -486,7 +524,13 @@ def fill_europepmc(
             continue
         added.extend(
             _apply_europepmc_row(
-                row, payload, known=known, per_hop_limit=per_hop_limit, direction=direction, tally=tally
+                row,
+                payload,
+                known=known,
+                per_hop_limit=per_hop_limit,
+                direction=direction,
+                tally=tally,
+                expand_neighbors=expand_neighbors,
             )
         )
     if not uncached:
@@ -506,7 +550,13 @@ def fill_europepmc(
             continue
         added.extend(
             _apply_europepmc_row(
-                row, found.get(doi), known=known, per_hop_limit=per_hop_limit, direction=direction, tally=tally
+                row,
+                found.get(doi),
+                known=known,
+                per_hop_limit=per_hop_limit,
+                direction=direction,
+                tally=tally,
+                expand_neighbors=expand_neighbors,
             )
         )
     rest = [row for row in uncached if (row.ids.get("doi") or "").lower() not in probe_set]
@@ -533,6 +583,7 @@ def fill_europepmc(
                     per_hop_limit=per_hop_limit,
                     direction=direction,
                     tally=tally,
+                    expand_neighbors=expand_neighbors,
                 )
             )
     return added
@@ -546,6 +597,7 @@ def _apply_europepmc_row(
     per_hop_limit: int,
     direction: str,
     tally: Any,
+    expand_neighbors: bool = True,
 ) -> list[Candidate]:
     if tally is not None:
         tally.advance(1)
@@ -555,13 +607,17 @@ def _apply_europepmc_row(
         tally.fields += _fill_empty(row, payload, backend="europepmc")
     else:
         _fill_empty(row, payload, backend="europepmc")
-    new_rows = _neighbor_rows(
-        row,
-        _ref_dicts(payload),
-        known,
-        backend="europepmc",
-        per_hop_limit=per_hop_limit,
-        direction=direction,
+    new_rows = (
+        _neighbor_rows(
+            row,
+            _ref_dicts(payload),
+            known,
+            backend="europepmc",
+            per_hop_limit=per_hop_limit,
+            direction=direction,
+        )
+        if expand_neighbors
+        else []
     )
     if tally is not None:
         tally.papers += len(new_rows)
@@ -580,6 +636,7 @@ def run_fill_pass(
     direction: str,
     tally: Any = None,
     europepmc_cache: Path | None = None,
+    expand_neighbors: bool = True,
 ) -> dict[str, list[str]]:
     """Walk citation backends in order. A pause continues the pass, then one retry."""
     paused: dict[str, list[str]] = {}
@@ -599,6 +656,7 @@ def run_fill_pass(
                         direction=direction,
                         tally=tally,
                         only_dois=only,
+                        expand_neighbors=expand_neighbors,
                     )
                 except FillPaused as exc:
                     rows.extend(exc.added)
@@ -618,11 +676,23 @@ def run_fill_pass(
             try:
                 if name == "crossref":
                     added = fill_crossref(
-                        rows, getter, per_hop_limit=per_hop_limit, direction=direction, tally=tally, only_dois=only
+                        rows,
+                        getter,
+                        per_hop_limit=per_hop_limit,
+                        direction=direction,
+                        tally=tally,
+                        only_dois=only,
+                        expand_neighbors=expand_neighbors,
                     )
                 elif name == "semanticscholar":
                     added = fill_semanticscholar(
-                        rows, getter, per_hop_limit=per_hop_limit, direction=direction, tally=tally, only_dois=only
+                        rows,
+                        getter,
+                        per_hop_limit=per_hop_limit,
+                        direction=direction,
+                        tally=tally,
+                        only_dois=only,
+                        expand_neighbors=expand_neighbors,
                     )
                 else:
                     added = fill_payload_backend(
@@ -633,6 +703,7 @@ def run_fill_pass(
                         direction=direction,
                         tally=tally,
                         only_dois=only,
+                        expand_neighbors=expand_neighbors,
                     )
             except FillPaused as exc:
                 paused[exc.backend] = list(exc.remaining)

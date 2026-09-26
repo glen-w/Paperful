@@ -7,7 +7,7 @@ lists that lane, not the full `sources` list.
 | Source | Tried when |
 | --- | --- |
 | `unpaywall` | DOI and `email` are set |
-| `openalex` / `europepmc` | DOI |
+| `openalex` / `europepmc` / `openaire` | DOI |
 | `scihub` | DOI, and either undated or year ≤ 2021 (Sci-Hub largely stopped ingesting after ~2021; see [Sci-Hub](scihub.md#coverage-cutoff-2021)) |
 | `arxiv` | arXiv id, `10.48550/arxiv.…` DOI, or a scholarly item type with a long title |
 | `biorxiv` | `10.1101/…` DOI (including from a bioRxiv/medRxiv URL) |
@@ -42,12 +42,20 @@ item types are dropped from the run list entirely (e.g. `htmlpdf` on a
 `--year-from` is after Sci-Hub's ~2021 coverage, `scihub` is dropped from the
 run list even if you opted in.
 
-Independently, a **circuit breaker** skips a source for the rest of the run
-after `circuit_breaker_threshold` (default 3) CAPTCHA or block-like errors
-(`blocked`, `captcha`, `429`, `rate limit`, `sorry`). A Scholar CAPTCHA is a
-miss for that source; the item continues through the rest of its lane. Only
-an unsolved Sci-Hub robot check records the item as `captcha`. `--try-all`
-does not disable the breaker.
+Independently, a **circuit breaker** pauses a source after `circuit_breaker_threshold`
+(default 3) CAPTCHA or block-like errors (`blocked`, `captcha`, `sorry`). A 429
+does not open it; the HTTP client already waits on `Retry-After`. After the
+pause (25 items) one later item is tried. A clean result closes the circuit;
+another block pauses it again. A Scholar CAPTCHA is a miss for that source;
+the item continues through the rest of its lane. Only an unsolved Sci-Hub
+robot check records the item as `captcha`. `--try-all` does not disable the
+breaker.
+
+Items every applicable source misses are `not_found` with reason `closed`
+(skipped next run unless `--retry-failed`). Items that missed a lane because
+the circuit was paused, or because the EZProxy session expired, are
+`retryable` and are picked up on the next `run` without that flag. An expired
+campus session stops further EZProxy calls for the rest of that run.
 
 ## HTML→PDF (web, news, blogs)
 

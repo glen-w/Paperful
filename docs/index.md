@@ -2,7 +2,7 @@
 
 New here? The landing page is
 [paperful.app](https://paperful.app/). This guide
-is the reference. **Not affiliated with paperful.io.**
+is the reference.
 
 Paperful cleans a reference library, finds missing PDFs, and summarises
 papers, then keeps an on-disk mirror you can back up and move. It is not a

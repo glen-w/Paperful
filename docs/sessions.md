@@ -51,6 +51,8 @@ profile is stuck, remove `state/sessions/chromium/` and log in again.
 Do **not** probe Scholar in a tight loop.
 
 When Scholar is blocked mid-run you will see `scholar blocked/captcha`. After
-`circuit_breaker_threshold` (default 3) it is skipped for the rest of that
-run. Items left `captcha` / `error` are retried on the next run; `not_found`
-needs `--retry-failed`.
+`circuit_breaker_threshold` (default 3) it pauses, then one later item is
+tried again. A 429 does not pause it. Items left `captcha` / `error` /
+`retryable` are retried on the next run; `not_found` (reason `closed`) needs
+`--retry-failed`. An expired EZProxy session stops the proxy lane for the
+rest of that run.

@@ -14,6 +14,7 @@ from paperful.sources import (
     core,
     direct,
     europepmc,
+    openaire,
     openalex,
     scihub,
     semanticscholar,
@@ -46,6 +47,7 @@ def test_registry_has_every_planned_source_and_scihub_is_opt_in():
         "europepmc",
         "semanticscholar",
         "core",
+        "openaire",
         "scholar",
         "direct",
         "ezproxy",
@@ -56,6 +58,7 @@ def test_registry_has_every_planned_source_and_scihub_is_opt_in():
     assert "scholar" not in DEFAULT_SOURCES
     assert DEFAULT_SOURCES[-1] == "htmlpdf"
     assert DEFAULT_SOURCES.index("core") == DEFAULT_SOURCES.index("semanticscholar") + 1
+    assert DEFAULT_SOURCES.index("openaire") == DEFAULT_SOURCES.index("core") + 1
     assert DEFAULT_SOURCES.index("ezproxy") < DEFAULT_SOURCES.index("htmlpdf")
     assert DEFAULT_SOURCES.index("biorxiv") < DEFAULT_SOURCES.index("semanticscholar")
     assert DEFAULT_SOURCES.index("europepmc") < DEFAULT_SOURCES.index("semanticscholar")
@@ -425,6 +428,8 @@ def test_europepmc_prefers_europe_pmc_oa_pdf(ctx_factory):
     assert cand.urls == [
         "https://europepmc.org/articles/PMC1817752?pdf=render",
         "https://pub.test/copy.pdf",
+        "https://europepmc.org/backend/ptpmcrender.fcgi?accid=PMC1817752&blobtype=pdf",
+        "https://europepmc.org/pub/databases/pmc/pdf/OA/18177/52/PMC1817752.zip",
     ]
     assert cand.note == "PMC1817752"
 
@@ -455,6 +460,50 @@ def test_europepmc_skips_without_doi_and_misses_empty(ctx_factory):
         ).outcome
         is Outcome.NOT_FOUND
     )
+
+
+def test_europepmc_pmc_id_without_pdf_list_still_has_render_url(ctx_factory):
+    cand = europepmc.find(
+        make_item(),
+        ctx_factory(
+            lambda r: _json(
+                {"resultList": {"result": [{"pmcid": "PMC1817752", "fullTextUrlList": {}}]}}
+            )
+        ),
+    )
+    assert cand.outcome is Outcome.FOUND
+    assert cand.urls[0] == "https://europepmc.org/articles/PMC1817752?pdf=render"
+
+
+def test_openaire_keeps_open_repository_pdfs(ctx_factory):
+    def handler(req):
+        assert req.url.params["pid"] == "10.1000/test.doi"
+        return _json(
+            {
+                "results": [
+                    {
+                        "instances": [
+                            {
+                                "accessRight": {"code": "CLOSED"},
+                                "urls": ["https://publisher.test/closed.pdf"],
+                            },
+                            {
+                                "accessRight": {"code": "OPEN"},
+                                "urls": [
+                                    "https://zenodo.org/records/1",
+                                    "https://zenodo.org/records/1/files/paper.pdf",
+                                ],
+                            },
+                        ]
+                    }
+                ]
+            }
+        )
+
+    cand = openaire.find(make_item(), ctx_factory(handler))
+    assert cand.urls[0] == "https://zenodo.org/records/1/files/paper.pdf"
+    assert "https://publisher.test/closed.pdf" not in cand.urls
+    assert openaire.find(make_item(doi=None), ctx_factory(handler)).outcome is Outcome.SKIPPED
 
 
 # ---- direct ------------------------------------------------------------------

@@ -212,8 +212,17 @@ class OpenAlexClient:
             self._http_client = httpx.Client(timeout=60.0, follow_redirects=True)
         return self._http_client
 
-    def _collect(self, path: str, params: dict[str, Any], limit: int) -> list[dict[str, Any]]:
+    def _collect(
+        self,
+        path: str,
+        params: dict[str, Any],
+        limit: int,
+        *,
+        use_cursor: bool = False,
+    ) -> list[dict[str, Any]]:
         """Page while OpenAlex reports more hits. ``limit <= 0`` keeps every page (up to 50)."""
+        if use_cursor:
+            return self._collect_cursor(path, params, limit)
         uncapped = limit <= 0
         out: list[dict[str, Any]] = []
         page = 1
@@ -238,6 +247,32 @@ class OpenAlexClient:
             page += 1
         return out if uncapped else out[:limit]
 
+    def _collect_cursor(self, path: str, params: dict[str, Any], limit: int) -> list[dict[str, Any]]:
+        """Cursor pages. Used when a search asks for more than 50 pages."""
+        uncapped = limit <= 0
+        out: list[dict[str, Any]] = []
+        cursor = "*"
+        seen: set[str] = set()
+        while cursor and cursor not in seen and (uncapped or len(out) < limit):
+            seen.add(cursor)
+            room = 100 if uncapped else limit - len(out)
+            query = dict(params)
+            query.pop("page", None)
+            query["per_page"] = max(1, min(100, room))
+            query["cursor"] = cursor
+            payload = self.get(path, query)
+            batch = list(payload.get("results") or [])
+            if not batch:
+                break
+            out.extend(batch)
+            meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else None
+            nxt = str((meta or {}).get("next_cursor") or "")
+            count = int((meta or {}).get("count") or 0)
+            if not nxt or (count and len(out) >= count):
+                break
+            cursor = nxt
+        return out if uncapped else out[:limit]
+
     def search(
         self,
         query: str,
@@ -258,7 +293,8 @@ class OpenAlexClient:
         params: dict[str, Any] = {"search": query, "select": SELECT}
         if filters:
             params["filter"] = ",".join(filters)
-        return self._collect("/works", params, limit)
+        use_cursor = limit <= 0 or limit > 5000
+        return self._collect("/works", params, limit, use_cursor=use_cursor)
 
     def work_by_doi(self, doi: str) -> dict[str, Any] | None:
         payload = self.get(f"/works/https://doi.org/{doi}", {"select": SELECT})
@@ -266,26 +302,44 @@ class OpenAlexClient:
             return payload
         return None
 
-    def works_by_dois(self, dois: list[str]) -> list[dict[str, Any]]:
-        """Works for these DOIs. Select is id, doi, and referenced_works only."""
+    def works_by_dois(
+        self, dois: list[str], *, select: str = "id,doi,referenced_works"
+    ) -> list[dict[str, Any]]:
+        """Works for these DOIs. The default select is id, doi, and referenced_works."""
         out: list[dict[str, Any]] = []
         ids = [doi for doi in dois if doi]
         for start in range(0, len(ids), 50):
             batch = ids[start : start + 50]
             try:
-                payload = self.get(
-                    "/works",
-                    {
-                        "filter": "doi:" + "|".join(batch),
-                        "per_page": len(batch),
-                        "select": "id,doi,referenced_works",
-                    },
-                )
+                out.extend(self._doi_batch(batch, select=select))
             except OpenAlexBudgetExceeded as exc:
                 exc.partial = out + list(exc.partial or [])
                 raise
-            out.extend(payload.get("results") or [])
         return out
+
+    def _doi_batch(self, batch: list[str], *, select: str) -> list[dict[str, Any]]:
+        """One DOI filter. A 400 is one bad id: split the batch and skip that id."""
+        if not batch:
+            return []
+        try:
+            payload = self.get(
+                "/works",
+                {
+                    "filter": "doi:" + "|".join(batch),
+                    "per_page": len(batch),
+                    "select": select,
+                },
+            )
+        except OpenAlexBudgetExceeded:
+            raise
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != 400:
+                raise
+            if len(batch) == 1:
+                return []
+            mid = len(batch) // 2
+            return self._doi_batch(batch[:mid], select=select) + self._doi_batch(batch[mid:], select=select)
+        return list(payload.get("results") or [])
 
     def works_by_ids(self, openalex_ids: list[str]) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []

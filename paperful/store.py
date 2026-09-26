@@ -33,12 +33,14 @@ STATUS_NOT_FOUND = "not_found"  # every source said no
 STATUS_NO_IDENTIFIER = "no_identifier"  # nothing to search with (no DOI/arXiv/URL)
 STATUS_CAPTCHA = "captcha"  # Sci-Hub robot check could not be passed
 STATUS_ERROR = "error"  # transient / unexpected failure, retried on next run
+STATUS_RETRYABLE = "retryable"  # a lane was paused; next run tries again
 STATUS_ATTACH_FAILED = "attach_failed"  # PDF ok, Zotero write failed
 # Saved under --strict-pdf-doi. `paperful attach` skips these unless opted in.
 REASON_STRICT_PDF_DOI = "strict_pdf_doi"
+REASON_CLOSED = "closed"  # every applicable source said not_found
 TERMINAL_SKIP = {STATUS_OK, STATUS_ATTACHED}
 FAILED = {STATUS_NOT_FOUND, STATUS_NO_IDENTIFIER}
-RETRY_ALWAYS = {STATUS_ERROR, STATUS_CAPTCHA, STATUS_ATTACH_FAILED}
+RETRY_ALWAYS = {STATUS_ERROR, STATUS_CAPTCHA, STATUS_ATTACH_FAILED, STATUS_RETRYABLE}
 
 _MAX_TITLE = 90
 _MAX_NAME = 180

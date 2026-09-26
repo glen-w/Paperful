@@ -122,6 +122,27 @@ def test_propose_overwrite_replaces_title_date_venue(cfg, monkeypatch):
     assert patch.after["title"] == "Cleaner Title From Crossref About Marine Governance"
 
 
+def test_propose_replaces_blank_and_citation_titles_without_overwrite(cfg):
+    work_title = "Hand function and tool behavior in early hominids"
+    blank = make_item(doi="10.9/ok", title="", url=None, publication_title=None, date=None)
+    client = mock_client(
+        _work_handler("10.9/ok", work_title, venue="Journal of Human Evolution", year=1998)
+    )
+    findings = lint_item(client, cfg, blank)
+    assert any(finding.code == "title_unusable" for finding in findings)
+    patch = propose_patch(client, cfg, blank, findings, prepared=True)
+    assert patch is not None
+    assert patch.after["title"] == work_title
+
+    cite = '[1] R.L. Susman: "Hand function and tool behavior in early hominids," J. Hum. Evol.'
+    cited = make_item(doi="10.9/ok", title=cite, url=None, publication_title="V", date="1998")
+    findings = lint_item(client, cfg, cited)
+    assert any(finding.code == "title_unusable" for finding in findings)
+    patch = propose_patch(client, cfg, cited, findings, prepared=True)
+    assert patch is not None
+    assert patch.after["title"] == work_title
+
+
 def test_propose_no_title_without_overwrite(cfg):
     title = "A sufficiently long test title about marine governance"
     item = make_item(

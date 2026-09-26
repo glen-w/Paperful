@@ -13,6 +13,7 @@ from ..pipeline import Pipeline, RunStats
 from ..remarks import linked_sentence, say
 from ..routing import with_recover_lane
 from ..store import Manifest
+from ..lint import usable_work_title
 from ..zot import Item
 from .candidate import Candidate
 
@@ -84,9 +85,18 @@ def create_new(
         biblio = row.biblio
         year = biblio.get("year")
         authors = list(biblio.get("authors") or [])
+        title = str(biblio.get("title") or "")
+        if not usable_work_title(title):
+            failed += 1
+            row.status = "error"
+            if "(title)" not in (row.why or ""):
+                row.why = f"{row.why} (title)".strip()
+            if tally is not None:
+                tally.advance(1)
+            continue
         record = {
             "item_type": _item_type(str(biblio.get("type") or "")),
-            "title": biblio.get("title") or "",
+            "title": title,
             "creators": _creators(authors),
             "date": str(year) if year else "",
             "doi": row.ids.get("doi") or "",
@@ -148,6 +158,41 @@ def create_new(
             )
         )
     return created_items, {"created": created, "skipped_exists": skipped_exists, "failed": failed}
+
+
+def pending_pdf_items(rows: list[Any], created: list[Item], manifest: Any) -> list[Item]:
+    """Created items plus library rows that still need a PDF. Successes stay put."""
+    pending: list[Item] = []
+    seen: set[str] = set()
+    for item in created:
+        if item.key in seen:
+            continue
+        if manifest.should_process(item.key, False):
+            pending.append(item)
+            seen.add(item.key)
+    for row in rows:
+        match = getattr(row, "exists_match", None) or {}
+        key = str(match.get("item_key") or "")
+        if not key or key in seen or not manifest.should_process(key, False):
+            continue
+        biblio = getattr(row, "biblio", None) or {}
+        authors = list(biblio.get("authors") or [])
+        year = biblio.get("year")
+        pending.append(
+            Item(
+                key=key,
+                item_type="journalArticle",
+                title=str(biblio.get("title") or ""),
+                doi=(getattr(row, "ids", None) or {}).get("doi") or None,
+                arxiv_id=None,
+                url=biblio.get("oa_url") or None,
+                year=int(year) if isinstance(year, int) else None,
+                first_author=authors[0].split()[-1] if authors else None,
+                collection_paths=[],
+            )
+        )
+        seen.add(key)
+    return pending
 
 
 def fill_pdfs(

@@ -39,6 +39,7 @@ _LABELS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "403 forbidden",
             "http 403",
             "content not available",
+            "problem providing the content",
         ),
     ),
     (

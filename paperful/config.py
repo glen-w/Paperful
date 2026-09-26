@@ -33,6 +33,7 @@ DEFAULT_SOURCES = [
     "europepmc",
     "semanticscholar",
     "core",
+    "openaire",
     "direct",
     "ezproxy",
     "htmlpdf",
@@ -47,6 +48,7 @@ EOI_SOURCES = [
     "europepmc",
     "semanticscholar",
     "core",
+    "openaire",
     "direct",
     "ezproxy",
     "htmlpdf",
@@ -103,7 +105,7 @@ class Config:
         True  # skip sources that look inapplicable from item metadata
     )
     circuit_breaker_threshold: int = (
-        3  # block-like failures before skipping a source for the run
+        3  # captcha/block failures before a source pauses, then one probe
     )
     user_agent: str = USER_AGENT
     # Campus EZProxy (e.g. Sciences Po). Empty base disables the source.

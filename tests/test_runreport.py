@@ -19,6 +19,7 @@ from paperful.runreport import (
     build_report,
     classify_enrichment,
     error_type_for,
+    low_download_advice,
     outcome_banner,
     print_run_summary,
     write_run_report,
@@ -207,7 +208,126 @@ def test_browser_miss_rollup(cfg):
     ]
     report = build_report(stats, cfg)
     assert report["summary"]["browser_misses"] == {"paywall": 2}
+    assert report["summary"]["not_downloaded"] == {"paywall": 2}
     assert report["summary"]["agent_after_playwright"] == 1
+
+
+def test_not_downloaded_rollup_prefers_the_block(cfg):
+    stats = pl.RunStats()
+    stats.items = [
+        ItemOutcome(
+            itemKey="CF",
+            title="t",
+            status="not_found",
+            reason="closed",
+            attempts=[
+                "unpaywall:not_found",
+                "browser_agent:not_found(cloudflare @wiley.com; security verification; steps 3/8)",
+            ],
+        ),
+        ItemOutcome(
+            itemKey="CAP",
+            title="t",
+            status="captcha",
+            reason="captcha unsolved",
+            attempts=["scihub:captcha(captcha unsolved)"],
+        ),
+        ItemOutcome(
+            itemKey="MISS",
+            title="t",
+            status="not_found",
+            reason="closed",
+            attempts=["unpaywall:not_found", "openalex:not_found"],
+        ),
+        ItemOutcome(
+            itemKey="SAVED",
+            title="t",
+            status="attached",
+            attempts=["browser_agent:not_found(cloudflare @springer.com)"],
+        ),
+        ItemOutcome(
+            itemKey="EXP",
+            title="t",
+            status="retryable",
+            reason="session expired",
+            attempts=["ezproxy:skipped(session expired)"],
+        ),
+        ItemOutcome(
+            itemKey="DL",
+            title="t",
+            status="error",
+            reason="only transient failures",
+            attempts=["unpaywall:download-failed(timeout)"],
+        ),
+        ItemOutcome(
+            itemKey="NONE",
+            title="t",
+            status="no_identifier",
+            reason="no DOI, arXiv id or URL",
+            attempts=[],
+        ),
+    ]
+    report = build_report(stats, cfg)
+    assert report["summary"]["not_downloaded"] == {
+        "cloudflare": 1,
+        "captcha": 1,
+        "not_found": 1,
+        "session_expired": 1,
+        "download_failed": 1,
+        "no_identifier": 1,
+    }
+    buf = io.StringIO()
+    print_run_summary(Console(file=buf, force_terminal=False, width=120), report)
+    flat = " ".join(buf.getvalue().split())
+    assert "Not downloaded" in flat
+    assert "not found 1" in flat
+    assert "cloudflare 1" in flat
+    assert "captcha 1" in flat
+    assert "session expired 1" in flat
+    assert "download failed 1" in flat
+    assert "no identifier 1" in flat
+    assert "session login ezproxy" in flat
+
+
+def test_paywall_prices_sum_unsaved_articles(cfg):
+    stats = pl.RunStats()
+    stats.items = [
+        ItemOutcome(
+            itemKey="A",
+            title="t",
+            status="not_found",
+            attempts=["browser_agent:not_found(paywall @springer.com; price 39.95 EUR)"],
+        ),
+        ItemOutcome(
+            itemKey="B",
+            title="t",
+            status="not_found",
+            attempts=["browser_agent:not_found(paywall @wiley.com; price 39.95 EUR)"],
+        ),
+        ItemOutcome(
+            itemKey="C",
+            title="t",
+            status="not_found",
+            attempts=["browser_agent:not_found(paywall @elsevier.com; price 29.95 USD)"],
+        ),
+        ItemOutcome(
+            itemKey="D",
+            title="t",
+            status="attached",
+            attempts=["browser_agent:not_found(paywall @springer.com; price 39.95 EUR)"],
+        ),
+    ]
+    report = build_report(stats, cfg)
+    assert report["summary"]["paywall_prices"] == {
+        "EUR": {"articles": 2, "total": "79.90"},
+        "USD": {"articles": 1, "total": "29.95"},
+    }
+    buf = io.StringIO()
+    print_run_summary(Console(file=buf, force_terminal=False, width=120), report)
+    flat = " ".join(buf.getvalue().split())
+    assert "To buy" in flat
+    assert "€79.90 for 2 articles" in flat
+    assert "$29.95 for 1 article" in flat
 
 
 def test_print_run_summary_renders(cfg):
@@ -229,8 +349,25 @@ def test_print_run_summary_renders(cfg):
     assert "Sources checked" in out
     assert "Errors" in out
     assert "Run report:" in out
+    assert "Few PDFs" not in out
     flat = " ".join(out.split())
     assert "Quota:" in flat and "paperful attach" in flat
+
+
+def test_low_download_advice_names_the_retry(cfg):
+    assert low_download_advice(downloaded=7, sought=8) is None
+    assert low_download_advice(downloaded=2, sought=7) is None
+    note = low_download_advice(downloaded=108, sought=981, collection="Inbox/Basketball")
+    assert note is not None
+    assert "session login ezproxy" in note
+    assert "session login scholar" in note
+    assert 'paperful run -C "Inbox/Basketball" --retry-failed' in note
+    assert "after 2021" in note
+    stats = pl.RunStats(ok=108, attached=108, not_found=870)
+    report = build_report(stats, cfg, command="run", scope="Inbox/Basketball")
+    buf = io.StringIO()
+    print_run_summary(Console(file=buf, force_terminal=False, width=120), report)
+    assert 'paperful run -C "Inbox/Basketball" --retry-failed' in buf.getvalue()
 
 
 def test_write_run_report_skips_pack_when_none_open(cfg):

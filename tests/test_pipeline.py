@@ -18,6 +18,8 @@ from paperful.store import (
     STATUS_ERROR,
     STATUS_NO_IDENTIFIER,
     STATUS_NOT_FOUND,
+    STATUS_RETRYABLE,
+    REASON_CLOSED,
     REASON_STRICT_PDF_DOI,
     STATUS_OK,
     Manifest,
@@ -169,6 +171,7 @@ def test_miss_classification(pipe_factory):
     pipe2, manifest2 = pipe_factory({"oa": nf_src}, ["oa"])
     pipe2.run([make_item(key="NF")])
     assert manifest2.get("NF").status == STATUS_NOT_FOUND
+    assert manifest2.get("NF").reason == "closed"
 
 
 def test_circuit_breaker_skips_source_after_repeated_blocks(pipe_factory, cfg):
@@ -182,6 +185,110 @@ def test_circuit_breaker_skips_source_after_repeated_blocks(pipe_factory, cfg):
     assert blocked.calls == ["I0", "I1", "I2"]
     assert "blocked:skipped(circuit open)" in manifest.get("I3").attempts
     assert "blocked:skipped(circuit open)" in manifest.get("I4").attempts
+    assert manifest.get("I3").status == STATUS_RETRYABLE
+    assert manifest.get("I4").reason == "source paused"
+
+
+def test_paused_source_does_not_retry_an_inapplicable_item(pipe_factory):
+    sh = StubSource("scihub", default=Outcome.CAPTCHA)
+    pipe, manifest = pipe_factory({"scihub": sh}, ["scihub"])
+    pipe.run(
+        [
+            make_item(key="S0"),
+            make_item(key="S1"),
+            make_item(key="S2"),
+            make_item(key="NEW", year=2024),
+        ]
+    )
+    assert manifest.get("NEW").status == STATUS_NOT_FOUND
+    assert manifest.get("NEW").reason == REASON_CLOSED
+    assert "scihub:skipped(circuit open)" not in manifest.get("NEW").attempts
+    assert set(sh.calls) == {"S0", "S1", "S2"}
+
+
+def test_rate_limit_does_not_open_the_circuit(pipe_factory):
+    limited = StubSource("oa", default=Outcome.ERROR)
+    limited.find = lambda item, ctx, _src=limited: (
+        _src.calls.append(item.key) or Candidate.miss("oa", Outcome.ERROR, "HTTP 429")
+    )
+    pipe, manifest = pipe_factory({"oa": limited}, ["oa"])
+    pipe.cfg.concurrency_oa = 1
+    pipe.run([make_item(key=f"I{i}") for i in range(4)])
+    assert limited.calls == ["I0", "I1", "I2", "I3"]
+    assert "oa:skipped(circuit open)" not in manifest.get("I3").attempts
+
+
+def test_browser_agent_bot_wall_skips_the_rest_of_the_run(pipe_factory):
+    agent = StubSource(
+        "browser_agent",
+        {"A": Candidate.miss("browser_agent", Outcome.CAPTCHA, "cloudflare")},
+    )
+    scihub = StubSource("scihub", default=Outcome.NOT_FOUND)
+    pipe, manifest = pipe_factory(
+        {"browser_agent": agent, "scihub": scihub},
+        ["browser_agent", "scihub"],
+    )
+    pipe.try_all = True
+    pipe.run([make_item(key="A"), make_item(key="B")])
+    assert agent.calls == ["A"]
+    assert scihub.calls == ["A", "B"]
+    assert manifest.get("A").status == STATUS_CAPTCHA
+    assert "browser_agent:skipped(bot wall)" in manifest.get("B").attempts
+    assert manifest.get("B").status == STATUS_RETRYABLE
+    assert manifest.get("B").reason == "bot wall"
+
+
+def test_ezproxy_expiry_marks_the_rest_retryable(pipe_factory):
+    from paperful.store import STATUS_RETRYABLE
+
+    ez = StubSource(
+        "ezproxy",
+        {"A": Candidate.miss("ezproxy", Outcome.ERROR, "ezproxy session expired - re-login")},
+    )
+    pipe, manifest = pipe_factory({"ezproxy": ez}, ["ezproxy"])
+    pipe.try_all = True
+    pipe.run([make_item(key="A"), make_item(key="B"), make_item(key="C")])
+    assert ez.calls == ["A"]
+    assert manifest.get("A").status == STATUS_RETRYABLE
+    assert manifest.get("B").status == STATUS_RETRYABLE
+    assert "ezproxy:skipped(session expired)" in manifest.get("C").attempts
+    assert ez.calls == ["A"]
+
+
+def test_urls_to_fetch_prefers_direct_pdfs():
+    urls = [f"https://pub.test/land/{i}" for i in range(8)]
+    urls += [f"https://pub.test/file{i}.pdf" for i in range(8)]
+    picked = pl.urls_to_fetch(urls)
+    assert picked[:8] == [f"https://pub.test/file{i}.pdf" for i in range(8)]
+    assert len([u for u in picked if "/land/" in u]) == 6
+
+
+def test_preprint_oa_retry_keeps_the_library_doi(pipe_factory, monkeypatch):
+    from types import SimpleNamespace
+
+    seen: list[str | None] = []
+
+    def find(item, ctx):
+        seen.append(item.doi)
+        if item.doi == "10.1038/published":
+            return Candidate(url="https://repo.test/v.pdf", source="oa")
+        return Candidate.miss("oa", Outcome.NOT_FOUND)
+
+    src = StubSource("oa")
+    src.find = find
+    pipe, manifest = pipe_factory({"oa": src}, ["oa"])
+    pipe.try_all = True
+    monkeypatch.setattr(
+        pl,
+        "version_link",
+        lambda *a, **k: SimpleNamespace(published_doi="10.1038/published"),
+    )
+    pipe.run([make_item(key="P", doi="10.1101/2020.01.01.123456")])
+    rec = manifest.get("P")
+    assert rec.status == STATUS_OK
+    assert rec.doi == "10.1101/2020.01.01.123456"
+    assert "version:10.1038/published" in rec.attempts
+    assert seen == ["10.1101/2020.01.01.123456", "10.1038/published"]
 
 
 def test_source_routing_skips_inapplicable_sources(pipe_factory, cfg):

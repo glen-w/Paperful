@@ -27,7 +27,14 @@ from .download import Download, DownloadError, fetch_pdf, looks_like_pdf
 from .pdfid import doi_from_pdf
 from .pipeline_attach import attach_after_remap
 from .pipeline_browser import release_browser_for_agent, skip_recover_without_lane_failure
-from .resolve import IdentifierCache, prepare_identifiers
+from .playbooks import looks_like_pdf_url
+from .resolve import (
+    IdentifierCache,
+    is_preprint_doi,
+    normalize_doi,
+    prepare_identifiers,
+    version_link,
+)
 from .routing import (
     is_publisher_url,
     prior_playwright_miss,
@@ -51,6 +58,8 @@ from .store import (
     STATUS_ERROR,
     STATUS_NO_IDENTIFIER,
     STATUS_NOT_FOUND,
+    STATUS_RETRYABLE,
+    REASON_CLOSED,
     REASON_STRICT_PDF_DOI,
     STATUS_OK,
     Manifest,
@@ -64,6 +73,28 @@ from .zot import Item
 
 # Sources that share a browser/session or are heavy — keep serial & polite.
 _SERIAL_SOURCES = frozenset({"scihub", "ezproxy", "htmlpdf", "scholar", "browser_agent"})
+_DIRECT_PDF_CAP = 12
+_LANDING_CAP = 6
+
+
+def urls_to_fetch(urls: list[str]) -> list[str]:
+    """Prefer direct PDF URLs and allow more of them than landing pages."""
+    direct: list[str] = []
+    landing: list[str] = []
+    for url in urls:
+        if not url:
+            continue
+        bucket = direct if _direct_pdf_url(url) else landing
+        if url not in direct and url not in landing:
+            bucket.append(url)
+    return direct[:_DIRECT_PDF_CAP] + landing[:_LANDING_CAP]
+
+
+def _direct_pdf_url(url: str) -> bool:
+    low = url.lower()
+    if looks_like_pdf_url(url) or "pdf=render" in low or "blobtype=pdf" in low:
+        return True
+    return low.split("?")[0].endswith(".pdf")
 
 
 def _attach_operator_line(code: str) -> str:
@@ -100,6 +131,7 @@ class RunStats:
     no_identifier: int = 0
     captcha: int = 0
     error: int = 0
+    retryable: int = 0
     attached: int = 0
     attach_failed: int = 0
     skipped_manifest: int = 0
@@ -122,6 +154,7 @@ class RunStats:
             "no_identifier",
             "captcha",
             "error",
+            "retryable",
             "attached",
             "attach_failed",
         }:
@@ -143,6 +176,15 @@ class RunStats:
     def add_item(self, outcome: ItemOutcome) -> None:
         self.items.append(outcome)
         self.note_error(outcome.error_type)
+
+
+def _lane_paused(attempts: list[str]) -> bool:
+    return any(
+        "skipped(circuit open)" in a
+        or "session expired" in a
+        or "skipped(bot wall)" in a
+        for a in attempts
+    )
 
 
 class Pipeline:
@@ -172,6 +214,8 @@ class Pipeline:
         self.stats = RunStats()
         self.stats.sources_configured = list(self.sources)
         self._circuit = CircuitBreaker(cfg.circuit_breaker_threshold)
+        self._ezproxy_down = False
+        self._browser_agent_down = False
         self._attach_lock = threading.Lock()
         self._print_lock = threading.Lock()
         self._stats_lock = threading.Lock()
@@ -319,6 +363,9 @@ class Pipeline:
             ):
                 self.progress()
                 return None
+        if self._retry_published_oa(item, oa_sources, attempts, blocked_hosts):
+            self.progress()
+            return None
         return attempts
 
     # ---- phase 2: campus EZProxy, serial ------------------------------------
@@ -327,6 +374,10 @@ class Pipeline:
     ) -> list[tuple[Item, list[str]]]:
         """Try a serial source; return items that still need Sci-Hub / finish_miss."""
         self._emit(f"[bold]-- {name}[/] ({len(queue)} remaining)")
+        if name == "ezproxy" and self._ezproxy_down:
+            return self._skip_ezproxy(queue)
+        if name == "browser_agent" and self._browser_agent_down:
+            return self._skip_browser_agent(queue)
         still: list[tuple[Item, list[str]]] = []
         lo, hi = self.cfg.delay_scihub_s
         first = True
@@ -360,14 +411,107 @@ class Pipeline:
                 self.progress()
                 continue
             if cand.outcome is Outcome.ERROR and "session expired" in (cand.note or ""):
-                self._emit(
-                    "[yellow]ezproxy session expired; skipping remaining proxy attempts this batch[/]"
-                )
+                self._mark_ezproxy_down()
                 still.append((item, attempts))
-                still.extend(queue[idx + 1 :])
+                still.extend(self._skip_ezproxy(queue[idx + 1 :]))
+                return still
+            if name == "browser_agent" and cand.outcome is Outcome.CAPTCHA:
+                self._mark_browser_agent_down()
+                still.append((item, attempts))
+                still.extend(self._skip_browser_agent(queue[idx + 1 :]))
                 return still
             still.append((item, attempts))
         return still
+
+    def _mark_browser_agent_down(self) -> None:
+        if self._browser_agent_down:
+            return
+        self._browser_agent_down = True
+        self._emit(
+            "[yellow]browser_agent hit a bot wall; skipping it for the rest of this run.[/]"
+        )
+
+    def _skip_browser_agent(
+        self, queue: list[tuple[Item, list[str]]]
+    ) -> list[tuple[Item, list[str]]]:
+        still: list[tuple[Item, list[str]]] = []
+        for item, attempts in queue:
+            attempts.append("browser_agent:skipped(bot wall)")
+            with self._stats_lock:
+                self.stats.note_source("browser_agent", "skipped")
+            self._log_item(item, "browser_agent: [dim]skipped[/] (bot wall)")
+            still.append((item, attempts))
+        return still
+
+    def _mark_ezproxy_down(self) -> None:
+        if self._ezproxy_down:
+            return
+        self._ezproxy_down = True
+        self._emit(
+            "[yellow]ezproxy session expired. Re-login with `paperful session login`, "
+            "then `paperful run` on this collection.[/]"
+        )
+
+    def _skip_ezproxy(
+        self, queue: list[tuple[Item, list[str]]]
+    ) -> list[tuple[Item, list[str]]]:
+        still: list[tuple[Item, list[str]]] = []
+        for item, attempts in queue:
+            attempts.append("ezproxy:skipped(session expired)")
+            with self._stats_lock:
+                self.stats.note_source("ezproxy", "skipped")
+            self._log_item(item, "ezproxy: [dim]skipped[/] (session expired)")
+            still.append((item, attempts))
+        return still
+
+    def _retry_published_oa(
+        self,
+        item: Item,
+        oa_sources: list[str],
+        attempts: list[str],
+        blocked_hosts: set[str],
+    ) -> bool:
+        """Try OA lanes once on the published DOI. The library DOI is left as it was."""
+        query = item.doi or ""
+        if item.arxiv_id and not is_preprint_doi(query):
+            query = f"10.48550/arxiv.{item.arxiv_id}"
+        if not is_preprint_doi(query):
+            return False
+        try:
+            link = version_link(self.client, query, self.cfg.email, self._id_cache)
+        except Exception:
+            return False
+        published = normalize_doi(getattr(link, "published_doi", None) if link else None)
+        if not published or published == normalize_doi(item.doi):
+            return False
+        attempts.append(f"version:{published}")
+        saved = item.doi
+        item.doi = published
+        try:
+            lanes = self._lanes_for(item)
+            for name in oa_sources:
+                if self._stop.is_set():
+                    return False
+                if self._skip_source(item, name, lanes, attempts):
+                    continue
+                cand = REGISTRY[name].find(item, self.ctx)
+                attempts.append(
+                    f"{name}:{cand.outcome.value}"
+                    + (f"({cand.note})" if cand.note else "")
+                )
+                with self._stats_lock:
+                    self.stats.note_source(name, cand.outcome.value)
+                self._log_source_result(item, name, cand)
+                self._maybe_trip_circuit(name, cand)
+                if cand.outcome is not Outcome.FOUND:
+                    continue
+                item.doi = saved
+                if self._try_download(item, cand, attempts, blocked_hosts):
+                    return True
+                item.doi = published
+        finally:
+            item.doi = saved
+        return False
 
     # ---- phase 3: Sci-Hub, serial --------------------------------------------
     def _phase_scihub(
@@ -415,25 +559,34 @@ class Pipeline:
         return still
 
     # ---- helpers ----------------------------------------------------------------
-    def _lanes_for(self, item: Item) -> list[str]:
+    def _applicable(self, item: Item) -> list[str]:
         configured = [s for s in self.sources if s in REGISTRY]
         if self.try_all:
-            routed = configured
-        else:
-            routed = sources_for_item(item, self.cfg, configured)
-        return [s for s in routed if not self._circuit.tripped(s)]
+            return configured
+        return sources_for_item(item, self.cfg, configured)
+
+    def _lanes_for(self, item: Item) -> list[str]:
+        return [s for s in self._applicable(item) if not self._circuit.tripped(s)]
 
     def _skip_source(
         self, item: Item, name: str, lanes: list[str], attempts: list[str]
     ) -> bool:
+        applicable = name in self._applicable(item)
+        if name == "ezproxy" and self._ezproxy_down and applicable:
+            attempts.append(f"{name}:skipped(session expired)")
+            with self._stats_lock:
+                self.stats.note_source(name, "skipped")
+            self._log_item(item, f"{escape(name)}: [dim]skipped[/] (session expired)")
+            return True
         if name in lanes:
             return False
-        if self._circuit.tripped(name):
+        if self._circuit.tripped(name) and applicable:
             attempts.append(f"{name}:skipped(circuit open)")
+            self._circuit.consume_skip(name)
             with self._stats_lock:
                 self.stats.note_source(name, "skipped")
             self._log_item(
-                item, f"{escape(name)}: [dim]skipped[/] (blocked for rest of run)"
+                item, f"{escape(name)}: [dim]skipped[/] (paused after blocks)"
             )
         else:
             attempts.append(f"{name}:skipped(not applicable)")
@@ -446,7 +599,7 @@ class Pipeline:
         if self._circuit.note(name, cand.outcome, cand.note or ""):
             self._emit(
                 f"[yellow]{name} blocked {self.cfg.circuit_breaker_threshold} times; "
-                f"skipping {name} for rest of run[/]"
+                f"pausing {name}[/]"
             )
 
     def _try_download(
@@ -479,7 +632,7 @@ class Pipeline:
         else:
             urls: list[str] = []
             skipped_blocked = False
-            for url in cand.urls[:6]:
+            for url in urls_to_fetch(cand.urls):
                 host = publisher_host(url)
                 if host and host in blocked:
                     skipped_blocked = True
@@ -706,12 +859,22 @@ class Pipeline:
             self._record(
                 item, STATUS_NO_IDENTIFIER, attempts, reason="no DOI, arXiv id or URL"
             )
+        elif _lane_paused(attempts):
+            if any("session expired" in a for a in attempts):
+                reason = "session expired"
+            elif any("skipped(bot wall)" in a for a in attempts):
+                reason = "bot wall"
+            else:
+                reason = "source paused"
+            self._record(item, STATUS_RETRYABLE, attempts, reason=reason)
+        elif any(":captcha" in a for a in attempts):
+            self._record(item, STATUS_CAPTCHA, attempts, reason="bot wall")
         elif any(
             a.endswith(":error") or "download-failed" in a for a in attempts
         ) and not any(a.endswith(":not_found") for a in attempts):
             self._record(item, STATUS_ERROR, attempts, reason="only transient failures")
         else:
-            self._record(item, STATUS_NOT_FOUND, attempts, reason="no source had it")
+            self._record(item, STATUS_NOT_FOUND, attempts, reason=REASON_CLOSED)
 
     def _record(
         self, item: Item, status: str, attempts: list[str], reason: str = ""
@@ -735,6 +898,7 @@ class Pipeline:
             STATUS_NOT_FOUND: "dim",
             STATUS_NO_IDENTIFIER: "dim",
             STATUS_CAPTCHA: "yellow",
+            STATUS_RETRYABLE: "yellow",
             STATUS_ERROR: "red",
         }[status]
         self._log_item(

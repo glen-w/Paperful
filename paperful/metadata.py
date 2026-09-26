@@ -18,6 +18,7 @@ from .lint import (
     title_is_all_caps,
     title_looks_like_filename,
     title_to_title_case,
+    usable_work_title,
 )
 from .resolve import (
     IdentifierCache,
@@ -89,6 +90,10 @@ def propose_patch(
     work: WorkMeta | None = None
     if item.doi and item.doi_verified in {"ok", "swapped"}:
         work = work_by_doi(client, item.doi, cfg.email, cache)
+    elif item.doi and not usable_work_title(item.title):
+        # A blank or citation-string title cannot confirm the DOI, and it
+        # must not block replacing that string with the work's title.
+        work = work_by_doi(client, item.doi, cfg.email, cache)
 
     pdf_work = _maybe_adopt_pdf_doi(
         client,
@@ -110,7 +115,13 @@ def propose_patch(
         candidate_date = work.date or (str(work.year) if work.year else None)
         if candidate_date and _should_set_date(item.date, candidate_date, overwrite):
             after["date"] = candidate_date
-        if overwrite and work.title:
+        if work.title and overwrite:
+            after["title"] = work.title
+        elif (
+            work.title
+            and usable_work_title(work.title)
+            and not usable_work_title(item.title)
+        ):
             after["title"] = work.title
         if source != "pdf":
             source = work.source or source

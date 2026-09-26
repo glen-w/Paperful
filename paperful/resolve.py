@@ -39,6 +39,9 @@ def normalize_doi(raw: str | None) -> str | None:
     doi = re.sub(
         r"/(?:full|abstract|pdf|epdf|meta|summary)$", "", doi, flags=re.IGNORECASE
     )
+    # Crossref sometimes appends ".pmid:123;pmcid:PMC1" to an otherwise real DOI.
+    doi = re.split(r"(?i)[.;](?:pmid|pmcid):", doi, maxsplit=1)[0]
+    doi = doi.rstrip(_TRAILING_PUNCT_NO_PAREN).rstrip("/")
     return doi.lower()
 
 

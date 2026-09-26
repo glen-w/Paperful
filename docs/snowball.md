@@ -206,7 +206,7 @@ The picture is [How a hop is cut](#how-a-hop-is-cut).
 | Knob | Default | Meaning |
 | --- | --- | --- |
 | `depth` | 0 for keyword, 1 for DOI / ORCID / collection | Hops from the seed. Soft ceiling 5 |
-| `direction` | `refs` | `refs`, `cites`, `both`, `keywords`, `refs+keywords`, `cites+keywords`, or `refs+cites+keywords`. `both` stays references plus cited-by |
+| `direction` | `refs` | `refs`, `cites`, `both`, `keywords`, `similar`, or combinations such as `refs+similar` and `refs+cites+keywords`. `both` stays references plus cited-by. `similar` is one ranked hop (shared references, plus Semantic Scholar recommendations), not a deeper crawl |
 | `keyword_limit` | 3 | How many of a work's OpenAlex keywords to expand. Integer 1–5. `all` and `0` are errors. 5 uses every keyword OpenAlex stored (at most five) |
 | `keyword_hop_limit` | 50 | Works kept per seed on the keyword side. A positive integer. `all` and `0` are errors. A keyword filter is an open query, so it never pages without a cap. Citation `per_hop_limit = all` still applies on a mixed run |
 | `keyword_min_score` | 0 | Drop seed keywords below this similarity. 0 keeps whatever OpenAlex already assigned |
@@ -318,11 +318,15 @@ OpenAlex ignores `mailto`. Snowball calls OpenAlex without an API key first, so 
 
 Semantic Scholar’s Academic Graph is public, so snowball calls it with no key. That unauthenticated pool is shared and can be throttled. Heavier use needs a private key: [request one](https://www.semanticscholar.org/product/api#api-key-form) (it arrives by email; the introductory limit is 1 request per second). Put it in `SEMANTIC_SCHOLAR_API_KEY`. Like `OPENALEX_API_KEY`, it stays in the environment, never in `config.toml`.
 
-Each crawl writes `state/snowball/<run-id>/candidates.jsonl` as it goes, for every configured backend. A rate limit, outage, or interrupt keeps that file and `deferred.json`. Continue with:
+Each crawl writes `state/snowball/<run-id>/candidates.jsonl` as it goes, for every configured backend. A rate limit, outage, or interrupt keeps that file and, when OpenAlex stops the crawl, `deferred.json`. Continue with:
 
 ```sh
 paperful snowball resume <run-id>
 ```
+
+If the queue is already complete and `deferred.json` is gone, the same command does not search again. With `--gate auto`, `-C`, and `--fetch-pdfs`, it creates any rows still missing from the library and fetches PDFs for keys that do not already have one.
+
+A keyword search that asks for more than 5,000 works follows OpenAlex's cursor instead of stopping at 50 pages.
 
 A list call that hits the daily budget of the key already in use stops the same way. The reset is midnight UTC, or sooner if you add [pay-as-you-go credit or a subscription](https://openalex.org/pricing) on that key.
 
@@ -343,9 +347,16 @@ is `fast` or `full`. An open PDF already downloaded for the bibliography is writ
 onto the item. Semantic Scholar responses are cached under `state/snowball/cache/`. Europe PMC
 misses and hits are cached under `state/snowball/cache/europepmc/`. Crossref,
 Semantic Scholar, Europe PMC, and the open-PDF bibliography ask only for hop-0
-works that still have no outgoing references. Neighbours and citing works are
-left alone. A backend that adds references closes the gap, so the next one is
-not asked. Europe PMC searches those gaps in batches, and fetches a reference
+works that still have no outgoing references, and only when this crawl is
+hopping (`depth` 1 or more, or `hybrid`). A keyword search at depth 0 stays
+on the hit list: those backends may fill an empty field on a hit, and they
+do not import its references. Neighbours and citing works are left alone. A
+backend that adds references closes the gap, so the next one is not asked.
+A reference title is the structured article title. The raw citation string
+is not stored as the title. Before the year filter, a neighbour with a blank
+or citation-shaped title is filled from the OpenAlex work. If that still
+leaves no work title, the row is filtered and not created. Europe PMC searches
+those gaps in batches, and fetches a reference
 list only when the record has one. A MEDLINE id with no DOI is resolved when
 Europe PMC has a DOI for it. When a spread of the remaining queue is absent
 from the index, the rest of that pass is skipped.

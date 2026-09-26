@@ -7,6 +7,8 @@ from paperful.store import (
     STATUS_ERROR,
     STATUS_NOT_FOUND,
     STATUS_OK,
+    STATUS_RETRYABLE,
+    REASON_CLOSED,
     Manifest,
     Record,
     item_dirname,
@@ -151,6 +153,11 @@ def test_manifest_latest_record_wins_and_resume_logic(tmp_path):
     assert reloaded.should_process("K2", retry_failed=True)
     assert reloaded.should_process("K3", retry_failed=False)
     assert reloaded.should_process("NEW", retry_failed=False)
+    m.write(Record(itemKey="K5", status=STATUS_NOT_FOUND, reason=REASON_CLOSED))
+    m.write(Record(itemKey="K6", status=STATUS_RETRYABLE, reason="source paused"))
+    assert not m.should_process("K5", retry_failed=False)
+    assert m.should_process("K5", retry_failed=True)
+    assert m.should_process("K6", retry_failed=False)
     assert [r.itemKey for r in reloaded.pending_attach()] == ["K1"]
     assert reloaded.counts() == {
         STATUS_OK: 1,

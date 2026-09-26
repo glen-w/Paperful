@@ -170,6 +170,8 @@ def source_applicable(item: Item, cfg: Config, name: str) -> bool:
         return is_cshl_doi(doi)
     if name == "europepmc":
         return bool(item.doi)
+    if name == "openaire":
+        return bool(item.doi)
     if name == "semanticscholar":
         return bool(item.doi or item.arxiv_id)
     if name == "core":

@@ -56,4 +56,36 @@ def _pdf_urls(record: dict) -> list[str]:
     for _, url in scored:
         if url not in seen:
             seen.append(url)
+    for url in pmc_pdf_urls(str(record.get("pmcid") or "")):
+        if url not in seen:
+            seen.append(url)
     return seen
+
+
+def pmc_pdf_urls(pmcid: str) -> list[str]:
+    """Canonical Europe PMC PDF URLs for a PMCID.
+
+    The article render endpoint is the reliable one. The backend render URL
+    and the OA zip are fallbacks when ``fullTextUrlList`` is empty or stale.
+    """
+    acc = _pmc_accession(pmcid)
+    if not acc:
+        return []
+    number = acc[3:]
+    folder = f"{number[:-2]}/{number[-2:]}" if len(number) >= 2 else number
+    return [
+        f"https://europepmc.org/articles/{acc}?pdf=render",
+        f"https://europepmc.org/backend/ptpmcrender.fcgi?accid={acc}&blobtype=pdf",
+        f"https://europepmc.org/pub/databases/pmc/pdf/OA/{folder}/{acc}.zip",
+    ]
+
+
+def _pmc_accession(pmcid: str) -> str:
+    token = (pmcid or "").strip().upper()
+    if token.startswith("PMC"):
+        digits = "".join(ch for ch in token[3:] if ch.isdigit())
+    else:
+        digits = "".join(ch for ch in token if ch.isdigit())
+    if not digits:
+        return ""
+    return f"PMC{digits}"

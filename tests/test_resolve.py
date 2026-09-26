@@ -204,6 +204,17 @@ def test_openalex_related_works_do_not_link():
     assert version_link(client, "10.1000/vor", "t@example.org") is None
 
 
+def test_normalize_doi_strips_glued_pmid():
+    assert (
+        normalize_doi("10.11138/mltj/2017.7.1.119.pmid:28717619;pmcid:pmc5505579")
+        == "10.11138/mltj/2017.7.1.119"
+    )
+    assert (
+        normalize_doi("10.1186/s12891-022-05408-4.PMID:35549689;PMCID:PMC9097047")
+        == "10.1186/s12891-022-05408-4"
+    )
+
+
 def test_normalize_doi_keeps_parentheses_inside_old_elsevier_dois():
     assert (
         normalize_doi("10.1016/0031-9384(69)90073-0") == "10.1016/0031-9384(69)90073-0"

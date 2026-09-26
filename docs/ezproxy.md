@@ -76,7 +76,7 @@ ezproxy_base = "https://YOUR-PREFIX.idm.oclc.org/login?url="
 
 sources = [
   "unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar",
-  "core", "direct", "ezproxy", "htmlpdf",
+  "core", "openaire", "direct", "ezproxy", "htmlpdf",
 ]
 ```
 

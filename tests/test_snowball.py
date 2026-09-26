@@ -1992,6 +1992,9 @@ def test_keyword_hop_uses_top_slugs_and_finite_cap(tmp_path: Path):
 
     assert normalize_direction("refs+keywords") == "refs+keywords"
     assert normalize_direction("all") == "both"
+    assert normalize_direction("similar") == "similar"
+    assert normalize_direction("refs+similar") == "refs+similar"
+    assert normalize_direction("both+similar") == "refs+cites+similar"
     with pytest.raises(ValueError, match="keyword_limit"):
         parse_keyword_limit("all")
     with pytest.raises(ValueError, match="keyword_hop_limit"):
@@ -2126,6 +2129,54 @@ def test_keyword_min_score_drops_weak_slugs(tmp_path: Path):
     )
     assert result.exit_code == 0
     assert seen["filter"] == "keywords.id:alpha"
+
+
+def test_low_pdf_yield_prints_retry_advice():
+    from paperful.snowball.command import _print_fetch_result
+
+    buf = StringIO()
+    _print_fetch_result(
+        Console(file=buf, highlight=False, width=120),
+        {"downloaded": 216, "attach_ok": 108, "attach_deferred": 0},
+        sought=981,
+        collection="Inbox/Basketball",
+    )
+    text = buf.getvalue()
+    assert "downloaded 216 · attached 108" in text
+    assert "session login ezproxy" in text
+    assert 'paperful run -C "Inbox/Basketball" --retry-failed' in text
+
+
+def test_works_by_dois_skips_a_filter_that_openalex_rejects():
+    import httpx
+
+    def getter(path, params):
+        filt = str(params.get("filter") or "")
+        if "pmid" in filt and "|" in filt:
+            request = httpx.Request("GET", "https://api.openalex.org/works")
+            response = httpx.Response(400, request=request)
+            raise httpx.HTTPStatusError("bad filter", request=request, response=response)
+        if "pmid" in filt:
+            return {"results": []}
+        doi = filt.split("|", 1)[0].removeprefix("doi:")
+        return {
+            "results": [
+                {
+                    "id": "https://openalex.org/W1",
+                    "doi": f"https://doi.org/{doi}",
+                    "referenced_works": [],
+                }
+            ]
+        }
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    works = client.works_by_dois(
+        [
+            "10.1000/good",
+            "10.11138/mltj/2017.7.1.119.pmid:28717619;pmcid:pmc5505579",
+        ]
+    )
+    assert [row["doi"] for row in works] == ["https://doi.org/10.1000/good"]
 
 
 def test_works_by_keywords_refuses_unbounded_limit():
@@ -2761,3 +2812,299 @@ def test_fill_order_follows_backends_and_cached_pdf_is_written(tmp_path: Path):
     _write_cached_pdfs(_cfg(tmp_path), [item], [row])
     written = list((tmp_path / "out").rglob("*.pdf"))
     assert written and written[0].read_bytes() == b"%PDF-1.4 cached"
+
+
+def test_crossref_reference_ignores_unstructured_citation():
+    from paperful.snowball.fill import crossref_references
+
+    refs = crossref_references(
+        {
+            "reference": [
+                {
+                    "DOI": "10.1006/jhev.1998.0220",
+                    "unstructured": '[1] R.L. Susman: "Hand function and tool behavior in early hominids," J. Hum. Evol.',
+                },
+                {"DOI": "10.1000/real", "article-title": "Grip strength in basketball players", "year": 2024},
+                {
+                    "DOI": "10.1000/cite",
+                    "article-title": "Huang, A. S., Hirabayashi, K. (2024). Assessment of glaucoma. JAMA Ophthalmology.",
+                },
+            ]
+        }
+    )
+    by_doi = {row["doi"]: row for row in refs}
+    assert by_doi["10.1006/jhev.1998.0220"]["title"] == ""
+    assert by_doi["10.1000/real"]["title"] == "Grip strength in basketball players"
+    assert by_doi["10.1000/cite"]["title"] == ""
+
+
+def test_depth_zero_search_does_not_import_references(tmp_path: Path):
+    hit = _work("W1", "10.1000/hit", "Basketball biomechanics review", 2024, 4)
+    calls: list[str] = []
+
+    def crossref(doi: str) -> dict:
+        calls.append(doi)
+        return {
+            "title": hit["display_name"],
+            "year": 2024,
+            "venue": "Journal of Sports",
+            "authors": ["Ada Lovelace"],
+            "references": [
+                {"doi": "10.1000/old", "title": '[1] R.L. Susman: "Hand function"', "year": 1998}
+            ],
+        }
+
+    result = run_search(
+        _cfg(tmp_path),
+        "basketball",
+        SnowballRequest(year_from=2023, year_to=2026),
+        console=Console(file=StringIO(), highlight=False, width=160),
+        client=_client({"W1": hit}),
+        lookup=lambda doi, title: None,
+        crossref_getter=crossref,
+    )
+    assert result.exit_code == 0
+    assert calls == []
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    assert {row["ids"]["doi"] for row in rows} == {"10.1000/hit"}
+    assert rows[0]["status"] == "new"
+    assert rows[0]["biblio"]["title"] == "Basketball biomechanics review"
+
+
+def test_depth_zero_fills_a_hole_without_adding_references(tmp_path: Path):
+    hit = _work("W1", "10.1000/hit", "Basketball biomechanics review", 2024, 4)
+    hit["primary_location"] = {"source": {"display_name": ""}, "landing_page_url": "https://example.test/a"}
+    calls: list[str] = []
+
+    def crossref(doi: str) -> dict:
+        calls.append(doi)
+        return {
+            "venue": "Journal of Sports Sciences",
+            "references": [{"doi": "10.1000/old", "title": "Some other paper", "year": 2024}],
+        }
+
+    result = run_search(
+        _cfg(tmp_path),
+        "basketball",
+        SnowballRequest(year_from=2023, year_to=2026),
+        console=Console(file=StringIO(), highlight=False, width=160),
+        client=_client({"W1": hit}),
+        lookup=lambda doi, title: None,
+        crossref_getter=crossref,
+    )
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    assert calls == ["10.1000/hit"]
+    assert {row["ids"]["doi"] for row in rows} == {"10.1000/hit"}
+    assert rows[0]["biblio"]["venue"] == "Journal of Sports Sciences"
+
+
+def test_reference_stub_takes_the_openalex_title_inside_the_year_window(tmp_path: Path):
+    hit = _work("W1", "10.1000/hit", "Basketball biomechanics review", 2024, 3, refs=[])
+    old = _work("Wold", "10.1000/old", "Hand function and tool behavior in early hominids", 1998, 20)
+    kept = _work("Wnew", "10.1000/new", "Grip strength in basketball players", 2024, 8)
+    catalogue = {"10.1000/hit": hit, "10.1000/old": old, "10.1000/new": kept}
+
+    def getter(path: str, params: dict) -> dict:
+        if path.startswith("/works/https://doi.org/"):
+            doi = path.split("/works/https://doi.org/", 1)[1]
+            return catalogue.get(doi, {})
+        filt = str(params.get("filter") or "")
+        if filt.startswith("doi:"):
+            wanted = set(filt.split(":", 1)[1].split("|"))
+            return {"results": [work for doi, work in catalogue.items() if doi in wanted]}
+        if "search" in params:
+            return {"results": [hit]}
+        return {"results": []}
+
+    def crossref(doi: str) -> dict:
+        return {
+            "references": [
+                {
+                    "doi": "10.1000/old",
+                    "title": '[1] R.L. Susman: "Hand function and tool behavior in early hominids," J. Hum. Evol.',
+                },
+                {"doi": "10.1000/new", "title": ""},
+            ]
+        }
+
+    result = run_search(
+        _cfg(tmp_path),
+        "basketball",
+        SnowballRequest(depth=1, year_from=2023, year_to=2026),
+        console=Console(file=StringIO(), highlight=False, width=160),
+        client=OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter),
+        lookup=lambda doi, title: None,
+        crossref_getter=crossref,
+    )
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    by_doi = {row["ids"]["doi"]: row for row in rows}
+    assert by_doi["10.1000/hit"]["status"] == "new"
+    assert by_doi["10.1000/hit"]["hop"] == 0
+    assert by_doi["10.1000/old"]["status"] == "filtered"
+    assert "(year)" in by_doi["10.1000/old"]["why"]
+    assert by_doi["10.1000/old"]["biblio"]["title"] == "Hand function and tool behavior in early hominids"
+    assert by_doi["10.1000/new"]["status"] == "new"
+    assert by_doi["10.1000/new"]["biblio"]["title"] == "Grip strength in basketball players"
+    assert by_doi["10.1000/new"]["biblio"]["authors"] == ["Ada Lovelace"]
+    assert by_doi["10.1000/new"]["biblio"]["year"] == 2024
+
+
+def test_create_new_skips_a_citation_title():
+    from paperful.snowball.ingest import create_new
+
+    lib = _CreateLib()
+    row = Candidate(
+        "r",
+        {"type": "keyword", "value": "basketball"},
+        1,
+        "refs",
+        {"doi": "10.1000/old"},
+        {
+            "title": '[1] R.L. Susman: "Hand function and tool behavior in early hominids"',
+            "year": 1998,
+            "authors": [],
+            "type": "article",
+        },
+        "crossref ref of 10.1000/hit",
+        "new",
+        {"backend": "crossref"},
+        "auto",
+    )
+    items, counts = create_new(lib, [row], "Inbox/Basketball")
+    assert items == []
+    assert lib.created == []
+    assert counts["created"] == 0
+    assert counts["failed"] == 1
+    assert row.status == "error"
+
+
+def test_similar_ranks_coupled_work_above_a_one_off(tmp_path: Path):
+    works = {
+        "S1": _work("S1", "10.1000/seed", "Seed", 2020, 10, ["A", "B"]),
+        "A": _work("A", "10.1000/a", "Ref A", 2010, 1),
+        "B": _work("B", "10.1000/b", "Ref B", 2010, 1),
+        "C": _work("C", "10.1000/coupled", "Coupled", 2021, 4),
+        "O": _work("O", "10.1000/once", "Once", 2021, 99),
+    }
+    client = _client(works, citing={"A": ["C", "O"], "B": ["C"]})
+    seen: list[list[str]] = []
+
+    def recommend(ids: list[str], limit: int) -> list[dict]:
+        seen.append(ids)
+        return [
+            {
+                "title": "Recommended",
+                "year": 2022,
+                "citationCount": 3,
+                "externalIds": {"DOI": "10.1000/rec"},
+            }
+        ]
+
+    client.recommend_getter = recommend
+    result = run_doi(
+        _cfg(tmp_path),
+        ["10.1000/seed"],
+        SnowballRequest(direction="similar", depth=1, per_hop_limit=10),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=client,
+        lookup=lambda doi, title: None,
+    )
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    similar = [row for row in rows if row["direction"] == "similar"]
+    order = [row["ids"]["doi"] for row in sorted(similar, key=lambda row: -row["score"])]
+    assert order[0] == "10.1000/coupled"
+    assert "10.1000/once" in order
+    assert order.index("10.1000/coupled") < order.index("10.1000/once")
+    assert "10.1000/rec" in order
+    assert seen and seen[0] == ["DOI:10.1000/seed"]
+
+
+def test_openalex_search_uses_cursor_past_the_page_cap():
+    pages: list[str] = []
+
+    def getter(path: str, params: dict) -> dict:
+        pages.append(str(params.get("cursor") or params.get("page") or ""))
+        cursor = params.get("cursor")
+        if cursor == "*":
+            return {
+                "results": [{"id": "https://openalex.org/W1", "doi": "https://doi.org/10.1/a"}],
+                "meta": {"count": 2, "next_cursor": "abc"},
+            }
+        if cursor == "abc":
+            return {
+                "results": [{"id": "https://openalex.org/W2", "doi": "https://doi.org/10.1/b"}],
+                "meta": {"count": 2, "next_cursor": None},
+            }
+        return {"results": [], "meta": {"count": 0}}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    found = client.search("basketball", limit=0, year_from=None, year_to=None)
+    assert [row["id"].rsplit("/", 1)[-1] for row in found] == ["W1", "W2"]
+    assert pages == ["*", "abc"]
+    pages.clear()
+    client.search("basketball", limit=10, year_from=None, year_to=None)
+    assert pages == ["1"]
+
+
+def test_resume_without_deferred_fetches_pdfs_without_search(tmp_path: Path, monkeypatch):
+    from paperful.pipeline import RunStats
+    from paperful.snowball.ingest import fill_pdfs as real_fill
+    from paperful.snowball.queue import write_queue
+
+    cfg = _cfg(tmp_path)
+    row = Candidate(
+        "runq",
+        {"type": "doi", "value": "10.1000/seed"},
+        0,
+        "search",
+        {"doi": "10.1000/seed"},
+        {"title": "Seed paper"},
+        "seed",
+        "new",
+        {"backend": "openalex"},
+        "auto",
+    )
+
+    def boom(path: str, params: dict) -> dict:
+        raise AssertionError(path)
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=boom)
+    write_queue(cfg.state_dir, "runq", [row], client, library_unread=False)
+    calls: dict[str, int] = {"fill": 0}
+
+    def create_new(lib, rows, collection, **kwargs):
+        return (
+            [
+                Item(
+                    key="NEWKEY01",
+                    item_type="journalArticle",
+                    title="Seed paper",
+                    doi="10.1000/seed",
+                    arxiv_id=None,
+                    url=None,
+                    year=2020,
+                    first_author="Lovelace",
+                    collection_paths=[collection],
+                )
+            ],
+            {"created": 1, "skipped_exists": 0, "failed": 0},
+        )
+
+    def fill_pdfs(cfg, lib, items, console, **kwargs):
+        calls["fill"] = len(items)
+        return RunStats()
+
+    monkeypatch.setattr("paperful.snowball.ingest.create_new", create_new)
+    monkeypatch.setattr("paperful.snowball.ingest.fill_pdfs", fill_pdfs)
+    del real_fill
+    result = run_resume(
+        cfg,
+        "runq",
+        SnowballRequest(gate="auto", collection="Inbox/Test", fetch_pdfs="full"),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=client,
+        backend=object(),
+    )
+    assert result.exit_code == 0
+    assert calls["fill"] == 1
+    assert client.requests == 0

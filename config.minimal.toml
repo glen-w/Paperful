@@ -11,4 +11,4 @@ state_dir = "state"
 
 # Open access only. No campus EZProxy. Scholar and Sci-Hub stay off.
 # Same list as `paperful run --preset oa`.
-sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "core", "direct", "htmlpdf"]
+sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticscholar", "core", "openaire", "direct", "htmlpdf"]

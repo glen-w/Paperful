@@ -175,6 +175,48 @@ def title_has_markup(title: str) -> bool:
     return bool(cleaned) and cleaned != title.strip()
 
 
+_NUMBERED_CITE = re.compile(r"^(?:\[\d+\]|\d+[.)])\s+")
+_DOI_IN_TITLE = re.compile(r"doi\.org/|\bDOI:\s*10\.|\bPMID\b", re.I)
+_VANCOUVER_YEAR = re.compile(r"\b(?:19|20)\d{2};\d")
+_ET_AL_YEAR = re.compile(r"\bet al\.?\b", re.I)
+_YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
+_YEAR_PAREN = re.compile(r"\((?:[^)]*,\s*)?(?:19|20)\d{2}\)")
+_SURNAME_INITIAL = re.compile(r"^[A-Z][\w'’\-]+,\s+[A-Z]\.")
+_AUTHOR_YEAR = re.compile(
+    r"^(?:[A-Z][\w'’\-.]+(?:\s+[A-Z][\w'’\-.]*){0,6})\s+\((?:19|20)\d{2}\)"
+)
+_INITIALS_THEN_YEAR = re.compile(r"^[A-Z][\w'’\-]+\s+[A-Z]\.(?:[A-Z]\.)?,")
+
+
+def usable_work_title(value: object) -> bool:
+    """True when this string is a work title, not a blank or a bibliography entry.
+
+    Reference lists often store the whole citation (``[1] Author: "Title"``,
+    ``Surname, I. (2014). Title. Journal``) in the title field. Those are not
+    titles. A structured article title is.
+    """
+    text = strip_title_markup(str(value or ""))
+    if not text or not re.search(r"[A-Za-z]", text):
+        return False
+    if _NUMBERED_CITE.match(text):
+        return False
+    if _DOI_IN_TITLE.search(text):
+        return False
+    if _VANCOUVER_YEAR.search(text):
+        return False
+    if _ET_AL_YEAR.search(text) and _YEAR.search(text):
+        return False
+    if _SURNAME_INITIAL.match(text) and text.count(",") >= 2:
+        return False
+    if _AUTHOR_YEAR.match(text):
+        return False
+    if _INITIALS_THEN_YEAR.match(text) and _YEAR_PAREN.search(text):
+        return False
+    if text.count(",") >= 3 and _YEAR_PAREN.search(text):
+        return False
+    return True
+
+
 def lint_item(
     client: httpx.Client,
     cfg: Config,
@@ -232,7 +274,9 @@ def lint_item(
     if item.pmid and not item.doi and "pubmed:no-doi" in notes:
         add("pmid_no_doi", f"PMID {item.pmid} did not convert")
 
-    if scholarly and item.title:
+    if scholarly and not usable_work_title(item.title):
+        add("title_unusable", "title is blank or a citation string, not the work title")
+    elif scholarly and item.title:
         if title_has_markup(item.title):
             add("title_html", "title contains HTML markup or entities")
         if title_is_all_caps(item.title):

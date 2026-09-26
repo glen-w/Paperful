@@ -269,6 +269,108 @@ def test_abort_miss_for_url(url, miss):
     assert ba._abort_miss_for_url(url) == miss
 
 
+@pytest.mark.parametrize(
+    ("url", "miss"),
+    [
+        ("https://challenges.cloudflare.com/cdn-cgi/challenge", "cloudflare"),
+        (
+            "https://challenges.cloudflare.com.evil.test/cdn-cgi",
+            None,
+        ),
+        ("https://www.sciencedirect.com/science/article/pii/x", None),
+    ],
+)
+def test_abort_miss_for_cloudflare_url(url, miss):
+    assert ba._abort_miss_for_url(url) == miss
+
+
+def test_abort_miss_for_text_ignores_the_task_preamble():
+    message = (
+        "<user_request>\n"
+        "This browser does not solve CAPTCHAs. Cloudflare security verification. "
+        "Request blocked.\n"
+        "</user_request>\n"
+        "<browser_state>\n"
+        "Sign in | Article title | Download PDF\n"
+        "</browser_state>\n"
+    )
+    assert ba._abort_miss_for_text(ba._page_text_for_abort(message)) is None
+
+
+@pytest.mark.parametrize(
+    ("text", "miss", "bot_wall"),
+    [
+        ("Performing security verification", "cloudflare", True),
+        (
+            "There was a problem providing the content you requested",
+            "blocked",
+            True,
+        ),
+        ("Subscription required. Buy this article.", "paywall", False),
+        ("Sign in to your institution", None, False),
+    ],
+)
+def test_abort_miss_for_visible_page_text(text, miss, bot_wall):
+    assert ba._abort_miss_for_text(text) == miss
+    if miss:
+        assert ba._miss_is_bot_wall(miss) is bot_wall
+
+
+def test_run_until_pdf_stops_on_cloudflare_text(tmp_path):
+    import asyncio
+
+    class State:
+        url = "https://onlinelibrary.wiley.com/doi/10.1000/x"
+        title = "Just a moment"
+
+    class Step:
+        state = State()
+        state_message = (
+            "<user_request>Cloudflare</user_request>"
+            "<browser_state>Performing security verification</browser_state>"
+        )
+
+    class Hist:
+        history = [Step()]
+
+    class FakeAgent:
+        def __init__(self):
+            self.stopped = False
+            self.steps = 0
+            self.browser_session = None
+            self.history = Hist()
+
+        def stop(self):
+            self.stopped = True
+
+        async def run(self, max_steps=20, on_step_end=None):
+            for _ in range(max_steps):
+                if self.stopped:
+                    return
+                self.steps += 1
+                if on_step_end is not None:
+                    await on_step_end(self)
+                await asyncio.sleep(0.01)
+
+    agent = FakeAgent()
+    reasons: dict[str, str] = {}
+    asyncio.run(
+        ba._run_until_pdf(
+            agent,
+            tmp_path,
+            1000,
+            max_steps=20,
+            max_wall_s=5.0,
+            interval_s=0.05,
+            stop_reason=reasons,
+        )
+    )
+    assert agent.stopped
+    assert agent.steps < 5
+    assert reasons.get("miss") == "cloudflare"
+    assert ba._miss_is_bot_wall(reasons["miss"])
+
+
 def test_run_until_pdf_stops_on_search_engine(tmp_path):
     import asyncio
 
@@ -331,6 +433,40 @@ def test_stable_largest_pdf_waits_for_unchanged_size(tmp_path):
     path.write_bytes(PDF_BYTES + b"x" * 100)
     assert ba._stable_largest_pdf(tmp_path, 1000, sizes) is None
     assert ba._stable_largest_pdf(tmp_path, 1000, sizes) == PDF_BYTES + b"x" * 100
+
+
+def test_finish_recover_records_the_buy_button_price(tmp_path):
+    class Result:
+        def __init__(self, text):
+            self.extracted_content = text
+            self.long_term_memory = None
+
+    class Hist:
+        def action_results(self):
+            return [Result('Clicked button "Buy article PDF 39,95 €"')]
+
+        def extracted_content(self):
+            return []
+
+        def model_thoughts(self):
+            return []
+
+        def final_result(self):
+            return "Subscription required. The journal subscription is 199,00 €."
+
+        def urls(self):
+            return ["https://link.springer.com/article/10.1007/s11276-023-03567-3"]
+
+        def number_of_steps(self):
+            return 3
+
+    class Agent:
+        history = Hist()
+
+    got = ba._finish_recover(Agent(), tmp_path, 1000, "no PDF in download folder", 8)
+    assert "price 39.95 EUR" in got.note
+    assert "199.00" not in got.note
+    assert "10.1007" not in got.note.split("price", 1)[-1]
 
 
 def test_finish_recover_names_paywall_and_steps(tmp_path):

@@ -17,6 +17,7 @@ def apply_overlap(rows: list[Candidate]) -> None:
         seeds = list(row.biblio.get("seed_keys") or [])
         seed_overlap = len(seeds) if seeds else 1
         keyword_overlap = int(row.biblio.get("keyword_overlap") or 0)
-        overlap = max(seed_overlap, keyword_overlap)
+        ref_overlap = int(row.biblio.get("ref_overlap") or 0)
+        overlap = max(seed_overlap, keyword_overlap, ref_overlap)
         row.biblio["overlap"] = overlap
         row.score = overlap * 1000 + cited

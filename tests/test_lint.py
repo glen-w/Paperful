@@ -20,6 +20,39 @@ def _json(payload, status=200):
     )
 
 
+def test_usable_work_title_rejects_citation_strings():
+    from paperful.lint import usable_work_title
+
+    good = [
+        "Cerebral cortical surface structure and neural activation pattern among adolescent football players",
+        "High linearity, low hysteresis Ti3C2Tx MXene strain sensor",
+        "Sex differences in skeletal muscle fiber types: A meta-analysis",
+        "Basketball",
+        "A Review of Statistics in Basketball Analysis",
+        "New",
+        "Cardiac arrest and neurologic recovery: insights from the case of Mr. Damar Hamlin",
+    ]
+    bad = [
+        "",
+        "   ",
+        '[1] R.L. Susman: "Hand function and tool behavior in early hominids," J. Hum. Evol.',
+        "24) O’Connor D, Green S and Higgins J. 2008. Defining the review question",
+        "2. Chang, O. U., Labban, T. Y., Gapin, E. & Etnier, B.",
+        "Huang, A. S., Hirabayashi, K., Barna, L., & Pasquale, L. R. (2024). Assessment of glaucoma.",
+        "Abualigah, L., Yousri, D., Abd Elaziz, M., Ewees, A.A., The arithmetic optimization algorithm",
+        "Maron BJ, Shirani J, Poliac LC, et al. Sudden death in young competitive athletes. JAMA 1996;276:199–204.",
+        "Helsen W.F., Starkes J.L. (1999). A multidimensional approach to skilled perception and performance in sport.",
+        "World Medical Association (2013). Declaration of Helsinki: Ethical Principles for Medical Research Involving Human Subjects.",
+        "Hosmer Jr, D. W., Lemeshow, S. & Sturdivant, R. X. Applied Logistic Regression (Wiley, 2013).",
+        "Roberts GC (2001) Understanding the dynamics of motivation in physical activity.",
+        "Young, J., Angevaren, M., Rusted, J. & Tabet, N. Aerobic exercise to improve cognitive function (2015).",
+    ]
+    for title in good:
+        assert usable_work_title(title), title
+    for title in bad:
+        assert not usable_work_title(title), title
+
+
 def test_title_to_title_case():
     assert (
         title_to_title_case("A STUDY OF THE EFFECTIVENESS OF THE ONE HAND AND T")

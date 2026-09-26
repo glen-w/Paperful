@@ -87,6 +87,10 @@ def _dedupe(rows: list[Candidate]) -> list[Candidate]:
         kept_overlap = int(existing.biblio.get("keyword_overlap") or 0)
         if incoming_overlap > kept_overlap:
             existing.biblio["keyword_overlap"] = incoming_overlap
+        incoming_refs = int(row.biblio.get("ref_overlap") or 0)
+        kept_refs = int(existing.biblio.get("ref_overlap") or 0)
+        if incoming_refs > kept_refs:
+            existing.biblio["ref_overlap"] = incoming_refs
     return out
 
 
@@ -100,6 +104,10 @@ def _wants_cites(direction: str) -> bool:
 
 def _wants_keywords(direction: str) -> bool:
     return "keywords" in direction_sides(direction)
+
+
+def _wants_similar(direction: str) -> bool:
+    return "similar" in direction_sides(direction)
 
 
 def _cite_sort(rank: str) -> str | None:
@@ -738,7 +746,8 @@ def _expand_hops(
     want_refs = _wants_refs(direction)
     want_cites = _wants_cites(direction)
     want_keywords = _wants_keywords(direction)
-    if not want_refs and not want_cites and not want_keywords:
+    want_similar = _wants_similar(direction)
+    if not want_refs and not want_cites and not want_keywords and not want_similar:
         return []
     rank = (per_hop_rank or "most-cited").strip().lower()
     if want_keywords:
@@ -996,10 +1005,179 @@ def _expand_hops(
                 min_seed_citations=min_seed_citations,
             ):
                 return rows
+        if want_similar and hop == 1 and _similar_neighbours(
+            client,
+            frontier,
+            rows,
+            seen_oa,
+            hop=hop,
+            depth=depth,
+            direction=direction,
+            run_id=run_id,
+            seed=seed,
+            gate=gate,
+            per_hop_limit=per_hop_limit,
+            rank=rank,
+            year_from=year_from,
+            year_to=year_to,
+            why_prefix=why_prefix,
+            min_seed_citations=min_seed_citations,
+        ):
+            return rows
         frontier = next_works
         if not frontier:
             break
     return rows
+
+
+def _similar_neighbours(
+    client: OpenAlexClient,
+    frontier: list[dict[str, Any]],
+    rows: list[Candidate],
+    seen_oa: set[str],
+    *,
+    hop: int,
+    depth: int,
+    direction: str,
+    run_id: str,
+    seed: dict[str, str],
+    gate: str,
+    per_hop_limit: int,
+    rank: str,
+    year_from: int | None,
+    year_to: int | None,
+    why_prefix: str,
+    min_seed_citations: int,
+) -> bool:
+    """One similar hop from the frontier. True when OpenAlex budget stops the crawl."""
+    from .similar import (
+        CITERS_PER_REF,
+        collect_partners,
+        fetch_recommendations,
+        paper_ids,
+        recommendation_work,
+        reference_sample,
+    )
+
+    ref_ids = reference_sample(frontier)
+    client.stage = f"hop {hop}/{depth} similar"
+    client.note(f"hop {hop}/{depth} similar · {len(frontier)} seeds")
+    partners: list[tuple[int, dict[str, Any]]] = []
+    try:
+        if ref_ids:
+            partners, _rest = collect_partners(
+                client,
+                ref_ids,
+                per_ref=CITERS_PER_REF,
+                year_from=year_from,
+                year_to=year_to,
+            )
+    except OpenAlexBudgetExceeded as exc:
+        works = dict(getattr(exc, "coupling_works", {}) or {})
+        counts = dict(getattr(exc, "coupling_counts", {}) or {})
+        partial = [
+            (int(counts[oa]), works[oa])
+            for oa in counts
+            if oa in works
+        ]
+        partial.sort(key=lambda item: (-item[0], -int(item[1].get("cited_by_count") or 0)))
+        _append_similar(client, rows, seen_oa, partial, per_hop_limit, run_id, seed, hop, gate, why_prefix, year_from, year_to)
+        _defer(
+            client,
+            exc,
+            kind="similar",
+            remaining_ids=list(getattr(exc, "pending_ids", []) or []),
+            coupling_counts=counts,
+            coupling_works=list(works.values()),
+            hop=hop,
+            depth=depth,
+            direction=direction,
+            run_id=run_id,
+            seed=seed,
+            gate=gate,
+            per_hop_limit=per_hop_limit,
+            per_hop_rank=rank,
+            year_from=year_from,
+            year_to=year_to,
+            why_prefix=why_prefix,
+            min_seed_citations=min_seed_citations,
+        )
+        return True
+    room = per_hop_limit if per_hop_limit > 0 else 50
+    _append_similar(
+        client, rows, seen_oa, partners, room, run_id, seed, hop, gate, why_prefix, year_from, year_to
+    )
+    used = sum(1 for row in rows if row.direction == "similar" and row.hop == hop)
+    rec_limit = max(0, room - used) if per_hop_limit > 0 else 50
+    getter = getattr(client, "recommend_getter", None)
+    if rec_limit:
+        for paper in fetch_recommendations(paper_ids(frontier), limit=rec_limit, getter=getter):
+            work = recommendation_work(paper)
+            if work is None:
+                continue
+            _append_similar(
+                client,
+                rows,
+                seen_oa,
+                [(0, work)],
+                room,
+                run_id,
+                seed,
+                hop,
+                gate,
+                why_prefix,
+                year_from,
+                year_to,
+            )
+            if per_hop_limit > 0 and sum(1 for row in rows if row.direction == "similar") >= room:
+                break
+    _emit(client, rows)
+    return False
+
+
+def _append_similar(
+    client: OpenAlexClient,
+    rows: list[Candidate],
+    seen_oa: set[str],
+    partners: list[tuple[int, dict[str, Any]]],
+    limit: int,
+    run_id: str,
+    seed: dict[str, str],
+    hop: int,
+    gate: str,
+    why_prefix: str,
+    year_from: int | None,
+    year_to: int | None,
+) -> None:
+    del client
+    have = sum(1 for row in rows if row.direction == "similar" and row.hop == hop)
+    for overlap, work in partners:
+        if limit > 0 and have >= limit:
+            return
+        child_id = short_id(str(work.get("id") or ""))
+        if child_id and child_id in seen_oa:
+            continue
+        why = str(work.get("_why") or f"shares {overlap} references with {why_prefix}")
+        row = work_to_candidate(
+            work,
+            run_id=run_id,
+            seed=seed,
+            hop=hop,
+            direction="similar",
+            why=why,
+            gate=gate,
+        )
+        if not row.identity:
+            continue
+        if any(existing.identity == row.identity for existing in rows):
+            continue
+        if overlap:
+            row.biblio["ref_overlap"] = overlap
+        if child_id:
+            seen_oa.add(child_id)
+        _mark_year(row, year_from, year_to)
+        rows.append(row)
+        have += 1
 
 
 def hybrid_candidates(
@@ -1098,6 +1276,62 @@ def continue_deferred(client: OpenAlexClient, deferred: dict[str, Any]) -> list[
         keyword_hop_limit=int(deferred.get("keyword_hop_limit") or 50),
         keyword_min_score=float(deferred.get("keyword_min_score") or 0.0),
     )
+    if kind == "similar":
+        from .similar import CITERS_PER_REF, collect_partners
+
+        stored = {
+            short_id(str(work.get("id") or "")): work
+            for work in (deferred.get("coupling_works") or [])
+            if isinstance(work, dict)
+        }
+        counts = {
+            str(key): int(value)
+            for key, value in (deferred.get("coupling_counts") or {}).items()
+        }
+        client.stage = "resume similar"
+        client.note(f"resume similar · {len(remaining)} references")
+        try:
+            partners, _rest = collect_partners(
+                client,
+                remaining,
+                per_ref=CITERS_PER_REF,
+                year_from=year_from,
+                year_to=year_to,
+                counts=counts,
+                works=stored,
+            )
+        except OpenAlexBudgetExceeded as exc:
+            works = dict(getattr(exc, "coupling_works", {}) or {})
+            fresh = dict(getattr(exc, "coupling_counts", {}) or {})
+            _defer(
+                client,
+                exc,
+                **{
+                    **deferred,
+                    "remaining_ids": list(getattr(exc, "pending_ids", []) or []),
+                    "coupling_counts": fresh,
+                    "coupling_works": list(works.values()),
+                },
+            )
+            partners = [
+                (int(fresh[oa]), works[oa]) for oa in fresh if oa in works
+            ]
+        seen: set[str] = set()
+        _append_similar(
+            client,
+            rows,
+            seen,
+            partners,
+            per_hop,
+            run_id,
+            seed,
+            hop,
+            gate,
+            why,
+            year_from if isinstance(year_from, int) else None,
+            year_to if isinstance(year_to, int) else None,
+        )
+        return rows
     if kind == "keywords":
         client.stage = "resume keywords"
         client.note(f"resume keywords · {len(remaining)} seeds")
