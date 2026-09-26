@@ -918,6 +918,73 @@ def test_keyword_depth_expand_and_soft_ceiling(tmp_path: Path):
     assert capped.exit_code == 0
 
 
+def test_orcid_retries_connect_timeout_then_reads_works(monkeypatch):
+    import httpx
+
+    from paperful.snowball import orcid as orcid_mod
+
+    calls = {"n": 0}
+
+    class _Resp:
+        status_code = 200
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"group": []}
+
+    class _Client:
+        def __init__(self, *args, **kwargs) -> None:
+            del args, kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args) -> bool:
+            del args
+            return False
+
+        def get(self, url, headers=None):
+            del url, headers
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise httpx.ConnectTimeout("handshake timed out")
+            return _Resp()
+
+    monkeypatch.setattr(orcid_mod.httpx, "Client", _Client)
+    monkeypatch.setattr(orcid_mod.time, "sleep", lambda _s: None)
+    assert orcid_mod.orcid_dois("0000-0002-8214-5187") == []
+    assert calls["n"] == 3
+
+
+def test_orcid_connect_timeout_becomes_orcid_error(monkeypatch):
+    import httpx
+
+    from paperful.snowball.orcid import OrcidError, orcid_dois
+    from paperful.snowball import orcid as orcid_mod
+
+    class _Client:
+        def __init__(self, *args, **kwargs) -> None:
+            del args, kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args) -> bool:
+            del args
+            return False
+
+        def get(self, url, headers=None):
+            del url, headers
+            raise httpx.ConnectTimeout("handshake timed out")
+
+    monkeypatch.setattr(orcid_mod.httpx, "Client", _Client)
+    monkeypatch.setattr(orcid_mod.time, "sleep", lambda _s: None)
+    with pytest.raises(OrcidError, match="ORCID request failed"):
+        orcid_dois("0000-0002-8214-5187")
+
+
 def test_orcid_openalex_fill_and_list_payload(tmp_path: Path):
     from paperful.snowball.orcid import orcid_dois
     from paperful.snowball.openalex import normalize_orcid, short_id

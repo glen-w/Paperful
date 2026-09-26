@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -35,14 +36,27 @@ def orcid_dois(orcid: str, *, getter: Getter | None = None) -> list[str]:
     return _dois_from_payload(payload)
 
 
+_HTTP_ATTEMPTS = 4
+
+
 def _http_works(orcid: str) -> dict[str, Any]:
+    """GET the public works document. Retry transport and timeout failures."""
     url = f"https://pub.orcid.org/v3.0/{orcid}/works"
     headers = {
         "Accept": "application/json",
         "User-Agent": "paperful-snowball/0.1",
     }
-    with httpx.Client(timeout=60.0, follow_redirects=True) as client:
-        resp = client.get(url, headers=headers)
+    last: Exception | None = None
+    for attempt in range(_HTTP_ATTEMPTS):
+        try:
+            with httpx.Client(timeout=60.0, follow_redirects=True) as client:
+                resp = client.get(url, headers=headers)
+        except (httpx.TransportError, httpx.TimeoutException) as exc:
+            last = exc
+            if attempt + 1 < _HTTP_ATTEMPTS:
+                time.sleep(min(8.0, 0.5 * (2**attempt)))
+                continue
+            raise OrcidError(f"ORCID request failed for {orcid}") from exc
         if resp.status_code == 404:
             raise OrcidError(f"ORCID not found: {orcid}")
         resp.raise_for_status()
@@ -50,6 +64,7 @@ def _http_works(orcid: str) -> dict[str, Any]:
         if not isinstance(data, dict):
             raise OrcidError("ORCID response was not an object")
         return data
+    raise OrcidError(f"ORCID request failed for {orcid}") from last
 
 
 def _dois_from_payload(payload: dict[str, Any] | list[Any]) -> list[str]:
