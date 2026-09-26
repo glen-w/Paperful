@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Don’t want to install it yourself?</title>
+    <meta
+      name="description"
+      content="Buy me a coffee and I’ll send you your library, all clean and shiny, full of PDFs."
+    />
+    <link rel="icon" href="favicon.ico" sizes="any" />
+    <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="canonical" href="https://paperful.cloud/" />
+    <meta property="og:title" content="Don’t want to install it yourself?" />
+    <meta
+      property="og:description"
+      content="Buy me a coffee and I’ll send you your library, all clean and shiny, full of PDFs."
+    />
+    <meta property="og:image" content="https://paperful.cloud/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Don’t want to install it yourself? Buy me a coffee and I’ll send your library back."
+    />
+    <meta property="og:url" content="https://paperful.cloud/" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Don’t want to install it yourself?" />
+    <meta
+      name="twitter:description"
+      content="Buy me a coffee and I’ll send you your library, all clean and shiny, full of PDFs."
+    />
+    <meta name="twitter:image" content="https://paperful.cloud/og.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #101820;
+        --ink-soft: #3d4a55;
+        --paper: #f7f1e8;
+        --paper-deep: #eadfcf;
+        --accent: #c46a2a;
+        --accent-deep: #9a4e1c;
+        --line: rgba(16, 24, 32, 0.12);
+        --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+        --font-body: "Source Sans 3", "Segoe UI", sans-serif;
+        --header-height: 3.5rem;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        font-family: var(--font-body);
+        color: var(--ink);
+        background:
+          radial-gradient(1000px 520px at 85% -5%, rgba(196, 106, 42, 0.18), transparent 50%),
+          linear-gradient(165deg, #fbf7f0 0%, var(--paper) 45%, var(--paper-deep) 100%);
+        line-height: 1.55;
+        min-height: 100vh;
+      }
+
+      a {
+        color: var(--accent-deep);
+      }
+
+      .skip {
+        position: absolute;
+        left: -999px;
+        top: 0;
+        background: var(--ink);
+        color: #fff;
+        padding: 0.5rem 0.75rem;
+        z-index: 20;
+      }
+
+      .skip:focus {
+        left: 0.5rem;
+        top: 0.5rem;
+      }
+
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 60;
+        backdrop-filter: blur(10px);
+        background: rgba(247, 241, 232, 0.92);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .header-inner {
+        width: min(1080px, calc(100% - 2.5rem));
+        margin-inline: auto;
+        display: flex;
+        align-items: center;
+        min-height: var(--header-height);
+      }
+
+      .brand {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 1.25rem;
+        text-decoration: none;
+        color: var(--ink);
+        letter-spacing: -0.02em;
+      }
+
+      h1 {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: clamp(1.35rem, 2.7vw, 1.85rem);
+        line-height: 1.28;
+        letter-spacing: -0.02em;
+        color: var(--ink);
+        margin: 0 0 0.75rem;
+      }
+
+      .frame {
+        width: min(1080px, calc(100% - 2.5rem));
+        margin-inline: auto;
+      }
+
+      .spoken {
+        width: min(52rem, 100%);
+        padding: 1.15rem 0 1.5rem;
+      }
+
+      .door {
+        margin: 0 0 0.85rem;
+        padding: 0.95rem 1rem 1.05rem;
+        border-radius: 0.4rem;
+        max-width: 36rem;
+      }
+
+      .door h2 {
+        font-family: var(--font-display);
+        font-size: 1.35rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        margin: 0 0 0.45rem;
+      }
+
+      .door-coffee h2 {
+        margin: 0.85rem 0 0;
+        font-size: 1rem;
+        font-weight: 600;
+        font-family: var(--font-body);
+      }
+
+      .door p {
+        margin: 0;
+        font-size: 1.125rem;
+      }
+
+      .door-coffee {
+        background: rgba(196, 106, 42, 0.12);
+        border: 1px solid var(--accent);
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 0;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 1rem;
+        padding: 0.7rem 1.15rem;
+        border-radius: 0.35rem;
+        background: var(--accent);
+        color: #fff8f2;
+      }
+
+      .btn:hover,
+      .btn:focus-visible {
+        background: var(--accent-deep);
+      }
+
+      .btn:focus-visible,
+      a:focus-visible {
+        outline: 2px solid var(--accent-deep);
+        outline-offset: 2px;
+      }
+
+      .tool-line,
+      .receipt {
+        margin: 0;
+        color: var(--ink-soft);
+        font-size: 0.95rem;
+      }
+
+      .after {
+        width: min(40rem, 100%);
+        margin: 0 0 2.5rem;
+        padding-top: 0.25rem;
+      }
+
+      .after h2 {
+        font-family: var(--font-display);
+        font-size: 1.35rem;
+        font-weight: 500;
+        margin: 0 0 0.75rem;
+      }
+
+      .after p {
+        margin: 0 0 0.9rem;
+      }
+
+      .after code {
+        font-size: 0.92em;
+      }
+
+      .site-footer {
+        padding: 1.25rem 0 1.75rem;
+        border-top: 1px solid var(--line);
+        color: var(--ink-soft);
+        font-size: 0.95rem;
+      }
+
+      .footer-inner {
+        width: min(1080px, calc(100% - 2.5rem));
+        margin-inline: auto;
+      }
+
+      .footer-inner p {
+        margin: 0.2rem 0;
+      }
+
+      @media (max-width: 720px) {
+        .spoken {
+          padding-top: 0.7rem;
+        }
+
+        h1 {
+          margin-bottom: 0.45rem;
+        }
+
+        .door {
+          padding: 0.75rem 0.9rem 0.85rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="/">paperful</a>
+      </div>
+    </header>
+
+    <main id="main">
+      <div class="frame">
+      <div class="spoken">
+        <h1>Don’t want to install and run it yourself?</h1>
+        <article class="door door-coffee">
+          <p>
+            Let me do it for you. Buy me a coffee and I’ll send you your
+            library, all clean and shiny, full of PDFs.
+          </p>
+          <h2>
+            <a
+              class="btn"
+              href="https://ko-fi.com/C0C1XK8G"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Buy me a coffee</a
+            >
+          </h2>
+        </article>
+
+        <p class="tool-line">
+          If you will install it yourself, the tool is the open-source page:
+          <a href="https://paperful.app/">paperful.app</a>.
+          <a href="https://glenwright.earth/Paperful/">glenwright.earth/Paperful</a>
+          opens the same page.
+        </p>
+      </div>
+
+      <section class="after">
+        <h2>What you get back</h2>
+        <p>
+          Your library, in the reference manager you already use. RIS,
+          BibTeX, CSV, or EndNote XML, the PDFs, and
+          <code>misses.csv</code> for anything I could not fetch. Zotero is
+          the one that is well tested. Mendeley and EndNote adapters are
+          seeking testers.
+        </p>
+        <p>
+          The PDFs are the open-access copies the license lets you keep. You
+          already have somewhere to put them: a zip you will store, or a
+          WebDAV URL you already have. I hand that over. I do not host the
+          library. If the terms do not allow the file, that item stays on the
+          miss list and you get the link.
+        </p>
+        <p>
+          A miss is one of these: <code>no_doi</code>, <code>paywalled</code>,
+          <code>no_oa</code>, <code>fetch_failed</code>,
+          <code>license_blocked</code>.
+        </p>
+        <p>
+          I only pull from open-access indexes: Unpaywall, OpenAlex, arXiv,
+          bioRxiv/medRxiv, Europe PMC, Semantic Scholar, CORE, and the item’s
+          own URL. Your campus login stays on your machine.
+        </p>
+        <p>
+          A full Zotero quota is a normal result. Citation data sync is
+          already free. The quota is attachments: 300&nbsp;MB free, then paid
+          Zotero storage. WebDAV is for a personal library only. Group
+          libraries cannot use WebDAV. Files on WebDAV are not the same as
+          files in the zotero.org web library. Zotero will not support a
+          third-party WebDAV server.
+        </p>
+        <p class="receipt">
+          If a grant line needs a receipt, say so when you buy the coffee.
+        </p>
+      </section>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <p>Glen Wright. The tool’s public tag is v0.9.</p>
+      </div>
+    </footer>
+  </body>
+</html>
