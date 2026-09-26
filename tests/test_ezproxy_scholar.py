@@ -166,6 +166,16 @@ def test_scholar_playwright_find(ctx_factory):
     assert cand.url == "https://repo.test/a.pdf"
 
 
+def test_scholar_skips_javascript_void_links():
+    html = """
+    <div class="gs_or_ggsm"><a href="javascript:void(0)">[PDF]</a></div>
+    <a href="https://repo.test/ok.pdf">[PDF]</a>
+    <a href="https://scholar.google.com/scholar_url?url=javascript%3Avoid%280%29">[PDF]</a>
+    """
+    urls = scholar.extract_pdf_links(html, "https://scholar.google.com/scholar")
+    assert urls == ["https://repo.test/ok.pdf"]
+
+
 def test_scholar_extracts_pdf_sidebar():
     html = """
     <div class="gs_r"><div class="gs_or_ggsm"><a href="https://repository.example.edu/paper.pdf">[PDF]</a></div></div>

@@ -131,6 +131,8 @@ def extract_pdf_links(html: str, base_url: str) -> list[str]:
             return
         abs_url = urljoin(base_url, href.strip())
         low = abs_url.lower()
+        if not low.startswith(("http://", "https://")):
+            return
         # Keep Google redirectors so we can unwrap them below; skip other GS chrome.
         if "scholar.google." in low and "url=" not in low:
             return
@@ -164,6 +166,9 @@ def extract_pdf_links(html: str, base_url: str) -> list[str]:
     # De-dupe preserving order
     out: list[str] = []
     for u in cleaned:
-        if u not in out and not any(h in u.lower() for h in _SKIP_HOSTS):
+        low = u.lower()
+        if not low.startswith(("http://", "https://")):
+            continue
+        if u not in out and not any(h in low for h in _SKIP_HOSTS):
             out.append(u)
     return out

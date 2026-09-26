@@ -124,6 +124,20 @@ def test_oa_sources_run_in_order_and_scihub_only_after_all_miss(pipe_factory, cf
     assert pdf.is_file()
 
 
+def test_javascript_void_url_does_not_abort_the_run(pipe_factory):
+    src = StubSource(
+        "scholar",
+        {"A": Candidate(url="javascript:void(0)", source="scholar")},
+    )
+    pipe, manifest = pipe_factory({"scholar": src}, ["scholar"])
+    pipe.client.cookies.set("sid", "secret")
+    pipe.ctx.client = pipe.client
+    pipe.run([make_item(key="A")])
+    rec = manifest.get("A")
+    assert rec.status != STATUS_OK
+    assert "scholar:download-failed(not an http(s) URL)" in rec.attempts
+
+
 def test_alternate_urls_are_tried_after_download_failure(pipe_factory):
     def handler(req):
         if req.url.host == "blocked.test":

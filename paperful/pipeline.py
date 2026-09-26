@@ -23,7 +23,7 @@ from .remarks import say
 from .circuit import CircuitBreaker
 from .config import Config
 from .cookies import apply_netscape_cookies
-from .download import Download, DownloadError, fetch_pdf, looks_like_pdf
+from .download import Download, DownloadError, fetch_pdf, is_fetchable_url, looks_like_pdf
 from .pdfid import doi_from_pdf
 from .pipeline_attach import attach_after_remap
 from .pipeline_browser import release_browser_for_agent, skip_recover_without_lane_failure
@@ -713,6 +713,13 @@ class Pipeline:
     def _fetch_url(
         self, item: Item, cand: Candidate, url: str, attempts: list[str]
     ) -> Download | None:
+        if not is_fetchable_url(url):
+            attempts.append(f"{cand.source}:download-failed(not an http(s) URL)")
+            self._log_item(
+                item,
+                f"{escape(cand.source)}: [yellow]download failed[/] (not an http(s) URL)",
+            )
+            return None
         browser_first = self._browser_first(url, cand.source)
         if browser_first:
             dl = self._browser_pdf(item, cand, url, attempts)

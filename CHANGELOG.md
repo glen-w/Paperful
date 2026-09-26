@@ -6,6 +6,8 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+A `javascript:void(0)` (or other non-http) PDF link is a failed download for that item. It no longer aborts `run` when the HTTP client has cookies.
+
 The run summary counts items that did not yield a PDF by reason — captcha, cloudflare, paywall, and a plain not-found — one reason per item. When the browser agent reads a publisher price on an unsaved article, that price is logged on the item and the summary totals it (`€79.90 for 2 articles`).
 
 Long PDF runs pause a blocked source instead of dropping it for the rest of the process, and a 429 does not open that circuit. An expired EZProxy session stops the proxy lane for the run; those items are `retryable` on the next `run`. A miss from every source stays `not_found` with reason `closed`. Europe PMC tries the PMC render URL when a PMCID is present. OpenAIRE is a DOI source for repository copies. A preprint that misses open access is tried once against its published DOI, without changing the library DOI.

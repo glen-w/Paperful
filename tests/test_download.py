@@ -2,7 +2,7 @@ import httpx
 import pytest
 
 from paperful import download as dl
-from paperful.download import DownloadError, fetch_pdf, looks_like_pdf
+from paperful.download import DownloadError, fetch_pdf, is_fetchable_url, looks_like_pdf
 from tests.conftest import PDF_BYTES, mock_client
 
 
@@ -98,6 +98,18 @@ def test_fetch_pdf_gives_up_after_retries_on_network_error():
 
     with pytest.raises(DownloadError, match="ConnectError"):
         fetch_pdf(mock_client(handler), "https://x.test/a.pdf", retries=2)
+
+
+def test_fetch_pdf_rejects_javascript_void_instead_of_crashing():
+    """Cookie merging turns javascript:void(0) into urllib ValueError: '/void(0)'."""
+    client = httpx.Client(
+        cookies={"sid": "secret"},
+        transport=httpx.MockTransport(lambda req: httpx.Response(200, content=PDF_BYTES)),
+    )
+    assert not is_fetchable_url("javascript:void(0)")
+    assert not is_fetchable_url("/void(0)")
+    with pytest.raises(DownloadError, match="not an http"):
+        fetch_pdf(client, "javascript:void(0)")
 
 
 def test_fetch_pdf_size_cap(monkeypatch):
