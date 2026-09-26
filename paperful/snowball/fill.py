@@ -6,7 +6,7 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, NoReturn
 
 from .candidate import Candidate
 
@@ -21,10 +21,11 @@ class ApiKeyRejected(RuntimeError):
 class FillPaused(RuntimeError):
     """A fill API asked us to stop and resume the remaining DOIs later."""
 
-    def __init__(self, backend: str, remaining: list[str] | None = None):
+    def __init__(self, backend: str, remaining: list[str] | None = None, added: list | None = None):
         super().__init__(backend)
         self.backend = backend
         self.remaining = list(remaining or [])
+        self.added = list(added or [])
 
 
 def fill_crossref(
@@ -37,11 +38,7 @@ def fill_crossref(
     direction: str = "refs",
     only_dois: set[str] | None = None,
 ) -> list[Candidate]:
-    pending = [
-        row
-        for row in rows
-        if row.status != "error" and (row.ids.get("doi") or "") and _wanted(row, only_dois)
-    ]
+    pending = _gap_rows(rows, only_dois)
     added: list[Candidate] = []
     known = {row.identity for row in rows if row.identity}
     if tally is not None and pending:
@@ -80,15 +77,11 @@ def fill_semanticscholar(
     tally: Any = None,
     only_dois: set[str] | None = None,
 ) -> list[Candidate]:
-    """Fill holes and append reference neighbours OpenAlex did not already emit."""
+    """Fill holes and append reference neighbours for seeds that still cite nothing."""
     added: list[Candidate] = []
     known = {row.identity for row in rows if row.identity}
     want_refs = direction in {"refs", "both"}
-    pending = [
-        row
-        for row in rows
-        if (row.ids.get("doi") or "") and row.status != "error" and _wanted(row, only_dois)
-    ]
+    pending = _gap_rows(rows, only_dois)
     if tally is not None and pending:
         tally.stage = "semantic scholar"
         tally.track(len(pending))
@@ -380,11 +373,34 @@ def s2_api_key() -> str:
     return os.environ.get("SEMANTIC_SCHOLAR_API_KEY", "").strip()
 
 
+def _gap_rows(rows: list[Candidate], only_dois: set[str] | None) -> list[Candidate]:
+    """Hop-0 works that still have no outgoing references.
+
+    Neighbours and citing works are not asked. A reference added by an earlier
+    backend closes the gap for the next one.
+    """
+    return [
+        row
+        for row in rows
+        if row.hop == 0
+        and row.direction != "cites"
+        and (row.ids.get("doi") or "")
+        and row.status != "error"
+        and _wanted(row, only_dois)
+        and not _has_outgoing(row, rows)
+    ]
+
+
+def _raise_paused(added: list[Candidate], remaining: list[str], cause: BaseException) -> NoReturn:
+    raise FillPaused("europepmc", remaining, added) from cause
+
+
 def _has_outgoing(row: Candidate, rows: list[Candidate]) -> bool:
     doi = (row.ids.get("doi") or "").lower()
     if not doi:
         return False
-    return any(doi in (child.why or "").lower() for child in rows if child is not row)
+    needle = f"ref of {doi}"
+    return any(needle in (child.why or "").lower() for child in rows if child is not row)
 
 
 def fill_payload_backend(
@@ -396,18 +412,10 @@ def fill_payload_backend(
     direction: str,
     tally: Any = None,
     only_dois: set[str] | None = None,
-    only_without_refs: bool = False,
 ) -> list[Candidate]:
     added: list[Candidate] = []
     known = {row.identity for row in rows if row.identity}
-    pending = [
-        row
-        for row in rows
-        if (row.ids.get("doi") or "")
-        and row.status != "error"
-        and _wanted(row, only_dois)
-        and not (only_without_refs and _has_outgoing(row, rows))
-    ]
+    pending = _gap_rows(rows, only_dois)
     if tally is not None and pending:
         tally.stage = backend
         tally.track(len(pending))
@@ -433,17 +441,131 @@ def fill_payload_backend(
             tally.advance(1)
         else:
             _fill_empty(row, payload, backend=backend)
+        new_rows = _neighbor_rows(
+            row,
+            _ref_dicts(payload),
+            known,
+            backend=backend,
+            per_hop_limit=per_hop_limit,
+            direction=direction,
+        )
+        if tally is not None and backend == "europepmc":
+            tally.papers += len(new_rows)
+        added.extend(new_rows)
+    return added
+
+
+def fill_europepmc(
+    rows: list[Candidate],
+    *,
+    cache_dir: Path,
+    per_hop_limit: int,
+    direction: str,
+    tally: Any = None,
+    only_dois: set[str] | None = None,
+) -> list[Candidate]:
+    """Batch Europe PMC over hop-0 works that still have no outgoing references.
+
+    A spread of that queue that misses the index skips the rest.
+    """
+    from .europepmc import BATCH_SIZE, PROBE_SIZE, cached_payload, lookup_dois, spread_dois
+
+    pending = _gap_rows(rows, only_dois)
+    if tally is not None and pending:
+        tally.stage = "europepmc"
+        tally.track(len(pending))
+    if not pending:
+        return []
+    added: list[Candidate] = []
+    known = {row.identity for row in rows if row.identity}
+    uncached: list[Candidate] = []
+    for row in pending:
+        hit, payload = cached_payload(row.ids.get("doi") or "", cache_dir)
+        if not hit:
+            uncached.append(row)
+            continue
         added.extend(
-            _neighbor_rows(
-                row,
-                _ref_dicts(payload),
-                known,
-                backend=backend,
-                per_hop_limit=per_hop_limit,
-                direction=direction,
+            _apply_europepmc_row(
+                row, payload, known=known, per_hop_limit=per_hop_limit, direction=direction, tally=tally
             )
         )
+    if not uncached:
+        return added
+    probe = spread_dois([row.ids.get("doi") or "" for row in uncached], PROBE_SIZE)
+    probe_set = {doi.lower() for doi in probe}
+    try:
+        found = lookup_dois(probe, cache_dir=cache_dir)
+    except FillPaused as exc:
+        _raise_paused(added, _remaining_dois(uncached, uncached[0]), exc)
+    if tally is not None:
+        tally.searches += len(probe)
+    in_index = sum(1 for payload in found.values() if payload)
+    for row in uncached:
+        doi = (row.ids.get("doi") or "").lower()
+        if doi not in probe_set:
+            continue
+        added.extend(
+            _apply_europepmc_row(
+                row, found.get(doi), known=known, per_hop_limit=per_hop_limit, direction=direction, tally=tally
+            )
+        )
+    rest = [row for row in uncached if (row.ids.get("doi") or "").lower() not in probe_set]
+    if in_index == 0 and rest:
+        if tally is not None:
+            tally.emit(f"europepmc · {len(probe)} searched · 0 in index · skipped {len(rest)}")
+            tally.advance(len(rest))
+        return added
+    for index in range(0, len(rest), BATCH_SIZE):
+        chunk = rest[index : index + BATCH_SIZE]
+        try:
+            found = lookup_dois([row.ids.get("doi") or "" for row in chunk], cache_dir=cache_dir)
+        except FillPaused as exc:
+            _raise_paused(added, _remaining_dois(uncached, chunk[0]), exc)
+        if tally is not None:
+            tally.searches += len(chunk)
+        for row in chunk:
+            doi = (row.ids.get("doi") or "").lower()
+            added.extend(
+                _apply_europepmc_row(
+                    row,
+                    found.get(doi),
+                    known=known,
+                    per_hop_limit=per_hop_limit,
+                    direction=direction,
+                    tally=tally,
+                )
+            )
     return added
+
+
+def _apply_europepmc_row(
+    row: Candidate,
+    payload: dict[str, Any] | None,
+    *,
+    known: set[str],
+    per_hop_limit: int,
+    direction: str,
+    tally: Any,
+) -> list[Candidate]:
+    if tally is not None:
+        tally.advance(1)
+    if not payload:
+        return []
+    if tally is not None:
+        tally.fields += _fill_empty(row, payload, backend="europepmc")
+    else:
+        _fill_empty(row, payload, backend="europepmc")
+    new_rows = _neighbor_rows(
+        row,
+        _ref_dicts(payload),
+        known,
+        backend="europepmc",
+        per_hop_limit=per_hop_limit,
+        direction=direction,
+    )
+    if tally is not None:
+        tally.papers += len(new_rows)
+    return new_rows
 
 
 def run_fill_pass(
@@ -457,6 +579,7 @@ def run_fill_pass(
     per_hop_limit: int,
     direction: str,
     tally: Any = None,
+    europepmc_cache: Path | None = None,
 ) -> dict[str, list[str]]:
     """Walk citation backends in order. A pause continues the pass, then one retry."""
     paused: dict[str, list[str]] = {}
@@ -466,6 +589,23 @@ def run_fill_pass(
         for name in names:
             only = {doi.lower() for doi in paused.get(name, [])} if retry else None
             if retry and not only:
+                continue
+            if name == "europepmc" and europepmc_cache is not None:
+                try:
+                    added = fill_europepmc(
+                        rows,
+                        cache_dir=europepmc_cache,
+                        per_hop_limit=per_hop_limit,
+                        direction=direction,
+                        tally=tally,
+                        only_dois=only,
+                    )
+                except FillPaused as exc:
+                    rows.extend(exc.added)
+                    paused[exc.backend] = list(exc.remaining)
+                    continue
+                rows.extend(added)
+                paused.pop(name, None)
                 continue
             getter = {
                 "crossref": crossref_getter,
@@ -493,7 +633,6 @@ def run_fill_pass(
                         direction=direction,
                         tally=tally,
                         only_dois=only,
-                        only_without_refs=name == "pdf",
                     )
             except FillPaused as exc:
                 paused[exc.backend] = list(exc.remaining)

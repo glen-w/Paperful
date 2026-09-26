@@ -201,7 +201,7 @@ def test_tally_line_names_the_totals():
     row = Candidate(
         "r",
         {"type": "doi", "value": "x"},
-        1,
+        0,
         "refs",
         {"doi": "10.1/b"},
         {},
@@ -1357,14 +1357,20 @@ def test_hybrid_and_overlap(tmp_path: Path):
 
 
 def test_crossref_fills_empty_and_s2_does_not_overwrite(tmp_path: Path):
-    works = {
-        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 1, refs=["W2"]),
-        "W2": _work("W2", "10.1000/new", "", 2021, 0),
-    }
-    works["W2"]["display_name"] = ""
-    works["W2"]["publication_year"] = None
-    works["W2"]["primary_location"] = {}
-    works["W2"]["authorships"] = []
+    from paperful.snowball.fill import run_fill_pass
+
+    gap = Candidate(
+        "r",
+        {"type": "doi", "value": "10.1000/gap"},
+        0,
+        "refs",
+        {"doi": "10.1000/gap"},
+        {},
+        "seed",
+        "new",
+        {"backend": "openalex"},
+        "dry-run",
+    )
     called = {"s2": 0}
 
     def crossref(doi: str) -> dict:
@@ -1372,8 +1378,28 @@ def test_crossref_fills_empty_and_s2_does_not_overwrite(tmp_path: Path):
 
     def s2(doi: str) -> dict:
         called["s2"] += 1
-        return {}
+        return {"title": "Should not replace", "year": 1999, "venue": "Other", "authors": ["Other"]}
 
+    run_fill_pass(
+        [gap],
+        ("crossref", "semanticscholar"),
+        crossref_getter=crossref,
+        s2_getter=s2,
+        europepmc_getter=None,
+        pdf_getter=None,
+        per_hop_limit=5,
+        direction="refs",
+    )
+    assert gap.biblio["title"] == "Filled"
+    assert gap.biblio["venue"] == "Nature"
+    assert called["s2"] == 1
+
+    works = {
+        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 1, refs=["W2"]),
+        "W2": _work("W2", "10.1000/new", "", 2021, 0),
+    }
+    works["W2"]["display_name"] = ""
+    asked: list[str] = []
     result = run_doi(
         _cfg(tmp_path),
         ["10.1000/seed"],
@@ -1381,14 +1407,13 @@ def test_crossref_fills_empty_and_s2_does_not_overwrite(tmp_path: Path):
         console=Console(highlight=False, width=160),
         client=_client(works),
         lookup=lambda doi, title: None,
-        crossref_getter=crossref,
-        s2_getter=s2,
+        crossref_getter=lambda doi: asked.append(f"crossref:{doi}") or {"title": "Filled"},
+        s2_getter=lambda doi: asked.append(f"s2:{doi}") or {},
     )
     rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
-    filled = next(row for row in rows if row["ids"]["doi"] == "10.1000/new")
-    assert filled["biblio"]["title"] == "Filled"
-    assert filled["biblio"]["venue"] == "Nature"
-    assert called["s2"] == 1
+    neighbour = next(row for row in rows if row["ids"]["doi"] == "10.1000/new")
+    assert neighbour["biblio"]["title"] == ""
+    assert asked == []
 
 
 def test_approve_each_yes_no_and_cap(tmp_path: Path):
@@ -1519,9 +1544,10 @@ def test_deep_gates_backends_and_fill(tmp_path: Path, monkeypatch: pytest.Monkey
 
     monkeypatch.delenv("SEMANTIC_SCHOLAR_API_KEY", raising=False)
 
+    asked: list[str] = []
+
     def s2(doi: str) -> dict:
-        if doi != "10.1000/new":
-            return {}
+        asked.append(doi)
         return {
             "title": "Should not replace",
             "references": [{"title": "Extra", "year": 2017, "externalIds": {"DOI": "10.1000/s2"}}],
@@ -1537,9 +1563,8 @@ def test_deep_gates_backends_and_fill(tmp_path: Path, monkeypatch: pytest.Monkey
         s2_getter=s2,
     )
     s2_rows = [json.loads(line) for line in (s2_run.run_dir / "candidates.jsonl").read_text().splitlines()]
-    extra = next(row for row in s2_rows if row["ids"]["doi"] == "10.1000/s2")
-    assert extra["provenance"]["backend"] == "semanticscholar"
-    assert extra["why"].startswith("s2 ref")
+    assert all(row["ids"]["doi"] != "10.1000/s2" for row in s2_rows)
+    assert asked == []
     assert normalize_direction("all") == "both"
 
     cache = tmp_path / "cache"
@@ -2565,13 +2590,14 @@ def test_fill_pause_continues_and_retries_then_writes_settled(tmp_path: Path, mo
         per_hop_limit=15,
         direction="refs",
     )
-    assert paused.get("semanticscholar")
-    assert "10.1000/seed" in paused["semanticscholar"]
-    assert order_seen[:3] == ["semanticscholar", "europepmc", "pdf"]
-    assert calls.count("s2:10.1000/seed") == 2
+    # Europe PMC closed the reference gap, so the Semantic Scholar pause is not retried.
+    assert paused == {}
+    assert order_seen == ["semanticscholar", "europepmc"]
+    assert "pdf" not in order_seen
+    assert calls.count("s2:10.1000/seed") == 1
     dois = {row.ids["doi"] for row in rows}
     assert "10.1000/from-epmc" in dois
-    assert "10.1000/from-pdf" in dois
+    assert "10.1000/from-pdf" not in dois
 
     works = {
         "W1": _work("W1", "10.1000/seed", "Seed", 2020, 1, refs=["W2"]),
@@ -2598,13 +2624,13 @@ def test_fill_pause_continues_and_retries_then_writes_settled(tmp_path: Path, mo
         backend=lib,
         s2_getter=s2,
     )
-    assert result.exit_code == 1
-    assert (result.run_dir / "deferred.json").is_file()
+    assert result.exit_code == 0
+    assert not (result.run_dir / "deferred.json").is_file()
     created = set(lib.created)
-    assert "10.1000/new" not in created
-    assert "10.1000/from-epmc" in created
-    assert "10.1000/new" not in fetched
-    assert "10.1000/from-epmc" in fetched
+    # OpenAlex already listed this neighbour, so no citation backend is asked.
+    assert "10.1000/new" in created
+    assert "10.1000/from-epmc" not in created
+    assert "10.1000/from-epmc" not in fetched
 
 
 def test_fill_order_follows_backends_and_cached_pdf_is_written(tmp_path: Path):

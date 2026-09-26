@@ -738,11 +738,8 @@ def _execute(
     if "europepmc" in backends_early and client is None:
         from .europepmc import europepmc_work
 
-        oa.epmc_getter = europepmc_work
-    if "europepmc" in backends_early and client is None:
-        from .europepmc import europepmc_work
-
-        oa.epmc_getter = europepmc_work
+        oa.epmc_cache_dir = cfg.state_dir / "snowball" / "cache" / "europepmc"
+        oa.epmc_getter = lambda doi, _cache=oa.epmc_cache_dir: europepmc_work(doi, cache_dir=_cache)
     tally.start()
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     gate = request.gate
@@ -815,6 +812,7 @@ def _execute(
         crossref_getter=crossref_getter,
         s2_getter=s2_getter,
         europepmc_getter=getattr(oa, "epmc_getter", None),
+        europepmc_cache=getattr(oa, "epmc_cache_dir", None),
         pdf_getter=getattr(oa, "pdf_getter", None),
         per_hop_limit=caps[1],
         direction=direction,
@@ -1194,6 +1192,7 @@ def _fill_metadata(
     direction: str,
     tally: Tally | None = None,
     europepmc_getter: Any = None,
+    europepmc_cache: Any = None,
     pdf_getter: Any = None,
 ) -> tuple[list[Candidate], dict[str, list[str]]]:
     del console, request
@@ -1208,10 +1207,15 @@ def _fill_metadata(
 
         def s2_getter(doi: str, _cache: Any = cache, _key: str = key) -> dict | None:
             return s2_paper(doi, cache_dir=_cache, api_key=_key)
+    if live and "europepmc" in backends and europepmc_cache is None:
+        europepmc_cache = cfg.state_dir / "snowball" / "cache" / "europepmc"
     if europepmc_getter is None and live and "europepmc" in backends:
         from .europepmc import europepmc_work
 
-        europepmc_getter = europepmc_work
+        cache = europepmc_cache
+
+        def europepmc_getter(doi: str, _cache: Any = cache) -> dict | None:
+            return europepmc_work(doi, cache_dir=_cache)
     if pdf_getter is None and live and "pdf" in backends:
         from .bibliography import pdf_payload_for_row
 
@@ -1229,6 +1233,7 @@ def _fill_metadata(
         per_hop_limit=per_hop_limit,
         direction=direction,
         tally=tally,
+        europepmc_cache=europepmc_cache if live and "europepmc" in backends else None,
     )
     return rows, paused
 

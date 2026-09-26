@@ -331,24 +331,34 @@ Short 429s and 5xx responses retry with exponential backoff. A reset of a minute
 dry-run, or with `--force`. It refuses to store a key.
 
 Backends resolve in the configured order and emit each work once, keyed by DOI.
-The default is OpenAlex, then Crossref (empty fields and DOI references), Semantic Scholar
-(reference gaps, with or without a key), ORCID (the person’s own work list), Europe PMC
-citations, then an open-PDF bibliography. Reorder `backends` when a key or proxy makes
+The default is OpenAlex, then Crossref, Semantic Scholar
+(with or without a key), ORCID (the person’s own work list), Europe PMC,
+then an open-PDF bibliography. Reorder `backends` when a key or proxy makes
 a later source the better first try. OpenAlex wins when it and a later backend
 disagree on a field that both filled. A 429 or 5xx pauses that backend and the pass
 continues with the next one. After the pass, each paused backend is tried once more
 on only its remaining DOIs. DOIs still blocked stay in `deferred.json`. Items no
 paused backend still lists are created, and their PDFs are fetched when `fetch_pdfs`
 is `fast` or `full`. An open PDF already downloaded for the bibliography is written
-onto the item. Semantic Scholar responses are cached under `state/snowball/cache/`.
+onto the item. Semantic Scholar responses are cached under `state/snowball/cache/`. Europe PMC
+misses and hits are cached under `state/snowball/cache/europepmc/`. Crossref,
+Semantic Scholar, Europe PMC, and the open-PDF bibliography ask only for hop-0
+works that still have no outgoing references. Neighbours and citing works are
+left alone. A backend that adds references closes the gap, so the next one is
+not asked. Europe PMC searches those gaps in batches, and fetches a reference
+list only when the record has one. A MEDLINE id with no DOI is resolved when
+Europe PMC has a DOI for it. When a spread of the remaining queue is absent
+from the index, the rest of that pass is skipped.
+
 `backends` must include `openalex`. An unknown name is a config error. Dropping
 `orcid` skips the public works list and keeps the OpenAlex author filter.
 
 When OpenAlex lists no `referenced_works` for a seed, a refs hop does not treat
 that as “cites nothing”. It asks Semantic Scholar, then Europe PMC, then an open
 PDF bibliography, and resolves entries back to OpenAlex (DOI match, or a strict
-title match). A pause on one of those sources does not stop the hop. Cited-by
-stays OpenAlex-only.
+title match). The Europe PMC lookup is the same cached search as the fill pass:
+a list is fetched only when the record has one. A pause on one of those sources
+does not stop the hop. Cited-by stays OpenAlex-only.
 
 `snowball run --profile NAME` prints that profile’s one-line description
 before any request. `mode` is `search`, `hybrid`, `doi`, `orcid`, or

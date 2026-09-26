@@ -46,7 +46,7 @@ def colour_for(stage: str) -> str:
         return "green"
     if "pdf" in step:
         return "cyan"
-    if step.startswith("crossref") or step.startswith("semantic"):
+    if step.startswith("crossref") or step.startswith("semantic") or step.startswith("europepmc"):
         return "magenta"
     if "cited-by" in step:
         return "blue"
