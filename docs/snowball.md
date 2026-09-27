@@ -108,6 +108,15 @@ works per paper. `--per-hop-rank` chooses which ones: `most-cited` (default),
 neighbour or every row. After that hop, `max_candidates` (default 200) can
 still cut the `new` + `exists` list.
 
+`--cites-query` keeps citing works whose title, abstract, or full text matches
+that OpenAlex search. It is sent with `filter=cites:`. References are not
+filtered. The direction must include cites, and depth must be at least 1.
+`--per-hop-limit all` and `--max-candidates all` still apply to the matches.
+
+```text
+paperful snowball doi 10.1016/j.jclepro.2022.132764 --depth 1 --direction cites --per-hop-limit all --max-candidates all --cites-query degrowth
+```
+
 ```text
 paperful snowball orcid 0000-0002-9162-9618 --depth 1 --direction both --per-hop-limit 25 --per-hop-rank most-cited --max-candidates all
 ```
@@ -213,6 +222,7 @@ The picture is [How a hop is cut](#how-a-hop-is-cut).
 | `max_candidates` | 200 | Stops after this many `new` + `exists` rows. `all` (or `0`) keeps every row |
 | `per_hop_limit` | 50 | Neighbours kept per seed work per hop (references and cited-by). `all` (or `0`) keeps every one OpenAlex returns |
 | `per_hop_rank` | `most-cited` | How a numeric `per_hop_limit` picks neighbours: `most-cited`, `least-cited`, or `random` |
+| `cites_query` | unset | OpenAlex search on every cited-by request (title, abstract, or full text). References stay unfiltered. Needs a direction that includes cites and depth of at least 1 |
 | `year_from` / `year_to` | unset | Drop candidates outside the window |
 | `types` | journal-article-shaped | OpenAlex / Zotero types |
 | `oa_only` | false | Metadata filter only. It does not change the PDF chain |
@@ -412,7 +422,7 @@ Adjacent tools, and the piece worth copying:
 | [litsearch](https://pypi.org/project/litsearch/), [lit-review-mcp](https://github.com/Bethww/lit-review-mcp), [CoLRev](https://colrev-environment.github.io/colrev/) | Flag ideas | The review project, the report, the screener |
 | [Citation Gecko](https://github.com/CitationGecko/gecko-react) | Overlap rank: neighbours score `overlap * 1000 + cited_by_count` | The network UI |
 | [zotero-snowball](https://github.com/socratic-irony/zotero-snowball), [Citegeist](https://github.com/phdemotions/zotero-citegeist) | — | In-Zotero one-hop dialogs |
-| [pyalex](https://github.com/J535D165/pyalex) | — | A second HTTP client. Snowball extends the client paperful already uses for OpenAlex (mailto, sleep, backoff) |
+| [pyalex](https://github.com/J535D165/pyalex) | — | A second HTTP client. Snowball extends the client Paperful already uses for OpenAlex (mailto, sleep, backoff) |
 
 ResearchRabbit, Litmaps, Connected Papers, Inciteful, Elicit, Consensus,
 Scite, and Lens.org stay outside. `--refine` can suggest further queries behind

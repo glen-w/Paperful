@@ -78,6 +78,7 @@ def request_from_profile(raw: dict[str, Any], cfg: Config) -> SnowballRequest:
         keyword_limit=raw.get("keyword_limit"),
         keyword_hop_limit=raw.get("keyword_hop_limit"),
         keyword_min_score=raw.get("keyword_min_score"),
+        cites_query=str(raw.get("cites_query") or "").strip(),
         dedupe_scope=str(raw["dedupe_scope"]) if raw.get("dedupe_scope") else None,
         tag_prefix=str(raw["tag_prefix"]) if raw.get("tag_prefix") else None,
         types=_strs(raw.get("types")) if "types" in raw else None,

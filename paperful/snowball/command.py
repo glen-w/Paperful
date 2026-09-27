@@ -22,6 +22,7 @@ from .expand import (
     apply_filters,
     clamp_depth,
     keyword_depth,
+    direction_sides,
     normalize_direction,
     parse_keyword_hop_limit,
     parse_keyword_limit,
@@ -102,6 +103,7 @@ class SnowballRequest:
     refine: bool | None = None
     link_versions: bool = False
     from_created_date: str | None = None
+    cites_query: str = ""
 
 
 @dataclass
@@ -134,6 +136,7 @@ def run_search(
     except ValueError as exc:
         raise SnowballError(str(exc)) from exc
     keywords = _keyword_caps(cfg, request)
+    cites_query = _checked_cites_query(request, direction, expands=depth >= 1)
     return _execute(
         cfg,
         request,
@@ -164,6 +167,7 @@ def run_search(
             keyword_limit=keywords[0],
             keyword_hop_limit=keywords[1],
             keyword_min_score=keywords[2],
+            cites_query=cites_query,
         ),
     )
 
@@ -192,6 +196,7 @@ def run_hybrid(
     except ValueError as exc:
         raise SnowballError(str(exc)) from exc
     keywords = _keyword_caps(cfg, request)
+    cites_query = _checked_cites_query(request, direction, expands=True)
     seeds = request.hybrid_seeds if request.hybrid_seeds is not None else cfg.snowball_hybrid_seeds
 
     def crawl(oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int, str]) -> tuple[list[Candidate], list[str]]:
@@ -211,6 +216,7 @@ def run_hybrid(
             keyword_limit=keywords[0],
             keyword_hop_limit=keywords[1],
             keyword_min_score=keywords[2],
+            cites_query=cites_query,
         )
 
     return _execute(
@@ -253,6 +259,7 @@ def run_doi(
         raise SnowballError(str(exc)) from exc
     keywords = _keyword_caps(cfg, request)
     depth, warning = clamp_depth(_graph_depth(cfg, request))
+    cites_query = _checked_cites_query(request, direction, expands=depth >= 1)
     cleaned = [d.strip() for d in dois if d.strip()]
     if not cleaned:
         raise SnowballError("Pass at least one DOI.")
@@ -274,6 +281,7 @@ def run_doi(
             keyword_limit=keywords[0],
             keyword_hop_limit=keywords[1],
             keyword_min_score=keywords[2],
+            cites_query=cites_query,
         )
 
     return _execute(
@@ -315,6 +323,7 @@ def run_orcid(
         raise SnowballError(str(exc)) from exc
     keywords = _keyword_caps(cfg, request)
     depth, warning = clamp_depth(_graph_depth(cfg, request))
+    cites_query = _checked_cites_query(request, direction, expands=depth >= 1)
     backends = _backends(cfg, request)
     if "orcid" in backends:
         try:
@@ -343,6 +352,7 @@ def run_orcid(
             keyword_limit=keywords[0],
             keyword_hop_limit=keywords[1],
             keyword_min_score=keywords[2],
+            cites_query=cites_query,
         )
 
     return _execute(
@@ -377,6 +387,7 @@ def run_collection(
         raise SnowballError(str(exc)) from exc
     keywords = _keyword_caps(cfg, request)
     depth, warning = clamp_depth(_graph_depth(cfg, request))
+    cites_query = _checked_cites_query(request, direction, expands=depth >= 1)
     lib = backend
     try:
         lib = lib or get_backend(cfg)
@@ -406,6 +417,7 @@ def run_collection(
             keyword_limit=keywords[0],
             keyword_hop_limit=keywords[1],
             keyword_min_score=keywords[2],
+            cites_query=cites_query,
         )
 
     return _execute(
@@ -723,6 +735,18 @@ def _keyword_caps(cfg: Config, request: SnowballRequest) -> tuple[int, int, floa
     except ValueError as exc:
         raise SnowballError(str(exc)) from exc
     return limit, hop, score
+
+
+def _checked_cites_query(request: SnowballRequest, direction: str, *, expands: bool) -> str:
+    """OpenAlex text search for cited-by. Empty when the flag is unset."""
+    query = (request.cites_query or "").strip()
+    if not query:
+        return ""
+    if "cites" not in direction_sides(direction):
+        raise SnowballError("--cites-query needs a direction that includes cites.")
+    if not expands:
+        raise SnowballError("--cites-query needs depth of at least 1.")
+    return query
 
 
 def _rank(value: str | None, default: str) -> str:
@@ -1367,6 +1391,9 @@ def _summary_meta(
         "filtered": filtered,
         "dedupe_scope": scope,
     }
+    cites_query = (request.cites_query or "").strip()
+    if cites_query:
+        meta["cites_query"] = cites_query
     refine = cfg.snowball_refine if request.refine is None else request.refine
     if not refine:
         return meta

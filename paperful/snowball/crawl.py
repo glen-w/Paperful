@@ -128,6 +128,21 @@ def _cite_fetch_limit(per_hop_limit: int, rank: str) -> int:
     return per_hop_limit
 
 
+def _cites_why(prefix: str, query: str) -> str:
+    text = f"cites {prefix}"
+    if query:
+        return f"{text} · {query}"
+    return text
+
+
+def _remember_cites_query(client: OpenAlexClient, cites_query: str) -> None:
+    client.cites_query = (cites_query or "").strip()
+
+
+def _cites_query(client: OpenAlexClient) -> str:
+    return str(getattr(client, "cites_query", "") or "").strip()
+
+
 def search_candidates(
     client: OpenAlexClient,
     query: str,
@@ -145,6 +160,7 @@ def search_candidates(
     keyword_limit: int = 3,
     keyword_hop_limit: int = 50,
     keyword_min_score: float = 0.0,
+    cites_query: str = "",
 ) -> list[Candidate]:
     _remember_keywords(
         client,
@@ -152,6 +168,7 @@ def search_candidates(
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
     )
+    _remember_cites_query(client, cites_query)
     seed = {"type": "keyword", "value": query}
     client.stage = "OpenAlex search"
     client.note(client.stage)
@@ -228,6 +245,7 @@ def doi_candidates(
     keyword_limit: int = 3,
     keyword_hop_limit: int = 50,
     keyword_min_score: float = 0.0,
+    cites_query: str = "",
 ) -> tuple[list[Candidate], list[str]]:
     """Return neighbours of each DOI and DOIs that failed to resolve."""
     _remember_keywords(
@@ -236,6 +254,7 @@ def doi_candidates(
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
     )
+    _remember_cites_query(client, cites_query)
     client.keyword_defer_empty_raise = True
     rows: list[Candidate] = []
     failed: list[str] = []
@@ -339,6 +358,7 @@ def orcid_candidates(
     keyword_limit: int = 3,
     keyword_hop_limit: int = 50,
     keyword_min_score: float = 0.0,
+    cites_query: str = "",
 ) -> tuple[list[Candidate], list[str]]:
     """Person's works (hop 0), then the same expander as DOI seeds."""
     _remember_keywords(
@@ -347,6 +367,7 @@ def orcid_candidates(
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
     )
+    _remember_cites_query(client, cites_query)
     seed = {"type": "orcid", "value": orcid}
     rows: list[Candidate] = []
     failed: list[str] = []
@@ -552,6 +573,7 @@ def _defer(client: OpenAlexClient, exc: BaseException, **fields: Any) -> None:
     fields.setdefault("keyword_limit", limit)
     fields.setdefault("keyword_hop_limit", hop_limit)
     fields.setdefault("keyword_min_score", min_score)
+    fields.setdefault("cites_query", _cites_query(client))
     client.deferred = {
         "reset_at": getattr(exc, "reset_at", None),
         "reset_in_s": getattr(exc, "reset_in_s", None),
@@ -915,8 +937,12 @@ def _expand_hops(
                 )
             ]
             if citing_seeds:
+                query = _cites_query(client)
                 client.stage = f"hop {hop}/{depth} cited-by"
-                client.note(f"hop {hop}/{depth} cited-by · {len(citing_seeds)} seeds")
+                label = f"hop {hop}/{depth} cited-by · {len(citing_seeds)} seeds"
+                if query:
+                    label = f"{label} · {query}"
+                client.note(label)
                 if client.tally is not None:
                     client.tally.track(len(citing_seeds))
                 cite_limit = _cite_fetch_limit(per_hop_limit, rank)
@@ -932,6 +958,7 @@ def _expand_hops(
                             year_from=year_from,
                             year_to=year_to,
                             sort=cite_sort,
+                            search=query or None,
                         )
                     except Exception as exc:
                         remaining = [
@@ -972,7 +999,7 @@ def _expand_hops(
                             seed=seed,
                             hop=hop,
                             direction="cites",
-                            why=f"cites {why_prefix}",
+                            why=_cites_why(why_prefix, query),
                             gate=gate,
                         )
                         if _mark_year(row, year_from, year_to):
@@ -1197,6 +1224,7 @@ def hybrid_candidates(
     keyword_limit: int = 3,
     keyword_hop_limit: int = 50,
     keyword_min_score: float = 0.0,
+    cites_query: str = "",
 ) -> tuple[list[Candidate], list[str]]:
     """Keyword hits, then one hop from the top DOI hits."""
     hits = search_candidates(
@@ -1215,6 +1243,7 @@ def hybrid_candidates(
         keyword_limit=keyword_limit,
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
+        cites_query=cites_query,
     )
     ranked = sorted(
         [row for row in hits if row.ids.get("doi") and row.status != "error"],
@@ -1240,6 +1269,7 @@ def hybrid_candidates(
         keyword_limit=keyword_limit,
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
+        cites_query=cites_query,
     )
     return truncate(_dedupe(hits + neighbours), max_candidates), failed
 
@@ -1257,6 +1287,7 @@ def continue_deferred(client: OpenAlexClient, deferred: dict[str, Any]) -> list[
     year_to = deferred.get("year_to")
     why = str(deferred.get("why_prefix") or "resume")
     remaining = [str(item) for item in (deferred.get("remaining_ids") or []) if item]
+    _remember_cites_query(client, str(deferred.get("cites_query") or ""))
     rows: list[Candidate] = []
 
     def _row(work: dict[str, Any], direction: str, reason: str) -> Candidate:
@@ -1376,8 +1407,12 @@ def continue_deferred(client: OpenAlexClient, deferred: dict[str, Any]) -> list[
                 client.tally.advance(1)
         return rows
     if kind == "cites":
+        query = _cites_query(client)
         client.stage = "resume cited-by"
-        client.note(f"resume cited-by · {len(remaining)} seeds")
+        label = f"resume cited-by · {len(remaining)} seeds"
+        if query:
+            label = f"{label} · {query}"
+        client.note(label)
         if client.tally is not None:
             client.tally.track(len(remaining))
         cite_limit = _cite_fetch_limit(per_hop, rank)
@@ -1392,6 +1427,7 @@ def continue_deferred(client: OpenAlexClient, deferred: dict[str, Any]) -> list[
                     year_from=year_from,
                     year_to=year_to,
                     sort=cite_sort,
+                    search=query or None,
                 )
             except OpenAlexBudgetExceeded as exc:
                 _defer(client, exc, **{**deferred, "remaining_ids": remaining[index - 1 :]})
@@ -1400,7 +1436,7 @@ def continue_deferred(client: OpenAlexClient, deferred: dict[str, Any]) -> list[
                 citing = select_works_by_citations(citing, per_hop, "random")
             elif per_hop > 0:
                 citing = citing[:per_hop]
-            rows.extend(_row(child, "cites", f"cites {why}") for child in citing)
+            rows.extend(_row(child, "cites", _cites_why(why, query)) for child in citing)
             if client.tally is not None:
                 client.tally.advance(1)
         return rows

@@ -195,6 +195,14 @@ KeywordMinScoreOpt = typer.Option(
     "--keyword-min-score",
     help="Drop seed keywords below this similarity. 0 keeps whatever OpenAlex assigned.",
 )
+CitesQueryOpt = typer.Option(
+    None,
+    "--cites-query",
+    help=(
+        "Only citing works that match this OpenAlex search (title, abstract, or full text). "
+        "Needs a direction that includes cites, and depth of at least 1. References are unchanged."
+    ),
+)
 DIRECTION_HELP = (
     "refs, cites, both, keywords, similar, refs+keywords, cites+keywords, "
     "refs+similar, or refs+cites+keywords. both stays references plus cited-by."
@@ -4057,6 +4065,7 @@ def _snowball_request(
     keyword_limit: str | int | None = None,
     keyword_hop_limit: str | int | None = None,
     keyword_min_score: float | None = None,
+    cites_query: str | None = None,
     languages: str | None = None,
     min_seed_citations: int | None = None,
     note_provenance: bool | None = None,
@@ -4080,6 +4089,7 @@ def _snowball_request(
         keyword_limit=keyword_limit,
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
+        cites_query=(cites_query or "").strip(),
         languages=_csv(languages) if languages else None,
         min_seed_citations=min_seed_citations,
         note_provenance=note_provenance,
@@ -4119,6 +4129,7 @@ def snowball_search(
     keyword_limit: str | None = KeywordLimitOpt,
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
+    cites_query: str | None = CitesQueryOpt,
     gate: str | None = typer.Option(
         None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
     ),
@@ -4148,6 +4159,7 @@ def snowball_search(
         keyword_limit=keyword_limit,
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
+        cites_query=(cites_query or "").strip(),
         languages=languages,
         min_seed_citations=min_seed_citations,
         note_provenance=note_provenance,
@@ -4172,6 +4184,7 @@ def snowball_hybrid(
     keyword_limit: str | None = KeywordLimitOpt,
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
+    cites_query: str | None = CitesQueryOpt,
     gate: str | None = typer.Option(None, "--gate", help="dry-run, approve-each, approve-batch, or auto."),
     collection: str = typer.Option("", "--collection", "-C", help="Target collection for a writing gate."),
     fetch_pdfs: str | None = FetchPdfsOpt,
@@ -4197,6 +4210,7 @@ def snowball_hybrid(
         keyword_limit=keyword_limit,
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
+        cites_query=(cites_query or "").strip(),
         languages=languages,
         min_seed_citations=min_seed_citations,
         hybrid_seeds=hybrid_seeds,
@@ -4220,6 +4234,7 @@ def snowball_doi(
     keyword_limit: str | None = KeywordLimitOpt,
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
+    cites_query: str | None = CitesQueryOpt,
     gate: str | None = typer.Option(
         None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
     ),
@@ -4244,6 +4259,7 @@ def snowball_doi(
         keyword_limit=keyword_limit,
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
+        cites_query=(cites_query or "").strip(),
     )
     from .snowball.command import run_doi
 
@@ -4263,6 +4279,7 @@ def snowball_orcid(
     keyword_limit: str | None = KeywordLimitOpt,
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
+    cites_query: str | None = CitesQueryOpt,
     gate: str | None = typer.Option(
         None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
     ),
@@ -4287,6 +4304,7 @@ def snowball_orcid(
         keyword_limit=keyword_limit,
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
+        cites_query=(cites_query or "").strip(),
     )
     from .snowball.command import run_orcid
 
@@ -4306,6 +4324,7 @@ def snowball_collection(
     keyword_limit: str | None = KeywordLimitOpt,
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
+    cites_query: str | None = CitesQueryOpt,
     gate: str | None = typer.Option(
         None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
     ),
@@ -4336,6 +4355,7 @@ def snowball_collection(
         keyword_limit=keyword_limit,
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
+        cites_query=(cites_query or "").strip(),
     )
     from .snowball.command import run_collection
 
@@ -4399,6 +4419,7 @@ def snowball_run(
     keyword_limit: str | None = KeywordLimitOpt,
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
+    cites_query: str | None = CitesQueryOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Run a saved snowball profile (keyword, DOI, ORCID, or collection)."""
@@ -4424,6 +4445,8 @@ def snowball_run(
             request.keyword_hop_limit = keyword_hop_limit
         if keyword_min_score is not None:
             request.keyword_min_score = keyword_min_score
+        if cites_query is not None and cites_query.strip():
+            request.cites_query = cites_query.strip()
         description = str(raw.get("description") or "").strip()
         if description:
             console.print(description)
@@ -4490,6 +4513,7 @@ def snowball_profile_save(
     keyword_limit: str | None = KeywordLimitOpt,
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
+    cites_query: str | None = CitesQueryOpt,
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     dedupe_scope: str = typer.Option("", "--dedupe-scope"),
@@ -4581,6 +4605,8 @@ def snowball_profile_save(
             raise SnowballError(str(exc)) from exc
     if keyword_min_score is not None:
         body["keyword_min_score"] = keyword_min_score
+    if cites_query and cites_query.strip():
+        body["cites_query"] = cites_query.strip()
     if year_from is not None:
         body["year_from"] = year_from
     if year_to is not None:

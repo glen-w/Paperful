@@ -377,8 +377,13 @@ class OpenAlexClient:
         year_to: int | None = None,
         sort: str | None = None,
         from_created_date: str | None = None,
+        search: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Works that cite ``openalex_id`` (OpenAlex ``filter=cites:``)."""
+        """Works that cite ``openalex_id`` (OpenAlex ``filter=cites:``).
+
+        ``search`` is OpenAlex's text search (title, abstract, or full text).
+        It is combined with the cites filter, not applied after the page.
+        """
         oa = short_id(openalex_id)
         if not oa:
             return []
@@ -391,6 +396,9 @@ class OpenAlexClient:
         if created:
             filters.append(f"from_created_date:{created}")
         params: dict[str, Any] = {"filter": ",".join(filters), "select": SELECT}
+        text = (search or "").strip()
+        if text:
+            params["search"] = text
         if sort:
             params["sort"] = sort
         return self._collect("/works", params, limit)

@@ -1946,6 +1946,287 @@ def test_budget_stop_keeps_partial_rows_and_resume(tmp_path: Path):
     assert "10.1000/cite" in saved
 
 
+def test_cites_query_filters_cited_by_and_keeps_references(tmp_path: Path):
+    works = {
+        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 5, ["W3"]),
+        "W2": _work("W2", "10.1000/degrowth", "Degrowth policy", 2023, 2),
+        "W3": _work("W3", "10.1000/ref", "Unrelated reference", 2018, 1),
+        "W4": _work("W4", "10.1000/other", "Unrelated citer", 2023, 9),
+    }
+    searches: list[str | None] = []
+
+    def getter(path: str, params: dict) -> dict:
+        if path.startswith("/works/https://doi.org/"):
+            doi = path.split("/works/https://doi.org/", 1)[1]
+            for work in works.values():
+                if work["doi"].endswith(doi):
+                    return work
+            return {}
+        filt = str(params.get("filter") or "")
+        if filt.startswith("openalex:"):
+            ids = filt.split(":", 1)[1].split("|")
+            return {"results": [works[item] for item in ids if item in works], "meta": {"count": 1}}
+        if "cites:" in filt:
+            searches.append(params.get("search"))
+            if params.get("search") == "degrowth":
+                return {"results": [works["W2"]], "meta": {"count": 1}}
+            return {"results": [works["W2"], works["W4"]], "meta": {"count": 2}}
+        return {"results": []}
+
+    result = run_doi(
+        _cfg(tmp_path),
+        ["10.1000/seed"],
+        SnowballRequest(
+            gate="dry-run",
+            direction="both",
+            depth=1,
+            per_hop_limit=10,
+            cites_query="degrowth",
+        ),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter),
+        lookup=lambda doi, title: None,
+    )
+    assert result.exit_code == 0
+    assert searches == ["degrowth"]
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    by_direction = {}
+    for row in rows:
+        by_direction.setdefault(row["direction"], []).append(row["biblio"]["title"])
+    assert by_direction["refs"] == ["Unrelated reference"]
+    assert by_direction["cites"] == ["Degrowth policy"]
+    cite = next(row for row in rows if row["direction"] == "cites")
+    assert cite["why"].endswith("· degrowth")
+    summary = json.loads((result.run_dir / "summary.json").read_text())
+    assert summary["cites_query"] == "degrowth"
+
+
+def test_cites_query_rejects_refs_only_and_depth_zero(tmp_path: Path):
+    cfg = _cfg(tmp_path)
+    console = Console(file=StringIO(), highlight=False, width=80)
+    with pytest.raises(SnowballError, match="direction that includes cites"):
+        run_doi(
+            cfg,
+            ["10.1000/seed"],
+            SnowballRequest(direction="refs", cites_query="degrowth"),
+            console=console,
+            client=_client({}),
+        )
+    with pytest.raises(SnowballError, match="depth of at least 1"):
+        run_doi(
+            cfg,
+            ["10.1000/seed"],
+            SnowballRequest(direction="cites", depth=0, cites_query="degrowth"),
+            console=console,
+            client=_client({}),
+        )
+
+
+def test_cites_query_survives_budget_resume(tmp_path: Path):
+    works = {
+        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 5),
+        "W2": _work("W2", "10.1000/degrowth", "Degrowth policy", 2023, 2),
+    }
+    calls = {"cites": 0}
+
+    def getter(path: str, params: dict) -> dict:
+        if path.startswith("/works/https://doi.org/"):
+            return works["W1"]
+        if "cites:" in str(params.get("filter") or ""):
+            calls["cites"] += 1
+            if calls["cites"] == 1:
+                raise OpenAlexBudgetExceeded("spent", reset_at="2000-01-01T00:00:00+00:00", reset_in_s=0)
+            assert params.get("search") == "degrowth"
+            return {"results": [works["W2"]], "meta": {"count": 1}}
+        return {"results": []}
+
+    client = OpenAlexClient(email="t@example.org", api_key="k", sleep_s=0, getter=getter)
+    client._using_key = True
+    cfg = _cfg(tmp_path)
+    result = run_doi(
+        cfg,
+        ["10.1000/seed"],
+        SnowballRequest(gate="dry-run", direction="cites", depth=1, per_hop_limit=10, cites_query="  degrowth "),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=client,
+        lookup=lambda doi, title: None,
+    )
+    assert result.exit_code == 1
+    deferred = json.loads((result.run_dir / "deferred.json").read_text())
+    assert deferred["cites_query"] == "degrowth"
+
+    resumed = run_resume(
+        cfg,
+        result.run_dir.name,
+        SnowballRequest(gate="dry-run"),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=OpenAlexClient(email="t@example.org", api_key="k", sleep_s=0, getter=getter),
+    )
+    assert resumed.exit_code == 0
+    saved = (resumed.run_dir / "candidates.jsonl").read_text()
+    assert "Degrowth policy" in saved
+    assert "· degrowth" in saved
+
+
+def test_cites_query_flag_and_profile(tmp_path: Path):
+    from paperful.snowball.profile import request_from_profile
+
+    help_text = runner.invoke(cli.app, ["snowball", "doi", "--help"])
+    assert help_text.exit_code == 0
+    assert "--cites-query" in help_text.stdout
+    loaded = request_from_profile(
+        {"direction": "cites", "cites_query": " degrowth "},
+        _cfg(tmp_path),
+    )
+    assert loaded.cites_query == "degrowth"
+
+
+def test_works_citing_sends_search_beside_the_cites_filter():
+    seen: list[dict] = []
+
+    def getter(path: str, params: dict) -> dict:
+        seen.append(dict(params))
+        return {"results": [], "meta": {"count": 0}}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    client.works_citing("W1", limit=1, search='  "post-growth"  ')
+    client.works_citing("W1", limit=1, search="   ")
+    assert seen[0]["search"] == '"post-growth"'
+    assert "cites:W1" in seen[0]["filter"]
+    assert "search" not in seen[1]
+
+
+def test_cites_query_reaches_the_second_hop(tmp_path: Path):
+    works = {
+        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 8),
+        "W2": _work("W2", "10.1000/hop1", "Degrowth policy", 2023, 3),
+        "W4": _work("W4", "10.1000/other", "Unrelated citer", 2023, 9),
+        "W5": _work("W5", "10.1000/hop2", "Degrowth and work", 2024, 1),
+        "W6": _work("W6", "10.1000/hop2b", "Unrelated neighbour", 2024, 4),
+    }
+    calls: list[tuple[str, str | None]] = []
+
+    def getter(path: str, params: dict) -> dict:
+        if path.startswith("/works/https://doi.org/"):
+            return works["W1"]
+        filt = str(params.get("filter") or "")
+        seed = ""
+        for part in filt.split(","):
+            if part.startswith("cites:"):
+                seed = part.split(":", 1)[1]
+        if not seed:
+            return {"results": []}
+        calls.append((seed, params.get("search")))
+        matched = {"W1": "W2", "W2": "W5"}.get(seed)
+        if params.get("search") == "degrowth" and matched:
+            return {"results": [works[matched]], "meta": {"count": 1}}
+        extras = {"W1": ["W2", "W4"], "W2": ["W5", "W6"]}.get(seed, [])
+        return {"results": [works[item] for item in extras], "meta": {"count": len(extras)}}
+
+    result = run_doi(
+        _cfg(tmp_path),
+        ["10.1000/seed"],
+        SnowballRequest(direction="cites", depth=2, per_hop_limit=10, cites_query="degrowth"),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter),
+        lookup=lambda doi, title: None,
+    )
+    assert result.exit_code == 0
+    assert calls == [("W1", "degrowth"), ("W2", "degrowth")]
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    assert [(row["hop"], row["biblio"]["title"]) for row in rows] == [
+        (1, "Degrowth policy"),
+        (2, "Degrowth and work"),
+    ]
+
+
+def test_cites_query_does_not_filter_the_similar_hop(tmp_path: Path):
+    works = {
+        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 5, ["W3"]),
+        "W2": _work("W2", "10.1000/cite", "Degrowth policy", 2023, 2),
+        "W3": _work("W3", "10.1000/ref", "Shared reference", 2018, 1),
+        "W7": _work("W7", "10.1000/partner", "Coupled paper", 2022, 6, ["W3"]),
+    }
+    searches: dict[str, str | None] = {}
+
+    def getter(path: str, params: dict) -> dict:
+        if path.startswith("/works/https://doi.org/"):
+            doi = path.split("/works/https://doi.org/", 1)[1]
+            for work in works.values():
+                if work["doi"].endswith(doi):
+                    return work
+            return {}
+        filt = str(params.get("filter") or "")
+        if filt.startswith("openalex:"):
+            ids = filt.split(":", 1)[1].split("|")
+            return {"results": [works[item] for item in ids if item in works]}
+        seed = ""
+        for part in filt.split(","):
+            if part.startswith("cites:"):
+                seed = part.split(":", 1)[1]
+        if not seed:
+            return {"results": []}
+        searches[seed] = params.get("search")
+        if seed == "W1":
+            hits = [works["W2"]] if params.get("search") == "degrowth" else [works["W2"]]
+            return {"results": hits, "meta": {"count": len(hits)}}
+        if seed == "W3":
+            return {"results": [works["W7"]], "meta": {"count": 1}}
+        return {"results": []}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    client.recommend_getter = lambda paper_ids, limit: []
+    result = run_doi(
+        _cfg(tmp_path),
+        ["10.1000/seed"],
+        SnowballRequest(direction="cites+similar", depth=1, per_hop_limit=10, cites_query="degrowth"),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=client,
+        lookup=lambda doi, title: None,
+    )
+    assert result.exit_code == 0
+    assert searches["W1"] == "degrowth"
+    assert searches["W3"] is None
+    with pytest.raises(SnowballError, match="direction that includes cites"):
+        run_doi(
+            _cfg(tmp_path),
+            ["10.1000/seed"],
+            SnowballRequest(direction="similar", depth=1, cites_query="degrowth"),
+            console=Console(file=StringIO(), highlight=False, width=80),
+            client=_client({}),
+        )
+
+
+def test_profile_save_keeps_cites_query(tmp_path: Path):
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nstate_dir = "{tmp_path / "state"}"\n[snowball]\nenabled = true\n'
+    )
+    saved = runner.invoke(
+        cli.app,
+        [
+            "snowball",
+            "profile",
+            "save",
+            "fitz-cites",
+            "--doi",
+            "10.1016/j.jclepro.2022.132764",
+            "--direction",
+            "cites",
+            "--cites-query",
+            "degrowth",
+            "--depth",
+            "1",
+            "-c",
+            str(cfg_path),
+        ],
+    )
+    assert saved.exit_code == 0, saved.output
+    text = (tmp_path / "profiles" / "fitz-cites.toml").read_text()
+    assert 'cites_query = "degrowth"' in text
+    assert 'direction = "cites"' in text
+
+
 def _keyword(slug: str, score: float) -> dict:
     return {
         "id": f"https://openalex.org/keywords/{slug}",
