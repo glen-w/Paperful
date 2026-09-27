@@ -9,7 +9,7 @@ separately, writes PDFs or field patches back. **Zotero** (local API on
 to the Mendeley REST API; `manager = "endnote"` reads a local `.enl` library
 and stages an XML import bundle instead of editing the database. Both are
 **seeking testers** — do not treat them as proven. The disk mirror is what
-you keep if the manager changes. See [Why paperful](why.md).
+you keep if the manager changes. See [Why Paperful](why.md).
 
 `run` never rewrites bibliographic fields. On Zotero, attach,
 `fix-metadata --apply`, and `dedupe --apply` use the Zotero 10+ write API.
@@ -267,7 +267,7 @@ stop at `no_identifier`.
 - [ROADMAP.md](ROADMAP.md) — 0.1→1.0 trust; core vs maybe-later
 - [quiet-mirror.md](quiet-mirror.md) — `out/` as quiet browsable mirror (direction)
 - [releases.md](releases.md) — 0.x vs 1.0
-- [comparison.md](comparison.md) — where paperful sits next to plugins and bib tools
+- [comparison.md](comparison.md) — where Paperful sits next to plugins and bib tools
 - [commands.md](commands.md) — CLI and disk artifacts
 - [dedupe.md](dedupe.md) — duplicate packs and the BBNJ hygiene loop
 - [config.md](config.md) — `config.toml` keys and grey playbooks

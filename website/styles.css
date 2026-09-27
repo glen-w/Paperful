@@ -393,8 +393,7 @@ a {
   border: 1px solid var(--accent);
 }
 
-.service .tool-line,
-.service .receipt {
+.service .tool-line {
   margin: 0;
   color: var(--ink-soft);
   font-size: 0.95rem;

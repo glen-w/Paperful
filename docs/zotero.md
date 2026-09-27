@@ -2,7 +2,7 @@
 
 Paperful talks only to the **local** API (`http://localhost:23119/api`, library
 id `0`). Official behaviour below is from Zotero support pages fetched
-**2026-09-19**. Lines marked **paperful** are client rules, not Zotero’s.
+**2026-09-19**. Lines marked **Paperful** are client rules, not Zotero’s.
 
 ## Setup
 
@@ -120,7 +120,7 @@ When Zotero File Storage is full, attach can fail while the PDF remains in
 permanently, upgrade, or WebDAV for the personal library) and attach later.
 Paperful does not speak WebDAV. Linked URLs do not use file quota and are
 not a substitute. Groups cannot use linked files; group files sync only through
-Zotero Storage. See [Why paperful](why.md) and [Quiet mirror](quiet-mirror.md).
+Zotero Storage. See [Why Paperful](why.md) and [Quiet mirror](quiet-mirror.md).
 
 In Zotero 10 the settings pane is **Account** (older builds still say Sync).
 Turn file sync on for this data directory, or right-click the attachment →
@@ -158,7 +158,7 @@ sets `deleted: true` on the emptied parent. It does not permanently delete.
 Collection **keys** are the stable ids; the
 same display name can appear more than once.
 
-## Scoping runs (paperful)
+## Scoping runs (Paperful)
 
 Paperful never invents Zotero saved searches. Scope is:
 

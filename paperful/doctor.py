@@ -121,7 +121,7 @@ def remediation_text(
             "Set [endnote] library = \"/path/to/Library.enl\". The matching "
             ".Data folder (with sdb/sdb.eni and PDF/) must sit beside it. "
             "If EndNote is open and the database is locked, close it or let "
-            "paperful copy the file."
+            "Paperful copy the file."
         )
     if check.name == "Write API":
         return (
@@ -217,7 +217,7 @@ def remediation_text(
     if check.name == "Grey playbooks":
         return (
             f"Builtin grey-lit packs are incomplete. Check {cfg_hint} "
-            "(grey_playbooks_builtin / grey_playbooks_dir) or update paperful."
+            "(grey_playbooks_builtin / grey_playbooks_dir) or update Paperful."
         )
     if check.name == "Mirror":
         return (

@@ -1,6 +1,6 @@
-# How paperful compares
+# How Paperful compares
 
-A plain-language map of where paperful sits next to Zotero plugins, bibliography
+A plain-language map of where Paperful sits next to Zotero plugins, bibliography
 fixers, Mendeley export cleaners, and DOI-centric download scripts.
 
 **Last reviewed:** 2026-09-24. Feature lists for other products are based on public
@@ -13,23 +13,23 @@ Prefer this page for “is this the right tool?”
 
 | If you need… | Look at… |
 |--------------|----------|
-| A platform-agnostic **mirror** of the library (backup, and a way out if the citation manager changes). **Zotero is well tested.** Mendeley and EndNote adapters are seeking testers | **paperful** `snapshot` / `restore` — [quiet mirror](quiet-mirror.md). Do not treat the other adapters as proven |
-| Bulk **missing-PDF** fetch for a Zotero library (OA → campus proxy → optional Sci-Hub), collection-shaped folders, resumable CLI | **paperful** (this repo) |
+| A platform-agnostic **mirror** of the library (backup, and a way out if the citation manager changes). **Zotero is well tested.** Mendeley and EndNote adapters are seeking testers | **Paperful** `snapshot` / `restore` — [quiet mirror](quiet-mirror.md). Do not treat the other adapters as proven |
+| Bulk **missing-PDF** fetch for a Zotero library (OA → campus proxy → optional Sci-Hub), collection-shaped folders, resumable CLI | **Paperful** (this repo) |
 | **In-Zotero** “find OA PDF” plus optional grey-zone sources in one plugin UI | [zotero-zotadata](https://github.com/ydeng11/zotero-zotadata) |
-| **Attachment hygiene** (broken links, rename, stored-to-linked, duplicate files on one parent) | **paperful** `attachments` (report by default; surgery with a flag and `--apply`). In-app: [StorScan](https://github.com/brian-j-griffith/StorScan), [Attanger](https://github.com/MuiseDestiny/zotero-attanger), [ZotMoov](https://github.com/wileyyugioh/zotmoov) |
-| **Metadata repair** (DOI/ISBN/arXiv bulk update, parent-from-PDF) | paperful `lint` / `fix-metadata`, or [ZotMeta](https://github.com/RoadToDream/ZotMeta) |
-| **Duplicate parents** in one collection (DOI, then title+year). Review a pack, then merge the PDF, notes, and better fields onto one item. | **paperful** `dedupe` |
-| **Grey literature** landings (UN, FAO, ISA, and similar) kept as real PDFs | **paperful** playbooks in `direct` / `landing`. Journal-style OA fetch is the row above |
-| **Batch notes** from PDFs you already have: one grounded summary per item, then a collection review. Local model, off by default. Scans need `ocr` first | **paperful** `summarize` / `synthesize` |
+| **Attachment hygiene** (broken links, rename, stored-to-linked, duplicate files on one parent) | **Paperful** `attachments` (report by default; surgery with a flag and `--apply`). In-app: [StorScan](https://github.com/brian-j-griffith/StorScan), [Attanger](https://github.com/MuiseDestiny/zotero-attanger), [ZotMoov](https://github.com/wileyyugioh/zotmoov) |
+| **Metadata repair** (DOI/ISBN/arXiv bulk update, parent-from-PDF) | Paperful `lint` / `fix-metadata`, or [ZotMeta](https://github.com/RoadToDream/ZotMeta) |
+| **Duplicate parents** in one collection (DOI, then title+year). Review a pack, then merge the PDF, notes, and better fields onto one item. | **Paperful** `dedupe` |
+| **Grey literature** landings (UN, FAO, ISA, and similar) kept as real PDFs | **Paperful** playbooks in `direct` / `landing`. Journal-style OA fetch is the row above |
+| **Batch notes** from PDFs you already have: one grounded summary per item, then a collection review. Local model, off by default. Scans need `ocr` first | **Paperful** `summarize` / `synthesize` |
 | **Scriptable library surgery** (merge, enrich, disk GC, two-up scan split) via CLI/MCP | [zotero-agent](https://github.com/alex-roc/zotero-agent) |
 | **AI assistant** read/write over the library, including chat and (on some forks) OCR of scans | zotero-mcp forks ([richardjlyon](https://github.com/richardjlyon/zotero-mcp), [cookjohn](https://github.com/cookjohn/zotero-mcp), [mcp-zotero](https://github.com/Xevos117/mcp-zotero)) |
 | **`.bib` normalize / dedupe / upgrade preprints** (no Zotero required) | [bibcite](https://github.com/leo1oel/bibcite), [bibtex-tidy](https://github.com/FlamingTempura/bibtex-tidy), [bibmanager](https://bibmanager.readthedocs.io/) |
 | **Mendeley** dedup inside the app; clean **exported** BibTeX | Mendeley Duplicates smart collection; export cleaners such as [mendeley_bibtex_cleaner](https://gist.github.com/alexandrehuat/6d3263f73ccae87d0107977978316c02) |
 | **DOI-list PDF batch** without Zotero | [paperscraper](https://github.com/jannisborn/paperscraper) |
-| **Grow the library** from a keyword, a DOI’s references, an ORCID, a similar-paper hop, or a hybrid hop, then optionally fill PDFs. Citation maps such as Research Rabbit link out; paperful downloads. Re-check later with **watch** (baseline once, then propose new arrivals on disk; you schedule `watch run`) | **paperful snowball** — dry-run, `approve-each`, `approve-batch`, `--gate auto`, `--fetch-pdfs`, and `watch` ([snowball](snowball.md)). In-app one-hop browsers stay separate ([zotero-snowball](https://github.com/socratic-irony/zotero-snowball), [Citegeist](https://github.com/phdemotions/zotero-citegeist)). General harvesters without the mirror: [findpapers](https://github.com/jonatasgrosman/findpapers), [opencite](https://github.com/neuromechanist/opencite) |
+| **Grow the library** from a keyword, a DOI’s references, an ORCID, a similar-paper hop, or a hybrid hop, then optionally fill PDFs. Citation maps such as Research Rabbit link out; Paperful downloads. Re-check later with **watch** (baseline once, then propose new arrivals on disk; you schedule `watch run`) | **Paperful snowball** — dry-run, `approve-each`, `approve-batch`, `--gate auto`, `--fetch-pdfs`, and `watch` ([snowball](snowball.md)). In-app one-hop browsers stay separate ([zotero-snowball](https://github.com/socratic-irony/zotero-snowball), [Citegeist](https://github.com/phdemotions/zotero-citegeist)). General harvesters without the mirror: [findpapers](https://github.com/jonatasgrosman/findpapers), [opencite](https://github.com/neuromechanist/opencite) |
 | “Just use what ships in Zotero” | Built-in **Find Available PDF** plus [custom PDF resolvers](https://www.zotero.org/support/kb/custom_pdf_resolvers) |
 
-paperful does **not** replace a full metadata editor, an in-app attachment
+Paperful does **not** replace a full metadata editor, an in-app attachment
 reorganiser, or a `.bib` linter. `attachments` reports layout problems and,
 with a flag plus `--apply`, repairs them from `out/`. Incoming downloads,
 author folders, and tablet send/get stay with Attanger and ZotMoov. The jobs
@@ -39,7 +39,7 @@ tested; Mendeley and EndNote are seeking testers).
 
 Architecture: [architecture.md](architecture.md).
 
-## Where paperful sits
+## Where Paperful sits
 
 Most tools in this space optimise one or more of:
 
@@ -49,7 +49,7 @@ Most tools in this space optimise one or more of:
 4. **Fix `.bib` / exports** — keys, duplicates, Mendeley-specific fields
 5. **Automate / agent** — MCP, CLI, batch undo
 
-Those map onto paperful’s jobs. **Find** is **(1)**: open access, campus
+Those map onto Paperful’s jobs. **Find** is **(1)**: open access, campus
 proxy, playbooks, and an opt-in AI browser after the scripted lanes fail.
 **Completeness** is **(2)** (`lint` / `fix-metadata`, patches on disk,
 `--apply` to the adapter) plus duplicate review (`dedupe`) and opt-in
@@ -87,7 +87,7 @@ Parallel tracks:
 
 Legend: **Yes** = first-class · **Partial** = adjacent or lighter · **No** = absent or out of scope.
 
-| Capability | paperful | Zotero built-in | zotero-zotadata | StorScan | ZotMeta | zotero-agent |
+| Capability | Paperful | Zotero built-in | zotero-zotadata | StorScan | ZotMeta | zotero-agent |
 |------------|----------|-----------------|-----------------|----------|---------|--------------|
 | Bulk fetch **missing** PDFs | Yes | Partial | Yes | Partial | No | Partial |
 | Collection-scoped batch runs | Yes | No | Partial | Partial | Partial | Yes |
@@ -109,9 +109,9 @@ Legend: **Yes** = first-class · **Partial** = adjacent or lighter · **No** = a
 
 zotero-mcp and BibTeX-cluster columns: [comparison reference](comparison-reference.md#capability-snapshot).
 
-## What paperful does not do today
+## What Paperful does not do today
 
-- Mendeley and EndNote adapters exist and are **seeking testers**. Zotero is the well-tested path. EndNote writes are an import bundle (File → Import); paperful does not edit the `.enl` database
+- Mendeley and EndNote adapters exist and are **seeking testers**. Zotero is the well-tested path. EndNote writes are an import bundle (File → Import); Paperful does not edit the `.enl` database
 - Author-folder layouts, incoming-download matching, and tablet send/get (`attachments --link` can point a personal library at `out/`; it is off unless you pass it)
 - Mendeley and EndNote item merge (`dedupe --apply` is Zotero-only)
 - Two-up scan split, or a chat agent over the library (`ocr` adds a text layer; it does not split pages. `summarize` / `synthesize` / `recover` are opt-in and local)

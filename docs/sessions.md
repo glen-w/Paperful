@@ -1,6 +1,6 @@
 # Browser sessions (Scholar, EZProxy, publishers)
 
-Log in once in your normal browser; paperful reuses that login on this
+Log in once in your normal browser; Paperful reuses that login on this
 machine. The walkthrough is [How it works](how-it-works.md#using-your-scholar-or-library-login).
 This page is the vault, engines, and CAPTCHA troubleshooting.
 
@@ -9,7 +9,7 @@ for the headless fallback installs automatically on first need.
 
 `session login` **prefers your system Chrome/Edge** (launched without Playwright
 automation flags) so Google SSO works, then attaches over CDP to save cookies
-into the paperful profile. Use `--engine playwright` only as a fallback.
+into the Paperful profile. Use `--engine playwright` only as a fallback.
 
 ```sh
 uv run paperful session login scholar

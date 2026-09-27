@@ -1,6 +1,6 @@
 # Sci-Hub
 
-Sci-Hub occupies a **legal grey zone in some jurisdictions**. paperful does
+Sci-Hub occupies a **legal grey zone in some jurisdictions**. Paperful does
 not enable it unless you opt in. You are responsible for complying with the
 laws that apply to you. The authors and distributors of this tool do not
 encourage copyright infringement.
@@ -32,7 +32,7 @@ impractical). Their own "article not in database" pages say items published
 **after 2021** are usually absent; occasional older gaps and rare later hits
 exist, but coverage after that year is thin.
 
-paperful therefore **does not call Sci-Hub** when:
+Paperful therefore **does not call Sci-Hub** when:
 
 - the item has a parsed year **greater than 2021**, or
 - the run uses `--year-from` **strictly after 2021** (Sci-Hub is dropped from

@@ -3,7 +3,7 @@
 Paperful talks to **Mendeley Reference Manager** over the cloud REST API
 (`https://api.mendeley.com`). There is no local API. Official behaviour below
 is from [dev.mendeley.com](https://dev.mendeley.com/) fetched **2026-09-21**.
-Lines marked **paperful** are client rules, not Elsevier’s.
+Lines marked **Paperful** are client rules, not Elsevier’s.
 
 **This adapter is seeking testers.** Zotero remains the well-tested path.
 Do not treat a first Mendeley run as proven.
@@ -46,7 +46,7 @@ The official Python SDK is unmaintained. Paperful uses httpx.
 | Notes | Document `notes` (HTML, `view=all`) is read as a child note tagged `mendeley-notes`. Paperful **writes** child notes as annotations (`type=note`) and prefixes `<!-- paperful-note:{tag} -->` so re-runs update instead of duplicate. |
 | Collection notes | Mendeley has no standalone notes. `synthesize` creates a generic document in the folder and puts the HTML on an annotation. |
 
-Duplicate file uploads return **400**; paperful treats that as unchanged.
+Duplicate file uploads return **400**; Paperful treats that as unchanged.
 
 ## Paperful rules
 

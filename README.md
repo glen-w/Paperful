@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="website/images/logo.png" alt="paperful" width="280">
+  <img src="website/images/logo.png" alt="Paperful" width="280">
 </h1>
 
 <p align="center">
@@ -22,8 +22,8 @@
 Five jobs: **library**, **find**, **completeness**, **mirror**, **control**.
 The live catalogue is an adapter. Zotero’s local API is the one that is well
 tested. Mendeley and EndNote are in the tree and seeking testers — do not
-treat them as proven. Why this shape: [Why paperful](docs/why.md). Not sure
-this is the right tool? [How paperful compares](docs/comparison.md).
+treat them as proven. Why this shape: [Why Paperful](docs/why.md). Not sure
+this is the right tool? [How Paperful compares](docs/comparison.md).
 
 **Library.** Collections, years, and item types are the scope. `import` and
 `export` speak RIS, BibTeX, and EndNote XML.
@@ -49,7 +49,7 @@ Sci-Hub occupies a legal grey zone in some jurisdictions — see
 [Sci-Hub](docs/scihub.md)). Each item only hits sources that match its
 metadata; `--try-all` disables that. If a site says slow down, the client
 waits; if it keeps blocking, that source is paused so one publisher does not
-stall the run. Sci-Hub coverage after ~2021 is thin — paperful skips it for
+stall the run. Sci-Hub coverage after ~2021 is thin — Paperful skips it for
 items dated after 2021 (and drops it from the run when `--year-from` is past
 that year). Recent paywalled papers are a campus-access problem when your
 library has the subscription. Paperful does not fetch every paywalled or
@@ -72,7 +72,7 @@ gaps → find → lint → fix → summarise. The model is off until `[llm].enab
 **Mirror.** Work happens **on disk** (`out/`, `state/`). `snapshot` writes one
 folder per scoped item (`record.json`, optional PDF, notes). `restore --apply`
 recreates only what the live catalogue is missing and does not overwrite
-fields already there. Copy `out/` yourself; paperful is not a sync service.
+fields already there. Copy `out/` yourself; Paperful is not a sync service.
 
 **Control.** Downloads and proposals land on disk first. Write-back is a
 separate step. Dry-run before a big fetch. Docker runs the tool; Zotero and

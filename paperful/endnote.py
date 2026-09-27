@@ -312,7 +312,7 @@ class EndNoteBackend:
 
     def merge_into(self, keep_key: str, drop_key: str) -> dict[str, Any]:
         raise LibraryError(
-            "EndNote cannot merge items through paperful. "
+            "EndNote cannot merge items through Paperful. "
             "dedupe --apply needs Zotero so the PDF and notes stay on one item."
         )
 
@@ -326,14 +326,14 @@ class EndNoteBackend:
 
     def trash_item(self, item_key: str) -> None:
         raise LibraryError(
-            "EndNote cannot trash items through paperful. Delete in EndNote, or omit "
+            "EndNote cannot trash items through Paperful. Delete in EndNote, or omit "
             "the reference from the next import bundle."
         )
 
     def trash_attachment(self, attachment_key: str) -> None:
         del attachment_key
         raise LibraryError(
-            "EndNote cannot remove a PDF through paperful. The attachment report "
+            "EndNote cannot remove a PDF through Paperful. The attachment report "
             "is the list to clean up in EndNote."
         )
 
@@ -1118,9 +1118,9 @@ def _readme(dest: Path) -> str:
     num, name = zotero_to_endnote("journalArticle")
     del num, name
     return (
-        "paperful EndNote import bundle\n"
+        "Paperful EndNote import bundle\n"
         "==============================\n\n"
-        "EndNote has no public write API. paperful never edits your .enl / .Data\n"
+        "EndNote has no public write API. Paperful never edits your .enl / .Data\n"
         "database. Import this folder through EndNote's own File menu:\n\n"
         "  1. Open EndNote.\n"
         "  2. File → Import → File…\n"

@@ -1,4 +1,4 @@
-# paperful documentation
+# Paperful documentation
 
 New here? The landing page is
 [paperful.app](https://paperful.app/). [How it works](how-it-works.md)
@@ -13,7 +13,7 @@ opt in. Not every paywalled or DOI-less item comes back.
 Operators clone the repo and run `docker compose build`. The image is
 build-local only: no `docker pull`, no PyPI. [Docker](docker.md).
 Contributors use [`uv`](https://docs.astral.sh/uv/). **0.x** flags may still
-move; see [releases](releases.md). Why this shape: [Why paperful](why.md).
+move; see [releases](releases.md). Why this shape: [Why Paperful](why.md).
 
 ```{toctree}
 :maxdepth: 2

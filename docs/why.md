@@ -1,4 +1,4 @@
-# Why paperful
+# Why Paperful
 
 The fill pipeline — sources, campus login, tidy around a run — is
 [How it works](how-it-works.md). This page is why the product is shaped this
@@ -52,7 +52,7 @@ one folder per item (`record.json`, optional PDF, notes) plus a collection
 tree. `snapshot` writes it. `restore --apply` creates only what the live
 catalogue is missing and does not overwrite fields already there. That tree
 is the backup. RIS, BibTeX, and EndNote XML are the interchange. Copy `out/`
-with your own sync; paperful is not a sync service and not a WebDAV client.
+with your own sync; Paperful is not a sync service and not a WebDAV client.
 Phone sync stays with the catalogue. See [Quiet mirror](quiet-mirror.md).
 
 **Control.** Downloads, patches, and summaries land on disk first.
@@ -75,7 +75,7 @@ Python, the Zotero local API, Ollama or LiteLLM, Docker.
 | Summaries and a collection review | Opt-in local model. Needs a text layer. Off until you enable it |
 | Disk mirror you can copy without the manager | Shipped (`out/` + `state/`). `import` / `export` for RIS, BibTeX, EndNote XML |
 | Mendeley (`manager = "mendeley"`, REST at api.mendeley.com) | Seeking testers. Needs an app at dev.mendeley.com and `paperful session login mendeley`. Not proven against a real library here |
-| EndNote (`manager = "endnote"`, local `.enl`) | Seeking testers. Reads `sdb.eni`. Writes stage `state/endnote-import/` for File → Import. paperful does not edit the EndNote database, and it cannot trash items there |
+| EndNote (`manager = "endnote"`, local `.enl`) | Seeking testers. Reads `sdb.eni`. Writes stage `state/endnote-import/` for File → Import. Paperful does not edit the EndNote database, and it cannot trash items there |
 | Text layer for scanned PDFs | `paperful ocr` (OCRmyPDF on the disk file). Two-up page split stays with zotero-agent |
 | Linked-file cutover, hosted multi-user service, a second reading app | Cutover is `attachments --link --apply` (off by default; personal library only). Hosted service and a second reading app are not the product |
 
@@ -83,5 +83,5 @@ Python, the Zotero local API, Ollama or LiteLLM, Docker.
 
 - [How it works](how-it-works.md) — fill pipeline
 - [Quiet mirror](quiet-mirror.md) — folder contract
-- [How paperful compares](comparison.md)
+- [How Paperful compares](comparison.md)
 - [Roadmap](ROADMAP.md) — Zotero is the tested path; Mendeley and EndNote are seeking testers

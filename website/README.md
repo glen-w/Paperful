@@ -1,4 +1,4 @@
-# paperful website
+# Paperful website
 
 Modest public landing (plain HTML/CSS, minimal JS for mobile nav). Product
 front door: hero (library, find, mirror) → how it works (fill pipeline) →

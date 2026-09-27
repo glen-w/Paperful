@@ -82,7 +82,7 @@ def inside_out(out_dir: Path, path: str | None) -> bool:
 def apply_refusal(*, manager: str, library_type: str, link: bool) -> str | None:
     """Why ``--apply`` must stop. ``None`` means the write is allowed.
 
-    Mendeley can upload and delete cloud files. EndNote is report-only: paperful
+    Mendeley can upload and delete cloud files. EndNote is report-only: Paperful
     does not edit the library database. ``--link`` is a Zotero personal library.
     """
     if link and manager != "zotero":

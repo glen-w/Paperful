@@ -136,7 +136,7 @@ class MendeleyClient:
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(
-                    b"<html><body><p>You can close this window and return to paperful.</p></body></html>"
+                    b"<html><body><p>You can close this window and return to Paperful.</p></body></html>"
                 )
 
             def log_message(self, format: str, *args: Any) -> None:  # noqa: A003
@@ -690,7 +690,7 @@ class MendeleyBackend:
 
     def merge_into(self, keep_key: str, drop_key: str) -> dict[str, Any]:
         raise LibraryError(
-            "Mendeley cannot merge items through paperful. "
+            "Mendeley cannot merge items through Paperful. "
             "dedupe --apply needs Zotero so the PDF and notes stay on one item."
         )
 

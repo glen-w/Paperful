@@ -9,7 +9,7 @@ The landing page is the short version of this story.
 
 1. **Pick the slice.** A collection, or the whole library. Year and item-type
    filters are optional. Items that already have an imported PDF are skipped.
-2. **Check the record.** Before any download, paperful verifies an existing
+2. **Check the record.** Before any download, Paperful verifies an existing
    DOI against Crossref or OpenAlex, and can fill a missing one from a URL,
    a PubMed id, or a title match. That check is in memory for the search.
    The original identifier stays in the log. Zotero is not rewritten here.
@@ -21,7 +21,7 @@ The landing page is the short version of this story.
    Google Scholar if you opt in. See [Using your Scholar or library login](#using-your-scholar-or-library-login).
 5. **Only try what fits.** Each item is sent only to sources that match what
    the record already knows — a DOI, an arXiv id, a publisher URL. If a site
-   says slow down, paperful waits. If a site keeps blocking, that source is
+   says slow down, Paperful waits. If a site keeps blocking, that source is
    paused. See [Slowing down](#slowing-down).
 6. **Save on this machine first.** The PDF lands under `out/` with a readable
    source line on the parent (“Free copy from Unpaywall.”). On Zotero 10+ it
@@ -67,7 +67,7 @@ that chain; run it before `gaps` / `run` when the collection is messy.
 ## Slowing down
 
 If a site returns a rate limit, the HTTP client waits and retries. If a site
-keeps showing a block page or a CAPTCHA (three times by default), paperful
+keeps showing a block page or a CAPTCHA (three times by default), Paperful
 pauses that source, continues with the rest of the lane, and tries one later
 item. A clean result opens the source again.
 
@@ -96,5 +96,5 @@ the item. Optional: a grounded summary note, then a collection-level review
 of those notes. A folder copy you can back up or export as RIS, BibTeX, or
 EndNote XML — not a sync service.
 
-Why this shape: [Why paperful](why.md). Commands: [Commands](commands.md).
+Why this shape: [Why Paperful](why.md). Commands: [Commands](commands.md).
 Architecture of the same flow: [Architecture](architecture.md).
