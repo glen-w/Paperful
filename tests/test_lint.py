@@ -46,6 +46,12 @@ def test_usable_work_title_rejects_citation_strings():
         "Hosmer Jr, D. W., Lemeshow, S. & Sturdivant, R. X. Applied Logistic Regression (Wiley, 2013).",
         "Roberts GC (2001) Understanding the dynamics of motivation in physical activity.",
         "Young, J., Angevaren, M., Rusted, J. & Tabet, N. Aerobic exercise to improve cognitive function (2015).",
+        "(untitled)",
+        "untitled",
+        "Xiao B, Wu H, Wei Y (2018) Simple baselines for human pose estimation and tracking.",
+        "Cole MH, Grimshaw PN. The biomechanics of the modern golf swing: Implications for lower back injuries. Sports Med. 2016; 46: 339-351.",
+        "Castro-Alonso JC, Ayres P and Sweller J. Instructional visualizations, cognitive load theory, and visuospatial processing.",
+        "Jeukendrup, A.E. (2017). Training the gut for athletes. Sports Med; 47:101-10.",
     ]
     for title in good:
         assert usable_work_title(title), title

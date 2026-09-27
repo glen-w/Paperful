@@ -182,6 +182,9 @@ def _maybe_adopt_pdf_doi(
     )
     if not pdf_doi:
         return None
+    if not usable_work_title(item.title):
+        # A citation string overlaps too many works to decide which DOI is real.
+        return None
 
     work = work_by_doi(client, pdf_doi, cfg.email, cache)
     if work is None:

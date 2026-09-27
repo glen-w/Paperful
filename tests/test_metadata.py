@@ -142,6 +142,56 @@ def test_propose_replaces_blank_and_citation_titles_without_overwrite(cfg):
     assert patch is not None
     assert patch.after["title"] == work_title
 
+    placeholder = make_item(
+        doi="10.9/ok", title="(untitled)", url=None, publication_title=None, date=None
+    )
+    findings = lint_item(client, cfg, placeholder)
+    assert any(finding.code == "title_unusable" for finding in findings)
+    patch = propose_patch(client, cfg, placeholder, findings, prepared=True)
+    assert patch is not None
+    assert patch.after["title"] == work_title
+
+
+def test_unusable_title_keeps_the_library_doi(cfg):
+    from paperful.resolve import prepare_identifiers
+
+    cite = '[1] R.L. Susman: "Hand function and tool behavior in early hominids," J. Hum. Evol.'
+    item = make_item(doi="10.1/library", title=cite, url=None, year=1998)
+    searched: list[str] = []
+
+    def handler(req):
+        path = req.url.path
+        if path.rstrip("/").endswith("/works"):
+            searched.append(str(req.url))
+            return _json(
+                {
+                    "message": {
+                        "items": [
+                            {
+                                "DOI": "10.9/wrong",
+                                "title": [cite],
+                                "issued": {"date-parts": [[1998]]},
+                            }
+                        ]
+                    }
+                }
+            )
+        return _json(
+            {
+                "message": {
+                    "DOI": "10.1/library",
+                    "title": ["A completely unrelated ocean governance paper"],
+                    "issued": {"date-parts": [[1998]]},
+                }
+            }
+        )
+
+    notes = prepare_identifiers(mock_client(handler), item, email="a@b.c")
+    assert item.doi == "10.1/library"
+    assert item.doi_verified == "suspect"
+    assert any("kept-doi" in note for note in notes)
+    assert searched == []
+
 
 def test_propose_no_title_without_overwrite(cfg):
     title = "A sufficiently long test title about marine governance"
@@ -474,6 +524,56 @@ def test_pdf_doi_adopted_when_verified(cfg, tmp_path, monkeypatch):
     assert patch is not None
     assert patch.after.get("doi") == "10.5555/from-pdf"
     assert patch.source == "pdf"
+
+
+def test_pdf_doi_not_adopted_when_title_is_a_citation(cfg, tmp_path, monkeypatch):
+    from pypdf import PdfWriter
+
+    cite = '[1] R.L. Susman: "Hand function and tool behavior in early hominids," J. Hum. Evol.'
+    library_title = "Hand function and tool behavior in early hominids"
+    pdf = tmp_path / "item.pdf"
+    w = PdfWriter()
+    w.add_blank_page(width=72, height=72)
+    w.add_metadata({"/Title": "doi:10.5555/from-pdf"})
+    w.write(pdf)
+    monkeypatch.setattr("paperful.pdfid._PDFTOTEXT", None)
+    monkeypatch.setattr("paperful.pdfid.shutil.which", lambda name: None)
+
+    def handler(req):
+        path = req.url.path
+        if "/works/" in path and not path.endswith("/works"):
+            doi = path.split("/works/", 1)[1]
+            title = (
+                "Some other paper that also mentions the citation"
+                if "from-pdf" in doi
+                else library_title
+            )
+            return _json(
+                {
+                    "message": {
+                        "DOI": doi,
+                        "title": [title],
+                        "issued": {"date-parts": [[1998]]},
+                    }
+                }
+            )
+        return _json({"message": {"items": []}})
+
+    item = make_item(
+        doi="10.1000/library",
+        title=cite,
+        url=None,
+        pdf_path=str(pdf),
+        has_pdf=True,
+        publication_title=None,
+        date=None,
+    )
+    client = mock_client(handler)
+    findings = lint_item(client, cfg, item)
+    patch = propose_patch(client, cfg, item, findings, prepared=True)
+    assert patch is not None
+    assert patch.after.get("doi") is None
+    assert patch.after.get("title") == library_title
 
 
 def test_pdf_doi_not_adopted_when_library_ok(cfg, tmp_path, monkeypatch):

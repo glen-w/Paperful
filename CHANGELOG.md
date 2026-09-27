@@ -18,8 +18,14 @@ A depth-0 snowball search stays on the hit list. Citation backends fill empty
 fields on those hits and do not import their references. A reference title is
 the structured article title, never the raw citation. A blank or citation-shaped
 title is filled from the OpenAlex work before the year filter; if that still
-is not a work title, the row is not created. `fix-metadata` replaces a blank
-or citation-shaped title from the DOI without `--overwrite`.
+is not a work title, the row is not created. `fix-metadata` replaces a blank,
+`(untitled)`, or citation-shaped title from the DOI without `--overwrite`,
+and does not replace that DOI from the bad title. A DOI with a unicode hyphen,
+a doubled hyphen, a `/figures/`, `/tables/`, or `/metrics` suffix, or a Wiley
+SICI missing a colon, is looked up as the bare DOI. Snowball still refuses to
+store a reference list entry as the title: author-year lines such as
+``Xiao B, Wu H, Wei Y (2018) Simple baselines…`` stay blank until the work
+record supplies the article title.
 
 `paperful attachments` compares PDF attachments to `out/` and writes a report.
 It does not change Zotero unless you also pass `--fix-broken`, `--merge-files`,

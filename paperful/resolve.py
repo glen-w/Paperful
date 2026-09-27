@@ -7,13 +7,13 @@ import unicodedata
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import Any, Protocol
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
 
-# Parentheses are legal inside DOIs (old Elsevier: 10.1016/0031-9384(69)90073-0); brackets/braces are not.
-DOI_RE = re.compile(r"\b(10\.\d{4,9}/[^\s\"'<>\[\]\{\}]+)", re.IGNORECASE)
+# Parentheses and angle brackets are legal inside DOIs (old Elsevier; Wiley SICI).
+DOI_RE = re.compile(r"\b(10\.\d{4,9}/[^\s\"'\[\]\{\}]+)", re.IGNORECASE)
 ARXIV_NEW_RE = re.compile(r"(?<!\d)(\d{4}\.\d{4,5})(v\d+)?(?!\d)")
 ARXIV_OLD_RE = re.compile(r"\b([a-z\-]+(?:\.[A-Z]{2})?/\d{7})(v\d+)?\b")
 PMID_RE = re.compile(r"(?im)^\s*(?:PMID|PubMed PMID|PubMed ID):\s*(\d+)\b")
@@ -25,6 +25,18 @@ def normalize_doi(raw: str | None) -> str | None:
     if not raw:
         return None
     s = raw.strip()
+    s = s.translate(
+        str.maketrans(
+            {
+                "\u2010": "-",  # hyphen
+                "\u2011": "-",  # non-breaking hyphen
+                "\u2012": "-",
+                "\u2013": "-",  # en dash
+                "\u2212": "-",  # minus
+            }
+        )
+    )
+    s = re.sub(r"-{2,}", "-", s)
     s = re.sub(r"^(?:https?://)?(?:dx\.)?doi\.org/", "", s, flags=re.IGNORECASE)
     s = re.sub(r"^doi:\s*", "", s, flags=re.IGNORECASE)
     m = DOI_RE.search(s)
@@ -35,10 +47,21 @@ def normalize_doi(raw: str | None) -> str | None:
     while doi.endswith(")") and doi.count(")") > doi.count("("):
         doi = doi[:-1].rstrip(_TRAILING_PUNCT_NO_PAREN)
     doi = doi.rstrip("/")
-    # Common URL suffixes glued to DOIs in URL fields
-    doi = re.sub(
-        r"/(?:full|abstract|pdf|epdf|meta|summary)$", "", doi, flags=re.IGNORECASE
-    )
+    # Springer and similar links append /figures/5 or /metrics to a real DOI.
+    while True:
+        cleaned = re.sub(r"/(?:figures|tables)/\d+$", "", doi, flags=re.IGNORECASE)
+        cleaned = re.sub(
+            r"/(?:full|abstract|pdf|epdf|meta|summary|metrics)$",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+        cleaned = cleaned.rstrip("/")
+        if cleaned == doi:
+            break
+        doi = cleaned
+    # Old Wiley SICI DOIs use "<page::AID-...>". A stored single colon does not resolve.
+    doi = re.sub(r"(<\d+):(?=aid-)", r"\1::", doi, flags=re.IGNORECASE)
     # Crossref sometimes appends ".pmid:123;pmcid:PMC1" to an otherwise real DOI.
     doi = re.split(r"(?i)[.;](?:pmid|pmcid):", doi, maxsplit=1)[0]
     doi = doi.rstrip(_TRAILING_PUNCT_NO_PAREN).rstrip("/")
@@ -494,6 +517,14 @@ def prepare_identifiers(
         if result.status == "unknown":
             item.doi_verified = "unknown"
             return notes
+        # A blank or citation-string title cannot identify a replacement work.
+        # Keep the library DOI so fix-metadata can fill the title from it.
+        from .lint import usable_work_title
+
+        if not usable_work_title(item.title):
+            item.doi_verified = "suspect"
+            notes.append("verify:kept-doi(unusable title)")
+            return notes
         original = item.doi
         original_source = item.doi_source
         item.doi = None
@@ -537,7 +568,9 @@ def _crossref_work(client: httpx.Client, doi: str, email: str) -> WorkMeta | Non
         params["mailto"] = email
     try:
         resp = client.get(
-            f"https://api.crossref.org/works/{doi}", params=params or None, timeout=30
+            "https://api.crossref.org/works/" + quote(doi, safe="/()"),
+            params=params or None,
+            timeout=30,
         )
         if resp.status_code == 404:
             return None
@@ -546,12 +579,13 @@ def _crossref_work(client: httpx.Client, doi: str, email: str) -> WorkMeta | Non
     except (httpx.HTTPError, ValueError, TypeError):
         return None
     titles = msg.get("title") or []
-    title = titles[0] if titles else ""
+    title = strip_title_markup(titles[0]) if titles else ""
     authors = msg.get("author") or []
     first = None
     if authors:
         first = authors[0].get("family") or authors[0].get("name")
     venue_list = msg.get("container-title") or []
+    venue = strip_title_markup(venue_list[0]) if venue_list else ""
     parts = _best_date_parts(msg)
     year = None
     if parts and parts[0] is not None:
@@ -565,7 +599,7 @@ def _crossref_work(client: httpx.Client, doi: str, email: str) -> WorkMeta | Non
         year=year,
         date=format_date_parts(parts),
         first_author=first,
-        venue=venue_list[0] if venue_list else None,
+        venue=venue or None,
         source="crossref",
     )
 
@@ -576,7 +610,7 @@ def _openalex_work(client: httpx.Client, doi: str, email: str) -> WorkMeta | Non
         params["mailto"] = email
     try:
         resp = client.get(
-            f"https://api.openalex.org/works/https://doi.org/{doi}",
+            "https://api.openalex.org/works/https://doi.org/" + quote(doi, safe="/()"),
             params=params or None,
             timeout=30,
         )
@@ -989,12 +1023,13 @@ def _zotero_type(crossref_type: Any) -> str:
 
 def _work_from_crossref_message(msg: dict[str, Any], doi: str) -> WorkMeta:
     titles = msg.get("title") or []
-    title = titles[0] if titles else ""
+    title = strip_title_markup(titles[0]) if titles else ""
     authors = msg.get("author") or []
     first = None
     if authors and isinstance(authors[0], dict):
         first = authors[0].get("family") or authors[0].get("name")
     venue_list = msg.get("container-title") or []
+    venue = strip_title_markup(venue_list[0]) if venue_list else ""
     parts = _best_date_parts(msg)
     year = None
     if parts and parts[0] is not None:
@@ -1008,7 +1043,7 @@ def _work_from_crossref_message(msg: dict[str, Any], doi: str) -> WorkMeta:
         year=year,
         date=format_date_parts(parts),
         first_author=first,
-        venue=venue_list[0] if venue_list else None,
+        venue=venue or None,
         source="crossref",
     )
 

@@ -177,7 +177,7 @@ def title_has_markup(title: str) -> bool:
 
 _NUMBERED_CITE = re.compile(r"^(?:\[\d+\]|\d+[.)])\s+")
 _DOI_IN_TITLE = re.compile(r"doi\.org/|\bDOI:\s*10\.|\bPMID\b", re.I)
-_VANCOUVER_YEAR = re.compile(r"\b(?:19|20)\d{2};\d")
+_VANCOUVER_YEAR = re.compile(r"\b(?:19|20)\d{2}\s*;\s*\d")
 _ET_AL_YEAR = re.compile(r"\bet al\.?\b", re.I)
 _YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
 _YEAR_PAREN = re.compile(r"\((?:[^)]*,\s*)?(?:19|20)\d{2}\)")
@@ -185,7 +185,21 @@ _SURNAME_INITIAL = re.compile(r"^[A-Z][\w'’\-]+,\s+[A-Z]\.")
 _AUTHOR_YEAR = re.compile(
     r"^(?:[A-Z][\w'’\-.]+(?:\s+[A-Z][\w'’\-.]*){0,6})\s+\((?:19|20)\d{2}\)"
 )
+# "Xiao B, Wu H, Wei Y (2018) Simple baselines…"
+_AUTHOR_LIST_YEAR = re.compile(
+    r"^(?:[A-Z][\w'’\-]+(?:\s+[A-Z][\w'’\-.]*){0,5})"
+    r"(?:,\s*(?:[A-Z][\w'’\-]+(?:\s+[A-Z][\w'’\-.]*){0,5})){0,12}"
+    r"\s+\((?:19|20)\d{2}\)"
+)
+# "Cole MH, Grimshaw PN. The biomechanics…"
+_INITIALED_AUTHORS = re.compile(
+    r"^(?:[A-Z][\w'’\-]+\s+[A-Z]{1,4},\s+){1,8}"
+    r"[A-Z][\w'’\-]+(?:\s+[A-Z]{1,4})?(?:\s+and\s+[A-Z][\w'’\-]+(?:\s+[A-Z]{1,4})?)?\.\s+[A-Z]"
+)
 _INITIALS_THEN_YEAR = re.compile(r"^[A-Z][\w'’\-]+\s+[A-Z]\.(?:[A-Z]\.)?,")
+
+
+_PLACEHOLDER_TITLES = {"untitled", "(untitled)"}
 
 
 def usable_work_title(value: object) -> bool:
@@ -193,10 +207,13 @@ def usable_work_title(value: object) -> bool:
 
     Reference lists often store the whole citation (``[1] Author: "Title"``,
     ``Surname, I. (2014). Title. Journal``) in the title field. Those are not
-    titles. A structured article title is.
+    titles. A structured article title is. ``(untitled)`` is the placeholder
+    paperful uses when Zotero's title is empty.
     """
     text = strip_title_markup(str(value or ""))
     if not text or not re.search(r"[A-Za-z]", text):
+        return False
+    if text.casefold() in _PLACEHOLDER_TITLES:
         return False
     if _NUMBERED_CITE.match(text):
         return False
@@ -206,9 +223,11 @@ def usable_work_title(value: object) -> bool:
         return False
     if _ET_AL_YEAR.search(text) and _YEAR.search(text):
         return False
-    if _SURNAME_INITIAL.match(text) and text.count(",") >= 2:
+    if _SURNAME_INITIAL.match(text) and (_YEAR.search(text) or text.count(",") >= 2):
         return False
-    if _AUTHOR_YEAR.match(text):
+    if _AUTHOR_YEAR.match(text) or _AUTHOR_LIST_YEAR.match(text):
+        return False
+    if _INITIALED_AUTHORS.match(text):
         return False
     if _INITIALS_THEN_YEAR.match(text) and _YEAR_PAREN.search(text):
         return False

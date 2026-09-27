@@ -28,7 +28,38 @@ def test_normalize_doi_strips_publisher_suffixes():
     )
 
 
-def test_normalize_doi_rejects_non_doi():
+def test_normalize_doi_strips_springer_crumbs_and_unicode_hyphens():
+    assert (
+        normalize_doi("10.1007/s44196-023-00257-y/figures/5")
+        == "10.1007/s44196-023-00257-y"
+    )
+    assert (
+        normalize_doi("10.1007/s00500-023-09031-w/metrics")
+        == "10.1007/s00500-023-09031-w"
+    )
+    assert (
+        normalize_doi("10.1016/0167\u20109457(90)90005\u2010x")
+        == "10.1016/0167-9457(90)90005-x"
+    )
+    assert (
+        normalize_doi("10.1007/s10484-020-09456-1/tables/4")
+        == "10.1007/s10484-020-09456-1"
+    )
+    assert normalize_doi("10.1007/978--3--642--32060--6_50") == (
+        "10.1007/978-3-642-32060-6_50"
+    )
+    assert (
+        normalize_doi(
+            "10.1002/1520-6629(198601)14:1<6::aid-jcop2290140103>3.0.co;2-i"
+        )
+        == "10.1002/1520-6629(198601)14:1<6::aid-jcop2290140103>3.0.co;2-i"
+    )
+    assert (
+        normalize_doi(
+            "10.1002/(sici)1097-4598(199910)22:10<1380:aid-mus7>3.0.co;2-u"
+        )
+        == "10.1002/(sici)1097-4598(199910)22:10<1380::aid-mus7>3.0.co;2-u"
+    )
     assert normalize_doi("") is None
     assert normalize_doi("not a doi") is None
     assert normalize_doi(None) is None

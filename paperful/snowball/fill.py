@@ -244,9 +244,11 @@ def _fill_empty(row: Candidate, payload: dict[str, Any], *, backend: str) -> int
     biblio = row.biblio
     filled = 0
     if not biblio.get("title") and payload.get("title"):
-        biblio["title"] = payload["title"]
-        row.provenance["filled_by"] = backend
-        filled += 1
+        candidate = str(payload["title"])
+        if usable_work_title(candidate):
+            biblio["title"] = candidate
+            row.provenance["filled_by"] = backend
+            filled += 1
     if not biblio.get("year") and payload.get("year"):
         biblio["year"] = int(payload["year"])
         row.provenance["filled_by"] = backend

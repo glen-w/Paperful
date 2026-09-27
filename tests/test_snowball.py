@@ -2838,6 +2838,36 @@ def test_crossref_reference_ignores_unstructured_citation():
     assert by_doi["10.1000/cite"]["title"] == ""
 
 
+def test_fill_empty_does_not_store_a_citation_as_the_title():
+    from paperful.snowball.fill import _fill_empty
+
+    row = Candidate(
+        "r",
+        {"type": "doi", "value": "10.1000/parent"},
+        1,
+        "refs",
+        {"doi": "10.1000/xiao"},
+        {"title": "", "year": None, "authors": [], "venue": "", "type": "article"},
+        "crossref ref",
+        "new",
+        {"backend": "crossref"},
+        "auto",
+    )
+    filled = _fill_empty(
+        row,
+        {
+            "title": "Xiao B, Wu H, Wei Y (2018) Simple baselines for human pose estimation and tracking.",
+            "year": 2018,
+            "authors": [],
+            "venue": "",
+        },
+        backend="crossref",
+    )
+    assert row.biblio["title"] == ""
+    assert filled == 1
+    assert row.biblio["year"] == 2018
+
+
 def test_depth_zero_search_does_not_import_references(tmp_path: Path):
     hit = _work("W1", "10.1000/hit", "Basketball biomechanics review", 2024, 4)
     calls: list[str] = []
