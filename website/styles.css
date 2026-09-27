@@ -113,19 +113,9 @@ a {
 
 .hero-logo {
   display: block;
-  width: 140px;
+  width: min(18rem, 78vw);
   height: auto;
-  margin: 0 0 1.25rem;
-}
-
-.brand-mark {
-  font-family: var(--font-display);
-  font-size: clamp(2.6rem, 7vw, 4.4rem);
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  line-height: 1;
-  margin: 0 0 1.25rem;
-  color: var(--ink);
+  margin: 0 0 0.25rem;
 }
 
 .hero h1 {

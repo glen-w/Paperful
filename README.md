@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <strong>Clean the library. Find the PDFs. Keep a mirror.</strong>
+  <strong>Find missing PDFs. Clean up your library. Keep control of your papers.</strong>
 </p>
 
 <p align="center">

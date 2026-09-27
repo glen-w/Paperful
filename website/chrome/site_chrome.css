@@ -5,7 +5,7 @@
   --pf-paper: #f7f1e8;
   --pf-accent: #c46a2a;
   --pf-line: rgba(16, 24, 32, 0.12);
-  --pf-font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --pf-font-brand: "Nunito", "Segoe UI", sans-serif;
   --pf-font-body: "Source Sans 3", "Segoe UI", sans-serif;
   --pf-header-height: 3.5rem;
 
@@ -34,12 +34,12 @@
 }
 
 .pf-site-chrome .brand {
-  font-family: var(--pf-font-display);
-  font-weight: 700;
-  font-size: 1.25rem;
+  font-family: var(--pf-font-brand);
+  font-weight: 800;
+  font-size: 1.35rem;
   text-decoration: none;
   color: var(--pf-ink);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
 }
 
 .pf-site-chrome .nav-toggle {
