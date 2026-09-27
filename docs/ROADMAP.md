@@ -255,7 +255,17 @@ prerequisites for the fetch / lint / attach loop.
    unofficial scrapers only — spike
    [libgen-api](https://pypi.org/project/libgen-api/) /
    [libgenesis-api](https://pypi.org/project/libgenesis-api/) first; same
-   opt-in + disclaimer bar as Sci-Hub; no third-party HTTP gateways).
+   opt-in + disclaimer bar as Sci-Hub; no third-party HTTP gateways);
+   **opt-in SearXNG** for author / personal-site / institutional-repo PDFs that
+   Unpaywall / OpenAIRE / CORE never indexed — thin client against a local
+   instance (`SEARXNG_BASE_URL`), not a public meta-search. Reuse the fetch +
+   engine-rotation + disk-cache pattern from folk directory
+   `ingest/scrape_searxng.py`; do not port the county×event grid. Query by
+   title/author/`filetype:pdf` (or DOI), hand URLs to the existing download +
+   PDF-identity checks. Same bar as Scholar: never in `DEFAULT_SOURCES`,
+   circuit-breaker / sleep so fill runs do not burn the instance, CAPTCHA/empty
+   engines are misses not hard fails. Partly overlaps opt-in `scholar`; wins
+   when Scholar is blocked or the PDF lives only on a personal page.
 3. **Identity / resolver graph** — work ↔ version ↔ preprint; scored patches with
    undo; citation ingest; manifestation-aware dedupe. Collection DOI / title+year
    trash is already `paperful dedupe`. Preprint ↔ version of record is

@@ -28,6 +28,7 @@ from paperful.snowball.expand import MAX_DEPTH, apply_filters, cap_ids, clamp_de
 from paperful.snowball.candidate import Candidate
 from paperful.snowball.openalex import OpenAlexBudgetExceeded, OpenAlexClient, _is_budget, keyless_limit_message
 from paperful.zot import Item
+from tests.textutil import plain_text
 
 runner = CliRunner()
 
@@ -2078,7 +2079,7 @@ def test_cites_query_flag_and_profile(tmp_path: Path):
 
     help_text = runner.invoke(cli.app, ["snowball", "doi", "--help"])
     assert help_text.exit_code == 0
-    assert "--cites-query" in help_text.stdout
+    assert "--cites-query" in plain_text(help_text.stdout)
     loaded = request_from_profile(
         {"direction": "cites", "cites_query": " degrowth "},
         _cfg(tmp_path),

@@ -17,6 +17,7 @@ from paperful.store import (
     Record,
 )
 from paperful.zot import Collection
+from tests.textutil import plain_text
 
 runner = CliRunner()
 
@@ -412,7 +413,7 @@ def test_mutating_commands_name_the_write_gate():
     for name, token in tokens.items():
         res = runner.invoke(cli.app, [name, "--help"])
         assert res.exit_code == 0, name
-        assert token in res.stdout, name
+        assert token in plain_text(res.stdout), name
 
 
 def test_doctor_email_red_when_unpaywall_and_empty(cfg_file, stub_zotero):

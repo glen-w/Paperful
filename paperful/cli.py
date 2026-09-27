@@ -76,11 +76,12 @@ from .zot import (
 def _load_dotenv() -> None:
     """Fill unset variables from a gitignored .env in the working directory."""
     path = Path.cwd() / ".env"
-    if not path.is_file():
-        return
     try:
+        if not path.is_file():
+            return
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
+        # Unreadable cwd (e.g. Compose mount owned by another uid) must not abort CLI start.
         return
     for line in lines:
         text = line.strip()
