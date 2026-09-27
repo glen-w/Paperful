@@ -1946,14 +1946,15 @@ def test_budget_stop_keeps_partial_rows_and_resume(tmp_path: Path):
     assert "10.1000/cite" in saved
 
 
-def test_cites_query_filters_cited_by_and_keeps_references(tmp_path: Path):
+def test_cites_query_filters_references_and_cited_by(tmp_path: Path):
     works = {
-        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 5, ["W3"]),
+        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 5, ["W3", "W8"]),
         "W2": _work("W2", "10.1000/degrowth", "Degrowth policy", 2023, 2),
         "W3": _work("W3", "10.1000/ref", "Unrelated reference", 2018, 1),
         "W4": _work("W4", "10.1000/other", "Unrelated citer", 2023, 9),
+        "W8": _work("W8", "10.1000/cited", "Degrowth foundations", 2019, 4),
     }
-    searches: list[str | None] = []
+    searches: list[tuple[str, str | None]] = []
 
     def getter(path: str, params: dict) -> dict:
         if path.startswith("/works/https://doi.org/"):
@@ -1964,10 +1965,14 @@ def test_cites_query_filters_cited_by_and_keeps_references(tmp_path: Path):
             return {}
         filt = str(params.get("filter") or "")
         if filt.startswith("openalex:"):
+            searches.append(("refs", params.get("search")))
             ids = filt.split(":", 1)[1].split("|")
-            return {"results": [works[item] for item in ids if item in works], "meta": {"count": 1}}
+            hits = [works[item] for item in ids if item in works]
+            if params.get("search") == "degrowth":
+                hits = [work for work in hits if "degrowth" in work["display_name"].lower()]
+            return {"results": hits, "meta": {"count": len(hits)}}
         if "cites:" in filt:
-            searches.append(params.get("search"))
+            searches.append(("cites", params.get("search")))
             if params.get("search") == "degrowth":
                 return {"results": [works["W2"]], "meta": {"count": 1}}
             return {"results": [works["W2"], works["W4"]], "meta": {"count": 2}}
@@ -1988,15 +1993,15 @@ def test_cites_query_filters_cited_by_and_keeps_references(tmp_path: Path):
         lookup=lambda doi, title: None,
     )
     assert result.exit_code == 0
-    assert searches == ["degrowth"]
+    assert ("refs", "degrowth") in searches
+    assert ("cites", "degrowth") in searches
     rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
     by_direction = {}
     for row in rows:
         by_direction.setdefault(row["direction"], []).append(row["biblio"]["title"])
-    assert by_direction["refs"] == ["Unrelated reference"]
+    assert by_direction["refs"] == ["Degrowth foundations"]
     assert by_direction["cites"] == ["Degrowth policy"]
-    cite = next(row for row in rows if row["direction"] == "cites")
-    assert cite["why"].endswith("· degrowth")
+    assert all(row["why"].endswith("· degrowth") for row in rows)
     summary = json.loads((result.run_dir / "summary.json").read_text())
     assert summary["cites_query"] == "degrowth"
 
@@ -2004,11 +2009,11 @@ def test_cites_query_filters_cited_by_and_keeps_references(tmp_path: Path):
 def test_cites_query_rejects_refs_only_and_depth_zero(tmp_path: Path):
     cfg = _cfg(tmp_path)
     console = Console(file=StringIO(), highlight=False, width=80)
-    with pytest.raises(SnowballError, match="direction that includes cites"):
+    with pytest.raises(SnowballError, match="refs or cites"):
         run_doi(
             cfg,
             ["10.1000/seed"],
-            SnowballRequest(direction="refs", cites_query="degrowth"),
+            SnowballRequest(direction="keywords", cites_query="degrowth"),
             console=console,
             client=_client({}),
         )
@@ -2187,7 +2192,7 @@ def test_cites_query_does_not_filter_the_similar_hop(tmp_path: Path):
     assert result.exit_code == 0
     assert searches["W1"] == "degrowth"
     assert searches["W3"] is None
-    with pytest.raises(SnowballError, match="direction that includes cites"):
+    with pytest.raises(SnowballError, match="refs or cites"):
         run_doi(
             _cfg(tmp_path),
             ["10.1000/seed"],

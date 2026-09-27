@@ -738,12 +738,13 @@ def _keyword_caps(cfg: Config, request: SnowballRequest) -> tuple[int, int, floa
 
 
 def _checked_cites_query(request: SnowballRequest, direction: str, *, expands: bool) -> str:
-    """OpenAlex text search for cited-by. Empty when the flag is unset."""
+    """OpenAlex text search for references and cited-by. Empty when unset."""
     query = (request.cites_query or "").strip()
     if not query:
         return ""
-    if "cites" not in direction_sides(direction):
-        raise SnowballError("--cites-query needs a direction that includes cites.")
+    sides = direction_sides(direction)
+    if "refs" not in sides and "cites" not in sides:
+        raise SnowballError("--cites-query needs a direction that includes refs or cites.")
     if not expands:
         raise SnowballError("--cites-query needs depth of at least 1.")
     return query

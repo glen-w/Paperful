@@ -199,8 +199,8 @@ CitesQueryOpt = typer.Option(
     None,
     "--cites-query",
     help=(
-        "Only citing works that match this OpenAlex search (title, abstract, or full text). "
-        "Needs a direction that includes cites, and depth of at least 1. References are unchanged."
+        "Only references and citing works that match this OpenAlex search "
+        "(title, abstract, or full text). Needs refs or cites in the direction, and depth of at least 1."
     ),
 )
 DIRECTION_HELP = (

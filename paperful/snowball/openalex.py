@@ -341,24 +341,28 @@ class OpenAlexClient:
             return self._doi_batch(batch[:mid], select=select) + self._doi_batch(batch[mid:], select=select)
         return list(payload.get("results") or [])
 
-    def works_by_ids(self, openalex_ids: list[str]) -> list[dict[str, Any]]:
+    def works_by_ids(
+        self, openalex_ids: list[str], *, search: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Works for these OpenAlex ids. ``search`` keeps only matches in the batch."""
         out: list[dict[str, Any]] = []
         ids = list(openalex_ids)
+        text = (search or "").strip()
         if self.tally is not None and ids:
             self.tally.track(len(ids))
         for start in range(0, len(ids), 100):
             batch = ids[start : start + 100]
             if not batch:
                 continue
+            params: dict[str, Any] = {
+                "filter": "openalex:" + "|".join(batch),
+                "per_page": len(batch),
+                "select": SELECT,
+            }
+            if text:
+                params["search"] = text
             try:
-                payload = self.get(
-                    "/works",
-                    {
-                        "filter": "openalex:" + "|".join(batch),
-                        "per_page": len(batch),
-                        "select": SELECT,
-                    },
-                )
+                payload = self.get("/works", params)
             except OpenAlexBudgetExceeded as exc:
                 exc.pending_ids = ids[start:]
                 exc.partial = out

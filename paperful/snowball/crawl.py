@@ -128,11 +128,43 @@ def _cite_fetch_limit(per_hop_limit: int, rank: str) -> int:
     return per_hop_limit
 
 
-def _cites_why(prefix: str, query: str) -> str:
-    text = f"cites {prefix}"
+def _with_query(text: str, query: str) -> str:
     if query:
         return f"{text} · {query}"
     return text
+
+
+def _cites_why(prefix: str, query: str) -> str:
+    return _with_query(f"cites {prefix}", query)
+
+
+def _refs_matching_search(
+    client: OpenAlexClient, works: list[dict[str, Any]], query: str
+) -> list[dict[str, Any]]:
+    """Keep recovered references that match ``query``. No query keeps the list."""
+    if not query:
+        return works
+    tagged: list[tuple[str, str]] = []
+    for work in works:
+        oa = short_id(str(work.get("id") or ""))
+        if oa:
+            tagged.append((oa, str(work.get("_recovery") or "pdf")))
+    if not tagged:
+        return []
+    found = {
+        short_id(str(child.get("id") or "")): child
+        for child in client.works_by_ids([oa for oa, _recovery in tagged], search=query)
+        if child.get("id")
+    }
+    out: list[dict[str, Any]] = []
+    for oa, recovery in tagged:
+        child = found.get(oa)
+        if child is None:
+            continue
+        copied = dict(child)
+        copied["_recovery"] = recovery
+        out.append(copied)
+    return out
 
 
 def _remember_cites_query(client: OpenAlexClient, cites_query: str) -> None:
@@ -785,6 +817,7 @@ def _expand_hops(
         client.note(f"hop {hop}/{depth} · {len(frontier)} seeds · {direction}")
         next_works: list[dict[str, Any]] = []
         if want_refs:
+            query = _cites_query(client)
             per_work_ids: list[list[str]] = []
             fetch_ids: list[str] = []
             fetch_set: set[str] = set()
@@ -820,7 +853,7 @@ def _expand_hops(
                         _emit(client, rows)
                         return rows
                     if recovered:
-                        recovered_by_index[index] = recovered
+                        recovered_by_index[index] = _refs_matching_search(client, recovered, query)
                     per_work_ids.append([])
                     continue
                 if rank == "random" and per_hop_limit > 0:
@@ -832,10 +865,13 @@ def _expand_hops(
                         fetch_ids.append(ref_id)
             by_id: dict[str, dict[str, Any]] = {}
             if fetch_ids:
-                client.stage = f"hop {hop}/{depth} references · {len(fetch_ids)} ids"
-                client.note(client.stage)
+                client.stage = f"hop {hop}/{depth} references"
+                label = f"hop {hop}/{depth} references · {len(fetch_ids)} ids"
+                if query:
+                    label = f"{label} · {query}"
+                client.note(label)
                 try:
-                    children = client.works_by_ids(fetch_ids)
+                    children = client.works_by_ids(fetch_ids, search=query or None)
                 except Exception as exc:
                     children = list(getattr(exc, "partial", []) or [])
                     _defer(
@@ -875,8 +911,8 @@ def _expand_hops(
                                 id_of=lambda work: short_id(str(work.get("id") or "")),
                             )
                         source_why = {
-                            "semanticscholar": f"s2 ref of {why_prefix}",
-                            "pdf": f"pdf ref of {why_prefix}",
+                            "semanticscholar": _with_query(f"s2 ref of {why_prefix}", query),
+                            "pdf": _with_query(f"pdf ref of {why_prefix}", query),
                         }
                         for child in resolved:
                             child_id = short_id(str(child.get("id") or ""))
@@ -890,7 +926,7 @@ def _expand_hops(
                                 seed=seed,
                                 hop=hop,
                                 direction="refs",
-                                why=source_why.get(recovery, f"ref of {why_prefix}"),
+                                why=source_why.get(recovery, _with_query(f"ref of {why_prefix}", query)),
                                 gate=gate,
                             )
                             row.provenance["backend"] = recovery
@@ -917,7 +953,7 @@ def _expand_hops(
                             seed=seed,
                             hop=hop,
                             direction="refs",
-                            why=f"ref of {why_prefix}",
+                            why=_with_query(f"ref of {why_prefix}", query),
                             gate=gate,
                         )
                         if _mark_year(row, year_from, year_to):
@@ -1441,15 +1477,20 @@ def continue_deferred(client: OpenAlexClient, deferred: dict[str, Any]) -> list[
                 client.tally.advance(1)
         return rows
     if kind == "refs":
-        client.stage = f"resume references · {len(remaining)} ids"
-        client.note(client.stage)
+        query = _cites_query(client)
+        client.stage = "resume references"
+        label = f"resume references · {len(remaining)} ids"
+        if query:
+            label = f"{label} · {query}"
+        client.note(label)
+        reason = _with_query(f"ref of {why}", query)
         try:
-            children = client.works_by_ids(remaining)
+            children = client.works_by_ids(remaining, search=query or None)
         except OpenAlexBudgetExceeded as exc:
-            rows.extend(_row(child, "refs", f"ref of {why}") for child in exc.partial)
+            rows.extend(_row(child, "refs", reason) for child in exc.partial)
             _defer(client, exc, **{**deferred, "remaining_ids": list(exc.pending_ids)})
             return rows
-        return [_row(child, "refs", f"ref of {why}") for child in children]
+        return [_row(child, "refs", reason) for child in children]
     if kind == "author" and remaining:
         try:
             found = client.works_by_author_orcid(
