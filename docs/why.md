@@ -1,5 +1,9 @@
 # Why paperful
 
+The fill pipeline — sources, campus login, tidy around a run — is
+[How it works](how-it-works.md). This page is why the product is shaped this
+way.
+
 Paperful is a research helper for a reference library you already keep. It
 cleans the records, finds missing PDFs, and summarises papers, then keeps a
 platform-agnostic mirror you can back up and move. The work stays on this
@@ -77,6 +81,7 @@ Python, the Zotero local API, Ollama or LiteLLM, Docker.
 
 ## Related
 
+- [How it works](how-it-works.md) — fill pipeline
 - [Quiet mirror](quiet-mirror.md) — folder contract
 - [How paperful compares](comparison.md)
 - [Roadmap](ROADMAP.md) — Zotero is the tested path; Mendeley and EndNote are seeking testers

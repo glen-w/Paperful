@@ -18,6 +18,7 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
 }
 
 body {
@@ -297,6 +298,39 @@ a {
   font-size: 0.92em;
 }
 
+.pipeline {
+  margin: 0 0 1.5rem;
+  padding-left: 1.35rem;
+}
+
+.pipeline li {
+  margin: 0 0 1rem;
+  color: var(--ink-soft);
+}
+
+.pipeline li:last-child {
+  margin-bottom: 0;
+}
+
+.pipeline strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.around-fill {
+  margin: 1.5rem 0 0;
+  color: var(--ink-soft);
+}
+
+.around-fill strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.outcomes strong {
+  color: var(--ink);
+}
+
 .code {
   background: #101820;
   color: #e6eef2;
@@ -325,6 +359,82 @@ a {
   gap: 0.75rem;
 }
 
+/* Cleaning Service page (spoken offer under shared site chrome) */
+.service {
+  padding-top: 0.25rem;
+}
+
+.service .spoken {
+  width: min(52rem, 100%);
+  padding: 1.15rem 0 1.5rem;
+}
+
+.service h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.35rem, 2.7vw, 1.85rem);
+  line-height: 1.28;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 0 0 0.75rem;
+}
+
+.service .door {
+  margin: 0 0 0.85rem;
+  padding: 0.95rem 1rem 1.05rem;
+  border-radius: 0.4rem;
+  max-width: 36rem;
+}
+
+.service .door h2 {
+  margin: 0.85rem 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+}
+
+.service .door p {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.service .door-coffee {
+  background: rgba(196, 106, 42, 0.12);
+  border: 1px solid var(--accent);
+}
+
+.service .tool-line,
+.service .receipt {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.service .after {
+  width: min(40rem, 100%);
+  margin: 0 0 2.5rem;
+  padding-top: 0.25rem;
+}
+
+.service .after h2 {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 500;
+  margin: 0 0 0.75rem;
+}
+
+.service .after p {
+  margin: 0 0 0.9rem;
+}
+
+.service .after code {
+  font-size: 0.92em;
+}
+
+.pf-site-chrome .site-nav a[aria-current="page"] {
+  color: var(--pf-accent);
+}
+
 @media (min-width: 900px) {
   .scene-grid {
     grid-template-columns: repeat(3, 1fr);
@@ -345,5 +455,17 @@ a {
   .feature:nth-child(4),
   .feature:nth-child(5) {
     grid-column: auto;
+  }
+
+  .service .spoken {
+    padding-top: 0.7rem;
+  }
+
+  .service h1 {
+    margin-bottom: 0.45rem;
+  }
+
+  .service .door {
+    padding: 0.75rem 0.9rem 0.85rem;
   }
 }

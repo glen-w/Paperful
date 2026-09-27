@@ -1,5 +1,9 @@
 # Browser sessions (Scholar, EZProxy, publishers)
 
+Log in once in your normal browser; paperful reuses that login on this
+machine. The walkthrough is [How it works](how-it-works.md#using-your-scholar-or-library-login).
+This page is the vault, engines, and CAPTCHA troubleshooting.
+
 One local vault: `state/sessions/`. Playwright is a core dependency; Chromium
 for the headless fallback installs automatically on first need.
 

@@ -1,5 +1,9 @@
 # Source routing and circuit breaker
 
+Free copies first, then campus, then only the sources that match the record.
+The walkthrough is [How it works](how-it-works.md). This page is the routing
+table and what happens when a site blocks.
+
 With `source_routing = true` (the default), each item is sent only to sources
 that look applicable from its metadata. The per-item log line `trying: …`
 lists that lane, not the full `sources` list.

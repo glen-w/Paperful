@@ -39,21 +39,24 @@ docker compose run --rm paperful snowball search "area based management" --gate 
 docker compose run --rm paperful run --collection interesting --preset oa --dry-run
 ```
 
-**Find.** Open access first (Unpaywall, OpenAlex, arXiv, bioRxiv/medRxiv,
-Europe PMC, Semantic Scholar, CORE, the item's own URL). Campus **EZProxy**
-when you have a subscription. User playbooks, then an opt-in AI browser, take
-the landings those indexes miss. **Google Scholar** and **Sci-Hub** are
-opt-in and off by default (Scholar needs a session login; Sci-Hub occupies a
-legal grey zone in some jurisdictions — see [Sci-Hub](docs/scihub.md)). Each
-item only hits sources that match its metadata (DOI, arXiv id, URL, …);
-`--try-all` disables that. Sci-Hub coverage after ~2021 is thin — paperful
-skips Sci-Hub for items dated after 2021 (and drops it from the run when
-`--year-from` is past that year). Recent paywalled papers are a campus-access
-problem when your library has the subscription. Paperful does not fetch every
-paywalled or DOI-less item. The PDF keeps a provenance stamp
-(`paperful oa:unpaywall`, `campus:ezproxy`, `grey:undocs`). The parent item
-also gets a readable line ("Free copy from Unpaywall."), as a note unless
-`[remarks].surface` is `tag` or `off`.
+**Find.** A fill (`run`) looks for a free copy first — Unpaywall, OpenAlex,
+arXiv, bioRxiv/medRxiv, Europe PMC, Semantic Scholar, CORE, OpenAIRE, then
+the item's own URL. Campus **EZProxy** when you have a subscription: log in
+once in your browser; the password is not stored. User playbooks, then an
+opt-in AI browser, take the landings those indexes miss. **Google Scholar**
+and **Sci-Hub** stay off until you opt in (Scholar needs a session login;
+Sci-Hub occupies a legal grey zone in some jurisdictions — see
+[Sci-Hub](docs/scihub.md)). Each item only hits sources that match its
+metadata; `--try-all` disables that. If a site says slow down, the client
+waits; if it keeps blocking, that source is paused so one publisher does not
+stall the run. Sci-Hub coverage after ~2021 is thin — paperful skips it for
+items dated after 2021 (and drops it from the run when `--year-from` is past
+that year). Recent paywalled papers are a campus-access problem when your
+library has the subscription. Paperful does not fetch every paywalled or
+DOI-less item. The PDF keeps a provenance stamp (`paperful oa:unpaywall`,
+`campus:ezproxy`, `grey:undocs`). The parent item also gets a readable line
+("Free copy from Unpaywall."), as a note unless `[remarks].surface` is `tag`
+or `off`. Walkthrough: [How it works](docs/how-it-works.md).
 
 **Completeness.** `gaps` counts what is missing. `lint` and `fix-metadata`
 propose patches on disk; `--apply` writes them. `dedupe` reviews duplicates.

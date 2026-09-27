@@ -68,10 +68,10 @@
           Menu
         </button>
         <nav id="site-nav" class="site-nav" data-nav>
-          <a href="#product">See how it works</a>
-          <a href="./guide/comparison.html">Compare</a>
+          <a href="#product">How it works</a>
           <a href="./guide/">Docs</a>
           <a href="#install">Install</a>
+          <a href="./cleaning-service.html">Cleaning Service</a>
           <a href="https://github.com/glen-w/Paperful">GitHub</a>
         </nav>
       </div>
@@ -101,77 +101,114 @@
             0.9.0.
           </p>
           <div class="cta-row">
-            <a class="btn primary" href="#product">See how it works</a>
+            <a class="btn primary" href="#product">How it works</a>
             <a class="btn ghost" href="#install">Install</a>
           </div>
         </div>
       </section>
 
       <section class="section" id="product">
-        <div class="wrap">
-          <h2>How it helps</h2>
+        <div class="wrap narrow" id="how-it-works">
+          <h2>How it works</h2>
           <p class="section-lead">
-            Grow the library from a search or seed papers. Fill PDFs for items
-            you already keep. Each attachment keeps a clear source line — for
-            example, “Free copy from Unpaywall.”
+            When you fill a collection, paperful does this. Preview first from
+            Install if you want to see the plan before anything is fetched.
           </p>
-          <div class="scene-grid">
-            <article class="feature">
-              <h3>1. Install once, stay local</h3>
-              <p>
-                Clone the repo and build with Docker Compose. Zotero stays on
-                your computer; paperful talks to it through the local API.
-                Zotero 10+ attaches PDFs for you; 7–9 still save them to disk.
-              </p>
-            </article>
-            <article class="feature">
-              <h3>2. Preview, then fill</h3>
-              <pre class="code"><code>docker compose run --rm paperful doctor
-docker compose run --rm paperful run -C interesting --preset oa --dry-run</code></pre>
-              <p>
-                Start with a dry-run so you see what would change. Use
-                <code>--preset oa</code> for open access. With campus EZProxy,
-                switch to <code>--preset eoi</code> after a one-time login on
-                the host.
-              </p>
-            </article>
-            <article class="feature">
-              <h3>3. You stay in control</h3>
-              <p>
-                Writes land on disk first; you choose when to apply them.
-                Scholar, Sci-Hub, and the local model stay off until you turn
-                them on. Not every paywalled paper will come back — and that is
-                by design.
-              </p>
-            </article>
-          </div>
+          <ol class="pipeline">
+            <li>
+              <strong>Pick the slice.</strong>
+              A collection, or the whole library. You can narrow by year or
+              item type.
+            </li>
+            <li>
+              <strong>Check the record.</strong>
+              Confirm the DOI looks like the same paper. That check is in
+              memory for the search; Zotero is not rewritten here.
+            </li>
+            <li>
+              <strong>Look for a free copy first.</strong>
+              Unpaywall, OpenAlex, arXiv, bioRxiv/medRxiv, Europe PMC,
+              Semantic Scholar, CORE, then the item’s own URL. Web pages can
+              be printed to PDF. Odd hosts use playbooks you write. Google
+              Scholar and Sci-Hub stay off until you turn them on.
+            </li>
+            <li>
+              <strong>Use your library login when you have it.</strong>
+              Log in once in Chrome or Edge. paperful reuses that campus
+              session through EZProxy. Same pattern for Scholar if you opt in.
+              The institutional password is never stored in config. When the
+              campus session expires, that lane stops for the rest of the run.
+            </li>
+            <li>
+              <strong>Only try what fits.</strong>
+              A paper with a DOI does not get sent to every site. If a site
+              says slow down, we wait. If it keeps blocking or showing a
+              CAPTCHA, we pause that source and come back later so one
+              publisher does not stall the run.
+            </li>
+            <li>
+              <strong>Save on this machine first.</strong>
+              The PDF lands on disk with a readable source line (“Free copy
+              from Unpaywall.”). On Zotero 10+ it can attach; older Zotero
+              still gets the file on disk. Not every paywalled paper comes
+              back.
+            </li>
+          </ol>
+          <p class="around-fill">
+            <strong>Around a fill.</strong>
+            Before a messy ingest, review duplicates; nothing merges until you
+            say so. After a fill, you can tidy identifiers and, if you want,
+            write summary notes from the PDF text.
+            <a href="./guide/how-it-works.html">How it works</a>
+            ·
+            <a href="./guide/sources.html">Sources</a>
+            ·
+            <a href="./guide/sessions.html">Sessions</a>
+            ·
+            <a href="./guide/ezproxy.html">EZProxy</a>
+            ·
+            <a href="./guide/dedupe.html">Dedupe</a>.
+          </p>
         </div>
       </section>
 
       <section class="section muted" id="what">
         <div class="wrap narrow">
-          <h2>What you can do</h2>
+          <h2>What it does</h2>
           <ul class="outcomes">
-            <li>Tidy a collection — fix identifiers, review duplicates, summarise if you want</li>
             <li>
-              Find PDFs through open access, campus access, and playbooks you
-              write
+              <strong>Downloads.</strong>
+              Missing PDFs, when a copy can be reached. Each attachment keeps
+              a source line.
             </li>
-            <li>Grow the library from a keyword, DOI, or ORCID</li>
-            <li>Snapshot everything to a folder and restore only what is missing</li>
-            <li>Export the mirror as RIS, BibTeX, or EndNote XML</li>
-            <li>Use campus EZProxy without storing your password</li>
-            <li>Leave Scholar, Sci-Hub, and AI summarisation off until you need them</li>
+            <li>
+              <strong>Notes.</strong>
+              Optional grounded summary from the PDF’s text. Local model, off
+              until you enable it. Scans need a text layer first.
+            </li>
+            <li>
+              <strong>Summaries.</strong>
+              A collection-level review of those notes.
+            </li>
+            <li>
+              <strong>A folder copy.</strong>
+              Snapshot on disk; export RIS, BibTeX, or EndNote XML. Copy that
+              folder yourself — not a sync service.
+            </li>
           </ul>
           <p>
-            Dive deeper:
-            <a href="./guide/commands.html">commands</a>
+            You can also grow the library from a search or seed papers; that is
+            a different step from filling PDFs you already keep.
+            <a href="./guide/snowball.html">Snowball</a>.
+          </p>
+          <p>
+            <a href="./guide/how-it-works.html">How it works</a>
             ·
-            <a href="./guide/dedupe.html">dedupe</a>
+            <a href="./guide/llm.html">Notes and summaries</a>
             ·
-            <a href="./guide/why.html">why paperful</a>
+            <a href="./guide/quiet-mirror.html">Folder copy</a>
             ·
-            <a href="./guide/comparison.html">how it compares</a>.
+            <a href="./guide/comparison.html">How it compares</a>.
           </p>
         </div>
       </section>
@@ -182,15 +219,20 @@ docker compose run --rm paperful run -C interesting --preset oa --dry-run</code>
           <p>
             paperful is a local tool. It reads your catalogue through an
             adapter — Zotero’s local API is the path that is well tested.
-            Session cookies stay under <code>state/sessions/</code>. Your
-            mirror lives in <code>out/</code>, ready to copy wherever you like.
+            Logins you make in the browser stay on this machine; the folder
+            copy is yours to move.
           </p>
         </div>
       </section>
 
-      <section class="section muted" id="how">
+      <section class="section muted" id="install">
         <div class="wrap narrow">
-          <h2>From install to a filled collection</h2>
+          <h2>Install</h2>
+          <p>
+            Build on your machine — there is no app store package and no
+            published Docker image. Keep Zotero on the host with the local API
+            enabled.
+          </p>
           <ol class="steps">
             <li>
               Copy <code>config.minimal.toml</code>, add your
@@ -200,33 +242,12 @@ docker compose run --rm paperful run -C interesting --preset oa --dry-run</code>
               List collections and see which ones still need PDFs:
               <code>paperful collections</code>.
             </li>
+            <li>Dry-run a collection, then fetch and attach.</li>
             <li>
-              Dry-run a collection, then fetch and attach.
-            </li>
-            <li>
-              Optionally log in to EZProxy or Scholar before a larger run.
+              Optionally log in to EZProxy or Scholar on the host before a
+              larger run.
             </li>
           </ol>
-          <p>
-            <a href="./guide/commands.html">Commands</a>
-            ·
-            <a href="./guide/config.html">Config</a>
-            ·
-            <a href="./guide/ezproxy.html">EZProxy</a>
-            ·
-            <a href="./guide/sessions.html">Sessions</a>
-          </p>
-        </div>
-      </section>
-
-      <section class="section" id="install">
-        <div class="wrap narrow">
-          <h2>Install</h2>
-          <p>
-            Build on your machine — there is no app store package and no
-            published Docker image. Keep Zotero on the host with the local API
-            enabled.
-          </p>
           <pre class="code"><code>git clone https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
@@ -235,6 +256,15 @@ docker compose build
 docker compose run --rm paperful doctor
 docker compose run --rm paperful run --collection interesting --preset oa --dry-run
 # campus: --preset eoi, after uv run paperful session login ezproxy on the host</code></pre>
+          <p>
+            Rename is not enough: edit <code>.env</code> (data directory and
+            Zotero host) and set a real <code>email</code> in
+            <code>config.toml</code>. The minimal config is open-access sources
+            only — paths, Zotero as manager, no campus EZProxy.
+            <a href="./guide/docker.html#environment-and-override">.env / Docker</a>
+            ·
+            <a href="./guide/config.html">config.toml</a>.
+          </p>
           <p class="fine">
             Version 0.9 builds from a tagged clone. Full setup:
             <a href="./guide/docker.html">Docker</a>

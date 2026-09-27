@@ -1,5 +1,8 @@
 # Dedupe
 
+Review duplicates before a messy fill; nothing merges until you say so. That
+loop sits around a fill, not inside it — [How it works](how-it-works.md#around-a-fill).
+
 `paperful dedupe` finds duplicate parent items in a collection (or the whole
 library) and writes a review pack on disk. It does not change the library
 unless you pass `--apply`. `--apply` copies the extra parent's PDF, notes,

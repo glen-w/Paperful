@@ -1,5 +1,9 @@
 # Campus EZProxy
 
+Log in once with your library; paperful reuses that session and never stores
+the password. The walkthrough is
+[How it works](how-it-works.md#using-your-scholar-or-library-login).
+
 Publisher sites (Elsevier ScienceDirect, Springer Nature, Wiley, JSTOR, …)
 normally require a subscription. If your university or research library
 offers **EZProxy** (or a similar “login?url=” redirector), paperful can
