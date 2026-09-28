@@ -2012,7 +2012,10 @@ def test_cites_query_filters_references_and_cited_by(tmp_path: Path):
         by_direction.setdefault(row["direction"], []).append(row["biblio"]["title"])
     assert by_direction["refs"] == ["Degrowth foundations"]
     assert by_direction["cites"] == ["Degrowth policy"]
-    assert all(row["why"].endswith("· degrowth") for row in rows)
+    assert by_direction["doi"] == ["Seed"]
+    assert all(
+        row["why"].endswith("· degrowth") for row in rows if row["direction"] != "doi"
+    )
     summary = json.loads((result.run_dir / "summary.json").read_text())
     assert summary["cites_query"] == "degrowth"
 
@@ -2153,6 +2156,7 @@ def test_cites_query_reaches_the_second_hop(tmp_path: Path):
     assert [(row["hop"], row["biblio"]["title"]) for row in rows] == [
         (1, "Degrowth policy"),
         (2, "Degrowth and work"),
+        (0, "Seed"),
     ]
 
 
@@ -2376,8 +2380,8 @@ def test_mixed_direction_keeps_refs_when_keywords_missing(tmp_path: Path):
     assert "1 of 1 seeds have no OpenAlex keywords" in text
     lines = (result.run_dir / "candidates.jsonl").read_text().splitlines()
     rows = [json.loads(line) for line in lines]
-    assert {row["direction"] for row in rows} == {"refs"}
-    assert rows[0]["ids"]["doi"] == "10.1000/ref"
+    assert {row["direction"] for row in rows} == {"doi", "refs"}
+    assert {row["ids"]["doi"] for row in rows} == {"10.1000/seed", "10.1000/ref"}
 
 
 def test_keyword_notice_counts_the_whole_doi_list(tmp_path: Path):
@@ -2406,7 +2410,9 @@ def test_keyword_notice_counts_the_whole_doi_list(tmp_path: Path):
     assert seen["filter"] == "keywords.id:alpha"
     lines = (result.run_dir / "candidates.jsonl").read_text().splitlines()
     rows = [json.loads(line) for line in lines]
-    assert {row["ids"]["doi"] for row in rows} == {"10.1000/hit"}
+    assert {row["ids"]["doi"] for row in rows} == {"10.1000/bare", "10.1000/tagged", "10.1000/hit"}
+    assert {row["ids"]["doi"] for row in rows if row["hop"] == 0} == {"10.1000/bare", "10.1000/tagged"}
+    assert {row["ids"]["doi"] for row in rows if row["hop"] == 1} == {"10.1000/hit"}
 
 
 def test_keyword_min_score_drops_weak_slugs(tmp_path: Path):
