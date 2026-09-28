@@ -348,3 +348,8 @@ Larger product bets. Park until the ledger and core loop justify them.
 - [snowball.md](snowball.md) — library-building from a keyword, DOI, ORCID, or collection
 - Site career / domain timeline plan (consumer of durable tags):
   `/Users/89298/Documents/website/glen-w.github.io/docs/dev/career-timeline-plan.md`
+
+## GUI
+
+Parked **2.0 vision** only — not a 1.0 deliverable. Web-native workbench
+sketch (open / Docker / SaaS): [gui.md](gui.md).
