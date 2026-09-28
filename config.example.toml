@@ -150,8 +150,18 @@ mirror_failures_before_skip = 3
 
 # Manual PDF handoff after soft-blocked OA misses (gaps --list-missing / --handoff).
 # [gaps]
-# handoff = "list"                 # list | tabs | walk
+# handoff = "list"                 # list | tabs | walk | watch
 # downloads_dir = "~/Downloads"    # newest *.pdf pickup for --handoff walk
+
+# PDF drop folder for --handoff watch and `paperful inbox watch` / `drain`.
+# Not snowball's state/snowball/watches/*/inbox.jsonl. Point the browser
+# download directory here (or Save As into it). Empty dir = feature off.
+# [inbox]
+# dir = "~/Documents/paperful_inbox"
+# watch_after_handoff = true       # after --handoff tabs|watch, keep polling
+# poll_seconds = 2.0
+# settle_seconds = 1.5             # size must stay stable before ingest
+# idle_seconds = 0                 # 0 = wait forever (Ctrl+C)
 
 # Named run configs (not grey-lit playbooks). Same keys work in profiles/<name>.toml
 # beside this file. Select with: paperful all --profile bbnj-journal

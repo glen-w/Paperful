@@ -149,8 +149,14 @@ class Config:
     synthesize_tag: str = "paperful-report"
     synthesize_dest: str = "both"  # disk | zotero | both
     synthesize_timeout_s: float = 0.0  # 0 → max(llm.timeout_s, 300)
-    gaps_handoff: str = "list"  # list | tabs | walk
+    gaps_handoff: str = "list"  # list | tabs | walk | watch
     gaps_downloads_dir: str = ""  # empty → ~/Downloads
+    # PDF drop folder for handoff watch / `paperful inbox` (not snowball inbox.jsonl).
+    inbox_dir: str = ""  # empty → feature off
+    inbox_watch_after_handoff: bool = True
+    inbox_poll_seconds: float = 2.0
+    inbox_settle_seconds: float = 1.5
+    inbox_idle_seconds: float = 0.0  # 0 → wait forever (Ctrl+C)
     snowball_enabled: bool = False
     snowball_max_candidates: int = 200
     snowball_per_hop_limit: int = 50
@@ -245,6 +251,18 @@ class Config:
     @property
     def reports_dir(self) -> Path:
         return self.state_dir / "reports"
+
+    @property
+    def inbox_path(self) -> Path | None:
+        """Resolved PDF drop folder, or None when ``[inbox].dir`` is unset."""
+        raw = (self.inbox_dir or "").strip()
+        if not raw:
+            return None
+        return Path(raw).expanduser()
+
+    @property
+    def inbox_seen_path(self) -> Path:
+        return self.state_dir / "inbox-seen.jsonl"
 
     def effective_synthesize_timeout(self) -> float:
         if self.synthesize_timeout_s > 0:
@@ -643,6 +661,18 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             cfg.gaps_handoff = parse_handoff(str(gaps["handoff"]))
         if "downloads_dir" in gaps:
             cfg.gaps_downloads_dir = str(gaps["downloads_dir"]).strip()
+    inbox = raw.get("inbox")
+    if isinstance(inbox, dict):
+        if "dir" in inbox:
+            cfg.inbox_dir = str(inbox["dir"]).strip()
+        if "watch_after_handoff" in inbox:
+            cfg.inbox_watch_after_handoff = bool(inbox["watch_after_handoff"])
+        if "poll_seconds" in inbox:
+            cfg.inbox_poll_seconds = max(0.2, float(inbox["poll_seconds"]))
+        if "settle_seconds" in inbox:
+            cfg.inbox_settle_seconds = max(0.0, float(inbox["settle_seconds"]))
+        if "idle_seconds" in inbox:
+            cfg.inbox_idle_seconds = max(0.0, float(inbox["idle_seconds"]))
     mirror = raw.get("mirror")
     if isinstance(mirror, dict) and "pdfs" in mirror:
         cfg.mirror_pdfs = parse_pdfs(str(mirror["pdfs"]))

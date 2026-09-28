@@ -1837,6 +1837,7 @@ def test_api_error_keeps_a_restorable_queue(tmp_path: Path):
         SnowballRequest(gate="dry-run", direction="cites", depth=1),
         console=console,
         client=OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter),
+        lookup=lambda doi, title: None,
     )
     assert result.exit_code == 1
     assert (result.run_dir / "candidates.jsonl").is_file()
@@ -1912,6 +1913,7 @@ def test_budget_stop_keeps_partial_rows_and_resume(tmp_path: Path):
         SnowballRequest(gate="dry-run", direction="cites", depth=1, per_hop_limit=10),
         console=console,
         client=client,
+        lookup=lambda doi, title: None,
     )
     assert result.exit_code == 1
     deferred_path = result.run_dir / "deferred.json"

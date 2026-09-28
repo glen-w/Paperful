@@ -135,11 +135,20 @@ snowball_app = typer.Typer(
     ),
 )
 app.add_typer(snowball_app, name="snowball")
+inbox_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help=(
+        "Watch a PDF drop folder and attach downloads to matching library items. "
+        "Not snowball's watch inbox.jsonl."
+    ),
+)
+app.add_typer(inbox_app, name="inbox")
 
 # Canonical top-level verbs. tests/test_cli.py asserts this matches `paperful --help`.
 JOBS: dict[str, tuple[str, ...]] = {
     "library": ("collections", "import", "export", "snowball"),
-    "find": ("run", "attach", "recover", "gaps"),
+    "find": ("run", "attach", "recover", "gaps", "inbox"),
     "completeness": (
         "lint",
         "fix-metadata",
@@ -1772,12 +1781,15 @@ def gaps(
     handoff: str | None = typer.Option(
         None,
         "--handoff",
-        help="After listing: list (default), tabs (open URLs), or walk (interactive ingest).",
+        help=(
+            "After listing: list (default), tabs (open URLs), walk (interactive "
+            "Downloads ingest), or watch (tabs + poll the inbox.dir folder)."
+        ),
     ),
     include_doi_tabs: bool = typer.Option(
         False,
         "--include-doi-tabs",
-        help="With --handoff tabs, also open doi.org for doi_only rows.",
+        help="With --handoff tabs|watch, also open doi.org for doi_only rows.",
     ),
     downloads_dir: Path | None = typer.Option(
         None,
@@ -1797,7 +1809,7 @@ def gaps(
     """Count items with no stored PDF, a linked PDF URL only, or no DOI.
 
     Points at `run` (PDFs) and `lint` (identifiers). Does not write the library
-    unless ``--handoff walk`` attaches files.
+    unless ``--handoff walk`` or ``--handoff watch`` attaches files.
     """
     from .dedupe import summarize_gaps
     from .handoff import (
@@ -1829,7 +1841,7 @@ def gaps(
     except ValueError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1) from exc
-    if mode in {"tabs", "walk"} and not list_missing:
+    if mode in {"tabs", "walk", "watch"} and not list_missing:
         list_missing = True
     _require_manager(cfg)
     backend = _connect(cfg, quiet=as_json)
@@ -1952,7 +1964,7 @@ def gaps(
 
     if mode == "list":
         return
-    if mode == "tabs":
+    if mode in {"tabs", "watch"}:
 
         def _confirm(n: int) -> bool:
             answer = typer.prompt(
@@ -1964,6 +1976,22 @@ def gaps(
             missing, include_doi_tabs=include_doi_tabs, confirm=_confirm
         )
         console.print(f"Opened {opened} tab(s) in your browser.")
+        if mode == "tabs" and not (
+            cfg.inbox_watch_after_handoff and cfg.inbox_path is not None
+        ):
+            return
+        if not backend.supports_write():
+            console.print("[red]--handoff watch needs library write support.[/]")
+            raise typer.Exit(1)
+        _inbox_handoff_session(
+            cfg,
+            backend,
+            manifest,
+            items,
+            missing,
+            scope=scope,
+            once=False,
+        )
         return
 
     # walk
@@ -2037,12 +2065,15 @@ def run(
     handoff: str | None = typer.Option(
         None,
         "--handoff",
-        help="After the run: list|tabs|walk for soft-blocked openable PDF URLs.",
+        help=(
+            "After the run: list|tabs|walk|watch for soft-blocked openable PDF URLs. "
+            "watch = tabs then poll the inbox.dir folder."
+        ),
     ),
     include_doi_tabs: bool = typer.Option(
         False,
         "--include-doi-tabs",
-        help="With --handoff tabs, also open doi.org for doi_only rows.",
+        help="With --handoff tabs|watch, also open doi.org for doi_only rows.",
     ),
     downloads_dir: Path | None = typer.Option(
         None,
@@ -2320,7 +2351,7 @@ def _run_session_handoff(
         console.print("[dim]No openable soft-blocked PDFs to hand off.[/]")
         return
     console.print(f"[bold]Handoff[/] ({mode}): {len(missing)} openable miss(es)")
-    if mode == "tabs":
+    if mode in {"tabs", "watch"}:
 
         def _confirm(n: int) -> bool:
             answer = typer.prompt(
@@ -2332,6 +2363,25 @@ def _run_session_handoff(
             missing, include_doi_tabs=include_doi_tabs, confirm=_confirm
         )
         console.print(f"Opened {opened} tab(s).")
+        enter_watch = mode == "watch" or (
+            mode == "tabs"
+            and cfg.inbox_watch_after_handoff
+            and cfg.inbox_path is not None
+        )
+        if not enter_watch:
+            return
+        if backend is None or not backend.supports_write():
+            console.print("[yellow]--handoff watch needs a writable library; skipped.[/]")
+            return
+        _inbox_handoff_session(
+            cfg,
+            backend,
+            manifest,
+            catalog,
+            missing,
+            scope="run handoff",
+            once=False,
+        )
         return
     if backend is None or not backend.supports_write():
         console.print("[yellow]--handoff walk needs a writable library; skipped.[/]")
@@ -2352,6 +2402,70 @@ def _run_session_handoff(
         f"Walk attached {result.attached}, skipped {result.skipped}"
         + (" (quit early)" if result.quit_early else "")
     )
+
+
+def _inbox_handoff_session(
+    cfg: Config,
+    backend: LibraryBackend,
+    manifest: Manifest,
+    items: list,
+    missing: list,
+    *,
+    scope: str,
+    once: bool,
+    idle_seconds: float | None = None,
+    use_fifo: bool = True,
+) -> None:
+    """Openable-miss session: poll ``[inbox].dir``, match DOI then FIFO, report."""
+    from .inbox import (
+        ensure_inbox_dirs,
+        events_as_report_items,
+        fifo_from_missing,
+        process_candidates,
+        summary_from_stats,
+    )
+
+    started = time.time()
+    try:
+        root = ensure_inbox_dirs(cfg)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    console.print(
+        f"[bold]Inbox[/] watching {root} "
+        f"(DOI match"
+        + ("; FIFO for openable misses" if use_fifo else "")
+        + "; Ctrl+C to stop)"
+    )
+    fifo = fifo_from_missing(missing) if use_fifo else None
+    stats = process_candidates(
+        cfg,
+        backend,
+        manifest,
+        list(items),
+        fifo_queue=fifo,
+        once=once,
+        idle_seconds=idle_seconds,
+        on_status=lambda msg: console.print(msg),
+    )
+    _flush(backend)
+    path = write_command_report(
+        cfg,
+        command="inbox",
+        scope=scope,
+        summary=summary_from_stats(stats),
+        items=events_as_report_items(stats.events),
+        flags={"once": once, "fifo": use_fifo},
+        started=started,
+        extra_paths={"inbox_dir": str(root)},
+    )
+    console.print(
+        f"Inbox attached {stats.attached}, unmatched {stats.unmatched}, "
+        f"errors {stats.errors}, skipped {stats.skipped}"
+        + (f" ({stats.quit_reason})" if stats.quit_reason else "")
+    )
+    if path is not None:
+        console.print(f"Inbox report: {path}")
 
 
 def _mirror_deferred(cfg: Config) -> None:
@@ -2465,6 +2579,187 @@ def attach(
         console.print("\n[yellow]Interrupted.[/]")
     _flush(backend)
     console.print(f"[bold]Attached {done}/{len(pending)}[/]")
+
+
+@inbox_app.command("watch")
+def inbox_watch(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    idle: float | None = typer.Option(
+        None,
+        "--idle",
+        help="Stop after this many idle seconds (default: inbox.idle_seconds, 0=forever).",
+    ),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Long-running sidecar: poll inbox.dir and attach by PDF DOI (no FIFO)."""
+    from .inbox import (
+        ensure_inbox_dirs,
+        events_as_report_items,
+        process_candidates,
+        summary_from_stats,
+    )
+
+    if _scope_unset(collection, library, profile, run_config):
+        _refuse_missing_scope()
+    cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    if not collection and not library:
+        _refuse_missing_scope()
+    _require_manager(cfg)
+    backend = _connect(cfg)
+    if not backend.supports_write():
+        _exit_env("inbox watch needs library write support.", cfg)
+    try:
+        root = ensure_inbox_dirs(cfg)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    loaded = _loaded_scope(
+        backend,
+        collection=collection,
+        library=bool(library),
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    items, scope = loaded.items, loaded.label
+    manifest = Manifest(cfg.manifest_path)
+    started = time.time()
+    console.print(
+        f"[bold]Inbox[/] watching {root} for {scope} (DOI match only; Ctrl+C to stop)"
+    )
+    stats = process_candidates(
+        cfg,
+        backend,
+        manifest,
+        items,
+        fifo_queue=None,
+        once=False,
+        idle_seconds=idle,
+        on_status=lambda msg: console.print(msg),
+    )
+    _flush(backend)
+    path = write_command_report(
+        cfg,
+        command="inbox",
+        scope=scope,
+        summary=summary_from_stats(stats),
+        items=events_as_report_items(stats.events),
+        flags={"once": False, "fifo": False, "idle": idle},
+        started=started,
+        extra_paths={"inbox_dir": str(root)},
+    )
+    console.print(
+        f"Inbox attached {stats.attached}, unmatched {stats.unmatched}, "
+        f"errors {stats.errors}, skipped {stats.skipped}"
+        + (f" ({stats.quit_reason})" if stats.quit_reason else "")
+    )
+    if path is not None:
+        console.print(f"Inbox report: {path}")
+
+
+@inbox_app.command("drain")
+def inbox_drain(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """One-shot: ingest current PDFs in inbox.dir (DOI match only)."""
+    from .inbox import (
+        ensure_inbox_dirs,
+        events_as_report_items,
+        process_candidates,
+        summary_from_stats,
+    )
+
+    if _scope_unset(collection, library, profile, run_config):
+        _refuse_missing_scope()
+    cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    if not collection and not library:
+        _refuse_missing_scope()
+    _require_manager(cfg)
+    backend = _connect(cfg)
+    if not backend.supports_write():
+        _exit_env("inbox drain needs library write support.", cfg)
+    try:
+        root = ensure_inbox_dirs(cfg)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    loaded = _loaded_scope(
+        backend,
+        collection=collection,
+        library=bool(library),
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    items, scope = loaded.items, loaded.label
+    manifest = Manifest(cfg.manifest_path)
+    started = time.time()
+    console.print(f"[bold]Inbox[/] draining {root} for {scope}")
+    stats = process_candidates(
+        cfg,
+        backend,
+        manifest,
+        items,
+        fifo_queue=None,
+        once=True,
+        on_status=lambda msg: console.print(msg),
+    )
+    _flush(backend)
+    path = write_command_report(
+        cfg,
+        command="inbox",
+        scope=scope,
+        summary=summary_from_stats(stats),
+        items=events_as_report_items(stats.events),
+        flags={"once": True, "fifo": False},
+        started=started,
+        extra_paths={"inbox_dir": str(root)},
+    )
+    console.print(
+        f"Inbox attached {stats.attached}, unmatched {stats.unmatched}, "
+        f"errors {stats.errors}, skipped {stats.skipped}"
+    )
+    if path is not None:
+        console.print(f"Inbox report: {path}")
 
 
 @app.command()

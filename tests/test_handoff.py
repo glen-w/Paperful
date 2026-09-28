@@ -60,6 +60,7 @@ def test_missing_from_run_outcomes_keeps_soft_blocks():
 def test_parse_handoff_rejects_unknown():
     assert parse_handoff(None) == "list"
     assert parse_handoff("TABS") == "tabs"
+    assert parse_handoff("watch") == "watch"
     with pytest.raises(ValueError, match="walk"):
         parse_handoff("explode")
 

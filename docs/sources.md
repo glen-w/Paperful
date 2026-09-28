@@ -71,15 +71,28 @@ fails, use the manual handoff loop:
 ```sh
 uv run paperful gaps -C Inbox/Fitzpatrick --list-missing
 uv run paperful gaps -C Inbox/Fitzpatrick --list-missing --handoff tabs
+uv run paperful gaps -C Inbox/Fitzpatrick --list-missing --handoff watch
 uv run paperful gaps -C Inbox/Fitzpatrick --list-missing --handoff walk
 uv run paperful attach --item L7ISVTKE --file ~/Downloads/paper.pdf
+uv run paperful inbox watch -C Inbox/Fitzpatrick   # long-running sidecar
+uv run paperful inbox drain -C Inbox/Fitzpatrick    # one-shot
 ```
 
 `--handoff list` (default) only prints/exports. `tabs` opens each
-`openable_url` in your default browser (confirms when more than 20). `walk`
-opens one URL at a time, waits for you to download, then ingests via the same
-path as `attach --item --file`. Config: `[gaps].handoff`, `[gaps].downloads_dir`.
-After a snowball `--fetch-pdfs` pass, the same handoff is
+`openable_url` in your default browser (confirms when more than 20). `watch`
+opens those tabs, then polls `[inbox].dir` until Ctrl+C or idle timeout:
+match by DOI extracted from the PDF, else FIFO against the openable-miss
+queue from this handoff. `walk` opens one URL at a time, waits for you to
+download into `[gaps].downloads_dir` (default `~/Downloads`), then ingests
+via the same path as `attach --item --file`.
+
+Set `[inbox].dir` (for example `~/Documents/paperful_inbox`) and point the
+browser download folder there (or Save As into it). Unmatched PDFs move to
+`<inbox>/unmatched/`. This folder is **not** snowball’s
+`state/snowball/watches/*/inbox.jsonl`. When `[inbox].watch_after_handoff` is
+true (default) and `dir` is set, `--handoff tabs` also enters the watch loop
+after opening tabs. Config: `[gaps].handoff`, `[gaps].downloads_dir`,
+`[inbox].*`. After a snowball `--fetch-pdfs` pass, the same handoff is
 `gaps -C <collection> --list-missing --handoff …` (or `run --handoff` on a
 retry of soft-blocked keys).
 

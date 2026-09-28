@@ -27,7 +27,7 @@ from .store import (
 )
 from .zot import Item
 
-HANDOFF_MODES = frozenset({"list", "tabs", "walk"})
+HANDOFF_MODES = frozenset({"list", "tabs", "walk", "watch"})
 TABS_CONFIRM_AFTER = 20
 HINT_OPENABLE = "openable_url"
 HINT_DOI = "doi_only"
