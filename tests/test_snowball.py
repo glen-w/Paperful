@@ -314,12 +314,16 @@ def test_doi_refs_and_keyword_hits(tmp_path: Path):
     assert result.exit_code == 0
     lines = (result.run_dir / "candidates.jsonl").read_text().splitlines()
     rows = [json.loads(line) for line in lines]
-    assert {row["ids"]["doi"] for row in rows} == {"10.1000/a", "10.1000/b"}
+    assert {row["ids"]["doi"] for row in rows} == {"10.1000/seed", "10.1000/a", "10.1000/b"}
     text = buf.getvalue()
     assert "hop 1/1" in text
     assert "searches" in text and "papers" in text
     assert "fields updated" not in text and "PDFs" not in text
     by_doi = {row["ids"]["doi"]: row for row in rows}
+    assert by_doi["10.1000/seed"]["hop"] == 0
+    assert by_doi["10.1000/seed"]["direction"] == "doi"
+    assert by_doi["10.1000/seed"]["why"] == "seed DOI 10.1000/seed"
+    assert by_doi["10.1000/seed"]["status"] == "new"
     assert by_doi["10.1000/a"]["hop"] == 1
     assert by_doi["10.1000/a"]["direction"] == "refs"
     assert by_doi["10.1000/a"]["provenance"]["backend"] == "openalex"
@@ -367,11 +371,12 @@ def test_depth_two_and_cited_by(tmp_path: Path):
         lookup=lambda doi, title: None,
     )
     dois = {json.loads(line)["ids"]["doi"] for line in (depth2.run_dir / "candidates.jsonl").read_text().splitlines()}
-    assert dois == {"10.1000/mid", "10.1000/deep"}
+    assert dois == {"10.1000/seed", "10.1000/mid", "10.1000/deep"}
     hops = {
         json.loads(line)["ids"]["doi"]: json.loads(line)["hop"]
         for line in (depth2.run_dir / "candidates.jsonl").read_text().splitlines()
     }
+    assert hops["10.1000/seed"] == 0
     assert hops["10.1000/mid"] == 1
     assert hops["10.1000/deep"] == 2
 
@@ -384,9 +389,10 @@ def test_depth_two_and_cited_by(tmp_path: Path):
         lookup=lambda doi, title: None,
     )
     cite_rows = [json.loads(line) for line in (cites.run_dir / "candidates.jsonl").read_text().splitlines()]
-    assert len(cite_rows) == 1
-    assert cite_rows[0]["ids"]["doi"] == "10.1000/cite"
-    assert cite_rows[0]["direction"] == "cites"
+    by_doi = {row["ids"]["doi"]: row for row in cite_rows}
+    assert set(by_doi) == {"10.1000/seed", "10.1000/cite"}
+    assert by_doi["10.1000/seed"]["hop"] == 0
+    assert by_doi["10.1000/cite"]["direction"] == "cites"
 
 
 class _Lib:
@@ -434,7 +440,7 @@ def test_auto_creates_only_new_and_fetch_pdfs_uses_those_keys(tmp_path: Path, mo
         seen.extend(items)
 
         class Stats:
-            attached = 1
+            attached = len(items)
             attach_failed = 0
             not_found = 0
 
@@ -451,18 +457,19 @@ def test_auto_creates_only_new_and_fetch_pdfs_uses_those_keys(tmp_path: Path, mo
         backend=lib,
     )
     assert result.exit_code == 0
-    assert len(lib.created) == 1
-    assert lib.created[0]["DOI"] == "10.1000/new"
-    assert lib.created[0]["collections"] == ["COL1"]
-    assert {tag["tag"] for tag in lib.created[0]["tags"]} >= {"paperful-snowball", "paperful-snowball:openalex"}
-    assert lib.notes[0][0] == "ITEM1"
-    assert "mailto" not in lib.notes[0][1]
-    assert "OPENALEX" not in lib.notes[0][1]
-    assert "10.1000/seed" in lib.notes[0][1]
-    assert [item.key for item in seen] == ["ITEM1"]
+    assert len(lib.created) == 2
+    assert {row["DOI"] for row in lib.created} == {"10.1000/seed", "10.1000/new"}
+    new_item = next(row for row in lib.created if row["DOI"] == "10.1000/new")
+    assert new_item["collections"] == ["COL1"]
+    assert {tag["tag"] for tag in new_item["tags"]} >= {"paperful-snowball", "paperful-snowball:openalex"}
+    assert {note[0] for note in lib.notes} == {"ITEM1", "ITEM2"}
+    assert all("mailto" not in note[1] for note in lib.notes)
+    assert all("OPENALEX" not in note[1] for note in lib.notes)
+    assert any("10.1000/seed" in note[1] for note in lib.notes)
+    assert sorted(item.key for item in seen) == ["ITEM1", "ITEM2"]
     report = json.loads((result.run_dir / "write_report.json").read_text())
-    assert report["created"] == 1
-    assert report["attach_ok"] == 1
+    assert report["created"] == 2
+    assert report["attach_ok"] == 2
 
     lib2 = _Lib()
     monkeypatch.setattr("paperful.snowball.command.fill_pdfs", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no pdf")))
@@ -472,7 +479,7 @@ def test_auto_creates_only_new_and_fetch_pdfs_uses_those_keys(tmp_path: Path, mo
         SnowballRequest(gate="auto", collection="Inbox/Snowball", fetch_pdfs=False),
         console=Console(highlight=False, width=200),
         client=_client(works),
-        lookup=lambda doi, title: "HAVE" if doi == "10.1000/new" else None,
+        lookup=lambda doi, title: "HAVE" if doi in {"10.1000/new", "10.1000/seed"} else None,
         backend=lib2,
     )
     assert lib2.created == []
@@ -1151,7 +1158,8 @@ def test_collection_empty_and_apply_skips_exists(tmp_path: Path):
         lookup=lambda doi, title: None,
         backend=lib,
     )
-    assert len(lib.created) == 1
+    assert len(lib.created) == 2
+    assert {row["DOI"] for row in lib.created} == {"10.1000/seed", "10.1000/keep"}
     lib2 = _Lib()
     again = run_apply(
         cfg,
@@ -1387,7 +1395,7 @@ def test_note_provenance_off(tmp_path: Path):
         lookup=lambda doi, title: None,
         backend=lib,
     )
-    assert lib.created == ["10.1000/new"]
+    assert {row for row in lib.created} == {"10.1000/seed", "10.1000/new"}
     assert lib.notes == []
 
 

@@ -424,6 +424,7 @@ def run_collection(
             keyword_hop_limit=keywords[1],
             keyword_min_score=keywords[2],
             cites_query=cites_query,
+            include_seeds=False,
         )
 
     return _execute(

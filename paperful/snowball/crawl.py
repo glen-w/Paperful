@@ -278,8 +278,9 @@ def doi_candidates(
     keyword_hop_limit: int = 50,
     keyword_min_score: float = 0.0,
     cites_query: str = "",
+    include_seeds: bool = True,
 ) -> tuple[list[Candidate], list[str]]:
-    """Return neighbours of each DOI and DOIs that failed to resolve."""
+    """Return each seed DOI (hop 0 when include_seeds), its neighbours, and failures."""
     _remember_keywords(
         client,
         keyword_limit=keyword_limit,
@@ -317,6 +318,7 @@ def doi_candidates(
                 year_from=year_from,
                 year_to=year_to,
                 why_prefix=doi or raw,
+                include_seeds=include_seeds,
             )
             break
         except Exception as exc:
@@ -336,6 +338,7 @@ def doi_candidates(
                     year_from=year_from,
                     year_to=year_to,
                     why_prefix=doi or raw,
+                    include_seeds=include_seeds,
                 )
                 break
             failed.append(doi)
@@ -345,6 +348,18 @@ def doi_candidates(
             failed.append(doi)
             rows.append(_error_row(run_id, seed, doi, f"unresolved {doi}", gate, direction))
             continue
+        if include_seeds:
+            rows.append(
+                work_to_candidate(
+                    work,
+                    run_id=run_id,
+                    seed=seed,
+                    hop=0,
+                    direction="doi",
+                    why=f"seed DOI {doi}",
+                    gate=gate,
+                )
+            )
         _emit(client, rows)
         if depth >= 1:
             rows.extend(
@@ -1508,13 +1523,15 @@ def continue_deferred(client: OpenAlexClient, deferred: dict[str, Any]) -> list[
             return rows
         return [_row(child, "search", "OpenAlex search") for child in found]
     if kind == "seeds":
+        keep_seeds = bool(deferred.get("include_seeds", True))
         for index, doi in enumerate(remaining):
             try:
                 work = client.work_by_doi(doi)
             except OpenAlexBudgetExceeded as exc:
                 _defer(client, exc, **{**deferred, "remaining_ids": remaining[index:]})
                 return rows
-            if work:
-                rows.append(_row(work, "refs", doi))
+            if work and keep_seeds:
+                cleaned = _seed_doi(doi) or doi
+                rows.append(_row(work, "doi", f"seed DOI {cleaned}"))
         return rows
     return rows

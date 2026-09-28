@@ -90,9 +90,9 @@ A snowball profile is a named job in `profiles/`. `paperful run` and
 | --- | --- | --- |
 | Keyword | OpenAlex title/abstract search | **0** — the hit list. Depth 1+ expands those hits and must be set explicitly. A global `depth = 1` does not expand every keyword hit |
 | Hybrid | That hit list, then one hop from the top `hybrid_seeds` DOIs (default 5) | The hop is always 1. `--depth` does not add further hops |
-| DOI | The work’s neighbours (`referenced_works` and/or works that cite it) | **1**, direction `refs` by default. Use `--direction cites` or `both` for cited-by |
+| DOI | The seed work itself (hop 0), then its neighbours (`referenced_works` and/or works that cite it) | **1**, direction `refs` by default. Use `--direction cites` or `both` for cited-by |
 | ORCID | That person’s works (ORCID public API, filled by OpenAlex author filter), then the same expander | **1**. [One hop out](#how-a-hop-is-cut) from those works |
-| Collection | DOIs already in the seed collection path, then the same expander | **1**. `-C` is the write target (defaults to the seed path) |
+| Collection | DOIs already in the seed collection path, then neighbours only | **1**. `-C` is the write target (defaults to the seed path) |
 
 `expand = cited_authors` (every paper by every cited author) stays off. It
 is a later, capped switch.
@@ -143,9 +143,10 @@ flowchart TB
   list -->|"max-candidates 0"| kept
 ```
 
-DOI and collection seeds use the same hop. The centre is the seed papers,
-not a person’s works. Keyword search stays on the hit list unless you set
-depth. The usual numbers are in [Stop rules](#stop-rules).
+DOI and collection seeds use the same hop. For DOI, the seed work itself is
+included as hop 0, then neighbours. Collection expands DOIs already in the
+seed path. Keyword search stays on the hit list unless you set depth. The
+usual numbers are in [Stop rules](#stop-rules).
 
 `direction` including `keywords` adds another side. OpenAlex stores at most
 five scored keywords on a work. The hop takes the top `keyword_limit` (default
