@@ -61,6 +61,28 @@ the circuit was paused, or because the EZProxy session expired, are
 `retryable` and are picked up on the next `run` without that flag. An expired
 campus session stops further EZProxy calls for the rest of that run.
 
+When an OA or `direct` lane **finds** a PDF URL but httpx gets an empty or
+non-PDF body (soft bot-gate — common on some publisher `downloadpdf` links),
+Paperful retries that URL in the vault browser even if the host is not on the
+usual campus allowlist, enables `browser_agent` as a fallback, and records
+`retryable` / `soft block` until recover has had a real try. If that still
+fails, use the manual handoff loop:
+
+```sh
+uv run paperful gaps -C Inbox/Fitzpatrick --list-missing
+uv run paperful gaps -C Inbox/Fitzpatrick --list-missing --handoff tabs
+uv run paperful gaps -C Inbox/Fitzpatrick --list-missing --handoff walk
+uv run paperful attach --item L7ISVTKE --file ~/Downloads/paper.pdf
+```
+
+`--handoff list` (default) only prints/exports. `tabs` opens each
+`openable_url` in your default browser (confirms when more than 20). `walk`
+opens one URL at a time, waits for you to download, then ingests via the same
+path as `attach --item --file`. Config: `[gaps].handoff`, `[gaps].downloads_dir`.
+After a snowball `--fetch-pdfs` pass, the same handoff is
+`gaps -C <collection> --list-missing --handoff …` (or `run --handoff` on a
+retry of soft-blocked keys).
+
 ## HTML→PDF (web, news, blogs)
 
 Items typed as `webpage`, `blogPost`, `newspaperArticle`, `magazineArticle`, or

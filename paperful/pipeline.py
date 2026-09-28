@@ -10,7 +10,6 @@ from collections.abc import Callable
 from typing import Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
@@ -185,6 +184,11 @@ def _lane_paused(attempts: list[str]) -> bool:
         or "skipped(bot wall)" in a
         for a in attempts
     )
+
+
+def _is_soft_block_error(exc: DownloadError) -> bool:
+    msg = str(exc)
+    return "too small" in msg or msg.startswith("not a PDF")
 
 
 class Pipeline:
@@ -738,8 +742,13 @@ class Pipeline:
                 item,
                 f"{escape(cand.source)}: [yellow]download failed[/] ({escape(str(exc))})",
             )
-            if not browser_first:
-                return self._browser_pdf(item, cand, url, attempts)
+            soft = _is_soft_block_error(exc)
+            # Soft-blocked OA PDF URLs need a vault browser retry even when the
+            # host is not on the publisher allowlist (e.g. AMS downloadpdf).
+            if soft or not browser_first:
+                return self._browser_pdf(
+                    item, cand, url, attempts, force=soft
+                )
             return None
 
     def _browser_first(self, url: str, source: str) -> bool:
@@ -750,11 +759,21 @@ class Pipeline:
         return is_publisher_url(url)
 
     def _browser_pdf(
-        self, item: Item, cand: Candidate, url: str, attempts: list[str]
+        self,
+        item: Item,
+        cand: Candidate,
+        url: str,
+        attempts: list[str],
+        *,
+        force: bool = False,
     ) -> Download | None:
         if self.browser is None or not self.browser.available():
             return None
-        if cand.source not in {"ezproxy", "scholar"} and not is_publisher_url(url):
+        if (
+            not force
+            and cand.source not in {"ezproxy", "scholar"}
+            and not is_publisher_url(url)
+        ):
             return None
         targets = [url]
         if (
@@ -862,6 +881,8 @@ class Pipeline:
         return res.ok
 
     def _finish_miss(self, item: Item, attempts: list[str]) -> None:
+        from .routing import soft_block_miss
+
         if not item.doi and not item.arxiv_id and not item.url:
             self._record(
                 item, STATUS_NO_IDENTIFIER, attempts, reason="no DOI, arXiv id or URL"
@@ -874,6 +895,18 @@ class Pipeline:
             else:
                 reason = "source paused"
             self._record(item, STATUS_RETRYABLE, attempts, reason=reason)
+        elif soft_block_miss(attempts):
+            agent_done = any(
+                a.startswith("browser_agent:")
+                and not a.startswith("browser_agent:skipped")
+                for a in attempts
+            )
+            if not agent_done:
+                self._record(item, STATUS_RETRYABLE, attempts, reason="soft block")
+            elif any(":captcha" in a for a in attempts):
+                self._record(item, STATUS_CAPTCHA, attempts, reason="bot wall")
+            else:
+                self._record(item, STATUS_NOT_FOUND, attempts, reason=REASON_CLOSED)
         elif any(":captcha" in a for a in attempts):
             self._record(item, STATUS_CAPTCHA, attempts, reason="bot wall")
         elif any(

@@ -1755,6 +1755,31 @@ def gaps(
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
+    list_missing: bool = typer.Option(
+        False,
+        "--list-missing",
+        help="List items with no stored PDF (key, title, DOI, URL, hint).",
+    ),
+    handoff: str | None = typer.Option(
+        None,
+        "--handoff",
+        help="After listing: list (default), tabs (open URLs), or walk (interactive ingest).",
+    ),
+    include_doi_tabs: bool = typer.Option(
+        False,
+        "--include-doi-tabs",
+        help="With --handoff tabs, also open doi.org for doi_only rows.",
+    ),
+    downloads_dir: Path | None = typer.Option(
+        None,
+        "--downloads-dir",
+        help="Directory for --handoff walk newest-PDF pickup (default ~/Downloads).",
+    ),
+    to: Path | None = typer.Option(
+        None,
+        "--to",
+        help="Write the missing-PDF list to a .tsv or .md file.",
+    ),
     as_json: bool = typer.Option(False, "--json", help="Print counts as JSON."),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
@@ -1762,9 +1787,17 @@ def gaps(
 ) -> None:
     """Count items with no stored PDF, a linked PDF URL only, or no DOI.
 
-    Points at `run` (PDFs) and `lint` (identifiers). Does not write the library.
+    Points at `run` (PDFs) and `lint` (identifiers). Does not write the library
+    unless ``--handoff walk`` attaches files.
     """
     from .dedupe import summarize_gaps
+    from .handoff import (
+        list_missing_pdfs,
+        open_tabs,
+        parse_handoff,
+        walk_missing,
+        write_missing_export,
+    )
 
     if _scope_unset(collection, library, profile, run_config):
         _refuse_missing_scope()
@@ -1782,6 +1815,13 @@ def gaps(
     collection, library, year_from, year_to, item_type = _take_scope(bound)
     if not collection and not library:
         _refuse_missing_scope()
+    try:
+        mode = parse_handoff(handoff, default=cfg.gaps_handoff)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    if mode in {"tabs", "walk"} and not list_missing:
+        list_missing = True
     _require_manager(cfg)
     backend = _connect(cfg, quiet=as_json)
     loaded = _loaded_scope(
@@ -1824,31 +1864,129 @@ def gaps(
             "no_stored_pdf": counts.no_stored_pdf,
             "linked_url_only": counts.linked_url_only,
             "missing_doi": counts.missing_doi,
+            "handoff": mode if list_missing else "",
         },
         items=rows,
         started=started,
     )
-    if as_json:
+    if as_json and not list_missing:
         console.print(
             json.dumps(payload, indent=2), soft_wrap=True, highlight=False, markup=False
         )
         return
-    console.print(f"Scope: [bold]{scope}[/]")
-    table = Table(title="Gaps")
-    table.add_column("Count", justify="right")
-    table.add_column("Gap")
-    table.add_column("Next")
-    table.add_row(str(counts.items), "items in scope", "")
-    table.add_row(
-        str(counts.no_stored_pdf), "no stored PDF", "paperful run (or --upgrade-linked)"
+    if not as_json:
+        console.print(f"Scope: [bold]{scope}[/]")
+        table = Table(title="Gaps")
+        table.add_column("Count", justify="right")
+        table.add_column("Gap")
+        table.add_column("Next")
+        table.add_row(str(counts.items), "items in scope", "")
+        table.add_row(
+            str(counts.no_stored_pdf),
+            "no stored PDF",
+            "paperful run (or --upgrade-linked)",
+        )
+        table.add_row(
+            str(counts.linked_url_only),
+            "linked PDF URL only",
+            "paperful run --upgrade-linked",
+        )
+        table.add_row(str(counts.missing_doi), "missing DOI", "paperful lint")
+        console.print(table)
+
+    if not list_missing:
+        return
+
+    manifest = Manifest(cfg.manifest_path)
+    missing = list_missing_pdfs(items, manifest)
+    if to is not None:
+        path = write_missing_export(missing, to)
+        console.print(f"Wrote {len(missing)} rows to {path}")
+    if as_json:
+        console.print(
+            json.dumps(
+                {
+                    **payload,
+                    "missing": [
+                        {
+                            "itemKey": r.key,
+                            "title": r.title,
+                            "doi": r.doi,
+                            "url": r.url,
+                            "hint": r.hint,
+                        }
+                        for r in missing
+                    ],
+                },
+                indent=2,
+            ),
+            soft_wrap=True,
+            highlight=False,
+            markup=False,
+        )
+    else:
+        t = Table(title=f"{len(missing)} missing PDFs")
+        t.add_column("Key", style="dim")
+        t.add_column("Title")
+        t.add_column("DOI")
+        t.add_column("URL")
+        t.add_column("Hint")
+        for row in missing:
+            t.add_row(
+                row.key,
+                row.title[:50],
+                row.doi or "-",
+                (row.url or "-")[:48],
+                row.hint,
+            )
+        console.print(t)
+
+    if mode == "list":
+        return
+    if mode == "tabs":
+
+        def _confirm(n: int) -> bool:
+            answer = typer.prompt(
+                f"Open {n} tabs in your browser?", default="y"
+            ).strip().lower()
+            return answer in {"y", "yes"}
+
+        opened = open_tabs(
+            missing, include_doi_tabs=include_doi_tabs, confirm=_confirm
+        )
+        console.print(f"Opened {opened} tab(s) in your browser.")
+        return
+
+    # walk
+    if not backend.supports_write():
+        console.print("[red]--handoff walk needs library write support.[/]")
+        raise typer.Exit(1)
+    dl = _gaps_downloads_dir(cfg, downloads_dir)
+    by_key = {it.key: it for it in items}
+    result = walk_missing(
+        cfg,
+        backend,
+        manifest,
+        by_key,
+        missing,
+        downloads_dir=dl,
+        prompt=lambda msg: typer.prompt(msg, default=""),
+        on_status=lambda msg: console.print(msg),
     )
-    table.add_row(
-        str(counts.linked_url_only),
-        "linked PDF URL only",
-        "paperful run --upgrade-linked",
+    _flush(backend)
+    console.print(
+        f"Walk attached {result.attached}, skipped {result.skipped}"
+        + (" (quit early)" if result.quit_early else "")
     )
-    table.add_row(str(counts.missing_doi), "missing DOI", "paperful lint")
-    console.print(table)
+
+
+def _gaps_downloads_dir(cfg: Config, override: Path | None) -> Path:
+    if override is not None:
+        return override.expanduser()
+    raw = (cfg.gaps_downloads_dir or "").strip()
+    if raw:
+        return Path(raw).expanduser()
+    return Path.home() / "Downloads"
 
 
 @app.command()
@@ -1886,6 +2024,21 @@ def run(
     scihub: bool | None = SciHubOpt,
     upgrade_linked: bool | None = UpgradeLinkedOpt,
     strict_pdf_doi: bool | None = StrictPdfDoiOpt,
+    handoff: str | None = typer.Option(
+        None,
+        "--handoff",
+        help="After the run: list|tabs|walk for soft-blocked openable PDF URLs.",
+    ),
+    include_doi_tabs: bool = typer.Option(
+        False,
+        "--include-doi-tabs",
+        help="With --handoff tabs, also open doi.org for doi_only rows.",
+    ),
+    downloads_dir: Path | None = typer.Option(
+        None,
+        "--downloads-dir",
+        help="Downloads dir for --handoff walk (default ~/Downloads).",
+    ),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
@@ -2102,6 +2255,91 @@ def run(
         _flush(backend)
     if mirror_only:
         _mirror_deferred(cfg)
+    if handoff and not dry_run:
+        _run_session_handoff(
+            cfg,
+            backend,
+            manifest,
+            catalog,
+            stats,
+            handoff=handoff,
+            include_doi_tabs=include_doi_tabs,
+            downloads_dir=downloads_dir,
+        )
+
+
+def _run_session_handoff(
+    cfg: Config,
+    backend: LibraryBackend | None,
+    manifest: Manifest,
+    catalog: list,
+    stats: RunStats,
+    *,
+    handoff: str,
+    include_doi_tabs: bool,
+    downloads_dir: Path | None,
+) -> None:
+    from .handoff import (
+        missing_from_run_outcomes,
+        open_tabs,
+        parse_handoff,
+        walk_missing,
+    )
+
+    try:
+        mode = parse_handoff(handoff)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/]")
+        return
+    if mode == "list":
+        return
+    outcomes = [
+        {
+            "itemKey": o.itemKey,
+            "status": o.status,
+            "reason": o.reason,
+            "attempts": list(o.attempts or []),
+        }
+        for o in stats.items
+    ]
+    by_key = {it.key: it for it in catalog}
+    missing = missing_from_run_outcomes(by_key, outcomes)
+    if not missing:
+        console.print("[dim]No openable soft-blocked PDFs to hand off.[/]")
+        return
+    console.print(f"[bold]Handoff[/] ({mode}): {len(missing)} openable miss(es)")
+    if mode == "tabs":
+
+        def _confirm(n: int) -> bool:
+            answer = typer.prompt(
+                f"Open {n} tabs in your browser?", default="y"
+            ).strip().lower()
+            return answer in {"y", "yes"}
+
+        opened = open_tabs(
+            missing, include_doi_tabs=include_doi_tabs, confirm=_confirm
+        )
+        console.print(f"Opened {opened} tab(s).")
+        return
+    if backend is None or not backend.supports_write():
+        console.print("[yellow]--handoff walk needs a writable library; skipped.[/]")
+        return
+    dl = _gaps_downloads_dir(cfg, downloads_dir)
+    result = walk_missing(
+        cfg,
+        backend,
+        manifest,
+        by_key,
+        missing,
+        downloads_dir=dl,
+        prompt=lambda msg: typer.prompt(msg, default=""),
+        on_status=lambda msg: console.print(msg),
+    )
+    _flush(backend)
+    console.print(
+        f"Walk attached {result.attached}, skipped {result.skipped}"
+        + (" (quit early)" if result.quit_early else "")
+    )
 
 
 def _mirror_deferred(cfg: Config) -> None:
@@ -2149,6 +2387,12 @@ def _load_last_run(cfg: Config) -> dict | None:
 
 @app.command()
 def attach(
+    item: list[str] = typer.Option([], "--item", help="Attach a file to this item key."),
+    file: Path | None = typer.Option(
+        None,
+        "--file",
+        help="PDF path for --item (manual download ingest).",
+    ),
     config: Path | None = ConfigOpt,
     limit: int | None = typer.Option(None, "--limit", "-n"),
     allow_pdf_doi_mismatch: bool = typer.Option(
@@ -2157,13 +2401,38 @@ def attach(
         help="Also attach PDFs that --strict-pdf-doi left on disk.",
     ),
 ) -> None:
-    """Write already-downloaded PDFs into the library. This command attaches; it is not a dry-run."""
+    """Write already-downloaded PDFs into the library. This command attaches; it is not a dry-run.
+
+    Use ``--item KEY --file PATH`` to ingest a hand-downloaded PDF.
+    """
+    from .handoff import attach_pdf_file
+
     cfg = _cfg(config)
     _require_manager(cfg)
     backend = _connect(cfg)
     manifest = Manifest(cfg.manifest_path)
     if not backend.supports_write():
         _exit_env("This library has no write support.", cfg)
+
+    if item or file is not None:
+        if len(item) != 1 or file is None:
+            console.print(
+                "[red]Manual ingest needs exactly one --item KEY and --file PATH.[/]"
+            )
+            raise typer.Exit(1)
+        loaded = _loaded_scope(backend, item_keys=item)
+        if not loaded.items:
+            console.print(f"[red]Unknown item {item[0]}.[/]")
+            raise typer.Exit(1)
+        try:
+            rec = attach_pdf_file(cfg, backend, manifest, loaded.items[0], file)
+        except (OSError, ValueError, LibraryError) as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(1) from exc
+        _flush(backend)
+        console.print(f"[green]Attached[/] {rec.itemKey} ← {file}")
+        return
+
     pending = manifest.pending_attach(allow_pdf_doi_mismatch=allow_pdf_doi_mismatch)
     if limit:
         pending = pending[:limit]
@@ -3767,7 +4036,16 @@ def _dispatch_all_step(
     dry_run: bool,
 ) -> None:
     if step == "gaps":
-        _call_step(gaps, **scope, as_json=False)
+        _call_step(
+            gaps,
+            **scope,
+            as_json=False,
+            list_missing=False,
+            handoff=None,
+            include_doi_tabs=False,
+            downloads_dir=None,
+            to=None,
+        )
         return
     if step == "run":
         _call_step(
@@ -3783,6 +4061,9 @@ def _dispatch_all_step(
             scihub=bound.scihub,
             upgrade_linked=bound.upgrade_linked,
             strict_pdf_doi=bound.strict_pdf_doi,
+            handoff=None,
+            include_doi_tabs=False,
+            downloads_dir=None,
         )
         return
     if step == "lint":

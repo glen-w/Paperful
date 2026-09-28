@@ -84,7 +84,11 @@ def browser_lane_failed(attempts: list[str]) -> bool:
 
     ``skipped(not applicable)`` does not count: recover is a fallback after
     Scholar / EZProxy / htmlpdf actually fail, not a substitute for them.
+    Soft-blocked OA PDF URLs (empty / non-PDF httpx body after ``:found``)
+    also count so ``browser_agent`` can run.
     """
+    if soft_block_miss(attempts):
+        return True
     for entry in attempts:
         name, sep, rest = entry.partition(":")
         if not sep or name not in BROWSER_LANES:
@@ -93,6 +97,17 @@ def browser_lane_failed(attempts: list[str]) -> bool:
             continue
         return True
     return False
+
+
+def soft_block_miss(attempts: list[str]) -> bool:
+    """True when a source found a PDF URL but httpx got an empty or non-PDF body."""
+    found = any(":found" in entry for entry in attempts)
+    if not found:
+        return False
+    return any(
+        "download-failed(too small" in entry or "download-failed(not a PDF" in entry
+        for entry in attempts
+    )
 
 
 def with_recover_lane(cfg: Config, sources: list[str]) -> list[str]:
@@ -312,6 +327,7 @@ _EZPROXY_PUBLISHER_HOSTS = frozenset(
         "cochranelibrary.com",
         "ovid.com",
         "bioone.org",
+        "ametsoc.org",
     }
 )
 

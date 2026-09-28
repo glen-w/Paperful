@@ -147,6 +147,11 @@ mirror_failures_before_skip = 3
 # during_run = true              # last serial lane after Scholar / EZProxy / htmlpdf fail
 # # model = "qwen2.5:14b"        # larger model for browsing only
 
+# Manual PDF handoff after soft-blocked OA misses (gaps --list-missing / --handoff).
+# [gaps]
+# handoff = "list"                 # list | tabs | walk
+# downloads_dir = "~/Downloads"    # newest *.pdf pickup for --handoff walk
+
 # Named run configs (not grey-lit playbooks). Same keys work in profiles/<name>.toml
 # beside this file. Select with: paperful all --profile bbnj-journal
 # See docs/workflows.md.

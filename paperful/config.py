@@ -149,6 +149,8 @@ class Config:
     synthesize_tag: str = "paperful-report"
     synthesize_dest: str = "both"  # disk | zotero | both
     synthesize_timeout_s: float = 0.0  # 0 → max(llm.timeout_s, 300)
+    gaps_handoff: str = "list"  # list | tabs | walk
+    gaps_downloads_dir: str = ""  # empty → ~/Downloads
     snowball_enabled: bool = False
     snowball_max_candidates: int = 200
     snowball_per_hop_limit: int = 50
@@ -633,6 +635,14 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             cfg.synthesize_dest = parse_dest(str(synth["dest"]), key="[synthesize].dest")
         if "timeout_s" in synth:
             cfg.synthesize_timeout_s = float(synth["timeout_s"])
+    gaps = raw.get("gaps")
+    if isinstance(gaps, dict):
+        if "handoff" in gaps:
+            from .handoff import parse_handoff
+
+            cfg.gaps_handoff = parse_handoff(str(gaps["handoff"]))
+        if "downloads_dir" in gaps:
+            cfg.gaps_downloads_dir = str(gaps["downloads_dir"]).strip()
     mirror = raw.get("mirror")
     if isinstance(mirror, dict) and "pdfs" in mirror:
         cfg.mirror_pdfs = parse_pdfs(str(mirror["pdfs"]))

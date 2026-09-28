@@ -1075,13 +1075,30 @@ def test_summarize_default_writes_note_and_disk_only_skips_it(tmp_path, stub_zot
 
     class B:
         applied = []
+        notes = {}
 
         def get_item(self, k):
             return make_item(key=k, has_pdf=True)
 
-        def create_or_update_note(self, *a):
-            self.applied.append(a)
-            return "N1"
+        def find_child_note_keys(self, item_key, tag):
+            return [k for k, (parent, t, _html) in self.notes.items() if parent == item_key and t == tag]
+
+        def read_child_note(self, item_key, tag):
+            for parent, t, html in self.notes.values():
+                if parent == item_key and t == tag:
+                    return html
+            return None
+
+        def create_or_update_note(self, item_key, html, tag):
+            self.applied.append((item_key, html, tag))
+            existing = self.find_child_note_keys(item_key, tag)
+            if existing:
+                key = existing[0]
+                self.notes[key] = (item_key, tag, html)
+                return key
+            key = "N1"
+            self.notes[key] = (item_key, tag, html)
+            return key
 
     monkeypatch.setattr(cli, "get_backend", lambda cfg, zl: B())
     monkeypatch.setattr("paperful.summarize.pdf_text_for", lambda *a, **k: "Marine governance text.")

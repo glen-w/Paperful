@@ -681,6 +681,53 @@ class _StubBrowser:
         return
 
 
+def test_soft_blocked_non_publisher_url_retries_via_browser(pipe_factory):
+    """Empty OA body on a non-allowlisted host still forces vault browser."""
+    browser = _StubBrowser()
+    url = "https://oa.example.edu/bitstream/handle/1/paper.pdf"
+    src = StubSource(
+        "unpaywall",
+        {"A": Candidate(url=url, source="unpaywall")},
+    )
+
+    def handler(req):
+        return httpx.Response(202, content=b"", headers={"content-type": "text/html"})
+
+    pipe, manifest = pipe_factory(
+        {"unpaywall": src}, ["unpaywall"], handler=handler
+    )
+    pipe.browser = browser
+    pipe.ctx.browser = browser
+    pipe.run([make_item(key="A", url=url)])
+    rec = manifest.get("A")
+    assert rec.status == STATUS_OK
+    assert any("download-failed(too small" in a for a in rec.attempts)
+    assert "unpaywall:browser" in rec.attempts
+    assert browser.urls == [url]
+
+
+def test_soft_block_without_browser_is_retryable(pipe_factory):
+    url = "https://oa.example.edu/bitstream/handle/1/paper.pdf"
+    src = StubSource(
+        "unpaywall",
+        {"A": Candidate(url=url, source="unpaywall")},
+    )
+
+    def handler(req):
+        return httpx.Response(202, content=b"", headers={"content-type": "text/html"})
+
+    pipe, manifest = pipe_factory(
+        {"unpaywall": src}, ["unpaywall"], handler=handler
+    )
+    # No vault browser → soft block stays retryable for the next run.
+    pipe.browser = None
+    pipe.ctx.browser = None
+    pipe.run([make_item(key="A", url=url)])
+    rec = manifest.get("A")
+    assert rec.status == STATUS_RETRYABLE
+    assert rec.reason == "soft block"
+
+
 def test_publisher_403_retries_via_browser_and_proxifies(pipe_factory, cfg):
     cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
     browser = _StubBrowser()
