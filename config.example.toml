@@ -145,6 +145,7 @@ mirror_failures_before_skip = 3
 # max_steps = 20
 # max_wall_s = 300
 # during_run = true              # last serial lane after Scholar / EZProxy / htmlpdf fail
+#                                # override per run: --browser-agent / --no-browser-agent
 # # model = "qwen2.5:14b"        # larger model for browsing only
 
 # Manual PDF handoff after soft-blocked OA misses (gaps --list-missing / --handoff).

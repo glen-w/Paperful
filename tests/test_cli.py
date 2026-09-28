@@ -1049,6 +1049,42 @@ def test_run_dry_run_skips_recover_lane_when_during_run_off(
     assert "Browser recovery is experimental" not in res.stdout
 
 
+def test_run_dry_run_skips_recover_lane_with_cli_flag(
+    tmp_path, stub_zotero, monkeypatch
+):
+    cfg_file = _llm_cfg_file(tmp_path)
+    monkeypatch.setattr(
+        "paperful.browser_agent.browser_agent_extra_available", lambda: True
+    )
+    res = runner.invoke(
+        cli.app,
+        ["run", "-c", str(cfg_file), "--library", "--dry-run", "--no-browser-agent"],
+        env={"COLUMNS": "200"},
+    )
+    assert res.exit_code == 0, res.stdout
+    sources_line = res.stdout.split("Sources:")[-1].split("\n")[0]
+    assert "browser_agent" not in sources_line
+    assert "Browser recovery is experimental" not in res.stdout
+
+
+def test_run_dry_run_forces_recover_lane_with_cli_flag_when_config_off(
+    tmp_path, stub_zotero, monkeypatch
+):
+    cfg_file = _llm_cfg_file(tmp_path, extra="[browser_agent]\nduring_run = false\n")
+    monkeypatch.setattr(
+        "paperful.browser_agent.browser_agent_extra_available", lambda: True
+    )
+    res = runner.invoke(
+        cli.app,
+        ["run", "-c", str(cfg_file), "--library", "--dry-run", "--browser-agent"],
+        env={"COLUMNS": "200"},
+    )
+    assert res.exit_code == 0, res.stdout
+    sources_line = res.stdout.split("Sources:")[-1].split("\n")[0]
+    assert "browser_agent" in sources_line
+    assert "Browser recovery is experimental" in res.stdout
+
+
 def test_recover_unknown_item(tmp_path, stub_zotero, monkeypatch):
     cfg_file = _llm_cfg_file(tmp_path)
     monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model)

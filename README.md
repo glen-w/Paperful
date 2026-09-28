@@ -154,13 +154,13 @@ docker compose run --rm paperful all --profile bbnj-journal
 
 Reference (same corpus as the hosted guide):
 
+- [Docker](docs/docker.md) — preferred operator install; Zotero stays on the host
 - [Commands and output](docs/commands.md)
-- [Duplicate packs](docs/dedupe.md)
 - [Configuration](docs/config.md)
 - [Source routing](docs/sources.md)
 - [Architecture](docs/architecture.md)
 - [Quiet mirror](docs/quiet-mirror.md) — `out/` as a browsable collection tree
-- [Docker](docs/docker.md) — build-local image; Zotero stays on the host
+- [Duplicate packs](docs/dedupe.md)
 - [Research operators](docs/research-ops.md) — email, campus use, provenance
 
 Optional local LLM (Ollama by default; off until `[llm].enabled`): grounded
@@ -168,7 +168,8 @@ title proposals in `fix-metadata`, a `pdf_identity_mismatch` lint check,
 `summarize` (HTML under `state/summaries/` and a tagged Zotero child note;
 `--to disk` skips the note), `synthesize` (a literature review of those
 notes), and `recover`: last `run` lane after Scholar / EZProxy / htmlpdf
-fail, or `paperful recover --item` for named keys. Setup, model guidance,
+fail, or `paperful recover --item` for named keys. Override the auto lane
+per run with `--browser-agent` / `--no-browser-agent`. Setup, model guidance,
 privacy notes, and troubleshooting:
 [LLM](docs/llm.md); key table:
 [Configuration](docs/config.md#llm-optional-local-first).

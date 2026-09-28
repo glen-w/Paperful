@@ -107,6 +107,7 @@ tag = "paperful-report"
 max_steps = 20
 max_wall_s = 300
 # during_run = true                 # false keeps recover as --item only
+#                                     # also: --no-browser-agent on one run
 # model = "qwen2.5:14b"             # override [llm].model for browsing only
 ```
 
@@ -134,7 +135,9 @@ On `run`, when `[llm].enabled` and `paperful[browser-agent]` are available,
 Paperful appends `browser_agent` after Scholar / EZProxy / htmlpdf. The agent
 fires only if one of those vault lanes was tried and failed (not merely
 skipped as inapplicable). Playwright releases the session profile first.
-`[browser_agent].during_run = false` turns that auto-lane off. Sci-Hub, when
+`[browser_agent].during_run = false` turns that auto-lane off for every run.
+`--no-browser-agent` skips it for one `run` (or `all`); `--browser-agent`
+forces it on even when `during_run` is false. Sci-Hub, when
 opted in, stays after recover.
 
 `paperful recover --item` still targets named keys without waiting for other
@@ -305,7 +308,7 @@ and start Ollama bound to all interfaces on the host
 | `browser-use is not installed` | `uv sync --extra browser-agent` |
 | `session vault not ready` | `paperful session login scholar` (headed, on the host) |
 | `recover` ends `not_found` quickly | Model too small for browsing; try a 14B+ tag via `[browser_agent].model` |
-| `recover` never starts during `run` | Extra missing, `[llm].enabled` false, or `[browser_agent].during_run = false` |
+| `recover` never starts during `run` | Extra missing, `[llm].enabled` false, `[browser_agent].during_run = false`, or `--no-browser-agent` |
 | Summary note shows raw `##` | Update Paperful (0.5+ converts Markdown); re-run `summarize` |
 | `could not extract PDF text` | Scanned PDF. Run `paperful ocr -C …` then `--apply`, and summarize again |
 | Report seems to ignore half the notes | Ollama truncated the prompt. Lower `[synthesize].max_context_chars` or raise `[llm].max_num_ctx`, and confirm the model supports that window |

@@ -110,17 +110,25 @@ def soft_block_miss(attempts: list[str]) -> bool:
     )
 
 
-def with_recover_lane(cfg: Config, sources: list[str]) -> list[str]:
+def with_recover_lane(
+    cfg: Config,
+    sources: list[str],
+    *,
+    during_run: bool | None = None,
+) -> list[str]:
     """Insert ``browser_agent`` after other browser lanes when recover can auto-fire.
 
     Stays out of ``DEFAULT_SOURCES``. Opt-in is ``[llm].enabled`` (and
     ``[browser_agent].during_run``, the extra, and Python 3.11+). Inserted
     after the last of scholar / ezproxy / htmlpdf so Sci-Hub stays last.
+    ``during_run`` overrides ``[browser_agent].during_run`` for one call
+    (CLI ``--browser-agent`` / ``--no-browser-agent``).
     """
     listed = list(sources)
     if "browser_agent" in listed:
         return listed
-    if not cfg.llm_enabled or not cfg.browser_agent_during_run:
+    enabled = cfg.browser_agent_during_run if during_run is None else during_run
+    if not cfg.llm_enabled or not enabled:
         return listed
     if not any(name in BROWSER_LANES for name in listed):
         return listed

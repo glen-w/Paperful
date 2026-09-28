@@ -287,6 +287,15 @@ SciHubOpt = typer.Option(
         "--no-scihub turns a profile default off."
     ),
 )
+BrowserAgentOpt = typer.Option(
+    None,
+    "--browser-agent/--no-browser-agent",
+    help=(
+        "Auto-append the browser-agent recover lane when llm.enabled "
+        "(default: [browser_agent].during_run). "
+        "--no-browser-agent skips it for this run so other PDF lanes can be tested alone."
+    ),
+)
 ApplyOpt = typer.Option(
     None,
     "--apply/--no-apply",
@@ -2022,6 +2031,7 @@ def run(
         ),
     ),
     scihub: bool | None = SciHubOpt,
+    browser_agent: bool | None = BrowserAgentOpt,
     upgrade_linked: bool | None = UpgradeLinkedOpt,
     strict_pdf_doi: bool | None = StrictPdfDoiOpt,
     handoff: str | None = typer.Option(
@@ -2100,7 +2110,7 @@ def run(
     # under --try-all.
     source_list = filter_sources_for_item_types(source_list, types)
     source_list = filter_sources_for_year_scope(source_list, year_from)
-    source_list = with_recover_lane(cfg, source_list)
+    source_list = with_recover_lane(cfg, source_list, during_run=browser_agent)
     _warn_if_scihub(source_list)
     _warn_if_recover(source_list)
 
@@ -2193,6 +2203,8 @@ def run(
         try_all=try_all,
         upgrade_linked=upgrade_linked,
         scihub=scihub,
+        no_browser_agent=True if browser_agent is False else None,
+        browser_agent=True if browser_agent is True else None,
         preset=preset,
         sources=sources,
         year_from=year_from,
@@ -3926,6 +3938,7 @@ def all_cmd(
     no_attach: bool | None = NoAttachOpt,
     strict_pdf_doi: bool | None = StrictPdfDoiOpt,
     scihub: bool | None = SciHubOpt,
+    browser_agent: bool | None = BrowserAgentOpt,
     sources: str | None = typer.Option(
         None, "--sources", help="Comma-separated source order override for the run step."
     ),
@@ -4017,7 +4030,9 @@ def all_cmd(
                 )
                 continue
             console.print(f"\n[bold]all[/] · {step}")
-            _dispatch_all_step(step, bound, scope, dry_run=dry_run)
+            _dispatch_all_step(
+                step, bound, scope, dry_run=dry_run, browser_agent=browser_agent
+            )
     finally:
         if opened:
             try:
@@ -4034,6 +4049,7 @@ def _dispatch_all_step(
     scope: dict[str, Any],
     *,
     dry_run: bool,
+    browser_agent: bool | None = None,
 ) -> None:
     if step == "gaps":
         _call_step(
@@ -4059,6 +4075,7 @@ def _dispatch_all_step(
             sources=bound.sources_csv,
             preset=bound.preset,
             scihub=bound.scihub,
+            browser_agent=browser_agent,
             upgrade_linked=bound.upgrade_linked,
             strict_pdf_doi=bound.strict_pdf_doi,
             handoff=None,

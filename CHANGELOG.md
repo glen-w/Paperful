@@ -6,6 +6,10 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+`run` and `all` accept `--browser-agent` / `--no-browser-agent` to override
+`[browser_agent].during_run` for one invocation (default stays on when
+`llm.enabled`).
+
 A `javascript:void(0)` (or other non-http) PDF link is a failed download for that item. It no longer aborts `run` when the HTTP client has cookies.
 
 The run summary counts items that did not yield a PDF by reason — captcha, cloudflare, paywall, and a plain not-found — one reason per item. When the browser agent reads a publisher price on an unsaved article, that price is logged on the item and the summary totals it (`€79.90 for 2 articles`).

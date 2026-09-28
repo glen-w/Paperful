@@ -297,6 +297,8 @@ def test_with_recover_lane_inserts_after_last_browser_lane(cfg, monkeypatch):
     cfg.browser_agent_during_run = False
     assert "browser_agent" not in with_recover_lane(cfg, listed)
     cfg.browser_agent_during_run = True
+    assert "browser_agent" not in with_recover_lane(cfg, listed, during_run=False)
+    assert with_recover_lane(cfg, listed, during_run=True)[-2] == "browser_agent"
     assert with_recover_lane(cfg, ["unpaywall", "scihub"]) == ["unpaywall", "scihub"]
     already = ["scholar", "browser_agent"]
     assert with_recover_lane(cfg, already) == already

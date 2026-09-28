@@ -87,7 +87,7 @@ flowchart LR
 | `summarize` | `llm.enabled` | `state/summaries/<key>.html` when dest includes disk | child note unless `--to disk` |
 | `synthesize` | `llm.enabled` | `state/reports/<slug>.html` when dest includes disk | standalone note in the scoped collection unless `--to disk` |
 
-`browser_agent` is a registered **serial** source but never in `DEFAULT_SOURCES`. `run` auto-appends it after Scholar / EZProxy / htmlpdf when `[llm].enabled` and `[browser_agent].during_run` (default on) and the extra is importable; the agent runs only if one of those vault lanes was tried and failed. Before that phase the pipeline closes `BrowserSession` so browser-use can own the vault Chromium profile. `paperful recover --item` builds the pipeline with `use_browser=False` and only that source. Hard CAPTCHAs end as `captcha`, not auto-solved. `summarize` refuses items the gated identity check flags unless `--force`.
+`browser_agent` is a registered **serial** source but never in `DEFAULT_SOURCES`. `run` auto-appends it after Scholar / EZProxy / htmlpdf when `[llm].enabled` and `[browser_agent].during_run` (default on) and the extra is importable; the agent runs only if one of those vault lanes was tried and failed. `--browser-agent` / `--no-browser-agent` on `run` or `all` override `during_run` for that invocation. Before that phase the pipeline closes `BrowserSession` so browser-use can own the vault Chromium profile. `paperful recover --item` builds the pipeline with `use_browser=False` and only that source. Hard CAPTCHAs end as `captcha`, not auto-solved. `summarize` refuses items the gated identity check flags unless `--force`.
 
 ## Identifiers and lint
 
