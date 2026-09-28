@@ -72,6 +72,20 @@ Zotero has. Do not document either adapter as supported until testers say so.
   `unmatched/`). Distinct from snowball watch `inbox.jsonl`. CLI
   `--browser-agent` / `--no-browser-agent` overrides `[browser_agent].during_run`
   for one `run` / `all`.
+- **OA honesty / miss taxonomy (next).** Project internal miss status to a frozen
+  surface enum for dry-run, `gaps`, and the run report:
+  `no_doi | paywalled | no_oa | fetch_failed | license_blocked | import_ok`
+  (one code → one plain string; keep rich detail on `attempts[]`). Stamp
+  Unpaywall / OpenAlex `license` / `oa_status` / `version` onto candidates and
+  `record.json` so bronze vs licensed OA is auditable and a future license gate
+  can emit `license_blocked` without writing bytes. **Configurable:** the
+  operator chooses which of those fields get stamped (and later which feed a
+  gate); defaults should be honest but not surprise a local library with
+  redistribution policy. Prefer licensed `url_for_pdf` / green repository copies
+  over bronze-only publisher landings when both exist. Follow-ons: DOI→candidate
+  URL cache (TTL) to cut repeat API traffic; Crossref `link[]` PDF harvest as
+  campus-entitled API-first (never claimed as free OA without entitlement).
+  Not a hosted service SKU; not Sci-Hub completeness metrics.
 - **Quiet mirror** — [quiet-mirror.md](quiet-mirror.md). **Shipped:** `snapshot`
   writes a per-item folder (`record.json`, optional PDF, notes) plus
   `out/_index.jsonl`, `out/_collections.json`, and `out/_history.json`.
@@ -342,15 +356,18 @@ Larger product bets. Park until the ledger and core loop justify them.
    log to `state/fetch-wins.jsonl`. `paperful playbooks propose` / `promote`
    install user-owned recipes in `grey_playbooks_dir/learned.toml` (default
    `gated`; `auto` is opt-in and can promote flukes). Learned packs are not
-   shipped in the wheel.
+   shipped in the wheel. Still later: playbook health / expiry, and win
+   analytics rolled into the run report (which hosts / win kinds paid off).
 8. **Collaboration without SaaS** — shared `state/` over syncthing/git; attach
    locks; optional headless fetch node. Aligns with the house
    [quiet mirror](quiet-mirror.md) stance: Syncthing (or similar) is transport;
    Paperful stays a local CLI, not a sync product.
 9. **Compliance & provenance** — 1.0 attach stamp is listed above. On disk,
    `record.json` plus `out/_history.json` are the chain-of-custody note for
-   the library and the append-only ledgers. Still later: more jurisdictional
-   presets, and PDF annotation export.
+   the library and the append-only ledgers. OA `license` / `oa_status` /
+   `version` stamps (Core above) feed this lane; which fields are written stays
+   config-driven. Still later: optional redistribution / license gate using those
+   stamps, more jurisdictional presets, and PDF annotation export.
 
 ## Explicitly out of near-term scope
 

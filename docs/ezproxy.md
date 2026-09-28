@@ -136,7 +136,13 @@ uv run paperful run --collection YOUR_COLLECTION --retry-failed
 
 Library SSO typically lasts hours to a few days. When EZProxy starts failing
 you will see `ezproxy:error(ezproxy session expired…)` and later items skip
-the proxy for that pass. On a terminal, `run` pauses after the fetch
+the proxy for that pass. Soft-blocked OA PDF URLs that retry in the vault
+browser and land twice on campus CAS (`login @federation…`, or the older
+`no download control @federation…`) trip the same skip: remaining EZProxy
+wraps and the ezproxy lane are paused until you re-login. Publisher hosts
+that already failed a download in this run are also skipped for later items
+(`publisher already blocked`); that host set survives a mid-run re-login.
+On a terminal, `run` pauses after the fetch
 (`ezproxy_relogin`, default on): log in again, and Paperful retries only
 those items. That browser is closed before the report and before `--handoff`
 opens tabs in your normal browser. Set `ezproxy_relogin = false` or pass

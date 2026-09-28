@@ -40,6 +40,7 @@ from .routing import (
     publisher_host,
     sources_for_item,
 )
+from .page_signals import looks_like_vault_login_miss
 from .session import BrowserSession, vault_cookies_path
 from .sources.ezproxy import proxify
 from .runreport import (
@@ -75,6 +76,8 @@ from .zot import Item
 _SERIAL_SOURCES = frozenset({"scihub", "ezproxy", "htmlpdf", "scholar", "browser_agent"})
 _DIRECT_PDF_CAP = 12
 _LANDING_CAP = 6
+# Soft-block vault retries that land on campus CAS; trip EZProxy after this many.
+_VAULT_SSO_MISS_THRESHOLD = 2
 
 
 def urls_to_fetch(urls: list[str]) -> list[str]:
@@ -269,6 +272,8 @@ class Pipeline:
         self._circuit = CircuitBreaker(cfg.circuit_breaker_threshold)
         self._ezproxy_down = False
         self._browser_agent_down = False
+        self._blocked_hosts: set[str] = set()
+        self._vault_sso_misses = 0
         self._attach_lock = threading.Lock()
         self._print_lock = threading.Lock()
         self._stats_lock = threading.Lock()
@@ -295,6 +300,8 @@ class Pipeline:
         self._run_total = total
         self._item_index = {it.key: i for i, it in enumerate(items, start=1)}
         self._circuit.reset()
+        self._blocked_hosts.clear()
+        self._vault_sso_misses = 0
         try:
             for start in range(0, total, batch_size):
                 if self._stop.is_set():
@@ -327,6 +334,7 @@ class Pipeline:
         self.browser = BrowserSession(self.cfg) if self._use_browser else None
         self.ctx = Context(config=self.cfg, client=self.client, browser=self.browser)
         self._ezproxy_down = False
+        self._vault_sso_misses = 0
 
     def _run_batch(self, items: list[Item]) -> None:
         oa_sources = [
@@ -384,7 +392,6 @@ class Pipeline:
     # ---- phase 1: identifier + OA -------------------------------------------
     def _phase_oa(self, item: Item, oa_sources: list[str]) -> list[str] | None:
         attempts: list[str] = []
-        blocked_hosts: set[str] = set()
         self._log_item_label(item)
         notes = prepare_identifiers(
             self.client,
@@ -428,11 +435,11 @@ class Pipeline:
             self._log_source_result(item, name, cand)
             self._maybe_trip_circuit(name, cand)
             if cand.outcome is Outcome.FOUND and self._try_download(
-                item, cand, attempts, blocked_hosts
+                item, cand, attempts
             ):
                 self.progress()
                 return None
-        if self._retry_published_oa(item, oa_sources, attempts, blocked_hosts):
+        if self._retry_published_oa(item, oa_sources, attempts):
             self.progress()
             return None
         return attempts
@@ -527,6 +534,15 @@ class Pipeline:
                 "then `paperful run` on this collection.[/]"
             )
 
+    def _note_vault_sso_miss(self, attempts: list[str], source: str) -> None:
+        """Count campus-CAS vault misses; trip EZProxy after the threshold."""
+        attempts.append(f"{source}:skipped(session expired)")
+        with self._stats_lock:
+            self._vault_sso_misses += 1
+            count = self._vault_sso_misses
+        if count >= _VAULT_SSO_MISS_THRESHOLD:
+            self._mark_ezproxy_down()
+
     def _skip_ezproxy(
         self, queue: list[tuple[Item, list[str]]]
     ) -> list[tuple[Item, list[str]]]:
@@ -544,7 +560,6 @@ class Pipeline:
         item: Item,
         oa_sources: list[str],
         attempts: list[str],
-        blocked_hosts: set[str],
     ) -> bool:
         """Try OA lanes once on the published DOI. The library DOI is left as it was."""
         query = item.doi or ""
@@ -581,7 +596,7 @@ class Pipeline:
                 if cand.outcome is not Outcome.FOUND:
                     continue
                 item.doi = saved
-                if self._try_download(item, cand, attempts, blocked_hosts):
+                if self._try_download(item, cand, attempts):
                     return True
                 item.doi = published
         finally:
@@ -682,9 +697,7 @@ class Pipeline:
         item: Item,
         cand: Candidate,
         attempts: list[str],
-        blocked_hosts: set[str] | None = None,
     ) -> bool:
-        blocked = blocked_hosts if blocked_hosts is not None else set()
         dl = None
         if cand.content is not None:
             self._log_item(item, f"[dim]{cand.source}: downloading...[/]")
@@ -709,7 +722,9 @@ class Pipeline:
             skipped_blocked = False
             for url in urls_to_fetch(cand.urls):
                 host = publisher_host(url)
-                if host and host in blocked:
+                with self._stats_lock:
+                    dead = bool(host and host in self._blocked_hosts)
+                if dead:
                     skipped_blocked = True
                     continue
                 urls.append(url)
@@ -728,7 +743,8 @@ class Pipeline:
                     break
                 host = publisher_host(url)
                 if host:
-                    blocked.add(host)
+                    with self._stats_lock:
+                        self._blocked_hosts.add(host)
         if dl is None:
             return False
         short_verdict = "ok"
@@ -879,11 +895,18 @@ class Pipeline:
         ):
             return None
         targets = [url]
-        if (
-            self.cfg.ezproxy_base
+        can_wrap = (
+            bool(self.cfg.ezproxy_base)
             and is_publisher_url(url)
             and "idm.oclc.org" not in urlparse(url).netloc
-        ):
+        )
+        if can_wrap and self._ezproxy_down:
+            attempts.append(f"{cand.source}:skipped(session expired)")
+            self._log_item(
+                item,
+                f"{escape(cand.source)}: [dim]skipped[/] (session expired)",
+            )
+        elif can_wrap:
             wrapped = proxify(url, self.cfg.ezproxy_base)
             if wrapped != url:
                 targets = [wrapped, url]
@@ -899,6 +922,8 @@ class Pipeline:
                     item,
                     f"{escape(cand.source)}: [yellow]browser failed[/] ({escape(str(exc))})",
                 )
+                if looks_like_vault_login_miss(str(exc)):
+                    self._note_vault_sso_miss(attempts, cand.source)
                 continue
             if not looks_like_pdf(content) or len(content) < self.cfg.min_pdf_bytes:
                 attempts.append(f"{cand.source}:browser-failed(not a PDF)")

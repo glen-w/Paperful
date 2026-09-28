@@ -325,6 +325,7 @@ def test_refresh_session_clears_ezproxy_down(pipe_factory, monkeypatch):
     monkeypatch.setattr(pl, "BrowserSession", lambda cfg: DummyBrowser())
     pipe.refresh_session()
     assert pipe._ezproxy_down is False
+    assert pipe._vault_sso_misses == 0
     assert pipe.client is sentinel
     assert pipe.client is not old_client
     assert pipe.ctx.client is sentinel
@@ -894,6 +895,87 @@ def test_oa_skips_same_publisher_host_after_403(pipe_factory):
     assert len(calls) == 1
     rec = manifest.get("A")
     assert any("publisher already blocked" in a for a in rec.attempts)
+
+
+def test_oa_skips_publisher_host_across_items(pipe_factory):
+    calls = []
+
+    def handler(req):
+        calls.append(str(req.url))
+        return httpx.Response(403)
+
+    up = StubSource(
+        "unpaywall",
+        {
+            "A": Candidate(
+                url="https://www.sciencedirect.com/science/article/pii/S1/pdfft",
+                source="unpaywall",
+            ),
+            "B": Candidate(
+                url="https://www.sciencedirect.com/science/article/pii/S2/pdfft",
+                source="unpaywall",
+            ),
+        },
+    )
+    pipe, manifest = pipe_factory(
+        {"unpaywall": up}, ["unpaywall"], handler=handler
+    )
+    pipe.cfg.concurrency_oa = 1
+    pipe.run([make_item(key="A"), make_item(key="B")])
+    assert len(calls) == 1
+    assert any(
+        "publisher already blocked" in a for a in manifest.get("B").attempts
+    )
+
+
+def test_vault_sso_misses_trip_ezproxy_and_skip_proxify(pipe_factory, cfg):
+    from paperful.session import SessionError
+
+    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    pubs = {
+        "A": "https://www.sciencedirect.com/science/article/pii/S1/pdfft",
+        "B": "https://www.wiley.com/doi/pdf/10.1002/x",
+        "C": "https://link.springer.com/content/pdf/10.1007/x.pdf",
+    }
+
+    class LoginBrowser:
+        def __init__(self):
+            self.urls: list[str] = []
+
+        def available(self) -> bool:
+            return True
+
+        def fetch_pdf(self, url, timeout_ms=60_000):
+            self.urls.append(url)
+            raise SessionError("no download control @federation.sciences-po.fr")
+
+        def close(self) -> None:
+            return
+
+    browser = LoginBrowser()
+    src = StubSource(
+        "unpaywall",
+        {
+            key: Candidate(url=url, source="unpaywall")
+            for key, url in pubs.items()
+        },
+    )
+    pipe, manifest = pipe_factory(
+        {"unpaywall": src},
+        ["unpaywall"],
+        handler=lambda r: httpx.Response(403),
+    )
+    pipe.cfg.concurrency_oa = 1
+    pipe.browser = browser
+    pipe.ctx.browser = browser
+    pipe.run([make_item(key="A"), make_item(key="B"), make_item(key="C")])
+    assert pipe._ezproxy_down is True
+    wraps = [u for u in browser.urls if "idm.oclc.org" in u]
+    assert len(wraps) == 1
+    assert any("session expired" in a for a in manifest.get("A").attempts)
+    assert any(
+        "skipped(session expired)" in a for a in manifest.get("B").attempts
+    )
 
 
 def test_attach_operator_lines_for_quota_and_auth():

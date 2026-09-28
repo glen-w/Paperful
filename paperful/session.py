@@ -485,11 +485,21 @@ def _playwright_pdf_miss(page: Any, url: str, *, clicked: bool) -> str:
         text = page.inner_text("body")[:4000]
     except Exception:
         text = ""
-    label = classify_page_block(text)
-    if label is None:
-        label = (
-            "clicked download control, no PDF" if clicked else "no download control"
-        )
+    html = ""
+    try:
+        html = str(page.content() or "")[:4000]
+    except Exception:
+        html = ""
+    if looks_like_login_page(final, text or html):
+        label = "login"
+    else:
+        label = classify_page_block(text)
+        if label is None:
+            label = (
+                "clicked download control, no PDF"
+                if clicked
+                else "no download control"
+            )
     return format_miss(label, final)
 
 
@@ -618,6 +628,10 @@ def collect_pdf_from_page(
             if found:
                 data, final, _win = found[0]
                 return data, final, "sso+" + _win
+            if host_label(_page_url(page, url)) == start_host:
+                raise SessionError(
+                    format_miss("login", _page_url(page, url))
+                )
         if found:
             return found[0]
         rewritten = rewrite_known_pdf_url(_page_url(page, url), playbooks)

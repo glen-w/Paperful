@@ -115,6 +115,21 @@ def looks_like_login_page(url: str, body: str) -> bool:
     return False
 
 
+def looks_like_vault_login_miss(note: str) -> bool:
+    """True for vault browser misses that landed on campus SSO / CAS.
+
+    Matches ``login @host`` and older ``no download control @federation…``
+    notes where French CAS copy never hit ``classify_page_block``.
+    """
+    raw = (note or "").strip()
+    if not raw:
+        return False
+    if miss_label(raw).lower() == "login":
+        return True
+    low = raw.lower()
+    return any(h in low for h in _LOGIN_URL_HINTS)
+
+
 def is_search_engine_host(host: str) -> bool:
     host = (host or "").lower()
     if host.startswith("www."):

@@ -239,6 +239,9 @@ def test_publisher_host_groups_rewritten_ezproxy_hosts():
         "tandfonline.com"
     )
     assert is_publisher_url("https://linkinghub.elsevier.com/retrieve/pii/S1")
+    assert publisher_host("https://linkinghub.elsevier.com/retrieve/pii/S1") == (
+        "elsevier.com"
+    )
     assert not is_publisher_url("https://arxiv.org/pdf/1234.5678")
     assert not publisher_host("https://repository.example.edu/bitstream/1/a.pdf")
 

@@ -398,6 +398,48 @@ def test_collect_pdf_from_page_waits_out_sso():
     assert "nature.com" in final
 
 
+def test_collect_pdf_from_page_fails_fast_on_stuck_sso(monkeypatch):
+    import paperful.session as sess
+
+    monkeypatch.setattr(sess, "_SSO_WAIT_S", 0.05)
+
+    class Page(_FakePage):
+        def __init__(self):
+            super().__init__(
+                resp=_FakeResp(
+                    b"<html>login</html>",
+                    "https://federation.sciences-po.fr/cas/login",
+                ),
+                html="<html>central authentication service</html>",
+            )
+            self.url = "https://federation.sciences-po.fr/cas/login"
+
+        def inner_text(self, selector):
+            return "central authentication service"
+
+        def content(self):
+            return self._html
+
+    try:
+        collect_pdf_from_page(
+            Page(), "https://federation.sciences-po.fr/cas/login"
+        )
+        raise AssertionError("expected SessionError")
+    except SessionError as exc:
+        assert "login @federation.sciences-po.fr" in str(exc)
+
+
+def test_looks_like_vault_login_miss():
+    from paperful.page_signals import looks_like_vault_login_miss
+
+    assert looks_like_vault_login_miss("login @federation.sciences-po.fr")
+    assert looks_like_vault_login_miss(
+        "no download control @federation.sciences-po.fr"
+    )
+    assert not looks_like_vault_login_miss("blocked @linkinghub.elsevier.com")
+    assert not looks_like_vault_login_miss("no download control @wiley.com")
+
+
 def test_collect_pdf_from_page_rewrite_miss_falls_through():
     from paperful.playbooks import GreyPlaybook
 

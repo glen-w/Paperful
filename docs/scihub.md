@@ -3,7 +3,9 @@
 Sci-Hub occupies a **legal grey zone in some jurisdictions**. Paperful does
 not enable it unless you opt in. You are responsible for complying with the
 laws that apply to you. The authors and distributors of this tool do not
-encourage copyright infringement.
+encourage copyright infringement. If you are unsure whether use is lawful
+where you are, only opt in when you already have legal access to the journals
+and the download is a legitimate archive or backup copy for your own use.
 
 Opt in either way (Sci-Hub is then tried last, after open-access sources and
 EZProxy):
