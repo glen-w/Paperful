@@ -212,7 +212,12 @@ uv run paperful summarize --item ABCD1234 --prompt prompts/one-liner.md
   when the provider is not loopback).
 - `--to disk|zotero|both` (default `both`, or `[summarize].dest`) chooses the
   write. `disk` is `state/summaries/<key>.html`. `zotero` is one child note
-  tagged `[summarize].tag`, updated on re-run rather than duplicated.
+  tagged `[summarize].tag`. Without `--force`, items that already have the
+  requested outputs **for the current model** (and prompt sha, when local)
+  are skipped — safe to resume after an interrupt. A different model is a
+  different audit trail and is rewritten. A partial pair (disk HTML without
+  the note, or the reverse) is finished from a matching other side without
+  calling the model again. `--force` regenerates even when the footer matches.
   `--to disk` leaves the Zotero tree clean. `--apply` still means “this run
   must write the note” and exits 1 together with `--to disk`.
 - Ollama receives `num_ctx` sized from the prompt (about 3 characters per

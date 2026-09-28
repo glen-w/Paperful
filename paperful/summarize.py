@@ -200,6 +200,7 @@ class SummaryBatch:
     rows: list[SummaryRow]
     summarized: int
     failed: int
+    skipped: int = 0
 
     @property
     def fatal(self) -> str | None:
@@ -207,6 +208,171 @@ class SummaryBatch:
             if row.fatal:
                 return row.reason
         return None
+
+
+_FOOTER = re.compile(
+    r"<p>\s*<em>\s*(?P<body>paperful\s*·.*?)\s*</em>\s*</p>\s*\Z",
+    re.IGNORECASE | re.DOTALL,
+)
+# Local:  paperful · <model> · <stamp> · prompt <sha>
+# Remote: paperful · remote LLM · <model> · <stamp>
+_PROVENANCE = re.compile(
+    r"^paperful\s*·\s*"
+    r"(?:(?P<remote>remote\s+LLM)\s*·\s*)?"
+    r"(?P<model>.+?)\s*·\s*"
+    r"(?P<stamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+UTC)"
+    r"(?:\s*·\s*prompt\s+(?P<prompt_sha>[0-9a-f]{8}))?"
+    r"\s*$",
+    re.IGNORECASE,
+)
+
+
+def parse_summary_provenance(html: str) -> dict[str, str] | None:
+    """Pull model / prompt sha from the paperful footer, if present."""
+    match = _FOOTER.search((html or "").strip())
+    if not match:
+        return None
+    body = re.sub(r"\s+", " ", match.group("body")).strip()
+    parsed = _PROVENANCE.match(body)
+    if not parsed:
+        return None
+    out: dict[str, str] = {"model": parsed.group("model").strip()}
+    if parsed.group("remote"):
+        out["remote"] = "1"
+    if parsed.group("prompt_sha"):
+        out["prompt_sha"] = parsed.group("prompt_sha").lower()
+    return out
+
+
+def current_prompt_sha(cfg: Config) -> str:
+    template, _ = load_prompt_template(cfg)
+    return hashlib.sha256(template.encode()).hexdigest()[:8]
+
+
+def summary_matches_config(cfg: Config, html: str) -> bool:
+    """True when the footer's model (and prompt sha, when local) match this run."""
+    prov = parse_summary_provenance(html)
+    if not prov:
+        return False
+    if prov["model"] != cfg.llm_model.strip():
+        return False
+    if llm_egress_is_remote(cfg):
+        return True
+    # Local runs stamp a prompt sha; require it so a prompt change is a new audit trail.
+    return prov.get("prompt_sha") == current_prompt_sha(cfg)
+
+
+def summary_disk_path(cfg: Config, item: Item) -> Path:
+    return cfg.summaries_dir / f"{item.key}.html"
+
+
+def _existing_note_key(
+    backend: LibraryBackend | None, cfg: Config, item: Item
+) -> str | None:
+    if backend is None:
+        return None
+    keys = backend.find_child_note_keys(item.key, cfg.summarize_tag)
+    return keys[0] if keys else None
+
+
+def _reuse_existing_summary(
+    cfg: Config,
+    item: Item,
+    backend: LibraryBackend | None,
+    *,
+    dest: str,
+) -> SummaryRow | None:
+    """Return a row when dest outputs already match this run, or finish a partial.
+
+    Without ``--force``, skip the model when every requested destination is
+    already filled with a summary for the current model (and prompt, when
+    local). A different model is a different audit output — regenerate.
+    If only one side is missing, copy from a matching other side without
+    calling the LLM.
+    """
+    need_disk = wants_disk(dest)
+    need_zotero = wants_zotero(dest)
+    path = summary_disk_path(cfg, item)
+    has_disk = path.is_file()
+    note_key = _existing_note_key(backend, cfg, item) if need_zotero else None
+    has_note = bool(note_key)
+
+    html_disk = path.read_text(encoding="utf-8") if has_disk else None
+    html_note = None
+    if has_note:
+        if backend is None:
+            raise LibraryError("No library backend to read the existing note.")
+        html_note = backend.read_child_note(item.key, cfg.summarize_tag)
+
+    disk_ok = html_disk is not None and summary_matches_config(cfg, html_disk)
+    note_ok = html_note is not None and summary_matches_config(cfg, html_note)
+    reusable = html_disk if disk_ok else (html_note if note_ok else None)
+    if reusable is None:
+        return None
+
+    if need_disk and need_zotero and disk_ok and note_ok:
+        return SummaryRow(
+            key=item.key,
+            title=item.title,
+            status="skipped",
+            reason="summary already exists for this model",
+            disk_path=str(path),
+            note_key=note_key or "",
+        )
+    if need_disk and not need_zotero and disk_ok:
+        return SummaryRow(
+            key=item.key,
+            title=item.title,
+            status="skipped",
+            reason="summary already exists for this model",
+            disk_path=str(path),
+        )
+    if need_zotero and not need_disk and note_ok:
+        return SummaryRow(
+            key=item.key,
+            title=item.title,
+            status="skipped",
+            reason="summary already exists for this model",
+            note_key=note_key or "",
+        )
+
+    disk_path = str(path) if has_disk else ""
+    if need_disk and not disk_ok:
+        disk_path = str(write_summary_disk(cfg, item, reusable))
+    if need_zotero and not note_ok:
+        if backend is None:
+            raise LibraryError("No library backend for a Zotero note.")
+        note_key = apply_summary_note(cfg, backend, item, reusable)
+        return SummaryRow(
+            key=item.key,
+            title=item.title,
+            status="summarized",
+            reason=(
+                "synced note from matching summary"
+                if has_note
+                else "attached existing disk summary"
+            ),
+            disk_path=disk_path,
+            note_key=note_key,
+        )
+    if need_disk and not has_disk:
+        return SummaryRow(
+            key=item.key,
+            title=item.title,
+            status="summarized",
+            reason="wrote existing note to disk",
+            disk_path=disk_path,
+            note_key=note_key or "",
+        )
+    # Disk rewritten from matching note while note already ok.
+    return SummaryRow(
+        key=item.key,
+        title=item.title,
+        status="summarized",
+        reason="synced disk from matching note",
+        disk_path=disk_path,
+        note_key=note_key or "",
+    )
 
 
 def summarize_items(
@@ -221,14 +387,28 @@ def summarize_items(
 ) -> SummaryBatch:
     """Summarize each item.
 
-    A model timeout or other item error fails that row and the batch continues.
-    A library write error stops the batch after that row.
+    Without ``force``, items that already have the requested outputs for the
+    current model (and prompt, when local) are skipped (resume-safe). A model
+    timeout or other item error fails that row and the batch continues. A
+    library write error stops the batch after that row.
     """
     rows: list[SummaryRow] = []
     ok = 0
     failed = 0
+    skipped = 0
     for it in items:
         try:
+            if not force:
+                reused = _reuse_existing_summary(cfg, it, backend, dest=dest)
+                if reused is not None:
+                    if reused.status == "skipped":
+                        skipped += 1
+                    else:
+                        ok += 1
+                    rows.append(reused)
+                    if on_row is not None:
+                        on_row(reused)
+                    continue
             html = render_summary(cfg, it, manifest, backend, force=force)
             disk_path = ""
             note_key = ""
@@ -263,11 +443,15 @@ def summarize_items(
             rows.append(row)
             if on_row is not None:
                 on_row(row)
-            return SummaryBatch(rows=rows, summarized=ok, failed=failed)
+            return SummaryBatch(
+                rows=rows, summarized=ok, failed=failed, skipped=skipped
+            )
         rows.append(row)
         if on_row is not None:
             on_row(row)
-    return SummaryBatch(rows=rows, summarized=ok, failed=failed)
+    return SummaryBatch(
+        rows=rows, summarized=ok, failed=failed, skipped=skipped
+    )
 
 
 def apply_summary_note(

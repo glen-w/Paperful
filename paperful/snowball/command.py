@@ -33,6 +33,7 @@ from .expand import (
 from .fill import FillPaused, crossref_work, run_fill_pass, s2_api_key, s2_paper
 from .ingest import create_new, fill_pdfs
 from .local_cites import load_local_cites
+from .local_openalex import store_from_config
 from .openalex import OpenAlexBudgetExceeded, OpenAlexClient, keyless_limit_message, normalize_orcid
 from .orcid import OrcidError, orcid_dois
 from .queue import load_queue, write_queue, write_report
@@ -49,6 +50,11 @@ Decider = Callable[[Candidate], bool]
 KNOWN_BACKENDS = ("openalex", "crossref", "semanticscholar", "orcid", "europepmc", "pdf")
 
 
+def _openalex_client(cfg: Config, **kwargs: Any) -> OpenAlexClient:
+    """Build an OpenAlex client; attach an opt-in snapshot store when configured."""
+    return OpenAlexClient(email=cfg.email, store=store_from_config(cfg), **kwargs)
+
+
 def _local_cites(cfg: Config, backend: Any, collection: str) -> Any:
     """In-collection cite index. A failure leaves creation to proceed without it."""
     if (cfg.remarks_surface or "note").strip().lower() == "off":
@@ -56,7 +62,7 @@ def _local_cites(cfg: Config, backend: Any, collection: str) -> Any:
     if backend is None or not collection.strip():
         return None
     try:
-        client = OpenAlexClient(email=cfg.email)
+        client = _openalex_client(cfg)
         return load_local_cites(
             backend,
             collection,
@@ -474,7 +480,7 @@ def run_resume(
         _, rows = load_queue(cfg.state_dir, run_id)
     except FileNotFoundError as exc:
         raise SnowballError(f"No snowball queue for run {run_id!r}.") from exc
-    oa = client or OpenAlexClient(email=cfg.email, sleep_s=0.15)
+    oa = client or _openalex_client(cfg, sleep_s=0.15)
     tally = _live_tally(console)
     oa.tally = tally
     oa.progress = lambda message: console.print(paint(message))
@@ -822,7 +828,7 @@ def _execute(
     mode = _pdf_mode(request)
     if mode != "off" and request.gate in {"dry-run", "approve-batch"}:
         console.print("[yellow]fetch_pdfs ignored until create (auto / apply)[/]")
-    oa = client or OpenAlexClient(email=cfg.email, sleep_s=0.0 if client else 0.15)
+    oa = client or _openalex_client(cfg, sleep_s=0.0 if client else 0.15)
     tally = _live_tally(console)
     oa.tally = tally
     if request.from_created_date:

@@ -283,25 +283,34 @@ def test_lint_item_appends_identity_finding(llm_cfg, monkeypatch):
 
 class NoteBackend:
     def __init__(self):
-        self.notes: dict[str, tuple[str, str]] = {}
+        self.notes: dict[str, tuple[str, str, str]] = {}
         self.created = 0
         self.updated = 0
 
     def find_child_note_keys(self, item_key, tag):
         return [
             k
-            for k, (parent, t) in self.notes.items()
+            for k, (parent, t, _html) in self.notes.items()
             if parent == item_key and t == tag
         ]
+
+    def read_child_note(self, item_key, tag):
+        for parent, t, html in self.notes.values():
+            if parent == item_key and t == tag:
+                return html
+        return None
 
     def create_or_update_note(self, item_key, html, tag):
         existing = self.find_child_note_keys(item_key, tag)
         if existing:
             self.updated += 1
-            return existing[0]
+            key = existing[0]
+            parent, t, _ = self.notes[key]
+            self.notes[key] = (parent, t, html)
+            return key
         self.created += 1
         key = f"N{len(self.notes) + 1}"
-        self.notes[key] = (item_key, tag)
+        self.notes[key] = (item_key, tag, html)
         return key
 
 
@@ -355,6 +364,9 @@ def test_summarize_items_records_failures_and_stops_on_library_error(llm_cfg, mo
     blocked = make_item(key="BLOCKED1", has_pdf=True)
 
     class Boom:
+        def find_child_note_keys(self, item_key, tag):
+            return []
+
         def create_or_update_note(self, item_key, html, tag):
             if item_key == "BLOCKED1":
                 raise LibraryError("write denied")
@@ -368,6 +380,80 @@ def test_summarize_items_records_failures_and_stops_on_library_error(llm_cfg, mo
     assert batch.rows[1].status == "failed" and "PDF" in batch.rows[1].reason
     assert batch.rows[2].fatal and batch.fatal == "write denied"
     assert batch.summarized == 1 and batch.failed == 2
+
+
+def test_summarize_items_skips_existing_without_force(llm_cfg, monkeypatch):
+    _ground(monkeypatch, summarize)
+    stub = StubLLM(text="<p>fresh</p>")
+    monkeypatch.setattr(summarize, "get_client", lambda cfg: stub)
+    item = make_item(key="SKIPME01", has_pdf=True)
+    backend = NoteBackend()
+    first = summarize.summarize_items(
+        llm_cfg, [item], None, backend, dest="both"
+    )
+    assert first.summarized == 1 and first.skipped == 0 and stub.calls
+    calls_after_first = len(stub.calls)
+
+    again = summarize.summarize_items(
+        llm_cfg, [item], None, backend, dest="both"
+    )
+    assert again.summarized == 0 and again.skipped == 1
+    assert again.rows[0].status == "skipped"
+    assert len(stub.calls) == calls_after_first
+    assert backend.created == 1 and backend.updated == 0
+
+    forced = summarize.summarize_items(
+        llm_cfg, [item], None, backend, dest="both", force=True
+    )
+    assert forced.summarized == 1 and forced.skipped == 0
+    assert len(stub.calls) == calls_after_first + 1
+    assert backend.updated == 1
+
+
+def test_summarize_items_rewrites_when_model_changes(llm_cfg, monkeypatch):
+    _ground(monkeypatch, summarize)
+    stub = StubLLM(text="<p>v1</p>")
+    monkeypatch.setattr(summarize, "get_client", lambda cfg: stub)
+    item = make_item(key="MODELCHG", has_pdf=True)
+    backend = NoteBackend()
+    summarize.summarize_items(llm_cfg, [item], None, backend, dest="both")
+    calls_before = len(stub.calls)
+
+    llm_cfg.llm_model = "other-model:9b"
+    stub.text = "<p>v2</p>"
+    batch = summarize.summarize_items(
+        llm_cfg, [item], None, backend, dest="both"
+    )
+    assert batch.summarized == 1 and batch.skipped == 0
+    assert len(stub.calls) == calls_before + 1
+    html = (llm_cfg.summaries_dir / f"{item.key}.html").read_text()
+    assert "other-model:9b" in html and "v2" in html
+
+
+def test_summarize_items_attaches_existing_disk_without_llm(llm_cfg, monkeypatch):
+    _ground(monkeypatch, summarize)
+    stub = StubLLM(text="<p>should not run</p>")
+    monkeypatch.setattr(summarize, "get_client", lambda cfg: stub)
+    item = make_item(key="DISKONLY1", has_pdf=True)
+    sha = summarize.current_prompt_sha(llm_cfg)
+    path = llm_cfg.summaries_dir / f"{item.key}.html"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "<p>already on disk</p>\n"
+        f"<p><em>paperful · {llm_cfg.llm_model} · 2026-01-01 00:00 UTC · prompt {sha}</em></p>",
+        encoding="utf-8",
+    )
+    backend = NoteBackend()
+
+    batch = summarize.summarize_items(
+        llm_cfg, [item], None, backend, dest="both"
+    )
+    assert batch.summarized == 1 and batch.skipped == 0
+    assert batch.rows[0].reason == "attached existing disk summary"
+    assert backend.created == 1 and not stub.calls
+    note_html = backend.read_child_note(item.key, llm_cfg.summarize_tag)
+    assert note_html is not None and "already on disk" in note_html
+    assert llm_cfg.llm_model in note_html
 
 
 def test_summarize_items_continues_after_llm_timeout(llm_cfg, monkeypatch):

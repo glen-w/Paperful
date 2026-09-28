@@ -185,6 +185,16 @@ pdfs = "additional"
 # when that allowance is spent. mailto does not raise either budget.
 # SEMANTIC_SCHOLAR_API_KEY is optional and also stays in the environment.
 # The public API is enough until heavy use; request a key, it is not self-serve.
+#
+# Optional. Most users leave this unset — see docs/config.md#advanced.
+# Download or host the OpenAlex parquet snapshot yourself; Paperful does not ship it.
+# [openalex_store]
+# backend = "ssh_duckdb"   # later: local_duckdb | http
+# ssh_host = "nuc"
+# # ssh_user = "you"
+# parquet_glob = "/mnt/files/openalex/data/parquet/**/*.parquet"
+# # duckdb_bin = "duckdb"
+# # timeout_s = 120
 # [snowball]
 # enabled = false
 # max_candidates = 200     # all keeps every new+exists row

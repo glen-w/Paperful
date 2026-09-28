@@ -62,6 +62,7 @@ class OpenAlexClient:
         backoff_base_s: float = 1.0,
         backoff_cap_s: float = 60.0,
         budget_wait_s: float = 0.0,
+        store: Any = None,
     ):
         self.email = email
         self.api_key = api_key if api_key is not None else os.environ.get("OPENALEX_API_KEY", "")
@@ -77,6 +78,7 @@ class OpenAlexClient:
         self.emit: Callable[[list[Any]], None] | None = None
         self.from_created_date: str | None = None
         self._getter = getter
+        self.store = store
         self.requests = 0
         self.retries = 0
         self.status_429 = 0
@@ -297,7 +299,17 @@ class OpenAlexClient:
         return self._collect("/works", params, limit, use_cursor=use_cursor)
 
     def work_by_doi(self, doi: str) -> dict[str, Any] | None:
-        payload = self.get(f"/works/https://doi.org/{doi}", {"select": SELECT})
+        cleaned = normalize_doi(doi) or ""
+        if cleaned and self.store is not None:
+            try:
+                hit = self.store.work_by_doi(cleaned)
+            except Exception as exc:
+                self.note(f"openalex store failed · {exc}")
+                hit = None
+            if hit is not None and (hit.get("id") or hit.get("doi")):
+                self.note("openalex store · 1/1 doi")
+                return hit
+        payload = self.get(f"/works/https://doi.org/{cleaned or doi}", {"select": SELECT})
         if payload.get("id") or payload.get("doi"):
             return payload
         return None
@@ -306,16 +318,53 @@ class OpenAlexClient:
         self, dois: list[str], *, select: str = "id,doi,referenced_works"
     ) -> list[dict[str, Any]]:
         """Works for these DOIs. The default select is id, doi, and referenced_works."""
-        out: list[dict[str, Any]] = []
         ids = [doi for doi in dois if doi]
-        for start in range(0, len(ids), 50):
-            batch = ids[start : start + 50]
+        if not ids:
+            return []
+        by_doi: dict[str, dict[str, Any]] = {}
+        if self.store is not None:
             try:
-                out.extend(self._doi_batch(batch, select=select))
-            except OpenAlexBudgetExceeded as exc:
-                exc.partial = out + list(exc.partial or [])
-                raise
-        return out
+                stored = self.store.works_by_dois(ids, select=select)
+            except Exception as exc:
+                self.note(f"openalex store failed · {exc}")
+                stored = []
+            for row in stored:
+                key = normalize_doi(str(row.get("doi") or "")) or ""
+                if key:
+                    by_doi[key] = row
+            if by_doi:
+                self.note(f"openalex store · {len(by_doi)}/{len(ids)} dois")
+        pending_api = [
+            d for d in ids if (normalize_doi(d) or d.strip().lower()) not in by_doi
+        ]
+        api_by_doi: dict[str, dict[str, Any]] = {}
+        if pending_api:
+            api_rows: list[dict[str, Any]] = []
+            for start in range(0, len(pending_api), 50):
+                batch = pending_api[start : start + 50]
+                try:
+                    api_rows.extend(self._doi_batch(batch, select=select))
+                except OpenAlexBudgetExceeded as exc:
+                    partial = [
+                        by_doi[normalize_doi(d) or d.strip().lower()]
+                        for d in ids
+                        if (normalize_doi(d) or d.strip().lower()) in by_doi
+                    ]
+                    exc.partial = partial + api_rows + list(exc.partial or [])
+                    raise
+            api_by_doi = {
+                (normalize_doi(str(row.get("doi") or "")) or ""): row
+                for row in api_rows
+                if normalize_doi(str(row.get("doi") or ""))
+            }
+        merged: list[dict[str, Any]] = []
+        for doi in ids:
+            key = normalize_doi(doi) or doi.strip().lower()
+            if key in by_doi:
+                merged.append(by_doi[key])
+            elif key in api_by_doi:
+                merged.append(api_by_doi[key])
+        return merged
 
     def _doi_batch(self, batch: list[str], *, select: str) -> list[dict[str, Any]]:
         """One DOI filter. A 400 is one bad id: split the batch and skip that id."""
@@ -345,11 +394,48 @@ class OpenAlexClient:
         self, openalex_ids: list[str], *, search: str | None = None
     ) -> list[dict[str, Any]]:
         """Works for these OpenAlex ids. ``search`` keeps only matches in the batch."""
-        out: list[dict[str, Any]] = []
         ids = list(openalex_ids)
         text = (search or "").strip()
         if self.tally is not None and ids:
             self.tally.track(len(ids))
+        # Text search stays on the live API until store search (roadmap 2B).
+        if text or self.store is None:
+            return self._works_by_ids_api(ids, search=text or None)
+
+        by_id: dict[str, dict[str, Any]] = {}
+        try:
+            stored = self.store.works_by_ids(ids)
+        except Exception as exc:
+            self.note(f"openalex store failed · {exc}")
+            stored = []
+        for row in stored:
+            key = short_id(str(row.get("id") or ""))
+            if key:
+                by_id[key] = row
+        missing = [i for i in ids if short_id(i) not in by_id]
+        satisfied = len(ids) - len(missing)
+        if satisfied:
+            self.note(f"openalex store · {satisfied}/{len(ids)} ids")
+            if self.tally is not None:
+                self.tally.advance(satisfied)
+        if missing:
+            try:
+                for row in self._works_by_ids_api(missing, search=None):
+                    key = short_id(str(row.get("id") or ""))
+                    if key:
+                        by_id[key] = row
+            except OpenAlexBudgetExceeded as exc:
+                partial = [by_id[short_id(i)] for i in ids if short_id(i) in by_id]
+                exc.partial = partial + list(exc.partial or [])
+                raise
+        return [by_id[short_id(i)] for i in ids if short_id(i) in by_id]
+
+    def _works_by_ids_api(
+        self, openalex_ids: list[str], *, search: str | None = None
+    ) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        ids = list(openalex_ids)
+        text = (search or "").strip()
         for start in range(0, len(ids), 100):
             batch = ids[start : start + 100]
             if not batch:

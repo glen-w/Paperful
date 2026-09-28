@@ -20,7 +20,7 @@ and [architecture](architecture.md).
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `email` | `""` | Contact address for Unpaywall, Crossref, and NCBI. OpenAlex ignores `mailto`; its daily budget follows `OPENALEX_API_KEY`, or the client IP when that is unset |
+| `email` | `""` | Contact address for Unpaywall, Crossref, NCBI, and polite OpenAlex use. Required when `unpaywall` is in `sources` |
 | `manager` | `zotero` | Library adapter. **`zotero` is well tested — use that.** `mendeley` and `endnote` are in the tree and seeking testers. EndNote writes are an import bundle, not an edit of the `.enl` file |
 | `[mendeley].client_id` / `client_secret` | `""` | Elsevier OAuth app from [dev.mendeley.com/myapps.html](https://dev.mendeley.com/myapps.html). Or `PAPERFUL_MENDELEY_CLIENT_*`. See [Mendeley](mendeley.md) |
 | `[mendeley].redirect_uri` | `http://127.0.0.1:8765/callback` | Must match the app. Host-only (`session login mendeley`) |
@@ -30,7 +30,6 @@ and [architecture](architecture.md).
 | `[remarks].surface` | `note` | Where the readable lines go: where a PDF came from, which duplicate to keep, and why a snowball hit belongs. `note` (child note), `tag` (parent tag), or `off`. The PDF attachment stamp stays the machine token |
 | `sources` | `unpaywall` → `openalex` → `arxiv` → `biorxiv` → `europepmc` → `semanticscholar` → `core` → `openaire` → `direct` → `ezproxy` → `htmlpdf` | Source order; `--sources` overrides per run. `scholar` and `scihub` are **not** included unless you opt in. `core` is skipped until `core_api_key` is set. `openaire` looks up repository copies by DOI |
 | `verify_doi` | `true` | Check library DOIs against Crossref/OpenAlex before fetching; may swap DOI **in memory** for that run. `false` leaves an existing DOI as `doi_verified=unknown` and does not swap |
-| `doi_suspect_score` | `0.70` | Title similarity below this marks a library DOI as suspect (eligible for in-memory swap). API failure is `unknown` and **keeps** the original DOI |
 | `core_api_key` | `""` | CORE API bearer token; empty skips the `core` source |
 | `ezproxy_base` | `""` (disabled) | Campus proxy prefix ending in `url=` — see [Campus EZProxy](ezproxy.md) |
 | `ezproxy_cookies` | `state/ezproxy-cookies.txt` | Compat Netscape dump after `session login ezproxy` |
@@ -38,17 +37,8 @@ and [architecture](architecture.md).
 | `grey_playbooks_builtin` | `true` | Load the packaged ocean/governance example pack |
 | `grey_playbooks_dir` | (none) | Directory of extra pack `*.toml` files (merged after builtin, before inline). Relative paths resolve against the config file's folder |
 | `[[grey_playbooks]]` | (none) | User rewrite/scrape/synthesize rules; same `name` overrides the pack |
-| `scihub_mirrors` | built-in list | Hostnames tried in order |
-| `delay_scihub_s` | `[3, 8]` | Random pause (seconds) before each Sci-Hub / EZProxy / htmlpdf page fetch |
-| `concurrency_oa` | `4` | Parallel workers for open-access sources (Scholar, EZProxy, htmlpdf, and Sci-Hub are serial) |
-| `min_pdf_bytes` | `10000` | Smaller downloads are rejected as error pages |
-| `crossref_min_score` | `0.90` | Title-similarity threshold for accepting a title→DOI match (Crossref, then OpenAlex, then Semantic Scholar) |
-| `mirror_failures_before_skip` | `3` | Network failures before a Sci-Hub mirror is skipped for the run |
-| `source_routing` | `true` | Skip sources that look inapplicable from item metadata; use `--try-all` to override per run |
-| `circuit_breaker_threshold` | `3` | Captcha or block-page failures before a source pauses. A 429 does not count. After the pause, one item is tried again |
 | `attach` | `true` | Attach into Zotero after download (`--no-attach` overrides) |
 | `app_name` | `paperful` | Name shown in Zotero's authorisation dialog |
-| `user_agent` | Chrome-like string | HTTP `User-Agent` for source and download requests |
 
 Leave `ezproxy_base` empty (or remove `ezproxy` from `sources`) if you do not
 use a library proxy. Google Scholar is off until you add `scholar` to
@@ -56,8 +46,9 @@ use a library proxy. Google Scholar is off until you add `scholar` to
 you add `"scihub"` to `sources` or pass `--scihub` — see [Sci-Hub](scihub.md).
 Items dated after 2021 are not sent to Sci-Hub; a `--year-from` past that
 year drops it from the run list.
-Set `source_routing = false` (or pass `--try-all`) when Zotero fields are
-untrustworthy and you want every configured source tried anyway.
+
+Tuning knobs (thresholds, concurrency, User-Agent, OpenAlex snapshot hosting)
+live under [Advanced](#advanced).
 
 ## Run configs (profiles)
 
@@ -179,29 +170,91 @@ walkthrough, model advice, Docker networking, and troubleshooting: [LLM](llm.md)
 | `[llm].model` | `qwen2.5:7b` | Model id |
 | `[llm].base_url` | `http://127.0.0.1:11434` | Ollama API |
 | `[llm].api_base` | `""` | OpenAI-compatible base when `provider = litellm` |
+| `[fix_metadata].llm_title` | `false` | Grounded title proposals in `fix-metadata` |
+| `[lint].llm_pdf_match` | `false` | `pdf_identity_mismatch` finding; `summarize` refuses flagged items unless `--force` |
+| `[summarize].dest` | `both` | `disk` (`state/summaries/`), `zotero` (child note), or `both`. `--to` overrides |
+| `[synthesize].dest` | `both` | `disk` (`state/reports/`), `zotero` (standalone note in the collection), or `both` |
+| `[browser_agent].during_run` | `true` | When `[llm].enabled` and the extra is installed, `run` appends `browser_agent` after Scholar / EZProxy / htmlpdf |
+| `[ocr].languages` | `eng` | Tesseract languages for `paperful ocr` (`eng+fra` or `eng fra`) |
+
+Timeouts, context budgets, prompt templates, tags, attachment hygiene, and
+browser-agent step caps: [Advanced](#advanced).
+
+API keys stay in the environment (never in `config.toml`).
+
+## Advanced
+
+Power-user knobs. Defaults are fine for a first library; change these when a
+run misbehaves or you host infrastructure yourself.
+
+### Fetch tuning
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `doi_suspect_score` | `0.70` | Title similarity below this marks a library DOI as suspect (eligible for in-memory swap). API failure is `unknown` and **keeps** the original DOI |
+| `crossref_min_score` | `0.90` | Title-similarity threshold for accepting a title→DOI match (Crossref, then OpenAlex, then Semantic Scholar) |
+| `concurrency_oa` | `4` | Parallel workers for open-access sources (Scholar, EZProxy, htmlpdf, and Sci-Hub are serial) |
+| `min_pdf_bytes` | `10000` | Smaller downloads are rejected as error pages |
+| `source_routing` | `true` | Skip sources that look inapplicable from item metadata; use `--try-all` (or `false` here) when Zotero fields are untrustworthy |
+| `circuit_breaker_threshold` | `3` | Captcha or block-page failures before a source pauses. A 429 does not count. After the pause, one item is tried again |
+| `user_agent` | Chrome-like string | HTTP `User-Agent` for source and download requests |
+| `scihub_mirrors` | built-in list | Hostnames tried in order when Sci-Hub is opted in |
+| `delay_scihub_s` | `[3, 8]` | Random pause (seconds) before each Sci-Hub / EZProxy / htmlpdf page fetch |
+| `mirror_failures_before_skip` | `3` | Network failures before a Sci-Hub mirror is skipped for the run |
+
+### LLM and attachment fine print
+
+| Table / key | Default | Role |
+| --- | --- | --- |
 | `[llm].allow_remote` | `false` | Allow non-loopback Ollama (e.g. `host.docker.internal` from the image) |
 | `[llm].timeout_s` | `120` | Per-completion timeout |
 | `[llm].max_num_ctx` | `32768` | Cap on the Ollama context window for `summarize` and `synthesize`. The model tag must support it |
-| `[fix_metadata].llm_title` | `false` | Grounded title proposals in `fix-metadata` |
-| `[lint].llm_pdf_match` | `false` | `pdf_identity_mismatch` finding; `summarize` refuses flagged items unless `--force` |
 | `[lint].llm_pdf_match_min_confidence` | `0.6` | A `match: true` below this confidence is still flagged |
 | `[summarize].prompt_template` | `default` | Or path to a custom prompt file (relative to the config file); its SHA is stamped in the note footer |
 | `[summarize].max_context_chars` | `24000` | Budget for PDF text sent to the model (head + headings + tail) |
 | `[summarize].tag` | `paperful-summary` | Zotero child-note tag; re-runs update the note carrying it |
-| `[summarize].dest` | `both` | `disk` (`state/summaries/`), `zotero` (child note), or `both`. `--to` overrides |
 | `[synthesize].prompt_template` | `default` | Report prompt, or a path relative to the config file |
 | `[synthesize].max_context_chars` | `24000` | Budget for summary text in one model call (room left for the prompt) |
 | `[synthesize].tag` | `paperful-report` | Base tag on the collection note. A second tag `tag:<slug>` makes re-runs update |
-| `[synthesize].dest` | `both` | `disk` (`state/reports/`), `zotero` (standalone note in the collection), or `both` |
 | `[synthesize].timeout_s` | `max([llm].timeout_s, 300)` | Per-completion timeout for the report |
 | `[browser_agent].max_steps` / `max_wall_s` | `20` / `300` | Step and wall-clock caps for `recover` (agent stops early once a valid PDF lands) |
-| `[ocr].languages` | `eng` | Tesseract languages for `paperful ocr` (`eng+fra` or `eng fra`) |
+| `[browser_agent].model` | (`[llm].model`) | Larger model for browsing only; `doctor` warns under ~10B |
 | `[ocr].timeout_s` | `600` | Seconds allowed per PDF |
 | `[attachments].fix_broken` | `false` | With `attachments --apply`, refill a ghost or broken link from `out/` when the MD5 matches |
 | `[attachments].merge_files` | `false` | With `--apply`, trash extra PDF children on the same parent that share an MD5 |
 | `[attachments].rename` | `false` | With `--apply`, rename files under `out/` to the mirror stem |
 | `[attachments].link` | `false` | With `--apply`, stored-to-linked under `out/` (personal Zotero library only) |
-| `[browser_agent].during_run` | `true` | When `[llm].enabled` and the extra is installed, `run` appends `browser_agent` after Scholar / EZProxy / htmlpdf |
-| `[browser_agent].model` | (`[llm].model`) | Larger model for browsing only; `doctor` warns under ~10B |
 
-API keys stay in the environment (never in `config.toml`).
+### OpenAlex API limits and snapshot store
+
+Snowball and large fills talk to the live [OpenAlex](https://openalex.org/) API
+by default. A small crawl often needs no key; a free
+[`OPENALEX_API_KEY`](https://openalex.org/settings/api) (environment only)
+raises the daily allowance. Full limits, resume behaviour, and Semantic Scholar
+keys: [snowball Advanced](snowball.md#advanced).
+
+If you outgrow the API (heavy snowballs, shared VPN IP, institutional mirror),
+you can download the [OpenAlex parquet
+snapshot](https://help.openalex.org/access/snapshot/) yourself — locally or on
+a shared host — and point Paperful at it. Paperful does **not** ship the dump;
+most installs leave this unset.
+
+When `[openalex_store]` is set, DOI and OpenAlex-id batch reads try the store
+first; misses and every other OpenAlex call (cited-by, search, keywords, ORCID)
+still use the live API. Rate-limit / budget handling stays API-only.
+
+v1 backend: `ssh_duckdb` — DuckDB runs **on the host that holds the parquet**
+(laptop path later; HTTP for campuses later). Paperful SSHs in, runs SQL, and
+copies small JSON rows back. Env overrides: `OPENALEX_STORE_SSH_HOST`,
+`OPENALEX_STORE_PARQUET_GLOB`.
+
+```toml
+# Optional. Most users leave this unset.
+# [openalex_store]
+# backend = "ssh_duckdb"   # later: local_duckdb | http
+# ssh_host = "nuc"
+# # ssh_user = "you"
+# parquet_glob = "/mnt/files/openalex/data/parquet/**/*.parquet"
+# # duckdb_bin = "duckdb"
+# # timeout_s = 120
+```

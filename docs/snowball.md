@@ -325,9 +325,10 @@ reports that flag, whether keys are present, and whether a backend answers.
 A missing OpenAlex key warns. A missing Semantic Scholar key does not, and neither missing key aborts the other backends.
 
 `email` at the top of `config.toml` is the contact address for Unpaywall and Crossref.
-OpenAlex ignores `mailto`. Snowball calls OpenAlex without an API key first, so a small search needs no account. That free allowance is shared by everyone on the same public address (a campus network or VPN exit included) and is about a tenth of a free key. When it runs out, a configured `OPENALEX_API_KEY` takes over for the rest of the crawl. With no key, the partial queue is kept and `paperful snowball resume` continues after you add one. One key only: a second free key or a `user+tag@gmail.com` alias does not add budget. A free key is about $1/day. Past that, OpenAlex sells [pay-as-you-go credit and subscriptions](https://openalex.org/pricing).
-
-Semantic Scholar’s Academic Graph is public, so snowball calls it with no key. That unauthenticated pool is shared and can be throttled. Heavier use needs a private key: [request one](https://www.semanticscholar.org/product/api#api-key-form) (it arrives by email; the introductory limit is 1 request per second). Put it in `SEMANTIC_SCHOLAR_API_KEY`. Like `OPENALEX_API_KEY`, it stays in the environment, never in `config.toml`.
+For heavy crawls, put a free `OPENALEX_API_KEY` in the environment (never in
+`config.toml`). Limits, resume after budget, Semantic Scholar keys, and an
+optional local or hosted OpenAlex parquet snapshot:
+[Advanced](#advanced).
 
 Each crawl writes `state/snowball/<run-id>/candidates.jsonl` as it goes, for every configured backend. A rate limit, outage, or interrupt keeps that file and, when OpenAlex stops the crawl, `deferred.json`. Continue with:
 
@@ -338,8 +339,6 @@ paperful snowball resume <run-id>
 If the queue is already complete and `deferred.json` is gone, the same command does not search again. With `--gate auto`, `-C`, and `--fetch-pdfs`, it creates any rows still missing from the library and fetches PDFs for keys that do not already have one.
 
 A keyword search that asks for more than 5,000 works follows OpenAlex's cursor instead of stopping at 50 pages.
-
-A list call that hits the daily budget of the key already in use stops the same way. The reset is midnight UTC, or sooner if you add [pay-as-you-go credit or a subscription](https://openalex.org/pricing) on that key.
 
 Short 429s and 5xx responses retry with exponential backoff. A reset of a minute or more does not keep polling until midnight.
 `snowball profile save` writes seeds and knobs only, after a successful
@@ -390,6 +389,44 @@ before any request. `mode` is `search`, `hybrid`, `doi`, `orcid`, or
 query strings and prints them. If `[llm]` is off, or the call fails, the crawl
 still finishes and `summary.json` records `suggestions_error`. Suggestions are
 not seeds.
+
+## Advanced
+
+Rate limits, API keys, and hosting a snapshot. Skip this for a small dry-run.
+
+### OpenAlex and Semantic Scholar keys
+
+OpenAlex ignores `mailto` for budget. Snowball calls OpenAlex without an API
+key first, so a small search needs no account. That free allowance is shared by
+everyone on the same public address (a campus network or VPN exit included) and
+is about a tenth of a free key. When it runs out, a configured
+`OPENALEX_API_KEY` takes over for the rest of the crawl. With no key, the
+partial queue is kept and `paperful snowball resume` continues after you add
+one. One key only: a second free key or a `user+tag@gmail.com` alias does not
+add budget. A free key is about $1/day. Past that, OpenAlex sells
+[pay-as-you-go credit and subscriptions](https://openalex.org/pricing).
+
+A list call that hits the daily budget of the key already in use stops the
+same way. The reset is midnight UTC, or sooner if you add credit on that key.
+
+Semantic Scholar’s Academic Graph is public, so snowball calls it with no key.
+That unauthenticated pool is shared and can be throttled. Heavier use needs a
+private key: [request one](https://www.semanticscholar.org/product/api#api-key-form)
+(it arrives by email; the introductory limit is 1 request per second). Put it
+in `SEMANTIC_SCHOLAR_API_KEY`. Like `OPENALEX_API_KEY`, it stays in the
+environment, never in `config.toml`.
+
+### OpenAlex parquet snapshot (optional)
+
+If API limits or shared-IP budgets are the bottleneck, download the
+[OpenAlex snapshot](https://help.openalex.org/access/snapshot/) yourself — on
+this machine or a host you control — and configure `[openalex_store]`. Paperful
+does not ship the dump. v1 queries via SSH + DuckDB on the data host and serves
+DOI / OpenAlex-id batches only; everything else still hits the live API.
+
+Setup and TOML: [config Advanced](config.md#openalex-api-limits-and-snapshot-store).
+Roadmap for cites/search parity and campus HTTP hosting:
+[ROADMAP](ROADMAP.md#snowball).
 
 ## Where the crawl comes from
 
@@ -445,4 +482,5 @@ BibTeX citekeys still make sense. Snowball does not depend on that plugin.
 - [ROADMAP](ROADMAP.md#snowball) — phases
 - [comparison](comparison.md) — paperscraper, findpapers, in-Zotero plugins
 - [config](config.md#run-configs-profiles) — profile precedence this lane reuses
+- [config Advanced](config.md#advanced) — fetch tuning and OpenAlex snapshot store
 - [commands](commands.md) — `run`, which `fetch_pdfs` calls

@@ -238,6 +238,22 @@ Still outside this lane: every paper by every cited author; a snowball step
 inside `paperful all`; a built-in scheduler; a review UI; systematic-review screening; a
 citation-graph canvas; Sci-Hub or Google Scholar as snowball sources.
 
+**OpenAlex snapshot store (opt-in).** Most installs use the live API only.
+Institutions (or a personal homeserver) may host an [OpenAlex parquet
+snapshot](https://help.openalex.org/access/snapshot/) and point
+`[openalex_store]` at it. Architecture: a `WorksStore` transport behind
+`OpenAlexClient` — not an entry in `snowball_backends`.
+
+- **v1 (shipped):** `ssh_duckdb` — DuckDB runs on the data host; Paperful SSHs
+  SQL and gets small JSON rows. Covers `work_by_doi` / `works_by_dois` /
+  `works_by_ids` with API fallback for misses. Docs:
+  [config Advanced](config.md#openalex-api-limits-and-snapshot-store),
+  [snowball Advanced](snowball.md#advanced).
+- **Next (2B):** `works_citing` plus text search (`cites-query`) from the
+  snapshot (likely an inverted cites index or careful scan strategy).
+- **Later (2C):** keyword / ORCID / `search` parity; `local_duckdb` and `http`
+  backends for campus hosting without SSH.
+
 ## Maybe later, not core
 
 Workbench layers beyond the mirror contract. Worth keeping on the map; not

@@ -3236,7 +3236,10 @@ def summarize(
     force: bool = typer.Option(
         False,
         "--force",
-        help="Summarize even when the gated PDF identity check flags the item.",
+        help=(
+            "Regenerate even when a summary already exists, and summarize when "
+            "the gated PDF identity check flags the item."
+        ),
     ),
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
@@ -3308,12 +3311,19 @@ def summarize(
         items = items[:limit]
     started = time.time()
 
-    def _finish(outcomes: list[dict], summarized: int, failed: int) -> None:
+    def _finish(
+        outcomes: list[dict], summarized: int, failed: int, skipped: int
+    ) -> None:
         write_command_report(
             cfg,
             command="summarize",
             scope=scope,
-            summary={"summarized": summarized, "failed": failed, "dest": dest},
+            summary={
+                "summarized": summarized,
+                "failed": failed,
+                "skipped": skipped,
+                "dest": dest,
+            },
             items=outcomes,
             flags={"to": dest},
             started=started,
@@ -3325,12 +3335,14 @@ def summarize(
                 console.print(f"[green]Wrote[/] {row.disk_path}")
             if row.note_key:
                 console.print(f"  attached note {row.note_key}")
+        elif row.status == "skipped":
+            console.print(f"[dim]{row.key}[/]: {row.reason}")
         elif not row.fatal:
             console.print(f"[yellow]{row.key}[/]: {row.reason}")
 
     if not items:
         console.print("[yellow]No items with PDFs in scope.[/]")
-        _finish([], 0, 0)
+        _finish([], 0, 0, 0)
         raise typer.Exit(0)
     batch = summarize_items(
         cfg, items, manifest, backend, dest=dest, force=force, on_row=_show
@@ -3344,12 +3356,17 @@ def summarize(
         }
         for row in batch.rows
     ]
-    _finish(outcomes, batch.summarized, batch.failed)
+    _finish(outcomes, batch.summarized, batch.failed, batch.skipped)
     if batch.fatal:
         console.print(f"[red]{batch.fatal}[/]")
         raise typer.Exit(1)
     where = cfg.summaries_dir if wants_disk(dest) else "Zotero"
     console.print(f"Summarized {batch.summarized}/{len(items)} items under {where}")
+    if batch.skipped:
+        console.print(
+            f"Skipped {batch.skipped} already summarized for this model "
+            "(pass --force to redo)."
+        )
     if dest == "disk":
         console.print("Zotero not written (dest=disk).")
     _flush(backend)

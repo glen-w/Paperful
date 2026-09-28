@@ -165,6 +165,13 @@ class Config:
     snowball_tag_prefix: str = "paperful-snowball"
     snowball_types: tuple[str, ...] = ()
     snowball_oa_only: bool = False
+    # Opt-in OpenAlex snapshot store (SSH+DuckDB v1). Empty backend = API only.
+    openalex_store_backend: str = ""  # ssh_duckdb | (later local_duckdb | http)
+    openalex_store_ssh_host: str = ""
+    openalex_store_ssh_user: str = ""
+    openalex_store_parquet_glob: str = ""
+    openalex_store_duckdb_bin: str = "duckdb"
+    openalex_store_timeout_s: float = 120.0
     snowball_venue_include: tuple[str, ...] = ()
     snowball_venue_exclude: tuple[str, ...] = ()
     snowball_languages: tuple[str, ...] = ()
@@ -662,6 +669,22 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
         if not lib.is_absolute():
             lib = (source.parent / lib).resolve()
         cfg.endnote_library = lib
+    store = raw.get("openalex_store")
+    if isinstance(store, dict):
+        if "backend" in store:
+            cfg.openalex_store_backend = str(store["backend"]).strip().lower()
+        if "ssh_host" in store:
+            cfg.openalex_store_ssh_host = str(store["ssh_host"]).strip()
+        if "ssh_user" in store:
+            cfg.openalex_store_ssh_user = str(store["ssh_user"]).strip()
+        if "parquet_glob" in store:
+            cfg.openalex_store_parquet_glob = str(store["parquet_glob"]).strip()
+        if "duckdb_bin" in store:
+            cfg.openalex_store_duckdb_bin = (
+                str(store["duckdb_bin"]).strip() or "duckdb"
+            )
+        if "timeout_s" in store:
+            cfg.openalex_store_timeout_s = max(1.0, float(store["timeout_s"]))
     cfg.summarize_prompt_template = _resolve_prompt_path(
         cfg.summarize_prompt_template, source
     )
