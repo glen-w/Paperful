@@ -254,6 +254,7 @@ class Pipeline:
         try_all: bool | None = None,
         use_browser: bool = True,
         strict_pdf_doi: bool = False,
+        on_ezproxy_down: Callable[[], bool] | None = None,
     ):
         self.cfg = cfg
         self.manifest = manifest
@@ -263,6 +264,7 @@ class Pipeline:
         self.attacher = attacher
         self.strict_pdf_doi = strict_pdf_doi
         self.progress = progress or (lambda: None)
+        self.on_ezproxy_down = on_ezproxy_down
         self._use_browser = use_browser
         self.client = make_client(cfg)
         self.browser = BrowserSession(cfg) if use_browser else None
@@ -271,6 +273,7 @@ class Pipeline:
         self.stats.sources_configured = list(self.sources)
         self._circuit = CircuitBreaker(cfg.circuit_breaker_threshold)
         self._ezproxy_down = False
+        self._ezproxy_down_offered = False
         self._browser_agent_down = False
         self._blocked_hosts: set[str] = set()
         self._vault_sso_misses = 0
@@ -302,10 +305,13 @@ class Pipeline:
         self._circuit.reset()
         self._blocked_hosts.clear()
         self._vault_sso_misses = 0
+        self._ezproxy_down_offered = False
         try:
             for start in range(0, total, batch_size):
                 if self._stop.is_set():
                     break
+                if start > 0:
+                    self._maybe_offer_ezproxy_relogin()
                 batch = items[start : start + batch_size]
                 if total > batch_size:
                     self._emit(
@@ -318,6 +324,21 @@ class Pipeline:
                 self.browser.close()
         self.stats.finished_at = time.time()
         return self.stats
+
+    def _maybe_offer_ezproxy_relogin(self) -> None:
+        """Once per run, at a batch boundary, offer mid-run EZProxy recovery."""
+        if not self._ezproxy_down or self.on_ezproxy_down is None:
+            return
+        if self._ezproxy_down_offered:
+            return
+        self._ezproxy_down_offered = True
+        try:
+            self.on_ezproxy_down()
+        except Exception as exc:
+            self._emit(
+                f"[yellow]EZProxy re-login failed ({escape(type(exc).__name__)}).[/] "
+                "Remaining proxy attempts stay skipped."
+            )
 
     def refresh_session(self) -> None:
         """New HTTP client and vault browser after a headed re-login.

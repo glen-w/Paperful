@@ -59,11 +59,11 @@ Items every applicable source misses are `not_found` with reason `closed`
 (skipped next run unless `--retry-failed`). Items that missed a lane because
 the circuit was paused, or because the EZProxy session expired, are
 `retryable` and are picked up on the next `run` without that flag. An expired
-campus session stops further EZProxy calls for the rest of that pass. On a
-terminal, `run` pauses after the fetch (`ezproxy_relogin`, default on) so you
-can log in and retry only those items. That login browser is closed before
-the report, and before `--handoff` opens tabs in your normal browser.
-`--no-ezproxy-relogin` skips the pause.
+campus session skips further EZProxy wraps; on a TTY, `run` offers re-login at
+the next batch boundary and again after the fetch (`ezproxy_relogin`, default
+on) so you can log in and retry only those items. That login browser is closed
+before the report, and before `--handoff` opens tabs in your normal browser.
+`--no-ezproxy-relogin` skips the pauses.
 
 When an OA or `direct` lane **finds** a PDF URL but httpx gets an empty or
 non-PDF body (soft bot-gate — common on some publisher `downloadpdf` links),

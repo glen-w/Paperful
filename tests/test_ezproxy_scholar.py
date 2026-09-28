@@ -120,6 +120,108 @@ def test_ezproxy_finds_pdf_via_proxy(ctx_factory, cfg, tmp_path):
     assert "pdfft" in cand.url
 
 
+def test_ezproxy_session_ok_httpx(ctx_factory, cfg, tmp_path):
+    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cookie_file = tmp_path / "ezproxy-cookies.txt"
+    cookie_file.write_text(".scpo.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n")
+    cfg.ezproxy_cookies = cookie_file
+
+    def handler(req):
+        return httpx.Response(
+            200,
+            text="<html>publisher</html>",
+            request=httpx.Request(
+                "GET",
+                "https://www-nature-com.scpo.idm.oclc.org/articles/nature",
+            ),
+        )
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    apply_netscape_cookies(client, cookie_file)
+    ctx = ctx_factory(handler)
+    ctx.client = client
+    ctx.config = cfg
+    ok, detail = ezproxy.session_ok(ctx)
+    assert ok and "ok" in detail
+
+
+def test_ezproxy_session_ok_httpx_cas_bounce(ctx_factory, cfg, tmp_path):
+    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cookie_file = tmp_path / "ezproxy-cookies.txt"
+    cookie_file.write_text(".scpo.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n")
+    cfg.ezproxy_cookies = cookie_file
+
+    def handler(req):
+        return httpx.Response(
+            200,
+            text="<html>Central Authentication Service</html>",
+            request=httpx.Request("GET", "https://federation.sciences-po.fr/cas/login"),
+        )
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    apply_netscape_cookies(client, cookie_file)
+    ctx = ctx_factory(handler)
+    ctx.client = client
+    ctx.config = cfg
+    ok, detail = ezproxy.session_ok(ctx)
+    assert not ok
+    assert "session expired" in detail
+
+
+def test_ezproxy_session_ok_prefers_browser(ctx_factory, cfg, tmp_path):
+    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cookie_file = tmp_path / "ezproxy-cookies.txt"
+    cookie_file.write_text(".scpo.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n")
+    cfg.ezproxy_cookies = cookie_file
+
+    class LoginBrowser:
+        def available(self) -> bool:
+            return True
+
+        def fetch_html(self, url, timeout_ms=45_000):
+            return (
+                "<html>Central Authentication Service</html>",
+                "https://federation.sciences-po.fr/cas/login",
+            )
+
+    ctx = ctx_factory(
+        lambda r: httpx.Response(
+            200,
+            text="<html>would look ok to httpx</html>",
+            request=httpx.Request(
+                "GET", "https://www-nature-com.scpo.idm.oclc.org/articles/nature"
+            ),
+        )
+    )
+    ctx.browser = LoginBrowser()
+    ok, detail = ezproxy.session_ok(ctx)
+    assert not ok
+    assert "session expired" in detail
+
+
+def test_ezproxy_session_ok_browser_pass(ctx_factory, cfg, tmp_path):
+    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    (tmp_path / "sessions").mkdir(parents=True, exist_ok=True)
+    cookie_file = tmp_path / "ezproxy-cookies.txt"
+    cookie_file.write_text(".scpo.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n")
+    cfg.ezproxy_cookies = cookie_file
+
+    class OkBrowser:
+        def available(self) -> bool:
+            return True
+
+        def fetch_html(self, url, timeout_ms=45_000):
+            return (
+                "<html>article</html>",
+                "https://www-nature-com.scpo.idm.oclc.org/articles/nature",
+            )
+
+    ctx = ctx_factory(lambda r: httpx.Response(500))
+    ctx.browser = OkBrowser()
+    ok, detail = ezproxy.session_ok(ctx)
+    assert ok and "browser" in detail
+
+
 def test_ezproxy_session_expired(ctx_factory, cfg, tmp_path):
     cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
     cookie_file = tmp_path / "c.txt"

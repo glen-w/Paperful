@@ -6,6 +6,11 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+`doctor --probe` hits Scholar / EZProxy `session_ok` (vault Chromium when
+available) and ambers when cookie files exist but campus CAS or a captcha
+still blocks. Default `doctor` stays file-presence only. The same vault-faithful
+probe runs before batch 1 of `run` when `ezproxy` is in sources.
+
 One-page PDFs are gated by text density (`gate_short_pdfs`, default on). Sparse
 stubs (few words — ethics/consent forms) soft-reject so later sources can still
 run. Denser one-pagers (letters, short comments) save to `out/` with reason
@@ -35,7 +40,7 @@ A `javascript:void(0)` (or other non-http) PDF link is a failed download for tha
 
 The run summary counts items that did not yield a PDF by reason — captcha, cloudflare, paywall, and a plain not-found — one reason per item. When the browser agent reads a publisher price on an unsaved article, that price is logged on the item and the summary totals it (`€79.90 for 2 articles`).
 
-Long PDF runs pause a blocked source instead of dropping it for the rest of the process, and a 429 does not open that circuit. An expired EZProxy session stops the proxy lane for the run; those items are `retryable` on the next `run`. A miss from every source stays `not_found` with reason `closed`. Europe PMC tries the PMC render URL when a PMCID is present. OpenAIRE is a DOI source for repository copies. A preprint that misses open access is tried once against its published DOI, without changing the library DOI.
+Long PDF runs pause a blocked source instead of dropping it for the rest of the process, and a 429 does not open that circuit. When EZProxy is configured, `run` probes the vault before batch 1. An expired campus session skips further proxy wraps; on a TTY, `run` offers re-login at the next batch boundary and again after the fetch (`ezproxy_relogin`) for items left `retryable` / `session expired`. A miss from every source stays `not_found` with reason `closed`. Europe PMC tries the PMC render URL when a PMCID is present. OpenAIRE is a DOI source for repository copies. A preprint that misses open access is tried once against its published DOI, without changing the library DOI.
 
 `snowball --direction similar` adds one ranked hop: works that share the seed's references, then Semantic Scholar recommendations. A saved queue with no `deferred.json` resumes into create and PDF fetch without searching OpenAlex again.
 

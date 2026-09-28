@@ -8,6 +8,7 @@ import sys
 import time
 from enum import Enum
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 import typer
@@ -748,11 +749,11 @@ def version() -> None:
     console.print(__version__)
 
 
-def _collect_doctor_checks(cfg: Config) -> list[Check]:
+def _collect_doctor_checks(cfg: Config, *, probe: bool = False) -> list[Check]:
     try:
-        return run_checks(cfg, ZoteroLocal())
+        return run_checks(cfg, ZoteroLocal(), probe=probe)
     except Exception:
-        return run_checks(cfg, None)
+        return run_checks(cfg, None, probe=probe)
 
 
 def _print_doctor_table(checks: list[Check]) -> None:
@@ -779,7 +780,9 @@ def _wait_doctor_continue() -> bool:
         return False
 
 
-def _guide_doctor(cfg: Config, checks: list[Check]) -> list[Check]:
+def _guide_doctor(
+    cfg: Config, checks: list[Check], *, probe: bool = False
+) -> list[Check]:
     """Walk amber/red remediations interactively; re-check after each step."""
     docker = in_docker()
     pending = actionable_checks(checks, cfg, docker=docker)
@@ -794,7 +797,7 @@ def _guide_doctor(cfg: Config, checks: list[Check]) -> list[Check]:
     )
     for check, _text in pending:
         name = check.name
-        checks = _collect_doctor_checks(cfg)
+        checks = _collect_doctor_checks(cfg, probe=probe)
         current = next((c for c in checks if c.name == name), None)
         if current is None or current.status == "green":
             if current is not None:
@@ -811,7 +814,7 @@ def _guide_doctor(cfg: Config, checks: list[Check]) -> list[Check]:
             break
         # Reload config so email / path edits are picked up mid-guide.
         cfg = _cfg(cfg.config_path)
-        checks = _collect_doctor_checks(cfg)
+        checks = _collect_doctor_checks(cfg, probe=probe)
         updated = next((c for c in checks if c.name == name), None)
         if updated is None:
             continue
@@ -833,13 +836,18 @@ def doctor(
         "--guide/--no-guide",
         help="Walk through amber/red fixes interactively (default: on when stdin is a TTY)",
     ),
+    probe: bool = typer.Option(
+        False,
+        "--probe/--no-probe",
+        help="Hit Scholar / EZProxy session_ok (network); amber when files exist but CAS/captcha",
+    ),
     as_json: bool = typer.Option(
         False, "--json", help="Print checks as JSON (name, status, code, detail)."
     ),
 ) -> None:
     """Check Zotero, paths, email, and optional browser sessions (green / amber / red)."""
     cfg = _cfg(config)
-    checks = _collect_doctor_checks(cfg)
+    checks = _collect_doctor_checks(cfg, probe=probe)
     if as_json:
         payload = [
             {
@@ -863,7 +871,7 @@ def doctor(
     else:
         want_guide = guide
     if want_guide and actionable:
-        checks = _guide_doctor(cfg, checks)
+        checks = _guide_doctor(cfg, checks, probe=probe)
     elif actionable and not want_guide:
         console.print(
             "\n[dim]Amber/red fixes available — re-run with[/] "
@@ -2309,19 +2317,21 @@ def run(
             _mirror_deferred(cfg)
         return
 
+    pipe = Pipeline(
+        cfg,
+        manifest,
+        console,
+        sources=source_list,
+        attacher=attacher,
+        try_all=True if try_all else None,
+        strict_pdf_doi=bool(strict_pdf_doi),
+    )
+    pipe.on_ezproxy_down = _mid_run_ezproxy_hook(cfg, pipe, enabled=relogin)
+    _preflight_ezproxy_session(cfg, pipe, source_list, enabled=relogin)
+    interrupted = False
     with _item_progress() as progress:
         task_id = progress.add_task("Fetching PDFs", total=len(todo))
-        pipe = Pipeline(
-            cfg,
-            manifest,
-            console,
-            sources=source_list,
-            attacher=attacher,
-            progress=lambda: progress.advance(task_id),
-            try_all=True if try_all else None,
-            strict_pdf_doi=bool(strict_pdf_doi),
-        )
-        interrupted = False
+        pipe.progress = lambda: progress.advance(task_id)
         try:
             stats = pipe.run(todo)
         except KeyboardInterrupt:
@@ -2381,6 +2391,105 @@ def _stdin_is_tty() -> bool:
     return sys.stdin.isatty()
 
 
+def _ezproxy_headed_login_and_probe(cfg: Config, pipe: Pipeline) -> bool:
+    """Open headed EZProxy login, refresh the vault, and probe. True when ready."""
+    from . import session as sess
+    from .sources import ezproxy as ez
+
+    console.print("Opening a browser to refresh the EZProxy session.")
+    try:
+        sess.login_headed(
+            cfg,
+            "ezproxy",
+            confirm=_confirm_session_login,
+            on_note=lambda msg: console.print(f"[dim]{msg}[/]"),
+        )
+    except sess.SessionError as exc:
+        console.print(f"[red]{exc}[/]")
+        console.print("Run [bold]paperful session login ezproxy[/] and retry.")
+        return False
+    pipe.refresh_session()
+    ok, detail = ez.session_ok(pipe.ctx)
+    if not ok:
+        console.print(
+            f"[yellow]EZProxy session still not ready ({detail}).[/] "
+            "Run [bold]paperful session login ezproxy[/] and retry."
+        )
+        if pipe.browser is not None:
+            pipe.browser.close()
+        return False
+    console.print("[green]EZProxy session ready.[/]")
+    return True
+
+
+def _ensure_ezproxy_session(
+    cfg: Config,
+    pipe: Pipeline,
+    *,
+    enabled: bool,
+    prompt: str,
+) -> bool:
+    """Prompt for headed re-login and verify session_ok. Returns True if ready."""
+    if not enabled or not _stdin_is_tty():
+        return False
+    try:
+        answer = console.input(prompt).strip().lower()
+    except EOFError:
+        return False
+    if answer not in {"", "y", "yes"}:
+        console.print("[yellow]Skipping EZProxy re-login.[/]")
+        return False
+    return _ezproxy_headed_login_and_probe(cfg, pipe)
+
+
+def _preflight_ezproxy_session(
+    cfg: Config,
+    pipe: Pipeline,
+    source_list: list[str],
+    *,
+    enabled: bool,
+) -> None:
+    """Probe EZProxy before batch 1; offer login or skip wraps for this pass."""
+    if "ezproxy" not in source_list or not cfg.ezproxy_base:
+        return
+    from .sources import ezproxy as ez
+
+    ok, detail = ez.session_ok(pipe.ctx)
+    if ok:
+        return
+    console.print(f"[yellow]EZProxy session not ready ({detail}).[/]")
+    if _ensure_ezproxy_session(
+        cfg,
+        pipe,
+        enabled=enabled,
+        prompt="EZProxy session not ready — log in now? [Y/n] ",
+    ):
+        return
+    pipe._ezproxy_down = True
+    console.print(
+        "[yellow]Continuing without EZProxy wraps for this pass.[/] "
+        "Remaining proxy attempts will be skipped."
+    )
+
+
+def _mid_run_ezproxy_hook(
+    cfg: Config, pipe: Pipeline, *, enabled: bool
+) -> Callable[[], bool] | None:
+    """Return a Pipeline.on_ezproxy_down callback, or None when mid-run pause is off."""
+    if not enabled:
+        return None
+
+    def bound() -> bool:
+        return _ensure_ezproxy_session(
+            cfg,
+            pipe,
+            enabled=enabled,
+            prompt="EZProxy session expired mid-run — re-login and continue? [Y/n] ",
+        )
+
+    return bound
+
+
 def _maybe_ezproxy_relogin(
     cfg: Config,
     pipe: Pipeline,
@@ -2402,41 +2511,14 @@ def _maybe_ezproxy_relogin(
     if not retry:
         return
     n = len(retry)
-    try:
-        answer = console.input(
-            f"Re-login and retry {n} EZProxy item(s)? [Y/n] "
-        ).strip().lower()
-    except EOFError:
+    if not _ensure_ezproxy_session(
+        cfg,
+        pipe,
+        enabled=True,
+        prompt=f"Re-login and retry {n} EZProxy item(s)? [Y/n] ",
+    ):
         return
-    if answer not in {"", "y", "yes"}:
-        console.print("[yellow]Skipping EZProxy re-login.[/]")
-        return
-    from . import session as sess
-    from .sources import ezproxy as ez
-
-    console.print("Opening a browser to refresh the EZProxy session.")
-    try:
-        sess.login_headed(
-            cfg,
-            "ezproxy",
-            confirm=_confirm_session_login,
-            on_note=lambda msg: console.print(f"[dim]{msg}[/]"),
-        )
-    except sess.SessionError as exc:
-        console.print(f"[red]{exc}[/]")
-        console.print("Run [bold]paperful session login ezproxy[/] and retry.")
-        return
-    pipe.refresh_session()
-    ok, detail = ez.session_ok(pipe.ctx)
-    if not ok:
-        console.print(
-            f"[yellow]EZProxy session still not ready ({detail}).[/] "
-            "Run [bold]paperful session login ezproxy[/] and retry."
-        )
-        if pipe.browser is not None:
-            pipe.browser.close()
-        return
-    console.print(f"[green]EZProxy session ready.[/] Retrying {n} item(s).")
+    console.print(f"Retrying {n} item(s).")
     saved_sources = list(pipe.sources)
     saved_progress = pipe.progress
     pipe.sources = ["ezproxy"]

@@ -19,8 +19,14 @@ uv run paperful session login scholar --engine chrome      # force system Chrome
 uv run paperful session login scholar --engine playwright  # Playwright window
 uv run paperful session status
 uv run paperful session status --probe  # optional Scholar / EZProxy session_ok
+uv run paperful doctor --probe          # same live check inside doctor
 uv run paperful session export          # refresh Netscape dumps for httpx
 ```
+
+`session_ok` prefers the vault Chromium profile (the same path as Unpaywall
+browser wraps) and falls back to httpx + Netscape cookies. File presence in
+`doctor` without `--probe` only means a login was saved, not that campus SSO
+is still live.
 
 Scholar fetches during `run` reuse this Chromium profile when it exists (Google
 often keys CAPTCHA to the browser, not cookies). htmlpdf uses the same profile
@@ -70,5 +76,6 @@ When Scholar is blocked mid-run you will see `scholar blocked/captcha`. After
 `circuit_breaker_threshold` (default 3) it pauses, then one later item is
 tried again. A 429 does not pause it. Items left `captcha` / `error` /
 `retryable` are retried on the next run; `not_found` (reason `closed`) needs
-`--retry-failed`. An expired EZProxy session stops the proxy lane for the
-rest of that run.
+`--retry-failed`. An expired EZProxy session pauses proxy wraps; on a TTY
+`run` offers re-login at the next batch boundary and again after the fetch for
+items left `session expired`.

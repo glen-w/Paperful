@@ -77,10 +77,11 @@ item. A clean result opens the source again.
 
 Items missed because a source was paused, or because the campus session
 expired, are picked up on the next `run`. Items every applicable source
-missed stay closed until you ask to retry them. An expired EZProxy session
-stops further proxy calls for the rest of that pass. On a terminal, `run`
-then pauses so you can log in again and retry those items
-(`ezproxy_relogin`, default on; `--no-ezproxy-relogin` skips the pause).
+missed stay closed until you ask to retry them. When `ezproxy` is configured,
+`run` probes the vault before batch 1. An expired session skips further proxy
+wraps; on a terminal, `run` offers re-login at the next batch boundary and
+again after the fetch for items left `session expired` (`ezproxy_relogin`,
+default on; `--no-ezproxy-relogin` skips the pauses).
 
 The knobs and error names: [Source routing](sources.md).
 
@@ -89,7 +90,9 @@ The knobs and error names: [Source routing](sources.md).
 The tool never asks for or stores your institutional password. You log in
 once in a headed browser (`paperful session login ezproxy` or `scholar` on
 the host). `run` reuses that login until the campus session expires —
-typically hours to a few days. When a publisher page is HTML, the same
+typically hours to a few days. Confirm it is still live with
+`paperful doctor --probe` or `paperful session status --probe` (file presence
+alone is not enough). When a publisher page is HTML, the same
 browser follows the PDF link or download control before giving up. Scholar
 fetches use the same browser profile, because Google often keys a CAPTCHA
 to the browser, not just cookies.

@@ -648,6 +648,76 @@ def test_run_ezproxy_relogin_skips_second_pass_when_probe_fails(
     assert "still not ready" in res.stdout
 
 
+def test_run_ezproxy_preflight_marks_down_when_probe_fails(
+    cfg_file, stub_zotero, monkeypatch
+):
+    _stub_one_item(stub_zotero)
+    cfg_file.write_text(
+        cfg_file.read_text()
+        + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
+    )
+    seen: list[bool] = []
+
+    def fake_run(self, items, batch_size=40):
+        seen.append(self._ezproxy_down)
+        from paperful.pipeline import RunStats
+
+        self.stats = RunStats()
+        self.stats.finished_at = self.stats.started_at
+        return self.stats
+
+    monkeypatch.setattr(cli.Pipeline, "run", fake_run)
+    monkeypatch.setattr(cli, "_stdin_is_tty", lambda: False)
+    monkeypatch.setattr(
+        "paperful.sources.ezproxy.session_ok",
+        lambda ctx: (False, "session expired or not logged in"),
+    )
+    res = runner.invoke(
+        cli.app,
+        ["run", "-c", str(cfg_file), "-C", "BBNJ", "--no-browser-agent"],
+    )
+    assert res.exit_code == 0, res.stdout
+    assert seen == [True]
+    assert "without EZProxy wraps" in res.stdout
+
+
+def test_run_ezproxy_preflight_login_on_tty(cfg_file, stub_zotero, monkeypatch):
+    _stub_one_item(stub_zotero)
+    cfg_file.write_text(
+        cfg_file.read_text()
+        + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
+    )
+    logins: list[str] = []
+    probes = iter([(False, "expired"), (True, "ok")])
+
+    def fake_run(self, items, batch_size=40):
+        from paperful.pipeline import RunStats
+
+        assert self._ezproxy_down is False
+        self.stats = RunStats()
+        self.stats.finished_at = self.stats.started_at
+        return self.stats
+
+    monkeypatch.setattr(cli.Pipeline, "run", fake_run)
+    monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
+    monkeypatch.setattr(
+        "paperful.session.login_headed",
+        lambda cfg, slot, **kwargs: logins.append(slot) or [],
+    )
+    monkeypatch.setattr(
+        "paperful.sources.ezproxy.session_ok",
+        lambda ctx: next(probes),
+    )
+    res = runner.invoke(
+        cli.app,
+        ["run", "-c", str(cfg_file), "-C", "BBNJ", "--no-browser-agent"],
+        input="\n",
+    )
+    assert res.exit_code == 0, res.stdout
+    assert logins == ["ezproxy"]
+    assert "EZProxy session ready" in res.stdout
+
+
 def test_run_skips_already_handled_items(cfg_file, stub_zotero, tmp_path):
     from tests.conftest import make_item
 
@@ -816,6 +886,53 @@ def test_doctor_ok(cfg_file, stub_zotero):
     assert "Playwright" in res.stdout
     assert "Grey playbooks" in res.stdout
     assert "UNGA/undocs" in res.stdout
+
+
+def test_doctor_probe_ambers_expired_ezproxy(
+    cfg_file, tmp_path, stub_zotero, monkeypatch
+):
+    cfg_file.write_text(
+        cfg_file.read_text()
+        + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
+    )
+    meta = tmp_path / "state" / "sessions" / "meta.json"
+    meta.parent.mkdir(parents=True)
+    meta.write_text('{"slots":{"ezproxy":{"logged_in_at":1}}}')
+    monkeypatch.setattr(
+        "paperful.sources.ezproxy.session_ok",
+        lambda ctx: (False, "session expired or not logged in"),
+    )
+    res = runner.invoke(
+        cli.app, ["doctor", "-c", str(cfg_file), "--probe", "--no-guide"]
+    )
+    assert res.exit_code == 0, res.stdout
+    assert "EZProxy session" in res.stdout
+    assert "expired" in res.stdout
+    assert "amber" in res.stdout
+
+
+def test_doctor_probe_keeps_file_green_without_flag(
+    cfg_file, tmp_path, stub_zotero, monkeypatch
+):
+    cfg_file.write_text(
+        cfg_file.read_text()
+        + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
+    )
+    meta = tmp_path / "state" / "sessions" / "meta.json"
+    meta.parent.mkdir(parents=True)
+    meta.write_text('{"slots":{"ezproxy":{"logged_in_at":1}}}')
+    called = []
+
+    def boom(ctx):
+        called.append(1)
+        return False, "should not run"
+
+    monkeypatch.setattr("paperful.sources.ezproxy.session_ok", boom)
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--no-guide"])
+    assert res.exit_code == 0, res.stdout
+    assert called == []
+    assert "EZProxy session" in res.stdout
+    assert "green" in res.stdout
 
 
 def test_doctor_scholar_not_in_default_sources(cfg_file, stub_zotero):

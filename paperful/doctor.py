@@ -253,8 +253,76 @@ def _writable(path: Path) -> bool:
         return False
 
 
+def _probe_ezproxy_session_check(cfg: Config, where: str) -> Check:
+    """Live EZProxy probe for doctor --probe (files already present)."""
+    from .pipeline import make_client
+    from .session import BrowserSession
+    from .sources import ezproxy as ez
+    from .sources.base import Context
+
+    browser = BrowserSession(cfg)
+    client = make_client(cfg)
+    try:
+        ok, detail = ez.session_ok(
+            Context(config=cfg, client=client, browser=browser)
+        )
+    finally:
+        try:
+            client.close()
+        except Exception:
+            pass
+        try:
+            browser.close()
+        except Exception:
+            pass
+    if ok:
+        return Check("EZProxy session", "green", detail)
+    return Check(
+        "EZProxy session",
+        "amber",
+        f"expired — {detail} ({where})",
+        code="ezproxy_expired",
+    )
+
+
+def _probe_scholar_session_check(cfg: Config, where: str) -> Check:
+    """Live Scholar probe for doctor --probe (files already present)."""
+    from .pipeline import make_client
+    from .session import BrowserSession
+    from .sources import scholar as gs
+    from .sources.base import Context
+
+    browser = BrowserSession(cfg)
+    client = make_client(cfg)
+    try:
+        ok, detail = gs.session_ok(
+            Context(config=cfg, client=client, browser=browser)
+        )
+    finally:
+        try:
+            client.close()
+        except Exception:
+            pass
+        try:
+            browser.close()
+        except Exception:
+            pass
+    if ok:
+        return Check("Scholar session", "green", detail)
+    return Check(
+        "Scholar session",
+        "amber",
+        f"expired — {detail} ({where})",
+        code="scholar_expired",
+    )
+
+
 def run_checks(
-    cfg: Config, zl: ZoteroLocal | None, ping: Callable[[], dict] | None = None
+    cfg: Config,
+    zl: ZoteroLocal | None,
+    ping: Callable[[], dict] | None = None,
+    *,
+    probe: bool = False,
 ) -> list[Check]:
     checks: list[Check] = []
     info: dict | None = None
@@ -349,13 +417,17 @@ def run_checks(
             where = str(
                 meta if meta.is_file() else (vault if vault.is_file() else cookie_path)
             )
-            checks.append(Check("EZProxy session", "green", where))
+            if probe:
+                checks.append(_probe_ezproxy_session_check(cfg, where))
+            else:
+                checks.append(Check("EZProxy session", "green", where))
         else:
             checks.append(
                 Check(
                     "EZProxy session",
                     "amber",
                     f"missing — run: paperful session login ezproxy ({cookie_path})",
+                    code="ezproxy_missing",
                 )
             )
     else:
@@ -367,13 +439,17 @@ def run_checks(
             where = str(
                 meta if meta.is_file() else (vault if vault.is_file() else scholar_path)
             )
-            checks.append(Check("Scholar session", "green", where))
+            if probe:
+                checks.append(_probe_scholar_session_check(cfg, where))
+            else:
+                checks.append(Check("Scholar session", "green", where))
         else:
             checks.append(
                 Check(
                     "Scholar session",
                     "amber",
                     f"missing — run: paperful session login scholar ({scholar_path})",
+                    code="scholar_missing",
                 )
             )
     else:

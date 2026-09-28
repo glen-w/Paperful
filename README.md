@@ -142,9 +142,10 @@ Optional (seeking testers): Mendeley via REST — register an app, then
 EndNote desktop — set `[endnote].library` to the `.enl`. Writes are an import
 bundle. [EndNote](docs/endnote.md).
 
-If you use campus EZProxy, finish [Campus EZProxy](docs/ezproxy.md) before a
-big run. If you keep `scholar` in `sources`, log in once on the host with
-`paperful session login scholar` — see [Browser sessions](docs/sessions.md).
+If you use campus EZProxy, finish [Campus EZProxy](docs/ezproxy.md) and confirm
+with `paperful doctor --probe` before a big run. If you keep `scholar` in
+`sources`, log in once on the host with `paperful session login scholar` — see
+[Browser sessions](docs/sessions.md).
 
 Flags `--year-from` / `--year-to` and `--type` / `-T` also work on `lint`,
 `fix-metadata`, `dedupe`, `attachments`, `gaps`, `summarize`, `synthesize`, `snapshot`, and

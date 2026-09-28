@@ -139,8 +139,15 @@ def _ensure_proxied(pdf_url: str, ezproxy_base: str, landing_url: str) -> str:
     return proxify(pdf_url, ezproxy_base)
 
 
+_PROBE_DOI = "https://doi.org/10.1038/nature"
+
+
 def session_ok(ctx: Context) -> tuple[bool, str]:
-    """Cheap check: hit the proxy login URL and see if we bounce to CAS."""
+    """Check that an EZProxy wrap does not bounce to campus CAS.
+
+    Prefers the vault Chromium profile when ``ctx.browser`` is available (same
+    path as Unpaywall browser wraps). Falls back to httpx + Netscape cookies.
+    """
     if not ctx.config.ezproxy_base:
         return False, "ezproxy_base not set"
     from ..session import profile_ready, vault_cookies_path
@@ -152,7 +159,16 @@ def session_ok(ctx: Context) -> tuple[bool, str]:
         and not profile_ready(ctx.config)
     ):
         return False, f"cookie file missing ({cookie_path})"
-    probe = proxify("https://doi.org/10.1038/nature", ctx.config.ezproxy_base)
+    probe = proxify(_PROBE_DOI, ctx.config.ezproxy_base)
+    use_browser = ctx.browser is not None and ctx.browser.available()
+    if use_browser:
+        try:
+            html, final = ctx.browser.fetch_html(probe, timeout_ms=30_000)
+        except Exception as exc:
+            return False, f"browser probe failed ({type(exc).__name__})"
+        if looks_like_login_page(final, html):
+            return False, "session expired or not logged in (CAS/login page)"
+        return True, f"ok (browser → {urlparse(final).netloc})"
     try:
         resp = ctx.client.get(probe, timeout=30)
     except httpx.HTTPError as exc:

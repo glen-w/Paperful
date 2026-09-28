@@ -53,7 +53,8 @@ sources = ["unpaywall", "openalex", "arxiv", "biorxiv", "europepmc", "semanticsc
 #   uv run paperful session login ezproxy
 # Never put your password here. Campus acceptable use: docs/research-ops.md.
 ezproxy_base = ""
-# Pause at the end of `run` when the campus session expires, then retry those items.
+# Pause on a TTY when the campus session is dead: before batch 1, at the next
+# batch boundary mid-run, and after the fetch (retry session-expired items).
 # ezproxy_relogin = true
 # ezproxy_cookies = "state/ezproxy-cookies.txt"  # compat dump after session login
 # scholar_cookies = "state/scholar-cookies.txt"   # compat dump; prefer session login scholar

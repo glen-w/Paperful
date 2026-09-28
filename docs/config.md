@@ -32,6 +32,7 @@ and [architecture](architecture.md).
 | `verify_doi` | `true` | Check library DOIs against Crossref/OpenAlex before fetching; may swap DOI **in memory** for that run. `false` leaves an existing DOI as `doi_verified=unknown` and does not swap |
 | `core_api_key` | `""` | CORE API bearer token; empty skips the `core` source |
 | `ezproxy_base` | `""` (disabled) | Campus proxy prefix ending in `url=` — see [Campus EZProxy](ezproxy.md) |
+| `ezproxy_relogin` | `true` | On a TTY, prompt to re-login before batch 1 (failed probe), at the next batch boundary mid-run, and after the fetch for session-expired items. `--no-ezproxy-relogin` skips |
 | `ezproxy_cookies` | `state/ezproxy-cookies.txt` | Compat Netscape dump after `session login ezproxy` |
 | `scholar_cookies` | `state/scholar-cookies.txt` | Compat Netscape dump after `session login scholar` |
 | `grey_playbooks_builtin` | `true` | Load the packaged ocean/governance example pack |

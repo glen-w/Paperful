@@ -128,7 +128,7 @@ flowchart LR
 
 ## Circuit breaker
 
-Open-access sources run in parallel (`concurrency_oa`). Captcha and block pages increment a per-source counter; after `circuit_breaker_threshold` the source pauses, then one later item is probed. A 429 does not open the circuit. Scholar, Sci-Hub, EZProxy, and HTML→PDF stay serial (they share one Chromium profile lock). An expired EZProxy session stops further proxy calls for that pass; those items are `retryable`. On a TTY, `run` then pauses (`ezproxy_relogin`, default on) to re-login and retry only those items. Publisher PDF URLs that 403 on httpx are retried in that profile (EZProxy-wrapped when configured). Direct PDF URLs are tried before landing pages.
+Open-access sources run in parallel (`concurrency_oa`). Captcha and block pages increment a per-source counter; after `circuit_breaker_threshold` the source pauses, then one later item is probed. A 429 does not open the circuit. Scholar, Sci-Hub, EZProxy, and HTML→PDF stay serial (they share one Chromium profile lock). `run` probes EZProxy before batch 1 when configured. An expired session skips further proxy wraps; on a TTY, `run` offers re-login at the next batch boundary and again after the fetch (`ezproxy_relogin`, default on) to retry session-expired items. Publisher PDF URLs that 403 on httpx are retried in that profile (EZProxy-wrapped when configured). Direct PDF URLs are tried before landing pages.
 
 ## Sci-Hub and presets
 
@@ -162,12 +162,13 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
 ## Operator tooling
 
 - `paperful doctor` — preflight. Colours: **green** = ready; **amber** = usable with
-  a degraded path (empty email, missing session, no `pdftotext`, Playwright /
-  Chromium not ready, Zotero 7–9 write API, incomplete grey-lit pack); **red** on
-  `Zotero :23119` / `out_dir` / `state_dir` is fatal (`doctor` and any command that
-  needs Zotero). Reports grey-lit packs (UNGA/undocs · BBNJ/DOALOS · ISA) when
-  builtin is on. On a TTY, walks amber/red remediations (`--guide` / `--no-guide`).
-  See [commands](commands.md#doctor).
+  a degraded path (empty email, missing session, expired session when `--probe`,
+  no `pdftotext`, Playwright / Chromium not ready, Zotero 7–9 write API,
+  incomplete grey-lit pack); **red** on `Zotero :23119` / `out_dir` / `state_dir`
+  is fatal (`doctor` and any command that needs Zotero). Reports grey-lit packs
+  (UNGA/undocs · BBNJ/DOALOS · ISA) when builtin is on. On a TTY, walks amber/red
+  remediations (`--guide` / `--no-guide`). `--probe` hits Scholar / EZProxy
+  `session_ok` (network). See [commands](commands.md#doctor).
 - `paperful run --dry-run` — no downloads. Per item: **Would-hit** is the
   routed source list in order (full `sources` when `--try-all`).
 - `paperful lint` / `paperful fix-metadata` — identifier hygiene; apply is explicit.

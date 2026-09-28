@@ -978,6 +978,113 @@ def test_vault_sso_misses_trip_ezproxy_and_skip_proxify(pipe_factory, cfg):
     )
 
 
+def test_ezproxy_down_hook_fires_between_batches(pipe_factory, cfg):
+    from paperful.session import SessionError
+
+    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.concurrency_oa = 1
+    pubs = {
+        "A": "https://www.sciencedirect.com/science/article/pii/S1/pdfft",
+        "B": "https://www.wiley.com/doi/pdf/10.1002/x",
+    }
+    hooks: list[bool] = []
+
+    class LoginBrowser:
+        def available(self) -> bool:
+            return True
+
+        def fetch_pdf(self, url, timeout_ms=60_000):
+            raise SessionError("login @federation.sciences-po.fr")
+
+        def close(self) -> None:
+            return
+
+    def on_down() -> bool:
+        hooks.append(True)
+        return False
+
+    src = StubSource(
+        "unpaywall",
+        {
+            key: Candidate(url=url, source="unpaywall")
+            for key, url in pubs.items()
+        },
+    )
+    pipe, manifest = pipe_factory(
+        {"unpaywall": src},
+        ["unpaywall"],
+        handler=lambda r: httpx.Response(403),
+    )
+    pipe.on_ezproxy_down = on_down
+    pipe.browser = LoginBrowser()
+    pipe.ctx.browser = pipe.browser
+    pipe.run(
+        [make_item(key="A"), make_item(key="B")],
+        batch_size=1,
+    )
+    assert pipe._ezproxy_down is True
+    assert hooks == [True]
+    assert any("session expired" in a for a in manifest.get("A").attempts)
+    assert any(
+        "skipped(session expired)" in a for a in manifest.get("B").attempts
+    )
+
+
+def test_ezproxy_down_hook_recovery_clears_skip(pipe_factory, cfg):
+    from paperful.session import SessionError
+
+    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.concurrency_oa = 1
+    state = {"n": 0}
+
+    class ToggleBrowser:
+        def available(self) -> bool:
+            return True
+
+        def fetch_pdf(self, url, timeout_ms=60_000):
+            state["n"] += 1
+            if state["n"] <= 2:
+                raise SessionError("login @federation.sciences-po.fr")
+            return PDF_BYTES, url, "body"
+
+        def close(self) -> None:
+            return
+
+    def on_down() -> bool:
+        pipe.refresh_session()
+        pipe.browser = ToggleBrowser()
+        pipe.ctx.browser = pipe.browser
+        return True
+
+    src = StubSource(
+        "unpaywall",
+        {
+            "A": Candidate(
+                url="https://www.sciencedirect.com/science/article/pii/S1/pdfft",
+                source="unpaywall",
+            ),
+            "B": Candidate(
+                url="https://www.wiley.com/doi/pdf/10.1002/x",
+                source="unpaywall",
+            ),
+        },
+    )
+    pipe, manifest = pipe_factory(
+        {"unpaywall": src},
+        ["unpaywall"],
+        handler=lambda r: httpx.Response(403),
+    )
+    pipe.on_ezproxy_down = on_down
+    pipe.browser = ToggleBrowser()
+    pipe.ctx.browser = pipe.browser
+    pipe.run(
+        [make_item(key="A"), make_item(key="B")],
+        batch_size=1,
+    )
+    assert pipe._ezproxy_down is False
+    assert manifest.get("B").status == STATUS_OK
+
+
 def test_attach_operator_lines_for_quota_and_auth():
     assert "out/" in pl._attach_operator_line("quota")
     assert "paperful attach" in pl._attach_operator_line("quota")

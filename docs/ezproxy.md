@@ -119,9 +119,11 @@ profile follows an SSO hop, a citation PDF link, and a download control.
 Details: [Sessions](sessions.md).
 
 New runs pick up EZProxy when `ezproxy` is in `sources` and the session is
-valid:
+valid. Before a long pass, confirm with `paperful doctor --probe` (or
+`session status --probe`):
 
 ```sh
+uv run paperful doctor --probe
 uv run paperful run --collection YOUR_COLLECTION
 ```
 
@@ -134,21 +136,28 @@ uv run paperful run --collection YOUR_COLLECTION --retry-failed
 
 ## 6. When the session expires
 
+`run` probes the vault (Chromium profile when present, else cookies) before
+batch 1 when `ezproxy` is in sources. A dead session on a TTY with
+`ezproxy_relogin` (default on) prompts for headed login; decline or a non-TTY
+skips EZProxy wraps for that pass so OA lanes do not hammer campus CAS.
+
 Library SSO typically lasts hours to a few days. When EZProxy starts failing
-you will see `ezproxy:error(ezproxy session expired…)` and later items skip
-the proxy for that pass. Soft-blocked OA PDF URLs that retry in the vault
-browser and land twice on campus CAS (`login @federation…`, or the older
-`no download control @federation…`) trip the same skip: remaining EZProxy
-wraps and the ezproxy lane are paused until you re-login. Publisher hosts
-that already failed a download in this run are also skipped for later items
-(`publisher already blocked`); that host set survives a mid-run re-login.
-On a terminal, `run` pauses after the fetch
-(`ezproxy_relogin`, default on): log in again, and Paperful retries only
-those items. That browser is closed before the report and before `--handoff`
-opens tabs in your normal browser. Set `ezproxy_relogin = false` or pass
-`--no-ezproxy-relogin` to skip the pause. Otherwise run
-`paperful session login ezproxy`, then another `run` (`--retry-failed` only
-if the misses were closed as `not_found`).
+mid-run you will see `ezproxy:error(ezproxy session expired…)` and later items
+skip the proxy. Soft-blocked OA PDF URLs that retry in the vault browser and
+land twice on campus CAS (`login @federation…`, or the older
+`no download control @federation…`) trip the same skip. On a TTY, `run` offers
+re-login once at the **next batch boundary** so later batches can use the proxy
+again. Publisher hosts that already failed a download in this run are also
+skipped for later items (`publisher already blocked`); that host set survives a
+mid-run re-login. After the fetch, a TTY run still pauses for any items left
+`session expired` and retries only those. That browser is closed before the
+report and before `--handoff` opens tabs in your normal browser. Set
+`ezproxy_relogin = false` or pass `--no-ezproxy-relogin` to skip the pauses.
+Otherwise run `paperful session login ezproxy`, then another `run`
+(`--retry-failed` only if the misses were closed as `not_found`).
+
+Confirm a live session with `paperful doctor --probe` or
+`paperful session status --probe` (file presence alone is not enough).
 
 ## Advanced: Netscape cookies.txt
 
