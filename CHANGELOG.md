@@ -6,6 +6,9 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+Mid-run EZProxy re-login pauses the Rich fetch progress bar so the Y/n prompt
+(and headed-login Enter confirm) stay visible instead of being overwritten.
+
 `doctor --probe` no longer prints Playwright `TargetClosedError` / "Task was
 destroyed" noise: Chromium readiness is checked via `playwright install
 --dry-run` instead of starting a throwaway sync driver before the live probes.

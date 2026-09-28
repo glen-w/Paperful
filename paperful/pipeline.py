@@ -278,6 +278,8 @@ class Pipeline:
         self.attacher = attacher
         self.strict_pdf_doi = strict_pdf_doi
         self.progress = progress or (lambda: None)
+        # Rich Progress while `run` is in the fetch bar; used to pause Live for prompts.
+        self.live_progress: Any = None
         self.on_ezproxy_down = on_ezproxy_down
         self._use_browser = use_browser
         self.client = make_client(cfg)

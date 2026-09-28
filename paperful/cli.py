@@ -13,7 +13,7 @@ from typing import Any
 
 import typer
 from rich.console import Console
-from .progress import item_progress
+from .progress import item_progress, pause_live
 from rich.table import Table
 
 from . import __version__
@@ -2332,6 +2332,7 @@ def run(
     with _item_progress() as progress:
         task_id = progress.add_task("Fetching PDFs", total=len(todo))
         pipe.progress = lambda: progress.advance(task_id)
+        pipe.live_progress = progress
         try:
             stats = pipe.run(todo)
         except KeyboardInterrupt:
@@ -2343,6 +2344,7 @@ def run(
             if not stats.finished_at:
                 stats.finished_at = time.time()
         stats = pipe.stats
+        pipe.live_progress = None
     # Fetch bar is done and pipe.run has closed the vault browser. Re-login
     # happens here, still before the report and before --handoff opens tabs.
     if not interrupted:
@@ -2432,17 +2434,22 @@ def _ensure_ezproxy_session(
     enabled: bool,
     prompt: str,
 ) -> bool:
-    """Prompt for headed re-login and verify session_ok. Returns True if ready."""
+    """Prompt for headed re-login and verify session_ok. Returns True if ready.
+
+    Pauses the fetch progress Live first so the prompt (and headed-login
+    Enter confirm) are not overwritten by the Rich bar.
+    """
     if not enabled or not _stdin_is_tty():
         return False
-    try:
-        answer = console.input(prompt).strip().lower()
-    except EOFError:
-        return False
-    if answer not in {"", "y", "yes"}:
-        console.print("[yellow]Skipping EZProxy re-login.[/]")
-        return False
-    return _ezproxy_headed_login_and_probe(cfg, pipe)
+    with pause_live(getattr(pipe, "live_progress", None)):
+        try:
+            answer = console.input(prompt).strip().lower()
+        except EOFError:
+            return False
+        if answer not in {"", "y", "yes"}:
+            console.print("[yellow]Skipping EZProxy re-login.[/]")
+            return False
+        return _ezproxy_headed_login_and_probe(cfg, pipe)
 
 
 def _preflight_ezproxy_session(

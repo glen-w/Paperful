@@ -147,7 +147,8 @@ skip the proxy. Soft-blocked OA PDF URLs that retry in the vault browser and
 land twice on campus CAS (`login @federation…`, or the older
 `no download control @federation…`) trip the same skip. On a TTY, `run` offers
 re-login once at the **next batch boundary** so later batches can use the proxy
-again. Hosts that already failed hard in this run (publisher 403s, or vault
+again. That prompt pauses the fetch progress bar so the question stays visible.
+Hosts that already failed hard in this run (publisher 403s, or vault
 landings that ended in `login` / `captcha` / `no download control`) are skipped
 for later items (`host already blocked`); that host set survives a
 mid-run re-login. Transport timeouts use a short connect budget and only silence
