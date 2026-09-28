@@ -14,7 +14,7 @@ COPY pyproject.toml uv.lock README.md ./
 COPY paperful ./paperful
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --no-dev --no-editable
+    uv sync --no-dev --no-editable --reinstall-package paperful
 
 FROM python:3.12-slim-bookworm AS runtime
 

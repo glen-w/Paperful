@@ -15,7 +15,8 @@ The landing page is the short version of this story.
    The original identifier stays in the log. Zotero is not rewritten here.
 3. **Look for a free copy first.** Open-access indexes, then the item’s own
    URL, then campus access when you have it. News and blog items can be
-   printed to PDF. Odd hosts use [playbooks](sources.md) you write.
+   printed to PDF. Odd hosts use [playbooks](sources.md) you write, or recipes
+   learned on this machine ([sessions](sessions.md)).
 4. **Use your library login when you have it.** Log in once in Chrome or
    Edge. `run` reuses that campus session through EZProxy. Same pattern for
    Google Scholar if you opt in. See [Using your Scholar or library login](#using-your-scholar-or-library-login).
@@ -83,8 +84,10 @@ The knobs and error names: [Source routing](sources.md).
 The tool never asks for or stores your institutional password. You log in
 once in a headed browser (`paperful session login ezproxy` or `scholar` on
 the host). `run` reuses that login until the campus session expires —
-typically hours to a few days. Scholar fetches use the same browser profile,
-because Google often keys a CAPTCHA to the browser, not just cookies.
+typically hours to a few days. When a publisher page is HTML, the same
+browser follows the PDF link or download control before giving up. Scholar
+fetches use the same browser profile, because Google often keys a CAPTCHA
+to the browser, not just cookies.
 
 Those logins live on this machine. Do not commit them or paste them into
 chat. [Sessions](sessions.md) · [Campus EZProxy](ezproxy.md).

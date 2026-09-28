@@ -127,6 +127,13 @@ grey_playbooks_dir = "packs"
 Merge order: builtin pack → `packs/*.toml` → inline `[[grey_playbooks]]`
 (same `name` wins later). See [Configuration](config.md).
 
+Vault and browser-agent PDF successes append `state/fetch-wins.jsonl` on this
+volume. `paperful playbooks promote` (and `[playbooks].promote = "auto"`)
+writes `packs/learned.toml` when `grey_playbooks_dir = "packs"`. Both `state/`
+and `packs/` are gitignored. `auto` may promote a fluke; the default is
+`gated`. Headed `session login` stays on the host; a container `run` still
+writes wins onto the shared `state/` mount.
+
 ## Run configs
 
 `profiles/` next to `config.toml` holds named run configs (`paperful all

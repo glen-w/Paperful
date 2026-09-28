@@ -63,6 +63,8 @@ flowchart LR
 | `state/summaries/<key>.html` | `summarize` output when dest includes disk; the Zotero child note is the other copy |
 | `state/reports/<slug>.html` | `synthesize` literature review; sibling `<slug>.json` records source hashes |
 | `state/sessions/` | Chromium profile + `meta.json` (login timestamps, no secrets). Netscape dumps for httpx |
+| `state/fetch-wins.jsonl` | One line per vault or browser-agent PDF (host and path; query string dropped). Input to `paperful playbooks propose` |
+| `state/playbooks-proposed.toml` | Draft learned pack from `playbooks propose`. Not loaded until `playbooks promote` |
 | `state/last-run.json` | Latest `run` or `recover` report (`paperful.run_report.v1`). Other verbs do not replace it |
 | `state/runs/<stamp>-<command>.json` | One report per `run`, `recover`, `gaps`, `lint`, `fix-metadata` (dry-run and `--apply`), `attachments` (dry-run and `--apply`), `summarize`, `synthesize`, and `snapshot` |
 | `state/packs/<id>.json` | Parent witness (`paperful.pack.v1`) listing those reports for one `pack open` … `pack close` sequence. `state/packs/current` names the open id |
@@ -237,8 +239,16 @@ closes the pack it opened. See [Workflows](workflows.md).
 
 ## Grey literature
 
-`direct` runs a **playbook engine** ([`paperful/playbooks.py`](../paperful/playbooks.py)):
-declarative `rewrite` / `scrape` / `synthesize` rules from config. A builtin
+`direct` and the vault browser share a **playbook engine**
+([`paperful/playbooks.py`](../paperful/playbooks.py)): declarative `rewrite` /
+`scrape` / `synthesize` rules from config. The vault fetch
+([`paperful/session.py`](../paperful/session.py)) applies those rewrites and
+HTML PDF links before a fixed click list.
+[`paperful/fetch_wins.py`](../paperful/fetch_wins.py) appends successes and
+can write `learned.toml` under `grey_playbooks_dir`. That file is a normal
+dir pack (names start with `learned-`); it is not shipped in the wheel.
+Knobs and the propose/promote commands: [Sessions](sessions.md) and
+[Configuration](config.md). A builtin
 **ocean/governance example pack** (`paperful/data/grey_playbooks_ocean.toml`)
 ships named grey-lit packs plus FAO/OECD/IEA/WHO examples — not core product
 logic; set `grey_playbooks_builtin = false` or override by `name`.

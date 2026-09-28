@@ -675,7 +675,7 @@ class _StubBrowser:
 
     def fetch_pdf(self, url, timeout_ms=60_000):
         self.urls.append(url)
-        return self.pdf, url
+        return self.pdf, url, "body"
 
     def close(self) -> None:
         return

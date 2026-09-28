@@ -15,7 +15,7 @@ dashboard. Recipes below are copy-paste commands.
 | **Run config / profile** | SCOPE plus fetch/write policy for a repeated slice (collection, years, item types, `try_all`, …) | `[profiles.*]` in `config.toml`, or `profiles/<name>.toml` beside that file |
 | **`all`** | One command that runs a fixed sequence of existing verbs | `paperful all` |
 | **`--preset eoi`** | Source *policy*: open access plus campus EZProxy, no Scholar, no Sci-Hub | CLI flag or `preset` in a profile |
-| **Playbook** | Grey-literature URL → PDF rule (`rewrite` / `scrape` / `synthesize`) | `[[grey_playbooks]]`, `packs/*.toml` |
+| **Playbook** | URL → PDF rule (`rewrite` / `scrape` / `synthesize`), hand-written or learned from fetch wins | `[[grey_playbooks]]`, `packs/*.toml`, `packs/learned.toml` |
 | **Pack** | Witness for one *executed* sequence. Lists child reports. Not a template you re-run | `state/packs/<id>.json` |
 
 Grey-lit `packs/` and run-config `profiles/` are different directories.

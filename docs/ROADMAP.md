@@ -319,9 +319,12 @@ Larger product bets. Park until the ledger and core loop justify them.
    lane: last serial source on `run` after Scholar / EZProxy / htmlpdf fail
    (`[llm].enabled` + extra), and `paperful recover --item` for named keys.
    Never in `DEFAULT_SOURCES`, not “AI fetch everything.” Soft bot walls may improve with
-   their Cloud stealth (not wired); hard CAPTCHAs stay human. Next: mine
-   successful agent paths into grey playbooks so the deterministic fetcher
-   stays primary.
+   their Cloud stealth (not wired); hard CAPTCHAs stay human. Vault fetch follows
+   meta PDF links and SSO hops without an LLM. Successful vault and agent fetches
+   log to `state/fetch-wins.jsonl`. `paperful playbooks propose` / `promote`
+   install user-owned recipes in `grey_playbooks_dir/learned.toml` (default
+   `gated`; `auto` is opt-in and can promote flukes). Learned packs are not
+   shipped in the wheel.
 8. **Collaboration without SaaS** — shared `state/` over syncthing/git; attach
    locks; optional headless fetch node. Aligns with the house
    [quiet mirror](quiet-mirror.md) stance: Syncthing (or similar) is transport;

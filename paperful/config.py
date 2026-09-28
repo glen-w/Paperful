@@ -121,6 +121,9 @@ class Config:
     grey_playbooks_dir: Path | None = None
     grey_playbooks: list[GreyPlaybook] = field(default_factory=list)
     config_path: Path | None = None
+    # Learned publisher recipes: gated logs wins; auto writes packs/learned.toml.
+    playbooks_promote: str = "gated"  # gated | auto
+    playbooks_auto_min_hits: int = 2
     # Named run configs from [profiles.*]. Not grey-lit playbooks.
     run_profiles: dict[str, dict[str, Any]] = field(default_factory=dict)
     # LLM (local-first Ollama; LiteLLM optional via paperful[llm])
@@ -562,6 +565,15 @@ def parse_pdfs(value: str) -> str:
     return mode
 
 
+def parse_playbooks_promote(value: str) -> str:
+    key = value.strip().lower()
+    if key not in {"gated", "auto"}:
+        raise ValueError(
+            f"[playbooks].promote {value!r} must be gated or auto"
+        )
+    return key
+
+
 def parse_dest(value: str, *, key: str = "dest") -> str:
     """Normalise a write destination. Blank means both; anything else must be known."""
     dest = str(value).strip().lower()
@@ -673,6 +685,15 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             cfg.inbox_settle_seconds = max(0.0, float(inbox["settle_seconds"]))
         if "idle_seconds" in inbox:
             cfg.inbox_idle_seconds = max(0.0, float(inbox["idle_seconds"]))
+    learned = raw.get("playbooks")
+    if isinstance(learned, dict):
+        if "promote" in learned:
+            cfg.playbooks_promote = parse_playbooks_promote(str(learned["promote"]))
+        if "auto_min_hits" in learned:
+            hits = int(learned["auto_min_hits"])
+            if hits < 1:
+                raise ValueError("[playbooks].auto_min_hits must be >= 1")
+            cfg.playbooks_auto_min_hits = hits
     mirror = raw.get("mirror")
     if isinstance(mirror, dict) and "pdfs" in mirror:
         cfg.mirror_pdfs = parse_pdfs(str(mirror["pdfs"]))

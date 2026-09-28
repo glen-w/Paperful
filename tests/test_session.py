@@ -142,9 +142,10 @@ class _FakeDownload:
 
 
 class _FakeLoc:
-    def __init__(self, n, click=None):
+    def __init__(self, n, click=None, src=None):
         self._n = n
         self._click = click
+        self._src = src
         self.first = self
 
     def count(self):
@@ -154,14 +155,21 @@ class _FakeLoc:
         if self._click:
             self._click()
 
+    def get_attribute(self, name):
+        if name == "src":
+            return self._src
+        return None
+
 
 class _FakePage:
-    def __init__(self, resp=None, goto_error=None, download=None, locators=None):
+    def __init__(self, resp=None, goto_error=None, download=None, locators=None, html=""):
         self._resp = resp
         self._goto_error = goto_error
         self._download = download
         self._handlers: dict[str, list] = {}
         self._locators = locators or {}
+        self._html = html
+        self.url = resp.url if resp is not None else ""
 
     def on(self, event, cb):
         self._handlers.setdefault(event, []).append(cb)
@@ -173,6 +181,15 @@ class _FakePage:
 
     def locator(self, selector):
         return self._locators.get(selector, _FakeLoc(0))
+
+    def wait_for_load_state(self, *args, **kwargs):
+        return None
+
+    def content(self):
+        return self._html
+
+    def inner_text(self, selector):
+        return ""
 
     def goto(self, url, **kwargs):
         if self._download:
@@ -194,9 +211,10 @@ def test_collect_pdf_from_page_uses_pdf_response():
             headers={"content-type": "application/pdf"},
         )
     )
-    data, final = collect_pdf_from_page(page, "https://x.test/a.pdf")
+    data, final, win = collect_pdf_from_page(page, "https://x.test/a.pdf")
     assert data == PDF_BYTES
     assert final.endswith("a.pdf")
+    assert win == "body"
 
 
 def test_collect_pdf_from_page_uses_download_when_goto_aborts(tmp_path):
@@ -206,9 +224,10 @@ def test_collect_pdf_from_page_uses_download_when_goto_aborts(tmp_path):
         goto_error=RuntimeError("Download is starting"),
         download=_FakeDownload(path, "https://x.test/a.pdf"),
     )
-    data, final = collect_pdf_from_page(page, "https://x.test/a.pdf")
+    data, final, win = collect_pdf_from_page(page, "https://x.test/a.pdf")
     assert data == PDF_BYTES
     assert final.endswith("a.pdf")
+    assert win == "download"
 
 
 def test_collect_pdf_from_page_raises_when_html_only():
@@ -243,6 +262,234 @@ def test_collect_pdf_from_page_names_paywall():
         raise AssertionError("expected SessionError")
     except SessionError as exc:
         assert "paywall @wiley.com" in str(exc)
+
+
+def test_collect_pdf_from_page_follows_citation_meta():
+    pdf_resp = _FakeResp(
+        PDF_BYTES,
+        "https://www.nature.com/articles/s1.pdf",
+        headers={"content-type": "application/pdf"},
+    )
+
+    class Page(_FakePage):
+        def goto(self, url, **kwargs):
+            self.url = url
+            if url.endswith(".pdf"):
+                for cb in self._handlers.get("response", []):
+                    cb(pdf_resp)
+                return pdf_resp
+            return super().goto(url, **kwargs)
+
+    html = (
+        '<html><head><meta name="citation_pdf_url" '
+        'content="https://www.nature.com/articles/s1.pdf"></head></html>'
+    )
+    page = Page(
+        resp=_FakeResp(b"<html>", "https://www.nature.com/articles/s1"),
+        html=html,
+    )
+    page.url = "https://www.nature.com/articles/s1"
+    data, final, win = collect_pdf_from_page(page, "https://www.nature.com/articles/s1")
+    assert data == PDF_BYTES
+    assert final.endswith("s1.pdf")
+    assert win == "meta"
+
+
+def test_collect_pdf_from_page_clicks_view_pdf(tmp_path):
+    path = tmp_path / "a.pdf"
+    path.write_bytes(PDF_BYTES)
+    page = _FakePage(
+        resp=_FakeResp(b"<html>article</html>", "https://x.test/article"),
+        html="<html>article</html>",
+    )
+
+    def click():
+        for cb in page._handlers.get("download", []):
+            cb(_FakeDownload(path, "https://x.test/a.pdf"))
+
+    page._locators["a:has-text('View PDF')"] = _FakeLoc(1, click=click)
+    data, _final, win = collect_pdf_from_page(page, "https://x.test/article")
+    assert data == PDF_BYTES
+    assert win == "click:View PDF"
+
+
+def test_collect_pdf_from_page_uses_viewer_iframe():
+    pdf_resp = _FakeResp(
+        PDF_BYTES,
+        "https://x.test/viewer/a.pdf",
+        headers={"content-type": "application/pdf"},
+    )
+
+    class Page(_FakePage):
+        def goto(self, url, **kwargs):
+            self.url = url
+            if url.endswith(".pdf"):
+                for cb in self._handlers.get("response", []):
+                    cb(pdf_resp)
+                return pdf_resp
+            return super().goto(url, **kwargs)
+
+    page = Page(
+        resp=_FakeResp(b"<html></html>", "https://x.test/article"),
+        html="<html></html>",
+        locators={
+            "iframe[src*='.pdf']": _FakeLoc(1, src="https://x.test/viewer/a.pdf")
+        },
+    )
+    data, final, win = collect_pdf_from_page(page, "https://x.test/article")
+    assert data == PDF_BYTES
+    assert final.endswith("a.pdf")
+    assert win == "viewer:iframe"
+
+
+def test_collect_pdf_from_page_waits_out_sso():
+    pdf_resp = _FakeResp(
+        PDF_BYTES,
+        "https://www.nature.com/articles/s1.pdf",
+        headers={"content-type": "application/pdf"},
+    )
+
+    class Page(_FakePage):
+        def __init__(self):
+            super().__init__(
+                resp=_FakeResp(
+                    b"<html>login</html>",
+                    "https://federation.sciences-po.fr/cas/login",
+                ),
+                html="<html>central authentication service</html>",
+            )
+            self.url = "https://federation.sciences-po.fr/cas/login"
+            self._polls = 0
+
+        def inner_text(self, selector):
+            return "central authentication service"
+
+        @property
+        def url(self):
+            self._polls += 1
+            if self._polls > 3:
+                return "https://www.nature.com/articles/s1"
+            return "https://federation.sciences-po.fr/cas/login"
+
+        @url.setter
+        def url(self, value):
+            self._landed = value
+
+        def content(self):
+            if "nature.com" in self.url:
+                return (
+                    '<html><meta name="citation_pdf_url" '
+                    'content="https://www.nature.com/articles/s1.pdf"></html>'
+                )
+            return self._html
+
+        def goto(self, url, **kwargs):
+            if url.endswith(".pdf"):
+                for cb in self._handlers.get("response", []):
+                    cb(pdf_resp)
+                return pdf_resp
+            return super().goto(url, **kwargs)
+
+    data, final, win = collect_pdf_from_page(
+        Page(), "https://federation.sciences-po.fr/cas/login"
+    )
+    assert data == PDF_BYTES
+    assert win == "sso+meta"
+    assert "nature.com" in final
+
+
+def test_collect_pdf_from_page_rewrite_miss_falls_through():
+    from paperful.playbooks import GreyPlaybook
+
+    pdf_resp = _FakeResp(
+        PDF_BYTES,
+        "https://x.test/real.pdf",
+        headers={"content-type": "application/pdf"},
+    )
+    html = (
+        '<html><meta name="citation_pdf_url" content="https://x.test/real.pdf"></html>'
+    )
+
+    class Page(_FakePage):
+        def goto(self, url, **kwargs):
+            self.url = "https://x.test/article"
+            if url.endswith("real.pdf"):
+                for cb in self._handlers.get("response", []):
+                    cb(pdf_resp)
+                return pdf_resp
+            resp = _FakeResp(b"<html>not a pdf</html>", url, headers={"content-type": "text/html"})
+            return resp
+
+    page = Page(
+        resp=_FakeResp(b"<html>", "https://x.test/article"),
+        html=html,
+    )
+    page.url = "https://x.test/article"
+    book = GreyPlaybook(
+        name="learned-x-test-rewrite",
+        kind="rewrite",
+        hosts=("x.test",),
+        url_re=r"https://x\.test/article(?P<code>.*)",
+        pdf_template="https://x.test/miss{code}",
+    )
+    data, final, win = collect_pdf_from_page(
+        page, "https://x.test/article", playbooks=[book]
+    )
+    assert data == PDF_BYTES
+    assert win == "meta"
+    assert final.endswith("real.pdf")
+
+
+def test_collect_pdf_from_page_skips_off_host_and_search():
+    html = (
+        '<html><a href="https://cdn.other.test/secret.pdf">PDF</a>'
+        '<a href="https://scholar.google.com/a.pdf">PDF</a></html>'
+    )
+    page = _FakePage(
+        resp=_FakeResp(b"<html>", "https://x.test/article", headers={"content-type": "text/html"}),
+        html=html,
+    )
+    page.url = "https://x.test/article"
+    try:
+        collect_pdf_from_page(page, "https://x.test/article")
+        raise AssertionError("expected SessionError")
+    except SessionError as exc:
+        assert "no download control" in str(exc)
+
+
+def test_collect_pdf_from_page_caps_extract_navigations():
+    links = "".join(
+        f'<a href="https://x.test/n{i}.pdf">PDF</a>' for i in range(4)
+    )
+    seen: list[str] = []
+
+    class Page(_FakePage):
+        def goto(self, url, **kwargs):
+            seen.append(url)
+            if url.endswith("n3.pdf"):
+                resp = _FakeResp(
+                    PDF_BYTES, url, headers={"content-type": "application/pdf"}
+                )
+                for cb in self._handlers.get("response", []):
+                    cb(resp)
+                return resp
+            return _FakeResp(b"<html></html>", url, headers={"content-type": "text/html"})
+
+    page = Page(
+        resp=_FakeResp(b"<html>", "https://x.test/article"),
+        html=f"<html>{links}</html>",
+    )
+    page.url = "https://x.test/article"
+    try:
+        collect_pdf_from_page(page, "https://x.test/article")
+        raise AssertionError("expected SessionError")
+    except SessionError as exc:
+        assert "no download control" in str(exc)
+    assert [u for u in seen if u.endswith(".pdf")] == [
+        "https://x.test/n0.pdf",
+        "https://x.test/n1.pdf",
+        "https://x.test/n2.pdf",
+    ]
 
 
 def test_browser_session_runs_on_dedicated_thread(cfg):

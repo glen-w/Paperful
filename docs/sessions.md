@@ -26,7 +26,19 @@ Scholar fetches during `run` reuse this Chromium profile when it exists (Google
 often keys CAPTCHA to the browser, not cookies). htmlpdf uses the same profile
 so a publisher login can apply. EZProxy landing pages and publisher PDFs that
 403 on a cookie-only GET (ScienceDirect `/pdfft`, …) are fetched in this
-profile too; exported cookies remain a fallback for httpx.
+profile too; exported cookies remain a fallback for httpx. A landing page
+that is HTML is settled, an SSO interstitial is waited out, then a playbook
+rewrite, `citation_pdf_url` / PDF links, download controls (including View
+PDF), and a PDF viewer iframe are tried before the miss.
+
+Successful vault downloads and browser-agent PDFs append a line to
+`state/fetch-wins.jsonl` (host and path only, no query string). `paperful
+playbooks propose` drafts a learned pack from those wins; `playbooks promote`
+writes `{grey_playbooks_dir}/learned.toml`. Default `[playbooks].promote` is
+`gated`. `auto` writes that file after `auto_min_hits` matching wins (default
+2) and can still promote a fluke — a one-off URL or cookie-banner path. Prefer
+`gated` unless you will edit `learned.toml` by hand. `run --promote gated|auto`
+overrides the config for one process.
 
 `paperful recover` and the auto `browser_agent` lane on `run` launch Chromium on this same
 profile. `run` closes the Playwright `BrowserSession` before that lane so the

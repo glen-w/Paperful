@@ -14,20 +14,13 @@ from urllib.parse import urlparse
 
 import httpx
 
+from ..page_signals import looks_like_login_page
 from ..routing import ezproxy_target
 from ..zot import Item
 from .base import Candidate, Context, Outcome
 from .landing import extract_pdf_urls
 
 NAME = "ezproxy"
-
-_LOGIN_HINTS = (
-    "central authentication service",
-    "entrez votre identifiant",
-    "shibboleth",
-    "wayf",
-    "select your institution",
-)
 
 
 def proxify(target: str, base: str) -> str:
@@ -42,24 +35,6 @@ def proxify(target: str, base: str) -> str:
     if base.endswith("/"):
         return base + target
     return f"{base}{target}"
-
-
-def looks_like_login_page(url: str, body: str) -> bool:
-    url_l = url.lower()
-    if any(
-        x in url_l for x in ("/cas/login", "federation.sciences-po.fr", "shibboleth")
-    ):
-        return True
-    body_l = body[:4000].lower()
-    if any(h in body_l for h in _LOGIN_HINTS):
-        return True
-    if (
-        "idm.oclc.org" in url_l
-        and "/login" in url_l
-        and ("password" in body_l or "identifiant" in body_l)
-    ):
-        return True
-    return False
 
 
 def looks_like_login(resp: httpx.Response) -> bool:

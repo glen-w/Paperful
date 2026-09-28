@@ -94,6 +94,12 @@ mirror_failures_before_skip = 3
 # Optional directory of extra pack TOML files (merged after builtin, before inline).
 # Relative paths resolve against this config file's folder (Compose: packs/ under /data).
 # grey_playbooks_dir = "packs"
+# Learned recipes (not shipped): paperful playbooks propose / promote
+# writes packs/learned.toml. auto may promote flukes — leave gated unless
+# you will edit that file.
+# [playbooks]
+# promote = "gated"       # gated | auto
+# auto_min_hits = 2
 # [[grey_playbooks]]
 # name = "my_org"
 # kind = "rewrite"

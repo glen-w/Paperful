@@ -35,7 +35,9 @@ and [architecture](architecture.md).
 | `ezproxy_cookies` | `state/ezproxy-cookies.txt` | Compat Netscape dump after `session login ezproxy` |
 | `scholar_cookies` | `state/scholar-cookies.txt` | Compat Netscape dump after `session login scholar` |
 | `grey_playbooks_builtin` | `true` | Load the packaged ocean/governance example pack |
-| `grey_playbooks_dir` | (none) | Directory of extra pack `*.toml` files (merged after builtin, before inline). Relative paths resolve against the config file's folder |
+| `grey_playbooks_dir` | (none) | Directory of extra pack `*.toml` files (merged after builtin, before inline). Relative paths resolve against the config file's folder. Learned recipes go in `learned.toml` inside this directory |
+| `[playbooks].promote` | `gated` | `gated` only logs fetch wins. `auto` writes `learned.toml` after `auto_min_hits` matching wins. **Auto may promote flukes** (one-off article URLs, cookie-banner clicks). `run --promote` overrides one run |
+| `[playbooks].auto_min_hits` | `2` | How many matching wins `auto` needs before writing a recipe. Manual `playbooks promote` can install a single cluster |
 | `[[grey_playbooks]]` | (none) | User rewrite/scrape/synthesize rules; same `name` overrides the pack |
 | `attach` | `true` | Attach into Zotero after download (`--no-attach` overrides) |
 | `app_name` | `paperful` | Name shown in Zotero's authorisation dialog |
@@ -139,6 +141,9 @@ BBNJ/DOALOS · ISA**, plus FAO/OECD/IEA/WHO examples — on by default via
 `grey_playbooks_builtin = true`. Optionally set `grey_playbooks_dir = "packs"`
 to load every `*.toml` in that directory (same schema). Merge order: builtin →
 dir packs → inline `[[grey_playbooks]]` (same `name` replaces earlier entries).
+`paperful playbooks promote` adds `learned.toml` in that directory from local
+fetch wins. Those recipes are not in the package. `[playbooks].promote = "auto"`
+writes them during `run` and may promote a fluke; the default is `gated`.
 PMC / arXiv / HAL stay as core OA rewrites, not playbooks. See
 [architecture § Grey literature](architecture.md#grey-literature) for hosts
 and symbol patterns. If you use the optional Docker image, put packs next to
@@ -147,6 +152,10 @@ config under `/data` (see [Docker](docker.md)).
 ```toml
 grey_playbooks_builtin = true
 grey_playbooks_dir = "packs"
+
+# [playbooks]
+# promote = "gated"       # gated | auto — auto may promote a fluke
+# auto_min_hits = 2
 
 [[grey_playbooks]]
 name = "my_org"

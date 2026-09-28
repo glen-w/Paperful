@@ -26,7 +26,14 @@ from typing import Any, Literal
 from .config import Config
 from .cookies import split_playwright_cookies, write_netscape
 from .download import looks_like_pdf
-from .page_signals import classify_page_block, format_miss
+from .page_signals import (
+    classify_page_block,
+    format_miss,
+    host_label,
+    is_search_engine_host,
+    looks_like_login_page,
+    same_site,
+)
 from .sources.ezproxy import proxify
 
 SLOTS = ("scholar", "ezproxy")
@@ -442,13 +449,25 @@ def dump_profile_cookies(cfg: Config) -> list[Path]:
     return export_cookies(cfg, cookies)
 
 
-_PDF_CLICK_SELECTORS = (
-    "a[href*='pdfft']",
-    "a[href*='/pdf'][href*='download']",
-    "a[data-aa-name='pdf-download']",
-    "a#pdfLink",
-    "a:has-text('Download PDF')",
-    "button:has-text('Download PDF')",
+_PDF_CLICKS = (
+    ("a[href*='pdfft']", "click:pdfft"),
+    ("a[href*='/pdf'][href*='download']", "click:download"),
+    ("a[data-aa-name='pdf-download']", "click:pdf-download"),
+    ("a#pdfLink", "click:pdfLink"),
+    ("a:has-text('Download PDF')", "click:Download PDF"),
+    ("button:has-text('Download PDF')", "click:Download PDF"),
+    ("a:has-text('View PDF')", "click:View PDF"),
+    ("button:has-text('View PDF')", "click:View PDF"),
+    ("a:has-text('Full text PDF')", "click:Full text PDF"),
+    ("a[href$='.pdf']", "click:.pdf"),
+)
+_MAX_EXTRACT_NAV = 3
+_SSO_WAIT_S = 15.0
+_NETWORKIDLE_MS = 8_000
+_VIEWER_SELECTORS = (
+    "iframe[src*='.pdf']",
+    "embed[src*='.pdf']",
+    "embed[type*='pdf']",
 )
 
 
@@ -474,28 +493,68 @@ def _playwright_pdf_miss(page: Any, url: str, *, clicked: bool) -> str:
     return format_miss(label, final)
 
 
+def _page_url(page: Any, fallback: str) -> str:
+    current = getattr(page, "url", None)
+    return str(current or fallback)
+
+
+def _page_text(page: Any) -> str:
+    try:
+        return str(page.inner_text("body") or "")[:4000]
+    except Exception:
+        return ""
+
+
+def _page_html(page: Any) -> str:
+    try:
+        return str(page.content() or "")
+    except Exception:
+        return ""
+
+
+def _followable(target: str, origin: str) -> bool:
+    host = host_label(target)
+    if not host or is_search_engine_host(host):
+        return False
+    if "idm.oclc.org" in host or "idm.oclc.org" in host_label(origin):
+        return True
+    return same_site(target, origin)
+
+
 def collect_pdf_from_page(
-    page: Any, url: str, timeout_ms: int = 60_000
-) -> tuple[bytes, str]:
-    """Drive a Playwright page to `url` and return PDF bytes.
+    page: Any,
+    url: str,
+    timeout_ms: int = 60_000,
+    playbooks: list[Any] | None = None,
+) -> tuple[bytes, str, str]:
+    """Drive a Playwright page to `url` and return PDF bytes, final URL, win kind.
 
-    Handles three publisher behaviours: PDF as the navigation body, a
-    `download` event (Content-Disposition: attachment), and a landing page
-    with a Download PDF control. Raises SessionError if nothing looks like
-    a PDF.
+    After the navigation body / download event, waits out an SSO interstitial,
+    follows a playbook rewrite, then HTML PDF links, click controls, and a
+    PDF viewer iframe. A rewrite that is not a PDF falls through. Raises
+    SessionError if nothing looks like a PDF.
     """
-    found: list[tuple[bytes, str]] = []
+    from .sources.landing import extract_pdf_urls, rewrite_known_pdf_url
 
-    def _take(data: bytes, final: str) -> None:
+    found: list[tuple[bytes, str, str]] = []
+    pending = {"win": "body"}
+    visited: set[str] = set()
+    saw_login = False
+
+    def _take(data: bytes, final: str, win: str | None = None) -> None:
         if found or not data or not looks_like_pdf(data):
             return
-        found.append((data, final))
+        found.append((data, final, win or pending["win"]))
 
     def on_download(download: Any) -> None:
         try:
             path = download.path()
             if path:
-                _take(Path(path).read_bytes(), str(getattr(download, "url", url)))
+                _take(
+                    Path(path).read_bytes(),
+                    str(getattr(download, "url", url)),
+                    pending["win"] if str(pending["win"]).startswith("click:") else "download",
+                )
         except Exception:
             return
 
@@ -512,36 +571,90 @@ def collect_pdf_from_page(
         except Exception:
             return
 
-    page.on("download", on_download)
-    page.on("response", on_response)
-    try:
-        resp = None
+    def _goto(target: str, win: str, *, force: bool = False) -> None:
+        key = target.split("?", 1)[0]
+        if key in visited:
+            return
+        if not force and not _followable(target, _page_url(page, url)):
+            return
+        visited.add(key)
+        pending["win"] = win
         try:
-            resp = page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+            resp = page.goto(target, wait_until="domcontentloaded", timeout=timeout_ms)
         except Exception:
             resp = None
         if found:
-            return found[0]
+            return
         if resp is not None:
             try:
-                _take(resp.body(), str(getattr(resp, "url", url)))
+                _take(resp.body(), str(getattr(resp, "url", target)))
             except Exception:
                 pass
-            if found:
-                return found[0]
         elif not found:
-            # Navigation aborted (typical for Content-Disposition: attachment).
             deadline = time.time() + min(8.0, timeout_ms / 1000)
             while time.time() < deadline and not found:
                 time.sleep(0.2)
+
+    page.on("download", on_download)
+    page.on("response", on_response)
+    try:
+        _goto(url, "body", force=True)
+        if found:
+            return found[0]
+        try:
+            page.wait_for_load_state("networkidle", timeout=_NETWORKIDLE_MS)
+        except Exception:
+            pass
+        if found:
+            return found[0]
+        if looks_like_login_page(_page_url(page, url), _page_text(page) or _page_html(page)):
+            saw_login = True
+            start_host = host_label(_page_url(page, url))
+            deadline = time.time() + _SSO_WAIT_S
+            while time.time() < deadline and not found:
+                if host_label(_page_url(page, url)) != start_host:
+                    break
+                time.sleep(0.2)
+            if found:
+                data, final, _win = found[0]
+                return data, final, "sso+" + _win
+        if found:
+            return found[0]
+        rewritten = rewrite_known_pdf_url(_page_url(page, url), playbooks)
+        if rewritten:
+            _goto(rewritten, "rewrite")
             if found:
                 return found[0]
+        origin = _page_url(page, url)
+        html = _page_html(page)
+        extracted: list[str] = []
+        if html:
+            try:
+                extracted = extract_pdf_urls(html, origin, playbooks)
+            except Exception:
+                extracted = []
+        hopped = 0
+        for candidate in extracted:
+            if hopped >= _MAX_EXTRACT_NAV:
+                break
+            if candidate.split("?", 1)[0] in visited:
+                continue
+            if not _followable(candidate, origin):
+                continue
+            hopped += 1
+            _goto(candidate, "meta")
+            if found:
+                data, final, win = found[0]
+                if saw_login and not win.startswith("sso+"):
+                    win = "sso+" + win
+                return data, final, win
         clicked = False
-        for selector in _PDF_CLICK_SELECTORS:
+        for selector, win in _PDF_CLICKS:
             loc = page.locator(selector)
             try:
                 if loc.count() == 0:
                     continue
+                pending["win"] = win
                 loc.first.click(timeout=5_000)
                 clicked = True
             except Exception:
@@ -549,6 +662,21 @@ def collect_pdf_from_page(
             click_deadline = time.time() + 10.0
             while time.time() < click_deadline and not found:
                 time.sleep(0.2)
+            if found:
+                return found[0]
+        for selector in _VIEWER_SELECTORS:
+            loc = page.locator(selector)
+            try:
+                if loc.count() == 0:
+                    continue
+                src = loc.first.get_attribute("src")
+            except Exception:
+                continue
+            if not src:
+                continue
+            from urllib.parse import urljoin
+
+            _goto(urljoin(origin, str(src)), "viewer:iframe")
             if found:
                 return found[0]
         raise SessionError(_playwright_pdf_miss(page, url, clicked=clicked))
@@ -669,16 +797,21 @@ class BrowserSession:
 
         return self._run(_do)
 
-    def fetch_pdf(self, url: str, timeout_ms: int = 60_000) -> tuple[bytes, str]:
-        """Navigate in the vault profile and return PDF bytes + final URL.
+    def fetch_pdf(self, url: str, timeout_ms: int = 60_000) -> tuple[bytes, str, str]:
+        """Navigate in the vault profile and return PDF bytes, final URL, win kind.
 
         ScienceDirect / Wiley / T&F often 403 a cookie-only GET; the same URL
         in this profile (campus SSO cookies + a real Chromium) can download.
         """
 
-        def _do() -> tuple[bytes, str]:
+        def _do() -> tuple[bytes, str, str]:
             self._ensure()
-            return collect_pdf_from_page(self._page(), url, timeout_ms=timeout_ms)
+            return collect_pdf_from_page(
+                self._page(),
+                url,
+                timeout_ms=timeout_ms,
+                playbooks=self.cfg.grey_playbooks,
+            )
 
         return self._run(_do)
 

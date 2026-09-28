@@ -40,6 +40,17 @@ def find(item: Item, ctx: Context) -> Candidate:
             result = run_recover(ctx.config, item, url)
     except Exception as exc:
         return Candidate.miss(NAME, Outcome.ERROR, type(exc).__name__)
+    if result.pdf_bytes:
+        from ..fetch_wins import record_win
+
+        record_win(
+            ctx.config,
+            item_key=item.key,
+            source=NAME,
+            start_url=url,
+            final_url=url,
+            win="agent",
+        )
     return _candidate_from_result(result)
 
 

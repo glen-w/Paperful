@@ -789,7 +789,7 @@ class Pipeline:
                 item, f"[dim]{escape(cand.source)}: downloading via browser...[/]"
             )
             try:
-                content, final = self.browser.fetch_pdf(target)
+                content, final, win = self.browser.fetch_pdf(target)
             except Exception as exc:
                 attempts.append(f"{cand.source}:browser-failed({exc})")
                 self._log_item(
@@ -805,6 +805,16 @@ class Pipeline:
                 )
                 continue
             attempts.append(f"{cand.source}:browser")
+            from .fetch_wins import record_win
+
+            record_win(
+                self.cfg,
+                item_key=item.key,
+                source=cand.source,
+                start_url=target,
+                final_url=final or target,
+                win=win,
+            )
             return Download(
                 content=content,
                 md5=hashlib.md5(content).hexdigest(),

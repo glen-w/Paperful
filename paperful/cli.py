@@ -124,6 +124,15 @@ profile_app = typer.Typer(
     help="Named run configs (SCOPE + policy). Not grey-lit playbooks.",
 )
 app.add_typer(profile_app, name="profile")
+playbooks_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help=(
+        "Propose and promote learned PDF playbooks from local fetch wins. "
+        "Not run-config profiles."
+    ),
+)
+app.add_typer(playbooks_app, name="playbooks")
 snowball_app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
@@ -161,7 +170,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "all",
     ),
     "mirror": ("snapshot", "restore"),
-    "control": ("doctor", "session", "mirrors", "ezproxy", "scholar", "pack", "profile"),
+    "control": ("doctor", "session", "mirrors", "ezproxy", "scholar", "pack", "profile", "playbooks"),
     "utility": ("report", "version", "jobs"),
 }
 
@@ -2080,6 +2089,11 @@ def run(
         "--downloads-dir",
         help="Downloads dir for --handoff walk (default ~/Downloads).",
     ),
+    promote: str | None = typer.Option(
+        None,
+        "--promote",
+        help="Override [playbooks].promote for this run: gated or auto.",
+    ),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
@@ -2088,6 +2102,14 @@ def run(
     if _scope_unset(collection, library, profile, run_config):
         _refuse_missing_scope()
     cfg = _cfg(config)
+    if isinstance(promote, str):
+        from .config import parse_playbooks_promote
+
+        try:
+            cfg.playbooks_promote = parse_playbooks_promote(promote)
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(2)
     bound = _bind_run(
         cfg,
         use_run_policy=True,
@@ -4502,6 +4524,73 @@ def _profile_bind_kwargs(
         "skip": skip,
         "require_summarize": require_summarize,
     }
+
+
+@playbooks_app.command("propose")
+def playbooks_propose(
+    config: Path | None = ConfigOpt,
+    to: Path | None = typer.Option(
+        None,
+        "--to",
+        help="Write the draft TOML here (default: state/playbooks-proposed.toml).",
+    ),
+    min_hits: int = typer.Option(
+        1, "--min-hits", help="Cluster size required in the draft (default 1)."
+    ),
+) -> None:
+    """Draft learned playbooks from state/fetch-wins.jsonl. Does not install them."""
+    from .fetch_wins import load_wins, proposed_path, propose_toml, wins_path
+
+    cfg = _cfg(config)
+    if min_hits < 1:
+        console.print("[red]--min-hits must be >= 1[/]")
+        raise typer.Exit(2)
+    rows = load_wins(wins_path(cfg))
+    text = propose_toml(rows, min_hits=min_hits)
+    dest = to if to is not None else proposed_path(cfg)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(text, encoding="utf-8")
+    if text.strip():
+        console.print(text)
+    else:
+        console.print("[dim]No promotable wins yet.[/]")
+    console.print(f"Wrote {dest}")
+
+
+@playbooks_app.command("promote")
+def playbooks_promote(
+    config: Path | None = ConfigOpt,
+    source: Path | None = typer.Option(
+        None,
+        "--from",
+        help="Proposed TOML (default: state/playbooks-proposed.toml).",
+    ),
+) -> None:
+    """Install proposed learned playbooks into grey_playbooks_dir/learned.toml."""
+    from .fetch_wins import proposed_path, write_learned
+    from .playbooks import load_pack_file
+
+    cfg = _cfg(config)
+    if cfg.grey_playbooks_dir is None:
+        console.print(
+            "[red]grey_playbooks_dir is unset.[/] "
+            'Set grey_playbooks_dir = "packs" in config.toml.'
+        )
+        raise typer.Exit(2)
+    path = source if source is not None else proposed_path(cfg)
+    if not path.is_file():
+        console.print(f"[red]No proposal file at {path}.[/] Run playbooks propose first.")
+        raise typer.Exit(2)
+    books = [pb for pb in load_pack_file(path) if pb.name.startswith("learned-")]
+    if not books:
+        console.print("[yellow]Proposal has no learned- playbooks.[/]")
+        raise typer.Exit(1)
+    changed = write_learned(cfg.grey_playbooks_dir, books)
+    dest = cfg.grey_playbooks_dir / "learned.toml"
+    if changed:
+        console.print(f"[green]Promoted[/] {len(books)} playbook(s) to {dest}")
+    else:
+        console.print(f"[dim]Unchanged[/] {dest}")
 
 
 @profile_app.command("list")

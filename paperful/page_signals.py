@@ -68,6 +68,26 @@ _LABELS: tuple[tuple[str, tuple[str, ...]], ...] = (
 )
 
 
+_LOGIN_URL_HINTS = ("/cas/login", "federation.sciences-po.fr", "shibboleth")
+_LOGIN_BODY_HINTS = (
+    "central authentication service",
+    "entrez votre identifiant",
+    "shibboleth",
+    "wayf",
+    "select your institution",
+)
+_SEARCH_HOSTS = (
+    "google.com",
+    "bing.com",
+    "duckduckgo.com",
+    "yahoo.com",
+    "baidu.com",
+    "yandex.com",
+    "yandex.ru",
+    "scholar.google.com",
+)
+
+
 def host_label(url: str | None) -> str:
     """Hostname without a leading ``www.``, or empty when the URL has none."""
     if not url:
@@ -76,6 +96,38 @@ def host_label(url: str | None) -> str:
     if host.startswith("www."):
         host = host[4:]
     return host
+
+
+def looks_like_login_page(url: str, body: str) -> bool:
+    """True for campus SSO / CAS / Shibboleth interstitials."""
+    url_l = (url or "").lower()
+    if any(x in url_l for x in _LOGIN_URL_HINTS):
+        return True
+    body_l = (body or "")[:4000].lower()
+    if any(h in body_l for h in _LOGIN_BODY_HINTS):
+        return True
+    if (
+        "idm.oclc.org" in url_l
+        and "/login" in url_l
+        and ("password" in body_l or "identifiant" in body_l)
+    ):
+        return True
+    return False
+
+
+def is_search_engine_host(host: str) -> bool:
+    host = (host or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    return any(host == s or host.endswith("." + s) for s in _SEARCH_HOSTS)
+
+
+def same_site(left: str, right: str) -> bool:
+    """True when two URLs share a host, or one hostname is under the other."""
+    a, b = host_label(left), host_label(right)
+    if not a or not b:
+        return False
+    return a == b or a.endswith("." + b) or b.endswith("." + a)
 
 
 def classify_page_block(text: str | None) -> str | None:

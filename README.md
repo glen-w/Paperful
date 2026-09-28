@@ -42,8 +42,10 @@ docker compose run --rm paperful run --collection interesting --preset oa --dry-
 **Find.** A fill (`run`) looks for a free copy first — Unpaywall, OpenAlex,
 arXiv, bioRxiv/medRxiv, Europe PMC, Semantic Scholar, CORE, OpenAIRE, then
 the item's own URL. Campus **EZProxy** when you have a subscription: log in
-once in your browser; the password is not stored. User playbooks, then an
-opt-in AI browser, take the landings those indexes miss. **Google Scholar**
+once in your browser; the password is not stored. The vault browser follows
+the PDF link on the landing page. Hand-written or learned playbooks, then an
+opt-in AI browser, take the landings those indexes miss
+([sessions](docs/sessions.md)). **Google Scholar**
 and **Sci-Hub** stay off until you opt in (Scholar needs a session login;
 Sci-Hub occupies a legal grey zone in some jurisdictions — see
 [Sci-Hub](docs/scihub.md)). Each item only hits sources that match its

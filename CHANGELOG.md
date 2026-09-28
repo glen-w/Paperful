@@ -6,6 +6,15 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+Vault PDF fetch follows SSO interstitials, playbook rewrites, citation PDF
+links, View PDF controls, and viewer iframes before giving up. Successes append
+`state/fetch-wins.jsonl` (no query string). `paperful playbooks propose` /
+`promote` write user-owned `learned.toml` under `grey_playbooks_dir`.
+`[playbooks].promote` defaults to `gated`; `auto` waits for `auto_min_hits`
+(default 2) and can still promote a fluke. `run --promote` overrides one run.
+Learned files stay in `state/` and `packs/` (gitignored, including Docker
+`PAPERFUL_DATA`).
+
 Configurable PDF drop folder (`[inbox].dir`) for manual downloads after soft
 blocks. `--handoff watch` opens tabs then polls the folder; `paperful inbox
 watch` / `drain` are a long-running sidecar and one-shot drain. Files match by
