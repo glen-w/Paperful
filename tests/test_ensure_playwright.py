@@ -2,9 +2,47 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from paperful import session as sess
+
+
+def test_chromium_installed_uses_dry_run_not_sync_driver(monkeypatch, tmp_path):
+    """Avoid sync_playwright() — it leaks TargetClosedError on later probes."""
+    monkeypatch.setattr(sess, "playwright_available", lambda: True)
+    chrome_dir = tmp_path / "chromium-999"
+    chrome_dir.mkdir()
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(list(cmd))
+        return SimpleNamespace(
+            returncode=0,
+            stdout=(
+                "Chrome for Testing (playwright chromium v999)\n"
+                f"  Install location:    {chrome_dir}\n"
+                "FFmpeg\n"
+                f"  Install location:    {tmp_path / 'ffmpeg'}\n"
+            ),
+        )
+
+    monkeypatch.setattr(sess.subprocess, "run", fake_run)
+    assert sess.chromium_installed() is True
+    assert calls and "--dry-run" in calls[0] and "chromium" in calls[0]
+
+    def missing_run(cmd, **kwargs):
+        return SimpleNamespace(
+            returncode=0,
+            stdout=(
+                "Chrome for Testing\n"
+                f"  Install location:    {tmp_path / 'missing-chromium'}\n"
+            ),
+        )
+
+    monkeypatch.setattr(sess.subprocess, "run", missing_run)
+    assert sess.chromium_installed() is False
 
 
 def test_ensure_playwright_missing_package(monkeypatch):

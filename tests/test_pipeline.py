@@ -332,6 +332,27 @@ def test_refresh_session_clears_ezproxy_down(pipe_factory, monkeypatch):
     assert pipe.ctx.browser is pipe.browser
 
 
+def test_release_browser_replaces_closed_session(pipe_factory, monkeypatch):
+    pipe, _manifest = pipe_factory({"ezproxy": StubSource("ezproxy")}, ["ezproxy"])
+
+    class DummyBrowser:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    old = DummyBrowser()
+    pipe.browser = old
+    pipe.ctx = pl.Context(config=pipe.cfg, client=pipe.client, browser=old)
+    monkeypatch.setattr(pl, "BrowserSession", lambda cfg: DummyBrowser())
+    pipe.release_browser()
+    assert old.closed is True
+    assert pipe.browser is not old
+    assert pipe.ctx.browser is pipe.browser
+    assert pipe.browser.closed is False
+
+
 def test_ezproxy_expiry_marks_the_rest_retryable(pipe_factory):
     from paperful.store import STATUS_RETRYABLE
 

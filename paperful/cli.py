@@ -2397,6 +2397,9 @@ def _ezproxy_headed_login_and_probe(cfg: Config, pipe: Pipeline) -> bool:
     from .sources import ezproxy as ez
 
     console.print("Opening a browser to refresh the EZProxy session.")
+    # session_ok / mid-run fetches may already hold the vault profile. System
+    # Chrome needs that user-data-dir exclusively or it exits with no window.
+    pipe.release_browser()
     try:
         sess.login_headed(
             cfg,

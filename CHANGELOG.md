@@ -6,6 +6,18 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+`doctor --probe` no longer prints Playwright `TargetClosedError` / "Task was
+destroyed" noise: Chromium readiness is checked via `playwright install
+--dry-run` instead of starting a throwaway sync driver before the live probes.
+
+`session login` CDP attach uses Playwright `no_defaults` so cookie export
+works against system Chrome that rejects `Browser.setDownloadBehavior`
+("Browser context management is not supported"). Requires Playwright ≥1.60.
+
+`run` releases the vault Chromium before headed EZProxy re-login so system
+Chrome can open the shared profile (preflight `session_ok` otherwise held the
+SingletonLock and the login window never appeared).
+
 `doctor --probe` hits Scholar / EZProxy `session_ok` (vault Chromium when
 available) and ambers when cookie files exist but campus CAS or a captcha
 still blocks. Default `doctor` stays file-presence only. The same vault-faithful

@@ -79,16 +79,30 @@ def playwright_available() -> bool:
 
 
 def chromium_installed() -> bool:
-    """True when Playwright's Chromium binary is on disk."""
+    """True when Playwright's Chromium binary is on disk.
+
+    Uses ``playwright install --dry-run`` instead of ``sync_playwright()``.
+    Starting the sync driver solely to read ``executable_path`` leaves pending
+    connection tasks; the next ``BrowserSession`` (or process exit) then prints
+    ``TargetClosedError`` / "Task was destroyed" noise on ``doctor --probe``.
+    """
     if not playwright_available():
         return False
     try:
-        from playwright.sync_api import sync_playwright
-
-        with sync_playwright() as p:
-            return Path(p.chromium.executable_path).is_file()
-    except Exception:
+        result = subprocess.run(
+            [sys.executable, "-m", "playwright", "install", "--dry-run", "chromium"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
         return False
+    for line in result.stdout.splitlines():
+        # First location is Chromium (ffmpeg / headless shell follow).
+        if "Install location:" in line:
+            return Path(line.split(":", 1)[1].strip()).is_dir()
+    return False
 
 
 def ensure_playwright(*, auto_install: bool = True) -> str | None:
@@ -157,11 +171,29 @@ def _free_port() -> int:
         return int(sock.getsockname()[1])
 
 
-def _wait_cdp(port: int, *, timeout_s: float = 45.0) -> None:
+def _wait_cdp(
+    port: int,
+    *,
+    timeout_s: float = 45.0,
+    proc: subprocess.Popen[Any] | None = None,
+    profile: Path | None = None,
+) -> None:
     url = f"http://127.0.0.1:{port}/json/version"
     deadline = time.time() + timeout_s
     last_err: Exception | None = None
     while time.time() < deadline:
+        if proc is not None and proc.poll() is not None:
+            hint = ""
+            if profile is not None:
+                hint = (
+                    f" Another process is likely using the Paperful profile "
+                    f"({profile}) — stop other paperful run/doctor/status "
+                    f"--probe jobs and retry."
+                )
+            raise SessionError(
+                f"Chrome exited before opening a debug port on 127.0.0.1:{port}."
+                + hint
+            )
         try:
             with urllib.request.urlopen(url, timeout=1.0) as resp:
                 if getattr(resp, "status", 200) == 200:
@@ -169,9 +201,16 @@ def _wait_cdp(port: int, *, timeout_s: float = 45.0) -> None:
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             last_err = exc
             time.sleep(0.2)
+    hint = ""
+    if profile is not None:
+        hint = (
+            f" If no window appeared, close other Chrome using "
+            f"{profile} and retry."
+        )
     raise SessionError(
         f"Chrome did not open a debug port on 127.0.0.1:{port}"
         + (f" ({last_err})" if last_err else "")
+        + hint
     )
 
 
@@ -335,12 +374,30 @@ def _login_via_system_chrome(
     )
     cookies: list[dict[str, Any]] = []
     try:
-        _wait_cdp(port)
+        _wait_cdp(port, proc=proc, profile=user_dir)
         confirm()
         from playwright.sync_api import sync_playwright
 
         with sync_playwright() as p:
-            browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
+            # no_defaults skips Browser.setDownloadBehavior / focus overrides
+            # that break attach on some system Chrome builds ("Browser context
+            # management is not supported"). We only need cookies.
+            try:
+                browser = p.chromium.connect_over_cdp(
+                    f"http://127.0.0.1:{port}",
+                    no_defaults=True,
+                )
+            except TypeError:
+                # Playwright < 1.60 has no no_defaults kwarg.
+                browser = p.chromium.connect_over_cdp(
+                    f"http://127.0.0.1:{port}"
+                )
+            except Exception as exc:
+                raise SessionError(
+                    f"Could not attach to Chrome over CDP ({exc}). "
+                    "Close other Chrome windows using this profile, retry, "
+                    "or use --engine playwright."
+                ) from exc
             context = browser.contexts[0] if browser.contexts else None
             if context is None:
                 raise SessionError(

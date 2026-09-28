@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -16,6 +17,13 @@ def test_find_system_chrome_prefers_candidate(tmp_path, monkeypatch):
     monkeypatch.setattr(sess, "_SYSTEM_CHROME_CANDIDATES", (fake,))
     monkeypatch.setattr(sess, "_SYSTEM_CHROME_WHICH", ())
     assert sess.find_system_chrome() == fake
+
+
+def test_wait_cdp_raises_when_chrome_exits_early(tmp_path):
+    proc = MagicMock()
+    proc.poll.return_value = 1
+    with pytest.raises(sess.SessionError, match="exited before opening"):
+        sess._wait_cdp(9, timeout_s=0.5, proc=proc, profile=tmp_path / "chromium")
 
 
 def test_login_headed_chrome_required(cfg, monkeypatch):

@@ -13,12 +13,12 @@ dependencies = [
     "pypdf>=5.0",
     "tomli>=2.0; python_version < '3.11'",
     "fonttools>=4.0",
-    "playwright>=1.40",  # htmlpdf source + session login (Chromium)
+    "playwright>=1.60",  # htmlpdf + session login CDP no_defaults
 ]
 
 [project.optional-dependencies]
 # Kept for older install docs (`pip install paperful[htmlpdf]`); Playwright is now core.
-htmlpdf = ["playwright>=1.40"]
+htmlpdf = ["playwright>=1.60"]
 llm = ["litellm>=1.70,<2"]
 browser-agent = [
     "browser-use>=0.11; python_version >= '3.11'",

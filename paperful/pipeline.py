@@ -356,19 +356,29 @@ class Pipeline:
                 "Remaining proxy attempts stay skipped."
             )
 
+    def release_browser(self) -> None:
+        """Close vault Chromium and leave a fresh lazy session.
+
+        Headed ``session login`` and browser-agent need exclusive access to
+        ``state/sessions/chromium`` (Chrome SingletonLock). Closing without
+        replacing would leave a permanently closed ``BrowserSession``.
+        """
+        if self.browser is not None:
+            self.browser.close()
+        self.browser = BrowserSession(self.cfg) if self._use_browser else None
+        self.ctx = Context(config=self.cfg, client=self.client, browser=self.browser)
+
     def refresh_session(self) -> None:
         """New HTTP client and vault browser after a headed re-login.
 
         ``run`` closes the browser, and a closed session cannot be reopened.
         """
-        if self.browser is not None:
-            self.browser.close()
+        self.release_browser()
         try:
             self.client.close()
         except Exception:
             pass
         self.client = make_client(self.cfg)
-        self.browser = BrowserSession(self.cfg) if self._use_browser else None
         self.ctx = Context(config=self.cfg, client=self.client, browser=self.browser)
         self._ezproxy_down = False
         self._vault_sso_misses = 0

@@ -49,7 +49,9 @@ overrides the config for one process.
 `paperful recover` and the auto `browser_agent` lane on `run` launch Chromium on this same
 profile. `run` closes the Playwright `BrowserSession` before that lane so the
 agent can take the profile; do not run a second `run` or `recover` against the
-same vault at the same time.
+same vault at the same time. Headed EZProxy re-login during `run` does the same
+release first — otherwise Chrome exits with no window while the probe still holds
+`state/sessions/chromium`.
 
 `session login mendeley` is **not** this vault: it opens Elsevier’s OAuth page
 and stores tokens in `state/mendeley-oauth.json`. See [Mendeley](mendeley.md).
@@ -61,6 +63,20 @@ Never commit `state/sessions/` or cookie files; never paste them into chat.
 That is Google rejecting a Playwright-launched browser (automation flags /
 `--no-sandbox`). Use the default system-Chrome login above. If an old automated
 profile is stuck, remove `state/sessions/chromium/` and log in again.
+
+## If Chrome never opens / `Chrome did not open a debug port`
+
+Another process is using `state/sessions/chromium` (a live `run`, `doctor
+--probe`, or a leftover headless Chrome). Stop that job, or quit the Chrome
+whose command line includes that profile path, then retry
+`paperful session login ezproxy`.
+
+## If CDP attach fails (`Browser context management is not supported`)
+
+Playwright connected to the debug port but could not apply its usual browser
+overrides. Current Paperful uses `no_defaults` on attach (cookies only). If you
+still see this, close other Chrome windows on the Paperful profile and retry,
+or fall back with `--engine playwright`.
 
 ## If you see `Session not ready` (Scholar)
 

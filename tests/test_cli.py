@@ -688,6 +688,7 @@ def test_run_ezproxy_preflight_login_on_tty(cfg_file, stub_zotero, monkeypatch):
         + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
     )
     logins: list[str] = []
+    releases: list[bool] = []
     probes = iter([(False, "expired"), (True, "ok")])
 
     def fake_run(self, items, batch_size=40):
@@ -698,7 +699,11 @@ def test_run_ezproxy_preflight_login_on_tty(cfg_file, stub_zotero, monkeypatch):
         self.stats.finished_at = self.stats.started_at
         return self.stats
 
+    def fake_release(self):
+        releases.append(True)
+
     monkeypatch.setattr(cli.Pipeline, "run", fake_run)
+    monkeypatch.setattr(cli.Pipeline, "release_browser", fake_release)
     monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
     monkeypatch.setattr(
         "paperful.session.login_headed",
@@ -715,6 +720,8 @@ def test_run_ezproxy_preflight_login_on_tty(cfg_file, stub_zotero, monkeypatch):
     )
     assert res.exit_code == 0, res.stdout
     assert logins == ["ezproxy"]
+    # Once before login_headed, again from refresh_session after success.
+    assert releases == [True, True]
     assert "EZProxy session ready" in res.stdout
 
 
