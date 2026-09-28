@@ -3,9 +3,19 @@
 Sci-Hub occupies a **legal grey zone in some jurisdictions**. Paperful does
 not enable it unless you opt in. You are responsible for complying with the
 laws that apply to you. The authors and distributors of this tool do not
-encourage copyright infringement. If you are unsure whether use is lawful
-where you are, only opt in when you already have legal access to the journals
-and the download is a legitimate archive or backup copy for your own use.
+encourage copyright infringement. The feature exists because some researchers
+already use Sci-Hub; Paperful does not promote it, and leaves it off by
+default so campus and open-access paths stay first.
+
+If you are unsure whether use is lawful where you are, only opt in when you
+already have legal access to the journals and the download is a legitimate
+archive or backup copy for your own use. Having subscription or library
+access **by itself may not** make a Sci-Hub download lawful: publishers and
+licenses usually intend access through their sites or your institution's
+proxy, not an unauthorized mirror. Courts that have ruled on Sci-Hub's
+operation have treated it as copyright infringement. Private-copy
+or research exceptions, where they exist, often still require a lawful
+source.
 
 Opt in either way (Sci-Hub is then tried last, after open-access sources and
 EZProxy):
