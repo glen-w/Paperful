@@ -4,15 +4,81 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import tempfile
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from .resolve import DOI_RE, normalize_doi
 
 _PDFTOTEXT = shutil.which("pdftotext")
 
+ShortPdfVerdict = Literal["ok", "sparse_short", "dense_short"]
+
+
+@dataclass(frozen=True)
+class PdfProbe:
+    """Page count and first-page word count for short-PDF gating."""
+
+    pages: int
+    words: int
+
 
 def pdftotext_available() -> bool:
     return bool(_PDFTOTEXT)
+
+
+def word_count(text: str) -> int:
+    return len(text.split())
+
+
+def page_count(path: Path) -> int:
+    """Return page count, or ``0`` when the PDF cannot be opened."""
+    if not path.is_file():
+        return 0
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return 0
+    try:
+        return len(PdfReader(str(path)).pages)
+    except Exception:
+        return 0
+
+
+def probe_pdf(path: Path) -> PdfProbe:
+    pages = page_count(path)
+    if pages < 1:
+        return PdfProbe(pages=0, words=0)
+    text = text_from_pdf(path, max_pages=1)
+    return PdfProbe(pages=pages, words=word_count(text))
+
+
+def probe_pdf_bytes(content: bytes) -> PdfProbe:
+    """Write ``content`` to a temp file and probe it."""
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as fh:
+        fh.write(content)
+        dest = Path(fh.name)
+    try:
+        return probe_pdf(dest)
+    finally:
+        dest.unlink(missing_ok=True)
+
+
+def short_pdf_verdict(
+    pages: int, words: int, *, min_words: int
+) -> ShortPdfVerdict:
+    """Classify a PDF for the one-page density gate.
+
+    Unreadable PDFs (``pages < 1``) stay ``ok`` so opaque but otherwise-valid
+    downloads are not rejected. One-page sparse stubs soft-reject; denser
+    one-pagers go to the admit lane.
+    """
+    if pages < 1 or pages >= 2:
+        return "ok"
+    if words < min_words:
+        return "sparse_short"
+    return "dense_short"
 
 
 def text_from_pdf(path: Path, *, max_pages: int | None = 2) -> str:

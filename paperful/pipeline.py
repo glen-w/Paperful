@@ -23,7 +23,7 @@ from .circuit import CircuitBreaker
 from .config import Config
 from .cookies import apply_netscape_cookies
 from .download import Download, DownloadError, fetch_pdf, is_fetchable_url, looks_like_pdf
-from .pdfid import doi_from_pdf
+from .pdfid import doi_from_pdf, probe_pdf_bytes, short_pdf_verdict
 from .pipeline_attach import attach_after_remap
 from .pipeline_browser import release_browser_for_agent, skip_recover_without_lane_failure
 from .playbooks import looks_like_pdf_url
@@ -59,6 +59,7 @@ from .store import (
     STATUS_NOT_FOUND,
     STATUS_RETRYABLE,
     REASON_CLOSED,
+    REASON_SHORT_PDF,
     REASON_STRICT_PDF_DOI,
     STATUS_OK,
     Manifest,
@@ -660,6 +661,25 @@ class Pipeline:
                     blocked.add(host)
         if dl is None:
             return False
+        short_verdict = "ok"
+        if self.cfg.gate_short_pdfs:
+            probe = probe_pdf_bytes(dl.content)
+            short_verdict = short_pdf_verdict(
+                probe.pages,
+                probe.words,
+                min_words=self.cfg.short_pdf_min_words,
+            )
+            if short_verdict == "sparse_short":
+                attempts.append(
+                    f"{cand.source}:download-failed(sparse one-page PDF, "
+                    f"{probe.words} words)"
+                )
+                self._log_item(
+                    item,
+                    f"{escape(cand.source)}: [yellow]download failed[/] "
+                    f"(sparse one-page PDF, {probe.words} words)",
+                )
+                return False
         primary, extras = save_pdf(self.cfg.out_dir, item, dl.content, dl.md5)
         pdf_doi = doi_from_pdf(primary)
         write_fetch_records(
@@ -677,6 +697,12 @@ class Pipeline:
                 f"[yellow]pdf DOI {escape(pdf_doi)} differs from {escape(item.doi)}[/]",
             )
         defer_mismatch = mismatch and self.strict_pdf_doi
+        defer_short = short_verdict == "dense_short"
+        hold_reason = ""
+        if defer_mismatch:
+            hold_reason = REASON_STRICT_PDF_DOI
+        elif defer_short:
+            hold_reason = REASON_SHORT_PDF
         rec = Record(
             itemKey=item.key,
             status=STATUS_OK,
@@ -693,7 +719,7 @@ class Pipeline:
             extra_paths=relpaths(self.cfg.out_dir, extras),
             md5=dl.md5,
             attempts=attempts,
-            reason=REASON_STRICT_PDF_DOI if defer_mismatch else "",
+            reason=hold_reason,
         )
         self.manifest.write(rec)
         with self._stats_lock:
@@ -706,6 +732,13 @@ class Pipeline:
             self._log_item(
                 item,
                 "[yellow]saved, not attached (--strict-pdf-doi)[/]",
+            )
+            self._add_outcome(rec)
+        elif defer_short:
+            self._log_item(
+                item,
+                "[yellow]saved, not attached (short PDF — "
+                "admit with attach --allow-short-pdf)[/]",
             )
             self._add_outcome(rec)
         elif self.attacher:

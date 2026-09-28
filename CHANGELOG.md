@@ -6,6 +6,12 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+One-page PDFs are gated by text density (`gate_short_pdfs`, default on). Sparse
+stubs (few words — ethics/consent forms) soft-reject so later sources can still
+run. Denser one-pagers (letters, short comments) save to `out/` with reason
+`short_pdf` and wait for `paperful attach --allow-short-pdf`. Tune with
+`short_pdf_min_words` (default 200).
+
 Vault PDF fetch follows SSO interstitials, playbook rewrites, citation PDF
 links, View PDF controls, and viewer iframes before giving up. Successes append
 `state/fetch-wins.jsonl` (no query string). `paperful playbooks propose` /

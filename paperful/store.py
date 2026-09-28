@@ -37,6 +37,8 @@ STATUS_RETRYABLE = "retryable"  # a lane was paused; next run tries again
 STATUS_ATTACH_FAILED = "attach_failed"  # PDF ok, Zotero write failed
 # Saved under --strict-pdf-doi. `paperful attach` skips these unless opted in.
 REASON_STRICT_PDF_DOI = "strict_pdf_doi"
+# Dense one-page PDF held for admit. `paperful attach` skips unless opted in.
+REASON_SHORT_PDF = "short_pdf"
 REASON_CLOSED = "closed"  # every applicable source said not_found
 TERMINAL_SKIP = {STATUS_OK, STATUS_ATTACHED}
 FAILED = {STATUS_NOT_FOUND, STATUS_NO_IDENTIFIER}
@@ -117,16 +119,22 @@ class Manifest:
             return retry_failed
         return True  # error / captcha / attach_failed
 
-    def pending_attach(self, *, allow_pdf_doi_mismatch: bool = False) -> list[Record]:
-        return [
-            r
-            for r in self.records.values()
-            if r.status in {STATUS_OK, STATUS_ATTACH_FAILED}
-            and r.path
-            and (
-                allow_pdf_doi_mismatch or r.reason != REASON_STRICT_PDF_DOI
-            )
-        ]
+    def pending_attach(
+        self,
+        *,
+        allow_pdf_doi_mismatch: bool = False,
+        allow_short_pdf: bool = False,
+    ) -> list[Record]:
+        out: list[Record] = []
+        for r in self.records.values():
+            if r.status not in {STATUS_OK, STATUS_ATTACH_FAILED} or not r.path:
+                continue
+            if r.reason == REASON_STRICT_PDF_DOI and not allow_pdf_doi_mismatch:
+                continue
+            if r.reason == REASON_SHORT_PDF and not allow_short_pdf:
+                continue
+            out.append(r)
+        return out
 
     def counts(self) -> dict[str, int]:
         out: dict[str, int] = {}

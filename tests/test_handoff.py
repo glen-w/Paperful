@@ -218,6 +218,65 @@ def test_attach_pdf_file_rejects_non_pdf(cfg, tmp_path: Path):
         )
 
 
+def test_attach_pdf_file_rejects_sparse_one_page(cfg, tmp_path: Path):
+    from pypdf import PdfWriter
+
+    cfg.out_dir = tmp_path / "out"
+    cfg.state_dir = tmp_path / "state"
+    cfg.state_dir.mkdir(parents=True)
+    cfg.min_pdf_bytes = 100
+    pdf = tmp_path / "sparse.pdf"
+    w = PdfWriter()
+    w.add_blank_page(width=72, height=72)
+    w.write(pdf)
+
+    class Backend:
+        def supports_write(self):
+            return True
+
+    with pytest.raises(ValueError, match="sparse one-page PDF"):
+        attach_pdf_file(
+            cfg,
+            Backend(),
+            Manifest(cfg.manifest_path),
+            make_item(key="SPARSE01"),
+            pdf,
+        )
+
+
+def test_attach_pdf_file_admits_dense_one_page(cfg, tmp_path: Path, monkeypatch):
+    from paperful.pdfid import PdfProbe
+    from paperful import handoff as ho
+
+    cfg.out_dir = tmp_path / "out"
+    cfg.state_dir = tmp_path / "state"
+    cfg.state_dir.mkdir(parents=True)
+    pdf = tmp_path / "letter.pdf"
+    pdf.write_bytes(b"%PDF-1.4 " + b"x" * 12_000)
+    monkeypatch.setattr(
+        ho, "probe_pdf_bytes", lambda content: PdfProbe(pages=1, words=400)
+    )
+    attached: list[tuple] = []
+
+    class Backend:
+        def supports_write(self):
+            return True
+
+        def attach(self, key, path, title=None, note=None):
+            attached.append((key, path, note))
+
+            class R:
+                ok = True
+                reason = "uploaded"
+
+            return R()
+
+    rec = attach_pdf_file(
+        cfg, Backend(), Manifest(cfg.manifest_path), make_item(key="DENSE001"), pdf
+    )
+    assert rec.status == STATUS_ATTACHED and attached
+
+
 def test_walk_missing_attaches_from_prompt(cfg, tmp_path: Path):
     cfg.out_dir = tmp_path / "out"
     cfg.state_dir = tmp_path / "state"

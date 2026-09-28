@@ -58,7 +58,10 @@ library has the subscription. Paperful does not fetch every paywalled or
 DOI-less item. The PDF keeps a provenance stamp (`paperful oa:unpaywall`,
 `campus:ezproxy`, `grey:undocs`). The parent item also gets a readable line
 ("Free copy from Unpaywall."), as a note unless `[remarks].surface` is `tag`
-or `off`. Walkthrough: [How it works](docs/how-it-works.md).
+or `off`. One-page stubs and DOI mismatches can hold attach until you admit
+them (`attach --allow-short-pdf` / `--allow-pdf-doi-mismatch`) — see
+[research-ops](docs/research-ops.md#wrong-work-pdfs). Walkthrough:
+[How it works](docs/how-it-works.md).
 
 **Completeness.** `gaps` counts what is missing. `lint` and `fix-metadata`
 propose patches on disk; `--apply` writes them. `dedupe` reviews duplicates.

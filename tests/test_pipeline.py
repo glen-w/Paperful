@@ -20,6 +20,7 @@ from paperful.store import (
     STATUS_NOT_FOUND,
     STATUS_RETRYABLE,
     REASON_CLOSED,
+    REASON_SHORT_PDF,
     REASON_STRICT_PDF_DOI,
     STATUS_OK,
     Manifest,
@@ -877,4 +878,181 @@ def test_pdf_doi_mismatch_attaches_with_warning_by_default(cfg, monkeypatch):
     pipe.run([make_item(key="A")])
     assert len(att.calls) == 1
     assert att.notes[0] == "paperful oa:unpaywall warn:pdf_doi_mismatch"
+
+
+def test_sparse_one_page_soft_rejects_and_later_source_wins(cfg, monkeypatch):
+    from paperful.pdfid import PdfProbe
+
+    sparse = StubSource(
+        "unpaywall",
+        {"A": Candidate(url="https://x.test/sparse.pdf", source="unpaywall")},
+    )
+    real = StubSource(
+        "openalex",
+        {"A": Candidate(url="https://x.test/real.pdf", source="openalex")},
+    )
+    monkeypatch.setattr(pl, "REGISTRY", {"unpaywall": sparse, "openalex": real})
+    monkeypatch.setattr(pl, "prepare_identifiers", lambda *a, **k: [])
+    monkeypatch.setattr(pl, "doi_from_pdf", lambda path: None)
+
+    probes = iter(
+        [
+            PdfProbe(pages=1, words=12),
+            PdfProbe(pages=0, words=0),
+        ]
+    )
+    monkeypatch.setattr(pl, "probe_pdf_bytes", lambda content: next(probes))
+
+    att = FakeAttacher()
+    manifest = Manifest(cfg.manifest_path)
+    pipe = pl.Pipeline(
+        cfg,
+        manifest,
+        Console(file=io.StringIO()),
+        sources=["unpaywall", "openalex"],
+        attacher=att,
+    )
+    pipe.client = mock_client(lambda r: httpx.Response(200, content=PDF_BYTES))
+    pipe.ctx.client = pipe.client
+    pipe.run([make_item(key="A")])
+    assert len(att.calls) == 1
+    rec = manifest.get("A")
+    assert rec.status == STATUS_ATTACHED
+    assert rec.source == "openalex"
+    assert rec.reason != REASON_SHORT_PDF
+
+
+def test_dense_one_page_saves_without_attach(cfg, monkeypatch):
+    from paperful.pdfid import PdfProbe
+
+    src = StubSource(
+        "unpaywall",
+        {"A": Candidate(url="https://x.test/letter.pdf", source="unpaywall")},
+    )
+    monkeypatch.setattr(pl, "REGISTRY", {"unpaywall": src})
+    monkeypatch.setattr(pl, "prepare_identifiers", lambda *a, **k: [])
+    monkeypatch.setattr(pl, "doi_from_pdf", lambda path: None)
+    monkeypatch.setattr(
+        pl, "probe_pdf_bytes", lambda content: PdfProbe(pages=1, words=350)
+    )
+    att = FakeAttacher()
+    manifest = Manifest(cfg.manifest_path)
+    pipe = pl.Pipeline(
+        cfg,
+        manifest,
+        Console(file=io.StringIO()),
+        sources=["unpaywall"],
+        attacher=att,
+    )
+    pipe.client = mock_client(lambda r: httpx.Response(200, content=PDF_BYTES))
+    pipe.ctx.client = pipe.client
+    pipe.run([make_item(key="A")])
+    assert att.calls == []
+    rec = manifest.get("A")
+    assert rec.status == STATUS_OK
+    assert rec.reason == REASON_SHORT_PDF
+    assert manifest.pending_attach() == []
+    assert [r.itemKey for r in manifest.pending_attach(allow_short_pdf=True)] == ["A"]
+
+
+def test_gate_short_pdfs_off_attaches_dense_one_page(cfg, monkeypatch):
+    from paperful.pdfid import PdfProbe
+
+    cfg.gate_short_pdfs = False
+    src = StubSource(
+        "unpaywall",
+        {"A": Candidate(url="https://x.test/letter.pdf", source="unpaywall")},
+    )
+    monkeypatch.setattr(pl, "REGISTRY", {"unpaywall": src})
+    monkeypatch.setattr(pl, "prepare_identifiers", lambda *a, **k: [])
+    monkeypatch.setattr(pl, "doi_from_pdf", lambda path: None)
+    monkeypatch.setattr(
+        pl, "probe_pdf_bytes", lambda content: PdfProbe(pages=1, words=350)
+    )
+    att = FakeAttacher()
+    manifest = Manifest(cfg.manifest_path)
+    pipe = pl.Pipeline(
+        cfg,
+        manifest,
+        Console(file=io.StringIO()),
+        sources=["unpaywall"],
+        attacher=att,
+    )
+    pipe.client = mock_client(lambda r: httpx.Response(200, content=PDF_BYTES))
+    pipe.ctx.client = pipe.client
+    pipe.run([make_item(key="A")])
+    assert len(att.calls) == 1
+    rec = manifest.get("A")
+    assert rec.status == STATUS_ATTACHED
+    assert rec.reason != REASON_SHORT_PDF
+
+
+def test_sparse_embedded_content_soft_rejects(cfg, monkeypatch):
+    from paperful.pdfid import PdfProbe
+
+    src = StubSource(
+        "htmlpdf",
+        {
+            "A": Candidate(
+                url="https://news.test/a",
+                source="htmlpdf",
+                content=PDF_BYTES,
+            )
+        },
+    )
+    monkeypatch.setattr(pl, "REGISTRY", {"htmlpdf": src})
+    monkeypatch.setattr(pl, "prepare_identifiers", lambda *a, **k: [])
+    monkeypatch.setattr(
+        pl, "probe_pdf_bytes", lambda content: PdfProbe(pages=1, words=5)
+    )
+    att = FakeAttacher()
+    manifest = Manifest(cfg.manifest_path)
+    pipe = pl.Pipeline(
+        cfg,
+        manifest,
+        Console(file=io.StringIO()),
+        sources=["htmlpdf"],
+        attacher=att,
+        use_browser=False,
+    )
+    pipe.client = mock_client(lambda r: httpx.Response(500))
+    pipe.ctx.client = pipe.client
+    pipe.run([make_item(key="A", item_type="webpage", doi=None)])
+    assert att.calls == []
+    assert manifest.get("A") is None or manifest.get("A").status != STATUS_OK
+
+
+def test_strict_pdf_doi_precedes_short_pdf_hold(cfg, monkeypatch):
+    from paperful.pdfid import PdfProbe
+
+    src = StubSource(
+        "unpaywall",
+        {"A": Candidate(url="https://x.test/a.pdf", source="unpaywall")},
+    )
+    monkeypatch.setattr(pl, "REGISTRY", {"unpaywall": src})
+    monkeypatch.setattr(pl, "prepare_identifiers", lambda *a, **k: [])
+    monkeypatch.setattr(pl, "doi_from_pdf", lambda path: "10.9999/other")
+    monkeypatch.setattr(
+        pl, "probe_pdf_bytes", lambda content: PdfProbe(pages=1, words=400)
+    )
+    att = FakeAttacher()
+    manifest = Manifest(cfg.manifest_path)
+    pipe = pl.Pipeline(
+        cfg,
+        manifest,
+        Console(file=io.StringIO()),
+        sources=["unpaywall"],
+        attacher=att,
+        strict_pdf_doi=True,
+    )
+    pipe.client = mock_client(lambda r: httpx.Response(200, content=PDF_BYTES))
+    pipe.ctx.client = pipe.client
+    pipe.run([make_item(key="A")])
+    assert att.calls == []
+    rec = manifest.get("A")
+    assert rec.reason == REASON_STRICT_PDF_DOI
+    assert manifest.pending_attach(allow_short_pdf=True) == []
+    assert [r.itemKey for r in manifest.pending_attach(allow_pdf_doi_mismatch=True)] == [
+        "A"
+    ]
 

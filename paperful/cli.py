@@ -64,7 +64,14 @@ from .runreport import (
 from .scope import ScopeError, filter_scope_items, load_scope, resolve_keys
 from .sources import Context
 from .sources.scihub import ping_mirrors
-from .store import STATUS_ATTACHED, STATUS_NOT_FOUND, Manifest, items_from_mirror
+from .store import (
+    REASON_SHORT_PDF,
+    STATUS_ATTACHED,
+    STATUS_NOT_FOUND,
+    STATUS_OK,
+    Manifest,
+    items_from_mirror,
+)
 from .zot import (
     ZoteroLocal,
     items_without_stored_pdf,
@@ -2548,6 +2555,11 @@ def attach(
         "--allow-pdf-doi-mismatch",
         help="Also attach PDFs that --strict-pdf-doi left on disk.",
     ),
+    allow_short_pdf: bool = typer.Option(
+        False,
+        "--allow-short-pdf",
+        help="Also attach dense one-page PDFs held for admit.",
+    ),
 ) -> None:
     """Write already-downloaded PDFs into the library. This command attaches; it is not a dry-run.
 
@@ -2581,10 +2593,26 @@ def attach(
         console.print(f"[green]Attached[/] {rec.itemKey} ← {file}")
         return
 
-    pending = manifest.pending_attach(allow_pdf_doi_mismatch=allow_pdf_doi_mismatch)
+    pending = manifest.pending_attach(
+        allow_pdf_doi_mismatch=allow_pdf_doi_mismatch,
+        allow_short_pdf=allow_short_pdf,
+    )
     if limit:
         pending = pending[:limit]
     console.print(f"{len(pending)} PDFs to attach")
+    if not allow_short_pdf:
+        held_short = sum(
+            1
+            for r in manifest.records.values()
+            if r.status == STATUS_OK
+            and r.path
+            and r.reason == REASON_SHORT_PDF
+        )
+        if held_short:
+            console.print(
+                f"[dim]{held_short} short PDF(s) held — "
+                "pass --allow-short-pdf to admit[/]"
+            )
     if not pending:
         console.print("[bold]Attached 0/0[/]")
         return

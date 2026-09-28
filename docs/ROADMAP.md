@@ -298,8 +298,10 @@ prerequisites for the fetch / lint / attach loop.
    `--apply`, and only from files already under `out/`. `--link` is the
    stored-to-linked cutover and is refused for group libraries. The quiet
    mirror stays a dual `imported_file` store unless you pass `--link`. Still
-   parked: PDF quality / wrong-paper triage, orphan GC of unreferenced
-   `storage/` files, author folders, and tablet send/get. PDF annotations and
+   parked: full wrong-paper triage, orphan GC of unreferenced
+   `storage/` files, author folders, and tablet send/get. **Shipped (slice):**
+   one-page density gate — sparse stubs soft-reject and keep searching; denser
+   one-pagers hold for `attach --allow-short-pdf`. PDF annotations and
    a full CSL dump are still later. A text layer for scans is `paperful ocr`.
 
 ## Maybe later

@@ -23,6 +23,8 @@ uv run paperful run --library
 
 # attach previously downloaded PDFs
 uv run paperful attach
+uv run paperful attach --allow-short-pdf          # admit denser one-pagers held by the density gate
+uv run paperful attach --allow-pdf-doi-mismatch   # attach files left by --strict-pdf-doi
 uv run paperful attach --item ITEMKEY --file ~/Downloads/paper.pdf
 
 # what happened
@@ -132,7 +134,7 @@ uv run paperful pack show
 | Command | Purpose |
 | --- | --- |
 | `doctor` | Environment check (Zotero / Mendeley / EndNote, paths, email, sessions, pdftotext, ocrmypdf, Playwright, grey-lit packs, LLM, browser-agent extra). Green / amber / red. TTY guide for remediations (`--guide` / `--no-guide`). `--json` prints `{name, status, code, detail}` and still exits 2 when a check is red (`zotero_down`, `zotero_api_off`, `zotero_bad_host`, `zotero_no_write`, `unpaywall_email`). Empty email is red only when `unpaywall` is in `sources`. LLM disabled stays green. Missing `ocrmypdf` is amber. |
-| `run` | Fill PDFs for items already in the library. Default attaches on Zotero 10+ (`--dry-run` does not). `--preset oa` drops EZProxy; `--preset eoi` is OA + EZProxy (`--upgrade-linked`, `--try-all`, `--retry-failed`, `--sources`, `--scihub`, `--browser-agent` / `--no-browser-agent`, `--strict-pdf-doi`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`, `--promote gated\|auto`). When `[llm].enabled` and the browser-agent extra is installed, appends `browser_agent` after Scholar / EZProxy / htmlpdf (default `[browser_agent].during_run`; `--no-browser-agent` skips it for one run). Soft-blocked OA PDF URLs (empty httpx body) retry via the vault browser (SSO hop, citation PDF link, download control) and can hand off with `--handoff list|tabs|walk|watch` (`watch` = tabs then poll `[inbox].dir`). `--promote` overrides `[playbooks].promote` for that process. Never rewrites bibliographic fields. A PDF DOI that differs from the library item still attaches, with `warn:pdf_doi_mismatch` on the Zotero note. `--strict-pdf-doi` saves the file and does not attach; `paperful attach --allow-pdf-doi-mismatch` attaches those rows later. |
+| `run` | Fill PDFs for items already in the library. Default attaches on Zotero 10+ (`--dry-run` does not). `--preset oa` drops EZProxy; `--preset eoi` is OA + EZProxy (`--upgrade-linked`, `--try-all`, `--retry-failed`, `--sources`, `--scihub`, `--browser-agent` / `--no-browser-agent`, `--strict-pdf-doi`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`, `--promote gated\|auto`). When `[llm].enabled` and the browser-agent extra is installed, appends `browser_agent` after Scholar / EZProxy / htmlpdf (default `[browser_agent].during_run`; `--no-browser-agent` skips it for one run). Soft-blocked OA PDF URLs (empty httpx body) retry via the vault browser (SSO hop, citation PDF link, download control) and can hand off with `--handoff list|tabs|walk|watch` (`watch` = tabs then poll `[inbox].dir`). `--promote` overrides `[playbooks].promote` for that process. Never rewrites bibliographic fields. A PDF DOI that differs from the library item still attaches, with `warn:pdf_doi_mismatch` on the Zotero note. `--strict-pdf-doi` saves the file and does not attach; `paperful attach --allow-pdf-doi-mismatch` attaches those rows later. One-page PDFs: sparse stubs soft-reject (keep searching); denser one-pagers hold for `attach --allow-short-pdf` (`gate_short_pdfs` / `short_pdf_min_words`). |
 | `recover` | Opt-in **browser-agent** PDF recovery (`--item KEY` repeatable, `--dry-run`, `--no-attach`). Also auto-appended as the last `run` lane when `[llm].enabled` and other vault browser lanes (Scholar, EZProxy, htmlpdf) fail — or when an OA lane soft-blocked a found PDF URL. Needs Python 3.11+, `paperful[browser-agent]`, and a session vault. Manual report: `state/runs/<stamp>-recover.json`. See [LLM](llm.md#a-recover-browser-agent-pdf-recovery). |
 | `lint` | Read-only identifier / PDF-DOI / title-hygiene findings (`--json`, `--strict`, `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). Codes: `missing_doi`, `suspect_doi`, `swappable_doi`, `pmid_no_doi`, `pdf_doi_mismatch`, `title_html`, `title_all_caps`, `title_filename`, `title_unusable`, `no_identifier`, plus `pdf_identity_mismatch` when `[lint].llm_pdf_match` is on. Writes `state/runs/<stamp>-lint.json` (also for `--json`, before a `--strict` exit 1). |
 | `fix-metadata` | Propose patches on disk; `--apply` writes them to the library (`--overwrite` replaces title, date, or venue even when you edited them — dry-run first; `--year-from` / `--year-to`, `--type` / `-T`, `--limit`). Whitelist: `doi`, `title`, `date`, `publicationTitle`. HTML title cleanup, ALL CAPS → Title Case, a blank or citation-shaped title replaced from the DOI work, and verified PDF-DOI adoption included; filename titles stay lint-only unless `[fix_metadata].llm_title` proposes a grounded title (`source = "llm_title"`). Dry-run and `--apply` both write `state/runs/<stamp>-fix-metadata.json` (`patches_applied` only after `--apply`). |
@@ -150,7 +152,7 @@ uv run paperful pack show
 | `pack` | `open` / `close` / `show` — group the run reports from one operator sequence into `state/packs/<id>.json` (`paperful.pack.v1`). `show` does not open the library. `PAPERFUL_PACK=off` keeps a command out of the open pack. |
 | `collections` | Collection tree with “No PDF” counts |
 | `report` | Manifest summary + latest run report (`--last-run`, `--json`, `--not-found`, `--status`) |
-| `attach` | Attach already-downloaded PDFs into the configured manager, or ingest a hand download with `--item KEY --file PATH` |
+| `attach` | Attach already-downloaded PDFs into the configured manager, or ingest a hand download with `--item KEY --file PATH`. `--allow-pdf-doi-mismatch` and `--allow-short-pdf` unlock holds from `--strict-pdf-doi` and the one-page density gate |
 | `snapshot` | Write a per-item restore folder under `out/` (`record.json`, optional PDF, notes) plus index, collection tree, and ledger pointers. `--pdfs additional\|all\|none`. `--dry-run` counts without writing. Year/type scope flags apply. |
 | `restore` | Recreate missing library items from those folders. Dry-run unless `--apply`. `--apply` creates missing items, attaches a local PDF when the live item has none, and adds missing notes. Does not overwrite bibliographic fields. Year/type scope flags apply. |
 | `import` | Load RIS, BibTeX, or EndNote XML into the configured manager. Dry-run unless `--apply`. |
@@ -278,13 +280,16 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
   that file. The legacy card is folded into `record.json`.
 - `state/manifest.jsonl` — one line per item attempt; the latest line per item
   key wins. Statuses: `ok` (on disk), `attached` (on disk + in Zotero),
-  `not_found`, `no_identifier`, `captcha`, `error`, `attach_failed`. `ok` /
+  `not_found`, `no_identifier`, `captcha`, `error`, `attach_failed`,
+  `retryable`. `ok` /
   `attached` are never retried; `not_found` / `no_identifier` only with
   `--retry-failed`; the rest are retried on every run. Extra fields:
   `library_doi` (DOI as stored in the manager), `doi` (DOI used for this
   attempt), `doi_verified` (`ok` / `suspect` / `swapped` / `unknown` /
   `missing`), `pdf_doi` (extracted from the file on disk after a successful
-  download).
+  download), `reason` (for example `strict_pdf_doi` or `short_pdf` when attach
+  is held — batch `attach` skips those unless `--allow-pdf-doi-mismatch` or
+  `--allow-short-pdf`).
 - `state/metadata-patches.jsonl` — append-only audit log of proposed bibliographic
   patches from `fix-metadata` (dry-run and `--apply` both append here first).
   One patch per item key per invocation; inspect the file for review — it is not

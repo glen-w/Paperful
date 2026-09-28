@@ -94,6 +94,9 @@ class Config:
     delay_scihub_s: tuple[float, float] = (3.0, 8.0)
     concurrency_oa: int = 4
     min_pdf_bytes: int = 10_000
+    # One-page density gate: soft-reject sparse stubs; hold dense one-pagers for admit.
+    gate_short_pdfs: bool = True
+    short_pdf_min_words: int = 200
     crossref_min_score: float = 0.90
     doi_suspect_score: float = 0.70
     verify_doi: bool = True
@@ -319,6 +322,10 @@ def _from_dict(raw: dict[str, Any], source: Path) -> Config:
         cfg.concurrency_oa = max(1, int(raw["concurrency_oa"]))
     if "min_pdf_bytes" in raw:
         cfg.min_pdf_bytes = int(raw["min_pdf_bytes"])
+    if "gate_short_pdfs" in raw:
+        cfg.gate_short_pdfs = bool(raw["gate_short_pdfs"])
+    if "short_pdf_min_words" in raw:
+        cfg.short_pdf_min_words = max(0, int(raw["short_pdf_min_words"]))
     if "crossref_min_score" in raw:
         cfg.crossref_min_score = float(raw["crossref_min_score"])
     if "doi_suspect_score" in raw:

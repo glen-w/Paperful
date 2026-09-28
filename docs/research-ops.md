@@ -54,10 +54,26 @@ library item, and the note carries `warn:pdf_doi_mismatch`.
 
 ```sh
 paperful run -C COLLECTION --strict-pdf-doi
+paperful attach --allow-pdf-doi-mismatch
 ```
 
 That saves the file as `ok` and does not attach it. A later `paperful attach`
 skips those rows unless you pass `--allow-pdf-doi-mismatch`.
+
+One-page PDFs are gated by text density (default on; `gate_short_pdfs`,
+`short_pdf_min_words` in [config](config.md)). A sparse one-pager (ethics
+declaration, consent form) is soft-rejected so other sources can still run. A
+denser one-pager (letter, short comment) is saved as `ok` with reason
+`short_pdf` and skipped by `attach` until you pass `--allow-short-pdf`. Set
+`gate_short_pdfs = false` to disable.
+
+```sh
+paperful attach --allow-short-pdf
+```
+
+Open the file under `out/` first if you need to decide whether it is a real
+letter or still junk. Manual `attach --item --file` and handoff walk/inbox
+reject sparse one-pagers but attach denser ones (you already chose the file).
 
 An in-memory DOI swap during fetch changes which work is requested. It does
 not write the library until `fix-metadata --apply`. Run `lint` before a large

@@ -48,6 +48,19 @@ mirror_failures_before_skip = 7
         and cfg.app_name == "custom"
         and cfg.mirror_failures_before_skip == 7
     )
+    assert cfg.gate_short_pdfs is True and cfg.short_pdf_min_words == 200
+
+
+def test_load_short_pdf_gate_knobs(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text("""
+email = "me@example.org"
+gate_short_pdfs = false
+short_pdf_min_words = 50
+""")
+    cfg = load_config(p)
+    assert cfg.gate_short_pdfs is False
+    assert cfg.short_pdf_min_words == 50
     assert cfg.manifest_path == cfg.state_dir / "manifest.jsonl"
     assert cfg.local_key_path.parent == cfg.state_dir
 

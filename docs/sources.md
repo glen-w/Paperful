@@ -84,7 +84,11 @@ opens those tabs, then polls `[inbox].dir` until Ctrl+C or idle timeout:
 match by DOI extracted from the PDF, else FIFO against the openable-miss
 queue from this handoff. `walk` opens one URL at a time, waits for you to
 download into `[gaps].downloads_dir` (default `~/Downloads`), then ingests
-via the same path as `attach --item --file`.
+via the same path as `attach --item --file`. Sparse one-page PDFs (few words)
+are rejected there so an ethics stub does not attach by accident; denser
+one-pagers (letters) attach because you already chose the file. Automated
+`run` holds denser one-pagers for `attach --allow-short-pdf` — see
+[research-ops](research-ops.md#wrong-work-pdfs).
 
 Set `[inbox].dir` (for example `~/Documents/paperful_inbox`) and point the
 browser download folder there (or Save As into it). Unmatched PDFs move to

@@ -9,6 +9,8 @@ from paperful.store import (
     STATUS_OK,
     STATUS_RETRYABLE,
     REASON_CLOSED,
+    REASON_SHORT_PDF,
+    REASON_STRICT_PDF_DOI,
     Manifest,
     Record,
     item_dirname,
@@ -165,6 +167,23 @@ def test_manifest_latest_record_wins_and_resume_logic(tmp_path):
         STATUS_ERROR: 1,
         STATUS_ATTACHED: 1,
     }
+
+
+def test_pending_attach_skips_gated_reasons(tmp_path):
+    m = Manifest(tmp_path / "m.jsonl")
+    m.write(Record(itemKey="DOI", status=STATUS_OK, path="a.pdf", reason=REASON_STRICT_PDF_DOI))
+    m.write(Record(itemKey="SHORT", status=STATUS_OK, path="b.pdf", reason=REASON_SHORT_PDF))
+    m.write(Record(itemKey="OK", status=STATUS_OK, path="c.pdf"))
+    assert [r.itemKey for r in m.pending_attach()] == ["OK"]
+    assert [r.itemKey for r in m.pending_attach(allow_pdf_doi_mismatch=True)] == [
+        "DOI",
+        "OK",
+    ]
+    assert [r.itemKey for r in m.pending_attach(allow_short_pdf=True)] == ["SHORT", "OK"]
+    assert [
+        r.itemKey
+        for r in m.pending_attach(allow_pdf_doi_mismatch=True, allow_short_pdf=True)
+    ] == ["DOI", "SHORT", "OK"]
 
 
 def test_manifest_tolerates_corrupt_lines(tmp_path):

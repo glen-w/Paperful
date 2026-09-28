@@ -26,7 +26,10 @@ The landing page is the short version of this story.
    paused. See [Slowing down](#slowing-down).
 6. **Save on this machine first.** The PDF lands under `out/` with a readable
    source line on the parent (“Free copy from Unpaywall.”). On Zotero 10+ it
-   can attach; older Zotero still gets the file on disk. Not every paywalled
+   can attach; older Zotero still gets the file on disk. A sparse one-page
+   download (ethics stub, consent form) is dropped so another source can try;
+   a denser one-pager waits for `paperful attach --allow-short-pdf`. Details:
+   [research-ops](research-ops.md#wrong-work-pdfs). Not every paywalled
    or DOI-less item comes back.
 
 ## Where it looks

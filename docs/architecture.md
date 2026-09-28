@@ -33,11 +33,16 @@ flowchart LR
    default skip items with only a `linked_url` PDF).
 2. **Prepare identifiers** — verify library DOI; optional in-memory swap; PubMed PMID→DOI; title→DOI via Crossref / OpenAlex / Semantic Scholar. Skipped for web/blog/forum types.
 3. **Sources** — ordered list (Unpaywall, OpenAlex, arXiv, …, CORE, EZProxy, HTML→PDF); per-item routing skips inapplicable sources unless `--try-all`.
-4. **Download** — validate PDF size; write under `out_dir` inside
+4. **Download** — validate PDF magic and `min_pdf_bytes`; probe page count and
+   first-page word density (`pdfid`); write under `out_dir` inside
    `<Author - Year - Title -- KEY>/`; write or refresh `record.json`; extract PDF DOI (`pdftotext`, then `pypdf`); append to `state/manifest.jsonl`.
+   Sparse one-pagers soft-reject so later sources can still run; denser one-pagers
+   stay `ok` with `reason=short_pdf` until `attach --allow-short-pdf`.
 5. **Attach** — optional write-back through the adapter (Zotero `imported_file`
    upload; Mendeley `POST /files`; EndNote stages a bundle until `flush_writes`).
-   Failures recorded as `attach_failed` with typed reasons.
+   Failures recorded as `attach_failed` with typed reasons. Batch `attach` skips
+   `reason=strict_pdf_doi` and `reason=short_pdf` unless the matching allow flag
+   is passed.
 
 `paperful lint` runs step 2 (and PDF-text DOI) for items **with and without** PDFs. `paperful fix-metadata` writes `state/metadata-patches.jsonl` then, with `--apply`, pushes patches through the adapter.
 
@@ -117,7 +122,7 @@ flowchart LR
 
 ## PDF text
 
-[`paperful/pdfid.py`](../paperful/pdfid.py): `pdftotext` (Poppler) if on `PATH`, else `pypdf` (first two pages + `/Title`; `max_pages=None` reads the whole file for `summarize`). Manager fulltext is last-resort: export the file to `state/pdf-cache/` first. `paperful doctor` reports amber if `pdftotext` is missing.
+[`paperful/pdfid.py`](../paperful/pdfid.py): `pdftotext` (Poppler) if on `PATH`, else `pypdf` (first two pages + `/Title`; `max_pages=None` reads the whole file for `summarize`). Also `page_count`, first-page `word_count`, and `short_pdf_verdict` for the one-page density gate on `run` (and sparse reject on handoff ingest). Manager fulltext is last-resort: export the file to `state/pdf-cache/` first. `paperful doctor` reports amber if `pdftotext` is missing.
 
 [`paperful/ocr.py`](../paperful/ocr.py): `paperful ocr` (dry-run unless `--apply`) runs `ocrmypdf` on image PDFs and replaces the file under `out/`. A manager-only PDF is exported into the item folder first; `state/pdf-cache/` is never the file that gets the layer, because the next export would overwrite it. `--attach` uploads that file as a new attachment and leaves the scan in place. `doctor` is amber when `ocrmypdf` is missing. The step is optional on `paperful all` (`--steps`), not in the default chain.
 

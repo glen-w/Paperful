@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 from .config import Config
 from .download import looks_like_pdf
 from .library import LibraryBackend, LibraryError
+from .pdfid import probe_pdf_bytes, short_pdf_verdict
 from .provenance import provenance_stamp
 from .store import (
     STATUS_ATTACHED,
@@ -258,6 +259,15 @@ def attach_pdf_file(
         raise ValueError(f"not a PDF: {path}")
     if len(content) < cfg.min_pdf_bytes:
         raise ValueError(f"too small ({len(content)} bytes): {path}")
+    if cfg.gate_short_pdfs:
+        probe = probe_pdf_bytes(content)
+        verdict = short_pdf_verdict(
+            probe.pages, probe.words, min_words=cfg.short_pdf_min_words
+        )
+        if verdict == "sparse_short":
+            raise ValueError(
+                f"sparse one-page PDF ({probe.words} words): {path}"
+            )
     if not backend.supports_write():
         raise LibraryError("This library has no write support.")
     import hashlib

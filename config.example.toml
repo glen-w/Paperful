@@ -73,6 +73,12 @@ concurrency_oa = 4
 # Reject downloads smaller than this (bytes) - usually an HTML error page.
 min_pdf_bytes = 10000
 
+# One-page PDF gate: sparse stubs (ethics/consent forms) soft-reject and keep
+# searching; denser one-pagers (letters, short comments) save but wait for
+# `paperful attach --allow-short-pdf`. Set gate_short_pdfs = false to disable.
+# gate_short_pdfs = true
+# short_pdf_min_words = 200
+
 # Title→DOI enrichment (Crossref, then OpenAlex, then Semantic Scholar): accept if similarity >= this.
 crossref_min_score = 0.90
 # Library DOI is suspect (eligible for in-memory swap) if title similarity is below this.
