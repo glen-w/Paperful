@@ -37,7 +37,7 @@ from .doctor import (
 )
 from .library import LibraryBackend, LibraryError, get_backend
 from .pack import PackError, close_pack, current_id, open_pack, pack_join_disabled
-from .pipeline import Pipeline, RunStats, make_client
+from .pipeline import Pipeline, RunStats, make_client, session_expired_items
 from .routing import (
     filter_sources_for_item_types,
     filter_sources_for_year_scope,
@@ -302,6 +302,14 @@ StrictPdfDoiOpt = typer.Option(
     help=(
         "Save a PDF whose DOI differs from the library item, but do not attach it. "
         "--no-strict-pdf-doi turns a profile default off."
+    ),
+)
+EzproxyReloginOpt = typer.Option(
+    None,
+    "--ezproxy-relogin/--no-ezproxy-relogin",
+    help=(
+        "After a run, pause to re-login when the EZProxy session expired, "
+        "then retry those items. Default follows ezproxy_relogin in config (on)."
     ),
 )
 SciHubOpt = typer.Option(
@@ -2075,6 +2083,7 @@ def run(
         ),
     ),
     scihub: bool | None = SciHubOpt,
+    ezproxy_relogin: bool | None = EzproxyReloginOpt,
     browser_agent: bool | None = BrowserAgentOpt,
     upgrade_linked: bool | None = UpgradeLinkedOpt,
     strict_pdf_doi: bool | None = StrictPdfDoiOpt,
@@ -2147,6 +2156,13 @@ def run(
     scihub = bound.scihub
     upgrade_linked = bound.upgrade_linked
     strict_pdf_doi = bound.strict_pdf_doi
+    # `all` calls this function directly. An omitted flag is a Typer option
+    # object, not None; only an explicit bool overrides config.
+    relogin = (
+        ezproxy_relogin
+        if isinstance(ezproxy_relogin, bool)
+        else cfg.ezproxy_relogin
+    )
     if not collection and not library:
         _refuse_missing_scope()
     _require_manager(cfg)
@@ -2271,6 +2287,7 @@ def run(
         year_to=year_to,
         item_types=",".join(sorted(types)) if types else None,
         strict_pdf_doi=strict_pdf_doi,
+        ezproxy_relogin=relogin,
     )
     write_api = None if mirror_only else _library_write_api(backend)
 
@@ -2304,15 +2321,31 @@ def run(
             try_all=True if try_all else None,
             strict_pdf_doi=bool(strict_pdf_doi),
         )
+        interrupted = False
         try:
             stats = pipe.run(todo)
         except KeyboardInterrupt:
+            interrupted = True
             console.print(
                 "\n[yellow]Interrupted - progress is in the manifest; rerun to resume.[/]"
             )
             stats = pipe.stats
             if not stats.finished_at:
                 stats.finished_at = time.time()
+        stats = pipe.stats
+    # Fetch bar is done and pipe.run has closed the vault browser. Re-login
+    # happens here, still before the report and before --handoff opens tabs.
+    if not interrupted:
+        try:
+            _maybe_ezproxy_relogin(cfg, pipe, todo, enabled=relogin)
+        except KeyboardInterrupt:
+            console.print(
+                "\n[yellow]Interrupted during EZProxy re-login - "
+                "progress is in the manifest.[/]"
+            )
+            if not pipe.stats.finished_at:
+                pipe.stats.finished_at = time.time()
+        stats = pipe.stats
     stats.skipped_manifest = skipped_manifest
     stats.linked_url_skipped = linked_skipped
     stats.scope = scope
@@ -2328,6 +2361,10 @@ def run(
     if mirror_only:
         _mirror_deferred(cfg)
     if handoff and not dry_run:
+        # Tabs use the default browser. Release the vault profile first so
+        # those tabs do not land in the EZProxy login window.
+        if pipe.browser is not None:
+            pipe.browser.close()
         _run_session_handoff(
             cfg,
             backend,
@@ -2338,6 +2375,82 @@ def run(
             include_doi_tabs=include_doi_tabs,
             downloads_dir=downloads_dir,
         )
+
+
+def _stdin_is_tty() -> bool:
+    return sys.stdin.isatty()
+
+
+def _maybe_ezproxy_relogin(
+    cfg: Config,
+    pipe: Pipeline,
+    todo: list,
+    *,
+    enabled: bool,
+) -> None:
+    """Pause after the fetch so the operator can refresh an expired EZProxy session.
+
+    The vault browser from the fetch is already closed. This opens a headed
+    login, retries only ``retryable`` / ``session expired`` items, then closes
+    that browser again. The report and ``--handoff`` tabs run after this
+    returns, so manual-download tabs are not opened in the login window.
+    Off, or not a terminal: leave those items for the next ``run``.
+    """
+    if not enabled or not _stdin_is_tty():
+        return
+    retry = session_expired_items(pipe.manifest, todo)
+    if not retry:
+        return
+    n = len(retry)
+    try:
+        answer = console.input(
+            f"Re-login and retry {n} EZProxy item(s)? [Y/n] "
+        ).strip().lower()
+    except EOFError:
+        return
+    if answer not in {"", "y", "yes"}:
+        console.print("[yellow]Skipping EZProxy re-login.[/]")
+        return
+    from . import session as sess
+    from .sources import ezproxy as ez
+
+    console.print("Opening a browser to refresh the EZProxy session.")
+    try:
+        sess.login_headed(
+            cfg,
+            "ezproxy",
+            confirm=_confirm_session_login,
+            on_note=lambda msg: console.print(f"[dim]{msg}[/]"),
+        )
+    except sess.SessionError as exc:
+        console.print(f"[red]{exc}[/]")
+        console.print("Run [bold]paperful session login ezproxy[/] and retry.")
+        return
+    pipe.refresh_session()
+    ok, detail = ez.session_ok(pipe.ctx)
+    if not ok:
+        console.print(
+            f"[yellow]EZProxy session still not ready ({detail}).[/] "
+            "Run [bold]paperful session login ezproxy[/] and retry."
+        )
+        if pipe.browser is not None:
+            pipe.browser.close()
+        return
+    console.print(f"[green]EZProxy session ready.[/] Retrying {n} item(s).")
+    saved_sources = list(pipe.sources)
+    saved_progress = pipe.progress
+    pipe.sources = ["ezproxy"]
+    pipe.stats.drop_outcomes({it.key for it in retry})
+    try:
+        with _item_progress() as progress:
+            task_id = progress.add_task("EZProxy retry", total=n)
+            pipe.progress = lambda: progress.advance(task_id)
+            pipe.run(retry)
+    finally:
+        pipe.sources = saved_sources
+        pipe.progress = saved_progress
+        if pipe.browser is not None:
+            pipe.browser.close()
 
 
 def _run_session_handoff(
@@ -4426,6 +4539,7 @@ def _dispatch_all_step(
             handoff=None,
             include_doi_tabs=False,
             downloads_dir=None,
+            ezproxy_relogin=None,
         )
         return
     if step == "lint":

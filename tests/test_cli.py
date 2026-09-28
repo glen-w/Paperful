@@ -431,6 +431,223 @@ def test_run_unknown_collection(cfg_file, stub_zotero):
     assert res.exit_code == 1 and "No collection matching" in res.stdout
 
 
+def _stub_one_item(stub_zotero):
+    from tests.conftest import make_item
+
+    stub_zotero.items_in_scope = lambda keys: [
+        make_item(key="I1", year=2024, collection_paths=["BBNJ"]),
+    ]
+
+
+def _fake_ezproxy_run(runs: list[list[str]]):
+    from paperful.runreport import ItemOutcome
+    from paperful.store import STATUS_RETRYABLE
+
+    def fake_run(self, items, batch_size=40):
+        runs.append(list(self.sources))
+        if len(runs) == 1:
+            for it in items:
+                self.manifest.write(
+                    Record(
+                        itemKey=it.key,
+                        status=STATUS_RETRYABLE,
+                        reason="session expired",
+                        title=it.title,
+                    )
+                )
+                self.stats.bump(STATUS_RETRYABLE)
+                self.stats.add_item(
+                    ItemOutcome(
+                        itemKey=it.key,
+                        title=it.title,
+                        status=STATUS_RETRYABLE,
+                        reason="session expired",
+                    )
+                )
+            self._ezproxy_down = True
+        else:
+            for it in items:
+                self.manifest.write(
+                    Record(itemKey=it.key, status=STATUS_OK, title=it.title)
+                )
+                self.stats.bump(STATUS_OK)
+                self.stats.add_item(
+                    ItemOutcome(itemKey=it.key, title=it.title, status=STATUS_OK)
+                )
+        self.stats.finished_at = 1.0
+        return self.stats
+
+    return fake_run
+
+
+def test_run_ezproxy_relogin_retries_on_tty(cfg_file, stub_zotero, monkeypatch):
+    _stub_one_item(stub_zotero)
+    runs: list[list[str]] = []
+    logins: list[str] = []
+    monkeypatch.setattr(cli.Pipeline, "run", _fake_ezproxy_run(runs))
+    monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
+    monkeypatch.setattr(
+        "paperful.session.login_headed",
+        lambda cfg, slot, **kwargs: logins.append(slot) or [],
+    )
+    monkeypatch.setattr(
+        "paperful.sources.ezproxy.session_ok", lambda ctx: (True, "ok")
+    )
+    res = runner.invoke(
+        cli.app,
+        ["run", "-c", str(cfg_file), "-C", "BBNJ", "--no-browser-agent"],
+        input="\n",
+    )
+    assert res.exit_code == 0, res.stdout
+    assert logins == ["ezproxy"]
+    assert len(runs) == 2
+    assert runs[1] == ["ezproxy"]
+    assert "Re-login and retry 1" in res.stdout
+    assert "EZProxy misses" not in res.stdout
+
+
+def test_run_ezproxy_relogin_skips_when_declined_or_not_a_tty(
+    cfg_file, stub_zotero, monkeypatch
+):
+    _stub_one_item(stub_zotero)
+    runs: list[list[str]] = []
+    logins: list[str] = []
+    monkeypatch.setattr(cli.Pipeline, "run", _fake_ezproxy_run(runs))
+    monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
+    monkeypatch.setattr(
+        "paperful.session.login_headed",
+        lambda cfg, slot, **kwargs: logins.append(slot) or [],
+    )
+    res = runner.invoke(
+        cli.app,
+        ["run", "-c", str(cfg_file), "-C", "BBNJ", "--no-browser-agent"],
+        input="n\n",
+    )
+    assert res.exit_code == 0, res.stdout
+    assert logins == []
+    assert len(runs) == 1
+
+    runs.clear()
+    monkeypatch.setattr(cli, "_stdin_is_tty", lambda: False)
+    res = runner.invoke(
+        cli.app,
+        ["run", "-c", str(cfg_file), "-C", "BBNJ", "--no-browser-agent"],
+    )
+    assert res.exit_code == 0, res.stdout
+    assert logins == []
+    assert len(runs) == 1
+
+    runs.clear()
+    monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
+    res = runner.invoke(
+        cli.app,
+        [
+            "run",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--no-browser-agent",
+            "--no-ezproxy-relogin",
+        ],
+        input="y\n",
+    )
+    assert res.exit_code == 0, res.stdout
+    assert logins == []
+    assert len(runs) == 1
+
+
+def test_run_handoff_tabs_open_after_ezproxy_browser_closes(
+    cfg_file, stub_zotero, monkeypatch
+):
+    from paperful.session import BrowserSession
+
+    _stub_one_item(stub_zotero)
+    events: list[str] = []
+    monkeypatch.setattr(cli.Pipeline, "run", _fake_ezproxy_run([]))
+    monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
+    monkeypatch.setattr(
+        "paperful.session.login_headed",
+        lambda cfg, slot, **kwargs: events.append("login") or [],
+    )
+    monkeypatch.setattr(
+        "paperful.sources.ezproxy.session_ok", lambda ctx: (True, "ok")
+    )
+    orig_close = BrowserSession.close
+
+    def tracking_close(self):
+        events.append("close")
+        return orig_close(self)
+
+    monkeypatch.setattr(BrowserSession, "close", tracking_close)
+    monkeypatch.setattr(
+        cli, "_run_session_handoff", lambda *args, **kwargs: events.append("handoff")
+    )
+    res = runner.invoke(
+        cli.app,
+        [
+            "run",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--no-browser-agent",
+            "--handoff",
+            "tabs",
+        ],
+        input="\n",
+    )
+    assert res.exit_code == 0, res.stdout
+    assert events[-1] == "handoff"
+    after_login = events[events.index("login") + 1 : events.index("handoff")]
+    assert "close" in after_login
+
+
+def test_run_ezproxy_relogin_follows_config_off(cfg_file, stub_zotero, monkeypatch):
+    cfg_file.write_text(cfg_file.read_text() + "ezproxy_relogin = false\n")
+    _stub_one_item(stub_zotero)
+    runs: list[list[str]] = []
+    logins: list[str] = []
+    monkeypatch.setattr(cli.Pipeline, "run", _fake_ezproxy_run(runs))
+    monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
+    monkeypatch.setattr(
+        "paperful.session.login_headed",
+        lambda cfg, slot, **kwargs: logins.append(slot) or [],
+    )
+    res = runner.invoke(
+        cli.app,
+        ["run", "-c", str(cfg_file), "-C", "BBNJ", "--no-browser-agent"],
+        input="y\n",
+    )
+    assert res.exit_code == 0, res.stdout
+    assert logins == []
+    assert len(runs) == 1
+
+
+def test_run_ezproxy_relogin_skips_second_pass_when_probe_fails(
+    cfg_file, stub_zotero, monkeypatch
+):
+    _stub_one_item(stub_zotero)
+    runs: list[list[str]] = []
+    monkeypatch.setattr(cli.Pipeline, "run", _fake_ezproxy_run(runs))
+    monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
+    monkeypatch.setattr(
+        "paperful.session.login_headed", lambda cfg, slot, **kwargs: []
+    )
+    monkeypatch.setattr(
+        "paperful.sources.ezproxy.session_ok",
+        lambda ctx: (False, "session expired or not logged in"),
+    )
+    res = runner.invoke(
+        cli.app,
+        ["run", "-c", str(cfg_file), "-C", "BBNJ", "--no-browser-agent"],
+        input="y\n",
+    )
+    assert res.exit_code == 0, res.stdout
+    assert len(runs) == 1
+    assert "still not ready" in res.stdout
+
+
 def test_run_skips_already_handled_items(cfg_file, stub_zotero, tmp_path):
     from tests.conftest import make_item
 

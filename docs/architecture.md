@@ -128,7 +128,7 @@ flowchart LR
 
 ## Circuit breaker
 
-Open-access sources run in parallel (`concurrency_oa`). Captcha and block pages increment a per-source counter; after `circuit_breaker_threshold` the source pauses, then one later item is probed. A 429 does not open the circuit. Scholar, Sci-Hub, EZProxy, and HTML→PDF stay serial (they share one Chromium profile lock). An expired EZProxy session stops further proxy calls for that run; those items are `retryable`. Publisher PDF URLs that 403 on httpx are retried in that profile (EZProxy-wrapped when configured). Direct PDF URLs are tried before landing pages.
+Open-access sources run in parallel (`concurrency_oa`). Captcha and block pages increment a per-source counter; after `circuit_breaker_threshold` the source pauses, then one later item is probed. A 429 does not open the circuit. Scholar, Sci-Hub, EZProxy, and HTML→PDF stay serial (they share one Chromium profile lock). An expired EZProxy session stops further proxy calls for that pass; those items are `retryable`. On a TTY, `run` then pauses (`ezproxy_relogin`, default on) to re-login and retry only those items. Publisher PDF URLs that 403 on httpx are retried in that profile (EZProxy-wrapped when configured). Direct PDF URLs are tried before landing pages.
 
 ## Sci-Hub and presets
 

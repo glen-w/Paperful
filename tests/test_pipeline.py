@@ -24,6 +24,7 @@ from paperful.store import (
     REASON_STRICT_PDF_DOI,
     STATUS_OK,
     Manifest,
+    Record,
     item_dirname,
     item_filename,
     record_path,
@@ -251,6 +252,83 @@ def test_browser_agent_bot_wall_skips_the_rest_of_the_run(pipe_factory):
     assert "browser_agent:skipped(bot wall)" in manifest.get("B").attempts
     assert manifest.get("B").status == STATUS_RETRYABLE
     assert manifest.get("B").reason == "bot wall"
+
+
+def test_session_expired_items_ignores_other_rows(cfg):
+    manifest = Manifest(cfg.manifest_path)
+    manifest.write(
+        Record(itemKey="A", status=STATUS_RETRYABLE, reason="session expired")
+    )
+    manifest.write(
+        Record(itemKey="B", status=STATUS_RETRYABLE, reason="source paused")
+    )
+    manifest.write(
+        Record(itemKey="C", status=STATUS_NOT_FOUND, reason="session expired")
+    )
+    items = [
+        make_item(key="A"),
+        make_item(key="B"),
+        make_item(key="C"),
+        make_item(key="D"),
+    ]
+    picked = pl.session_expired_items(manifest, items)
+    assert [it.key for it in picked] == ["A"]
+
+
+def test_ezproxy_second_pass_retries_skipped_keys(pipe_factory):
+    from paperful.runreport import ItemOutcome
+
+    ez = StubSource(
+        "ezproxy",
+        {"A": Candidate.miss("ezproxy", Outcome.ERROR, "ezproxy session expired - re-login")},
+    )
+    pipe, manifest = pipe_factory({"ezproxy": ez}, ["ezproxy"])
+    pipe.try_all = True
+    items = [make_item(key="A"), make_item(key="B"), make_item(key="C")]
+    pipe.run(items)
+    assert ez.calls == ["A"]
+    assert pipe.stats.retryable == 3
+    pipe.stats.add_item(
+        ItemOutcome(itemKey="Z", title="kept", status=STATUS_NOT_FOUND, reason="closed")
+    )
+    pipe.stats.bump(STATUS_NOT_FOUND)
+    pipe.stats.drop_outcomes({it.key for it in items})
+    assert pipe.stats.retryable == 0
+    assert pipe.stats.not_found == 1
+    assert [row.itemKey for row in pipe.stats.items] == ["Z"]
+
+    ez.results = {
+        key: Candidate(url=f"https://pub.test/{key}.pdf", source="ezproxy")
+        for key in ("A", "B", "C")
+    }
+    ez.calls.clear()
+    pipe._ezproxy_down = False
+    pipe.sources = ["ezproxy"]
+    pipe.run(items)
+    assert set(ez.calls) == {"A", "B", "C"}
+    assert manifest.get("A").status == STATUS_OK
+    assert pipe.stats.retryable == 0
+    assert pipe.stats.ok == 3
+
+
+def test_refresh_session_clears_ezproxy_down(pipe_factory, monkeypatch):
+    pipe, _manifest = pipe_factory({"ezproxy": StubSource("ezproxy")}, ["ezproxy"])
+    pipe._ezproxy_down = True
+    old_client = pipe.client
+    sentinel = mock_client(lambda r: httpx.Response(200, content=PDF_BYTES))
+
+    class DummyBrowser:
+        def close(self):
+            self.closed = True
+
+    monkeypatch.setattr(pl, "make_client", lambda cfg: sentinel)
+    monkeypatch.setattr(pl, "BrowserSession", lambda cfg: DummyBrowser())
+    pipe.refresh_session()
+    assert pipe._ezproxy_down is False
+    assert pipe.client is sentinel
+    assert pipe.client is not old_client
+    assert pipe.ctx.client is sentinel
+    assert pipe.ctx.browser is pipe.browser
 
 
 def test_ezproxy_expiry_marks_the_rest_retryable(pipe_factory):

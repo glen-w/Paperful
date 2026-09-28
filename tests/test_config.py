@@ -17,6 +17,7 @@ def test_defaults_when_no_file(tmp_path, monkeypatch):
     assert cfg.scholar_cookie_path == cfg.state_dir / "scholar-cookies.txt"
     assert "scihub" not in cfg.sources
     assert cfg.attach is True and cfg.concurrency_oa == 4
+    assert cfg.ezproxy_relogin is True
     assert cfg.mirror_pdfs == "additional"
 
 
@@ -68,6 +69,16 @@ short_pdf_min_words = 50
 def test_missing_explicit_path_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         load_config(tmp_path / "missing.toml")
+
+
+def test_ezproxy_relogin_can_be_turned_off(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text("""
+email = "me@example.org"
+ezproxy_relogin = false
+""")
+    cfg = load_config(p)
+    assert cfg.ezproxy_relogin is False
 
 
 def test_load_routing_and_scholar_cookie_paths(tmp_path):

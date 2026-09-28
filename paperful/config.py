@@ -113,6 +113,8 @@ class Config:
     user_agent: str = USER_AGENT
     # Campus EZProxy (e.g. Sciences Po). Empty base disables the source.
     ezproxy_base: str = ""
+    # After a run, pause on a TTY to re-login and retry session-expired items.
+    ezproxy_relogin: bool = True
     ezproxy_cookies: Path | None = (
         None  # Netscape cookies.txt; default state/ezproxy-cookies.txt
     )
@@ -348,6 +350,8 @@ def _from_dict(raw: dict[str, Any], source: Path) -> Config:
         cfg.user_agent = str(raw["user_agent"])
     if "ezproxy_base" in raw:
         cfg.ezproxy_base = str(raw["ezproxy_base"]).strip()
+    if "ezproxy_relogin" in raw:
+        cfg.ezproxy_relogin = bool(raw["ezproxy_relogin"])
     if "ezproxy_cookies" in raw and raw["ezproxy_cookies"]:
         cfg.ezproxy_cookies = Path(str(raw["ezproxy_cookies"])).expanduser()
     if "scholar_cookies" in raw and raw["scholar_cookies"]:

@@ -78,7 +78,9 @@ item. A clean result opens the source again.
 Items missed because a source was paused, or because the campus session
 expired, are picked up on the next `run`. Items every applicable source
 missed stay closed until you ask to retry them. An expired EZProxy session
-stops further proxy calls for the rest of that run.
+stops further proxy calls for the rest of that pass. On a terminal, `run`
+then pauses so you can log in again and retry those items
+(`ezproxy_relogin`, default on; `--no-ezproxy-relogin` skips the pause).
 
 The knobs and error names: [Source routing](sources.md).
 

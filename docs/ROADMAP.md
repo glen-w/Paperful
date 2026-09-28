@@ -63,7 +63,15 @@ Zotero has. Do not document either adapter as supported until testers say so.
 ## Core (keep sharpening)
 
 - Resumable missing-PDF fetch, source routing, circuit breaker, EZProxy / Scholar
-  session hygiene, attach reliability, `doctor` / `report`
+  session hygiene, attach reliability, `doctor` / `report`. **Shipped (find
+  recovery):** soft-blocked OA URLs (empty httpx body) retry in the vault
+  browser (SSO / PDF link / download control), then optional `browser_agent`;
+  items stay `retryable` / `soft block` rather than hard `not_found`. Manual
+  handoff: `run` / `gaps --handoff list|tabs|walk|watch` and `paperful inbox
+  watch` / `drain` against `[inbox].dir` (PDF DOI match; unmatched →
+  `unmatched/`). Distinct from snowball watch `inbox.jsonl`. CLI
+  `--browser-agent` / `--no-browser-agent` overrides `[browser_agent].during_run`
+  for one `run` / `all`.
 - **Quiet mirror** — [quiet-mirror.md](quiet-mirror.md). **Shipped:** `snapshot`
   writes a per-item folder (`record.json`, optional PDF, notes) plus
   `out/_index.jsonl`, `out/_collections.json`, and `out/_history.json`.
@@ -99,8 +107,10 @@ Py 3.11+), `fix-metadata` title proposals (`[fix_metadata].llm_title`), `lint`
 `synthesize` → literature review from those notes (`state/reports/` and, by
 default, a collection note). Image PDFs need `paperful ocr --apply` first.
 See [architecture § LLM layer](architecture.md#llm-layer-optional-local-first).
-Still later: Browser Use Cloud / BU2, batch `recover --from-last-run`, playbook
-mining from agent traces, venue/date cleanup.
+URL recipes from vault/agent wins are already `playbooks propose` / `promote`
+← `state/fetch-wins.jsonl` (below). Still later: Browser Use Cloud / BU2,
+batch `recover --from-last-run`, mining richer playbooks from agent *step*
+traces (beyond host/path wins), venue/date cleanup.
 
 **MVP:** when a title looks wonky (ALL CAPS, truncated, HTML junk, filename-as-title,
 mojibake), propose a cleaned title using **abstract and/or first-page PDF text**
@@ -198,8 +208,9 @@ LLM tags as source of truth without stage 1–2 anchors.
 ## Snowball
 
 **Status:** keyword, DOI, ORCID, and collection seeds, hybrid keyword-then-hop,
-gates including `approve-each`, overlap ranking, and optional `[llm]` query
-suggestions are in the tree. Contract: [snowball.md](snowball.md). Still
+`direction` sides `refs` / `cites` / `both` / `keywords` / `similar` (and
+combos), gates including `approve-each`, overlap ranking, and optional `[llm]`
+query suggestions are in the tree. Contract: [snowball.md](snowball.md). Still
 outside: `expand = cited_authors`.
 
 Snowball grows a library outward from a keyword, one or more DOIs, an ORCID,
@@ -223,8 +234,11 @@ Phases, in order. Each can stop without the next.
 2. **Writing gates and the one-shot library. Shipped:** `--gate auto` and
    `fetch_pdfs`, plus `approve-batch` / `snowball apply`, ORCID works (plus
    OpenAlex author fill), and collection DOI seeds.
-3. **Optional expansion. Shipped:** cited-by (`direction`), depth above 1
-   under the same caps.
+3. **Optional expansion. Shipped:** `direction` including cited-by, OpenAlex
+   keyword hops, and `similar` (one ranked hop: shared references, then
+   Semantic Scholar recommendations; combinable e.g. `refs+similar`), plus
+   depth above 1 under the same caps. A finished queue with no `deferred.json`
+   resumes into create / PDF fetch without searching OpenAlex again.
 4. **Config. Shipped:** dedupe scope, type and venue filters, profile save.
 5. **Last pass. Shipped:** `hybrid`, `approve-each`, overlap ranking,
    Crossref / Semantic Scholar fill, and `[llm]` suggestions on the queue.
@@ -263,7 +277,9 @@ prerequisites for the fetch / lint / attach loop.
    as run scopes. Mendeley and EndNote adapters exist and are seeking testers
    (above). Treating every manager as an equal is still later.
 2. **Acquire beyond journal PDFs** — **shipped:** local session vault
-   (`paperful session login`); **pluggable grey-lit PDF playbooks** in
+   (`paperful session login`); soft-blocked OA → vault retry (Core above);
+   manual handoff / PDF inbox (`--handoff`, `inbox watch` / `drain`);
+   **pluggable grey-lit PDF playbooks** in
    `direct`/`landing` with builtin packs (UNGA/undocs · BBNJ/DOALOS · ISA;
    plus FAO/OECD/IEA/WHO — extend via `[[grey_playbooks]]`). Still
    parked: SI/dataset/code siblings;

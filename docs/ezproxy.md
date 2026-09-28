@@ -135,8 +135,14 @@ uv run paperful run --collection YOUR_COLLECTION --retry-failed
 ## 6. When the session expires
 
 Library SSO typically lasts hours to a few days. When EZProxy starts failing
-you will see `ezproxy:error(ezproxy session expired…)` in `paperful report`.
-Fix: `paperful session login ezproxy`, then `--retry-failed` if needed.
+you will see `ezproxy:error(ezproxy session expired…)` and later items skip
+the proxy for that pass. On a terminal, `run` pauses after the fetch
+(`ezproxy_relogin`, default on): log in again, and Paperful retries only
+those items. That browser is closed before the report and before `--handoff`
+opens tabs in your normal browser. Set `ezproxy_relogin = false` or pass
+`--no-ezproxy-relogin` to skip the pause. Otherwise run
+`paperful session login ezproxy`, then another `run` (`--retry-failed` only
+if the misses were closed as `not_found`).
 
 ## Advanced: Netscape cookies.txt
 

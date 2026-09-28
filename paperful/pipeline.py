@@ -177,6 +177,53 @@ class RunStats:
         self.items.append(outcome)
         self.note_error(outcome.error_type)
 
+    def drop_outcomes(self, keys: set[str]) -> None:
+        """Remove prior outcomes so a second pass does not double-count those items."""
+        countable = {
+            "ok",
+            "not_found",
+            "no_identifier",
+            "captcha",
+            "error",
+            "retryable",
+            "attached",
+            "attach_failed",
+        }
+        kept: list[ItemOutcome] = []
+        for outcome in self.items:
+            if outcome.itemKey not in keys:
+                kept.append(outcome)
+                continue
+            if outcome.status in countable:
+                current = int(getattr(self, outcome.status, 0))
+                setattr(self, outcome.status, max(0, current - 1))
+            if outcome.source and outcome.status in (STATUS_OK, STATUS_ATTACHED):
+                left = self.by_source.get(outcome.source, 0) - 1
+                if left <= 0:
+                    self.by_source.pop(outcome.source, None)
+                else:
+                    self.by_source[outcome.source] = left
+            if outcome.error_type:
+                left = self.errors_by_type.get(outcome.error_type, 0) - 1
+                if left <= 0:
+                    self.errors_by_type.pop(outcome.error_type, None)
+                else:
+                    self.errors_by_type[outcome.error_type] = left
+        self.items = kept
+
+
+def session_expired_items(manifest: Manifest, items: list[Item]) -> list[Item]:
+    """Items this run left retryable because the EZProxy session expired."""
+    expired: list[Item] = []
+    for item in items:
+        rec = manifest.get(item.key)
+        if rec is None or rec.status != STATUS_RETRYABLE:
+            continue
+        if "session expired" not in (rec.reason or ""):
+            continue
+        expired.append(item)
+    return expired
+
 
 def _lane_paused(attempts: list[str]) -> bool:
     return any(
@@ -213,6 +260,7 @@ class Pipeline:
         self.attacher = attacher
         self.strict_pdf_doi = strict_pdf_doi
         self.progress = progress or (lambda: None)
+        self._use_browser = use_browser
         self.client = make_client(cfg)
         self.browser = BrowserSession(cfg) if use_browser else None
         self.ctx = Context(config=cfg, client=self.client, browser=self.browser)
@@ -263,6 +311,22 @@ class Pipeline:
                 self.browser.close()
         self.stats.finished_at = time.time()
         return self.stats
+
+    def refresh_session(self) -> None:
+        """New HTTP client and vault browser after a headed re-login.
+
+        ``run`` closes the browser, and a closed session cannot be reopened.
+        """
+        if self.browser is not None:
+            self.browser.close()
+        try:
+            self.client.close()
+        except Exception:
+            pass
+        self.client = make_client(self.cfg)
+        self.browser = BrowserSession(self.cfg) if self._use_browser else None
+        self.ctx = Context(config=self.cfg, client=self.client, browser=self.browser)
+        self._ezproxy_down = False
 
     def _run_batch(self, items: list[Item]) -> None:
         oa_sources = [
@@ -452,10 +516,16 @@ class Pipeline:
         if self._ezproxy_down:
             return
         self._ezproxy_down = True
-        self._emit(
-            "[yellow]ezproxy session expired. Re-login with `paperful session login`, "
-            "then `paperful run` on this collection.[/]"
-        )
+        if self.cfg.ezproxy_relogin:
+            self._emit(
+                "[yellow]ezproxy session expired.[/] Remaining proxy attempts in this "
+                "pass will be skipped. A terminal run can re-login at the end."
+            )
+        else:
+            self._emit(
+                "[yellow]ezproxy session expired. Re-login with `paperful session login`, "
+                "then `paperful run` on this collection.[/]"
+            )
 
     def _skip_ezproxy(
         self, queue: list[tuple[Item, list[str]]]
