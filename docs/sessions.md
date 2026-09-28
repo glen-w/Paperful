@@ -24,9 +24,12 @@ uv run paperful session export          # refresh Netscape dumps for httpx
 ```
 
 `session_ok` prefers the vault Chromium profile (the same path as Unpaywall
-browser wraps) and falls back to httpx + Netscape cookies. File presence in
-`doctor` without `--probe` only means a login was saved, not that campus SSO
-is still live.
+browser wraps) and falls back to httpx + Netscape cookies. Campus EZProxy /
+CAS tickets are often **session cookies**: CDP export keeps them in
+`state/sessions/cookies.txt`, but Chrome drops them from the profile when it
+exits. The vault browser re-injects that Netscape dump on launch so probes and
+publisher fetches match the httpx jar. File presence in `doctor` without
+`--probe` only means a login was saved, not that campus SSO is still live.
 
 Scholar fetches during `run` reuse this Chromium profile when it exists (Google
 often keys CAPTCHA to the browser, not cookies). htmlpdf uses the same profile

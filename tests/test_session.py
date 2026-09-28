@@ -5,11 +5,14 @@ from __future__ import annotations
 from paperful import pipeline as pl
 from paperful.cookies import (
     load_netscape_cookies,
+    merge_netscape_for_playwright,
     netscape_from_playwright,
+    playwright_cookies_from_netscape,
     split_playwright_cookies,
     write_netscape,
 )
 from paperful.session import (
+    BrowserSession,
     SessionError,
     collect_pdf_from_page,
     export_cookies,
@@ -53,6 +56,105 @@ def test_netscape_from_playwright_roundtrip(tmp_path):
     scholar, other = split_playwright_cookies(cookies)
     assert [c["name"] for c in scholar] == ["SID"]
     assert [c["name"] for c in other] == ["session"]
+
+
+def test_playwright_cookies_from_netscape_keeps_session_cookies(tmp_path):
+    path = tmp_path / "c.txt"
+    write_netscape(
+        path,
+        [
+            {
+                "name": "ezproxy",
+                "value": "tok",
+                "domain": ".idm.oclc.org",
+                "path": "/",
+                "expires": 0,
+                "secure": False,
+                "httpOnly": False,
+            },
+            {
+                "name": "CASTGC",
+                "value": "TGT-1",
+                "domain": "federation.sciences-po.fr",
+                "path": "/cas/",
+                "expires": 0,
+                "secure": True,
+                "httpOnly": True,
+            },
+        ],
+    )
+    parsed = playwright_cookies_from_netscape(path)
+    by_name = {c["name"]: c for c in parsed}
+    assert by_name["ezproxy"]["domain"] == ".idm.oclc.org"
+    assert "expires" not in by_name["ezproxy"]
+    assert by_name["CASTGC"]["httpOnly"] is True
+    assert by_name["CASTGC"]["secure"] is True
+
+
+def test_merge_netscape_for_playwright_first_wins(tmp_path):
+    a = tmp_path / "a.txt"
+    b = tmp_path / "b.txt"
+    write_netscape(
+        a,
+        [
+            {
+                "name": "ezproxy",
+                "value": "from-a",
+                "domain": ".idm.oclc.org",
+                "path": "/",
+            }
+        ],
+    )
+    write_netscape(
+        b,
+        [
+            {
+                "name": "ezproxy",
+                "value": "from-b",
+                "domain": ".idm.oclc.org",
+                "path": "/",
+            },
+            {
+                "name": "SID",
+                "value": "g",
+                "domain": ".google.com",
+                "path": "/",
+            },
+        ],
+    )
+    merged = merge_netscape_for_playwright(a, b)
+    assert len(merged) == 2
+    assert {c["name"]: c["value"] for c in merged} == {
+        "ezproxy": "from-a",
+        "SID": "g",
+    }
+
+
+def test_browser_session_injects_exported_cookies(cfg, tmp_path):
+    write_netscape(
+        vault_cookies_path(cfg),
+        [
+            {
+                "name": "ezproxy",
+                "value": "tok",
+                "domain": ".idm.oclc.org",
+                "path": "/",
+                "expires": 0,
+            }
+        ],
+    )
+    added: list[list[dict]] = []
+
+    class FakeCtx:
+        def add_cookies(self, cookies):
+            added.append(list(cookies))
+
+    sess = BrowserSession(cfg)
+    sess._ctx = FakeCtx()
+    sess._inject_exported_cookies()
+    assert len(added) == 1
+    assert added[0][0]["name"] == "ezproxy"
+    assert "expires" not in added[0][0]
 
 
 def test_export_cookies_writes_vault_and_compat(cfg, tmp_path):

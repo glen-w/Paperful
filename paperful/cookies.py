@@ -88,6 +88,64 @@ def write_netscape(path: Path, cookies: list[dict[str, Any]]) -> None:
         pass
 
 
+def playwright_cookies_from_netscape(path: Path) -> list[dict[str, Any]]:
+    """Parse a Netscape cookies.txt into Playwright ``add_cookies`` dicts.
+
+    Session cookies (expires 0 / missing) omit ``expires`` so Playwright keeps
+    them for the browser context lifetime. Leading-dot domains are preserved.
+    """
+    if not path.is_file():
+        return []
+    out: list[dict[str, Any]] = []
+    for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = raw.strip()
+        if not line or (line.startswith("#") and not line.startswith("#HttpOnly_")):
+            continue
+        http_only = line.startswith("#HttpOnly_")
+        if http_only:
+            line = line[len("#HttpOnly_") :]
+        parts = line.split("\t")
+        if len(parts) < 7:
+            continue
+        domain, _flag, cookie_path, secure, expires, name, value = parts[:7]
+        if not name or not domain:
+            continue
+        cookie: dict[str, Any] = {
+            "name": name,
+            "value": value,
+            "domain": domain,
+            "path": cookie_path or "/",
+            "secure": secure.upper() == "TRUE",
+            "httpOnly": http_only,
+        }
+        try:
+            exp_i = int(expires)
+        except ValueError:
+            exp_i = 0
+        if exp_i > 0:
+            cookie["expires"] = exp_i
+        out.append(cookie)
+    return out
+
+
+def merge_netscape_for_playwright(*paths: Path) -> list[dict[str, Any]]:
+    """Load Playwright cookies from one or more Netscape files (first wins)."""
+    seen: set[tuple[str, str, str]] = set()
+    out: list[dict[str, Any]] = []
+    for path in paths:
+        for cookie in playwright_cookies_from_netscape(path):
+            key = (
+                str(cookie.get("domain") or ""),
+                str(cookie.get("path") or "/"),
+                str(cookie.get("name") or ""),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(cookie)
+    return out
+
+
 def split_playwright_cookies(
     cookies: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:

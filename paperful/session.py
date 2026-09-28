@@ -24,7 +24,11 @@ from pathlib import Path
 from typing import Any, Literal
 
 from .config import Config
-from .cookies import split_playwright_cookies, write_netscape
+from .cookies import (
+    merge_netscape_for_playwright,
+    split_playwright_cookies,
+    write_netscape,
+)
 from .download import looks_like_pdf
 from .page_signals import (
     classify_page_block,
@@ -836,6 +840,31 @@ class BrowserSession:
             headed=False,
             user_agent=self.cfg.user_agent,
         )
+        # EZProxy / CAS tickets are often session cookies. System Chrome exports
+        # them to Netscape on login, then drops them when the process exits —
+        # Default/Cookies no longer has them. Re-inject so vault fetches match
+        # the httpx jar that make_client already loads.
+        self._inject_exported_cookies()
+
+    def _inject_exported_cookies(self) -> None:
+        assert self._ctx is not None
+        cookies = merge_netscape_for_playwright(
+            vault_cookies_path(self.cfg),
+            self.cfg.ezproxy_cookie_path,
+            self.cfg.scholar_cookie_path,
+        )
+        if not cookies:
+            return
+        try:
+            self._ctx.add_cookies(cookies)
+            return
+        except Exception:
+            pass
+        for cookie in cookies:
+            try:
+                self._ctx.add_cookies([cookie])
+            except Exception:
+                continue
 
     def _page(self) -> Any:
         assert self._ctx is not None
