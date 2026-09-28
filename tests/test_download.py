@@ -93,11 +93,37 @@ def test_fetch_pdf_retries_on_503_then_succeeds():
 
 
 def test_fetch_pdf_gives_up_after_retries_on_network_error():
+    calls = []
+
     def handler(req):
+        calls.append(1)
         raise httpx.ConnectError("boom", request=req)
 
     with pytest.raises(DownloadError, match="ConnectError"):
-        fetch_pdf(mock_client(handler), "https://x.test/a.pdf", retries=2)
+        fetch_pdf(mock_client(handler), "https://x.test/a.pdf", retries=5)
+    # Transport errors cap at 2 attempts regardless of retries=.
+    assert len(calls) == 2
+
+
+def test_fetch_pdf_uses_split_timeout(monkeypatch):
+    seen = {}
+
+    def handler(req):
+        return httpx.Response(200, content=PDF_BYTES)
+
+    real_stream = httpx.Client.stream
+
+    def wrap_stream(self, method, url, **kwargs):
+        seen["timeout"] = kwargs.get("timeout")
+        return real_stream(self, method, url, **kwargs)
+
+    monkeypatch.setattr(httpx.Client, "stream", wrap_stream)
+    client = mock_client(handler)
+    fetch_pdf(client, "https://x.test/a.pdf", min_bytes=10)
+    timeout = seen["timeout"]
+    assert isinstance(timeout, httpx.Timeout)
+    assert timeout.connect == 15.0
+    assert timeout.read == 90.0
 
 
 def test_fetch_pdf_rejects_javascript_void_instead_of_crashing():

@@ -10,10 +10,34 @@ import httpx
 
 MAX_PDF_BYTES = 300 * 1024 * 1024
 _RETRY_STATUSES = {429, 500, 502, 503, 504}
+# Short connect; keep a long read for large PDFs once the socket is open.
+_PDF_TIMEOUT = httpx.Timeout(connect=15.0, read=90.0, write=90.0, pool=15.0)
+_TRANSPORT_ERRORS = (
+    httpx.ConnectTimeout,
+    httpx.ConnectError,
+    httpx.ReadTimeout,
+    httpx.WriteTimeout,
+    httpx.PoolTimeout,
+)
+# Transport blips get one retry; status retries use the caller ``retries`` cap.
+_TRANSPORT_ATTEMPTS = 2
 
 
 class DownloadError(Exception):
     pass
+
+
+def is_transport_download_error(exc: DownloadError | str) -> bool:
+    """True when ``fetch_pdf`` failed on connect/read/pool, not HTTP/body."""
+    msg = str(exc)
+    return msg in {
+        "ConnectTimeout",
+        "ConnectError",
+        "ReadTimeout",
+        "WriteTimeout",
+        "PoolTimeout",
+        "TimeoutException",
+    }
 
 
 @dataclass
@@ -57,11 +81,18 @@ def fetch_pdf(
     if referer:
         headers["Referer"] = referer
     last = "unknown error"
-    for attempt in range(retries):
+    transport_fails = 0
+    status_fails = 0
+    # Bound the loop: status retries + transport retries, whichever is larger.
+    max_attempts = max(retries, _TRANSPORT_ATTEMPTS)
+    for attempt in range(max_attempts):
         try:
-            with client.stream("GET", url, headers=headers, timeout=90) as resp:
+            with client.stream("GET", url, headers=headers, timeout=_PDF_TIMEOUT) as resp:
                 if resp.status_code in _RETRY_STATUSES:
                     last = f"HTTP {resp.status_code}"
+                    status_fails += 1
+                    if status_fails >= retries:
+                        break
                     _sleep(resp, attempt)
                     continue
                 if resp.status_code >= 400:
@@ -93,8 +124,17 @@ def fetch_pdf(
             # Cookie merging rejects some non-http URLs with ValueError
             # (`unknown url type`) instead of httpx.InvalidURL.
             raise DownloadError(str(exc) or "invalid URL") from exc
+        except _TRANSPORT_ERRORS as exc:
+            last = type(exc).__name__
+            transport_fails += 1
+            if transport_fails >= _TRANSPORT_ATTEMPTS:
+                break
+            time.sleep(1.5 * transport_fails)
         except httpx.HTTPError as exc:
             last = type(exc).__name__
+            status_fails += 1
+            if status_fails >= retries:
+                break
             time.sleep(1.5 * (attempt + 1))
     raise DownloadError(last)
 

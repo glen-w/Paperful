@@ -22,7 +22,14 @@ from .remarks import say
 from .circuit import CircuitBreaker
 from .config import Config
 from .cookies import apply_netscape_cookies
-from .download import Download, DownloadError, fetch_pdf, is_fetchable_url, looks_like_pdf
+from .download import (
+    Download,
+    DownloadError,
+    fetch_pdf,
+    is_fetchable_url,
+    is_transport_download_error,
+    looks_like_pdf,
+)
 from .pdfid import doi_from_pdf, probe_pdf_bytes, short_pdf_verdict
 from .pipeline_attach import attach_after_remap
 from .pipeline_browser import release_browser_for_agent, skip_recover_without_lane_failure
@@ -40,7 +47,12 @@ from .routing import (
     publisher_host,
     sources_for_item,
 )
-from .page_signals import looks_like_vault_login_miss
+from .page_signals import (
+    host_label,
+    looks_like_dead_vault_miss,
+    looks_like_vault_login_miss,
+    miss_host,
+)
 from .session import BrowserSession, vault_cookies_path
 from .sources.ezproxy import proxify
 from .runreport import (
@@ -78,6 +90,8 @@ _DIRECT_PDF_CAP = 12
 _LANDING_CAP = 6
 # Soft-block vault retries that land on campus CAS; trip EZProxy after this many.
 _VAULT_SSO_MISS_THRESHOLD = 2
+# Transport blips to one host before treating it as dead for the rest of the run.
+_TRANSPORT_DEAD_THRESHOLD = 3
 
 
 def urls_to_fetch(urls: list[str]) -> list[str]:
@@ -276,6 +290,7 @@ class Pipeline:
         self._ezproxy_down_offered = False
         self._browser_agent_down = False
         self._blocked_hosts: set[str] = set()
+        self._transport_fail_hosts: dict[str, int] = {}
         self._vault_sso_misses = 0
         self._attach_lock = threading.Lock()
         self._print_lock = threading.Lock()
@@ -304,6 +319,7 @@ class Pipeline:
         self._item_index = {it.key: i for i, it in enumerate(items, start=1)}
         self._circuit.reset()
         self._blocked_hosts.clear()
+        self._transport_fail_hosts.clear()
         self._vault_sso_misses = 0
         self._ezproxy_down_offered = False
         try:
@@ -356,6 +372,7 @@ class Pipeline:
         self.ctx = Context(config=self.cfg, client=self.client, browser=self.browser)
         self._ezproxy_down = False
         self._vault_sso_misses = 0
+        self._transport_fail_hosts.clear()
 
     def _run_batch(self, items: list[Item]) -> None:
         oa_sources = [
@@ -564,6 +581,63 @@ class Pipeline:
         if count >= _VAULT_SSO_MISS_THRESHOLD:
             self._mark_ezproxy_down()
 
+    def _host_keys(self, url: str) -> list[str]:
+        """Normalized host keys for dead-host checks (label + publisher family)."""
+        keys: list[str] = []
+        label = host_label(url)
+        if label:
+            keys.append(label)
+        pub = publisher_host(url)
+        if pub and pub not in keys:
+            keys.append(pub)
+        return keys
+
+    def _host_is_dead(self, url: str) -> bool:
+        keys = self._host_keys(url)
+        if not keys:
+            return False
+        with self._stats_lock:
+            return any(k in self._blocked_hosts for k in keys)
+
+    def _mark_host_dead(self, *hosts: str) -> None:
+        cleaned = [h.strip().lower() for h in hosts if h and h.strip()]
+        if not cleaned:
+            return
+        with self._stats_lock:
+            for host in cleaned:
+                if host.startswith("www."):
+                    host = host[4:]
+                self._blocked_hosts.add(host)
+
+    def _note_dead_vault_miss(self, note: str, candidate_url: str = "") -> None:
+        """Remember the final vault host after login/captcha/no-control misses.
+
+        Do not silence the candidate publisher on an SSO bounce to federation —
+        only the landing host in the miss note (or the candidate when no host
+        was recorded).
+        """
+        final = miss_host(note)
+        if final:
+            self._mark_host_dead(final)
+            return
+        if candidate_url:
+            self._mark_host_dead(*self._host_keys(candidate_url))
+
+    def _note_fetch_failure(self, url: str, exc: DownloadError | None = None) -> None:
+        """Mark hosts dead on hard fails; count transport blips until threshold."""
+        keys = self._host_keys(url)
+        if not keys:
+            return
+        if exc is not None and is_transport_download_error(exc):
+            with self._stats_lock:
+                for key in keys:
+                    n = self._transport_fail_hosts.get(key, 0) + 1
+                    self._transport_fail_hosts[key] = n
+                    if n >= _TRANSPORT_DEAD_THRESHOLD:
+                        self._blocked_hosts.add(key)
+            return
+        self._mark_host_dead(*keys)
+
     def _skip_ezproxy(
         self, queue: list[tuple[Item, list[str]]]
     ) -> list[tuple[Item, list[str]]]:
@@ -742,19 +816,16 @@ class Pipeline:
             urls: list[str] = []
             skipped_blocked = False
             for url in urls_to_fetch(cand.urls):
-                host = publisher_host(url)
-                with self._stats_lock:
-                    dead = bool(host and host in self._blocked_hosts)
-                if dead:
+                if self._host_is_dead(url):
                     skipped_blocked = True
                     continue
                 urls.append(url)
             if not urls:
                 if skipped_blocked:
-                    attempts.append(f"{cand.source}:skipped(publisher already blocked)")
+                    attempts.append(f"{cand.source}:skipped(host already blocked)")
                     self._log_item(
                         item,
-                        f"{escape(cand.source)}: [dim]skipped[/] (publisher already blocked)",
+                        f"{escape(cand.source)}: [dim]skipped[/] (host already blocked)",
                     )
                 return False
             self._log_item(item, f"[dim]{cand.source}: downloading...[/]")
@@ -762,10 +833,7 @@ class Pipeline:
                 dl = self._fetch_url(item, cand, url, attempts)
                 if dl is not None:
                     break
-                host = publisher_host(url)
-                if host:
-                    with self._stats_lock:
-                        self._blocked_hosts.add(host)
+                # Hard-fail marking happens inside _fetch_url / browser miss handlers.
         if dl is None:
             return False
         short_verdict = "ok"
@@ -883,9 +951,13 @@ class Pipeline:
                 f"{escape(cand.source)}: [yellow]download failed[/] ({escape(str(exc))})",
             )
             soft = _is_soft_block_error(exc)
+            # Soft landings still get a vault retry; do not silence the host yet.
+            if not soft:
+                self._note_fetch_failure(url, exc)
             # Soft-blocked OA PDF URLs need a vault browser retry even when the
             # host is not on the publisher allowlist (e.g. AMS downloadpdf).
-            if soft or not browser_first:
+            # Transport blips do not force a vault retry.
+            if soft or (not browser_first and not is_transport_download_error(exc)):
                 return self._browser_pdf(
                     item, cand, url, attempts, force=soft
                 )
@@ -915,6 +987,13 @@ class Pipeline:
             and not is_publisher_url(url)
         ):
             return None
+        if self._host_is_dead(url):
+            attempts.append(f"{cand.source}:skipped(host already blocked)")
+            self._log_item(
+                item,
+                f"{escape(cand.source)}: [dim]skipped[/] (host already blocked)",
+            )
+            return None
         targets = [url]
         can_wrap = (
             bool(self.cfg.ezproxy_base)
@@ -927,11 +1006,20 @@ class Pipeline:
                 item,
                 f"{escape(cand.source)}: [dim]skipped[/] (session expired)",
             )
+            # Campus is down; raw publisher pages usually bounce to the same SSO.
+            return None
         elif can_wrap:
             wrapped = proxify(url, self.cfg.ezproxy_base)
             if wrapped != url:
                 targets = [wrapped, url]
         for target in targets:
+            if self._host_is_dead(target):
+                attempts.append(f"{cand.source}:skipped(host already blocked)")
+                self._log_item(
+                    item,
+                    f"{escape(cand.source)}: [dim]skipped[/] (host already blocked)",
+                )
+                continue
             self._log_item(
                 item, f"[dim]{escape(cand.source)}: downloading via browser...[/]"
             )
@@ -943,7 +1031,10 @@ class Pipeline:
                     item,
                     f"{escape(cand.source)}: [yellow]browser failed[/] ({escape(str(exc))})",
                 )
-                if looks_like_vault_login_miss(str(exc)):
+                note = str(exc)
+                if looks_like_dead_vault_miss(note):
+                    self._note_dead_vault_miss(note, candidate_url=url)
+                if looks_like_vault_login_miss(note):
                     self._note_vault_sso_miss(attempts, cand.source)
                 continue
             if not looks_like_pdf(content) or len(content) < self.cfg.min_pdf_bytes:

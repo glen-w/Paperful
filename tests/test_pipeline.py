@@ -894,7 +894,7 @@ def test_oa_skips_same_publisher_host_after_403(pipe_factory):
     pipe.run([make_item(key="A")])
     assert len(calls) == 1
     rec = manifest.get("A")
-    assert any("publisher already blocked" in a for a in rec.attempts)
+    assert any("host already blocked" in a for a in rec.attempts)
 
 
 def test_oa_skips_publisher_host_across_items(pipe_factory):
@@ -924,7 +924,7 @@ def test_oa_skips_publisher_host_across_items(pipe_factory):
     pipe.run([make_item(key="A"), make_item(key="B")])
     assert len(calls) == 1
     assert any(
-        "publisher already blocked" in a for a in manifest.get("B").attempts
+        "host already blocked" in a for a in manifest.get("B").attempts
     )
 
 
@@ -975,6 +975,105 @@ def test_vault_sso_misses_trip_ezproxy_and_skip_proxify(pipe_factory, cfg):
     assert any("session expired" in a for a in manifest.get("A").attempts)
     assert any(
         "skipped(session expired)" in a for a in manifest.get("B").attempts
+    )
+
+
+def test_dead_vault_landing_skips_browser_across_items(pipe_factory):
+    from paperful.session import SessionError
+
+    class HalBrowser:
+        def __init__(self):
+            self.urls: list[str] = []
+
+        def available(self) -> bool:
+            return True
+
+        def fetch_pdf(self, url, timeout_ms=60_000):
+            self.urls.append(url)
+            raise SessionError("no download control @hal.science")
+
+        def close(self) -> None:
+            return
+
+    browser = HalBrowser()
+    src = StubSource(
+        "unpaywall",
+        {
+            "A": Candidate(
+                url="https://hal.science/hal-0001/document",
+                source="unpaywall",
+            ),
+            "B": Candidate(
+                url="https://hal.science/hal-0002/document",
+                source="unpaywall",
+            ),
+        },
+    )
+
+    def handler(req):
+        return httpx.Response(
+            200,
+            content=b"<html>landing</html>" * 40,
+            headers={"content-type": "text/html"},
+        )
+
+    pipe, manifest = pipe_factory(
+        {"unpaywall": src},
+        ["unpaywall"],
+        handler=handler,
+    )
+    pipe.cfg.concurrency_oa = 1
+    pipe.browser = browser
+    pipe.ctx.browser = browser
+    pipe.run([make_item(key="A"), make_item(key="B")])
+    assert browser.urls == ["https://hal.science/hal-0001/document"]
+    assert any(
+        "host already blocked" in a for a in manifest.get("B").attempts
+    )
+
+
+def test_connect_timeout_does_not_block_publisher_until_threshold(pipe_factory):
+    calls = []
+
+    def handler(req):
+        calls.append(str(req.url))
+        raise httpx.ConnectTimeout("slow", request=req)
+
+    up = StubSource(
+        "unpaywall",
+        {
+            "A": Candidate(
+                url="https://www.sciencedirect.com/science/article/pii/S1/pdfft",
+                source="unpaywall",
+            ),
+            "B": Candidate(
+                url="https://www.sciencedirect.com/science/article/pii/S2/pdfft",
+                source="unpaywall",
+            ),
+            "C": Candidate(
+                url="https://www.sciencedirect.com/science/article/pii/S3/pdfft",
+                source="unpaywall",
+            ),
+            "D": Candidate(
+                url="https://www.sciencedirect.com/science/article/pii/S4/pdfft",
+                source="unpaywall",
+            ),
+        },
+    )
+    pipe, _manifest = pipe_factory(
+        {"unpaywall": up}, ["unpaywall"], handler=handler
+    )
+    pipe.cfg.concurrency_oa = 1
+    pipe.browser = None
+    pipe.ctx.browser = None
+    pipe._use_browser = False
+    items = [make_item(key=k) for k in ("A", "B", "C", "D")]
+    pipe.run(items)
+    # Each fetch_pdf does 2 transport attempts; host dies after 3 item fails.
+    assert len(calls) == 6  # A+B+C × 2 attempts, D skipped
+    assert any(
+        "host already blocked" in a
+        for a in pipe.manifest.get("D").attempts
     )
 
 

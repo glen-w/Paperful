@@ -440,6 +440,22 @@ def test_looks_like_vault_login_miss():
     assert not looks_like_vault_login_miss("no download control @wiley.com")
 
 
+def test_miss_host_and_dead_vault_miss():
+    from paperful.page_signals import looks_like_dead_vault_miss, miss_host
+
+    assert miss_host("login @federation.sciences-po.fr") == "federation.sciences-po.fr"
+    assert miss_host("no download control @hal.science; steps 2/4") == "hal.science"
+    assert miss_host("blocked") == ""
+    assert looks_like_dead_vault_miss("login @federation.sciences-po.fr")
+    assert looks_like_dead_vault_miss("captcha @scholar.google.com")
+    assert looks_like_dead_vault_miss("no download control @hal.science")
+    assert looks_like_dead_vault_miss(
+        "no download control @federation.sciences-po.fr"
+    )
+    assert not looks_like_dead_vault_miss("blocked @linkinghub.elsevier.com")
+    assert not looks_like_dead_vault_miss("clicked download control, no PDF @x.test")
+
+
 def test_collect_pdf_from_page_rewrite_miss_falls_through():
     from paperful.playbooks import GreyPlaybook
 

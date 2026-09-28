@@ -147,9 +147,11 @@ skip the proxy. Soft-blocked OA PDF URLs that retry in the vault browser and
 land twice on campus CAS (`login @federation…`, or the older
 `no download control @federation…`) trip the same skip. On a TTY, `run` offers
 re-login once at the **next batch boundary** so later batches can use the proxy
-again. Publisher hosts that already failed a download in this run are also
-skipped for later items (`publisher already blocked`); that host set survives a
-mid-run re-login. After the fetch, a TTY run still pauses for any items left
+again. Hosts that already failed hard in this run (publisher 403s, or vault
+landings that ended in `login` / `captcha` / `no download control`) are skipped
+for later items (`host already blocked`); that host set survives a
+mid-run re-login. Transport timeouts use a short connect budget and only silence
+a host after repeated blips. After the fetch, a TTY run still pauses for any items left
 `session expired` and retries only those. That browser is closed before the
 report and before `--handoff` opens tabs in your normal browser. Set
 `ezproxy_relogin = false` or pass `--no-ezproxy-relogin` to skip the pauses.

@@ -130,6 +130,34 @@ def looks_like_vault_login_miss(note: str) -> bool:
     return any(h in low for h in _LOGIN_URL_HINTS)
 
 
+# Exact miss buckets that should silence a vault host for the rest of a run.
+# Prefix-only would wrongly match ``clicked download control, no PDF``.
+_DEAD_VAULT_MISS_LABELS = frozenset({"login", "captcha", "no download control"})
+
+
+def miss_host(note: str) -> str:
+    """Hostname from a ``label @host`` miss note, or empty when absent."""
+    head = (note or "").split(";", 1)[0].strip()
+    if " @" not in head:
+        return ""
+    host = head.split(" @", 1)[1].strip().lower()
+    if host.startswith("www."):
+        host = host[4:]
+    return host
+
+
+def looks_like_dead_vault_miss(note: str) -> bool:
+    """True when a vault miss should block that final host for the run."""
+    raw = (note or "").strip()
+    if not raw:
+        return False
+    label = miss_label(raw).lower()
+    if label in _DEAD_VAULT_MISS_LABELS:
+        return True
+    # Older CAS notes that never classified as ``login``.
+    return looks_like_vault_login_miss(raw)
+
+
 def is_search_engine_host(host: str) -> bool:
     host = (host or "").lower()
     if host.startswith("www."):

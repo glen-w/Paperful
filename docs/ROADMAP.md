@@ -66,7 +66,10 @@ Zotero has. Do not document either adapter as supported until testers say so.
   session hygiene, attach reliability, `doctor` / `report`. **Shipped (find
   recovery):** soft-blocked OA URLs (empty httpx body) retry in the vault
   browser (SSO / PDF link / download control), then optional `browser_agent`;
-  items stay `retryable` / `soft block` rather than hard `not_found`. Manual
+  items stay `retryable` / `soft block` rather than hard `not_found`. Dead vault
+  landings (`login` / `captcha` / `no download control`) silence that final host
+  for the rest of the run; transport timeouts use a short connect budget and do
+  not permanently block a publisher on a single blip. Manual
   handoff: `run` / `gaps --handoff list|tabs|walk|watch` and `paperful inbox
   watch` / `drain` against `[inbox].dir` (PDF DOI match; unmatched →
   `unmatched/`). Distinct from snowball watch `inbox.jsonl`. CLI
@@ -93,6 +96,16 @@ Zotero has. Do not document either adapter as supported until testers say so.
   creates missing items and does not overwrite fields already in Zotero. Dual
   `imported_file` store; house sync (Syncthing) stays outside Paperful. Not a
   second reading UI. Not a linked-file cutover. Not a WebDAV client.
+  **Housekeeping (after maintainer `out/` is clean):** flat
+  `Author - Year - Title.pdf` (+ legacy `*.paperful.json`) is a pre-item-folder
+  hangover. `doctor` ambers on mixed flat+folder trees and tells people to
+  `snapshot`; `migrate_flat_*` / card absorb run on `snapshot` and on the next
+  `run` that saves that file. Once the personal library has been migrated
+  (`snapshot --library` or equivalent) and doctor is green on Mirror, **remove**
+  that legacy path from code, tests, and docs (quiet-mirror / commands /
+  CHANGELOG mentions) so future users are not steered into a whole-library
+  snapshot for a layout they never had. Keep `snapshot` / `restore` themselves —
+  only the flat→folder migration and the mixed-layout doctor amber go.
 - Deterministic `lint` / `fix-metadata` (Crossref / OpenAlex / Semantic Scholar /
   PubMed, PDF-text DOI via pdftotext then pypdf) with explicit `--apply`.
   **Shipped:** verified PDF-DOI → patch; date precision guard; HTML title cleanup;
