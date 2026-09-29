@@ -369,6 +369,96 @@ scheduling nightly “ask everything” jobs without an explicit operator comman
 `summarize` / `synthesize` — summaries stay the human-readable layer; RAG stays
 the evidence-linked Q&A layer.
 
+### Bibliography gap scan (later; not `gaps`)
+
+**Status:** roadmap — pieces exist; a collection-scoped **verb** does not.
+
+| Today | Roadmap gap scan |
+| --- | --- |
+| **`paperful gaps`** (shipped) | **Bibliography gap scan** (planned) |
+| Items **already in scope** missing a stored PDF, linked-only URL, or DOI | Works **cited inside** your collection’s PDFs (or seed items) that are **not** in the library fingerprint |
+| Drives `run` / handoff | Drives review pack → optional `ingest-dois` / snowball seed / gated create |
+
+**Already in the tree (reuse, do not reinvent):** snowball bibliography parsing
+(`paperful/snowball/bibliography.py` — landing HTML, open-PDF reference
+sections, `parse_bibliography_entries`); OpenAlex reference lists cached under
+`state/cites/` for in-collection overlap remarks; Europe PMC / remote ref
+recovery on hops. None of that is yet “scan every PDF in `-C` and emit
+**missing-from-library** rows” as one operator-facing command.
+
+**Direction:** `paperful refs gap` (name TBD) — scope `-C` / year / type;
+deterministic DOI/title-year match against the same fingerprint family as
+`dedupe` / snowball `_mark_exists`; dry-run table + `state/refs-gaps/` pack;
+optional rank by how many in-scope parents cite each missing work. Hand off to
+`ingest-dois`, `snowball doi`, or `run` after explicit apply. OCR / text-layer
+required for scan-only PDFs (`ocr` first). Not a silent snowball auto-run.
+
+### Frontier digest (later; watch + external ingest)
+
+**Status:** roadmap — snowball **watch** is shipped (baseline, `inbox.jsonl`,
+dry-run, no PDFs); a **digest** is the human-readable rollup on top.
+
+**Digest (Paperful):** after `snowball watch run` (or on demand), emit a short
+report: new vs `exists` vs deferred, overlap hints, suggested `-C`, links to
+queue paths — file under `state/` or stdout; still **no** built-in scheduler
+(launchd / cron calls `watch run` + digest). Complements watch inbox review.
+
+**Newsletter / alert ingest (rollup bridge):** optional plug-in or HTTP client
+to sibling **[rollup](Documents/rollup)**-style ingest architecture — pull
+candidate papers from the operator’s **newsletters and alerts**, first source
+**Google Scholar** email/alert feeds (opt-in; same honesty bar as Scholar in
+handoff, not a silent `run` source). Normalise to DOI/title rows → Paperful
+snowball queue or bibliography-gap / ingest path. Rollup owns fetch/parse of
+mail sources; Paperful owns library fingerprint, gates, and ledger. Spike
+shared message shapes before hard-wiring repos.
+
+### Structured section extract (MVP; later)
+
+**Status:** roadmap — narrower than full `summarize`; structured fields for
+downstream RAG, synthesis, and gap scan context.
+
+**MVP fields (per item, on disk):** `abstract`, `conclusion`, `methodology`,
+`research_questions` (plus optional raw section map). **Stage 1 — deterministic:**
+split PDF text (and manager abstract when present) on a maintained **heading
+synonym list** — e.g. Abstract, Introduction, Background, Methods / Materials
+and methods, Results, Discussion, Conclusion(s), Summary, Research questions,
+Limitations, References / Bibliography (locale and publisher variants in
+`state/section-headings.toml` or shipped defaults). Boundaries from line-start
+heuristics + known IMRaD patterns; fail partial sections to findings, not
+garbage writes. **Stage 2 — LLM inference** only when `[llm].enabled` and a
+dedicated gate (e.g. `[extract_sections].llm`): fill missing MVP fields from
+the bounded excerpt; reject outputs that do not quote-ground in the supplied
+spans. Writes `state/sections/<key>.json` (and optional mirror into
+`record.json` on snapshot); **no** silent Zotero parent mutation. Overlaps
+Zotero-RAG RQ extraction (deterministic + LLM) — share heading list and
+provenance enums where possible.
+
+### Annotation mirror (later)
+
+**Status:** roadmap — Zotero stays reader of record; the quiet mirror gains
+**your** highlights and notes for RAG / evidence packs.
+
+Read item annotations (and tagged notes where distinguishable) through
+`LibraryBackend` on `snapshot` or a dedicated `paperful annotations mirror`
+verb; store beside `record.json` under `out/` (hashes + page anchors). Read-only
+sync into Paperful — never replace Zotero’s annotation UI. Consumers: cited
+answers prefer operator highlights; future evidence-pack export. Group libraries
+and adapter parity (Mendeley/EndNote) are explicit non-goals until tested.
+
+### Run witness (later; trust thicken)
+
+**Status:** roadmap — extend existing run artifacts, not a new product surface.
+
+**Shipped slices:** `state/runs/<stamp>-*.json`, `state/last-run.json`, pack
+open/close under `state/packs/`, frozen `paperful.run_report.v1` (0.1 → 1.0
+checklist). **Direction:** every material batch (`run`, `summarize`, `synthesize`,
+snowball execute, future RAG/refs-gap) appends a **witness** block: config file
+hash (or normalised effective config), active `profiles/*.toml` name, scope
+(`-C`, year/type), source list and presets, `[llm]` model ids per verb, PDF /
+index versions when relevant, Paperful version. Packs reference witness ids so
+“what produced this literature review?” is answerable without git. Additive keys
+only on `run_report` until 1.0 tag; document in [architecture](architecture.md).
+
 ### Auto-tagging library items (later; not 1.0)
 
 **Status:** roadmap only — do not implement until the fetch / lint / attach loop
@@ -658,11 +748,17 @@ prerequisites for the fetch / lint / attach loop.
 Larger product bets. Park until the ledger and core loop justify them.
 
 5. **Reading & knowledge** — local full-text index; annotation sync;
-   evidence packs; briefs grounded only in local PDFs. **Zotero-RAG (planned):**
-   batch question → cited answer runs, corpus question generation, paper-level
-   RQ extraction, and temporal RAG across the collection — see [Zotero-RAG
-   integration](#zotero-rag-integration-later-question-centric-layer) under
-   Optional LLM assist.
+   evidence packs; briefs grounded only in local PDFs. **Planned (see Optional
+   LLM + subsections above):** [Zotero-RAG
+   integration](#zotero-rag-integration-later-question-centric-layer);
+   [bibliography gap scan](#bibliography-gap-scan-later-not-gaps) (cited-but-not-owned,
+   distinct from shipped `gaps`); [structured section
+   extract](#structured-section-extract-mvp-later); [annotation
+   mirror](#annotation-mirror-later); [frontier
+   digest](#frontier-digest-later-watch--external-ingest) (watch rollup + optional
+   rollup newsletter bridge, Scholar alerts first). **[Run
+   witness](#run-witness-later-trust-thicken)** ties batches to config/model/index
+   for reproducibility.
 6. **Writing & export** — CSL / BibLaTeX / Quarto sync; living review / gap lists;
    git-friendly CSL-JSON dumps
 7. **Agent surface** — MCP + CLI sharing one capability API; dry-run defaults;
@@ -692,8 +788,11 @@ Larger product bets. Park until the ledger and core loop justify them.
    `record.json` plus `out/_history.json` are the chain-of-custody note for
    the library and the append-only ledgers. OA `license` / `oa_status` /
    `version` stamps (Core above) feed this lane; which fields are written stays
-   config-driven. Still later: optional redistribution / license gate using those
-   stamps, more jurisdictional presets, and PDF annotation export.
+   config-driven. **[Run witness](#run-witness-later-trust-thicken)** (Optional
+   LLM section) extends run reports and packs with config/model scope. Still
+   later: optional redistribution / license gate using those stamps, more
+   jurisdictional presets, and PDF annotation export (annotation **mirror** is
+   read-sync into `out/`, not export-only).
 
 ## Explicitly out of near-term scope
 
