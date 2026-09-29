@@ -25,9 +25,16 @@ from typing import Any, Literal
 
 from .config import Config
 from .cookies import (
+    cookies_for_playwright_inject,
+    cookies_have_proxy_host,
+    ezproxy_cookie_status,
+    load_storage_state_cookies,
+    merge_cookie_lists,
     merge_netscape_for_playwright,
     split_playwright_cookies,
+    storage_state_path as _storage_state_path_for,
     write_netscape,
+    write_storage_state,
 )
 from .download import looks_like_pdf
 from .page_signals import (
@@ -45,6 +52,7 @@ SCHOLAR_URL = "https://scholar.google.com/"
 _META_NAME = "meta.json"
 _CHROMIUM = "chromium"
 _COOKIES_NAME = "cookies.txt"
+_PROBE_WAIT_MS = 45_000
 LoginEngine = Literal["auto", "chrome", "playwright"]
 
 _SYSTEM_CHROME_CANDIDATES = (
@@ -195,8 +203,7 @@ def _wait_cdp(
                     f"--probe jobs and retry."
                 )
             raise SessionError(
-                f"Chrome exited before opening a debug port on 127.0.0.1:{port}."
-                + hint
+                f"Chrome exited before opening a debug port on 127.0.0.1:{port}." + hint
             )
         try:
             with urllib.request.urlopen(url, timeout=1.0) as resp:
@@ -207,10 +214,7 @@ def _wait_cdp(
             time.sleep(0.2)
     hint = ""
     if profile is not None:
-        hint = (
-            f" If no window appeared, close other Chrome using "
-            f"{profile} and retry."
-        )
+        hint = f" If no window appeared, close other Chrome using {profile} and retry."
     raise SessionError(
         f"Chrome did not open a debug port on 127.0.0.1:{port}"
         + (f" ({last_err})" if last_err else "")
@@ -243,6 +247,23 @@ def meta_path(cfg: Config) -> Path:
 
 def vault_cookies_path(cfg: Config) -> Path:
     return sessions_dir(cfg) / _COOKIES_NAME
+
+
+def storage_state_path(cfg: Config) -> Path:
+    """Playwright storage_state JSON — durable source of truth for vault cookies."""
+    return _storage_state_path_for(sessions_dir(cfg))
+
+
+def load_vault_cookies(cfg: Config) -> list[dict[str, Any]]:
+    """Load cookies: storage_state first, then Netscape files fill gaps."""
+    return merge_cookie_lists(
+        load_storage_state_cookies(storage_state_path(cfg)),
+        merge_netscape_for_playwright(
+            vault_cookies_path(cfg),
+            cfg.ezproxy_cookie_path,
+            cfg.scholar_cookie_path,
+        ),
+    )
 
 
 def ensure_sessions_dir(cfg: Config) -> Path:
@@ -323,10 +344,24 @@ def _launch_persistent(p: Any, user_data_dir: Path, *, headed: bool, user_agent:
         return p.chromium.launch_persistent_context(**common)
 
 
-def export_cookies(cfg: Config, cookies: list[dict[str, Any]]) -> list[Path]:
-    """Write vault + compat Netscape files. Returns paths written."""
+def export_cookies(
+    cfg: Config,
+    cookies: list[dict[str, Any]],
+    *,
+    merge_existing: bool = False,
+) -> list[Path]:
+    """Write storage_state + vault/compat Netscape files. Returns paths written.
+
+    When ``merge_existing`` is True, keep prior vault session cookies that the
+    live profile no longer has (Chrome drops session cookies on exit).
+    """
     ensure_sessions_dir(cfg)
+    if merge_existing:
+        cookies = merge_cookie_lists(cookies, load_vault_cookies(cfg))
     written: list[Path] = []
+    state_path = storage_state_path(cfg)
+    write_storage_state(state_path, cookies)
+    written.append(state_path)
     vault = vault_cookies_path(cfg)
     write_netscape(vault, cookies)
     written.append(vault)
@@ -339,6 +374,123 @@ def export_cookies(cfg: Config, cookies: list[dict[str, Any]]) -> list[Path]:
     if other:
         write_netscape(ez_path, other)
         written.append(ez_path)
+    return written
+
+
+def require_ezproxy_proxy_cookies(cfg: Config, cookies: list[dict[str, Any]]) -> None:
+    """Raise SessionError when an EZProxy login dump has no proxy-host ticket."""
+    if cookies_have_proxy_host(cookies, cfg.ezproxy_base):
+        return
+    status = ezproxy_cookie_status(cookies, cfg.ezproxy_base)
+    hint = (
+        "CAS/IdP cookies only — finish the redirect until a publisher page "
+        "loads through the proxy (URL should include your idm.oclc.org host)."
+        if status == "cas_only"
+        else "No campus proxy cookies were captured."
+    )
+    raise SessionError(
+        f"EZProxy login incomplete: {hint} "
+        "Stay on the proxied page, press Enter again, or retry "
+        "`paperful session login ezproxy`."
+    )
+
+
+def _cdp_cookies_from_context(context: Any) -> list[dict[str, Any]]:
+    """Prefer CDP Network.getAllCookies; fall back to Playwright context.cookies()."""
+    page = None
+    try:
+        pages = list(context.pages) if context.pages else []
+        page = pages[0] if pages else context.new_page()
+        client = context.new_cdp_session(page)
+        raw = client.send("Network.getAllCookies")
+        items = raw.get("cookies") if isinstance(raw, dict) else None
+        if isinstance(items, list) and items:
+            out: list[dict[str, Any]] = []
+            for item in items:
+                if not isinstance(item, dict) or not item.get("name"):
+                    continue
+                cookie: dict[str, Any] = {
+                    "name": item.get("name"),
+                    "value": item.get("value") or "",
+                    "domain": item.get("domain") or "",
+                    "path": item.get("path") or "/",
+                    "secure": bool(item.get("secure")),
+                    "httpOnly": bool(item.get("httpOnly")),
+                }
+                same = item.get("sameSite")
+                if same in ("Strict", "Lax", "None"):
+                    cookie["sameSite"] = same
+                elif isinstance(same, str):
+                    low = same.lower()
+                    if low == "none":
+                        cookie["sameSite"] = "None"
+                    elif low in ("strict", "lax"):
+                        cookie["sameSite"] = low.capitalize()
+                exp = item.get("expires")
+                try:
+                    exp_f = float(exp) if exp is not None else -1.0
+                except (TypeError, ValueError):
+                    exp_f = -1.0
+                if exp_f > 0:
+                    cookie["expires"] = int(exp_f)
+                out.append(cookie)
+            return out
+    except Exception:
+        pass
+    try:
+        return list(context.cookies())
+    except Exception:
+        return []
+
+
+def _probe_and_collect_cookies(
+    context: Any,
+    cfg: Config,
+    slot: str,
+    *,
+    on_note: Callable[[str], None] | None = None,
+) -> list[dict[str, Any]]:
+    """After login confirm: optional EZProxy probe nav, then dump all cookies."""
+    page = context.pages[0] if context.pages else context.new_page()
+    if slot == "ezproxy":
+        probe = login_url_for(cfg, "ezproxy")
+        if on_note:
+            on_note("Confirming EZProxy ticket — opening proxied start URL…")
+        try:
+            page.goto(probe, wait_until="domcontentloaded", timeout=_PROBE_WAIT_MS)
+            try:
+                page.wait_for_load_state("networkidle", timeout=15_000)
+            except Exception:
+                pass
+            # Allow one SSO hop to settle.
+            deadline = time.time() + 20.0
+            while time.time() < deadline:
+                final = str(page.url or "")
+                html = ""
+                try:
+                    html = str(page.content() or "")[:4000]
+                except Exception:
+                    html = ""
+                if not looks_like_login_page(final, html):
+                    break
+                time.sleep(0.5)
+        except Exception as exc:
+            if on_note:
+                on_note(
+                    f"Probe navigation warning ({type(exc).__name__}); dumping cookies anyway."
+                )
+    return _cdp_cookies_from_context(context)
+
+
+def _finish_login_export(
+    cfg: Config,
+    slot: str,
+    cookies: list[dict[str, Any]],
+) -> list[Path]:
+    if slot == "ezproxy":
+        require_ezproxy_proxy_cookies(cfg, cookies)
+    written = export_cookies(cfg, cookies)
+    mark_slot(cfg, slot)
     return written
 
 
@@ -393,9 +545,7 @@ def _login_via_system_chrome(
                 )
             except TypeError:
                 # Playwright < 1.60 has no no_defaults kwarg.
-                browser = p.chromium.connect_over_cdp(
-                    f"http://127.0.0.1:{port}"
-                )
+                browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
             except Exception as exc:
                 raise SessionError(
                     f"Could not attach to Chrome over CDP ({exc}). "
@@ -408,10 +558,14 @@ def _login_via_system_chrome(
                     "Chrome opened but has no browser context yet — "
                     "complete login, leave a tab open, then press Enter again."
                 )
-            cookies = list(context.cookies())
-            # Close via CDP only (do not also terminate the process — that race
-            # prints TargetClosedError / "Task was destroyed" after success).
-            browser.close()
+            try:
+                cookies = _probe_and_collect_cookies(
+                    context, cfg, slot, on_note=on_note
+                )
+            finally:
+                # Close via CDP only (do not also terminate the process — that race
+                # prints TargetClosedError / "Task was destroyed" after success).
+                browser.close()
         try:
             proc.wait(timeout=10)
         except subprocess.TimeoutExpired:
@@ -424,9 +578,7 @@ def _login_via_system_chrome(
                 proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 proc.kill()
-    written = export_cookies(cfg, cookies)
-    mark_slot(cfg, slot)
-    return written
+    return _finish_login_export(cfg, slot, cookies)
 
 
 def _login_via_playwright(
@@ -457,12 +609,10 @@ def _login_via_playwright(
             page = context.pages[0] if context.pages else context.new_page()
             page.goto(url, wait_until="domcontentloaded", timeout=90_000)
             confirm()
-            cookies = list(context.cookies())
+            cookies = _probe_and_collect_cookies(context, cfg, slot, on_note=on_note)
         finally:
             context.close()
-    written = export_cookies(cfg, cookies)
-    mark_slot(cfg, slot)
-    return written
+    return _finish_login_export(cfg, slot, cookies)
 
 
 def login_headed(
@@ -493,21 +643,50 @@ def login_headed(
 
 
 def dump_profile_cookies(cfg: Config) -> list[Path]:
-    """Headless open of the persistent profile to refresh Netscape exports."""
+    """Headless open of the persistent profile to refresh cookie exports.
+
+    Re-injects the durable vault first so session cookies Chrome dropped from
+    the profile DB are not wiped from storage_state / Netscape.
+    """
     if not chromium_dir(cfg).is_dir():
         raise SessionError(f"no Chromium profile yet ({chromium_dir(cfg)})")
     ensure_playwright(auto_install=True)
     from playwright.sync_api import sync_playwright
 
+    prior = load_vault_cookies(cfg)
     with sync_playwright() as p:
         context = _launch_persistent(
             p, chromium_dir(cfg), headed=False, user_agent=cfg.user_agent
         )
         try:
-            cookies = list(context.cookies())
+            _apply_cookies_to_context(context, prior)
+            live = _cdp_cookies_from_context(context)
         finally:
             context.close()
-    return export_cookies(cfg, cookies)
+    return export_cookies(cfg, live, merge_existing=True)
+
+
+def _apply_cookies_to_context(
+    context: Any, cookies: list[dict[str, Any]]
+) -> tuple[int, int]:
+    """Inject cookies; return (applied, failed)."""
+    prepared = cookies_for_playwright_inject(cookies)
+    if not prepared:
+        return 0, 0
+    try:
+        context.add_cookies(prepared)
+        return len(prepared), 0
+    except Exception:
+        pass
+    ok = 0
+    failed = 0
+    for cookie in prepared:
+        try:
+            context.add_cookies([cookie])
+            ok += 1
+        except Exception:
+            failed += 1
+    return ok, failed
 
 
 _PDF_CLICKS = (
@@ -557,9 +736,7 @@ def _playwright_pdf_miss(page: Any, url: str, *, clicked: bool) -> str:
         label = classify_page_block(text)
         if label is None:
             label = (
-                "clicked download control, no PDF"
-                if clicked
-                else "no download control"
+                "clicked download control, no PDF" if clicked else "no download control"
             )
     return format_miss(label, final)
 
@@ -624,7 +801,9 @@ def collect_pdf_from_page(
                 _take(
                     Path(path).read_bytes(),
                     str(getattr(download, "url", url)),
-                    pending["win"] if str(pending["win"]).startswith("click:") else "download",
+                    pending["win"]
+                    if str(pending["win"]).startswith("click:")
+                    else "download",
                 )
         except Exception:
             return
@@ -678,7 +857,9 @@ def collect_pdf_from_page(
             pass
         if found:
             return found[0]
-        if looks_like_login_page(_page_url(page, url), _page_text(page) or _page_html(page)):
+        if looks_like_login_page(
+            _page_url(page, url), _page_text(page) or _page_html(page)
+        ):
             saw_login = True
             start_host = host_label(_page_url(page, url))
             deadline = time.time() + _SSO_WAIT_S
@@ -690,9 +871,7 @@ def collect_pdf_from_page(
                 data, final, _win = found[0]
                 return data, final, "sso+" + _win
             if host_label(_page_url(page, url)) == start_host:
-                raise SessionError(
-                    format_miss("login", _page_url(page, url))
-                )
+                raise SessionError(format_miss("login", _page_url(page, url)))
         if found:
             return found[0]
         rewritten = rewrite_known_pdf_url(_page_url(page, url), playbooks)
@@ -780,6 +959,7 @@ class BrowserSession:
         self._pw: Any = None
         self._ctx: Any = None
         self._owner_tid: int | None = None
+        self.inject_warning: str | None = None
 
     def available(self) -> bool:
         return playwright_available() and profile_ready(self.cfg)
@@ -841,30 +1021,39 @@ class BrowserSession:
             user_agent=self.cfg.user_agent,
         )
         # EZProxy / CAS tickets are often session cookies. System Chrome exports
-        # them to Netscape on login, then drops them when the process exits —
-        # Default/Cookies no longer has them. Re-inject so vault fetches match
-        # the httpx jar that make_client already loads.
+        # them to storage_state + Netscape on login, then drops them when the
+        # process exits — Default/Cookies no longer has them. Re-inject so vault
+        # fetches match the httpx jar that make_client already loads.
         self._inject_exported_cookies()
 
     def _inject_exported_cookies(self) -> None:
         assert self._ctx is not None
-        cookies = merge_netscape_for_playwright(
-            vault_cookies_path(self.cfg),
-            self.cfg.ezproxy_cookie_path,
-            self.cfg.scholar_cookie_path,
-        )
+        self.inject_warning = None
+        cookies = load_vault_cookies(self.cfg)
         if not cookies:
             return
-        try:
-            self._ctx.add_cookies(cookies)
-            return
-        except Exception:
-            pass
-        for cookie in cookies:
-            try:
-                self._ctx.add_cookies([cookie])
-            except Exception:
-                continue
+        _ok, failed = _apply_cookies_to_context(self._ctx, cookies)
+        if failed:
+            self.inject_warning = (
+                f"re-injected vault cookies with {failed} failure(s); "
+                "campus SSO may not stick — re-run paperful session login ezproxy"
+            )
+        elif self.cfg.ezproxy_base:
+            status = ezproxy_cookie_status(cookies, self.cfg.ezproxy_base)
+            if status == "cas_only":
+                self.inject_warning = (
+                    "vault has CAS/IdP cookies but no EZProxy proxy-host ticket — "
+                    "run paperful session login ezproxy and wait for the publisher page"
+                )
+            elif status == "empty" and any(
+                "idm.oclc" in str(c.get("domain") or "").lower()
+                or "federation" in str(c.get("domain") or "").lower()
+                for c in cookies
+            ):
+                self.inject_warning = (
+                    "vault campus cookies look incomplete — "
+                    "run paperful session login ezproxy"
+                )
 
     def _page(self) -> Any:
         assert self._ctx is not None

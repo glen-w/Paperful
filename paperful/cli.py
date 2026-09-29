@@ -178,7 +178,16 @@ JOBS: dict[str, tuple[str, ...]] = {
         "all",
     ),
     "mirror": ("snapshot", "restore"),
-    "control": ("doctor", "session", "mirrors", "ezproxy", "scholar", "pack", "profile", "playbooks"),
+    "control": (
+        "doctor",
+        "session",
+        "mirrors",
+        "ezproxy",
+        "scholar",
+        "pack",
+        "profile",
+        "playbooks",
+    ),
     "utility": ("report", "version", "jobs"),
 }
 
@@ -548,7 +557,7 @@ def _print_exit_ladder(
     if manager == "endnote":
         console.print(
             "\n[bold]Next steps[/]\n"
-            "  1. Set [endnote] library = \"/path/to/Library.enl\".\n"
+            '  1. Set [endnote] library = "/path/to/Library.enl".\n'
             "  2. Confirm the matching .Data folder (sdb/sdb.eni, PDF/) is beside it.\n"
             "  3. Run [bold]paperful doctor[/].\n"
         )
@@ -1238,9 +1247,7 @@ def dedupe(
 
     phase_name = phase.strip().lower()
     if phase_name not in PHASES:
-        console.print(
-            f"[red]Unknown phase '{phase}'.[/] Known: {', '.join(PHASES)}"
-        )
+        console.print(f"[red]Unknown phase '{phase}'.[/] Known: {', '.join(PHASES)}")
         raise typer.Exit(1)
     if _scope_unset(collection, library, profile, run_config):
         _refuse_missing_scope()
@@ -1999,14 +2006,14 @@ def gaps(
     if mode in {"tabs", "watch"}:
 
         def _confirm(n: int) -> bool:
-            answer = typer.prompt(
-                f"Open {n} tabs in your browser?", default="y"
-            ).strip().lower()
+            answer = (
+                typer.prompt(f"Open {n} tabs in your browser?", default="y")
+                .strip()
+                .lower()
+            )
             return answer in {"y", "yes"}
 
-        opened = open_tabs(
-            missing, include_doi_tabs=include_doi_tabs, confirm=_confirm
-        )
+        opened = open_tabs(missing, include_doi_tabs=include_doi_tabs, confirm=_confirm)
         console.print(f"Opened {opened} tab(s) in your browser.")
         if mode == "tabs" and not (
             cfg.inbox_watch_after_handoff and cfg.inbox_path is not None
@@ -2167,9 +2174,7 @@ def run(
     # `all` calls this function directly. An omitted flag is a Typer option
     # object, not None; only an explicit bool overrides config.
     relogin = (
-        ezproxy_relogin
-        if isinstance(ezproxy_relogin, bool)
-        else cfg.ezproxy_relogin
+        ezproxy_relogin if isinstance(ezproxy_relogin, bool) else cfg.ezproxy_relogin
     )
     if not collection and not library:
         _refuse_missing_scope()
@@ -2199,9 +2204,7 @@ def run(
     _warn_if_recover(source_list)
 
     manifest = Manifest(cfg.manifest_path)
-    item_filter = (
-        year_from is not None or year_to is not None or types is not None
-    )
+    item_filter = year_from is not None or year_to is not None or types is not None
     # One library listing. Year and type filters, the linked-URL skip count,
     # and the PDF todo all come from that list.
     if not mirror_only:
@@ -2215,9 +2218,7 @@ def run(
             year_to=year_to,
             item_types=types,
         )
-        linked_skipped = (
-            0 if upgrade_linked else linked_url_only_count(scoped)
-        )
+        linked_skipped = 0 if upgrade_linked else linked_url_only_count(scoped)
     else:
         scoped = catalog
         linked_skipped = (
@@ -2588,14 +2589,14 @@ def _run_session_handoff(
     if mode in {"tabs", "watch"}:
 
         def _confirm(n: int) -> bool:
-            answer = typer.prompt(
-                f"Open {n} tabs in your browser?", default="y"
-            ).strip().lower()
+            answer = (
+                typer.prompt(f"Open {n} tabs in your browser?", default="y")
+                .strip()
+                .lower()
+            )
             return answer in {"y", "yes"}
 
-        opened = open_tabs(
-            missing, include_doi_tabs=include_doi_tabs, confirm=_confirm
-        )
+        opened = open_tabs(missing, include_doi_tabs=include_doi_tabs, confirm=_confirm)
         console.print(f"Opened {opened} tab(s).")
         enter_watch = mode == "watch" or (
             mode == "tabs"
@@ -2605,7 +2606,9 @@ def _run_session_handoff(
         if not enter_watch:
             return
         if backend is None or not backend.supports_write():
-            console.print("[yellow]--handoff watch needs a writable library; skipped.[/]")
+            console.print(
+                "[yellow]--handoff watch needs a writable library; skipped.[/]"
+            )
             return
         _inbox_handoff_session(
             cfg,
@@ -2747,7 +2750,9 @@ def _load_last_run(cfg: Config) -> dict | None:
 
 @app.command()
 def attach(
-    item: list[str] = typer.Option([], "--item", help="Attach a file to this item key."),
+    item: list[str] = typer.Option(
+        [], "--item", help="Attach a file to this item key."
+    ),
     file: Path | None = typer.Option(
         None,
         "--file",
@@ -2809,9 +2814,7 @@ def attach(
         held_short = sum(
             1
             for r in manifest.records.values()
-            if r.status == STATUS_OK
-            and r.path
-            and r.reason == REASON_SHORT_PDF
+            if r.status == STATUS_OK and r.path and r.reason == REASON_SHORT_PDF
         )
         if held_short:
             console.print(
@@ -3084,7 +3087,9 @@ def snapshot(
         f"{verb} restore folders for [bold]{len(items)}[/] items "
         f"in [bold]{scope}[/] (pdfs={mode})"
     )
-    stats = run_snapshot(cfg, backend, items, pdfs=mode, dry_run=dry_run, manifest=manifest)
+    stats = run_snapshot(
+        cfg, backend, items, pdfs=mode, dry_run=dry_run, manifest=manifest
+    )
     report = snapshot_report(cfg, scope, mode, dry_run, stats)
     if not dry_run:
         write_run_report(cfg, report, as_last_run=False)
@@ -3107,9 +3112,13 @@ def restore(
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
-    limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N folders."),
+    limit: int | None = typer.Option(
+        None, "--limit", "-n", help="Stop after N folders."
+    ),
     dry_run: bool = typer.Option(
-        False, "--dry-run", help="Show what would be created. Does not write the library."
+        False,
+        "--dry-run",
+        help="Show what would be created. Does not write the library.",
     ),
     apply: bool | None = typer.Option(
         None,
@@ -3204,7 +3213,9 @@ def restore(
         f"notes {counts.get('create_note', 0)}"
     )
     if not apply:
-        console.print("[dim]Dry run. Pass --apply to write missing items into the library.[/]")
+        console.print(
+            "[dim]Dry run. Pass --apply to write missing items into the library.[/]"
+        )
         return
     done = apply_restore(planned, backend, backend)
     console.print(
@@ -3265,9 +3276,13 @@ def import_library(
 
 @app.command("export")
 def export_library(
-    dest: Path = typer.Argument(..., help="Output .ris / .bib / .xml file (or a folder for EndNote XML)."),
+    dest: Path = typer.Argument(
+        ..., help="Output .ris / .bib / .xml file (or a folder for EndNote XML)."
+    ),
     fmt: str | None = typer.Option(
-        None, "--format", help="ris, bibtex, or endnote-xml. Default: from the file suffix."
+        None,
+        "--format",
+        help="ris, bibtex, or endnote-xml. Default: from the file suffix.",
     ),
     collection: list[str] = typer.Option(
         [], "--collection", "-C", help="Collection path/name/key (repeatable)."
@@ -3278,7 +3293,9 @@ def export_library(
     item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n"),
     pdfs: bool = typer.Option(
-        False, "--pdfs/--no-pdfs", help="Copy PDFs next to the export (needed for EndNote XML)."
+        False,
+        "--pdfs/--no-pdfs",
+        help="Copy PDFs next to the export (needed for EndNote XML).",
     ),
     config: Path | None = ConfigOpt,
 ) -> None:
@@ -3335,7 +3352,9 @@ def export_library(
         rec["url"] = it.url
         rec["pmid"] = it.pmid
         rec["abstract"] = it.abstract or rec.get("abstract")
-        rec["collection_paths"] = [p for p in it.collection_paths if p != "_uncollected"]
+        rec["collection_paths"] = [
+            p for p in it.collection_paths if p != "_uncollected"
+        ]
         rec["item_key"] = it.key
         pdf_list: list[str] = []
         if pdf_dir is not None and it.has_pdf:
@@ -3583,8 +3602,14 @@ def _netscape_fallback_hint(cookie_path: Path, *, scholar: bool) -> None:
 
 
 def _probe_slot(cfg: Config, slot: str) -> None:
-    from .cookies import cookie_domains
-    from .session import BrowserSession, profile_ready, vault_cookies_path
+    from .cookies import cookie_domains, ezproxy_cookie_status
+    from .session import (
+        BrowserSession,
+        load_vault_cookies,
+        profile_ready,
+        storage_state_path,
+        vault_cookies_path,
+    )
     from .sources import ezproxy as ez
     from .sources import scholar as gs
 
@@ -3596,9 +3621,30 @@ def _probe_slot(cfg: Config, slot: str) -> None:
             if (
                 not cookie_path.is_file()
                 and not vault_cookies_path(cfg).is_file()
+                and not storage_state_path(cfg).is_file()
                 and not profile_ready(cfg)
             ):
                 _netscape_fallback_hint(cookie_path, scholar=False)
+                _print_exit_ladder()
+                raise typer.Exit(2)
+            ticket = ezproxy_cookie_status(load_vault_cookies(cfg), cfg.ezproxy_base)
+            if ticket == "cas_only":
+                console.print(
+                    "[red]Session not ready:[/] CAS/IdP cookies only — "
+                    "no EZProxy proxy-host ticket"
+                )
+                console.print(
+                    "Run [bold]paperful session login ezproxy[/] and wait until a "
+                    "publisher page loads through the proxy "
+                    "(URL should include your idm.oclc.org host), then press Enter."
+                )
+                _print_exit_ladder()
+                raise typer.Exit(2)
+            if ticket != "proxy_ticket":
+                console.print(
+                    "[red]Session not ready:[/] no campus proxy cookies in the vault"
+                )
+                console.print("Run [bold]paperful session login ezproxy[/] and retry.")
                 _print_exit_ladder()
                 raise typer.Exit(2)
             ok, detail = ez.session_ok(ctx)
@@ -3624,6 +3670,11 @@ def _probe_slot(cfg: Config, slot: str) -> None:
         browser.close()
     if ok:
         console.print(f"[green]Session OK[/] — {detail}")
+        if slot == "ezproxy":
+            console.print("[dim]proxy-host ticket present in vault[/]")
+        warn = getattr(browser, "inject_warning", None)
+        if warn:
+            console.print(f"[yellow]{warn}[/]")
         return
     console.print(f"[red]Session not ready:[/] {detail}")
     if slot == "scholar":
@@ -3673,7 +3724,9 @@ def session_login(
         )
         return
     if key not in sess.SLOTS:
-        console.print(f"[red]Unknown slot {slot!r}.[/] Use scholar, ezproxy, or mendeley.")
+        console.print(
+            f"[red]Unknown slot {slot!r}.[/] Use scholar, ezproxy, or mendeley."
+        )
         raise typer.Exit(1)
     eng = engine.strip().lower()
     if eng not in ("auto", "chrome", "playwright"):
@@ -3700,8 +3753,13 @@ def session_login(
     for path in written:
         console.print(f"Wrote {path}")
     console.print(
-        "[green]Session saved.[/] Probe with [bold]paperful session status[/]."
+        "[green]Session saved.[/] Probe with [bold]paperful session status --probe[/]."
     )
+    if key == "ezproxy":
+        console.print(
+            "[dim]storage_state + Netscape include a proxy-host ticket "
+            "(login probed a proxied publisher URL before saving).[/]"
+        )
 
 
 @session_app.command("status")
@@ -3713,6 +3771,7 @@ def session_status(
 ) -> None:
     """Show the vault. Default is offline file presence; --probe runs session_ok."""
     from . import session as sess
+    from .cookies import ezproxy_cookie_status
 
     cfg = _cfg(config)
     console.print(f"Vault:     {sess.sessions_dir(cfg)}")
@@ -3726,11 +3785,27 @@ def session_status(
     else:
         console.print("[dim]No login slots recorded. Run paperful session login.[/]")
     vault = sess.vault_cookies_path(cfg)
+    state = sess.storage_state_path(cfg)
     ez_path = cfg.ezproxy_cookie_path
     gs_path = cfg.scholar_cookie_path
+    console.print(f"storage_state:  {'yes' if state.is_file() else 'no'} ({state})")
     console.print(f"Vault cookies:  {'yes' if vault.is_file() else 'no'} ({vault})")
     console.print(f"EZProxy file:  {'yes' if ez_path.is_file() else 'no'} ({ez_path})")
     console.print(f"Scholar file:   {'yes' if gs_path.is_file() else 'no'} ({gs_path})")
+    if cfg.ezproxy_base:
+        status = ezproxy_cookie_status(sess.load_vault_cookies(cfg), cfg.ezproxy_base)
+        if status == "proxy_ticket":
+            console.print("EZProxy cookies: [green]proxy-host ticket present[/]")
+        elif status == "cas_only":
+            console.print(
+                "EZProxy cookies: [yellow]CAS/IdP only — no proxy ticket[/] "
+                "(run [bold]paperful session login ezproxy[/] and wait for the publisher page)"
+            )
+        else:
+            console.print(
+                "EZProxy cookies: [yellow]none[/] "
+                "(run [bold]paperful session login ezproxy[/])"
+            )
     if not probe:
         return
     if cfg.ezproxy_base:
@@ -3741,7 +3816,7 @@ def session_status(
 
 @session_app.command("export")
 def session_export(config: Path | None = ConfigOpt) -> None:
-    """Dump Netscape cookies from the Chromium profile (httpx compat)."""
+    """Refresh storage_state + Netscape from the vault (keeps session tickets)."""
     from . import session as sess
 
     cfg = _cfg(config)
@@ -4111,7 +4186,9 @@ def summarize(
         raise typer.Exit(1)
     dest = to.value if to is not None else cfg.summarize_dest
     if apply and dest == "disk":
-        console.print("[red]--apply writes a Zotero note; it conflicts with --to disk.[/]")
+        console.print(
+            "[red]--apply writes a Zotero note; it conflicts with --to disk.[/]"
+        )
         raise typer.Exit(1)
     _require_manager(cfg)
     try:
@@ -4300,7 +4377,9 @@ def synthesize(
         item_keys=item,
     )
     items, scope = loaded.items, loaded.label
-    items.sort(key=lambda it: (it.year or 9999, (it.first_author or "").lower(), it.key))
+    items.sort(
+        key=lambda it: (it.year or 9999, (it.first_author or "").lower(), it.key)
+    )
     if limit:
         items = items[:limit]
     targets = []
@@ -4372,7 +4451,9 @@ def synthesize(
         if event.kind == "html":
             console.print(f"[green]Wrote[/] {event.path}")
         elif event.kind == "note":
-            console.print(f"  attached note {event.note_key} in {event.collection_path}")
+            console.print(
+                f"  attached note {event.note_key} in {event.collection_path}"
+            )
         elif event.kind == "json":
             console.print(f"[green]Wrote[/] {event.path}")
 
@@ -4476,7 +4557,9 @@ def all_cmd(
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
-    limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items in each step."),
+    limit: int | None = typer.Option(
+        None, "--limit", "-n", help="Stop after N items in each step."
+    ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
@@ -4490,7 +4573,9 @@ def all_cmd(
     scihub: bool | None = SciHubOpt,
     browser_agent: bool | None = BrowserAgentOpt,
     sources: str | None = typer.Option(
-        None, "--sources", help="Comma-separated source order override for the run step."
+        None,
+        "--sources",
+        help="Comma-separated source order override for the run step.",
     ),
     preset: str | None = typer.Option(
         None, "--preset", help="Named source preset for the run step (eoi)."
@@ -4575,9 +4660,7 @@ def all_cmd(
                         "(--require-summarize).[/]"
                     )
                     raise typer.Exit(1)
-                console.print(
-                    "[yellow]Skipping summarize — llm.enabled is false.[/]"
-                )
+                console.print("[yellow]Skipping summarize — llm.enabled is false.[/]")
                 continue
             console.print(f"\n[bold]all[/] · {step}")
             _dispatch_all_step(
@@ -4669,9 +4752,7 @@ def _dispatch_all_step(
         )
         return
     if step == "snapshot":
-        _call_step(
-            snapshot, **scope, limit=bound.limit, dry_run=dry_run, pdfs=None
-        )
+        _call_step(snapshot, **scope, limit=bound.limit, dry_run=dry_run, pdfs=None)
         return
     if step == "dedupe":
         _call_step(
@@ -4813,7 +4894,9 @@ def playbooks_promote(
         raise typer.Exit(2)
     path = source if source is not None else proposed_path(cfg)
     if not path.is_file():
-        console.print(f"[red]No proposal file at {path}.[/] Run playbooks propose first.")
+        console.print(
+            f"[red]No proposal file at {path}.[/] Run playbooks propose first."
+        )
         raise typer.Exit(2)
     books = [pb for pb in load_pack_file(path) if pb.name.startswith("learned-")]
     if not books:
@@ -4853,14 +4936,18 @@ def profile_list(config: Path | None = ConfigOpt) -> None:
 
 @profile_app.command("show")
 def profile_show(
-    name: str | None = typer.Argument(None, help="Profile name. Omit to show builtin all defaults."),
+    name: str | None = typer.Argument(
+        None, help="Profile name. Omit to show builtin all defaults."
+    ),
     collection: list[str] = typer.Option([], "--collection", "-C"),
     library: bool | None = LibraryOpt,
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Note that summarize would be skipped."),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Note that summarize would be skipped."
+    ),
     try_all: bool | None = TryAllOpt,
     retry_failed: bool | None = RetryFailedOpt,
     upgrade_linked: bool | None = UpgradeLinkedOpt,
@@ -4873,7 +4960,9 @@ def profile_show(
     overwrite: bool | None = OverwriteOpt,
     steps: str | None = StepsOpt,
     skip: list[str] = SkipOpt,
-    require_summarize: bool | None = typer.Option(None, "--require-summarize/--no-require-summarize"),
+    require_summarize: bool | None = typer.Option(
+        None, "--require-summarize/--no-require-summarize"
+    ),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
@@ -4881,7 +4970,9 @@ def profile_show(
     """Print the effective ``paperful all`` config after profile and flag merge."""
     chosen = name or profile
     if name and profile and name != profile:
-        console.print("[red]Pass the profile name once, as an argument or --profile.[/]")
+        console.print(
+            "[red]Pass the profile name once, as an argument or --profile.[/]"
+        )
         raise typer.Exit(1)
     cfg = _cfg(config)
     bound = _bind_run(
@@ -4920,7 +5011,9 @@ def profile_show(
 
 @profile_app.command("save")
 def profile_save(
-    name: str = typer.Argument(..., help="Profile name. Written to profiles/<name>.toml."),
+    name: str = typer.Argument(
+        ..., help="Profile name. Written to profiles/<name>.toml."
+    ),
     collection: list[str] = typer.Option([], "--collection", "-C"),
     library: bool | None = LibraryOpt,
     year_from: int | None = YearFromOpt,
@@ -4939,9 +5032,15 @@ def profile_save(
     overwrite: bool | None = OverwriteOpt,
     steps: str | None = StepsOpt,
     skip: list[str] = SkipOpt,
-    require_summarize: bool | None = typer.Option(None, "--require-summarize/--no-require-summarize"),
-    description: str | None = typer.Option(None, "--description", help="One-line note stored in the file."),
-    force: bool = typer.Option(False, "--force", help="Overwrite an existing profile file."),
+    require_summarize: bool | None = typer.Option(
+        None, "--require-summarize/--no-require-summarize"
+    ),
+    description: str | None = typer.Option(
+        None, "--description", help="One-line note stored in the file."
+    ),
+    force: bool = typer.Option(
+        False, "--force", help="Overwrite an existing profile file."
+    ),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
@@ -5055,25 +5154,41 @@ def snowball_search(
     query: str = typer.Argument(..., help="Keyword query."),
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
-    depth: int | None = typer.Option(None, "--depth", help="0 = hits only. Expand hits when >= 1."),
+    depth: int | None = typer.Option(
+        None, "--depth", help="0 = hits only. Expand hits when >= 1."
+    ),
     max_candidates: str | None = MaxCandidatesOpt,
     per_hop_limit: str | None = PerHopLimitOpt,
     per_hop_rank: str | None = PerHopRankOpt,
-    direction: str | None = typer.Option(None, "--direction", help=DIRECTION_HELP + " Used when depth >= 1."),
+    direction: str | None = typer.Option(
+        None, "--direction", help=DIRECTION_HELP + " Used when depth >= 1."
+    ),
     keyword_limit: str | None = KeywordLimitOpt,
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
     cites_query: str | None = CitesQueryOpt,
     gate: str | None = typer.Option(
-        None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
+        None,
+        "--gate",
+        help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run.",
     ),
-    collection: str = typer.Option("", "--collection", "-C", help="Target collection for --gate auto."),
+    collection: str = typer.Option(
+        "", "--collection", "-C", help="Target collection for --gate auto."
+    ),
     fetch_pdfs: str | None = FetchPdfsOpt,
-    languages: str | None = typer.Option(None, "--languages", help="Comma-separated language codes."),
+    languages: str | None = typer.Option(
+        None, "--languages", help="Comma-separated language codes."
+    ),
     min_seed_citations: int | None = typer.Option(None, "--min-seed-citations"),
-    note_provenance: bool | None = typer.Option(None, "--note-provenance/--no-note-provenance"),
-    backends: str | None = typer.Option(None, "--backends", help="Comma-separated backend names."),
-    refine: bool | None = typer.Option(None, "--refine/--no-refine", help="Ask the LLM for query suggestions."),
+    note_provenance: bool | None = typer.Option(
+        None, "--note-provenance/--no-note-provenance"
+    ),
+    backends: str | None = typer.Option(
+        None, "--backends", help="Comma-separated backend names."
+    ),
+    refine: bool | None = typer.Option(
+        None, "--refine/--no-refine", help="Ask the LLM for query suggestions."
+    ),
     config: Path | None = ConfigOpt,
 ) -> None:
     """Search OpenAlex and write a candidate queue. Creates items only with --gate auto."""
@@ -5113,14 +5228,20 @@ def snowball_hybrid(
     max_candidates: str | None = MaxCandidatesOpt,
     per_hop_limit: str | None = PerHopLimitOpt,
     per_hop_rank: str | None = PerHopRankOpt,
-    hybrid_seeds: int | None = typer.Option(None, "--hybrid-seeds", help="How many top DOI hits to expand."),
+    hybrid_seeds: int | None = typer.Option(
+        None, "--hybrid-seeds", help="How many top DOI hits to expand."
+    ),
     direction: str | None = typer.Option(None, "--direction", help=DIRECTION_HELP),
     keyword_limit: str | None = KeywordLimitOpt,
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
     cites_query: str | None = CitesQueryOpt,
-    gate: str | None = typer.Option(None, "--gate", help="dry-run, approve-each, approve-batch, or auto."),
-    collection: str = typer.Option("", "--collection", "-C", help="Target collection for a writing gate."),
+    gate: str | None = typer.Option(
+        None, "--gate", help="dry-run, approve-each, approve-batch, or auto."
+    ),
+    collection: str = typer.Option(
+        "", "--collection", "-C", help="Target collection for a writing gate."
+    ),
     fetch_pdfs: str | None = FetchPdfsOpt,
     languages: str | None = typer.Option(None, "--languages"),
     min_seed_citations: int | None = typer.Option(None, "--min-seed-citations"),
@@ -5160,7 +5281,9 @@ def snowball_doi(
     dois: list[str] = typer.Argument(..., help="One or more seed DOIs."),
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
-    depth: int | None = typer.Option(None, "--depth", help="Graph hops. Default: [snowball] depth, else 1."),
+    depth: int | None = typer.Option(
+        None, "--depth", help="Graph hops. Default: [snowball] depth, else 1."
+    ),
     max_candidates: str | None = MaxCandidatesOpt,
     per_hop_limit: str | None = PerHopLimitOpt,
     per_hop_rank: str | None = PerHopRankOpt,
@@ -5170,9 +5293,13 @@ def snowball_doi(
     keyword_min_score: float | None = KeywordMinScoreOpt,
     cites_query: str | None = CitesQueryOpt,
     gate: str | None = typer.Option(
-        None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
+        None,
+        "--gate",
+        help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run.",
     ),
-    collection: str = typer.Option("", "--collection", "-C", help="Target collection for --gate auto."),
+    collection: str = typer.Option(
+        "", "--collection", "-C", help="Target collection for --gate auto."
+    ),
     fetch_pdfs: str | None = FetchPdfsOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
@@ -5205,7 +5332,9 @@ def snowball_orcid(
     orcid: str = typer.Argument(..., help="ORCID iD."),
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
-    depth: int | None = typer.Option(None, "--depth", help="Graph hops. Default: [snowball] depth, else 1."),
+    depth: int | None = typer.Option(
+        None, "--depth", help="Graph hops. Default: [snowball] depth, else 1."
+    ),
     max_candidates: str | None = MaxCandidatesOpt,
     per_hop_limit: str | None = PerHopLimitOpt,
     per_hop_rank: str | None = PerHopRankOpt,
@@ -5215,9 +5344,13 @@ def snowball_orcid(
     keyword_min_score: float | None = KeywordMinScoreOpt,
     cites_query: str | None = CitesQueryOpt,
     gate: str | None = typer.Option(
-        None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
+        None,
+        "--gate",
+        help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run.",
     ),
-    collection: str = typer.Option("", "--collection", "-C", help="Target collection for --gate auto."),
+    collection: str = typer.Option(
+        "", "--collection", "-C", help="Target collection for --gate auto."
+    ),
     fetch_pdfs: str | None = FetchPdfsOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
@@ -5247,10 +5380,14 @@ def snowball_orcid(
 
 @snowball_app.command("collection")
 def snowball_collection(
-    seed_collection: str = typer.Argument(..., help="Existing library collection whose DOIs seed the crawl."),
+    seed_collection: str = typer.Argument(
+        ..., help="Existing library collection whose DOIs seed the crawl."
+    ),
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
-    depth: int | None = typer.Option(None, "--depth", help="Graph hops. Default: [snowball] depth, else 1."),
+    depth: int | None = typer.Option(
+        None, "--depth", help="Graph hops. Default: [snowball] depth, else 1."
+    ),
     max_candidates: str | None = MaxCandidatesOpt,
     per_hop_limit: str | None = PerHopLimitOpt,
     per_hop_rank: str | None = PerHopRankOpt,
@@ -5260,7 +5397,9 @@ def snowball_collection(
     keyword_min_score: float | None = KeywordMinScoreOpt,
     cites_query: str | None = CitesQueryOpt,
     gate: str | None = typer.Option(
-        None, "--gate", help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run."
+        None,
+        "--gate",
+        help="dry-run, approve-each, approve-batch, or auto. Default: config, else dry-run.",
     ),
     collection: str = typer.Option(
         "",
@@ -5300,9 +5439,15 @@ def snowball_collection(
 
 @snowball_app.command("resume")
 def snowball_resume(
-    run_id: str = typer.Argument(..., help="Run id under state/snowball/<run-id>/ with deferred.json."),
-    collection: str = typer.Option("", "--collection", "-C", help="Target collection when the saved gate is auto."),
-    gate: str | None = typer.Option(None, "--gate", help="dry-run or auto. Default: config."),
+    run_id: str = typer.Argument(
+        ..., help="Run id under state/snowball/<run-id>/ with deferred.json."
+    ),
+    collection: str = typer.Option(
+        "", "--collection", "-C", help="Target collection when the saved gate is auto."
+    ),
+    gate: str | None = typer.Option(
+        None, "--gate", help="dry-run or auto. Default: config."
+    ),
     config: Path | None = ConfigOpt,
 ) -> None:
     """Continue OpenAlex work saved when the daily budget was spent. Same API key."""
@@ -5348,7 +5493,9 @@ def snowball_apply(
 
 @snowball_app.command("run")
 def snowball_run(
-    profile: str = typer.Option(..., "--profile", help="profiles/<name>.toml with kind = snowball."),
+    profile: str = typer.Option(
+        ..., "--profile", help="profiles/<name>.toml with kind = snowball."
+    ),
     direction: str = typer.Option("", "--direction", help=DIRECTION_HELP),
     keyword_limit: str | None = KeywordLimitOpt,
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
@@ -5404,7 +5551,9 @@ def snowball_run(
                 raise SnowballError(f"Profile {profile!r} needs orcid.")
             action = lambda c: run_orcid(c, orcid, request, console=console)
         elif mode == "collection":
-            seed = str(raw.get("seed_collection") or raw.get("collection") or "").strip()
+            seed = str(
+                raw.get("seed_collection") or raw.get("collection") or ""
+            ).strip()
             if not seed:
                 raise SnowballError(f"Profile {profile!r} needs seed_collection.")
             if not request.collection.strip():
@@ -5432,9 +5581,13 @@ snowball_app.add_typer(snowball_profile_app, name="profile")
 def snowball_profile_save(
     name: str = typer.Argument(..., help="Profile name (profiles/<name>.toml)."),
     query: str = typer.Option("", "--query", help="Keyword seed."),
-    doi: list[str] | None = typer.Option(None, "--doi", help="DOI seed. Repeat for several."),
+    doi: list[str] | None = typer.Option(
+        None, "--doi", help="DOI seed. Repeat for several."
+    ),
     orcid: str = typer.Option("", "--orcid", help="ORCID seed."),
-    seed_collection: str = typer.Option("", "--seed-collection", help="Collection whose DOIs seed the crawl."),
+    seed_collection: str = typer.Option(
+        "", "--seed-collection", help="Collection whose DOIs seed the crawl."
+    ),
     description: str = typer.Option("", "--description"),
     gate: str = typer.Option("dry-run", "--gate"),
     collection: str = typer.Option("", "--collection", "-C", help="Target collection."),
@@ -5452,14 +5605,20 @@ def snowball_profile_save(
     year_to: int | None = YearToOpt,
     dedupe_scope: str = typer.Option("", "--dedupe-scope"),
     oa_only: bool = typer.Option(False, "--oa-only"),
-    hybrid: bool = typer.Option(False, "--hybrid", help="With --query, save mode = hybrid."),
+    hybrid: bool = typer.Option(
+        False, "--hybrid", help="With --query, save mode = hybrid."
+    ),
     languages: str = typer.Option("", "--languages"),
     min_seed_citations: int | None = typer.Option(None, "--min-seed-citations"),
-    note_provenance: bool | None = typer.Option(None, "--note-provenance/--no-note-provenance"),
+    note_provenance: bool | None = typer.Option(
+        None, "--note-provenance/--no-note-provenance"
+    ),
     backends: str = typer.Option("", "--backends"),
     hybrid_seeds: int | None = typer.Option(None, "--hybrid-seeds"),
     refine: bool = typer.Option(False, "--refine"),
-    force: bool = typer.Option(False, "--force", help="Overwrite, or save a writing gate."),
+    force: bool = typer.Option(
+        False, "--force", help="Overwrite, or save a writing gate."
+    ),
     config: Path | None = ConfigOpt,
 ) -> None:
     """Write seeds and knobs. Refuses API keys. A writing gate needs --force."""
@@ -5467,9 +5626,16 @@ def snowball_profile_save(
     from .snowball.command import SnowballError
     from .snowball.profile import save_profile as save_snowball_profile
 
-    seeds = [bool(query.strip()), bool(doi), bool(orcid.strip()), bool(seed_collection.strip())]
+    seeds = [
+        bool(query.strip()),
+        bool(doi),
+        bool(orcid.strip()),
+        bool(seed_collection.strip()),
+    ]
     if sum(seeds) != 1:
-        console.print("[red]Pass exactly one of --query, --doi, --orcid, or --seed-collection.[/]")
+        console.print(
+            "[red]Pass exactly one of --query, --doi, --orcid, or --seed-collection.[/]"
+        )
         raise typer.Exit(2)
     body: dict[str, Any] = {"gate": gate}
     if query.strip() and hybrid:
@@ -5583,8 +5749,12 @@ snowball_app.add_typer(snowball_watch_app, name="watch")
 
 @snowball_watch_app.command("save")
 def snowball_watch_save(
-    name: str = typer.Argument(..., help="Watch name under state/snowball/watches/<name>/."),
-    profile: str = typer.Option(..., "--profile", help="Existing kind=snowball profile."),
+    name: str = typer.Argument(
+        ..., help="Watch name under state/snowball/watches/<name>/."
+    ),
+    profile: str = typer.Option(
+        ..., "--profile", help="Existing kind=snowball profile."
+    ),
     config: Path | None = ConfigOpt,
 ) -> None:
     """Point a watch at a saved snowball profile. No API keys."""

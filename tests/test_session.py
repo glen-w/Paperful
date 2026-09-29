@@ -4,12 +4,18 @@ from __future__ import annotations
 
 from paperful import pipeline as pl
 from paperful.cookies import (
+    cookies_for_playwright_inject,
+    cookies_have_proxy_host,
+    ezproxy_cookie_status,
     load_netscape_cookies,
+    load_storage_state_cookies,
+    merge_cookie_lists,
     merge_netscape_for_playwright,
     netscape_from_playwright,
     playwright_cookies_from_netscape,
     split_playwright_cookies,
     write_netscape,
+    write_storage_state,
 )
 from paperful.session import (
     BrowserSession,
@@ -19,7 +25,9 @@ from paperful.session import (
     load_meta,
     mark_slot,
     profile_ready,
+    require_ezproxy_proxy_cookies,
     sessions_dir,
+    storage_state_path,
     vault_cookies_path,
 )
 from tests.conftest import PDF_BYTES
@@ -56,6 +64,131 @@ def test_netscape_from_playwright_roundtrip(tmp_path):
     scholar, other = split_playwright_cookies(cookies)
     assert [c["name"] for c in scholar] == ["SID"]
     assert [c["name"] for c in other] == ["session"]
+
+
+def test_split_playwright_cookies_keeps_youtube_out_of_ezproxy():
+    cookies = [
+        {
+            "name": "SID",
+            "value": "g",
+            "domain": ".youtube.com",
+            "path": "/",
+        },
+        {
+            "name": "ezproxy",
+            "value": "tok",
+            "domain": ".idm.oclc.org",
+            "path": "/",
+        },
+    ]
+    scholar, other = split_playwright_cookies(cookies)
+    assert [c["name"] for c in scholar] == ["SID"]
+    assert [c["name"] for c in other] == ["ezproxy"]
+
+
+def test_storage_state_roundtrip_preserves_samesite(tmp_path):
+    path = tmp_path / "storage_state.json"
+    cookies = [
+        {
+            "name": "ezproxy",
+            "value": "tok",
+            "domain": ".idm.oclc.org",
+            "path": "/",
+            "secure": True,
+            "httpOnly": True,
+            "sameSite": "None",
+            "expires": 0,
+        }
+    ]
+    write_storage_state(path, cookies)
+    loaded = load_storage_state_cookies(path)
+    assert len(loaded) == 1
+    assert loaded[0]["sameSite"] == "None"
+    assert loaded[0]["expires"] == -1
+    injected = cookies_for_playwright_inject(loaded)
+    assert "expires" not in injected[0]
+    assert injected[0]["sameSite"] == "None"
+
+
+def test_cookies_for_playwright_inject_sets_samesite_none_for_secure():
+    cookies = [
+        {
+            "name": "ezproxy",
+            "value": "tok",
+            "domain": ".idm.oclc.org",
+            "path": "/",
+            "secure": True,
+            "httpOnly": False,
+        }
+    ]
+    injected = cookies_for_playwright_inject(cookies)
+    assert injected[0]["sameSite"] == "None"
+
+
+def test_require_ezproxy_proxy_cookies_rejects_cas_only(cfg):
+    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cas_only = [
+        {
+            "name": "JSESSIONID",
+            "value": "abc",
+            "domain": "federation.sciences-po.fr",
+            "path": "/cas/",
+        }
+    ]
+    assert ezproxy_cookie_status(cas_only, cfg.ezproxy_base) == "cas_only"
+    assert not cookies_have_proxy_host(cas_only, cfg.ezproxy_base)
+    try:
+        require_ezproxy_proxy_cookies(cfg, cas_only)
+        raise AssertionError("expected SessionError")
+    except SessionError as exc:
+        assert "CAS" in str(exc) or "incomplete" in str(exc).lower()
+    ok = [
+        {
+            "name": "ezproxy",
+            "value": "tok",
+            "domain": ".scpo.idm.oclc.org",
+            "path": "/",
+        }
+    ]
+    require_ezproxy_proxy_cookies(cfg, ok)
+
+
+def test_export_cookies_merge_existing_keeps_session_ticket(cfg):
+    prior = [
+        {
+            "name": "ezproxy",
+            "value": "keep-me",
+            "domain": ".idm.oclc.org",
+            "path": "/",
+            "expires": 0,
+            "secure": True,
+            "sameSite": "None",
+        }
+    ]
+    export_cookies(cfg, prior)
+    live = [
+        {
+            "name": "SID",
+            "value": "g",
+            "domain": ".google.com",
+            "path": "/",
+        }
+    ]
+    export_cookies(cfg, live, merge_existing=True)
+    loaded = load_storage_state_cookies(storage_state_path(cfg))
+    by_name = {c["name"]: c for c in loaded}
+    assert by_name["ezproxy"]["value"] == "keep-me"
+    assert by_name["SID"]["value"] == "g"
+
+
+def test_merge_cookie_lists_first_wins_fills_gaps():
+    a = [{"name": "a", "value": "1", "domain": ".x", "path": "/"}]
+    b = [
+        {"name": "a", "value": "2", "domain": ".x", "path": "/"},
+        {"name": "b", "value": "3", "domain": ".x", "path": "/"},
+    ]
+    merged = merge_cookie_lists(a, b)
+    assert {c["name"]: c["value"] for c in merged} == {"a": "1", "b": "3"}
 
 
 def test_playwright_cookies_from_netscape_keeps_session_cookies(tmp_path):
@@ -140,6 +273,7 @@ def test_browser_session_injects_exported_cookies(cfg, tmp_path):
                 "domain": ".idm.oclc.org",
                 "path": "/",
                 "expires": 0,
+                "secure": True,
             }
         ],
     )
@@ -155,6 +289,57 @@ def test_browser_session_injects_exported_cookies(cfg, tmp_path):
     assert len(added) == 1
     assert added[0][0]["name"] == "ezproxy"
     assert "expires" not in added[0][0]
+    assert added[0][0]["sameSite"] == "None"
+
+
+def test_browser_session_inject_warning_on_failures(cfg):
+    write_netscape(
+        vault_cookies_path(cfg),
+        [
+            {
+                "name": "ezproxy",
+                "value": "tok",
+                "domain": ".idm.oclc.org",
+                "path": "/",
+                "secure": True,
+            }
+        ],
+    )
+
+    class BoomCtx:
+        def add_cookies(self, cookies):
+            raise RuntimeError("nope")
+
+    sess = BrowserSession(cfg)
+    sess._ctx = BoomCtx()
+    sess._inject_exported_cookies()
+    assert sess.inject_warning is not None
+    assert "failure" in sess.inject_warning
+
+
+def test_browser_session_inject_warns_cas_only(cfg):
+    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    write_netscape(
+        vault_cookies_path(cfg),
+        [
+            {
+                "name": "JSESSIONID",
+                "value": "abc",
+                "domain": "federation.sciences-po.fr",
+                "path": "/cas/",
+            }
+        ],
+    )
+
+    class FakeCtx:
+        def add_cookies(self, cookies):
+            return None
+
+    sess = BrowserSession(cfg)
+    sess._ctx = FakeCtx()
+    sess._inject_exported_cookies()
+    assert sess.inject_warning is not None
+    assert "CAS" in sess.inject_warning or "proxy-host" in sess.inject_warning
 
 
 def test_export_cookies_writes_vault_and_compat(cfg, tmp_path):
@@ -176,6 +361,8 @@ def test_export_cookies_writes_vault_and_compat(cfg, tmp_path):
         },
     ]
     written = export_cookies(cfg, cookies)
+    assert storage_state_path(cfg) in written
+    assert storage_state_path(cfg).is_file()
     assert vault_cookies_path(cfg) in written
     assert vault_cookies_path(cfg).is_file()
     assert cfg.scholar_cookie_path.is_file()
@@ -264,7 +451,9 @@ class _FakeLoc:
 
 
 class _FakePage:
-    def __init__(self, resp=None, goto_error=None, download=None, locators=None, html=""):
+    def __init__(
+        self, resp=None, goto_error=None, download=None, locators=None, html=""
+    ):
         self._resp = resp
         self._goto_error = goto_error
         self._download = download
@@ -356,9 +545,7 @@ def test_collect_pdf_from_page_names_paywall():
 
     try:
         collect_pdf_from_page(
-            Page(
-                resp=_FakeResp(b"<html>", "https://www.wiley.com/doi/abs/10.1/x")
-            ),
+            Page(resp=_FakeResp(b"<html>", "https://www.wiley.com/doi/abs/10.1/x")),
             "https://doi.org/10.1/x",
         )
         raise AssertionError("expected SessionError")
@@ -523,9 +710,7 @@ def test_collect_pdf_from_page_fails_fast_on_stuck_sso(monkeypatch):
             return self._html
 
     try:
-        collect_pdf_from_page(
-            Page(), "https://federation.sciences-po.fr/cas/login"
-        )
+        collect_pdf_from_page(Page(), "https://federation.sciences-po.fr/cas/login")
         raise AssertionError("expected SessionError")
     except SessionError as exc:
         assert "login @federation.sciences-po.fr" in str(exc)
@@ -535,9 +720,7 @@ def test_looks_like_vault_login_miss():
     from paperful.page_signals import looks_like_vault_login_miss
 
     assert looks_like_vault_login_miss("login @federation.sciences-po.fr")
-    assert looks_like_vault_login_miss(
-        "no download control @federation.sciences-po.fr"
-    )
+    assert looks_like_vault_login_miss("no download control @federation.sciences-po.fr")
     assert not looks_like_vault_login_miss("blocked @linkinghub.elsevier.com")
     assert not looks_like_vault_login_miss("no download control @wiley.com")
 
@@ -551,9 +734,7 @@ def test_miss_host_and_dead_vault_miss():
     assert looks_like_dead_vault_miss("login @federation.sciences-po.fr")
     assert looks_like_dead_vault_miss("captcha @scholar.google.com")
     assert looks_like_dead_vault_miss("no download control @hal.science")
-    assert looks_like_dead_vault_miss(
-        "no download control @federation.sciences-po.fr"
-    )
+    assert looks_like_dead_vault_miss("no download control @federation.sciences-po.fr")
     assert not looks_like_dead_vault_miss("blocked @linkinghub.elsevier.com")
     assert not looks_like_dead_vault_miss("clicked download control, no PDF @x.test")
 
@@ -577,7 +758,9 @@ def test_collect_pdf_from_page_rewrite_miss_falls_through():
                 for cb in self._handlers.get("response", []):
                     cb(pdf_resp)
                 return pdf_resp
-            resp = _FakeResp(b"<html>not a pdf</html>", url, headers={"content-type": "text/html"})
+            resp = _FakeResp(
+                b"<html>not a pdf</html>", url, headers={"content-type": "text/html"}
+            )
             return resp
 
     page = Page(
@@ -606,7 +789,9 @@ def test_collect_pdf_from_page_skips_off_host_and_search():
         '<a href="https://scholar.google.com/a.pdf">PDF</a></html>'
     )
     page = _FakePage(
-        resp=_FakeResp(b"<html>", "https://x.test/article", headers={"content-type": "text/html"}),
+        resp=_FakeResp(
+            b"<html>", "https://x.test/article", headers={"content-type": "text/html"}
+        ),
         html=html,
     )
     page.url = "https://x.test/article"
@@ -618,9 +803,7 @@ def test_collect_pdf_from_page_skips_off_host_and_search():
 
 
 def test_collect_pdf_from_page_caps_extract_navigations():
-    links = "".join(
-        f'<a href="https://x.test/n{i}.pdf">PDF</a>' for i in range(4)
-    )
+    links = "".join(f'<a href="https://x.test/n{i}.pdf">PDF</a>' for i in range(4))
     seen: list[str] = []
 
     class Page(_FakePage):
@@ -633,7 +816,9 @@ def test_collect_pdf_from_page_caps_extract_navigations():
                 for cb in self._handlers.get("response", []):
                     cb(resp)
                 return resp
-            return _FakeResp(b"<html></html>", url, headers={"content-type": "text/html"})
+            return _FakeResp(
+                b"<html></html>", url, headers={"content-type": "text/html"}
+            )
 
     page = Page(
         resp=_FakeResp(b"<html>", "https://x.test/article"),

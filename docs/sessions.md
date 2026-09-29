@@ -20,16 +20,25 @@ uv run paperful session login scholar --engine playwright  # Playwright window
 uv run paperful session status
 uv run paperful session status --probe  # optional Scholar / EZProxy session_ok
 uv run paperful doctor --probe          # same live check inside doctor
-uv run paperful session export          # refresh Netscape dumps for httpx
+uv run paperful session export          # refresh storage_state + Netscape (keeps tickets)
 ```
 
 `session_ok` prefers the vault Chromium profile (the same path as Unpaywall
 browser wraps) and falls back to httpx + Netscape cookies. Campus EZProxy /
-CAS tickets are often **session cookies**: CDP export keeps them in
-`state/sessions/cookies.txt`, but Chrome drops them from the profile when it
-exits. The vault browser re-injects that Netscape dump on launch so probes and
-publisher fetches match the httpx jar. File presence in `doctor` without
-`--probe` only means a login was saved, not that campus SSO is still live.
+CAS tickets are often **session cookies**. Login writes them to
+`state/sessions/storage_state.json` (Playwright format, keeps `sameSite`) and
+mirrors Netscape dumps for httpx (`cookies.txt`, `ezproxy-cookies.txt`). Chrome
+drops session cookies from the profile when it exits; the vault browser
+re-injects `storage_state` (then Netscape) on launch so probes and publisher
+fetches match the httpx jar. `session export` re-injects before refreshing so
+it does not wipe those tickets.
+
+Offline `session status` / `doctor` report **proxy-host ticket** vs **CAS/IdP
+only**. `doctor --probe` and `session status --probe` refuse to green-light a
+CAS-only vault even if a live SSO hop would briefly succeed — re-run
+`session login ezproxy` and wait until a publisher page loads through the proxy
+(URL should include your `idm.oclc.org` host) before pressing Enter. File
+presence without `--probe` still does not prove campus SSO is live.
 
 Scholar fetches during `run` reuse this Chromium profile when it exists (Google
 often keys CAPTCHA to the browser, not cookies). htmlpdf uses the same profile

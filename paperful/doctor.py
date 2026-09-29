@@ -76,7 +76,10 @@ def remediation_text(
                 "See docs/zotero.md, then continue."
             )
         if code == "zotero_host_unresolved":
-            configured = os.environ.get("PAPERFUL_ZOTERO_HOST", "").strip() or "the configured host"
+            configured = (
+                os.environ.get("PAPERFUL_ZOTERO_HOST", "").strip()
+                or "the configured host"
+            )
             return (
                 f"1. {configured} does not resolve on this machine. Unset "
                 "PAPERFUL_ZOTERO_HOST when running outside Docker.\n"
@@ -118,7 +121,7 @@ def remediation_text(
         )
     if check.name == _ENDNOTE_CHECK:
         return (
-            "Set [endnote] library = \"/path/to/Library.enl\". The matching "
+            'Set [endnote] library = "/path/to/Library.enl". The matching '
             ".Data folder (with sdb/sdb.eni and PDF/) must sit beside it. "
             "If EndNote is open and the database is locked, close it or let "
             "Paperful copy the file."
@@ -144,10 +147,18 @@ def remediation_text(
         )
     if check.name == "EZProxy session":
         cmd = "uv run paperful session login ezproxy"
+        extra = ""
+        if check.code == "ezproxy_cas_only":
+            extra = (
+                " Wait until a publisher page loads through the proxy "
+                "(URL should include your idm.oclc.org host), then press Enter."
+            )
         return (
             f"Run{host}: {cmd}\n"
             f"(system Chrome/Edge when available — campus SSO).{data_hint}\n"
-            "When the vault is saved, continue here to re-check."
+            f"{extra}".rstrip()
+            + ("\n" if extra else "")
+            + "When the vault is saved, continue here to re-check."
         )
     if check.name == "Scholar session":
         cmd = "uv run paperful session login scholar"
@@ -194,7 +205,7 @@ def remediation_text(
     if check.name == "LLM":
         return (
             f"Edit {cfg_hint} [llm]: start Ollama (ollama serve) and pull the model "
-            "(ollama pull <model>), or set provider = \"litellm\" after "
+            '(ollama pull <model>), or set provider = "litellm" after '
             "`uv sync --extra llm` with keys in the environment. Then continue."
         )
     if check.name == "browser-agent extra":
@@ -204,13 +215,13 @@ def remediation_text(
                 "then `paperful session login scholar` before `run` / `recover`."
             )
         return (
-            f"Edit {cfg_hint} [browser_agent]: model = \"<14b+ tag>\" "
+            f'Edit {cfg_hint} [browser_agent]: model = "<14b+ tag>" '
             "(small models loop on publisher pages), then continue."
         )
     if check.name == "Docker paths":
         cfg_hint = str(cfg.config_path) if cfg.config_path else "config.toml"
         return (
-            f"Edit {cfg_hint}: set out_dir = \"out\" and state_dir = \"state\" "
+            f'Edit {cfg_hint}: set out_dir = "out" and state_dir = "state" '
             "(relative to the config file / Compose /data mount). "
             "Avoid ~/… paths — they resolve to a different home inside the container."
         )
@@ -253,8 +264,40 @@ def _writable(path: Path) -> bool:
         return False
 
 
+def _offline_ezproxy_session_check(cfg: Config, where: str) -> Check:
+    """File-based EZProxy readiness: require a proxy-host ticket, not CAS-only."""
+    from .cookies import ezproxy_cookie_status
+    from .session import load_vault_cookies
+
+    status = ezproxy_cookie_status(load_vault_cookies(cfg), cfg.ezproxy_base)
+    if status == "proxy_ticket":
+        return Check("EZProxy session", "green", f"proxy-host ticket ({where})")
+    if status == "cas_only":
+        return Check(
+            "EZProxy session",
+            "amber",
+            f"CAS/IdP cookies only — no proxy ticket ({where}); "
+            "run: paperful session login ezproxy and wait for the publisher page",
+            code="ezproxy_cas_only",
+        )
+    return Check(
+        "EZProxy session",
+        "amber",
+        f"no campus proxy cookies ({where}); run: paperful session login ezproxy",
+        code="ezproxy_missing",
+    )
+
+
 def _probe_ezproxy_session_check(cfg: Config, where: str) -> Check:
-    """Live EZProxy probe for doctor --probe (files already present)."""
+    """Live EZProxy probe for doctor --probe (files already present).
+
+    Fails fast on CAS-only / missing proxy-host ticket so a lucky SSO hop cannot
+    paint the check green when the durable vault has no campus proxy cookie.
+    """
+    offline = _offline_ezproxy_session_check(cfg, where)
+    if offline.code in {"ezproxy_cas_only", "ezproxy_missing"}:
+        return offline
+
     from .pipeline import make_client
     from .session import BrowserSession
     from .sources import ezproxy as ez
@@ -262,10 +305,12 @@ def _probe_ezproxy_session_check(cfg: Config, where: str) -> Check:
 
     browser = BrowserSession(cfg)
     client = make_client(cfg)
+    ok = False
+    detail = "probe failed"
+    warn = None
     try:
-        ok, detail = ez.session_ok(
-            Context(config=cfg, client=client, browser=browser)
-        )
+        ok, detail = ez.session_ok(Context(config=cfg, client=client, browser=browser))
+        warn = getattr(browser, "inject_warning", None)
     finally:
         try:
             client.close()
@@ -275,8 +320,19 @@ def _probe_ezproxy_session_check(cfg: Config, where: str) -> Check:
             browser.close()
         except Exception:
             pass
+    if ok and warn:
+        return Check(
+            "EZProxy session",
+            "amber",
+            f"{detail}; {warn}",
+            code="ezproxy_inject",
+        )
     if ok:
-        return Check("EZProxy session", "green", detail)
+        return Check(
+            "EZProxy session",
+            "green",
+            f"{detail} (proxy-host ticket)",
+        )
     return Check(
         "EZProxy session",
         "amber",
@@ -295,9 +351,7 @@ def _probe_scholar_session_check(cfg: Config, where: str) -> Check:
     browser = BrowserSession(cfg)
     client = make_client(cfg)
     try:
-        ok, detail = gs.session_ok(
-            Context(config=cfg, client=client, browser=browser)
-        )
+        ok, detail = gs.session_ok(Context(config=cfg, client=client, browser=browser))
     finally:
         try:
             client.close()
@@ -341,7 +395,9 @@ def run_checks(
                 ver = info.get("zotero_version") or "?"
                 checks.append(
                     Check(
-                        _ZOTERO_CHECK, "green", f"reachable at {zot_where} (Zotero {ver})"
+                        _ZOTERO_CHECK,
+                        "green",
+                        f"reachable at {zot_where} (Zotero {ver})",
                     )
                 )
             except ConnectionError as exc:
@@ -411,16 +467,28 @@ def run_checks(
 
     cookie_path = cfg.ezproxy_cookie_path
     vault = cfg.state_dir / "sessions" / "cookies.txt"
+    state = cfg.state_dir / "sessions" / "storage_state.json"
     meta = cfg.state_dir / "sessions" / "meta.json"
     if cfg.ezproxy_base:
-        if cookie_path.is_file() or vault.is_file() or meta.is_file():
+        if (
+            cookie_path.is_file()
+            or vault.is_file()
+            or state.is_file()
+            or meta.is_file()
+        ):
             where = str(
-                meta if meta.is_file() else (vault if vault.is_file() else cookie_path)
+                state
+                if state.is_file()
+                else (
+                    meta
+                    if meta.is_file()
+                    else (vault if vault.is_file() else cookie_path)
+                )
             )
             if probe:
                 checks.append(_probe_ezproxy_session_check(cfg, where))
             else:
-                checks.append(Check("EZProxy session", "green", where))
+                checks.append(_offline_ezproxy_session_check(cfg, where))
         else:
             checks.append(
                 Check(
@@ -702,7 +770,13 @@ def _grey_playbooks_check(cfg: Config) -> Check:
 
 
 def _mendeley_library_check(cfg: Config) -> Check:
-    from .mendeley import MendeleyAuthError, MendeleyClient, client_id_of, client_secret_of, token_path
+    from .mendeley import (
+        MendeleyAuthError,
+        MendeleyClient,
+        client_id_of,
+        client_secret_of,
+        token_path,
+    )
 
     if not client_id_of(cfg) or not client_secret_of(cfg):
         return Check(

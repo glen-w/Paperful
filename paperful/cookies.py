@@ -1,11 +1,16 @@
-"""Load and dump Netscape cookie files for httpx."""
+"""Load and dump Netscape cookie files for httpx, plus Playwright storage_state."""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
+
+_STORAGE_STATE_NAME = "storage_state.json"
+_GOOGLE_FAMILY = ("google.", "youtube.", "ggpht.", "gstatic.", "googleapis.")
 
 
 def load_netscape_cookies(path: Path) -> httpx.Cookies:
@@ -49,6 +54,15 @@ def has_domain_cookies(client: httpx.Client, *fragments: str) -> bool:
     )
 
 
+def cookie_key(cookie: dict[str, Any]) -> tuple[str, str, str]:
+    """Identity for merge / dedupe: domain + path + name."""
+    return (
+        str(cookie.get("domain") or ""),
+        str(cookie.get("path") or "/"),
+        str(cookie.get("name") or ""),
+    )
+
+
 def netscape_from_playwright(cookies: list[dict[str, Any]]) -> str:
     """Serialize Playwright `context.cookies()` dicts as a Netscape cookies.txt."""
     lines = [
@@ -86,6 +100,65 @@ def write_netscape(path: Path, cookies: list[dict[str, Any]]) -> None:
         path.chmod(0o600)
     except OSError:
         pass
+
+
+def storage_state_path(sessions_dir: Path) -> Path:
+    return sessions_dir / _STORAGE_STATE_NAME
+
+
+def write_storage_state(path: Path, cookies: list[dict[str, Any]]) -> None:
+    """Write Playwright storage_state JSON (cookies only; durable sameSite)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cleaned = [_normalize_cookie_for_storage(c) for c in cookies if c.get("name")]
+    payload = {"cookies": cleaned, "origins": []}
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    try:
+        path.chmod(0o600)
+    except OSError:
+        pass
+
+
+def load_storage_state_cookies(path: Path) -> list[dict[str, Any]]:
+    """Load cookie dicts from a Playwright storage_state JSON file."""
+    if not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    raw = data.get("cookies") if isinstance(data, dict) else None
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict) or not item.get("name"):
+            continue
+        out.append(_normalize_cookie_for_storage(item))
+    return out
+
+
+def merge_cookie_lists(*lists: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Merge cookie lists; first list wins for a domain/path/name key.
+
+    Later lists only fill gaps. Prefer a non-empty value when the kept slot is empty.
+    """
+    by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
+    order: list[tuple[str, str, str]] = []
+    for cookies in lists:
+        for cookie in cookies:
+            key = cookie_key(cookie)
+            if not key[2]:
+                continue
+            existing = by_key.get(key)
+            if existing is None:
+                by_key[key] = dict(cookie)
+                order.append(key)
+                continue
+            if not str(existing.get("value") or "") and str(cookie.get("value") or ""):
+                by_key[key] = dict(cookie)
+            elif "sameSite" not in existing and cookie.get("sameSite"):
+                existing["sameSite"] = cookie["sameSite"]
+    return [by_key[k] for k in order]
 
 
 def playwright_cookies_from_netscape(path: Path) -> list[dict[str, Any]]:
@@ -130,20 +203,86 @@ def playwright_cookies_from_netscape(path: Path) -> list[dict[str, Any]]:
 
 def merge_netscape_for_playwright(*paths: Path) -> list[dict[str, Any]]:
     """Load Playwright cookies from one or more Netscape files (first wins)."""
-    seen: set[tuple[str, str, str]] = set()
+    lists = [playwright_cookies_from_netscape(path) for path in paths]
+    return merge_cookie_lists(*lists)
+
+
+def cookies_for_playwright_inject(
+    cookies: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Normalize cookies for ``BrowserContext.add_cookies``.
+
+    Secure campus cookies without ``sameSite`` get ``None`` so they still ride
+    cross-site EZProxy hops. Session cookies omit ``expires``.
+    """
     out: list[dict[str, Any]] = []
-    for path in paths:
-        for cookie in playwright_cookies_from_netscape(path):
-            key = (
-                str(cookie.get("domain") or ""),
-                str(cookie.get("path") or "/"),
-                str(cookie.get("name") or ""),
-            )
-            if key in seen:
-                continue
-            seen.add(key)
-            out.append(cookie)
+    for raw in cookies:
+        if not raw.get("name") or not raw.get("domain"):
+            continue
+        cookie = _normalize_cookie_for_storage(raw)
+        if cookie.get("secure") and not cookie.get("sameSite"):
+            cookie["sameSite"] = "None"
+        exp = cookie.get("expires")
+        try:
+            exp_i = int(exp) if exp is not None else -1
+        except (TypeError, ValueError):
+            exp_i = -1
+        if exp_i > 0:
+            cookie["expires"] = exp_i
+        else:
+            cookie.pop("expires", None)
+        out.append(cookie)
     return out
+
+
+def proxy_host_fragment(ezproxy_base: str) -> str:
+    """Hostname fragment used to recognize EZProxy tickets (e.g. idm.oclc.org)."""
+    raw = (ezproxy_base or "").strip()
+    if not raw:
+        return ""
+    if "://" not in raw:
+        raw = "https://" + raw
+    host = (urlparse(raw).hostname or "").lower()
+    if not host:
+        return ""
+    if host.endswith(".idm.oclc.org") or host == "idm.oclc.org":
+        return "idm.oclc.org"
+    # login?url= prefix hosts: scpo.idm.oclc.org → idm.oclc.org already handled;
+    # other campuses keep the full host.
+    return host
+
+
+def cookies_have_proxy_host(cookies: list[dict[str, Any]], ezproxy_base: str) -> bool:
+    """True when any cookie domain matches the configured EZProxy host."""
+    needle = proxy_host_fragment(ezproxy_base)
+    if not needle:
+        return False
+    for cookie in cookies:
+        domain = str(cookie.get("domain") or "").lower().lstrip(".")
+        if domain == needle or domain.endswith("." + needle) or needle in domain:
+            return True
+    return False
+
+
+def ezproxy_cookie_status(cookies: list[dict[str, Any]], ezproxy_base: str) -> str:
+    """Offline readiness label: proxy_ticket | cas_only | empty."""
+    if not cookies:
+        return "empty"
+    if cookies_have_proxy_host(cookies, ezproxy_base):
+        return "proxy_ticket"
+    for cookie in cookies:
+        domain = str(cookie.get("domain") or "").lower()
+        if any(
+            tip in domain
+            for tip in ("federation.", "cas.", "shibboleth", "idp.", "sso.")
+        ):
+            return "cas_only"
+        name = str(cookie.get("name") or "").upper()
+        if name in {"JSESSIONID", "CASTGC", "_IDP_AUTHN_LC_KEY"} or name.startswith(
+            "CASTGC"
+        ):
+            return "cas_only"
+    return "empty"
 
 
 def split_playwright_cookies(
@@ -153,9 +292,41 @@ def split_playwright_cookies(
     scholar: list[dict[str, Any]] = []
     other: list[dict[str, Any]] = []
     for c in cookies:
-        domain = str(c.get("domain") or "").lower()
-        if "google" in domain:
+        domain = str(c.get("domain") or "").lower().lstrip(".")
+        if any(
+            domain == tip.rstrip(".")
+            or domain.endswith("." + tip.rstrip("."))
+            or tip.rstrip(".") in domain
+            for tip in _GOOGLE_FAMILY
+        ):
             scholar.append(c)
         else:
             other.append(c)
     return scholar, other
+
+
+def _normalize_cookie_for_storage(raw: dict[str, Any]) -> dict[str, Any]:
+    cookie: dict[str, Any] = {
+        "name": str(raw.get("name") or ""),
+        "value": str(raw.get("value") or ""),
+        "domain": str(raw.get("domain") or ""),
+        "path": str(raw.get("path") or "/") or "/",
+        "secure": bool(raw.get("secure")),
+        "httpOnly": bool(raw.get("httpOnly")),
+    }
+    same = raw.get("sameSite")
+    if same in ("Strict", "Lax", "None"):
+        cookie["sameSite"] = same
+    elif isinstance(same, str) and same.lower() in ("strict", "lax", "none"):
+        cookie["sameSite"] = same.capitalize() if same.lower() != "none" else "None"
+    raw_exp = raw.get("expires")
+    try:
+        exp_i = int(raw_exp) if raw_exp is not None else -1
+    except (TypeError, ValueError):
+        exp_i = -1
+    # Playwright storage_state uses -1 for session cookies.
+    if exp_i > 0:
+        cookie["expires"] = exp_i
+    else:
+        cookie["expires"] = -1
+    return cookie

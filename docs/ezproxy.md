@@ -97,17 +97,24 @@ uv run paperful session login ezproxy
 Playwright is already a core dependency (`uv sync`). Chromium downloads on the
 first login if needed. Login prefers your system Chrome/Edge (Google and campus
 SSO often reject a Playwright-launched window). `paperful ezproxy` does the
-same. Complete campus SSO in the window that opens, then press Enter in the
-terminal. Cookies are written under `state/sessions/` (and compat
-`state/ezproxy-cookies.txt`). Never commit that directory.
+same. Complete campus SSO in the window that opens and wait until a **publisher
+page loads through the proxy** (the address bar should show your
+`idm.oclc.org` host, not only the CAS/IdP page), then press Enter. Paperful
+probes a proxied start URL, requires a proxy-host cookie, and writes
+`state/sessions/storage_state.json` plus Netscape mirrors
+(`cookies.txt`, `ezproxy-cookies.txt`). A CAS-only dump is rejected — that
+used to look “saved” and then expire mid-run. Never commit that directory.
 
 ## 4. Verify the session
 
 ```sh
+uv run paperful session status
 uv run paperful ezproxy --no-open
 ```
 
-Success looks like `Session OK`. If not, run `session login ezproxy` again.
+`session status` should say **proxy-host ticket present** (not CAS/IdP only).
+A live probe (`ezproxy --no-open` or `doctor --probe`) should report
+`Session OK`. If not, run `session login ezproxy` again.
 
 ## 5. Run (or retry) downloads
 
@@ -160,7 +167,9 @@ Otherwise run `paperful session login ezproxy`, then another `run`
 (`--retry-failed` only if the misses were closed as `not_found`).
 
 Confirm a live session with `paperful doctor --probe` or
-`paperful session status --probe` (file presence alone is not enough).
+`paperful session status --probe`. Offline status should already show a
+**proxy-host ticket**; CAS-only means re-login. File presence alone is not
+enough to prove campus SSO is live.
 
 ## Advanced: Netscape cookies.txt
 

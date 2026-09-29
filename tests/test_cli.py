@@ -70,7 +70,9 @@ class StubZL:
 
         return [
             make_item(key="I1", year=2024, collection_paths=["BBNJ"]),
-            make_item(key="I2", year=2019, doi=None, collection_paths=["BBNJ/EIA _ SEA"]),
+            make_item(
+                key="I2", year=2019, doi=None, collection_paths=["BBNJ/EIA _ SEA"]
+            ),
         ]
 
     def items_in_scope(self, keys):
@@ -128,7 +130,9 @@ def test_run_uses_mirror_when_manager_is_down(cfg_file, tmp_path, monkeypatch):
     )
     held = folder.parent / "Held - 2020 - Done -- ITEM0002"
     held.mkdir()
-    (held / "record.json").write_text(json.dumps({"item_key": "ITEM0002", "title": "Has PDF"}))
+    (held / "record.json").write_text(
+        json.dumps({"item_key": "ITEM0002", "title": "Has PDF"})
+    )
     (held / "paper.pdf").write_bytes(b"%PDF-1.4")
     res = runner.invoke(
         cli.app,
@@ -385,9 +389,13 @@ def test_dedupe_dry_run_skips_the_duplicate_line(cfg_file, stub_zotero, monkeypa
         lambda *a, **k: calls.append(k.get("surface")),
     )
     monkeypatch.setattr(
-        ZoteroBackend, "merge_into", lambda self, keep, drop: {"moved": [], "fields": []}
+        ZoteroBackend,
+        "merge_into",
+        lambda self, keep, drop: {"moved": [], "fields": []},
     )
-    dry = runner.invoke(cli.app, ["dedupe", "-c", str(cfg_file), "-C", "BBNJ", "--dry-run"])
+    dry = runner.invoke(
+        cli.app, ["dedupe", "-c", str(cfg_file), "-C", "BBNJ", "--dry-run"]
+    )
     assert dry.exit_code == 0, dry.stdout
     plain = runner.invoke(cli.app, ["dedupe", "-c", str(cfg_file), "-C", "BBNJ"])
     assert plain.exit_code == 0, plain.stdout
@@ -419,7 +427,9 @@ def test_mutating_commands_name_the_write_gate():
 def test_doctor_email_red_when_unpaywall_and_empty(cfg_file, stub_zotero):
     text = cfg_file.read_text().replace('email = "t@example.org"', 'email = ""')
     cfg_file.write_text(text)
-    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--no-guide", "--json"])
+    res = runner.invoke(
+        cli.app, ["doctor", "-c", str(cfg_file), "--no-guide", "--json"]
+    )
     assert res.exit_code == 2
     assert "unpaywall_email" in res.stdout
 
@@ -490,9 +500,7 @@ def test_run_ezproxy_relogin_retries_on_tty(cfg_file, stub_zotero, monkeypatch):
         "paperful.session.login_headed",
         lambda cfg, slot, **kwargs: logins.append(slot) or [],
     )
-    monkeypatch.setattr(
-        "paperful.sources.ezproxy.session_ok", lambda ctx: (True, "ok")
-    )
+    monkeypatch.setattr("paperful.sources.ezproxy.session_ok", lambda ctx: (True, "ok"))
     res = runner.invoke(
         cli.app,
         ["run", "-c", str(cfg_file), "-C", "BBNJ", "--no-browser-agent"],
@@ -570,9 +578,7 @@ def test_run_handoff_tabs_open_after_ezproxy_browser_closes(
         "paperful.session.login_headed",
         lambda cfg, slot, **kwargs: events.append("login") or [],
     )
-    monkeypatch.setattr(
-        "paperful.sources.ezproxy.session_ok", lambda ctx: (True, "ok")
-    )
+    monkeypatch.setattr("paperful.sources.ezproxy.session_ok", lambda ctx: (True, "ok"))
     orig_close = BrowserSession.close
 
     def tracking_close(self):
@@ -631,9 +637,7 @@ def test_run_ezproxy_relogin_skips_second_pass_when_probe_fails(
     runs: list[list[str]] = []
     monkeypatch.setattr(cli.Pipeline, "run", _fake_ezproxy_run(runs))
     monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
-    monkeypatch.setattr(
-        "paperful.session.login_headed", lambda cfg, slot, **kwargs: []
-    )
+    monkeypatch.setattr("paperful.session.login_headed", lambda cfg, slot, **kwargs: [])
     monkeypatch.setattr(
         "paperful.sources.ezproxy.session_ok",
         lambda ctx: (False, "session expired or not logged in"),
@@ -653,8 +657,7 @@ def test_run_ezproxy_preflight_marks_down_when_probe_fails(
 ):
     _stub_one_item(stub_zotero)
     cfg_file.write_text(
-        cfg_file.read_text()
-        + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
+        cfg_file.read_text() + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
     )
     seen: list[bool] = []
 
@@ -684,8 +687,7 @@ def test_run_ezproxy_preflight_marks_down_when_probe_fails(
 def test_run_ezproxy_preflight_login_on_tty(cfg_file, stub_zotero, monkeypatch):
     _stub_one_item(stub_zotero)
     cfg_file.write_text(
-        cfg_file.read_text()
-        + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
+        cfg_file.read_text() + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
     )
     logins: list[str] = []
     releases: list[bool] = []
@@ -846,8 +848,7 @@ def test_session_status_empty_vault(cfg_file):
 def test_session_status_probe_scholar(cfg_file, tmp_path, monkeypatch):
     text = cfg_file.read_text()
     cfg_file.write_text(
-        text
-        + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
+        text + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
     )
     cookie_file = tmp_path / "state" / "scholar-cookies.txt"
     cookie_file.parent.mkdir(parents=True, exist_ok=True)
@@ -899,12 +900,26 @@ def test_doctor_probe_ambers_expired_ezproxy(
     cfg_file, tmp_path, stub_zotero, monkeypatch
 ):
     cfg_file.write_text(
-        cfg_file.read_text()
-        + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
+        cfg_file.read_text() + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
     )
     meta = tmp_path / "state" / "sessions" / "meta.json"
     meta.parent.mkdir(parents=True)
     meta.write_text('{"slots":{"ezproxy":{"logged_in_at":1}}}')
+    from paperful.cookies import write_storage_state
+
+    write_storage_state(
+        meta.parent / "storage_state.json",
+        [
+            {
+                "name": "ezproxy",
+                "value": "tok",
+                "domain": ".scpo.idm.oclc.org",
+                "path": "/",
+                "secure": True,
+                "sameSite": "None",
+            }
+        ],
+    )
     monkeypatch.setattr(
         "paperful.sources.ezproxy.session_ok",
         lambda ctx: (False, "session expired or not logged in"),
@@ -918,12 +933,88 @@ def test_doctor_probe_ambers_expired_ezproxy(
     assert "amber" in res.stdout
 
 
-def test_doctor_probe_keeps_file_green_without_flag(
+def test_doctor_probe_ambers_cas_only_without_live_call(
     cfg_file, tmp_path, stub_zotero, monkeypatch
 ):
     cfg_file.write_text(
-        cfg_file.read_text()
-        + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
+        cfg_file.read_text() + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
+    )
+    sessions = tmp_path / "state" / "sessions"
+    sessions.mkdir(parents=True)
+    (sessions / "meta.json").write_text('{"slots":{"ezproxy":{"logged_in_at":1}}}')
+    from paperful.cookies import write_storage_state
+
+    write_storage_state(
+        sessions / "storage_state.json",
+        [
+            {
+                "name": "JSESSIONID",
+                "value": "cas",
+                "domain": "federation.sciences-po.fr",
+                "path": "/cas/",
+            }
+        ],
+    )
+    called = []
+
+    def boom(ctx):
+        called.append(1)
+        return True, "should not run"
+
+    monkeypatch.setattr("paperful.sources.ezproxy.session_ok", boom)
+    res = runner.invoke(
+        cli.app, ["doctor", "-c", str(cfg_file), "--probe", "--no-guide"]
+    )
+    assert res.exit_code == 0, res.stdout
+    assert called == []
+    assert "CAS/IdP" in res.stdout or "proxy ticket" in res.stdout
+    assert "amber" in res.stdout
+
+
+def test_doctor_offline_green_with_proxy_ticket(
+    cfg_file, tmp_path, stub_zotero, monkeypatch
+):
+    cfg_file.write_text(
+        cfg_file.read_text() + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
+    )
+    sessions = tmp_path / "state" / "sessions"
+    sessions.mkdir(parents=True)
+    (sessions / "meta.json").write_text('{"slots":{"ezproxy":{"logged_in_at":1}}}')
+    from paperful.cookies import write_storage_state
+
+    write_storage_state(
+        sessions / "storage_state.json",
+        [
+            {
+                "name": "ezproxy",
+                "value": "tok",
+                "domain": ".scpo.idm.oclc.org",
+                "path": "/",
+                "secure": True,
+                "sameSite": "None",
+            }
+        ],
+    )
+    called = []
+
+    def boom(ctx):
+        called.append(1)
+        return False, "should not run"
+
+    monkeypatch.setattr("paperful.sources.ezproxy.session_ok", boom)
+    res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--no-guide"])
+    assert res.exit_code == 0, res.stdout
+    assert called == []
+    assert "EZProxy session" in res.stdout
+    assert "proxy-host ticket" in res.stdout
+    assert "green" in res.stdout
+
+
+def test_doctor_offline_ambers_meta_only_without_proxy_ticket(
+    cfg_file, tmp_path, stub_zotero, monkeypatch
+):
+    cfg_file.write_text(
+        cfg_file.read_text() + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
     )
     meta = tmp_path / "state" / "sessions" / "meta.json"
     meta.parent.mkdir(parents=True)
@@ -939,7 +1030,8 @@ def test_doctor_probe_keeps_file_green_without_flag(
     assert res.exit_code == 0, res.stdout
     assert called == []
     assert "EZProxy session" in res.stdout
-    assert "green" in res.stdout
+    assert "amber" in res.stdout
+    assert "proxy" in res.stdout.lower() or "campus" in res.stdout.lower()
 
 
 def test_doctor_scholar_not_in_default_sources(cfg_file, stub_zotero):
@@ -954,8 +1046,7 @@ def test_doctor_scholar_not_in_default_sources(cfg_file, stub_zotero):
 def test_doctor_scholar_session_amber_without_vault(cfg_file, stub_zotero):
     text = cfg_file.read_text()
     cfg_file.write_text(
-        text
-        + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
+        text + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
     )
     res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--no-guide"])
     assert res.exit_code == 0
@@ -970,8 +1061,7 @@ def test_doctor_guide_greens_scholar_after_host_login(
 ):
     text = cfg_file.read_text()
     cfg_file.write_text(
-        text
-        + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
+        text + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
     )
     monkeypatch.setattr("paperful.doctor.shutil.which", lambda name: "/bin/pdftotext")
     # CI has the Playwright package but no Chromium: that amber step would come
@@ -1001,8 +1091,7 @@ def test_doctor_guide_greens_scholar_after_host_login(
 def test_doctor_guide_docker_hints_host_login(cfg_file, stub_zotero, monkeypatch):
     text = cfg_file.read_text()
     cfg_file.write_text(
-        text
-        + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
+        text + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
     )
     monkeypatch.setattr("paperful.doctor.shutil.which", lambda name: "/bin/pdftotext")
     monkeypatch.setattr("paperful.cli.in_docker", lambda: True)
@@ -1016,8 +1105,7 @@ def test_doctor_guide_docker_hints_host_login(cfg_file, stub_zotero, monkeypatch
 def test_doctor_auto_guides_in_docker(cfg_file, stub_zotero, monkeypatch):
     text = cfg_file.read_text()
     cfg_file.write_text(
-        text
-        + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
+        text + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
     )
     monkeypatch.setattr("paperful.doctor.shutil.which", lambda name: "/bin/pdftotext")
     monkeypatch.setattr("paperful.cli.in_docker", lambda: True)
@@ -1031,8 +1119,7 @@ def test_doctor_auto_guides_in_docker(cfg_file, stub_zotero, monkeypatch):
 def test_doctor_scholar_session_green_with_cookies(cfg_file, tmp_path, stub_zotero):
     text = cfg_file.read_text()
     cfg_file.write_text(
-        text
-        + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
+        text + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
     )
     cookie = tmp_path / "state" / "scholar-cookies.txt"
     cookie.parent.mkdir(parents=True, exist_ok=True)
@@ -1174,7 +1261,9 @@ def test_attach_command_uses_pending_records(
         def attach(self, key, path, title=None, note=None):
             from paperful.attach import AttachResult
 
-            return AttachResult(True, attachment_key="ATT", reason="success", code="success")
+            return AttachResult(
+                True, attachment_key="ATT", reason="success", code="success"
+            )
 
         def flush_writes(self):
             return None
@@ -1294,9 +1383,7 @@ def test_export_ris_library(cfg_file, stub_zotero, tmp_path):
     assert "TI  -" in text
 
 
-def test_restore_dry_run_names_the_library_not_zotero(
-    cfg_file, stub_zotero, tmp_path
-):
+def test_restore_dry_run_names_the_library_not_zotero(cfg_file, stub_zotero, tmp_path):
     res = runner.invoke(
         cli.app, ["restore", "--library", "--dry-run", "-c", str(cfg_file)]
     )
@@ -1332,7 +1419,9 @@ def test_recover_python_gate(cfg_file, monkeypatch):
     from collections import namedtuple
 
     VI = namedtuple("VI", "major minor micro releaselevel serial")
-    fake = type("S", (), {"version_info": VI(3, 10, 0, "final", 0), "modules": real_sys.modules})()
+    fake = type(
+        "S", (), {"version_info": VI(3, 10, 0, "final", 0), "modules": real_sys.modules}
+    )()
     monkeypatch.setattr(cli, "sys", fake)
     res = runner.invoke(cli.app, ["recover", "-c", str(cfg_file), "--item", "I1"])
     assert res.exit_code == 1 and "3.11" in res.stdout
@@ -1343,11 +1432,17 @@ def test_recover_dry_run_prints_start_url(tmp_path, stub_zotero, monkeypatch):
     from tests.conftest import make_item
 
     cfg_file = _llm_cfg_file(tmp_path)
-    monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model)
     monkeypatch.setattr(
-        cli, "get_backend", lambda cfg, zl: type("B", (), {"get_item": lambda self, k: make_item(key=k)})()
+        "paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model
     )
-    res = runner.invoke(cli.app, ["recover", "-c", str(cfg_file), "--item", "I1", "--dry-run"])
+    monkeypatch.setattr(
+        cli,
+        "get_backend",
+        lambda cfg, zl: type("B", (), {"get_item": lambda self, k: make_item(key=k)})(),
+    )
+    res = runner.invoke(
+        cli.app, ["recover", "-c", str(cfg_file), "--item", "I1", "--dry-run"]
+    )
     assert res.exit_code == 0, res.stdout
     assert RECOVER_DISCLAIMER in res.stdout
     assert "https://doi.org/10.1000/test.doi" in res.stdout
@@ -1428,9 +1523,17 @@ def test_run_dry_run_forces_recover_lane_with_cli_flag_when_config_off(
 
 def test_recover_unknown_item(tmp_path, stub_zotero, monkeypatch):
     cfg_file = _llm_cfg_file(tmp_path)
-    monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model)
-    monkeypatch.setattr(cli, "get_backend", lambda cfg, zl: type("B", (), {"get_item": lambda self, k: None})())
-    res = runner.invoke(cli.app, ["recover", "-c", str(cfg_file), "--item", "NOPE", "--dry-run"])
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model
+    )
+    monkeypatch.setattr(
+        cli,
+        "get_backend",
+        lambda cfg, zl: type("B", (), {"get_item": lambda self, k: None})(),
+    )
+    res = runner.invoke(
+        cli.app, ["recover", "-c", str(cfg_file), "--item", "NOPE", "--dry-run"]
+    )
     assert res.exit_code == 1 and "Unknown item" in res.stdout
 
 
@@ -1444,11 +1547,15 @@ def test_summarize_exits_when_llm_disabled(cfg_file, stub_zotero):
     assert res.exit_code == 1 and "llm.enabled" in res.stdout
 
 
-def test_summarize_default_writes_note_and_disk_only_skips_it(tmp_path, stub_zotero, monkeypatch):
+def test_summarize_default_writes_note_and_disk_only_skips_it(
+    tmp_path, stub_zotero, monkeypatch
+):
     from tests.conftest import make_item
 
     cfg_file = _llm_cfg_file(tmp_path)
-    monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model)
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model
+    )
 
     class B:
         applied = []
@@ -1458,7 +1565,11 @@ def test_summarize_default_writes_note_and_disk_only_skips_it(tmp_path, stub_zot
             return make_item(key=k, has_pdf=True)
 
         def find_child_note_keys(self, item_key, tag):
-            return [k for k, (parent, t, _html) in self.notes.items() if parent == item_key and t == tag]
+            return [
+                k
+                for k, (parent, t, _html) in self.notes.items()
+                if parent == item_key and t == tag
+            ]
 
         def read_child_note(self, item_key, tag):
             for parent, t, html in self.notes.values():
@@ -1478,7 +1589,9 @@ def test_summarize_default_writes_note_and_disk_only_skips_it(tmp_path, stub_zot
             return key
 
     monkeypatch.setattr(cli, "get_backend", lambda cfg, zl: B())
-    monkeypatch.setattr("paperful.summarize.pdf_text_for", lambda *a, **k: "Marine governance text.")
+    monkeypatch.setattr(
+        "paperful.summarize.pdf_text_for", lambda *a, **k: "Marine governance text."
+    )
 
     class Stub:
         provider = "stub"
@@ -1514,9 +1627,13 @@ def test_summarize_default_writes_note_and_disk_only_skips_it(tmp_path, stub_zot
     assert res.exit_code == 1 and "--apply" in res.stdout
 
 
-def test_synthesize_report_collection_conflicts_with_disk(tmp_path, stub_zotero, monkeypatch):
+def test_synthesize_report_collection_conflicts_with_disk(
+    tmp_path, stub_zotero, monkeypatch
+):
     cfg_file = _llm_cfg_file(tmp_path)
-    monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model)
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model
+    )
     res = runner.invoke(
         cli.app,
         [
@@ -1539,9 +1656,15 @@ def test_summarize_remote_egress_notice(tmp_path, stub_zotero, monkeypatch):
     from tests.conftest import make_item
 
     cfg_file = _llm_cfg_file(tmp_path, 'provider = "litellm"\nmodel = "openai/gpt"\n')
-    monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model)
     monkeypatch.setattr(
-        cli, "get_backend", lambda cfg, zl: type("B", (), {"get_item": lambda self, k: make_item(key=k, has_pdf=False)})()
+        "paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model
+    )
+    monkeypatch.setattr(
+        cli,
+        "get_backend",
+        lambda cfg, zl: type(
+            "B", (), {"get_item": lambda self, k: make_item(key=k, has_pdf=False)}
+        )(),
     )
     res = runner.invoke(cli.app, ["summarize", "-c", str(cfg_file), "--item", "I1"])
     assert "Remote LLM" in res.stdout
@@ -1586,9 +1709,13 @@ def test_synthesize_exits_when_llm_disabled(cfg_file, stub_zotero):
     assert res.exit_code == 1 and "llm.enabled" in res.stdout
 
 
-def test_synthesize_library_needs_a_collection_for_zotero(tmp_path, stub_zotero, monkeypatch):
+def test_synthesize_library_needs_a_collection_for_zotero(
+    tmp_path, stub_zotero, monkeypatch
+):
     cfg_file = _llm_cfg_file(tmp_path)
-    monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model)
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model
+    )
 
     class B:
         def items_in_scope(self, keys):
@@ -1607,10 +1734,14 @@ def test_synthesize_dry_run_and_disk_report(tmp_path, stub_zotero, monkeypatch):
     from tests.conftest import make_item
 
     cfg_file = _llm_cfg_file(tmp_path)
-    monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model)
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model
+    )
     summary = tmp_path / "state" / "summaries"
     summary.mkdir(parents=True)
-    (summary / "I1.html").write_text("<h2>Objective</h2><p>Governance.</p>", encoding="utf-8")
+    (summary / "I1.html").write_text(
+        "<h2>Objective</h2><p>Governance.</p>", encoding="utf-8"
+    )
     calls = []
 
     class B:
@@ -1634,7 +1765,17 @@ def test_synthesize_dry_run_and_disk_report(tmp_path, stub_zotero, monkeypatch):
     monkeypatch.setattr(cli, "get_backend", lambda cfg, zl: B())
     monkeypatch.setattr("paperful.llm.get_client", lambda cfg: Stub())
     res = runner.invoke(
-        cli.app, ["synthesize", "-c", str(cfg_file), "--item", "I1", "--to", "disk", "--dry-run"]
+        cli.app,
+        [
+            "synthesize",
+            "-c",
+            str(cfg_file),
+            "--item",
+            "I1",
+            "--to",
+            "disk",
+            "--dry-run",
+        ],
     )
     assert res.exit_code == 0, res.stdout
     assert "1 on disk" in res.stdout and not calls
@@ -1669,13 +1810,13 @@ def test_pack_second_open_exits(cfg_file, tmp_path):
     assert "still open" in again.stdout
 
 
-def test_gaps_joins_open_pack_unless_opted_out(cfg_file, stub_zotero, tmp_path, monkeypatch):
+def test_gaps_joins_open_pack_unless_opted_out(
+    cfg_file, stub_zotero, tmp_path, monkeypatch
+):
     opened = runner.invoke(cli.app, ["pack", "open", "-c", str(cfg_file)])
     assert opened.exit_code == 0, opened.stdout
     pack_id = opened.stdout.strip()
-    res = runner.invoke(
-        cli.app, ["gaps", "-c", str(cfg_file), "--library", "--json"]
-    )
+    res = runner.invoke(cli.app, ["gaps", "-c", str(cfg_file), "--library", "--json"])
     assert res.exit_code == 0, res.stdout
     payload = json.loads(res.stdout)
     assert payload["items"] == 2
@@ -1692,9 +1833,7 @@ def test_gaps_joins_open_pack_unless_opted_out(cfg_file, stub_zotero, tmp_path, 
     assert not (tmp_path / "state" / "last-run.json").exists()
 
     monkeypatch.setenv("PAPERFUL_PACK", "off")
-    again = runner.invoke(
-        cli.app, ["gaps", "-c", str(cfg_file), "--library", "--json"]
-    )
+    again = runner.invoke(cli.app, ["gaps", "-c", str(cfg_file), "--library", "--json"])
     assert again.exit_code == 0, again.stdout
     pack = json.loads((tmp_path / "state" / "packs" / f"{pack_id}.json").read_text())
     assert len(pack["steps"]) == 1
@@ -1733,5 +1872,3 @@ def test_pack_show_human_table_and_empty(cfg_file, stub_zotero, tmp_path):
     assert "no PDF" in shown.stdout
     assert "missing DOI" in shown.stdout
     assert not (tmp_path / "state" / "last-run.json").exists()
-
-
