@@ -227,6 +227,99 @@ docker compose run --rm paperful all --profile bbnj-journal --dry-run
 Same commands as `uv run`. Headed `session login` stays on the host. See
 [Docker](docker.md).
 
+## 4. Deep collection pass (example template)
+
+Operator recipe for one collection slice: dedupe, aggressive PDF fetch
+(including the browser-agent lane), metadata write-back, grounded summaries,
+then manual handoff for whatever automation missed. Replace placeholders with
+your collection path (name or `parent/subcollection`), profile name, and pack
+label. Subcollections are included automatically when you pass a parent path.
+
+**Prerequisites:** Zotero 10+ with write API, a real Unpaywall `email`,
+`[llm].enabled` for `summarize` and the auto `browser_agent` lane on `run`,
+`uv sync --extra llm --extra browser-agent` (Python 3.11+), and headed
+`paperful session login ezproxy` / `scholar` when you use those sources.
+Optional: `[inbox].dir` so `--handoff tabs` can continue into inbox watch.
+Campus-only policy: add `--preset eoi` on `run` / `all`.
+
+`paperful all` does **not** pass `--handoff` to its internal `run` step.
+Use the shell chain below (or a second `run` / `gaps` with `--handoff`) for
+tab or walk handoff.
+
+Review duplicates before merging:
+
+```sh
+uv run paperful dedupe -C COLLECTION --dry-run
+# read state/dedupe-packs/*.md
+uv run paperful dedupe -C COLLECTION --apply
+# title+year merges (optional):
+uv run paperful dedupe -C COLLECTION --apply --apply-medium
+```
+
+One-shot chain (dedupe → fetch with relogin + browser agent → lint → metadata
+→ summarize → sequential handoff for stragglers). Add year/type filters to
+`SCOPE` when you need them (see [scope filters](commands.md#scope-filters)):
+
+```sh
+SCOPE=(-C COLLECTION)
+# SCOPE=(-C COLLECTION -T TYPE --year-from YYYY --year-to YYYY)
+
+uv run paperful pack open --label PACK_LABEL
+
+uv run paperful dedupe "${SCOPE[@]}" --apply && \
+uv run paperful gaps "${SCOPE[@]}" && \
+uv run paperful run "${SCOPE[@]}" \
+  --try-all --retry-failed --upgrade-linked \
+  --browser-agent \
+  --handoff tabs && \
+uv run paperful lint "${SCOPE[@]}" && \
+uv run paperful fix-metadata "${SCOPE[@]}" --apply && \
+uv run paperful summarize "${SCOPE[@]}" --apply && \
+uv run paperful gaps "${SCOPE[@]}" --list-missing --handoff walk
+
+uv run paperful pack close
+```
+
+Same policy as `all`, but with dedupe first and explicit handoff on a
+standalone `run`:
+
+```sh
+uv run paperful all -C COLLECTION \
+  --steps dedupe,gaps,run,lint,fix-metadata,summarize \
+  --apply --browser-agent
+# then, for remaining misses:
+uv run paperful gaps -C COLLECTION --list-missing --handoff walk
+```
+
+Handoff modes: `tabs` (batch open, optional inbox watch after tabs),
+`watch` (tabs then poll `[inbox].dir`), `walk` (one URL at a time via
+`[gaps].downloads_dir`). See [Sources](sources.md) (manual handoff after
+soft blocks).
+
+Save the slice for reruns (`handoff` is still a separate step):
+
+```sh
+uv run paperful profile save PROFILE_NAME \
+  -C COLLECTION \
+  --try-all --retry-failed --upgrade-linked \
+  --apply \
+  --steps dedupe,gaps,run,lint,fix-metadata,summarize \
+  --description "DESCRIPTION"
+
+uv run paperful all --profile PROFILE_NAME --browser-agent
+uv run paperful gaps -C COLLECTION --list-missing --handoff walk
+```
+
+Dry-run the automated half first:
+
+```sh
+uv run paperful all -C COLLECTION \
+  --steps dedupe,gaps,run,lint,fix-metadata,summarize \
+  --apply --browser-agent --dry-run
+```
+
+(`summarize` is skipped; dedupe and `run` do not apply merges or downloads.)
+
 ## What this is not
 
 - Not a workflow engine. Steps are a list, not a graph.

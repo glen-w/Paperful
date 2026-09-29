@@ -96,6 +96,7 @@ uv run paperful profile save bbnj-journal -C BBNJ -T journalArticle --year-from 
 uv run paperful all --profile bbnj-journal
 uv run paperful profile list
 uv run paperful profile show bbnj-journal
+# dedupe + browser handoff + summarize template: docs/workflows.md § 4
 
 # Sci-Hub is off unless you opt in (config `sources`, or this flag)
 uv run paperful run --library --scihub

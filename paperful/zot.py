@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -243,8 +243,12 @@ class ZoteroLocal:
         return counts
 
     # ---- items ----------------------------------------------------------
-    def _pdf_parent_sets(self) -> tuple[set[str], set[str]]:
+    def _pdf_parent_sets(
+        self, *, status: Callable[[str], None] | None = None
+    ) -> tuple[set[str], set[str]]:
         """Imported PDF parents, and parents with only a linked PDF URL (no imported file)."""
+        tick = status or (lambda _msg: None)
+        tick("Fetching PDF attachments from Zotero…")
         attachments = self.zot.everything(self.zot.items(itemType="attachment"))
         imported: set[str] = set()
         linked_url: set[str] = set()
@@ -279,14 +283,25 @@ class ZoteroLocal:
             self.items_in_scope(collection_keys), upgrade_linked=upgrade_linked
         )
 
-    def items_in_scope(self, collection_keys: list[str] | None) -> list[Item]:
+    def items_in_scope(
+        self,
+        collection_keys: list[str] | None,
+        *,
+        status: Callable[[str], None] | None = None,
+    ) -> list[Item]:
         """All top-level regular items in the selected collections (or library)."""
+        tick = status or (lambda _msg: None)
+        tick("Reading collection tree…")
         cols = self.collections()
-        imported, linked_only = self._pdf_parent_sets()
+        imported, linked_only = self._pdf_parent_sets(status=status)
         if collection_keys is None:
+            tick("Fetching top-level library items…")
             raw = self.zot.everything(self.zot.top())
             selected: set[str] | None = None
         else:
+            tick(
+                f"Fetching items from {len(collection_keys)} collection subtree(s)…"
+            )
             raw_by_key: dict[str, dict[str, Any]] = {}
             for ck in collection_keys:
                 for it in self.zot.everything(self.zot.collection_items_top(ck)):
@@ -314,6 +329,7 @@ class ZoteroLocal:
                 i.label.lower(),
             )
         )
+        tick(f"Loaded {len(items)} parent items")
         return items
 
     def item_exists(self, key: str) -> bool:

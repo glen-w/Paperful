@@ -733,6 +733,7 @@ def _loaded_scope(
     item_type: list[str],
     item_keys: list[str] | None = None,
     pdfs_only: bool = False,
+    status: Callable[[str], None] | None = None,
 ):
     try:
         return load_scope(
@@ -744,6 +745,7 @@ def _loaded_scope(
             year_to=year_to,
             item_types=_resolve_types(item_type),
             pdfs_only=pdfs_only,
+            status=status,
         )
     except ScopeError as exc:
         _scope_error(exc)
@@ -1253,6 +1255,8 @@ def dedupe(
         apply_merge,
         attach_merge_previews,
         classify,
+        merge_apply_total,
+        merge_preview_total,
         pack_counts,
         write_pack,
     )
@@ -1286,23 +1290,85 @@ def dedupe(
         _refuse_missing_scope()
     _require_manager(cfg)
     backend = _connect(cfg, quiet=as_json)
-    loaded = _loaded_scope(
-        backend,
-        collection=collection,
-        library=library,
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
-    )
-    items, scope = loaded.items, loaded.label
-    if limit:
-        items = items[:limit]
-    try:
-        groups = classify(items, phase_name)
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1)
-    attach_merge_previews(backend, groups)
+    items: list
+    scope: str
+    groups: list
+    if as_json:
+        loaded = _loaded_scope(
+            backend,
+            collection=collection,
+            library=library,
+            year_from=year_from,
+            year_to=year_to,
+            item_type=item_type,
+        )
+        items, scope = loaded.items, loaded.label
+        if limit:
+            items = items[:limit]
+        try:
+            groups = classify(items, phase_name)
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(1)
+        attach_merge_previews(backend, groups)
+    else:
+        with _item_progress() as progress:
+            load_id = progress.add_task("Connecting to Zotero scope…", total=None)
+
+            def _load_status(msg: str) -> None:
+                progress.update(load_id, description=msg)
+
+            loaded = _loaded_scope(
+                backend,
+                collection=collection,
+                library=library,
+                year_from=year_from,
+                year_to=year_to,
+                item_type=item_type,
+                status=_load_status,
+            )
+            items, scope = loaded.items, loaded.label
+            if limit:
+                items = items[:limit]
+            progress.update(
+                load_id,
+                description=f"Scope: {scope} — {len(items)} items",
+                total=1,
+                completed=1,
+            )
+            class_id = progress.add_task("Classifying duplicates…", total=1)
+            try:
+                groups = classify(items, phase_name)
+            except ValueError as exc:
+                console.print(f"[red]{exc}[/]")
+                raise typer.Exit(1)
+            progress.advance(class_id)
+            preview_n = merge_preview_total(groups)
+            preview_id = progress.add_task(
+                "Previewing merges…", total=preview_n or 1
+            )
+
+            def _preview_status(keep: str, drop: str) -> None:
+                progress.update(
+                    preview_id, description=f"Preview merge {drop} → keep {keep}"
+                )
+
+            def _preview_advance() -> None:
+                progress.advance(preview_id)
+
+            attach_merge_previews(
+                backend,
+                groups,
+                on_preview=_preview_status if preview_n else None,
+                on_advance=_preview_advance if preview_n else None,
+            )
+            if not preview_n:
+                progress.advance(preview_id)
+            progress.update(
+                preview_id,
+                description=f"Found {len(groups)} duplicate group(s)",
+                completed=preview_n or 1,
+            )
     json_path, md_path = write_pack(
         cfg.state_dir, scope, groups, phase=phase_name, n_items=len(items)
     )
@@ -1315,15 +1381,42 @@ def dedupe(
         from .remarks import remark_duplicates
 
         remark_duplicates(backend, groups, items, surface=cfg.remarks_surface)
+        merge_n = merge_apply_total(groups, apply_medium=apply_medium)
         try:
-            applied, errors = apply_merge(
-                backend,
-                groups,
-                apply_medium=apply_medium,
-                audit_path=cfg.dedupe_applied_path,
-                scope=scope,
-                pack=json_path,
-            )
+            if as_json:
+                applied, errors = apply_merge(
+                    backend,
+                    groups,
+                    apply_medium=apply_medium,
+                    audit_path=cfg.dedupe_applied_path,
+                    scope=scope,
+                    pack=json_path,
+                )
+            else:
+                with _item_progress() as progress:
+                    merge_id = progress.add_task("Merging duplicates…", total=merge_n or 1)
+
+                    def _merge_status(keep: str, drop: str, phase: str) -> None:
+                        progress.update(
+                            merge_id,
+                            description=f"[{phase}] merge {drop} → keep {keep}",
+                        )
+
+                    def _merge_advance() -> None:
+                        progress.advance(merge_id)
+
+                    applied, errors = apply_merge(
+                        backend,
+                        groups,
+                        apply_medium=apply_medium,
+                        audit_path=cfg.dedupe_applied_path,
+                        scope=scope,
+                        pack=json_path,
+                        on_merge=_merge_status if merge_n else None,
+                        on_advance=_merge_advance if merge_n else None,
+                    )
+                    if not merge_n:
+                        progress.advance(merge_id)
         except LibraryError as exc:
             _exit_env(str(exc))
     payload = {

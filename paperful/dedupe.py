@@ -21,6 +21,7 @@ import json
 import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -183,6 +184,16 @@ def actionable_groups(
     return chosen
 
 
+def merge_preview_total(groups: list[DedupeGroup]) -> int:
+    return sum(
+        len(g.trash) for g in groups if not g.held and g.keep and g.trash
+    )
+
+
+def merge_apply_total(groups: list[DedupeGroup], *, apply_medium: bool) -> int:
+    return sum(len(g.trash) for g in actionable_groups(groups, apply_medium=apply_medium))
+
+
 def apply_merge(
     backend: Any,
     groups: list[DedupeGroup],
@@ -191,6 +202,8 @@ def apply_merge(
     audit_path: Path,
     scope: str,
     pack: Path,
+    on_merge: Callable[[str, str, str], None] | None = None,
+    on_advance: Callable[[], None] | None = None,
 ) -> tuple[int, list[str]]:
     """Merge extras onto the keeper, then trash them.
 
@@ -205,6 +218,8 @@ def apply_merge(
     now = datetime.now(tz=timezone.utc).isoformat()
     for group in actionable_groups(groups, apply_medium=apply_medium):
         for key in group.trash:
+            if on_merge and group.keep:
+                on_merge(group.keep, key, group.phase)
             try:
                 result = backend.merge_into(group.keep, key)
             except LibraryError:
@@ -215,6 +230,8 @@ def apply_merge(
             if not isinstance(result, dict):
                 result = {}
             merged += 1
+            if on_advance:
+                on_advance()
             lines.append(
                 json.dumps(
                     {
@@ -240,7 +257,13 @@ def apply_merge(
     return merged, errors
 
 
-def attach_merge_previews(backend: Any, groups: list[DedupeGroup]) -> None:
+def attach_merge_previews(
+    backend: Any,
+    groups: list[DedupeGroup],
+    *,
+    on_preview: Callable[[str, str], None] | None = None,
+    on_advance: Callable[[], None] | None = None,
+) -> None:
     """Fill ``merge_preview`` on non-held groups. Missing items stay empty."""
     preview = getattr(backend, "preview_merge", None)
     if not callable(preview):
@@ -250,12 +273,18 @@ def attach_merge_previews(backend: Any, groups: list[DedupeGroup]) -> None:
             continue
         rows: list[dict[str, Any]] = []
         for key in group.trash:
+            if on_preview and group.keep:
+                on_preview(group.keep, key)
             try:
                 row = preview(group.keep, key)
             except Exception:
+                if on_advance:
+                    on_advance()
                 continue
             if isinstance(row, dict):
                 rows.append(row)
+            if on_advance:
+                on_advance()
         group.merge_preview = rows
 
 

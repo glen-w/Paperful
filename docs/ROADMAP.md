@@ -63,8 +63,10 @@ Zotero has. Do not document either adapter as supported until testers say so.
 
 ## Core (keep sharpening)
 
-- Resumable missing-PDF fetch, source routing, circuit breaker, EZProxy / Scholar
-  session hygiene, attach reliability, `doctor` / `report`. **Shipped (find
+- Resumable missing-PDF fetch, source routing, circuit breaker, EZProxy session
+  hygiene, attach reliability, `doctor` / `report`. **Google Scholar posture**
+  (below): stop treating vault Scholar replay as core; human browser at handoff
+  instead. **Shipped (find
   recovery):** soft-blocked OA URLs (empty httpx body) retry in the vault
   browser (SSO / PDF link / download control), then optional `browser_agent`;
   items stay `retryable` / `soft block` rather than hard `not_found`. Dead vault
@@ -77,6 +79,89 @@ Zotero has. Do not document either adapter as supported until testers say so.
   `unmatched/`). Distinct from snowball watch `inbox.jsonl`. CLI
   `--browser-agent` / `--no-browser-agent` overrides `[browser_agent].during_run`
   for one `run` / `all`.
+- **Academic HTML→PDF snapshot (optional, later).** `htmlpdf` today applies only
+  to web/news types (and DOI-less `document` / `report`); journal articles skip
+  with `not a web/news item` even when `run` already reached the publisher HTML
+  reader (OA, EZProxy, `direct`, or vault retry) but no lane returned a native
+  PDF. **Direction:** opt-in fallback after scripted lanes exhaust — Playwright
+  print-to-PDF of the article URL the operator would otherwise open in handoff.
+  Provenance must read as a **page snapshot**, not publisher PDF or licensed OA;
+  reuse session vault, paywall hints, and `min_pdf_bytes`; off by default on
+  DOI journal items so completeness runs do not silently attach HTML prints.
+- **Google Scholar — out of core `run`, handoff + API research (next).** Today
+  `scholar` is an opt-in serial source that replays cookies from the session
+  vault (same Chromium profile family as EZProxy). In practice it rarely stays
+  healthy: sessions expire, fingerprint drift, and Google serves `/sorry/` CAPTCHA
+  (`doctor --probe` ambers are common). **Direction:** remove automated Scholar
+  from the reliable fetch loop (not from the repo overnight — deprecate in docs
+  and presets first, then drop the `run` source once handoff covers the workflow).
+  **Replace with end-of-run handoff:** after OA, EZProxy, grey playbooks, and
+  optional `browser_agent`, open remaining misses via `--handoff list|tabs|walk|watch`
+  so the operator uses their **usual working browser** (logged-in Google, campus
+  extensions, saved passwords) — not isolated vault Chromium — to find PDFs and
+  save into `[inbox].dir` → `inbox drain`. Scholar URLs belong in that tab list,
+  not as a bot lane mid-batch. Same posture as the parked Firefox extension
+  **PDFs from open tabs** (tab cookies, confirm checklist, paced download).
+  **Research before any new automated Scholar lane:** spike third-party Scholar
+  APIs and metadata-only discovery (e.g. [SerpApi Google Scholar
+  API](https://serpapi.com/google-scholar-api) — structured results, pagination,
+  `cites` / `cluster`; paid key, quota, and ToS vs local scrape). Evaluate for
+  **link discovery and bibliographic fill**, not bulk download or a silent cloud
+  default; must fit opt-in config, circuit breaker, and the OA honesty miss enum.
+  **SerpApi already exercised elsewhere:** [Google Maps via
+  SerpApi](https://serpapi.com/google-maps-api) worked well in recent work —
+  borrow that repo’s client patterns, env key / quota handling, and test
+  credentials when spiking Scholar (or other SerpApi engines) so Paperful does
+  not invent a second third-party API stack.
+  OpenAlex / Semantic Scholar / Crossref remain the programmatic defaults; Scholar
+  stays out of snowball backends. CAPTCHA solve services stay out of scope (see
+  CAPTCHA section).
+  **Near-term run behaviour (while `scholar` is still on `run`):** the serial
+  Scholar phase queues every OA miss and then hits Google once per item (~
+  `delay_scihub_s` apart). HTTP **429** is recorded as `error`, not `captcha`, so
+  the circuit breaker never opens (429 is excluded for API `Retry-After` lanes;
+  Scholar uses raw `httpx`, not `http_json`). Unlike EZProxy, there is no
+  “session down — skip the rest of this pass” latch, so a burned Scholar session
+  still gets **N** probe requests in one batch. **Fix before deprecation:**
+  first 429 (or short streak) → skip Scholar for the remainder of the run
+  (mirror `_mark_ezproxy_down`); optionally map Scholar 429/503 to block outcomes
+  so the existing breaker can pause mid-batch. **Spreading load:** shuffling queue
+  order alone does not help much; what helps is fewer requests after a clear block
+  and/or spacing attempts across the whole run (shared rate limiter, per-item
+  Scholar only after long jitter, or interleaving with other work) instead of one
+  end-of-batch burst after parallel OA.
+- **Inbox create-on-unmatched (config, later).** Optional `[inbox]` mode so
+  `watch` / `drain` still ingests when no missing-PDF parent matches: create a
+  parent in a configured collection (or a routed target once smart inbox exists),
+  attach the PDF, and fill bibliographic fields from Paperful’s identifier
+  pipelines (DOI from PDF → Crossref / OpenAlex / Semantic Scholar; title /
+  first-page fallbacks when DOI is missing). **Reference-manager metadata
+  window:** configurable settle or poll after attach so Zotero and other backends
+  that retrieve metadata from PDFs can run before Paperful writes or merges fields
+  (skip or shorten the wait when the backend has no such behavior). Gated vs auto
+  should match smart inbox; fail closed to `unmatched/` or a review queue when
+  resolution is thin. Today’s default stays DOI attach only — no silent
+  create-parent.
+- **Smart inbox (optional, later).** Today `inbox` only attaches a PDF onto an
+  existing missing-PDF parent by DOI (or FIFO in a handoff session). It does not
+  choose a collection or create parents. Builds on **create-on-unmatched** above.
+  A smarter drop-folder lane would
+  **route** (and optionally ingest) each PDF toward the right collection using
+  **deterministic** signals first — ongoing / recent snowball runs and watches
+  (`state/snowball/…`, open packs, last `-C` / profile), DOI already in the
+  library, filename / PDF metadata / first-page text fingerprints against
+  collection titles and recent candidates — then an optional LLM ranker.
+  **LLM use** is configurable per this lane: `off` | `when_thin` (only when
+  deterministic signals conflict or score below a bar) | `always`. **Model**
+  follows the house pattern: global `[llm].provider` + `[llm].model` (and the
+  LiteLLM `provider/model` id form), overridable **per function** (e.g.
+  `[inbox].model` / `[inbox].provider`, same idea as `[browser_agent].model`
+  today; other verbs keep their own overrides). Apply modes: **gated** (propose
+  collection ± create-parent → human confirm / edit) or **auto** (apply when
+  confidence clears a config bar). Fail closed to today’s `unmatched/` (or a
+  review queue) — never silent misfile. Builds on the Firefox-bridge
+  create-parent ingest gap; keep DOI attach as the fast path when a miss already
+  exists.
 - **OA honesty / miss taxonomy (next).** Project internal miss status to a frozen
   surface enum for dry-run, `gaps`, and the run report:
   `no_doi | paywalled | no_oa | fetch_failed | license_blocked | import_ok`
@@ -231,6 +316,59 @@ PDF-identity MVP.
 the PDF identity check, and grounded briefs (`summarize` / `synthesize`) are
 shipped. Still proposals on disk; never a silent library write.
 
+### Zotero-RAG integration (later; question-centric layer)
+
+**Status:** roadmap only — deepen the optional **zotero-rag** bridge (corpus
+index + grounded answers) without making chat the default product surface.
+CLI first (batch Q&A); **built-in chat with collection** in the 2.0 GUI
+**Ask** mode follows once cited answers are stable — see [GUI](#gui). Reuse the
+house LLM pattern: global `[llm]` + per-verb overrides (same spirit as
+`[summarize].model`, `[browser_agent].model`, smart inbox per-function gates).
+
+**Direction:**
+
+1. **Batch Q&A with citations** — ingest a file or stdin of questions (one per
+   line or structured batch); run each against the indexed collection; write
+   answers with **citations** to items/chunks on disk (`state/` report JSON +
+   optional Zotero child notes). Resume-safe skips when question hash + index
+   version unchanged. Not a silent library write without `--apply` where notes
+   are involved.
+2. **Question generation from summaries** — optional LLM pass over existing
+   `summarize` outputs (and/or `synthesize` sections) to propose **unanswered**
+   or **open** research questions for the corpus; land in a reviewable queue
+   before batch RAG (same patch / dry-run honesty as other LLM verbs).
+3. **Prompt variants and `--focus`** — keep today’s summary-oriented default;
+   add alternate bundled prompts (e.g. **questions-only** brief, gap list,
+   methods comparison) and a `--focus` (or profile field) that selects prompt
+   template + retrieval knobs without hand-editing files every time. Custom
+   `--prompt FILE` stays the escape hatch.
+4. **Extract questions posed by papers** — two lanes, composable:
+   **deterministic** (section headings, “we ask whether”, numbered RQs in
+   abstract/introduction via rules + optional first-page text) and **LLM**
+   (grounded in local PDF excerpt / summary note; reject ungrounded). Store
+   extracted RQs on disk keyed by `item_key` with provenance (`rule` vs
+   `llm`).
+5. **Corpus-wide RAG on those questions** — take questions from extraction,
+   from summary generation, or from an operator file; query the **whole**
+   collection (or `-C` / year / type scope) to see whether other papers
+   **already answered** or **later addressed** the same question. Filters
+   (e.g. `--year-from` / `--year-to`, “only items after the asking paper”) are
+   first-class so temporal stories (“did 2020 papers already answer this 2015
+   RQ?”) are explicit in the report, not implicit in model memory.
+6. **Config** — global defaults under `[zotero_rag]` (or shared with the
+   zotero-rag project’s config file when co-installed); **per-task** overrides
+   on the CLI and in `profiles/*.toml` (batch path, focus, scope, generation
+   gates, citation format). `doctor` should amber when the index is stale vs
+   `snapshot` / PDF set.
+
+**Non-goals for this lane:** replacing Zotero’s reader; cloud-default RAG;
+answers without citations; auto-mutating parent metadata from Q&A output;
+scheduling nightly “ask everything” jobs without an explicit operator command.
+
+**Consumer fit:** extends **Reading & knowledge** (below) and complements
+`summarize` / `synthesize` — summaries stay the human-readable layer; RAG stays
+the evidence-linked Q&A layer.
+
 ### Auto-tagging library items (later; not 1.0)
 
 **Status:** roadmap only — do not implement until the fetch / lint / attach loop
@@ -310,44 +448,130 @@ Phases, in order. Each can stop without the next.
    run queue. Always dry-run / no PDFs. Paperful does not schedule it; your
    own launchd or cron may call `watch run`. See [snowball.md](snowball.md#watch).
 
-### Dedupe — skip before create, not merge after
+### Dedupe during snowball — ongoing prevention, not merge-after
 
-Snowball does not run
-`paperful dedupe` at the end of a crawl. The goal is to avoid writing duplicate
-parents in the first place; stragglers are cleaned with the same hygiene loop as
-any other ingest (`dedupe --dry-run` → read `state/dedupe-packs/` →
-`dedupe --apply` on the target collection). There is no `--dedupe-after` (or
-snowball step inside `paperful all`) today.
+Snowball never runs `paperful dedupe` inside the crawl. **Ongoing** here means
+duplicate work is collapsed and library hits are applied **while the queue is
+built and before any parent is created**, not a one-shot merge at the end.
+Stragglers still use the same hygiene loop as any other ingest:
+`dedupe --dry-run` → read `state/dedupe-packs/` → `dedupe --apply` on the
+target collection. There is no `--dedupe-after` flag and no snowball step inside
+`paperful all` today.
 
-What ships today, in order:
+Treat snowball dedupe and `paperful dedupe` as complementary:
 
-1. **Queue** — one row per work identity inside a run (`crawl` merges duplicate
-   hops and records every seed that pointed at the same work).
-2. **Library fingerprint** — before create, each `status = new` row is checked
-   against the live library using normalized DOI, then title+year (same
-   normalisation family as `paperful dedupe`). Matching rows become `exists`
-   (or `version` when the CLI run can link preprint ↔ published via
-   `paperful versions`; that marks the row, it does not merge parents).
-   `create_new` skips `exists` / `version` and reports `skipped_exists`.
-3. **`dedupe_scope`** — `library` (default): whole library; `collection`: only
-   parents already under the target `-C` path; `none`: skip the library read
-   (logged loudly; `auto` / `approve-each` still refuse create if the library
-   cannot be opened). `snowball apply` always re-checks against the **full**
-   library before create, regardless of profile scope — a second apply also
-   skips DOIs already created from that queue.
+| Layer | When | What it does | What it does *not* do |
+| --- | --- | --- | --- |
+| **In-run identity** | Every hop and on OpenAlex resume merge | One `candidates.jsonl` row per work (`doi:` or `openalex:` identity). Duplicate paths merge `seed_keys`, ref/keyword overlap, and scores. | Read Zotero; trash or merge parents |
+| **Library fingerprint** | Once per crawl finish (and again on `apply` / saved-queue resume) | Normalized DOI, then title+year (same family as [dedupe](dedupe.md)); optional preprint ↔ published via `link_versions` → row `version` (tag only, no `versions` merge). `create_new` skips `exists` / `version`. | Re-scan the library on every reference hop; title+year `held_divergent_title` logic |
+| **Hygiene `dedupe`** | Operator schedule (between batches or after a messy week) | Classify DOI groups and title+year packs; `--apply` merges extras onto a keeper. | Run automatically at snowball exit |
 
-Why duplicate parents can still appear: `collection` scope misses the same DOI
-elsewhere; `none` or a stale queue edited after the library changed; title+year
-gaps (missing year, title drift) that `dedupe` would classify or hold; two
-parallel runs; preprint and version-of-record left as two parents (`version`
-is not `dedupe --apply`). Same PDF on two parents stays
-[`attachments`](commands.md) / `dedupe`, not snowball.
+#### Timeline through one run
 
-**Parked (snowball lane):** optional post-create sweep flag or profile knob that
-runs `dedupe` classify (and optionally `--apply`) on the target collection after
-`auto` / `apply`; `--dedupe-scope` on every snowball subcommand; align
-`snowball apply` lookup scope with the saved `dedupe_scope`. Richer
-manifestation-aware identity stays under **Identity / resolver graph** below.
+```text
+seeds → hops (OpenAlex / filters)
+  → crawl _dedupe (work identity, all hops so far)
+  → fill / overlap / truncate
+  → read library per dedupe_scope → _mark_exists on every row
+  → write queue (dry-run / approve-batch) OR create_new (writing gates)
+```
+
+- **Dry-run and `approve-batch`** still perform the library fingerprint before
+  `candidates.jsonl` is written, so the table’s “in library” column is the same
+  signal `auto` would use later. Editing `keep=true` on an `exists` row does not
+  create a parent; `create_new` skips it.
+- **`snowball apply`** reloads the queue, re-runs `_mark_exists` against the
+  **full library** (not the profile’s `dedupe_scope`), then creates only rows
+  still `status = new`. A second apply skips DOIs already written from that
+  queue. If you imported parents elsewhere between dry-run and apply, they show
+  up as `exists` on apply — that is the main “ongoing” safety net for delayed
+  gates.
+- **`snowball resume`** after an OpenAlex budget pause merges new neighbours with
+  `_dedupe` into the on-disk queue; it does not repeat the library fingerprint
+  on the merged file unless you run `apply` or a fresh execute path that
+  re-executes `_mark_exists`. **`resume` on a finished queue** (no
+  `deferred.json`) re-marks `exists` on the full library before create/PDF
+  continue.
+- **`snowball watch`** is a second ongoing filter: baseline stores every work
+  identity from the first profile run in `state/snowball/watches/<name>/seen.json`.
+  Later runs still use the profile’s `dedupe_scope` during the crawl, but only
+  rows that are `status = new`, not already in `seen`, and (on non-baseline runs)
+  unseen since baseline land in `inbox.jsonl`. Library `exists` rows never become
+  watch proposals even if the watch ledger has not seen that DOI yet.
+
+#### `dedupe_scope` (config and profiles)
+
+| Value | Fingerprint against | Typical use |
+| --- | --- | --- |
+| `library` (default) | All parents the backend can list | New topic collection; avoid duplicating anything you already own |
+| `collection` | Parents under target `-C` only | Deliberately re-fetch metadata for works already filed elsewhere; **same DOI outside `-C` can still be created** |
+| `none` | Skipped (yellow log) | Scout-only queues; `auto` / `approve-each` still refuse create if the library cannot be opened |
+
+Persist with `snowball profile save --dedupe-scope …` or `[snowball].dedupe_scope` /
+`profiles/*.toml`. CLI `--dedupe-scope` exists on profile save, not yet on every
+`search` / `doi` / `run` invocation (parked below).
+
+Indexed lookup (when the backend exposes `items_in_scope`) also maps arXiv IDs and
+`preprint DOI:` lines in Extra into the DOI index, aligned with dedupe’s DOI
+normalisation. The Zotero fast path uses `find_top_item_key` (DOI-first; title
+fallback without the full title+year index).
+
+#### Operator loop (large corpus + watch)
+
+Recommended rhythm when snowball is actively growing a collection — same spirit
+as the **Large corpus from scratch** worked example under [Documentation
+(thicken)](#documentation-thicken):
+
+1. **Pre-flight** — `dedupe -C <target> --dry-run` on the slice (or `--library`
+   if the topic bleeds across collections). Fix obvious DOI collisions before
+   the crawl so `exists` counts are trustworthy.
+2. **Scout** — profile with `gate = dry-run`, `dedupe_scope = library`, realistic
+   `max_candidates` / hop caps. Read `state/snowball/<run-id>/candidates.jsonl`
+   (`exists_match` → `item_key`, `doi`, or `title_year`).
+3. **Write** — `approve-batch` + `snowball apply`, or `gate = auto` on a named
+   profile after one dry-run. Expect `skipped_exists` in the run report.
+4. **Post-batch hygiene** — after `fetch_pdfs` / `run` stragglers, `dedupe` again
+   on `-C` (title+year stragglers often appear here, not in snowball).
+5. **Frontier** — `snowball watch save` / `watch run` on the same profile;
+   review `inbox.jsonl`, then apply or manual import; watch does not download
+   PDFs.
+
+`paperful all` does not insert dedupe or snowball; chain explicitly (see
+[workflows.md](workflows.md) fill recipes).
+
+#### Why duplicate parents can still appear
+
+- **`collection` scope** — fingerprint misses the same DOI in another collection.
+- **`none` or unread library** — queue rows stay `new` until a later apply with
+  a readable backend.
+- **Stale queue** — manual edits, or apply long after dry-run without re-apply’s
+  fresh `_mark_exists` (resume-after-budget merge is the weak spot: new rows are
+  not re-fingerprinted on disk until apply or a full re-run).
+- **Title+year blind spots** — missing year, `(untitled)`, HTML/title drift:
+  snowball may create a second parent; `dedupe` may **hold** divergent titles on
+  the same DOI instead of merging.
+- **Parallel snowball or manual ingest** — two creates for one DOI before either
+  run’s fingerprint; second wins only if apply re-check runs.
+- **`version` vs merge** — preprint and version-of-record stay two parents unless
+  you run `paperful versions` / `dedupe --apply`; snowball only marks `version`.
+- **Same bytes, two parents** — [`attachments`](commands.md) / `dedupe`, not
+  snowball.
+
+#### Parked (snowball lane — thicker “ongoing”)
+
+- **Re-fingerprint on queue merge** — after OpenAlex `resume` adds rows, run
+  `_mark_exists` on the merged `candidates.jsonl` before optional `auto` create on
+  `added` (today `added` can create without a fresh library pass).
+- **`--dedupe-scope` on every subcommand** — override profile per invocation.
+- **Align `snowball apply` with saved `dedupe_scope`** — or document “apply always
+  library” as intentional (safer for delayed gates).
+- **In-run create index** — while `create_new` runs, feed new keys/DOIs back into
+  the fingerprint so a single `auto` batch cannot create the same DOI twice if
+  the queue had duplicates reintroduced by hand.
+- **Optional post-create sweep** — profile knob: `dedupe` classify (and optionally
+  `--apply`) on target `-C` after `auto` / `apply`.
+- **Manifestation-aware identity** — work ↔ preprint ↔ VoR graph (**Identity /
+  resolver graph**, Maybe later §3); snowball keeps skip-only semantics.
 
 Still outside this lane: every paper by every cited author; a snowball step
 inside `paperful all`; a built-in scheduler; a review UI; systematic-review screening; a
@@ -383,7 +607,11 @@ prerequisites for the fetch / lint / attach loop.
    **pluggable grey-lit PDF playbooks** in
    `direct`/`landing` with builtin packs (UNGA/undocs · BBNJ/DOALOS · ISA;
    plus FAO/OECD/IEA/WHO — extend via `[[grey_playbooks]]`). Still
-   parked: SI/dataset/code siblings;
+   parked: **inbox create-on-unmatched** (config; metadata resolve + optional
+   wait for manager PDF metadata); **smart inbox** routing (Core above —
+   snowball/recent-run context + PDF signals; LLM `off` | `when_thin` | `always`;
+   model global + per-function; gated or auto);
+   SI/dataset/code siblings;
    **opt-in LibGen** for `book` / `bookSection` gap-fill (title or ISBN routing;
    unofficial scrapers only — spike
    [libgen-api](https://pypi.org/project/libgen-api/) /
@@ -395,14 +623,15 @@ prerequisites for the fetch / lint / attach loop.
    engine-rotation + disk-cache pattern from folk directory
    `ingest/scrape_searxng.py`; do not port the county×event grid. Query by
    title/author/`filetype:pdf` (or DOI), hand URLs to the existing download +
-   PDF-identity checks. Same bar as Scholar: never in `DEFAULT_SOURCES`,
+   PDF-identity checks.
+   Same bar as legacy opt-in `scholar` on `run`: never in `DEFAULT_SOURCES`,
    circuit-breaker / sleep so fill runs do not burn the instance, CAPTCHA/empty
-   engines are misses not hard fails. Partly overlaps opt-in `scholar`; wins
-   when Scholar is blocked or the PDF lives only on a personal page.
+   engines are misses not hard fails. Wins when the PDF lives only on a personal
+   page; complements handoff tabs rather than vault Scholar replay.
 3. **Identity / resolver graph** — work ↔ version ↔ preprint; scored patches with
    undo; citation ingest; manifestation-aware dedupe. Collection DOI / title+year
    trash is already `paperful dedupe`. Snowball only **skips** rows that match
-   those fingerprints before create ([Snowball — Dedupe](#dedupe--skip-before-create-not-merge-after));
+   those fingerprints before create ([Snowball — dedupe during snowball](#dedupe-during-snowball--ongoing-prevention-not-merge-after));
    it does not trash or merge existing parents. Preprint ↔ version of record is
    `paperful versions`: the older parent keeps the published citation and PDF,
    and the preprint stays as a version (snowball may tag a candidate `version`
@@ -429,7 +658,11 @@ prerequisites for the fetch / lint / attach loop.
 Larger product bets. Park until the ledger and core loop justify them.
 
 5. **Reading & knowledge** — local full-text index; annotation sync;
-   evidence packs; briefs grounded only in local PDFs
+   evidence packs; briefs grounded only in local PDFs. **Zotero-RAG (planned):**
+   batch question → cited answer runs, corpus question generation, paper-level
+   RQ extraction, and temporal RAG across the collection — see [Zotero-RAG
+   integration](#zotero-rag-integration-later-question-centric-layer) under
+   Optional LLM assist.
 6. **Writing & export** — CSL / BibLaTeX / Quarto sync; living review / gap lists;
    git-friendly CSL-JSON dumps
 7. **Agent surface** — MCP + CLI sharing one capability API; dry-run defaults;
@@ -438,7 +671,8 @@ Larger product bets. Park until the ledger and core loop justify them.
    year / type sequence (`profiles/*.toml`). Those are not grey-lit playbooks.
    **Shipped (opt-in):**
    [browser-use](https://github.com/browser-use/browser-use) as a *recovery*
-   lane: last serial source on `run` after Scholar / EZProxy / htmlpdf fail
+   lane: last serial source on `run` after EZProxy / htmlpdf fail (today still
+   after opt-in `scholar` until that source leaves core)
    (`[llm].enabled` + extra), and `paperful recover --item` for named keys.
    Never in `DEFAULT_SOURCES`, not “AI fetch everything.” Soft bot walls may improve with
    their Cloud stealth (not wired); hard CAPTCHAs stay human (see CAPTCHA
@@ -516,6 +750,44 @@ background / localhost maturity),
 (local-manager pairing; JabRef’s HTTP direction informs later Capability API),
 DownThemAll / Pull Tabs for paced tab-download UX only.
 
+## Documentation (thicken)
+
+**Status:** roadmap — reference docs exist; playbooks and media do not yet match
+the depth of the CLI. Not a 1.0 blocker; raises trust before install and after
+the first confusing run.
+
+Ship in layers:
+
+1. **Example commands and templates** — copy-paste invocations plus
+   `profiles/*.toml` and config snippets for recurring flows: `-C` / collection
+   scoping, `--dry-run` → `--apply`, `paperful all`, snowball profiles and
+   gates, `[inbox].dir` handoff, `session login` (Zotero / Mendeley / campus
+   vault), and `[llm]` gates spelled as one-liners with expected exit codes.
+2. **Worked examples** (narrative walkthroughs: starting state → command
+   sequence → banners / `state/` paths → Zotero outcome):
+   - **Messy folder / uneven library** — weak metadata, broken or ghost PDF
+     attachments, same bytes on two parents, title+year stragglers: `doctor` →
+     `lint` / `fix-metadata` → `attachments` → `dedupe` → `run`, always
+     dry-run and read packs on disk before `--apply`.
+   - **Large corpus from scratch** — snowball from **keyword** plus seed
+     **DOI**s (profile save, `direction` / `hybrid`, `dedupe_scope`, gates,
+     optional `fetch_pdfs`, then `run` for stragglers; optional `watch` for
+     frontier inbox) with a realistic cap / approve story.
+   - **PDFs for an existing collection** — two passes documented side by side:
+     **quick** (default sources, `--dry-run` Would-hit, CORE / grey playbooks,
+     EZProxy session hygiene, `run` banner);      **full** (`session login` / relogin for **EZProxy** (not Scholar-as-bot),
+     vault retry on soft-blocked OA, optional `[browser_agent]` on
+     `run` or `recover --item`, `--handoff list|tabs|walk|watch` including
+     Scholar in the **system browser**, PDF download into `[inbox].dir` and
+     `inbox drain` / `watch`).
+3. **Screenshots and video guides** — annotated screenshots for dry-run tables,
+   `doctor` colour lines, attachment provenance in Zotero, snowball queue rows,
+   and handoff inbox layout; short screen recordings aligned with the three
+   worked examples above (hygiene, snowball, fetch quick vs full).
+
+Keep new pages linked from README and [commands.md](commands.md); avoid a
+second doc tree that drifts from the CLI.
+
 ## Related docs
 
 - [architecture.md](architecture.md) — disk-first adapters and data flow
@@ -533,3 +805,16 @@ DownThemAll / Pull Tabs for paced tab-download UX only.
 Parked **2.0 vision** only — not a 1.0 deliverable. Web-native workbench
 sketch (open / Docker / SaaS): [gui.md](gui.md). The Firefox extension above
 is a thinner optional bridge; it does not wait on the full GUI Capability API.
+
+**Built-in chat with collection (2.0, opt-in):** a scoped **Ask** mode in the
+workbench — conversational Q&A over the current collection (and the same
+year / type / profile filters as other modes), with **citations** back to
+items and PDF chunks via the zotero-rag index. Not the default landing
+experience and not a replacement for Zotero’s reader; requires
+`[llm].enabled` and an up-to-date corpus index (`snapshot` / PDF set). The
+Capability API exposes the same verbs as CLI batch Q&A ([Zotero-RAG
+integration](#zotero-rag-integration-later-question-centric-layer)): turn
+history, `--focus` / prompt presets, optional “promote this thread to batch
+report on disk,” and explicit scope chrome so SaaS / shared workspaces never
+imply library-wide answers without a visible filter. GUI ships **after** CLI
+batch ingest and cited answers are stable.

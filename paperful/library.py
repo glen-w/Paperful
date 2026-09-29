@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -153,7 +154,18 @@ class ZoteroBackend:
     ) -> list[Item]:
         return self.zl.items_lacking_pdf(collection_keys, upgrade_linked=upgrade_linked)
 
-    def items_in_scope(self, collection_keys: list[str] | None) -> list[Item]:
+    def items_in_scope(
+        self,
+        collection_keys: list[str] | None,
+        *,
+        status: Callable[[str], None] | None = None,
+    ) -> list[Item]:
+        if status is not None:
+            try:
+                return self.zl.items_in_scope(collection_keys, status=status)
+            except TypeError:
+                status("Loading items from library…")
+                return self.zl.items_in_scope(collection_keys)
         return self.zl.items_in_scope(collection_keys)
 
     def count_linked_url_only(self, collection_keys: list[str] | None) -> int:
@@ -390,12 +402,15 @@ class ZoteroBackend:
             relations["dc:relation"] = [current, uri]
         self.zl.zot.update_item(raw)
 
+    def _delete_zotero_item(self, item_key: str) -> None:
+        """Trash one Zotero item via the local write API (Zotero 10+)."""
+        raw = self.zl.zot.item(item_key)
+        self.zl.zot.delete_item(raw)
+
     def trash_item(self, item_key: str) -> None:
         """Move a parent item to the Zotero trash. Does not delete files under out/."""
         self._ensure_write()
-        raw = self.zl.zot.item(item_key)
-        raw["data"]["deleted"] = True
-        self.zl.zot.update_item(raw)
+        self._delete_zotero_item(item_key)
 
     def preview_merge(self, keep_key: str, drop_key: str) -> dict[str, Any]:
         """What ``merge_into`` would copy. Empty when either item is missing."""
@@ -440,15 +455,13 @@ class ZoteroBackend:
             raw = self.zl.zot.item(move["key"])
             if move["action"] == "reparent":
                 raw["data"]["parentItem"] = keep_key
-            elif move["action"] == "trash":
-                raw["data"]["deleted"] = True
-            else:
-                continue
-            self.zl.zot.update_item(raw)
-            if move["action"] == "reparent":
+                self.zl.zot.update_item(raw)
                 moved.append(move["key"])
             elif move["action"] == "trash":
+                self._delete_zotero_item(move["key"])
                 trashed_children.append(move["key"])
+            else:
+                continue
         patch = merge_parent_patch(
             keep_raw.get("data") or {}, drop_raw.get("data") or {}
         )

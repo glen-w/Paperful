@@ -267,16 +267,16 @@ def test_item_from_json_dedupe_fields():
     assert item.has_linked_url is True
 
 
-def test_trash_item_sets_deleted(cfg):
+def test_trash_item_calls_delete_item(cfg):
     class FakeZot:
         def __init__(self):
-            self.updated = None
+            self.deleted = None
 
         def item(self, key):
-            return {"data": {"key": key, "title": "T", "version": 1}}
+            return {"key": key, "data": {"key": key, "title": "T"}, "version": 1}
 
-        def update_item(self, raw):
-            self.updated = raw
+        def delete_item(self, raw):
+            self.deleted = raw
 
     class ZL:
         def __init__(self):
@@ -285,7 +285,7 @@ def test_trash_item_sets_deleted(cfg):
     backend = ZoteroBackend(cfg, ZL())
     backend._ensure_write = lambda: None
     backend.trash_item("DROP")
-    assert backend.zl.zot.updated["data"]["deleted"] is True
+    assert backend.zl.zot.deleted["key"] == "DROP"
 
 
 def test_cli_dedupe_dry_run_writes_pack(tmp_path, monkeypatch):
@@ -852,6 +852,9 @@ def test_merge_into_moves_children_then_deletes_donor(cfg):
         def update_item(self, raw):
             items[raw["data"]["key"]] = raw
 
+        def delete_item(self, raw):
+            items.pop(raw["key"], None)
+
     class ZL:
         def __init__(self):
             self.zot = FakeZot()
@@ -863,7 +866,7 @@ def test_merge_into_moves_children_then_deletes_donor(cfg):
     assert "title" in result["fields"]
     assert items["NOTE"]["data"]["parentItem"] == "KEEP"
     assert items["PDF"]["data"]["parentItem"] == "KEEP"
-    assert items["DROP"]["data"]["deleted"] is True
+    assert "DROP" not in items
     assert items["KEEP"]["data"]["title"] == "Real title"
     assert items["KEEP"]["data"]["abstractNote"] == "The abstract"
     assert items["KEEP"]["data"]["collections"] == ["A", "B"]
@@ -907,7 +910,7 @@ def test_merge_into_does_not_trash_when_child_move_fails(cfg):
         assert "child move" in str(exc)
     else:
         raise AssertionError("expected RuntimeError")
-    assert items["DROP"]["data"].get("deleted") is not True
+    assert "DROP" in items
 
 
 def test_merge_into_retries_without_date_added(cfg):
@@ -946,6 +949,9 @@ def test_merge_into_retries_without_date_added(cfg):
                 raise RuntimeError("dateAdded rejected")
             items[raw["data"]["key"]] = raw
 
+        def delete_item(self, raw):
+            items.pop(raw["key"], None)
+
     class ZL:
         def __init__(self):
             self.zot = FakeZot()
@@ -954,5 +960,5 @@ def test_merge_into_retries_without_date_added(cfg):
     backend._ensure_write = lambda: None
     backend.merge_into("KEEP", "DROP")
     assert items["KEEP"]["data"]["dateAdded"] == "2020-01-01T00:00:00Z"
-    assert items["DROP"]["data"]["deleted"] is True
+    assert "DROP" not in items
 

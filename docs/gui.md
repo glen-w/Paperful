@@ -26,7 +26,9 @@ Nothing here blocks tagging 1.0.
 
 - Systematic-review screening as the primary UX
 - A citation-graph playground as the main surface
-- Chat-over-library as the default way to use Paperful
+- Chat-over-library as the **default** way to use Paperful (a built-in,
+  opt-in **Ask / chat with collection** mode is in scope for 2.0 — see
+  [§ Ask](#ask-chat-with-collection) and [ROADMAP — GUI](ROADMAP.md#gui))
 - Replacing Zotero sync or becoming a WebDAV client
 - Assuming `localhost:23119` inside SaaS without a remote adapter path
 - Shipping Sci-Hub, Scholar, or LLM as on-by-default
@@ -80,6 +82,7 @@ the center pane changes with the job mode.
 │  Repair    │                                             │  PDF preview  │
 │  Mirror    │                                             │  (if on disk) │
 │  Reports   │                                             │               │
+│  Ask       │                                             │  citations    │
 │  Doctor    │                                             │               │
 ├────────────┴─────────────────────────────────────────────┴───────────────┤
 │  Run rail: banner  downloaded N · attached M · …   │  live log / errors │
@@ -89,7 +92,7 @@ the center pane changes with the job mode.
 | Region | Role |
 | --- | --- |
 | **Scope chrome** | Collection path (adapter + `out/_collections.json`), year/type filters, active run profile, open pack |
-| **Job modes** | Grow · Fill · Repair · Mirror · Reports · Doctor / Setup |
+| **Job modes** | Grow · Fill · Repair · Mirror · Reports · Ask · Doctor / Setup |
 | **Center table** | Mode-specific rows with multi-select and status |
 | **Detail** | Title, authors, year, venue, ids, notes, attachments; PDF when present under `out/` |
 | **Run rail** | Dry-run default, gate/preset, one-line trust banner, write-API indicator, streamed log |
@@ -160,6 +163,29 @@ Browse and thicken the quiet mirror — not a second sync product.
 
 `[llm].enabled` stays off until the operator turns it on (setup pane or
 config). Proposals never mutate the library alone.
+
+### Ask (chat with collection)
+
+Built-in, **opt-in** conversational surface over the **scoped** library
+(indexed PDFs under the quiet mirror + zotero-rag). Same Control posture:
+scope is always visible in the chrome; answers must show **citations**
+(item key, title, chunk/snippet — not free-floating model text). Maps to the
+Zotero-RAG CLI layer described in [ROADMAP — Zotero-RAG
+integration](ROADMAP.md#zotero-rag-integration-later-question-centric-layer)
+(batch question files land first; GUI follows once cited answers are stable).
+
+| Action | Maps to (Capability API) | Notes |
+| --- | --- | --- |
+| New thread | `rag.chat` (name TBD) with scope = active `-C` + filters | Requires index freshness; `doctor` ambers when stale |
+| Follow-up | Same thread id; server holds retrieval context | No silent widening of scope mid-thread |
+| Focus / prompt preset | `--focus` or profile field | Question-centric vs summary-style system prompts |
+| Export thread | Write `state/rag/…` report JSON; optional child note | Explicit Apply for Zotero writes |
+| Batch from file | Upload / paste questions → cited answer table | Parity with CLI batch ingest |
+
+UI patterns: chat pane in the center (or split with detail), citation chips
+that open the **Detail** biblio card and PDF preview when on disk; optional
+side panel for “questions extracted from this item” when that lane exists.
+Not a general web search box — retrieval stays local to the workspace ledger.
 
 ### Doctor / Setup
 
@@ -234,7 +260,8 @@ Planning ladder, not a calendar. Each phase can stop without the next.
 | **P1** | Web **read-only** review: snowball queues, patch list, dedupe / version packs | Open + Docker |
 | **P2** | Gated write-back over HTTP: `keep` / `apply`, patches, scoped `run` | Open + Docker |
 | **P3** | Full workbench modes + in-browser PDF preview | Open + Docker |
-| **P4** | SaaS tenancy (auth, workspace isolation, remote manager adapters) + polish (export, tagging UI if that lane exists) | SaaS |
+| **P3b** | **Ask** — chat with collection (cited RAG over scoped index; `[llm]` + index gates) | Open + Docker |
+| **P4** | SaaS tenancy (auth, workspace isolation, remote manager adapters) + polish (export, tagging UI if that lane exists; Ask when remote index + LLM policy allow) | SaaS |
 
 P0 does not ship a GUI. It makes a later GUI honest.
 

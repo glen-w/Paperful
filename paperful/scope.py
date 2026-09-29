@@ -5,8 +5,8 @@ No Typer and no console output. Callers turn :class:`ScopeError` into an exit.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-
 from .zot import Item, filter_items_by_type, filter_items_by_year
 
 
@@ -74,6 +74,25 @@ def filter_scope_items(
     return filtered, label
 
 
+def _items_in_scope(
+    backend,
+    collection_keys: list[str] | None,
+    status: Callable[[str], None] | None,
+) -> list[Item]:
+    zl = getattr(backend, "zl", None)
+    if zl is not None:
+        if status is not None:
+            try:
+                return zl.items_in_scope(collection_keys, status=status)
+            except TypeError:
+                status("Loading items from library…")
+                return zl.items_in_scope(collection_keys)
+        return zl.items_in_scope(collection_keys)
+    if status:
+        status("Loading items from library…")
+    return backend.items_in_scope(collection_keys)
+
+
 def load_scope(
     backend,
     *,
@@ -84,6 +103,7 @@ def load_scope(
     year_to: int | None = None,
     item_types: frozenset[str] | None = None,
     pdfs_only: bool = False,
+    status: Callable[[str], None] | None = None,
 ) -> ItemScope:
     """Union of ``--item`` keys and a collection or library, then year and type.
 
@@ -101,10 +121,10 @@ def load_scope(
     keys: list[str] | None = None
     if library:
         label = "whole library"
-        items.extend(backend.items_in_scope(None))
+        items.extend(_items_in_scope(backend, None, status))
     elif specs:
         keys, label = resolve_keys(backend, specs, False)
-        items.extend(backend.items_in_scope(keys))
+        items.extend(_items_in_scope(backend, keys, status))
     else:
         label = "items " + ",".join(keys_asked)
     seen: set[str] = set()
