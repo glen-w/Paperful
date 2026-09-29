@@ -111,6 +111,12 @@ def parent_payload(record: dict[str, Any], collection_keys: list[str]) -> dict[s
         "collections": collection_keys,
         "relations": {},
     }
+    if record.get("book_title"):
+        data["bookTitle"] = record["book_title"]
+    if record.get("series_title"):
+        data["seriesTitle"] = record["series_title"]
+    if record.get("pages"):
+        data["pages"] = record["pages"]
     pmid = record.get("pmid")
     if pmid and "PMID:" not in (data["extra"] or ""):
         extra = (data["extra"] or "").rstrip()

@@ -328,6 +328,10 @@ class WorkMeta:
     first_author: str | None = None
     venue: str | None = None
     source: str = ""  # crossref | openalex | semanticscholar | pubmed
+    work_type: str = ""  # Crossref/OpenAlex type, e.g. book-chapter
+    book_title: str | None = None
+    series_title: str | None = None
+    pages: str | None = None
 
 
 @dataclass
@@ -578,30 +582,7 @@ def _crossref_work(client: httpx.Client, doi: str, email: str) -> WorkMeta | Non
         msg = resp.json().get("message") or {}
     except (httpx.HTTPError, ValueError, TypeError):
         return None
-    titles = msg.get("title") or []
-    title = strip_title_markup(titles[0]) if titles else ""
-    authors = msg.get("author") or []
-    first = None
-    if authors:
-        first = authors[0].get("family") or authors[0].get("name")
-    venue_list = msg.get("container-title") or []
-    venue = strip_title_markup(venue_list[0]) if venue_list else ""
-    parts = _best_date_parts(msg)
-    year = None
-    if parts and parts[0] is not None:
-        try:
-            year = int(parts[0])
-        except (TypeError, ValueError):
-            year = None
-    return WorkMeta(
-        doi=normalize_doi(msg.get("DOI") or doi) or doi.lower(),
-        title=title,
-        year=year,
-        date=format_date_parts(parts),
-        first_author=first,
-        venue=venue or None,
-        source="crossref",
-    )
+    return _work_from_crossref_message(msg, doi)
 
 
 def _openalex_work(client: httpx.Client, doi: str, email: str) -> WorkMeta | None:
@@ -629,6 +610,17 @@ def _openalex_work(client: httpx.Client, doi: str, email: str) -> WorkMeta | Non
     loc = data.get("primary_location") or {}
     source = loc.get("source") or {}
     venue = source.get("display_name") if isinstance(source, dict) else None
+    work_type = str(data.get("type") or "")
+    series_title = venue if work_type == "book-chapter" and venue else None
+    # OpenAlex rarely separates book vs series; prefer raw_source_name only when
+    # it differs from the series display name (otherwise leave book_title empty).
+    raw_source = ""
+    if isinstance(loc, dict):
+        raw_source = str(loc.get("raw_source_name") or "").strip()
+    book_title = None
+    if work_type == "book-chapter" and raw_source and raw_source != (venue or ""):
+        book_title = raw_source
+        venue = book_title
     year = data.get("publication_year")
     try:
         year_i = int(year) if year else None
@@ -650,6 +642,9 @@ def _openalex_work(client: httpx.Client, doi: str, email: str) -> WorkMeta | Non
         first_author=first,
         venue=venue,
         source="openalex",
+        work_type=work_type,
+        book_title=book_title,
+        series_title=series_title,
     )
 
 
@@ -1021,6 +1016,32 @@ def _zotero_type(crossref_type: Any) -> str:
     return _CROSSREF_ITEM_TYPE.get(str(crossref_type or ""), "journalArticle")
 
 
+def container_titles_for_type(
+    work_type: str, container_titles: list[Any]
+) -> tuple[str | None, str | None, str | None]:
+    """Map Crossref ``container-title`` to venue / book / series.
+
+    Book chapters often list series then book (Springer). Prefer the last
+    title as the book (venue); the first as series when there are two+.
+    """
+    cleaned = [
+        strip_title_markup(str(item))
+        for item in container_titles
+        if str(item or "").strip()
+    ]
+    cleaned = [item for item in cleaned if item]
+    if not cleaned:
+        return None, None, None
+    if work_type == "book-chapter" and len(cleaned) >= 2:
+        series_title = cleaned[0]
+        book_title = cleaned[-1]
+        return book_title, book_title, series_title
+    venue = cleaned[0]
+    if work_type == "book-chapter":
+        return venue, venue, None
+    return venue, None, None
+
+
 def _work_from_crossref_message(msg: dict[str, Any], doi: str) -> WorkMeta:
     titles = msg.get("title") or []
     title = strip_title_markup(titles[0]) if titles else ""
@@ -1028,8 +1049,11 @@ def _work_from_crossref_message(msg: dict[str, Any], doi: str) -> WorkMeta:
     first = None
     if authors and isinstance(authors[0], dict):
         first = authors[0].get("family") or authors[0].get("name")
-    venue_list = msg.get("container-title") or []
-    venue = strip_title_markup(venue_list[0]) if venue_list else ""
+    work_type = str(msg.get("type") or "")
+    venue, book_title, series_title = container_titles_for_type(
+        work_type, list(msg.get("container-title") or [])
+    )
+    pages = str(msg.get("page") or "").strip() or None
     parts = _best_date_parts(msg)
     year = None
     if parts and parts[0] is not None:
@@ -1045,6 +1069,10 @@ def _work_from_crossref_message(msg: dict[str, Any], doi: str) -> WorkMeta:
         first_author=first,
         venue=venue or None,
         source="crossref",
+        work_type=work_type,
+        book_title=book_title,
+        series_title=series_title,
+        pages=pages,
     )
 
 

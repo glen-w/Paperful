@@ -304,6 +304,9 @@ class EndNoteBackend:
             "title": "title",
             "date": "date",
             "publicationTitle": "publication_title",
+            "bookTitle": "book_title",
+            "seriesTitle": "series_title",
+            "pages": "pages",
             "itemType": "item_type",
             "extra": "extra",
         }

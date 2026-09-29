@@ -126,6 +126,9 @@ class Item:
     pmid: str | None = None
     extra: str = ""
     publication_title: str | None = None
+    book_title: str | None = None
+    series_title: str | None = None
+    pages: str | None = None
     date: str | None = None
     doi_verified: str = "missing"  # ok | suspect | swapped | unknown | missing
     pdf_path: str | None = None
@@ -423,6 +426,9 @@ def item_from_json(
     if not paths:
         paths = [UNCOLLECTED]
     pub = (data.get("publicationTitle") or "").strip() or None
+    book_title = (data.get("bookTitle") or "").strip() or None
+    series_title = (data.get("seriesTitle") or "").strip() or None
+    pages = (data.get("pages") or "").strip() or None
     date = (data.get("date") or "").strip() or None
     creators = data.get("creators") or []
     surnames = [
@@ -448,6 +454,9 @@ def item_from_json(
         pmid=pmid,
         extra=extra,
         publication_title=pub,
+        book_title=book_title,
+        series_title=series_title,
+        pages=pages,
         date=date,
         has_pdf=has_pdf,
         has_linked_url=has_linked_url and not has_pdf,

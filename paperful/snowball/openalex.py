@@ -632,10 +632,22 @@ def work_to_candidate(
             authors.append(name)
     year = work.get("publication_year")
     venue = ""
+    series_title = ""
+    book_title = ""
+    work_type = str(work.get("type") or "")
     loc = work.get("primary_location") or {}
     source = loc.get("source") or {}
     if isinstance(source, dict):
         venue = str(source.get("display_name") or "")
+    if work_type == "book-chapter" and venue:
+        # OpenAlex source is usually the series; keep it off venue so Crossref
+        # fill can set the book title, and stash series for ingest.
+        series_title = venue
+        venue = ""
+        raw = str(loc.get("raw_source_name") or "").strip()
+        if raw and raw != series_title:
+            book_title = raw
+            venue = raw
     return Candidate(
         run_id=run_id,
         seed=seed,
@@ -647,7 +659,9 @@ def work_to_candidate(
             "year": int(year) if year else None,
             "authors": authors,
             "venue": venue,
-            "type": work.get("type") or "",
+            "type": work_type,
+            "book_title": book_title,
+            "series_title": series_title,
             "oa_url": (loc.get("pdf_url") or loc.get("landing_page_url") or ""),
             "is_oa": bool((work.get("open_access") or {}).get("is_oa")),
             "language": str(work.get("language") or ""),

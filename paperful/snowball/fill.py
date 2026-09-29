@@ -262,11 +262,40 @@ def _fill_empty(row: Candidate, payload: dict[str, Any], *, backend: str) -> int
         biblio["authors"] = [str(name) for name in authors if name]
         row.provenance["filled_by"] = backend
         filled += 1
+    if not biblio.get("type") and payload.get("type"):
+        biblio["type"] = payload["type"]
+        row.provenance["filled_by"] = backend
+        filled += 1
+    if not biblio.get("book_title") and payload.get("book_title"):
+        biblio["book_title"] = payload["book_title"]
+        row.provenance["filled_by"] = backend
+        filled += 1
+    if not biblio.get("series_title") and payload.get("series_title"):
+        biblio["series_title"] = payload["series_title"]
+        row.provenance["filled_by"] = backend
+        filled += 1
+    if not biblio.get("pages") and payload.get("pages"):
+        biblio["pages"] = payload["pages"]
+        row.provenance["filled_by"] = backend
+        filled += 1
+    # Crossref book title should replace a series-only venue left by OpenAlex.
+    if (
+        payload.get("book_title")
+        and payload.get("series_title")
+        and biblio.get("venue") == payload.get("series_title")
+        and biblio.get("venue") != payload.get("book_title")
+    ):
+        biblio["venue"] = payload["book_title"]
+        biblio["book_title"] = payload["book_title"]
+        row.provenance["filled_by"] = backend
+        filled += 1
     return filled
 
 
 def crossref_work(doi: str, *, email: str = "") -> dict[str, Any] | None:
     import httpx
+
+    from ..resolve import container_titles_for_type
 
     params = {"mailto": email} if email else None
     try:
@@ -282,7 +311,10 @@ def crossref_work(doi: str, *, email: str = "") -> dict[str, Any] | None:
     except (httpx.HTTPError, ValueError):
         return None
     titles = message.get("title") or []
-    venues = message.get("container-title") or []
+    work_type = str(message.get("type") or "")
+    venue, book_title, series_title = container_titles_for_type(
+        work_type, list(message.get("container-title") or [])
+    )
     issued = ((message.get("issued") or {}).get("date-parts") or [[None]])[0]
     year = issued[0] if issued else None
     authors = []
@@ -295,8 +327,12 @@ def crossref_work(doi: str, *, email: str = "") -> dict[str, Any] | None:
     return {
         "title": titles[0] if titles else "",
         "year": year,
-        "venue": venues[0] if venues else "",
+        "venue": venue or "",
         "authors": authors,
+        "type": work_type,
+        "book_title": book_title or "",
+        "series_title": series_title or "",
+        "pages": str(message.get("page") or "").strip(),
         "references": crossref_references(message),
     }
 

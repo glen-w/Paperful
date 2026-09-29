@@ -9,6 +9,7 @@ from typing import Any, Callable
 from urllib.parse import urlparse
 
 import httpx
+from bs4 import BeautifulSoup
 
 from ..pdfid import text_from_pdf
 from ..resolve import extract_doi, normalize_doi, title_similarity
@@ -16,15 +17,26 @@ from .fill import FillPaused, s2_api_key, s2_paper
 from .openalex import OpenAlexClient, short_id
 
 PdfFetcher = Callable[[str], str]
+HtmlFetcher = Callable[[str], str]
 S2Getter = Callable[[str], dict[str, Any] | None]
 
 TITLE_MIN = 0.92
 TITLE_LEAD = 0.05
-_REF_HEADING = re.compile(r"(?im)^(?:\d+\.?\s*)?references?\s*$")
+LANDING_DOI_CAP = 200
+_REF_HEADING = re.compile(
+    r"(?im)^(?:\d+\.?\s*)?(?:references?|bibliography|notes|literature\s+cited)\s*$"
+)
 _ENTRY_SPLIT = re.compile(r"(?:^|\n)\s*\[(\d+)\]\s+")
+_FOOTNOTE_SPLIT = re.compile(r"(?:^|\n)\s*(\d+)\.\s+")
 _YEAR_TITLE = re.compile(
     r"\((\d{4})\)\s*\.\s*(.+?)(?:\.\s+[A-Z]|\.\s*$|\n|$)",
     re.DOTALL,
+)
+_SECTION_HEADINGS = (
+    "notes",
+    "references",
+    "bibliography",
+    "literature cited",
 )
 
 
@@ -34,18 +46,21 @@ def recover_referenced_works(
     *,
     s2_getter: S2Getter | None = None,
     pdf_fetcher: PdfFetcher | None = None,
+    html_fetcher: HtmlFetcher | None = None,
     cache_dir: Path | None = None,
 ) -> list[dict[str, Any]]:
     """OpenAlex works this seed cites when ``referenced_works`` is empty.
 
-    Tries Semantic Scholar, then Europe PMC, then an open PDF bibliography.
-    A pause does not abort the hop. Each returned work carries ``_recovery``.
+    Tries Semantic Scholar, then Europe PMC, then publisher landing HTML,
+    then an open PDF bibliography. A pause does not abort the hop. Each
+    returned work carries ``_recovery``.
     """
     if referenced_work_ids(work):
         return []
     doi = normalize_doi(str(work.get("doi") or "")) or ""
     getter = s2_getter if s2_getter is not None else getattr(client, "s2_getter", None)
     fetcher = pdf_fetcher if pdf_fetcher is not None else getattr(client, "pdf_fetcher", None)
+    landing = html_fetcher if html_fetcher is not None else getattr(client, "html_fetcher", None)
     cache = cache_dir if cache_dir is not None else getattr(client, "s2_cache_dir", None)
 
     if getter is None and cache is not None:
@@ -84,6 +99,12 @@ def recover_referenced_works(
             client.note(f"recovered {len(works)} refs via Europe PMC · {label}")
             return works
 
+    landing_works = _works_from_landing(client, work, landing)
+    if landing_works:
+        label = doi or short_id(str(work.get("id") or "")) or "seed"
+        client.note(f"recovered {len(landing_works)} refs via landing HTML · {label}")
+        return landing_works
+
     text, pdf_path = _pdf_bibliography_text(work, fetcher)
     if not text:
         label = doi or short_id(str(work.get("id") or "")) or "seed"
@@ -109,19 +130,15 @@ def parse_bibliography_entries(text: str) -> list[dict[str, Any]]:
     body = _references_section(dehyphenate(text))
     if not body:
         return []
-    parts = _ENTRY_SPLIT.split(body)
-    # parts: preamble, n1, entry1, n2, entry2, ...
-    entries: list[dict[str, Any]] = []
-    if len(parts) >= 3:
-        for i in range(1, len(parts), 2):
-            if i + 1 >= len(parts):
-                break
-            entries.append(_parse_entry(parts[i + 1]))
-    else:
-        # Unnumbered block: try whole section as one blob, or line-based.
+    entries = _split_entries(body, _ENTRY_SPLIT)
+    if len(entries) < 2:
+        footnote = _split_entries(body, _FOOTNOTE_SPLIT)
+        if len(footnote) > len(entries):
+            entries = footnote
+    if not entries:
         chunk = body.strip()
         if chunk:
-            entries.append(_parse_entry(chunk))
+            entries = [_parse_entry(chunk)]
     return [item for item in entries if item.get("doi") or item.get("title")]
 
 
@@ -130,12 +147,153 @@ def dehyphenate(text: str) -> str:
     return re.sub(r"-\n\s*", "", text or "")
 
 
+def landing_url(work: dict[str, Any]) -> str:
+    """Best public landing URL for bibliography scraping."""
+    loc = work.get("primary_location") if isinstance(work.get("primary_location"), dict) else {}
+    for key in ("landing_page_url",):
+        url = str(loc.get(key) or "").strip()
+        if url.startswith("http"):
+            return url
+    ids = work.get("ids") if isinstance(work.get("ids"), dict) else {}
+    for key in ("doi",):
+        raw = str(ids.get(key) or work.get("doi") or "").strip()
+        doi = normalize_doi(raw) or ""
+        if doi:
+            return f"https://doi.org/{doi}"
+    doi = normalize_doi(str(work.get("doi") or "")) or ""
+    if doi:
+        return f"https://doi.org/{doi}"
+    return ""
+
+
+def parse_landing_bibliography(html: str) -> list[dict[str, Any]]:
+    """DOI-first entries from a publisher Notes/References HTML section."""
+    if not html:
+        return []
+    soup = BeautifulSoup(html, "html.parser")
+    section = _best_biblio_section(soup)
+    if section is None:
+        text = soup.get_text("\n", strip=True)
+        return parse_bibliography_entries(text)
+
+    dois: list[str] = []
+    seen: set[str] = set()
+    for anchor in section.find_all("a", href=True):
+        doi = normalize_doi(str(anchor.get("href") or "")) or extract_doi(
+            str(anchor.get("href") or "")
+        )
+        if doi:
+            doi = normalize_doi(doi) or doi.lower()
+            if doi not in seen:
+                seen.add(doi)
+                dois.append(doi)
+        if len(dois) >= LANDING_DOI_CAP:
+            break
+
+    text = section.get_text("\n", strip=True)
+    entries = parse_bibliography_entries(text) if text else []
+    for entry in entries:
+        doi = entry.get("doi") or ""
+        if doi and doi not in seen:
+            seen.add(doi)
+            dois.append(doi)
+        if len(dois) >= LANDING_DOI_CAP:
+            break
+
+    out: list[dict[str, Any]] = [{"doi": doi, "title": "", "year": None} for doi in dois]
+    # Keep title-only entries that lacked a DOI for the title-match path.
+    for entry in entries:
+        if entry.get("doi"):
+            continue
+        if entry.get("title"):
+            out.append(entry)
+    return out[:LANDING_DOI_CAP]
+
+
+def _best_biblio_section(soup: BeautifulSoup) -> Any | None:
+    """Largest DOI-rich Notes/References block, or None."""
+    candidates: list[tuple[int, int, Any]] = []
+    for node in soup.find_all(["section", "div", "aside", "ol", "ul"]):
+        heading = _section_heading_text(node)
+        if not heading:
+            continue
+        text = node.get_text(" ", strip=True)
+        doi_count = _doi_signal_count(node, text)
+        candidates.append((doi_count, len(text), node))
+    for heading in soup.find_all(re.compile(r"^h[1-6]$")):
+        label = " ".join(heading.get_text(" ", strip=True).lower().split())
+        if label not in _SECTION_HEADINGS:
+            continue
+        parts: list[str] = []
+        sibling = heading.find_next_sibling()
+        while sibling is not None:
+            name = getattr(sibling, "name", None) or ""
+            if isinstance(name, str) and name.startswith("h") and name[1:].isdigit():
+                break
+            parts.append(str(sibling))
+            sibling = sibling.find_next_sibling()
+        if not parts:
+            continue
+        wrapper = BeautifulSoup(
+            "<div>" + "".join(parts) + "</div>", "html.parser"
+        ).div
+        if wrapper is None:
+            continue
+        text = wrapper.get_text(" ", strip=True)
+        doi_count = _doi_signal_count(wrapper, text)
+        candidates.append((doi_count, len(text), wrapper))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    return candidates[0][2]
+
+
+def _doi_signal_count(node: Any, text: str) -> int:
+    href_hits = len(node.find_all("a", href=re.compile(r"doi\.org|doi:", re.I)))
+    text_hits = len(re.findall(r"10\.\d{4,9}/[^\s\"'<>]+", text or ""))
+    return href_hits + text_hits
+
+
+def _section_heading_text(node: Any) -> str:
+    for attr in ("data-title", "aria-label", "id", "class"):
+        raw = node.get(attr) if hasattr(node, "get") else None
+        if isinstance(raw, list):
+            raw = " ".join(str(item) for item in raw)
+        label = " ".join(str(raw or "").lower().split())
+        if label in _SECTION_HEADINGS or any(h in label for h in _SECTION_HEADINGS):
+            return label
+    for child in getattr(node, "find_all", lambda *a, **k: [])(
+        re.compile(r"^h[1-6]$"), recursive=False
+    ):
+        label = " ".join(child.get_text(" ", strip=True).lower().split())
+        if label in _SECTION_HEADINGS:
+            return label
+    # First short heading-like child text.
+    for child in list(getattr(node, "children", []) or [])[:3]:
+        if getattr(child, "name", None) in {"h2", "h3", "h4", "strong", "span"}:
+            label = " ".join(child.get_text(" ", strip=True).lower().split())
+            if label in _SECTION_HEADINGS:
+                return label
+    return ""
+
+
 def _references_section(text: str) -> str:
     matches = list(_REF_HEADING.finditer(text or ""))
     if not matches:
         return ""
     start = matches[-1].end()
     return (text or "")[start:].strip()
+
+
+def _split_entries(body: str, pattern: re.Pattern[str]) -> list[dict[str, Any]]:
+    parts = pattern.split(body)
+    entries: list[dict[str, Any]] = []
+    if len(parts) >= 3:
+        for i in range(1, len(parts), 2):
+            if i + 1 >= len(parts):
+                break
+            entries.append(_parse_entry(parts[i + 1]))
+    return entries
 
 
 def _parse_entry(raw: str) -> dict[str, Any]:
@@ -153,7 +311,11 @@ def _parse_entry(raw: str) -> dict[str, Any]:
             year = None
         title = match.group(2).strip().rstrip(".")
         # Drop trailing venue crumbs left in the title span.
-        title = re.split(r"\.\s+(?:Journal|Marine|Frontiers|NPJ|Pacific|UNESCO|United)\b", title, maxsplit=1)[0]
+        title = re.split(
+            r"\.\s+(?:Journal|Marine|Frontiers|NPJ|Pacific|UNESCO|United)\b",
+            title,
+            maxsplit=1,
+        )[0]
         title = title.strip().rstrip(".")
     return {"doi": doi, "title": title, "year": year, "raw": text}
 
@@ -175,10 +337,39 @@ def _works_from_s2(client: OpenAlexClient, payload: dict[str, Any] | None) -> li
     return _resolve_dois(client, dois, source="semanticscholar")
 
 
+def _works_from_landing(
+    client: OpenAlexClient,
+    work: dict[str, Any],
+    fetcher: HtmlFetcher | None,
+) -> list[dict[str, Any]]:
+    url = landing_url(work)
+    if not url:
+        return []
+    try:
+        html = fetcher(url) if fetcher is not None else _download_html(url)
+    except Exception:
+        return []
+    if not html:
+        return []
+    entries = parse_landing_bibliography(html)
+    if not entries:
+        return []
+    return _works_from_entries(client, entries, source="landing")
+
+
 def _works_from_pdf_text(client: OpenAlexClient, text: str) -> list[dict[str, Any]]:
+    return _works_from_entries(client, parse_bibliography_entries(text), source="pdf")
+
+
+def _works_from_entries(
+    client: OpenAlexClient,
+    entries: list[dict[str, Any]],
+    *,
+    source: str,
+) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for entry in parse_bibliography_entries(text):
+    for entry in entries:
         work = None
         doi = entry.get("doi") or ""
         if doi:
@@ -195,7 +386,7 @@ def _works_from_pdf_text(client: OpenAlexClient, text: str) -> list[dict[str, An
             continue
         seen.add(oa)
         tagged = dict(work)
-        tagged["_recovery"] = "pdf"
+        tagged["_recovery"] = source
         out.append(tagged)
     return out
 
@@ -323,6 +514,23 @@ def pdf_payload(doi: str, *, cache_dir: Path | None = None) -> dict[str, Any] | 
         dest.write_bytes(Path(path).read_bytes())
         payload["cached_pdf"] = str(dest)
     return payload
+
+
+def _download_html(url: str) -> str:
+    try:
+        with httpx.Client(follow_redirects=True, timeout=30.0) as client:
+            resp = client.get(
+                url,
+                headers={"User-Agent": "paperful-snowball/0.1 (mailto:paperful@example.org)"},
+            )
+            if resp.status_code >= 400:
+                return ""
+            ctype = (resp.headers.get("content-type") or "").lower()
+            if "html" not in ctype and "text/" not in ctype and ctype:
+                return ""
+            return resp.text or ""
+    except (httpx.HTTPError, OSError, ValueError):
+        return ""
 
 
 def _download_pdf_text(url: str) -> tuple[str, str]:

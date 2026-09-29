@@ -648,6 +648,9 @@ class MendeleyBackend:
             "title": "title",
             "date": "year",
             "publicationTitle": "source",
+            "bookTitle": "source",
+            "seriesTitle": "series",
+            "pages": "pages",
         }
         # Mendeley has no extra field. Preprint ids stay on the Zotero/EndNote item.
         mendeley_type = {

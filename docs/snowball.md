@@ -376,11 +376,14 @@ from the index, the rest of that pass is skipped.
 `orcid` skips the public works list and keeps the OpenAlex author filter.
 
 When OpenAlex lists no `referenced_works` for a seed, a refs hop does not treat
-that as “cites nothing”. It asks Semantic Scholar, then Europe PMC, then an open
-PDF bibliography, and resolves entries back to OpenAlex (DOI match, or a strict
-title match). The Europe PMC lookup is the same cached search as the fill pass:
-a list is fetched only when the record has one. A pause on one of those sources
-does not stop the hop. Cited-by stays OpenAlex-only.
+that as “cites nothing”. It asks Semantic Scholar, then Europe PMC, then a
+publisher landing page (Notes / References HTML), then an open PDF bibliography,
+and resolves entries back to OpenAlex (DOI match, or a strict title match). The
+Europe PMC lookup is the same cached search as the fill pass: a list is fetched
+only when the record has one. A pause on one of those sources does not stop the
+hop. Cited-by stays OpenAlex-only. Book chapters often deposit zero Crossref /
+OpenAlex references while still listing footnotes on the public landing; the
+HTML stage recovers DOI links from that page without needing a PDF.
 
 `snowball run --profile NAME` prints that profile’s one-line description
 before any request. `mode` is `search`, `hybrid`, `doi`, `orcid`, or

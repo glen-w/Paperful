@@ -32,7 +32,15 @@ from .resolve import (
 from .store import Manifest
 from .zot import Item
 
-PATCH_FIELDS = ("doi", "title", "date", "publicationTitle")
+PATCH_FIELDS = (
+    "doi",
+    "title",
+    "date",
+    "publicationTitle",
+    "bookTitle",
+    "seriesTitle",
+    "pages",
+)
 
 
 @dataclass
@@ -109,7 +117,15 @@ def propose_patch(
         source = "pdf"
 
     if work:
-        if overwrite or not item.publication_title:
+        if work.work_type == "book-chapter" or item.item_type == "bookSection":
+            book = work.book_title or work.venue
+            if book and (overwrite or not item.book_title):
+                after["bookTitle"] = book
+            if work.series_title and (overwrite or not item.series_title):
+                after["seriesTitle"] = work.series_title
+            if work.pages and (overwrite or not item.pages):
+                after["pages"] = work.pages
+        elif overwrite or not item.publication_title:
             if work.venue:
                 after["publicationTitle"] = work.venue
         candidate_date = work.date or (str(work.year) if work.year else None)
@@ -152,6 +168,9 @@ def propose_patch(
         "title": item.title,
         "date": item.date,
         "publicationTitle": item.publication_title,
+        "bookTitle": item.book_title,
+        "seriesTitle": item.series_title,
+        "pages": item.pages,
     }
     changed = {k: v for k, v in after.items() if before.get(k) != v}
     if not changed:

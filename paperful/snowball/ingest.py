@@ -101,9 +101,27 @@ def create_new(
             "date": str(year) if year else "",
             "doi": row.ids.get("doi") or "",
             "url": biblio.get("oa_url") or "",
-            "publication_title": biblio.get("venue") or "",
+            "publication_title": "",
             "tags": [{"tag": prefix}, {"tag": f"{prefix}:{row.provenance.get('backend') or 'openalex'}"}],
         }
+        if record["item_type"] == "bookSection":
+            book = (
+                str(biblio.get("book_title") or "").strip()
+                or str(biblio.get("venue") or "").strip()
+            )
+            series = str(biblio.get("series_title") or "").strip()
+            pages = str(biblio.get("pages") or "").strip()
+            if book:
+                record["book_title"] = book
+            if series:
+                record["series_title"] = series
+            if pages:
+                record["pages"] = pages
+            # Fallback: series alone is better than an empty bookTitle.
+            if not book and series:
+                record["book_title"] = series
+        else:
+            record["publication_title"] = biblio.get("venue") or ""
         payload = parent_payload(record, [collection_key])
         try:
             key = backend.create_parent(payload)

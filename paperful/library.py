@@ -359,6 +359,9 @@ class ZoteroBackend:
             "title": "title",
             "date": "date",
             "publicationTitle": "publicationTitle",
+            "bookTitle": "bookTitle",
+            "seriesTitle": "seriesTitle",
+            "pages": "pages",
         }
         raw = self.zl.zot.item(item_key)
         data = raw["data"]
