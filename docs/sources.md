@@ -78,8 +78,9 @@ uv run paperful gaps -C Inbox/Fitzpatrick --list-missing --handoff tabs
 uv run paperful gaps -C Inbox/Fitzpatrick --list-missing --handoff watch
 uv run paperful gaps -C Inbox/Fitzpatrick --list-missing --handoff walk
 uv run paperful attach --item L7ISVTKE --file ~/Downloads/paper.pdf
-uv run paperful inbox watch -C Inbox/Fitzpatrick   # long-running sidecar
-uv run paperful inbox drain -C Inbox/Fitzpatrick    # one-shot
+uv run paperful inbox watch                    # long-running sidecar (whole library)
+uv run paperful inbox drain                    # one-shot
+uv run paperful inbox watch -C Inbox/Fitzpatrick  # optional narrow
 ```
 
 `--handoff list` (default) only prints/exports. `tabs` opens each
@@ -95,7 +96,9 @@ one-pagers (letters) attach because you already chose the file. Automated
 [research-ops](research-ops.md#wrong-work-pdfs).
 
 Set `[inbox].dir` (for example `~/Documents/paperful_inbox`) and point the
-browser download folder there (or Save As into it). Unmatched PDFs move to
+browser download folder there (or Save As into it). `inbox watch` / `drain`
+default to the **whole library** so one drop folder can serve every topic;
+pass `-C` only to narrow the DOI index. Unmatched PDFs move to
 `<inbox>/unmatched/`. This folder is **not** snowball’s
 `state/snowball/watches/*/inbox.jsonl`. When `[inbox].watch_after_handoff` is
 true (default) and `dir` is set, `--handoff tabs` also enters the watch loop

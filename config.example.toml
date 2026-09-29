@@ -171,6 +171,8 @@ mirror_failures_before_skip = 3
 # PDF drop folder for --handoff watch and `paperful inbox watch` / `drain`.
 # Not snowball's state/snowball/watches/*/inbox.jsonl. Point the browser
 # download directory here (or Save As into it). Empty dir = feature off.
+# Bare `inbox watch` / `drain` match PDF DOIs across the whole library;
+# pass -C only to narrow. Handoff watch stays collection-scoped (+ FIFO).
 # [inbox]
 # dir = "~/Documents/paperful_inbox"
 # watch_after_handoff = true       # after --handoff tabs|watch, keep polling

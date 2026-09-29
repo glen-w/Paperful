@@ -152,6 +152,17 @@ def test_run_requires_scope(cfg_file):
     assert res.exit_code == 1 and "--collection" in res.stdout
 
 
+def test_inbox_library_when_unscoped_defaults_to_library():
+    """Shared drop folder: bare inbox watch/drain match the whole library."""
+    fn = cli._inbox_library_when_unscoped
+    assert fn([], None, None, None) is True
+    assert fn(["Fish"], None, None, None) is None
+    assert fn([], False, None, None) is False
+    assert fn([], True, None, None) is True
+    assert fn([], None, "fish", None) is None
+    assert fn([], None, None, object()) is None
+
+
 def test_collections_table(cfg_file, stub_zotero):
     res = runner.invoke(cli.app, ["collections", "-c", str(cfg_file)])
     assert res.exit_code == 0

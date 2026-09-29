@@ -79,8 +79,9 @@ uv run paperful gaps -C BBNJ --list-missing --to missing.tsv
 uv run paperful gaps -C BBNJ --list-missing --handoff tabs
 uv run paperful gaps -C BBNJ --list-missing --handoff watch
 uv run paperful gaps -C BBNJ --list-missing --handoff walk
-uv run paperful inbox watch -C BBNJ          # poll [inbox].dir (sidecar)
-uv run paperful inbox drain -C BBNJ           # one-shot ingest
+uv run paperful inbox watch                   # poll [inbox].dir (whole library)
+uv run paperful inbox drain                   # one-shot ingest
+uv run paperful inbox watch -C BBNJ           # optional: narrow DOI index
 
 # restrict to Zotero item types (repeatable / comma-separated; friendly names ok)
 uv run paperful run -C BBNJ -T journalArticle --year-from 2023 --year-to 2026
@@ -146,7 +147,7 @@ uv run paperful pack show
 | `attachments` | Compare PDF attachments to `out/`. Report only unless you pass `--fix-broken`, `--merge-files`, `--rename`, or `--link` together with `--apply`. Repairs use a matching file already under `out/`. `--link` is Zotero personal libraries only. Mendeley can upload and delete cloud files; it cannot link. EndNote is report-only (missing paths, duplicate PDFs, filename drift) and does not edit the library. Same MD5 on two parents is reported and left to `dedupe`. Not in `paperful all`. |
 | `versions` | Preprint and published paper as one work. Dry-run writes `state/version-packs/` (`paperful.version_pack.v1`). `--apply` puts the published citation and PDF on the older parent, keeps the preprint id and PDF, and trashes a sibling only after that PDF is attached. Title-only pairs are listed and not applied. |
 | `gaps` | Counts: no stored PDF, linked PDF URL only, missing DOI. `--list-missing` prints key/title/DOI/URL/hint (`openable_url` / `doi_only` / `hard_miss`); `--to` writes `.tsv` or `.md`. `--handoff list|tabs|walk|watch` opens your browser, walks Downloads into `attach --item --file`, or (watch) polls `[inbox].dir`. Year/type scope flags apply. Writes `state/runs/<stamp>-gaps.json`. |
-| `inbox` | PDF drop-folder sidecar (`watch` / `drain`). Needs `[inbox].dir`. Matches by DOI from the PDF against items in scope that still lack a PDF; never creates parents. Writes `state/runs/<stamp>-inbox.json`. Not snowball’s `inbox.jsonl`. |
+| `inbox` | PDF drop-folder sidecar (`watch` / `drain`). Needs `[inbox].dir`. Matches by DOI from the PDF against missing-PDF items; defaults to the **whole library** so one drop folder serves every topic (`-C` / year / type optional narrow). Never creates parents; no FIFO (handoff `watch` still uses FIFO). Writes `state/runs/<stamp>-inbox.json`. Not snowball’s `inbox.jsonl`. |
 | `all` | `gaps` → `run --try-all --retry-failed --upgrade-linked` → `lint` → `fix-metadata --apply` → `summarize --apply`. Stops on the first failure. `--dry-run` skips `summarize` and does not apply metadata. `--browser-agent` / `--no-browser-agent` pass through to the `run` step. `--profile` / `-f` load a saved run config. Opens a pack when none is open. See [Workflows](workflows.md). |
 | `profile` | `list` / `show` / `save` — named run configs beside `config.toml` (`profiles/<name>.toml` or `[profiles.*]`). `show` prints the merge `all` would use. `save` does not edit `config.toml`. |
 | `snowball` | Grow a library from a keyword, DOI, ORCID, or collection (`search`, `hybrid`, `doi`, `orcid`, `collection`, `apply`, `run --profile`, `profile save`, `watch save` / `run` / `show`). `hybrid` is keyword hits then one hop. `--direction` is `refs`, `cites`, `both`, `keywords`, `similar`, or a combination such as `refs+similar`. `similar` is one ranked hop (shared references, then Semantic Scholar recommendations). `--direction keywords` expands OpenAlex keywords (`--keyword-limit` 1–5, `--keyword-hop-limit` a positive integer; `all` is refused). `--cites-query` limits references and cited-by to an OpenAlex search (title, abstract, or full text). Seeds with no keywords are reported and skipped on that side. Dry-run unless a writing gate is set. `approve-each` is for short lists. `fetch_pdfs` is `off`, `fast`, or `full` on the new keys only. A saved queue with no deferred OpenAlex work resumes into create and PDF fetch. `watch` re-runs a profile, remembers seen works, and proposes new arrivals on disk (never creates items; Paperful does not schedule it). `run` and `all` refuse `kind = snowball` profiles. [How a hop is cut](snowball.md#how-a-hop-is-cut). |
@@ -174,6 +175,10 @@ collections are written once and hard-linked into the other folders.
 After collection / `--library` selection, these optional filters shrink the
 item list further (applied before `--limit`). They appear in the Scope line
 (e.g. `BBNJ, years 2023–2026, types journalArticle`).
+
+Most verbs need `-C` or `--library` (or a profile that sets one). `inbox
+watch` / `drain` are the exception: with no scope they default to the whole
+library so a shared drop folder is not tied to one collection.
 
 `--profile NAME` loads that slice from a run config so you do not repeat
 `-C` / years / `-T` on every verb. `-f` / `--run-config FILE` overlays it.

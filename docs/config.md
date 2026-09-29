@@ -187,8 +187,8 @@ walkthrough, model advice, Docker networking, and troubleshooting: [LLM](llm.md)
 | `[browser_agent].during_run` | `true` | When `[llm].enabled` and the extra is installed, `run` appends `browser_agent` after Scholar / EZProxy / htmlpdf. Override per run with `--browser-agent` / `--no-browser-agent` |
 | `[gaps].handoff` | `list` | Default for `gaps --handoff` when the flag is omitted: `list`, `tabs`, `walk`, or `watch`. `run` only handoffs when you pass `--handoff` |
 | `[gaps].downloads_dir` | `~/Downloads` | Newest `*.pdf` pickup for `--handoff walk` (empty → home Downloads) |
-| `[inbox].dir` | `""` | PDF drop folder for `--handoff watch` / `paperful inbox` (empty = off). Not snowball’s watch `inbox.jsonl` |
-| `[inbox].watch_after_handoff` | `true` | After `--handoff tabs` (or `watch`), keep polling `[inbox].dir` when `dir` is set |
+| `[inbox].dir` | `""` | PDF drop folder for `--handoff watch` / `paperful inbox` (empty = off). Not snowball’s watch `inbox.jsonl`. `inbox watch` / `drain` match by PDF DOI across the whole library by default; pass `-C` to narrow |
+| `[inbox].watch_after_handoff` | `true` | After `--handoff tabs` (or `watch`), keep polling `[inbox].dir` when `dir` is set (handoff session stays collection-scoped + FIFO) |
 | `[inbox].poll_seconds` | `2.0` | Poll interval while watching |
 | `[inbox].settle_seconds` | `1.5` | Require stable file size before ingest |
 | `[inbox].idle_seconds` | `0` | Stop after this many idle seconds (`0` = until Ctrl+C); `--idle` on `inbox watch` overrides |

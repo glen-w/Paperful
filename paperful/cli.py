@@ -383,6 +383,18 @@ def _refuse_missing_scope() -> None:
     raise typer.Exit(1)
 
 
+def _inbox_library_when_unscoped(
+    collection: list[str],
+    library: bool | None,
+    profile: str | None,
+    run_config: Path | None,
+) -> bool | None:
+    """Shared drop folder: default to whole-library DOI match when scope is omitted."""
+    if _scope_unset(collection, library, profile, run_config):
+        return True
+    return library
+
+
 def _take_scope(
     bound: ResolvedRunConfig,
 ) -> tuple[list[str], bool, int | None, int | None, list[str]]:
@@ -2842,7 +2854,10 @@ def attach(
 @inbox_app.command("watch")
 def inbox_watch(
     collection: list[str] = typer.Option(
-        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+        [],
+        "--collection",
+        "-C",
+        help="Optional narrow; omit (or pass --library) to match any missing-PDF item.",
     ),
     library: bool | None = LibraryOpt,
     year_from: int | None = YearFromOpt,
@@ -2857,7 +2872,11 @@ def inbox_watch(
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
-    """Long-running sidecar: poll inbox.dir and attach by PDF DOI (no FIFO)."""
+    """Long-running sidecar: poll inbox.dir and attach by PDF DOI (no FIFO).
+
+    Defaults to the whole library so one drop folder can serve every topic.
+    Pass ``-C`` only when you intentionally want a narrower DOI index.
+    """
     from .inbox import (
         ensure_inbox_dirs,
         events_as_report_items,
@@ -2865,8 +2884,7 @@ def inbox_watch(
         summary_from_stats,
     )
 
-    if _scope_unset(collection, library, profile, run_config):
-        _refuse_missing_scope()
+    library = _inbox_library_when_unscoped(collection, library, profile, run_config)
     cfg = _cfg(config)
     bound = _bind_run(
         cfg,
@@ -2937,7 +2955,10 @@ def inbox_watch(
 @inbox_app.command("drain")
 def inbox_drain(
     collection: list[str] = typer.Option(
-        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+        [],
+        "--collection",
+        "-C",
+        help="Optional narrow; omit (or pass --library) to match any missing-PDF item.",
     ),
     library: bool | None = LibraryOpt,
     year_from: int | None = YearFromOpt,
@@ -2947,7 +2968,11 @@ def inbox_drain(
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
-    """One-shot: ingest current PDFs in inbox.dir (DOI match only)."""
+    """One-shot: ingest current PDFs in inbox.dir (DOI match only).
+
+    Defaults to the whole library so one drop folder can serve every topic.
+    Pass ``-C`` only when you intentionally want a narrower DOI index.
+    """
     from .inbox import (
         ensure_inbox_dirs,
         events_as_report_items,
@@ -2955,8 +2980,7 @@ def inbox_drain(
         summary_from_stats,
     )
 
-    if _scope_unset(collection, library, profile, run_config):
-        _refuse_missing_scope()
+    library = _inbox_library_when_unscoped(collection, library, profile, run_config)
     cfg = _cfg(config)
     bound = _bind_run(
         cfg,

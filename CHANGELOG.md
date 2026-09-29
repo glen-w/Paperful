@@ -49,8 +49,10 @@ Learned files stay in `state/` and `packs/` (gitignored, including Docker
 Configurable PDF drop folder (`[inbox].dir`) for manual downloads after soft
 blocks. `--handoff watch` opens tabs then polls the folder; `paperful inbox
 watch` / `drain` are a long-running sidecar and one-shot drain. Files match by
-PDF DOI (FIFO of openable misses during a handoff session). Unmatched PDFs move
-to `unmatched/`. Reports: `state/runs/<stamp>-inbox.json`.
+PDF DOI (FIFO of openable misses during a handoff session). `inbox watch` /
+`drain` default to the whole library so one drop folder serves every topic;
+`-C` is an optional narrow. Unmatched PDFs move to `unmatched/`. Reports:
+`state/runs/<stamp>-inbox.json`.
 
 `run` and `all` accept `--browser-agent` / `--no-browser-agent` to override
 `[browser_agent].during_run` for one invocation (default stays on when
