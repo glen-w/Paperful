@@ -166,6 +166,21 @@ def title_looks_like_filename(title: str) -> bool:
     return False
 
 
+def normalize_saved_title(title: str) -> str:
+    """Strip HTML and Title-Case ALL CAPS titles before writing to the library.
+
+    Filename-shaped titles are left alone (same rule as ``fix-metadata``).
+    Idempotent on already-cased titles.
+    """
+    raw = (title or "").strip()
+    if not raw:
+        return raw
+    cleaned = strip_title_markup(raw) or raw
+    if title_is_all_caps(cleaned) and not title_looks_like_filename(cleaned):
+        return title_to_title_case(cleaned)
+    return cleaned
+
+
 def title_has_markup(title: str) -> bool:
     if not title:
         return False

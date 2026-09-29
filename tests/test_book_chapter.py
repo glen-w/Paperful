@@ -308,6 +308,55 @@ def test_create_new_journal_keeps_publication_title():
     assert "bookTitle" not in created[0]
 
 
+def test_create_new_recases_all_caps_title():
+    created: list[dict] = []
+
+    class Backend:
+        supports_write = True
+
+        def ensure_collection_path(self, path: str) -> str:
+            return "COL1"
+
+        def create_parent(self, payload: dict) -> str:
+            created.append(payload)
+            return "ITEM1"
+
+        def create_or_update_note(self, *a, **k) -> None:
+            return None
+
+    from paperful.snowball.candidate import Candidate
+
+    row = Candidate(
+        run_id="r1",
+        seed={"type": "doi", "value": "10.1000/psm"},
+        hop=0,
+        direction="refs",
+        ids={"doi": "10.1000/psm", "openalex": "W1"},
+        biblio={
+            "title": (
+                "SOME PRACTICAL GUIDANCE FOR THE IMPLEMENTATION OF "
+                "PROPENSITY SCORE MATCHING"
+            ),
+            "year": 2008,
+            "authors": ["Marco Caliendo"],
+            "venue": "Journal of Economic Surveys",
+            "type": "journal-article",
+        },
+        why="seed",
+        status="new",
+        provenance={"backend": "openalex"},
+        gate="open",
+    )
+    items, counts = create_new(Backend(), [row], "Inbox", note_provenance=False)
+    assert counts["created"] == 1
+    expected = (
+        "Some Practical Guidance for the Implementation of "
+        "Propensity Score Matching"
+    )
+    assert created[0]["title"] == expected
+    assert items[0].title == expected
+
+
 def test_create_new_book_section_sets_book_title(monkeypatch):
     created: list[dict] = []
 

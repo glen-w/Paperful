@@ -103,25 +103,12 @@ def record_in_scope(
 
 
 def parent_payload(record: dict[str, Any], collection_keys: list[str]) -> dict[str, Any]:
-    data: dict[str, Any] = {
-        "itemType": record.get("item_type") or "document",
-        "title": record.get("title") or "",
-        "creators": record.get("creators") or [],
-        "abstractNote": record.get("abstract") or "",
-        "date": record.get("date") or "",
-        "DOI": record.get("doi") or "",
-        "url": record.get("url") or "",
-        "extra": record.get("extra") or "",
-        "publicationTitle": record.get("publication_title") or "",
-        "tags": list(record.get("tags") or []),
-        "collections": collection_keys,
-        "relations": record.get("relations") or {},
-    }
-    fields = record.get("fields")
-    if isinstance(fields, dict):
-        for key, value in fields.items():
-            if key not in data:
-                data[key] = value
+    from .interop.load import parent_payload as _parent_payload
+
+    data = _parent_payload(record, collection_keys)
+    relations = record.get("relations")
+    if isinstance(relations, dict):
+        data["relations"] = relations
     return data
 
 

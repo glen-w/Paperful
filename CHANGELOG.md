@@ -6,6 +6,11 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+Creating library parents (snowball ingest, restore, import) Title-Cases ALL
+CAPS scholarly titles before write, using the same rules as `fix-metadata`.
+DOI work titles adopted by `fix-metadata` get the same pass so Crossref/
+OpenAlex ALL CAPS does not land in Zotero.
+
 Mid-run EZProxy re-login pauses the Rich fetch progress bar so the Y/n prompt
 (and headed-login Enter confirm) stay visible instead of being overwritten.
 

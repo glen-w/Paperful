@@ -13,7 +13,7 @@ from ..pipeline import Pipeline, RunStats
 from ..remarks import linked_sentence, say
 from ..routing import with_recover_lane
 from ..store import Manifest
-from ..lint import usable_work_title
+from ..lint import normalize_saved_title, usable_work_title
 from ..zot import Item
 from .candidate import Candidate
 
@@ -85,7 +85,7 @@ def create_new(
         biblio = row.biblio
         year = biblio.get("year")
         authors = list(biblio.get("authors") or [])
-        title = str(biblio.get("title") or "")
+        title = normalize_saved_title(str(biblio.get("title") or ""))
         if not usable_work_title(title):
             failed += 1
             row.status = "error"

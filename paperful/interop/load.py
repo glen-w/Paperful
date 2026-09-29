@@ -97,9 +97,11 @@ def record_from_item_json(data: dict[str, Any], item_dir: Path | None = None) ->
 
 def parent_payload(record: dict[str, Any], collection_keys: list[str]) -> dict[str, Any]:
     """Zotero-shaped create payload (restore / import)."""
+    from ..lint import normalize_saved_title
+
     data: dict[str, Any] = {
         "itemType": record.get("item_type") or "document",
-        "title": record.get("title") or "",
+        "title": normalize_saved_title(str(record.get("title") or "")),
         "creators": record.get("creators") or [],
         "abstractNote": record.get("abstract") or "",
         "date": record.get("date") or "",

@@ -72,6 +72,27 @@ def test_title_to_title_case():
     )
 
 
+def test_normalize_saved_title():
+    from paperful.lint import normalize_saved_title
+
+    assert (
+        normalize_saved_title(
+            "SOME PRACTICAL GUIDANCE FOR THE IMPLEMENTATION OF PROPENSITY SCORE MATCHING"
+        )
+        == "Some Practical Guidance for the Implementation of Propensity Score Matching"
+    )
+    assert (
+        normalize_saved_title("<i>SOME PRACTICAL GUIDANCE FOR MATCHING</i>")
+        == "Some Practical Guidance for Matching"
+    )
+    # Already mixed case: leave alone (including intentional small-word capitals).
+    assert (
+        normalize_saved_title("Some Practical Guidance for Matching")
+        == "Some Practical Guidance for Matching"
+    )
+    assert normalize_saved_title("paper.pdf") == "paper.pdf"
+
+
 def test_lint_swappable_doi(cfg):
     title = "A sufficiently long test title about marine governance"
 

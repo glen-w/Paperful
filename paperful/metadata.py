@@ -15,6 +15,7 @@ from .library import LibraryBackend
 from .lint import (
     Finding,
     lint_item,
+    normalize_saved_title,
     title_is_all_caps,
     title_looks_like_filename,
     title_to_title_case,
@@ -132,13 +133,13 @@ def propose_patch(
         if candidate_date and _should_set_date(item.date, candidate_date, overwrite):
             after["date"] = candidate_date
         if work.title and overwrite:
-            after["title"] = work.title
+            after["title"] = normalize_saved_title(work.title)
         elif (
             work.title
             and usable_work_title(work.title)
             and not usable_work_title(item.title)
         ):
-            after["title"] = work.title
+            after["title"] = normalize_saved_title(work.title)
         if source != "pdf":
             source = work.source or source
 
