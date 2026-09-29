@@ -8,8 +8,9 @@ adapter.** Mendeley and EndNote are in the tree and seeking testers. See
 [architecture.md](architecture.md) and [why.md](why.md).
 
 Surfaces like a Zotero plugin, Firefox extension, or web GUI are **not** the
-product direction. Optional thin bridges (`paperful session login`) capture a local browser
-profile; they do not rewrite the fetcher.
+1.0 product direction. Optional thin bridges (`paperful session login`, and a
+parked Firefox extension below) capture a local browser profile or shell CLI
+verbs; they do not rewrite the fetcher.
 
 **1.0** is that loop, the trust checklist below, and a locked item record
 (`paperful.item.v1` plus `snapshot` / `restore`), proven on **Zotero**. Mendeley
@@ -71,7 +72,8 @@ Zotero has. Do not document either adapter as supported until testers say so.
   for the rest of the run; transport timeouts use a short connect budget and do
   not permanently block a publisher on a single blip. Manual
   handoff: `run` / `gaps --handoff list|tabs|walk|watch` and `paperful inbox
-  watch` / `drain` against `[inbox].dir` (PDF DOI match; unmatched →
+  watch` / `drain` against `[inbox].dir` (PDF DOI match; `inbox` defaults to
+  whole-library scope so one drop folder serves every topic; unmatched →
   `unmatched/`). Distinct from snowball watch `inbox.jsonl`. CLI
   `--browser-agent` / `--no-browser-agent` overrides `[browser_agent].during_run`
   for one `run` / `all`.
@@ -135,9 +137,39 @@ Py 3.11+), `fix-metadata` title proposals (`[fix_metadata].llm_title`), `lint`
 default, a collection note). Image PDFs need `paperful ocr --apply` first.
 See [architecture § LLM layer](architecture.md#llm-layer-optional-local-first).
 URL recipes from vault/agent wins are already `playbooks propose` / `promote`
-← `state/fetch-wins.jsonl` (below). Still later: Browser Use Cloud / BU2,
-batch `recover --from-last-run`, mining richer playbooks from agent *step*
-traces (beyond host/path wins), venue/date cleanup.
+← `state/fetch-wins.jsonl` (below). Still later: **second-model fallback** on
+`browser_agent` / `recover` (one retry with
+`[browser_agent].fallback_model` — prefer a larger local tag or LiteLLM when
+`allow_remote` — before `not_found` / `captcha`; not a cascade); Browser Use
+Cloud / BU2; batch `recover --from-last-run`; mining richer playbooks from
+agent *step* traces (beyond host/path wins); venue/date cleanup; CAPTCHA
+posture below.
+
+### CAPTCHA / soft bot walls (open; do not ship a bypass product)
+
+Hard CAPTCHAs end as `captcha` today; vault landings that look like
+`login` / `captcha` / `no download control` already silence that host for the
+rest of the run. Soft bot walls may improve with Browser Use Cloud stealth
+(not wired). **No** Cloudflare-bypass product feature; Sci-Hub ALTCHA stays
+on the opt-in Sci-Hub lane only.
+
+Open questions before wiring anything else:
+
+1. **Third-party solve APIs** (2Captcha, CapSolver, …) — paid, keys leave the
+   machine, publisher ToS / campus AUP risk. Only consider behind explicit
+   opt-in + disclaimer, never as a default, never for pirate hosts. Prefer
+   human-in-the-loop over a solve service.
+2. **Human-once, quiet-for-run?** If vault / browser-use keeps the **same
+   persistent Chromium profile** (cookie jar, User-Agent, outbound IP), a
+   human challenge solve that issues site clearance (e.g. Cloudflare
+   `cf_clearance`) can quiet *subsequent* challenges on that zone for the
+   cookie lifetime (often tens of minutes), as long as later traffic stays in
+   that profile. Opening a tab in a *different* browser (system Firefox vs
+   vault Chromium) does **not** transfer clearance. Spike worth trying: on
+   `captcha`, pause like EZProxy re-login — open headed vault on that URL,
+   wait for the operator to pass the challenge, resume the same host for the
+   rest of the run — instead of (or before) permanent host silence. Measure
+   how often clearance actually sticks across publishers.
 
 **MVP:** when a title looks wonky (ALL CAPS, truncated, HTML junk, filename-as-title,
 mojibake), propose a cleaned title using **abstract and/or first-page PDF text**
@@ -266,7 +298,10 @@ Phases, in order. Each can stop without the next.
    Semantic Scholar recommendations; combinable e.g. `refs+similar`), plus
    depth above 1 under the same caps. A finished queue with no `deferred.json`
    resumes into create / PDF fetch without searching OpenAlex again.
-4. **Config. Shipped:** dedupe scope, type and venue filters, profile save.
+4. **Config. Shipped:** `dedupe_scope`, type and venue filters, profile save
+   (`snowball profile save --dedupe-scope` persists it; `[snowball]` and
+   `profiles/*.toml` override at run time — not a separate CLI flag on
+   `search` / `doi` / `run` yet).
 5. **Last pass. Shipped:** `hybrid`, `approve-each`, overlap ranking,
    Crossref / Semantic Scholar fill, and `[llm]` suggestions on the queue.
 6. **Watch. Shipped:** `snowball watch save` / `run` / `show` re-runs a saved
@@ -274,6 +309,45 @@ Phases, in order. Each can stop without the next.
    arrivals into `state/snowball/watches/<name>/inbox.jsonl` plus a normal
    run queue. Always dry-run / no PDFs. Paperful does not schedule it; your
    own launchd or cron may call `watch run`. See [snowball.md](snowball.md#watch).
+
+### Dedupe — skip before create, not merge after
+
+Snowball does not run
+`paperful dedupe` at the end of a crawl. The goal is to avoid writing duplicate
+parents in the first place; stragglers are cleaned with the same hygiene loop as
+any other ingest (`dedupe --dry-run` → read `state/dedupe-packs/` →
+`dedupe --apply` on the target collection). There is no `--dedupe-after` (or
+snowball step inside `paperful all`) today.
+
+What ships today, in order:
+
+1. **Queue** — one row per work identity inside a run (`crawl` merges duplicate
+   hops and records every seed that pointed at the same work).
+2. **Library fingerprint** — before create, each `status = new` row is checked
+   against the live library using normalized DOI, then title+year (same
+   normalisation family as `paperful dedupe`). Matching rows become `exists`
+   (or `version` when the CLI run can link preprint ↔ published via
+   `paperful versions`; that marks the row, it does not merge parents).
+   `create_new` skips `exists` / `version` and reports `skipped_exists`.
+3. **`dedupe_scope`** — `library` (default): whole library; `collection`: only
+   parents already under the target `-C` path; `none`: skip the library read
+   (logged loudly; `auto` / `approve-each` still refuse create if the library
+   cannot be opened). `snowball apply` always re-checks against the **full**
+   library before create, regardless of profile scope — a second apply also
+   skips DOIs already created from that queue.
+
+Why duplicate parents can still appear: `collection` scope misses the same DOI
+elsewhere; `none` or a stale queue edited after the library changed; title+year
+gaps (missing year, title drift) that `dedupe` would classify or hold; two
+parallel runs; preprint and version-of-record left as two parents (`version`
+is not `dedupe --apply`). Same PDF on two parents stays
+[`attachments`](commands.md) / `dedupe`, not snowball.
+
+**Parked (snowball lane):** optional post-create sweep flag or profile knob that
+runs `dedupe` classify (and optionally `--apply`) on the target collection after
+`auto` / `apply`; `--dedupe-scope` on every snowball subcommand; align
+`snowball apply` lookup scope with the saved `dedupe_scope`. Richer
+manifestation-aware identity stays under **Identity / resolver graph** below.
 
 Still outside this lane: every paper by every cited author; a snowball step
 inside `paperful all`; a built-in scheduler; a review UI; systematic-review screening; a
@@ -327,9 +401,12 @@ prerequisites for the fetch / lint / attach loop.
    when Scholar is blocked or the PDF lives only on a personal page.
 3. **Identity / resolver graph** — work ↔ version ↔ preprint; scored patches with
    undo; citation ingest; manifestation-aware dedupe. Collection DOI / title+year
-   trash is already `paperful dedupe`. Preprint ↔ version of record is
+   trash is already `paperful dedupe`. Snowball only **skips** rows that match
+   those fingerprints before create ([Snowball — Dedupe](#dedupe--skip-before-create-not-merge-after));
+   it does not trash or merge existing parents. Preprint ↔ version of record is
    `paperful versions`: the older parent keeps the published citation and PDF,
-   and the preprint stays as a version. Still later:
+   and the preprint stays as a version (snowball may tag a candidate `version`
+   without running that merge). Still later:
    `paperful ingest-dois --from-file dois.txt -C BBNJ --dry-run` then `--apply`
    (create items by DOI, tag `crossref-backfill`, hand off to `run` for PDFs).
    That backfill stays out of any scheduled bot inside Paperful.
@@ -364,13 +441,15 @@ Larger product bets. Park until the ledger and core loop justify them.
    lane: last serial source on `run` after Scholar / EZProxy / htmlpdf fail
    (`[llm].enabled` + extra), and `paperful recover --item` for named keys.
    Never in `DEFAULT_SOURCES`, not “AI fetch everything.” Soft bot walls may improve with
-   their Cloud stealth (not wired); hard CAPTCHAs stay human. Vault fetch follows
+   their Cloud stealth (not wired); hard CAPTCHAs stay human (see CAPTCHA
+   open questions under Optional LLM). Vault fetch follows
    meta PDF links and SSO hops without an LLM. Successful vault and agent fetches
    log to `state/fetch-wins.jsonl`. `paperful playbooks propose` / `promote`
    install user-owned recipes in `grey_playbooks_dir/learned.toml` (default
    `gated`; `auto` is opt-in and can promote flukes). Learned packs are not
-   shipped in the wheel. Still later: playbook health / expiry, and win
-   analytics rolled into the run report (which hosts / win kinds paid off).
+   shipped in the wheel. Still later: second-model fallback on agent failure
+   (LLM section); playbook health / expiry; win analytics rolled into the run
+   report (which hosts / win kinds paid off).
 8. **Collaboration without SaaS** — shared `state/` over syncthing/git; attach
    locks; optional headless fetch node. Aligns with the house
    [quiet mirror](quiet-mirror.md) stance: Syncthing (or similar) is transport;
@@ -389,6 +468,54 @@ Larger product bets. Park until the ledger and core loop justify them.
 - Shipping Sci-Hub or proxy abuse as defaults (opt-in + presets stay as today)
 - Jeffersonian transcription / qualitative coding apps
 
+## Optional thin bridge — Firefox extension (parked)
+
+**Status:** design-only; **not** a 1.0 deliverable and **not** a replacement
+for the Zotero Connector. Same Control posture as the CLI (dry-run default,
+explicit Apply, fail closed if Paperful is unreachable). Feasibility +
+contracts researched 2026-09-29 (local notes; substance locked below).
+
+Three explicit toolbar actions (no single “grab everything”):
+
+| Action | Maps to | Priority |
+| --- | --- | --- |
+| **Snowball this DOI** — detect DOI on the current page → `paperful snowball doi` | CLI already writes `paperful.snowball.candidate.v1`; dry-run → optional Apply + `-C` | **P0** |
+| **Ingest to quiet mirror** — current page → `out/` (`paperful.item.v1`) → Zotero upsert via LibraryBackend | Needs a Paperful-owned create-parent ingest verb; today’s `inbox` attaches only | **P1** |
+| **PDFs from open tabs** — enumerate tabs, confirm checklist, download with tab cookies into `[inbox].dir`, then `inbox drain` | Campus entitlement strength; refuse pirate hosts; park unattended mass download | **P1** spike |
+
+**v0 transport (room lock):** Extension → **`nativeMessaging`** host → shells
+`paperful` CLI (dry-run JSON → confirm → write). No new daemon and no invented
+localhost Capability API for these three actions. Thin `paperful serve` /
+Capability API later only if doctor/status needs a sticky probe (GUI 2.0 still
+targets HTTP — [gui.md](gui.md)). **Wrong:** extension → Zotero `:23119`
+directly (skips quiet mirror + provenance; do not replace Connector for
+cite-save).
+
+**Contracts (names):** NM message shapes `snowball.doi`, `ingest`,
+`tabs.pdfs.plan` / confirm with the same dry-run + miss-enum honesty as the
+CLI. DOI detect: Unpaywall-style meta list first (`citation_doi`,
+`dc.identifier.doi`, …), then doi.org links, then bounded regex — not a full
+Zotero translator VM. Provenance: `paperful web:extension` (or `campus:…`
+when the URL matches a configured proxy host). Hard-refuse Sci-Hub / LibGen /
+known pirate hosts on the tab-PDF job.
+
+**P0 spike:** content-script DOI → native host → `paperful snowball doi …`
+`--dry-run` → popup shows `run_id` + new/exists counts.
+
+**Blockers / gaps:** `[snowball].enabled` opt-in; ingest create-parent verb
+missing; mass-download ToS / campus AUP (confirm count, concurrency cap);
+AMO friction (sideload fine for personal spike); do not collide with Zotero
+23119.
+
+**Inspo (steal patterns, not product identity):**
+[zotero-connectors](https://github.com/zotero/zotero-connectors) (inject /
+background / localhost maturity),
+[unpaywall-extension](https://github.com/ourresearch/unpaywall-extension)
+(DOI meta + legal OA posture),
+[JabRef browser extension](https://docs.jabref.org/collect/jabref-browser-extension)
+(local-manager pairing; JabRef’s HTTP direction informs later Capability API),
+DownThemAll / Pull Tabs for paced tab-download UX only.
+
 ## Related docs
 
 - [architecture.md](architecture.md) — disk-first adapters and data flow
@@ -399,8 +526,10 @@ Larger product bets. Park until the ledger and core loop justify them.
 - [snowball.md](snowball.md) — library-building from a keyword, DOI, ORCID, or collection
 - Site career / domain timeline plan (consumer of durable tags):
   `/Users/89298/Documents/website/glen-w.github.io/docs/dev/career-timeline-plan.md`
+- Firefox extension (parked thin bridge) — section above; not a separate doc yet
 
 ## GUI
 
 Parked **2.0 vision** only — not a 1.0 deliverable. Web-native workbench
-sketch (open / Docker / SaaS): [gui.md](gui.md).
+sketch (open / Docker / SaaS): [gui.md](gui.md). The Firefox extension above
+is a thinner optional bridge; it does not wait on the full GUI Capability API.
