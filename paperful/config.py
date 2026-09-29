@@ -71,7 +71,8 @@ SCIHUB_DISCLAIMER = (
 )
 RECOVER_DISCLAIMER = (
     "Browser recovery is experimental. You are responsible for publisher terms "
-    "and applicable law. Page content may be sent to your configured LLM."
+    "and applicable law. Page content may be sent to a remote LLM; using a local "
+    "LLM does not send page content off this machine."
 )
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "

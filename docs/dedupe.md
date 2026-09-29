@@ -10,8 +10,10 @@ and better fields onto the keeper, then moves that emptied parent to the
 trash. It does not delete files under `out/`. Mendeley and EndNote cannot
 merge, so `--apply` is refused there.
 
-Monday literature ingest stays outside Paperful. After that ingest, the local
-hygiene loop is:
+Paperful does not create library parents by itself except where a command
+documents it (for example `restore --apply` or snowball `apply`). After any
+bulk add from elsewhere — Zotero import, another harvester, shared `.bib`, and
+so on — run this hygiene loop on the target collection (examples use `BBNJ`):
 
 ```sh
 uv run paperful dedupe -C BBNJ --dry-run

@@ -17,6 +17,7 @@ from .lint import (
     lint_item,
     normalize_saved_title,
     title_is_all_caps,
+    title_is_all_lower,
     title_looks_like_filename,
     title_to_title_case,
     usable_work_title,
@@ -148,7 +149,7 @@ def propose_patch(
         candidate = cleaned or item.title.strip()
         if (
             candidate
-            and title_is_all_caps(candidate)
+            and (title_is_all_caps(candidate) or title_is_all_lower(candidate))
             and not title_looks_like_filename(candidate)
         ):
             cased = title_to_title_case(candidate)

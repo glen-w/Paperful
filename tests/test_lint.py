@@ -91,6 +91,12 @@ def test_normalize_saved_title():
         == "Some Practical Guidance for Matching"
     )
     assert normalize_saved_title("paper.pdf") == "paper.pdf"
+    assert (
+        normalize_saved_title(
+            "high seas fisheries: what role for a new international instrument"
+        )
+        == "High Seas Fisheries: What Role for a New International Instrument"
+    )
 
 
 def test_lint_swappable_doi(cfg):

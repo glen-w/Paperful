@@ -97,9 +97,7 @@ uv run paperful all --profile bbnj-journal
 uv run paperful profile list
 uv run paperful profile show bbnj-journal
 # dedupe + browser handoff + summarize template: docs/workflows.md § 4
-
-# Sci-Hub is off unless you opt in (config `sources`, or this flag)
-uv run paperful run --library --scihub
+# Sci-Hub is off by default; opt-in only, at your own risk — see scihub.md
 
 # session (optional)
 uv run paperful session login ezproxy   # system Chrome/Edge when present; campus SSO
@@ -108,7 +106,7 @@ uv run paperful session login mendeley  # Elsevier OAuth (host-only localhost re
 uv run paperful session status
 uv run paperful ezproxy --no-open       # probe the EZProxy session
 uv run paperful scholar --no-open       # probe Scholar
-uv run paperful mirrors                  # which Sci-Hub mirrors are up (Sci-Hub itself stays off)
+uv run paperful mirrors
 
 # interchange (RIS / BibTeX / EndNote XML)
 uv run paperful export library.ris --library

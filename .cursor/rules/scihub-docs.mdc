@@ -1,0 +1,27 @@
+---
+description: Do not promote Sci-Hub in docs, screenshots, or command examples
+globs: docs/**,**/screenshots/**
+alwaysApply: false
+---
+
+# Sci-Hub in documentation and screenshots
+
+Paperful supports Sci-Hub only as an explicit opt-in. **Do not show or promote Sci-Hub** in user-facing docs, screenshots, or copy-paste command blocks.
+
+## Allowed mentions (brief only)
+
+Outside [docs/scihub.md](docs/scihub.md), the only Sci-Hub note should be that it is **off by default**, may be **opted in at the user’s own risk**, and that legal compliance is the user’s responsibility. Point readers to `scihub.md` for disclaimer and opt-in details — do not repeat full opt-in recipes elsewhere.
+
+## Do not
+
+- Use `--scihub`, `"scihub"` in `sources`, or Sci-Hub mirror URLs in **example commands** or workflow snippets (including `docs/commands.md`).
+- Feature Sci-Hub in hero copy, quick starts, or “try this” paths ahead of OA / EZProxy.
+- Capture or add **screenshots** (under `docs/screenshots/` or elsewhere in docs) that show Sci-Hub sites, mirror lists as a recommended step, or terminal output from a Sci-Hub-enabled run.
+- Suggest `paperful mirrors` as a routine or onboarding step; it is only relevant after opt-in (documented in `scihub.md`).
+
+## OK
+
+- State that `--preset eoi` and defaults **exclude** Sci-Hub (policy, not promotion).
+- List `--scihub` in exhaustive CLI flag reference tables with “opt-in; see scihub.md”.
+- Technical architecture notes that Sci-Hub exists as a serial, last-resort source when enabled.
+- The dedicated page `docs/scihub.md` and tests/fixtures that exercise the implementation.

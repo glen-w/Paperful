@@ -63,6 +63,13 @@ def title_is_all_caps(title: str) -> bool:
     return sum(1 for c in letters if c.isupper()) / len(letters) >= 0.85
 
 
+def title_is_all_lower(title: str) -> bool:
+    letters = [c for c in title if c.isalpha()]
+    if len(letters) < 12:
+        return False
+    return all(c.islower() for c in letters)
+
+
 # Articles, coordinating conjunctions, and short prepositions stay lowercase
 # in Title Case unless they are the first or last word (Chicago-ish).
 _TITLE_SMALL = frozenset(
@@ -167,7 +174,7 @@ def title_looks_like_filename(title: str) -> bool:
 
 
 def normalize_saved_title(title: str) -> str:
-    """Strip HTML and Title-Case ALL CAPS titles before writing to the library.
+    """Strip HTML and Title-Case uniform ALL CAPS or all-lowercase titles.
 
     Filename-shaped titles are left alone (same rule as ``fix-metadata``).
     Idempotent on already-cased titles.
@@ -176,7 +183,9 @@ def normalize_saved_title(title: str) -> str:
     if not raw:
         return raw
     cleaned = strip_title_markup(raw) or raw
-    if title_is_all_caps(cleaned) and not title_looks_like_filename(cleaned):
+    if title_looks_like_filename(cleaned):
+        return cleaned
+    if title_is_all_caps(cleaned) or title_is_all_lower(cleaned):
         return title_to_title_case(cleaned)
     return cleaned
 

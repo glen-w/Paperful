@@ -31,6 +31,7 @@ curl -fsSL https://ollama.com/install.sh | sh
 
 ollama pull qwen2.5:7b        # title / identity / summaries
 ollama pull qwen2.5:14b       # recommended floor for `recover` (browsing agent)
+# See browser-agent-models.md for VRAM bands, ranked tags, and avoid list.
 ```
 
 No Python extra is needed for Ollama: Paperful talks HTTP to the daemon.
@@ -38,7 +39,7 @@ No Python extra is needed for Ollama: Paperful talks HTTP to the daemon.
 | Verb | Works well with | Notes |
 | --- | --- | --- |
 | `fix-metadata` titles, `lint` identity, `summarize`, `synthesize` | 7B–12B instruct models (`qwen2.5:7b`, `gemma3:12b`, `llama3.1:8b`) | JSON-capable instruct tags; thinking models are fine but slower. `summarize` and `synthesize` set Ollama `num_ctx` from the prompt, capped by `[llm].max_num_ctx` |
-| `recover` | 14B+ (`qwen2.5:14b`, `qwen3:14b`, larger) | Small models loop on cookie banners and publisher menus; `doctor` warns under ~10B by tag name |
+| `recover` | 14B+ (`qwen2.5:14b`, `qwen3:14b`, larger); 32B / VL on 24 GB+ | Small models loop on cookie banners and publisher menus; `doctor` warns under ~10B by tag name. Full guidance: [browser-agent-models.md](browser-agent-models.md) |
 
 ### LiteLLM (paid / OpenAI-compatible APIs)
 
@@ -112,6 +113,8 @@ max_wall_s = 300
 ```
 
 Full key table: [Configuration § LLM](config.md#llm-optional-local-first).
+Ollama tag ranking and acceptance tests: [browser-agent-models.md](browser-agent-models.md).
+Roadmap gaps (`fallback_model`, vision, `num_ctx`): [ROADMAP § browser-use](ROADMAP.md#browser-use-integration-models-docs-config).
 
 ## 3. Check
 
@@ -130,6 +133,9 @@ LiteLLM by import only. The TTY guide prints the fix for each amber row.
 ## 4. Verbs
 
 ### A. `recover` — browser-agent PDF recovery
+
+Model choice (Ollama tags, VRAM bands, acceptance test):
+[browser-agent-models.md](browser-agent-models.md).
 
 On `run`, when `[llm].enabled` and `paperful[browser-agent]` are available,
 Paperful appends `browser_agent` after Scholar / EZProxy / htmlpdf. The agent
@@ -170,8 +176,9 @@ uv run paperful recover --item K1 --item K2 --no-attach
   `source = "browser_agent"`, attach through the normal path. A dedicated
   `recover` writes `state/runs/<stamp>-recover.json`; auto-recover on `run`
   is counted in that run’s report (`command = "run"`).
-- Prints a disclaimer: you are responsible for publisher terms; page content
-  goes to your configured LLM.
+- Prints an orange disclaimer: you are responsible for publisher terms; remote
+  LLMs may receive page content; a local LLM does not send page content off
+  this machine.
 
 Do not run two commands concurrently against the same vault: both would open
 the same Chromium profile.
@@ -307,7 +314,7 @@ and start Ollama bound to all interfaces on the host
 | `recover requires Python 3.11+` | `uv python pin 3.12 && uv sync --extra browser-agent` |
 | `browser-use is not installed` | `uv sync --extra browser-agent` |
 | `session vault not ready` | `paperful session login scholar` (headed, on the host) |
-| `recover` ends `not_found` quickly | Model too small for browsing; try a 14B+ tag via `[browser_agent].model` |
+| `recover` ends `not_found` quickly | Model too small or wrong class for UI tools; try 14B+ via `[browser_agent].model` — [browser-agent-models.md](browser-agent-models.md) |
 | `recover` never starts during `run` | Extra missing, `[llm].enabled` false, `[browser_agent].during_run = false`, or `--no-browser-agent` |
 | Summary note shows raw `##` | Update Paperful (0.5+ converts Markdown); re-run `summarize` |
 | `could not extract PDF text` | Scanned PDF. Run `paperful ocr -C …` then `--apply`, and summarize again |

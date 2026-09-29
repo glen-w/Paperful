@@ -285,7 +285,7 @@ stop at `no_identifier`.
 - [releases.md](releases.md) — 0.x vs 1.0
 - [comparison.md](comparison.md) — where Paperful sits next to plugins and bib tools
 - [commands.md](commands.md) — CLI and disk artifacts
-- [dedupe.md](dedupe.md) — duplicate packs and the BBNJ hygiene loop
+- [dedupe.md](dedupe.md) — duplicate packs and the post-ingest hygiene loop
 - [config.md](config.md) — `config.toml` keys and grey playbooks
 - [ezproxy.md](ezproxy.md) / [sessions.md](sessions.md) — campus proxy and browser vault
 - [docker.md](docker.md) — build-local image (host Zotero + headed login stay outside)

@@ -52,6 +52,8 @@ def colour_for(stage: str) -> str:
         return "blue"
     if step.startswith("hop ") or step.startswith("resume"):
         return "cyan"
+    if "openalex" in step and "allowance" in step:
+        return "yellow"
     return "white"
 
 

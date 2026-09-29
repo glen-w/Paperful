@@ -23,7 +23,7 @@ EZProxy):
 - add `"scihub"` at the end of `sources` in `config.toml`, or
 - pass `--scihub` on a single `run`.
 
-A yellow disclaimer is printed whenever Sci-Hub is in the source list for
+A red disclaimer is printed whenever Sci-Hub is in the source list for
 that run. `paperful mirrors` pings configured hostnames even when Sci-Hub is
 off; it does not turn the source on.
 

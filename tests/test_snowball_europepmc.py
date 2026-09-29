@@ -240,3 +240,14 @@ def test_europepmc_progress_uses_papers():
     assert metrics_for("europepmc") == ("searches", "papers")
     assert colour_for("europepmc") == "magenta"
     assert metrics_for("crossref") == ("searches", "fields")
+
+
+def test_openalex_allowance_notice_is_yellow():
+    assert (
+        colour_for(
+            "OpenAlex's free no-key allowance for this network address is used up. "
+            "Continuing with your API key."
+        )
+        == "yellow"
+    )
+    assert colour_for("OpenAlex daily allowance for your API key is used up.") == "yellow"

@@ -237,7 +237,7 @@ run misbehaves or you host infrastructure yourself.
 | `[synthesize].tag` | `paperful-report` | Base tag on the collection note. A second tag `tag:<slug>` makes re-runs update |
 | `[synthesize].timeout_s` | `max([llm].timeout_s, 300)` | Per-completion timeout for the report |
 | `[browser_agent].max_steps` / `max_wall_s` | `20` / `300` | Step and wall-clock caps for `recover` (agent stops early once a valid PDF lands) |
-| `[browser_agent].model` | (`[llm].model`) | Larger model for browsing only; `doctor` warns under ~10B |
+| `[browser_agent].model` | (`[llm].model`) | Larger tool-capable model for browsing only; `doctor` warns under ~10B; see [browser-agent-models.md](browser-agent-models.md) |
 | `[ocr].timeout_s` | `600` | Seconds allowed per PDF |
 | `[attachments].fix_broken` | `false` | With `attachments --apply`, refill a ghost or broken link from `out/` when the MD5 matches |
 | `[attachments].merge_files` | `false` | With `--apply`, trash extra PDF children on the same parent that share an MD5 |

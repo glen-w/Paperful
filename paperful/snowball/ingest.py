@@ -250,9 +250,9 @@ def fill_pdfs(
         return fast
     sources = with_recover_lane(cfg, list(cfg.sources))
     if "scihub" in sources:
-        console.print(f"[yellow]{SCIHUB_DISCLAIMER}[/]")
+        console.print(f"[red]{SCIHUB_DISCLAIMER}[/]")
     if "browser_agent" in sources:
-        console.print(f"[yellow]{RECOVER_DISCLAIMER}[/]")
+        console.print(f"[orange3]{RECOVER_DISCLAIMER}[/]")
     console.print(
         f"full stack: {len(left)} still without a PDF. Sources: {', '.join(sources)}"
     )

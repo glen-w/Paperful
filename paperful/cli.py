@@ -587,12 +587,12 @@ def _exit_env(message: str, cfg: Config | None = None, *, code: str = "") -> Non
 
 def _warn_if_scihub(source_list: list[str]) -> None:
     if "scihub" in source_list:
-        console.print(f"[yellow]{SCIHUB_DISCLAIMER}[/]")
+        console.print(f"[red]{SCIHUB_DISCLAIMER}[/]")
 
 
 def _warn_if_recover(source_list: list[str]) -> None:
     if "browser_agent" in source_list:
-        console.print(f"[yellow]{RECOVER_DISCLAIMER}[/]")
+        console.print(f"[orange3]{RECOVER_DISCLAIMER}[/]")
 
 
 def _require_manager(cfg: Config) -> None:
@@ -3680,7 +3680,7 @@ def pack_show(
 def mirrors(config: Path | None = ConfigOpt) -> None:
     """Ping the configured Sci-Hub mirrors."""
     cfg = _cfg(config)
-    console.print(f"[yellow]{SCIHUB_DISCLAIMER}[/]")
+    console.print(f"[red]{SCIHUB_DISCLAIMER}[/]")
     if "scihub" not in cfg.sources:
         console.print(
             '[dim]Sci-Hub is off until you add "scihub" to sources or pass --scihub on run.[/]'
@@ -4046,10 +4046,10 @@ def recover(
     except LlmConfigError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1)
-    console.print(f"[yellow]{RECOVER_DISCLAIMER}[/]")
+    console.print(f"[orange3]{RECOVER_DISCLAIMER}[/]")
     if llm_egress_is_remote(cfg):
         console.print(
-            "[yellow]Remote LLM provider — page text may leave this machine.[/]"
+            "[orange3]Remote LLM provider — page text may leave this machine.[/]"
         )
     backend = _connect(cfg)
     manifest = Manifest(cfg.manifest_path)
