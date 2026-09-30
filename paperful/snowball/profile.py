@@ -121,6 +121,36 @@ def orcids_from_profile(raw: dict[str, Any]) -> list[str]:
     return [single] if single else []
 
 
+def queries_from_profile(raw: dict[str, Any]) -> list[str]:
+    """Read ``queries`` array or legacy singular ``query`` from a snowball profile."""
+    items = list(_strs(raw.get("queries")))
+    if items:
+        return items
+    single = str(raw.get("query") or "").strip()
+    return [single] if single else []
+
+
+def query_op_from_profile(raw: dict[str, Any]) -> str:
+    """``and`` (default) or ``or`` for multi-keyword profiles."""
+    value = str(raw.get("query_op") or "and").strip().lower()
+    if value not in {"and", "or"}:
+        raise SnowballError("query_op must be and or or")
+    return value
+
+
+def composed_query_from_profile(raw: dict[str, Any]) -> str:
+    """Compose the OpenAlex keyword query from a search/hybrid profile."""
+    from .expand import compose_keyword_query
+
+    terms = queries_from_profile(raw)
+    if not terms:
+        raise SnowballError("Profile needs query.")
+    try:
+        return compose_keyword_query(terms, op=query_op_from_profile(raw))
+    except ValueError as exc:
+        raise SnowballError(str(exc)) from exc
+
+
 def save_profile(cfg: Config, name: str, body: dict[str, Any], *, force: bool) -> Path:
     """Write seeds and knobs only. Refuses keys. A writing gate needs --force."""
     from ..run_config import check_profile_name

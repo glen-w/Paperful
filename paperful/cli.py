@@ -5273,6 +5273,15 @@ def _csv(raw: str | None) -> tuple[str, ...]:
     return tuple(part.strip() for part in (raw or "").split(",") if part.strip())
 
 
+def _profile_queries(body: dict[str, Any], queries: list[str], *, or_mode: bool) -> None:
+    """Persist one ``query`` or a ``queries`` array (+ optional ``query_op``)."""
+    if len(queries) == 1:
+        body["query"] = queries[0]
+    else:
+        body["queries"] = list(queries)
+    if or_mode:
+        body["query_op"] = "or"
+
 def _run_snowball(cfg: Config, action: Any) -> None:
     from .snowball.command import SnowballError
 
@@ -5287,7 +5296,7 @@ def _run_snowball(cfg: Config, action: Any) -> None:
 
 @snowball_app.command("search")
 def snowball_search(
-    query: str = typer.Argument(..., help="Keyword query."),
+    queries: list[str] = typer.Argument(..., help="One or more keyword terms."),
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     depth: int | None = typer.Option(
@@ -5303,6 +5312,9 @@ def snowball_search(
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
     cites_query: str | None = CitesQueryOpt,
+    or_mode: bool = typer.Option(
+        False, "--or", help="Match any keyword (default: all)."
+    ),
     gate: str | None = typer.Option(
         None,
         "--gate",
@@ -5352,13 +5364,21 @@ def snowball_search(
         refine=refine,
     )
     from .snowball.command import run_search
+    from .snowball.expand import compose_keyword_query
 
+    try:
+        query = compose_keyword_query(queries, op="or" if or_mode else "and")
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(2) from exc
     _run_snowball(cfg, lambda c: run_search(c, query, request, console=console))
 
 
 @snowball_app.command("hybrid")
 def snowball_hybrid(
-    query: str = typer.Argument(..., help="Keyword query. Top hits then get one hop."),
+    queries: list[str] = typer.Argument(
+        ..., help="One or more keyword terms. Top hits then get one hop."
+    ),
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     max_candidates: str | None = MaxCandidatesOpt,
@@ -5372,6 +5392,9 @@ def snowball_hybrid(
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
     cites_query: str | None = CitesQueryOpt,
+    or_mode: bool = typer.Option(
+        False, "--or", help="Match any keyword (default: all)."
+    ),
     gate: str | None = typer.Option(
         None, "--gate", help="dry-run, approve-each, approve-batch, or auto."
     ),
@@ -5408,7 +5431,13 @@ def snowball_hybrid(
         refine=refine,
     )
     from .snowball.command import run_hybrid
+    from .snowball.expand import compose_keyword_query
 
+    try:
+        query = compose_keyword_query(queries, op="or" if or_mode else "and")
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(2) from exc
     _run_snowball(cfg, lambda c: run_hybrid(c, query, request, console=console))
 
 
@@ -5649,7 +5678,7 @@ def snowball_run(
         run_orcid,
         run_search,
     )
-    from .snowball.profile import load_profile, request_from_profile
+    from .snowball.profile import composed_query_from_profile, load_profile, request_from_profile
 
     try:
         raw = load_profile(cfg, profile)
@@ -5669,14 +5698,10 @@ def snowball_run(
             console.print(description)
         mode = str(raw.get("mode") or "")
         if mode == "search":
-            query = str(raw.get("query") or "").strip()
-            if not query:
-                raise SnowballError(f"Profile {profile!r} needs query.")
+            query = composed_query_from_profile(raw)
             action = lambda c: run_search(c, query, request, console=console)
         elif mode == "hybrid":
-            query = str(raw.get("query") or "").strip()
-            if not query:
-                raise SnowballError(f"Profile {profile!r} needs query.")
+            query = composed_query_from_profile(raw)
             action = lambda c: run_hybrid(c, query, request, console=console)
         elif mode == "doi":
             dois = [str(item) for item in (raw.get("dois") or [])]
@@ -5718,7 +5743,9 @@ snowball_app.add_typer(snowball_profile_app, name="profile")
 @snowball_profile_app.command("save")
 def snowball_profile_save(
     name: str = typer.Argument(..., help="Profile name (profiles/<name>.toml)."),
-    query: str = typer.Option("", "--query", help="Keyword seed."),
+    query: list[str] | None = typer.Option(
+        None, "--query", help="Keyword seed. Repeat for several."
+    ),
     doi: list[str] | None = typer.Option(
         None, "--doi", help="DOI seed. Repeat for several."
     ),
@@ -5745,6 +5772,9 @@ def snowball_profile_save(
     year_to: int | None = YearToOpt,
     dedupe_scope: str = typer.Option("", "--dedupe-scope"),
     oa_only: bool = typer.Option(False, "--oa-only"),
+    or_mode: bool = typer.Option(
+        False, "--or", help="With several --query, match any (default: all)."
+    ),
     hybrid: bool = typer.Option(
         False, "--hybrid", help="With --query, save mode = hybrid."
     ),
@@ -5766,8 +5796,9 @@ def snowball_profile_save(
     from .snowball.command import SnowballError
     from .snowball.profile import save_profile as save_snowball_profile
 
+    queries = [part.strip() for part in (query or []) if part and part.strip()]
     seeds = [
-        bool(query.strip()),
+        bool(queries),
         bool(doi),
         bool(orcid),
         bool(seed_collection.strip()),
@@ -5778,12 +5809,12 @@ def snowball_profile_save(
         )
         raise typer.Exit(2)
     body: dict[str, Any] = {"gate": gate}
-    if query.strip() and hybrid:
+    if queries and hybrid:
         body["mode"] = "hybrid"
-        body["query"] = query.strip()
-    elif query.strip():
+        _profile_queries(body, queries, or_mode=or_mode)
+    elif queries:
         body["mode"] = "search"
-        body["query"] = query.strip()
+        _profile_queries(body, queries, or_mode=or_mode)
     elif doi:
         body["mode"] = "doi"
         body["dois"] = list(doi)

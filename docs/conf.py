@@ -68,6 +68,11 @@ suppress_warnings = ["myst.xref_missing", "misc.highlighting_failure"]
 html_theme = "furo"
 html_title = "Paperful"
 html_favicon = "favicon.ico"
+html_theme_options = {
+    # Ink wordmark on light; cream wordmark on dark (see docs/logo*.png).
+    "light_logo": "logo.png",
+    "dark_logo": "logo-dark.png",
+}
 # Shared public-site chrome (header nav) lives under website/chrome/ so the
 # marketing landing and /guide/ share one sticky header.
 html_static_path = ["_static", "../website/chrome"]

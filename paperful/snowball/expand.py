@@ -45,6 +45,28 @@ def keyword_depth(explicit: int | None) -> int:
     return used
 
 
+def compose_keyword_query(terms: list[str] | tuple[str, ...], *, op: str = "and") -> str:
+    """Build one OpenAlex ``search=`` string from keyword terms.
+
+    A single term is passed through unchanged (hand-written booleans stay intact).
+    Two or more terms are phrase-quoted and joined with ``AND`` (default) or ``OR``.
+    """
+    cleaned = [part.strip() for part in terms if part and str(part).strip()]
+    if not cleaned:
+        raise ValueError("Pass a keyword query.")
+    mode = (op or "and").strip().lower()
+    if mode not in {"and", "or"}:
+        raise ValueError("query_op must be and or or")
+    if len(cleaned) == 1:
+        return cleaned[0]
+    joiner = " OR " if mode == "or" else " AND "
+    return joiner.join(f'"{_escape_phrase(part)}"' for part in cleaned)
+
+
+def _escape_phrase(text: str) -> str:
+    return text.replace("\\", "\\\\").replace('"', '\\"')
+
+
 # OpenAlex types treated as journal-article-shaped when [snowball] types is unset.
 JOURNAL_SHAPED = frozenset(
     {"article", "journal-article", "review", "preprint", "posted-content"}

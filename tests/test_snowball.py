@@ -686,6 +686,154 @@ def test_orcid_profile_legacy_and_list(tmp_path: Path):
     assert "0000-0002-1825-0097" in body
 
 
+def test_compose_keyword_query_and_or():
+    from paperful.snowball.expand import compose_keyword_query
+
+    assert compose_keyword_query(["bbnj EIA"]) == "bbnj EIA"
+    assert compose_keyword_query(["msp", "ore"]) == '"msp" AND "ore"'
+    assert compose_keyword_query(["msp", "ore"], op="or") == '"msp" OR "ore"'
+    assert (
+        compose_keyword_query(["marine spatial planning", "offshore renewable"])
+        == '"marine spatial planning" AND "offshore renewable"'
+    )
+    assert compose_keyword_query(['say "hi"', "bye"]) == '"say \\"hi\\"" AND "bye"'
+    with pytest.raises(ValueError, match="Pass a keyword"):
+        compose_keyword_query(["  ", ""])
+    with pytest.raises(ValueError, match="query_op"):
+        compose_keyword_query(["a", "b"], op="xor")
+
+
+def test_queries_from_profile_and_compose(tmp_path: Path):
+    from paperful.snowball.profile import (
+        composed_query_from_profile,
+        queries_from_profile,
+        query_op_from_profile,
+        save_profile,
+    )
+
+    cfg = _cfg(tmp_path)
+    assert queries_from_profile({"query": "bbnj"}) == ["bbnj"]
+    assert queries_from_profile({"queries": ["msp", "ore"]}) == ["msp", "ore"]
+    assert query_op_from_profile({}) == "and"
+    assert query_op_from_profile({"query_op": "or"}) == "or"
+    assert composed_query_from_profile({"query": "bbnj"}) == "bbnj"
+    assert composed_query_from_profile({"queries": ["msp", "ore"]}) == '"msp" AND "ore"'
+    assert (
+        composed_query_from_profile({"queries": ["msp", "ore"], "query_op": "or"})
+        == '"msp" OR "ore"'
+    )
+    path = save_profile(
+        cfg,
+        "multi-kw",
+        {
+            "mode": "search",
+            "queries": ["msp", "ore"],
+            "query_op": "or",
+            "gate": "dry-run",
+        },
+        force=False,
+    )
+    text = path.read_text()
+    assert "queries =" in text
+    assert 'query_op = "or"' in text
+    saved = runner.invoke(
+        cli.app,
+        [
+            "snowball",
+            "profile",
+            "save",
+            "cli-multi",
+            "--query",
+            "msp",
+            "--query",
+            "ore",
+            "--or",
+            "-c",
+            str(tmp_path / "config.toml"),
+        ],
+    )
+    assert saved.exit_code == 0
+    body = (tmp_path / "profiles" / "cli-multi.toml").read_text()
+    assert "queries =" in body
+    assert 'query_op = "or"' in body
+    single = runner.invoke(
+        cli.app,
+        [
+            "snowball",
+            "profile",
+            "save",
+            "cli-one",
+            "--query",
+            "bbnj",
+            "-c",
+            str(tmp_path / "config.toml"),
+        ],
+    )
+    assert single.exit_code == 0
+    one = (tmp_path / "profiles" / "cli-one.toml").read_text()
+    assert 'query = "bbnj"' in one
+    assert "queries =" not in one
+
+
+def test_multi_keyword_search_composes_openalex_query(tmp_path: Path):
+    works = {"W1": _work("W1", "10.1000/a", "MSP and ORE", 2020, 1)}
+    seen: list[str] = []
+
+    def getter(path: str, params: dict) -> dict:
+        if "search" in params:
+            seen.append(str(params["search"]))
+            return {"results": list(works.values())}
+        return {"results": []}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    from paperful.snowball.expand import compose_keyword_query
+
+    query = compose_keyword_query(["msp", "ore"])
+    result = run_search(
+        _cfg(tmp_path),
+        query,
+        SnowballRequest(gate="dry-run", max_candidates=10),
+        console=Console(highlight=False, width=160),
+        client=client,
+    )
+    assert result.exit_code == 0
+    assert seen == ['"msp" AND "ore"']
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    assert rows[0]["seed"]["value"] == '"msp" AND "ore"'
+
+
+def test_cli_multi_keyword_or_flag(tmp_path: Path, monkeypatch):
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nstate_dir = "{tmp_path / "state"}"\n[snowball]\nenabled = true\n'
+    )
+    seen: list[str] = []
+
+    def fake_run_search(cfg, query, request, **kwargs):
+        seen.append(query)
+
+        class _Ok:
+            exit_code = 0
+
+        return _Ok()
+
+    monkeypatch.setattr("paperful.snowball.command.run_search", fake_run_search)
+    result = runner.invoke(
+        cli.app,
+        [
+            "snowball",
+            "search",
+            "msp",
+            "ore",
+            "--or",
+            "-c",
+            str(cfg_path),
+        ],
+    )
+    assert result.exit_code == 0, result.stdout + result.stderr
+    assert seen == ['"msp" OR "ore"']
+
+
 def test_author_resume_loops_remaining_orcids(tmp_path: Path):
     from paperful.snowball.crawl import continue_deferred
 

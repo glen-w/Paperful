@@ -994,6 +994,13 @@ as the **Large corpus from scratch** worked example under [Documentation
   resolver graph**, Maybe later §3); snowball keeps skip-only semantics.
 - **Co-author graph + author-site discovery preflight** — phase 7 above;
   feeds author-site registry before PDF fill on new snowball items.
+- **Keyword wildcards / stem expansion** — OpenAlex `search=` strips `*`, `?`,
+  and `~` (no true wildcard). Operators who want `polic*` (policy, policies,
+  political, …) need Paperful to expand the stem client-side into an OR group
+  before composing the boolean query (same path as multi-keyword AND/`--or`).
+  Scope: `search` / `hybrid` seeds (and later `--cites-query` if useful). Cap
+  expansion length so the `search=` URL stays under OpenAlex’s ~4 KB limit;
+  document that a bare `polic*` today is not a wildcard.
 
 Still outside this lane: every paper by every cited author; a snowball step
 inside `paperful all`; a built-in scheduler; a review UI; systematic-review screening; a

@@ -179,9 +179,9 @@ def _dispatch(
     """Run the profile seed. Hybrid watches the keyword hit list only (depth 0)."""
     mode = str(raw.get("mode") or "")
     if mode == "hybrid" or mode == "search":
-        query = str(raw.get("query") or "").strip()
-        if not query:
-            raise SnowballError("Profile needs query.")
+        from .profile import composed_query_from_profile
+
+        query = composed_query_from_profile(raw)
         if mode == "hybrid":
             request.depth = 0
         return run_search(

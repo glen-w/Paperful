@@ -1,5 +1,8 @@
 <h1 align="center">
-  <img src="website/images/logo.png" alt="Paperful" width="280">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="website/images/logo-dark.png" />
+    <img src="website/images/logo.png" alt="Paperful" width="280" />
+  </picture>
 </h1>
 
 <p align="center">
