@@ -283,9 +283,6 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
 - `out/_history.json` — pointers at the append-only ledgers under `state/`
   (manifest, patches, dedupe, runs). Sessions, cookies, and the local API key
   are not copied.
-- A flat `Author - Year - Title.pdf` plus `*.paperful.json` left from an older
-  run is moved into the item folder on `snapshot` or the next `run` that saves
-  that file. The legacy card is folded into `record.json`.
 - `state/manifest.jsonl` — one line per item attempt; the latest line per item
   key wins. Statuses: `ok` (on disk), `attached` (on disk + in Zotero),
   `not_found`, `no_identifier`, `captcha`, `error`, `attach_failed`,

@@ -8,13 +8,7 @@ from pathlib import Path
 from paperful.config import Config
 from paperful.restore import plan_restore
 from paperful.snapshot import run_snapshot, write_history
-from paperful.store import (
-    Manifest,
-    Record,
-    STATUS_OK,
-    item_dirname,
-    record_path,
-)
+from paperful.store import item_dirname, record_path
 from paperful.zot import Collection, Item
 
 

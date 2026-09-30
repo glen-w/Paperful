@@ -247,8 +247,17 @@ def _lane_paused(attempts: list[str]) -> bool:
         "skipped(circuit open)" in a
         or "session expired" in a
         or "skipped(bot wall)" in a
+        or a == "scholar:skipped(blocked)"
         for a in attempts
     )
+
+
+def _scholar_blocked(cand: Candidate) -> bool:
+    """Google has refused this client; further requests this run only dig deeper."""
+    if cand.outcome is Outcome.CAPTCHA:
+        return True
+    note = cand.note or ""
+    return cand.outcome is Outcome.ERROR and note in {"HTTP 429", "HTTP 503"}
 
 
 def _is_soft_block_error(exc: DownloadError) -> bool:
@@ -291,6 +300,7 @@ class Pipeline:
         self._ezproxy_down = False
         self._ezproxy_down_offered = False
         self._browser_agent_down = False
+        self._scholar_down = False
         self._blocked_hosts: set[str] = set()
         self._transport_fail_hosts: dict[str, int] = {}
         self._vault_sso_misses = 0
@@ -504,6 +514,8 @@ class Pipeline:
             return self._skip_ezproxy(queue)
         if name == "browser_agent" and self._browser_agent_down:
             return self._skip_browser_agent(queue)
+        if name == "scholar" and self._scholar_down:
+            return self._skip_scholar(queue)
         still: list[tuple[Item, list[str]]] = []
         lo, hi = self.cfg.delay_scihub_s
         first = True
@@ -546,8 +558,34 @@ class Pipeline:
                 still.append((item, attempts))
                 still.extend(self._skip_browser_agent(queue[idx + 1 :]))
                 return still
+            if name == "scholar" and _scholar_blocked(cand):
+                self._mark_scholar_down(cand.note or cand.outcome.value)
+                still.append((item, attempts))
+                still.extend(self._skip_scholar(queue[idx + 1 :]))
+                return still
             still.append((item, attempts))
         return still
+
+    def _mark_scholar_down(self, why: str) -> None:
+        if self._scholar_down:
+            return
+        self._scholar_down = True
+        self._emit(
+            f"[yellow]scholar blocked ({escape(why)}); skipping it for the rest of "
+            "this run.[/] Use --handoff for the remaining misses."
+        )
+
+    def _skip_scholar(
+        self, queue: list[tuple[Item, list[str]]]
+    ) -> list[tuple[Item, list[str]]]:
+        for item, attempts in queue:
+            if "scholar" not in self._applicable(item):
+                continue
+            attempts.append("scholar:skipped(blocked)")
+            with self._stats_lock:
+                self.stats.note_source("scholar", "skipped")
+            self._log_item(item, "scholar: [dim]skipped[/] (blocked this run)")
+        return queue
 
     def _mark_browser_agent_down(self) -> None:
         if self._browser_agent_down:

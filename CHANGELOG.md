@@ -6,6 +6,11 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+Removed the legacy flat-PDF migration. A flat `Author - Year - Title.pdf` and
+its `*.paperful.json` card are no longer moved into an item folder by `snapshot`
+or `run`, and `doctor` no longer ambers on mixed flat + folder trees. The
+`snapshot` summary drops its `migrations` count.
+
 `snowball orcid` accepts several ORCID iDs in one crawl (shared caps / gate /
 `-C`), matching multi-DOI positionals. Profile save takes repeatable `--orcid`
 and writes `orcids = [...]`; legacy singular `orcid` still loads.

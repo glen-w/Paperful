@@ -20,7 +20,6 @@ the contract; extra report keys may still be added.
 | `paperful.run_report.v1` | Required keys frozen; extra keys may be added | Same |
 | `paperful.item.v1` | Named. 0.x may add keys. Do not tag 1.0 until removal of a required key is a break | Lock |
 | `paperful.snowball.candidate.v1` | Shipped and tested. Additive keys allowed | Revisit with the item lock |
-| `paperful.mirror.v1` | Legacy `*.paperful.json` folds into `record.json` | One write path |
 | Snapshot / restore | Behaviour shipped. Round-trip is not a 1.0 promise yet | Lock |
 
 Install claim tested in CI (`.github/workflows/ci.yml`, job `docker`): clone,

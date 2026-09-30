@@ -3218,7 +3218,7 @@ def snapshot(
         write_run_report(cfg, report, as_last_run=False)
     console.print(
         f"[bold]records {stats.records}[/] · pdf exports {stats.pdf_exports} · "
-        f"notes {stats.notes} · migrations {stats.migrations}"
+        f"notes {stats.notes}"
     )
 
 

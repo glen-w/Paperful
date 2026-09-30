@@ -1,6 +1,5 @@
 import hashlib
 import os
-from pathlib import Path
 
 from paperful.store import (
     STATUS_ATTACHED,
@@ -110,6 +109,15 @@ def test_write_fetch_records_sits_beside_each_copy(tmp_path):
     )
     again = json.loads(record_path(primary.parent).read_text())
     assert again["fetch"]["source"] == "ezproxy" and again["pdf_doi"] is None
+
+
+def test_unique_path_reuses_identical_and_suffixes_different(tmp_path):
+    existing = tmp_path / "x.pdf"
+    existing.write_bytes(b"same")
+    same_md5 = hashlib.md5(b"same").hexdigest()
+    assert unique_path(tmp_path, "x.pdf", same_md5) == existing
+    other = unique_path(tmp_path, "x.pdf", hashlib.md5(b"other").hexdigest())
+    assert other.name == "x (2).pdf"
 
 
 def test_manifest_latest_record_wins_and_resume_logic(tmp_path):

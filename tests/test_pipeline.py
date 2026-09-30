@@ -254,6 +254,57 @@ def test_browser_agent_bot_wall_skips_the_rest_of_the_run(pipe_factory):
     assert manifest.get("B").reason == "bot wall"
 
 
+@pytest.mark.parametrize(
+    "first",
+    [
+        Candidate.miss("scholar", Outcome.ERROR, "HTTP 429"),
+        Candidate.miss("scholar", Outcome.ERROR, "HTTP 503"),
+        Candidate.miss("scholar", Outcome.CAPTCHA, "scholar blocked/captcha"),
+    ],
+)
+def test_scholar_block_skips_scholar_for_the_rest_of_the_run(pipe_factory, first):
+    scholar = StubSource("scholar", {"A": first})
+    scihub = StubSource("scihub", default=Outcome.NOT_FOUND)
+    pipe, manifest = pipe_factory(
+        {"scholar": scholar, "scihub": scihub}, ["scholar", "scihub"]
+    )
+    pipe.try_all = True
+    pipe.run([make_item(key=k) for k in ("A", "B", "C")], batch_size=1)
+    assert scholar.calls == ["A"]
+    assert scihub.calls == ["A", "B", "C"]
+    for key in ("B", "C"):
+        rec = manifest.get(key)
+        assert "scholar:skipped(blocked)" in rec.attempts
+        assert rec.status == STATUS_RETRYABLE
+        assert rec.reason == "source paused"
+
+
+def test_scholar_latch_ignores_items_scholar_would_not_try(pipe_factory):
+    scholar = StubSource(
+        "scholar", {"A": Candidate.miss("scholar", Outcome.ERROR, "HTTP 429")}
+    )
+    scihub = StubSource("scihub", default=Outcome.NOT_FOUND)
+    pipe, manifest = pipe_factory(
+        {"scholar": scholar, "scihub": scihub}, ["scholar", "scihub"]
+    )
+    pipe.try_all = False
+    short = make_item(key="SHORT", doi=None, title="Short", url="https://x.test/p")
+    pipe.run([make_item(key="A"), short])
+    assert scholar.calls == ["A"]
+    assert "scholar:skipped(blocked)" not in manifest.get("SHORT").attempts
+    assert manifest.get("SHORT").status != STATUS_RETRYABLE
+
+
+def test_scholar_plain_error_does_not_latch(pipe_factory):
+    scholar = StubSource(
+        "scholar", {"A": Candidate.miss("scholar", Outcome.ERROR, "HTTP 500")}
+    )
+    pipe, manifest = pipe_factory({"scholar": scholar}, ["scholar"])
+    pipe.try_all = True
+    pipe.run([make_item(key="A"), make_item(key="B")])
+    assert scholar.calls == ["A", "B"]
+
+
 def test_session_expired_items_ignores_other_rows(cfg):
     manifest = Manifest(cfg.manifest_path)
     manifest.write(

@@ -17,8 +17,6 @@ from typing import Any
 from .attach import attach_failure_code
 from .zot import Item
 
-# Legacy sibling card. New writes use record.json (paperful.item.v1).
-MIRROR_SCHEMA = "paperful.mirror.v1"
 ITEM_SCHEMA = "paperful.item.v1"
 HISTORY_SCHEMA = "paperful.history.v1"
 COLLECTIONS_SCHEMA = "paperful.collections.v1"
@@ -333,13 +331,6 @@ def save_pdf(
 
 
 
-
-def hashlib_md5(path: Path) -> str:
-    import hashlib
-
-    return hashlib.md5(path.read_bytes()).hexdigest()
-
-
 def record_path(item_dir: Path) -> Path:
     return item_dir / "record.json"
 
@@ -458,39 +449,6 @@ def write_fetch_records(
         write_json(dest, rec)
         written.append(dest)
     return written
-
-
-def _paths_match(stored: str | None, path: Path) -> bool:
-    if not stored:
-        return False
-    try:
-        return Path(stored).resolve() == path.resolve()
-    except OSError:
-        return Path(stored) == path
-
-
-def retarget_manifest(manifest: Manifest, old: Path, new: Path, out_dir: Path) -> None:
-    """Append a fresh manifest line when a PDF moved into an item folder."""
-    try:
-        rel_new = str(new.relative_to(out_dir))
-    except ValueError:
-        rel_new = str(new)
-    for rec in list(manifest.records.values()):
-        changed = False
-        if _paths_match(rec.path, old):
-            rec.path = str(new)
-            changed = True
-        extras: list[str] = []
-        for ep in rec.extra_paths:
-            abs_ep = ep if Path(ep).is_absolute() else out_dir / ep
-            if _paths_match(str(abs_ep), old) or _paths_match(ep, old):
-                extras.append(rel_new)
-                changed = True
-            else:
-                extras.append(ep)
-        if changed:
-            rec.extra_paths = extras
-            manifest.write(rec)
 
 
 def relpaths(out_dir: Path, paths: Iterable[Path]) -> list[str]:
