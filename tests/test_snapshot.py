@@ -13,7 +13,6 @@ from paperful.store import (
     Record,
     STATUS_OK,
     item_dirname,
-    migrate_flat_tree,
     record_path,
 )
 from paperful.zot import Collection, Item
@@ -127,41 +126,6 @@ def test_snapshot_pdf_modes_and_record_roundtrip(tmp_path):
     bare_dir = cfg.out_dir / "BBNJ" / item_dirname(bare)
     assert (bare_dir / "record.json").is_file()
     assert not list(bare_dir.glob("*.pdf"))
-
-
-def test_migrate_flat_card_updates_manifest(tmp_path):
-    out = tmp_path / "out"
-    flat_dir = out / "BBNJ"
-    flat_dir.mkdir(parents=True)
-    pdf = flat_dir / "Smith - 2020 - A paper.pdf"
-    pdf.write_bytes(b"%PDF-1.4 flat")
-    card = {
-        "schema": "paperful.mirror.v1",
-        "item_key": "ABCD1234",
-        "item_type": "journalArticle",
-        "title": "A paper",
-        "first_author": "Smith",
-        "year": 2020,
-        "source": "unpaywall",
-        "fetched_url": "https://oa.test/a.pdf",
-        "md5": "abc",
-        "pdf": pdf.name,
-        "fetched_at": "2026-01-01T00:00:00Z",
-        "collection_paths": ["BBNJ"],
-    }
-    pdf.with_name(pdf.stem + ".paperful.json").write_text(json.dumps(card))
-    manifest = Manifest(tmp_path / "manifest.jsonl")
-    manifest.write(Record(itemKey="ABCD1234", status=STATUS_OK, path=str(pdf)))
-    assert migrate_flat_tree(out, manifest) == 1
-    dest = flat_dir / item_dirname(_item()) / pdf.name
-    assert dest.is_file()
-    assert not pdf.exists()
-    assert not pdf.with_name(pdf.stem + ".paperful.json").exists()
-    body = json.loads(record_path(dest.parent).read_text())
-    assert body["fetch"]["source"] == "unpaywall"
-    assert body["item_key"] == "ABCD1234"
-    assert manifest.get("ABCD1234").path == str(dest)
-    assert migrate_flat_tree(out, manifest) == 0
 
 
 def test_history_omits_secrets(tmp_path):
@@ -404,16 +368,3 @@ def test_dirname_keeps_key_when_title_is_long():
     assert len(name) <= 180
 
 
-def test_doctor_ambers_mixed_flat_and_item_dirs(tmp_path):
-    from paperful.doctor import _mirror_check
-
-    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
-    flat = cfg.out_dir / "BBNJ"
-    flat.mkdir(parents=True)
-    (flat / "old.pdf").write_bytes(b"%PDF")
-    item_dir = flat / "Smith - 2020 - A paper -- ABCD1234"
-    item_dir.mkdir()
-    (item_dir / "record.json").write_text("{}")
-    check = _mirror_check(cfg)
-    assert check.name == "Mirror" and check.status == "amber"
-    assert "pdfs=additional" in check.detail

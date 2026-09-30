@@ -112,32 +112,6 @@ def test_write_fetch_records_sits_beside_each_copy(tmp_path):
     assert again["fetch"]["source"] == "ezproxy" and again["pdf_doi"] is None
 
 
-def test_save_pdf_moves_a_flat_file_into_the_item_folder(tmp_path):
-    import json
-
-    item = _item(paths=["BBNJ/sub"])
-    content = b"%PDF-1.4 old"
-    flat = tmp_path / "BBNJ" / "sub"
-    flat.mkdir(parents=True)
-    name = item_filename(item)
-    (flat / name).write_bytes(content)
-    (flat / f"{Path(name).stem}.paperful.json").write_text(
-        json.dumps({"item_key": item.key, "source": "unpaywall", "title": item.title})
-    )
-    primary, extras = save_pdf(tmp_path, item, content, hashlib.md5(content).hexdigest())
-    assert extras == []
-    assert primary.parent.name == item_dirname(item)
-    assert not (flat / name).exists()
-    body = json.loads((primary.parent / "record.json").read_text())
-    assert body["fetch"]["source"] == "unpaywall"
-    existing = tmp_path / "x.pdf"
-    existing.write_bytes(b"same")
-    same_md5 = hashlib.md5(b"same").hexdigest()
-    assert unique_path(tmp_path, "x.pdf", same_md5) == existing
-    other = unique_path(tmp_path, "x.pdf", hashlib.md5(b"other").hexdigest())
-    assert other.name == "x (2).pdf"
-
-
 def test_manifest_latest_record_wins_and_resume_logic(tmp_path):
     path = tmp_path / "manifest.jsonl"
     m = Manifest(path)

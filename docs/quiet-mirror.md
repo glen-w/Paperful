@@ -68,11 +68,6 @@ hardlinked, `record.json` is copied.
 
 `run` always writes a PDF it downloads. That setting does not turn fetching off.
 
-A flat `Author - Year - Title.pdf` with a legacy `*.paperful.json` card is
-moved into the item folder by `snapshot`, or by the next `run` that saves that
-file. The card is folded into `record.json` and removed. A second pass is a
-no-op. `paperful doctor` ambers when flat PDFs and item folders are mixed.
-
 `paperful restore` reads these folders. Without `--apply` it only counts.
 `--apply` creates a missing collection path and a missing parent (matched by
 item key, then DOI, then title+year), attaches a local PDF when the live item

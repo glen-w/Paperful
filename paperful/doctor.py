@@ -618,20 +618,12 @@ _AGENT_FLOOR_B = 10.0
 
 
 def _mirror_check(cfg: Config) -> Check:
-    from .snapshot import count_layout
+    from .snapshot import count_item_dirs
 
-    flat, item_dirs = count_layout(cfg.out_dir)
+    item_dirs = count_item_dirs(cfg.out_dir)
     detail = f"pdfs={cfg.mirror_pdfs}"
-    if flat and item_dirs:
-        return Check(
-            "Mirror",
-            "amber",
-            f"{detail}; {flat} flat PDF(s) outside item folders — run snapshot",
-        )
     if item_dirs:
         return Check("Mirror", "green", f"{detail}; {item_dirs} item folder(s)")
-    if flat:
-        return Check("Mirror", "green", f"{detail}; {flat} flat PDF(s)")
     return Check("Mirror", "green", detail)
 
 

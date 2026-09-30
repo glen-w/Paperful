@@ -28,7 +28,6 @@ from .store import (
     item_dirname,
     item_filename,
     load_json,
-    migrate_flat_tree,
     record_path,
     write_json,
 )
@@ -62,7 +61,6 @@ class SnapshotStats:
     records: int = 0
     pdf_exports: int = 0
     notes: int = 0
-    migrations: int = 0
     index: list[dict[str, Any]] = field(default_factory=list)
 
 
@@ -447,7 +445,6 @@ def run_snapshot(
     manifest: Manifest | None,
 ) -> SnapshotStats:
     stats = SnapshotStats()
-    stats.migrations = migrate_flat_tree(cfg.out_dir, manifest, dry_run=dry_run)
     cols: dict[str, Collection] = {}
     fn = getattr(backend, "collections", None)
     if fn is not None:
@@ -493,25 +490,19 @@ def snapshot_report(
             "records": stats.records,
             "pdf_exports": stats.pdf_exports,
             "notes": stats.notes,
-            "migrations": stats.migrations,
         },
     }
 
 
-def count_layout(out_dir: Path) -> tuple[int, int]:
-    """(flat PDFs, item directories)."""
-    flat = 0
-    dirs = 0
+def count_item_dirs(out_dir: Path) -> int:
+    """Count item directories in the mirror."""
     if not out_dir.is_dir():
-        return 0, 0
+        return 0
     seen: set[Path] = set()
     for pdf in out_dir.rglob("*.pdf"):
         if is_item_dirname(pdf.parent.name):
             seen.add(pdf.parent)
-        elif pdf.parent.name not in {"notes"}:
-            flat += 1
     for rec in out_dir.rglob("record.json"):
         if is_item_dirname(rec.parent.name):
             seen.add(rec.parent)
-    dirs = len(seen)
-    return flat, dirs
+    return len(seen)
