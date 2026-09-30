@@ -4372,15 +4372,17 @@ def summarize(
         )
 
     def _show(row: SummaryRow) -> None:
+        who = row.label or row.title or row.key
         if row.status == "summarized":
+            console.print(f"[green]Wrote[/] {who}")
             if row.disk_path:
-                console.print(f"[green]Wrote[/] {row.disk_path}")
+                console.print(f"  {row.disk_path}")
             if row.note_key:
                 console.print(f"  attached note {row.note_key}")
         elif row.status == "skipped":
-            console.print(f"[dim]{row.key}[/]: {row.reason}")
+            console.print(f"[dim]{who}[/]: {row.reason}")
         elif not row.fatal:
-            console.print(f"[yellow]{row.key}[/]: {row.reason}")
+            console.print(f"[yellow]{who}[/]: {row.reason}")
 
     if not items:
         console.print("[yellow]No items with PDFs in scope.[/]")

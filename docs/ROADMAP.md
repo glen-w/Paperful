@@ -34,6 +34,7 @@ auto Sci-Hub, no “AI fetch everything”).
 | Slim README + [CHANGELOG](../CHANGELOG.md) known limits | Trust before install | Shipped |
 | Lock `paperful.run_report.v1` | Trust for agents | Required keys frozen; extra keys may be added. Not tagged 1.0 |
 | Lock `paperful.item.v1` and `snapshot` / `restore` (additive keys only after 1.0) | Trust for the disk ledger | Named schema; 0.x may add keys. Behaviour shipped |
+| Strip legacy flat-PDF migrate + mixed-layout doctor amber | Day-0 mirror never steers people into a whole-library layout cleanup | Keep until maintainer `out/` is clean; **strip before 1.0** (see Quiet mirror housekeeping) |
 | **Mendeley and EndNote adapters** | The ledger survives a manager change | In the tree. **Seeking testers.** Zotero stays the well-tested path. See below |
 
 Nice-to-have (not 1.0 blockers): colour glossary next to `doctor` (documented);
@@ -253,16 +254,16 @@ Zotero has. Do not document either adapter as supported until testers say so.
   creates missing items and does not overwrite fields already in Zotero. Dual
   `imported_file` store; house sync (Syncthing) stays outside Paperful. Not a
   second reading UI. Not a linked-file cutover. Not a WebDAV client.
-  **Housekeeping (after maintainer `out/` is clean):** flat
-  `Author - Year - Title.pdf` (+ legacy `*.paperful.json`) is a pre-item-folder
-  hangover. `doctor` ambers on mixed flat+folder trees and tells people to
-  `snapshot`; `migrate_flat_*` / card absorb run on `snapshot` and on the next
-  `run` that saves that file. Once the personal library has been migrated
-  (`snapshot --library` or equivalent) and doctor is green on Mirror, **remove**
-  that legacy path from code, tests, and docs (quiet-mirror / commands /
-  CHANGELOG mentions) so future users are not steered into a whole-library
-  snapshot for a layout they never had. Keep `snapshot` / `restore` themselves —
-  only the flat→folder migration and the mixed-layout doctor amber go.
+  **Housekeeping (strip before 1.0):** flat `Author - Year - Title.pdf` (+
+  legacy `*.paperful.json`) is a pre-item-folder hangover. `doctor` ambers on
+  mixed flat+folder trees and tells people to `snapshot`; `migrate_flat_*` /
+  card absorb run on `snapshot` and on the next `run` that saves that file.
+  Keep that path until maintainer `out/` is clean (migrate what has a card /
+  manifest hit; park true orphans under `paperful_inbox/unmatched` for manual
+  triage). **Before 1.0:** remove the legacy flat→folder migration and the
+  mixed-layout doctor amber from code, tests, and docs (quiet-mirror /
+  commands / CHANGELOG) so future users are not steered into a whole-library
+  snapshot for a layout they never had. Keep `snapshot` / `restore` themselves.
 - Deterministic `lint` / `fix-metadata` (Crossref / OpenAlex / Semantic Scholar /
   PubMed, PDF-text DOI via pdftotext then pypdf) with explicit `--apply`.
   **Shipped:** verified PDF-DOI → patch; date precision guard; HTML title cleanup;

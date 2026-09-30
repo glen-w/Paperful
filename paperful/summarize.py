@@ -218,6 +218,7 @@ class SummaryRow:
     disk_path: str = ""
     note_key: str = ""
     fatal: bool = False
+    label: str = ""
 
 
 @dataclass
@@ -339,6 +340,7 @@ def _reuse_existing_summary(
         return SummaryRow(
             key=item.key,
             title=item.title,
+            label=item.label,
             status="skipped",
             reason="summary already exists for this model",
             disk_path=str(path),
@@ -348,6 +350,7 @@ def _reuse_existing_summary(
         return SummaryRow(
             key=item.key,
             title=item.title,
+            label=item.label,
             status="skipped",
             reason="summary already exists for this model",
             disk_path=str(path),
@@ -356,6 +359,7 @@ def _reuse_existing_summary(
         return SummaryRow(
             key=item.key,
             title=item.title,
+            label=item.label,
             status="skipped",
             reason="summary already exists for this model",
             note_key=note_key or "",
@@ -371,6 +375,7 @@ def _reuse_existing_summary(
         return SummaryRow(
             key=item.key,
             title=item.title,
+            label=item.label,
             status="summarized",
             reason=(
                 "synced note from matching summary"
@@ -384,6 +389,7 @@ def _reuse_existing_summary(
         return SummaryRow(
             key=item.key,
             title=item.title,
+            label=item.label,
             status="summarized",
             reason="wrote existing note to disk",
             disk_path=disk_path,
@@ -393,6 +399,7 @@ def _reuse_existing_summary(
     return SummaryRow(
         key=item.key,
         title=item.title,
+        label=item.label,
         status="summarized",
         reason="synced disk from matching note",
         disk_path=disk_path,
@@ -447,6 +454,7 @@ def summarize_items(
             row = SummaryRow(
                 key=it.key,
                 title=it.title,
+                label=it.label,
                 status="summarized",
                 disk_path=disk_path,
                 note_key=note_key,
@@ -454,13 +462,18 @@ def summarize_items(
         except (ValueError, OSError, LLMClientError) as exc:
             failed += 1
             row = SummaryRow(
-                key=it.key, title=it.title, status="failed", reason=str(exc)
+                key=it.key,
+                title=it.title,
+                label=it.label,
+                status="failed",
+                reason=str(exc),
             )
         except LibraryError as exc:
             failed += 1
             row = SummaryRow(
                 key=it.key,
                 title=it.title,
+                label=it.label,
                 status="failed",
                 reason=str(exc),
                 fatal=True,
