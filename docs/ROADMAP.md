@@ -811,14 +811,14 @@ LLM tags as source of truth without stage 1–2 anchors.
 
 ## Snowball
 
-**Status:** keyword, DOI, ORCID, and collection seeds, hybrid keyword-then-hop,
+**Status:** keyword, multi-DOI / multi-ORCID, and collection seeds, hybrid keyword-then-hop,
 `direction` sides `refs` / `cites` / `both` / `keywords` / `similar` (and
 combos), gates including `approve-each`, overlap ranking, and optional `[llm]`
 query suggestions are in the tree. Contract: [snowball.md](snowball.md). Still
 outside: `expand = cited_authors`.
 
-Snowball grows a library outward from a keyword, one or more DOIs, an ORCID,
-or DOIs already in a collection. It writes a candidate queue on disk, then
+Snowball grows a library outward from a keyword, one or more DOIs, one or more
+ORCIDs, or DOIs already in a collection. It writes a candidate queue on disk, then
 creates items only under an explicit gate. `run` still fills PDFs. With
 `fetch_pdfs`, snowball calls that same `run` in-process on the keys it just
 created, so one command can go from a keyword to a collection with PDFs. The
@@ -985,6 +985,10 @@ as the **Large corpus from scratch** worked example under [Documentation
   the queue had duplicates reintroduced by hand.
 - **Optional post-create sweep** — profile knob: `dedupe` classify (and optionally
   `--apply`) on target `-C` after `auto` / `apply`.
+- **Seed-file / stdin for long DOI or ORCID lists** — `snowball doi` and
+  `snowball orcid` already take several positionals (and profile `--doi` /
+  `--orcid` repeats). Optional `--seeds-file` / stdin so operators are not
+  shell-pasting long lists.
 - **Manifestation-aware identity** — work ↔ preprint ↔ VoR graph (**Identity /
   resolver graph**, Maybe later §3); snowball keeps skip-only semantics.
 - **Co-author graph + author-site discovery preflight** — phase 7 above;
@@ -1152,7 +1156,8 @@ prerequisites for the fetch / lint / attach loop.
    scheduled bot inside Paperful. **Grey identity:** fingerprint
    `norm(title)|year|registrant_host` (plus ISBN/report number when present) for
    snowball / dedupe / inbox-create when DOI is absent.
-   Growing a library from a keyword, a DOI bibliography, or an ORCID is the
+   Growing a library from a keyword, one or more DOI bibliographies, or one or
+   more ORCIDs is the
    [Snowball](snowball.md) section above, not a line item inside this graph.
 4. **File & attachment OS** — **shipped (Zotero):** `paperful attachments`
    reports ghosts, broken links, same-file duplicates, and filename drift.
@@ -1337,7 +1342,7 @@ second doc tree that drifts from the CLI.
 - [quiet-mirror.md](quiet-mirror.md) — `out/` as the copy you keep
 - [releases.md](releases.md) — 0.x vs 1.0; known limits
 - [comparison.md](comparison.md) — what Paperful does and does not replace today
-- [snowball.md](snowball.md) — library-building from a keyword, DOI, ORCID, or collection
+- [snowball.md](snowball.md) — library-building from a keyword, multi-DOI / multi-ORCID, or collection
 - Site career / domain timeline plan (consumer of durable tags):
   `/Users/89298/Documents/website/glen-w.github.io/docs/dev/career-timeline-plan.md`
 - Firefox extension (parked thin bridge) — section above; not a separate doc yet

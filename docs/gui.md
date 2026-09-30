@@ -110,7 +110,7 @@ Snowball and watch. See [snowball.md](snowball.md).
 
 | Action | Maps to | Ledger |
 | --- | --- | --- |
-| Keyword / DOI / ORCID / collection / hybrid seed | `snowball search\|doi\|orcid\|collection\|hybrid` | `state/snowball/<run-id>/` |
+| Keyword / DOI(s) / ORCID(s) / collection / hybrid seed | `snowball search\|doi\|orcid\|collection\|hybrid` (`doi` / `orcid` accept several seeds) | `state/snowball/<run-id>/` |
 | Candidate table | Parse `paperful.snowball.candidate.v1` | `candidates.jsonl`, `summary.json` |
 | Toggle keep / batch approve | Edit `keep` then `snowball apply` | Same queue |
 | Gates | `dry-run` · `approve-each` · `approve-batch` · `auto` | Request + config |

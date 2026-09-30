@@ -5463,7 +5463,7 @@ def snowball_doi(
 
 @snowball_app.command("orcid")
 def snowball_orcid(
-    orcid: str = typer.Argument(..., help="ORCID iD."),
+    orcids: list[str] = typer.Argument(..., help="One or more ORCID iDs."),
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     depth: int | None = typer.Option(
@@ -5488,7 +5488,7 @@ def snowball_orcid(
     fetch_pdfs: str | None = FetchPdfsOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
-    """Person's works (ORCID + OpenAlex), then references/citations those works expand to."""
+    """People's works (ORCID + OpenAlex), then references/citations those works expand to."""
     cfg = _cfg(config)
     request = _snowball_request(
         cfg,
@@ -5509,7 +5509,7 @@ def snowball_orcid(
     )
     from .snowball.command import run_orcid
 
-    _run_snowball(cfg, lambda c: run_orcid(c, orcid, request, console=console))
+    _run_snowball(cfg, lambda c: run_orcid(c, orcids, request, console=console))
 
 
 @snowball_app.command("collection")
@@ -5680,10 +5680,12 @@ def snowball_run(
             dois = [str(item) for item in (raw.get("dois") or [])]
             action = lambda c: run_doi(c, dois, request, console=console)
         elif mode == "orcid":
-            orcid = str(raw.get("orcid") or "").strip()
-            if not orcid:
-                raise SnowballError(f"Profile {profile!r} needs orcid.")
-            action = lambda c: run_orcid(c, orcid, request, console=console)
+            from .snowball.profile import orcids_from_profile
+
+            orcids = orcids_from_profile(raw)
+            if not orcids:
+                raise SnowballError(f"Profile {profile!r} needs orcid or orcids.")
+            action = lambda c: run_orcid(c, orcids, request, console=console)
         elif mode == "collection":
             seed = str(
                 raw.get("seed_collection") or raw.get("collection") or ""
@@ -5718,7 +5720,9 @@ def snowball_profile_save(
     doi: list[str] | None = typer.Option(
         None, "--doi", help="DOI seed. Repeat for several."
     ),
-    orcid: str = typer.Option("", "--orcid", help="ORCID seed."),
+    orcid: list[str] | None = typer.Option(
+        None, "--orcid", help="ORCID seed. Repeat for several."
+    ),
     seed_collection: str = typer.Option(
         "", "--seed-collection", help="Collection whose DOIs seed the crawl."
     ),
@@ -5763,7 +5767,7 @@ def snowball_profile_save(
     seeds = [
         bool(query.strip()),
         bool(doi),
-        bool(orcid.strip()),
+        bool(orcid),
         bool(seed_collection.strip()),
     ]
     if sum(seeds) != 1:
@@ -5781,9 +5785,9 @@ def snowball_profile_save(
     elif doi:
         body["mode"] = "doi"
         body["dois"] = list(doi)
-    elif orcid.strip():
+    elif orcid:
         body["mode"] = "orcid"
-        body["orcid"] = orcid.strip()
+        body["orcids"] = list(orcid)
     else:
         body["mode"] = "collection"
         body["seed_collection"] = seed_collection.strip()

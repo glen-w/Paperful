@@ -207,12 +207,14 @@ def _dispatch(
             lookup=lookup,
         )
     if mode == "orcid":
-        orcid = str(raw.get("orcid") or "").strip()
-        if not orcid:
-            raise SnowballError("Profile needs orcid.")
+        from .profile import orcids_from_profile
+
+        orcids = orcids_from_profile(raw)
+        if not orcids:
+            raise SnowballError("Profile needs orcid or orcids.")
         return run_orcid(
             cfg,
-            orcid,
+            orcids,
             request,
             console=console,
             client=client,

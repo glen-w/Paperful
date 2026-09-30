@@ -389,9 +389,10 @@ def doi_candidates(
 
 def orcid_candidates(
     client: OpenAlexClient,
-    orcid: str,
-    dois: list[str],
+    orcids: str | list[str],
+    dois: list[str] | None = None,
     *,
+    dois_by_orcid: dict[str, list[str]] | None = None,
     run_id: str,
     gate: str,
     depth: int,
@@ -407,7 +408,7 @@ def orcid_candidates(
     keyword_min_score: float = 0.0,
     cites_query: str = "",
 ) -> tuple[list[Candidate], list[str]]:
-    """Person's works (hop 0), then the same expander as DOI seeds."""
+    """One or more people's works (hop 0), then one expander over the combined seeds."""
     _remember_keywords(
         client,
         keyword_limit=keyword_limit,
@@ -415,47 +416,108 @@ def orcid_candidates(
         keyword_min_score=keyword_min_score,
     )
     _remember_cites_query(client, cites_query)
-    seed = {"type": "orcid", "value": orcid}
+    people = [orcids] if isinstance(orcids, str) else [item for item in orcids if item]
+    by_orcid = {key: list(value) for key, value in (dois_by_orcid or {}).items()}
+    if dois is not None and len(people) == 1 and people[0] not in by_orcid:
+        by_orcid[people[0]] = list(dois)
     rows: list[Candidate] = []
     failed: list[str] = []
     seed_works: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
+    primary = people[0] if people else ""
 
-    for raw in dois:
-        doi = _seed_doi(raw) or ""
-        if not doi:
-            failed.append(raw)
-            rows.append(_error_row(run_id, seed, raw, f"invalid DOI {raw}", gate, direction))
-            continue
-        client.stage = f"ORCID work {doi}"
-        client.note(client.stage)
-        try:
-            work = client.work_by_doi(doi)
-        except OpenAlexBudgetExceeded as exc:
-            _defer(
+    for index, orcid in enumerate(people):
+        later = people[index + 1 :]
+        paused = _orcid_person_hop0(
+            client,
+            orcid,
+            by_orcid.get(orcid) or [],
+            run_id=run_id,
+            gate=gate,
+            depth=depth,
+            direction=direction,
+            max_candidates=max_candidates,
+            per_hop_limit=per_hop_limit,
+            year_from=year_from,
+            year_to=year_to,
+            remaining_orcids=later,
+            dois_by_orcid=by_orcid,
+            rows=rows,
+            failed=failed,
+            seed_works=seed_works,
+            seen_ids=seen_ids,
+        )
+        if paused or client.deferred:
+            break
+
+    for row in rows:
+        if row.status != "error":
+            _mark_year(row, year_from, year_to)
+    if depth >= 1 and seed_works and not client.deferred:
+        seed = {"type": "orcid", "value": primary}
+        why = f"ORCID {primary}" if len(people) == 1 else f"ORCID {'+'.join(people)}"
+        rows.extend(
+            _expand_hops(
                 client,
-                exc,
-                kind="seeds",
-                remaining_ids=dois[dois.index(raw) :],
-                hop=0,
-                depth=depth,
-                direction=direction,
+                seed_works,
                 run_id=run_id,
                 seed=seed,
                 gate=gate,
+                depth=depth,
+                direction=direction,
                 per_hop_limit=per_hop_limit,
                 year_from=year_from,
                 year_to=year_to,
-                why_prefix=f"ORCID {orcid}",
+                why_prefix=why,
+                min_seed_citations=min_seed_citations,
+                per_hop_rank=per_hop_rank,
             )
-            break
-        except Exception as exc:
-            if isinstance(exc, OpenAlexError):
+        )
+    return truncate(_dedupe(rows), max_candidates), failed
+
+
+def _orcid_person_hop0(
+    client: OpenAlexClient,
+    orcid: str,
+    dois: list[str],
+    *,
+    run_id: str,
+    gate: str,
+    depth: int,
+    direction: str,
+    max_candidates: int,
+    per_hop_limit: int,
+    year_from: int | None,
+    year_to: int | None,
+    remaining_orcids: list[str],
+    dois_by_orcid: dict[str, list[str]],
+    rows: list[Candidate],
+    failed: list[str],
+    seed_works: list[dict[str, Any]],
+    seen_ids: set[str],
+    skip_dois: bool = False,
+) -> bool:
+    """Resolve ORCID API DOIs + OpenAlex author works for one person. True if deferred."""
+    seed = {"type": "orcid", "value": orcid}
+    if not skip_dois:
+        for raw in dois:
+            doi = _seed_doi(raw) or ""
+            if not doi:
+                failed.append(raw)
+                rows.append(_error_row(run_id, seed, raw, f"invalid DOI {raw}", gate, direction))
+                continue
+            client.stage = f"ORCID work {doi}"
+            client.note(client.stage)
+            try:
+                work = client.work_by_doi(doi)
+            except OpenAlexBudgetExceeded as exc:
                 _defer(
                     client,
                     exc,
                     kind="seeds",
                     remaining_ids=dois[dois.index(raw) :],
+                    remaining_orcids=list(remaining_orcids),
+                    dois_by_orcid=dois_by_orcid,
                     hop=0,
                     depth=depth,
                     direction=direction,
@@ -463,65 +525,89 @@ def orcid_candidates(
                     seed=seed,
                     gate=gate,
                     per_hop_limit=per_hop_limit,
+                    max_candidates=max_candidates,
                     year_from=year_from,
                     year_to=year_to,
                     why_prefix=f"ORCID {orcid}",
                 )
-                break
-            failed.append(doi)
-            rows.append(_error_row(run_id, seed, doi, str(exc), gate, direction))
-            continue
-        if not work:
-            failed.append(doi)
-            rows.append(_error_row(run_id, seed, doi, f"unresolved {doi}", gate, direction))
-            continue
-        oa = short_id(str(work.get("id") or ""))
-        if oa and oa in seen_ids:
-            continue
-        if oa:
-            seen_ids.add(oa)
-        seed_works.append(work)
-        rows.append(
-            work_to_candidate(
-                work,
-                run_id=run_id,
-                seed=seed,
-                hop=0,
-                direction="orcid",
-                why=f"ORCID {orcid}",
-                gate=gate,
+                return True
+            except Exception as exc:
+                if isinstance(exc, OpenAlexError):
+                    _defer(
+                        client,
+                        exc,
+                        kind="seeds",
+                        remaining_ids=dois[dois.index(raw) :],
+                        remaining_orcids=list(remaining_orcids),
+                        dois_by_orcid=dois_by_orcid,
+                        hop=0,
+                        depth=depth,
+                        direction=direction,
+                        run_id=run_id,
+                        seed=seed,
+                        gate=gate,
+                        per_hop_limit=per_hop_limit,
+                        max_candidates=max_candidates,
+                        year_from=year_from,
+                        year_to=year_to,
+                        why_prefix=f"ORCID {orcid}",
+                    )
+                    return True
+                failed.append(doi)
+                rows.append(_error_row(run_id, seed, doi, str(exc), gate, direction))
+                continue
+            if not work:
+                failed.append(doi)
+                rows.append(_error_row(run_id, seed, doi, f"unresolved {doi}", gate, direction))
+                continue
+            oa = short_id(str(work.get("id") or ""))
+            if oa and oa in seen_ids:
+                continue
+            if oa:
+                seen_ids.add(oa)
+            seed_works.append(work)
+            rows.append(
+                work_to_candidate(
+                    work,
+                    run_id=run_id,
+                    seed=seed,
+                    hop=0,
+                    direction="orcid",
+                    why=f"ORCID {orcid}",
+                    gate=gate,
+                )
             )
-        )
-        _emit(client, rows)
-        if client.deferred:
-            break
+            _emit(client, rows)
+            if client.deferred:
+                return True
 
-    # OpenAlex author filter fills gaps the ORCID works list missed.
     author_works: list[dict[str, Any]] = []
-    if not client.deferred:
-        client.stage = f"OpenAlex author {orcid}"
-        client.note(client.stage)
-        try:
-            author_works = client.works_by_author_orcid(
-                orcid, limit=max_candidates, year_from=year_from, year_to=year_to
-            )
-        except OpenAlexBudgetExceeded as exc:
-            _defer(
-                client,
-                exc,
-                kind="author",
-                remaining_ids=[orcid],
-                hop=0,
-                depth=depth,
-                direction=direction,
-                run_id=run_id,
-                seed=seed,
-                gate=gate,
-                per_hop_limit=per_hop_limit,
-                year_from=year_from,
-                year_to=year_to,
-                why_prefix=f"ORCID {orcid}",
-            )
+    client.stage = f"OpenAlex author {orcid}"
+    client.note(client.stage)
+    try:
+        author_works = client.works_by_author_orcid(
+            orcid, limit=max_candidates, year_from=year_from, year_to=year_to
+        )
+    except OpenAlexBudgetExceeded as exc:
+        _defer(
+            client,
+            exc,
+            kind="author",
+            remaining_ids=[orcid, *remaining_orcids],
+            dois_by_orcid=dois_by_orcid,
+            hop=0,
+            depth=depth,
+            direction=direction,
+            run_id=run_id,
+            seed=seed,
+            gate=gate,
+            per_hop_limit=per_hop_limit,
+            max_candidates=max_candidates,
+            year_from=year_from,
+            year_to=year_to,
+            why_prefix=f"ORCID {orcid}",
+        )
+        return True
     for work in author_works:
         oa = short_id(str(work.get("id") or ""))
         if oa and oa in seen_ids:
@@ -540,29 +626,7 @@ def orcid_candidates(
                 gate=gate,
             )
         )
-
-    for row in rows:
-        if row.status != "error":
-            _mark_year(row, year_from, year_to)
-    if depth >= 1 and seed_works and not client.deferred:
-        rows.extend(
-            _expand_hops(
-                client,
-                seed_works,
-                run_id=run_id,
-                seed=seed,
-                gate=gate,
-                depth=depth,
-                direction=direction,
-                per_hop_limit=per_hop_limit,
-                year_from=year_from,
-                year_to=year_to,
-                why_prefix=f"ORCID {orcid}",
-                min_seed_citations=min_seed_citations,
-                per_hop_rank=per_hop_rank,
-            )
-        )
-    return truncate(_dedupe(rows), max_candidates), failed
+    return False
 
 
 def _error_row(
@@ -1507,14 +1571,42 @@ def continue_deferred(client: OpenAlexClient, deferred: dict[str, Any]) -> list[
             return rows
         return [_row(child, "refs", reason) for child in children]
     if kind == "author" and remaining:
-        try:
-            found = client.works_by_author_orcid(
-                remaining[0], limit=per_hop, year_from=year_from, year_to=year_to
+        by_orcid = {
+            str(key): [str(item) for item in (value or [])]
+            for key, value in (deferred.get("dois_by_orcid") or {}).items()
+        }
+        depth = int(deferred.get("depth") or 0)
+        direction = str(deferred.get("direction") or "refs")
+        max_candidates = int(deferred.get("max_candidates") or per_hop or 50)
+        failed: list[str] = []
+        seed_works: list[dict[str, Any]] = []
+        seen_ids: set[str] = set()
+        for index, orcid in enumerate(remaining):
+            # First ORCID paused mid-author: its DOI list was already resolved.
+            skip_dois = index == 0
+            paused = _orcid_person_hop0(
+                client,
+                orcid,
+                by_orcid.get(orcid) or [],
+                run_id=run_id,
+                gate=gate,
+                depth=depth,
+                direction=direction,
+                max_candidates=max_candidates,
+                per_hop_limit=per_hop,
+                year_from=year_from if isinstance(year_from, int) else None,
+                year_to=year_to if isinstance(year_to, int) else None,
+                remaining_orcids=remaining[index + 1 :],
+                dois_by_orcid=by_orcid,
+                rows=rows,
+                failed=failed,
+                seed_works=seed_works,
+                seen_ids=seen_ids,
+                skip_dois=skip_dois,
             )
-        except OpenAlexBudgetExceeded as exc:
-            _defer(client, exc, **deferred)
-            return rows
-        return [_row(child, "orcid", f"OpenAlex author {remaining[0]}") for child in found]
+            if paused or client.deferred:
+                return rows
+        return rows
     if kind == "search" and remaining:
         try:
             found = client.search(remaining[0], limit=per_hop, year_from=year_from, year_to=year_to)
@@ -1524,6 +1616,11 @@ def continue_deferred(client: OpenAlexClient, deferred: dict[str, Any]) -> list[
         return [_row(child, "search", "OpenAlex search") for child in found]
     if kind == "seeds":
         keep_seeds = bool(deferred.get("include_seeds", True))
+        orcid_seed = str(seed.get("type") or "") == "orcid"
+        by_orcid = {
+            str(key): [str(item) for item in (value or [])]
+            for key, value in (deferred.get("dois_by_orcid") or {}).items()
+        }
         for index, doi in enumerate(remaining):
             try:
                 work = client.work_by_doi(doi)
@@ -1532,6 +1629,47 @@ def continue_deferred(client: OpenAlexClient, deferred: dict[str, Any]) -> list[
                 return rows
             if work and keep_seeds:
                 cleaned = _seed_doi(doi) or doi
-                rows.append(_row(work, "doi", f"seed DOI {cleaned}"))
+                if orcid_seed:
+                    orcid = str(seed.get("value") or "")
+                    rows.append(_row(work, "orcid", f"ORCID {orcid}"))
+                else:
+                    rows.append(_row(work, "doi", f"seed DOI {cleaned}"))
+        if orcid_seed and not client.deferred:
+            remaining_orcids = [
+                str(item) for item in (deferred.get("remaining_orcids") or []) if item
+            ]
+            current = str(seed.get("value") or "")
+            people = ([current] if current else []) + remaining_orcids
+            depth = int(deferred.get("depth") or 0)
+            direction = str(deferred.get("direction") or "refs")
+            max_candidates = int(deferred.get("max_candidates") or per_hop or 50)
+            failed = []
+            seed_works: list[dict[str, Any]] = []
+            seen_ids: set[str] = set()
+            for index, orcid in enumerate(people):
+                # Current ORCID's remaining DOIs were just resolved above.
+                skip_dois = index == 0
+                paused = _orcid_person_hop0(
+                    client,
+                    orcid,
+                    by_orcid.get(orcid) or [],
+                    run_id=run_id,
+                    gate=gate,
+                    depth=depth,
+                    direction=direction,
+                    max_candidates=max_candidates,
+                    per_hop_limit=per_hop,
+                    year_from=year_from if isinstance(year_from, int) else None,
+                    year_to=year_to if isinstance(year_to, int) else None,
+                    remaining_orcids=people[index + 1 :],
+                    dois_by_orcid=by_orcid,
+                    rows=rows,
+                    failed=failed,
+                    seed_works=seed_works,
+                    seen_ids=seen_ids,
+                    skip_dois=skip_dois,
+                )
+                if paused or client.deferred:
+                    return rows
         return rows
     return rows

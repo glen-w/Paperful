@@ -47,8 +47,14 @@ def _work(oa: str, doi: str, title: str, year: int, cites: int, refs: list[str] 
     }
 
 
-def _client(works: dict[str, dict], *, citing: dict[str, list[str]] | None = None) -> OpenAlexClient:
+def _client(
+    works: dict[str, dict],
+    *,
+    citing: dict[str, list[str]] | None = None,
+    by_orcid: dict[str, list[str]] | None = None,
+) -> OpenAlexClient:
     citing = citing or {}
+    by_orcid = by_orcid or {}
 
     def getter(path: str, params: dict) -> dict:
         if path.startswith("/works/https://doi.org/"):
@@ -69,7 +75,12 @@ def _client(works: dict[str, dict], *, citing: dict[str, list[str]] | None = Non
             ids = citing.get(seed, [])
             return {"results": [works[i] for i in ids if i in works]}
         if "author.orcid:" in filt:
-            return {"results": []}
+            oid = ""
+            for part in filt.split(","):
+                if part.startswith("author.orcid:"):
+                    oid = part.split(":", 1)[1]
+            ids = by_orcid.get(oid, [])
+            return {"results": [works[i] for i in ids if i in works]}
         if "search" in params:
             return {"results": list(works.values())}
         return {"results": []}
@@ -585,6 +596,171 @@ def test_orcid_seeds(tmp_path: Path):
     by_doi = {row["ids"]["doi"]: row for row in rows}
     assert by_doi["10.1000/ego"]["hop"] == 0
     assert by_doi["10.1000/ref"]["hop"] == 1
+
+
+def test_multi_orcid_seeds(tmp_path: Path):
+    works = {
+        "W1": _work("W1", "10.1000/a", "A", 2020, 2, ["W3"]),
+        "W2": _work("W2", "10.1000/b", "B", 2019, 2, ["W3"]),
+        "W3": _work("W3", "10.1000/shared-ref", "Shared ref", 2018, 1),
+        "W4": _work("W4", "10.1000/co", "Coauthored", 2021, 1),
+    }
+    a = "0000-0002-9162-9618"
+    b = "0000-0002-1825-0097"
+
+    def getter(orcid: str):
+        doi = "10.1000/a" if orcid == a else "10.1000/b"
+        return {
+            "group": [
+                {
+                    "work-summary": [
+                        {
+                            "external-ids": {
+                                "external-id": [
+                                    {"external-id-type": "doi", "external-id-value": doi}
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+
+    result = run_orcid(
+        _cfg(tmp_path),
+        [a, b, a],
+        SnowballRequest(depth=1),
+        console=Console(highlight=False, width=160),
+        client=_client(works, by_orcid={a: ["W4"], b: ["W4"]}),
+        lookup=lambda doi, title: None,
+        orcid_getter=getter,
+    )
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    dois = {row["ids"]["doi"] for row in rows}
+    assert dois == {"10.1000/a", "10.1000/b", "10.1000/shared-ref", "10.1000/co"}
+    assert sum(1 for row in rows if row["ids"]["doi"] == "10.1000/co") == 1
+    assert sum(1 for row in rows if row["ids"]["doi"] == "10.1000/shared-ref") == 1
+    by_doi = {row["ids"]["doi"]: row for row in rows}
+    assert by_doi["10.1000/a"]["hop"] == 0
+    assert by_doi["10.1000/b"]["hop"] == 0
+    assert by_doi["10.1000/shared-ref"]["hop"] == 1
+
+
+def test_orcid_profile_legacy_and_list(tmp_path: Path):
+    from paperful.snowball.profile import orcids_from_profile, save_profile
+
+    cfg = _cfg(tmp_path)
+    assert orcids_from_profile({"orcid": "0000-0002-9162-9618"}) == ["0000-0002-9162-9618"]
+    assert orcids_from_profile(
+        {"orcids": ["0000-0002-9162-9618", "0000-0002-1825-0097"]}
+    ) == ["0000-0002-9162-9618", "0000-0002-1825-0097"]
+    path = save_profile(
+        cfg,
+        "two-authors",
+        {
+            "mode": "orcid",
+            "orcids": ["0000-0002-9162-9618", "0000-0002-1825-0097"],
+            "gate": "dry-run",
+        },
+        force=False,
+    )
+    text = path.read_text()
+    assert "orcids =" in text
+    saved = runner.invoke(
+        cli.app,
+        [
+            "snowball",
+            "profile",
+            "save",
+            "cli-orcids",
+            "--orcid",
+            "0000-0002-9162-9618",
+            "--orcid",
+            "0000-0002-1825-0097",
+            "-c",
+            str(tmp_path / "config.toml"),
+        ],
+    )
+    assert saved.exit_code == 0
+    body = (tmp_path / "profiles" / "cli-orcids.toml").read_text()
+    assert "0000-0002-1825-0097" in body
+
+
+def test_author_resume_loops_remaining_orcids(tmp_path: Path):
+    from paperful.snowball.crawl import continue_deferred
+
+    works = {
+        "W1": _work("W1", "10.1000/a", "A", 2020, 1),
+        "W2": _work("W2", "10.1000/b", "B", 2019, 1),
+    }
+    a = "0000-0002-9162-9618"
+    b = "0000-0002-1825-0097"
+    client = _client(works, by_orcid={a: ["W1"], b: ["W2"]})
+    rows = continue_deferred(
+        client,
+        {
+            "kind": "author",
+            "remaining_ids": [a, b],
+            "dois_by_orcid": {a: [], b: []},
+            "run_id": "t",
+            "seed": {"type": "orcid", "value": a},
+            "gate": "dry-run",
+            "hop": 0,
+            "depth": 0,
+            "direction": "refs",
+            "per_hop_limit": 50,
+            "max_candidates": 50,
+            "why_prefix": f"ORCID {a}",
+        },
+    )
+    dois = {row.ids.get("doi") for row in rows}
+    assert dois == {"10.1000/a", "10.1000/b"}
+
+
+def test_multi_orcid_invalid_second_refuses(tmp_path: Path):
+    with pytest.raises(SnowballError, match="Invalid ORCID"):
+        run_orcid(
+            _cfg(tmp_path),
+            ["0000-0002-9162-9618", "not-an-orcid"],
+            SnowballRequest(),
+            console=Console(),
+        )
+
+
+def test_seeds_resume_continues_remaining_orcids(tmp_path: Path):
+    from paperful.snowball.crawl import continue_deferred
+
+    works = {
+        "W1": _work("W1", "10.1000/a-remaining", "A remaining", 2020, 1),
+        "W2": _work("W2", "10.1000/a-author", "A author", 2021, 1),
+        "W3": _work("W3", "10.1000/b", "B", 2019, 1),
+    }
+    a = "0000-0002-9162-9618"
+    b = "0000-0002-1825-0097"
+    client = _client(works, by_orcid={a: ["W2"], b: ["W3"]})
+    rows = continue_deferred(
+        client,
+        {
+            "kind": "seeds",
+            "remaining_ids": ["10.1000/a-remaining"],
+            "remaining_orcids": [b],
+            "dois_by_orcid": {a: ["10.1000/a-remaining"], b: []},
+            "run_id": "t",
+            "seed": {"type": "orcid", "value": a},
+            "gate": "dry-run",
+            "hop": 0,
+            "depth": 0,
+            "direction": "refs",
+            "per_hop_limit": 50,
+            "max_candidates": 50,
+            "why_prefix": f"ORCID {a}",
+        },
+    )
+    dois = {row.ids.get("doi") for row in rows}
+    assert "10.1000/a-remaining" in dois
+    assert "10.1000/a-author" in dois
+    assert "10.1000/b" in dois
+    assert all(row.direction == "orcid" for row in rows)
 
 
 def test_collection_seeds(tmp_path: Path):

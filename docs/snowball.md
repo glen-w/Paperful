@@ -1,6 +1,6 @@
 # Snowball
 
-**Status:** keyword search, DOI / ORCID / collection seeds, `hybrid` (keyword
+**Status:** keyword search, multi-DOI / multi-ORCID / collection seeds, `hybrid` (keyword
 hits, then one hop), refs, cited-by, and OpenAlex keywords, depth up to 5 under caps, gates
 `dry-run` / `approve-each` / `approve-batch` / `auto`, overlap ranking,
 `--fetch-pdfs`, and pull-only `watch` (baseline then propose new arrivals) are
@@ -10,16 +10,18 @@ implemented. Config honors `dedupe_scope`, `tag_prefix`,
 `[llm]` is on and does not create items. `expand = cited_authors` stays off.
 Phases live in [ROADMAP](ROADMAP.md#snowball).
 
-Snowball grows a library outward from a keyword, a DOI, a person, or an
-existing collection. It proposes works, then creates items under an explicit
-gate. [`run`](commands.md) fills PDFs for items that already exist. `fetch_pdfs`
-can do that in the same process, limited to the keys just created. How far
-one command reaches is [drawn below](#how-a-hop-is-cut).
+Snowball grows a library outward from a keyword, one or more DOIs, one or more
+people (ORCID), or an existing collection. It proposes works, then creates items
+under an explicit gate. [`run`](commands.md) fills PDFs for items that already
+exist. `fetch_pdfs` can do that in the same process, limited to the keys just
+created. How far one command reaches is [drawn below](#how-a-hop-is-cut).
 
 ```text
 paperful snowball search "area based management tools" --year-from 2018
 paperful snowball doi 10.1038/s41586-021-03819-2 --depth 2 --direction both
+paperful snowball doi 10.1038/s41586-021-03819-2 10.1126/science.aao5646
 paperful snowball orcid 0000-0002-9162-9618
+paperful snowball orcid 0000-0002-9162-9618 0000-0002-1825-0097 --depth 1
 paperful snowball collection "Inbox/Seeds" --direction refs
 paperful snowball run --profile doi-refs-gated
 paperful snowball apply <run-id> -C "Inbox/Snowball"
@@ -30,7 +32,8 @@ paperful snowball watch save bbnj --profile keyword-scout
 paperful snowball watch run bbnj
 ```
 `search`, `hybrid`, `doi`, `orcid`, and `collection` are seeds under one verb.
-`hybrid` is the keyword-then-hop job. There is no separate top-level
+`doi` and `orcid` take one or more seeds in a single crawl (shared caps / gate /
+`-C`). `hybrid` is the keyword-then-hop job. There is no separate top-level
 `harvest`, `crawl`, or `discover`. `watch` re-runs a saved profile on a
 schedule you choose; see [Watch](#watch).
 
@@ -90,8 +93,8 @@ A snowball profile is a named job in `profiles/`. `paperful run` and
 | --- | --- | --- |
 | Keyword | OpenAlex title/abstract search | **0** — the hit list. Depth 1+ expands those hits and must be set explicitly. A global `depth = 1` does not expand every keyword hit |
 | Hybrid | That hit list, then one hop from the top `hybrid_seeds` DOIs (default 5) | The hop is always 1. `--depth` does not add further hops |
-| DOI | The seed work itself (hop 0), then its neighbours (`referenced_works` and/or works that cite it) | **1**, direction `refs` by default. Use `--direction cites` or `both` for cited-by |
-| ORCID | That person’s works (ORCID public API, filled by OpenAlex author filter), then the same expander | **1**. [One hop out](#how-a-hop-is-cut) from those works |
+| DOI | Each seed work (hop 0), then its neighbours (`referenced_works` and/or works that cite it). Pass several DOIs for one shared crawl | **1**, direction `refs` by default. Use `--direction cites` or `both` for cited-by |
+| ORCID | Those people’s works (ORCID public API, filled by OpenAlex author filter), then the same expander. Pass several ORCID iDs for one shared crawl | **1**. [One hop out](#how-a-hop-is-cut) from the combined works |
 | Collection | DOIs already in the seed collection path, then neighbours only | **1**. `-C` is the write target (defaults to the seed path) |
 
 `expand = cited_authors` (every paper by every cited author) stays off. It
@@ -99,7 +102,9 @@ is a later, capped switch.
 
 ## How a hop is cut
 
-An ORCID run starts at that person’s own works (hop 0). `--depth 1` takes
+An ORCID run starts at those people’s own works (hop 0). Pass several ORCID
+iDs in one command (or repeat `--orcid` on `profile save`) to merge them into
+one crawl under shared caps. `--depth 1` takes
 one hop out from those works and stops. It does not walk the neighbours’
 neighbours. `--direction both` takes references and citing works. Each side
 is capped on its own: `--per-hop-limit 25` keeps 25 references and 25 citing
@@ -343,7 +348,8 @@ A keyword search that asks for more than 5,000 works follows OpenAlex's cursor i
 
 Short 429s and 5xx responses retry with exponential backoff. A reset of a minute or more does not keep polling until midnight.
 `snowball profile save` writes seeds and knobs only, after a successful
-dry-run, or with `--force`. It refuses to store a key.
+dry-run, or with `--force`. It refuses to store a key. Repeat `--doi` or
+`--orcid` for several seeds (`dois = [...]` / `orcids = [...]` in the profile).
 
 Backends resolve in the configured order and emit each work once, keyed by DOI.
 The default is OpenAlex, then Crossref, Semantic Scholar
@@ -387,7 +393,9 @@ HTML stage recovers DOI links from that page without needing a PDF.
 
 `snowball run --profile NAME` prints that profile’s one-line description
 before any request. `mode` is `search`, `hybrid`, `doi`, `orcid`, or
-`collection`. `snowball profile save --query … --hybrid` stores `mode = "hybrid"`.
+`collection`. DOI profiles store `dois = [...]`; ORCID profiles store
+`orcids = [...]` (legacy singular `orcid` still loads). `snowball profile save
+--query … --hybrid` stores `mode = "hybrid"`.
 
 `--refine` (or `refine = true` on a profile) asks the configured model for
 query strings and prints them. If `[llm]` is off, or the call fails, the crawl
@@ -450,8 +458,9 @@ outputs, and `scholar_citations.py`.
 ## What to reuse elsewhere
 
 OpenAlex is the graph (search, author, `referenced_works`, `cites:`). The
-ORCID public API is the person’s own works; those lists are often incomplete,
-so OpenAlex expands them. Semantic Scholar references and citations fill gaps
+ORCID public API is each person’s own works; those lists are often incomplete,
+so OpenAlex expands them. Several ORCID iDs in one command merge hop-0 works
+before a shared hop expand. Semantic Scholar references and citations fill gaps
 on the public API; a key is only for heavier use. Crossref, already used to verify DOIs, fills metadata
 gaps. It is not the forward-citation graph.
 

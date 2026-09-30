@@ -6,6 +6,10 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+`snowball orcid` accepts several ORCID iDs in one crawl (shared caps / gate /
+`-C`), matching multi-DOI positionals. Profile save takes repeatable `--orcid`
+and writes `orcids = [...]`; legacy singular `orcid` still loads.
+
 Creating library parents (snowball ingest, restore, import) Title-Cases ALL
 CAPS scholarly titles before write, using the same rules as `fix-metadata`.
 DOI work titles adopted by `fix-metadata` get the same pass so Crossref/

@@ -310,7 +310,7 @@ def run_doi(
 
 def run_orcid(
     cfg: Config,
-    orcid: str,
+    orcid: str | list[str],
     request: SnowballRequest,
     *,
     console: Console,
@@ -320,9 +320,19 @@ def run_orcid(
     orcid_getter: Any = None,
 ) -> PathResult:
     _guard(cfg, request)
-    cleaned = normalize_orcid(orcid)
+    raw_list = [orcid] if isinstance(orcid, str) else list(orcid)
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_list:
+        value = normalize_orcid(str(raw).strip())
+        if not value:
+            raise SnowballError(f"Invalid ORCID iD: {raw!r}")
+        if value in seen:
+            continue
+        seen.add(value)
+        cleaned.append(value)
     if not cleaned:
-        raise SnowballError(f"Invalid ORCID iD: {orcid!r}")
+        raise SnowballError("Pass at least one ORCID iD.")
     try:
         direction = normalize_direction(request.direction)
     except ValueError as exc:
@@ -331,20 +341,21 @@ def run_orcid(
     depth, warning = clamp_depth(_graph_depth(cfg, request))
     cites_query = _checked_cites_query(request, direction, expands=depth >= 1)
     backends = _backends(cfg, request)
+    dois_by_orcid: dict[str, list[str]] = {item: [] for item in cleaned}
     if "orcid" in backends:
-        try:
-            dois = orcid_dois(cleaned, getter=orcid_getter)
-        except OrcidError as exc:
-            raise SnowballError(str(exc)) from exc
+        for item in cleaned:
+            try:
+                dois_by_orcid[item] = orcid_dois(item, getter=orcid_getter)
+            except OrcidError as exc:
+                raise SnowballError(str(exc)) from exc
     else:
-        dois = []
         console.print("[yellow]orcid backend off; using OpenAlex author filter only[/]")
 
     def crawl(oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int, str]) -> tuple[list[Candidate], list[str]]:
         return orcid_candidates(
             oa,
             cleaned,
-            dois,
+            dois_by_orcid=dois_by_orcid,
             run_id=run_id,
             gate=gate,
             depth=depth,

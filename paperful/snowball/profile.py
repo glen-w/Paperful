@@ -112,6 +112,15 @@ def _strs(raw: Any) -> tuple[str, ...]:
     return ()
 
 
+def orcids_from_profile(raw: dict[str, Any]) -> list[str]:
+    """Read ``orcids`` array or legacy singular ``orcid`` from a snowball profile."""
+    items = list(_strs(raw.get("orcids")))
+    if items:
+        return items
+    single = str(raw.get("orcid") or "").strip()
+    return [single] if single else []
+
+
 def save_profile(cfg: Config, name: str, body: dict[str, Any], *, force: bool) -> Path:
     """Write seeds and knobs only. Refuses keys. A writing gate needs --force."""
     from ..run_config import check_profile_name
