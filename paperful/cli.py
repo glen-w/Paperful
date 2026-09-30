@@ -413,6 +413,12 @@ class WriteDest(str, Enum):
     both = "both"
 
 
+class SummarizeOrder(str, Enum):
+    newest = "newest"
+    oldest = "oldest"
+    library = "library"
+
+
 def _item_progress():
     """Live bar that stays below scrolling per-item logs."""
     return item_progress(console)
@@ -4264,6 +4270,14 @@ def summarize(
             "the gated PDF identity check flags the item."
         ),
     ),
+    order: SummarizeOrder | None = typer.Option(
+        None,
+        "--order",
+        help=(
+            "Queue order before --limit: newest, oldest, or library (manager "
+            "order). Default is summarize.order in config, or library."
+        ),
+    ),
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
@@ -4276,7 +4290,7 @@ def summarize(
     from .llm import llm_egress_is_remote
     from .llm.preflight import validate_llm_for_verb
     from .llm.validate import LlmConfigError
-    from .summarize import SummaryRow, summarize_items
+    from .summarize import SummaryRow, order_items, summarize_items
 
     if not item and _scope_unset(collection, library, profile, run_config):
         console.print("[red]Give --item KEY and/or --collection / --library.[/]")
@@ -4302,6 +4316,7 @@ def summarize(
         console.print("[red]Give --item KEY and/or --collection / --library.[/]")
         raise typer.Exit(1)
     dest = to.value if to is not None else cfg.summarize_dest
+    queue_order = order.value if order is not None else cfg.summarize_order
     if apply and dest == "disk":
         console.print(
             "[red]--apply writes a Zotero note; it conflicts with --to disk.[/]"
@@ -4332,6 +4347,7 @@ def summarize(
         pdfs_only=True,
     )
     items, scope = loaded.items, loaded.label
+    items = order_items(items, queue_order)
     if limit:
         items = items[:limit]
     started = time.time()
@@ -4348,9 +4364,10 @@ def summarize(
                 "failed": failed,
                 "skipped": skipped,
                 "dest": dest,
+                "order": queue_order,
             },
             items=outcomes,
-            flags={"to": dest},
+            flags={"to": dest, "order": queue_order},
             started=started,
         )
 

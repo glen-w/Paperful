@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .config import Config, wants_disk, wants_zotero
+from .config import Config, parse_summarize_order, wants_disk, wants_zotero
 from .grounding import budget_slice, metadata_block, pdf_text_for
 from .library import LibraryBackend, LibraryError
 from .llm import (
@@ -21,6 +21,31 @@ from .llm import (
 )
 from .store import Manifest
 from .zot import Item
+
+
+def order_items(items: list[Item], order: str) -> list[Item]:
+    """Return items in summarize queue order.
+
+    ``library`` keeps input order. ``newest`` / ``oldest`` sort by year, then
+    date string, then key. Undated items stay at the end either way so a
+    slow LLM run still prioritises dated work.
+    """
+    kind = parse_summarize_order(order)
+    if kind == "library":
+        return list(items)
+    dated: list[Item] = []
+    undated: list[Item] = []
+    for it in items:
+        if it.year is None and not (it.date or "").strip():
+            undated.append(it)
+        else:
+            dated.append(it)
+    dated.sort(
+        key=lambda it: (it.year or 0, (it.date or "").strip(), it.key),
+        reverse=(kind == "newest"),
+    )
+    return dated + undated
+
 
 _DEFAULT_PROMPT = """You are summarizing a scholarly work for a personal research library.
 Use ONLY the metadata and document text below. If information is missing, say so.

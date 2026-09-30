@@ -153,6 +153,7 @@ class Config:
     summarize_max_context_chars: int = 24_000
     summarize_tag: str = "paperful-summary"
     summarize_dest: str = "both"  # disk | zotero | both
+    summarize_order: str = "library"  # library | newest | oldest
     synthesize_prompt_template: str = "default"
     synthesize_max_context_chars: int = 24_000
     synthesize_tag: str = "paperful-report"
@@ -596,6 +597,21 @@ def parse_dest(value: str, *, key: str = "dest") -> str:
     return dest
 
 
+_SUMMARIZE_ORDERS = frozenset({"library", "newest", "oldest"})
+
+
+def parse_summarize_order(value: str, *, key: str = "order") -> str:
+    """Normalise summarize queue order. Blank means library (input) order."""
+    order = str(value).strip().lower()
+    if not order:
+        return "library"
+    if order not in _SUMMARIZE_ORDERS:
+        raise ValueError(
+            f"config {key} {value!r} must be newest, oldest, or library"
+        )
+    return order
+
+
 def wants_disk(dest: str) -> bool:
     return dest in ("disk", "both")
 
@@ -663,6 +679,10 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             cfg.summarize_tag = str(summ["tag"]).strip() or "paperful-summary"
         if "dest" in summ:
             cfg.summarize_dest = parse_dest(str(summ["dest"]), key="[summarize].dest")
+        if "order" in summ:
+            cfg.summarize_order = parse_summarize_order(
+                str(summ["order"]), key="[summarize].order"
+            )
     synth = raw.get("synthesize")
     if isinstance(synth, dict):
         if "prompt_template" in synth:

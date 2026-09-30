@@ -150,6 +150,7 @@ mirror_failures_before_skip = 3
 # max_context_chars = 24000
 # tag = "paperful-summary"       # child-note tag; re-runs update, never duplicate
 # dest = "both"                  # disk | zotero | both. disk keeps the Zotero tree clean
+# order = "library"              # library | newest | oldest (before --limit; undated last)
 # [synthesize]
 # prompt_template = "default"
 # max_context_chars = 24000

@@ -614,6 +614,7 @@ def test_dest_config(tmp_path):
         tmp_path / "config.toml",
     )
     assert cfg.summarize_dest == "disk"
+    assert cfg.summarize_order == "library"
     assert cfg.synthesize_dest == "zotero"
     assert cfg.synthesize_tag == "paperful-report"
     assert cfg.effective_synthesize_timeout() == 10
@@ -622,6 +623,43 @@ def test_dest_config(tmp_path):
     assert blank.effective_synthesize_timeout() == 300
     with pytest.raises(ValueError, match="disk, zotero, or both"):
         _from_dict({"synthesize": {"dest": "mirror"}}, tmp_path / "config.toml")
+
+
+def test_summarize_order_config(tmp_path):
+    from paperful.config import _from_dict
+
+    cfg = _from_dict({"summarize": {"order": " Newest "}}, tmp_path / "config.toml")
+    assert cfg.summarize_order == "newest"
+    blank = _from_dict({"summarize": {"order": "  "}}, tmp_path / "config.toml")
+    assert blank.summarize_order == "library"
+    with pytest.raises(ValueError, match="newest, oldest, or library"):
+        _from_dict({"summarize": {"order": "type"}}, tmp_path / "config.toml")
+
+
+def test_order_items_newest_oldest_and_library():
+    a = make_item(key="A", year=2020, date="2020-01")
+    b = make_item(key="B", year=2024, date="2024-06")
+    c = make_item(key="C", year=None, date=None)
+    d = make_item(key="D", year=2024, date="2024-01")
+    items = [a, b, c, d]
+    assert [it.key for it in summarize.order_items(items, "library")] == [
+        "A",
+        "B",
+        "C",
+        "D",
+    ]
+    assert [it.key for it in summarize.order_items(items, "newest")] == [
+        "B",
+        "D",
+        "A",
+        "C",
+    ]
+    assert [it.key for it in summarize.order_items(items, "oldest")] == [
+        "A",
+        "D",
+        "B",
+        "C",
+    ]
 
 
 def test_render_summary_sets_num_ctx(llm_cfg, monkeypatch):

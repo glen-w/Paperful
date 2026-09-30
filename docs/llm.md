@@ -96,6 +96,7 @@ prompt_template = "default"         # or a path, e.g. "prompts/summary.md"
 max_context_chars = 24000
 tag = "paperful-summary"
 # dest = "both"                    # disk | zotero | both
+# order = "library"                # library | newest | oldest
 
 [synthesize]                        # verb E
 prompt_template = "default"
@@ -208,6 +209,7 @@ silent (no finding).
 uv run paperful summarize --item ABCD1234                 # disk HTML + tagged child note
 uv run paperful summarize -C BBNJ --to disk               # HTML only; Zotero tree stays clean
 uv run paperful summarize -C BBNJ --year-from 2023 -T journalArticle --limit 5
+uv run paperful summarize -C BBNJ --order newest          # recent publications first
 uv run paperful summarize --item ABCD1234 --prompt prompts/one-liner.md
 ```
 
@@ -230,6 +232,10 @@ uv run paperful summarize --item ABCD1234 --prompt prompts/one-liner.md
   calling the model again. `--force` regenerates even when the footer matches.
   `--to disk` leaves the Zotero tree clean. `--apply` still means “this run
   must write the note” and exits 1 together with `--to disk`.
+- `--order newest|oldest|library` (default `[summarize].order`, or `library`)
+  sets queue order **before** `--limit`. Use `newest` when the model is slow
+  and recent papers matter first. Undated items stay at the end under
+  `newest` / `oldest`. Item type stays a filter (`-T`), not an order key.
 - Ollama receives `num_ctx` sized from the prompt (about 3 characters per
   token, plus reply headroom, rounded up, capped by `[llm].max_num_ctx`).
   The model tag has to actually support that window. If Ollama logs a
