@@ -88,6 +88,30 @@ def test_text_pdf_is_skipped(tmp_path, monkeypatch):
     assert batch.would == 0
 
 
+def test_classify_replaces_the_first_pages_probe(tmp_path, monkeypatch):
+    pdf = _blank_pdf(tmp_path / "cover-then-scan.pdf")
+
+    def no_probe(*a, **k):
+        raise AssertionError("classify was given; the probe must not run")
+
+    monkeypatch.setattr("paperful.ocr.text_from_pdf", no_probe)
+    seen = []
+
+    def classify(path):
+        seen.append(path)
+        return "partial text"
+
+    cfg = _cfg(tmp_path)
+    manifest = Manifest(tmp_path / "state" / "manifest.jsonl")
+    batch = ocr_items(cfg, [_item(pdf)], manifest, None, apply=False, classify=classify)
+    assert seen == [pdf]
+    assert batch.would == 1 and batch.rows[0].reason == "partial text"
+    skipped = ocr_items(
+        cfg, [_item(pdf)], manifest, None, apply=False, classify=lambda path: None
+    )
+    assert skipped.skipped == 1
+
+
 def test_apply_without_ocrmypdf_raises(tmp_path, monkeypatch):
     pdf = _blank_pdf(tmp_path / "scan.pdf")
     monkeypatch.setattr("paperful.ocr.shutil.which", lambda name: None)

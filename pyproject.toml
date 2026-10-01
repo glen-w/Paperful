@@ -20,6 +20,10 @@ dependencies = [
 # Kept for older install docs (`pip install paperful[htmlpdf]`); Playwright is now core.
 htmlpdf = ["playwright>=1.60"]
 llm = ["litellm>=1.70,<2"]
+# Library index for `paperful rag` / `paperful ask`. Embeddings go through [llm].
+rag = ["lancedb>=0.39,<1"]
+# Layout-aware PDF parsing for `[rag].parser = "docling"`. Pulls in torch.
+rag-docling = ["docling>=2"]
 browser-agent = [
     "browser-use>=0.11; python_version >= '3.11'",
     "ollama>=0.4; python_version >= '3.11'",
@@ -37,7 +41,8 @@ docs = [
 paperful = "paperful.cli:app"
 
 [dependency-groups]
-dev = ["pytest>=8"]
+# lancedb here so CI runs the index tests.
+dev = ["pytest>=8", "lancedb>=0.39,<1"]
 
 [build-system]
 requires = ["hatchling"]

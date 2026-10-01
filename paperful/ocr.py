@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -202,8 +203,13 @@ def ocr_items(
     apply: bool,
     attach: bool = False,
     track: Track | None = None,
+    classify: Callable[[Path], str | None] | None = None,
 ) -> OcrBatch:
-    """Classify each PDF. With ``apply``, rewrite image files under ``out/``."""
+    """Classify each PDF. With ``apply``, rewrite image files under ``out/``.
+
+    ``classify`` replaces the first-pages probe for callers that have already
+    read the whole file. It returns the reason to OCR, or None to skip.
+    """
     if apply and not ocrmypdf_available():
         raise OcrUnavailable(
             "ocrmypdf is not on PATH. "
@@ -219,7 +225,10 @@ def ocr_items(
             batch.rows.append(row)
             batch.failed += 1
             continue
-        why = needs_text_layer(text_from_pdf(sample))
+        if classify is not None:
+            why = classify(sample)
+        else:
+            why = needs_text_layer(text_from_pdf(sample))
         shown = str(durable or sample)
         if why is None:
             row = OcrRow(item.key, item.title, shown, "skip", "has text")

@@ -162,6 +162,15 @@ inbox_app = typer.Typer(
     ),
 )
 app.add_typer(inbox_app, name="inbox")
+rag_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help=(
+        "Library index behind `paperful ask`. Built from the on-disk mirror; "
+        "it never calls the reference manager."
+    ),
+)
+app.add_typer(rag_app, name="rag")
 
 # Canonical top-level verbs. tests/test_cli.py asserts this matches `paperful --help`.
 JOBS: dict[str, tuple[str, ...]] = {
@@ -176,6 +185,8 @@ JOBS: dict[str, tuple[str, ...]] = {
         "ocr",
         "summarize",
         "synthesize",
+        "rag",
+        "ask",
         "all",
     ),
     "mirror": ("snapshot", "restore"),
@@ -2252,6 +2263,7 @@ def gaps(
         raise typer.Exit(1)
     dl = _gaps_downloads_dir(cfg, downloads_dir)
     by_key = {it.key: it for it in items}
+    walk_started = time.time()
     result = walk_missing(
         cfg,
         backend,
@@ -2263,6 +2275,7 @@ def gaps(
         on_status=lambda msg: console.print(msg),
     )
     _flush(backend)
+    _rag_auto(cfg, walk_started)
     console.print(
         f"Walk attached {result.attached}, skipped {result.skipped}"
         + (" (quit early)" if result.quit_early else "")
@@ -2587,6 +2600,8 @@ def run(
         _flush(backend)
     if mirror_only:
         _mirror_deferred(cfg)
+    if not dry_run and not interrupted:
+        _rag_auto(cfg, stats.started_at)
     if handoff and not dry_run:
         # Tabs use the default browser. Release the vault profile first so
         # those tabs do not land in the EZProxy login window.
@@ -2838,6 +2853,7 @@ def _run_session_handoff(
         console.print("[yellow]--handoff walk needs a writable library; skipped.[/]")
         return
     dl = _gaps_downloads_dir(cfg, downloads_dir)
+    walk_started = time.time()
     result = walk_missing(
         cfg,
         backend,
@@ -2849,6 +2865,7 @@ def _run_session_handoff(
         on_status=lambda msg: console.print(msg),
     )
     _flush(backend)
+    _rag_auto(cfg, walk_started)
     console.print(
         f"Walk attached {result.attached}, skipped {result.skipped}"
         + (" (quit early)" if result.quit_early else "")
@@ -2900,6 +2917,7 @@ def _inbox_handoff_session(
         on_status=lambda msg: console.print(msg),
     )
     _flush(backend)
+    _rag_auto(cfg, started)
     path = write_command_report(
         cfg,
         command="inbox",
@@ -3015,6 +3033,7 @@ def attach(
             raise typer.Exit(1) from exc
         _flush(backend)
         console.print(f"[green]Attached[/] {rec.itemKey} ← {file}")
+        _rag_auto(cfg, time.time(), keys=[rec.itemKey])
         return
 
     pending = manifest.pending_attach(
@@ -3135,6 +3154,7 @@ def inbox_watch(
         on_status=lambda msg: console.print(msg),
     )
     _flush(backend)
+    _rag_auto(cfg, started)
     path = write_command_report(
         cfg,
         command="inbox",
@@ -3228,6 +3248,7 @@ def inbox_drain(
         on_status=lambda msg: console.print(msg),
     )
     _flush(backend)
+    _rag_auto(cfg, started)
     path = write_command_report(
         cfg,
         command="inbox",
@@ -3330,6 +3351,9 @@ def snapshot(
         f"[bold]records {stats.records}[/] · pdf exports {stats.pdf_exports} · "
         f"notes {stats.notes}"
     )
+    if not dry_run:
+        # Exports do not go through the manifest, so name the items.
+        _rag_auto(cfg, time.time(), keys=stats.pdf_keys)
 
 
 @app.command()
@@ -4368,6 +4392,538 @@ def ocr(
             f"(already have text). Pass --apply to write the text layer."
         )
     _flush(backend)
+    if apply:
+        _rag_auto(
+            cfg, started, keys=[row.key for row in batch.rows if row.status == "ocr"]
+        )
+
+
+# ---- library index: `paperful rag` and `paperful ask` -------------------------
+# These read out_dir and state_dir only. None of them opens the reference manager.
+
+
+def _rag_require(cfg: Config) -> None:
+    if not cfg.rag_enabled:
+        console.print("[red]rag.enabled is false in config.toml[/]")
+        raise typer.Exit(1)
+
+
+def _rag_embedder(cfg: Config):
+    """A checked embedder, or exit 1 with the reason."""
+    from .llm import embed_egress_is_remote, validate_embedder
+    from .llm.validate import LlmConfigError
+
+    try:
+        embedder = validate_embedder(cfg)
+    except LlmConfigError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    if embed_egress_is_remote(cfg):
+        console.print(
+            "[yellow]Remote embedding model — passage text leaves this machine.[/]"
+        )
+    return embedder
+
+
+def _rag_open(cfg: Config):
+    """The index and its ledger, or exit 1 when there is nothing to search."""
+    from .rag.index import (
+        Index,
+        IndexMismatch,
+        IndexMissing,
+        RagUnavailable,
+        ledger_path,
+    )
+    from .rag.ledger import Ledger
+
+    try:
+        return Index.open(cfg), Ledger(ledger_path(cfg))
+    except (RagUnavailable, IndexMissing, IndexMismatch) as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+
+
+def _rag_auto(cfg: Config, since: float, keys: Any = ()) -> None:
+    """Index PDFs this command just landed, when ``[rag].auto_ingest`` is on.
+
+    Never fails the command it follows: the index is a cache, and
+    ``paperful rag ingest`` catches up later.
+    """
+    if not (cfg.rag_enabled and cfg.rag_auto_ingest):
+        return
+    from .rag.auto import auto_ingest
+
+    try:
+        with _item_progress() as progress:
+            batch = auto_ingest(
+                cfg,
+                since=since,
+                keys=keys,
+                track=_track(progress, "Indexing new PDFs"),
+                ocr_track=_track(progress, "Running OCR"),
+            )
+    except KeyboardInterrupt:
+        console.print(
+            "[yellow]Indexing interrupted. `paperful rag ingest` resumes it.[/]"
+        )
+        return
+    except Exception as exc:
+        console.print(f"Index not updated: {exc}", markup=False, style="yellow")
+        console.print("[yellow]Run `paperful rag ingest` to catch up.[/]")
+        return
+    if batch is None:
+        return
+    done = batch.count("pdf", "ocr", "abstract")
+    if done:
+        console.print(
+            f"[dim]Index: {done} item(s) updated, {batch.chunks} passages.[/]"
+        )
+
+
+def _print_hits(hits: list) -> None:
+    from .rag.prompt import Source
+
+    for n, hit in enumerate(hits, start=1):
+        who = Source("", hit.item_key, hit.title, hit.authors, hit.year).citation
+        where = f", {hit.pages}" if hit.pages else ""
+        console.print(
+            f"{n}. {hit.score:.3f}  {who}. {hit.title}{where} [{hit.item_key}]",
+            markup=False,
+            highlight=False,
+        )
+        snippet = " ".join(hit.text.split())
+        if len(snippet) > 320:
+            snippet = snippet[:317] + "…"
+        console.print(f"   {snippet}", markup=False, highlight=False, style="dim")
+
+
+@rag_app.command("ingest")
+def rag_ingest(
+    item: list[str] = typer.Option([], "--item", help="Item key (repeatable)."),
+    collection: list[str] = typer.Option(
+        [],
+        "--collection",
+        "-C",
+        help="Collection path under the mirror (repeatable).",
+    ),
+    library: bool | None = LibraryOpt,
+    force: bool = typer.Option(
+        False, "--force", help="Re-index items even when nothing changed."
+    ),
+    retry_failed: bool = typer.Option(
+        False,
+        "--retry-failed",
+        help="Try again the PDFs that failed on an earlier run.",
+    ),
+    no_ocr: bool = typer.Option(
+        False, "--no-ocr", help="Do not run OCR on scans this run."
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be indexed. Writes nothing."
+    ),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    limit: int | None = typer.Option(
+        None, "--limit", "-n", help="Index at most this many items this run."
+    ),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Index PDFs and abstracts from the mirror. Scans get OCR first; text PDFs do not."""
+    from .llm import LLMClientError
+    from .rag.index import IndexMismatch, RagUnavailable
+    from .rag.ingest import ingest_entries, select_entries
+
+    if not item and _scope_unset(collection, library, profile, run_config):
+        console.print("[red]Give --item KEY and/or --collection / --library.[/]")
+        raise typer.Exit(1)
+    cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=limit,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    limit = bound.limit
+    if not item and not collection and not library:
+        console.print("[red]Give --item KEY and/or --collection / --library.[/]")
+        raise typer.Exit(1)
+    _rag_require(cfg)
+    types = _resolve_types(item_type)
+    embedder = None if dry_run else _rag_embedder(cfg)
+    started = time.time()
+    with _spinner("Reading the mirror…"):
+        entries = select_entries(
+            cfg,
+            collections=None if library else collection,
+            item_keys=item,
+            year_from=year_from,
+            year_to=year_to,
+            item_types=types,
+        )
+    scope = "library" if library else ", ".join(collection) or f"{len(item)} item(s)"
+    whole_mirror = bool(library) and not item and types is None
+    whole_mirror = whole_mirror and year_from is None and year_to is None
+    try:
+        with _item_progress() as progress:
+            batch = ingest_entries(
+                cfg,
+                entries,
+                force=force,
+                retry_failed=retry_failed,
+                ocr=not no_ocr,
+                dry_run=dry_run,
+                prune=whole_mirror and limit is None,
+                limit=limit,
+                track=_track(progress, "Indexing"),
+                ocr_track=_track(progress, "Running OCR"),
+                embedder=embedder,
+            )
+    except (RagUnavailable, IndexMismatch) as exc:
+        console.print(str(exc), markup=False, style="red")
+        raise typer.Exit(1) from exc
+    except LLMClientError as exc:
+        console.print(f"Stopped: {exc}", markup=False, style="red")
+        console.print("Items indexed so far are kept. Run again to continue.")
+        raise typer.Exit(1) from exc
+    changed = [r for r in batch.rows if r.status not in ("unchanged", "nothing")]
+    failed = [r for r in changed if r.status == "failed"]
+    shown = changed if len(changed) <= 30 else failed[:30]
+    if shown:
+        table = Table(title="paperful rag ingest" + (" (dry-run)" if dry_run else ""))
+        table.add_column("Key")
+        table.add_column("Title")
+        table.add_column("From")
+        table.add_column("Passages", justify="right")
+        table.add_column("Why")
+        for row in shown:
+            title = row.title if len(row.title) <= 60 else row.title[:57] + "…"
+            table.add_row(row.key, title, row.status, str(row.chunks or ""), row.reason)
+        console.print(table)
+    summary = batch.summary()
+    write_command_report(
+        cfg,
+        command="rag-ingest",
+        scope=scope,
+        summary=dict(summary),
+        items=[
+            {
+                "itemKey": r.key,
+                "title": r.title,
+                "status": r.status,
+                "reason": r.reason,
+                "chunks": r.chunks,
+            }
+            for r in changed
+        ],
+        flags={
+            "force": force,
+            "retry_failed": retry_failed,
+            "no_ocr": no_ocr,
+            "dry_run": dry_run,
+            "embed_model": cfg.rag_embed_model,
+        },
+        started=started,
+    )
+    lead = "Would index" if dry_run else "Indexed"
+    console.print(
+        f"{lead} {summary['pdf'] + summary['ocr']} PDFs "
+        f"({summary['ocr']} after OCR) and {summary['abstract']} abstracts"
+        + ("" if dry_run else f", {summary['chunks']} passages")
+        + f". Unchanged {summary['unchanged']}, nothing to index "
+        f"{summary['empty']}, removed {summary['removed']}, "
+        f"failed {summary['failed']}."
+    )
+    if dry_run:
+        console.print("Run without --dry-run to build the index.")
+
+
+@rag_app.command("status")
+def rag_status(
+    json_out: bool = typer.Option(False, "--json", help="Print JSON."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """What the index holds and how far it is behind the mirror."""
+    from .rag.status import index_status
+    from .store import mirror_entries
+
+    cfg = _cfg(config)
+    with _spinner("Reading the mirror…", json_out=json_out):
+        status = index_status(cfg, mirror_entries(cfg.out_dir))
+    if json_out:
+        console.print(
+            json.dumps(status, indent=2), soft_wrap=True, highlight=False, markup=False
+        )
+        return
+    mirror = status["mirror"]
+    table = Table(title="paperful rag status")
+    table.add_column("What")
+    table.add_column("Value")
+    rows = [
+        ("Enabled", "yes" if status["enabled"] else "no (rag.enabled is false)"),
+        ("Embedding model", f"{status['embed_provider']} / {status['embed_model']}"),
+        ("Index", status["path"] if status["exists"] else "not built yet"),
+        ("Items indexed", str(status["items_pdf"] + status["items_abstract"])),
+        ("  from PDF text", str(status["items_pdf"])),
+        ("  from abstract only", str(status["items_abstract"])),
+        ("Passages", str(status["chunks"])),
+        ("Scans waiting for OCR", str(status["items_ocr_pending"])),
+        ("PDFs that failed", str(status["items_with_error"])),
+        ("Items with several PDFs (newest indexed)", str(status["items_multi_pdf"])),
+        ("Mirror items", str(mirror["items"])),
+        ("  with a PDF on disk", str(mirror["with_pdf"])),
+        ("  PDF held by the manager only", str(mirror["pdf_not_in_mirror"])),
+        ("Items a new ingest would touch", str(mirror["stale"])),
+    ]
+    for name, value in rows:
+        table.add_row(name, value)
+    console.print(table)
+    if status["problem"]:
+        console.print(status["problem"], markup=False, style="yellow")
+    if mirror["pdf_not_in_mirror"]:
+        console.print(
+            f"[dim]{mirror['pdf_not_in_mirror']} items have a PDF in the reference "
+            "manager that is not in the mirror. `paperful snapshot --pdfs all` "
+            "copies them in.[/]"
+        )
+    if mirror["stale"]:
+        console.print(
+            "[dim]`paperful rag ingest --library` brings the index up to date.[/]"
+        )
+
+
+@rag_app.command("search")
+def rag_search(
+    query: str = typer.Argument(..., help="What to look for."),
+    top_k: int | None = typer.Option(None, "-k", "--top-k", help="Passages to show."),
+    item: list[str] = typer.Option([], "--item", help="Item key (repeatable)."),
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path under the mirror (repeatable)."
+    ),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    json_out: bool = typer.Option(False, "--json", help="Print JSON."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Show the indexed passages closest to a query. No chat model is used."""
+    from dataclasses import asdict
+
+    from .llm import LLMClientError
+    from .rag.retrieve import scope_keys, search
+
+    cfg = _cfg(config)
+    _rag_require(cfg)
+    types = _resolve_types(item_type)
+    embedder = _rag_embedder(cfg)
+    index, ledger = _rag_open(cfg)
+    keys = scope_keys(
+        ledger,
+        collections=collection,
+        item_keys=item,
+        year_from=year_from,
+        year_to=year_to,
+        item_types=types,
+    )
+    try:
+        hits = search(
+            cfg, query, k=top_k, keys=keys, embedder=embedder, index=index, ledger=ledger
+        )
+    except LLMClientError as exc:
+        console.print(str(exc), markup=False, style="red")
+        raise typer.Exit(1) from exc
+    if json_out:
+        console.print(
+            json.dumps([asdict(h) for h in hits], indent=2, ensure_ascii=False),
+            soft_wrap=True,
+            highlight=False,
+            markup=False,
+        )
+        return
+    if not hits:
+        console.print("[yellow]No passages match.[/]")
+        return
+    _print_hits(hits)
+
+
+def _ask_once(
+    cfg: Config,
+    question: str,
+    *,
+    stream: bool,
+    show_context: bool,
+    **retrieval: Any,
+) -> dict[str, Any]:
+    """Answer one question on the terminal and return it for the run report."""
+    from .rag.answer import answer
+
+    reply = answer(cfg, question, **retrieval)
+    if show_context and reply.hits:
+        console.print("[bold]Passages[/]")
+        _print_hits(reply.hits)
+        console.print()
+    # Answers carry [S1]-style markers; Rich would read them as markup and drop them.
+    if stream:
+        for piece in reply:
+            console.out(piece, end="", highlight=False)
+        console.out("", highlight=False)
+    else:
+        with _spinner("Thinking…"):
+            reply.read()
+        console.print(reply.text, markup=False, highlight=False)
+    cited = reply.cited()
+    listed = cited or reply.sources
+    if listed:
+        heading = "Sources" if cited else "Retrieved, not cited"
+        console.print(f"\n[bold]{heading}[/]")
+        for source in listed:
+            pages = f" {', '.join(source.pages)}." if source.pages else ""
+            console.print(
+                f"[{source.marker}] {source.citation}. {source.title}.{pages} "
+                f"[{source.item_key}]",
+                markup=False,
+                highlight=False,
+            )
+    return {
+        "question": question,
+        "answer": reply.text,
+        "cited": [s.marker for s in cited],
+        "sources": [
+            {
+                "marker": s.marker,
+                "itemKey": s.item_key,
+                "title": s.title,
+                "pages": s.pages,
+            }
+            for s in reply.sources
+        ],
+    }
+
+
+def _ask_questions(first: str | None) -> Iterator[str]:
+    """The question given, or a prompt loop. Piped input is one question per line."""
+    if first is not None:
+        yield first
+        return
+    interactive = sys.stdin.isatty()
+    if interactive:
+        console.print("[dim]Ask about your library. Empty line or :q to leave.[/]")
+    while True:
+        try:
+            line = input("ask> " if interactive else "")
+        except EOFError:
+            return
+        line = line.strip()
+        if line in (":q", "exit", "quit") or (interactive and not line):
+            return
+        if line:
+            yield line
+
+
+@app.command()
+def ask(
+    question: str | None = typer.Argument(
+        None, help="The question. Leave out to be prompted for several."
+    ),
+    top_k: int | None = typer.Option(
+        None, "-k", "--top-k", help="Passages sent to the model."
+    ),
+    item: list[str] = typer.Option([], "--item", help="Item key (repeatable)."),
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path under the mirror (repeatable)."
+    ),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    no_stream: bool = typer.Option(
+        False, "--no-stream", help="Print the answer when it is complete."
+    ),
+    show_context: bool = typer.Option(
+        False, "--show-context", help="List the passages the answer is built from."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Answer a question from the indexed library, with sources. Needs `rag ingest` first."""
+    from .llm import LLMClientError, get_client, llm_egress_is_remote
+    from .llm.preflight import validate_llm_for_ask
+    from .llm.validate import LlmConfigError
+    from .rag.retrieve import scope_keys
+
+    cfg = _cfg(config)
+    _rag_require(cfg)
+    try:
+        validate_llm_for_ask(cfg)
+    except LlmConfigError as exc:
+        console.print(str(exc), markup=False, style="red")
+        raise typer.Exit(1) from exc
+    types = _resolve_types(item_type)
+    embedder = _rag_embedder(cfg)
+    if llm_egress_is_remote(cfg):
+        console.print(
+            "[yellow]Remote LLM — excerpts from your PDFs leave this machine.[/]"
+        )
+    index, ledger = _rag_open(cfg)
+    keys = scope_keys(
+        ledger,
+        collections=collection,
+        item_keys=item,
+        year_from=year_from,
+        year_to=year_to,
+        item_types=types,
+    )
+    client = get_client(cfg)
+    started = time.time()
+    answered: list[dict[str, Any]] = []
+    failures = 0
+    for asked in _ask_questions(question):
+        try:
+            answered.append(
+                _ask_once(
+                    cfg,
+                    asked,
+                    stream=not no_stream,
+                    show_context=show_context,
+                    k=top_k,
+                    keys=keys,
+                    client=client,
+                    embedder=embedder,
+                    index=index,
+                    ledger=ledger,
+                )
+            )
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Cancelled.[/]")
+            failures += 1
+        except LLMClientError as exc:
+            console.print()
+            console.print(str(exc), markup=False, style="red")
+            failures += 1
+        if question is None:
+            console.print()
+    if answered or failures:
+        write_command_report(
+            cfg,
+            command="ask",
+            scope=", ".join(collection) or "index",
+            summary={"questions": len(answered) + failures, "answered": len(answered)},
+            items=answered,
+            flags={
+                "top_k": top_k or cfg.rag_top_k,
+                "model": cfg.rag_model or cfg.llm_model,
+                "embed_model": cfg.rag_embed_model,
+            },
+            started=started,
+        )
+    if question is not None and failures:
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -5429,11 +5985,13 @@ def _profile_queries(body: dict[str, Any], queries: list[str], *, or_mode: bool)
 def _run_snowball(cfg: Config, action: Any) -> None:
     from .snowball.command import SnowballError
 
+    snowball_started = time.time()
     try:
         result = action(cfg)
     except SnowballError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
+    _rag_auto(cfg, snowball_started)
     if result.exit_code:
         raise typer.Exit(result.exit_code)
 
