@@ -57,6 +57,19 @@ run. Denser one-pagers (letters, short comments) save to `out/` with reason
 `short_pdf_min_words` (default 200).
 
 Vault PDF fetch follows SSO interstitials, playbook rewrites, citation PDF
+`snowball resume` after an OpenAlex budget stop during a keyword search now
+keeps the original `max_candidates` (including `all`) instead of capping the
+search at `per_hop_limit`.
+
+Snowball reference recovery from publisher landing pages keeps references with
+no DOI when the page lists references as `<li>` items, so they reach the title
+match instead of being merged into one entry and dropped.
+
+`run` stops asking Google Scholar after the first clear block. An HTTP 429,
+503, or CAPTCHA / `/sorry/` page skips Scholar for the rest of the run instead
+of one request per queued item; those items are left `retryable` for the next
+run.
+
 links, View PDF controls, and viewer iframes before giving up. Successes append
 `state/fetch-wins.jsonl` (no query string). `paperful playbooks propose` /
 `promote` write user-owned `learned.toml` under `grey_playbooks_dir`.

@@ -3765,3 +3765,70 @@ def test_resume_without_deferred_fetches_pdfs_without_search(tmp_path: Path, mon
     assert result.exit_code == 0
     assert calls["fill"] == 1
     assert client.requests == 0
+
+
+@pytest.mark.parametrize("name", ["../evil", "a/b", ".hidden", "", "a b"])
+def test_watch_names_cannot_leave_the_watches_folder(tmp_path: Path, name: str):
+    from paperful.snowball.watch import load_watch, save_watch, show_watch
+
+    cfg = _cfg(tmp_path)
+    escaped = tmp_path / "state" / "snowball" / "evil"
+    escaped.mkdir(parents=True)
+    (escaped / "watch.json").write_text('{"profile": "x"}')
+    with pytest.raises(SnowballError, match="Invalid watch name"):
+        save_watch(cfg, name, "anything")
+    with pytest.raises(SnowballError, match="Invalid watch name"):
+        load_watch(cfg, name)
+    with pytest.raises(SnowballError, match="Invalid watch name"):
+        show_watch(cfg, name, console=Console(file=StringIO()))
+
+
+def test_watch_doi_profile_baselines_then_proposes_new_citers(tmp_path: Path):
+    from paperful.snowball.profile import save_profile
+    from paperful.snowball.watch import inbox_count, run_watch, save_watch
+
+    cfg = _cfg(tmp_path)
+    (tmp_path / "profiles").mkdir()
+    save_profile(
+        cfg,
+        "seed-watch",
+        {"mode": "doi", "dois": ["10.1000/seed"], "direction": "cites", "depth": 1, "gate": "dry-run"},
+        force=False,
+    )
+    save_watch(cfg, "seed", "seed-watch")
+    works = {
+        "W0": _work("W0", "10.1000/seed", "Seed", 2019, 9),
+        "W1": _work("W1", "10.1000/a", "Alpha", 2020, 1),
+    }
+    citing = {"W0": ["W1"]}
+    console = Console(file=StringIO(), highlight=False, width=120)
+    kwargs = dict(console=console, lookup=lambda doi, title: None, backend=_Lib())
+    first = run_watch(cfg, "seed", client=_client(works, citing=citing), **kwargs)
+    assert first.baseline is True and first.proposed == 0
+
+    works["W2"] = _work("W2", "10.1000/b", "Beta", 2024, 0)
+    citing["W0"].append("W2")
+    second = run_watch(cfg, "seed", client=_client(works, citing=citing), **kwargs)
+    assert second.proposed == 1
+    assert inbox_count(cfg, "seed") == 1
+
+
+@pytest.mark.parametrize(
+    "profile, message",
+    [
+        ({"mode": "doi", "dois": []}, "Profile needs dois"),
+        ({"mode": "orcid"}, "Profile needs orcid"),
+        ({"mode": "collection"}, "Profile needs seed_collection"),
+        ({"mode": "tarot"}, "Profile mode must be"),
+    ],
+)
+def test_watch_refuses_an_incomplete_profile(tmp_path: Path, profile: dict, message: str):
+    from paperful.snowball.profile import save_profile
+    from paperful.snowball.watch import run_watch, save_watch
+
+    cfg = _cfg(tmp_path)
+    (tmp_path / "profiles").mkdir()
+    save_profile(cfg, "broken", {**profile, "gate": "dry-run"}, force=False)
+    save_watch(cfg, "w", "broken")
+    with pytest.raises(SnowballError, match=message):
+        run_watch(cfg, "w", console=Console(file=StringIO()), client=_client({}), lookup=lambda d, t: None, backend=_Lib())

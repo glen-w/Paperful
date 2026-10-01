@@ -129,13 +129,10 @@ Zotero has. Do not document either adapter as supported until testers say so.
   **Near-term run behaviour (while `scholar` is still on `run`):** the serial
   Scholar phase queues every OA miss and then hits Google once per item (~
   `delay_scihub_s` apart). HTTP **429** is recorded as `error`, not `captcha`, so
-  the circuit breaker never opens (429 is excluded for API `Retry-After` lanes;
-  Scholar uses raw `httpx`, not `http_json`). Unlike EZProxy, there is no
-  “session down — skip the rest of this pass” latch, so a burned Scholar session
-  still gets **N** probe requests in one batch. **Fix before deprecation:**
-  first 429 (or short streak) → skip Scholar for the remainder of the run
-  (mirror `_mark_ezproxy_down`); optionally map Scholar 429/503 to block outcomes
-  so the existing breaker can pause mid-batch. **Spreading load:** shuffling queue
+  the circuit breaker still ignores it (429 is excluded for API `Retry-After`
+  lanes). **Shipped (latch):** the first Scholar 429, 503, or CAPTCHA /
+  `/sorry/` page skips Scholar for the rest of the run, across batches; queued
+  items get `scholar:skipped(blocked)` and end `retryable`. **Spreading load:** shuffling queue
   order alone does not help much; what helps is fewer requests after a clear block
   and/or spacing attempts across the whole run (shared rate limiter, per-item
   Scholar only after long jitter, or interleaving with other work) instead of one
@@ -316,7 +313,7 @@ for the end-to-end operator story.
 | 8 | `paperful collections add --keys-file` — membership batch, dry-run / apply | Parked (Agent §7) |
 | 9 | Acronym allowlist harvest (Core `fix-metadata` next) | Next |
 | 10 | [Frontier digest](#frontier-digest-later-watch--external-ingest); thin [snowball briefing](#frontier-digest-later-watch--external-ingest) export before full digest | Later |
-| 11 | Scholar 429 latch (Core Scholar) | Next |
+| 11 | Scholar 429 latch (Core Scholar) | Shipped |
 | 12 | Authors/orgs frequency report from `-C` (`state/reports/…`; seed **field author packs**) | Later |
 | 13 | Handoff list ranking (Core handoff) | Later |
 | 14 | Opt-in academic HTML→PDF snapshot (Core `htmlpdf`) | Later |

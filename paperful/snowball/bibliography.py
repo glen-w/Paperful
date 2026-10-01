@@ -190,8 +190,12 @@ def parse_landing_bibliography(html: str) -> list[dict[str, Any]]:
         if len(dois) >= LANDING_DOI_CAP:
             break
 
-    text = section.get_text("\n", strip=True)
-    entries = parse_bibliography_entries(text) if text else []
+    items = section.find_all("li")
+    if items:
+        entries = [entry for entry in map(_li_entry, items) if entry["doi"] or entry["title"]]
+    else:
+        text = section.get_text("\n", strip=True)
+        entries = parse_bibliography_entries(text) if text else []
     for entry in entries:
         doi = entry.get("doi") or ""
         if doi and doi not in seen:
@@ -208,6 +212,18 @@ def parse_landing_bibliography(html: str) -> list[dict[str, Any]]:
         if entry.get("title"):
             out.append(entry)
     return out[:LANDING_DOI_CAP]
+
+
+def _li_entry(item: Any) -> dict[str, Any]:
+    """One reference list item; a DOI in its own links beats DOI-looking text."""
+    entry = _parse_entry(item.get_text(" ", strip=True))
+    for anchor in item.find_all("a", href=True):
+        href = str(anchor.get("href") or "")
+        doi = normalize_doi(href) or extract_doi(href)
+        if doi:
+            entry["doi"] = normalize_doi(doi) or doi.lower()
+            break
+    return entry
 
 
 def _best_biblio_section(soup: BeautifulSoup) -> Any | None:

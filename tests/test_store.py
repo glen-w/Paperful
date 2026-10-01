@@ -1,4 +1,5 @@
 import hashlib
+import json as _json
 import os
 
 from paperful.store import (
@@ -14,6 +15,7 @@ from paperful.store import (
     Record,
     item_dirname,
     item_filename,
+    items_from_mirror,
     resolve_pdf_path,
     safe_filename,
     save_pdf,
@@ -221,3 +223,74 @@ def test_resolve_pdf_path_rewrites_docker_data_prefix(tmp_path):
     docker = f"/data/out/ocean/BBNJ/{pdf.name}"
     assert resolve_pdf_path(tmp_path, docker) == pdf
     assert resolve_pdf_path(tmp_path, "/data/out/missing.pdf") is None
+
+
+# ---- items_from_mirror: the catalogue `run` uses when the manager is offline ---
+
+
+
+def _mirror_item(out, collection, key, *, pdf=True, **record):
+    folder = out / collection / f"Smith - 2020 - A paper -- {key}"
+    folder.mkdir(parents=True, exist_ok=True)
+    body = {"item_key": key, "title": f"Paper {key}", "year": 2020, **record}
+    (folder / "record.json").write_text(_json.dumps(body))
+    if pdf:
+        (folder / "Smith - 2020 - A paper.pdf").write_bytes(b"%PDF-1.4")
+    return folder
+
+
+def test_mirror_catalogue_is_empty_without_an_out_dir(tmp_path):
+    assert items_from_mirror(tmp_path / "missing") == []
+
+
+def test_mirror_scope_includes_subcollections_but_not_prefix_siblings(tmp_path):
+    out = tmp_path / "out"
+    _mirror_item(out, "BBNJ", "K1")
+    _mirror_item(out, "BBNJ/sub", "K2")
+    _mirror_item(out, "BBNJ-old", "K3")
+    _mirror_item(out, "Other", "K4")
+    keys = sorted(i.key for i in items_from_mirror(out, ["BBNJ/"]))
+    assert keys == ["K1", "K2"]
+    assert len(items_from_mirror(out)) == 4
+
+
+def test_mirror_item_in_two_collections_is_listed_once(tmp_path):
+    out = tmp_path / "out"
+    _mirror_item(out, "A", "K1", collection_paths=["A", "B"])
+    _mirror_item(out, "B", "K1", collection_paths=["A", "B"])
+    items = items_from_mirror(out)
+    assert [i.key for i in items] == ["K1"]
+    assert items[0].collection_paths == ["A", "B"]
+
+
+def test_mirror_skips_corrupt_records_and_non_item_folders(tmp_path):
+    out = tmp_path / "out"
+    good = _mirror_item(out, "A", "K1")
+    bad = _mirror_item(out, "A", "K2")
+    (bad / "record.json").write_text("{not json")
+    stray = out / "A" / "loose folder"
+    stray.mkdir()
+    (stray / "record.json").write_text(_json.dumps({"item_key": "K3"}))
+    assert [i.key for i in items_from_mirror(out)] == ["K1"]
+    assert good.is_dir()
+
+
+def test_mirror_row_fields_and_fallbacks(tmp_path):
+    out = tmp_path / "out"
+    _mirror_item(
+        out,
+        "A",
+        "DIRKEY1",
+        pdf=False,
+        item_key=None,
+        year="2020",
+        creators=[{"name": "UNESCO"}],
+        doi="10.1000/x",
+    )
+    (item,) = items_from_mirror(out)
+    assert item.key == "DIRKEY1"
+    assert item.year is None
+    assert item.first_author == "UNESCO"
+    assert item.collection_paths == ["A"]
+    assert item.has_pdf is False and item.pdf_path is None
+    assert item.doi == "10.1000/x"

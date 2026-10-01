@@ -219,6 +219,7 @@ def search_candidates(
             seed=seed,
             gate=gate,
             per_hop_limit=per_hop_limit,
+            max_candidates=max_candidates,
             year_from=year_from,
             year_to=year_to,
             why_prefix="search hit",
@@ -1608,8 +1609,10 @@ def continue_deferred(client: OpenAlexClient, deferred: dict[str, Any]) -> list[
                 return rows
         return rows
     if kind == "search" and remaining:
+        saved = deferred.get("max_candidates")
+        limit = per_hop if saved is None else int(saved)
         try:
-            found = client.search(remaining[0], limit=per_hop, year_from=year_from, year_to=year_to)
+            found = client.search(remaining[0], limit=limit, year_from=year_from, year_to=year_to)
         except OpenAlexBudgetExceeded as exc:
             _defer(client, exc, **deferred)
             return rows
