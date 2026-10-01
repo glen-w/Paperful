@@ -8,7 +8,7 @@ import sys
 from rich.console import Console
 from rich.progress import Progress
 
-from paperful.progress import item_progress, pause_live
+from paperful.progress import item_progress, pause_live, tracker
 
 
 class _TtyBuffer(io.StringIO):
@@ -74,3 +74,37 @@ def test_ensure_ezproxy_session_pauses_live_progress(monkeypatch):
     # Keep Live from eating later test stdout via captured handles.
     sys.stdout = sys.__stdout__
     sys.stderr = sys.__stderr__
+
+
+def test_item_progress_disabled_never_starts_live():
+    console = Console(file=_TtyBuffer(), force_terminal=True)
+    with item_progress(console, disable=True) as progress:
+        task_id = progress.add_task("quiet", total=2)
+        progress.advance(task_id)
+        assert not progress.live.is_started
+    assert console.file.getvalue() == ""
+
+
+def test_tracker_advances_per_row_and_names_the_row_in_hand():
+    from tests.conftest import make_item
+
+    console = Console(file=_TtyBuffer(), force_terminal=True)
+    progress = item_progress(console, disable=True)
+    items = [make_item(key="K1", title="First [draft]"), make_item(key="K2")]
+    seen: list[tuple[str, int, str]] = []
+    for item in tracker(progress, "Working")(items):
+        task = progress.tasks[0]
+        seen.append((item.key, int(task.completed), task.description))
+    task = progress.tasks[0]
+    assert [(k, n) for k, n, _ in seen] == [("K1", 0), ("K2", 1)]
+    assert "First \\[draft]" in seen[0][2]
+    assert (task.total, task.completed, task.description) == (2, 2, "Working")
+
+
+def test_tracker_stops_short_when_the_loop_breaks():
+    console = Console(file=_TtyBuffer(), force_terminal=True)
+    progress = item_progress(console, disable=True)
+    for row in tracker(progress, "Working")(["a", "b", "c"]):
+        if row == "b":
+            break
+    assert progress.tasks[0].completed == 1

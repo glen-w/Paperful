@@ -10,6 +10,7 @@ from typing import Any
 
 import httpx
 
+from .progress import Track
 from .config import Config
 from .library import LibraryBackend
 from .lint import (
@@ -256,11 +257,12 @@ def collect_patches(
     backend: LibraryBackend | None = None,
     manifest: Manifest | None = None,
     overwrite: bool = False,
+    track: Track | None = None,
 ) -> list[Patch]:
     """Lint each item once, then propose a whitelist patch. Deduped by item key."""
     cache = IdentifierCache()
     patches: list[Patch] = []
-    for item in items:
+    for item in track(items) if track else items:
         findings = lint_item(
             client, cfg, item, backend=backend, manifest=manifest, cache=cache
         )
@@ -301,11 +303,11 @@ def write_patches(path: Path, patches: list[Patch]) -> None:
 
 
 def apply_patches(
-    backend: LibraryBackend, patches: list[Patch]
+    backend: LibraryBackend, patches: list[Patch], *, track: Track | None = None
 ) -> tuple[int, list[str]]:
     ok = 0
     errors: list[str] = []
-    for p in patches:
+    for p in track(patches) if track else patches:
         try:
             backend.apply_patch(p.itemKey, p.after)
             ok += 1

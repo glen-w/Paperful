@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .progress import Track
 from .store import item_dirname, item_filename
 from .zot import Item, is_pdf_attachment
 
@@ -389,12 +390,16 @@ def plan_actions(
 
 
 def apply_actions(
-    backend: Any, actions: list[Action], *, out_dir: Path
+    backend: Any,
+    actions: list[Action],
+    *,
+    out_dir: Path,
+    track: Track | None = None,
 ) -> tuple[int, list[str]]:
     """Run a plan. Refuses paths outside ``out_dir``. Does not delete mirror bytes."""
     done = 0
     errors: list[str] = []
-    for action in actions:
+    for action in track(actions) if track else actions:
         try:
             _apply_one(backend, action, out_dir)
         except Exception as exc:

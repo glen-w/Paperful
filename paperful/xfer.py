@@ -6,11 +6,16 @@ from pathlib import Path
 from typing import Any
 
 from .interop.load import parent_payload
+from .progress import Track
 from .library import LibraryBackend
 
 
 def apply_import(
-    records: list[dict[str, Any]], backend: LibraryBackend, *, dry_run: bool = False
+    records: list[dict[str, Any]],
+    backend: LibraryBackend,
+    *,
+    dry_run: bool = False,
+    track: Track | None = None,
 ) -> dict[str, int]:
     """Create parents, attach local PDFs, add notes. EndNote stages a bundle."""
     done = {"create": 0, "attach": 0, "notes": 0, "skipped_pdf": 0}
@@ -19,7 +24,7 @@ def apply_import(
         done["attach"] = sum(1 for r in records if r.get("pdfs"))
         done["notes"] = sum(len(r.get("notes") or []) for r in records)
         return done
-    for rec in records:
+    for rec in track(records) if track else records:
         paths = [
             p
             for p in (rec.get("collection_paths") or [])

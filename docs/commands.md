@@ -114,7 +114,7 @@ uv run paperful import other.bib                 # dry-run
 uv run paperful import other.bib --apply
 
 # identifiers vs PDFs (read-only); metadata writes are a separate step
-uv run paperful lint --library --json
+uv run paperful lint --library --json             # progress bar on stderr; stdout is JSON
 uv run paperful lint -C BBNJ --strict             # exit 1 if any finding
 uv run paperful fix-metadata --library            # dry-run → state/metadata-patches.jsonl
 uv run paperful fix-metadata --library --apply    # write DOI/title/date/venue into Zotero 10+

@@ -6,6 +6,16 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+Every command that walks the library now says what it is doing. `lint`,
+`fix-metadata`, `attachments`, `versions`, `snapshot`, `restore`, `import`,
+`export`, `ocr`, `summarize` and `synthesize` show the same live progress bar as
+`run` and `snowball`: items done, the item in hand, elapsed time and ETA. `lint`
+also shows the running finding count. Loading the library scope shows a spinner
+in those commands and in `run`, `gaps`, `collections` and `inbox`. With `--json`
+the bar goes to stderr and only on a terminal, so stdout stays JSON. Ctrl-C
+during `lint` keeps the findings so far: it prints them, writes the run report
+with `flags.interrupted`, and exits 130.
+
 Removed the legacy flat-PDF migration. A flat `Author - Year - Title.pdf` and
 its `*.paperful.json` card are no longer moved into an item folder by `snapshot`
 or `run`, and `doctor` no longer ambers on mixed flat + folder trees. The

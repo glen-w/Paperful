@@ -1321,6 +1321,69 @@ def test_lint_strict_exits_1(cfg_file, stub_zotero, monkeypatch, tmp_path):
     assert data["items"][0]["status"] == "missing_doi"
 
 
+def test_lint_drives_progress_callbacks(cfg_file, stub_zotero, monkeypatch):
+    from paperful.lint import Finding
+
+    seen: list[str] = []
+
+    def fake(client, cfg, items, *, on_start, on_item, **k):
+        out = []
+        for item in items:
+            on_start(item)
+            seen.append(item.key)
+            found = [Finding(item.key, "missing_doi", item.title, "no DOI")]
+            out.extend(found)
+            on_item(item, found)
+        return out
+
+    monkeypatch.setattr("paperful.lint.lint_items", fake)
+    res = runner.invoke(cli.app, ["lint", "-c", str(cfg_file), "--library"])
+    assert res.exit_code == 0
+    assert seen == ["I1", "I2"]
+    assert "linting 2 items" in res.stdout
+    assert "2 findings" in res.stdout
+
+
+def test_lint_json_stdout_stays_json_with_callbacks(
+    cfg_file, stub_zotero, monkeypatch
+):
+    from paperful.lint import Finding
+
+    def fake(client, cfg, items, *, on_start, on_item, **k):
+        found = [Finding(items[0].key, "missing_doi", "T", "no DOI")]
+        on_start(items[0])
+        on_item(items[0], found)
+        return found
+
+    monkeypatch.setattr("paperful.lint.lint_items", fake)
+    res = runner.invoke(cli.app, ["lint", "-c", str(cfg_file), "--library", "--json"])
+    assert res.exit_code == 0
+    assert [f["code"] for f in json.loads(res.stdout)] == ["missing_doi"]
+
+
+def test_lint_interrupt_keeps_partial_findings(
+    cfg_file, stub_zotero, monkeypatch, tmp_path
+):
+    from paperful.lint import Finding
+
+    def fake(client, cfg, items, *, on_start, on_item, **k):
+        on_start(items[0])
+        on_item(items[0], [Finding(items[0].key, "missing_doi", "T", "no DOI")])
+        on_start(items[1])
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("paperful.lint.lint_items", fake)
+    res = runner.invoke(cli.app, ["lint", "-c", str(cfg_file), "--library"])
+    assert res.exit_code == 130
+    assert "Interrupted after 1/2 items" in res.stdout
+    assert "missing_doi" in res.stdout
+    runs = list((tmp_path / "state" / "runs").glob("*-lint.json"))
+    assert len(runs) == 1
+    data = json.loads(runs[0].read_text())
+    assert data["flags"]["interrupted"] is True
+    assert data["summary"]["findings"] == 1
+
+
 def test_fix_metadata_dry_run(cfg_file, stub_zotero, tmp_path, monkeypatch):
     monkeypatch.setattr("paperful.lint.lint_item", lambda *a, **k: [])
     monkeypatch.setattr("paperful.metadata.propose_patch", lambda *a, **k: None)
@@ -1351,7 +1414,7 @@ def test_fix_metadata_apply(cfg_file, stub_zotero, monkeypatch):
     monkeypatch.setattr("paperful.metadata.propose_patch", lambda *a, **k: patch)
     seen: list = []
 
-    def fake_apply(backend, patches):
+    def fake_apply(backend, patches, **k):
         seen.append(list(patches))
         return 1, []
 

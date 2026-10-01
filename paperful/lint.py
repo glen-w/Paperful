@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 import httpx
 
@@ -355,13 +356,19 @@ def lint_items(
     *,
     backend: LibraryBackend | None = None,
     manifest: Manifest | None = None,
+    on_start: Callable[[Item], None] | None = None,
+    on_item: Callable[[Item, list[Finding]], None] | None = None,
 ) -> list[Finding]:
+    """Lint each item. ``on_start`` fires before an item, ``on_item`` after."""
     cache = IdentifierCache()
     out: list[Finding] = []
     for item in items:
-        out.extend(
-            lint_item(
-                client, cfg, item, backend=backend, manifest=manifest, cache=cache
-            )
+        if on_start:
+            on_start(item)
+        findings = lint_item(
+            client, cfg, item, backend=backend, manifest=manifest, cache=cache
         )
+        out.extend(findings)
+        if on_item:
+            on_item(item, findings)
     return out

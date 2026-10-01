@@ -16,6 +16,7 @@ from typing import Any, Callable
 
 import httpx
 
+from .progress import Track
 from .dedupe import scope_slug
 from .download import DownloadError, fetch_pdf
 from .resolve import (
@@ -56,6 +57,8 @@ class VersionProposal:
 def classify_versions(
     items: list[Item],
     resolve: ResolveFn,
+    *,
+    track: Track | None = None,
 ) -> list[VersionProposal]:
     """High-confidence edges become apply rows. Title proximity stays needs_review."""
     by_doi: dict[str, list[Item]] = {}
@@ -66,7 +69,7 @@ def classify_versions(
     proposals: list[VersionProposal] = []
     seen_published: set[str] = set()
     linked: set[str] = set()
-    for item in items:
+    for item in track(items) if track else items:
         for doi in _item_dois(item):
             try:
                 link = resolve(doi)
@@ -134,6 +137,7 @@ def apply_versions(
     audit_path: Path,
     scope: str,
     pack: Path,
+    track: Track | None = None,
 ) -> tuple[int, list[str]]:
     """Patch survivors. Trash a sibling only after the published PDF is attached."""
     from .library import LibraryError
@@ -142,7 +146,7 @@ def apply_versions(
     errors: list[str] = []
     lines: list[str] = []
     now = datetime.now(tz=timezone.utc).isoformat()
-    for row in proposals:
+    for row in track(proposals) if track else proposals:
         if row.needs_review or row.confidence != "high":
             continue
         try:

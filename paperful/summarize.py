@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .progress import Track
 from .config import Config, parse_summarize_order, wants_disk, wants_zotero
 from .grounding import budget_slice, metadata_block, pdf_text_for
 from .library import LibraryBackend, LibraryError
@@ -416,6 +417,7 @@ def summarize_items(
     dest: str,
     force: bool = False,
     on_row: Callable[[SummaryRow], None] | None = None,
+    track: Track | None = None,
 ) -> SummaryBatch:
     """Summarize each item.
 
@@ -428,7 +430,7 @@ def summarize_items(
     ok = 0
     failed = 0
     skipped = 0
-    for it in items:
+    for it in track(items) if track else items:
         try:
             if not force:
                 reused = _reuse_existing_summary(cfg, it, backend, dest=dest)

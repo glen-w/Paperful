@@ -8,12 +8,13 @@ import sys
 import time
 from enum import Enum
 from pathlib import Path
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import Any
 
 import typer
 from rich.console import Console
-from .progress import item_progress, pause_live
+from .progress import Track, item_progress, pause_live, tracker
 from rich.table import Table
 
 from . import __version__
@@ -419,9 +420,39 @@ class SummarizeOrder(str, Enum):
     library = "library"
 
 
-def _item_progress():
-    """Live bar that stays below scrolling per-item logs."""
-    return item_progress(console)
+def _item_progress(*, json_out: bool = False, transient: bool = False):
+    """Live bar that stays below scrolling per-item logs.
+
+    ``json_out`` keeps stdout pure: the bar moves to stderr, and only on a
+    terminal.
+    """
+    live = Console(stderr=True, highlight=False) if json_out else console
+    # Off a terminal a spinner has nothing to show, and JSON runs stay quiet.
+    quiet = (json_out or transient) and not live.is_terminal
+    return item_progress(live, disable=quiet, transient=transient)
+
+
+def _track(progress, description: str) -> Track:
+    return tracker(progress, description)
+
+
+@contextmanager
+def _spinner(
+    text: str, *, json_out: bool = False
+) -> Iterator[Callable[[str], None]]:
+    """Spinner and clock for one slow call that has no item count.
+
+    Yields a function that replaces the text. The line clears when done.
+    """
+    with _item_progress(json_out=json_out, transient=True) as progress:
+        task_id = progress.add_task(text, total=None)
+        yield lambda msg: progress.update(task_id, description=msg)
+
+
+def _load_scope(backend: LibraryBackend, *, json_out: bool = False, **scope: Any):
+    """``_loaded_scope`` behind a spinner that shows the loader's own status."""
+    with _spinner("Connecting to library scope…", json_out=json_out) as say:
+        return _loaded_scope(backend, status=say, **scope)
 
 
 def _cfg(path: Path | None) -> Config:
@@ -920,8 +951,9 @@ def collections(config: Path | None = ConfigOpt) -> None:
     cfg = _cfg(config)
     _require_manager(cfg)
     backend = _connect(cfg)
-    cols = backend.collections()
-    counts = backend.collection_counts()
+    with _spinner("Counting collections…"):
+        cols = backend.collections()
+        counts = backend.collection_counts()
     table = Table(title=f"{cfg.manager} collections (counts include subcollections)")
     table.add_column("Path")
     table.add_column("Items", justify="right")
@@ -951,8 +983,11 @@ def lint(
     config: Path | None = ConfigOpt,
 ) -> None:
     """Read-only check of identifiers vs APIs and PDF text on disk. Does not write to the manager."""
-    from .lint import lint_items
+    from rich.markup import escape
+
+    from .lint import Finding, lint_items
     from .pipeline import make_client
+    from .zot import Item
 
     if _scope_unset(collection, library, profile, run_config):
         _refuse_missing_scope()
@@ -974,8 +1009,13 @@ def lint(
         _refuse_missing_scope()
     _require_manager(cfg)
     backend = _connect(cfg, quiet=as_json)
-    loaded = _loaded_scope(
+    manifest = Manifest(cfg.manifest_path)
+    partial: list[Finding] = []
+    done = 0
+    interrupted = False
+    loaded = _load_scope(
         backend,
+        json_out=as_json,
         collection=collection,
         library=library,
         year_from=year_from,
@@ -985,13 +1025,48 @@ def lint(
     items, scope = loaded.items, loaded.label
     if limit:
         items = items[:limit]
-    manifest = Manifest(cfg.manifest_path)
     if not as_json:
         console.print(f"Scope: [bold]{scope}[/] — linting {len(items)} items")
-    started = time.time()
-    findings = lint_items(
-        make_client(cfg), cfg, items, backend=backend, manifest=manifest
-    )
+    with _item_progress(json_out=as_json) as progress:
+        lint_id = progress.add_task("Linting", total=len(items))
+
+        def _describe(current: str = "") -> str:
+            n = len(partial)
+            text = f"Linting [dim]· {n} finding{'' if n == 1 else 's'}"
+            if current:
+                text += f" · {escape(current)}"
+            return text + "[/]"
+
+        def _lint_start(item: Item) -> None:
+            progress.update(lint_id, description=_describe(item.label[:48]))
+
+        def _lint_done(item: Item, found: list[Finding]) -> None:
+            nonlocal done
+            done += 1
+            partial.extend(found)
+            progress.update(lint_id, advance=1, description=_describe())
+
+        started = time.time()
+        try:
+            findings = lint_items(
+                make_client(cfg),
+                cfg,
+                items,
+                backend=backend,
+                manifest=manifest,
+                on_start=_lint_start,
+                on_item=_lint_done,
+            )
+            partial[:] = findings
+            progress.update(lint_id, completed=len(items), description=_describe())
+        except KeyboardInterrupt:
+            interrupted = True
+            findings = partial
+    if interrupted:
+        progress.console.print(
+            f"\n[yellow]Interrupted after {done}/{len(items)} items.[/] "
+            "Findings so far:"
+        )
     by_code: dict[str, int] = {}
     for finding in findings:
         by_code[finding.code] = by_code.get(finding.code, 0) + 1
@@ -1009,7 +1084,7 @@ def lint(
             }
             for finding in findings
         ],
-        flags={"strict": strict},
+        flags={"strict": strict, "interrupted": interrupted},
         started=started,
     )
     if as_json:
@@ -1025,6 +1100,8 @@ def lint(
         for f in findings:
             table.add_row(f.code, f.itemKey, f.title[:50], f.detail[:80])
         console.print(table)
+    if interrupted:
+        raise typer.Exit(130)
     if strict and findings:
         raise typer.Exit(1)
 
@@ -1077,7 +1154,9 @@ def fix_metadata(
         _refuse_missing_scope()
     _require_manager(cfg)
     backend = _connect(cfg)
-    loaded = _loaded_scope(
+    manifest = Manifest(cfg.manifest_path)
+    client = make_client(cfg)
+    loaded = _load_scope(
         backend,
         collection=collection,
         library=library,
@@ -1088,12 +1167,17 @@ def fix_metadata(
     items, scope = loaded.items, loaded.label
     if limit:
         items = items[:limit]
-    manifest = Manifest(cfg.manifest_path)
-    client = make_client(cfg)
     started = time.time()
-    patches = collect_patches(
-        client, cfg, items, backend=backend, manifest=manifest, overwrite=overwrite
-    )
+    with _item_progress() as progress:
+        patches = collect_patches(
+            client,
+            cfg,
+            items,
+            backend=backend,
+            manifest=manifest,
+            overwrite=overwrite,
+            track=_track(progress, "Checking metadata"),
+        )
     console.print(f"Scope: [bold]{scope}[/] — {len(patches)} proposed patches")
     if patches:
         table = Table(title="Proposed patches")
@@ -1132,7 +1216,10 @@ def fix_metadata(
     if not backend.supports_write():
         _exit_env("This library has no write support.", cfg)
     try:
-        ok, errors = apply_patches(backend, patches)
+        with _item_progress() as progress:
+            ok, errors = apply_patches(
+                backend, patches, track=_track(progress, "Applying patches")
+            )
     except LibraryError as exc:
         _exit_env(str(exc), cfg)
     _flush(backend)
@@ -1553,8 +1640,9 @@ def attachments(
     )
     _require_manager(cfg)
     backend = _connect(cfg, quiet=as_json)
-    loaded = _loaded_scope(
+    loaded = _load_scope(
         backend,
+        json_out=as_json,
         collection=collection,
         library=library,
         year_from=year_from,
@@ -1568,23 +1656,24 @@ def attachments(
     children = []
     mirrors: dict = {}
     stems: dict = {}
-    for item in items:
-        raw = []
-        try:
-            raw = backend.children(item.key) or []
-        except Exception:
+    with _item_progress(json_out=as_json) as progress:
+        for item in _track(progress, "Scanning attachments")(items):
             raw = []
-        present = {
-            str(ch.get("key") or (ch.get("data") or {}).get("key") or ""): _child_bytes(
-                backend, ch
-            )
-            for ch in raw
-            if isinstance(ch, dict)
-        }
-        kids = pdf_children(item.key, raw, present=present)
-        children.extend(kids)
-        mirrors[item.key] = mirror_pdfs_for(cfg.out_dir, item)
-        stems[item.key] = stem_filename(item)
+            try:
+                raw = backend.children(item.key) or []
+            except Exception:
+                raw = []
+            present = {
+                str(ch.get("key") or (ch.get("data") or {}).get("key") or ""): _child_bytes(
+                    backend, ch
+                )
+                for ch in raw
+                if isinstance(ch, dict)
+            }
+            kids = pdf_children(item.key, raw, present=present)
+            children.extend(kids)
+            mirrors[item.key] = mirror_pdfs_for(cfg.out_dir, item)
+            stems[item.key] = stem_filename(item)
     scan = plan_actions(
         children,
         mirrors,
@@ -1607,9 +1696,13 @@ def attachments(
             _exit_env("This library has no write support.", cfg)
         else:
             try:
-                applied, apply_errors = apply_actions(
-                    backend, scan.actions, out_dir=cfg.out_dir
-                )
+                with _item_progress(json_out=as_json) as progress:
+                    applied, apply_errors = apply_actions(
+                        backend,
+                        scan.actions,
+                        out_dir=cfg.out_dir,
+                        track=_track(progress, "Applying changes"),
+                    )
             except LibraryError as exc:
                 _exit_env(str(exc))
             errors.extend(apply_errors)
@@ -1798,8 +1891,9 @@ def versions(
         _refuse_missing_scope()
     _require_manager(cfg)
     backend = _connect(cfg, quiet=as_json)
-    loaded = _loaded_scope(
+    loaded = _load_scope(
         backend,
+        json_out=as_json,
         collection=collection,
         library=library,
         year_from=year_from,
@@ -1813,7 +1907,12 @@ def versions(
     errors: list[str] = []
     try:
         try:
-            proposals = classify_versions(items, resolver_for(client, cfg.email))
+            with _item_progress(json_out=as_json) as progress:
+                proposals = classify_versions(
+                    items,
+                    resolver_for(client, cfg.email),
+                    track=_track(progress, "Checking versions"),
+                )
         except Exception as exc:
             console.print(f"[red]{exc}[/]")
             raise typer.Exit(1)
@@ -1826,14 +1925,16 @@ def versions(
             if not backend.supports_write():
                 _exit_env("This library has no write support.", cfg)
             try:
-                applied, errors = apply_versions(
-                    backend,
-                    proposals,
-                    fetch_published=http_fetch_published(client, cfg.email),
-                    audit_path=cfg.versions_applied_path,
-                    scope=scope,
-                    pack=json_path,
-                )
+                with _item_progress(json_out=as_json) as progress:
+                    applied, errors = apply_versions(
+                        backend,
+                        proposals,
+                        fetch_published=http_fetch_published(client, cfg.email),
+                        audit_path=cfg.versions_applied_path,
+                        scope=scope,
+                        pack=json_path,
+                        track=_track(progress, "Linking versions"),
+                    )
             except LibraryError as exc:
                 _exit_env(str(exc))
         payload = {
@@ -1995,8 +2096,9 @@ def gaps(
         list_missing = True
     _require_manager(cfg)
     backend = _connect(cfg, quiet=as_json)
-    loaded = _loaded_scope(
+    loaded = _load_scope(
         backend,
+        json_out=as_json,
         collection=collection,
         library=library,
         year_from=year_from,
@@ -2320,7 +2422,8 @@ def run(
     # and the PDF todo all come from that list.
     if not mirror_only:
         assert backend is not None
-        catalog = backend.items_in_scope(keys)
+        with _spinner("Loading items from library…"):
+            catalog = backend.items_in_scope(keys)
     if item_filter:
         scoped, scope = _apply_item_filters(
             catalog,
@@ -3007,7 +3110,7 @@ def inbox_watch(
     except ValueError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1) from exc
-    loaded = _loaded_scope(
+    loaded = _load_scope(
         backend,
         collection=collection,
         library=bool(library),
@@ -3103,7 +3206,7 @@ def inbox_drain(
     except ValueError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1) from exc
-    loaded = _loaded_scope(
+    loaded = _load_scope(
         backend,
         collection=collection,
         library=bool(library),
@@ -3193,7 +3296,7 @@ def snapshot(
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1) from exc
     backend = _connect(cfg)
-    loaded = _loaded_scope(
+    loaded = _load_scope(
         backend,
         collection=collection,
         library=library,
@@ -3210,9 +3313,16 @@ def snapshot(
         f"{verb} restore folders for [bold]{len(items)}[/] items "
         f"in [bold]{scope}[/] (pdfs={mode})"
     )
-    stats = run_snapshot(
-        cfg, backend, items, pdfs=mode, dry_run=dry_run, manifest=manifest
-    )
+    with _item_progress() as progress:
+        stats = run_snapshot(
+            cfg,
+            backend,
+            items,
+            pdfs=mode,
+            dry_run=dry_run,
+            manifest=manifest,
+            track=_track(progress, "Counting folders" if dry_run else "Writing folders"),
+        )
     report = snapshot_report(cfg, scope, mode, dry_run, stats)
     if not dry_run:
         write_run_report(cfg, report, as_last_run=False)
@@ -3313,19 +3423,21 @@ def restore(
     if limit:
         records = records[:limit]
     keys, _scope = _scope_keys(backend, collection, library)
-    library_items = backend.items_in_scope(keys)
-    note_tags: dict[str, set[str]] = {}
-    for it in library_items:
-        tags: set[str] = set()
-        for ch in backend.children(it.key):
-            data = ch.get("data") or {}
-            if data.get("itemType") != "note":
-                continue
-            for tag in data.get("tags") or []:
-                if isinstance(tag, dict) and tag.get("tag"):
-                    tags.add(str(tag["tag"]))
-        if tags:
-            note_tags[it.key] = tags
+    with _spinner("Loading items from library…"):
+        library_items = backend.items_in_scope(keys)
+    with _item_progress() as progress:
+        note_tags: dict[str, set[str]] = {}
+        for it in _track(progress, "Reading library notes")(library_items):
+            tags: set[str] = set()
+            for ch in backend.children(it.key):
+                data = ch.get("data") or {}
+                if data.get("itemType") != "note":
+                    continue
+                for tag in data.get("tags") or []:
+                    if isinstance(tag, dict) and tag.get("tag"):
+                        tags.add(str(tag["tag"]))
+            if tags:
+                note_tags[it.key] = tags
     planned = plan_restore(records, library_items, note_tags_for=note_tags)
     counts = planned.counts()
     console.print(
@@ -3340,7 +3452,10 @@ def restore(
             "[dim]Dry run. Pass --apply to write missing items into the library.[/]"
         )
         return
-    done = apply_restore(planned, backend, backend)
+    with _item_progress() as progress:
+        done = apply_restore(
+            planned, backend, backend, track=_track(progress, "Restoring items")
+        )
     console.print(
         f"[bold]created {done['create_item']}[/] · "
         f"attached {done['attach_pdf']} · notes {done['create_note']}"
@@ -3388,7 +3503,10 @@ def import_library(
     backend = _connect(cfg)
     if not backend.supports_write():
         _exit_env("This library has no write support.", cfg)
-    done = apply_import(records, backend, dry_run=False)
+    with _item_progress() as progress:
+        done = apply_import(
+            records, backend, dry_run=False, track=_track(progress, "Importing records")
+        )
     console.print(
         f"[bold]created {done['create']}[/] · attached {done['attach']} · "
         f"notes {done['notes']}"
@@ -3440,7 +3558,7 @@ def export_library(
         console.print("[red]--format must be ris, bibtex, or endnote-xml.[/]")
         raise typer.Exit(1)
     backend = _connect(cfg)
-    loaded = _loaded_scope(
+    loaded = _load_scope(
         backend,
         collection=collection,
         library=library,
@@ -3459,57 +3577,58 @@ def export_library(
         pdf_dir.mkdir(parents=True, exist_ok=True)
     records = []
     copied = 0
-    for it in items:
-        rec_json = None
-        for folder in it.collection_paths or ["_uncollected"]:
-            rec_json = load_json(record_path(cfg.out_dir / folder / item_dirname(it)))
-            if rec_json:
-                break
-        rec = record_from_item_json(rec_json or {}, None)
-        rec["item_type"] = it.item_type
-        rec["title"] = it.title
-        rec["doi"] = it.doi
-        rec["year"] = it.year
-        rec["date"] = it.date or rec.get("date") or (str(it.year) if it.year else "")
-        rec["publication_title"] = it.publication_title or rec.get("publication_title")
-        rec["url"] = it.url
-        rec["pmid"] = it.pmid
-        rec["abstract"] = it.abstract or rec.get("abstract")
-        rec["collection_paths"] = [
-            p for p in it.collection_paths if p != "_uncollected"
-        ]
-        rec["item_key"] = it.key
-        pdf_list: list[str] = []
-        if pdf_dir is not None and it.has_pdf:
-            target = pdf_dir / item_filename(it)
-            exported = backend.export_pdf(it, target)
-            if exported is not None and Path(exported).is_file():
-                pdf_list.append(str(exported))
-                copied += 1
-        rec["pdfs"] = pdf_list
-        notes = []
-        for ch in backend.children(it.key):
-            data = ch.get("data") or {}
-            if data.get("itemType") != "note":
-                continue
-            html = str(data.get("note") or "")
-            if not html:
-                continue
-            tags = [
-                t.get("tag")
-                for t in (data.get("tags") or [])
-                if isinstance(t, dict) and t.get("tag")
+    with _item_progress() as progress:
+        for it in _track(progress, "Exporting records")(items):
+            rec_json = None
+            for folder in it.collection_paths or ["_uncollected"]:
+                rec_json = load_json(record_path(cfg.out_dir / folder / item_dirname(it)))
+                if rec_json:
+                    break
+            rec = record_from_item_json(rec_json or {}, None)
+            rec["item_type"] = it.item_type
+            rec["title"] = it.title
+            rec["doi"] = it.doi
+            rec["year"] = it.year
+            rec["date"] = it.date or rec.get("date") or (str(it.year) if it.year else "")
+            rec["publication_title"] = it.publication_title or rec.get("publication_title")
+            rec["url"] = it.url
+            rec["pmid"] = it.pmid
+            rec["abstract"] = it.abstract or rec.get("abstract")
+            rec["collection_paths"] = [
+                p for p in it.collection_paths if p != "_uncollected"
             ]
-            notes.append(
-                {
-                    "file": f"{ch.get('key') or 'note'}.html",
-                    "html": html,
-                    "tag": tags[0] if tags else "paperful-exported",
-                }
-            )
-        if notes:
-            rec["notes"] = notes
-        records.append(rec)
+            rec["item_key"] = it.key
+            pdf_list: list[str] = []
+            if pdf_dir is not None and it.has_pdf:
+                target = pdf_dir / item_filename(it)
+                exported = backend.export_pdf(it, target)
+                if exported is not None and Path(exported).is_file():
+                    pdf_list.append(str(exported))
+                    copied += 1
+            rec["pdfs"] = pdf_list
+            notes = []
+            for ch in backend.children(it.key):
+                data = ch.get("data") or {}
+                if data.get("itemType") != "note":
+                    continue
+                html = str(data.get("note") or "")
+                if not html:
+                    continue
+                tags = [
+                    t.get("tag")
+                    for t in (data.get("tags") or [])
+                    if isinstance(t, dict) and t.get("tag")
+                ]
+                notes.append(
+                    {
+                        "file": f"{ch.get('key') or 'note'}.html",
+                        "html": html,
+                        "tag": tags[0] if tags else "paperful-exported",
+                    }
+                )
+            if notes:
+                rec["notes"] = notes
+            records.append(rec)
     text = dump_records(records, kind)
     if kind == "endnote-xml" and bundle_dir is not None:
         bundle_dir.mkdir(parents=True, exist_ok=True)
@@ -4163,7 +4282,7 @@ def ocr(
     if attach and not backend.supports_write():
         _exit_env("Write support required to attach.", cfg)
     manifest = Manifest(cfg.manifest_path)
-    loaded = _loaded_scope(
+    loaded = _load_scope(
         backend,
         collection=collection,
         library=bool(library),
@@ -4190,7 +4309,16 @@ def ocr(
         )
         raise typer.Exit(0)
     try:
-        batch = ocr_items(cfg, items, manifest, backend, apply=apply, attach=attach)
+        with _item_progress() as progress:
+            batch = ocr_items(
+                cfg,
+                items,
+                manifest,
+                backend,
+                apply=apply,
+                attach=attach,
+                track=_track(progress, "Running OCR" if apply else "Checking PDFs"),
+            )
     except OcrUnavailable as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1) from exc
@@ -4336,7 +4464,7 @@ def summarize(
         cfg.summarize_prompt_template = str(prompt.expanduser().resolve())
     backend = _connect(cfg)
     manifest = Manifest(cfg.manifest_path)
-    loaded = _loaded_scope(
+    loaded = _load_scope(
         backend,
         collection=collection,
         library=bool(library),
@@ -4388,9 +4516,17 @@ def summarize(
         console.print("[yellow]No items with PDFs in scope.[/]")
         _finish([], 0, 0, 0)
         raise typer.Exit(0)
-    batch = summarize_items(
-        cfg, items, manifest, backend, dest=dest, force=force, on_row=_show
-    )
+    with _item_progress() as progress:
+        batch = summarize_items(
+            cfg,
+            items,
+            manifest,
+            backend,
+            dest=dest,
+            force=force,
+            on_row=_show,
+            track=_track(progress, "Summarizing"),
+        )
     outcomes = [
         {
             "itemKey": row.key,
@@ -4503,7 +4639,7 @@ def synthesize(
     if prompt is not None:
         cfg.synthesize_prompt_template = str(prompt.expanduser().resolve())
     backend = _connect(cfg)
-    loaded = _loaded_scope(
+    loaded = _load_scope(
         backend,
         collection=collection,
         library=bool(library),
@@ -4552,7 +4688,14 @@ def synthesize(
     types = _resolve_types(item_type)
     if types:
         slug_parts.extend(sorted(types))
-    prepared = prepare_synthesis(cfg, items, backend, slug_parts)
+    with _item_progress() as progress:
+        prepared = prepare_synthesis(
+            cfg,
+            items,
+            backend,
+            slug_parts,
+            track=_track(progress, "Reading summaries"),
+        )
     sources, missing, slug = prepared.sources, prepared.missing, prepared.slug
     plan = prepared.chunks
     on_disk = sum(1 for src in sources if src.origin == "disk")
@@ -4594,19 +4737,20 @@ def synthesize(
             console.print(f"[green]Wrote[/] {event.path}")
 
     try:
-        written = write_synthesis(
-            cfg,
-            sources=sources,
-            missing=missing,
-            scope=scope,
-            slug=slug,
-            dest=dest,
-            targets=targets,
-            backend=backend,
-            client=get_client(cfg),
-            log=lambda line: console.print(f"[dim]{line}[/]"),
-            announce=_announce,
-        )
+        with _spinner("Writing the report…"):
+            written = write_synthesis(
+                cfg,
+                sources=sources,
+                missing=missing,
+                scope=scope,
+                slug=slug,
+                dest=dest,
+                targets=targets,
+                backend=backend,
+                client=get_client(cfg),
+                log=lambda line: console.print(f"[dim]{line}[/]"),
+                announce=_announce,
+            )
     except ReduceCapError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1)

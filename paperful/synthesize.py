@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .progress import Track
 from .config import Config, wants_disk, wants_zotero
 from .dedupe import scope_slug
 from .library import LibraryBackend
@@ -149,12 +150,16 @@ def body_budget(cfg: Config, template: str) -> int:
 
 
 def load_sources(
-    cfg: Config, items: list[Item], backend: LibraryBackend | None
+    cfg: Config,
+    items: list[Item],
+    backend: LibraryBackend | None,
+    *,
+    track: Track | None = None,
 ) -> tuple[list[SourceNote], list[Item]]:
     """Disk file wins; otherwise the tagged child note. Items with neither are missing."""
     found: list[SourceNote] = []
     missing: list[Item] = []
-    for item in items:
+    for item in track(items) if track else items:
         raw_html = ""
         origin = ""
         path = cfg.summaries_dir / f"{item.key}.html"
@@ -411,9 +416,11 @@ def prepare_synthesis(
     items: list[Item],
     backend: LibraryBackend,
     slug_parts: list[str],
+    *,
+    track: Track | None = None,
 ) -> SynthesisPrep:
     """Load summary notes, the report slug, and the chunk plan. No model call."""
-    sources, missing = load_sources(cfg, items, backend)
+    sources, missing = load_sources(cfg, items, backend, track=track)
     slug = synthesis_slug(*slug_parts)
     chunks = chunk_plan(cfg, sources) if sources else []
     return SynthesisPrep(sources=sources, missing=missing, slug=slug, chunks=chunks)

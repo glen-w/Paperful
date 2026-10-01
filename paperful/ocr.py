@@ -12,6 +12,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .progress import Track
 from .config import Config
 from .library import LibraryBackend
 from .lint import resolve_pdf_path
@@ -200,6 +201,7 @@ def ocr_items(
     *,
     apply: bool,
     attach: bool = False,
+    track: Track | None = None,
 ) -> OcrBatch:
     """Classify each PDF. With ``apply``, rewrite image files under ``out/``."""
     if apply and not ocrmypdf_available():
@@ -209,7 +211,7 @@ def ocr_items(
             "or apt install ocrmypdf tesseract-ocr-eng."
         )
     batch = OcrBatch()
-    for item in items:
+    for item in track(items) if track else items:
         durable, probe = _probe_pdf(cfg, item, manifest, backend)
         sample = probe or durable
         if sample is None:

@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .progress import Track
 from .store import is_item_dirname, load_json
 from .zot import Item, normalize_doi
 
@@ -205,14 +206,16 @@ def plan_restore(
     return plan
 
 
-def apply_restore(plan: RestorePlan, backend: Any, attacher: Any) -> dict[str, int]:
+def apply_restore(
+    plan: RestorePlan, backend: Any, attacher: Any, *, track: Track | None = None
+) -> dict[str, int]:
     """Create missing items, attach local PDFs, and add missing notes.
 
     Fields on an item that already exists are not written.
     """
     done = {"create_item": 0, "attach_pdf": 0, "create_note": 0}
     created: dict[Path, str] = {}
-    for action in plan.actions:
+    for action in track(plan.actions) if track else plan.actions:
         if action.kind == "exists":
             continue
         if action.kind == "create_item":

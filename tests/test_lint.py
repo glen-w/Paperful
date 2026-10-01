@@ -331,3 +331,36 @@ def test_apply_patches_records_errors():
     ok, errors = apply_patches(Boom(), [p])
     assert ok == 0
     assert errors and "K" in errors[0] and "denied" in errors[0]
+
+
+def test_lint_items_reports_each_item_before_and_after(cfg, monkeypatch):
+    from paperful import lint
+    from paperful.lint import Finding, lint_items
+
+    items = [make_item(key="K1"), make_item(key="K2")]
+    monkeypatch.setattr(
+        lint,
+        "lint_item",
+        lambda client, cfg, item, **k: (
+            [Finding(item.key, "missing_doi", item.title, "no DOI")]
+            if item.key == "K2"
+            else []
+        ),
+    )
+    events: list[tuple] = []
+    out = lint_items(
+        mock_client(lambda r: httpx.Response(500)),
+        cfg,
+        items,
+        on_start=lambda item: events.append(("start", item.key)),
+        on_item=lambda item, found: events.append(
+            ("done", item.key, [f.code for f in found])
+        ),
+    )
+    assert [f.itemKey for f in out] == ["K2"]
+    assert events == [
+        ("start", "K1"),
+        ("done", "K1", []),
+        ("start", "K2"),
+        ("done", "K2", ["missing_doi"]),
+    ]

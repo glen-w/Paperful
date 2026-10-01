@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .progress import Track
 from .config import Config
 from .store import (
     COLLECTIONS_SCHEMA,
@@ -443,6 +444,7 @@ def run_snapshot(
     pdfs: str,
     dry_run: bool,
     manifest: Manifest | None,
+    track: Track | None = None,
 ) -> SnapshotStats:
     stats = SnapshotStats()
     cols: dict[str, Collection] = {}
@@ -452,7 +454,7 @@ def run_snapshot(
             cols = fn() or {}
         except Exception:
             cols = {}
-    for item in items:
+    for item in track(items) if track else items:
         n_rec, n_pdf, n_notes, row = snapshot_item(
             cfg.out_dir,
             item,
