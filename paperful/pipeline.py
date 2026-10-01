@@ -164,6 +164,7 @@ class RunStats:
     finished_at: float = 0.0
     scope: str = ""
     sources_configured: list[str] = field(default_factory=list)
+    sources_disabled: list[str] = field(default_factory=list)
 
     def bump(self, status: str, source: str | None = None) -> None:
         if hasattr(self, status) and status in {
@@ -297,6 +298,7 @@ class Pipeline:
         self.ctx = Context(config=cfg, client=self.client, browser=self.browser)
         self.stats = RunStats()
         self.stats.sources_configured = list(self.sources)
+        self._disable_unconfigured_sources()
         self._circuit = CircuitBreaker(cfg.circuit_breaker_threshold)
         self._ezproxy_down = False
         self._ezproxy_down_offered = False
@@ -316,6 +318,18 @@ class Pipeline:
         self._pdf_parents: set[str] | None = None
         self._parent_by_doi: dict[str, str] | None = None
         self._parent_by_title: dict[str, str] | None = None
+
+    def _disable_unconfigured_sources(self) -> None:
+        """Remove sources with missing configuration from the run."""
+        disabled = []
+        if "ezproxy" in self.sources and not self.cfg.ezproxy_base:
+            self.sources = [s for s in self.sources if s != "ezproxy"]
+            disabled.append("ezproxy (no ezproxy_base)")
+        if "core" in self.sources and not self.cfg.core_api_key:
+            self.sources = [s for s in self.sources if s != "core"]
+            disabled.append("core (no CORE API key)")
+        if disabled:
+            self.stats.sources_disabled = disabled
 
     def stop(self) -> None:
         self._stop.set()
