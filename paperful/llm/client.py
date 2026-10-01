@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Iterator
 from dataclasses import dataclass, replace
 from typing import Any, Protocol
 
@@ -31,6 +32,18 @@ class CompletionRequest:
     num_ctx: int | None = None
 
 
+@dataclass(frozen=True)
+class ChatRequest:
+    """A conversation: ``{"role": "system" | "user" | "assistant", "content": ...}``."""
+
+    model: str
+    messages: tuple[dict[str, str], ...]
+    timeout_seconds: float = 120.0
+    temperature: float = 0.2
+    max_tokens: int | None = None
+    num_ctx: int | None = None
+
+
 def ctx_tokens_for(
     prompt: str, *, max_num_ctx: int = 32_768, reply_headroom: int = 2048
 ) -> int:
@@ -53,6 +66,13 @@ class LLMClient(Protocol):
 
     def complete_json(self, request: CompletionRequest) -> dict[str, Any]: ...
 
+    def chat_stream(self, request: ChatRequest) -> Iterator[str]: ...
+
+
+def chat(client: LLMClient, request: ChatRequest) -> str:
+    """The whole reply, for callers that do not show it as it arrives."""
+    return "".join(client.chat_stream(request))
+
 
 class NullLLMClient:
     provider = "null"
@@ -64,6 +84,9 @@ class NullLLMClient:
         raise LLMClientError("LLM is disabled")
 
     def complete_json(self, request: CompletionRequest) -> dict[str, Any]:
+        raise LLMClientError("LLM is disabled")
+
+    def chat_stream(self, request: ChatRequest) -> Iterator[str]:
         raise LLMClientError("LLM is disabled")
 
 
@@ -131,6 +154,35 @@ class OllamaClient:
         text = self.complete(replace(request, json_mode=True))
         return _parse_json_object(text)
 
+    def chat_stream(self, request: ChatRequest) -> Iterator[str]:
+        validate_ollama_url(self._api_root(), self.allow_remote)
+        options: dict[str, Any] = {"temperature": request.temperature}
+        if request.max_tokens is not None:
+            options["num_predict"] = request.max_tokens
+        if request.num_ctx is not None:
+            options["num_ctx"] = request.num_ctx
+        payload: dict[str, Any] = {
+            "model": request.model,
+            "messages": list(request.messages),
+            "stream": True,
+            "options": options,
+        }
+        url = f"{self._api_root()}/api/chat"
+        try:
+            with httpx.Client(timeout=request.timeout_seconds) as client:
+                with client.stream("POST", url, json=payload) as resp:
+                    resp.raise_for_status()
+                    for line in resp.iter_lines():
+                        piece = _ollama_chat_piece(line)
+                        if piece:
+                            yield piece
+        except httpx.TimeoutException as exc:
+            raise LLMClientError(
+                f"Ollama timed out after {request.timeout_seconds:g}s"
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise LLMClientError(f"Ollama request failed: {exc}") from exc
+
 
 @dataclass
 class LiteLLMClient:
@@ -178,6 +230,36 @@ class LiteLLMClient:
     def complete_json(self, request: CompletionRequest) -> dict[str, Any]:
         return _parse_json_object(self.complete(replace(request, json_mode=True)))
 
+    def chat_stream(self, request: ChatRequest) -> Iterator[str]:
+        try:
+            import litellm
+        except ImportError:
+            raise LlmExtraMissingError(
+                "LiteLLM is not installed; pip install 'paperful[llm]'"
+            )
+        validate_llm_api_base(self.api_base)
+        kwargs: dict[str, Any] = {
+            "model": request.model,
+            "messages": list(request.messages),
+            "temperature": request.temperature,
+            "timeout": request.timeout_seconds,
+            "stream": True,
+        }
+        if self.api_base:
+            kwargs["api_base"] = self.api_base
+        if request.max_tokens is not None:
+            kwargs["max_tokens"] = request.max_tokens
+        try:
+            for chunk in litellm.completion(**kwargs):
+                choices = getattr(chunk, "choices", None) or []
+                if not choices:
+                    continue
+                piece = getattr(getattr(choices[0], "delta", None), "content", None)
+                if piece:
+                    yield str(piece)
+        except Exception as exc:
+            raise LLMClientError(f"LiteLLM request failed: {exc}") from exc
+
 
 def get_client_impl(cfg) -> LLMClient:
     from ..config import Config
@@ -204,6 +286,24 @@ def _ollama_response_piece(line: str) -> str:
     if chunk.get("error"):
         raise LLMClientError(str(chunk["error"]))
     return str(chunk.get("response") or "")
+
+
+def _ollama_chat_piece(line: str) -> str:
+    """One streamed `/api/chat` line. Thinking text is not part of the answer."""
+    if not line.strip():
+        return ""
+    try:
+        chunk = json.loads(line)
+    except json.JSONDecodeError as exc:
+        raise LLMClientError(f"invalid Ollama stream: {exc}") from exc
+    if not isinstance(chunk, dict):
+        raise LLMClientError("expected JSON object from Ollama")
+    if chunk.get("error"):
+        raise LLMClientError(str(chunk["error"]))
+    message = chunk.get("message")
+    if not isinstance(message, dict):
+        return ""
+    return str(message.get("content") or "")
 
 
 def _parse_json_object(text: str) -> dict[str, Any]:

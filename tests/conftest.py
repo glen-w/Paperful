@@ -234,3 +234,29 @@ class FakeListingOneCollection(FakeListing):
 
     def _stub_paths(self, item) -> list[str]:
         return [self.resolve_collection("").path]
+
+
+@pytest.fixture
+def mock_ollama(monkeypatch):
+    """Route every httpx.Client the LLM layer creates through a handler."""
+    import paperful.llm.client as mod
+
+    state = {"handler": None, "requests": []}
+    orig = httpx.Client
+
+    class _Client(orig):
+        def __init__(self, *a, **kw):
+            kw["transport"] = httpx.MockTransport(state["handler"])
+            super().__init__(*a, **kw)
+
+    monkeypatch.setattr(mod.httpx, "Client", _Client)
+
+    def install(handler):
+        def wrapped(req):
+            state["requests"].append(req)
+            return handler(req)
+
+        state["handler"] = wrapped
+        return state["requests"]
+
+    return install

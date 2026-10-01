@@ -6,6 +6,23 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+New: ask your library. `paperful rag ingest` builds a search index from the
+PDFs and abstracts in the mirror, and `paperful ask "question"` answers from it,
+streaming the answer and listing the papers and pages it cited. `ask` with no
+question prompts for several; each is answered on its own. `paperful rag search`
+shows the matching passages without a chat model, and `paperful rag status`
+compares the index with the mirror. All of it is off until `[rag].enabled =
+true`, needs `paperful[rag]` (LanceDB), and reads `out/` only: it never calls
+the reference manager. Embeddings default to `nomic-embed-text` on Ollama
+(`bge-m3` for multilingual libraries, or LiteLLM); each embedding model keeps
+its own index under `state/rag/`. Ingest is incremental and resumable. Scans
+are OCR'd before indexing and PDFs with a text layer are not; note that
+`[rag].ocr = "auto"` rewrites scanned PDFs under `out/` without an `--apply`
+flag (`ocr = "off"` or `--no-ocr` turns that off). `[rag].auto_ingest = true`
+indexes new PDFs after `run`, `attach`, `inbox`, `snapshot`, `ocr --apply` and
+`snowball`; it is off by default. `[rag].parser = "docling"` is available with
+`paperful[rag-docling]`. `doctor` gains RAG rows. See `docs/rag.md`.
+
 **Mirror first.** Commands now work from the copy under `out/` and use the
 reference manager only to refresh that copy and to write back when asked.
 

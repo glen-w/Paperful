@@ -571,10 +571,11 @@ base_url = "http://127.0.0.1:11434"
 llm_title = false            # MVP gate; requires [llm].enabled
 ```
 
-**Non-goals for the MVP:** chat-over-library, blank-slate auto-tagging of the
-whole library, rewriting abstracts, silent cloud defaults, applying patches
-without `--apply`. Staged tagging (below) is **later**, not part of the title /
-PDF-identity MVP.
+**Non-goals for the MVP:** blank-slate auto-tagging of the whole library,
+rewriting abstracts, silent cloud defaults, applying patches without `--apply`.
+Staged tagging (below) is **later**, not part of the title / PDF-identity MVP.
+Chat-over-library was out of scope for this MVP only; it is a **2.0 goal** (see
+[Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer)).
 
 **Later LLM verbs:** venue/date cleanup from the first page. Title proposals,
 the PDF identity check, and grounded briefs (`summarize` / `synthesize`) are
@@ -584,12 +585,23 @@ shipped. Still proposals on disk; never a silent library write. **Note cleanup**
 
 ### Zotero-RAG integration (later; question-centric layer)
 
-**Status:** roadmap only — deepen the optional **zotero-rag** bridge (corpus
-index + grounded answers) without making chat the default product surface.
-CLI first (batch Q&A); **built-in chat with collection** in the 2.0 GUI
-**Ask** mode follows once cited answers are stable — see [GUI](#gui). Reuse the
-house LLM pattern: global `[llm]` + per-verb overrides (same spirit as
-`[summarize].model`, `[browser_agent].model`, smart inbox per-function gates).
+**Status:** foundation shipped — see [rag.md](rag.md). The index is built in
+Paperful from the on-disk mirror (no separate zotero-rag install, no reference
+manager calls): `paperful rag ingest | search | status` and `paperful ask`
+(one cited answer per question, or a prompt loop). Opt-in under `[rag]`;
+`auto_ingest` is off by default. The numbered directions below are still
+roadmap.
+
+**Chat-over-library is a 2.0 goal.** Multi-turn conversation over a scoped
+collection ships with the 2.0 GUI **Ask** mode — see [GUI](#gui) — and may land
+in the terminal first. The foundation is built for it: the LLM layer has a
+messages-based streaming call (`chat_stream`), and `rag.answer(question,
+history=...)` already takes earlier turns. What is missing is the loop that
+keeps a thread, rewrites a follow-up into a standalone retrieval query, and
+stores threads on disk. Today each `ask` question is answered on its own.
+
+Reuse the house LLM pattern: global `[llm]` + per-verb overrides (same spirit
+as `[summarize].model`, `[browser_agent].model`, `[rag].model`).
 
 **Direction:**
 
@@ -621,11 +633,11 @@ house LLM pattern: global `[llm]` + per-verb overrides (same spirit as
    (e.g. `--year-from` / `--year-to`, “only items after the asking paper”) are
    first-class so temporal stories (“did 2020 papers already answer this 2015
    RQ?”) are explicit in the report, not implicit in model memory.
-6. **Config** — global defaults under `[zotero_rag]` (or shared with the
-   zotero-rag project’s config file when co-installed); **per-task** overrides
+6. **Config** — global defaults under `[rag]` (shipped); **per-task** overrides
    on the CLI and in `profiles/*.toml` (batch path, focus, scope, generation
-   gates, citation format). `doctor` should amber when the index is stale vs
-   `snapshot` / PDF set.
+   gates, citation format). `doctor` ambers when the index is missing or its
+   embedding model is unavailable; `paperful rag status` compares the index
+   with the mirror. A stale-index amber in `doctor` is still to do.
 
 **Non-goals for this lane:** replacing Zotero’s reader; cloud-default RAG;
 answers without citations; auto-mutating parent metadata from Q&A output;
@@ -1382,12 +1394,13 @@ Parked **2.0 vision** only — not a 1.0 deliverable. Web-native workbench
 sketch (open / Docker / SaaS): [gui.md](gui.md). The Firefox extension above
 is a thinner optional bridge; it does not wait on the full GUI Capability API.
 
-**Built-in chat with collection (2.0, opt-in):** a scoped **Ask** mode in the
-workbench — conversational Q&A over the current collection (and the same
+**Built-in chat with collection (2.0 goal, opt-in):** a scoped **Ask** mode in
+the workbench — conversational Q&A over the current collection (and the same
 year / type / profile filters as other modes), with **citations** back to
-items and PDF chunks via the zotero-rag index. Not the default landing
-experience and not a replacement for Zotero’s reader; requires
-`[llm].enabled` and an up-to-date corpus index (`snapshot` / PDF set). The
+items and PDF passages via the `[rag]` index (`rag.answer` with turn history).
+Not the default landing experience and not a replacement for Zotero’s reader;
+requires `[llm].enabled`, `[rag].enabled` and an up-to-date index
+(`paperful rag ingest`). The
 Capability API exposes the same verbs as CLI batch Q&A ([Zotero-RAG
 integration](#zotero-rag-integration-later-question-centric-layer)): turn
 history, `--focus` / prompt presets, optional “promote this thread to batch

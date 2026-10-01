@@ -53,6 +53,7 @@ class SyncStats:
     unread: int = 0  # items the manager could not give; version not advanced
     unwritten: list[str] = field(default_factory=list)  # the disk refused; version not advanced
     pdf_exports: int = 0
+    pdf_keys: list[str] = field(default_factory=list)  # items whose PDF was copied in
     pdf_missing: int = 0  # the manager lists a PDF it could not hand over
     notes: int = 0
     index: list[dict[str, Any]] = field(default_factory=list)
@@ -335,6 +336,7 @@ def copy_pdfs(
             stats.pdf_missing += 1
             continue
         stats.pdf_exports += 1
+        stats.pdf_keys.append(key)
         for extra in index.dirs(key)[1:]:
             target = extra / Path(got).name
             if not target.exists():

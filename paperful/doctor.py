@@ -548,6 +548,7 @@ def run_checks(
 
     checks.append(_grey_playbooks_check(cfg))
     checks.extend(_llm_checks(cfg))
+    checks.extend(_rag_checks(cfg))
     checks.append(_snowball_check(cfg))
 
     return checks
@@ -684,6 +685,48 @@ def _llm_checks(cfg) -> list[Check]:
                 "not installed — uv sync --extra browser-agent (Python 3.11+)",
             )
         )
+    return out
+
+
+def _rag_checks(cfg) -> list[Check]:
+    """Library index for `paperful ask`. Cheap: reads the ledger, never the mirror."""
+    import importlib.util
+
+    from .llm.preflight import validate_embedder
+    from .llm.validate import LlmConfigError
+    from .rag.status import index_status
+
+    if not cfg.rag_enabled:
+        return [Check("RAG index", "green", "disabled (rag.enabled false)")]
+    if importlib.util.find_spec("lancedb") is None:
+        return [Check("RAG index", "amber", "lancedb not installed — uv sync --extra rag")]
+    out: list[Check] = []
+    try:
+        embedder = validate_embedder(cfg)
+        out.append(
+            Check("RAG embeddings", "green", f"{embedder.provider} · {embedder.model} — ok")
+        )
+    except LlmConfigError as exc:
+        out.append(Check("RAG embeddings", "amber", str(exc)))
+    except Exception as exc:  # unreachable daemon etc.
+        out.append(Check("RAG embeddings", "amber", f"{type(exc).__name__}: {exc}"))
+    status = index_status(cfg)
+    if status["problem"]:
+        out.append(Check("RAG index", "amber", status["problem"]))
+    elif not status["exists"]:
+        out.append(
+            Check("RAG index", "amber", "not built yet — paperful rag ingest --library")
+        )
+    else:
+        detail = (
+            f"{status['items_pdf'] + status['items_abstract']} items, "
+            f"{status['chunks']} passages"
+        )
+        waiting = status["items_ocr_pending"]
+        if waiting:
+            detail += f"; {waiting} scans wait for OCR"
+        detail += " · `paperful rag status` compares it with the mirror"
+        out.append(Check("RAG index", "green", detail))
     return out
 
 

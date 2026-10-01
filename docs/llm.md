@@ -329,6 +329,10 @@ and start Ollama bound to all interfaces on the host
 
 ## Related docs
 
+- [rag.md](rag.md): `paperful ask` and the library index. `ask` uses the chat
+  model configured here (`[rag].model` overrides it); embeddings are set under
+  `[rag]`.
+
 - [config.md](config.md#llm-optional-local-first) — key reference
 - [commands.md](commands.md) — `recover` / `summarize` / `synthesize` flags and exit codes
 - [architecture.md](architecture.md#llm-layer-optional-local-first) — layer, gates, note write path

@@ -4,26 +4,51 @@ from __future__ import annotations
 
 from ..config import Config
 from .client import (
+    ChatRequest,
     CompletionRequest,
     LiteLLMClient,
     LLMClient,
     LLMClientError,
     NullLLMClient,
     OllamaClient,
+    chat,
     ctx_tokens_for,
     get_client_impl,
 )
-from .preflight import validate_llm_for_recover, validate_llm_for_verb
+from .embed import (
+    EmbedError,
+    Embedder,
+    embed_fingerprint,
+    get_embedder,
+    task_prefixes,
+)
+from .preflight import (
+    validate_embedder,
+    validate_llm_for_ask,
+    validate_llm_for_recover,
+    validate_llm_for_verb,
+)
 from .validate import (
     LlmConfigError,
     LlmExtraMissingError,
+    embed_egress_is_remote,
     llm_egress_is_remote,
     reject_litellm_ollama_model,
 )
 
 __all__ = [
+    "ChatRequest",
     "CompletionRequest",
+    "EmbedError",
+    "Embedder",
+    "chat",
     "ctx_tokens_for",
+    "embed_egress_is_remote",
+    "embed_fingerprint",
+    "get_embedder",
+    "task_prefixes",
+    "validate_embedder",
+    "validate_llm_for_ask",
     "LLMClient",
     "LLMClientError",
     "LiteLLMClient",

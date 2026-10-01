@@ -45,6 +45,7 @@ research-ops
 sessions
 scihub
 llm
+rag
 ```
 
 ```{toctree}

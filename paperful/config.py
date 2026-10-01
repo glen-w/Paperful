@@ -213,6 +213,23 @@ class Config:
     # OCRmyPDF text layer for scanned PDFs. languages is a Tesseract -l list.
     ocr_languages: str = "eng"
     ocr_timeout_s: float = 600.0
+    # Library index for `paperful rag` / `paperful ask`. Reads the mirror only.
+    rag_enabled: bool = False
+    rag_auto_ingest: bool = False  # index new PDFs after run / attach / inbox / snapshot / ocr
+    rag_ocr: str = "auto"  # auto | off. auto rewrites scanned PDFs under out/
+    rag_parser: str = "light"  # light | docling
+    rag_embed_provider: str = "ollama"  # ollama | litellm
+    rag_embed_model: str = "nomic-embed-text"
+    rag_embed_base_url: str = ""  # empty → llm.base_url
+    rag_embed_api_base: str = ""  # empty → llm.api_base
+    rag_embed_batch_size: int = 32
+    rag_chunk_chars: int = 2048
+    rag_chunk_overlap: int = 256
+    rag_top_k: int = 10
+    rag_max_context_chars: int = 24_000
+    rag_hybrid: bool = True  # vector + full-text; falls back to vector only
+    rag_abstracts: bool = True  # index the abstract when an item has no readable PDF
+    rag_model: str = ""  # chat model for `ask`; empty → llm.model
     # Attachment hygiene. Off until `paperful attachments --apply`.
     attachments_fix_broken: bool = False
     attachments_merge_files: bool = False
@@ -263,6 +280,10 @@ class Config:
     @property
     def reports_dir(self) -> Path:
         return self.state_dir / "reports"
+
+    @property
+    def rag_dir(self) -> Path:
+        return self.state_dir / "rag"
 
     @property
     def inbox_path(self) -> Path | None:
@@ -611,6 +632,36 @@ def parse_dest(value: str, *, key: str = "dest") -> str:
     return dest
 
 
+_RAG_OCR_MODES = frozenset({"auto", "off"})
+_RAG_PARSERS = frozenset({"light", "docling"})
+_RAG_EMBED_PROVIDERS = frozenset({"ollama", "litellm"})
+
+
+def parse_rag_ocr(value: str) -> str:
+    """Normalise ``[rag].ocr``. ``auto`` is the default."""
+    mode = str(value).strip().lower()
+    if mode not in _RAG_OCR_MODES:
+        raise ValueError(f"config [rag].ocr {value!r} must be auto or off")
+    return mode
+
+
+def parse_rag_parser(value: str) -> str:
+    """Normalise ``[rag].parser``. ``light`` is the default."""
+    parser = str(value).strip().lower()
+    if parser not in _RAG_PARSERS:
+        raise ValueError(f"config [rag].parser {value!r} must be light or docling")
+    return parser
+
+
+def parse_rag_embed_provider(value: str) -> str:
+    provider = str(value).strip().lower()
+    if provider not in _RAG_EMBED_PROVIDERS:
+        raise ValueError(
+            f"config [rag].embed_provider {value!r} must be ollama or litellm"
+        )
+    return provider
+
+
 _SUMMARIZE_ORDERS = frozenset({"library", "newest", "oldest"})
 
 
@@ -768,6 +819,47 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             cfg.ocr_languages = str(ocr["languages"]).strip() or "eng"
         if "timeout_s" in ocr:
             cfg.ocr_timeout_s = max(1.0, float(ocr["timeout_s"]))
+    rag = raw.get("rag")
+    if isinstance(rag, dict):
+        if "enabled" in rag:
+            cfg.rag_enabled = bool(rag["enabled"])
+        if "auto_ingest" in rag:
+            cfg.rag_auto_ingest = bool(rag["auto_ingest"])
+        if "ocr" in rag:
+            cfg.rag_ocr = parse_rag_ocr(str(rag["ocr"]))
+        if "parser" in rag:
+            cfg.rag_parser = parse_rag_parser(str(rag["parser"]))
+        if "embed_provider" in rag:
+            cfg.rag_embed_provider = parse_rag_embed_provider(
+                str(rag["embed_provider"])
+            )
+        if "embed_model" in rag:
+            model = str(rag["embed_model"]).strip()
+            if not model:
+                raise ValueError("config [rag].embed_model is empty")
+            cfg.rag_embed_model = model
+        if "embed_base_url" in rag:
+            cfg.rag_embed_base_url = str(rag["embed_base_url"]).strip()
+        if "embed_api_base" in rag:
+            cfg.rag_embed_api_base = str(rag["embed_api_base"]).strip()
+        if "embed_batch_size" in rag:
+            cfg.rag_embed_batch_size = max(1, int(rag["embed_batch_size"]))
+        if "chunk_chars" in rag:
+            cfg.rag_chunk_chars = max(200, int(rag["chunk_chars"]))
+        if "chunk_overlap" in rag:
+            cfg.rag_chunk_overlap = max(0, int(rag["chunk_overlap"]))
+        if "top_k" in rag:
+            cfg.rag_top_k = max(1, int(rag["top_k"]))
+        if "max_context_chars" in rag:
+            cfg.rag_max_context_chars = max(1000, int(rag["max_context_chars"]))
+        if "hybrid" in rag:
+            cfg.rag_hybrid = bool(rag["hybrid"])
+        if "abstracts" in rag:
+            cfg.rag_abstracts = bool(rag["abstracts"])
+        if "model" in rag:
+            cfg.rag_model = str(rag["model"]).strip()
+        # Overlap must leave room for new text in every chunk.
+        cfg.rag_chunk_overlap = min(cfg.rag_chunk_overlap, cfg.rag_chunk_chars // 2)
     men = raw.get("mendeley")
     if isinstance(men, dict):
         if "client_id" in men:
