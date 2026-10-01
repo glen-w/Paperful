@@ -141,7 +141,9 @@ class Config:
     llm_allow_remote: bool = False
     llm_timeout_s: float = 120.0
     llm_max_num_ctx: int = 32_768
-    mirror_pdfs: str = "additional"  # additional | all | none
+    mirror_pdfs: str = "all"  # all | lazy | none
+    mirror_gone: str = "mark"  # mark | trash: an item that left the library
+    mirror_refresh: str = "auto"  # auto | manual: refresh before a command reads
     browser_agent_max_steps: int = 20
     browser_agent_max_wall_s: float = 300.0
     browser_agent_model: str = ""
@@ -554,7 +556,7 @@ def _parse_run_profiles(raw: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 _DESTS = frozenset({"disk", "zotero", "both"})
-_PDF_MODES = frozenset({"additional", "all", "none"})
+_PDF_MODES = frozenset({"all", "lazy", "none"})
 _REMARK_SURFACES = frozenset({"note", "tag", "off"})
 
 
@@ -568,13 +570,25 @@ def parse_remarks_surface(value: str) -> str:
     return surface
 
 
-def parse_pdfs(value: str) -> str:
-    """Normalise ``[mirror].pdfs``. ``additional`` is the default."""
+def _one_of(name: str, value: Any, allowed: tuple[str, ...]) -> str:
     mode = str(value).strip().lower()
+    if mode not in allowed:
+        raise ValueError(f"config {name} {value!r} must be {' or '.join(allowed)}")
+    return mode
+
+
+def parse_pdfs(value: str) -> str:
+    """Normalise ``[mirror].pdfs``. ``all`` is the default.
+
+    ``all`` copies every PDF the manager holds into its item folder. ``lazy``
+    copies one the first time a command needs it. ``none`` keeps manager PDFs
+    out of the mirror. ``additional`` is the old name for ``lazy``.
+    """
+    mode = str(value).strip().lower()
+    if mode == "additional":
+        return "lazy"
     if mode not in _PDF_MODES:
-        raise ValueError(
-            f"config [mirror].pdfs {value!r} must be additional, all, or none"
-        )
+        raise ValueError(f"config [mirror].pdfs {value!r} must be all, lazy, or none")
     return mode
 
 
@@ -729,6 +743,12 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
     mirror = raw.get("mirror")
     if isinstance(mirror, dict) and "pdfs" in mirror:
         cfg.mirror_pdfs = parse_pdfs(str(mirror["pdfs"]))
+    if isinstance(mirror, dict) and "gone" in mirror:
+        cfg.mirror_gone = _one_of("[mirror].gone", mirror["gone"], ("mark", "trash"))
+    if isinstance(mirror, dict) and "refresh" in mirror:
+        cfg.mirror_refresh = _one_of(
+            "[mirror].refresh", mirror["refresh"], ("auto", "manual")
+        )
     remarks = raw.get("remarks")
     if isinstance(remarks, dict) and remarks.get("surface") not in (None, ""):
         cfg.remarks_surface = parse_remarks_surface(str(remarks["surface"]))

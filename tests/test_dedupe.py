@@ -20,7 +20,7 @@ from paperful.dedupe import (
 )
 from paperful.library import LibraryError, ZoteroBackend
 from paperful.zot import Collection, item_from_json
-from tests.conftest import make_item
+from tests.conftest import FakeListingOneCollection, make_item
 
 runner = CliRunner()
 
@@ -295,7 +295,7 @@ def test_cli_dedupe_dry_run_writes_pack(tmp_path, monkeypatch):
         f'state_dir = "{tmp_path / "state"}"\n'
     )
 
-    class Stub:
+    class Stub(FakeListingOneCollection):
         def ping(self):
             return {
                 "zotero_version": "10.0.1",
@@ -332,7 +332,10 @@ def test_cli_dedupe_dry_run_writes_pack(tmp_path, monkeypatch):
     assert "doi" in reasons and "held_divergent_title" in reasons
     assert Path(payload["markdown"]).is_file()
     assert not (tmp_path / "state" / "dedupe-applied.jsonl").exists()
-    assert not list((tmp_path / "out").rglob("*"))
+    # The command refreshed the mirror. A dry-run marks nothing in it as gone.
+    records = list((tmp_path / "out").rglob("record.json"))
+    assert len(records) == 4
+    assert all("library" not in json.loads(p.read_text()) for p in records)
 
 
 def test_cli_apply_trashes_only_high_doi(tmp_path, monkeypatch):
@@ -343,7 +346,7 @@ def test_cli_apply_trashes_only_high_doi(tmp_path, monkeypatch):
     )
     trashed: list[str] = []
 
-    class Stub:
+    class Stub(FakeListingOneCollection):
         def ping(self):
             return {
                 "zotero_version": "10.0.1",
@@ -534,7 +537,7 @@ def _cfg_and_stub(tmp_path, monkeypatch, items, *, write=True):
         def create_items(self, payload):
             return {"success": {"0": "NOTE1"}}
 
-    class Stub:
+    class Stub(FakeListingOneCollection):
         def __init__(self):
             self.zot = _Zot()
 
@@ -639,7 +642,7 @@ def test_cli_gaps_json(tmp_path, monkeypatch):
         tmp_path,
         monkeypatch,
         [
-            make_item(key="A", has_pdf=True, doi="10.1/a"),
+            make_item(key="A", has_pdf=True, doi="10.1000/a"),
             make_item(key="B", has_pdf=False, has_linked_url=True, doi=None),
         ],
     )

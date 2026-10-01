@@ -60,8 +60,12 @@ uv run paperful summarize --item ITEMKEY --prompt prompts/mine.md --force
 uv run paperful synthesize -C BBNJ --dry-run         # chunk plan from existing summary notes
 uv run paperful synthesize -C BBNJ                   # report on disk and a note in the collection
 
-# thicken the on-disk mirror (per-item folders). pdfs: additional | all | none
-uv run paperful snapshot -C BBNJ --dry-run
+# the on-disk mirror. Every command refreshes it first; sync does only that.
+uv run paperful sync --dry-run                  # what changed in the library since last time
+uv run paperful sync                            # refresh, and copy library PDFs in (pdfs = all)
+uv run paperful sync --full                     # read the whole library again
+uv run paperful --offline gaps -C BBNJ          # work from the mirror; do not contact Zotero
+uv run paperful snapshot -C BBNJ --dry-run      # re-read one collection in full
 uv run paperful snapshot -C BBNJ --pdfs all
 uv run paperful restore -C BBNJ                 # dry-run unless --apply
 uv run paperful restore -C BBNJ --year-from 2021 --year-to 2026 -T journalArticle
@@ -154,7 +158,8 @@ uv run paperful pack show
 | `collections` | Collection tree with “No PDF” counts |
 | `report` | Manifest summary + latest run report (`--last-run`, `--json`, `--not-found`, `--status`) |
 | `attach` | Attach already-downloaded PDFs into the configured manager, or ingest a hand download with `--item KEY --file PATH`. `--allow-pdf-doi-mismatch` and `--allow-short-pdf` unlock holds from `--strict-pdf-doi` and the one-page density gate |
-| `snapshot` | Write a per-item restore folder under `out/` (`record.json`, optional PDF, notes) plus index, collection tree, and ledger pointers. `--pdfs additional\|all\|none`. `--dry-run` counts without writing. Year/type scope flags apply. |
+| `sync` | Bring `out/` up to date with the library: rewrite the folders of items that changed since the last refresh, mark items that left, copy in PDFs the library holds (`--pdfs all\|lazy\|none`, default from `[mirror].pdfs`). `--full` reads the whole library. `--dry-run` reads and counts, writes nothing. Refuses to mark most of the mirror as gone (a different library) unless `--accept-gone`. Every other command runs the same refresh before it reads, without the whole-library PDF pass. |
+| `snapshot` | Re-read a collection (or `--library`) in full and rewrite its item folders (`record.json`, optional PDF, notes) plus index, collection tree, and ledger pointers. `--pdfs all\|lazy\|none`. `--dry-run` counts without writing. Year/type scope flags apply. Needs the manager running. |
 | `restore` | Recreate missing library items from those folders. Dry-run unless `--apply`. `--apply` creates missing items, attaches a local PDF when the live item has none, and adds missing notes. Does not overwrite bibliographic fields. Year/type scope flags apply. |
 | `import` | Load RIS, BibTeX, or EndNote XML into the configured manager. Dry-run unless `--apply`. |
 | `export` | Write the scoped library to RIS, BibTeX, or EndNote XML (`--pdfs` copies files for XML). |
@@ -253,7 +258,7 @@ pass `--dry-run` and `--apply` together.
 | --- | --- |
 | 0 | Success (including empty dry-run) |
 | 1 | User error (unknown collection, bad preset, unknown `--phase`, `--dry-run` together with `--apply`, `--year-from` > `--year-to`, unknown `--type`, `--strict` lint findings, unknown `--item` key, LLM not enabled/misconfigured for `recover` / `summarize` / `synthesize`, `recover` on Python < 3.11, note write refused, `--to disk` together with `--apply` or `--report-collection`, `synthesize` still over budget after 3 reduce passes, `pack open` while one is open, `pack close` when none is open, unknown `--pdfs`) |
-| 2 | Environment: library unreachable on `collections`, `run`, `attach`, `lint`, `fix-metadata`, `dedupe`, `gaps`, `recover`, `summarize`, `synthesize`, `snapshot`, `restore`, `import --apply`, or `export`. Prints **Next steps** (Zotero local API, or Mendeley login, or EndNote `.enl`; then `paperful doctor`) |
+| 2 | Environment: library unreachable on `sync`, `snapshot`, `restore`, `attachments`, `attach`, or any `--apply`; or unreachable on any library command when there is no mirror under `out/` yet. With a mirror, read commands (`collections`, `gaps`, `lint`, `export`, dry-runs, `summarize --to disk`, `run` without attach) carry on from it and say how old it is. Prints **Next steps** (Zotero local API, or Mendeley login, or EndNote `.enl`; then `paperful doctor`) |
 
 ## Run summary
 
@@ -269,16 +274,17 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
   record (`paperful.item.v1`). Identity, full creators, abstract, tags, Extra,
   type-specific fields, collection membership, attachment rows, fetch
   provenance, and note filenames. **0.x may add keys.** `run` writes this when
-  it saves a PDF. `snapshot` writes one for every scoped item, including items
-  with no PDF.
+  it saves a PDF. A refresh writes one for every item, including items with
+  no PDF, and rewrites it after each change in the library.
 - `out/<collection>/<Author - Year - Title -- KEY>/<file>.pdf` — the PDF, when
-  there is one. `run` always writes downloads here. `snapshot --pdfs all` also
-  exports a PDF already stored in Zotero (`origin: zotero_export`). `additional`
-  (the default) does not. `none` writes records and notes only and does not
-  delete PDFs already on disk.
+  there is one. `run` always writes downloads here. With `[mirror].pdfs = "all"`
+  (the default) `sync` also copies in a PDF already stored in Zotero. `lazy`
+  copies one the first time a command needs it. `none` keeps them out and does
+  not delete PDFs already on disk.
 - `out/<collection>/…/notes/` — child-note HTML. A `state/summaries/<key>.html`
   file is copied as `paperful-summary.html`.
-- `out/_index.jsonl` — one line per item key (`dirs`, `has_pdf`, `md5`).
+- `out/_index.jsonl` — one line per item key (`dirs`, `has_pdf`, `md5`, child keys).
+- `out/_sync.json` — library version the mirror was last refreshed to.
 - `out/_collections.json` — collection tree.
 - `out/_history.json` — pointers at the append-only ledgers under `state/`
   (manifest, patches, dedupe, runs). Sessions, cookies, and the local API key

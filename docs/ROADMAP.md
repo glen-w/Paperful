@@ -294,6 +294,35 @@ Zotero has. Do not document either adapter as supported until testers say so.
 - Library adapter seam (`LibraryBackend`). **Zotero is well tested.** Mendeley
   and EndNote are seeking testers (above).
 
+### Mirror-first reads
+
+**Status:** shipped. The rule is in
+[architecture](architecture.md#mirror-first) and the
+[developer guide](developer.md). Measurements before the change:
+`assessments/2026-10-01-mirror-first-zotero-api.md` (local, not published).
+
+Commands refresh `out/` from what changed in the library, read the mirror,
+and write through it. Read verbs run with Zotero closed. A first refresh of
+a 22,700-item library takes about a minute; a refresh with nothing changed
+is six requests.
+
+Still open:
+
+- **Mendeley and EndNote** have no change feed, so their reads stay with the
+  manager. A `changes(since)` on either adapter moves it to the mirror path.
+- **Non-PDF attachments** (web snapshots, EPUB) have a row in the record and
+  no bytes in the mirror. Standalone notes and standalone attachments are
+  not mirrored.
+- **`attachments`** still reads each item's children from the manager. It
+  no longer downloads files to test for them.
+- **Freshness on screen.** An offline command says when the mirror was last
+  refreshed; it does not say how many items changed since.
+- **`state/pdf-cache/`** is emptied into the mirror by `paperful sync` one
+  file at a time as items are reached. There is no separate clean-up verb.
+
+Not in scope: reading `zotero.sqlite` or `storage/` directly, and any sync
+daemon.
+
 ### Near-term research-ops
 
 **Status:** next — thicken and ship verbs already named on this page; not a second
@@ -1326,13 +1355,18 @@ Ship in layers:
    `doctor` colour lines, attachment provenance in Zotero, snowball queue rows,
    and handoff inbox layout; short screen recordings aligned with the three
    worked examples above (hygiene, snowball, fetch quick vs full).
+4. **Developer guide** — [developer.md](developer.md). **Shipped:** the
+   mirror-first rule, what a command's backend serves from disk, rules for
+   new code, the module map, the refresh, disk schemas, and how to add a
+   verb, a source, or an adapter method. Keep it current when a rule or a
+   module boundary changes.
 
 Keep new pages linked from README and [commands.md](commands.md); avoid a
 second doc tree that drifts from the CLI.
 
 ## Related docs
 
-- [architecture.md](architecture.md) — disk-first adapters and data flow
+- [architecture.md](architecture.md) — disk-first adapters, the mirror-first rule, and data flow
 - [why.md](why.md) — library, find, completeness, mirror, control; what is true today
 - [quiet-mirror.md](quiet-mirror.md) — `out/` as the copy you keep
 - [releases.md](releases.md) — 0.x vs 1.0; known limits

@@ -14,7 +14,8 @@ from rich.table import Table
 
 from ..config import Config, parse_cap, parse_fetch_pdfs, parse_per_hop_rank
 from ..dedupe import normalize_dedupe_title
-from ..library import LibraryError, get_backend
+from ..catalogue import open_library
+from ..library import LibraryError
 from ..resolve import normalize_doi
 from .candidate import Candidate
 from .crawl import NoKeywordSeeds, doi_candidates, hybrid_candidates, orcid_candidates, search_candidates
@@ -45,6 +46,11 @@ from .rank import FORMULA, apply_overlap
 from .refine import llm_suggester, suggestions_for
 
 Lookup = Callable[[str | None, str | None], str | None]
+def get_backend(cfg: Config) -> Any:
+    """The library as snowball reads it: the mirror, refreshed when the manager answers."""
+    return open_library(cfg)
+
+
 _PREPRINT_DOI_LINE = re.compile(r"(?im)^Preprint DOI:\s*(\S+)")
 Decider = Callable[[Candidate], bool]
 KNOWN_BACKENDS = ("openalex", "crossref", "semanticscholar", "orcid", "europepmc", "pdf")

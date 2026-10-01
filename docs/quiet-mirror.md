@@ -17,12 +17,17 @@ See the Toast Heaven ops plan
 `docs/operations/syncthing-personal-and-research.md` in the `server` repo when
 that tree is nearby. Why this shape: [Why Paperful](why.md).
 
+The mirror is also where Paperful does its work. A command refreshes this
+tree from the manager, then reads it; the manager API is kept to that
+refresh and to explicit write-back. The rule and how the code follows it:
+[Mirror first](architecture.md#mirror-first).
+
 ## Roles
 
 | Layer | Role |
 | --- | --- |
 | **Zotero** | Catalogue, collections, citations, annotations; `storage/` holds `imported_file` attachments after attach; phone/WebDAV sync is Zotero’s job |
-| **`out/<collection>/<stem -- KEY>/`** | Quiet mirror. One folder per item: `record.json` (`paperful.item.v1`), optional PDF, `notes/`. `snapshot` writes every scoped item, including items with no PDF |
+| **`out/<collection>/<stem -- KEY>/`** | Quiet mirror. One folder per item: `record.json` (`paperful.item.v1`), optional PDF, `notes/`. A refresh keeps one for every item, including items with no PDF |
 | **`state/`** | Append-only history (manifest, patches, dedupe, runs) plus secrets. `out/_history.json` points at the ledgers and does not copy sessions, cookies, or the API key |
 
 **Dual store for now.** Attach stays **`imported_file`**: bytes land under `out/`,
@@ -34,7 +39,8 @@ stored child. Group libraries cannot use linked files, so `--link` refuses
 them. Tablet send/get stays with Zotero.
 
 ```text
-Zotero library  →  paperful snapshot  →  out/<collection>/<stem -- KEY>/
+Zotero library  →  paperful sync       →  out/<collection>/<stem -- KEY>/
+                    (and the refresh every command starts with)
                  →  paperful run       →  same folder (PDF + record.json)
                                       →  attach (imported_file)
 out/  →  paperful restore --apply  →  missing Zotero items only
@@ -47,8 +53,10 @@ out/<collection>/<Author - Year - Title -- KEY>/
   record.json
   <human name>.pdf          # optional
   notes/<tag-or-key>.html
+  annotations.json          # highlights, when there are any
 out/_index.jsonl
 out/_collections.json
+out/_sync.json              # library version last refreshed to
 out/_history.json
 ```
 
@@ -58,15 +66,29 @@ fields, collection membership, attachment rows, fetch provenance, and the note
 filenames. An item in several collections gets one folder per path: the PDF is
 hardlinked, `record.json` is copied.
 
-`[mirror].pdfs` (or `snapshot --pdfs`):
+`[mirror].pdfs` (or `sync --pdfs`, `snapshot --pdfs`):
 
-| Mode | What snapshot does with bytes |
+| Mode | What happens to a PDF the manager already holds |
 | --- | --- |
-| `additional` (default) | Keeps PDFs `run` already fetched. Does not export files that were already in Zotero |
-| `all` | Also exports an imported or linked-file PDF (`origin: zotero_export`). Skips a file whose MD5 is already in the folder. Skips linked-URL-only items |
-| `none` | Records and notes only. Does not delete a PDF that is already on disk |
+| `all` (default) | Copied into the item folder. `paperful sync` works through the whole library once and can be stopped and run again; after that only changed items are looked at. Skips linked-URL-only items |
+| `lazy` | Copied into the item folder the first time a command needs it (`lint`, `summarize`, `ocr`, `export`). `additional` is the old name and still loads |
+| `none` | Kept out of the mirror. A command that needs one makes a throwaway copy under `state/pdf-cache/`. Does not delete a PDF that is already on disk |
 
 `run` always writes a PDF it downloads. That setting does not turn fetching off.
+
+An item that is trashed, merged away, or deleted in the manager keeps its
+folder. `[mirror].gone` chooses how: `mark` (default) leaves the folder where
+it is and writes `"library": {"state": "trashed"}` (or `gone`) in the record,
+with the keeper's key after a merge; `trash` also moves the folder under
+`out/_trash/`. Commands leave marked items out. An item restored in the
+manager comes back on the next refresh. Paperful never deletes a file under
+`out/`.
+
+A folder is named for the item's author, year, and title; the key at the end
+is what identifies it. When the title changes the folder is renamed in
+place. When an item moves between collections its folder moves with it, and
+anything left in a collection it has gone from is folded into a folder it is
+still in.
 
 `paperful restore` reads these folders. Without `--apply` it only counts.
 `--apply` creates a missing collection path and a missing parent (matched by
@@ -86,8 +108,10 @@ and does not overwrite bibliographic fields.
 `state/` stays the append-only history. `out/_history.json` names those
 ledgers (manifest, metadata patches, dedupe audit, run reports) so a copy of
 `out/` can be audited next to `state/`. Reconstructing a failed fetch still
-requires `state/manifest.jsonl`. PDF annotations inside Zotero are not
-exported yet.
+requires `state/manifest.jsonl`. Annotations are copied as data
+(`annotations.json`); they are not drawn onto the PDF. Attachments that are
+not PDFs have a row in the record and no bytes in the mirror. Standalone
+notes are not mirrored.
 
 ## Non-goals (near term)
 

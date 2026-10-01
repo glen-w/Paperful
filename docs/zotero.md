@@ -181,6 +181,37 @@ uv run paperful run -C BBNJ --year-from 2023 --year-to 2026 -T journalArticle
 apply to `lint`, `fix-metadata`, `dedupe`, `gaps`, `ocr`, `summarize`, `synthesize`,
 `snapshot`, and `restore`.
 
+## What Paperful asks of the API
+
+Paperful works from its own copy under `out/` and keeps the API to three
+uses ([Mirror first](architecture.md#mirror-first)).
+
+**Refresh.** Before a command reads, six requests when nothing changed:
+
+| Request | For |
+| --- | --- |
+| `GET /items?since=<version>` | Rows changed since the last refresh (every row, paged by 2,000, on a first or `--full` refresh) |
+| `GET /collections` | The collection tree |
+| `GET /items/trash` | What is in the trash |
+| `GET /items/top?format=keys` | Every top-level key now in the library |
+| `GET /items?format=keys` | Every key, children included |
+| `GET /` | Version and server id |
+
+Trashed items are left out of `/items`, and the local API has no `/deleted`
+(**404**). A removal is read as a key that is no longer listed. When a child
+changed and its parent did not, the parent and its children are read
+(`/items/<key>`, `/items/<key>/children`): two requests per such parent.
+
+**PDF bytes.** `GET /items/<key>/file` without following the redirect gives
+the `file://` path; Paperful copies that file. In Docker the path is on the
+host, so the file is downloaded through the API instead.
+
+**Writes.** Only on attach, `--apply`, and note or tag writes. After each,
+the item and its children are read once so its folder is true.
+
+`sync`, `snapshot`, `restore`, and `attachments` read the library directly.
+Nothing else does.
+
 ## Local API vs web API
 
 Only API **v3**. Reads need no key. There is no default page size (`limit` /

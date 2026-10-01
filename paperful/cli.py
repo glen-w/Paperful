@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 import time
 from enum import Enum
@@ -37,7 +38,9 @@ from .doctor import (
     remediation_text,
     run_checks,
 )
-from .library import LibraryBackend, LibraryError, get_backend
+from .catalogue import MirrorCatalogue, MirrorFirstBackend, open_library
+from .library import LibraryBackend, LibraryError, get_backend, mirrored
+from .mirror import pdf_for
 from .pack import PackError, close_pack, current_id, open_pack, pack_join_disabled
 from .pipeline import Pipeline, RunStats, make_client, session_expired_items
 from .routing import (
@@ -178,7 +181,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "synthesize",
         "all",
     ),
-    "mirror": ("snapshot", "restore"),
+    "mirror": ("sync", "snapshot", "restore"),
     "control": (
         "doctor",
         "session",
@@ -645,29 +648,39 @@ def _manager_name(cfg: Config) -> str:
     return (cfg.manager or "zotero").strip().lower() or "zotero"
 
 
-def _open_library(cfg: Config) -> tuple[LibraryBackend | None, str]:
-    """Live library, or (None, reason) when it is not reachable.
+_OFFLINE = False
 
-    A missing manager does not stop work that can stay on the local mirror.
-    """
+
+def _offline() -> bool:
+    """``--offline`` or ``PAPERFUL_OFFLINE=1``: leave the manager alone."""
+    return _OFFLINE or os.environ.get("PAPERFUL_OFFLINE", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+
+
+def _try_live(cfg: Config, *, quiet: bool = False) -> tuple[LibraryBackend | None, str]:
+    """The manager itself, or (None, reason) when it is not reachable."""
     manager = _manager_name(cfg)
     try:
         if manager == "zotero":
             zl = ZoteroLocal()
             info = zl.ping()
-            console.print(
-                f"[dim]Zotero {info.get('zotero_version') or '?'}, "
-                f"local API v{info.get('api_version')}, write support: "
-                f"{'yes' if info.get('supports_write') else 'no'}[/]"
-            )
-            return get_backend(cfg, zl), ""
-        backend = get_backend(cfg)
+            if not quiet:
+                console.print(
+                    f"[dim]Zotero {info.get('zotero_version') or '?'}, "
+                    f"local API v{info.get('api_version')}, write support: "
+                    f"{'yes' if info.get('supports_write') else 'no'}[/]"
+                )
+            return mirrored(cfg, get_backend(cfg, zl)), ""
+        backend = mirrored(cfg, get_backend(cfg))
         info = backend.ping()
-        if manager == "mendeley":
+        if not quiet and manager == "mendeley":
             console.print(
                 f"[dim]Mendeley {info.get('display_name') or '?'}, write support: yes[/]"
             )
-        elif manager == "endnote":
+        elif not quiet and manager == "endnote":
             console.print(
                 f"[dim]EndNote {info.get('library') or '?'}, "
                 f"{info.get('refs', '?')} refs, writes via import bundle[/]"
@@ -677,13 +690,42 @@ def _open_library(cfg: Config) -> tuple[LibraryBackend | None, str]:
         return None, str(exc)
 
 
-def _connect(cfg: Config, *, quiet: bool = False) -> LibraryBackend:
+def _mirror_first(cfg: Config, live: LibraryBackend, *, quiet: bool) -> LibraryBackend:
+    """Refresh the mirror from ``live`` and read from it."""
+
+    def say(msg: str) -> None:
+        if not quiet:
+            console.print(f"[dim]{msg}[/]")
+
+    try:
+        return open_library(cfg, live=live, status=say)
+    except LibraryError as exc:
+        _exit_env(str(exc), cfg)
+
+
+def _open_library(cfg: Config) -> tuple[LibraryBackend | None, str]:
+    """The library, or (None, reason) when the manager is not reachable.
+
+    A missing manager does not stop work that can stay on the local mirror.
+    """
+    if _offline():
+        return None, "offline was asked for"
+    live, reason = _try_live(cfg)
+    if live is None:
+        return None, reason
+    return _mirror_first(cfg, live, quiet=False), ""
+
+
+def _live_backend(cfg: Config, *, quiet: bool = False) -> LibraryBackend:
+    """The manager itself, for verbs that compare it with the mirror. Exits 2 when it is down."""
     manager = (cfg.manager or "zotero").strip().lower()
+    if _offline():
+        _exit_env(f"This command reads {manager} directly and cannot run offline.", cfg)
     if manager == "zotero":
         zl = _zotero(quiet=quiet)
-        return get_backend(cfg, zl)
+        return mirrored(cfg, get_backend(cfg, zl))
     try:
-        backend = get_backend(cfg)
+        backend = mirrored(cfg, get_backend(cfg))
         info = backend.ping()
     except LibraryError as exc:
         _exit_env(str(exc), cfg)
@@ -701,7 +743,46 @@ def _connect(cfg: Config, *, quiet: bool = False) -> LibraryBackend:
     return backend
 
 
+def _connect(cfg: Config, *, quiet: bool = False) -> LibraryBackend:
+    """The library for a command: the mirror, refreshed when the manager answers.
+
+    With the manager down and a mirror on disk, reads carry on from the mirror
+    and writes are refused. With neither, exits 2.
+    """
+    catalogue = MirrorCatalogue(cfg.out_dir)
+    if _offline():
+        if not catalogue.usable():
+            _exit_env("Offline, and there is no mirror under out/ to work from.", cfg)
+        if not quiet:
+            console.print(f"[dim]Offline. Working from {catalogue.age_line()}.[/]")
+        return MirrorFirstBackend(cfg, catalogue, None)
+    if not catalogue.usable():
+        # Nothing on disk yet: the manager has to be there. Exits 2 with next steps.
+        return _mirror_first(cfg, _live_backend(cfg, quiet=quiet), quiet=quiet)
+    live, reason = _try_live(cfg, quiet=quiet)
+    if live is None:
+        if not quiet:
+            console.print(
+                f"[yellow]{_manager_name(cfg)} is not reachable ({reason}). "
+                f"Working from {catalogue.age_line()}. Nothing will be written to it.[/]"
+            )
+        return MirrorFirstBackend(cfg, catalogue, None)
+    return _mirror_first(cfg, live, quiet=quiet)
+
+
+def _no_write(backend: LibraryBackend) -> str:
+    if getattr(backend, "live", backend) is None:
+        return "The library is not reachable, so nothing can be written to it."
+    return "This library has no write support."
+
+
 def _flush(backend: LibraryBackend) -> None:
+    behind = getattr(backend, "unrefreshed", None)
+    if behind:
+        console.print(
+            f"[yellow]{len(behind)} item(s) changed in the library but not yet in "
+            f"the mirror. paperful snapshot brings them in.[/]"
+        )
     fn = getattr(backend, "flush_writes", None)
     if not callable(fn):
         return
@@ -789,8 +870,16 @@ def _loaded_scope(
 
 
 @app.callback()
-def _main() -> None:
+def _main(
+    offline: bool = typer.Option(
+        False,
+        "--offline",
+        help="Do not contact the reference manager. Work from the mirror as it is.",
+    ),
+) -> None:
     """paperful."""
+    global _OFFLINE
+    _OFFLINE = offline
 
 
 @app.command()
@@ -1214,7 +1303,7 @@ def fix_metadata(
         )
         return
     if not backend.supports_write():
-        _exit_env("This library has no write support.", cfg)
+        _exit_env(_no_write(backend), cfg)
     try:
         with _item_progress() as progress:
             ok, errors = apply_patches(
@@ -1470,7 +1559,7 @@ def dedupe(
     errors: list[str] = []
     if apply:
         if not backend.supports_write():
-            _exit_env("This library has no write support.", cfg)
+            _exit_env(_no_write(backend), cfg)
         from .remarks import remark_duplicates
 
         remark_duplicates(backend, groups, items, surface=cfg.remarks_surface)
@@ -1639,7 +1728,7 @@ def attachments(
         link=_opt_bool(link, cfg.attachments_link),
     )
     _require_manager(cfg)
-    backend = _connect(cfg, quiet=as_json)
+    backend = _live_backend(cfg, quiet=as_json)
     loaded = _load_scope(
         backend,
         json_out=as_json,
@@ -1656,13 +1745,15 @@ def attachments(
     children = []
     mirrors: dict = {}
     stems: dict = {}
+    unread: list[str] = []
     with _item_progress(json_out=as_json) as progress:
         for item in _track(progress, "Scanning attachments")(items):
-            raw = []
             try:
                 raw = backend.children(item.key) or []
-            except Exception:
-                raw = []
+            except LibraryError:
+                # Not the same as an item with no attachments. Leave it out.
+                unread.append(item.key)
+                continue
             present = {
                 str(ch.get("key") or (ch.get("data") or {}).get("key") or ""): _child_bytes(
                     backend, ch
@@ -1684,6 +1775,8 @@ def attachments(
     )
     applied = 0
     errors: list[str] = list(scan.refusals)
+    if unread:
+        errors.append(f"{len(unread)} item(s) could not be read and were skipped")
     if apply and flags.any:
         refusal = apply_refusal(
             manager=cfg.manager,
@@ -1693,7 +1786,7 @@ def attachments(
         if refusal:
             errors.append(refusal)
         elif not backend.supports_write():
-            _exit_env("This library has no write support.", cfg)
+            _exit_env(_no_write(backend), cfg)
         else:
             try:
                 with _item_progress(json_out=as_json) as progress:
@@ -1923,7 +2016,7 @@ def versions(
         applied = 0
         if apply:
             if not backend.supports_write():
-                _exit_env("This library has no write support.", cfg)
+                _exit_env(_no_write(backend), cfg)
             try:
                 with _item_progress(json_out=as_json) as progress:
                     applied, errors = apply_versions(
@@ -2996,7 +3089,7 @@ def attach(
     backend = _connect(cfg)
     manifest = Manifest(cfg.manifest_path)
     if not backend.supports_write():
-        _exit_env("This library has no write support.", cfg)
+        _exit_env(_no_write(backend), cfg)
 
     if item or file is not None:
         if len(item) != 1 or file is None:
@@ -3262,7 +3355,7 @@ def snapshot(
     pdfs: str | None = typer.Option(
         None,
         "--pdfs",
-        help="additional (fetched PDFs only), all (also export Zotero PDFs), or none.",
+        help="all (also copy library PDFs), lazy (fetched PDFs only), or none.",
     ),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
@@ -3295,7 +3388,7 @@ def snapshot(
     except ValueError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1) from exc
-    backend = _connect(cfg)
+    backend = _live_backend(cfg)
     loaded = _load_scope(
         backend,
         collection=collection,
@@ -3330,6 +3423,119 @@ def snapshot(
         f"[bold]records {stats.records}[/] · pdf exports {stats.pdf_exports} · "
         f"notes {stats.notes}"
     )
+    if stats.unread:
+        console.print(
+            f"[yellow]{stats.unread} item(s) could not be read. "
+            "Their folders were left as they were; run snapshot again.[/]"
+        )
+
+
+def _print_sync(stats, *, dry_run: bool) -> None:
+    was = "none" if stats.previous is None else f"v{stats.previous}"
+    kind = "full" if stats.full else "changes since last refresh"
+    verb = "would write" if dry_run else "written"
+    console.print(
+        f"[bold]library {was} → v{stats.version}[/] ({kind}) · "
+        f"{verb} {stats.written} · left the library {stats.gone} · "
+        f"pdfs copied {stats.pdf_exports}"
+    )
+    if stats.unread:
+        console.print(
+            f"[yellow]{stats.unread} item(s) could not be read. The mirror keeps "
+            "what it had for them and the next refresh tries again.[/]"
+        )
+    if stats.unwritten:
+        console.print(
+            f"[yellow]{len(stats.unwritten)} item folder(s) could not be written. "
+            "The next refresh tries again.[/]"
+        )
+        for line in stats.unwritten[:5]:
+            console.print(f"[dim]  {line}[/]")
+    if stats.pdf_missing:
+        console.print(
+            f"[yellow]{stats.pdf_missing} PDF(s) are listed in the library with no "
+            "file behind them. See paperful attachments.[/]"
+        )
+
+
+@app.command()
+def sync(
+    full: bool = typer.Option(
+        False, "--full", help="Read the whole library, not only what changed."
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Count what would change. Reads the library, writes nothing."
+    ),
+    pdfs: str | None = typer.Option(
+        None,
+        "--pdfs",
+        help="all (copy every library PDF into the mirror), lazy (on first use), or none.",
+    ),
+    accept_gone: bool = typer.Option(
+        False,
+        "--accept-gone",
+        help="Proceed when most mirrored items are not in this library.",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Bring out/ up to date with the library. Reads what changed since the last refresh."""
+    from .snapshot import run_snapshot, snapshot_report
+    from .sync import run_sync, sync_report
+
+    cfg = _cfg(config)
+    _require_manager(cfg)
+    try:
+        mode = parse_pdfs(pdfs) if pdfs else cfg.mirror_pdfs
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    backend = _live_backend(cfg)
+    if not callable(getattr(backend, "changes", None)):
+        # No change feed on this manager: read it whole, as snapshot does.
+        loaded = _load_scope(
+            backend, collection=[], library=True, year_from=None, year_to=None, item_type=[]
+        )
+        with _item_progress() as progress:
+            snap = run_snapshot(
+                cfg,
+                backend,
+                loaded.items,
+                pdfs=mode,
+                dry_run=dry_run,
+                manifest=Manifest(cfg.manifest_path),
+                track=_track(progress, "Writing folders"),
+            )
+        if not dry_run:
+            write_run_report(
+                cfg,
+                snapshot_report(cfg, loaded.label, mode, dry_run, snap),
+                as_last_run=False,
+            )
+        console.print(
+            f"[bold]records {snap.records}[/] · pdf exports {snap.pdf_exports} · "
+            f"notes {snap.notes}"
+        )
+        return
+    try:
+        with _item_progress() as progress:
+            stats = run_sync(
+                cfg,
+                backend,
+                full=full,
+                dry_run=dry_run,
+                pdfs=mode,
+                accept_gone=accept_gone,
+                track=_track(progress, "Writing items"),
+                pdf_track=_track(progress, "Copying PDFs"),
+                status=lambda msg: progress.console.print(f"[dim]{msg}[/]"),
+            )
+    except LibraryError as exc:
+        _exit_env(str(exc), cfg)
+    if not dry_run:
+        write_run_report(
+            cfg, sync_report(cfg, stats, dry_run=dry_run, pdfs=mode), as_last_run=False
+        )
+    _print_sync(stats, dry_run=dry_run)
 
 
 @app.command()
@@ -3389,7 +3595,7 @@ def restore(
     if not collection and not library:
         _refuse_missing_scope()
     _require_manager(cfg)
-    backend = _connect(cfg)
+    backend = _live_backend(cfg)
     prefixes: list[str] | None = None
     if not library:
         prefixes = []
@@ -3429,7 +3635,11 @@ def restore(
         note_tags: dict[str, set[str]] = {}
         for it in _track(progress, "Reading library notes")(library_items):
             tags: set[str] = set()
-            for ch in backend.children(it.key):
+            try:
+                kids = backend.children(it.key)
+            except LibraryError as exc:
+                _exit_env(str(exc), cfg)
+            for ch in kids:
                 data = ch.get("data") or {}
                 if data.get("itemType") != "note":
                     continue
@@ -3502,7 +3712,7 @@ def import_library(
         return
     backend = _connect(cfg)
     if not backend.supports_write():
-        _exit_env("This library has no write support.", cfg)
+        _exit_env(_no_write(backend), cfg)
     with _item_progress() as progress:
         done = apply_import(
             records, backend, dry_run=False, track=_track(progress, "Importing records")
@@ -3577,6 +3787,7 @@ def export_library(
         pdf_dir.mkdir(parents=True, exist_ok=True)
     records = []
     copied = 0
+    manifest = Manifest(cfg.manifest_path)
     with _item_progress() as progress:
         for it in _track(progress, "Exporting records")(items):
             rec_json = None
@@ -3601,13 +3812,24 @@ def export_library(
             pdf_list: list[str] = []
             if pdf_dir is not None and it.has_pdf:
                 target = pdf_dir / item_filename(it)
-                exported = backend.export_pdf(it, target)
+                local = pdf_for(cfg.out_dir, it, manifest)
+                try:
+                    if local is not None:
+                        exported = shutil.copyfile(local, target)
+                    else:
+                        exported = backend.export_pdf(it, target)
+                except LibraryError as exc:
+                    _exit_env(str(exc), cfg)
                 if exported is not None and Path(exported).is_file():
                     pdf_list.append(str(exported))
                     copied += 1
             rec["pdfs"] = pdf_list
             notes = []
-            for ch in backend.children(it.key):
+            try:
+                kids = backend.children(it.key)
+            except LibraryError as exc:
+                _exit_env(str(exc), cfg)
+            for ch in kids:
                 data = ch.get("data") or {}
                 if data.get("itemType") != "note":
                     continue

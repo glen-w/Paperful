@@ -196,13 +196,19 @@ mirror_failures_before_skip = 3
 # apply = true
 # steps = ["gaps", "run", "lint", "fix-metadata", "summarize"]
 
-# Quiet mirror. snapshot copies existing Zotero PDFs only when pdfs = "all".
-# additional — keep PDFs paperful fetched; do not export files already in Zotero
-# all        — also export imported/linked-file PDFs into the item folder
-# none       — records and notes only; do not delete PDFs already on disk
+# The mirror under out/. Commands refresh it from the manager, then read it.
+# pdfs: what to do with PDFs the manager already holds.
+#   all  — copy every one into its item folder (paperful sync does the first pass)
+#   lazy — copy one the first time a command needs it
+#   none — keep them out of the mirror; PDFs already on disk are not deleted
 # run always writes PDFs it downloads, whatever this is set to.
+# refresh: auto (each command refreshes first) or manual (only paperful sync).
+# gone: an item trashed or deleted in the manager. mark keeps its folder in
+#   place and marks the record; trash also moves it under out/_trash/.
 [mirror]
-pdfs = "additional"
+pdfs = "all"
+refresh = "auto"
+gone = "mark"
 
 # Snowball grows a library from a keyword, DOI, ORCID, or collection.
 # Off until you set enabled. Dry-run / approve-batch write state/snowball/.

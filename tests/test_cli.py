@@ -17,6 +17,7 @@ from paperful.store import (
     Record,
 )
 from paperful.zot import Collection
+from tests.conftest import FakeListing
 from tests.textutil import plain_text
 
 runner = CliRunner()
@@ -40,8 +41,23 @@ def cfg_file(tmp_path):
     return p
 
 
-class StubZL:
+class StubZot:
+    """The reads the adapter makes. This library has no children and no raw payloads."""
+
+    local_api_key = "k"
+
+    def children(self, key):
+        return []
+
+    def item(self, key):
+        from pyzotero import errors as ze
+
+        raise ze.ResourceNotFoundError(key)
+
+
+class StubZL(FakeListing):
     def __init__(self):
+        self.zot = StubZot()
         self.cols = {
             "A": Collection("A", "BBNJ", None, "BBNJ", "BBNJ"),
             "B": Collection("B", "EIA / SEA", "A", "BBNJ/EIA _ SEA", "BBNJ/EIA / SEA"),
@@ -176,8 +192,10 @@ def test_collections_table(cfg_file, stub_zotero):
 def test_run_dry_run_lists_items_and_writes_nothing(cfg_file, stub_zotero, tmp_path):
     from tests.conftest import make_item
 
+    # Both in the collection the run names: the scope is read from the mirror,
+    # which files each item under its own collections.
     stub_zotero.items_in_scope = lambda keys: [
-        make_item(key="I1", year=2024, collection_paths=["BBNJ"]),
+        make_item(key="I1", year=2024, collection_paths=["BBNJ/EIA _ SEA"]),
         make_item(
             key="I2",
             year=2019,

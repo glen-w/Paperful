@@ -6,7 +6,7 @@ import re
 
 from .config import Config
 from .library import LibraryBackend
-from .lint import resolve_pdf_path
+from .lint import ensure_pdf
 from .pdfid import text_from_pdf
 from .store import Manifest
 from .zot import Item
@@ -22,12 +22,7 @@ def pdf_text_for(
     *,
     max_pages: int | None = 2,
 ) -> str:
-    path = resolve_pdf_path(cfg, item, manifest)
-    if path is None and item.has_pdf and backend is not None:
-        dest = cfg.pdf_cache_dir / f"{item.key}.pdf"
-        path = backend.export_pdf(item, dest)
-        if path:
-            item.pdf_path = str(path)
+    path = ensure_pdf(cfg, item, manifest, backend)
     if not path or not path.is_file():
         return ""
     return text_from_pdf(path, max_pages=max_pages)

@@ -77,8 +77,10 @@ from a text-layer PDF; `synthesize` reviews those notes. `paperful all` runs
 gaps → find → lint → fix → summarise. The model is off until `[llm].enabled`.
 `paperful ocr --apply` adds a text layer to scanned PDFs on disk.
 
-**Mirror.** Work happens **on disk** (`out/`, `state/`). `snapshot` writes one
-folder per scoped item (`record.json`, optional PDF, notes). `restore --apply`
+**Mirror.** Work happens **on disk** (`out/`, `state/`). Each command first
+brings the mirror up to date with what changed in the library, then reads
+the mirror: one folder per item (`record.json`, PDF, notes). With Zotero
+closed, read commands carry on from it. `restore --apply`
 recreates only what the live catalogue is missing and does not overwrite
 fields already there. Copy `out/` yourself; Paperful is not a sync service.
 

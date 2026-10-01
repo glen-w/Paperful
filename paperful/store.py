@@ -20,7 +20,7 @@ from .zot import Item
 ITEM_SCHEMA = "paperful.item.v1"
 HISTORY_SCHEMA = "paperful.history.v1"
 COLLECTIONS_SCHEMA = "paperful.collections.v1"
-PDF_MODES = frozenset({"additional", "all", "none"})
+PDF_MODES = frozenset({"all", "lazy", "none"})
 _KEY_MARK = " -- "
 # Zotero keys are 8 alphanumeric; Mendeley ids are UUIDs; EndNote ids are integers.
 _ITEM_DIR_RE = re.compile(r" -- ([A-Za-z0-9][A-Za-z0-9._-]*)$")
@@ -225,64 +225,9 @@ def items_from_mirror(
     out_dir: Path, collection_prefixes: list[str] | None = None
 ) -> list[Item]:
     """Catalogue rows already on disk. The live manager is not required."""
-    if not out_dir.is_dir():
-        return []
-    prefixes = [p.strip("/") for p in (collection_prefixes or []) if p and p.strip("/")]
-    items: list[Item] = []
-    seen: set[str] = set()
-    for rec_path in sorted(out_dir.rglob("record.json")):
-        if not is_item_dirname(rec_path.parent.name):
-            continue
-        try:
-            rel = rec_path.parent.relative_to(out_dir).as_posix()
-        except ValueError:
-            continue
-        collection = "" if "/" not in rel else rel.rsplit("/", 1)[0]
-        if prefixes and not any(
-            collection == pre or collection.startswith(pre + "/") for pre in prefixes
-        ):
-            continue
-        rec = load_json(rec_path)
-        if rec is None:
-            continue
-        key = str(rec.get("item_key") or item_key_from_dirname(rec_path.parent.name) or "")
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        pdfs = sorted(p for p in rec_path.parent.glob("*.pdf") if p.is_file())
-        creators = rec.get("creators") if isinstance(rec.get("creators"), list) else []
-        first = None
-        if creators and isinstance(creators[0], dict):
-            first = creators[0].get("lastName") or creators[0].get("name")
-        year = rec.get("year")
-        if not isinstance(year, int):
-            year = None
-        paths = rec.get("collection_paths")
-        if not isinstance(paths, list) or not paths:
-            paths = [collection] if collection else []
-        items.append(
-            Item(
-                key=key,
-                item_type=str(rec.get("item_type") or "document"),
-                title=str(rec.get("title") or ""),
-                doi=rec.get("doi") or None,
-                arxiv_id=rec.get("arxiv_id") or None,
-                url=rec.get("url") or None,
-                year=year,
-                first_author=str(first) if first else None,
-                collection_paths=[str(p) for p in paths if p],
-                doi_source=str(rec.get("doi_source") or "none"),
-                library_doi=rec.get("library_doi") or None,
-                extra=str(rec.get("extra") or ""),
-                publication_title=rec.get("publication_title") or None,
-                date=str(rec.get("date") or "") or None,
-                pdf_path=str(pdfs[0]) if pdfs else None,
-                has_pdf=bool(pdfs),
-                date_added=rec.get("date_added") or None,
-                abstract=rec.get("abstract") or None,
-            )
-        )
-    return items
+    from .mirror import items_in_mirror
+
+    return items_in_mirror(out_dir, collection_prefixes)
 
 
 def unique_path(directory: Path, filename: str, md5: str) -> Path:
@@ -306,20 +251,18 @@ def save_pdf(
     out_dir: Path, item: Item, content: bytes, md5: str
 ) -> tuple[Path, list[Path]]:
     """Write once under the first collection's item folder; hardlink the rest."""
+    from .mirror import place_item_dirs
+
     filename = item_filename(item)
-    dirname = item_dirname(item)
-    paths = item.collection_paths or ["_uncollected"]
-    primary_dir = out_dir / paths[0] / dirname
-    primary_dir.mkdir(parents=True, exist_ok=True)
+    dirs = place_item_dirs(out_dir, item)
+    primary_dir = dirs[0]
     primary = unique_path(primary_dir, filename, md5)
     if not primary.exists():
         tmp = primary.with_suffix(".part")
         tmp.write_bytes(content)
         os.replace(tmp, primary)
     extras: list[Path] = []
-    for p in paths[1:]:
-        d = out_dir / p / dirname
-        d.mkdir(parents=True, exist_ok=True)
+    for d in dirs[1:]:
         target = unique_path(d, filename, md5)
         if not target.exists():
             try:

@@ -9,6 +9,7 @@ import pytest
 import typer
 from typer.testing import CliRunner
 
+from tests.conftest import FakeListing
 from paperful import cli
 from paperful.config import Config, load_config
 from paperful.run_config import (
@@ -167,7 +168,7 @@ description = "table"
     assert sources["bbnj"] == "config.toml+file"
 
 
-class StubZL:
+class StubZL(FakeListing):
     def __init__(self):
         self.cols = {"A": Collection("A", "BBNJ", None, "BBNJ", "BBNJ")}
 

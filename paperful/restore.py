@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .mirror import record_pdf
 from .progress import Track
 from .store import is_item_dirname, load_json
 from .zot import Item, normalize_doi
@@ -113,17 +114,6 @@ def parent_payload(record: dict[str, Any], collection_keys: list[str]) -> dict[s
     return data
 
 
-def _local_pdf(item_dir: Path, record: dict[str, Any]) -> Path | None:
-    fetch = record.get("fetch") if isinstance(record.get("fetch"), dict) else {}
-    named = fetch.get("pdf") if isinstance(fetch, dict) else None
-    if named:
-        candidate = item_dir / str(named)
-        if candidate.is_file():
-            return candidate
-    pdfs = sorted(p for p in item_dir.glob("*.pdf") if p.is_file())
-    return pdfs[0] if pdfs else None
-
-
 def plan_restore(
     records: list[tuple[Path, dict[str, Any]]],
     library: list[Item],
@@ -165,7 +155,7 @@ def plan_restore(
             live_key = match.key
             has_pdf = bool(match.has_pdf)
             present_tags = tags_for.get(match.key, set())
-        pdf = _local_pdf(item_dir, record)
+        pdf = record_pdf(item_dir, record)
         if pdf is not None and not has_pdf:
             plan.actions.append(
                 RestoreAction(

@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from urllib.parse import unquote, urlparse
+
 from pyzotero import zotero
 
 from .resolve import extract_arxiv_id, extract_doi, extract_pmid, normalize_doi
@@ -17,6 +19,8 @@ SKIP_TYPES = {"attachment", "note", "annotation"}
 UNCOLLECTED = "_uncollected"
 _PATH_UNSAFE = re.compile(r"[\\/:*?\"<>|\x00-\x1f]")
 _ZOTERO_PORT = 23119
+# Rows per request for a whole-library read. The local API has no page cap.
+LISTING_PAGE = 2000
 
 # Regular (non-attachment) Zotero item types from the CSL/Zotero schema.
 ITEM_TYPES: frozenset[str] = frozenset(
@@ -180,6 +184,67 @@ class ZoteroLocal:
             "supports_write": zotero_supports_write(version, server_id),
         }
 
+    # ---- whole listings (mirror refresh) ---------------------------------
+    def get(self, path: str, **params: Any) -> Any:
+        """One GET under the library root. Raises on anything but 200."""
+        resp = self.zot.client.get(
+            f"{self.zot.endpoint}/users/0{path}", params=params or None
+        )
+        resp.raise_for_status()
+        return resp
+
+    def listing(
+        self, path: str, *, page: int = LISTING_PAGE, **params: Any
+    ) -> tuple[list[dict[str, Any]], int | None]:
+        """Every row of a JSON listing, and the library version it was read at.
+
+        Pages by ``start``. A write that lands between pages changes the
+        version header; the read starts again so the rows are one state.
+        """
+        for _attempt in range(3):
+            rows: list[dict[str, Any]] = []
+            version: int | None = None
+            moved = False
+            start = 0
+            while True:
+                resp = self.get(path, limit=page, start=start, **params)
+                seen = _header_int(resp, "Last-Modified-Version")
+                if version is None:
+                    version = seen
+                elif seen is not None and seen != version:
+                    moved = True
+                    break
+                batch = resp.json()
+                rows.extend(row for row in batch if isinstance(row, dict))
+                if len(batch) < page:
+                    break
+                start += page
+            if not moved:
+                return rows, version
+        raise ConnectionError("the library kept changing while it was being read")
+
+    def file_path(self, key: str) -> Path | None:
+        """Where Zotero keeps a stored attachment's file, if this machine can see it.
+
+        The local API answers a file request with a redirect to a ``file://``
+        path. Asking for the redirect moves no bytes. ``None`` means no path
+        was given, or the path is on a filesystem this process cannot see
+        (Zotero on the host, Paperful in a container).
+        """
+        resp = self.zot.client.get(
+            f"{self.zot.endpoint}/users/0/items/{key}/file", follow_redirects=False
+        )
+        location = resp.headers.get("Location") or ""
+        if resp.status_code not in (301, 302, 303, 307) or not location.startswith("file:"):
+            return None
+        path = Path(unquote(urlparse(location).path))
+        # storage/<key>/<file>: with no storage/ here, the path says nothing.
+        return path if path.parent.parent.is_dir() else None
+
+    def keys(self, path: str, **params: Any) -> set[str]:
+        """Item keys of a listing. One request, no paging."""
+        return set(self.get(path, format="keys", **params).text.split())
+
     # ---- collections --------------------------------------------------
     def collections(self) -> dict[str, Collection]:
         if self._collections is None:
@@ -189,35 +254,10 @@ class ZoteroLocal:
 
     def resolve_collection(self, spec: str) -> Collection:
         """Resolve 'BBNJ/not undermine', a unique collection name, or a collection key."""
-        cols = self.collections()
-        spec_norm = spec.strip().strip("/")
-        if spec_norm in cols:
-            return cols[spec_norm]
-        wanted = _squash(spec_norm)
-        for c in cols.values():
-            if wanted in (_squash(c.path), _squash(c.raw_path)):
-                return c
-        matches = [c for c in cols.values() if c.name.lower() == spec_norm.lower()]
-        if len(matches) == 1:
-            return matches[0]
-        if len(matches) > 1:
-            paths = ", ".join(sorted(c.path for c in matches))
-            raise LookupError(
-                f"Collection name '{spec}' is ambiguous; use a path: {paths}"
-            )
-        raise LookupError(f"No collection matching '{spec}'")
+        return resolve_collection_in(self.collections(), spec)
 
     def subtree_keys(self, root: Collection) -> list[str]:
-        cols = self.collections()
-        out = [root.key]
-        frontier = [root.key]
-        while frontier:
-            parent = frontier.pop()
-            for c in cols.values():
-                if c.parent == parent:
-                    out.append(c.key)
-                    frontier.append(c.key)
-        return out
+        return subtree_keys_in(self.collections(), root)
 
     def collection_counts(self) -> dict[str, tuple[int, int]]:
         """Per collection key: (top-level items, items lacking PDF), counting subcollections."""
@@ -360,6 +400,33 @@ class ZoteroLocal:
         return None
 
 
+def _header_int(resp: Any, name: str) -> int | None:
+    try:
+        return int(resp.headers.get(name))
+    except (TypeError, ValueError):
+        return None
+
+
+def item_from_rows(
+    raw: dict[str, Any],
+    children: Iterable[dict[str, Any]],
+    cols: dict[str, Collection],
+    selected: set[str] | None = None,
+) -> Item:
+    """The listing's ``Item`` from a parent payload and its child rows. No request."""
+    has_pdf = False
+    has_linked = False
+    for ch in children:
+        data = ch.get("data") or {}
+        if is_pdf_attachment(data):
+            has_pdf = True
+        elif is_linked_url_pdf(data):
+            has_linked = True
+    return item_from_json(
+        raw, cols, selected, has_pdf=has_pdf, has_linked_url=has_linked
+    )
+
+
 def _force_zotero_local_host_header(request: Any) -> None:
     request.headers["Host"] = _ZOTERO_LOCAL_HOST_HEADER
 
@@ -403,6 +470,38 @@ def build_collection_tree(raw: Iterable[dict[str, Any]]) -> dict[str, Collection
             path=path_of(key, True),
             raw_path=path_of(key, False),
         )
+    return out
+
+
+def resolve_collection_in(cols: dict[str, Collection], spec: str) -> Collection:
+    """Resolve 'BBNJ/not undermine', a unique collection name, or a collection key."""
+    spec_norm = spec.strip().strip("/")
+    if spec_norm in cols:
+        return cols[spec_norm]
+    wanted = _squash(spec_norm)
+    for c in cols.values():
+        if wanted in (_squash(c.path), _squash(c.raw_path)):
+            return c
+    matches = [c for c in cols.values() if c.name.lower() == spec_norm.lower()]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        paths = ", ".join(sorted(c.path for c in matches))
+        raise LookupError(
+            f"Collection name '{spec}' is ambiguous; use a path: {paths}"
+        )
+    raise LookupError(f"No collection matching '{spec}'")
+
+
+def subtree_keys_in(cols: dict[str, Collection], root: Collection) -> list[str]:
+    out = [root.key]
+    frontier = [root.key]
+    while frontier:
+        parent = frontier.pop()
+        for c in cols.values():
+            if c.parent == parent:
+                out.append(c.key)
+                frontier.append(c.key)
     return out
 
 

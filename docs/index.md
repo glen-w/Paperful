@@ -28,6 +28,7 @@ workflows
 dedupe
 config
 architecture
+developer
 quiet-mirror
 releases
 ```

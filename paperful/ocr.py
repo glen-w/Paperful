@@ -14,7 +14,7 @@ from pathlib import Path
 
 from .progress import Track
 from .config import Config
-from .library import LibraryBackend
+from .library import LibraryBackend, LibraryError
 from .lint import resolve_pdf_path
 from .pdfid import text_from_pdf
 from .snapshot import item_dirs
@@ -119,7 +119,10 @@ def _probe_pdf(
     probe = found if found is not None and found.is_file() else None
     if probe is None and item.has_pdf and backend is not None:
         dest = cfg.pdf_cache_dir / f"{item.key}.pdf"
-        probe = backend.export_pdf(item, dest)
+        try:
+            probe = backend.export_pdf(item, dest)
+        except LibraryError:
+            probe = None
     return None, probe
 
 

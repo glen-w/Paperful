@@ -45,3 +45,10 @@ See [docs/architecture.md](docs/architecture.md). CLI orchestrates; identifier
 and PDF-text work lives in `resolve` / `pdfid` / `lint` / `metadata`; source
 adapters must not write `manifest` or `out_dir`. Managers go through
 `LibraryBackend` in `paperful/library.py`. Default tests stay offline.
+
+**Mirror first.** Paperful copies the user's files and metadata into `out/`
+and `state/` and works from that copy. The manager API is for refreshing the
+mirror and for explicit write-back, nothing else. Before adding a call to
+Zotero, read the [developer guide](docs/developer.md): a read verb must not
+need the manager running, a write must leave `record.json` true, and a
+failed read is never "nothing there". Tests enforce all three.

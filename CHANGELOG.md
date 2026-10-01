@@ -6,6 +6,47 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+**Mirror first.** Commands now work from the copy under `out/` and use the
+reference manager only to refresh that copy and to write back when asked.
+
+- Each command first asks Zotero what changed since the last refresh and
+  rewrites only those item folders. With nothing changed that is six
+  requests. Before, every command listed the library through the API, and
+  scoping one collection read every attachment in the library first.
+- `paperful sync` does that refresh on its own. `--full` reads the whole
+  library, `--dry-run` counts and writes nothing. The first refresh reads
+  the library once (about a minute for 22,000 items).
+- With Zotero closed, `collections`, `gaps`, `lint`, `export`, `ocr`,
+  dry-runs, and `run` (without attach) carry on from the mirror and say how
+  old it is. `--offline` (or `PAPERFUL_OFFLINE=1`) never contacts Zotero.
+  `sync`, `snapshot`, `restore`, `attachments`, `attach`, and any `--apply`
+  still need it and exit 2.
+- A write to Zotero (`attach`, `fix-metadata --apply`, `dedupe --apply`,
+  `versions --apply`, summary and remark notes, snowball and `import`
+  creates) now updates that item's folder in the same step. Before, the
+  mirror was stale until the next `snapshot`.
+- **Behaviour change:** `[mirror].pdfs` defaults to `all`. `paperful sync`
+  copies every PDF Zotero holds into its item folder, once; expect the
+  mirror to grow by about the size of your Zotero storage. `lazy` copies a
+  PDF the first time a command needs it (`additional` is the old name and
+  still loads). `none` keeps them out. Files already in `state/pdf-cache/`
+  are moved in rather than copied again.
+- An item trashed, merged, or deleted in Zotero keeps its folder and is
+  marked in its record; commands leave it out. `[mirror].gone = "trash"`
+  moves the folder under `out/_trash/` instead. Nothing under `out/` is
+  deleted. `sync` refuses to mark more than half the mirror as gone (a
+  different library) without `--accept-gone`.
+- A retitled item's folder is renamed instead of a second one appearing. An
+  item that changes collection takes its folder with it.
+- Annotations are copied to `annotations.json` beside the record.
+- A Zotero read that fails is now an error, not an empty answer. `snapshot`
+  and `sync` skip the item, keep what is on disk, and say how many could not
+  be read. Before, a stalled API could replace a full record with an empty
+  one, and a failed note lookup could post a duplicate note.
+- `attachments` no longer downloads each file to see whether it is there.
+- New config: `[mirror].refresh` (`auto` / `manual`), `[mirror].gone`
+  (`mark` / `trash`). `doctor` shows when the mirror was last refreshed.
+
 Every command that walks the library now says what it is doing. `lint`,
 `fix-metadata`, `attachments`, `versions`, `snapshot`, `restore`, `import`,
 `export`, `ocr`, `summarize` and `synthesize` show the same live progress bar as
@@ -15,6 +56,19 @@ in those commands and in `run`, `gaps`, `collections` and `inbox`. With `--json`
 the bar goes to stderr and only on a terminal, so stdout stays JSON. Ctrl-C
 during `lint` keeps the findings so far: it prints them, writes the run report
 with `flags.interrupted`, and exits 130.
+
+`snowball resume` after an OpenAlex budget stop during a keyword search now
+keeps the original `max_candidates` (including `all`) instead of capping the
+search at `per_hop_limit`.
+
+Snowball reference recovery from publisher landing pages keeps references with
+no DOI when the page lists references as `<li>` items, so they reach the title
+match instead of being merged into one entry and dropped.
+
+`run` stops asking Google Scholar after the first clear block. An HTTP 429,
+503, or CAPTCHA / `/sorry/` page skips Scholar for the rest of the run instead
+of one request per queued item; those items are left `retryable` for the next
+run.
 
 Removed the legacy flat-PDF migration. A flat `Author - Year - Title.pdf` and
 its `*.paperful.json` card are no longer moved into an item folder by `snapshot`
@@ -57,19 +111,6 @@ run. Denser one-pagers (letters, short comments) save to `out/` with reason
 `short_pdf_min_words` (default 200).
 
 Vault PDF fetch follows SSO interstitials, playbook rewrites, citation PDF
-`snowball resume` after an OpenAlex budget stop during a keyword search now
-keeps the original `max_candidates` (including `all`) instead of capping the
-search at `per_hop_limit`.
-
-Snowball reference recovery from publisher landing pages keeps references with
-no DOI when the page lists references as `<li>` items, so they reach the title
-match instead of being merged into one entry and dropped.
-
-`run` stops asking Google Scholar after the first clear block. An HTTP 429,
-503, or CAPTCHA / `/sorry/` page skips Scholar for the rest of the run instead
-of one request per queued item; those items are left `retryable` for the next
-run.
-
 links, View PDF controls, and viewer iframes before giving up. Successes append
 `state/fetch-wins.jsonl` (no query string). `paperful playbooks propose` /
 `promote` write user-owned `learned.toml` under `grey_playbooks_dir`.

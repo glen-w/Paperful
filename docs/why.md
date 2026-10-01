@@ -50,7 +50,8 @@ on disk so those commands can read them.
 
 **Mirror.** `out/` is a copy of the library that is not a citation manager:
 one folder per item (`record.json`, optional PDF, notes) plus a collection
-tree. `snapshot` writes it. `restore --apply` creates only what the live
+tree. Every command keeps it current and works from it, so a manager that
+is closed or misbehaving costs write-back, not the read work. `restore --apply` creates only what the live
 catalogue is missing and does not overwrite fields already there. That tree
 is the backup. RIS, BibTeX, and EndNote XML are the interchange. Copy `out/`
 with your own sync; Paperful is not a sync service and not a WebDAV client.

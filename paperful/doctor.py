@@ -234,7 +234,7 @@ def remediation_text(
         return (
             "Flat PDFs are still beside collection folders. Run "
             "`paperful snapshot -C …` (or `--library`) to move them into "
-            "item folders. `[mirror].pdfs` is additional, all, or none."
+            "item folders. `[mirror].pdfs` is all, lazy, or none."
         )
     return None
 
@@ -620,8 +620,15 @@ _AGENT_FLOOR_B = 10.0
 def _mirror_check(cfg: Config) -> Check:
     from .snapshot import count_item_dirs
 
+    from .sync import sync_state
+
     item_dirs = count_item_dirs(cfg.out_dir)
-    detail = f"pdfs={cfg.mirror_pdfs}"
+    state = sync_state(cfg.out_dir)
+    if state and state.get("synced_at"):
+        when = f"refreshed {state['synced_at']} (library v{state.get('version')})"
+    else:
+        when = "not refreshed yet (the first command does it, or paperful sync)"
+    detail = f"pdfs={cfg.mirror_pdfs}; {when}"
     if item_dirs:
         return Check("Mirror", "green", f"{detail}; {item_dirs} item folder(s)")
     return Check("Mirror", "green", detail)
