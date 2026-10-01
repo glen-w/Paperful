@@ -194,6 +194,20 @@ walkthrough, model advice, Docker networking, and troubleshooting: [LLM](llm.md)
 | `[inbox].settle_seconds` | `1.5` | Require stable file size before ingest |
 | `[inbox].idle_seconds` | `0` | Stop after this many idle seconds (`0` = until Ctrl+C); `--idle` on `inbox watch` overrides |
 | `[ocr].languages` | `eng` | Tesseract languages for `paperful ocr` (`eng+fra` or `eng fra`) |
+| `[rag].enabled` | `false` | Master switch for `paperful rag` and `paperful ask`. Needs `paperful[rag]`. See [rag.md](rag.md) |
+| `[rag].auto_ingest` | `false` | Index new PDFs after `run`, `attach`, `inbox`, `snapshot`, `ocr --apply` and `snowball` |
+| `[rag].ocr` | `auto` | `auto` runs OCRmyPDF on scans during ingest and rewrites them under `out_dir`; `off` leaves them alone. PDFs with a text layer are never OCR'd |
+| `[rag].parser` | `light` | `light` (`pdftotext` / `pypdf`) or `docling` (needs `paperful[rag-docling]`) |
+| `[rag].embed_provider` | `ollama` | `ollama` or `litellm` |
+| `[rag].embed_model` | `nomic-embed-text` | Embedding model. `bge-m3` for multilingual libraries. Each model keeps its own index under `state/rag/` |
+| `[rag].embed_base_url` / `embed_api_base` | `""` | Ollama root / LiteLLM base URL for embeddings; empty uses `[llm].base_url` / `[llm].api_base` |
+| `[rag].embed_batch_size` | `32` | Passages per embedding request |
+| `[rag].chunk_chars` / `chunk_overlap` | `2048` / `256` | Passage size and overlap in characters. Changing them re-indexes on the next ingest |
+| `[rag].top_k` | `10` | Passages sent to the chat model per question (`-k` overrides) |
+| `[rag].max_context_chars` | `24000` | Cap on excerpt text in the prompt |
+| `[rag].hybrid` | `true` | Blend vector and full-text search; falls back to vector only |
+| `[rag].abstracts` | `true` | Index the abstract when an item has no readable PDF |
+| `[rag].model` | `""` | Chat model for `ask`; empty uses `[llm].model` |
 
 Timeouts, context budgets, prompt templates, tags, attachment hygiene, and
 browser-agent step caps: [Advanced](#advanced).

@@ -265,6 +265,28 @@ pdfs = "additional"
 # languages = "eng"       # eng+fra or "eng fra"
 # timeout_s = 600
 
+# Library index for `paperful rag` and `paperful ask`. Needs `pip install 'paperful[rag]'`.
+# Reads PDFs and records from out_dir only; it never calls the reference manager.
+# `ask` also needs [llm].enabled. The index lives under state_dir/rag, one folder per
+# embedding model, so changing embed_model builds a new index and keeps the old one.
+# [rag]
+# enabled = false
+# auto_ingest = false            # index new PDFs after run / attach / inbox / snapshot / ocr
+# ocr = "auto"                   # auto | off. auto runs OCRmyPDF on scans and rewrites them under out_dir
+# parser = "light"               # light (pdftotext) | docling (needs paperful[rag-docling])
+# embed_provider = "ollama"      # ollama | litellm
+# embed_model = "nomic-embed-text"   # multilingual library: "bge-m3". LiteLLM: "openai/text-embedding-3-small"
+# # embed_base_url = ""          # Ollama root; empty uses [llm].base_url
+# # embed_api_base = ""          # LiteLLM base URL; empty uses [llm].api_base
+# embed_batch_size = 32
+# chunk_chars = 2048
+# chunk_overlap = 256
+# top_k = 10                     # passages sent to the model per question
+# max_context_chars = 24000
+# hybrid = true                  # vector + full-text search
+# abstracts = true               # index the abstract when an item has no readable PDF
+# # model = ""                   # chat model for `ask`; empty uses [llm].model
+
 # Attachment layout. Off until `paperful attachments --apply`.
 # [attachments]
 # fix_broken = false

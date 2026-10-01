@@ -63,6 +63,7 @@ class SnapshotStats:
     pdf_exports: int = 0
     notes: int = 0
     index: list[dict[str, Any]] = field(default_factory=list)
+    pdf_keys: list[str] = field(default_factory=list)  # items whose PDF was exported
 
 
 def record_from_raw(
@@ -466,6 +467,8 @@ def run_snapshot(
         )
         stats.records += n_rec
         stats.pdf_exports += n_pdf
+        if n_pdf:
+            stats.pdf_keys.append(item.key)
         stats.notes += n_notes
         stats.index.append(row)
     if not dry_run:

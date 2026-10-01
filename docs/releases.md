@@ -21,6 +21,7 @@ the contract; extra report keys may still be added.
 | `paperful.item.v1` | Named. 0.x may add keys. Do not tag 1.0 until removal of a required key is a break | Lock |
 | `paperful.snowball.candidate.v1` | Shipped and tested. Additive keys allowed | Revisit with the item lock |
 | Snapshot / restore | Behaviour shipped. Round-trip is not a 1.0 promise yet | Lock |
+| Library index (`state/rag/`) | A rebuildable cache. Folder layout, ledger and table columns may change in any release; `rag ingest` rebuilds it | Not a promise |
 
 Install claim tested in CI (`.github/workflows/ci.yml`, job `docker`): clone,
 `docker compose build`, `doctor` exits 2 when Zotero is absent. That is the

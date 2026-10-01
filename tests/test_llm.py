@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 import types
 
@@ -14,7 +15,14 @@ from paperful.llm import (
     llm_egress_is_remote,
     llm_model_for_agent,
 )
-from paperful.llm.client import LiteLLMClient, LLMClientError, _parse_json_object
+from paperful.llm.client import (
+    ChatRequest,
+    LiteLLMClient,
+    LLMClientError,
+    NullLLMClient,
+    _parse_json_object,
+    chat,
+)
 from paperful.llm.preflight import validate_llm_for_recover, validate_llm_for_verb
 from paperful.llm.validate import (
     LlmConfigError,
@@ -22,32 +30,6 @@ from paperful.llm.validate import (
     validate_llm_api_base,
     validate_ollama_url,
 )
-
-
-@pytest.fixture
-def mock_ollama(monkeypatch):
-    """Route every httpx.Client created inside paperful.llm.client through a handler."""
-    import paperful.llm.client as mod
-
-    state = {"handler": None, "requests": []}
-    orig = httpx.Client
-
-    class _Client(orig):
-        def __init__(self, *a, **kw):
-            kw["transport"] = httpx.MockTransport(state["handler"])
-            super().__init__(*a, **kw)
-
-    monkeypatch.setattr(mod.httpx, "Client", _Client)
-
-    def install(handler):
-        def wrapped(req):
-            state["requests"].append(req)
-            return handler(req)
-
-        state["handler"] = wrapped
-        return state["requests"]
-
-    return install
 
 
 # ---- validation --------------------------------------------------------------
@@ -353,3 +335,102 @@ def test_preflight_recover_rejects_ollama_prefixed_agent_model(cfg, monkeypatch)
     )
     with pytest.raises(LlmConfigError, match="browser_agent"):
         validate_llm_for_recover(cfg)
+
+
+# ---- chat (messages, streamed) -----------------------------------------------
+
+
+def _chat_request(**kw) -> ChatRequest:
+    messages = (
+        {"role": "system", "content": "be brief"},
+        {"role": "user", "content": "hi"},
+    )
+    return ChatRequest(model="qwen2.5:7b", messages=messages, **kw)
+
+
+def test_ollama_chat_stream_yields_content_and_skips_thinking(mock_ollama):
+    lines = [
+        {"message": {"role": "assistant", "content": "", "thinking": "hmm"}},
+        {"message": {"role": "assistant", "content": "Hel"}},
+        {"message": {"role": "assistant", "content": "lo"}},
+        {"message": {"role": "assistant", "content": ""}, "done": True},
+    ]
+    body = "\n".join(json.dumps(line) for line in lines)
+    requests = mock_ollama(lambda req: httpx.Response(200, text=body))
+    client = OllamaClient(base_url="http://127.0.0.1:11434/v1", allow_remote=False)
+    pieces = list(client.chat_stream(_chat_request(num_ctx=4096, max_tokens=50)))
+    assert pieces == ["Hel", "lo"]
+    sent = json.loads(requests[0].content)
+    assert requests[0].url.path == "/api/chat"
+    assert [m["role"] for m in sent["messages"]] == ["system", "user"]
+    assert sent["stream"] is True
+    assert sent["options"] == {"temperature": 0.2, "num_predict": 50, "num_ctx": 4096}
+
+
+def test_ollama_chat_stream_raises_on_error_line(mock_ollama):
+    body = json.dumps({"message": {"content": "par"}}) + "\n" + json.dumps(
+        {"error": "model crashed"}
+    )
+    mock_ollama(lambda req: httpx.Response(200, text=body))
+    client = OllamaClient(base_url="http://127.0.0.1:11434", allow_remote=False)
+    with pytest.raises(LLMClientError, match="model crashed"):
+        chat(client, _chat_request())
+
+
+def test_ollama_chat_stream_http_error(mock_ollama):
+    mock_ollama(lambda req: httpx.Response(500, text="boom"))
+    client = OllamaClient(base_url="http://127.0.0.1:11434", allow_remote=False)
+    with pytest.raises(LLMClientError, match="Ollama request failed"):
+        chat(client, _chat_request())
+
+
+def test_litellm_chat_stream_reads_deltas(monkeypatch):
+    seen = {}
+
+    def completion(**kwargs):
+        seen.update(kwargs)
+
+        def chunk(text):
+            delta = types.SimpleNamespace(content=text)
+            return types.SimpleNamespace(choices=[types.SimpleNamespace(delta=delta)])
+
+        return iter([chunk("a"), types.SimpleNamespace(choices=[]), chunk(None), chunk("b")])
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    client = LiteLLMClient(api_base="https://llm.example/v1")
+    assert chat(client, _chat_request(max_tokens=9)) == "ab"
+    assert seen["stream"] is True and seen["max_tokens"] == 9
+    assert seen["api_base"] == "https://llm.example/v1"
+    assert seen["messages"][0] == {"role": "system", "content": "be brief"}
+
+
+def test_litellm_chat_stream_wraps_errors(monkeypatch):
+    def completion(**kwargs):
+        raise RuntimeError("rate limited")
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    with pytest.raises(LLMClientError, match="rate limited"):
+        chat(LiteLLMClient(api_base=None), _chat_request())
+
+
+def test_null_client_chat_is_disabled():
+    with pytest.raises(LLMClientError, match="disabled"):
+        chat(NullLLMClient(), _chat_request())
+
+
+def test_preflight_ask_uses_rag_model(cfg, mock_ollama):
+    from paperful.llm.preflight import validate_llm_for_ask
+
+    cfg.llm_enabled = True
+    cfg.rag_model = "qwen3:8b"
+    mock_ollama(
+        lambda req: httpx.Response(200, json={"models": [{"name": "qwen3:8b"}]})
+    )
+    assert validate_llm_for_ask(cfg) == "qwen3:8b"
+    cfg.llm_enabled = False
+    with pytest.raises(LlmConfigError, match="llm.enabled"):
+        validate_llm_for_ask(cfg)

@@ -167,17 +167,17 @@ config). Proposals never mutate the library alone.
 ### Ask (chat with collection)
 
 Built-in, **opt-in** conversational surface over the **scoped** library
-(indexed PDFs under the quiet mirror + zotero-rag). Same Control posture:
-scope is always visible in the chrome; answers must show **citations**
-(item key, title, chunk/snippet — not free-floating model text). Maps to the
-Zotero-RAG CLI layer described in [ROADMAP — Zotero-RAG
-integration](ROADMAP.md#zotero-rag-integration-later-question-centric-layer)
-(batch question files land first; GUI follows once cited answers are stable).
+(PDFs under the quiet mirror, indexed by `paperful rag ingest`). Same Control
+posture: scope is always visible in the chrome; answers must show **citations**
+(item key, title, page / snippet — not free-floating model text). Maps to the
+CLI layer in [rag.md](rag.md) and [ROADMAP — Zotero-RAG
+integration](ROADMAP.md#zotero-rag-integration-later-question-centric-layer).
+The single-question path (`paperful ask`) is shipped; threads are a 2.0 goal.
 
 | Action | Maps to (Capability API) | Notes |
 | --- | --- | --- |
-| New thread | `rag.chat` (name TBD) with scope = active `-C` + filters | Requires index freshness; `doctor` ambers when stale |
-| Follow-up | Same thread id; server holds retrieval context | No silent widening of scope mid-thread |
+| New thread | `rag.answer(question, keys=scope)` with scope = active `-C` + filters | Requires index freshness; `paperful rag status` shows what is stale |
+| Follow-up | `rag.answer(question, history=turns)`; thread storage and follow-up rewriting are still to build | No silent widening of scope mid-thread |
 | Focus / prompt preset | `--focus` or profile field | Question-centric vs summary-style system prompts |
 | Export thread | Write `state/rag/…` report JSON; optional child note | Explicit Apply for Zotero writes |
 | Batch from file | Upload / paste questions → cited answer table | Parity with CLI batch ingest |

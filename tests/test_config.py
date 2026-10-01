@@ -185,3 +185,58 @@ def test_example_config_toml_parses_and_omits_scihub_by_default():
     assert cfg.out_dir == (repo_cfg.parent / "out").resolve()
     assert cfg.state_dir == (repo_cfg.parent / "state").resolve()
     assert isinstance(cfg, Config)
+
+
+def test_rag_defaults_are_off(tmp_path):
+    from paperful.config import _from_dict
+
+    cfg = _from_dict({}, tmp_path / "config.toml")
+    assert cfg.rag_enabled is False and cfg.rag_auto_ingest is False
+    assert cfg.rag_ocr == "auto" and cfg.rag_parser == "light"
+    assert cfg.rag_embed_provider == "ollama"
+    assert cfg.rag_embed_model == "nomic-embed-text"
+    assert cfg.rag_dir == cfg.state_dir / "rag"
+
+
+def test_rag_table_is_parsed_and_clamped(tmp_path):
+    from paperful.config import _from_dict
+
+    cfg = _from_dict(
+        {
+            "rag": {
+                "enabled": True,
+                "auto_ingest": True,
+                "ocr": "OFF",
+                "parser": "Docling",
+                "embed_provider": "litellm",
+                "embed_model": " openai/text-embedding-3-small ",
+                "embed_batch_size": 0,
+                "chunk_chars": 1000,
+                "chunk_overlap": 900,
+                "top_k": 0,
+                "hybrid": False,
+                "abstracts": False,
+                "model": "qwen3:8b",
+            }
+        },
+        tmp_path / "config.toml",
+    )
+    assert cfg.rag_enabled and cfg.rag_auto_ingest
+    assert cfg.rag_ocr == "off" and cfg.rag_parser == "docling"
+    assert cfg.rag_embed_provider == "litellm"
+    assert cfg.rag_embed_model == "openai/text-embedding-3-small"
+    assert cfg.rag_embed_batch_size == 1 and cfg.rag_top_k == 1
+    assert cfg.rag_chunk_chars == 1000 and cfg.rag_chunk_overlap == 500
+    assert cfg.rag_hybrid is False and cfg.rag_abstracts is False
+    assert cfg.rag_model == "qwen3:8b"
+
+
+@pytest.mark.parametrize(
+    "table",
+    [{"ocr": "always"}, {"parser": "pymupdf"}, {"embed_provider": "openai"}, {"embed_model": " "}],
+)
+def test_rag_table_rejects_unknown_values(tmp_path, table):
+    from paperful.config import _from_dict
+
+    with pytest.raises(ValueError, match=r"\[rag\]"):
+        _from_dict({"rag": table}, tmp_path / "config.toml")

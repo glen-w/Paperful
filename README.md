@@ -190,6 +190,17 @@ uv run paperful summarize --item ITEMKEY     # disk HTML + tagged child note
 uv run paperful synthesize -C COLLECTION     # report from those notes
 ```
 
+Optional library index (off until `[rag].enabled`): `paperful rag ingest`
+indexes the PDFs and abstracts in the mirror, and `paperful ask` answers
+questions from it with cited papers and pages. It reads `out/` only and never
+calls the reference manager. Setup: [Ask your library](docs/rag.md).
+
+```sh
+uv sync --extra rag && ollama pull nomic-embed-text   # then set [rag] enabled = true
+uv run paperful rag ingest -C COLLECTION     # scans get OCR; text PDFs do not
+uv run paperful ask "What do these papers say about X?" -C COLLECTION
+```
+
 ## Develop
 
 Contributors use [uv](https://docs.astral.sh/uv/) (Python 3.10+). This is not

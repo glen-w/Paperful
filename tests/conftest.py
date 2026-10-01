@@ -62,3 +62,29 @@ def ctx_factory(cfg):
         return Context(config=cfg, client=mock_client(handler))
 
     return _make
+
+
+@pytest.fixture
+def mock_ollama(monkeypatch):
+    """Route every httpx.Client the LLM layer creates through a handler."""
+    import paperful.llm.client as mod
+
+    state = {"handler": None, "requests": []}
+    orig = httpx.Client
+
+    class _Client(orig):
+        def __init__(self, *a, **kw):
+            kw["transport"] = httpx.MockTransport(state["handler"])
+            super().__init__(*a, **kw)
+
+    monkeypatch.setattr(mod.httpx, "Client", _Client)
+
+    def install(handler):
+        def wrapped(req):
+            state["requests"].append(req)
+            return handler(req)
+
+        state["handler"] = wrapped
+        return state["requests"]
+
+    return install

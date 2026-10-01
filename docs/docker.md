@@ -115,6 +115,9 @@ Start Ollama listening on all interfaces (`OLLAMA_HOST=0.0.0.0 ollama serve`).
 `docker compose run --rm paperful doctor` shows the `LLM` row. Details:
 [LLM](llm.md#docker).
 
+The image does not ship the `rag` extra (LanceDB), so `paperful rag` and
+`paperful ask` are host-only for now. See [rag.md](rag.md).
+
 ## Custom playbook packs
 
 Put extra grey-playbook TOML files in `packs/` (under the data dir) and set in

@@ -221,6 +221,46 @@ def is_item_dirname(name: str) -> bool:
     return item_key_from_dirname(name) is not None
 
 
+def item_from_record(
+    rec: dict[str, Any],
+    key: str,
+    collection_paths: list[str],
+    pdfs: list[Path],
+) -> Item:
+    """Catalogue row from a mirror ``record.json`` and the PDFs found beside it."""
+    creators = rec.get("creators") if isinstance(rec.get("creators"), list) else []
+    surnames = [
+        str(c.get("lastName") or c.get("name"))
+        for c in creators
+        if isinstance(c, dict) and (c.get("lastName") or c.get("name"))
+    ]
+    year = rec.get("year")
+    if not isinstance(year, int):
+        year = None
+    return Item(
+        key=key,
+        item_type=str(rec.get("item_type") or "document"),
+        title=str(rec.get("title") or ""),
+        doi=rec.get("doi") or None,
+        arxiv_id=rec.get("arxiv_id") or None,
+        url=rec.get("url") or None,
+        year=year,
+        first_author=surnames[0] if surnames else None,
+        collection_paths=[str(p) for p in collection_paths if p],
+        doi_source=str(rec.get("doi_source") or "none"),
+        library_doi=rec.get("library_doi") or None,
+        extra=str(rec.get("extra") or ""),
+        publication_title=rec.get("publication_title") or None,
+        date=str(rec.get("date") or "") or None,
+        pdf_path=str(pdfs[0]) if pdfs else None,
+        has_pdf=bool(pdfs),
+        date_added=rec.get("date_added") or None,
+        creator_count=len(creators),
+        abstract=rec.get("abstract") or None,
+        creator_surnames=surnames,
+    )
+
+
 def items_from_mirror(
     out_dir: Path, collection_prefixes: list[str] | None = None
 ) -> list[Item]:
@@ -250,39 +290,93 @@ def items_from_mirror(
             continue
         seen.add(key)
         pdfs = sorted(p for p in rec_path.parent.glob("*.pdf") if p.is_file())
-        creators = rec.get("creators") if isinstance(rec.get("creators"), list) else []
-        first = None
-        if creators and isinstance(creators[0], dict):
-            first = creators[0].get("lastName") or creators[0].get("name")
-        year = rec.get("year")
-        if not isinstance(year, int):
-            year = None
         paths = rec.get("collection_paths")
         if not isinstance(paths, list) or not paths:
             paths = [collection] if collection else []
-        items.append(
-            Item(
-                key=key,
-                item_type=str(rec.get("item_type") or "document"),
-                title=str(rec.get("title") or ""),
-                doi=rec.get("doi") or None,
-                arxiv_id=rec.get("arxiv_id") or None,
-                url=rec.get("url") or None,
-                year=year,
-                first_author=str(first) if first else None,
-                collection_paths=[str(p) for p in paths if p],
-                doi_source=str(rec.get("doi_source") or "none"),
-                library_doi=rec.get("library_doi") or None,
-                extra=str(rec.get("extra") or ""),
-                publication_title=rec.get("publication_title") or None,
-                date=str(rec.get("date") or "") or None,
-                pdf_path=str(pdfs[0]) if pdfs else None,
-                has_pdf=bool(pdfs),
-                date_added=rec.get("date_added") or None,
-                abstract=rec.get("abstract") or None,
-            )
-        )
+        items.append(item_from_record(rec, key, paths, pdfs))
     return items
+
+
+@dataclass
+class MirrorEntry:
+    """One library item as the mirror holds it, across every folder it appears in."""
+
+    key: str
+    dirs: list[str]  # item folders, relative to out_dir (posix)
+    record: dict[str, Any]  # the fullest record.json; {} when no folder has one
+    pdfs: list[Path]  # distinct files; a hardlink shared by folders counts once
+
+    @property
+    def collections(self) -> list[str]:
+        """Collection path of each folder. An item at the mirror root has ``""``."""
+        return [d.rsplit("/", 1)[0] if "/" in d else "" for d in self.dirs]
+
+    def item(self) -> Item:
+        paths = self.record.get("collection_paths")
+        if not isinstance(paths, list) or not paths:
+            paths = [c for c in self.collections if c]
+        return item_from_record(self.record, self.key, paths, self.pdfs)
+
+
+def _record_weight(rec: dict[str, Any]) -> tuple[int, int]:
+    """A snapshot record beats a fetch shell; then the one with more filled fields."""
+    filled = sum(1 for value in rec.values() if value not in (None, "", [], {}))
+    return (1 if rec.get("version") is not None else 0, filled)
+
+
+def mirror_entries(
+    out_dir: Path,
+    collection_prefixes: list[str] | None = None,
+    keys: Iterable[str] | None = None,
+) -> list[MirrorEntry]:
+    """Every item folder under ``out_dir``, grouped by item key.
+
+    Unlike ``items_from_mirror`` this reads all folders of an item: the PDF may
+    sit in a different collection folder than the fullest ``record.json``, and
+    an attached PDF can land before any record is written. A collection prefix
+    selects items with a folder under it; their PDFs still come from every folder.
+    """
+    if not out_dir.is_dir():
+        return []
+    prefixes = [p.strip("/") for p in (collection_prefixes or []) if p and p.strip("/")]
+    wanted = set(keys) if keys is not None else None
+    folders: dict[str, list[Path]] = {}
+    for dirpath, dirnames, _files in os.walk(out_dir):
+        item_dirs = [d for d in dirnames if is_item_dirname(d)]
+        for name in item_dirs:
+            key = item_key_from_dirname(name) or ""
+            if wanted is None or key in wanted:
+                folders.setdefault(key, []).append(Path(dirpath) / name)
+        # Item folders hold a record, PDFs and notes/ — never other items.
+        dirnames[:] = [d for d in dirnames if d not in item_dirs]
+    entries: list[MirrorEntry] = []
+    for key in sorted(folders):
+        dirs = sorted(folders[key])
+        rels = [d.relative_to(out_dir).as_posix() for d in dirs]
+        if prefixes:
+            parents = [r.rsplit("/", 1)[0] if "/" in r else "" for r in rels]
+            if not any(
+                c == pre or c.startswith(pre + "/") for c in parents for pre in prefixes
+            ):
+                continue
+        record: dict[str, Any] = {}
+        pdfs: list[Path] = []
+        inodes: set[tuple[int, int]] = set()
+        for folder in dirs:
+            rec = load_json(record_path(folder))
+            if rec is not None and _record_weight(rec) > _record_weight(record):
+                record = rec
+            for pdf in sorted(folder.glob("*.pdf")):
+                try:
+                    st = pdf.stat()
+                except OSError:
+                    continue
+                if not pdf.is_file() or (st.st_dev, st.st_ino) in inodes:
+                    continue
+                inodes.add((st.st_dev, st.st_ino))
+                pdfs.append(pdf)
+        entries.append(MirrorEntry(key=key, dirs=rels, record=record, pdfs=pdfs))
+    return entries
 
 
 def unique_path(directory: Path, filename: str, md5: str) -> Path:

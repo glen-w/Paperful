@@ -48,6 +48,19 @@ def validate_llm_api_base(url: str | None) -> None:
         raise LlmConfigError("llm.api_base must use http or https.")
 
 
+def embed_egress_is_remote(cfg) -> bool:
+    """True when passages sent for embedding may leave the machine."""
+    if not cfg.rag_enabled:
+        return False
+    if cfg.rag_embed_provider == "litellm":
+        return True
+    try:
+        validate_ollama_url(cfg.rag_embed_base_url or cfg.llm_base_url, False)
+        return False
+    except LlmConfigError:
+        return True
+
+
 def llm_egress_is_remote(cfg) -> bool:
     """True when completions may leave the machine."""
     if not cfg.llm_enabled:
