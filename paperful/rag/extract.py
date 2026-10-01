@@ -166,10 +166,18 @@ class DoclingParser:
             document = converter.convert(path).document
             numbers = sorted(document.pages)
             if not numbers:
-                return [document.export_to_markdown()]
-            return [document.export_to_markdown(page_no=n) for n in numbers]
+                return [_strip_placeholders(document.export_to_markdown())]
+            return [
+                _strip_placeholders(document.export_to_markdown(page_no=n))
+                for n in numbers
+            ]
         except Exception as exc:
             raise ParseError(f"docling failed: {exc}") from exc
+
+
+def _strip_placeholders(markdown: str) -> str:
+    """Docling marks each figure with a comment; it is not text to search."""
+    return markdown.replace("<!-- image -->", "")
 
 
 def get_parser(cfg: Config) -> Parser:

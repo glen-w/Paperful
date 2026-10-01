@@ -137,6 +137,12 @@ def test_docling_parser_names_the_extra_when_missing(tmp_path, monkeypatch):
         DoclingParser().pages(_blank_pdf(tmp_path / "a.pdf"))
 
 
+def test_docling_figure_placeholders_are_dropped():
+    from paperful.rag.extract import _strip_placeholders
+
+    assert _strip_placeholders("<!-- image -->\n\nBody text.") == "\n\nBody text."
+
+
 # ---- cache -------------------------------------------------------------------
 
 
