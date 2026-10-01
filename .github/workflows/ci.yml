@@ -23,7 +23,7 @@ jobs:
         run: |
           data="$(mktemp -d)"
           # Image runs as uid 1000; mktemp is 0700 for the runner uid — open the mount.
-          chmod 0755 "$data"
+          chmod 0777 "$data"
           cp config.example.toml "$data/config.toml"
           export PAPERFUL_DATA="$data"
           docker compose run --rm -T paperful --help
