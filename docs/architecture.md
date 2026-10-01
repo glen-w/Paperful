@@ -15,6 +15,59 @@ you keep if the manager changes. See [Why Paperful](why.md).
 `fix-metadata --apply`, and `dedupe --apply` use the Zotero 10+ write API.
 Dedupe merges the extra parent's PDF, notes, and better fields onto the keeper, then moves that parent to the Zotero trash. It does not delete files under `out/`.
 
+(mirror-first)=
+## Mirror first
+
+Reference managers are flaky. A local API stalls, item keys change after a
+sync, an attachment row outlives its bytes. Paperful's answer is to copy the
+user's files and metadata into its own mirror (`out/`, `state/`) and work
+from that copy. The manager API is a narrow door with three uses:
+
+1. **Refresh the mirror.** Read catalogue rows, notes, and PDF bytes, and
+   write them under `out/`.
+2. **Write back when asked.** Attach a PDF, apply a patch, merge a duplicate,
+   post a note. Always explicit, and the result is on disk first.
+3. **Check the door.** `ping`, write support, authorize.
+
+Anything else is a call Paperful should not be making. Rules for new code:
+
+- A verb that only reads takes its items, PDFs, and notes from the mirror. A
+  live listing is for refreshing the mirror, not for doing the work.
+- A manager that is not running costs write-back. It does not cost the read
+  work.
+- A write to the manager also updates `record.json`, so the mirror does not
+  wait for the next `snapshot` to be true.
+- A failed read is an error. It is never recorded as "no children" or "no
+  PDF".
+- Bytes exported from the manager go into the item folder, not a side cache.
+- pyzotero is called only from `zot.py`, `library.py`, and `attach.py`. A new
+  `LibraryBackend` method needs a reason the mirror cannot serve.
+
+How the code does it:
+
+- **Refresh.** A command first asks Zotero what changed since the library
+  version in `out/_sync.json`, rewrites those items' folders, marks items
+  that left, and then records the new version
+  ([`sync.py`](../paperful/sync.py)). Six requests when nothing changed. A
+  first refresh reads the whole library once. A read that fails stops the
+  refresh before the version moves.
+- **Read.** The command then reads `out/`
+  ([`catalogue.py`](../paperful/catalogue.py)): collections, items, child
+  notes, attachment rows, PDFs. With Zotero closed it reads the mirror as it
+  is and says how old it is. `--offline` (or `PAPERFUL_OFFLINE=1`) never
+  contacts the manager.
+- **Write through.** A write goes to the manager; that item is then re-read
+  into its folder in the same step (`MirroredBackend` in
+  [`library.py`](../paperful/library.py)). A trashed or merged parent is
+  marked in its record. Nothing under `out/` is deleted.
+
+Four verbs talk to the manager directly, because comparing it with the
+mirror is their job: `sync`, `snapshot`, `restore`, and `attachments`. They
+exit 2 when it is down. So does any `--apply`, attach, or note write.
+
+Mendeley and EndNote have no change feed. Their reads stay with the manager,
+as before; the write-through still applies.
+
 ## Data flow
 
 ```mermaid
@@ -27,7 +80,9 @@ flowchart LR
   adapter -->|read| resolve --> sources --> disk --> writeback --> adapter
 ```
 
-1. **Scope** — collection subtree or whole library; optional `--year-from` /
+0. **Refresh** — bring `out/` up to the manager's current library version
+   (skipped offline, or with `[mirror].refresh = "manual"`).
+1. **Scope** — read from the mirror: collection subtree or whole library; optional `--year-from` /
    `--year-to` (inclusive; undated items dropped) and `--type` / `-T` (Zotero
    item types); `run` skips items that already have an imported PDF (and by
    default skip items with only a `linked_url` PDF).
@@ -54,7 +109,10 @@ flowchart LR
 | `out/<collection>/<stem -- KEY>/record.json` | `paperful.item.v1`. Catalogue fields plus fetch provenance. 0.x may add keys |
 | `out/<collection>/<stem -- KEY>/*.pdf` | PDF when `run` downloaded it, or when `snapshot --pdfs all` exported it |
 | `out/<collection>/<stem -- KEY>/notes/` | Child-note HTML, including a copied summary when one exists |
-| `out/_index.jsonl` | Lookup rollup: item key, dirs, has_pdf, md5 |
+| `out/<collection>/<stem -- KEY>/annotations.json` | The reader's highlights and notes on the item's attachments, as the manager holds them (`paperful.annotations.v1`). Written by a refresh; absent when there are none |
+| `out/_sync.json` | The library version the mirror was last refreshed to, when, and whether every manager PDF has been copied (`paperful.sync.v1`) |
+| `out/_trash/` | Folders of items that left the library, when `[mirror].gone = "trash"`. Default is to keep the folder in place and mark the record |
+| `out/_index.jsonl` | Lookup rollup: item key, dirs, has_pdf, md5, child keys, and `state` for an item that left. Later lines win; a refresh rewrites it compact |
 | `out/_collections.json` | Collection tree (`paperful.collections.v1`) |
 | `out/_history.json` | Pointers at `state/` ledgers. Not a copy of sessions or keys |
 | `state/manifest.jsonl` | Append-only resume ledger. Latest line per item key wins. Fields include `doi` (used this attempt), `library_doi`, `doi_verified`, `pdf_doi` |
@@ -64,7 +122,7 @@ flowchart LR
 | `state/cites/<hash>.json` | OpenAlex reference lists for one DOI set, inverted so snowball can say how many items in the target collection cite a new work. Reused until that DOI set changes |
 | `state/version-packs/` | Preprint/published review packs (`paperful.version_pack.v1`) |
 | `state/versions-applied.jsonl` | One line per work updated by `versions --apply` |
-| `state/pdf-cache/` | Manager PDFs exported so lint reads text on disk |
+| `state/pdf-cache/` | Throwaway copies of manager PDFs, only when `[mirror].pdfs = "none"`. Otherwise an exported PDF goes into its item folder, and `sync` moves older cache files there |
 | `state/summaries/<key>.html` | `summarize` output when dest includes disk; the Zotero child note is the other copy |
 | `state/reports/<slug>.html` | `synthesize` literature review; sibling `<slug>.json` records source hashes |
 | `state/sessions/` | Chromium profile + `meta.json` (login timestamps, no secrets). Netscape dumps for httpx |
@@ -80,7 +138,11 @@ flowchart LR
 
 ## Library adapter
 
-[`paperful/library.py`](../paperful/library.py) defines `LibraryBackend`: list items, fetch one item by key (`get_item`), export a PDF **onto disk**, apply a field patch, merge a duplicate parent (children and better fields, then trash), attach a file, create-or-update a **tagged child note** (`create_or_update_note`, used by `summarize`), create-or-update a **standalone collection note** (`create_or_update_collection_note`, used by `synthesize`), and `flush_writes()` (EndNote stages `state/endnote-import/<stamp>/`; others no-op). The tag makes re-runs update instead of duplicate. Identifier and dedupe logic (`resolve`, `lint`, `pdfid`, `metadata`, `dedupe`) must not import a manager except through this protocol. Notes are skipped by `items_in_scope`, so a report note never enters `run` / `lint` / `gaps`. Canonical item types are Zotero ids; [`paperful/interop/`](../paperful/interop/) maps RIS / BibTeX / EndNote XML at the edge. `paperful import` / `export` use that layer. **Zotero is well tested.** [Mendeley](mendeley.md) and [EndNote](endnote.md) are seeking testers.
+Commands hold a `MirrorFirstBackend`: the same protocol, with reads served
+from `out/` and writes passed to the manager adapter. The adapter itself is
+below.
+
+[`paperful/library.py`](../paperful/library.py) defines `LibraryBackend`: report what changed since a library version (`changes`, Zotero only), list items, fetch one item by key (`get_item`), export a PDF **onto disk**, apply a field patch, merge a duplicate parent (children and better fields, then trash), attach a file, create-or-update a **tagged child note** (`create_or_update_note`, used by `summarize`), create-or-update a **standalone collection note** (`create_or_update_collection_note`, used by `synthesize`), and `flush_writes()` (EndNote stages `state/endnote-import/<stamp>/`; others no-op). The tag makes re-runs update instead of duplicate. Identifier and dedupe logic (`resolve`, `lint`, `pdfid`, `metadata`, `dedupe`) must not import a manager except through this protocol. Notes are skipped by `items_in_scope`, so a report note never enters `run` / `lint` / `gaps`. Canonical item types are Zotero ids; [`paperful/interop/`](../paperful/interop/) maps RIS / BibTeX / EndNote XML at the edge. `paperful import` / `export` use that layer. **Zotero is well tested.** [Mendeley](mendeley.md) and [EndNote](endnote.md) are seeking testers.
 
 ## LLM layer (optional, local-first)
 
@@ -140,9 +202,9 @@ When Zotero cloud storage is full, attachments may fail with quota errors; PDFs 
 
 **Quiet mirror:** `out/<collection>/<stem -- KEY>/` is a browsable restore
 folder (dual store with Zotero `storage/` after `imported_file` attach).
-`snapshot` fills a folder for every scoped item. `[mirror].pdfs` chooses
-whether existing Zotero PDFs are copied (`all`), left in Zotero
-(`additional`, the default), or omitted (`none`). `paperful restore --apply`
+`sync` keeps a folder for every item. `[mirror].pdfs` chooses whether
+existing Zotero PDFs are copied in (`all`, the default), copied the first
+time a command needs one (`lazy`), or kept out (`none`). `paperful restore --apply`
 creates missing items from those folders and does not overwrite fields that
 are already in Zotero. Stance: [quiet-mirror.md](quiet-mirror.md). House
 folder sync is out of scope for this CLI.
@@ -184,9 +246,10 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
   and then a **Run summary** table. `deferred` is manifest skips plus
   linked-URL skips. `write-api` is `unknown` when the library was not probed.
 
-When Zotero is unreachable, `collections`, `run`, `attach`, `lint`,
-`fix-metadata`, `dedupe`, and `gaps` exit **2** and print next steps (start
-Zotero, enable local API, `paperful doctor`).
+When Zotero is unreachable and there is a mirror, read commands carry on
+from it. `sync`, `snapshot`, `restore`, `attachments`, `attach`, and any
+`--apply` exit **2** and print next steps (start Zotero, enable local API,
+`paperful doctor`). With no mirror yet, every library command exits 2.
 
 (run-report-v1)=
 ## Report JSON (`paperful.run_report.v1`)

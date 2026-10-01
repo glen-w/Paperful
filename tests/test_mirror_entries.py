@@ -101,3 +101,21 @@ def test_mirror_entries_ignores_non_item_folders(tmp_path):
     (tmp_path / "ocean" / "notes").mkdir(parents=True)
     (tmp_path / "ocean" / "loose.pdf").write_bytes(b"%PDF-1.4 a")
     assert mirror_entries(tmp_path) == []
+
+
+def test_items_that_left_the_library_are_not_entries(tmp_path):
+    """A refresh marks a trashed item's record and keeps its folder. It is not indexed."""
+    import json
+
+    from paperful.store import mirror_entries
+
+    out = tmp_path / "out"
+    for collection, key, extra in (
+        ("A", "LIVE0001", {}),
+        ("A", "GONE0001", {"library": {"state": "trashed"}}),
+        ("_trash/A", "GONE0002", {}),
+    ):
+        folder = out / collection / f"Smith - 2020 - Paper -- {key}"
+        folder.mkdir(parents=True)
+        (folder / "record.json").write_text(json.dumps({"item_key": key, **extra}))
+    assert [e.key for e in mirror_entries(out)] == ["LIVE0001"]

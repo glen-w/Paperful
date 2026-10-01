@@ -18,7 +18,8 @@ def test_defaults_when_no_file(tmp_path, monkeypatch):
     assert "scihub" not in cfg.sources
     assert cfg.attach is True and cfg.concurrency_oa == 4
     assert cfg.ezproxy_relogin is True
-    assert cfg.mirror_pdfs == "additional"
+    assert cfg.mirror_pdfs == "all"
+    assert cfg.mirror_gone == "mark" and cfg.mirror_refresh == "auto"
 
 
 def test_load_explicit_file_resolves_relative_paths(tmp_path):
@@ -185,6 +186,19 @@ def test_example_config_toml_parses_and_omits_scihub_by_default():
     assert cfg.out_dir == (repo_cfg.parent / "out").resolve()
     assert cfg.state_dir == (repo_cfg.parent / "state").resolve()
     assert isinstance(cfg, Config)
+
+
+def test_mirror_modes_parse_and_reject(tmp_path):
+    p = tmp_path / "c.toml"
+    p.write_text('[mirror]\npdfs = "additional"\ngone = "trash"\nrefresh = "manual"\n')
+    cfg = load_config(p)
+    # ``additional`` was the old name for copy-on-first-use.
+    assert cfg.mirror_pdfs == "lazy"
+    assert cfg.mirror_gone == "trash" and cfg.mirror_refresh == "manual"
+    for body in ('pdfs = "some"', 'gone = "delete"', 'refresh = "always"'):
+        p.write_text(f"[mirror]\n{body}\n")
+        with pytest.raises(ValueError):
+            load_config(p)
 
 
 def test_rag_defaults_are_off(tmp_path):

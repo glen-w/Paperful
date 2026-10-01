@@ -311,3 +311,33 @@ def test_with_recover_lane_inserts_after_last_browser_lane(cfg, monkeypatch):
     assert "browser_agent" not in with_recover_lane(
         cfg, ["unpaywall", "scholar", "htmlpdf"]
     )
+
+
+def test_circuit_failed_probe_reopens_immediately_for_a_full_cooldown():
+    cb = CircuitBreaker(3, cooldown_items=2)
+    for _ in range(3):
+        cb.note("scihub", Outcome.CAPTCHA, "robot")
+    cb.consume_skip("scihub")
+    assert cb.tripped("scihub")
+    cb.consume_skip("scihub")
+    assert not cb.tripped("scihub")  # half-open: one probe allowed
+    assert cb.note("scihub", Outcome.CAPTCHA, "robot")  # one block re-opens, not three
+    assert cb.tripped("scihub")
+    cb.consume_skip("scihub")
+    assert cb.tripped("scihub")  # a full cooldown again, not a single skip
+
+
+def test_circuit_sources_are_independent_and_reset_clears_all():
+    cb = CircuitBreaker(1)
+    assert cb.note("scholar", Outcome.CAPTCHA, "sorry")
+    assert cb.tripped("scholar")
+    assert not cb.tripped("scihub")
+    cb.reset()
+    assert not cb.tripped("scholar")
+
+
+def test_circuit_threshold_floor_is_one():
+    cb = CircuitBreaker(0, cooldown_items=0)
+    assert cb.note("x", Outcome.CAPTCHA, "")
+    cb.consume_skip("x")
+    assert not cb.tripped("x")

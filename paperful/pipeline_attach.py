@@ -1,7 +1,7 @@
-"""Zotero parent-key remap after an attach miss.
+"""Parent-key remap after an attach miss.
 
 Used when sync or restore changed the item key the manifest still holds.
-This path reads ``attacher.zl`` and is Zotero-only.
+The library is read through the attacher, which is the mirror when there is one.
 """
 
 from __future__ import annotations
@@ -16,13 +16,19 @@ from .store import STATUS_ATTACHED, Record
 
 def live_parent_key(pipe: Any, rec: Record) -> str | None:
     """Map a stale manifest key to the current library item via DOI/title."""
-    zl = getattr(pipe.attacher, "zl", None) if pipe.attacher else None
-    if zl is None:
+    listing = getattr(pipe.attacher, "items_in_scope", None) if pipe.attacher else None
+    if not callable(listing):
+        # A bare Attacher has no catalogue of its own, only the client.
+        listing = getattr(getattr(pipe.attacher, "zl", None), "items_in_scope", None)
+    if not callable(listing):
         return None
     if pipe._parent_by_doi is None or pipe._parent_by_title is None:
         by_doi: dict[str, str] = {}
         by_title: dict[str, str] = {}
-        for it in zl.items_in_scope(None):
+        pipe._pdf_parents = set()
+        for it in listing(None):
+            if it.has_pdf:
+                pipe._pdf_parents.add(it.key)
             if it.doi:
                 nd = normalize_doi(it.doi)
                 if nd and nd not in by_doi:
@@ -49,15 +55,12 @@ def attach_after_remap(
     note: str | None = None,
 ) -> AttachResult:
     """Retry attach when Zotero remapped the parent key (sync / restore)."""
-    zl = getattr(pipe.attacher, "zl", None) if pipe.attacher else None
-    if zl is None:
-        return AttachResult(False, reason=prior_reason, code="parent_missing")
     new_key = live_parent_key(pipe, rec)
     if not new_key or new_key == rec.itemKey:
         return AttachResult(False, reason=prior_reason, code="parent_missing")
     old_key = rec.itemKey
     if pipe._pdf_parents is None:
-        pipe._pdf_parents = zl._pdf_parent_keys()
+        pipe._pdf_parents = set()
     if new_key in pipe._pdf_parents:
         rec.itemKey = new_key
         pipe.manifest.write(

@@ -31,6 +31,7 @@ from .download import (
     looks_like_pdf,
 )
 from .pdfid import doi_from_pdf, probe_pdf_bytes, short_pdf_verdict
+from .mirror import pdf_for_key
 from .pipeline_attach import attach_after_remap
 from .pipeline_browser import release_browser_for_agent, skip_recover_without_lane_failure
 from .playbooks import looks_like_pdf_url
@@ -1116,6 +1117,9 @@ class Pipeline:
         if not self.attacher or not rec.path:
             return False
         pdf = resolve_pdf_path(self.cfg.out_dir, rec.path)
+        if pdf is None:
+            # The folder is named for the title; a retitle moves it. The key does not change.
+            pdf = pdf_for_key(self.cfg.out_dir, rec.itemKey)
         if pdf is None:
             with self._attach_lock:
                 rec.status = STATUS_ATTACH_FAILED

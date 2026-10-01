@@ -84,6 +84,7 @@ def save_watch(cfg: Config, name: str, profile: str) -> Path:
 
 
 def load_watch(cfg: Config, name: str) -> dict[str, Any]:
+    _check_watch_name(name)
     path = watch_dir(cfg, name) / "watch.json"
     if not path.is_file():
         raise SnowballError(f"Unknown watch {name!r}. Save one with snowball watch save.")

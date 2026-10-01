@@ -129,13 +129,10 @@ Zotero has. Do not document either adapter as supported until testers say so.
   **Near-term run behaviour (while `scholar` is still on `run`):** the serial
   Scholar phase queues every OA miss and then hits Google once per item (~
   `delay_scihub_s` apart). HTTP **429** is recorded as `error`, not `captcha`, so
-  the circuit breaker never opens (429 is excluded for API `Retry-After` lanes;
-  Scholar uses raw `httpx`, not `http_json`). Unlike EZProxy, there is no
-  “session down — skip the rest of this pass” latch, so a burned Scholar session
-  still gets **N** probe requests in one batch. **Fix before deprecation:**
-  first 429 (or short streak) → skip Scholar for the remainder of the run
-  (mirror `_mark_ezproxy_down`); optionally map Scholar 429/503 to block outcomes
-  so the existing breaker can pause mid-batch. **Spreading load:** shuffling queue
+  the circuit breaker still ignores it (429 is excluded for API `Retry-After`
+  lanes). **Shipped (latch):** the first Scholar 429, 503, or CAPTCHA /
+  `/sorry/` page skips Scholar for the rest of the run, across batches; queued
+  items get `scholar:skipped(blocked)` and end `retryable`. **Spreading load:** shuffling queue
   order alone does not help much; what helps is fewer requests after a clear block
   and/or spacing attempts across the whole run (shared rate limiter, per-item
   Scholar only after long jitter, or interleaving with other work) instead of one
@@ -297,6 +294,35 @@ Zotero has. Do not document either adapter as supported until testers say so.
 - Library adapter seam (`LibraryBackend`). **Zotero is well tested.** Mendeley
   and EndNote are seeking testers (above).
 
+### Mirror-first reads
+
+**Status:** shipped. The rule is in
+[architecture](architecture.md#mirror-first) and the
+[developer guide](developer.md). Measurements before the change:
+`assessments/2026-10-01-mirror-first-zotero-api.md` (local, not published).
+
+Commands refresh `out/` from what changed in the library, read the mirror,
+and write through it. Read verbs run with Zotero closed. A first refresh of
+a 22,700-item library takes about a minute; a refresh with nothing changed
+is six requests.
+
+Still open:
+
+- **Mendeley and EndNote** have no change feed, so their reads stay with the
+  manager. A `changes(since)` on either adapter moves it to the mirror path.
+- **Non-PDF attachments** (web snapshots, EPUB) have a row in the record and
+  no bytes in the mirror. Standalone notes and standalone attachments are
+  not mirrored.
+- **`attachments`** still reads each item's children from the manager. It
+  no longer downloads files to test for them.
+- **Freshness on screen.** An offline command says when the mirror was last
+  refreshed; it does not say how many items changed since.
+- **`state/pdf-cache/`** is emptied into the mirror by `paperful sync` one
+  file at a time as items are reached. There is no separate clean-up verb.
+
+Not in scope: reading `zotero.sqlite` or `storage/` directly, and any sync
+daemon.
+
 ### Near-term research-ops
 
 **Status:** next — thicken and ship verbs already named on this page; not a second
@@ -316,7 +342,7 @@ for the end-to-end operator story.
 | 8 | `paperful collections add --keys-file` — membership batch, dry-run / apply | Parked (Agent §7) |
 | 9 | Acronym allowlist harvest (Core `fix-metadata` next) | Next |
 | 10 | [Frontier digest](#frontier-digest-later-watch--external-ingest); thin [snowball briefing](#frontier-digest-later-watch--external-ingest) export before full digest | Later |
-| 11 | Scholar 429 latch (Core Scholar) | Next |
+| 11 | Scholar 429 latch (Core Scholar) | Shipped |
 | 12 | Authors/orgs frequency report from `-C` (`state/reports/…`; seed **field author packs**) | Later |
 | 13 | Handoff list ranking (Core handoff) | Later |
 | 14 | Opt-in academic HTML→PDF snapshot (Core `htmlpdf`) | Later |
@@ -1341,13 +1367,18 @@ Ship in layers:
    `doctor` colour lines, attachment provenance in Zotero, snowball queue rows,
    and handoff inbox layout; short screen recordings aligned with the three
    worked examples above (hygiene, snowball, fetch quick vs full).
+4. **Developer guide** — [developer.md](developer.md). **Shipped:** the
+   mirror-first rule, what a command's backend serves from disk, rules for
+   new code, the module map, the refresh, disk schemas, and how to add a
+   verb, a source, or an adapter method. Keep it current when a rule or a
+   module boundary changes.
 
 Keep new pages linked from README and [commands.md](commands.md); avoid a
 second doc tree that drifts from the CLI.
 
 ## Related docs
 
-- [architecture.md](architecture.md) — disk-first adapters and data flow
+- [architecture.md](architecture.md) — disk-first adapters, the mirror-first rule, and data flow
 - [why.md](why.md) — library, find, completeness, mirror, control; what is true today
 - [quiet-mirror.md](quiet-mirror.md) — `out/` as the copy you keep
 - [releases.md](releases.md) — 0.x vs 1.0; known limits

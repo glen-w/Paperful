@@ -26,7 +26,9 @@ and [architecture](architecture.md).
 | `[mendeley].redirect_uri` | `http://127.0.0.1:8765/callback` | Must match the app. Host-only (`session login mendeley`) |
 | `[endnote].library` | (none) | Path to the `.enl` file. Matching `.Data` (with `sdb/sdb.eni`) must sit beside it. See [EndNote](endnote.md) |
 | `out_dir` / `state_dir` | `out` / `state` | PDF tree; manifest, patches, PDF cache, run reports, and write key |
-| `[mirror].pdfs` | `additional` | `snapshot` PDF policy: `additional` (fetched files only), `all` (also export Zotero PDFs), `none` (records and notes only). `run` always writes PDFs it downloads |
+| `[mirror].pdfs` | `all` | PDFs the manager already holds: `all` (copy every one into its item folder; `paperful sync` does the first pass), `lazy` (copy one when a command first needs it; `additional` is the old name), `none` (keep them out of the mirror). `run` always writes PDFs it downloads |
+| `[mirror].refresh` | `auto` | `auto`: each command refreshes the mirror from the manager before it reads. `manual`: only `paperful sync` does. `--offline` or `PAPERFUL_OFFLINE=1` skips the manager for one command |
+| `[mirror].gone` | `mark` | An item trashed, merged, or deleted in the manager: `mark` keeps its folder in place and marks the record; `trash` also moves the folder under `out/_trash/`. Nothing is deleted either way |
 | `[remarks].surface` | `note` | Where the readable lines go: where a PDF came from, which duplicate to keep, and why a snowball hit belongs. `note` (child note), `tag` (parent tag), or `off`. The PDF attachment stamp stays the machine token |
 | `sources` | `unpaywall` → `openalex` → `arxiv` → `biorxiv` → `europepmc` → `semanticscholar` → `core` → `openaire` → `direct` → `ezproxy` → `htmlpdf` | Source order; `--sources` overrides per run. `scholar` and `scihub` are **not** included unless you opt in. `core` is skipped until `core_api_key` is set. `openaire` looks up repository copies by DOI |
 | `verify_doi` | `true` | Check library DOIs against Crossref/OpenAlex before fetching; may swap DOI **in memory** for that run. `false` leaves an existing DOI as `doi_verified=unknown` and does not swap |

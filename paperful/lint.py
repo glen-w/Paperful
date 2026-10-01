@@ -10,10 +10,11 @@ from typing import Callable
 import httpx
 
 from .config import Config
-from .library import LibraryBackend
+from .library import LibraryBackend, LibraryError
 from .pdfid import doi_from_pdf
 from .resolve import IdentifierCache, prepare_identifiers, strip_title_markup
-from .store import Manifest
+from .mirror import item_dirs
+from .store import Manifest, item_filename
 from .zot import Item
 
 _SCHOLARLY = frozenset(
@@ -45,16 +46,41 @@ class Finding:
 
 
 def resolve_pdf_path(cfg: Config, item: Item, manifest: Manifest | None) -> Path | None:
-    if item.pdf_path:
-        p = Path(item.pdf_path)
-        if p.is_file():
-            return p
-    rec = manifest.get(item.key) if manifest else None
-    if rec and rec.path:
-        p = Path(rec.path)
-        if p.is_file():
-            return p
-    return None
+    """A PDF already on disk: the item's path, the manifest path, then the mirror folder."""
+    from .mirror import pdf_for
+
+    path = pdf_for(cfg.out_dir, item, manifest)
+    if path is None:
+        cached = cfg.pdf_cache_dir / f"{item.key}.pdf"
+        if cached.is_file():
+            return cached
+    return path
+
+
+def ensure_pdf(
+    cfg: Config, item: Item, manifest: Manifest | None, backend: LibraryBackend | None
+) -> Path | None:
+    """A PDF on disk, exporting from the manager only when none is here.
+
+    A manager that cannot be read gives ``None``, like an item with no file:
+    the caller skips its PDF checks and makes no claim about the item.
+    """
+    path = resolve_pdf_path(cfg, item, manifest)
+    if path is None and item.has_pdf and backend is not None:
+        # Into the item folder, so it is asked for once. ``none`` keeps manager
+        # PDFs out of the mirror; then it is a throwaway copy under state/.
+        folders = [] if cfg.mirror_pdfs == "none" else item_dirs(cfg.out_dir, item)
+        if folders:
+            dest = folders[0] / item_filename(item)
+        else:
+            dest = cfg.pdf_cache_dir / f"{item.key}.pdf"
+        try:
+            path = backend.export_pdf(item, dest)
+        except LibraryError:
+            return None
+        if path:
+            item.pdf_path = str(path)
+    return path
 
 
 def title_is_all_caps(title: str) -> bool:
@@ -328,12 +354,7 @@ def lint_item(
         if title_looks_like_filename(item.title):
             add("title_filename", "title looks like a filename or path")
 
-    pdf_path = resolve_pdf_path(cfg, item, manifest)
-    if pdf_path is None and item.has_pdf and backend is not None:
-        dest = cfg.pdf_cache_dir / f"{item.key}.pdf"
-        pdf_path = backend.export_pdf(item, dest)
-        if pdf_path:
-            item.pdf_path = str(pdf_path)
+    pdf_path = ensure_pdf(cfg, item, manifest, backend)
     if pdf_path and pdf_path.is_file():
         pdf_doi = doi_from_pdf(pdf_path)
         if pdf_doi:

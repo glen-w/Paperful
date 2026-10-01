@@ -2,17 +2,32 @@
 
 from __future__ import annotations
 
+import shutil
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from pyzotero import errors as ze
+
 from .attach import AttachResult, Attacher
 from .config import Config
-from .zot import Collection, Item, ZoteroLocal, is_pdf_attachment
+from .zot import (
+    Collection,
+    Item,
+    ZoteroLocal,
+    build_collection_tree,
+    is_pdf_attachment,
+    item_from_rows,
+)
 
 
 class LibraryError(Exception):
     pass
+
+
+class LibraryReadError(LibraryError):
+    """The manager could not be read. Never the same as "nothing there"."""
 
 
 def note_payload(html: str, tag: str, parent_item: str) -> dict[str, Any]:
@@ -126,6 +141,165 @@ def get_backend(cfg: Config, zl: ZoteroLocal | None = None) -> LibraryBackend:
     return ZoteroBackend(cfg, zl)
 
 
+@dataclass
+class ChangeSet:
+    """What the manager says changed. Facts only; the sync engine decides what to write."""
+
+    version: int | None  # library version these rows were read at
+    full: bool  # ``rows`` is the whole library, not a delta
+    rows: list[dict[str, Any]]  # raw items of every type, trashed ones excluded
+    top_keys: set[str]  # every top-level key now in the library
+    all_keys: set[str]  # every item key now in the library, children included
+    trashed: list[dict[str, Any]]  # raw rows in the manager's trash
+    collections: dict[str, Collection]
+    library_id: str = ""  # changes when the manager is pointed at another database
+
+
+def mirrored(cfg: Config, backend: LibraryBackend) -> LibraryBackend:
+    """``backend`` with write-through to the mirror under ``cfg.out_dir``."""
+    if isinstance(backend, MirroredBackend):
+        return backend
+    return MirroredBackend(cfg, backend)  # type: ignore[return-value]
+
+
+class MirroredBackend:
+    """Write-through. A write to the manager is followed by a re-read of that item
+    into ``out/``, so the mirror does not wait for the next snapshot to be true.
+
+    Reads and anything not named here go straight to the wrapped backend. A
+    failed re-read never fails the write: the key is kept in ``unrefreshed``.
+    """
+
+    def __init__(self, cfg: Config, inner: Any):
+        self._cfg = cfg
+        self._inner = inner
+        self.unrefreshed: list[str] = []
+
+    def __getattr__(self, name: str) -> Any:
+        if name.startswith("__") or "_inner" not in self.__dict__:
+            raise AttributeError(name)
+        return getattr(self._inner, name)
+
+    # ---- mirror side ---------------------------------------------------
+    def refresh(self, key: str) -> bool:
+        """Re-read one parent item and rewrite its folders. Two requests."""
+        from .snapshot import append_index, write_item
+
+        if not key or not callable(getattr(self._inner, "raw_item", None)):
+            return False
+        try:
+            raw = self._inner.raw_item(key)
+            if not isinstance(raw, dict):
+                raise LibraryReadError(f"item {key} could not be read")
+            data = raw.get("data") or {}
+            if data.get("parentItem") or data.get("itemType") in {
+                "attachment",
+                "note",
+                "annotation",
+            }:
+                return False
+            children = self._inner.children(key)
+            build = getattr(self._inner, "item_from_raw", None)
+            item = build(raw, children) if callable(build) else self._inner.get_item(key)
+            if item is None:
+                raise LibraryReadError(f"item {key} could not be read")
+            *_counts, row = write_item(
+                self._cfg.out_dir,
+                item,
+                raw,
+                children,
+                self._inner.collections(),
+                self._cfg.summaries_dir,
+                "none",
+            )
+            append_index(self._cfg.out_dir, row)
+        except Exception:
+            # The manager already holds the write. The next refresh of the
+            # mirror picks this item up; do not report the write as failed.
+            if key not in self.unrefreshed:
+                self.unrefreshed.append(key)
+            return False
+        if key in self.unrefreshed:
+            self.unrefreshed.remove(key)
+        return True
+
+    def _gone(self, key: str, *, merged_into: str | None = None) -> None:
+        from .mirror import retire
+
+        try:
+            retire(
+                self._cfg.out_dir,
+                key,
+                "trashed",
+                policy=self._cfg.mirror_gone,
+                merged_into=merged_into,
+            )
+        except OSError:
+            if key not in self.unrefreshed:
+                self.unrefreshed.append(key)
+
+    # ---- writes ----------------------------------------------------------
+    def apply_patch(self, item_key: str, fields: dict[str, Any]) -> None:
+        self._inner.apply_patch(item_key, fields)
+        self.refresh(item_key)
+
+    def relate_items(self, left_key: str, right_key: str) -> None:
+        self._inner.relate_items(left_key, right_key)
+        self.refresh(left_key)
+        self.refresh(right_key)
+
+    def replace_prefixed_tag(self, item_key: str, prefix: str, tag: str) -> None:
+        self._inner.replace_prefixed_tag(item_key, prefix, tag)
+        self.refresh(item_key)
+
+    def create_or_update_note(self, item_key: str, html: str, tag: str) -> str:
+        key = self._inner.create_or_update_note(item_key, html, tag)
+        self.refresh(item_key)
+        return key
+
+    def attach(
+        self,
+        item_key: str,
+        pdf_path: Path,
+        title: str | None = None,
+        note: str | None = None,
+    ) -> AttachResult:
+        result = self._inner.attach(item_key, pdf_path, title, note=note)
+        if getattr(result, "ok", False):
+            self.refresh(item_key)
+        return result
+
+    def create_linked_file(self, parent_key: str, pdf_path: Path) -> str:
+        key = self._inner.create_linked_file(parent_key, pdf_path)
+        self.refresh(parent_key)
+        return key
+
+    def create_parent(self, data: dict[str, Any]) -> str:
+        key = self._inner.create_parent(data)
+        self.refresh(key)
+        return key
+
+    def ensure_collection_path(self, path: str) -> str:
+        from .snapshot import write_collections
+
+        key = self._inner.ensure_collection_path(path)
+        try:
+            write_collections(self._cfg.out_dir, self._inner.collections())
+        except Exception:
+            pass  # the tree is rewritten whole on the next refresh
+        return key
+
+    def trash_item(self, item_key: str) -> None:
+        self._inner.trash_item(item_key)
+        self._gone(item_key)
+
+    def merge_into(self, keep_key: str, drop_key: str) -> dict[str, Any]:
+        result = self._inner.merge_into(keep_key, drop_key)
+        self._gone(drop_key, merged_into=keep_key)
+        self.refresh(keep_key)
+        return result
+
+
 class ZoteroBackend:
     """Zotero local API adapter. PDF extract/lint never call this except to export files."""
 
@@ -134,8 +308,47 @@ class ZoteroBackend:
         self.zl = zl or ZoteroLocal()
         self._attacher: Attacher | None = None
 
+    def _read(self, what: str, fn: Callable[..., Any], *args: Any) -> Any:
+        """One manager read. A missing key is ``None``; any other failure raises."""
+        try:
+            return fn(*args)
+        except ze.ResourceNotFoundError:
+            return None
+        except Exception as exc:
+            raise LibraryReadError(
+                f"Zotero read failed ({what}): {type(exc).__name__}: {exc}"
+            ) from exc
+
     def ping(self) -> dict[str, Any]:
         return self.zl.ping()
+
+    def changes(self, since: int | None) -> ChangeSet:
+        """Rows changed after library version ``since`` (all rows when ``None``).
+
+        Six requests when nothing changed. The local API leaves trashed items
+        out of every listing and has no ``/deleted``, so removals are read as
+        key sets: what is in the library now, and what is in the trash.
+        """
+
+        def read() -> ChangeSet:
+            params = {} if since is None else {"since": since}
+            rows, version = self.zl.listing("/items", **params)
+            cols_raw, _ = self.zl.listing("/collections")
+            trashed, _ = self.zl.listing("/items/trash")
+            return ChangeSet(
+                version=version,
+                full=since is None,
+                rows=rows,
+                top_keys=self.zl.keys("/items/top"),
+                all_keys=self.zl.keys("/items"),
+                trashed=trashed,
+                collections=build_collection_tree(cols_raw),
+                library_id=str(self.zl.ping().get("server_id") or ""),
+            )
+
+        changes = self._read("library changes", read)
+        self.zl._collections = changes.collections
+        return changes
 
     def collections(self) -> dict[str, Collection]:
         return self.zl.collections()
@@ -182,9 +395,19 @@ class ZoteroBackend:
     def attachment_has_bytes(self, key: str) -> bool:
         """True when the local API returns a non-empty file for this attachment.
 
-        Uses pyzotero's file fetch. A raw client stream misses the local API
-        transport and reports every stored PDF as missing.
+        Asks where the file is and looks there: no bytes move. When the path
+        is not visible from here, falls back to pyzotero's file fetch. (A raw
+        client stream misses the local API transport and reports every stored
+        PDF as missing.)
         """
+        locate = getattr(self.zl, "file_path", None)
+        if callable(locate):
+            try:
+                path = locate(key)
+            except Exception:
+                path = None
+            if path is not None:
+                return path.is_file() and path.stat().st_size > 0
         try:
             payload = self.zl.zot.file(key)
         except Exception:
@@ -303,50 +526,29 @@ class ZoteroBackend:
     def flush_writes(self) -> Path | None:
         return None
 
-    def get_item(self, key: str) -> Item | None:
-        from .zot import item_from_json
+    def item_from_raw(
+        self, raw: dict[str, Any], children: list[dict[str, Any]]
+    ) -> Item:
+        """The listing's ``Item`` from payloads already read. No request."""
+        return item_from_rows(raw, children, self.collections())
 
-        try:
-            raw = self.zl.zot.item(key)
-        except Exception:
+    def get_item(self, key: str) -> Item | None:
+        raw = self.raw_item(key)
+        if raw is None:
             return None
-        cols = self.collections()
-        has_pdf = False
-        has_linked = False
-        try:
-            for ch in self.zl.zot.children(key):
-                data = ch.get("data") or {}
-                if is_pdf_attachment(data):
-                    has_pdf = True
-                    if (data.get("linkMode") or "") == "linked_url":
-                        has_linked = True
-        except Exception:
-            pass
-        return item_from_json(
-            raw, cols, None, has_pdf=has_pdf, has_linked_url=has_linked
-        )
+        return self.item_from_raw(raw, self.children(key))
 
     def raw_item(self, key: str) -> dict[str, Any] | None:
-        try:
-            raw = self.zl.zot.item(key)
-        except Exception:
-            return None
+        raw = self._read(f"item {key}", self.zl.zot.item, key)
         return raw if isinstance(raw, dict) else None
 
     def children(self, key: str) -> list[dict[str, Any]]:
-        try:
-            kids = self.zl.zot.children(key)
-        except Exception:
-            return []
-        return [ch for ch in kids if isinstance(ch, dict)]
+        kids = self._read(f"children of {key}", self.zl.zot.children, key)
+        return [ch for ch in kids or [] if isinstance(ch, dict)]
 
     def export_pdf(self, item: Item, dest: Path) -> Path | None:
         dest.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            children = self.zl.zot.children(item.key)
-        except Exception:
-            return None
-        for ch in children:
+        for ch in self.children(item.key):
             data = ch.get("data") or {}
             if not is_pdf_attachment(data):
                 continue
@@ -354,8 +556,15 @@ class ZoteroBackend:
             if not key:
                 continue
             try:
+                locate = getattr(self.zl, "file_path", None)
+                path = locate(key) if callable(locate) else None
+                if path is not None and path.is_file():
+                    # Same disk: copy the file Zotero pointed at, not a download of it.
+                    shutil.copyfile(path, dest)
+                    return dest
                 self.zl.zot.dump(key, dest.name, str(dest.parent))
             except Exception:
+                # A row whose bytes never arrived (a ghost) fails here.
                 return None
             dumped = dest.parent / dest.name
             if dumped.exists():
@@ -515,11 +724,7 @@ class ZoteroBackend:
     def find_child_note_keys(self, item_key: str, tag: str) -> list[str]:
         want = tag.strip().lower()
         out: list[str] = []
-        try:
-            children = self.zl.zot.children(item_key)
-        except Exception:
-            return out
-        for ch in children:
+        for ch in self.children(item_key):
             data = ch.get("data") or {}
             if data.get("itemType") != "note":
                 continue
@@ -534,9 +739,8 @@ class ZoteroBackend:
         keys = self.find_child_note_keys(item_key, tag)
         if not keys:
             return None
-        try:
-            raw = self.zl.zot.item(keys[0])
-        except Exception:
+        raw = self.raw_item(keys[0])
+        if raw is None:
             return None
         return str((raw.get("data") or {}).get("note") or "") or None
 
@@ -588,13 +792,13 @@ class ZoteroBackend:
         """
         want = tag.strip().lower()
         out: list[str] = []
-        try:
-            items = self.zl.zot.everything(
+        items = self._read(
+            f"collection {collection_key}",
+            lambda: self.zl.zot.everything(
                 self.zl.zot.collection_items_top(collection_key)
-            )
-        except Exception:
-            return out
-        for it in items:
+            ),
+        )
+        for it in items or []:
             data = it.get("data") or {}
             if data.get("itemType") != "note" or data.get("parentItem"):
                 continue

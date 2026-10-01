@@ -408,6 +408,10 @@ def apply_actions(
             )
             continue
         done += 1
+        # Trashing a child does not name its parent; re-read the parent once.
+        refresh = getattr(backend, "refresh", None)
+        if callable(refresh) and action.parent_key and action.op != "rename_file":
+            refresh(action.parent_key)
     return done, errors
 
 

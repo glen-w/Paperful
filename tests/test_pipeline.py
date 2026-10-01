@@ -1494,3 +1494,120 @@ def test_strict_pdf_doi_precedes_short_pdf_hold(cfg, monkeypatch):
         "A"
     ]
 
+
+
+# ---- vault browser download fallback ------------------------------------------
+
+_PUB = "https://www.sciencedirect.com/science/article/pii/S1"
+_PROXY = "https://login.ezproxy.uni.test/login?url="
+
+
+class _VaultBrowser:
+    """Scripted vault: url -> bytes or an exception to raise."""
+
+    def __init__(self, script: dict, up: bool = True):
+        self.script = script
+        self.up = up
+        self.calls: list[str] = []
+
+    def available(self) -> bool:
+        return self.up
+
+    def fetch_pdf(self, url: str):
+        self.calls.append(url)
+        got = self.script.get(url)
+        if isinstance(got, BaseException):
+            raise got
+        if got is None:
+            raise RuntimeError("no script")
+        return got, url, None
+
+    def close(self) -> None:
+        pass
+
+
+def _vault_pipe(pipe_factory, browser, **cfg_overrides):
+    pipe, manifest = pipe_factory({}, [])
+    for key, value in cfg_overrides.items():
+        setattr(pipe.cfg, key, value)
+    pipe.browser = browser
+    return pipe, manifest
+
+
+def _cand(source="unpaywall"):
+    return Candidate(url=_PUB, source=source)
+
+
+def test_browser_pdf_ignores_non_publisher_urls_unless_forced(pipe_factory):
+    url = "https://repo.example.org/a.pdf"
+    browser = _VaultBrowser({url: PDF_BYTES})
+    pipe, _ = _vault_pipe(pipe_factory, browser)
+    attempts: list[str] = []
+    assert pipe._browser_pdf(make_item(), _cand(), url, attempts) is None
+    assert browser.calls == []
+    got = pipe._browser_pdf(make_item(), _cand(), url, attempts, force=True)
+    assert got is not None and got.content == PDF_BYTES
+    assert attempts == ["unpaywall:browser"]
+
+
+def test_browser_pdf_is_a_no_op_when_the_vault_is_unavailable(pipe_factory):
+    browser = _VaultBrowser({_PUB: PDF_BYTES}, up=False)
+    pipe, _ = _vault_pipe(pipe_factory, browser)
+    assert pipe._browser_pdf(make_item(), _cand(), _PUB, []) is None
+    assert browser.calls == []
+
+
+def test_browser_pdf_tries_the_proxied_url_then_the_raw_one(pipe_factory):
+    proxied = _PROXY + _PUB
+    browser = _VaultBrowser({proxied: RuntimeError("timeout"), _PUB: PDF_BYTES})
+    pipe, _ = _vault_pipe(pipe_factory, browser, ezproxy_base=_PROXY)
+    attempts: list[str] = []
+    got = pipe._browser_pdf(make_item(), _cand(), _PUB, attempts)
+    assert browser.calls == [proxied, _PUB]
+    assert got is not None and got.final_url == _PUB
+    assert attempts == ["unpaywall:browser-failed(timeout)", "unpaywall:browser"]
+
+
+def test_browser_pdf_skips_the_proxy_lane_while_the_campus_session_is_down(pipe_factory):
+    browser = _VaultBrowser({_PUB: PDF_BYTES})
+    pipe, _ = _vault_pipe(pipe_factory, browser, ezproxy_base=_PROXY)
+    pipe._ezproxy_down = True
+    attempts: list[str] = []
+    assert pipe._browser_pdf(make_item(), _cand(), _PUB, attempts) is None
+    assert browser.calls == []
+    assert attempts == ["unpaywall:skipped(session expired)"]
+
+
+def test_browser_pdf_skips_a_host_already_marked_dead(pipe_factory):
+    browser = _VaultBrowser({_PUB: PDF_BYTES})
+    pipe, _ = _vault_pipe(pipe_factory, browser)
+    pipe._mark_host_dead(*pipe._host_keys(_PUB))
+    attempts: list[str] = []
+    assert pipe._browser_pdf(make_item(), _cand(), _PUB, attempts) is None
+    assert browser.calls == []
+    assert attempts == ["unpaywall:skipped(host already blocked)"]
+
+
+@pytest.mark.parametrize(
+    "body", [b"<html>paywall</html>" * 200, b"%PDF-1.4 tiny"], ids=["html", "too-small"]
+)
+def test_browser_pdf_rejects_bytes_that_are_not_a_usable_pdf(pipe_factory, body):
+    browser = _VaultBrowser({_PUB: body})
+    pipe, _ = _vault_pipe(pipe_factory, browser)
+    attempts: list[str] = []
+    assert pipe._browser_pdf(make_item(), _cand(), _PUB, attempts) is None
+    assert attempts == ["unpaywall:browser-failed(not a PDF)"]
+
+
+def test_attach_record_with_a_missing_file_is_an_attach_failure(pipe_factory):
+    from paperful.store import Record
+
+    attacher = FakeAttacher()
+    pipe, manifest = pipe_factory({}, [], attacher=attacher)
+    rec = Record(itemKey="GONE", status=STATUS_OK, path=str(pipe.cfg.out_dir / "gone.pdf"))
+    assert pipe.attach_record(rec) is False
+    assert attacher.calls == []
+    saved = manifest.get("GONE")
+    assert saved.status == STATUS_ATTACH_FAILED
+    assert saved.reason.startswith("file missing")
+    assert pipe.stats.attach_failed_by_code == {"other": 1}

@@ -19,6 +19,8 @@ from typing import Any
 
 from .progress import Track
 from .config import Config
+from .library import LibraryError, LibraryReadError
+from .mirror import place_item_dirs
 from .store import (
     COLLECTIONS_SCHEMA,
     HISTORY_SCHEMA,
@@ -32,7 +34,7 @@ from .store import (
     record_path,
     write_json,
 )
-from .zot import Collection, Item, is_pdf_attachment
+from .zot import Collection, Item
 
 _PROMOTED = frozenset(
     {
@@ -41,7 +43,6 @@ _PROMOTED = frozenset(
         "creators",
         "abstractNote",
         "date",
-        "DOI",
         "url",
         "extra",
         "publicationTitle",
@@ -62,6 +63,7 @@ class SnapshotStats:
     records: int = 0
     pdf_exports: int = 0
     notes: int = 0
+    unread: int = 0  # the manager could not be read; the record on disk was left alone
     index: list[dict[str, Any]] = field(default_factory=list)
     pdf_keys: list[str] = field(default_factory=list)  # items whose PDF was exported
 
@@ -132,25 +134,22 @@ def item_dirs(out_dir: Path, item: Item) -> list[Path]:
 
 
 def _children(backend: Any, key: str) -> list[dict[str, Any]]:
+    """Child rows. A backend that cannot list children has none; a failed read raises."""
     fn = getattr(backend, "children", None)
     if fn is None:
         return []
-    try:
-        kids = fn(key) or []
-    except Exception:
-        return []
-    return [ch for ch in kids if isinstance(ch, dict)]
+    return [ch for ch in (fn(key) or []) if isinstance(ch, dict)]
 
 
 def _raw_item(backend: Any, key: str) -> dict[str, Any] | None:
+    """The manager's own payload. ``None`` only when the backend has no such call."""
     fn = getattr(backend, "raw_item", None)
     if fn is None:
         return None
-    try:
-        raw = fn(key)
-    except Exception:
-        return None
-    return raw if isinstance(raw, dict) else None
+    raw = fn(key)
+    if not isinstance(raw, dict):
+        raise LibraryReadError(f"item {key} could not be read")
+    return raw
 
 
 def _file_md5(path: Path) -> str:
@@ -163,17 +162,19 @@ def attachment_rows(children: list[dict[str, Any]]) -> list[dict[str, Any]]:
         data = ch.get("data") or {}
         if data.get("itemType") != "attachment":
             continue
-        if not is_pdf_attachment(data) and data.get("contentType") != "application/pdf":
-            continue
-        rows.append(
-            {
-                "key": ch.get("key"),
-                "filename": data.get("filename") or data.get("title"),
-                "linkMode": data.get("linkMode"),
-                "contentType": data.get("contentType"),
-                "md5": data.get("md5") or None,
-            }
-        )
+        row = {
+            "key": ch.get("key"),
+            "filename": data.get("filename") or data.get("title"),
+            "linkMode": data.get("linkMode"),
+            "contentType": data.get("contentType"),
+            "md5": data.get("md5") or None,
+        }
+        for name in ("title", "url", "path"):
+            if data.get(name):
+                row[name] = data[name]
+        rows.append(row)
+    # PDFs first: the first row is the one a reader means by "the file".
+    rows.sort(key=lambda r: r.get("contentType") != "application/pdf")
     return rows
 
 
@@ -213,13 +214,19 @@ def export_notes(
             continue
         key = str(ch.get("key") or "")
         fname = _note_filename(data, key or "note")
-        if fname in seen:
-            continue
         tags = [
             str(t.get("tag"))
             for t in (data.get("tags") or [])
             if isinstance(t, dict) and t.get("tag")
         ]
+        if fname in seen:
+            # The file is already there (the disk summary). Record whose note it is.
+            for row in meta:
+                if row["file"] == fname and key and "key" not in row:
+                    row["key"] = key
+                    if tags:
+                        row["tags"] = tags
+            continue
         row: dict[str, Any] = {"file": fname}
         if key:
             row["key"] = key
@@ -296,24 +303,69 @@ def _preserve_fetch(rec: dict[str, Any], item_dir: Path) -> None:
         rec["notes"] = existing["notes"]
 
 
-def snapshot_item(
+def _link_pdfs(dirs: list[Path]) -> None:
+    """Each collection folder holds the PDF. Hardlinks, so no second copy of the bytes."""
+    pdfs: list[Path] = []
+    for d in dirs:
+        pdfs = [p for p in d.glob("*.pdf") if p.is_file()]
+        if pdfs:
+            break
+    for d in dirs:
+        if any(d.glob("*.pdf")):
+            continue
+        for pdf in pdfs:
+            target = d / pdf.name
+            try:
+                target.hardlink_to(pdf)
+            except OSError:
+                shutil.copyfile(pdf, target)
+
+
+ANNOTATIONS_SCHEMA = "paperful.annotations.v1"
+
+
+def _write_annotations(item_dir: Path, annotations: list[dict[str, Any]]) -> None:
+    """The reader's highlights and notes, as the manager holds them."""
+    path = item_dir / "annotations.json"
+    if not annotations:
+        path.unlink(missing_ok=True)
+        return
+    rows = []
+    for row in annotations:
+        data = dict(row.get("data") or {})
+        data.setdefault("key", row.get("key"))
+        rows.append(data)
+    write_json(path, {"schema": ANNOTATIONS_SCHEMA, "annotations": rows})
+
+
+def write_item(
     out_dir: Path,
     item: Item,
-    backend: Any,
+    raw: dict[str, Any] | None,
+    children: list[dict[str, Any]],
     cols: dict[str, Collection],
     summaries_dir: Path,
     pdfs: str,
     *,
-    dry_run: bool,
+    backend: Any = None,
+    dry_run: bool = False,
+    exact: bool = False,
+    annotations: list[dict[str, Any]] | None = None,
 ) -> tuple[int, int, int, dict[str, Any]]:
-    dirs = item_dirs(out_dir, item)
+    """Write one item's folders from data already read. Asks the manager only for PDF bytes.
+
+    ``exact`` is passed to :func:`place_item_dirs`. ``annotations`` is the
+    item's whole set when known; ``None`` leaves ``annotations.json`` alone.
+    """
+    children = [ch for ch in children if not (ch.get("data") or {}).get("deleted")]
+    dirs = place_item_dirs(out_dir, item, dry_run=dry_run, exact=exact)
     primary, extras = dirs[0], dirs[1:]
-    raw = _raw_item(backend, item.key)
-    children = _children(backend, item.key)
     rec = record_from_raw(raw, item, cols)
     rec["schema"] = ITEM_SCHEMA
+    if ((raw or {}).get("data") or {}).get("deleted"):
+        rec["library"] = {"state": "trashed"}
     attachments = attachment_rows(children)
-    exported = maybe_export_pdf(
+    exported = backend is not None and maybe_export_pdf(
         item, primary, extras, backend, attachments, pdfs, dry_run=dry_run
     )
     if exported:
@@ -336,11 +388,15 @@ def snapshot_item(
                 if not target.exists():
                     shutil.copyfile(note, target)
     rec["notes"] = note_meta
-    _preserve_fetch(rec, primary)
+    # A scoped fetch may have landed in any one of the folders.
+    for d in dirs:
+        _preserve_fetch(rec, d)
     if not dry_run:
+        _link_pdfs(dirs)
         for d in dirs:
-            _preserve_fetch(rec, d)
             write_json(record_path(d), rec)
+            if annotations is not None:
+                _write_annotations(d, annotations)
     md5 = None
     fetch = rec.get("fetch") if isinstance(rec.get("fetch"), dict) else None
     if fetch and fetch.get("md5"):
@@ -357,11 +413,52 @@ def snapshot_item(
         "dirs": [str(d.relative_to(out_dir)) for d in dirs],
         "has_pdf": has_pdf,
         "md5": md5,
+        # Child keys, so a refresh can tell when one was removed in the manager.
+        "children": sorted(str(ch.get("key")) for ch in children if ch.get("key")),
     }
+    if annotations is not None:
+        row["annotations"] = sorted(
+            str(a.get("key")) for a in annotations if a.get("key")
+        )
     return 1, int(exported), n_notes, row
 
 
-def merge_index(out_dir: Path, rows: list[dict[str, Any]]) -> None:
+def snapshot_item(
+    out_dir: Path,
+    item: Item,
+    backend: Any,
+    cols: dict[str, Collection],
+    summaries_dir: Path,
+    pdfs: str,
+    *,
+    dry_run: bool,
+) -> tuple[int, int, int, dict[str, Any]]:
+    """Read one item from the manager and write its folders. A failed read raises."""
+    raw = _raw_item(backend, item.key)
+    children = _children(backend, item.key)
+    return write_item(
+        out_dir,
+        item,
+        raw,
+        children,
+        cols,
+        summaries_dir,
+        pdfs,
+        backend=backend,
+        dry_run=dry_run,
+    )
+
+
+def _index_put(by_key: dict[str, dict[str, Any]], row: dict[str, Any]) -> None:
+    """Later row wins. Annotation keys carry over when the later row did not read them."""
+    old = by_key.get(str(row["item_key"]))
+    if old and "annotations" in old and "annotations" not in row:
+        row = {**row, "annotations": old["annotations"]}
+    by_key[str(row["item_key"])] = row
+
+
+def read_index(out_dir: Path) -> dict[str, dict[str, Any]]:
+    """``_index.jsonl`` by item key. Lines appended after the last rewrite count."""
     path = out_dir / "_index.jsonl"
     by_key: dict[str, dict[str, Any]] = {}
     if path.is_file():
@@ -374,9 +471,22 @@ def merge_index(out_dir: Path, rows: list[dict[str, Any]]) -> None:
             except ValueError:
                 continue
             if isinstance(row, dict) and row.get("item_key"):
-                by_key[str(row["item_key"])] = row
+                _index_put(by_key, row)
+    return by_key
+
+
+def append_index(out_dir: Path, row: dict[str, Any]) -> None:
+    """Add one row without rewriting the file. The next ``merge_index`` compacts it."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    with (out_dir / "_index.jsonl").open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def merge_index(out_dir: Path, rows: list[dict[str, Any]]) -> None:
+    path = out_dir / "_index.jsonl"
+    by_key = read_index(out_dir)
     for row in rows:
-        by_key[str(row["item_key"])] = row
+        _index_put(by_key, row)
     lines = [
         json.dumps(by_key[k], ensure_ascii=False) for k in sorted(by_key)
     ]
@@ -456,15 +566,20 @@ def run_snapshot(
         except Exception:
             cols = {}
     for item in track(items) if track else items:
-        n_rec, n_pdf, n_notes, row = snapshot_item(
-            cfg.out_dir,
-            item,
-            backend,
-            cols,
-            cfg.summaries_dir,
-            pdfs,
-            dry_run=dry_run,
-        )
+        try:
+            n_rec, n_pdf, n_notes, row = snapshot_item(
+                cfg.out_dir,
+                item,
+                backend,
+                cols,
+                cfg.summaries_dir,
+                pdfs,
+                dry_run=dry_run,
+            )
+        except LibraryError:
+            # Could not read is not the same as nothing there. Keep what is on disk.
+            stats.unread += 1
+            continue
         stats.records += n_rec
         stats.pdf_exports += n_pdf
         if n_pdf:
@@ -495,6 +610,7 @@ def snapshot_report(
             "records": stats.records,
             "pdf_exports": stats.pdf_exports,
             "notes": stats.notes,
+            "unread": stats.unread,
         },
     }
 

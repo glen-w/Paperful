@@ -20,7 +20,7 @@ from .zot import Item
 ITEM_SCHEMA = "paperful.item.v1"
 HISTORY_SCHEMA = "paperful.history.v1"
 COLLECTIONS_SCHEMA = "paperful.collections.v1"
-PDF_MODES = frozenset({"additional", "all", "none"})
+PDF_MODES = frozenset({"all", "lazy", "none"})
 _KEY_MARK = " -- "
 # Zotero keys are 8 alphanumeric; Mendeley ids are UUIDs; EndNote ids are integers.
 _ITEM_DIR_RE = re.compile(r" -- ([A-Za-z0-9][A-Za-z0-9._-]*)$")
@@ -265,36 +265,9 @@ def items_from_mirror(
     out_dir: Path, collection_prefixes: list[str] | None = None
 ) -> list[Item]:
     """Catalogue rows already on disk. The live manager is not required."""
-    if not out_dir.is_dir():
-        return []
-    prefixes = [p.strip("/") for p in (collection_prefixes or []) if p and p.strip("/")]
-    items: list[Item] = []
-    seen: set[str] = set()
-    for rec_path in sorted(out_dir.rglob("record.json")):
-        if not is_item_dirname(rec_path.parent.name):
-            continue
-        try:
-            rel = rec_path.parent.relative_to(out_dir).as_posix()
-        except ValueError:
-            continue
-        collection = "" if "/" not in rel else rel.rsplit("/", 1)[0]
-        if prefixes and not any(
-            collection == pre or collection.startswith(pre + "/") for pre in prefixes
-        ):
-            continue
-        rec = load_json(rec_path)
-        if rec is None:
-            continue
-        key = str(rec.get("item_key") or item_key_from_dirname(rec_path.parent.name) or "")
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        pdfs = sorted(p for p in rec_path.parent.glob("*.pdf") if p.is_file())
-        paths = rec.get("collection_paths")
-        if not isinstance(paths, list) or not paths:
-            paths = [collection] if collection else []
-        items.append(item_from_record(rec, key, paths, pdfs))
-    return items
+    from .mirror import items_in_mirror
+
+    return items_in_mirror(out_dir, collection_prefixes)
 
 
 @dataclass
@@ -342,6 +315,8 @@ def mirror_entries(
     wanted = set(keys) if keys is not None else None
     folders: dict[str, list[Path]] = {}
     for dirpath, dirnames, _files in os.walk(out_dir):
+        if Path(dirpath) == out_dir and "_trash" in dirnames:
+            dirnames.remove("_trash")  # folders of items that left the library
         item_dirs = [d for d in dirnames if is_item_dirname(d)]
         for name in item_dirs:
             key = item_key_from_dirname(name) or ""
@@ -375,6 +350,9 @@ def mirror_entries(
                     continue
                 inodes.add((st.st_dev, st.st_ino))
                 pdfs.append(pdf)
+        gone = record.get("library")
+        if isinstance(gone, dict) and gone.get("state") in ("trashed", "gone"):
+            continue  # trashed or deleted in the manager; the folder is kept, not used
         entries.append(MirrorEntry(key=key, dirs=rels, record=record, pdfs=pdfs))
     return entries
 
@@ -400,20 +378,18 @@ def save_pdf(
     out_dir: Path, item: Item, content: bytes, md5: str
 ) -> tuple[Path, list[Path]]:
     """Write once under the first collection's item folder; hardlink the rest."""
+    from .mirror import place_item_dirs
+
     filename = item_filename(item)
-    dirname = item_dirname(item)
-    paths = item.collection_paths or ["_uncollected"]
-    primary_dir = out_dir / paths[0] / dirname
-    primary_dir.mkdir(parents=True, exist_ok=True)
+    dirs = place_item_dirs(out_dir, item)
+    primary_dir = dirs[0]
     primary = unique_path(primary_dir, filename, md5)
     if not primary.exists():
         tmp = primary.with_suffix(".part")
         tmp.write_bytes(content)
         os.replace(tmp, primary)
     extras: list[Path] = []
-    for p in paths[1:]:
-        d = out_dir / p / dirname
-        d.mkdir(parents=True, exist_ok=True)
+    for d in dirs[1:]:
         target = unique_path(d, filename, md5)
         if not target.exists():
             try:

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from .library import LibraryError
 from .zot import Item, filter_items_by_type, filter_items_by_year
 
 
@@ -79,17 +80,11 @@ def _items_in_scope(
     collection_keys: list[str] | None,
     status: Callable[[str], None] | None,
 ) -> list[Item]:
-    zl = getattr(backend, "zl", None)
-    if zl is not None:
-        if status is not None:
-            try:
-                return zl.items_in_scope(collection_keys, status=status)
-            except TypeError:
-                status("Loading items from library…")
-                return zl.items_in_scope(collection_keys)
-        return zl.items_in_scope(collection_keys)
-    if status:
-        status("Loading items from library…")
+    if status is not None:
+        try:
+            return backend.items_in_scope(collection_keys, status=status)
+        except TypeError:
+            status("Loading items from library…")
     return backend.items_in_scope(collection_keys)
 
 
@@ -114,7 +109,10 @@ def load_scope(
     specs = list(collections or [])
     items: list[Item] = []
     for key in keys_asked:
-        it = backend.get_item(key)
+        try:
+            it = backend.get_item(key)
+        except LibraryError as exc:
+            raise ScopeError(str(exc)) from exc
         if it is None:
             raise ScopeError(f"Unknown item {key}")
         items.append(it)
