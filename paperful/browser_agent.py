@@ -42,7 +42,34 @@ def browser_agent_extra_available() -> bool:
     # Importing browser-use sets the root logger to INFO. Do this after the
     # import so pyzotero's client does not print every local API call.
     _quiet_pyzotero_http_logs()
+    _quiet_screenshot_noise()
     return True
+
+
+class _ScreenshotNoise:
+    """Logging filter that drops browser-use screenshot timeout reports."""
+
+    def filter(self, record: Any) -> bool:
+        text = record.getMessage().lower()
+        return not ("screenshot" in text and ("timed out" in text or "capture_screenshot" in text))
+
+
+def _quiet_screenshot_noise() -> None:
+    """Hide screenshot-timeout warnings and their tracebacks.
+
+    A slow page makes browser-use's background screenshot time out. With vision
+    off (the default) that changes nothing; with vision on the step just goes
+    without an image. Either way it prints a ~60-line traceback over the
+    progress display. The filter sits on the
+    handlers because browser-use logs from many child loggers.
+    """
+    import logging
+
+    noise = _ScreenshotNoise()
+    for log in (logging.getLogger(), logging.getLogger("browser_use")):
+        for handler in log.handlers:
+            if not any(isinstance(f, _ScreenshotNoise) for f in handler.filters):
+                handler.addFilter(noise)
 
 
 def _quiet_pyzotero_http_logs() -> None:
@@ -157,6 +184,7 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
         downloads = Path(tmp)
         profile = chromium_dir(cfg)
         _drop_empty_extension_cache()
+        _quiet_screenshot_noise()
         browser = Browser(
             user_data_dir=profile,
             downloads_path=downloads,
@@ -165,7 +193,8 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
             **_browser_launch_kwargs(),
         )
         task = _recover_task(item, url)
-        # DOM + element tree only unless [browser_agent] points at a vision tag.
+        # DOM + element tree only unless [browser_agent] use_vision is set (needs
+        # a vision-capable model tag).
         # browser-use defaults use_vision=True; text-only Ollama models 400 on
         # "Multimodal data provided".
         stop_reason: dict[str, str] = {}
@@ -185,7 +214,8 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
             task=task,
             llm=llm,
             browser=browser,
-            use_vision=False,
+            use_vision=cfg.browser_agent_use_vision,
+            use_thinking=cfg.browser_agent_use_thinking,
             extend_system_message=_RECOVER_SYSTEM_EXT,
             register_should_stop_callback=should_stop,
         )

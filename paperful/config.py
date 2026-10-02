@@ -148,6 +148,8 @@ class Config:
     browser_agent_max_wall_s: float = 300.0
     browser_agent_model: str = ""
     browser_agent_during_run: bool = True
+    browser_agent_use_vision: bool = False
+    browser_agent_use_thinking: bool = True
     fix_metadata_llm_title: bool = False
     lint_llm_pdf_match: bool = False
     lint_llm_pdf_match_min_confidence: float = 0.6
@@ -723,6 +725,10 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             cfg.browser_agent_model = str(ba["model"]).strip()
         if "during_run" in ba:
             cfg.browser_agent_during_run = bool(ba["during_run"])
+        if "use_vision" in ba:
+            cfg.browser_agent_use_vision = bool(ba["use_vision"])
+        if "use_thinking" in ba:
+            cfg.browser_agent_use_thinking = bool(ba["use_thinking"])
     fm = raw.get("fix_metadata")
     if isinstance(fm, dict) and "llm_title" in fm:
         cfg.fix_metadata_llm_title = bool(fm["llm_title"])
