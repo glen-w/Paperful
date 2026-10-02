@@ -476,6 +476,7 @@ no invented URL — not parameter count or model marketing copy.
 | **Batch recover** | `recover --from-last-run` — still later. |
 | **Playbooks from wins** | `state/fetch-wins.jsonl` + `playbooks promote` today; **step-trace** mining still later. |
 | **Browser Use Cloud / BU2** | Stealth / CAPTCHA — explicit non-default; no bypass product. |
+| **Jev via OpenRouter (post-v1)** | [Jev](https://openrouter.ai/docs/guides/community/jev) is browser-optimized and faster than local Ollama but costs per call. Spike after v1 stable for high-volume batch recover. |
 | **Controlled bakeoff** | No Paperful CI fixture for “Springer cookie → PDF” per model; optional **`assessments/`** protocol later. |
 
 #### When *not* to run the agent (product rule)
@@ -1049,6 +1050,16 @@ snapshot](https://help.openalex.org/access/snapshot/) and point
   snapshot (likely an inverted cites index or careful scan strategy).
 - **Later (2C):** keyword / ORCID / `search` parity; `local_duckdb` and `http`
   backends for campus hosting without SSH.
+
+## Known issues
+
+- **`dedupe --apply-medium` alone is a dry-run.** The flag only widens what
+  `--apply` may merge (title+year groups on top of `high_doi`); it does not
+  write by itself. To merge both kinds, pass `--apply --apply-medium`. The
+  dry-run footer says so, but the flag name reads like it applies. Possible
+  fix: make `--apply-medium` imply `--apply`, or error when passed without it.
+  Not changed yet because it would alter documented behaviour. Also untested
+  at CLI level (`tests/test_dedupe.py` covers `apply_merge` directly).
 
 ## Maybe later, not core
 
