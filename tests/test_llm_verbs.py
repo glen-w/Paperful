@@ -483,6 +483,66 @@ def test_summarize_items_continues_after_llm_timeout(llm_cfg, monkeypatch):
     assert batch.summarized == 2 and batch.failed == 1
 
 
+def test_summarize_items_max_new_moves_down_the_queue(llm_cfg, monkeypatch):
+    stub = StubLLM(text="<p>s</p>")
+    monkeypatch.setattr(summarize, "get_client", lambda cfg: stub)
+    monkeypatch.setattr(
+        summarize,
+        "pdf_text_for",
+        lambda cfg, item, *a, **k: "" if item.key == "SCAN0001" else PDF_TEXT,
+    )
+    items = [
+        make_item(key="SCAN0001", has_pdf=True),
+        make_item(key="NEWER001", has_pdf=True),
+        make_item(key="OLDER001", has_pdf=True),
+        make_item(key="OLDEST01", has_pdf=True),
+    ]
+    first = summarize.summarize_items(
+        llm_cfg, items, None, None, dest="disk", max_new=1
+    )
+    assert [(row.key, row.status) for row in first.rows] == [
+        ("SCAN0001", "failed"),
+        ("NEWER001", "summarized"),
+    ]
+    # The failed scan and the skipped head do not use up the allowance.
+    second = summarize.summarize_items(
+        llm_cfg, items, None, None, dest="disk", max_new=1
+    )
+    assert [(row.key, row.status) for row in second.rows] == [
+        ("SCAN0001", "failed"),
+        ("NEWER001", "skipped"),
+        ("OLDER001", "summarized"),
+    ]
+    assert second.summarized == 1 and second.skipped == 1 and second.failed == 1
+    assert len(stub.calls) == 2
+    assert not summarize.summary_disk_path(llm_cfg, items[3]).exists()
+
+
+def test_summarize_items_max_seconds_finishes_the_item_in_hand(llm_cfg, monkeypatch):
+    stub = StubLLM(text="<p>s</p>")
+    monkeypatch.setattr(summarize, "get_client", lambda cfg: stub)
+    now = [0.0]
+    monkeypatch.setattr(summarize.time, "monotonic", lambda: now[0])
+
+    def slow_text(cfg, item, *a, **k):
+        now[0] += 90.0  # one paper uses up the whole allowance
+        return PDF_TEXT
+
+    monkeypatch.setattr(summarize, "pdf_text_for", slow_text)
+    items = [
+        make_item(key="NEWER001", has_pdf=True),
+        make_item(key="OLDER001", has_pdf=True),
+    ]
+    batch = summarize.summarize_items(
+        llm_cfg, items, None, None, dest="disk", max_seconds=60
+    )
+    assert [(row.key, row.status) for row in batch.rows] == [
+        ("NEWER001", "summarized")
+    ]
+    assert summarize.summary_disk_path(llm_cfg, items[0]).exists()
+    assert not summarize.summary_disk_path(llm_cfg, items[1]).exists()
+
+
 def test_summarize_apply_note_is_idempotent(llm_cfg, monkeypatch):
     _ground(monkeypatch, summarize)
     monkeypatch.setattr(summarize, "get_client", lambda cfg: StubLLM(text="<p>s</p>"))

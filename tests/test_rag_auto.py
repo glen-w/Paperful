@@ -132,7 +132,9 @@ def _ocr_cli(tmp_path, monkeypatch, *, apply: bool):
     monkeypatch.setattr(cli, "_connect", lambda cfg: object())
     monkeypatch.setattr(cli, "_load_scope", lambda backend, **scope: loaded)
 
-    def ocr_items(cfg, items, manifest, backend, *, apply, attach=False, track=None):
+    def ocr_items(
+        cfg, items, manifest, backend, *, apply, attach=False, max_seconds=None, track=None
+    ):
         batch = OcrBatch()
         status = "ocr" if apply else "would"
         batch.rows.append(OcrRow("SCAN0001", "Scan", "a.pdf", status, "no text"))

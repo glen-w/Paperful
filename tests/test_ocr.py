@@ -335,6 +335,101 @@ def test_one_failure_does_not_stop_the_batch(tmp_path, monkeypatch):
     assert bad.read_bytes() != b"%PDF-1.4 ok"
 
 
+def test_saved_web_page_is_not_sent_to_ocrmypdf(tmp_path, monkeypatch):
+    page = tmp_path / "page.pdf"
+    page.write_text("<!DOCTYPE html><html><body>Sign in to read</body></html>")
+    monkeypatch.setattr("paperful.ocr.text_from_pdf", lambda *a, **k: "")
+    monkeypatch.setattr("paperful.ocr.shutil.which", lambda name: "/usr/bin/ocrmypdf")
+
+    def no_run(cmd, **kwargs):
+        raise AssertionError("ocrmypdf should not run on a file that is not a PDF")
+
+    monkeypatch.setattr("paperful.ocr.subprocess.run", no_run)
+    batch = ocr_items(
+        _cfg(tmp_path),
+        [_item(page)],
+        Manifest(tmp_path / "state" / "manifest.jsonl"),
+        None,
+        apply=True,
+    )
+    assert [(row.status, row.reason) for row in batch.rows] == [
+        ("failed", "not a PDF file")
+    ]
+    assert batch.failed == 1 and batch.ocr == 0
+
+
+def test_file_ocrmypdf_already_wrote_is_not_done_again(tmp_path, monkeypatch):
+    from pypdf import PdfWriter
+
+    # OCR has run, and the first pages are still blank (a cover, a plate).
+    done = tmp_path / "book.pdf"
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=72)
+    writer.add_metadata({"/Creator": "OCRmyPDF 17.12.1 / Tesseract OCR 5.5.1"})
+    writer.write(done)
+    before = done.read_bytes()
+    monkeypatch.setattr("paperful.ocr.text_from_pdf", lambda *a, **k: "")
+    monkeypatch.setattr("paperful.ocr.shutil.which", lambda name: "/usr/bin/ocrmypdf")
+
+    def no_run(cmd, **kwargs):
+        raise AssertionError("ocrmypdf should not run twice on the same file")
+
+    monkeypatch.setattr("paperful.ocr.subprocess.run", no_run)
+    batch = ocr_items(
+        _cfg(tmp_path),
+        [_item(done)],
+        Manifest(tmp_path / "state" / "manifest.jsonl"),
+        None,
+        apply=True,
+    )
+    assert [row.status for row in batch.rows] == ["skip"]
+    assert "already OCR'd" in batch.rows[0].reason
+    assert batch.skipped == 1 and batch.ocr == 0
+    assert done.read_bytes() == before
+
+
+def test_max_seconds_stops_before_the_next_file(tmp_path, monkeypatch):
+    first = _blank_pdf(tmp_path / "first.pdf")
+    second = _blank_pdf(tmp_path / "second.pdf")
+    layered = b"%PDF-1.4 layered"
+    monkeypatch.setattr(
+        "paperful.ocr.text_from_pdf",
+        lambda path, **k: "text " * 40 if path.read_bytes() == layered else "",
+    )
+    monkeypatch.setattr("paperful.ocr.shutil.which", lambda name: "/usr/bin/ocrmypdf")
+    now = [0.0]
+    monkeypatch.setattr("paperful.ocr.time.monotonic", lambda: now[0])
+
+    def fake_run(cmd, **kwargs):
+        now[0] += 90.0  # one file uses up the whole allowance
+        Path(cmd[-1]).write_bytes(layered)
+
+        class Proc:
+            returncode = 0
+            stderr = b""
+            stdout = b""
+
+        return Proc()
+
+    monkeypatch.setattr("paperful.ocr.subprocess.run", fake_run)
+    cfg = _cfg(tmp_path)
+    items = [_item(first, key="FIRSTKEY"), _item(second, key="SECONDKY")]
+    manifest = Manifest(tmp_path / "state" / "manifest.jsonl")
+
+    batch = ocr_items(cfg, items, manifest, None, apply=True, max_seconds=60)
+    assert [(row.key, row.status) for row in batch.rows] == [("FIRSTKEY", "ocr")]
+    assert second.read_bytes() != layered
+
+    # The next run passes over the finished file and reaches the second.
+    now[0] = 0.0
+    batch = ocr_items(cfg, items, manifest, None, apply=True, max_seconds=60)
+    assert [(row.key, row.status) for row in batch.rows] == [
+        ("FIRSTKEY", "skip"),
+        ("SECONDKY", "ocr"),
+    ]
+    assert second.read_bytes() == layered
+
+
 def test_timeout_is_recorded_per_item(tmp_path, monkeypatch):
     import subprocess
 
@@ -423,3 +518,14 @@ def test_attach_without_apply_exits():
     res = CliRunner().invoke(app, ["ocr", "--item", "FAO2019A", "--attach"])
     assert res.exit_code == 1
     assert "needs --apply" in res.stdout
+
+
+def test_max_minutes_must_be_positive():
+    from typer.testing import CliRunner
+
+    from paperful.cli import app
+
+    res = CliRunner().invoke(
+        app, ["ocr", "--item", "FAO2019A", "--max-minutes", "0"]
+    )
+    assert res.exit_code == 2

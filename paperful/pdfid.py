@@ -141,10 +141,11 @@ def _pypdf_text(path: Path, max_pages: int | None) -> str:
         return ""
     try:
         reader = PdfReader(str(path))
+        # A damaged page tree raises here, on the first look at the pages.
+        pages = list(reader.pages) if max_pages is None else reader.pages[:max_pages]
     except Exception:
         return ""
     chunks: list[str] = []
-    pages = reader.pages if max_pages is None else reader.pages[:max_pages]
     for page in pages:
         try:
             chunks.append(page.extract_text() or "")

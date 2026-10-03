@@ -245,8 +245,7 @@ def test_europepmc_progress_uses_papers():
 def test_openalex_allowance_notice_is_yellow():
     assert (
         colour_for(
-            "OpenAlex's free no-key allowance for this network address is used up. "
-            "Continuing with your API key."
+            "Free OpenAlex allowance exhausted; switching to your API key."
         )
         == "yellow"
     )

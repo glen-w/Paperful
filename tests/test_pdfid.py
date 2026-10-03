@@ -55,6 +55,27 @@ def test_pdftotext_preferred(tmp_path, monkeypatch):
     assert "10.5555/from-text" in text_from_pdf(path)
 
 
+def test_damaged_page_tree_reads_as_no_text(tmp_path, monkeypatch):
+    import pypdf
+    from pypdf.errors import PdfReadError
+
+    class Damaged:
+        def __init__(self, path):
+            pass
+
+        @property
+        def pages(self):
+            raise PdfReadError("Invalid object in /Pages")
+
+    monkeypatch.setattr(pdfid, "_PDFTOTEXT", None)
+    monkeypatch.setattr(pdfid.shutil, "which", lambda name: None)
+    monkeypatch.setattr(pypdf, "PdfReader", Damaged)
+    path = _blank_pages(tmp_path / "damaged.pdf", 1)
+    # One bad file must not end a run over a whole library.
+    assert text_from_pdf(path) == ""
+    assert text_from_pdf(path, max_pages=None) == ""
+
+
 def test_missing_file():
     assert doi_from_pdf(Path("/no/such.pdf")) is None
 

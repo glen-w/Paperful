@@ -210,6 +210,7 @@ uv run paperful summarize --item ABCD1234                 # disk HTML + tagged c
 uv run paperful summarize -C BBNJ --to disk               # HTML only; Zotero tree stays clean
 uv run paperful summarize -C BBNJ --year-from 2023 -T journalArticle --limit 5
 uv run paperful summarize -C BBNJ --order newest          # recent publications first
+uv run paperful summarize --library --order newest --max-new 300   # the next 300, run after run
 uv run paperful summarize --item ABCD1234 --prompt prompts/one-liner.md
 ```
 
@@ -236,6 +237,17 @@ uv run paperful summarize --item ABCD1234 --prompt prompts/one-liner.md
   sets queue order **before** `--limit`. Use `newest` when the model is slow
   and recent papers matter first. Undated items stay at the end under
   `newest` / `oldest`. Item type stays a filter (`-T`), not an order key.
+- `--max-new N` stops after N summaries written by the model in this run.
+  `--limit` cuts the queue before the skip check, so repeating `--limit 300`
+  over a library revisits the same 300 items. `--max-new` walks past items
+  that are already summarized, and past failures, without counting them, so
+  each run carries on where the last one stopped. The run report records
+  `summary.not_reached`: items further down the queue that this run did not
+  get to.
+- `--max-minutes N` stops before the next item once N minutes have passed.
+  The item in hand finishes and the run report is written, so a nightly run
+  can end on time without being killed. It combines with `--max-new`:
+  whichever is reached first ends the run.
 - Ollama receives `num_ctx` sized from the prompt (about 3 characters per
   token, plus reply headroom, rounded up, capped by `[llm].max_num_ctx`).
   The model tag has to actually support that window. If Ollama logs a

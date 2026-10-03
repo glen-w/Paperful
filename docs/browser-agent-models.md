@@ -99,6 +99,15 @@ With `provider = "litellm"`, page text may leave the machine (orange disclaimer)
 Use for recovery only with `allow_remote` understood. Reject `ollama/…` ids on the
 LiteLLM path — use `provider = "ollama"` instead. See [llm.md](llm.md).
 
+### Jev (post-v1)
+
+[Jev](https://openrouter.ai/docs/guides/community/jev) (typesafe/jev-1.13, available on
+OpenRouter) is optimized for browser automation and notably **faster** than local Ollama
+models for PDF recovery tasks. Trade-off: cloud model (costs per API call, page content
+leaves the machine) vs local inference (free, slower per step). Worth spiking post-v1 when
+browser recovery is stable and operators want to batch-recover large citation gaps on mesopelagic-scale
+collections.
+
 ## References
 
 - browser-use: [supported models](https://docs.browser-use.com/open-source/supported-models), [tools](https://docs.browser-use.com/open-source/customize/tools/available.md), [agent params](https://docs.browser-use.com/open-source/customize/agent/all-parameters.md)
