@@ -20,6 +20,9 @@ jobs:
       - name: Build local image
         run: docker compose build
       - name: Smoke help and doctor without Zotero
+        # Compose-first claim: this job is the proof, not pytest-only.
+        # No live Zotero on the runner → doctor exit 2 (Zotero row amber/red).
+        # Must not fail the workflow solely because the API is missing.
         run: |
           data="$(mktemp -d)"
           # Image runs as uid 1000; mktemp is 0700 for the runner uid — open the mount.

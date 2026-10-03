@@ -6,6 +6,14 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+Docs: Wave D honesty. Compose-first stranger path names CI job `docker`
+(doctor without Zotero = exit 2). README leads with trust-the-disk
+(`gaps` → `attachments` → `run`/`out/` before summarize/Ask). CLI-first today;
+operator console parked post-1.0. Paperful **attach** vs TranscriptX **admit**
+in [docs/TERMS.md](docs/TERMS.md). `--link` documented as advanced surgery only.
+LLM labelling (LiteLLM experimental banners / paid-provider CI) was skipped
+this wave.
+
 New: ask your library. `paperful rag ingest` builds a search index from the
 PDFs and abstracts in the mirror, and `paperful ask "question"` answers from it,
 streaming the answer and listing the papers and pages it cited. `ask` with no

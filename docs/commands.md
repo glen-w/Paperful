@@ -24,7 +24,7 @@ uv run paperful run --library
 
 # attach previously downloaded PDFs
 uv run paperful attach
-uv run paperful attach --allow-short-pdf          # admit denser one-pagers held by the density gate
+uv run paperful attach --allow-short-pdf          # attach denser one-pagers held by the density gate
 uv run paperful attach --allow-pdf-doi-mismatch   # attach files left by --strict-pdf-doi
 uv run paperful attach --item ITEMKEY --file ~/Downloads/paper.pdf
 

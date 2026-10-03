@@ -94,7 +94,7 @@ A successful Zotero attach writes a provenance note on the PDF child
 `paperful pirate:scihub`, and so on). The manifest `source` field remains the
 record. A readable line ("Free copy from Unpaywall.") is also written on the
 parent, as a child note unless `[remarks].surface` is `tag` or `off`. See
-[Research operators](research-ops.md). Files held for admit (`short_pdf`,
+[Research operators](research-ops.md). Files held for **attach** (`short_pdf`,
 `--strict-pdf-doi`) stay on disk under `out/` until
 `paperful attach --allow-short-pdf` or `--allow-pdf-doi-mismatch`.
 

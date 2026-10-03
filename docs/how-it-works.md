@@ -5,6 +5,16 @@ the file to disk. It does not merge duplicates and it does not rewrite
 titles or dates. Those jobs sit around a fill — see [Around a fill](#around-a-fill).
 The landing page is the short version of this story.
 
+**Trust the disk** before notes or Ask: `gaps` → `attachments` (honesty) →
+`run` (bytes on disk under `out/`) → you read `out/` → then `summarize` /
+`ask`. `attach` is the write gate into Zotero. Do not call that step
+**admit**.
+
+| Claim | Quote |
+| --- | --- |
+| Dry-run shows the hit | `run --dry-run` **Would-hit** column (sources in order). No download. |
+| Gaps without fetch | `gaps` counts missing PDFs without filling them. |
+
 ## A fill, in order
 
 1. **Pick the slice.** A collection, or the whole library. Year and item-type
@@ -24,11 +34,13 @@ The landing page is the short version of this story.
    the record already knows — a DOI, an arXiv id, a publisher URL. If a site
    says slow down, Paperful waits. If a site keeps blocking, that source is
    paused. See [Slowing down](#slowing-down).
-6. **Save on this machine first.** The PDF lands under `out/` with a readable
-   source line on the parent (“Free copy from Unpaywall.”). On Zotero 10+ it
-   can attach; older Zotero still gets the file on disk. A sparse one-page
-   download (ethics stub, consent form) is dropped so another source can try;
-   a denser one-pager waits for `paperful attach --allow-short-pdf`. Details:
+6. **Save on this machine first.** The PDF lands under `out/` with a
+   **provenance stamp** on the file (`paperful oa:unpaywall`, `campus:ezproxy`,
+   `grey:undocs`) and a readable source line on the parent (“Free copy from
+   Unpaywall.”). On Zotero 10+ it can **attach**; older Zotero still gets the
+   file on disk. A sparse one-page download (ethics stub, consent form) is
+   dropped so another source can try; a denser one-pager waits for
+   `paperful attach --allow-short-pdf`. Details:
    [research-ops](research-ops.md#wrong-work-pdfs). Not every paywalled
    or DOI-less item comes back.
 
@@ -51,6 +63,9 @@ list. Details: [Source routing](sources.md).
 ## Around a fill
 
 Hygiene is a separate loop. Nothing is merged or rewritten until you say so.
+
+**Before a fetch**, `gaps` counts missing PDFs. `run --dry-run` prints a
+**Would-hit** column (sources in order) and does not write the library.
 
 **Before a messy ingest**, `dedupe` writes a review pack on disk. With
 `--apply` it copies the extra parent’s PDF, notes, and better fields onto

@@ -14,6 +14,16 @@ complete environment. Contributors use [`uv`](https://docs.astral.sh/uv/)
 Durable data — config, custom playbook packs, `out/`, and `state/` — still
 lives **outside** the container (and, by default, outside the git root).
 
+**Mounts (stranger path):** host `PAPERFUL_DATA` → container `/data`. `out/`
+and `state/` are folders **inside** that tree (`/data/out`, `/data/state`),
+not extra volumes. Compose does not mount Zotero Storage writable. See
+[Terms](TERMS.md).
+
+**What CI proves:** job `docker` in `.github/workflows/ci.yml` builds the
+image and runs `doctor --no-guide` with **no live Zotero**. Exit **2** is
+required (Zotero row amber/red). That is a first-run stranger machine, not a
+failed Compose install. Pytest job `test` is not the Compose-first proof.
+
 ## What still runs on the host
 
 - Zotero (GUI, local API, “Always allow”)
@@ -55,6 +65,8 @@ cp .env.example .env
 # edit .env: PAPERFUL_DATA=.
 docker compose build
 docker compose run --rm paperful doctor
+# Without host Zotero this exits 2 (amber/red). That is expected; CI job docker
+# asserts the same. Start Zotero, then re-run doctor.
 docker compose run --rm paperful run --collection interesting --dry-run
 ```
 
