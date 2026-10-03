@@ -3,7 +3,7 @@
 A plain-language map of where Paperful sits next to Zotero plugins, bibliography
 fixers, Mendeley export cleaners, and DOI-centric download scripts.
 
-**Last reviewed:** 2026-09-24. Feature lists for other products are based on public
+**Last reviewed:** 2026-10-03. Feature lists for other products are based on public
 docs and positioning — not paid pilots or exhaustive release testing.
 
 Vendor-by-vendor notes live in the [comparison reference](comparison-reference.md).
@@ -30,8 +30,10 @@ Prefer this page for “is this the right tool?”
 | “Just use what ships in Zotero” | Built-in **Find Available PDF** plus [custom PDF resolvers](https://www.zotero.org/support/kb/custom_pdf_resolvers) |
 
 Paperful does **not** replace a full metadata editor, an in-app attachment
-reorganiser, or a `.bib` linter. `attachments` reports layout problems and,
-with a flag plus `--apply`, repairs them from `out/`. Incoming downloads,
+reorganiser, or a `.bib` linter. It does **not** promise phone sync, mobile
+apps, or WebDAV — those stay with the citation manager. `attachments`
+reports layout problems and, with a flag plus `--apply`, repairs them from
+`out/`. `--link` is that surgery, not a Storage client. Incoming downloads,
 author folders, and tablet send/get stay with Attanger and ZotMoov. The jobs
 are library, find, completeness, mirror, and control. Fetch and lint run on
 disk; the manager is a write-back adapter (`manager = "zotero"` is well

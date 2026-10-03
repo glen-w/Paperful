@@ -9,6 +9,10 @@ cleans the records, finds missing PDFs, and summarises papers, then keeps a
 platform-agnostic mirror you can back up and move. The work stays on this
 machine.
 
+**Ladder:** `gaps` / `attachments` honesty → `run` fills `out/` → you read
+the mirror → then summarize or Ask. **attach** writes the PDF into Zotero.
+Do not say **admit**. [Terms](TERMS.md).
+
 Zotero is the catalogue that is well tested. Mendeley and EndNote adapters
 are in the tree and seeking testers. The mirror does not depend on which of
 those you open tomorrow.
@@ -20,7 +24,7 @@ types. `collections` shows what you have. `snowball` proposes new works from
 a keyword, one or more DOIs, one or more ORCIDs, or a seed collection, and
 creates items only when the gate says so. [How a hop is cut](snowball.md#how-a-hop-is-cut)
 shows depth, direction, and the two caps. `import` and `export` speak RIS,
-BibTeX, and EndNote XML.
+BibTeX, and EndNote XML. The write gate for a PDF is **attach**, not admit.
 The live catalogue is an adapter. Zotero’s local API is the one to use.
 Mendeley (REST) and EndNote (read the `.enl`; writes are an import bundle)
 are seeking testers.

@@ -17,10 +17,29 @@
 </p>
 
 <p align="center">
-  Local Compose sidecar, not a document-infra service.
-  Not a sync service. Not every paywalled or DOI-less item comes back.
+  Local Compose CLI sidecar. Not a document-infra service, not a sync,
+  mobile, or WebDAV client, not Zotero-in-the-browser.
+  Not every paywalled or DOI-less item comes back.
   Zotero is the well-tested adapter. Mendeley and EndNote are seeking testers.
 </p>
+
+**Trust the disk** (do this order before summarize or Ask):
+
+1. `gaps` — what is missing
+2. `attachments` — ghosts, broken links, duplicate files (report only unless a surgery flag **and** `--apply`)
+3. `run` — fill PDFs onto disk under `out/`
+4. Open `out/` yourself
+5. Then optional `summarize` / `ask`
+
+`--link` is advanced attachment surgery, not the stranger path. Words:
+[Terms](docs/TERMS.md) (`attach` ≠ TranscriptX `admit`; library = manager;
+mirror = `out/`).
+
+| Claim | Quote / proof |
+| --- | --- |
+| Stranger install is **Compose-first** | GitHub Actions job `docker` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml): `docker compose build`, then `doctor --no-guide` with **no live Zotero**. Exit **2** is expected (Zotero row amber/red). Pytest-only is not Compose-first. `uv` is secondary (host session login and contributors). |
+| Dry-run shows the hit before the network | `run --dry-run` **Would-hit** column; `gaps` counts missing without fetching. |
+| PDFs keep a source stamp | Provenance on the file (`paperful oa:unpaywall`, `campus:ezproxy`, `grey:undocs`) plus a readable parent line. |
 
 Five jobs: **library**, **find**, **completeness**, **mirror**, **control**.
 The live catalogue is an adapter. Zotero’s local API is the one that is well
@@ -61,8 +80,8 @@ library has the subscription. Paperful does not fetch every paywalled or
 DOI-less item. The PDF keeps a provenance stamp (`paperful oa:unpaywall`,
 `campus:ezproxy`, `grey:undocs`). The parent item also gets a readable line
 ("Free copy from Unpaywall."), as a note unless `[remarks].surface` is `tag`
-or `off`. One-page stubs and DOI mismatches can hold attach until you admit
-them (`attach --allow-short-pdf` / `--allow-pdf-doi-mismatch`) — see
+or `off`. One-page stubs and DOI mismatches can hold the file on disk until you
+**attach** them (`attach --allow-short-pdf` / `--allow-pdf-doi-mismatch`) — see
 [research-ops](docs/research-ops.md#wrong-work-pdfs). Walkthrough:
 [How it works](docs/how-it-works.md).
 
@@ -96,17 +115,21 @@ Live: [paperful.app](https://paperful.app/).
 
 ## Is this the right tool?
 
-Yes, if you use Zotero, want an on-disk mirror, and will run a CLI in Docker.
+Yes, if you use Zotero, want an on-disk mirror, and will run a **CLI in Docker**.
 Maybe, if Zotero’s own “find available PDF” already covers you.
-No, if you want a GUI, OCR, a sync service, or every paywalled PDF.
-Mendeley and EndNote are not proven. [Why](docs/why.md) · [Comparison](docs/comparison.md).
+**Today is CLI-first.** An operator console (commands / settings / RAG UI) is
+**post-1.0**. Paperful is not Zotero-in-the-browser, not a sync/mobile/WebDAV
+client, and not every paywalled PDF. `paperful ocr` exists for scans on disk;
+it is not a GUI product. Mendeley and EndNote are not proven.
+[Why](docs/why.md) · [Comparison](docs/comparison.md) · parked [GUI sketch](docs/gui.md).
 
 ## Quick start
 
-Tagged **v0.9** means clone and build. There is no GitHub Release binary, no
-published image, and no PyPI package: do not `docker pull` or
+Tagged **v0.9** means clone and **Compose build**. There is no GitHub Release
+binary, no published image, and no PyPI package: do not `docker pull` or
 `pip install paperful`. Zotero and headed `session login` stay on the host.
-Work lands on disk (`out/`, `state/`).
+Work lands on disk (`out/`, `state/`) inside `PAPERFUL_DATA` (Compose mounts
+that host path at `/data`).
 
 **You need**
 
@@ -140,7 +163,10 @@ docker compose run --rm paperful run --collection interesting --preset oa --dry-
 docker compose run --rm paperful run --collection interesting --preset eoi --dry-run
 ```
 
-Layout and the host/container split: [Docker](docs/docker.md).
+Layout and the host/container split: [Docker](docs/docker.md)
+(`PAPERFUL_DATA` → `/data`; `out/` and `state/` live **inside** that mount).
+First-run `doctor` without Zotero is **exit 2** (amber/red Zotero row) — same
+as CI job `docker`.
 
 Optional (seeking testers): Mendeley via REST — register an app, then
 `paperful session login mendeley` on the host. [Mendeley](docs/mendeley.md).

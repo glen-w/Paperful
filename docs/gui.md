@@ -2,9 +2,10 @@
 
 **Status: parked.** This is a sketch of a **GUI-enabled 2.0**, not a 0.x or
 1.0 deliverable. Today Paperful is a **local CLI** with a quiet disk mirror.
-Surfaces like a Zotero plugin are still not the product direction for 1.0.
-See [ROADMAP](ROADMAP.md) (trust checklist, “Not a GUI”) and
-[quiet mirror](quiet-mirror.md).
+An operator console (commands / settings / RAG), SPA, or Capability API is
+**not** Wave D and **not** 1.0. Surfaces like a Zotero plugin are still not
+the product direction for 1.0. See [ROADMAP](ROADMAP.md) (trust checklist,
+“Not a GUI”) and [quiet mirror](quiet-mirror.md).
 
 The sketch is intentionally ambitious: a **web-native workbench** over the
 same five jobs, the same ledger (`out/`, `state/`), and the same library

@@ -229,7 +229,7 @@ run misbehaves or you host infrastructure yourself.
 | `crossref_min_score` | `0.90` | Title-similarity threshold for accepting a title→DOI match (Crossref, then OpenAlex, then Semantic Scholar) |
 | `concurrency_oa` | `4` | Parallel workers for open-access sources (Scholar, EZProxy, htmlpdf, and Sci-Hub are serial) |
 | `min_pdf_bytes` | `10000` | Smaller downloads are rejected as error pages |
-| `gate_short_pdfs` | `true` | One-page density gate: soft-reject sparse stubs; hold denser one-pagers for admit |
+| `gate_short_pdfs` | `true` | One-page density gate: soft-reject sparse stubs; hold denser one-pagers for attach |
 | `short_pdf_min_words` | `200` | Below this word count, a one-page PDF is treated as sparse (not a paper) |
 | `source_routing` | `true` | Skip sources that look inapplicable from item metadata; use `--try-all` (or `false` here) when Zotero fields are untrustworthy |
 | `circuit_breaker_threshold` | `3` | Captcha or block-page failures before a source pauses. A 429 does not count. After the pause, one item is tried again |
