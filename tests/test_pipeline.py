@@ -87,6 +87,10 @@ def pipe_factory(cfg, monkeypatch):
     def _make(registry: dict, sources: list[str], handler=None, attacher=None):
         monkeypatch.setattr(pl, "REGISTRY", registry)
         monkeypatch.setattr(pl, "prepare_identifiers", lambda *a, **k: [])
+        # Preflight drops ezproxy when the campus prefix is unset. Tests that
+        # pass the stub still need a prefix so the source stays in the run.
+        if "ezproxy" in sources and not cfg.ezproxy_base:
+            cfg.ezproxy_base = "https://ezproxy.test/login?url="
         manifest = Manifest(cfg.manifest_path)
         pipe = pl.Pipeline(
             cfg,
