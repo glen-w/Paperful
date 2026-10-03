@@ -6,6 +6,8 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+Pipeline tests that stub EZProxy now set a campus prefix, so the preflight that drops an unconfigured `ezproxy` source no longer skips those runs.
+
 Docs: Wave D honesty. Compose-first stranger path names CI job `docker`
 (doctor without Zotero = exit 2). README leads with trust-the-disk
 (`gaps` → `attachments` → `run`/`out/` before summarize/Ask). CLI-first today;
