@@ -1719,6 +1719,60 @@ def test_summarize_default_writes_note_and_disk_only_skips_it(
     assert res.exit_code == 1 and "--apply" in res.stdout
 
 
+def test_summarize_max_new_reports_what_was_not_reached(
+    tmp_path, stub_zotero, monkeypatch
+):
+    from tests.conftest import make_item
+
+    cfg_file = _llm_cfg_file(tmp_path)
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model
+    )
+
+    class B:
+        def get_item(self, k):
+            return make_item(key=k, has_pdf=True)
+
+    monkeypatch.setattr(cli, "get_backend", lambda cfg, zl: B())
+    monkeypatch.setattr(
+        "paperful.summarize.pdf_text_for", lambda *a, **k: "Marine governance text."
+    )
+
+    class Stub:
+        provider = "stub"
+
+        def complete(self, req):
+            return "<h2>Objective</h2><p>ok</p>"
+
+    monkeypatch.setattr("paperful.summarize.get_client", lambda cfg: Stub())
+    args = ["summarize", "-c", str(cfg_file), "--to", "disk", "--max-new", "1"]
+    for key in ("I1", "I2", "I3"):
+        args += ["--item", key]
+    summaries = tmp_path / "state" / "summaries"
+
+    res = runner.invoke(cli.app, args)
+    assert res.exit_code == 0, res.stdout
+    assert sorted(p.name for p in summaries.iterdir()) == ["I1.html"]
+    assert "Stopped at --max-new 1" in res.stdout
+
+    res = runner.invoke(cli.app, args)
+    assert res.exit_code == 0, res.stdout
+    assert sorted(p.name for p in summaries.iterdir()) == ["I1.html", "I2.html"]
+    reports = sorted((tmp_path / "state" / "runs").glob("*-summarize.json"))
+    latest = max(
+        (json.loads(p.read_text()) for p in reports),
+        key=lambda r: r["summary"]["skipped"],
+    )
+    assert latest["flags"]["max_new"] == 1
+    assert latest["summary"]["summarized"] == 1
+    assert latest["summary"]["skipped"] == 1
+    assert latest["summary"]["not_reached"] == 1
+    assert [row["status"] for row in latest["items"]] == ["skipped", "summarized"]
+
+    res = runner.invoke(cli.app, [*args[:-2], "--max-new", "0"])
+    assert res.exit_code == 2
+
+
 def test_synthesize_report_collection_conflicts_with_disk(
     tmp_path, stub_zotero, monkeypatch
 ):

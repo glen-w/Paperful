@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -416,6 +417,8 @@ def summarize_items(
     *,
     dest: str,
     force: bool = False,
+    max_new: int | None = None,
+    max_seconds: float | None = None,
     on_row: Callable[[SummaryRow], None] | None = None,
     track: Track | None = None,
 ) -> SummaryBatch:
@@ -425,12 +428,25 @@ def summarize_items(
     current model (and prompt, when local) are skipped (resume-safe). A model
     timeout or other item error fails that row and the batch continues. A
     library write error stops the batch after that row.
+
+    ``max_new`` stops the batch once that many summaries have come from the
+    model. Skipped, reused and failed rows do not count, so repeated runs over
+    the same ordered queue move on instead of revisiting its head.
+
+    ``max_seconds`` stops the batch before the next item once that long has
+    passed. The item in hand finishes.
     """
     rows: list[SummaryRow] = []
     ok = 0
     failed = 0
     skipped = 0
+    new = 0
+    stop_at = None if max_seconds is None else time.monotonic() + max_seconds
     for it in track(items) if track else items:
+        if max_new is not None and new >= max_new:
+            break
+        if stop_at is not None and time.monotonic() >= stop_at:
+            break
         try:
             if not force:
                 reused = _reuse_existing_summary(cfg, it, backend, dest=dest)
@@ -453,6 +469,7 @@ def summarize_items(
                     raise LibraryError("No library backend for a Zotero note.")
                 note_key = apply_summary_note(cfg, backend, it, html)
             ok += 1
+            new += 1
             row = SummaryRow(
                 key=it.key,
                 title=it.title,

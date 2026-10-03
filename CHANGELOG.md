@@ -74,6 +74,27 @@ the bar goes to stderr and only on a terminal, so stdout stays JSON. Ctrl-C
 during `lint` keeps the findings so far: it prints them, writes the run report
 with `flags.interrupted`, and exits 130.
 
+`summarize --max-new N` stops after N summaries written by the model. Items
+skipped as already summarized, and items that fail, do not count, so a repeated
+`summarize --library --order newest --max-new 300` works down the library in
+batches. `--limit` still cuts the queue before the skip check. The run report
+adds `flags.max_new` and `summary.not_reached`.
+
+`ocr --max-minutes N` and `summarize --max-minutes N` stop before the next
+item once N minutes have passed; the item in hand finishes and the run report
+is written. Files that already have a text layer are skipped quickly, so a
+repeated `ocr --library --apply --max-minutes 45` gets further each time. The
+run report adds `flags.max_minutes` and `summary.not_reached`.
+
+`ocr` no longer repeats itself. A file OCRmyPDF has already written is skipped
+even when its first pages still have no text (a book that opens on a plate),
+and a file that is not a PDF at all, usually a saved web page, is reported as
+`not a PDF file` without running OCRmyPDF.
+
+Fixed: a PDF with a damaged page tree (`PdfReadError: Invalid object in
+/Pages`) ended `ocr`, and any other command reading that file's text, with a
+traceback. It now reads as a PDF with no text.
+
 `snowball resume` after an OpenAlex budget stop during a keyword search now
 keeps the original `max_candidates` (including `all`) instead of capping the
 search at `per_hop_limit`.

@@ -557,13 +557,13 @@ class OpenAlexClient:
 
 def keyless_limit_message(*, has_key: bool, reset_at: str | None = None) -> str:
     """Shown when the no-key allowance for this public address is spent."""
+    if has_key:
+        return "Free OpenAlex allowance exhausted; switching to your API key."
     text = (
         "OpenAlex's free no-key allowance for this network address is used up. "
         "It is shared by everyone on the same public IP, so exhaustion is common on a VPN. "
         f"The reliable fix is a free API key: {KEY_URL}"
     )
-    if has_key:
-        return text + " Continuing with your API key."
     wait = f" Or wait until {reset_at}." if reset_at else ""
     return (
         text

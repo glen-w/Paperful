@@ -4492,6 +4492,15 @@ def ocr(
         "--attach",
         help="After --apply, upload the text-layer PDF as a new attachment. The scan stays.",
     ),
+    max_minutes: int | None = typer.Option(
+        None,
+        "--max-minutes",
+        min=1,
+        help=(
+            "Stop before the next file once N minutes have passed. The file in "
+            "hand finishes. Run again to continue."
+        ),
+    ),
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
@@ -4566,6 +4575,7 @@ def ocr(
                 backend,
                 apply=apply,
                 attach=attach,
+                max_seconds=None if max_minutes is None else max_minutes * 60,
                 track=_track(progress, "Running OCR" if apply else "Checking PDFs"),
             )
     except OcrUnavailable as exc:
@@ -4593,18 +4603,24 @@ def ocr(
         }
         for row in batch.rows
     ]
+    summary = {
+        "ocr": batch.ocr,
+        "skipped": batch.skipped,
+        "failed": batch.failed,
+        "would": batch.would,
+    }
+    flags = {"apply": apply, "attach": attach}
+    not_reached = len(items) - len(batch.rows)
+    if max_minutes is not None:
+        summary["not_reached"] = not_reached
+        flags["max_minutes"] = max_minutes
     write_command_report(
         cfg,
         command="ocr",
         scope=scope,
-        summary={
-            "ocr": batch.ocr,
-            "skipped": batch.skipped,
-            "failed": batch.failed,
-            "would": batch.would,
-        },
+        summary=summary,
         items=outcomes,
-        flags={"apply": apply, "attach": attach},
+        flags=flags,
         started=started,
     )
     if apply:
@@ -4615,6 +4631,11 @@ def ocr(
         console.print(
             f"Would OCR {batch.would}, skip {batch.skipped} "
             f"(already have text). Pass --apply to write the text layer."
+        )
+    if max_minutes is not None and not_reached:
+        console.print(
+            f"Stopped at --max-minutes {max_minutes}. {not_reached} item(s) further "
+            f"down the list were not checked; run again to continue."
         )
     _flush(backend)
     if apply:
@@ -5191,6 +5212,24 @@ def summarize(
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n"),
+    max_new: int | None = typer.Option(
+        None,
+        "--max-new",
+        min=1,
+        help=(
+            "Stop after N new summaries from the model. Unlike --limit, items "
+            "skipped as already summarized, or failed, do not count."
+        ),
+    ),
+    max_minutes: int | None = typer.Option(
+        None,
+        "--max-minutes",
+        min=1,
+        help=(
+            "Stop before the next item once N minutes have passed. The item in "
+            "hand finishes. Run again to continue."
+        ),
+    ),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
@@ -5264,19 +5303,27 @@ def summarize(
     def _finish(
         outcomes: list[dict], summarized: int, failed: int, skipped: int
     ) -> None:
+        summary = {
+            "summarized": summarized,
+            "failed": failed,
+            "skipped": skipped,
+            "dest": dest,
+            "order": queue_order,
+        }
+        flags = {"to": dest, "order": queue_order}
+        if max_new is not None or max_minutes is not None:
+            summary["not_reached"] = len(items) - len(outcomes)
+        if max_new is not None:
+            flags["max_new"] = max_new
+        if max_minutes is not None:
+            flags["max_minutes"] = max_minutes
         write_command_report(
             cfg,
             command="summarize",
             scope=scope,
-            summary={
-                "summarized": summarized,
-                "failed": failed,
-                "skipped": skipped,
-                "dest": dest,
-                "order": queue_order,
-            },
+            summary=summary,
             items=outcomes,
-            flags={"to": dest, "order": queue_order},
+            flags=flags,
             started=started,
         )
 
@@ -5305,6 +5352,8 @@ def summarize(
             backend,
             dest=dest,
             force=force,
+            max_new=max_new,
+            max_seconds=None if max_minutes is None else max_minutes * 60,
             on_row=_show,
             track=_track(progress, "Summarizing"),
         )
@@ -5323,6 +5372,18 @@ def summarize(
         raise typer.Exit(1)
     where = cfg.summaries_dir if wants_disk(dest) else "Zotero"
     console.print(f"Summarized {batch.summarized}/{len(items)} items under {where}")
+    not_reached = len(items) - len(batch.rows)
+    if not_reached and (max_new is not None or max_minutes is not None):
+        # A reused summary carries a reason; one from the model does not.
+        new = sum(1 for r in batch.rows if r.status == "summarized" and not r.reason)
+        if max_new is not None and new >= max_new:
+            limit_hit = f"--max-new {max_new}"
+        else:
+            limit_hit = f"--max-minutes {max_minutes}"
+        console.print(
+            f"Stopped at {limit_hit}. {not_reached} item(s) further down "
+            "the queue were not reached; run again to continue."
+        )
     if batch.skipped:
         console.print(
             f"Skipped {batch.skipped} already summarized for this model "

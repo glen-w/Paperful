@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -71,6 +72,28 @@ def needs_text_layer(text: str) -> str | None:
     if alnum < _MIN_ALNUM:
         return "thin text"
     return None
+
+
+def _not_a_pdf(path: Path) -> bool:
+    """True when the file does not start like a PDF (usually a saved web page)."""
+    try:
+        with path.open("rb") as fh:
+            return b"%PDF-" not in fh.read(1024)
+    except OSError:
+        return False
+
+
+def _ocrmypdf_wrote(path: Path) -> bool:
+    """True when OCRmyPDF has already written this file (its Creator stamp)."""
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return False
+    try:
+        meta = PdfReader(str(path)).metadata
+    except Exception:
+        return False
+    return "ocrmypdf" in str(getattr(meta, "creator", "") or "").lower()
 
 
 def _under_cache(cfg: Config, path: Path) -> bool:
@@ -205,6 +228,7 @@ def ocr_items(
     *,
     apply: bool,
     attach: bool = False,
+    max_seconds: float | None = None,
     track: Track | None = None,
     classify: Callable[[Path], str | None] | None = None,
 ) -> OcrBatch:
@@ -212,6 +236,10 @@ def ocr_items(
 
     ``classify`` replaces the first-pages probe for callers that have already
     read the whole file. It returns the reason to OCR, or None to skip.
+
+    ``max_seconds`` stops the batch before the next file once that long has
+    passed. The file in hand finishes. Files already given a text layer are
+    skipped quickly, so a repeated run gets further down the list.
     """
     if apply and not ocrmypdf_available():
         raise OcrUnavailable(
@@ -220,7 +248,10 @@ def ocr_items(
             "or apt install ocrmypdf tesseract-ocr-eng."
         )
     batch = OcrBatch()
+    stop_at = None if max_seconds is None else time.monotonic() + max_seconds
     for item in track(items) if track else items:
+        if stop_at is not None and time.monotonic() >= stop_at:
+            break
         durable, probe = _probe_pdf(cfg, item, manifest, backend)
         sample = probe or durable
         if sample is None:
@@ -235,6 +266,18 @@ def ocr_items(
         shown = str(durable or sample)
         if why is None:
             row = OcrRow(item.key, item.title, shown, "skip", "has text")
+            batch.rows.append(row)
+            batch.skipped += 1
+            continue
+        if _not_a_pdf(sample):
+            row = OcrRow(item.key, item.title, shown, "failed", "not a PDF file")
+            batch.rows.append(row)
+            batch.failed += 1
+            continue
+        if _ocrmypdf_wrote(sample):
+            # A second pass finds nothing the first did not, and a nightly run
+            # would repeat it for ever (a book whose first pages are blank).
+            row = OcrRow(item.key, item.title, shown, "skip", "already OCR'd, no more text to find")
             batch.rows.append(row)
             batch.skipped += 1
             continue
