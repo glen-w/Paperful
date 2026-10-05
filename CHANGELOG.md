@@ -9,9 +9,11 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 ### Added
 
 - `paperful authorwatch`: ORCID/OpenAlex people lists, cursor `run` (optional
-  `--backfill-from`), `apply -C` (no `[snowball] enabled`). CSV/JSON/ORCID
-  import; social `--source` without `--file` prints the export recipe (no scrape).
-  Ledger: `state/authorwatch/<name>/`. See [authorwatch.md](docs/authorwatch.md).
+  `--backfill-from`), `apply -C` (no `[snowball] enabled`). First `run` without
+  `--backfill-from` does not open the library. `--apply` needs write API.
+  CSV/JSON/ORCID import; social `--source` without `--file` prints the export
+  recipe (no scrape). Ledger: `state/authorwatch/<name>/`. See
+  [authorwatch.md](docs/authorwatch.md).
 - `paperful ask --format json` (`paperful.agent.json.v1`; implies `--no-stream`).
   Snowball `search` / `hybrid` / `doi` / `orcid` / `collection` / `run` /
   `resume` share the envelope with `snowball apply`. `--format json` writes one

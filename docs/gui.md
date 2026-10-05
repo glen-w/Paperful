@@ -108,7 +108,8 @@ arguments; the server runs `paperful.*`.
 
 ### Grow
 
-Snowball and watch. See [snowball.md](snowball.md).
+Snowball, snowball watch, and authorwatch. See [snowball.md](snowball.md) and
+[authorwatch.md](authorwatch.md).
 
 | Action | Maps to | Ledger |
 | --- | --- | --- |
@@ -117,6 +118,7 @@ Snowball and watch. See [snowball.md](snowball.md).
 | Toggle keep / batch approve | Edit `keep` then `snowball apply` | Same queue |
 | Gates | `dry-run` · `approve-each` · `approve-batch` · `auto` | Request + config |
 | Watch inbox | `snowball watch run` / `show` | `state/snowball/watches/<name>/inbox.jsonl` |
+| People lists | `authorwatch save` / `run` / `apply` | `state/authorwatch/<name>/` |
 
 Default gate in the UI is **dry-run**. Writing gates require a target
 collection. Watch never auto-schedules: show last run and **Run now**;

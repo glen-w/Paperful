@@ -654,13 +654,13 @@ def run_list(
     ok_n, held_n, unresolved_n = _status_counts(people)
     is_baseline = not body.get("baseline_at")
     backfill = _parse_date(backfill_from) if backfill_from else ""
-    finder = _lookup(cfg, lookup, backend)
     seen = load_seen(cfg, name)
     proposed: list[Candidate] = []
     exists = 0
     polled = 0
 
     should_poll = bool(backfill) or not is_baseline
+    finder = _lookup(cfg, lookup, backend) if should_poll else None
     if should_poll:
         oa = _openalex_client(cfg, client)
         capped = ok_people[: max(0, max_authors)]

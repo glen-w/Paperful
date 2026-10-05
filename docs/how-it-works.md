@@ -90,8 +90,9 @@ a collection. Scans need a text layer first. [LLM](llm.md).
 that chain; run it before `gaps` / `run` when the collection is messy.
 [Workflows](workflows.md).
 
-To follow **people** (not a keyword crawl), `paperful authorwatch` polls OpenAlex
-for their new papers. That is not `snowball watch` and not the PDF `inbox watch`.
+To follow **people** (not a keyword crawl), `paperful authorwatch` records a
+local list and polls OpenAlex for their papers. First `run` is a cursor only.
+That is not `snowball watch` and not the PDF `inbox watch`.
 [Author watch](authorwatch.md).
 
 ## Slowing down

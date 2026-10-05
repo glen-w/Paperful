@@ -698,7 +698,7 @@ mail sources; Paperful owns library fingerprint, gates, and ledger. Spike
 shared message shapes before hard-wiring repos.
 
 (author-watch-lists-later-people-you-follow--their-papers)=
-### Author watch lists (later; people you follow → their papers)
+### Author watch lists (in tree; people you follow → their papers)
 
 **Status:** in tree — `paperful authorwatch`. Distinct from collection-scoped [`snowball watch`](snowball.md#watch)
 (keyword / DOI / ORCID **seed** profiles and hop expansion). Here the seed is a
@@ -713,11 +713,11 @@ Social HTML scrape stays later; v1 is `--orcid` plus CSV/JSON/ORCID file import.
 - **Watch run** — `paperful authorwatch run` sets a cursor baseline (no full-oeuvre fetch) then polls OpenAlex for works indexed after that cursor. `--backfill-from` proposes by **publication** date. `exists` stays out of the inbox. `authorwatch apply -C` creates parents (independent of `[snowball] enabled`). PDFs via `paperful run`. Paperful does not schedule.
 - **Import** — CSV/JSON/ORCID files. `import --source rg|linkedin|academia` without `--file` prints an export recipe. HTML scrape stays later.
 
-**Pitch (ship when the lane is real):** Get what really matters from the people
-you already follow — **their research**. Social follow graphs surface jobs,
-posts, and noise; authorwatch turns that graph into a frontier of **new papers**
-from those names, in one place — **your machine** (`state/`, optional `-C`, same
-mirror and honesty contract as snowball).
+**Pitch:** Get what really matters from the people you already follow —
+**their research**. Social follow graphs surface jobs, posts, and noise;
+authorwatch turns that graph into a frontier of **new papers** from those
+names, in one place — **your machine** (`state/`, optional `-C`, same
+mirror and honesty contract as snowball). HTML follow import stays later.
 
 **Non-goals:** replacing RSS or social timelines; auto-friending or messaging on
 RG; cloud “who to follow” recommendations; treating LinkedIn/Academia HTML scrape

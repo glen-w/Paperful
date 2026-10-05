@@ -555,3 +555,4 @@ BibTeX citekeys still make sense. Snowball does not depend on that plugin.
 - [config](config.md#run-configs-profiles) — profile precedence this lane reuses
 - [config Advanced](config.md#advanced) — fetch tuning and OpenAlex snapshot store
 - [commands](commands.md) — `run`, which `fetch_pdfs` calls
+- [authorwatch](authorwatch.md) — people lists, not a snowball hop

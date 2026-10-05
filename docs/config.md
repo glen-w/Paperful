@@ -239,7 +239,7 @@ walkthrough, model advice, Docker networking, and troubleshooting: [LLM](llm.md)
 | `[snowball].default_tags` | `()` | Extra tags on snowball `--gate auto` / `apply` creates, with `--tag` and `from-<seed-slug>` |
 | `[snowball].dedupe_after` | `off` | After create: `off`, `classify` (`state/dedupe-packs/`), or `apply` (merge high-DOI extras) |
 | `[snowball].author_site_preflight` | `false` | Co-author graph + proposed `state/author-packs/`. Promote before `author_site` fetch |
-| `[authorwatch]` comments | — | Caps also exist as `authorwatch run --max-authors` / `--per-author-limit`. No social scrape |
+| `[authorwatch]` | — | Not parsed. Caps are `authorwatch run --max-authors` / `--per-author-limit`. `doctor` ambers lists with people and no ORCID/OpenAlex id. No social scrape |
 | `[searxng].base_url` | `""` | Local SearXNG for author-site remainder discovery. Or `SEARXNG_BASE_URL`. Never a default `run` source |
 | `[ingest].dedupe_scope` | `library` | `library` or `collection` when skipping `exists` |
 | `[ocr].languages` | `eng` | Tesseract languages for `paperful ocr` (`eng+fra` or `eng fra`) |

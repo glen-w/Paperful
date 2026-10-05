@@ -27,6 +27,7 @@ Prefer this page for “is this the right tool?”
 | **Mendeley** dedup inside the app; clean **exported** BibTeX | Mendeley Duplicates smart collection; export cleaners such as [mendeley_bibtex_cleaner](https://gist.github.com/alexandrehuat/6d3263f73ccae87d0107977978316c02) |
 | **DOI-list PDF batch** without Zotero | [paperscraper](https://github.com/jannisborn/paperscraper) |
 | **Grow the library** from a keyword, one or more DOIs’ references, one or more ORCIDs, a similar-paper hop, or a hybrid hop, then optionally fill PDFs. Citation maps such as Research Rabbit link out; Paperful downloads. Re-check later with **watch** (baseline once, then propose new arrivals on disk; you schedule `watch run`) | **Paperful snowball** — dry-run, `approve-each`, `approve-batch`, `--gate auto`, `--fetch-pdfs`, and `watch` ([snowball](snowball.md)). In-app one-hop browsers stay separate ([zotero-snowball](https://github.com/socratic-irony/zotero-snowball), [Citegeist](https://github.com/phdemotions/zotero-citegeist)). General harvesters without the mirror: [findpapers](https://github.com/jonatasgrosman/findpapers), [opencite](https://github.com/neuromechanist/opencite) |
+| **People you follow** → their new papers (ORCID / OpenAlex; no hop, no social scrape) | **Paperful authorwatch** ([authorwatch](authorwatch.md)). Distinct from `snowball watch`. |
 | “Just use what ships in Zotero” | Built-in **Find Available PDF** plus [custom PDF resolvers](https://www.zotero.org/support/kb/custom_pdf_resolvers) |
 
 Paperful does **not** replace a full metadata editor, an in-app attachment
@@ -153,6 +154,9 @@ Want a new collection from a keyword, one or more papers’ bibliographies, one 
 Want new works matching a saved snowball profile, without a discovery daemon?
   → paperful snowball watch (baseline once, then propose; schedule watch run yourself)
 
+Want new papers from people you already follow (ORCID / OpenAlex ids, no hop)?
+  → paperful authorwatch (see authorwatch.md). Import a CSV of follows; Paperful does not scrape ResearchGate / LinkedIn / Academia.
+
 Just a list of DOIs, no Zotero?
   → paperscraper
 
@@ -171,6 +175,7 @@ How far a snowball hop reaches: [How a hop is cut](snowball.md#how-a-hop-is-cut)
 - [architecture.md](architecture.md) — disk-first adapters, circuit breaker, Sci-Hub
 - [ROADMAP.md](ROADMAP.md) — mirror contract toward 1.0; optional LLM; snowball phases
 - [snowball.md](snowball.md) — keyword, multi-DOI / multi-ORCID, collection, and hybrid library building
+- [authorwatch.md](authorwatch.md) — people lists → new papers (no hop)
 - [comparison-reference.md](comparison-reference.md) — vendor notes and extra tables
 - [commands.md](commands.md) — CLI and disk artifacts
 - [config.md](config.md) — `config.toml` and operations

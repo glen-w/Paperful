@@ -307,16 +307,15 @@ gone = "mark"
 # approve_each_max = 20
 # hybrid_seeds = 5
 # refine = false
-
-# People lists (`paperful authorwatch`). No scrape of social follows; import a CSV.
-# Caps also exist as CLI flags on `authorwatch run`.
-# [authorwatch]
-# max_authors = 50
-# per_author_limit = 200
 # dedupe_after = "off"           # off | classify | apply
 # author_site_preflight = false
 # author_site_max_authors = 15
 # author_site_max_queries = 20
+
+# People lists: `paperful authorwatch`. Caps are CLI flags on `authorwatch run`
+# (`--max-authors` 50, `--per-author-limit` 200). No [authorwatch] table is
+# parsed. No scrape of social follows; import a CSV. See docs/authorwatch.md.
+
 # [searxng]
 # base_url = ""                  # local instance; or SEARXNG_BASE_URL. never a default run source
 

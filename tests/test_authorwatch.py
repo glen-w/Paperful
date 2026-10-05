@@ -175,6 +175,18 @@ def test_default_run_sets_baseline_without_polling(cfg):
     assert load_inbox(cfg, "ocean") == []
 
 
+def test_baseline_run_does_not_open_library(cfg, monkeypatch):
+    add_person(cfg, "ocean", display_name="Jane Researcher")
+
+    def boom(*a, **k):
+        raise AssertionError("opened library on cursor baseline")
+
+    monkeypatch.setattr("paperful.authorwatch.get_backend", boom)
+    first = run_list(cfg, "ocean", console=console, client=FakeOA(works=[_work()]))
+    assert first.baseline is True
+    assert first.polled == 0
+
+
 def test_backfill_proposes_and_skips_exists_and_held(cfg):
     add_person(cfg, "ocean", orcid=ORCID, display_name="Josiah")
     add_person(cfg, "ocean", display_name="Held Person")

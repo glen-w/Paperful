@@ -143,7 +143,8 @@ for field. A new `Item` field needs a home in the record and a case there.
 ## Adding things
 
 **A read verb.** `backend = _connect(cfg)`, `_load_scope(backend, …)`, do
-the work, write a run report. Add it to `READ_VERBS`.
+the work, write a run report. Add it to `READ_VERBS`. Disk-only verbs such as
+`authorwatch save` still belong there so a closed manager is not an accident.
 
 **A write verb.** Same, dry-run by default. Before applying:
 `if not backend.supports_write(): _exit_env(_no_write(backend), cfg)`.

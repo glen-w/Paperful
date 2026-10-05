@@ -7,7 +7,8 @@ image and expects `doctor` to exit 2 without Zotero. There is no published
 image and no PyPI package. Headed `session login` is host-only
 (`uv run paperful session login …`). No campus access: `--preset oa`.
 Campus EZProxy: `--preset eoi`. `paperful jobs` lists verbs by job.
-The public grow verb is `snowball` (there is no `harvest` command).
+The public grow verb is `snowball` (there is no `harvest` command). People you
+follow (no hop) are `authorwatch`.
 
 ```sh
 # environment check (TTY guide for amber/red)
@@ -106,6 +107,10 @@ uv run paperful run -C BBNJ --dry-run --format json
 uv run paperful inbox drain --format json
 uv run paperful ask "What is BBNJ?" --format json
 uv run paperful snowball search "BBNJ" --gate dry-run --format json
+uv run paperful authorwatch save ocean-people
+uv run paperful authorwatch add ocean-people --orcid 0000-0002-1825-0097
+uv run paperful authorwatch run ocean-people --backfill-from 2025-01-01
+uv run paperful authorwatch apply ocean-people -C Watch/Ocean          # dry-run
 uv run paperful mcp                           # optional stdio: refs_gap + ask; prefer --format json
 uv run paperful ingest-dois --from-pack state/refs-gaps/<stamp> -C BBNJ
 uv run paperful ingest-dois --from-file dois.txt -C BBNJ --apply --tag bbnj
@@ -185,7 +190,7 @@ uv run paperful pack show
 | `versions` | Preprint and published paper as one work. Dry-run writes `state/version-packs/` (`paperful.version_pack.v1`). `--apply` puts the published citation and PDF on the older parent, keeps the preprint id and PDF, and trashes a sibling only after that PDF is attached. Title-only pairs are listed and not applied. |
 | `gaps` | Counts: no stored PDF, linked PDF URL only, missing DOI. `--list-missing` prints key/title/DOI/URL/hint (`openable_url` / `doi_only` / `hard_miss` / `author_request`); `--to` writes `.tsv` or `.md`. `--handoff list|tabs|walk|watch` opens your browser, walks Downloads into `attach --item --file`, or (watch) polls `[inbox].dir`. `--request-rg` opens existing ResearchGate publication URLs so you click Request full-text (never automated). Year/type scope flags apply. Writes `state/runs/<stamp>-gaps.json`. |
 | `twenty lookup` | Opt-in read-only Twenty People match for `-C` authors. Dry-run unless `--apply` (proposed author-pack websites + `state/author-contacts/`). Needs `[twenty].enabled`, `base_url`, env `TWENTY_API_KEY`. |
-| `authorwatch` | People you follow → their papers (`save` / `add` / `resolve` / `import` / `run` / `apply` / `show` / `briefing`). ORCID or unique OpenAlex id required to poll. First `run` is a cursor baseline (proposes 0) unless `--backfill-from`. `apply -C` creates metadata parents (dry-run unless `--apply`); does not need `[snowball] enabled`. Does not scrape RG/LinkedIn/Academia — import a CSV. Distinct from `snowball watch` and `inbox watch`. [Author watch](authorwatch.md). |
+| `authorwatch` | People you follow → their papers (`save` / `add` / `remove` / `resolve` / `import` / `run` / `apply` / `show` / `briefing`). ORCID or unique OpenAlex id required to poll. First `run` is a cursor baseline (proposes 0, no library open) unless `--backfill-from`. `apply -C` creates metadata parents (dry-run unless `--apply`; `--apply` needs write API). Does not need `[snowball] enabled`. Does not scrape RG/LinkedIn/Academia — import a CSV. Distinct from `snowball watch` and `inbox watch`. [Author watch](authorwatch.md). |
 | `inbox` | PDF drop-folder sidecar (`watch` / `drain` / `proposals`). Needs `[inbox].dir`. Default match is DOI-only against missing-PDF items (whole library unless `-C`). Optional `[inbox].match` ladder: hold before quarantine, OCR-for-match, title+year, `llm_when_thin`. `[inbox].create` is `attach_only` (default), `create_gated` (proposals), or high-bar `create_auto` (unique DOI only). Created parents are tagged `inbox-created`, `inbox:<dirname>`, `[ingest].default_tags`, and `--tag`. `--format json` on `drain` and `proposals list|apply|reject` is `paperful.agent.json.v1`. Handoff `watch` still uses FIFO. Writes `state/runs/<stamp>-inbox.json`. Not snowball’s `inbox.jsonl`. |
 | `notes delete` | Trash **Paperful-owned** notes only (`paperful.note.v1` or known tags). Dry-run unless `--apply`. `--type summary\|review\|attach\|duplicate\|linked\|snowball\|briefing` is the **note** kind (not Zotero `-T` / `--item-type` on parents). `--model` / `--except-model`, `--all` (every owned note in `-C` / `--library` / `--item`). `--apply --all` confirms on a TTY unless `--yes`. Never parents. `--format json`. |
 | `refs gap` | Works **cited inside** collection PDFs that are **not** in the library fingerprint. Always dry-run. Writes `state/refs-gaps/<stamp>/` (`paperful.refs_gap.pack.v1` plus `dois.txt`). `--format json` prints `paperful.agent.json.v1`. Then `ingest-dois --from-file` / `--from-pack`. Distinct from `gaps` (items already in scope missing a PDF). |
@@ -306,8 +311,8 @@ process exit code as the result.
 | --- | --- |
 | 0 | Success (including empty dry-run). `not_found` / paywalled misses on `run` are not failures. `ingest-dois` **held** and **unresolved** rows are findings, not exit 3. |
 | 1 | User error (unknown collection, bad preset, unknown `--phase`, `--dry-run` together with `--apply`, `--year-from` > `--year-to`, unknown `--type`, `--strict` lint findings, unknown `--item` key, LLM not enabled/misconfigured for `recover` / `summarize` / `synthesize`, `recover` on Python < 3.11, note write refused, `--to disk` together with `--apply` or `--report-collection`, `synthesize` still over budget after 3 reduce passes, `pack open` while one is open, `pack close` when none is open, unknown `--pdfs`). Also: a batch where every attempted write failed. |
-| 2 | Environment: library unreachable on `sync`, `snapshot`, `restore`, `attachments`, `attach`, or any `--apply`; or unreachable on any library command when there is no mirror under `out/` yet. With a mirror, read commands (`collections`, `gaps`, `lint`, `export`, dry-runs, `summarize --to disk`, `run` without attach) carry on from it and say how old it is. Prints **Next steps** (Zotero local API, or Mendeley login, or EndNote `.enl`; then `paperful doctor`) |
-| 3 | Partial **write** batch: some rows succeeded and some failed. `run` counts **attached vs attach_failed** (not `not_found`). Also `inbox drain` (attached vs errors), `fix-metadata --apply`, `dedupe --apply`, `snowball apply`, `summarize`, `ocr --apply`, `notes delete --apply`, `ingest-dois --apply` (created vs create errors), and other batch verbs that emit `paperful.agent.json.v1`. The envelope has `"partial": true`. Dry-run mixed findings stay **0**. |
+| 2 | Environment: library unreachable on `sync`, `snapshot`, `restore`, `attachments`, `attach`, or any `--apply` (including `authorwatch apply --apply`); or unreachable on any library command when there is no mirror under `out/` yet. With a mirror, read commands (`collections`, `gaps`, `lint`, `export`, dry-runs, `summarize --to disk`, `run` without attach) carry on from it and say how old it is. `authorwatch save` / `add` / `run` without `--backfill-from` do not open the library. Prints **Next steps** (Zotero local API, or Mendeley login, or EndNote `.enl`; then `paperful doctor`) |
+| 3 | Partial **write** batch: some rows succeeded and some failed. `run` counts **attached vs attach_failed** (not `not_found`). Also `inbox drain` (attached vs errors), `fix-metadata --apply`, `dedupe --apply`, `snowball apply`, `authorwatch apply --apply`, `summarize`, `ocr --apply`, `notes delete --apply`, `ingest-dois --apply` (created vs create errors), and other batch verbs that emit `paperful.agent.json.v1`. The envelope has `"partial": true`. Dry-run mixed findings stay **0**. |
 
 TTY-only (a GUI or agent must not claim these): `session login`, `doctor --guide`, mid-run EZProxy re-login, and `notes delete --apply --all` confirm unless `--yes`.
 
@@ -368,6 +373,7 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
   `versions --apply`.
 - `state/refs-gaps/<stamp>/` — `refs gap` pack (`pack.json`, `pack.md`, `dois.txt`). Always dry-run.
 - `state/ingest/<stamp>/` — `ingest-dois` summary JSON. Created only classifies unless `--apply`.
+- `state/authorwatch/<name>/` — people lists (`paperful.authorwatch.v1`), inbox, seen, applied. Cursor baseline does not open the library. See [authorwatch.md](authorwatch.md).
 - `state/inbox/proposals/` — gated inbox create/attach proposals (`paperful.inbox.proposal.v1`).
 - `state/pdf-cache/` — PDFs exported from the manager so lint can read text
   on disk (`pdftotext`, then `pypdf`).

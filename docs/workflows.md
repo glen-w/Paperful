@@ -18,6 +18,9 @@ dashboard. Recipes below are copy-paste commands. The research-pack
 | **`--preset eoi`** | Source *policy*: open access plus campus EZProxy, no Scholar, no Sci-Hub | CLI flag or `preset` in a profile |
 | **Playbook** | URL → PDF rule (`rewrite` / `scrape` / `synthesize`), hand-written or learned from fetch wins | `[[grey_playbooks]]`, `packs/*.toml`, `packs/learned.toml` |
 | **Pack** | Witness for one *executed* sequence. Lists child reports. Not a template you re-run | `state/packs/<id>.json` |
+| **`authorwatch`** | Named people list → their new papers (ORCID / OpenAlex). Not a crawl hop | `state/authorwatch/<name>/` |
+| **`snowball watch`** | Re-run a saved snowball *profile*; propose unseen works | `state/snowball/watches/<name>/` |
+| **`inbox watch`** | PDF drop folder → attach to matching items | `[inbox].dir` |
 
 Grey-lit `packs/` and run-config `profiles/` are different directories.
 `state/packs/` is the witness, and it is excluded from backups of the

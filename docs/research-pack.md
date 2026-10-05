@@ -5,7 +5,7 @@ first, `--apply` writes, PDFs come from `run` / handoff / inbox, not from
 ingest. This is not `paperful all` and not a grey-lit playbook.
 
 Seed greys and seed papers live in the collection before you start. After the
-ledger is honest, optional `snowball watch` + briefing, then `summarize` /
+ledger is honest, optional `snowball watch` or `authorwatch` + briefing, then `summarize` /
 `ask`.
 
 ## Sequence
