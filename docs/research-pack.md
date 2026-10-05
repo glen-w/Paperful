@@ -32,15 +32,17 @@ docker compose run --rm paperful run -C COLLECTION
 # remaining misses: system browser, then drop PDFs into [inbox].dir
 docker compose run --rm paperful gaps -C COLLECTION --list-missing --handoff walk
 docker compose run --rm paperful inbox drain
+# optional: ask authors instead of fetching remaining misses
+docker compose run --rm paperful reachout -C COLLECTION --to reachout.csv
 
 # 5. Hygiene after creates and attaches.
 docker compose run --rm paperful dedupe -C COLLECTION
 docker compose run --rm paperful dedupe -C COLLECTION --apply
 
 # 6. Optional frontier (no scheduler; no silent creates).
-docker compose run --rm paperful snowball watch run NAME
-docker compose run --rm paperful snowball watch briefing NAME
-docker compose run --rm paperful snowball briefing --run-id <run-id>
+docker compose run --rm paperful snowball watch run NAME --digest
+docker compose run --rm paperful snowball watch digest NAME
+docker compose run --rm paperful snowball digest --run-id <run-id>
 ```
 
 Contributors: the same verbs with `uv run paperful …`.
@@ -53,6 +55,8 @@ Contributors: the same verbs with `uv run paperful …`.
 | `state/refs-gaps/<stamp>/dois.txt` | Missing DOIs for ingest |
 | `state/runs/<stamp>-ingest-dois.json` | Created / exists / unresolved / held |
 | `state/last-run.json` | `paperful.run_report.v1` after `run` |
+| `state/snowball/<run-id>/digest.md` | Frontier digest for that queue |
+| `state/snowball/watches/<name>/digest.md` | Frontier digest for that watch |
 | `state/snowball/<run-id>/briefing.md` | Thin queue export |
 | `state/snowball/watches/<name>/briefing.md` | Thin watch inbox export |
 | `state/reports/<scope>-authors.json` | `paperful.authors_report.v1` from `authors --apply` |

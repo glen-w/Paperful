@@ -89,7 +89,9 @@ or `off`. One-page stubs and DOI mismatches can hold the file on disk until you
 `inbox watch` / `drain` ([inbox](docs/commands.md)). Walkthrough:
 [How it works](docs/how-it-works.md).
 
-**Completeness.** `gaps` counts what is missing. `refs gap` lists works
+**Completeness.** `gaps` counts what is missing. `reachout` lists missing
+PDFs for author contact (CSV / ResearchGate tabs) and never fetches or
+sends mail. `refs gap` lists works
 **cited inside** collection PDFs that are not in the library (always
 dry-run; then `ingest-dois`). `lint` and `fix-metadata`
 propose patches on disk; `--apply` writes them. `dedupe` reviews duplicates.

@@ -37,12 +37,15 @@ Unpaywall and OpenAlex hits also stamp `license`, `oa_status`, and `version`
 on `out/.../record.json` (`fetch.oa`) and on the manifest row when configured
 in `[oa_honesty].stamp_fields`.
 
-Miss taxonomy (dry-run, `gaps --list-missing`, `--handoff list`) uses a frozen
+Miss taxonomy (dry-run, `gaps --list-missing`, `--handoff list`, `reachout`)
+uses a frozen
 surface code: `no_doi`, `paywalled`, `no_oa`, `fetch_failed`, `license_blocked`,
 or `import_ok`, plus a plain-string column and optional `oa_status` / `license`
 when stamped. Rich detail stays on `attempts[]` as `miss_detail`. Opt-in
 ResearchGate request is a **handoff hint** (`author_request`): Paperful only
 opens a URL already on the item; you click Request full-text yourself (RG ToS).
+`paperful reachout` is the contact verb (CSV of titles/emails, RG tabs only);
+it never fetches and never sends mail.
 
 Until you are looking at that note, reconstruct origin from disk:
 

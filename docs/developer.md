@@ -96,6 +96,8 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `notehtml.py` | First-line prefixes + `paperful.note.v1` comment | none |
 | `notes.py` | Classify and trash Paperful-owned notes | `notehtml`, library protocol |
 | `handoff_rank.py` | Missing-PDF sort: refs-gap cites × miss severity | `handoff` |
+| `reachout.py` | Contact-only missing-PDF rows (metadata / Twenty emails, CSV). No fetch | `handoff`, `twenty` |
+| `twenty.py` | Read-only Twenty People lookup | httpx |
 | `mcp_server.py` | Optional stdio MCP: dry-run `refs_gap`, read-only `ask` (same envelopes as CLI) | `agent_ops` |
 | `authorwatch.py` | People lists → OpenAlex new works; `apply` creates parents | OpenAlex client, `identity`, `snowball.ingest` |
 

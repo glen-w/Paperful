@@ -385,3 +385,4 @@ opens existing ResearchGate publication URLs; you click Request full-text.
 - Not a grey-lit playbook. URL → PDF rules stay in `[[grey_playbooks]]`.
 - Not a pack. A pack records one run; a profile is the input you can run again.
 - Not a field author pack. `state/author-packs/` is for `author_site`; `state/packs/` is the run witness.
+- Not a fetch preset. `reachout` never downloads; `--preset oa` still grabs.

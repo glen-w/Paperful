@@ -8,6 +8,7 @@ Do not add `docs/GLOSSARY.md` beside this file. Do not use TranscriptX **admit**
 ```text
 find / download  →  out/ PDF (staging on disk)  →  attach  →  Zotero (library)
 gaps / attachments (honesty)  →  run (fill)  →  human reads out/  →  summarize / ask
+reachout (contact, no fetch)  →  you email or click ResearchGate Request yourself
 ```
 
 | Term | Meaning here |
@@ -19,6 +20,7 @@ gaps / attachments (honesty)  →  run (fill)  →  human reads out/  →  summa
 | **`state/`** | Run reports, sessions, write keys. Lives next to `out/` under `PAPERFUL_DATA`. |
 | **import** | RIS / BibTeX / EndNote XML into the manager. Not an “import inbox.” |
 | **run** | Fill PDFs for items **already** in the library. |
+| **reachout** | Contact-only list of missing PDFs (CSV / RG tabs). Never fetches. Never sends mail. |
 | **dry-run** | Show what would happen; no durable write to the library of record. |
 | **`--apply`** | Explicit second step that mutates the catalogue. |
 | **doctor** | Readiness probe (green / amber / red + next steps). |

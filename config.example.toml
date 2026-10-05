@@ -183,12 +183,14 @@ mirror_failures_before_skip = 3
 # Author PDF requests. Default off. ResearchGate is handoff-only: Paperful opens an
 # existing researchgate.net/publication URL in your system browser. You click
 # Request full-text (RG ToS). Paperful never clicks and does not search RG.
+# Contact-only (no fetch): paperful reachout -C … --to reachout.csv
 # email / both / delay are policy only in this version (no mail send).
 # [request]
 # channels = "off"               # off | rg | email | both | rg_then_email_after_days
 # email_after_days = 14
 
 # Twenty CRM (read-only). Never a default. API key in env TWENTY_API_KEY only.
+# paperful twenty lookup -C … --apply caches contacts; reachout --lookup can too.
 # [twenty]
 # enabled = false
 # base_url = ""                  # or TWENTY_BASE_URL

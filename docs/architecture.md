@@ -131,11 +131,13 @@ flowchart LR
 | `state/reports/<slug>.html` | `synthesize` literature review; sibling `<slug>.json` records source hashes |
 | `state/reports/<slug>-authors.json` | `authors --apply` creator frequency (`paperful.authors_report.v1`); seeds proposed field packs |
 | `state/author-packs/` | Proposed / promoted field author packs (`paperful.author_pack.v1`). From `authors --apply`, snowball preflight, or `twenty lookup --apply` |
+| `state/author-contacts/` | Twenty People cache (`paperful.author_contact.v1`). From `twenty lookup --apply` or `reachout --lookup`. No CRM write |
+| `state/author-requests.jsonl` | ResearchGate handoff ledger (you click Request). `gaps` / `run --handoff` / `reachout --handoff` |
 | `state/sessions/` | Chromium profile + `meta.json` (login timestamps, no secrets). Netscape dumps for httpx |
 | `state/fetch-wins.jsonl` | One line per vault or browser-agent PDF (host and path; query string dropped). Input to `paperful playbooks propose` |
 | `state/playbooks-proposed.toml` | Draft learned pack from `playbooks propose`. Not loaded until `playbooks promote` |
 | `state/last-run.json` | Latest `run` or `recover` report (`paperful.run_report.v1`). Other verbs do not replace it |
-| `state/runs/<stamp>-<command>.json` | One report per `run`, `recover`, `gaps`, `lint`, `fix-metadata` (dry-run and `--apply`), `attachments` (dry-run and `--apply`), `summarize`, `synthesize`, and `snapshot` |
+| `state/runs/<stamp>-<command>.json` | One report per `run`, `recover`, `gaps`, `reachout`, `lint`, `fix-metadata` (dry-run and `--apply`), `attachments` (dry-run and `--apply`), `summarize`, `synthesize`, and `snapshot` |
 | `state/packs/<id>.json` | Parent witness (`paperful.pack.v1`) listing those reports for one `pack open` … `pack close` sequence. `state/packs/current` names the open id |
 | `state/mendeley-oauth.json` | Mendeley tokens after `session login mendeley` (mode `0600`) |
 | `state/endnote-import/<stamp>/` | EndNote XML+PDF bundle for File → Import. Never an edit of `.enl` |
@@ -240,7 +242,7 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
 - `paperful run --dry-run` — no downloads. Per item: **Would-hit** is the
   routed source list in order (full `sources` when `--try-all`).
 - `paperful lint` / `paperful fix-metadata` — identifier hygiene; apply is explicit.
-- `paperful dedupe` / `paperful gaps` / `paperful refs gap` — duplicate packs, PDF/DOI counts, and cited-in-PDF missing-from-library packs. `refs gap` is always dry-run (`state/refs-gaps/`). `ingest-dois` creates parents from that pack or a DOI file only with `--apply`.
+- `paperful dedupe` / `paperful gaps` / `paperful reachout` / `paperful refs gap` — duplicate packs, PDF/DOI counts, contact-only missing-PDF CSV (never fetches, never sends mail), and cited-in-PDF missing-from-library packs. `refs gap` is always dry-run (`state/refs-gaps/`). `ingest-dois` creates parents from that pack or a DOI file only with `--apply`.
   `dedupe` writes `state/dedupe-packs/` and merges only with `--apply`
   (the spare-copy line is written then; title+year also needs `--apply-medium`).
   `versions` writes `state/version-packs/` and updates a preprint only with
