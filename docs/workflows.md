@@ -21,7 +21,7 @@ dashboard. Recipes below are copy-paste commands. The research-pack
 | **`authorwatch`** | Named people list → their new papers (ORCID / OpenAlex). Not a crawl hop | `state/authorwatch/<name>/` |
 | **`authors`** | Creator frequency in `-C`; `--apply` seeds a proposed field author pack | `state/reports/*-authors.json`, `state/author-packs/` |
 | **`reachout`** | Missing PDFs → CSV / RG tabs for author contact. Never fetches, never sends mail | `paperful reachout` |
-| **`snowball watch`** | Re-run a saved snowball *profile*; propose unseen works | `state/snowball/watches/<name>/` |
+| **`snowball watch`** | Re-run a saved snowball *profile*; propose unseen works. The rollup is `digest.md` ([Watch](snowball.md#watch)) | `state/snowball/watches/<name>/` |
 | **`inbox watch`** | PDF drop folder → attach to matching items | `[inbox].dir` |
 
 Grey-lit `packs/` and run-config `profiles/` are different directories.

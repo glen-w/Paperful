@@ -96,6 +96,11 @@ local list and polls OpenAlex for their papers. First `run` is a cursor only.
 That is not `snowball watch` and not the PDF `inbox watch`.
 [Author watch](authorwatch.md).
 
+To follow a saved keyword or seed profile, `snowball watch` proposes works
+that were not in the baseline. `snowball watch digest`, or `watch run
+--digest`, writes the rollup under `state/snowball/watches/<name>/digest.md`.
+[Watch](snowball.md#watch).
+
 To rank creators already in a collection and seed a proposed field author pack
 for personal-site PDF fetch, use `paperful authors -C …` (then promote). See
 [Workflows § field author packs](workflows.md#6-field-author-packs-corpus-frequency--author_site).

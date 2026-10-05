@@ -119,12 +119,14 @@ Snowball, snowball watch, authorwatch, and field author packs. See
 | Toggle keep / batch approve | Edit `keep` then `snowball apply` | Same queue |
 | Gates | `dry-run` · `approve-each` · `approve-batch` · `auto` | Request + config |
 | Watch inbox | `snowball watch run` / `show` | `state/snowball/watches/<name>/inbox.jsonl` |
+| Frontier digest | `snowball watch digest` or `watch run --digest` | `state/snowball/watches/<name>/digest.md` |
 | People lists | `authorwatch save` / `run` / `apply` | `state/authorwatch/<name>/` |
 | Corpus author/org frequency | `authors` (`--apply` seeds proposed pack) | `state/reports/*-authors.json`, `state/author-packs/` |
 
 Default gate in the UI is **dry-run**. Writing gates require a target
-collection. Watch never auto-schedules: show last run and **Run now**;
-launchd / cron stay outside Paperful.
+collection. Watch never auto-schedules: show last run and **Run now**, then
+open `digest.md`. launchd / cron stay outside Paperful
+([Watch](snowball.md#watch)).
 
 ### Fill
 

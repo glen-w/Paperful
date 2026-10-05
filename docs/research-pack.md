@@ -5,8 +5,8 @@ first, `--apply` writes, PDFs come from `run` / handoff / inbox, not from
 ingest. This is not `paperful all` and not a grey-lit playbook.
 
 Seed greys and seed papers live in the collection before you start. After the
-ledger is honest, optional `snowball watch` or `authorwatch` + briefing, then `summarize` /
-`ask`.
+ledger is honest, optional `snowball watch` or `authorwatch`, then the frontier
+digest (thin `briefing` is still there), then `summarize` / `ask`.
 
 ## Sequence
 
@@ -75,7 +75,7 @@ same slice, `paperful authors -C COLLECTION --apply` writes
 | Code | When |
 | --- | --- |
 | 0 | Success, including an empty dry-run or a classify with held rows |
-| 1 | User error (unknown collection, missing `--from-file`, `--apply` without `-C` on a briefing note) |
+| 1 | User error (unknown collection, missing `--from-file`, `--apply` without `-C` on a briefing or digest note) |
 | 2 | Manager unreachable on a write, or no mirror yet on a read that needs the library |
 | 3 | Partial batch (`inbox drain` mixed attach/errors; `run` mixed attach) |
 

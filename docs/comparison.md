@@ -152,7 +152,7 @@ Want a new collection from a keyword, one or more papers’ bibliographies, one 
   → paperful snowball (see snowball.md). Pass several DOIs or ORCID iDs in one command. One-shot PDF fill is --fetch-pdfs with --gate auto
 
 Want new works matching a saved snowball profile, without a discovery daemon?
-  → paperful snowball watch (baseline once, then propose; schedule watch run yourself)
+  → paperful snowball watch (baseline once, then propose). The rollup is `snowball watch digest` or `watch run --digest`. Schedule that yourself ([Watch](snowball.md#watch))
 
 Want new papers from people you already follow (ORCID / OpenAlex ids, no hop)?
   → paperful authorwatch (see authorwatch.md). Import a CSV of follows; Paperful does not scrape ResearchGate / LinkedIn / Academia.

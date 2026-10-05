@@ -113,9 +113,20 @@ printed; there is no extra API call. Newsletter ingest stays later.
 Paperful does not run a timer. Point cron, launchd, or a systemd user timer
 at `watch run --digest`. Replace the paths and the watch name.
 
+Operators (Compose), from the repo:
+
+```cron
+15 7 * * 1 cd /path/to/paperful && docker compose run --rm paperful snowball watch run bbnj --digest
+```
+
+Contributors, on a host checkout:
+
 ```cron
 15 7 * * 1 cd /path/to/library && uv run paperful snowball watch run bbnj --digest
 ```
+
+launchd and systemd below are the host-checkout form (`uv`). A Compose
+operator uses the cron line above (`docker compose run`).
 
 launchd (`~/Library/LaunchAgents/paperful.watch.bbnj.plist`):
 

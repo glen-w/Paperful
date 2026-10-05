@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from types import SimpleNamespace
 
 from typer.testing import CliRunner
@@ -328,4 +329,5 @@ def test_cli_digest_writes_markdown(tmp_path):
     assert (dest / "digest.md").is_file()
     help_res = runner.invoke(app, ["snowball", "watch", "run", "--help"])
     assert help_res.exit_code == 0, help_res.output
-    assert "--digest" in help_res.output
+    plain_help = re.sub(r"\x1b\[[0-9;]*m", "", help_res.output)
+    assert "--digest" in plain_help

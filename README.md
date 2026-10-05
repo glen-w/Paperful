@@ -56,8 +56,9 @@ metadata parents only when the gate says so. `run` fetches PDFs for items
 already in the library. Dry-run is the default for snowball; `run` attaches
 on Zotero 10+ unless you pass `--dry-run`. `authorwatch` is people you
 follow → their papers (no hop); see [Author watch](docs/authorwatch.md).
-See [Snowball](docs/snowball.md)
-and [how a hop is cut](docs/snowball.md#how-a-hop-is-cut).
+`snowball watch` re-runs a saved profile; `watch run --digest` writes the
+frontier rollup. See [Snowball](docs/snowball.md)
+and [Watch](docs/snowball.md#watch).
 
 ```sh
 docker compose run --rm paperful snowball search "area based management" --gate dry-run
