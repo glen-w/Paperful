@@ -55,11 +55,16 @@ Contributors: the same verbs with `uv run paperful …`.
 | `state/last-run.json` | `paperful.run_report.v1` after `run` |
 | `state/snowball/<run-id>/briefing.md` | Thin queue export |
 | `state/snowball/watches/<name>/briefing.md` | Thin watch inbox export |
+| `state/reports/<scope>-authors.json` | `paperful.authors_report.v1` from `authors --apply` |
+| `state/author-packs/<slug>.proposed.toml` | Field pack until `snowball packs promote` |
 
 `summarize` and `ask` wait until `dedupe` and attach are boring. Harvest
 collection acronyms (`paperful acronyms -C COLLECTION --apply`) before a
 large `fix-metadata` recase if titles are ALL CAPS with corpus tokens
-(BBNJ, FAO, OECD).
+(BBNJ, FAO, OECD). For frequent creators and institutional authors in the
+same slice, `paperful authors -C COLLECTION --apply` writes
+`state/reports/<scope>-authors.json` and a proposed field author pack; then
+`twenty lookup` / `snowball packs promote` before relying on `author_site`.
 
 ## Exits (same table as commands)
 

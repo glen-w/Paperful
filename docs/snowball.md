@@ -231,11 +231,13 @@ OR group; `?` and `~` are stripped with a warning. After create,
 default).
 
 Opt-in `--author-site-preflight` writes `coauthors.json` and a **proposed**
-pack under `state/author-packs/`. `snowball packs promote <slug>` makes it
-available to the `author_site` grey lane (`grey:author_site`). SearXNG is
-used only when `[searxng].base_url` or `SEARXNG_BASE_URL` is set.
-`[twenty].lookup_on_preflight` (with `[twenty].enabled`) may add CRM websites
-to that proposed pack. Promote before fetch; Paperful does not send mail.
+pack under `state/author-packs/`. `paperful authors -C … --apply` also seeds a
+proposed pack from in-library creator frequency (see [commands](commands.md)).
+`snowball packs promote <slug>` makes it available to the `author_site` grey
+lane (`grey:author_site`). SearXNG is used only when `[searxng].base_url` or
+`SEARXNG_BASE_URL` is set. `[twenty].lookup_on_preflight` (with
+`[twenty].enabled`) may add CRM websites to that proposed pack. Promote before
+fetch; Paperful does not send mail.
 
 ## One-shot PDFs
 

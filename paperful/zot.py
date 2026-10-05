@@ -142,6 +142,8 @@ class Item:
     creator_count: int = 0
     abstract: str | None = None
     creator_surnames: list[str] = field(default_factory=list)
+    # Creators stored as a single ``name`` (no lastName/firstName), e.g. FAO.
+    corporate_creators: list[str] = field(default_factory=list)
     isbn: str | None = None
     report_number: str | None = None
     pdf_tier: str = ""  # native | snapshot | "" (no stored PDF)
@@ -606,6 +608,7 @@ def item_from_json(
         if isinstance(c, dict)
     ]
     surnames = [s for s in surnames if s]
+    corporate = corporate_creator_names(creators)
     abstract = (data.get("abstractNote") or "").strip() or None
     date_added = (data.get("dateAdded") or "").strip() or None
     from .greyid import normalize_isbn, normalize_report_number
@@ -637,6 +640,7 @@ def item_from_json(
         creator_count=len(creators),
         abstract=abstract,
         creator_surnames=surnames,
+        corporate_creators=corporate,
         isbn=isbn,
         report_number=report_number,
         pdf_tier=pdf_tier if has_pdf else "",
@@ -771,3 +775,17 @@ def first_author(creators: list[dict[str, Any]]) -> str | None:
         if c.get("name"):
             return c["name"].strip()
     return None
+
+
+def corporate_creator_names(creators: list[Any] | None) -> list[str]:
+    """Single-field ``name`` creators with no lastName/firstName (e.g. FAO)."""
+    out: list[str] = []
+    for row in creators or []:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("name") or "").strip()
+        last = str(row.get("lastName") or "").strip()
+        first = str(row.get("firstName") or "").strip()
+        if name and not last and not first:
+            out.append(name)
+    return out

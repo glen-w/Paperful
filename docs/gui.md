@@ -108,8 +108,9 @@ arguments; the server runs `paperful.*`.
 
 ### Grow
 
-Snowball, snowball watch, and authorwatch. See [snowball.md](snowball.md) and
-[authorwatch.md](authorwatch.md).
+Snowball, snowball watch, authorwatch, and field author packs. See
+[snowball.md](snowball.md), [authorwatch.md](authorwatch.md), and
+[Workflows § field author packs](workflows.md#6-field-author-packs-corpus-frequency--author_site).
 
 | Action | Maps to | Ledger |
 | --- | --- | --- |
@@ -119,6 +120,7 @@ Snowball, snowball watch, and authorwatch. See [snowball.md](snowball.md) and
 | Gates | `dry-run` · `approve-each` · `approve-batch` · `auto` | Request + config |
 | Watch inbox | `snowball watch run` / `show` | `state/snowball/watches/<name>/inbox.jsonl` |
 | People lists | `authorwatch save` / `run` / `apply` | `state/authorwatch/<name>/` |
+| Corpus author/org frequency | `authors` (`--apply` seeds proposed pack) | `state/reports/*-authors.json`, `state/author-packs/` |
 
 Default gate in the UI is **dry-run**. Writing gates require a target
 collection. Watch never auto-schedules: show last run and **Run now**;

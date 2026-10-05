@@ -322,13 +322,13 @@ for the end-to-end operator story.
 | 9 | Acronym allowlist harvest (Core `fix-metadata`) | Shipped (`paperful acronyms`; Title Case consumes `state/acronyms/`) |
 | 10 | [Frontier digest](#frontier-digest-later-watch--external-ingest); thin [snowball briefing](#frontier-digest-later-watch--external-ingest) export before full digest | Thin v0 shipped (`snowball briefing`, `watch briefing`); full digest later |
 | 11 | Scholar late tail + latch + opt-in SerpApi | Shipped (`[fetch].order` policy; interleave with `browser_agent`; `[handoff].scholar`; `[serpapi].enabled` / `max_calls`) |
-| 12 | Authors/orgs frequency report from `-C` (`state/reports/…`; seed **field author packs**) | Later |
+| 12 | Authors/orgs frequency report from `-C` (`state/reports/…`; seed **field author packs**) | Shipped (`paperful authors`; `--apply` writes report + proposed pack) |
 | 13 | Handoff list ranking (Core handoff) | Shipped (cite count × miss severity) |
 | 14 | Opt-in academic HTML→PDF snapshot (Core `htmlpdf`) | Shipped (`[htmlpdf].academic` off\|gated\|auto; snapshot tier; `--upgrade-snapshot`) |
 | 15 | Agent JSON + documented exit codes on batch verbs; MCP after those are stable | **Shipped** — `paperful.agent.json.v1` + exits 0/1/2/3 on batch verbs; thin optional `paperful mcp` (`refs_gap`, `ask`) |
 | 16 | Author-site PDF (registry + packs + co-author crawl; **snowball co-author preflight** / `grey:author_site`) | Opt-in in tree (promote packs; SearXNG local-only) |
-| 17 | ResearchGate request-from-author (**handoff-only**; config off by default; you click) | Shipped (`[request].channels`; `state/author-requests.jsonl`) |
-| 18 | Twenty CRM — author lookup (website → proposed pack; email cache; no mail / no CRM write) | Shipped (`paperful twenty lookup`; `[twenty].enabled`) |
+| 17 | ResearchGate request-from-author (**handoff-only**; config off by default; you click) | Shipped (`[request].channels`; `state/author-requests.jsonl`; `paperful reachout --handoff tabs`) |
+| 18 | Twenty CRM — author lookup (website → proposed pack; email cache; no mail / no CRM write) | Shipped (`paperful twenty lookup`; `[twenty].enabled`; `paperful reachout` reads the cache) |
 | 19 | Typed note provenance (`paperful.note.v1`) + scannable **first-line** prefixes on all Paperful note writers | Shipped (summarize / synthesize / remarks / snowball / briefing) |
 | 20 | `paperful notes delete` (or equivalent) — scoped filters: type, model, `--except-model`, tags; dry-run / `--apply` | Shipped (`--type`, `--model` / `--except-model`, `--all` + confirm / `--yes`) |
 | 21 | [Author watch lists](#author-watch-lists-later-people-you-follow--their-papers) — ORCID / OpenAlex resolve + `run` / `apply`; file import of follows | **In tree** (`paperful authorwatch`; social HTML scrape later) |
@@ -1060,8 +1060,9 @@ prerequisites for the fetch / lint / attach loop.
    current run scope, **boost** that author’s site playbook and web-search rank
    (try known `base_host` before generic SearXNG). Packs are operator-owned files
    under `state/author-packs/` (or profile refs), mergeable from corpus stats
-   ([authors/orgs frequency report](#near-term-research-ops) row 12) plus manual
-   curation — not an auto cloud graph. Same honesty: grey only, no OA mislabel.
+   ([authors/orgs frequency report](#near-term-research-ops) row 12 —
+   `paperful authors -C … --apply`) plus manual curation — not an auto cloud
+   graph. Same honesty: grey only, no OA mislabel.
    **Co-author expansion on personal sites.** Learn **frequent co-author** edges
    from in-library items (creator lists) and from bibliography / OpenAlex ref
    overlap; link co-authors to the same pack when they repeatedly co-publish in
@@ -1206,7 +1207,8 @@ Larger product bets. Park until the ledger and core loop justify them.
    **Later:** mail-merge / `paperful request draft` using Twenty contact cache;
    CRM write-back only with `--apply` on an explicit sync verb. Request-channel
    policy stays config (`[request].channels`), not agent-default. Lookup itself
-   is `paperful twenty lookup` (REST, read-only).
+   is `paperful twenty lookup` (REST, read-only). Contact surface without fetch
+   is `paperful reachout` (CSV + optional RG tabs; metadata then Twenty emails).
 8. **Collaboration without SaaS** — shared `state/` over syncthing/git; attach
    locks; optional headless fetch node. Aligns with the house
    [quiet mirror](quiet-mirror.md) stance: Syncthing (or similar) is transport;

@@ -95,6 +95,10 @@ local list and polls OpenAlex for their papers. First `run` is a cursor only.
 That is not `snowball watch` and not the PDF `inbox watch`.
 [Author watch](authorwatch.md).
 
+To rank creators already in a collection and seed a proposed field author pack
+for personal-site PDF fetch, use `paperful authors -C …` (then promote). See
+[Workflows § field author packs](workflows.md#6-field-author-packs-corpus-frequency--author_site).
+
 ## Slowing down
 
 If a site returns a rate limit, the HTTP client waits and retries. If a site

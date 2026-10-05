@@ -87,7 +87,7 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `sync.py` | The refresh: delta or full, version last | `snapshot`, `mirror`, `library` |
 | `catalogue.py` | `MirrorCatalogue`, `MirrorFirstBackend`, `open_library` | `sync`, `mirror`, `library` |
 | `scope.py` | Collection, year, type selection | `library` errors |
-| `resolve.py`, `lint.py`, `acronyms.py`, `metadata.py`, `dedupe.py`, `pdfid.py` | Identifier and hygiene logic. Take a backend; never name a manager | the protocol |
+| `resolve.py`, `lint.py`, `acronyms.py`, `authors_report.py`, `metadata.py`, `dedupe.py`, `pdfid.py` | Identifier, hygiene, and corpus-frequency logic. Take a backend; never name a manager | the protocol |
 | `sources/` | One fetch lane each. Return bytes or a miss | `sources.base` |
 | `pipeline.py` | Order the lanes, save, attach, write the manifest | most things |
 | `cli.py` | Flags, progress, exits. No logic of its own | everything |
@@ -135,6 +135,8 @@ Every step can be repeated. A crash leaves valid records and an old version.
 | `paperful.rag.thread.v1` | `state/rag/threads/*.json` | Ask follow-up turns; under `state/` (backup-excluded) |
 | `paperful.authorwatch.v1` | `state/authorwatch/<name>/watch.json` | People-list cursor; under `state/` (backup-excluded) |
 | `paperful.authorwatch.person.v1` | `state/authorwatch/<name>/people.jsonl` | List members; backup-excluded |
+| `paperful.authors_report.v1` | `state/reports/<slug>-authors.json` | Creator frequency from `authors --apply` |
+| `paperful.author_pack.v1` | `state/author-packs/<slug>[.proposed].toml` | Field author pack; promote before `author_site` |
 
 The catalogue rebuilds an `Item` from a record. The test
 `test_item_from_record_matches_the_live_listing` holds the two equal field

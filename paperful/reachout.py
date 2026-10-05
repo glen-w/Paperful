@@ -296,3 +296,6 @@ def write_reachout_export(rows: list[ReachoutRow], path: Path) -> Path:
             d = row.as_dict()
             writer.writerow([d[c] for c in cols])
     return path
+
+
+write_reachout_csv = write_reachout_export

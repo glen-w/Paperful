@@ -41,9 +41,9 @@ and [architecture](architecture.md).
 | `[serpapi].enabled` | `false` | Paid Google Scholar **link discovery** after local routes. Needs env `SERPAPI_API_KEY`. Never a silent default. See [SerpApi](serpapi.md) |
 | `[serpapi].max_calls` | `20` | Paid Scholar searches this run. `0` = no cap. `--serpapi-max` overrides one run |
 | `[handoff].scholar` | `true` | Put a Scholar results URL on miss rows and open it in the system browser when there is no direct PDF URL |
-| `[request].channels` | `off` | Author-request policy: `off` \| `rg` \| `email` \| `both` \| `rg_then_email_after_days`. **`rg` is handoff-only:** opens an existing ResearchGate publication URL in your system browser so **you** click Request full-text (RG ToS). Paperful never clicks and does not search RG. `email` / delay are recorded for later mail-merge; Paperful does not send mail. Override one `gaps` / `run --handoff` with `--request-rg` / `--no-request-rg`. `--re-request` ignores the `state/author-requests.jsonl` ledger |
+| `[request].channels` | `off` | Author-request policy: `off` \| `rg` \| `email` \| `both` \| `rg_then_email_after_days`. **`rg` is handoff-only:** opens an existing ResearchGate publication URL in your system browser so **you** click Request full-text (RG ToS). Paperful never clicks and does not search RG. `email` / delay are recorded for later mail-merge; Paperful does not send mail. Override one `gaps` / `run --handoff` / `reachout` with `--request-rg` / `--no-request-rg`. `--re-request` ignores the `state/author-requests.jsonl` ledger |
 | `[request].email_after_days` | `14` | Used when `channels = rg_then_email_after_days` (policy only until a draft verb exists) |
-| `[twenty].enabled` | `false` | Read-only Twenty People lookup. Needs env `TWENTY_API_KEY` and `[twenty].base_url` (or `TWENTY_BASE_URL`). `paperful twenty lookup -C …` dry-run; `--apply` writes proposed author-pack websites and `state/author-contacts/`. No CRM writes, no mail |
+| `[twenty].enabled` | `false` | Read-only Twenty People lookup. Needs env `TWENTY_API_KEY` and `[twenty].base_url` (or `TWENTY_BASE_URL`). `paperful twenty lookup -C …` dry-run; `--apply` writes proposed author-pack websites and `state/author-contacts/`. `paperful reachout` reads that cache (and `--lookup` can search live). No CRM writes, no mail |
 | `[twenty].lookup_on_preflight` | `false` | When Twenty is ready, enrich snowball `--author-site-preflight` proposed packs from CRM websites |
 | `verify_doi` | `true` | Check library DOIs against Crossref/OpenAlex before fetching; may swap DOI **in memory** for that run. `false` leaves an existing DOI as `doi_verified=unknown` and does not swap |
 | `core_api_key` | `""` | CORE API bearer token; empty skips the `core` source |
@@ -238,7 +238,7 @@ walkthrough, model advice, Docker networking, and troubleshooting: [LLM](llm.md)
 | `[ingest].default_tags` | `()` | Tags on `ingest-dois --apply` and inbox-created parents |
 | `[snowball].default_tags` | `()` | Extra tags on snowball `--gate auto` / `apply` creates, with `--tag` and `from-<seed-slug>` |
 | `[snowball].dedupe_after` | `off` | After create: `off`, `classify` (`state/dedupe-packs/`), or `apply` (merge high-DOI extras) |
-| `[snowball].author_site_preflight` | `false` | Co-author graph + proposed `state/author-packs/`. Promote before `author_site` fetch |
+| `[snowball].author_site_preflight` | `false` | Co-author graph + proposed `state/author-packs/`. Promote before `author_site` fetch. Corpus frequency without a snowball run is `paperful authors -C … --apply` |
 | `[authorwatch]` | — | Not parsed. Caps are `authorwatch run --max-authors` / `--per-author-limit`. `doctor` ambers lists with people and no ORCID/OpenAlex id. No social scrape |
 | `[searxng].base_url` | `""` | Local SearXNG for author-site remainder discovery. Or `SEARXNG_BASE_URL`. Never a default `run` source |
 | `[ingest].dedupe_scope` | `library` | `library` or `collection` when skipping `exists` |

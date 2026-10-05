@@ -406,7 +406,33 @@ def test_jobs_command_names_snowball_and_run():
     assert res.exit_code == 0
     assert "snowball" in res.stdout
     assert "run" in res.stdout
+    assert "reachout" in res.stdout
     assert "grows" in res.stdout.lower() or "Snowball" in res.stdout
+
+
+def test_reachout_cli_lists_missing_and_refuses_watch(cfg_file, stub_zotero, tmp_path):
+    dest = tmp_path / "reachout.csv"
+    res = runner.invoke(
+        cli.app,
+        ["reachout", "-c", str(cfg_file), "-C", "BBNJ", "--to", str(dest)],
+    )
+    assert res.exit_code == 0, res.stdout
+    assert dest.is_file()
+    body = dest.read_text(encoding="utf-8")
+    assert "I2" in body
+    assert "email_source" in body
+    watch = runner.invoke(
+        cli.app,
+        ["reachout", "-c", str(cfg_file), "-C", "BBNJ", "--handoff", "watch"],
+    )
+    assert watch.exit_code == 1
+    assert "does not watch" in watch.stdout
+    lookup = runner.invoke(
+        cli.app,
+        ["reachout", "-c", str(cfg_file), "-C", "BBNJ", "--lookup"],
+    )
+    assert lookup.exit_code == 0, lookup.stdout
+    assert "lookup ignored" in lookup.stdout
 
 
 def test_dedupe_dry_run_skips_the_duplicate_line(cfg_file, stub_zotero, monkeypatch):

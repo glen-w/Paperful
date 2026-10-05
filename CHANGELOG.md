@@ -8,10 +8,21 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ### Added
 
+- `paperful authors -C …`: authors/orgs frequency from scope (`--min-count`,
+  `--max-authors`, `--format json`). Dry-run prints tables. `--apply` writes
+  `state/reports/<scope>-authors.json` (`paperful.authors_report.v1`) and seeds
+  `state/author-packs/<slug>.proposed.toml` (top people; preserves listing URLs).
+  Corporate `name`-only creators are orgs (report-only). Then `twenty lookup` /
+  `snowball packs promote`.
 - `paperful collections add --keys-file` — file existing library item keys into
   `-C` (membership only; dry-run unless `--apply`; added / already-in /
   not-found). `--format json`. Summary under `state/collections-add/`. Bare
   `collections` / `collections list` still print the tree. Not an MCP tool.
+- `paperful reachout -C …`: contact-only list of missing PDFs. Never fetches.
+  CSV (`--to`) with emails from item metadata, then Twenty contacts when
+  `[twenty].enabled` (`--lookup` for a live People search). `--non-oa-only`
+  keeps paywalled / no_oa / license_blocked. `--handoff tabs` opens existing
+  ResearchGate publication URLs so **you** click Request. Does not send mail.
 - `paperful authorwatch`: ORCID/OpenAlex people lists, cursor `run` (optional
   `--backfill-from`), `apply -C` (no `[snowball] enabled`). First `run` without
   `--backfill-from` does not open the library. `--apply` needs write API.

@@ -19,6 +19,8 @@ dashboard. Recipes below are copy-paste commands. The research-pack
 | **Playbook** | URL → PDF rule (`rewrite` / `scrape` / `synthesize`), hand-written or learned from fetch wins | `[[grey_playbooks]]`, `packs/*.toml`, `packs/learned.toml` |
 | **Pack** | Witness for one *executed* sequence. Lists child reports. Not a template you re-run | `state/packs/<id>.json` |
 | **`authorwatch`** | Named people list → their new papers (ORCID / OpenAlex). Not a crawl hop | `state/authorwatch/<name>/` |
+| **`authors`** | Creator frequency in `-C`; `--apply` seeds a proposed field author pack | `state/reports/*-authors.json`, `state/author-packs/` |
+| **`reachout`** | Missing PDFs → CSV / RG tabs for author contact. Never fetches, never sends mail | `paperful reachout` |
 | **`snowball watch`** | Re-run a saved snowball *profile*; propose unseen works | `state/snowball/watches/<name>/` |
 | **`inbox watch`** | PDF drop folder → attach to matching items | `[inbox].dir` |
 
@@ -344,9 +346,42 @@ docker compose run --rm paperful dedupe -C BBNJ --apply
 
 Contributors: the same verbs with `uv run paperful …`.
 
+## 6. Field author packs (corpus frequency → author_site)
+
+Rank creators already in `-C`, write a report, and seed a **proposed** pack
+for the `author_site` grey lane. Corporate `name`-only creators (FAO, …) stay
+in the report; only people go into the pack. Promote before fetch.
+
+```sh
+uv run paperful authors -C BBNJ                    # dry-run tables
+uv run paperful authors -C BBNJ --apply            # report + proposed pack
+uv run paperful twenty lookup -C BBNJ --apply      # optional: CRM websites
+uv run paperful snowball packs promote bbnj        # enable author_site
+uv run paperful run -C BBNJ                        # grey:author_site when names match
+```
+
+Snowball `--author-site-preflight` is the frontier/co-author path to the same
+`state/author-packs/` files; `authors` is the in-library frequency path.
+
+## 7. Reachout (ask authors, do not fetch)
+
+When you want contact data instead of grab modalities: no Unpaywall, no
+proxy, no Sci-Hub. Missing PDFs only. Emails come from the item (`extra`,
+`mailto:`, abstract) then Twenty contacts. Paperful never sends mail.
+
+```sh
+uv run paperful reachout -C ocean/BBNJ --to reachout.csv
+uv run paperful reachout -C ocean/BBNJ --non-oa-only --lookup --to reachout.csv
+uv run paperful reachout -C ocean/BBNJ --request-rg --handoff tabs
+```
+
+`--lookup` needs `[twenty].enabled` plus `TWENTY_API_KEY`. `--handoff tabs`
+opens existing ResearchGate publication URLs; you click Request full-text.
+
 ## What this is not
 
 - Not a workflow engine. Steps are a list, not a graph.
 - Not Rollup's cron, and not TranscriptX's saved GUI profiles.
 - Not a grey-lit playbook. URL → PDF rules stay in `[[grey_playbooks]]`.
 - Not a pack. A pack records one run; a profile is the input you can run again.
+- Not a field author pack. `state/author-packs/` is for `author_site`; `state/packs/` is the run witness.

@@ -185,7 +185,7 @@ with `paperful doctor --probe` before a big run. If you keep `scholar` in
 [Browser sessions](docs/sessions.md).
 
 Flags `--year-from` / `--year-to` and `--type` / `-T` also work on `lint`,
-`fix-metadata`, `dedupe`, `attachments`, `gaps`, `summarize`, `synthesize`, `snapshot`, and
+`fix-metadata`, `dedupe`, `attachments`, `gaps`, `reachout`, `summarize`, `synthesize`, `snapshot`, and
 `restore`. Save them with `paperful profile save`. See
 [Commands](docs/commands.md) and [Workflows](docs/workflows.md).
 

@@ -129,6 +129,8 @@ flowchart LR
 | `state/pdf-cache/` | Throwaway copies of manager PDFs, only when `[mirror].pdfs = "none"`. Otherwise an exported PDF goes into its item folder, and `sync` moves older cache files there |
 | `state/summaries/<key>.html` | `summarize` output when dest includes disk; the Zotero child note is the other copy |
 | `state/reports/<slug>.html` | `synthesize` literature review; sibling `<slug>.json` records source hashes |
+| `state/reports/<slug>-authors.json` | `authors --apply` creator frequency (`paperful.authors_report.v1`); seeds proposed field packs |
+| `state/author-packs/` | Proposed / promoted field author packs (`paperful.author_pack.v1`). From `authors --apply`, snowball preflight, or `twenty lookup --apply` |
 | `state/sessions/` | Chromium profile + `meta.json` (login timestamps, no secrets). Netscape dumps for httpx |
 | `state/fetch-wins.jsonl` | One line per vault or browser-agent PDF (host and path; query string dropped). Input to `paperful playbooks propose` |
 | `state/playbooks-proposed.toml` | Draft learned pack from `playbooks propose`. Not loaded until `playbooks promote` |
