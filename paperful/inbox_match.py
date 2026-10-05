@@ -56,6 +56,9 @@ class MatchResult:
     year: int | None = None
     confidence: float | None = None
     text: str = ""
+    isbn: str = ""
+    report_number: str = ""
+    host: str = ""
 
 
 def stages_for(cfg: Config) -> tuple[str, ...]:
@@ -89,6 +92,52 @@ def build_title_year_index(items: list[Item]) -> dict[tuple[str, int], Item | No
         if not title or year is None:
             continue
         counts.setdefault((title, year), []).append(item)
+    return {
+        key: (rows[0] if len(rows) == 1 else None) for key, rows in counts.items()
+    }
+
+
+def _unique_index(rows: dict[str, list[Item]]) -> dict[str, Item | None]:
+    return {key: (items[0] if len(items) == 1 else None) for key, items in rows.items()}
+
+
+def build_isbn_index(items: list[Item]) -> dict[str, Item | None]:
+    from .greyid import identifiers_from_item
+
+    counts: dict[str, list[Item]] = {}
+    for item in items:
+        if item.has_pdf:
+            continue
+        isbn, _report, _host = identifiers_from_item(item)
+        if isbn:
+            counts.setdefault(isbn, []).append(item)
+    return _unique_index(counts)
+
+
+def build_report_index(items: list[Item]) -> dict[str, Item | None]:
+    from .greyid import identifiers_from_item
+
+    counts: dict[str, list[Item]] = {}
+    for item in items:
+        if item.has_pdf:
+            continue
+        _isbn, report, _host = identifiers_from_item(item)
+        if report:
+            counts.setdefault(report, []).append(item)
+    return _unique_index(counts)
+
+
+def build_grey_index(items: list[Item]) -> dict[tuple[str, int, str], Item | None]:
+    from .greyid import grey_key
+
+    counts: dict[tuple[str, int, str], list[Item]] = {}
+    for item in items:
+        if item.has_pdf:
+            continue
+        key = grey_key(item.title, item.year, url=item.url)
+        if key is None:
+            continue
+        counts.setdefault(key, []).append(item)
     return {
         key: (rows[0] if len(rows) == 1 else None) for key, rows in counts.items()
     }
@@ -129,11 +178,27 @@ def match_ladder(
     text = text_from_pdf(path, max_pages=2)
     doi = doi_from_pdf(path)
     title, year = pdf_title_year(path, text)
+    from .greyid import grey_key, host_from_text, isbn_from_text, report_from_text
+
+    isbn = isbn_from_text(text)
+    report = report_from_text(text)
+    host = host_from_text(text)
+    pool = missing_items or []
+    isbn_index = build_isbn_index(pool)
+    report_index = build_report_index(pool)
+    grey_index = build_grey_index(pool)
+
+    def done(**kwargs: object) -> MatchResult:
+        kwargs.setdefault("isbn", isbn)
+        kwargs.setdefault("report_number", report)
+        kwargs.setdefault("host", host)
+        kwargs.setdefault("text", text)
+        return MatchResult(**kwargs)  # type: ignore[arg-type]
 
     if "doi" in stages and doi:
         item = doi_index.get(doi)
         if item is not None:
-            return MatchResult(item=item, how="doi", doi=doi, title=title, year=year, text=text)
+            return done(item=item, how="doi", doi=doi, title=title, year=year)
         doi_miss = f"no missing-PDF item for DOI {doi}"
     else:
         doi_miss = "no DOI in PDF"
@@ -151,33 +216,87 @@ def match_ladder(
                         doi = normalize_doi(m.group(1))
                         item = doi_index.get(doi) if doi else None
                         if item is not None:
-                            return MatchResult(
-                                item=item, how="ocr", doi=doi, title=title, year=year, text=text
-                            )
+                            return done(item=item, how="ocr", doi=doi, title=title, year=year)
                 title, year = pdf_title_year(path, text)
 
-    if "title_fingerprint" in stages and title and year is not None:
-        key = (normalize_dedupe_title(title), year)
-        item = title_index.get(key)
-        if item is None and key in title_index:
-            return MatchResult(
+    if "title_fingerprint" in stages and isbn:
+        hit = isbn_index.get(isbn)
+        if hit is None and isbn in isbn_index:
+            return done(
+                item=None, how="none", doi=doi, title=title, year=year, reason="ambiguous ISBN"
+            )
+        if hit is not None:
+            return done(
+                item=hit,
+                how="isbn",
+                doi=doi or normalize_doi(hit.doi),
+                title=title,
+                year=year,
+            )
+    if "title_fingerprint" in stages and report:
+        hit = report_index.get(report)
+        if hit is None and report in report_index:
+            return done(
                 item=None,
                 how="none",
                 doi=doi,
                 title=title,
                 year=year,
-                text=text,
+                reason="ambiguous report number",
+            )
+        if hit is not None:
+            return done(
+                item=hit,
+                how="report",
+                doi=doi or normalize_doi(hit.doi),
+                title=title,
+                year=year,
+            )
+    grey = grey_key(title, year, host=host) if "title_fingerprint" in stages else None
+    if grey is not None:
+        hit = grey_index.get(grey)
+        if hit is None and grey in grey_index:
+            return done(
+                item=None,
+                how="none",
+                doi=doi,
+                title=title,
+                year=year,
+                reason="ambiguous grey fingerprint",
+            )
+        if hit is not None:
+            return done(
+                item=hit,
+                how="grey_fingerprint",
+                doi=doi or normalize_doi(hit.doi),
+                title=title,
+                year=year,
+            )
+
+    if "title_fingerprint" in stages and title and year is not None:
+        key = (normalize_dedupe_title(title), year)
+        item = title_index.get(key)
+        if item is None and key in title_index:
+            return done(
+                item=None,
+                how="none",
+                doi=doi,
+                title=title,
+                year=year,
                 reason="ambiguous title+year",
             )
         if item is not None:
-            return MatchResult(
-                item=item,
-                how="title_fingerprint",
-                doi=doi or normalize_doi(item.doi),
-                title=title,
-                year=year,
-                text=text,
-            )
+            from .greyid import registrable_host
+
+            lib_host = registrable_host(item.url)
+            if not (host and lib_host and host != lib_host):
+                return done(
+                    item=item,
+                    how="title_fingerprint",
+                    doi=doi or normalize_doi(item.doi),
+                    title=title,
+                    year=year,
+                )
 
     if "title_resolve" in stages and cfg.inbox_title_resolve and title_resolve and title:
         resolved = title_resolve(title, year)
@@ -185,13 +304,12 @@ def match_ladder(
         if doi_r:
             item = doi_index.get(doi_r)
             if item is not None:
-                return MatchResult(
+                return done(
                     item=item,
                     how="title_resolve",
                     doi=doi_r,
                     title=title,
                     year=year,
-                    text=text,
                 )
 
     if _want_llm(cfg) and llm_match is not None and missing_items:
@@ -205,19 +323,18 @@ def match_ladder(
             item = items_by_key.get(row.key)
             if item is None or item.has_pdf:
                 continue
-            return MatchResult(
+            return done(
                 item=item,
                 how="fifo",
                 doi=normalize_doi(item.doi),
                 title=title,
                 year=year,
-                text=text,
             )
     reason = doi_miss
     if title:
         reason = f"{doi_miss}; title {title!r}"
-    return MatchResult(
-        item=None, how="none", doi=doi, title=title, year=year, text=text, reason=reason
+    return done(
+        item=None, how="none", doi=doi, title=title, year=year, reason=reason
     )
 
 

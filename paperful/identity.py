@@ -1,4 +1,4 @@
-"""DOI then title+year library fingerprints. Shared by snowball, ingest, refs gap, inbox."""
+"""DOI, grey keys, then title+year. Shared by snowball, ingest, refs gap, inbox."""
 
 from __future__ import annotations
 
@@ -35,11 +35,11 @@ def publication_year(value: object) -> int | None:
 @dataclass(frozen=True)
 class LookupHit:
     item_key: str
-    kind: str  # doi | title_year
+    kind: str  # doi | isbn | report | grey | title_year
 
 
 class LibraryFingerprint:
-    """Indexed DOI and title+year keys for items already in the library."""
+    """Indexed DOI, ISBN, report number, grey host, and title+year keys."""
 
     def __init__(
         self,
@@ -47,10 +47,18 @@ class LibraryFingerprint:
         by_title_year: dict[tuple[str, int], str],
         *,
         doi_of: dict[str, str] | None = None,
+        by_isbn: dict[str, str] | None = None,
+        by_report: dict[str, str] | None = None,
+        by_grey: dict[tuple[str, int, str], str] | None = None,
+        host_of: dict[str, str] | None = None,
     ) -> None:
         self.by_doi = by_doi
         self.by_title_year = by_title_year
         self.doi_of = doi_of or {}
+        self.by_isbn = by_isbn or {}
+        self.by_report = by_report or {}
+        self.by_grey = by_grey or {}
+        self.host_of = host_of or {}
 
     @classmethod
     def from_items(
@@ -67,8 +75,14 @@ class LibraryFingerprint:
                 for item in items
                 if want and want in (getattr(item, "collection_paths", None) or [])
             ]
+        from .greyid import grey_key, identifiers_from_item
+
         by_doi: dict[str, str] = {}
         by_title_year: dict[tuple[str, int], str] = {}
+        by_isbn: dict[str, str] = {}
+        by_report: dict[str, str] = {}
+        by_grey: dict[tuple[str, int, str], str] = {}
+        host_of: dict[str, str] = {}
         doi_of: dict[str, str] = {}
         for item in items:
             key = str(getattr(item, "key", "") or "")
@@ -93,21 +107,60 @@ class LibraryFingerprint:
             year = publication_year(getattr(item, "year", None))
             if title and year is not None:
                 by_title_year.setdefault((title, year), key)
-        return cls(by_doi, by_title_year, doi_of=doi_of)
+            isbn, report, host = identifiers_from_item(item)
+            if isbn:
+                by_isbn.setdefault(isbn, key)
+            if report:
+                by_report.setdefault(report, key)
+            if host:
+                host_of[key] = host
+            grey = grey_key(getattr(item, "title", None), year, host=host)
+            if grey:
+                by_grey.setdefault(grey, key)
+        return cls(
+            by_doi,
+            by_title_year,
+            doi_of=doi_of,
+            by_isbn=by_isbn,
+            by_report=by_report,
+            by_grey=by_grey,
+            host_of=host_of,
+        )
 
     def find(
         self,
         doi: str | None = None,
         title: str | None = None,
         year: object = None,
+        *,
+        isbn: str | None = None,
+        report_number: str | None = None,
+        url: str | None = None,
+        host: str | None = None,
     ) -> LookupHit | None:
+        from .greyid import grey_key, normalize_isbn, normalize_report_number, registrable_host
+
         found = normalize_doi(doi) if doi else None
         if found and found in self.by_doi:
             return LookupHit(self.by_doi[found], "doi")
+        isbn_key = normalize_isbn(isbn)
+        if isbn_key and isbn_key in self.by_isbn:
+            return LookupHit(self.by_isbn[isbn_key], "isbn")
+        report_key = normalize_report_number(report_number)
+        if report_key and report_key in self.by_report:
+            return LookupHit(self.by_report[report_key], "report")
+        query_host = (host or registrable_host(url) or "").strip().lower()
+        grey = grey_key(title, year, host=query_host)
+        if grey and grey in self.by_grey:
+            return LookupHit(self.by_grey[grey], "grey")
         key = normalize_dedupe_title(title)
         parsed = publication_year(year)
         if key and parsed is not None and (key, parsed) in self.by_title_year:
-            return LookupHit(self.by_title_year[(key, parsed)], "title_year")
+            item_key = self.by_title_year[(key, parsed)]
+            lib_host = self.host_of.get(item_key, "")
+            if query_host and lib_host and query_host != lib_host:
+                return None
+            return LookupHit(item_key, "title_year")
         return None
 
 
@@ -125,9 +178,20 @@ def library_lookup(backend: Any, *, scope: str, collection: str) -> Lookup:
         )
 
         def indexed(
-            doi: str | None, title: str | None, year: int | None = None
+            doi: str | None,
+            title: str | None,
+            year: int | None = None,
+            **extra: Any,
         ) -> Any:
-            hit = fp.find(doi, title, year)
+            hit = fp.find(
+                doi,
+                title,
+                year,
+                isbn=extra.get("isbn"),
+                report_number=extra.get("report_number"),
+                url=extra.get("url"),
+                host=extra.get("host"),
+            )
             if hit is None:
                 return None
             return hit.item_key, hit.kind

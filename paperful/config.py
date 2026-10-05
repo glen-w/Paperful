@@ -182,6 +182,10 @@ class Config:
     inbox_create: str = "attach_only"  # attach_only | create_gated | create_auto
     inbox_title_resolve: bool = False
     inbox_manager_metadata_s: float = 0.0
+    # Academic HTML→PDF. off leaves journals alone. gated writes a proposal.
+    htmlpdf_academic: str = "off"  # off | gated | auto
+    htmlpdf_upgrade: bool = False  # run retries snapshot-only items
+    htmlpdf_keep_snapshot: bool = False  # leave the print beside a native PDF
     ingest_default_tags: tuple[str, ...] = ()
     ingest_dedupe_scope: str = "library"
     snowball_enabled: bool = False
@@ -224,6 +228,11 @@ class Config:
     snowball_approve_each_max: int = 20
     snowball_hybrid_seeds: int = 5
     snowball_refine: bool = False
+    snowball_dedupe_after: str = "off"  # off | classify | apply
+    snowball_author_site_preflight: bool = False
+    snowball_author_site_max_authors: int = 15
+    snowball_author_site_max_queries: int = 20
+    searxng_base_url: str = ""
     # Where plain-language lines are written. note | tag | off.
     remarks_surface: str = "note"
     oa_honesty_stamp_fields: tuple[str, ...] = ("license", "oa_status", "version")
@@ -322,6 +331,10 @@ class Config:
     @property
     def inbox_proposals_dir(self) -> Path:
         return self.state_dir / "inbox" / "proposals"
+
+    @property
+    def htmlpdf_proposals_dir(self) -> Path:
+        return self.state_dir / "htmlpdf" / "proposals"
 
     def effective_synthesize_timeout(self) -> float:
         if self.synthesize_timeout_s > 0:
@@ -461,6 +474,22 @@ def _from_dict(raw: dict[str, Any], source: Path) -> Config:
     return cfg
 
 
+def parse_dedupe_after(value: Any) -> str:
+    """Post-create snowball hygiene: off, classify, or apply."""
+    if value is None or value is False:
+        return "off"
+    if value is True:
+        return "classify"
+    text = str(value).strip().lower()
+    if text in {"", "0", "false", "no", "off", "none"}:
+        return "off"
+    if text in {"classify", "pack", "dry-run"}:
+        return "classify"
+    if text in {"apply", "merge"}:
+        return "apply"
+    raise ValueError("dedupe_after must be off, classify, or apply")
+
+
 def parse_fetch_pdfs(value: Any) -> str:
     """Snowball PDF mode: off (metadata only), fast (first pass), or full (then the run stack)."""
     if value is None or value is False:
@@ -569,6 +598,14 @@ def _apply_snowball(raw: Any, cfg: Config) -> None:
         cfg.snowball_hybrid_seeds = int(raw["hybrid_seeds"])
     if "refine" in raw:
         cfg.snowball_refine = bool(raw["refine"])
+    if "dedupe_after" in raw and raw["dedupe_after"] is not None:
+        cfg.snowball_dedupe_after = parse_dedupe_after(raw["dedupe_after"])
+    if "author_site_preflight" in raw:
+        cfg.snowball_author_site_preflight = bool(raw["author_site_preflight"])
+    if "author_site_max_authors" in raw:
+        cfg.snowball_author_site_max_authors = int(raw["author_site_max_authors"])
+    if "author_site_max_queries" in raw:
+        cfg.snowball_author_site_max_queries = int(raw["author_site_max_queries"])
 
 
 def _snowball_strs(raw: Any) -> tuple[str, ...]:
@@ -854,6 +891,18 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             cfg.inbox_manager_metadata_s = max(
                 0.0, float(inbox["manager_metadata_s"])
             )
+    htmlpdf = raw.get("htmlpdf")
+    if isinstance(htmlpdf, dict):
+        if "academic" in htmlpdf:
+            cfg.htmlpdf_academic = _one_of(
+                "[htmlpdf].academic",
+                htmlpdf["academic"],
+                ("off", "gated", "auto"),
+            )
+        if "upgrade" in htmlpdf:
+            cfg.htmlpdf_upgrade = bool(htmlpdf["upgrade"])
+        if "keep_snapshot" in htmlpdf:
+            cfg.htmlpdf_keep_snapshot = bool(htmlpdf["keep_snapshot"])
     ingest = raw.get("ingest")
     if isinstance(ingest, dict):
         if "default_tags" in ingest:
@@ -978,6 +1027,9 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             )
         if "timeout_s" in store:
             cfg.openalex_store_timeout_s = max(1.0, float(store["timeout_s"]))
+    searx = raw.get("searxng")
+    if isinstance(searx, dict) and searx.get("base_url"):
+        cfg.searxng_base_url = str(searx["base_url"]).strip().rstrip("/")
     cfg.summarize_prompt_template = _resolve_prompt_path(
         cfg.summarize_prompt_template, source
     )

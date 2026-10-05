@@ -119,7 +119,14 @@ def _snapshot(out: Path, raw: dict, children: list[dict]) -> tuple[Item, Path]:
     """Write a record the way ``snapshot`` does and return the live Item."""
     has_pdf = any(c is PDF_CHILD for c in children)
     linked = any(c is LINK_CHILD for c in children)
-    live = item_from_json(raw, COLS, None, has_pdf=has_pdf, has_linked_url=linked)
+    live = item_from_json(
+        raw,
+        COLS,
+        None,
+        has_pdf=has_pdf,
+        has_linked_url=linked,
+        pdf_tier="native" if has_pdf else "",
+    )
     rec = record_from_raw(raw, live, COLS)
     rec["attachments"] = attachment_rows(children)
     folder = out / live.collection_paths[0] / item_dirname(live)

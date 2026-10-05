@@ -130,8 +130,8 @@ def test_medium_skips_items_already_in_a_doi_group():
     ]
     groups = classify(doi_dupes + title_dupes, "all")
     phases = {g.phase for g in groups}
-    assert phases == {"high_doi", "medium_title_year"}
-    medium = next(g for g in groups if g.phase == "medium_title_year")
+    assert phases == {"high_doi", "grey_host"}
+    medium = next(g for g in groups if g.phase == "grey_host")
     assert medium.needs_review is True
     assert set(medium.trash + [medium.keep]) == {"C", "D"}
     assert "A" not in medium.trash and "B" not in medium.trash
@@ -144,7 +144,7 @@ def test_unique_doi_can_match_missing_doi_on_title_year():
     ]
     groups = classify(items, "all")
     assert len(groups) == 1
-    assert groups[0].phase == "medium_title_year"
+    assert groups[0].phase == "grey_host"
     assert groups[0].needs_review is True
 
 

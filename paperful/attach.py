@@ -262,6 +262,9 @@ def attachment_payload(
     """
     guessed = mimetypes.guess_type(pdf_path.name)[0] or "application/pdf"
     default_title = "Full Text PDF" if guessed == "application/pdf" else pdf_path.stem
+    tags = []
+    if note and "snapshot:htmlpdf" in note:
+        tags = [{"tag": "pdf-tier:snapshot"}]
     return {
         "itemType": "attachment",
         "linkMode": "imported_file",
@@ -271,7 +274,7 @@ def attachment_payload(
         "charset": "",
         "accessDate": "",
         "note": note or "",
-        "tags": [],
+        "tags": tags,
         "relations": {},
     }
 

@@ -2,16 +2,18 @@
 
 Keep rule (high_doi and proposed medium keeps), highest first:
 
-1. stored/imported PDF (`has_pdf`)
-2. linked PDF URL only (`has_linked_url`)
-3. richer metadata: non-placeholder title, then a date/year, then more creators
-4. older `dateAdded` (missing sorts last), then item key
+1. native stored PDF (`has_pdf`, not an HTML snapshot)
+2. HTML page snapshot (`pdf_tier == snapshot`)
+3. linked PDF URL only (`has_linked_url`)
+4. richer metadata: non-placeholder title, then a date/year, then more creators
+5. older `dateAdded` (missing sorts last), then item key
 
 `--apply` copies the extra parent's PDF, notes, and better fields onto the
 keeper, then trashes the emptied parent. Same normalised DOI with titles
 below `TITLE_DIVERGE_BELOW` is held (`held_divergent_title`) and never
-merged. Title+year groups are `needs_review` and are skipped on `--apply`
-unless the caller passes `apply_medium`.
+merged. Title+year and title|year|host groups are `needs_review` and are skipped
+on `--apply` unless the caller passes `apply_medium`. ISBN and report-number
+groups apply with `--apply`, and are held when titles diverge.
 """
 
 from __future__ import annotations
@@ -29,7 +31,7 @@ from .resolve import normalize_doi, normalize_title, title_similarity
 from .zot import Item, is_linked_url_pdf, is_pdf_attachment
 
 TITLE_DIVERGE_BELOW = 0.60
-PHASES = ("high_doi", "medium_title_year", "all")
+PHASES = ("high_doi", "grey_id", "grey_host", "medium_title_year", "all")
 SCHEMA = "paperful.dedupe_pack.v1"
 _SCOPE_UNSAFE = re.compile(r"[^A-Za-z0-9]+")
 _FILENAME_TITLE = re.compile(r"\.pdf$", re.IGNORECASE)
@@ -79,6 +81,7 @@ class GapCounts:
     no_stored_pdf: int
     linked_url_only: int
     missing_doi: int
+    snapshot_only: int = 0
 
 
 def normalize_dedupe_title(title: str | None) -> str:
@@ -98,6 +101,18 @@ def classify(items: list[Item], phase: str = "all") -> list[DedupeGroup]:
         groups.extend(doi_groups)
         for group in doi_groups:
             used.update(member["key"] for member in group.members)
+    if phase in ("grey_id", "all"):
+        rest = [it for it in items if it.key not in used]
+        id_groups = _grey_id(rest)
+        groups.extend(id_groups)
+        for group in id_groups:
+            used.update(member["key"] for member in group.members)
+    if phase in ("grey_host", "all"):
+        rest = [it for it in items if it.key not in used]
+        host_groups = _grey_host(rest)
+        groups.extend(host_groups)
+        for group in host_groups:
+            used.update(member["key"] for member in group.members)
     if phase in ("medium_title_year", "all"):
         rest = [it for it in items if it.key not in used]
         groups.extend(_medium_title_year(rest))
@@ -113,11 +128,13 @@ def summarize_gaps(items: list[Item]) -> GapCounts:
             linked += 1
         if not item.doi:
             missing += 1
+    snapshot_only = sum(1 for item in items if item.pdf_tier == "snapshot")
     return GapCounts(
         items=len(items),
         no_stored_pdf=no_stored,
         linked_url_only=linked,
         missing_doi=missing,
+        snapshot_only=snapshot_only,
     )
 
 
@@ -176,9 +193,9 @@ def actionable_groups(
     for group in sorted(groups, key=lambda g: order.get(g.phase, 9)):
         if group.held or not group.trash or not group.keep:
             continue
-        if group.phase == "medium_title_year" and not apply_medium:
+        if group.phase in {"medium_title_year", "grey_host"} and not apply_medium:
             continue
-        if group.phase not in ("high_doi", "medium_title_year"):
+        if group.phase not in {"high_doi", "medium_title_year", "grey_id", "grey_host"}:
             continue
         chosen.append(group)
     return chosen
@@ -544,7 +561,56 @@ def _high_doi(items: list[Item]) -> list[DedupeGroup]:
     return groups
 
 
+def _grey_id(items: list[Item]) -> list[DedupeGroup]:
+    from .greyid import identifiers_from_item
+
+    buckets: dict[tuple[str, str], list[Item]] = {}
+    for item in items:
+        isbn, report, _host = identifiers_from_item(item)
+        if isbn:
+            buckets.setdefault(("isbn", isbn), []).append(item)
+        if report:
+            buckets.setdefault(("report", report), []).append(item)
+    groups: list[DedupeGroup] = []
+    seen: set[str] = set()
+    for (kind, value), members in sorted(buckets.items()):
+        fresh = [item for item in members if item.key not in seen]
+        if len(fresh) < 2:
+            continue
+        groups.append(
+            _make_group(fresh, phase="grey_id", doi=value, reason=kind)
+        )
+        seen.update(item.key for item in fresh)
+    return groups
+
+
+def _grey_host(items: list[Item]) -> list[DedupeGroup]:
+    from .greyid import grey_key
+
+    buckets: dict[tuple[str, int, str], list[Item]] = {}
+    for item in items:
+        key = grey_key(item.title, item.year, url=item.url)
+        if key is None:
+            continue
+        buckets.setdefault(key, []).append(item)
+    groups: list[DedupeGroup] = []
+    for (title, year, _host), members in sorted(buckets.items()):
+        if len(members) < 2:
+            continue
+        groups.append(
+            _make_group(
+                members,
+                phase="grey_host",
+                title_key=title,
+                year=year,
+                reason="grey",
+            )
+        )
+    return groups
+
+
 def _medium_title_year(items: list[Item]) -> list[DedupeGroup]:
+    from .greyid import registrable_host
     buckets: dict[tuple[str, int], list[Item]] = {}
     for item in items:
         if item.year is None or not _has_title(item):
@@ -556,6 +622,10 @@ def _medium_title_year(items: list[Item]) -> list[DedupeGroup]:
     groups: list[DedupeGroup] = []
     for (title, year), members in sorted(buckets.items()):
         if len(members) < 2:
+            continue
+        hosts = {registrable_host(item.url) for item in members}
+        hosts.discard("")
+        if len(hosts) > 1:
             continue
         groups.append(
             _make_group(members, phase="medium_title_year", title_key=title, year=year)
@@ -570,9 +640,10 @@ def _make_group(
     doi: str | None = None,
     title_key: str | None = None,
     year: int | None = None,
+    reason: str | None = None,
 ) -> DedupeGroup:
     scored = [_member(item) for item in members]
-    held = phase == "high_doi" and _titles_diverge(members)
+    held = phase in {"high_doi", "grey_id"} and _titles_diverge(members)
     if held:
         return DedupeGroup(
             phase=phase,
@@ -587,13 +658,15 @@ def _make_group(
             members=scored,
         )
     keeper = choose_keep(members)
+    if reason is None:
+        reason = "doi" if phase == "high_doi" else "title_year"
     return DedupeGroup(
         phase=phase,
-        reason="doi" if phase == "high_doi" else "title_year",
+        reason=reason,
         keep=keeper.key,
         trash=[item.key for item in members if item.key != keeper.key],
         held=False,
-        needs_review=phase == "medium_title_year",
+        needs_review=phase in {"medium_title_year", "grey_host"},
         doi=doi,
         title_key=title_key,
         year=year,
@@ -621,6 +694,8 @@ def _keep_sort(item: Item) -> tuple:
 
 
 def _attachment_rank(item: Item) -> int:
+    if item.has_pdf and item.pdf_tier != "snapshot":
+        return 3
     if item.has_pdf:
         return 2
     if item.has_linked_url:
@@ -690,6 +765,8 @@ def _markdown(
         lines.append("")
     for phase_name, heading in (
         ("high_doi", "high_doi"),
+        ("grey_id", "grey_id"),
+        ("grey_host", "grey_host"),
         ("medium_title_year", "medium_title_year"),
     ):
         subset = [g for g in groups if g.phase == phase_name and not g.held]

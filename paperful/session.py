@@ -1109,8 +1109,14 @@ class BrowserSession:
         url: str,
         paywall_hints: tuple[str, ...],
         timeout_ms: int = 45_000,
+        *,
+        title: str = "",
+        require_article: bool = False,
+        capture: dict[str, str] | None = None,
     ) -> tuple[bytes, str, str]:
         def _do() -> tuple[bytes, str, str]:
+            from .page_signals import print_page_refusal
+
             self._ensure()
             page = self._page()
             page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
@@ -1120,11 +1126,20 @@ class BrowserSession:
                 pass
             body = ""
             try:
-                body = page.inner_text("body")[:4000].lower()
+                body = page.inner_text("body")[:8000]
             except Exception:
                 pass
-            if any(h in body for h in paywall_hints):
+            if capture is not None:
+                capture["body"] = body
+                capture["url"] = str(page.url)
+            low = body.lower()
+            if any(h in low for h in paywall_hints):
                 return b"", str(page.url), "paywall"
+            refusal = print_page_refusal(
+                str(page.url), body, title=title, require_article=require_article
+            )
+            if refusal:
+                return b"", str(page.url), f"refuse:{refusal}"
             pdf = page.pdf(
                 format="A4",
                 print_background=True,

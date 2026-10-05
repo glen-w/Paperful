@@ -609,6 +609,36 @@ def _now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
+def _author_fields(work: dict[str, Any]) -> tuple[list[str], list[dict[str, str]]]:
+    names: list[str] = []
+    records: list[dict[str, str]] = []
+    for row in work.get("authorships") or []:
+        if not isinstance(row, dict):
+            continue
+        author = row.get("author") or {}
+        if not isinstance(author, dict):
+            author = {}
+        name = (author.get("display_name") or row.get("raw_author_name") or "").strip()
+        oa_id = short_id(str(author.get("id") or ""))
+        orcid = normalize_orcid(str(author.get("orcid") or ""))
+        parts = [p for p in name.split() if p]
+        last = (parts[-1].lower() if parts else "")
+        initial = (parts[0][:1].lower() if parts else "")
+        fingerprint = f"{last}|{initial}" if last else ""
+        if name:
+            names.append(name)
+        if oa_id or orcid or fingerprint:
+            records.append(
+                {
+                    "openalex": oa_id,
+                    "orcid": orcid,
+                    "display_name": name,
+                    "fingerprint": fingerprint,
+                }
+            )
+    return names, records
+
+
 def work_to_candidate(
     work: dict[str, Any],
     *,
@@ -621,12 +651,7 @@ def work_to_candidate(
 ) -> Candidate:
     doi = normalize_doi(str(work.get("doi") or "")) or ""
     oa = short_id(str(work.get("id") or ""))
-    authors: list[str] = []
-    for row in work.get("authorships") or []:
-        author = row.get("author") or {}
-        name = (author.get("display_name") or row.get("raw_author_name") or "").strip()
-        if name:
-            authors.append(name)
+    authors, author_records = _author_fields(work)
     year = work.get("publication_year")
     venue = ""
     series_title = ""
@@ -655,6 +680,7 @@ def work_to_candidate(
             "title": work.get("display_name") or "",
             "year": int(year) if year else None,
             "authors": authors,
+            "author_records": author_records,
             "venue": venue,
             "type": work_type,
             "book_title": book_title,

@@ -282,6 +282,12 @@ gone = "mark"
 # approve_each_max = 20
 # hybrid_seeds = 5
 # refine = false
+# dedupe_after = "off"           # off | classify | apply
+# author_site_preflight = false
+# author_site_max_authors = 15
+# author_site_max_queries = 20
+# [searxng]
+# base_url = ""                  # local instance; or SEARXNG_BASE_URL. never a default run source
 
 # Text layer for scanned PDFs (paperful ocr). Needs ocrmypdf on PATH.
 # The Compose image ships English. Add tesseract language packs for the rest.

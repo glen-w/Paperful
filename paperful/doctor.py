@@ -550,6 +550,7 @@ def run_checks(
     checks.extend(_llm_checks(cfg))
     checks.extend(_rag_checks(cfg))
     checks.append(_snowball_check(cfg))
+    checks.append(_author_packs_check(cfg))
 
     return checks
 
@@ -577,6 +578,37 @@ def _snowball_check(cfg: Config, *, probe: Callable[[str], str] | None = None) -
     detail = f"enabled ({oa}; {s2}; openalex {reach})"
     amber = reach != "ok" or oa.startswith("no ")
     return Check("snowball", "amber" if amber else "green", detail)
+
+
+def _author_packs_check(cfg: Config) -> Check:
+    from datetime import datetime, timezone
+
+    from .snowball.authors import load_promoted_packs, packs_dir
+
+    root = packs_dir(cfg)
+    promoted = load_promoted_packs(cfg)
+    if not promoted:
+        proposed = list(root.glob("*.proposed.toml")) if root.is_dir() else []
+        if proposed:
+            return Check(
+                "author packs",
+                "green",
+                f"{len(proposed)} proposed · snowball packs promote <slug> to use on fetch",
+            )
+        return Check("author packs", "green", "none")
+    stale = 0
+    now = datetime.now(timezone.utc).timestamp()
+    for pack in promoted:
+        path = root / f"{pack.name}.toml"
+        if path.is_file() and now - path.stat().st_mtime > 180 * 86400:
+            stale += 1
+    if stale:
+        return Check(
+            "author packs",
+            "amber",
+            f"{len(promoted)} promoted · {stale} older than 180 days",
+        )
+    return Check("author packs", "green", f"{len(promoted)} promoted")
 
 
 def _openalex_probe_status(status: int, *, keyed: bool) -> str:

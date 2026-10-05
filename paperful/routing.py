@@ -57,8 +57,13 @@ def is_block_failure(outcome: Outcome, note: str = "") -> bool:
 
 
 def sources_for_item(item: Item, cfg: Config, sources: list[str]) -> list[str]:
-    """Return configured sources that look applicable to this item's metadata."""
-    return [name for name in sources if source_applicable(item, cfg, name)]
+    """Return configured sources that look applicable to this item's metadata.
+
+    Web/news htmlpdf stays in its configured slot. Academic snapshots move
+    after ``browser_agent`` and before Sci-Hub.
+    """
+    lanes = [name for name in sources if source_applicable(item, cfg, name)]
+    return place_academic_htmlpdf(lanes, cfg, item)
 
 
 def prior_playwright_miss(attempts: list[str]) -> str | None:
@@ -145,8 +150,35 @@ def with_recover_lane(
     return listed
 
 
+def place_academic_htmlpdf(
+    sources: list[str], cfg: Config, item: Item | None = None
+) -> list[str]:
+    """Move htmlpdf after ``browser_agent`` for an academic item only.
+
+    Web/news items keep the configured slot. Sci-Hub, when present, stays last.
+    """
+    if item is not None:
+        from .sources.htmlpdf import academic_mode
+
+        if academic_mode(item, cfg) == "off":
+            return list(sources)
+    elif getattr(cfg, "htmlpdf_academic", "off") == "off":
+        return list(sources)
+    if "htmlpdf" not in sources:
+        return list(sources)
+    rest = [name for name in sources if name != "htmlpdf"]
+    if "scihub" in rest:
+        rest.insert(rest.index("scihub"), "htmlpdf")
+    else:
+        rest.append("htmlpdf")
+    return rest
+
+
 def filter_sources_for_item_types(
-    sources: list[str], item_types: frozenset[str] | None
+    sources: list[str],
+    item_types: frozenset[str] | None,
+    *,
+    academic_htmlpdf: bool = False,
 ) -> list[str]:
     """Drop sources that can never apply under a CLI ``-T`` / ``--item-type`` scope.
 
@@ -157,7 +189,11 @@ def filter_sources_for_item_types(
         return list(sources)
     out: list[str] = []
     for name in sources:
-        if name == "htmlpdf" and not (item_types & _HTMLPDF_ITEM_TYPES):
+        if (
+            name == "htmlpdf"
+            and not academic_htmlpdf
+            and not (item_types & _HTMLPDF_ITEM_TYPES)
+        ):
             continue
         out.append(name)
     return out
@@ -201,6 +237,10 @@ def source_applicable(item: Item, cfg: Config, name: str) -> bool:
         return bool(item.doi and cfg.core_api_key)
     if name == "scholar":
         return bool(item.doi or (item.title and len(item.title) >= 20))
+    if name == "author_site":
+        from .snowball.authors import matching_author
+
+        return matching_author(item, cfg) is not None
     if name == "direct":
         from .sources.landing import grey_target
 
@@ -210,16 +250,20 @@ def source_applicable(item: Item, cfg: Config, name: str) -> bool:
         # grey_target may synthesize a PDF URL when the item URL is a skip-host.
         return not url_is_direct_skip(target)
     if name == "htmlpdf":
+        if item.pdf_tier == "snapshot":
+            return False
         url = (item.url or "").strip().lower()
         if not url.startswith(("http://", "https://")):
             return False
         if url_is_direct_skip(url):
             return False
-        if item.item_type not in _HTMLPDF_ITEM_TYPES:
-            return False
-        if item.item_type in {"document", "report"}:
-            return not item.doi
-        return True
+        from .sources.htmlpdf import _DOC_TYPES, _WEB_TYPES, academic_mode
+
+        if item.item_type in _WEB_TYPES:
+            return True
+        if item.item_type in _DOC_TYPES and not item.doi:
+            return True
+        return academic_mode(item, cfg) in {"gated", "auto"}
     if name == "ezproxy":
         if not cfg.ezproxy_base:
             return False

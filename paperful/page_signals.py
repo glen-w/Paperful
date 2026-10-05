@@ -191,6 +191,77 @@ def miss_label(note: str) -> str:
     return head or "unknown"
 
 
+_COOKIE_HINTS = (
+    "cookie consent",
+    "we use cookies",
+    "accept all cookies",
+    "manage cookies",
+    "this website uses cookies",
+)
+_ACCESS_HINTS = (
+    "access options",
+    "choose your access",
+    "purchase options",
+    "view full text options",
+)
+_PDF_OFFER_HINTS = (
+    "download pdf",
+    "view pdf",
+    "download this article",
+    "full text pdf",
+    "pdf download",
+)
+_PRINT_BLOCK_LABELS = frozenset({"captcha", "cloudflare", "blocked", "paywall"})
+
+
+def title_overlap(title: str | None, body: str | None) -> bool:
+    """True when enough of the item title appears in the page text."""
+    from .dedupe import normalize_dedupe_title
+
+    tokens = [tok for tok in normalize_dedupe_title(title).split() if len(tok) > 3]
+    if len(tokens) < 3:
+        tokens = normalize_dedupe_title(title).split()
+    if not tokens:
+        return False
+    low = (body or "").lower()
+    hits = sum(1 for tok in tokens if tok in low)
+    return hits >= max(2, int(len(tokens) * 0.6))
+
+
+def print_page_refusal(
+    url: str | None,
+    body: str | None,
+    *,
+    title: str = "",
+    require_article: bool = False,
+) -> str | None:
+    """Why this HTML must not be printed, or None when a snapshot is allowed.
+
+    Refuses cookie walls, access-option landings, login/paywall/captcha pages,
+    and pages that still offer a native PDF download. ``require_article`` also
+    demands title overlap and a body long enough to be the article.
+    """
+    text = body or ""
+    low = text.lower()
+    block = classify_page_block(text)
+    if block in _PRINT_BLOCK_LABELS:
+        return block
+    if looks_like_login_page(url or "", text):
+        return "login"
+    if any(hint in low for hint in _COOKIE_HINTS) and len(low) < 1800:
+        return "cookie-wall"
+    if any(hint in low for hint in _ACCESS_HINTS) and len(text) < 2500:
+        return "access-options"
+    if any(hint in low for hint in _PDF_OFFER_HINTS):
+        return "native-pdf-offered"
+    if require_article:
+        if len(text) < 1500:
+            return "short-page"
+        if not title_overlap(title, text):
+            return "title-mismatch"
+    return None
+
+
 def format_miss(label: str, url: str | None, *, extra: str = "") -> str:
     """``paywall @springer.com; steps 4/8`` with parentheses stripped from extra."""
     host = host_label(url)

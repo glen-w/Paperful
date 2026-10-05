@@ -18,7 +18,7 @@ _OA = frozenset(
         "openaire",
     }
 )
-_WEB = frozenset({"htmlpdf", "scholar", "browser_agent", "direct"})
+_WEB = frozenset({"scholar", "browser_agent", "direct"})
 
 
 def provenance_label(source: str | None, *, playbook: str | None = None) -> str:
@@ -29,8 +29,12 @@ def provenance_label(source: str | None, *, playbook: str | None = None) -> str:
         return f"oa:{src}"
     if src == "ezproxy":
         return "campus:ezproxy"
+    if src == "htmlpdf":
+        return "snapshot:htmlpdf"
     if src == "scihub":
         return "pirate:scihub"
+    if src == "author_site" or (src == "direct" and book == "author_site"):
+        return "grey:author_site"
     if src == "direct" and book:
         return f"grey:{book}"
     if src == "direct":
@@ -66,12 +70,14 @@ def provenance_sentence(
         line = "Downloaded through your library login."
     elif src == "scihub":
         line = "Downloaded from Sci-Hub."
+    elif src == "author_site" or (src == "direct" and book == "author_site"):
+        line = "Saved from an author site."
     elif src == "direct" and book:
         line = f"Saved from {book}."
     elif src == "scholar":
         line = "Found via Google Scholar."
     elif src == "htmlpdf":
-        line = "Printed from the web page."
+        line = "Printed page snapshot, not a publisher PDF."
     elif src == "browser_agent":
         line = "Found by the browser recovery."
     elif src == "direct":

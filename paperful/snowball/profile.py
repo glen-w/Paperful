@@ -95,6 +95,10 @@ def request_from_profile(raw: dict[str, Any], cfg: Config) -> SnowballRequest:
         hybrid_seeds=int(raw["hybrid_seeds"]) if raw.get("hybrid_seeds") is not None else None,
         approve_each_max=int(raw["approve_each_max"]) if raw.get("approve_each_max") is not None else None,
         refine=bool(raw["refine"]) if "refine" in raw else None,
+        dedupe_after=str(raw["dedupe_after"]) if raw.get("dedupe_after") else None,
+        author_site_preflight=bool(raw["author_site_preflight"])
+        if "author_site_preflight" in raw
+        else None,
     )
 
 

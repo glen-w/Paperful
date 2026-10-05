@@ -86,15 +86,18 @@ Zotero has. Do not document either adapter as supported until testers say so.
   via opt-in web search ([Acquire §2](#maybe-later-not-core)); ResearchGate
   request-from-author only behind config when vault/handoff already has an RG
   session ([same section](#maybe-later-not-core)).
-- **Academic HTML→PDF snapshot (optional, later).** `htmlpdf` today applies only
-  to web/news types (and DOI-less `document` / `report`); journal articles skip
-  with `not a web/news item` even when `run` already reached the publisher HTML
-  reader (OA, EZProxy, `direct`, or vault retry) but no lane returned a native
-  PDF. **Direction:** opt-in fallback after scripted lanes exhaust — Playwright
-  print-to-PDF of the article URL the operator would otherwise open in handoff.
-  Provenance must read as a **page snapshot**, not publisher PDF or licensed OA;
-  reuse session vault, paywall hints, and `min_pdf_bytes`; off by default on
-  DOI journal items so completeness runs do not silently attach HTML prints.
+- **Academic HTML→PDF snapshot (shipped, opt-in).** Web/news (and DOI-less
+  `document` / `report`) still print when the page is the article. Journal and
+  other DOI items stay off unless `[htmlpdf].academic` is `gated` or `auto`
+  (`--htmlpdf` for one run). The print runs after scripted lanes and
+  `browser_agent`. Landing pages are refused: paywall, login, cookie wall,
+  access-options, short pages, and any page that still offers a native PDF.
+  `gated` writes `state/htmlpdf/proposals/` (`paperful htmlpdf proposals
+  list|apply|reject`). `auto` attaches only after those checks. The stamp is
+  `snapshot:htmlpdf` (weaker than a publisher PDF). `gaps` counts
+  `snapshot_only`. `run --upgrade-snapshot` retries native lanes and replaces
+  the print unless `--keep-snapshot`. A snapshot is miss-surface `snapshot`,
+  not `import_ok`.
 - **Google Scholar — out of core `run`, handoff + API research (next).** Today
   `scholar` is an opt-in serial source that replays cookies from the session
   vault (same Chromium profile family as EZProxy). In practice it rarely stays
@@ -234,10 +237,10 @@ Zotero has. Do not document either adapter as supported until testers say so.
   (plain-string column + optional `oa_status` / `license` when stamped); map rich
   `attempts[]` outcomes via `miss_detail` until Core fully switches. Without
   stamps when Unpaywall/OpenAlex supplied them → do not claim `import_ok`.
-- **Linked-URL health (later).** `doctor` and/or `paperful urls check -C …` —
-  short-budget HEAD/GET on metadata URLs; findings `ok | redirect | soft_404 |
-  hard_dead | paywall_html` (no rewrite unless `--apply` from a known mirror list).
-  Feeds handoff for linked-only greys; pairs with grey playbook packs.
+- **Linked-URL health (shipped).** `paperful urls check -C …` —
+  short-budget HEAD/GET on metadata URLs and linked-PDF URLs; findings `ok | redirect | soft_404 |
+  hard_dead | paywall_html`. `--apply` rewrites a URL only when a grey playbook
+  already knows the PDF target. Report-only by default.
 - **Quiet mirror** — [quiet-mirror.md](quiet-mirror.md). **Shipped:** `snapshot`
   writes a per-item folder (`record.json`, optional PDF, notes) plus
   `out/_index.jsonl`, `out/_collections.json`, and `out/_history.json`.
@@ -325,22 +328,22 @@ for the end-to-end operator story.
 | Priority | Item | Status |
 | --- | --- | --- |
 | 1 | [`paperful refs gap`](#bibliography-gap-scan-later-not-gaps) — cited-in-PDF, not-in-library pack | Shipped |
-| 2 | [Inbox match ladder](#inbox-match-ladder) (defer quarantine, title/OCR, optional `llm_when_thin`) + [create-on-unmatched](#core-keep-sharpening) (gated proposals) | Shipped (`create_auto` unique-DOI only) |
+| 2 | [Inbox match ladder](#inbox-match-ladder) (defer quarantine, title/OCR, optional `llm_when_thin`) + [create-on-unmatched](#core-keep-sharpening) (gated proposals) | Shipped (`create_auto`: unique DOI, or unique ISBN / report / title+year+host) |
 | 3 | `paperful ingest-dois` — DOI list → `-C`, `--dry-run` / `--apply`, `--tag` | Shipped |
 | 4 | Provenance tags on create (`--tag`, `[snowball]` / `[ingest]` default_tags, `from-<seed-slug>`) | Shipped |
 | 4b | OA honesty miss enum + license/OA stamps on `run --dry-run`, `gaps`, handoff list, run report | Shipped |
 | 5 | Grey playbook example packs (think-tanks, RFMOs, institute report hosts) via `[[grey_playbooks]]` | Ongoing |
-| 6 | Linked-URL health (Core above) | Later |
-| 7 | Non-DOI grey fingerprint (`norm(title)|year|registrant_host`; ISBN/report # when present) in snowball / dedupe / inbox ladder + inbox-create | Later |
+| 6 | Linked-URL health (Core above) | Shipped (`paperful urls check`; `--apply` only via a known playbook rewrite) |
+| 7 | Non-DOI grey fingerprint (`norm(title)|year|registrant_host`; ISBN/report # when present) in snowball / dedupe / inbox ladder + inbox-create | Shipped (ISBN/report like DOI; title\|year\|host is review-tier; host mismatch is not `exists`) |
 | 8 | `paperful collections add --keys-file` — membership batch, dry-run / apply | Parked (Agent §7) |
 | 9 | Acronym allowlist harvest (Core `fix-metadata`) | Shipped (`paperful acronyms`; Title Case consumes `state/acronyms/`) |
 | 10 | [Frontier digest](#frontier-digest-later-watch--external-ingest); thin [snowball briefing](#frontier-digest-later-watch--external-ingest) export before full digest | Thin v0 shipped (`snowball briefing`, `watch briefing`); full digest later |
 | 11 | Scholar 429 latch (Core Scholar) | Shipped |
 | 12 | Authors/orgs frequency report from `-C` (`state/reports/…`; seed **field author packs**) | Later |
 | 13 | Handoff list ranking (Core handoff) | Shipped (cite count × miss severity) |
-| 14 | Opt-in academic HTML→PDF snapshot (Core `htmlpdf`) | Later |
+| 14 | Opt-in academic HTML→PDF snapshot (Core `htmlpdf`) | Shipped (`[htmlpdf].academic` off\|gated\|auto; snapshot tier; `--upgrade-snapshot`) |
 | 15 | Agent JSON + documented exit codes on batch verbs; MCP after those are stable | JSON + exit 3 on the batch verbs; thin `paperful mcp` |
-| 16 | Author-site PDF (registry + packs + co-author crawl; **snowball co-author preflight** / `grey:author_site`) | Later |
+| 16 | Author-site PDF (registry + packs + co-author crawl; **snowball co-author preflight** / `grey:author_site`) | Opt-in in tree (promote packs; SearXNG local-only) |
 | 17 | ResearchGate request-from-author (logged-in vault; config off by default) | Later / explore |
 | 18 | Twenty CRM — author lookup (website → registry; email for mail merge / PDF request; channel policy vs RG) | Later / explore |
 | 19 | Typed note provenance (`paperful.note.v1`) + scannable **first-line** prefixes on all Paperful note writers | Shipped (summarize / synthesize / remarks / snowball / briefing) |
@@ -867,10 +870,9 @@ Phases, in order. Each can stop without the next.
    Semantic Scholar recommendations; combinable e.g. `refs+similar`), plus
    depth above 1 under the same caps. A finished queue with no `deferred.json`
    resumes into create / PDF fetch without searching OpenAlex again.
-4. **Config. Shipped:** `dedupe_scope`, type and venue filters, profile save
-   (`snowball profile save --dedupe-scope` persists it; `[snowball]` and
-   `profiles/*.toml` override at run time — not a separate CLI flag on
-   `search` / `doi` / `run` yet).
+4. **Config. Shipped:** `dedupe_scope`, type and venue filters, profile save,
+   and CLI `--dedupe-scope` on crawl / `run` / `resume` / `apply` / `watch run`
+   (`apply` still defaults to the full library).
 5. **Last pass. Shipped:** `hybrid`, `approve-each`, overlap ranking,
    Crossref / Semantic Scholar fill, and `[llm]` suggestions on the queue.
 6. **Watch. Shipped:** `snowball watch save` / `run` / `show` re-runs a saved
@@ -878,13 +880,13 @@ Phases, in order. Each can stop without the next.
    arrivals into `state/snowball/watches/<name>/inbox.jsonl` plus a normal
    run queue. Always dry-run / no PDFs. Paperful does not schedule it; your
    own launchd or cron may call `watch run`. See [snowball.md](snowball.md#watch).
-7. **Co-author site preflight (later).** Before or alongside hop expansion,
+7. **Co-author site preflight (opt-in).** Before or alongside hop expansion,
    derive a co-author graph from the seed + candidate author lists, discover
-   personal / institutional / static-site home pages for high-centrality names,
-   and write them into [field author packs](#maybe-later-not-core) for the
-   profile scope so the following `run` / `fetch_pdfs` pass tries those grey
-   lanes first. Rationale: GitHub Pages, Weebly, and university pages are
-   usually easier to fetch than major publisher paywalls. Opt-in profile knob;
+   personal / institutional / static-site home pages for high-centrality names
+   (ORCID researcher-urls, then optional local SearXNG), and write them into
+   [field author packs](#maybe-later-not-core) for the profile scope so the
+   following `run` / `fetch_pdfs` pass can try the `author_site` grey lane.
+   Proposed packs only until `snowball packs promote`. Opt-in profile knob;
    not a substitute for OpenAlex caps or gates.
 
 ### Dedupe during snowball — ongoing prevention, not merge-after
@@ -926,11 +928,10 @@ seeds → hops (OpenAlex / filters)
   up as `exists` on apply — that is the main “ongoing” safety net for delayed
   gates.
 - **`snowball resume`** after an OpenAlex budget pause merges new neighbours with
-  `_dedupe` into the on-disk queue; it does not repeat the library fingerprint
-  on the merged file unless you run `apply` or a fresh execute path that
-  re-executes `_mark_exists`. **`resume` on a finished queue** (no
-  `deferred.json`) re-marks `exists` on the full library before create/PDF
-  continue.
+  `_dedupe` into the on-disk queue and re-runs the library fingerprint before
+  optional `auto` create. **`resume` on a finished queue** (no
+  `deferred.json`) re-marks `exists` (full library unless `--dedupe-scope`)
+  before create/PDF continue.
 - **`snowball watch`** is a second ongoing filter: baseline stores every work
   identity from the first profile run in `state/snowball/watches/<name>/seen.json`.
   Later runs still use the profile’s `dedupe_scope` during the crawl, but only
@@ -947,8 +948,9 @@ seeds → hops (OpenAlex / filters)
 | `none` | Skipped (yellow log) | Scout-only queues; `auto` / `approve-each` still refuse create if the library cannot be opened |
 
 Persist with `snowball profile save --dedupe-scope …` or `[snowball].dedupe_scope` /
-`profiles/*.toml`. CLI `--dedupe-scope` exists on profile save, not yet on every
-`search` / `doi` / `run` invocation (parked below).
+`profiles/*.toml`. CLI `--dedupe-scope` overrides per invocation on crawl
+commands, `run`, `resume`, and `watch run`. `apply` stays full-library unless
+that flag is passed on apply.
 
 Indexed lookup (when the backend exposes `items_in_scope`) also maps arXiv IDs and
 `preprint DOI:` lines in Extra into the DOI index, aligned with dedupe’s DOI
@@ -984,8 +986,8 @@ as the **Large corpus from scratch** worked example under [Documentation
 - **`none` or unread library** — queue rows stay `new` until a later apply with
   a readable backend.
 - **Stale queue** — manual edits, or apply long after dry-run without re-apply’s
-  fresh `_mark_exists` (resume-after-budget merge is the weak spot: new rows are
-  not re-fingerprinted on disk until apply or a full re-run).
+  fresh `_mark_exists`. Resume-after-budget merge re-fingerprints before
+  `auto` create; delayed apply still defaults to the full library.
 - **Title+year blind spots** — missing year, `(untitled)`, HTML/title drift:
   snowball may create a second parent; `dedupe` may **hold** divergent titles on
   the same DOI instead of merging.
@@ -998,32 +1000,13 @@ as the **Large corpus from scratch** worked example under [Documentation
 
 #### Parked (snowball lane — thicker “ongoing”)
 
-- **Re-fingerprint on queue merge** — after OpenAlex `resume` adds rows, run
-  `_mark_exists` on the merged `candidates.jsonl` before optional `auto` create on
-  `added` (today `added` can create without a fresh library pass).
-- **`--dedupe-scope` on every subcommand** — override profile per invocation.
-- **Align `snowball apply` with saved `dedupe_scope`** — or document “apply always
-  library” as intentional (safer for delayed gates).
+- **Align `snowball apply` with saved `dedupe_scope`** — apply still defaults
+  to full-library fingerprint; `--dedupe-scope` on apply is the override.
 - **In-run create index** — while `create_new` runs, feed new keys/DOIs back into
   the fingerprint so a single `auto` batch cannot create the same DOI twice if
   the queue had duplicates reintroduced by hand.
-- **Optional post-create sweep** — profile knob: `dedupe` classify (and optionally
-  `--apply`) on target `-C` after `auto` / `apply`.
-- **Seed-file / stdin for long DOI or ORCID lists** — `snowball doi` and
-  `snowball orcid` already take several positionals (and profile `--doi` /
-  `--orcid` repeats). Optional `--seeds-file` / stdin so operators are not
-  shell-pasting long lists.
 - **Manifestation-aware identity** — work ↔ preprint ↔ VoR graph (**Identity /
   resolver graph**, Maybe later §3); snowball keeps skip-only semantics.
-- **Co-author graph + author-site discovery preflight** — phase 7 above;
-  feeds author-site registry before PDF fill on new snowball items.
-- **Keyword wildcards / stem expansion** — OpenAlex `search=` strips `*`, `?`,
-  and `~` (no true wildcard). Operators who want `polic*` (policy, policies,
-  political, …) need Paperful to expand the stem client-side into an OR group
-  before composing the boolean query (same path as multi-keyword AND/`--or`).
-  Scope: `search` / `hybrid` seeds (and later `--cites-query` if useful). Cap
-  expansion length so the `search=` URL stays under OpenAlex’s ~4 KB limit;
-  document that a bare `polic*` today is not a wildcard.
 
 Still outside this lane: every paper by every cited author; a snowball step
 inside `paperful all`; a built-in scheduler; a review UI; systematic-review screening; a

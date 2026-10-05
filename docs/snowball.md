@@ -1,11 +1,13 @@
 # Snowball
 
-**Status:** keyword search (multi-term AND / `--or`), multi-DOI / multi-ORCID /
-collection seeds, `hybrid` (keyword hits, then one hop), refs, cited-by, and
+**Status:** keyword search (multi-term AND / `--or`, trailing `*` stem
+expansion), multi-DOI / multi-ORCID / collection seeds, `--seeds-file`,
+`hybrid` (keyword hits, then one hop), refs, cited-by, and
 OpenAlex keywords, depth up to 5 under caps, gates
 `dry-run` / `approve-each` / `approve-batch` / `auto`, overlap ranking,
-`--fetch-pdfs`, and pull-only `watch` (baseline then propose new arrivals) are
-implemented. Config honors `dedupe_scope`, `tag_prefix`, `default_tags`,
+`--fetch-pdfs`, `--dedupe-scope` per invocation, optional `--dedupe-after`,
+opt-in author-site preflight / `snowball packs promote`, and pull-only `watch`
+are implemented. Config honors `dedupe_scope`, `tag_prefix`, `default_tags`,
 `types`, `oa_only`, venues, `languages`, `min_seed_citations`,
 `note_provenance`, and `backends`. `--refine` writes query suggestions when
 `[llm]` is on and does not create items. `expand = cited_authors` stays off.
@@ -204,6 +206,22 @@ path. It does not invent a silent default collection. `auto` is not a scheduler.
 Dedupe runs before create: normalized DOI against `dedupe_scope` (`library`
 by default, or `collection`, or `none` logged loudly), then the existing
 title+year fingerprint. Only `status = new` rows can become parents.
+`--dedupe-scope` on `search` / `doi` / `orcid` / `collection` / `run` /
+`resume` / `watch run` overrides the profile for that invocation.
+`snowball apply` fingerprints the **full library** unless you pass
+`--dedupe-scope` on apply itself (a saved `collection` scope does not leak
+into delayed apply).
+
+`--seeds-file` (or `-` for stdin) loads DOI or ORCID lists for `doi` /
+`orcid`. Trailing `*` on a keyword (`polic*`) expands client-side into an
+OR group; `?` and `~` are stripped with a warning. After create,
+`--dedupe-after classify|apply` can write `state/dedupe-packs/` (off by
+default).
+
+Opt-in `--author-site-preflight` writes `coauthors.json` and a **proposed**
+pack under `state/author-packs/`. `snowball packs promote <slug>` makes it
+available to the `author_site` grey lane (`grey:author_site`). SearXNG is
+used only when `[searxng].base_url` or `SEARXNG_BASE_URL` is set.
 
 ## One-shot PDFs
 
@@ -340,7 +358,14 @@ min_seed_citations = 0
 hybrid_seeds = 5
 approve_each_max = 20
 refine = false           # suggestions only; needs [llm].enabled
+dedupe_after = "off"     # off | classify | apply
+author_site_preflight = false
+author_site_max_authors = 15
+author_site_max_queries = 20
 ```
+
+`[searxng].base_url` (or `SEARXNG_BASE_URL`) is a **local** instance for
+author-site remainder discovery. It is never in `sources` by default.
 
 `enabled = false` until you opt in, the same posture as `[llm]`. `doctor`
 reports that flag, whether keys are present, and whether a backend answers.

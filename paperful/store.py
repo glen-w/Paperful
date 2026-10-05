@@ -224,6 +224,20 @@ def is_item_dirname(name: str) -> bool:
     return item_key_from_dirname(name) is not None
 
 
+def _catalogue_pdf_tier(rec: dict[str, Any]) -> str:
+    from .greyid import is_snapshot_note
+    from .zot import is_pdf_attachment
+
+    rows = [
+        r
+        for r in (rec.get("attachments") or [])
+        if isinstance(r, dict) and is_pdf_attachment(r)
+    ]
+    if rows and all(is_snapshot_note(r.get("note")) for r in rows):
+        return "snapshot"
+    return "native"
+
+
 def item_from_record(
     rec: dict[str, Any],
     key: str,
@@ -257,6 +271,7 @@ def item_from_record(
         date=str(rec.get("date") or "") or None,
         pdf_path=str(pdfs[0]) if pdfs else None,
         has_pdf=bool(pdfs),
+        pdf_tier=_catalogue_pdf_tier(rec) if pdfs else "",
         date_added=rec.get("date_added") or None,
         creator_count=len(creators),
         abstract=rec.get("abstract") or None,

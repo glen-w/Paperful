@@ -165,6 +165,18 @@ inbox_app = typer.Typer(
     ),
 )
 app.add_typer(inbox_app, name="inbox")
+htmlpdf_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Academic HTML page snapshots. Proposals stay on disk until apply.",
+)
+app.add_typer(htmlpdf_app, name="htmlpdf")
+htmlpdf_proposals_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Gated HTML snapshot proposals. Apply attaches a snapshot-tier PDF.",
+)
+htmlpdf_app.add_typer(htmlpdf_proposals_app, name="proposals")
 notes_app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
@@ -190,7 +202,7 @@ app.add_typer(refs_app, name="refs")
 # Canonical top-level verbs. tests/test_cli.py asserts this matches `paperful --help`.
 JOBS: dict[str, tuple[str, ...]] = {
     "library": ("collections", "import", "export", "snowball", "ingest-dois"),
-    "find": ("run", "attach", "recover", "gaps", "inbox"),
+    "find": ("run", "attach", "recover", "gaps", "inbox", "urls", "htmlpdf"),
     "completeness": (
         "lint",
         "fix-metadata",
@@ -280,6 +292,26 @@ CreateTagOpt = typer.Option(
     "--tag",
     help="Extra tags on created parents (repeatable). Combined with config default_tags and from-<seed-slug>.",
 )
+DedupeScopeOpt = typer.Option(
+    None,
+    "--dedupe-scope",
+    help="library, collection, or none. Crawl default: config/profile. apply defaults to library unless this flag is set.",
+)
+DedupeAfterOpt = typer.Option(
+    None,
+    "--dedupe-after",
+    help="After create: off (default), classify, or apply. classify writes state/dedupe-packs/.",
+)
+AuthorSitePreflightOpt = typer.Option(
+    None,
+    "--author-site-preflight/--no-author-site-preflight",
+    help="Opt-in co-author graph and proposed field pack. Default: config.",
+)
+SeedsFileOpt = typer.Option(
+    None,
+    "--seeds-file",
+    help="One DOI or ORCID per line (# comments). Use - to read stdin.",
+)
 DIRECTION_HELP = (
     "refs, cites, both, keywords, similar, refs+keywords, cites+keywords, "
     "refs+similar, or refs+cites+keywords. both stays references plus cited-by."
@@ -340,6 +372,14 @@ UpgradeLinkedOpt = typer.Option(
     help=(
         "Also fetch items that only have a linked PDF URL. "
         "--no-upgrade-linked turns a profile default off."
+    ),
+)
+UpgradeSnapshotOpt = typer.Option(
+    None,
+    "--upgrade-snapshot/--no-upgrade-snapshot",
+    help=(
+        "Re-fetch items whose only PDF is an HTML page snapshot. "
+        "A native PDF replaces the snapshot unless --keep-snapshot."
     ),
 )
 NoAttachOpt = typer.Option(
@@ -1592,7 +1632,7 @@ def dedupe(
     phase: str = typer.Option(
         "all",
         "--phase",
-        help="high_doi, medium_title_year, or all (default). Apply runs high_doi first.",
+        help="high_doi, grey_id, grey_host, medium_title_year, or all (default). Apply runs high_doi and grey_id first. grey_host needs --apply-medium.",
     ),
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
@@ -2313,6 +2353,213 @@ def _print_dedupe_table(groups: list) -> None:
     console.print(table)
 
 
+@app.command("urls")
+def urls_check(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Rewrite a URL only when a grey playbook already knows the PDF target.",
+    ),
+    limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """HEAD/GET metadata and linked-PDF URLs. Report only unless --apply."""
+    import httpx
+
+    from .agent_json import envelope
+    from .urls import probe_target, targets_for_item
+
+    if _scope_unset(collection, library, None, None):
+        _refuse_missing_scope()
+    started = time.time()
+    cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    _require_manager(cfg)
+    backend = _connect(cfg, quiet=json_out)
+    keys, scope = _scope_keys(backend, collection, library)
+    items = backend.items_in_scope(keys)
+    if limit:
+        items = items[:limit]
+    findings = []
+    applied = 0
+    refused = 0
+    with httpx.Client(follow_redirects=True, timeout=8.0) as client:
+        for item in items:
+            children = []
+            if hasattr(backend, "children"):
+                try:
+                    children = backend.children(item.key)
+                except Exception:
+                    children = []
+            for target in targets_for_item(item, children):
+                finding = probe_target(
+                    client, target, playbooks=cfg.grey_playbooks
+                )
+                row = finding.to_dict()
+                if apply:
+                    patch_key = (
+                        finding.attachment_key
+                        if finding.role == "linked_pdf" and finding.attachment_key
+                        else item.key if finding.role == "parent" else ""
+                    )
+                    if not finding.rewrite or not patch_key or not backend.supports_write():
+                        refused += 1
+                        row["apply"] = "refused"
+                    else:
+                        backend.apply_patch(patch_key, {"url": finding.rewrite})
+                        applied += 1
+                        row["apply"] = "rewritten"
+                findings.append(row)
+    summary = {
+        "scope": scope,
+        "checked": len(findings),
+        "applied": applied,
+        "refused": refused,
+    }
+    for code in ("ok", "redirect", "soft_404", "hard_dead", "paywall_html"):
+        summary[code] = sum(1 for row in findings if row["code"] == code)
+    write_command_report(
+        cfg,
+        command="urls",
+        scope=scope,
+        summary=summary,
+        items=findings,
+        flags={"apply": apply},
+        started=started,
+    )
+    payload = envelope(command="urls check", summary=summary, items=findings, flags={"apply": apply})
+
+    def _human() -> None:
+        table = Table(title="URL health")
+        table.add_column("code")
+        table.add_column("item")
+        table.add_column("url")
+        for row in findings:
+            table.add_row(row["code"], row["item_key"], row["url"][:80])
+        console.print(table)
+        if apply:
+            console.print(f"Rewrote {applied}. Refused {refused} (no known playbook rewrite).")
+
+    _emit_agent(payload, json_out=json_out, human=_human)
+
+
+@htmlpdf_proposals_app.command("list")
+def htmlpdf_proposals_list(
+    status: str = typer.Option("pending", "--status", help="pending, applied, rejected, or all."),
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    from .agent_json import envelope
+    from .sources.htmlpdf import list_proposals
+
+    cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    want = None if status == "all" else status
+    rows = list_proposals(cfg, status=want)
+    payload = envelope(
+        command="htmlpdf proposals list",
+        summary={"count": len(rows)},
+        items=rows,
+        flags={"status": status},
+    )
+
+    def _human() -> None:
+        if not rows:
+            console.print("No HTML snapshot proposals.")
+            return
+        table = Table(title="htmlpdf proposals")
+        table.add_column("id")
+        table.add_column("item")
+        table.add_column("status")
+        for row in rows:
+            table.add_row(str(row.get("id")), str(row.get("item_key")), str(row.get("status")))
+        console.print(table)
+
+    _emit_agent(payload, json_out=json_out, human=_human)
+
+
+@htmlpdf_proposals_app.command("apply")
+def htmlpdf_proposals_apply(
+    proposal_id: str = typer.Argument(..., help="Proposal id."),
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    from .agent_json import envelope
+    from .provenance import provenance_stamp
+    from .sources.htmlpdf import load_proposal, mark_applied, proposal_gate
+
+    cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    _require_manager(cfg)
+    backend = _connect(cfg, quiet=json_out)
+    if not backend.supports_write():
+        _exit_env("htmlpdf proposals apply needs library write support.", cfg)
+    _path, payload_row = load_proposal(cfg, proposal_id)
+    if payload_row.get("status") != "pending":
+        console.print(f"[red]Proposal {proposal_id} is {payload_row.get('status') or 'not pending'}.[/]")
+        raise typer.Exit(1)
+    refusal = proposal_gate(payload_row)
+    if refusal:
+        console.print(f"[red]Proposal {proposal_id} failed the page gate ({refusal}).[/]")
+        raise typer.Exit(1)
+    pdf = Path(str(payload_row.get("pdf") or ""))
+    item_key = str(payload_row.get("item_key") or "")
+    if not pdf.is_file() or not item_key:
+        console.print("[red]Proposal is missing a PDF or item key.[/]")
+        raise typer.Exit(1)
+    note = provenance_stamp("htmlpdf")
+    result = backend.attach(item_key, pdf, note=note)
+    if not result.ok:
+        console.print(f"[red]{result.reason}[/]")
+        raise typer.Exit(1)
+    data = mark_applied(cfg, proposal_id, item_key=item_key)
+    _flush(backend)
+    payload = envelope(
+        command="htmlpdf proposals apply",
+        summary={"id": proposal_id, "item_key": item_key},
+        items=[data],
+        flags={"apply": True},
+    )
+
+    def _human_apply() -> None:
+        console.print(f"Attached snapshot {proposal_id} → {item_key}")
+
+    _emit_agent(payload, json_out=json_out, human=_human_apply)
+
+
+@htmlpdf_proposals_app.command("reject")
+def htmlpdf_proposals_reject(
+    proposal_id: str = typer.Argument(..., help="Proposal id."),
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    from .agent_json import envelope
+    from .sources.htmlpdf import reject_proposal
+
+    cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    try:
+        data = reject_proposal(cfg, proposal_id)
+    except FileNotFoundError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    payload = envelope(
+        command="htmlpdf proposals reject",
+        summary={"id": proposal_id, "status": "rejected"},
+        items=[data],
+    )
+
+    def _human_reject() -> None:
+        console.print(f"Rejected proposal {proposal_id}")
+
+    _emit_agent(payload, json_out=json_out, human=_human_reject)
+
+
 @app.command()
 def gaps(
     collection: list[str] = typer.Option(
@@ -2415,6 +2662,7 @@ def gaps(
         "no_stored_pdf": counts.no_stored_pdf,
         "linked_url_only": counts.linked_url_only,
         "missing_doi": counts.missing_doi,
+        "snapshot_only": counts.snapshot_only,
     }
     rows = []
     for it in items:
@@ -2425,6 +2673,8 @@ def gaps(
             codes.append("linked_url_only")
         if not it.doi:
             codes.append("missing_doi")
+        if it.pdf_tier == "snapshot":
+            codes.append("snapshot_only")
         if codes:
             rows.append(
                 {"itemKey": it.key, "title": it.title, "status": ",".join(codes)}
@@ -2438,6 +2688,7 @@ def gaps(
             "no_stored_pdf": counts.no_stored_pdf,
             "linked_url_only": counts.linked_url_only,
             "missing_doi": counts.missing_doi,
+            "snapshot_only": counts.snapshot_only,
             "handoff": mode if list_missing else "",
         },
         items=rows,
@@ -2463,6 +2714,11 @@ def gaps(
             "paperful run --upgrade-linked",
         )
         table.add_row(str(counts.missing_doi), "missing DOI", "paperful lint")
+        table.add_row(
+            str(counts.snapshot_only),
+            "HTML snapshot only",
+            "paperful run --upgrade-snapshot",
+        )
         console.print(table)
 
     agent_payload = envelope(
@@ -2472,6 +2728,7 @@ def gaps(
             "no_stored_pdf": counts.no_stored_pdf,
             "linked_url_only": counts.linked_url_only,
             "missing_doi": counts.missing_doi,
+            "snapshot_only": counts.snapshot_only,
         },
         items=rows,
         flags={"list_missing": list_missing, "handoff": mode if list_missing else ""},
@@ -2662,6 +2919,17 @@ def run(
     ezproxy_relogin: bool | None = EzproxyReloginOpt,
     browser_agent: bool | None = BrowserAgentOpt,
     upgrade_linked: bool | None = UpgradeLinkedOpt,
+    upgrade_snapshot: bool | None = UpgradeSnapshotOpt,
+    keep_snapshot: bool = typer.Option(
+        False,
+        "--keep-snapshot",
+        help="With --upgrade-snapshot, leave the HTML print beside the new PDF.",
+    ),
+    htmlpdf_mode: str | None = typer.Option(
+        None,
+        "--htmlpdf",
+        help="Academic HTML snapshot for this run: off, gated, or auto. Default off.",
+    ),
     strict_pdf_doi: bool | None = StrictPdfDoiOpt,
     handoff: str | None = typer.Option(
         None,
@@ -2722,6 +2990,7 @@ def run(
         preset=preset,
         scihub=scihub,
         upgrade_linked=upgrade_linked,
+        upgrade_snapshot=upgrade_snapshot if isinstance(upgrade_snapshot, bool) else None,
         strict_pdf_doi=strict_pdf_doi,
     )
     collection, library, year_from, year_to, item_type = _take_scope(bound)
@@ -2734,6 +3003,24 @@ def run(
     scihub = bound.scihub
     upgrade_linked = bound.upgrade_linked
     strict_pdf_doi = bound.strict_pdf_doi
+    if isinstance(htmlpdf_mode, str) and htmlpdf_mode.strip():
+        from .config import _one_of
+
+        try:
+            cfg.htmlpdf_academic = _one_of(
+                "--htmlpdf", htmlpdf_mode, ("off", "gated", "auto")
+            )
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(2)
+    if isinstance(upgrade_snapshot, bool):
+        want_snapshot_upgrade = upgrade_snapshot
+    elif bound.upgrade_snapshot is not None:
+        want_snapshot_upgrade = bound.upgrade_snapshot
+    else:
+        want_snapshot_upgrade = cfg.htmlpdf_upgrade
+    if keep_snapshot:
+        cfg.htmlpdf_keep_snapshot = True
     # `all` calls this function directly. An omitted flag is a Typer option
     # object, not None; only an explicit bool overrides config.
     relogin = (
@@ -2761,7 +3048,11 @@ def run(
     # Drop sources that can never hit this -T / year scope (e.g. htmlpdf on
     # journals, Sci-Hub when --year-from is past its ~2021 coverage), including
     # under --try-all.
-    source_list = filter_sources_for_item_types(source_list, types)
+    source_list = filter_sources_for_item_types(
+        source_list,
+        types,
+        academic_htmlpdf=cfg.htmlpdf_academic != "off",
+    )
     source_list = filter_sources_for_year_scope(source_list, year_from)
     source_list = with_recover_lane(cfg, source_list, during_run=browser_agent)
     if not json_out:
@@ -2792,7 +3083,11 @@ def run(
             if upgrade_linked
             else linked_url_only_count(scoped, skip_empty_paths=keys is not None)
         )
-    items = items_without_stored_pdf(scoped, upgrade_linked=upgrade_linked)
+    items = items_without_stored_pdf(
+        scoped,
+        upgrade_linked=upgrade_linked,
+        upgrade_snapshot=want_snapshot_upgrade,
+    )
     todo = [it for it in items if manifest.should_process(it.key, retry_failed)]
     skipped_manifest = len(items) - len(todo)
     if limit:
@@ -7410,6 +7705,9 @@ def _snowball_request(
     hybrid_seeds: int | None = None,
     refine: bool | None = None,
     tags: list[str] | None = None,
+    dedupe_scope: str | None = None,
+    dedupe_after: str | None = None,
+    author_site_preflight: bool | None = None,
 ) -> Any:
     from .snowball.command import SnowballRequest
 
@@ -7436,11 +7734,52 @@ def _snowball_request(
         refine=refine,
         link_versions=True,
         tags=tuple(str(t).strip() for t in (tags or []) if str(t).strip()),
+        dedupe_scope=(dedupe_scope or "").strip() or None,
+        dedupe_after=(dedupe_after or "").strip() or None,
+        author_site_preflight=author_site_preflight,
     )
 
 
 def _csv(raw: str | None) -> tuple[str, ...]:
     return tuple(part.strip() for part in (raw or "").split(",") if part.strip())
+
+
+def _compose_keywords(queries: list[str], *, or_mode: bool) -> str:
+    from .snowball.expand import compose_keyword_query
+
+    notices: list[str] = []
+    query = compose_keyword_query(queries, op="or" if or_mode else "and", notices=notices)
+    for note in notices:
+        console.print(f"[yellow]{note}[/]")
+    return query
+
+
+def _doi_seeds(dois: list[str] | None, seeds_file: str | Path | None) -> list[str]:
+    from .snowball.seeds import dois_from_seeds, merge_tokens, parse_seed_lines, read_seeds_text
+
+    extra: list[str] = []
+    if seeds_file is not None:
+        extra = parse_seed_lines(read_seeds_text(str(seeds_file)))
+    merged = merge_tokens(list(dois or []), extra)
+    if not merged:
+        from .snowball.command import SnowballError
+
+        raise SnowballError("Pass one or more DOIs or --seeds-file.")
+    return dois_from_seeds(merged)
+
+
+def _orcid_seeds(orcids: list[str] | None, seeds_file: str | Path | None) -> list[str]:
+    from .snowball.seeds import merge_tokens, orcids_from_seeds, parse_seed_lines, read_seeds_text
+
+    extra: list[str] = []
+    if seeds_file is not None:
+        extra = parse_seed_lines(read_seeds_text(str(seeds_file)))
+    merged = merge_tokens(list(orcids or []), extra)
+    if not merged:
+        from .snowball.command import SnowballError
+
+        raise SnowballError("Pass one or more ORCID iDs or --seeds-file.")
+    return orcids_from_seeds(merged)
 
 
 def _profile_queries(body: dict[str, Any], queries: list[str], *, or_mode: bool) -> None:
@@ -7527,6 +7866,9 @@ def snowball_search(
         None, "--refine/--no-refine", help="Ask the LLM for query suggestions."
     ),
     tag: list[str] = CreateTagOpt,
+    dedupe_scope: str | None = DedupeScopeOpt,
+    dedupe_after: str | None = DedupeAfterOpt,
+    author_site_preflight: bool | None = AuthorSitePreflightOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Search OpenAlex and write a candidate queue. Creates items only with --gate auto."""
@@ -7553,12 +7895,14 @@ def snowball_search(
         backends=backends,
         refine=refine,
         tags=tag,
+        dedupe_scope=dedupe_scope,
+        dedupe_after=dedupe_after,
+        author_site_preflight=author_site_preflight,
     )
     from .snowball.command import run_search
-    from .snowball.expand import compose_keyword_query
 
     try:
-        query = compose_keyword_query(queries, op="or" if or_mode else "and")
+        query = _compose_keywords(queries, or_mode=or_mode)
     except ValueError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(2) from exc
@@ -7597,6 +7941,9 @@ def snowball_hybrid(
     min_seed_citations: int | None = typer.Option(None, "--min-seed-citations"),
     refine: bool | None = typer.Option(None, "--refine/--no-refine"),
     tag: list[str] = CreateTagOpt,
+    dedupe_scope: str | None = DedupeScopeOpt,
+    dedupe_after: str | None = DedupeAfterOpt,
+    author_site_preflight: bool | None = AuthorSitePreflightOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Keyword hits, then one hop from the top DOIs. Not a separate harvest command."""
@@ -7622,12 +7969,14 @@ def snowball_hybrid(
         hybrid_seeds=hybrid_seeds,
         refine=refine,
         tags=tag,
+        dedupe_scope=dedupe_scope,
+        dedupe_after=dedupe_after,
+        author_site_preflight=author_site_preflight,
     )
     from .snowball.command import run_hybrid
-    from .snowball.expand import compose_keyword_query
 
     try:
-        query = compose_keyword_query(queries, op="or" if or_mode else "and")
+        query = _compose_keywords(queries, or_mode=or_mode)
     except ValueError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(2) from exc
@@ -7636,7 +7985,9 @@ def snowball_hybrid(
 
 @snowball_app.command("doi")
 def snowball_doi(
-    dois: list[str] = typer.Argument(..., help="One or more seed DOIs."),
+    dois: list[str] | None = typer.Argument(
+        None, help="One or more seed DOIs. Optional when --seeds-file is set."
+    ),
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     depth: int | None = typer.Option(
@@ -7660,6 +8011,10 @@ def snowball_doi(
     ),
     fetch_pdfs: str | None = FetchPdfsOpt,
     tag: list[str] = CreateTagOpt,
+    dedupe_scope: str | None = DedupeScopeOpt,
+    dedupe_after: str | None = DedupeAfterOpt,
+    author_site_preflight: bool | None = AuthorSitePreflightOpt,
+    seeds_file: str | None = SeedsFileOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Bibliography and/or citing works of each DOI. Creates items only with --gate auto."""
@@ -7681,15 +8036,25 @@ def snowball_doi(
         keyword_min_score=keyword_min_score,
         cites_query=(cites_query or "").strip(),
         tags=tag,
+        dedupe_scope=dedupe_scope,
+        dedupe_after=dedupe_after,
+        author_site_preflight=author_site_preflight,
     )
-    from .snowball.command import run_doi
+    from .snowball.command import SnowballError, run_doi
 
-    _run_snowball(cfg, lambda c: run_doi(c, dois, request, console=console))
+    try:
+        seeds = _doi_seeds(dois, seeds_file)
+    except SnowballError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(exc.code) from exc
+    _run_snowball(cfg, lambda c: run_doi(c, seeds, request, console=console))
 
 
 @snowball_app.command("orcid")
 def snowball_orcid(
-    orcids: list[str] = typer.Argument(..., help="One or more ORCID iDs."),
+    orcids: list[str] | None = typer.Argument(
+        None, help="One or more ORCID iDs. Optional when --seeds-file is set."
+    ),
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     depth: int | None = typer.Option(
@@ -7713,6 +8078,10 @@ def snowball_orcid(
     ),
     fetch_pdfs: str | None = FetchPdfsOpt,
     tag: list[str] = CreateTagOpt,
+    dedupe_scope: str | None = DedupeScopeOpt,
+    dedupe_after: str | None = DedupeAfterOpt,
+    author_site_preflight: bool | None = AuthorSitePreflightOpt,
+    seeds_file: str | None = SeedsFileOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """People's works (ORCID + OpenAlex), then references/citations those works expand to."""
@@ -7734,10 +8103,18 @@ def snowball_orcid(
         keyword_min_score=keyword_min_score,
         cites_query=(cites_query or "").strip(),
         tags=tag,
+        dedupe_scope=dedupe_scope,
+        dedupe_after=dedupe_after,
+        author_site_preflight=author_site_preflight,
     )
-    from .snowball.command import run_orcid
+    from .snowball.command import SnowballError, run_orcid
 
-    _run_snowball(cfg, lambda c: run_orcid(c, orcids, request, console=console))
+    try:
+        seeds = _orcid_seeds(orcids, seeds_file)
+    except SnowballError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(exc.code) from exc
+    _run_snowball(cfg, lambda c: run_orcid(c, seeds, request, console=console))
 
 
 @snowball_app.command("collection")
@@ -7771,6 +8148,9 @@ def snowball_collection(
     ),
     fetch_pdfs: str | None = FetchPdfsOpt,
     tag: list[str] = CreateTagOpt,
+    dedupe_scope: str | None = DedupeScopeOpt,
+    dedupe_after: str | None = DedupeAfterOpt,
+    author_site_preflight: bool | None = AuthorSitePreflightOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Expand DOIs already in a collection. Creates items only with --gate auto."""
@@ -7793,6 +8173,9 @@ def snowball_collection(
         keyword_min_score=keyword_min_score,
         cites_query=(cites_query or "").strip(),
         tags=tag,
+        dedupe_scope=dedupe_scope,
+        dedupe_after=dedupe_after,
+        author_site_preflight=author_site_preflight,
     )
     from .snowball.command import run_collection
 
@@ -7866,6 +8249,8 @@ def snowball_resume(
         None, "--gate", help="dry-run or auto. Default: config."
     ),
     tag: list[str] = CreateTagOpt,
+    dedupe_scope: str | None = DedupeScopeOpt,
+    dedupe_after: str | None = DedupeAfterOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Continue OpenAlex work saved when the daily budget was spent. Same API key."""
@@ -7880,6 +8265,8 @@ def snowball_resume(
         year_from=None,
         year_to=None,
         tags=tag,
+        dedupe_scope=dedupe_scope,
+        dedupe_after=dedupe_after,
     )
     from .snowball.command import run_resume
 
@@ -7892,6 +8279,8 @@ def snowball_apply(
     collection: str = typer.Option("", "--collection", "-C", help="Target collection."),
     fetch_pdfs: str | None = FetchPdfsOpt,
     tag: list[str] = CreateTagOpt,
+    dedupe_scope: str | None = DedupeScopeOpt,
+    dedupe_after: str | None = DedupeAfterOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
@@ -7908,6 +8297,8 @@ def snowball_apply(
         year_from=None,
         year_to=None,
         tags=tag,
+        dedupe_scope=dedupe_scope,
+        dedupe_after=dedupe_after,
     )
     from .snowball.command import run_apply
 
@@ -7930,6 +8321,9 @@ def snowball_run(
     keyword_min_score: float | None = KeywordMinScoreOpt,
     cites_query: str | None = CitesQueryOpt,
     tag: list[str] = CreateTagOpt,
+    dedupe_scope: str | None = DedupeScopeOpt,
+    dedupe_after: str | None = DedupeAfterOpt,
+    author_site_preflight: bool | None = AuthorSitePreflightOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Run a saved snowball profile (keyword, DOI, ORCID, or collection)."""
@@ -7961,6 +8355,12 @@ def snowball_run(
             request.keyword_min_score = keyword_min_score
         if cites_query is not None and cites_query.strip():
             request.cites_query = cites_query.strip()
+        if dedupe_scope:
+            request.dedupe_scope = dedupe_scope.strip()
+        if dedupe_after:
+            request.dedupe_after = dedupe_after.strip()
+        if author_site_preflight is not None:
+            request.author_site_preflight = author_site_preflight
         description = str(raw.get("description") or "").strip()
         if description:
             console.print(description)
@@ -8039,6 +8439,7 @@ def snowball_profile_save(
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     dedupe_scope: str = typer.Option("", "--dedupe-scope"),
+    dedupe_after: str = typer.Option("", "--dedupe-after"),
     oa_only: bool = typer.Option(False, "--oa-only"),
     or_mode: bool = typer.Option(
         False, "--or", help="With several --query, match any (default: all)."
@@ -8054,6 +8455,8 @@ def snowball_profile_save(
     backends: str = typer.Option("", "--backends"),
     hybrid_seeds: int | None = typer.Option(None, "--hybrid-seeds"),
     refine: bool = typer.Option(False, "--refine"),
+    author_site_preflight: bool = typer.Option(False, "--author-site-preflight"),
+    seeds_file: str | None = SeedsFileOpt,
     force: bool = typer.Option(
         False, "--force", help="Overwrite, or save a writing gate."
     ),
@@ -8065,6 +8468,23 @@ def snowball_profile_save(
     from .snowball.profile import save_profile as save_snowball_profile
 
     queries = [part.strip() for part in (query or []) if part and part.strip()]
+    from .snowball.command import SnowballError as _SB
+    from .snowball.seeds import parse_seed_lines, read_seeds_text
+
+    file_tokens: list[str] = []
+    if seeds_file:
+        try:
+            file_tokens = parse_seed_lines(read_seeds_text(str(seeds_file)))
+        except _SB as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(exc.code) from exc
+        if doi:
+            doi = list(doi) + file_tokens
+        elif orcid:
+            orcid = list(orcid) + file_tokens
+        else:
+            console.print("[red]--seeds-file needs --doi or --orcid.[/]")
+            raise typer.Exit(2)
     seeds = [
         bool(queries),
         bool(doi),
@@ -8174,6 +8594,32 @@ def snowball_profile_save(
     console.print(f"Wrote [bold]{path}[/]")
 
 
+snowball_packs_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Proposed field author packs from snowball preflight. Promote before fetch uses them.",
+)
+snowball_app.add_typer(snowball_packs_app, name="packs")
+
+
+@snowball_packs_app.command("promote")
+def snowball_packs_promote(
+    slug: str = typer.Argument(..., help="Pack slug (state/author-packs/<slug>.proposed.toml)."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Copy a proposed author pack to the promoted file used by the author_site lane."""
+    cfg = _cfg(config)
+    from .snowball.command import SnowballError
+    from .snowball.preflight import promote_pack
+
+    try:
+        path = promote_pack(cfg, slug)
+    except SnowballError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(exc.code) from exc
+    console.print(f"Promoted [bold]{path}[/]")
+
+
 snowball_watch_app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
@@ -8212,13 +8658,17 @@ def snowball_watch_save(
 @snowball_watch_app.command("run")
 def snowball_watch_run(
     name: str = typer.Argument(..., help="Watch name."),
+    dedupe_scope: str | None = DedupeScopeOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Baseline on first run; later runs write only unseen new works to the inbox."""
     cfg = _cfg(config)
     from .snowball.watch import run_watch
 
-    _run_snowball(cfg, lambda c: run_watch(c, name, console=console))
+    _run_snowball(
+        cfg,
+        lambda c: run_watch(c, name, console=console, dedupe_scope=dedupe_scope),
+    )
 
 
 @snowball_watch_app.command("show")

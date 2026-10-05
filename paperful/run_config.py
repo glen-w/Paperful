@@ -53,6 +53,7 @@ PROFILE_KEYS = frozenset(
         "try_all",
         "retry_failed",
         "upgrade_linked",
+        "upgrade_snapshot",
         "no_attach",
         "strict_pdf_doi",
         "scihub",
@@ -73,6 +74,7 @@ RUN_KEYS = frozenset(
         "try_all",
         "retry_failed",
         "upgrade_linked",
+        "upgrade_snapshot",
         "no_attach",
         "strict_pdf_doi",
         "scihub",
@@ -92,6 +94,7 @@ _DUMP_ORDER = (
     "try_all",
     "retry_failed",
     "upgrade_linked",
+    "upgrade_snapshot",
     "no_attach",
     "strict_pdf_doi",
     "scihub",
@@ -131,6 +134,7 @@ class ResolvedRunConfig:
     try_all: bool = False
     retry_failed: bool = False
     upgrade_linked: bool = False
+    upgrade_snapshot: bool | None = None
     no_attach: bool = False
     strict_pdf_doi: bool = False
     scihub: bool = False
@@ -209,6 +213,7 @@ def resolve_run_config(
     try_all: bool | None = None,
     retry_failed: bool | None = None,
     upgrade_linked: bool | None = None,
+    upgrade_snapshot: bool | None = None,
     no_attach: bool | None = None,
     strict_pdf_doi: bool | None = None,
     scihub: bool | None = None,
@@ -269,6 +274,7 @@ def resolve_run_config(
         try_all=try_all,
         retry_failed=retry_failed,
         upgrade_linked=upgrade_linked,
+        upgrade_snapshot=upgrade_snapshot,
         no_attach=no_attach,
         strict_pdf_doi=strict_pdf_doi,
         scihub=scihub,
@@ -287,6 +293,7 @@ def resolve_run_config(
             try_all,
             retry_failed,
             upgrade_linked,
+            upgrade_snapshot,
             no_attach,
             strict_pdf_doi,
             scihub,
@@ -320,6 +327,7 @@ def collect_save_body(
     try_all: bool | None = None,
     retry_failed: bool | None = None,
     upgrade_linked: bool | None = None,
+    upgrade_snapshot: bool | None = None,
     no_attach: bool | None = None,
     strict_pdf_doi: bool | None = None,
     scihub: bool | None = None,
@@ -354,6 +362,7 @@ def collect_save_body(
         try_all=try_all,
         retry_failed=retry_failed,
         upgrade_linked=upgrade_linked,
+        upgrade_snapshot=upgrade_snapshot,
         no_attach=no_attach,
         strict_pdf_doi=strict_pdf_doi,
         scihub=scihub,
@@ -545,6 +554,7 @@ def _apply_cli(body: dict[str, Any], **flags: Any) -> None:
         "try_all",
         "retry_failed",
         "upgrade_linked",
+        "upgrade_snapshot",
         "no_attach",
         "strict_pdf_doi",
         "scihub",
@@ -615,6 +625,9 @@ def _finalize(body: dict[str, Any], *, for_all: bool) -> ResolvedRunConfig:
         try_all=bool(body.get("try_all")),
         retry_failed=bool(body.get("retry_failed")),
         upgrade_linked=bool(body.get("upgrade_linked")),
+        upgrade_snapshot=(
+            bool(body["upgrade_snapshot"]) if "upgrade_snapshot" in body else None
+        ),
         no_attach=bool(body.get("no_attach")),
         strict_pdf_doi=bool(body.get("strict_pdf_doi")),
         scihub=bool(body.get("scihub")),
@@ -672,6 +685,7 @@ def _normalize(raw: dict[str, Any], *, expect_name: str | None) -> dict[str, Any
         "try_all",
         "retry_failed",
         "upgrade_linked",
+        "upgrade_snapshot",
         "no_attach",
         "strict_pdf_doi",
         "scihub",

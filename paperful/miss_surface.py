@@ -28,6 +28,7 @@ MISS_SURFACE_CODES = frozenset(
         "fetch_failed",
         "license_blocked",
         "import_ok",
+        "snapshot",
     }
 )
 
@@ -38,6 +39,7 @@ MISS_SURFACE_PLAIN: dict[str, str] = {
     "fetch_failed": "Fetch failed or incomplete",
     "license_blocked": "Blocked by license policy",
     "import_ok": "PDF imported",
+    "snapshot": "HTML page snapshot, not a publisher PDF",
 }
 
 _OA_DISCOVERY = frozenset(
@@ -195,6 +197,8 @@ def project_miss_surface(
         return "license_blocked"
 
     saved = has_pdf or st in {STATUS_OK, STATUS_ATTACHED}
+    if saved and (source or "").strip().lower() == "htmlpdf":
+        return "snapshot"
     if saved:
         if import_ok_honest(
             source=source,

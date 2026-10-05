@@ -32,16 +32,28 @@ def orcid_dois(orcid: str, *, getter: Getter | None = None) -> list[str]:
     if getter is not None:
         payload = getter(cleaned)
     else:
-        payload = _http_works(cleaned)
+        payload = _http_json(cleaned, "works")
     return _dois_from_payload(payload)
+
+
+def orcid_researcher_urls(orcid: str, *, getter: Getter | None = None) -> list[str]:
+    """Personal / lab URLs from the public person record."""
+    cleaned = normalize_orcid(orcid)
+    if not cleaned or not _ORCID_RE.match(cleaned):
+        raise OrcidError(f"Invalid ORCID iD: {orcid!r}")
+    if getter is not None:
+        payload = getter(cleaned)
+    else:
+        payload = _http_json(cleaned, "person")
+    return _urls_from_person(payload)
 
 
 _HTTP_ATTEMPTS = 4
 
 
-def _http_works(orcid: str) -> dict[str, Any]:
-    """GET the public works document. Retry transport and timeout failures."""
-    url = f"https://pub.orcid.org/v3.0/{orcid}/works"
+def _http_json(orcid: str, suffix: str) -> dict[str, Any]:
+    """GET a public ORCID JSON document. Retry transport and timeout failures."""
+    url = f"https://pub.orcid.org/v3.0/{orcid}/{suffix}"
     headers = {
         "Accept": "application/json",
         "User-Agent": "paperful-snowball/0.1",
@@ -65,6 +77,10 @@ def _http_works(orcid: str) -> dict[str, Any]:
             raise OrcidError("ORCID response was not an object")
         return data
     raise OrcidError(f"ORCID request failed for {orcid}") from last
+
+
+def _http_works(orcid: str) -> dict[str, Any]:
+    return _http_json(orcid, "works")
 
 
 def _dois_from_payload(payload: dict[str, Any] | list[Any]) -> list[str]:
@@ -92,3 +108,22 @@ def _dois_from_payload(payload: dict[str, Any] | list[Any]) -> list[str]:
                 if doi and doi not in seen:
                     seen.append(doi)
     return seen
+
+
+def _urls_from_person(payload: dict[str, Any] | list[Any]) -> list[str]:
+    if not isinstance(payload, dict):
+        return []
+    block = payload.get("researcher-urls") or {}
+    rows = block.get("researcher-url") if isinstance(block, dict) else []
+    if isinstance(rows, dict):
+        rows = [rows]
+    out: list[str] = []
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        url = row.get("url") or {}
+        value = url.get("value") if isinstance(url, dict) else url
+        text = str(value or "").strip()
+        if text and text not in out:
+            out.append(text)
+    return out

@@ -8,11 +8,12 @@ def test_oa_campus_pirate_and_web_labels():
     assert provenance_label("openalex") == "oa:openalex"
     assert provenance_label("ezproxy") == "campus:ezproxy"
     assert provenance_label("scihub") == "pirate:scihub"
-    assert provenance_label("htmlpdf") == "web:htmlpdf"
+    assert provenance_label("htmlpdf") == "snapshot:htmlpdf"
     assert provenance_label("scholar") == "web:scholar"
     assert provenance_label("browser_agent") == "web:browser_agent"
     assert provenance_label("direct") == "web:direct"
     assert provenance_label("direct", playbook="undocs-unga-vme") == "grey:undocs-unga-vme"
+    assert provenance_label("author_site") == "grey:author_site"
     assert provenance_label(None) == "web:unknown"
 
 
@@ -28,9 +29,10 @@ def test_provenance_sentences():
     assert provenance_sentence("unpaywall") == "Free copy from Unpaywall."
     assert provenance_sentence("ezproxy") == "Downloaded through your library login."
     assert provenance_sentence("scihub") == "Downloaded from Sci-Hub."
+    assert provenance_sentence("author_site") == "Saved from an author site."
     assert provenance_sentence("direct", playbook="undocs") == "Saved from undocs."
     assert provenance_sentence("scholar") == "Found via Google Scholar."
-    assert provenance_sentence("htmlpdf") == "Printed from the web page."
+    assert provenance_sentence("htmlpdf") == "Printed page snapshot, not a publisher PDF."
     assert provenance_sentence("browser_agent") == "Found by the browser recovery."
     assert (
         provenance_sentence("unpaywall", pdf_doi_mismatch=True)

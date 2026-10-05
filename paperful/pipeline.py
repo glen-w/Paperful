@@ -86,7 +86,7 @@ from .store import (
 from .zot import Item
 
 # Sources that share a browser/session or are heavy — keep serial & polite.
-_SERIAL_SOURCES = frozenset({"scihub", "ezproxy", "htmlpdf", "scholar", "browser_agent"})
+_SERIAL_SOURCES = frozenset({"scihub", "ezproxy", "htmlpdf", "scholar", "browser_agent", "author_site"})
 _DIRECT_PDF_CAP = 12
 _LANDING_CAP = 6
 # Soft-block vault retries that land on campus CAS; trip EZProxy after this many.
@@ -265,6 +265,35 @@ def _scholar_blocked(cand: Candidate) -> bool:
 def _is_soft_block_error(exc: DownloadError) -> bool:
     msg = str(exc)
     return "too small" in msg or msg.startswith("not a PDF")
+
+
+def _drop_snapshot_attachments(attacher: Any, item_key: str, emit: Callable[[str], None]) -> None:
+    """Trash htmlpdf snapshot children after a native PDF attaches."""
+    from .greyid import is_snapshot_note
+    from .zot import is_pdf_attachment
+
+    if attacher is None or not hasattr(attacher, "children"):
+        return
+    trash = getattr(attacher, "trash_attachment", None)
+    if trash is None:
+        return
+    try:
+        children = attacher.children(item_key)
+    except Exception as exc:
+        emit(f"   [dim]snapshot cleanup skipped[/] {item_key}: {exc}")
+        return
+    for child in children:
+        data = child.get("data") or {}
+        if not is_pdf_attachment(data) or not is_snapshot_note(data.get("note")):
+            continue
+        key = str(child.get("key") or data.get("key") or "")
+        if not key:
+            continue
+        try:
+            trash(key)
+            emit(f"   [dim]replaced snapshot[/] {item_key} ({key})")
+        except Exception as exc:
+            emit(f"   [dim]snapshot cleanup skipped[/] {key}: {exc}")
 
 
 class Pipeline:
@@ -812,7 +841,9 @@ class Pipeline:
     def _applicable(self, item: Item) -> list[str]:
         configured = [s for s in self.sources if s in REGISTRY]
         if self.try_all:
-            return configured
+            from .routing import place_academic_htmlpdf
+
+            return place_academic_htmlpdf(configured, self.cfg, item)
         return sources_for_item(item, self.cfg, configured)
 
     def _lanes_for(self, item: Item) -> list[str]:
@@ -1186,6 +1217,8 @@ class Pipeline:
             with self._stats_lock:
                 self.stats.bump(STATUS_ATTACHED)
             self._emit(f"   [cyan]attached[/] {rec.itemKey} ({res.reason})")
+            if rec.source != "htmlpdf" and not self.cfg.htmlpdf_keep_snapshot:
+                _drop_snapshot_attachments(self.attacher, rec.itemKey, self._emit)
             self._add_outcome(rec)
             mismatch = bool(rec.pdf_doi and rec.doi and rec.pdf_doi != rec.doi)
             try:

@@ -8,6 +8,12 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ### Added
 
+- Snowball `--dedupe-scope` on crawl/run/resume/apply/watch; `--seeds-file`
+  (DOI/ORCID lists); trailing `*` keyword stem expansion; `--dedupe-after
+  classify|apply`; opt-in `--author-site-preflight` (co-author graph + proposed
+  `state/author-packs/`) and `snowball packs promote`. `author_site` grey lane
+  stamps `grey:author_site` (not a default `run` source). Resume re-fingerprints
+  merged OpenAlex rows before auto-create.
 - `--format json` (`paperful.agent.json.v1`) on the remaining batch verbs
   (`gaps`, `lint`, `fix-metadata`, `dedupe`, `snowball apply`, `summarize`,
   `synthesize`, `restore`, `import`, `recover`, `ocr`, `all`, inbox

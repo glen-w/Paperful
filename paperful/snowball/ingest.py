@@ -250,12 +250,13 @@ def fill_pdfs(
     if mode == "off" or not items:
         return RunStats()
     attacher = backend if cfg.attach else None
+    fill_sources = _fill_sources(cfg, items)
     fast = _run_fill(
         cfg,
         items,
         console,
         attacher=attacher,
-        sources=list(cfg.sources),
+        sources=fill_sources,
         use_browser=False,
         tally=tally,
         stage="fetching PDFs",
@@ -266,7 +267,7 @@ def fill_pdfs(
     left = [it for it in items if manifest.should_process(it.key, False)]
     if not left:
         return fast
-    sources = with_recover_lane(cfg, list(cfg.sources))
+    sources = with_recover_lane(cfg, fill_sources)
     if "scihub" in sources:
         console.print(f"[red]{SCIHUB_DISCLAIMER}[/]")
     if "browser_agent" in sources:
@@ -323,3 +324,14 @@ def _run_fill(
             lambda: prior_ok + int(getattr(getattr(pipe, "stats", None), "ok", 0) or 0)
         )
     return pipe.run(items)
+
+
+def _fill_sources(cfg: Config, items: list[Item]) -> list[str]:
+    sources = list(cfg.sources)
+    from .authors import matching_author
+
+    if "author_site" in sources:
+        return sources
+    if any(matching_author(item, cfg) is not None for item in items):
+        return ["author_site", *sources]
+    return sources

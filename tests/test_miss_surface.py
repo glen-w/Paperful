@@ -21,6 +21,7 @@ def test_frozen_enum_codes():
             "fetch_failed",
             "license_blocked",
             "import_ok",
+            "snapshot",
         }
     )
 

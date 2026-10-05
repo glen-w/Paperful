@@ -28,14 +28,13 @@ from .expand import (
     parse_keyword_hop_limit,
     parse_keyword_limit,
     parse_keyword_min_score,
-    publication_year,
     truncate,
 )
 from .fill import FillPaused, crossref_work, run_fill_pass, s2_api_key, s2_paper
 from .ingest import create_new, fill_pdfs
 from .local_cites import load_local_cites
 from .local_openalex import store_from_config
-from .openalex import OpenAlexBudgetExceeded, OpenAlexClient, keyless_limit_message, normalize_orcid
+from .openalex import OpenAlexClient, keyless_limit_message, normalize_orcid
 from .orcid import OrcidError, orcid_dois
 from .queue import load_queue, write_queue, write_report
 from ..progress import item_progress
@@ -122,6 +121,8 @@ class SnowballRequest:
     link_versions: bool = False
     from_created_date: str | None = None
     cites_query: str = ""
+    dedupe_after: str | None = None
+    author_site_preflight: bool | None = None
 
 
 @dataclass
@@ -541,12 +542,20 @@ def run_resume(
     else:
         added = continue_deferred(oa, deferred)
         merged = _dedupe(list(rows) + added)
+    lib_fp = backend
+    unread = False
+    try:
+        lib_fp, unread = _fingerprint_rows(
+            cfg, request, merged, backend=backend, console=console
+        )
+    except SnowballError:
+        raise
     write_queue(
         cfg.state_dir,
         run_id,
         merged,
         oa,
-        library_unread=False,
+        library_unread=unread,
         meta={"resumed": True, "resume_added": len(added)},
     )
     if oa.deferred is None and path.is_file():
@@ -563,10 +572,18 @@ def run_resume(
     console.print(f"resumed · {len(added)} rows added")
     tally.stop()
     if request.gate == "auto" and request.collection.strip() and added:
-        lib = backend
+        lib = backend or lib_fp
         try:
             lib = lib or get_backend(cfg)
-            settled = _settled_rows(added, _blocked_dois(paused))
+            by_id = {row.identity: row for row in merged if row.identity}
+            settled = [
+                by_id[row.identity]
+                for row in added
+                if row.identity in by_id
+                and by_id[row.identity].status == "new"
+                and by_id[row.identity].keep is not False
+            ]
+            settled = _settled_rows(settled, _blocked_dois(paused))
             items, _counts = create_new(
                 lib,
                 settled,
@@ -584,6 +601,7 @@ def run_resume(
             _write_cached_pdfs(cfg, items, settled)
             if _pdf_mode(request) != "off" and items:
                 fill_pdfs(cfg, lib, items, console, mode=_pdf_mode(request))
+            _maybe_dedupe_after(cfg, request, lib, request.collection, console)
         except (LibraryError, SnowballError) as exc:
             raise SnowballError(str(exc)) from exc
     return PathResult(dest, 0)
@@ -616,7 +634,9 @@ def _resume_saved_queue(
         lib = lib or get_backend(cfg)
     except Exception as exc:
         raise SnowballError(f"Library was not read. Refusing to create items. {exc}") from exc
-    lookup = _library_lookup(lib, scope="library", collection=request.collection)
+    lookup = _library_lookup(
+        lib, scope=_apply_fingerprint_scope(request), collection=request.collection
+    )
     _mark_exists(rows, lookup)
     creatable = [row for row in rows if row.status == "new" and row.keep is not False]
     items: list[Any] = []
@@ -641,6 +661,7 @@ def _resume_saved_queue(
         pending = pending_pdf_items(rows, items, manifest)
         if pending:
             fill_pdfs(cfg, lib, pending, console, mode=mode)
+    _maybe_dedupe_after(cfg, request, lib, request.collection, console)
     return PathResult(dest, 1 if failed else 0)
 
 
@@ -675,7 +696,9 @@ def run_apply(
     if finder is None:
         try:
             lib = lib or get_backend(cfg)
-            finder = _library_lookup(lib, scope="library", collection=collection)
+            finder = _library_lookup(
+                lib, scope=_apply_fingerprint_scope(request), collection=collection
+            )
         except Exception as exc:
             raise SnowballError(f"Library was not read. Refusing to create items. {exc}") from exc
     assert lib is not None and finder is not None
@@ -721,6 +744,7 @@ def run_apply(
         _print_fetch_result(console, report, sought=len(items), collection=collection)
     else:
         console.print(f"items created (metadata only): {counts['created']}")
+    _maybe_dedupe_after(cfg, request, lib, collection, console)
     write_report(dest, report)
     failed = int(counts.get("failed") or 0)
     created = int(counts.get("created") or 0)
@@ -795,6 +819,12 @@ def _checked_cites_query(request: SnowballRequest, direction: str, *, expands: b
     query = (request.cites_query or "").strip()
     if not query:
         return ""
+    from .expand import expand_search_term
+
+    expanded, notices = expand_search_term(query)
+    query = expanded or query
+    for note in notices:
+        Console(highlight=False).print(f"[yellow]{note}[/]")
     sides = direction_sides(direction)
     if "refs" not in sides and "cites" not in sides:
         raise SnowballError("--cites-query needs a direction that includes refs or cites.")
@@ -827,6 +857,14 @@ def _guard(cfg: Config, request: SnowballRequest) -> None:
     scope = (request.dedupe_scope or cfg.snowball_dedupe_scope or "library").strip()
     if scope not in {"library", "collection", "none"}:
         raise SnowballError("dedupe_scope must be library, collection, or none.")
+    after = request.dedupe_after
+    if after is not None:
+        from ..config import parse_dedupe_after
+
+        try:
+            parse_dedupe_after(after)
+        except ValueError as exc:
+            raise SnowballError(str(exc)) from exc
     _backends(cfg, request)
     if request.gate in {"auto", "approve-batch", "approve-each"} and not request.collection.strip():
         raise SnowballError(
@@ -1058,6 +1096,21 @@ def _execute(
             console=console,
         ),
     )
+    want_preflight = (
+        cfg.snowball_author_site_preflight
+        if request.author_site_preflight is None
+        else request.author_site_preflight
+    )
+    if want_preflight:
+        from .preflight import run_author_site_preflight
+
+        run_author_site_preflight(
+            cfg,
+            rows,
+            dest=dest,
+            collection=request.collection,
+            console=console,
+        )
     _print_table(console, rows)
     exit_code = 1 if failed or oa.deferred else 0
     if oa.deferred:
@@ -1115,12 +1168,94 @@ def _execute(
         )
     else:
         console.print(f"items created (metadata only): {counts['created']}")
+    _maybe_dedupe_after(cfg, request, lib, request.collection, console)
     tally.stop()
     return PathResult(dest, exit_code)
 
 
 def _library_lookup(backend: Any, *, scope: str, collection: str) -> Lookup:
     return library_lookup(backend, scope=scope, collection=collection)
+
+
+def _apply_fingerprint_scope(request: SnowballRequest) -> str:
+    """Delayed apply fingerprints the full library unless --dedupe-scope is set."""
+    scope = (request.dedupe_scope or "library").strip()
+    return scope if scope in {"library", "collection", "none"} else "library"
+
+
+def _fingerprint_rows(
+    cfg: Config,
+    request: SnowballRequest,
+    rows: list[Candidate],
+    *,
+    backend: Any,
+    console: Console,
+) -> tuple[Any, bool]:
+    """Mark exists/version on ``rows``. Returns (backend, library_unread)."""
+    scope = (request.dedupe_scope or cfg.snowball_dedupe_scope or "library").strip()
+    if scope not in {"library", "collection", "none"}:
+        raise SnowballError("dedupe_scope must be library, collection, or none.")
+    lib = backend
+    unread = False
+    if scope == "none":
+        console.print("[yellow]dedupe_scope none: not checking the library[/]")
+        return lib, False
+    finder = None
+    try:
+        lib = lib or get_backend(cfg)
+        finder = _library_lookup(lib, scope=scope, collection=request.collection)
+    except Exception:
+        return lib, True
+    try:
+        _mark_exists(rows, finder, version_of=_version_of(cfg, request))
+    except Exception:
+        unread = True
+    return lib, unread
+
+
+def _maybe_dedupe_after(
+    cfg: Config,
+    request: SnowballRequest,
+    backend: Any,
+    collection: str,
+    console: Console,
+) -> None:
+    from ..config import parse_dedupe_after
+
+    raw = cfg.snowball_dedupe_after if request.dedupe_after is None else request.dedupe_after
+    try:
+        mode = parse_dedupe_after(raw)
+    except ValueError as exc:
+        raise SnowballError(str(exc)) from exc
+    if mode == "off" or backend is None or not (collection or "").strip():
+        return
+    from ..dedupe import apply_merge, attach_merge_previews, classify, write_pack
+
+    try:
+        col = backend.resolve_collection(collection.strip())
+        items = backend.items_in_scope([col.key])
+    except Exception as exc:
+        console.print(f"[yellow]dedupe_after skipped: {exc}[/]")
+        return
+    groups = classify(items)
+    attach_merge_previews(backend, groups)
+    json_path, _md = write_pack(
+        cfg.state_dir, collection, groups, phase="all", n_items=len(items)
+    )
+    console.print(f"dedupe classified {len(groups)} groups · {json_path}")
+    if mode != "apply":
+        return
+    merged, errors = apply_merge(
+        backend,
+        groups,
+        apply_medium=False,
+        audit_path=cfg.state_dir / "dedupe-applied.jsonl",
+        scope=collection,
+        pack=json_path,
+    )
+    console.print(f"dedupe merged {merged}")
+    for err in errors:
+        console.print(f"[yellow]{err}[/]")
 
 
 def _mark_exists(
@@ -1134,9 +1269,29 @@ def _mark_exists(
         doi = row.ids.get("doi") or None
         title = row.biblio.get("title") or None
         year = row.biblio.get("year")
-        found = _call_lookup(lookup, doi, title, year)
+        url = row.biblio.get("url") or row.biblio.get("landing_page_url")
+        isbn = row.ids.get("isbn") or row.biblio.get("isbn")
+        report = row.ids.get("report") or row.biblio.get("report_number")
+        found = _call_lookup(
+            lookup,
+            doi,
+            title,
+            year,
+            url=url,
+            isbn=isbn,
+            report_number=report,
+        )
         if found:
-            _set_exists(row, found, doi=doi, title=title, year=year)
+            _set_exists(
+                row,
+                found,
+                doi=doi,
+                title=title,
+                year=year,
+                isbn=isbn,
+                report_number=report,
+                url=url,
+            )
             continue
         if not version_of or not doi:
             continue
@@ -1175,8 +1330,16 @@ def _version_of(cfg: Config, request: SnowballRequest) -> Callable[[str], Any] |
 
 
 def _call_lookup(
-    lookup: Lookup, doi: str | None, title: str | None, year: int | None
+    lookup: Lookup,
+    doi: str | None,
+    title: str | None,
+    year: int | None,
+    **extra: Any,
 ) -> Any:
+    try:
+        return lookup(doi, title, year, **extra)  # type: ignore[call-arg]
+    except TypeError:
+        pass
     try:
         return lookup(doi, title, year)  # type: ignore[call-arg]
     except TypeError:
@@ -1190,7 +1353,12 @@ def _set_exists(
     doi: str | None,
     title: str | None,
     year: int | None,
+    isbn: str | None = None,
+    report_number: str | None = None,
+    url: str | None = None,
 ) -> None:
+    from ..greyid import grey_token, normalize_isbn, normalize_report_number, registrable_host
+
     if isinstance(found, tuple):
         key, kind = found
     else:
@@ -1200,6 +1368,19 @@ def _set_exists(
         row.exists_match = {
             "item_key": key,
             "title_year": f"{normalize_dedupe_title(title)}|{year}",
+        }
+    elif kind == "grey":
+        host = registrable_host(url)
+        row.exists_match = {
+            "item_key": key,
+            "grey": grey_token(title, year, host),
+        }
+    elif kind == "isbn":
+        row.exists_match = {"item_key": key, "isbn": normalize_isbn(isbn)}
+    elif kind == "report":
+        row.exists_match = {
+            "item_key": key,
+            "report": normalize_report_number(report_number),
         }
     else:
         row.exists_match = {"item_key": key, "doi": normalize_doi(doi) or (doi or "")}

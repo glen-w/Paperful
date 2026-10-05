@@ -142,6 +142,9 @@ class Item:
     creator_count: int = 0
     abstract: str | None = None
     creator_surnames: list[str] = field(default_factory=list)
+    isbn: str | None = None
+    report_number: str | None = None
+    pdf_tier: str = ""  # native | snapshot | "" (no stored PDF)
 
     @property
     def label(self) -> str:
@@ -262,7 +265,7 @@ class ZoteroLocal:
     def collection_counts(self) -> dict[str, tuple[int, int]]:
         """Per collection key: (top-level items, items lacking PDF), counting subcollections."""
         cols = self.collections()
-        imported, _linked = self._pdf_parent_sets()
+        imported, _linked, _snapshot = self._pdf_parent_sets()
         pdf_parents = imported
         raw_items = self.zot.everything(self.zot.top())
         direct: dict[str, list[dict[str, Any]]] = {k: [] for k in cols}
@@ -285,12 +288,19 @@ class ZoteroLocal:
     # ---- items ----------------------------------------------------------
     def _pdf_parent_sets(
         self, *, status: Callable[[str], None] | None = None
-    ) -> tuple[set[str], set[str]]:
-        """Imported PDF parents, and parents with only a linked PDF URL (no imported file)."""
+    ) -> tuple[set[str], set[str], set[str]]:
+        """Imported PDF parents, linked-URL-only parents, and snapshot-only parents.
+
+        Snapshot-only means every imported PDF note is an htmlpdf page print.
+        A native PDF on the same parent drops it from that set.
+        """
+        from .greyid import is_snapshot_note
+
         tick = status or (lambda _msg: None)
         tick("Fetching PDF attachments from Zotero…")
         attachments = self.zot.everything(self.zot.items(itemType="attachment"))
-        imported: set[str] = set()
+        native: set[str] = set()
+        snapshot: set[str] = set()
         linked_url: set[str] = set()
         for a in attachments:
             data = a["data"]
@@ -298,11 +308,15 @@ class ZoteroLocal:
             if not parent:
                 continue
             if is_pdf_attachment(data):
-                imported.add(parent)
+                if is_snapshot_note(data.get("note")):
+                    snapshot.add(parent)
+                else:
+                    native.add(parent)
             elif is_linked_url_pdf(data):
                 linked_url.add(parent)
+        imported = native | snapshot
         linked_url -= imported
-        return imported, linked_url
+        return imported, linked_url, snapshot - native
 
     def _pdf_parent_keys(self) -> set[str]:
         """Keys of parent items that already have an imported PDF attachment."""
@@ -333,7 +347,7 @@ class ZoteroLocal:
         tick = status or (lambda _msg: None)
         tick("Reading collection tree…")
         cols = self.collections()
-        imported, linked_only = self._pdf_parent_sets(status=status)
+        imported, linked_only, snapshot_only = self._pdf_parent_sets(status=status)
         if collection_keys is None:
             tick("Fetching top-level library items…")
             raw = self.zot.everything(self.zot.top())
@@ -361,6 +375,7 @@ class ZoteroLocal:
                     selected,
                     has_pdf=key in imported,
                     has_linked_url=key in linked_only,
+                    pdf_tier="snapshot" if key in snapshot_only else ("native" if key in imported else ""),
                 )
             )
         items.sort(
@@ -414,16 +429,14 @@ def item_from_rows(
     selected: set[str] | None = None,
 ) -> Item:
     """The listing's ``Item`` from a parent payload and its child rows. No request."""
-    has_pdf = False
-    has_linked = False
-    for ch in children:
-        data = ch.get("data") or {}
-        if is_pdf_attachment(data):
-            has_pdf = True
-        elif is_linked_url_pdf(data):
-            has_linked = True
+    has_pdf, has_linked, pdf_tier = pdf_flags(children)
     return item_from_json(
-        raw, cols, selected, has_pdf=has_pdf, has_linked_url=has_linked
+        raw,
+        cols,
+        selected,
+        has_pdf=has_pdf,
+        has_linked_url=has_linked,
+        pdf_tier=pdf_tier,
     )
 
 
@@ -511,12 +524,42 @@ def _squash(s: str) -> str:
     return re.sub(r"\s*[/_]\s*", "/", s)
 
 
+def pdf_flags(children: Iterable[dict[str, Any]]) -> tuple[bool, bool, str]:
+    """``(has stored PDF, linked-URL only, tier)`` from child rows.
+
+    Tier is ``snapshot`` only when every stored PDF is an htmlpdf print.
+    """
+    from .greyid import is_snapshot_note
+
+    native = False
+    snapshot = False
+    linked = False
+    for ch in children:
+        data = ch.get("data") or {}
+        if is_pdf_attachment(data):
+            if is_snapshot_note(data.get("note")):
+                snapshot = True
+            else:
+                native = True
+        elif is_linked_url_pdf(data):
+            linked = True
+    has_pdf = native or snapshot
+    if native:
+        tier = "native"
+    elif snapshot:
+        tier = "snapshot"
+    else:
+        tier = ""
+    return has_pdf, linked and not has_pdf, tier
+
+
 def item_from_json(
     it: dict[str, Any],
     cols: dict[str, Collection],
     selected: set[str] | None,
     has_pdf: bool = False,
     has_linked_url: bool = False,
+    pdf_tier: str = "",
 ) -> Item:
     data = it["data"]
     meta = it.get("meta", {})
@@ -554,6 +597,10 @@ def item_from_json(
     surnames = [s for s in surnames if s]
     abstract = (data.get("abstractNote") or "").strip() or None
     date_added = (data.get("dateAdded") or "").strip() or None
+    from .greyid import normalize_isbn, normalize_report_number
+
+    isbn = normalize_isbn(data.get("ISBN") or "") or None
+    report_number = normalize_report_number(data.get("reportNumber") or "") or None
     return Item(
         key=it["key"],
         item_type=data.get("itemType", "document"),
@@ -579,6 +626,9 @@ def item_from_json(
         creator_count=len(creators),
         abstract=abstract,
         creator_surnames=surnames,
+        isbn=isbn,
+        report_number=report_number,
+        pdf_tier=pdf_tier if has_pdf else "",
     )
 
 
@@ -664,14 +714,22 @@ def filter_items_by_type(
 
 
 def items_without_stored_pdf(
-    items: list[Item], *, upgrade_linked: bool = False
+    items: list[Item],
+    *,
+    upgrade_linked: bool = False,
+    upgrade_snapshot: bool = False,
 ) -> list[Item]:
-    """Items with no imported PDF. Linked-URL-only rows drop unless ``upgrade_linked``."""
+    """Items with no native PDF.
+
+    Linked-URL-only rows drop unless ``upgrade_linked``. Snapshot-only htmlpdf
+    prints drop unless ``upgrade_snapshot`` (they are not a native PDF).
+    """
     out: list[Item] = []
     for it in items:
-        if it.has_pdf:
+        snapshot_only = it.pdf_tier == "snapshot"
+        if it.has_pdf and not (upgrade_snapshot and snapshot_only):
             continue
-        if it.has_linked_url and not upgrade_linked:
+        if it.has_linked_url and not it.has_pdf and not upgrade_linked:
             continue
         out.append(it)
     return out

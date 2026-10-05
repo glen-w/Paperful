@@ -45,10 +45,70 @@ def keyword_depth(explicit: int | None) -> int:
     return used
 
 
-def compose_keyword_query(terms: list[str] | tuple[str, ...], *, op: str = "and") -> str:
+MAX_STEM_VARIANTS = 8
+MAX_SEARCH_BYTES = 3500
+_STEM_SUFFIXES = ("", "s", "es", "ing", "ed", "ion", "ions", "al", "ally", "ic", "ical", "y")
+
+
+def expand_search_term(term: str) -> tuple[str, list[str]]:
+    """Expand a trailing ``*`` stem into an OpenAlex OR group. Return notices."""
+    notices: list[str] = []
+    text = (term or "").strip()
+    if not text:
+        return "", notices
+    if "?" in text or "~" in text:
+        notices.append(
+            "OpenAlex search= is not a wildcard engine; ? and ~ are stripped, not expanded"
+        )
+        text = text.replace("?", "").replace("~", "")
+    if "*" not in text:
+        return text, notices
+    if text.count("*") != 1 or not text.endswith("*") or len(text) < 2:
+        notices.append("only a trailing * is expanded (polic* → policy OR policies …)")
+        return text.replace("*", ""), notices
+    stem = text[:-1].strip()
+    if len(stem) < 3:
+        notices.append("stem too short to expand; using the letters as-is")
+        return stem, notices
+    variants: list[str] = []
+    for suffix in _STEM_SUFFIXES:
+        if suffix == "y" and stem.endswith("y"):
+            word = stem[:-1] + "ies"
+        else:
+            word = stem + suffix
+        if word and word not in variants:
+            variants.append(word)
+        if len(variants) >= MAX_STEM_VARIANTS:
+            break
+    if stem.endswith("y"):
+        ies = stem[:-1] + "ies"
+        if ies not in variants and len(variants) < MAX_STEM_VARIANTS:
+            variants.append(ies)
+    group = " OR ".join(variants)
+    if len(group.encode("utf-8")) > MAX_SEARCH_BYTES:
+        kept: list[str] = []
+        size = 0
+        for word in variants:
+            extra = len(word.encode("utf-8")) + (4 if kept else 0)
+            if size + extra > MAX_SEARCH_BYTES:
+                break
+            kept.append(word)
+            size += extra
+        group = " OR ".join(kept or variants[:1])
+        notices.append("stem expansion truncated to keep search= under OpenAlex's URL cap")
+    return f"({group})" if " OR " in group else group, notices
+
+
+def compose_keyword_query(
+    terms: list[str] | tuple[str, ...],
+    *,
+    op: str = "and",
+    notices: list[str] | None = None,
+) -> str:
     """Build one OpenAlex ``search=`` string from keyword terms.
 
-    A single term is passed through unchanged (hand-written booleans stay intact).
+    A single term is passed through unchanged (hand-written booleans stay intact)
+    unless it contains a trailing ``*``, which expands client-side into an OR group.
     Two or more terms are phrase-quoted and joined with ``AND`` (default) or ``OR``.
     """
     cleaned = [part.strip() for part in terms if part and str(part).strip()]
@@ -57,10 +117,30 @@ def compose_keyword_query(terms: list[str] | tuple[str, ...], *, op: str = "and"
     mode = (op or "and").strip().lower()
     if mode not in {"and", "or"}:
         raise ValueError("query_op must be and or or")
-    if len(cleaned) == 1:
-        return cleaned[0]
-    joiner = " OR " if mode == "or" else " AND "
-    return joiner.join(f'"{_escape_phrase(part)}"' for part in cleaned)
+    bucket = notices if notices is not None else []
+    expanded: list[str] = []
+    for part in cleaned:
+        piece, extra = expand_search_term(part)
+        bucket.extend(extra)
+        if piece:
+            expanded.append(piece)
+    if not expanded:
+        raise ValueError("Pass a keyword query.")
+    if len(expanded) == 1:
+        query = expanded[0]
+    else:
+        joiner = " OR " if mode == "or" else " AND "
+        bits: list[str] = []
+        for part in expanded:
+            if part.startswith("(") or " OR " in part or " AND " in part:
+                bits.append(part)
+            else:
+                bits.append(f'"{_escape_phrase(part)}"')
+        query = joiner.join(bits)
+    if len(query.encode("utf-8")) > MAX_SEARCH_BYTES:
+        query = query.encode("utf-8")[:MAX_SEARCH_BYTES].decode("utf-8", errors="ignore")
+        bucket.append("keyword query truncated to keep search= under OpenAlex's URL cap")
+    return query
 
 
 def _escape_phrase(text: str) -> str:

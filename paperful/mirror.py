@@ -367,6 +367,19 @@ def record_pdf(item_dir: Path, record: dict[str, Any] | None = None) -> Path | N
     return pdfs[0] if pdfs else None
 
 
+def _record_pdf_tier(record: dict[str, Any]) -> str:
+    from .greyid import is_snapshot_note
+
+    rows = [
+        r
+        for r in (record.get("attachments") or [])
+        if isinstance(r, dict) and is_pdf_attachment(r)
+    ]
+    if rows and all(is_snapshot_note(r.get("note")) for r in rows):
+        return "snapshot"
+    return "native"
+
+
 def _attachment_flags(record: dict[str, Any]) -> tuple[bool, bool]:
     """``(stored PDF, linked-URL PDF only)`` from the record's attachment rows."""
     rows = [r for r in (record.get("attachments") or []) if isinstance(r, dict)]
@@ -422,12 +435,14 @@ def item_from_record(
     )
     stored, linked = _attachment_flags(record)
     pdf = record_pdf(item_dir, record)
+    has_pdf = stored or pdf is not None
     item = item_from_json(
         {"key": key, "data": data, "meta": {}},
         {},
         None,
-        has_pdf=stored or pdf is not None,
+        has_pdf=has_pdf,
         has_linked_url=linked,
+        pdf_tier=_record_pdf_tier(record) if has_pdf else "",
     )
     # Identifier fields are stored as the listing computed them.
     year = record.get("year")

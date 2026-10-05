@@ -203,11 +203,17 @@ walkthrough, model advice, Docker networking, and troubleshooting: [LLM](llm.md)
 | `[inbox].llm_match` | `off` | `off` \| `when_thin` \| `always`. Needs `[llm].enabled`. Below confidence → no auto-attach |
 | `[inbox].llm_match_min_confidence` | `0.75` | LLM `match: true` below this does not auto-attach |
 | `[inbox].llm_auto_attach_min` | `0.92` | High bar for auto-attach; otherwise a gated proposal |
-| `[inbox].create` | `attach_only` | `attach_only` \| `create_gated` (proposals) \| `create_auto` (unique DOI + resolve only) |
+| `[inbox].create` | `attach_only` | `attach_only` \| `create_gated` (proposals) \| `create_auto` (unique DOI, or a unique ISBN / report number / title+year+host) |
+| `[htmlpdf].academic` | `off` | `off` \| `gated` \| `auto`. DOI journal items. `gated` proposes; `auto` attaches a page snapshot after landing checks. `--htmlpdf` overrides one `run` |
+| `[htmlpdf].upgrade` | `false` | When true, `run` retries items whose only PDF is an HTML snapshot. `--upgrade-snapshot` / `--no-upgrade-snapshot` override |
+| `[htmlpdf].keep_snapshot` | `false` | Leave the HTML print in place when a native PDF attaches. `--keep-snapshot` on `run` |
 | `[inbox].title_resolve` | `false` | Opt-in Crossref/OpenAlex title search when local title+year is thin (not silent create) |
 | `[inbox].manager_metadata_s` | `0` | Wait after attach so a manager recognizer can run (`0` when the backend has none) |
 | `[ingest].default_tags` | `()` | Tags on `ingest-dois --apply` and inbox-created parents |
 | `[snowball].default_tags` | `()` | Extra tags on snowball `--gate auto` / `apply` creates, with `--tag` and `from-<seed-slug>` |
+| `[snowball].dedupe_after` | `off` | After create: `off`, `classify` (`state/dedupe-packs/`), or `apply` (merge high-DOI extras) |
+| `[snowball].author_site_preflight` | `false` | Co-author graph + proposed `state/author-packs/`. Promote before `author_site` fetch |
+| `[searxng].base_url` | `""` | Local SearXNG for author-site remainder discovery. Or `SEARXNG_BASE_URL`. Never a default `run` source |
 | `[ingest].dedupe_scope` | `library` | `library` or `collection` when skipping `exists` |
 | `[ocr].languages` | `eng` | Tesseract languages for `paperful ocr` (`eng+fra` or `eng fra`) |
 | `[rag].enabled` | `false` | Master switch for `paperful rag` and `paperful ask`. Needs `paperful[rag]`. See [rag.md](rag.md) |

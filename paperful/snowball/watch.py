@@ -278,6 +278,7 @@ def run_watch(
     client: Any = None,
     backend: Any = None,
     lookup: Any = None,
+    dedupe_scope: str | None = None,
 ) -> WatchResult:
     if not cfg.snowball_enabled:
         raise SnowballError("Snowball is off. Set [snowball] enabled = true in config.toml.")
@@ -288,6 +289,8 @@ def run_watch(
         raise SnowballError(f"Watch {name!r} has no profile.")
     raw = load_profile(cfg, profile)
     request = _force_watch_request(request_from_profile(raw, cfg))
+    if dedupe_scope and str(dedupe_scope).strip():
+        request.dedupe_scope = str(dedupe_scope).strip()
     is_baseline = not body.get("baseline_at")
     if not is_baseline:
         request.from_created_date = _cursor_date(body.get("last_run_at") or body.get("baseline_at"))

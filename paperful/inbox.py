@@ -641,6 +641,55 @@ def _unmatched_path(
             doi=matched.doi or "",
             detail="create_auto fail-closed",
         )
+    if cfg.inbox_create == "create_auto" and _grey_create_key(matched):
+        fp = LibraryFingerprint.from_items(
+            list(backend.items_in_scope(None))
+            if hasattr(backend, "items_in_scope")
+            else []
+        )
+        if fp.find(
+            None,
+            matched.title,
+            matched.year,
+            isbn=matched.isbn,
+            report_number=matched.report_number,
+            host=matched.host,
+        ) is None:
+            data = {
+                "doi": "",
+                "title": matched.title,
+                "year": matched.year,
+                "collection": collection,
+            }
+            item = _create_inbox_parent(cfg, backend, data, extra_tags=extra_tags)
+            attached = _attach_matched(
+                cfg,
+                backend,
+                manifest,
+                pdf,
+                MatchResult(
+                    item=item,
+                    how=matched.how or "grey_fingerprint",
+                    title=matched.title,
+                    year=matched.year,
+                ),
+                doi_index,
+                title_index,
+                say,
+            )
+            attached.status = "created_auto"
+            attached.detail = TAG_CREATED
+            say(f"created {item.key} ← {pdf.name}")
+            return attached
+        dest = move_unmatched(root, pdf, REVIEW_DIRNAME)
+        say(f"review {pdf.name} → {dest} (create_auto fail-closed)")
+        return IngestEvent(
+            path=str(pdf),
+            status="unmatched",
+            how=matched.how,
+            doi=matched.doi or "",
+            detail="create_auto fail-closed",
+        )
     dest = move_unmatched(root, pdf)
     detail = matched.reason or "unmatched"
     say(f"unmatched {pdf.name} → {dest} ({detail})")
@@ -651,6 +700,13 @@ def _unmatched_path(
         doi=matched.doi or "",
         detail=detail,
     )
+
+
+def _grey_create_key(matched: MatchResult) -> bool:
+    """True when create_auto may mint a parent without a DOI."""
+    if matched.isbn or matched.report_number:
+        return True
+    return bool(matched.host and matched.title and matched.year is not None)
 
 
 def _create_inbox_parent(

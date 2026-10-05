@@ -53,9 +53,11 @@ def test_registry_has_every_planned_source_and_scihub_is_opt_in():
         "ezproxy",
         "htmlpdf",
         "scihub",
+        "author_site",
     }
     assert "scihub" not in DEFAULT_SOURCES
     assert "scholar" not in DEFAULT_SOURCES
+    assert "author_site" not in DEFAULT_SOURCES
     assert DEFAULT_SOURCES[-1] == "htmlpdf"
     assert DEFAULT_SOURCES.index("core") == DEFAULT_SOURCES.index("semanticscholar") + 1
     assert DEFAULT_SOURCES.index("openaire") == DEFAULT_SOURCES.index("core") + 1

@@ -47,7 +47,7 @@ def test_htmlpdf_uses_embedded_render(ctx_factory, monkeypatch):
     monkeypatch.setattr(
         htmlpdf,
         "_render_pdf",
-        lambda url, ua: (PDF_BYTES, url, "chromium print"),
+        lambda url, ua, title="", require_article=False, **_k: (PDF_BYTES, url, "chromium print"),
     )
     ctx = ctx_factory(lambda r: None)
     cand = htmlpdf.find(
@@ -66,7 +66,7 @@ def test_htmlpdf_paywall_note(ctx_factory, monkeypatch):
     monkeypatch.setattr(
         htmlpdf,
         "_render_pdf",
-        lambda url, ua: (b"", url, "paywall"),
+        lambda url, ua, title="", require_article=False, **_k: (b"", url, "paywall"),
     )
     ctx = ctx_factory(lambda r: None)
     cand = htmlpdf.find(
@@ -84,7 +84,7 @@ def test_htmlpdf_allows_report_without_doi(ctx_factory, monkeypatch):
     monkeypatch.setattr(
         htmlpdf,
         "_render_pdf",
-        lambda url, ua: (PDF_BYTES, url, "chromium print"),
+        lambda url, ua, title="", require_article=False, **_k: (PDF_BYTES, url, "chromium print"),
     )
     ctx = ctx_factory(lambda r: None)
     cand = htmlpdf.find(
@@ -118,7 +118,7 @@ def test_htmlpdf_uses_browser_session_when_available(ctx_factory):
         def available(self) -> bool:
             return True
 
-        def render_pdf(self, url, hints, timeout_ms=45_000):
+        def render_pdf(self, url, hints, timeout_ms=45_000, **_kwargs):
             return PDF_BYTES, url, "chromium print"
 
     ctx = ctx_factory(lambda r: None)
@@ -148,7 +148,7 @@ def test_htmlpdf_live_render_smoke(ctx_factory):
 
     html = "<html><body><h1>Paperful htmlpdf smoke</h1><p>Hello.</p></body></html>"
 
-    def _render(url, ua):
+    def _render(url, ua, title="", require_article=False, **_k):
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             try:
