@@ -149,3 +149,10 @@ def ingest_dois_exit(*, apply: bool, created: int, failed: int) -> int:
     if not apply:
         return 0
     return batch_exit(ok=created, failed=failed)
+
+
+def collections_add_exit(*, apply: bool, added: int, failed: int) -> int:
+    """not-found / already-in stay findings (exit 0). Mixed add+error on --apply is 3."""
+    if not apply:
+        return 0
+    return batch_exit(ok=added, failed=failed)

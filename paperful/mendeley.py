@@ -895,17 +895,25 @@ class MendeleyBackend:
         for ck in data.get("collections") or []:
             if ck:
                 try:
-                    self.client.post(
-                        f"/folders/{ck}/documents",
-                        accept=ACCEPT_FOLDER,
-                        content_type=ACCEPT_FOLDER,
-                        body={"id": new_id},
-                    )
+                    self.add_to_collection(new_id, str(ck))
                 except LibraryError:
                     continue
         self._docs = None
         self._folder_docs = None
         return new_id
+
+    def add_to_collection(self, item_key: str, collection_key: str) -> None:
+        """Add ``item_key`` to folder ``collection_key`` if not already a member."""
+        members = self._folder_membership().get(collection_key) or set()
+        if item_key in members:
+            return
+        self.client.post(
+            f"/folders/{collection_key}/documents",
+            accept=ACCEPT_FOLDER,
+            content_type=ACCEPT_FOLDER,
+            body={"id": item_key},
+        )
+        self._folder_docs = None
 
     def _load_folders(self) -> None:
         raw = self.client.paginate("/folders", accept=ACCEPT_FOLDER)

@@ -114,6 +114,7 @@ class LibraryBackend(Protocol):
     ) -> str: ...
     def supports_write(self) -> bool: ...
     def ensure_collection_path(self, path: str) -> str: ...
+    def add_to_collection(self, item_key: str, collection_key: str) -> None: ...
     def create_parent(self, data: dict[str, Any]) -> str: ...
     def attach(
         self,
@@ -279,6 +280,10 @@ class MirroredBackend:
         key = self._inner.create_parent(data)
         self.refresh(key)
         return key
+
+    def add_to_collection(self, item_key: str, collection_key: str) -> None:
+        self._inner.add_to_collection(item_key, collection_key)
+        self.refresh(item_key)
 
     def ensure_collection_path(self, path: str) -> str:
         from .snapshot import write_collections
@@ -517,6 +522,18 @@ class ZoteroBackend:
         if not key:
             raise LibraryError("Zotero did not return a key for the new item")
         return key
+
+    def add_to_collection(self, item_key: str, collection_key: str) -> None:
+        """Add ``item_key`` to ``collection_key`` if not already a member."""
+        self._ensure_write()
+        raw = self.zl.zot.item(item_key)
+        data = raw["data"]
+        cols = list(data.get("collections") or [])
+        if collection_key in cols:
+            return
+        cols.append(collection_key)
+        data["collections"] = cols
+        self.zl.zot.update_item(raw)
 
     def attach(
         self,

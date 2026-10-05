@@ -491,6 +491,17 @@ def resolve_collection_in(cols: dict[str, Collection], spec: str) -> Collection:
     spec_norm = spec.strip().strip("/")
     if spec_norm in cols:
         return cols[spec_norm]
+    # Bare leaf names that appear more than once must use a path — even when one
+    # of them also has an exact path match (e.g. empty top-level BBNJ vs ocean/BBNJ).
+    if "/" not in spec_norm and "\\" not in spec_norm:
+        name_matches = [
+            c for c in cols.values() if c.name.lower() == spec_norm.lower()
+        ]
+        if len(name_matches) > 1:
+            paths = ", ".join(sorted(c.path for c in name_matches))
+            raise LookupError(
+                f"Collection name '{spec}' is ambiguous; use a path: {paths}"
+            )
     wanted = _squash(spec_norm)
     for c in cols.values():
         if wanted in (_squash(c.path), _squash(c.raw_path)):

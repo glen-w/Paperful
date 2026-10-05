@@ -450,6 +450,10 @@ class MirrorFirstBackend:
         self.catalogue.forget()
         return key
 
+    def add_to_collection(self, item_key: str, collection_key: str) -> None:
+        self._need_live().add_to_collection(item_key, collection_key)
+        self.catalogue.forget()
+
     def create_parent(self, data: dict[str, Any]) -> str:
         return self._need_live().create_parent(data)
 

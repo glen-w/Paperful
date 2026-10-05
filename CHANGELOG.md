@@ -8,6 +8,10 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ### Added
 
+- `paperful collections add --keys-file` — file existing library item keys into
+  `-C` (membership only; dry-run unless `--apply`; added / already-in /
+  not-found). `--format json`. Summary under `state/collections-add/`. Bare
+  `collections` / `collections list` still print the tree. Not an MCP tool.
 - `paperful authorwatch`: ORCID/OpenAlex people lists, cursor `run` (optional
   `--backfill-from`), `apply -C` (no `[snowball] enabled`). First `run` without
   `--backfill-from` does not open the library. `--apply` needs write API.

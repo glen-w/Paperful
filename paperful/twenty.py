@@ -301,28 +301,30 @@ def split_display_name(name: str) -> tuple[str, str]:
 
 
 def authors_from_items(items: list[Item]) -> list[PackAuthor]:
+    """Unique creators across items (every surname, not only first author)."""
     seen: set[str] = set()
     out: list[PackAuthor] = []
     for item in items:
         surnames = [s for s in (item.creator_surnames or []) if s]
-        last = surnames[0] if surnames else (item.first_author or "")
-        if not last:
-            continue
-        first = ""
-        display = last
-        if item.first_author and " " in item.first_author.strip():
-            last, first = split_display_name(item.first_author)
-            display = item.first_author.strip()
-        fp = name_fingerprint(display if first else last)
-        if not fp or fp in seen:
-            continue
-        seen.add(fp)
-        out.append(
-            PackAuthor(
-                name=display,
-                fingerprint=fp,
-            )
-        )
+        if not surnames and item.first_author:
+            surnames = [item.first_author.strip()]
+        for i, raw in enumerate(surnames):
+            display = raw.strip()
+            if not display:
+                continue
+            # Prefer a fuller first-author display when Zotero stored "First Last".
+            if (
+                i == 0
+                and item.first_author
+                and " " in item.first_author.strip()
+                and item.first_author.strip().casefold().endswith(display.casefold())
+            ):
+                display = item.first_author.strip()
+            fp = name_fingerprint(display)
+            if not fp or fp in seen:
+                continue
+            seen.add(fp)
+            out.append(PackAuthor(name=display, fingerprint=fp))
     return out
 
 

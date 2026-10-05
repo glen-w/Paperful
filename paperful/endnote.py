@@ -430,6 +430,13 @@ class EndNoteBackend:
         )
         return key
 
+    def add_to_collection(self, item_key: str, collection_key: str) -> None:
+        del item_key, collection_key
+        raise LibraryError(
+            "EndNote cannot add an existing reference to a group from Paperful. "
+            "Use Zotero or Mendeley, or re-import with collection_paths."
+        )
+
     def create_parent(self, data: dict[str, Any]) -> str:
         paths = []
         for ck in data.get("collections") or []:

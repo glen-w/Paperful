@@ -1,7 +1,7 @@
 """Thin MCP stdio server over the same JSON channel as ``--format json``.
 
 Tools: ``refs_gap`` (never writes parents) and ``ask`` (index read + LLM).
-No ``collections add`` — that verb is parked. Prefer CLI ``--format json``.
+``collections add`` is CLI-only (``--apply`` writes). Prefer CLI ``--format json``.
 """
 
 from __future__ import annotations

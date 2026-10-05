@@ -131,12 +131,36 @@ def test_resolve_collection_by_key_path_name_and_ambiguity(zl):
     assert zl.resolve_collection("BBNJ/EIA / SEA").key == "SUB"
     assert zl.resolve_collection("bbnj/eia _ sea/").key == "SUB"
     assert zl.resolve_collection("interesting").key == "OTHER"
-    assert zl.resolve_collection("BBNJ").key == "ROOT"  # exact path match wins
+    assert zl.resolve_collection("BBNJ").key == "ROOT"  # unique bare name
     assert zl.resolve_collection("interesting/Drafts").key == "D2"
     with pytest.raises(LookupError, match="ambiguous"):
         zl.resolve_collection("Drafts")  # same name under two parents
     with pytest.raises(LookupError, match="No collection"):
         zl.resolve_collection("nope")
+
+
+def test_bare_name_ambiguous_even_with_exact_path(monkeypatch):
+    """Top-level BBNJ must not shadow ocean/BBNJ when both share the leaf name."""
+    fake = FakeZot(
+        httpx.Response(
+            200,
+            headers={
+                "X-Zotero-Version": "10.0.1",
+                "Zotero-API-Version": "3",
+                "Zotero-Server-ID": "abc",
+            },
+        )
+    )
+    fake._cols = [
+        _col("EMPTY", "BBNJ"),
+        _col("OCEAN", "ocean"),
+        _col("REAL", "BBNJ", "OCEAN"),
+    ]
+    monkeypatch.setattr("paperful.zot.zotero.Zotero", lambda *a, **k: fake)
+    zl = ZoteroLocal()
+    with pytest.raises(LookupError, match="ambiguous"):
+        zl.resolve_collection("BBNJ")
+    assert zl.resolve_collection("ocean/BBNJ").key == "REAL"
 
 
 def test_subtree_keys_and_counts(zl):

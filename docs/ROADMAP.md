@@ -318,7 +318,7 @@ for the end-to-end operator story.
 | 5 | Grey playbook example packs (think-tanks, RFMOs, institute report hosts) via `[[grey_playbooks]]` | Shipped — ocean builtin (`rfmo-docs`, `iucn-dosi`, `thinktank-ocean`) plus `paperful/data/grey_playbooks_examples/` (IEA/IRENA, OECD/WHO/UNEP/UNDP) |
 | 6 | Linked-URL health (Core above) | Shipped (`paperful urls check`; `--apply` only via a known playbook rewrite) |
 | 7 | Non-DOI grey fingerprint (`norm(title)|year|registrant_host`; ISBN/report # when present) in snowball / dedupe / inbox ladder + inbox-create | Shipped (ISBN/report like DOI; title\|year\|host is review-tier; host mismatch is not `exists`) |
-| 8 | `paperful collections add --keys-file` — membership batch, dry-run / apply | Parked (Agent §7) |
+| 8 | `paperful collections add --keys-file` — membership batch, dry-run / apply | Shipped |
 | 9 | Acronym allowlist harvest (Core `fix-metadata`) | Shipped (`paperful acronyms`; Title Case consumes `state/acronyms/`) |
 | 10 | [Frontier digest](#frontier-digest-later-watch--external-ingest); thin [snowball briefing](#frontier-digest-later-watch--external-ingest) export before full digest | Thin v0 shipped (`snowball briefing`, `watch briefing`); full digest later |
 | 11 | Scholar late tail + latch + opt-in SerpApi | Shipped (`[fetch].order` policy; interleave with `browser_agent`; `[handoff].scholar`; `[serpapi].enabled` / `max_calls`) |
@@ -1133,11 +1133,10 @@ prerequisites for the fetch / lint / attach loop.
    --dry-run` then `--apply` (resolve Crossref/OpenAlex; skip `exists` under
    dedupe scope; report created / exists / unresolved / **held** on ambiguous
    title mismatch; repeatable `--tag` / `[ingest].default_tags`; hand off
-   to `run` for PDFs). `paperful collections add --keys-file keys.txt -C …`
-   — membership-only batch (dry-run / apply; added / already-in / not-found) is
-   still later.
-   Complements `ingest-dois` (create parents) vs add (file existing keys). No
-   scheduled bot inside Paperful. **Grey identity:** fingerprint
+   to `run` for PDFs). **Shipped:** `paperful collections add --keys-file keys.txt
+   -C …` — membership-only batch (dry-run / apply; added / already-in /
+   not-found). Complements `ingest-dois` (create parents) vs add (file existing
+   keys). No scheduled bot inside Paperful. **Grey identity:** fingerprint
    `norm(title)|year|registrant_host` (plus ISBN/report number when present) for
    snowball / dedupe / inbox-create when DOI is absent.
    Growing a library from a keyword, one or more DOI bibliographies, or one or
@@ -1203,7 +1202,7 @@ Larger product bets. Park until the ledger and core loop justify them.
    table (`0` ok, `1` user, `2` manager down, `3` partial write batch). **MCP** is a thin
    optional stdio wrap of `refs_gap` + `ask` over the same envelope — not a second API
    and not a prerequisite for research-ops. Writes stay CLI `--apply`. `collections add`
-   stays parked.
+   is CLI-only (not an MCP tool).
    **Later:** mail-merge / `paperful request draft` using Twenty contact cache;
    CRM write-back only with `--apply` on an explicit sync verb. Request-channel
    policy stays config (`[request].channels`), not agent-default. Lookup itself

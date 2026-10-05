@@ -214,6 +214,12 @@ authorwatch_app = typer.Typer(
     ),
 )
 app.add_typer(authorwatch_app, name="authorwatch")
+collections_app = typer.Typer(
+    add_completion=False,
+    invoke_without_command=True,
+    help="Collection tree and membership batch (add existing keys).",
+)
+app.add_typer(collections_app, name="collections")
 
 # Canonical top-level verbs. tests/test_cli.py asserts this matches `paperful --help`.
 JOBS: dict[str, tuple[str, ...]] = {
@@ -224,6 +230,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "snowball",
         "ingest-dois",
         "twenty",
+        "reachout",
         "authorwatch",
     ),
     "find": ("run", "attach", "recover", "gaps", "inbox", "urls", "htmlpdf"),
@@ -1158,12 +1165,7 @@ def doctor(
         raise typer.Exit(2)
 
 
-@app.command()
-def collections(config: Path | None = ConfigOpt) -> None:
-    """Show the collection tree with item counts and how many lack a PDF."""
-    cfg = _cfg(config)
-    _require_manager(cfg)
-    backend = _connect(cfg)
+def _print_collections_table(cfg: Config, backend: LibraryBackend) -> None:
     with _spinner("Counting collections…"):
         cols = backend.collections()
         counts = backend.collection_counts()
@@ -1177,6 +1179,123 @@ def collections(config: Path | None = ConfigOpt) -> None:
         depth = c.path.count("/")
         table.add_row(("  " * depth) + c.name, str(n), str(missing), c.key)
     console.print(table)
+
+
+@collections_app.callback(invoke_without_command=True)
+def collections_root(
+    ctx: typer.Context,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Show the collection tree with item counts and how many lack a PDF."""
+    if ctx.invoked_subcommand is not None:
+        return
+    cfg = _cfg(config)
+    _require_manager(cfg)
+    backend = _connect(cfg)
+    _print_collections_table(cfg, backend)
+
+
+@collections_app.command("list")
+def collections_list(config: Path | None = ConfigOpt) -> None:
+    """Show the collection tree with item counts and how many lack a PDF."""
+    cfg = _cfg(config)
+    _require_manager(cfg)
+    backend = _connect(cfg)
+    _print_collections_table(cfg, backend)
+
+
+@collections_app.command("add")
+def collections_add_cmd(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Target collection path/name/key."
+    ),
+    keys_file: Path = typer.Option(
+        ...,
+        "--keys-file",
+        help="Text file: one library item key per line.",
+        exists=True,
+        dir_okay=False,
+    ),
+    apply: bool = typer.Option(
+        False, "--apply", help="Add membership. Default is dry-run."
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Classify only (default)."),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """File existing item keys into a collection. Dry-run unless --apply. Does not create items."""
+    from dataclasses import asdict as _asdict
+
+    from .agent_json import envelope
+    from .agent_ops import collections_add_exit
+    from .collections_add import apply_adds, classify_rows, keys_from_file, write_summary
+
+    if apply and dry_run:
+        console.print("[red]Pass either --dry-run or --apply, not both.[/]")
+        raise typer.Exit(1)
+    cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    bound = _bind_run(cfg, profile=profile, run_config=run_config, collection=collection)
+    collection, _library, _yf, _yt, _types = _take_scope(bound)
+    if not collection:
+        _refuse_missing_scope()
+    keys = keys_from_file(keys_file)
+    if not keys:
+        console.print("No keys to add.")
+        raise typer.Exit(0)
+    backend = _connect(cfg, quiet=json_out)
+    try:
+        target = backend.resolve_collection(collection[0])
+    except LookupError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    batch = classify_rows(
+        keys,
+        backend,
+        collection_key=target.key,
+        collection_path=target.path,
+    )
+    if apply:
+        _require_manager(cfg)
+        if not backend.supports_write():
+            _exit_env("collections add --apply needs library write support.", cfg)
+        apply_adds(backend, batch, target.key)
+        _flush(backend)
+    folder = write_summary(cfg.state_dir, target.path, batch)
+    counts = batch.counts()
+    payload = envelope(
+        command="collections add",
+        summary=counts,
+        items=[_asdict(row) for row in batch.rows],
+        paths={"summary": str(folder)},
+        flags={"apply": apply, "dry_run": not apply},
+        exit_code=collections_add_exit(
+            apply=apply, added=int(counts["added"]), failed=int(counts["failed"])
+        ),
+    )
+
+    def _human_add() -> None:
+        table = Table(title="collections add")
+        table.add_column("Key")
+        table.add_column("Status")
+        table.add_column("Title")
+        table.add_column("Detail")
+        for row in batch.rows:
+            table.add_row(row.key, row.status, (row.title or "")[:50], row.detail)
+        console.print(table)
+        pending = int(counts["add"])
+        console.print(
+            f"added {counts['added']} · already-in {counts['already_in']} · "
+            f"not-found {counts['not_found']}"
+            + (f" · would-add {pending}" if not apply else "")
+            + (f" · failed {counts['failed']}" if counts["failed"] else "")
+            + (" (dry-run)" if not apply else "")
+        )
+        console.print(f"Summary: {folder}")
+
+    _emit_agent(payload, json_out=json_out, human=_human_add)
 
 
 @app.command()
@@ -2942,6 +3061,227 @@ def _gaps_downloads_dir(cfg: Config, override: Path | None) -> Path:
 
 
 @app.command()
+def reachout(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    non_oa_only: bool = typer.Option(
+        False,
+        "--non-oa-only",
+        help="Keep paywalled / no_oa / license_blocked misses only.",
+    ),
+    lookup: bool = typer.Option(
+        False,
+        "--lookup",
+        help="When Twenty is enabled, search People for authors still missing an email.",
+    ),
+    to: Path | None = typer.Option(
+        None,
+        "--to",
+        help="Write CSV (default), TSV, or Markdown (.csv / .tsv / .md).",
+    ),
+    handoff: str | None = typer.Option(
+        None,
+        "--handoff",
+        help="list (default), tabs, or walk — ResearchGate publication URLs only.",
+    ),
+    request_rg: bool | None = RequestRgOpt,
+    re_request: bool = ReRequestOpt,
+    downloads_dir: Path | None = typer.Option(
+        None,
+        "--downloads-dir",
+        help="Directory for --handoff walk newest-PDF pickup (default ~/Downloads).",
+    ),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Contact authors for missing PDFs. Never fetches. Never sends mail."""
+    from .author_request import apply_request_rg_override
+    from .handoff import HINT_AUTHOR_REQUEST, list_missing_pdfs, open_tabs, parse_handoff, walk_missing
+    from .reachout import build_reachout_rows, write_reachout_export
+    from .store import Manifest
+    from .twenty import twenty_ready
+
+    if _scope_unset(collection, library, profile, run_config):
+        _refuse_missing_scope()
+    cfg = _cfg(config)
+    apply_request_rg_override(cfg, request_rg)
+    json_out = _agent_json(fmt)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    if not collection and not library:
+        _refuse_missing_scope()
+    try:
+        mode = parse_handoff(handoff, default="list")
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    if mode == "watch":
+        console.print(
+            "[red]reachout does not watch the inbox.[/] Use gaps --handoff watch."
+        )
+        raise typer.Exit(1)
+    if lookup and not twenty_ready(cfg):
+        console.print(
+            "[yellow]--lookup ignored:[/] Twenty is off or TWENTY_API_KEY / base_url missing."
+        )
+    _require_manager(cfg)
+    backend = _connect(cfg, quiet=json_out)
+    loaded = _load_scope(
+        backend,
+        json_out=json_out,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    items, scope = loaded.items, loaded.label
+    started = time.time()
+    manifest = Manifest(cfg.manifest_path)
+    rows = build_reachout_rows(
+        cfg,
+        items,
+        non_oa_only=non_oa_only,
+        lookup=lookup and twenty_ready(cfg),
+        re_request=re_request,
+        manifest=manifest,
+    )
+    export_path = ""
+    if to is not None:
+        export_path = str(write_reachout_export(rows, to))
+    with_email = sum(1 for r in rows if r.email)
+    with_rg = sum(1 for r in rows if r.request_url)
+    write_command_report(
+        cfg,
+        command="reachout",
+        scope=scope,
+        summary={
+            "items": len(items),
+            "rows": len(rows),
+            "with_email": with_email,
+            "with_rg": with_rg,
+            "handoff": mode,
+        },
+        items=[{"itemKey": r.key, "status": r.email_source or "none"} for r in rows],
+        started=started,
+    )
+    from .agent_json import envelope
+
+    def _human() -> None:
+        if export_path:
+            console.print(f"Wrote {len(rows)} rows to {export_path}")
+        table = Table(title=f"Reachout ({scope})")
+        table.add_column("Key", style="dim")
+        table.add_column("Author")
+        table.add_column("Title")
+        table.add_column("Email")
+        table.add_column("Source")
+        table.add_column("Request")
+        table.add_column("Miss")
+        for row in rows:
+            table.add_row(
+                row.key,
+                (row.author or "-")[:24],
+                (row.title or "-")[:40],
+                row.email or "-",
+                row.email_source or "-",
+                (row.request_url or "-")[:36],
+                row.miss_surface or "-",
+            )
+        console.print(table)
+        console.print(
+            f"{len(rows)} missing · {with_email} with email · {with_rg} ResearchGate. "
+            "No fetch. Paperful does not send mail."
+        )
+
+    agent_payload = envelope(
+        command="reachout",
+        summary={
+            "items": len(items),
+            "rows": len(rows),
+            "with_email": with_email,
+            "with_rg": with_rg,
+        },
+        items=[r.as_dict() for r in rows],
+        paths={"export": export_path} if export_path else None,
+        flags={
+            "non_oa_only": non_oa_only,
+            "lookup": lookup,
+            "handoff": mode,
+        },
+    )
+    _emit_agent(agent_payload, json_out=json_out, human=_human)
+    if mode == "list":
+        return
+    rg_rows = [
+        m
+        for m in list_missing_pdfs(items, manifest, cfg=cfg, re_request=re_request)
+        if m.hint == HINT_AUTHOR_REQUEST and m.request_url
+    ]
+    if non_oa_only:
+        keep = {r.key for r in rows}
+        rg_rows = [m for m in rg_rows if m.key in keep]
+    if not rg_rows:
+        console.print("[dim]No ResearchGate publication URLs to open.[/]")
+        return
+    if mode == "tabs":
+
+        def _confirm(n: int) -> bool:
+            answer = (
+                typer.prompt(f"Open {n} ResearchGate tabs?", default="y")
+                .strip()
+                .lower()
+            )
+            return answer in {"y", "yes"}
+
+        opened = open_tabs(
+            rg_rows,
+            include_doi_tabs=False,
+            confirm=_confirm,
+            scholar=False,
+            cfg=cfg,
+        )
+        console.print(f"Opened {opened} ResearchGate tab(s). You click Request.")
+        return
+    if not backend.supports_write():
+        console.print("[red]--handoff walk needs library write support.[/]")
+        raise typer.Exit(1)
+    dl = _gaps_downloads_dir(cfg, downloads_dir)
+    by_key = {it.key: it for it in items}
+    result = walk_missing(
+        cfg,
+        backend,
+        manifest,
+        by_key,
+        rg_rows,
+        downloads_dir=dl,
+        prompt=lambda msg: typer.prompt(msg, default=""),
+        on_status=lambda msg: console.print(msg),
+    )
+    _flush(backend)
+    console.print(
+        f"Walk attached {result.attached}, skipped {result.skipped}"
+        + (" (quit early)" if result.quit_early else "")
+    )
+
+
+@app.command()
 def run(
     collection: list[str] = typer.Option(
         [],
@@ -4586,6 +4926,17 @@ def twenty_lookup_cmd(
     )
     authors = authors_from_items(loaded.items)
     label = collection[0] if collection else "library"
+    if not loaded.items:
+        console.print(
+            f"[yellow]No items in scope ({label}).[/] "
+            "Check the collection path (e.g. ocean/BBNJ vs a same-named empty folder)."
+        )
+        raise typer.Exit(1)
+    if not authors:
+        console.print(
+            f"[yellow]{len(loaded.items)} item(s) in scope, but no creator names.[/]"
+        )
+        raise typer.Exit(1)
     rows = lookup_authors(
         cfg,
         authors,
@@ -4612,6 +4963,7 @@ def twenty_lookup_cmd(
         f"{len(rows)} authors · {matched} unique matches · "
         f"{sum(1 for r in rows if r.status == 'ambiguous')} ambiguous · "
         f"{sum(1 for r in rows if r.status == 'miss')} miss"
+        f" · {len(loaded.items)} items"
     )
     if apply:
         console.print(

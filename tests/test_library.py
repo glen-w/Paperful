@@ -50,6 +50,41 @@ def test_get_backend_unknown(cfg):
         get_backend(cfg)
 
 
+def test_zotero_add_to_collection_unions(cfg):
+    class FakeZot:
+        def __init__(self):
+            self.updated = None
+            self._item = {
+                "key": "ITEM1",
+                "data": {"collections": ["COL0"], "title": "T", "version": 1},
+            }
+
+        def item(self, key):
+            assert key == "ITEM1"
+            return self._item
+
+        def update_item(self, raw):
+            self.updated = raw
+
+    class ZL:
+        def __init__(self):
+            self.zot = FakeZot()
+
+    backend = ZoteroBackend(cfg, ZL())
+    backend._ensure_write = lambda: None
+    backend.add_to_collection("ITEM1", "COL1")
+    assert backend.zl.zot.updated["data"]["collections"] == ["COL0", "COL1"]
+    backend.add_to_collection("ITEM1", "COL1")  # idempotent
+    assert backend.zl.zot.updated["data"]["collections"] == ["COL0", "COL1"]
+
+
+def test_endnote_add_to_collection_refuses():
+    from paperful.endnote import EndNoteBackend
+
+    with pytest.raises(LibraryError, match="EndNote cannot add"):
+        EndNoteBackend.add_to_collection(object(), "1", "g1")
+
+
 def test_zotero_apply_patch_maps_fields(cfg):
     class FakeZot:
         def __init__(self):

@@ -2741,3 +2741,135 @@ def test_all_format_json_one_envelope(cfg_file, stub_zotero, monkeypatch):
     assert body["command"] == "all"
     assert "Pack" not in res.stdout
     assert all(row["status"] == "ok" or row["status"] == "skipped" for row in body["items"])
+
+
+def test_collections_list_alias(cfg_file, stub_zotero):
+    res = runner.invoke(cli.app, ["collections", "list", "-c", str(cfg_file)])
+    assert res.exit_code == 0
+    assert "BBNJ" in res.stdout and "EIA / SEA" in res.stdout
+
+
+def test_collections_add_cli_dry_run(cfg_file, stub_zotero, tmp_path, monkeypatch):
+    from paperful.collections_add import AddBatch, AddRow
+
+    keys = tmp_path / "keys.txt"
+    keys.write_text("I1\nGONE\n")
+    monkeypatch.setattr(
+        "paperful.collections_add.classify_rows",
+        lambda *a, **k: AddBatch(
+            rows=[
+                AddRow(key="I1", status="add", title="One"),
+                AddRow(key="GONE", status="not-found"),
+            ],
+            to_add=1,
+            not_found=1,
+        ),
+    )
+    added: list[str] = []
+    monkeypatch.setattr(
+        "paperful.library.ZoteroBackend.add_to_collection",
+        lambda self, item_key, collection_key: added.append(item_key),
+    )
+    res = runner.invoke(
+        cli.app,
+        [
+            "collections",
+            "add",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--keys-file",
+            str(keys),
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    assert added == []
+    summaries = list((tmp_path / "state" / "collections-add").glob("*/summary.json"))
+    assert summaries
+    payload = json.loads(summaries[0].read_text())
+    assert payload["schema"] == "paperful.collections_add.v1"
+    assert payload["applied"] is False
+
+
+def test_collections_add_format_json(cfg_file, stub_zotero, tmp_path, monkeypatch):
+    from paperful.collections_add import AddBatch, AddRow
+
+    keys = tmp_path / "keys-json.txt"
+    keys.write_text("I1\n")
+    monkeypatch.setattr(
+        "paperful.collections_add.classify_rows",
+        lambda *a, **k: AddBatch(
+            rows=[AddRow(key="I1", status="add", title="One")],
+            to_add=1,
+        ),
+    )
+    res = runner.invoke(
+        cli.app,
+        [
+            "collections",
+            "add",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--keys-file",
+            str(keys),
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    body = _one_json(res.stdout)
+    assert body["schema"] == "paperful.agent.json.v1"
+    assert body["command"] == "collections add"
+    assert body["flags"]["dry_run"] is True
+    assert body["items"][0]["status"] == "add"
+    assert body["items"][0]["key"] == "I1"
+
+
+def test_collections_add_apply_mixed_exits_3(cfg_file, stub_zotero, tmp_path, monkeypatch):
+    from paperful.collections_add import AddBatch, AddRow
+    from paperful.library import LibraryError
+
+    keys = tmp_path / "keys-mix.txt"
+    keys.write_text("OK1\nBAD1\n")
+    monkeypatch.setattr(
+        "paperful.collections_add.classify_rows",
+        lambda *a, **k: AddBatch(
+            rows=[
+                AddRow(key="OK1", status="add", title="Ok"),
+                AddRow(key="BAD1", status="add", title="Bad"),
+            ],
+            to_add=2,
+        ),
+    )
+    n = {"i": 0}
+
+    def add(self, item_key, collection_key):
+        n["i"] += 1
+        if item_key == "BAD1":
+            raise LibraryError("add failed")
+
+    monkeypatch.setattr("paperful.library.ZoteroBackend.add_to_collection", add)
+    res = runner.invoke(
+        cli.app,
+        [
+            "collections",
+            "add",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--keys-file",
+            str(keys),
+            "--apply",
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 3, res.stdout
+    body = _one_json(res.stdout)
+    assert body["partial"] is True
+    assert body["summary"]["added"] == 1
+    assert body["summary"]["failed"] == 1

@@ -149,3 +149,14 @@ def test_authors_from_items_dedupes():
     ]
     authors = authors_from_items(items)
     assert len(authors) == 1
+
+
+def test_authors_from_items_includes_coauthors():
+    items = [
+        make_item(
+            creator_surnames=["Allsopp", "Miller", "Atkins"],
+            first_author="Allsopp",
+        ),
+    ]
+    authors = authors_from_items(items)
+    assert {a.name for a in authors} == {"Allsopp", "Miller", "Atkins"}
