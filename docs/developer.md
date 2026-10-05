@@ -37,7 +37,7 @@ _connect
 | `raw_item`, `children`, `find_child_note_keys`, `read_child_note` | `record.json` and `notes/` |
 | `preview_merge` | `record.json` and `annotations.json` |
 | `export_pdf` | the item folder; the manager only when the folder has no PDF |
-| `apply_patch`, `attach`, `merge_into`, `trash_item`, note and tag writers, `create_parent` | the manager, then that item is re-read into its folder |
+| `apply_patch`, `attach`, `merge_into`, `trash_item`, `trash_note`, note and tag writers, `create_parent` | the manager, then that item is re-read into its folder. `trash_note` never marks the parent `_gone` |
 
 With the manager down, the write calls raise `LibraryError` and
 `supports_write()` is false. Check it before a batch and exit 2 with
@@ -93,6 +93,7 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `cli.py` | Flags, progress, exits. No logic of its own | everything |
 | `agent_json.py` | `--format json` envelope (`paperful.agent.json.v1`) and exit 3 | none |
 | `notehtml.py` | First-line prefixes + `paperful.note.v1` comment | none |
+| `notes.py` | Classify and trash Paperful-owned notes | `notehtml`, library protocol |
 | `handoff_rank.py` | Missing-PDF sort: refs-gap cites × miss severity | `handoff` |
 | `mcp_server.py` | Stdio MCP: dry-run `refs_gap`, read-only `ask` | JSON channel + catalogue |
 

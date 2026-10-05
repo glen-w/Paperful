@@ -426,6 +426,9 @@ class MirrorFirstBackend:
     def trash_item(self, item_key: str) -> None:
         self._need_live().trash_item(item_key)
 
+    def trash_note(self, note_key: str, *, parent_key: str = "") -> None:
+        self._need_live().trash_note(note_key, parent_key=parent_key)
+
     def merge_into(self, keep_key: str, drop_key: str) -> dict[str, Any]:
         return self._need_live().merge_into(keep_key, drop_key)
 

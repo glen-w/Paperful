@@ -695,6 +695,7 @@ def _rag_checks(cfg) -> list[Check]:
     from .llm.preflight import validate_embedder
     from .llm.validate import LlmConfigError
     from .rag.status import index_status
+    from .store import mirror_entries
 
     if not cfg.rag_enabled:
         return [Check("RAG index", "green", "disabled (rag.enabled false)")]
@@ -710,7 +711,7 @@ def _rag_checks(cfg) -> list[Check]:
         out.append(Check("RAG embeddings", "amber", str(exc)))
     except Exception as exc:  # unreachable daemon etc.
         out.append(Check("RAG embeddings", "amber", f"{type(exc).__name__}: {exc}"))
-    status = index_status(cfg)
+    status = index_status(cfg, mirror_entries(cfg.out_dir))
     if status["problem"]:
         out.append(Check("RAG index", "amber", status["problem"]))
     elif not status["exists"]:
@@ -725,8 +726,13 @@ def _rag_checks(cfg) -> list[Check]:
         waiting = status["items_ocr_pending"]
         if waiting:
             detail += f"; {waiting} scans wait for OCR"
-        detail += " · `paperful rag status` compares it with the mirror"
-        out.append(Check("RAG index", "green", detail))
+        stale = int((status.get("mirror") or {}).get("stale") or 0)
+        if stale:
+            detail += f"; {stale} behind the mirror — paperful rag ingest"
+            out.append(Check("RAG index", "amber", detail))
+        else:
+            detail += " · `paperful rag status` compares it with the mirror"
+            out.append(Check("RAG index", "green", detail))
     return out
 
 

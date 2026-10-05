@@ -129,7 +129,7 @@ def _ocr_cli(tmp_path, monkeypatch, *, apply: bool):
     items = [make_item(key="SCAN0001"), make_item(key="TEXT0001")]
     loaded = types.SimpleNamespace(items=items, label="library")
     monkeypatch.setenv("PAPERFUL_PACK", "off")
-    monkeypatch.setattr(cli, "_connect", lambda cfg: object())
+    monkeypatch.setattr(cli, "_connect", lambda cfg, quiet=False: object())
     monkeypatch.setattr(cli, "_load_scope", lambda backend, **scope: loaded)
 
     def ocr_items(
@@ -232,3 +232,23 @@ def test_doctor_greens_a_built_index(rag_cfg, monkeypatch):
     embeddings, index = _rag_checks(rag_cfg)
     assert embeddings.status == "green" and "nomic-embed-text" in embeddings.detail
     assert index.status == "green" and index.detail.startswith("1 items, ")
+
+
+def test_doctor_ambers_stale_index(rag_cfg, monkeypatch):
+    pytest.importorskip("lancedb")
+    from paperful.rag.ingest import ingest_entries, select_entries
+
+    add_item(rag_cfg, "AAAA1111", pdf=BODY)
+    embedder = FakeEmbedder()
+    ingest_entries(
+        rag_cfg,
+        select_entries(rag_cfg),
+        embedder=embedder,
+        parser=TextFileParser(),
+        ocr_available=lambda: False,
+    )
+    add_item(rag_cfg, "BBBB2222", pdf=BODY)
+    monkeypatch.setattr("paperful.llm.preflight.validate_embedder", lambda cfg: embedder)
+    embeddings, index = _rag_checks(rag_cfg)
+    assert embeddings.status == "green"
+    assert index.status == "amber" and "behind the mirror" in index.detail

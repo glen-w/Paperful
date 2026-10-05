@@ -130,6 +130,9 @@ class FakeLibrary:
     def trash_item(self, key):
         self.trashed.append(key)
 
+    def trash_note(self, note_key, *, parent_key=""):
+        self.trashed.append(note_key)
+
     def merge_into(self, keep, drop):
         self.kids[keep].extend(self.kids.pop(drop, []))
         self.items[keep]["data"]["abstractNote"] = "From the duplicate."
@@ -225,6 +228,19 @@ def test_trash_marks_the_record_and_keeps_the_files(cfg):
     assert (folder / "p.pdf").is_file()
     assert load_record(cfg.out_dir, "ITEM0001")["library"]["state"] == "trashed"
     assert items_in_mirror(cfg.out_dir) == []
+
+
+def test_trash_note_keeps_the_parent_folder(cfg):
+    lib, backend = _setup(cfg)
+    folder = cfg.out_dir / "BBNJ" / "Smith - 2020 - First title -- ITEM0001"
+    (folder / "p.pdf").write_bytes(b"%PDF-1.4")
+    backend.trash_note("N1", parent_key="ITEM0001")
+    assert lib.trashed == ["N1"]
+    rec = load_record(cfg.out_dir, "ITEM0001")
+    assert rec is not None
+    assert (rec.get("library") or {}).get("state") != "trashed"
+    assert (folder / "p.pdf").is_file()
+    assert [i.key for i in items_in_mirror(cfg.out_dir)] == ["ITEM0001"]
 
 
 def test_merge_marks_the_duplicate_and_refreshes_the_keeper(cfg):
@@ -382,3 +398,9 @@ def test_an_unreadable_parent_never_gets_a_second_note(cfg):
     with pytest.raises(LibraryReadError):
         backend.create_or_update_collection_note("COL1", "<p>x</p>", ["paperful-report"])
     assert backend.zl.zot.created == []
+
+
+def test_trash_note_refuses_a_parent_item(cfg):
+    backend = _zotero(cfg)
+    with pytest.raises(LibraryError, match="not a note"):
+        backend.trash_note("ITEM0001")

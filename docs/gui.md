@@ -179,7 +179,7 @@ under `state/rag/threads/` and retrieves on a rewritten query.
 | Action | Maps to (Capability API) | Notes |
 | --- | --- | --- |
 | New thread | `rag.answer(question, keys=scope)` with scope = active `-C` + filters | Requires index freshness; `paperful rag status` shows what is stale |
-| Follow-up | `rag.answer(question, history=turns)`; thread storage and follow-up rewriting are still to build | No silent widening of scope mid-thread |
+| Follow-up | `rag.answer(question, history=turns)` plus `paperful ask --thread` / `state/rag/threads/` | Follow-up query rewrite is shipped on the CLI; no silent widening of scope mid-thread |
 | Focus / prompt preset | `--focus` or profile field | Question-centric vs summary-style system prompts |
 | Export thread | Write `state/rag/…` report JSON; optional child note | Explicit Apply for Zotero writes |
 | Batch from file | Upload / paste questions → cited answer table | Parity with CLI batch ingest |

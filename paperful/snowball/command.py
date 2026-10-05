@@ -128,6 +128,7 @@ class SnowballRequest:
 class PathResult:
     run_dir: Any
     exit_code: int
+    summary: dict[str, Any] | None = None
 
 
 def run_search(
@@ -683,7 +684,11 @@ def run_apply(
     if not creatable:
         console.print("nothing to create (all keep rows already in library)")
         write_report(dest, {"created": 0, "skipped_exists": len(kept), "attach_ok": 0, "attach_deferred": 0})
-        return PathResult(dest, 0)
+        return PathResult(
+            dest,
+            0,
+            summary={"created": 0, "skipped_exists": len(kept), "attach_ok": 0, "attach_deferred": 0},
+        )
 
     note = cfg.snowball_note_provenance if request.note_provenance is None else request.note_provenance
     items, counts = create_new(
@@ -717,7 +722,15 @@ def run_apply(
     else:
         console.print(f"items created (metadata only): {counts['created']}")
     write_report(dest, report)
-    return PathResult(dest, 1 if counts.get("failed") else 0)
+    failed = int(counts.get("failed") or 0)
+    created = int(counts.get("created") or 0)
+    from ..agent_json import batch_exit
+
+    return PathResult(
+        dest,
+        batch_exit(ok=created, failed=failed) if failed or created else 0,
+        summary=report,
+    )
 
 
 def _print_fetch_result(

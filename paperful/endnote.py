@@ -333,6 +333,12 @@ class EndNoteBackend:
             "the reference from the next import bundle."
         )
 
+    def trash_note(self, note_key: str, *, parent_key: str = "") -> None:
+        del note_key, parent_key
+        raise LibraryError(
+            "EndNote cannot trash notes through Paperful. Delete the note in EndNote."
+        )
+
     def trash_attachment(self, attachment_key: str) -> None:
         del attachment_key
         raise LibraryError(

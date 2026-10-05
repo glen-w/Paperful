@@ -12,6 +12,18 @@ EXIT_USER = 1
 EXIT_ENV = 2
 EXIT_PARTIAL = 3
 
+REQUIRED_KEYS = (
+    "schema",
+    "command",
+    "exit",
+    "ok",
+    "partial",
+    "summary",
+    "items",
+    "paths",
+    "flags",
+)
+
 
 def envelope(
     *,

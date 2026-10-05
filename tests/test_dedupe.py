@@ -658,6 +658,28 @@ def test_cli_gaps_json(tmp_path, monkeypatch):
     assert "run" not in res.stdout  # json only, no table
 
 
+def test_cli_gaps_format_json(tmp_path, monkeypatch):
+    cfg_file = _cfg_and_stub(
+        tmp_path,
+        monkeypatch,
+        [
+            make_item(key="A", has_pdf=True, doi="10.1000/a"),
+            make_item(key="B", has_pdf=False, has_linked_url=True, doi=None),
+        ],
+    )
+    res = runner.invoke(
+        cli.app, ["gaps", "-c", str(cfg_file), "-C", "BBNJ", "--format", "json"]
+    )
+    assert res.exit_code == 0, res.stdout
+    payload = json.loads(res.stdout)
+    assert payload["schema"] == "paperful.agent.json.v1"
+    assert payload["command"] == "gaps"
+    assert payload["summary"]["no_stored_pdf"] == 1
+    assert payload["summary"]["linked_url_only"] == 1
+    assert payload["summary"]["missing_doi"] == 1
+    assert "items" not in payload or isinstance(payload["items"], list)
+
+
 def test_merge_fields_fill_blanks_and_better_text():
     patch = merge_parent_patch(
         {

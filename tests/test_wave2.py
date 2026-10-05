@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from paperful.agent_json import EXIT_PARTIAL, batch_exit, envelope
+from paperful.agent_json import EXIT_PARTIAL, REQUIRED_KEYS, SCHEMA, batch_exit, envelope
 from paperful.handoff import HINT_OPENABLE, MissingPdf
 from paperful.handoff_rank import rank_missing
 from paperful.mcp_server import dispatch
@@ -21,8 +21,14 @@ def test_batch_exit_partial():
 
 def test_envelope_schema():
     body = envelope(command="run", summary={"n": 1}, exit_code=0)
-    assert body["schema"] == "paperful.agent.json.v1"
+    assert body["schema"] == SCHEMA
     assert body["ok"] is True and body["partial"] is False
+    assert all(k in body for k in REQUIRED_KEYS)
+
+
+def test_envelope_keys_match_golden():
+    golden = Path(__file__).parent / "fixtures" / "agent_json_v1_keys.json"
+    assert json.loads(golden.read_text(encoding="utf-8")) == list(REQUIRED_KEYS)
 
 
 def test_note_wrap_idempotent():

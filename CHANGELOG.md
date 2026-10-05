@@ -8,6 +8,17 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ### Added
 
+- `--format json` (`paperful.agent.json.v1`) on the remaining batch verbs
+  (`gaps`, `lint`, `fix-metadata`, `dedupe`, `snowball apply`, `summarize`,
+  `synthesize`, `restore`, `import`, `recover`, `ocr`, `all`, inbox
+  proposals, `notes delete`). Mixed `--apply` batches exit **3**. Legacy
+  `--json` on `lint` / `gaps` / `dedupe` is unchanged unless `--format json`
+  is also passed.
+- `paperful notes delete`: dry-run then `--apply` trash of Paperful-owned
+  notes only (`--type`, `--model` / `--except-model`, `--all` with TTY
+  confirm or `--yes`). Never parent items.
+- `doctor` ambers when the RAG index is behind the mirror.
+
 - `paperful acronyms` harvests collection-scoped all-caps tokens into
   `state/acronyms/` (`paperful.acronyms.v1`). `fix-metadata` and parent create
   keep those tokens uppercase when recasing ALL CAPS titles.

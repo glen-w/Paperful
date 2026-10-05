@@ -102,6 +102,7 @@ class LibraryBackend(Protocol):
     def apply_patch(self, item_key: str, fields: dict[str, Any]) -> None: ...
     def relate_items(self, left_key: str, right_key: str) -> None: ...
     def trash_item(self, item_key: str) -> None: ...
+    def trash_note(self, note_key: str, *, parent_key: str = "") -> None: ...
     def merge_into(self, keep_key: str, drop_key: str) -> dict[str, Any]: ...
     def find_child_note_keys(self, item_key: str, tag: str) -> list[str]: ...
     def read_child_note(self, item_key: str, tag: str) -> str | None: ...
@@ -292,6 +293,11 @@ class MirroredBackend:
     def trash_item(self, item_key: str) -> None:
         self._inner.trash_item(item_key)
         self._gone(item_key)
+
+    def trash_note(self, note_key: str, *, parent_key: str = "") -> None:
+        self._inner.trash_note(note_key, parent_key=parent_key)
+        if parent_key:
+            self.refresh(parent_key)
 
     def merge_into(self, keep_key: str, drop_key: str) -> dict[str, Any]:
         result = self._inner.merge_into(keep_key, drop_key)
@@ -620,6 +626,18 @@ class ZoteroBackend:
         """Move a parent item to the Zotero trash. Does not delete files under out/."""
         self._ensure_write()
         self._delete_zotero_item(item_key)
+
+    def trash_note(self, note_key: str, *, parent_key: str = "") -> None:
+        """Trash a child or standalone note. Refuses parent items and attachments."""
+        del parent_key
+        self._ensure_write()
+        raw = self.zl.zot.item(note_key)
+        data = raw.get("data") or {}
+        if data.get("itemType") != "note":
+            raise LibraryError(
+                f"{note_key} is a {data.get('itemType') or 'item'}, not a note."
+            )
+        self.zl.zot.delete_item(raw)
 
     def preview_merge(self, keep_key: str, drop_key: str) -> dict[str, Any]:
         """What ``merge_into`` would copy. Empty when either item is missing."""

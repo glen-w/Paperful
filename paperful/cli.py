@@ -165,6 +165,12 @@ inbox_app = typer.Typer(
     ),
 )
 app.add_typer(inbox_app, name="inbox")
+notes_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Paperful-owned notes only (summaries, remarks, briefing). Never parent items.",
+)
+app.add_typer(notes_app, name="notes")
 rag_app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
@@ -198,6 +204,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "ask",
         "refs",
         "acronyms",
+        "notes",
         "all",
     ),
     "mirror": ("sync", "snapshot", "restore"),
@@ -1103,11 +1110,12 @@ def lint(
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
-    as_json: bool = typer.Option(False, "--json", help="Machine-readable findings."),
+    as_json: bool = typer.Option(False, "--json", help="Legacy findings array. Prefer --format json."),
     strict: bool = typer.Option(False, "--strict", help="Exit 1 if any finding."),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Read-only check of identifiers vs APIs and PDF text on disk. Does not write to the manager."""
     from rich.markup import escape
@@ -1119,6 +1127,7 @@ def lint(
     if _scope_unset(collection, library, profile, run_config):
         _refuse_missing_scope()
     cfg = _cfg(config)
+    json_out, as_json = _agent_wins(fmt, as_json)
     bound = _bind_run(
         cfg,
         profile=profile,
@@ -1135,14 +1144,15 @@ def lint(
     if not collection and not library:
         _refuse_missing_scope()
     _require_manager(cfg)
-    backend = _connect(cfg, quiet=as_json)
+    quiet = as_json or json_out
+    backend = _connect(cfg, quiet=quiet)
     manifest = Manifest(cfg.manifest_path)
     partial: list[Finding] = []
     done = 0
     interrupted = False
     loaded = _load_scope(
         backend,
-        json_out=as_json,
+        json_out=quiet,
         collection=collection,
         library=library,
         year_from=year_from,
@@ -1152,9 +1162,9 @@ def lint(
     items, scope = loaded.items, loaded.label
     if limit:
         items = items[:limit]
-    if not as_json:
+    if not quiet:
         console.print(f"Scope: [bold]{scope}[/] — linting {len(items)} items")
-    with _item_progress(json_out=as_json) as progress:
+    with _item_progress(json_out=quiet) as progress:
         lint_id = progress.add_task("Linting", total=len(items))
 
         def _describe(current: str = "") -> str:
@@ -1214,11 +1224,28 @@ def lint(
         flags={"strict": strict, "interrupted": interrupted},
         started=started,
     )
-    if as_json:
-        console.print(json.dumps([f.__dict__ for f in findings], indent=2))
-    elif not findings:
-        console.print("[green]No findings.[/]")
-    else:
+    from .agent_json import envelope
+
+    payload = envelope(
+        command="lint",
+        summary={"findings": len(findings), "findings_by_code": by_code},
+        items=[
+            {
+                "itemKey": finding.itemKey,
+                "title": finding.title,
+                "status": finding.code,
+                "reason": finding.detail,
+            }
+            for finding in findings
+        ],
+        flags={"strict": strict, "interrupted": interrupted},
+        exit_code=130 if interrupted else (1 if strict and findings else 0),
+    )
+
+    def _human_lint() -> None:
+        if not findings:
+            console.print("[green]No findings.[/]")
+            return
         table = Table(title=f"{len(findings)} findings")
         table.add_column("Code")
         table.add_column("Key", style="dim")
@@ -1227,6 +1254,14 @@ def lint(
         for f in findings:
             table.add_row(f.code, f.itemKey, f.title[:50], f.detail[:80])
         console.print(table)
+
+    if json_out:
+        _emit_agent(payload, json_out=True, human=_human_lint)
+        return
+    if as_json:
+        console.print(json.dumps([f.__dict__ for f in findings], indent=2))
+    else:
+        _human_lint()
     if interrupted:
         raise typer.Exit(130)
     if strict and findings:
@@ -1330,6 +1365,7 @@ def fix_metadata(
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Propose bibliographic patches on disk; --apply writes them through the library adapter.
 
@@ -1341,6 +1377,7 @@ def fix_metadata(
     if _scope_unset(collection, library, profile, run_config):
         _refuse_missing_scope()
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
     bound = _bind_run(
         cfg,
         use_apply=True,
@@ -1362,11 +1399,12 @@ def fix_metadata(
     if not collection and not library:
         _refuse_missing_scope()
     _require_manager(cfg)
-    backend = _connect(cfg)
+    backend = _connect(cfg, quiet=json_out)
     manifest = Manifest(cfg.manifest_path)
     client = make_client(cfg)
     loaded = _load_scope(
         backend,
+        json_out=json_out,
         collection=collection,
         library=library,
         year_from=year_from,
@@ -1377,7 +1415,7 @@ def fix_metadata(
     if limit:
         items = items[:limit]
     started = time.time()
-    with _item_progress() as progress:
+    with _item_progress(json_out=json_out) as progress:
         patches = collect_patches(
             client,
             cfg,
@@ -1387,62 +1425,83 @@ def fix_metadata(
             overwrite=overwrite,
             track=_track(progress, "Checking metadata"),
         )
-    console.print(f"Scope: [bold]{scope}[/] — {len(patches)} proposed patches")
-    if patches:
-        table = Table(title="Proposed patches")
-        table.add_column("Key", style="dim")
-        table.add_column("Title")
-        table.add_column("After")
-        for p in patches:
-            table.add_row(
-                p.itemKey,
-                p.title[:40],
-                ", ".join(f"{k}={v}" for k, v in p.after.items())[:80],
-            )
-        console.print(table)
     write_patches(cfg.patches_path, patches)
     field_counts: dict[str, int] = {}
     for p in patches:
         for key in p.after:
             field_counts[key] = field_counts.get(key, 0) + 1
-    console.print(f"[dim]Wrote {len(patches)} lines to {cfg.patches_path}[/]")
-    if not apply:
-        _print_fix_summary(len(patches), field_counts, applied=None, errors=[])
-        console.print(
-            "Dry-run. Pass [bold]--apply[/] to write these fields into the library."
-        )
-        _write_fix_report(
-            cfg,
-            scope,
-            patches,
-            field_counts,
-            applied=None,
-            errors=[],
-            apply=False,
-            started=started,
-        )
-        return
-    if not backend.supports_write():
-        _exit_env(_no_write(backend), cfg)
-    try:
-        with _item_progress() as progress:
-            ok, errors = apply_patches(
-                backend, patches, track=_track(progress, "Applying patches")
-            )
-    except LibraryError as exc:
-        _exit_env(str(exc), cfg)
-    _flush(backend)
-    _print_fix_summary(len(patches), field_counts, applied=ok, errors=errors)
+    applied_n: int | None = None
+    errors: list[str] = []
+    if apply:
+        if not backend.supports_write():
+            _exit_env(_no_write(backend), cfg)
+        try:
+            with _item_progress(json_out=json_out) as progress:
+                applied_n, errors = apply_patches(
+                    backend, patches, track=_track(progress, "Applying patches")
+                )
+        except LibraryError as exc:
+            _exit_env(str(exc), cfg)
+        _flush(backend)
     _write_fix_report(
         cfg,
         scope,
         patches,
         field_counts,
-        applied=ok,
+        applied=applied_n,
         errors=errors,
-        apply=True,
+        apply=bool(apply),
         started=started,
     )
+    from .agent_json import batch_exit, envelope
+
+    code = 0
+    if apply:
+        code = batch_exit(ok=int(applied_n or 0), failed=len(errors))
+    payload = envelope(
+        command="fix-metadata",
+        summary={
+            "patches_proposed": len(patches),
+            "fields_corrected_by_kind": field_counts,
+            **({"patches_applied": applied_n} if applied_n is not None else {}),
+            "errors": len(errors),
+        },
+        items=[
+            {
+                "itemKey": p.itemKey,
+                "title": p.title,
+                "status": "patched",
+                "after": p.after,
+            }
+            for p in patches
+        ],
+        paths={"patches": str(cfg.patches_path)},
+        flags={"apply": bool(apply), "overwrite": bool(overwrite)},
+        exit_code=code,
+    )
+
+    def _human_fix() -> None:
+        console.print(f"Scope: [bold]{scope}[/] — {len(patches)} proposed patches")
+        if patches:
+            table = Table(title="Proposed patches")
+            table.add_column("Key", style="dim")
+            table.add_column("Title")
+            table.add_column("After")
+            for p in patches:
+                table.add_row(
+                    p.itemKey,
+                    p.title[:40],
+                    ", ".join(f"{k}={v}" for k, v in p.after.items())[:80],
+                )
+            console.print(table)
+        console.print(f"[dim]Wrote {len(patches)} lines to {cfg.patches_path}[/]")
+        _print_fix_summary(len(patches), field_counts, applied=applied_n, errors=errors)
+        if not apply:
+            console.print(
+                "Dry-run. Pass [bold]--apply[/] to write these fields into the library."
+            )
+
+    _emit_agent(payload, json_out=json_out, human=_human_fix)
 
 
 def _print_fix_summary(
@@ -1540,11 +1599,12 @@ def dedupe(
     item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
     as_json: bool = typer.Option(
-        False, "--json", help="Print pack paths and counts as JSON."
+        False, "--json", help="Legacy pack paths JSON. Prefer --format json."
     ),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Find duplicate parents and write a review pack. Merge only with --apply.
 
@@ -1570,6 +1630,7 @@ def dedupe(
     if _scope_unset(collection, library, profile, run_config):
         _refuse_missing_scope()
     cfg = _cfg(config)
+    json_out, as_json = _agent_wins(fmt, as_json)
     bound = _bind_run(
         cfg,
         profile=profile,
@@ -1591,11 +1652,12 @@ def dedupe(
     if not collection and not library:
         _refuse_missing_scope()
     _require_manager(cfg)
-    backend = _connect(cfg, quiet=as_json)
+    quiet = as_json or json_out
+    backend = _connect(cfg, quiet=quiet)
     items: list
     scope: str
     groups: list
-    if as_json:
+    if quiet:
         loaded = _loaded_scope(
             backend,
             collection=collection,
@@ -1685,7 +1747,7 @@ def dedupe(
         remark_duplicates(backend, groups, items, surface=cfg.remarks_surface)
         merge_n = merge_apply_total(groups, apply_medium=apply_medium)
         try:
-            if as_json:
+            if quiet:
                 applied, errors = apply_merge(
                     backend,
                     groups,
@@ -1728,11 +1790,22 @@ def dedupe(
         "applied": applied,
         "errors": errors,
     }
-    if as_json:
-        console.print(
-            json.dumps(payload, indent=2), soft_wrap=True, highlight=False, markup=False
-        )
-    else:
+    from .agent_json import batch_exit, envelope
+
+    code = batch_exit(ok=applied, failed=len(errors)) if apply else 0
+    agent = envelope(
+        command="dedupe",
+        summary={
+            **counts,
+            "applied": applied,
+            "errors": len(errors),
+        },
+        paths={"pack": str(json_path), "markdown": str(md_path)},
+        flags={"apply": bool(apply), "apply_medium": apply_medium, "phase": phase_name},
+        exit_code=code,
+    )
+
+    def _human_dedupe() -> None:
         console.print(f"Scope: [bold]{scope}[/] — {len(items)} items")
         _print_dedupe_table(groups)
         console.print(f"[dim]Wrote {json_path}[/]")
@@ -1754,8 +1827,20 @@ def dedupe(
             console.print(f"Errors: {len(errors)}")
             for err in errors[:20]:
                 console.print(f"[yellow]{err}[/]")
+
+    if json_out:
+        _emit_agent(agent, json_out=True, human=_human_dedupe)
+        return
+    if as_json:
+        console.print(
+            json.dumps(payload, indent=2), soft_wrap=True, highlight=False, markup=False
+        )
         if errors:
             raise typer.Exit(1)
+        return
+    _human_dedupe()
+    if errors:
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -2265,10 +2350,11 @@ def gaps(
         "--to",
         help="Write the missing-PDF list to a .tsv or .md file.",
     ),
-    as_json: bool = typer.Option(False, "--json", help="Print counts as JSON."),
+    as_json: bool = typer.Option(False, "--json", help="Legacy counts JSON. Prefer --format json."),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Count items with no stored PDF, a linked PDF URL only, or no DOI.
 
@@ -2287,6 +2373,7 @@ def gaps(
     if _scope_unset(collection, library, profile, run_config):
         _refuse_missing_scope()
     cfg = _cfg(config)
+    json_out, as_json = _agent_wins(fmt, as_json)
     bound = _bind_run(
         cfg,
         profile=profile,
@@ -2308,10 +2395,11 @@ def gaps(
     if mode in {"tabs", "walk", "watch"} and not list_missing:
         list_missing = True
     _require_manager(cfg)
-    backend = _connect(cfg, quiet=as_json)
+    quiet = as_json or json_out
+    backend = _connect(cfg, quiet=quiet)
     loaded = _load_scope(
         backend,
-        json_out=as_json,
+        json_out=quiet,
         collection=collection,
         library=library,
         year_from=year_from,
@@ -2355,12 +2443,9 @@ def gaps(
         items=rows,
         started=started,
     )
-    if as_json and not list_missing:
-        console.print(
-            json.dumps(payload, indent=2), soft_wrap=True, highlight=False, markup=False
-        )
-        return
-    if not as_json:
+    from .agent_json import envelope
+
+    def _human_gaps_counts() -> None:
         console.print(f"Scope: [bold]{scope}[/]")
         table = Table(title="Gaps")
         table.add_column("Count", justify="right")
@@ -2379,6 +2464,28 @@ def gaps(
         )
         table.add_row(str(counts.missing_doi), "missing DOI", "paperful lint")
         console.print(table)
+
+    agent_payload = envelope(
+        command="gaps",
+        summary={
+            "items": counts.items,
+            "no_stored_pdf": counts.no_stored_pdf,
+            "linked_url_only": counts.linked_url_only,
+            "missing_doi": counts.missing_doi,
+        },
+        items=rows,
+        flags={"list_missing": list_missing, "handoff": mode if list_missing else ""},
+    )
+    if json_out and not list_missing:
+        _emit_agent(agent_payload, json_out=True, human=_human_gaps_counts)
+        return
+    if as_json and not list_missing:
+        console.print(
+            json.dumps(payload, indent=2), soft_wrap=True, highlight=False, markup=False
+        )
+        return
+    if not as_json and not json_out:
+        _human_gaps_counts()
 
     if not list_missing:
         return
@@ -2416,6 +2523,22 @@ def gaps(
             highlight=False,
             markup=False,
         )
+        return
+    if json_out:
+        agent_payload["items"] = [
+            {
+                "itemKey": r.key,
+                "title": r.title,
+                "doi": r.doi,
+                "url": r.url,
+                "hint": r.hint,
+                "miss_surface": r.miss_surface,
+            }
+            for r in missing
+        ]
+        agent_payload["summary"]["missing_pdfs"] = len(missing)
+        _emit_agent(agent_payload, json_out=True, human=lambda: None)
+        return
     else:
         t = Table(title=f"{len(missing)} missing PDFs")
         t.add_column("Key", style="dim")
@@ -3226,6 +3349,12 @@ def _emit_agent(payload: dict[str, Any], *, json_out: bool, human: Callable[[], 
         raise typer.Exit(code)
 
 
+def _agent_wins(fmt: str, as_json: bool = False) -> tuple[bool, bool]:
+    """``--format json`` wins over legacy ``--json``."""
+    json_out = _agent_json(fmt)
+    return json_out, bool(as_json) and not json_out
+
+
 def _finish_run(
     cfg: Config,
     stats: RunStats,
@@ -3485,8 +3614,9 @@ def inbox_drain(
     tag: list[str] = CreateTagOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
-    """One-shot: ingest current PDFs in inbox.dir (DOI match only).
+    """One-shot: ingest current PDFs in inbox.dir.
 
+    Default match is DOI-only. ``[inbox].match`` can add title / OCR / LLM stages.
     Defaults to the whole library so one drop folder can serve every topic.
     Pass ``-C`` only when you intentionally want a narrower DOI index.
     """
@@ -3596,30 +3726,43 @@ inbox_app.add_typer(inbox_proposals_app, name="proposals")
 def inbox_proposals_list(
     status: str = typer.Option("pending", "--status", help="pending, applied, rejected, or all."),
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     from .inbox_match import list_proposals
+    from .agent_json import envelope
 
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
     want = None if status == "all" else status
     rows = list_proposals(cfg, status=want)
-    if not rows:
-        console.print("No inbox proposals.")
-        return
-    table = Table(title="inbox proposals")
-    table.add_column("id")
-    table.add_column("action")
-    table.add_column("doi")
-    table.add_column("title")
-    table.add_column("status")
-    for row in rows:
-        table.add_row(
-            str(row.get("id") or ""),
-            str(row.get("action") or ""),
-            str(row.get("doi") or ""),
-            str(row.get("title") or "")[:60],
-            str(row.get("status") or ""),
-        )
-    console.print(table)
+    payload = envelope(
+        command="inbox proposals list",
+        summary={"count": len(rows)},
+        items=rows,
+        flags={"status": status},
+    )
+
+    def _human() -> None:
+        if not rows:
+            console.print("No inbox proposals.")
+            return
+        table = Table(title="inbox proposals")
+        table.add_column("id")
+        table.add_column("action")
+        table.add_column("doi")
+        table.add_column("title")
+        table.add_column("status")
+        for row in rows:
+            table.add_row(
+                str(row.get("id") or ""),
+                str(row.get("action") or ""),
+                str(row.get("doi") or ""),
+                str(row.get("title") or "")[:60],
+                str(row.get("status") or ""),
+            )
+        console.print(table)
+
+    _emit_agent(payload, json_out=json_out, human=_human)
 
 
 @inbox_proposals_app.command("apply")
@@ -3627,12 +3770,15 @@ def inbox_proposals_apply(
     proposal_id: str = typer.Argument(..., help="Proposal id from inbox proposals list."),
     tag: list[str] = CreateTagOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     from .inbox import apply_proposal
+    from .agent_json import envelope
 
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
     _require_manager(cfg)
-    backend = _connect(cfg)
+    backend = _connect(cfg, quiet=json_out)
     if not backend.supports_write():
         _exit_env("inbox proposals apply needs library write support.", cfg)
     manifest = Manifest(cfg.manifest_path)
@@ -3642,23 +3788,232 @@ def inbox_proposals_apply(
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1) from exc
     _flush(backend)
-    console.print(f"Applied proposal {proposal_id} → {data.get('item_key') or data.get('action')}")
+    payload = envelope(
+        command="inbox proposals apply",
+        summary={
+            "id": proposal_id,
+            "item_key": data.get("item_key") or "",
+            "action": data.get("action") or "",
+        },
+        items=[data],
+        flags={"apply": True},
+    )
+
+    def _human_apply() -> None:
+        console.print(
+            f"Applied proposal {proposal_id} → {data.get('item_key') or data.get('action')}"
+        )
+
+    _emit_agent(payload, json_out=json_out, human=_human_apply)
 
 
 @inbox_proposals_app.command("reject")
 def inbox_proposals_reject(
     proposal_id: str = typer.Argument(..., help="Proposal id from inbox proposals list."),
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     from .inbox import reject_proposal
+    from .agent_json import envelope
 
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
     try:
-        reject_proposal(cfg, proposal_id)
+        data = reject_proposal(cfg, proposal_id)
     except (FileNotFoundError, ValueError) as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1) from exc
-    console.print(f"Rejected proposal {proposal_id}")
+    payload = envelope(
+        command="inbox proposals reject",
+        summary={"id": proposal_id, "status": data.get("status") or "rejected"},
+        items=[data],
+    )
+
+    def _human_reject() -> None:
+        console.print(f"Rejected proposal {proposal_id}")
+
+    _emit_agent(payload, json_out=json_out, human=_human_reject)
+
+
+@notes_app.command("delete")
+def notes_delete(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    item: list[str] = typer.Option([], "--item", help="Parent item key (repeatable)."),
+    note_type: list[str] = typer.Option(
+        [],
+        "--type",
+        help="summary, review, attach, duplicate, linked, snowball, briefing (repeatable).",
+    ),
+    model: str = typer.Option("", "--model", help="Only notes from this LLM id."),
+    except_model: str = typer.Option(
+        "",
+        "--except-model",
+        help="Skip this LLM id. Without --type, only summary and review notes.",
+    ),
+    all_owned: bool = typer.Option(
+        False,
+        "--all",
+        help="Every Paperful-owned note in scope. Never user notes.",
+    ),
+    apply: bool = typer.Option(
+        False, "--apply", help="Trash matched notes. Default is dry-run."
+    ),
+    yes: bool = typer.Option(
+        False, "--yes", help="Skip confirm on --apply --all (needed when not a TTY)."
+    ),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = typer.Option(
+        [],
+        "-T",
+        "--item-type",
+        help="Only these Zotero parent item types (repeatable or comma-separated).",
+    ),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Trash Paperful-owned notes. Never parent items. Dry-run unless --apply."""
+    from .notes import NOTE_TYPES, apply_delete, collect, select
+
+    if not item and _scope_unset(collection, library, profile, run_config):
+        _refuse_missing_scope()
+    if all_owned and (note_type or model.strip()):
+        console.print("[red]Do not combine --all with --type or --model.[/]")
+        raise typer.Exit(1)
+    types: frozenset[str] | None = None
+    if note_type:
+        types = frozenset(t.strip().lower() for t in note_type if t.strip())
+        unknown = types - NOTE_TYPES
+        if unknown:
+            console.print(f"[red]Unknown --type: {', '.join(sorted(unknown))}[/]")
+            raise typer.Exit(1)
+    if not all_owned and types is None and not model.strip() and not except_model.strip():
+        console.print(
+            "[red]Give --type, --model / --except-model, or --all.[/]"
+        )
+        raise typer.Exit(1)
+    cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    if not item and not collection and not library:
+        _refuse_missing_scope()
+    _require_manager(cfg)
+    backend = _connect(cfg, quiet=json_out)
+    loaded = _load_scope(
+        backend,
+        json_out=json_out,
+        collection=collection,
+        library=bool(library) or not collection,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    items = loaded.items
+    scope = loaded.label
+    if item:
+        want = set(item)
+        items = [it for it in items if it.key in want]
+        if not items:
+            console.print("[red]No matching --item keys in scope.[/]")
+            raise typer.Exit(1)
+    cols = []
+    if collection:
+        for spec in collection:
+            try:
+                cols.append(backend.resolve_collection(spec))
+            except LookupError as exc:
+                console.print(f"[red]{exc}[/]")
+                raise typer.Exit(1) from exc
+    hits = collect(backend, items, cfg, collections=cols)
+    matched = select(
+        hits,
+        types=types,
+        model=model,
+        except_model=except_model,
+        all_owned=all_owned,
+    )
+    from .agent_json import batch_exit, envelope
+
+    if apply and all_owned and not yes:
+        if not sys.stdin.isatty():
+            console.print("[red]--apply --all needs a TTY confirm or --yes.[/]")
+            raise typer.Exit(1)
+        if not typer.confirm(f"Trash {len(matched)} Paperful note(s) in {scope}?"):
+            raise typer.Exit(1)
+    trashed = 0
+    errors: list[str] = []
+    if apply:
+        if not backend.supports_write():
+            _exit_env(_no_write(backend), cfg)
+        try:
+            trashed, errors = apply_delete(backend, matched)
+        except LibraryError as exc:
+            _exit_env(str(exc), cfg)
+        _flush(backend)
+    code = batch_exit(ok=trashed, failed=len(errors)) if apply else 0
+    payload = envelope(
+        command="notes delete",
+        summary={
+            "matched": len(matched),
+            "trashed": trashed,
+            "errors": len(errors),
+            "skipped_not_paperful": max(0, len(hits) - len(matched)) if all_owned else 0,
+        },
+        items=[
+            {
+                "noteKey": h.note_key,
+                "parentKey": h.parent_key,
+                "title": h.title,
+                "type": h.note_type,
+                "model": h.model,
+                "standalone": h.standalone,
+            }
+            for h in matched
+        ],
+        flags={
+            "apply": apply,
+            "all": all_owned,
+            "types": sorted(types) if types else [],
+            "model": model,
+            "except_model": except_model,
+        },
+        exit_code=code,
+    )
+
+    def _human_notes() -> None:
+        console.print(f"Scope: [bold]{scope}[/] — {len(matched)} Paperful note(s)")
+        if matched:
+            table = Table(title="notes delete" + ("" if apply else " (dry-run)"))
+            table.add_column("Note")
+            table.add_column("Parent")
+            table.add_column("Type")
+            table.add_column("Model")
+            for h in matched[:100]:
+                table.add_row(h.note_key, h.parent_key or "(collection)", h.note_type, h.model)
+            console.print(table)
+        if apply:
+            console.print(f"Trashed {trashed}. Errors {len(errors)}.")
+            for err in errors[:20]:
+                console.print(f"[yellow]{err}[/]")
+        else:
+            console.print("Dry-run. Pass [bold]--apply[/] to trash these notes.")
+
+    _emit_agent(payload, json_out=json_out, human=_human_notes)
 
 
 @refs_app.command("gap")
@@ -4160,6 +4515,7 @@ def restore(
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Recreate missing library items from out/. Dry-run unless --apply. Never overwrites fields."""
     from .restore import apply_restore, iter_records, plan_restore, record_in_scope
@@ -4167,6 +4523,7 @@ def restore(
     if _scope_unset(collection, library, profile, run_config):
         _refuse_missing_scope()
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
     bound = _bind_run(
         cfg,
         profile=profile,
@@ -4188,7 +4545,7 @@ def restore(
     if not collection and not library:
         _refuse_missing_scope()
     _require_manager(cfg)
-    backend = _live_backend(cfg)
+    backend = _live_backend(cfg, quiet=json_out)
     prefixes: list[str] | None = None
     if not library:
         prefixes = []
@@ -4222,9 +4579,9 @@ def restore(
     if limit:
         records = records[:limit]
     keys, _scope = _scope_keys(backend, collection, library)
-    with _spinner("Loading items from library…"):
+    with _spinner("Loading items from library…", json_out=json_out):
         library_items = backend.items_in_scope(keys)
-    with _item_progress() as progress:
+    with _item_progress(json_out=json_out) as progress:
         note_tags: dict[str, set[str]] = {}
         for it in _track(progress, "Reading library notes")(library_items):
             tags: set[str] = set()
@@ -4243,26 +4600,46 @@ def restore(
                 note_tags[it.key] = tags
     planned = plan_restore(records, library_items, note_tags_for=note_tags)
     counts = planned.counts()
-    console.print(
-        f"{len(records)} restore folder(s) · "
-        f"create {counts.get('create_item', 0)} · "
-        f"exists {counts.get('exists', 0)} · "
-        f"attach {counts.get('attach_pdf', 0)} · "
-        f"notes {counts.get('create_note', 0)}"
-    )
+    from .agent_json import envelope
+
     if not apply:
-        console.print(
-            "[dim]Dry run. Pass --apply to write missing items into the library.[/]"
+        payload = envelope(
+            command="restore",
+            summary={"folders": len(records), **counts},
+            flags={"dry_run": True},
         )
+
+        def _human_restore() -> None:
+            console.print(
+                f"{len(records)} restore folder(s) · "
+                f"create {counts.get('create_item', 0)} · "
+                f"exists {counts.get('exists', 0)} · "
+                f"attach {counts.get('attach_pdf', 0)} · "
+                f"notes {counts.get('create_note', 0)}"
+            )
+            console.print(
+                "[dim]Dry run. Pass --apply to write missing items into the library.[/]"
+            )
+
+        _emit_agent(payload, json_out=json_out, human=_human_restore)
         return
-    with _item_progress() as progress:
+    with _item_progress(json_out=json_out) as progress:
         done = apply_restore(
             planned, backend, backend, track=_track(progress, "Restoring items")
         )
-    console.print(
-        f"[bold]created {done['create_item']}[/] · "
-        f"attached {done['attach_pdf']} · notes {done['create_note']}"
+    payload = envelope(
+        command="restore",
+        summary=dict(done),
+        flags={"apply": True},
     )
+
+    def _human_restore_done() -> None:
+        console.print(
+            f"[bold]created {done['create_item']}[/] · "
+            f"attached {done['attach_pdf']} · notes {done['create_note']}"
+        )
+
+    _emit_agent(payload, json_out=json_out, human=_human_restore_done)
     _flush(backend)
 
 
@@ -4274,7 +4651,7 @@ def import_library(
     fmt: str | None = typer.Option(
         None,
         "--format",
-        help="ris, bibtex, or endnote-xml. Default: detect from the file.",
+        help="ris, bibtex, endnote-xml, or json (agent envelope; file type from the suffix).",
     ),
     apply: bool = typer.Option(
         False,
@@ -4289,32 +4666,63 @@ def import_library(
 
     cfg = _cfg(config)
     _require_manager(cfg)
+    json_out = False
+    file_fmt = fmt
+    if (fmt or "").strip().lower() == "json":
+        json_out = True
+        file_fmt = None
     try:
-        records = load_records(path, fmt)
+        records = load_records(path, file_fmt)
     except ValueError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1)
-    console.print(f"{len(records)} record(s) in {path.name}")
+    n_pdf = sum(1 for r in records if r.get("pdfs"))
+    n_notes = sum(len(r.get("notes") or []) for r in records)
     if not apply:
-        n_pdf = sum(1 for r in records if r.get("pdfs"))
-        n_notes = sum(len(r.get("notes") or []) for r in records)
-        console.print(
-            f"[dim]Dry run. Pass --apply to create {len(records)} items, "
-            f"attach {n_pdf} PDF path(s), add {n_notes} note(s).[/]"
+        from .agent_json import envelope
+
+        payload = envelope(
+            command="import",
+            summary={
+                "records": len(records),
+                "pdfs": n_pdf,
+                "notes": n_notes,
+            },
+            flags={"dry_run": True},
         )
+
+        def _human_imp() -> None:
+            console.print(f"{len(records)} record(s) in {path.name}")
+            console.print(
+                f"[dim]Dry run. Pass --apply to create {len(records)} items, "
+                f"attach {n_pdf} PDF path(s), add {n_notes} note(s).[/]"
+            )
+
+        _emit_agent(payload, json_out=json_out, human=_human_imp)
         return
-    backend = _connect(cfg)
+    backend = _connect(cfg, quiet=json_out)
     if not backend.supports_write():
         _exit_env(_no_write(backend), cfg)
-    with _item_progress() as progress:
+    with _item_progress(json_out=json_out) as progress:
         done = apply_import(
             records, backend, dry_run=False, track=_track(progress, "Importing records")
         )
-    console.print(
-        f"[bold]created {done['create']}[/] · attached {done['attach']} · "
-        f"notes {done['notes']}"
-        + (f" · missing PDFs {done['skipped_pdf']}" if done.get("skipped_pdf") else "")
+    from .agent_json import envelope
+
+    payload = envelope(
+        command="import",
+        summary=dict(done),
+        flags={"apply": True},
     )
+
+    def _human_imp_done() -> None:
+        console.print(
+            f"[bold]created {done['create']}[/] · attached {done['attach']} · "
+            f"notes {done['notes']}"
+            + (f" · missing PDFs {done['skipped_pdf']}" if done.get("skipped_pdf") else "")
+        )
+
+    _emit_agent(payload, json_out=json_out, human=_human_imp_done)
     _flush(backend)
 
 
@@ -4963,6 +5371,7 @@ def recover(
         False, "--no-attach", help="Download to out/ only; do not attach in Zotero."
     ),
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Browser-agent PDF recovery for named items (also auto-fires at the end of run)."""
     from .browser_agent import recover_start_url
@@ -4980,42 +5389,61 @@ def recover(
         )
         raise typer.Exit(1)
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
     _require_manager(cfg)
     try:
         validate_llm_for_recover(cfg)
     except LlmConfigError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1)
-    console.print(f"[orange3]{RECOVER_DISCLAIMER}[/]")
-    if llm_egress_is_remote(cfg):
-        console.print(
-            "[orange3]Remote LLM provider — page text may leave this machine.[/]"
-        )
-    backend = _connect(cfg)
+    if not json_out:
+        console.print(f"[orange3]{RECOVER_DISCLAIMER}[/]")
+        if llm_egress_is_remote(cfg):
+            console.print(
+                "[orange3]Remote LLM provider — page text may leave this machine.[/]"
+            )
+    backend = _connect(cfg, quiet=json_out)
     manifest = Manifest(cfg.manifest_path)
     todo: list = []
+    preview: list[dict[str, Any]] = []
     for key in item:
         it = backend.get_item(key)
         if it is None:
             console.print(f"[red]Unknown item key {key}[/]")
             raise typer.Exit(1)
         if it.has_pdf and not dry_run:
-            console.print(f"[dim]Skipping {key} — already has PDF[/]")
+            if not json_out:
+                console.print(f"[dim]Skipping {key} — already has PDF[/]")
+            preview.append({"itemKey": key, "status": "skip", "reason": "has_pdf"})
             continue
         url = recover_start_url(it)
         if not url:
             console.print(f"[red]{key}: no DOI or URL[/]")
             raise typer.Exit(1)
         if dry_run:
-            console.print(f"[bold]{key}[/] would recover from {url}")
+            if not json_out:
+                console.print(f"[bold]{key}[/] would recover from {url}")
+            preview.append({"itemKey": key, "status": "would", "url": url})
             continue
         todo.append(it)
     if dry_run or not todo:
+        from .agent_json import envelope
+
+        payload = envelope(
+            command="recover",
+            summary={
+                "count": len(preview),
+                "would": sum(1 for r in preview if r.get("status") == "would"),
+            },
+            items=preview,
+            flags={"dry_run": dry_run, "no_attach": no_attach},
+        )
+        _emit_agent(payload, json_out=json_out, human=lambda: None)
         raise typer.Exit(0)
     attacher = None if no_attach else backend
     if attacher and not backend.supports_write():
         _exit_env("Write support required to attach.", cfg)
-    with _item_progress() as progress:
+    with _item_progress(json_out=json_out) as progress:
         task_id = progress.add_task("Recovering PDFs", total=len(todo))
         pipe = Pipeline(
             cfg,
@@ -5039,7 +5467,27 @@ def recover(
         flags=_run_flags(no_attach=no_attach),
     )
     path = write_run_report(cfg, report)
-    print_run_summary(console, report, path)
+    from .agent_json import batch_exit, envelope
+
+    summary = report.get("summary") or {}
+    code = batch_exit(
+        ok=int(summary.get("attached") or 0),
+        failed=int(summary.get("attach_failed") or 0),
+    )
+    payload = envelope(
+        command="recover",
+        summary=summary if isinstance(summary, dict) else {},
+        items=list(report.get("items") or []),
+        paths={"report": str(path) if path else ""},
+        flags=_run_flags(no_attach=no_attach),
+        report=report,
+        exit_code=code,
+    )
+    _emit_agent(
+        payload,
+        json_out=json_out,
+        human=lambda: print_run_summary(console, report, path),
+    )
     _flush(backend)
 
 
@@ -5071,6 +5519,7 @@ def ocr(
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Add a text layer to scanned PDFs on disk. Dry-run unless --apply."""
     from .ocr import OcrUnavailable, ocr_items
@@ -5082,6 +5531,7 @@ def ocr(
         console.print("[red]--attach needs --apply.[/]")
         raise typer.Exit(1)
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
     bound = _bind_run(
         cfg,
         profile=profile,
@@ -5099,12 +5549,13 @@ def ocr(
         console.print("[red]Give --item KEY and/or --collection / --library.[/]")
         raise typer.Exit(1)
     _require_manager(cfg)
-    backend = _connect(cfg)
+    backend = _connect(cfg, quiet=json_out)
     if attach and not backend.supports_write():
         _exit_env("Write support required to attach.", cfg)
     manifest = Manifest(cfg.manifest_path)
     loaded = _load_scope(
         backend,
+        json_out=json_out,
         collection=collection,
         library=bool(library),
         year_from=year_from,
@@ -5121,7 +5572,6 @@ def ocr(
         started + max_minutes * 60.0 if max_minutes is not None and max_minutes > 0 else None
     )
     if not items:
-        console.print("[yellow]No items with PDFs in scope.[/]")
         write_command_report(
             cfg,
             command="ocr",
@@ -5131,9 +5581,21 @@ def ocr(
             flags={"apply": apply, "attach": attach, "max_minutes": max_minutes},
             started=started,
         )
+        from .agent_json import envelope
+
+        payload = envelope(
+            command="ocr",
+            summary={"ocr": 0, "skipped": 0, "failed": 0, "would": 0, "not_reached": 0},
+            flags={"apply": apply, "attach": attach},
+        )
+
+        def _human_ocr_empty() -> None:
+            console.print("[yellow]No items with PDFs in scope.[/]")
+
+        _emit_agent(payload, json_out=json_out, human=_human_ocr_empty)
         raise typer.Exit(0)
     try:
-        with _item_progress() as progress:
+        with _item_progress(json_out=json_out) as progress:
             batch = ocr_items(
                 cfg,
                 items,
@@ -5157,8 +5619,6 @@ def ocr(
             continue
         title = row.title if len(row.title) <= 60 else row.title[:57] + "…"
         table.add_row(row.key, title, row.path, row.reason or row.status)
-    if batch.would or batch.ocr or batch.failed:
-        console.print(table)
     outcomes = [
         {
             "itemKey": row.key,
@@ -5184,20 +5644,42 @@ def ocr(
         flags={"apply": apply, "attach": attach, "max_minutes": max_minutes},
         started=started,
     )
-    if apply:
-        console.print(
-            f"OCR {batch.ocr}, skipped {batch.skipped}, failed {batch.failed}."
-            + (
-                f" Not checked: {batch.not_reached}."
-                if batch.not_reached
-                else ""
+    from .agent_json import batch_exit, envelope
+
+    code = batch_exit(ok=batch.ocr, failed=batch.failed) if apply else 0
+    payload = envelope(
+        command="ocr",
+        summary={
+            "ocr": batch.ocr,
+            "skipped": batch.skipped,
+            "failed": batch.failed,
+            "would": batch.would,
+            "not_reached": batch.not_reached,
+        },
+        items=outcomes,
+        flags={"apply": apply, "attach": attach},
+        exit_code=code,
+    )
+
+    def _human_ocr() -> None:
+        if batch.would or batch.ocr or batch.failed:
+            console.print(table)
+        if apply:
+            console.print(
+                f"OCR {batch.ocr}, skipped {batch.skipped}, failed {batch.failed}."
+                + (
+                    f" Not checked: {batch.not_reached}."
+                    if batch.not_reached
+                    else ""
+                )
             )
-        )
-    else:
-        console.print(
-            f"Would OCR {batch.would}, skip {batch.skipped} "
-            f"(already have text). Pass --apply to write the text layer."
-        )
+        else:
+            console.print(
+                f"Would OCR {batch.would}, skip {batch.skipped} "
+                f"(already have text). Pass --apply to write the text layer."
+            )
+
+    _emit_agent(payload, json_out=json_out, human=_human_ocr)
     _flush(backend)
     if apply:
         _rag_auto(
@@ -5832,6 +6314,7 @@ def summarize(
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Grounded LLM summary from local PDF text. Default writes disk and a Zotero note."""
     from .llm import llm_egress_is_remote
@@ -5843,6 +6326,7 @@ def summarize(
         console.print("[red]Give --item KEY and/or --collection / --library.[/]")
         raise typer.Exit(1)
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
     bound = _bind_run(
         cfg,
         use_apply=True,
@@ -5881,10 +6365,11 @@ def summarize(
         )
     if prompt is not None:
         cfg.summarize_prompt_template = str(prompt.expanduser().resolve())
-    backend = _connect(cfg)
+    backend = _connect(cfg, quiet=json_out)
     manifest = Manifest(cfg.manifest_path)
     loaded = _load_scope(
         backend,
+        json_out=json_out,
         collection=collection,
         library=bool(library),
         year_from=year_from,
@@ -5901,6 +6386,7 @@ def summarize(
     deadline = (
         started + max_minutes * 60.0 if max_minutes is not None and max_minutes > 0 else None
     )
+    agent_box: list[dict[str, Any]] = []
 
     def _finish(
         outcomes: list[dict],
@@ -5930,8 +6416,26 @@ def summarize(
             },
             started=started,
         )
+        from .agent_json import batch_exit, envelope
+
+        code = batch_exit(ok=summarized, failed=failed)
+        payload = envelope(
+            command="summarize",
+            summary={
+                "summarized": summarized,
+                "failed": failed,
+                "skipped": skipped,
+                "not_reached": not_reached,
+            },
+            items=outcomes,
+            flags={"to": dest, "order": queue_order},
+            exit_code=code,
+        )
+        agent_box.append(payload)
 
     def _show(row: SummaryRow) -> None:
+        if json_out:
+            return
         who = row.label or row.title or row.key
         if row.status == "summarized":
             console.print(f"[green]Wrote[/] {who}")
@@ -5945,10 +6449,14 @@ def summarize(
             console.print(f"[yellow]{who}[/]: {row.reason}")
 
     if not items:
-        console.print("[yellow]No items with PDFs in scope.[/]")
         _finish([], 0, 0, 0)
-        raise typer.Exit(0)
-    with _item_progress() as progress:
+        _emit_agent(
+            agent_box[-1],
+            json_out=json_out,
+            human=lambda: console.print("[yellow]No items with PDFs in scope.[/]"),
+        )
+        return
+    with _item_progress(json_out=json_out) as progress:
         batch = summarize_items(
             cfg,
             items,
@@ -5977,20 +6485,32 @@ def summarize(
         batch.skipped,
         batch.not_reached,
     )
-    if batch.fatal:
+    if batch.fatal and not json_out:
         console.print(f"[red]{batch.fatal}[/]")
         raise typer.Exit(1)
-    where = cfg.summaries_dir if wants_disk(dest) else "Zotero"
-    console.print(f"Summarized {batch.summarized}/{len(items)} items under {where}")
-    if batch.not_reached:
-        console.print(f"Not reached: {batch.not_reached} (time or --max-new limit).")
-    if batch.skipped:
-        console.print(
-            f"Skipped {batch.skipped} already summarized for this model "
-            "(pass --force to redo)."
-        )
-    if dest == "disk":
-        console.print("Zotero not written (dest=disk).")
+
+    def _human_sum() -> None:
+        if batch.fatal:
+            console.print(f"[red]{batch.fatal}[/]")
+            return
+        where = cfg.summaries_dir if wants_disk(dest) else "Zotero"
+        console.print(f"Summarized {batch.summarized}/{len(items)} items under {where}")
+        if batch.not_reached:
+            console.print(f"Not reached: {batch.not_reached} (time or --max-new limit).")
+        if batch.skipped:
+            console.print(
+                f"Skipped {batch.skipped} already summarized for this model "
+                "(pass --force to redo)."
+            )
+        if dest == "disk":
+            console.print("Zotero not written (dest=disk).")
+
+    if batch.fatal:
+        agent_box[-1]["exit"] = 1
+        agent_box[-1]["ok"] = False
+    _emit_agent(agent_box[-1], json_out=json_out, human=_human_sum)
+    if batch.fatal:
+        raise typer.Exit(1)
     _flush(backend)
 
 
@@ -6029,6 +6549,7 @@ def synthesize(
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Literature review from summary notes already saved by summarize."""
     from .llm import LLMClientError, get_client, llm_egress_is_remote
@@ -6046,6 +6567,7 @@ def synthesize(
         console.print("[red]Give --item KEY and/or --collection / --library.[/]")
         raise typer.Exit(1)
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
     bound = _bind_run(
         cfg,
         profile=profile,
@@ -6080,9 +6602,10 @@ def synthesize(
         )
     if prompt is not None:
         cfg.synthesize_prompt_template = str(prompt.expanduser().resolve())
-    backend = _connect(cfg)
+    backend = _connect(cfg, quiet=json_out)
     loaded = _load_scope(
         backend,
+        json_out=json_out,
         collection=collection,
         library=bool(library),
         year_from=year_from,
@@ -6130,7 +6653,7 @@ def synthesize(
     types = _resolve_types(item_type)
     if types:
         slug_parts.extend(sorted(types))
-    with _item_progress() as progress:
+    with _item_progress(json_out=json_out) as progress:
         prepared = prepare_synthesis(
             cfg,
             items,
@@ -6179,7 +6702,7 @@ def synthesize(
             console.print(f"[green]Wrote[/] {event.path}")
 
     try:
-        with _spinner("Writing the report…"):
+        with _spinner("Writing the report…", json_out=json_out):
             written = write_synthesis(
                 cfg,
                 sources=sources,
@@ -6239,8 +6762,24 @@ def synthesize(
     report["summary"]["missing"] = len(missing)
     report["summary"]["chunks"] = n_chunks
     path = write_run_report(cfg, report, as_last_run=False)
-    console.print(
-        f"Synthesized {len(sources)} summaries ({len(missing)} not included) → {path}"
+    from .agent_json import envelope
+
+    payload = envelope(
+        command="synthesize",
+        summary={
+            "included": len(sources),
+            "missing": len(missing),
+            "chunks": n_chunks,
+        },
+        paths={"report": str(path) if path else ""},
+        flags={"to": dest, "slug": slug},
+    )
+    _emit_agent(
+        payload,
+        json_out=json_out,
+        human=lambda: console.print(
+            f"Synthesized {len(sources)} summaries ({len(missing)} not included) → {path}"
+        ),
     )
     _flush(backend)
 
@@ -6317,6 +6856,7 @@ def all_cmd(
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Run gaps, then fetch, lint, fix-metadata --apply, and summarize --apply.
 
@@ -6325,6 +6865,7 @@ def all_cmd(
     if _scope_unset(collection, library, profile, run_config):
         _refuse_missing_scope()
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
     bound = _bind_run(
         cfg,
         for_all=True,
@@ -6368,34 +6909,67 @@ def all_cmd(
     else:
         console.print(f"[dim]Pack {current_id(cfg)} joined.[/]")
     scope = _all_scope(bound, config)
+    steps_done: list[dict[str, Any]] = []
+    chain_exit = 0
     try:
         for step in bound.steps:
             if step == "summarize" and dry_run:
-                console.print(
-                    "[yellow]Skipping summarize — dry-run does not write summary notes.[/]"
-                )
+                if not json_out:
+                    console.print(
+                        "[yellow]Skipping summarize — dry-run does not write summary notes.[/]"
+                    )
+                steps_done.append({"step": step, "status": "skipped"})
                 continue
             if step == "summarize" and not cfg.llm_enabled:
                 if bound.require_summarize:
+                    steps_done.append({"step": step, "status": "failed", "exit": 1})
+                    if json_out:
+                        chain_exit = 1
+                        break
                     console.print(
                         "[red]summarize needs llm.enabled = true "
                         "(--require-summarize).[/]"
                     )
                     raise typer.Exit(1)
-                console.print("[yellow]Skipping summarize — llm.enabled is false.[/]")
+                if not json_out:
+                    console.print("[yellow]Skipping summarize — llm.enabled is false.[/]")
+                steps_done.append({"step": step, "status": "skipped"})
                 continue
-            console.print(f"\n[bold]all[/] · {step}")
-            _dispatch_all_step(
-                step, bound, scope, dry_run=dry_run, browser_agent=browser_agent
-            )
+            if not json_out:
+                console.print(f"\n[bold]all[/] · {step}")
+            try:
+                _dispatch_all_step(
+                    step, bound, scope, dry_run=dry_run, browser_agent=browser_agent
+                )
+                steps_done.append({"step": step, "status": "ok"})
+            except typer.Exit as exc:
+                code = int(exc.exit_code or 0)
+                if code in (0, None):
+                    steps_done.append({"step": step, "status": "ok"})
+                    continue
+                steps_done.append({"step": step, "status": "failed", "exit": code})
+                chain_exit = code
+                if json_out:
+                    break
+                raise
     finally:
         if opened:
             try:
                 closed = close_pack(cfg)
             except PackError:
                 closed = None
-            if closed is not None:
+            if closed is not None and not json_out:
                 console.print(f"[dim]Pack {closed['id']} closed.[/]")
+    from .agent_json import envelope
+
+    payload = envelope(
+        command="all",
+        summary={"steps": len(steps_done), "failed": chain_exit != 0},
+        items=steps_done,
+        flags={"dry_run": dry_run},
+        exit_code=chain_exit,
+    )
+    _emit_agent(payload, json_out=json_out, human=lambda: None)
 
 
 def _dispatch_all_step(
@@ -6416,6 +6990,7 @@ def _dispatch_all_step(
             include_doi_tabs=False,
             downloads_dir=None,
             to=None,
+            fmt="text",
         )
         return
     if step == "run":
@@ -6437,10 +7012,11 @@ def _dispatch_all_step(
             include_doi_tabs=False,
             downloads_dir=None,
             ezproxy_relogin=None,
+            fmt="text",
         )
         return
     if step == "lint":
-        _call_step(lint, **scope, limit=bound.limit, as_json=False, strict=False)
+        _call_step(lint, **scope, limit=bound.limit, as_json=False, strict=False, fmt="text")
         return
     if step == "fix-metadata":
         _call_step(
@@ -6449,6 +7025,7 @@ def _dispatch_all_step(
             limit=bound.limit,
             apply=False if dry_run else bound.apply,
             overwrite=bound.overwrite,
+            fmt="text",
         )
         return
     if step == "ocr":
@@ -6459,6 +7036,7 @@ def _dispatch_all_step(
             limit=bound.limit,
             apply=False if dry_run else bound.apply,
             attach=False,
+            fmt="text",
         )
         return
     if step == "summarize":
@@ -6471,6 +7049,7 @@ def _dispatch_all_step(
             to=None,
             prompt=None,
             force=False,
+            fmt="text",
         )
         return
     if step == "snapshot":
@@ -6486,6 +7065,7 @@ def _dispatch_all_step(
             apply_medium=False,
             phase="all",
             as_json=False,
+            fmt="text",
         )
         return
     if step == "restore":
@@ -6495,6 +7075,7 @@ def _dispatch_all_step(
             limit=bound.limit,
             dry_run=dry_run,
             apply=False if dry_run else bound.apply,
+            fmt="text",
         )
         return
     if step == "synthesize":
@@ -6508,6 +7089,7 @@ def _dispatch_all_step(
             dry_run=dry_run,
             force=False,
             limit=bound.limit,
+            fmt="text",
         )
         return
     console.print(f"[red]Unknown step {step!r}.[/]")
@@ -6870,8 +7452,15 @@ def _profile_queries(body: dict[str, Any], queries: list[str], *, or_mode: bool)
     if or_mode:
         body["query_op"] = "or"
 
-def _run_snowball(cfg: Config, action: Any) -> None:
+def _run_snowball(
+    cfg: Config,
+    action: Any,
+    *,
+    json_out: bool = False,
+    command: str = "snowball",
+) -> None:
     from .snowball.command import SnowballError
+    from .agent_json import envelope
 
     snowball_started = time.time()
     try:
@@ -6880,6 +7469,16 @@ def _run_snowball(cfg: Config, action: Any) -> None:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
     _rag_auto(cfg, snowball_started)
+    summary = getattr(result, "summary", None) or {}
+    if json_out:
+        payload = envelope(
+            command=command,
+            summary=summary if isinstance(summary, dict) else {},
+            paths={"run": str(result.run_dir)},
+            exit_code=int(result.exit_code or 0),
+        )
+        _emit_agent(payload, json_out=True, human=lambda: None)
+        return
     if result.exit_code:
         raise typer.Exit(result.exit_code)
 
@@ -7294,9 +7893,11 @@ def snowball_apply(
     fetch_pdfs: str | None = FetchPdfsOpt,
     tag: list[str] = CreateTagOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Create keep=true rows from a prior queue (approve-batch or edited dry-run)."""
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
     request = _snowball_request(
         cfg,
         gate="auto",
@@ -7310,7 +7911,12 @@ def snowball_apply(
     )
     from .snowball.command import run_apply
 
-    _run_snowball(cfg, lambda c: run_apply(c, run_id, request, console=console))
+    _run_snowball(
+        cfg,
+        lambda c: run_apply(c, run_id, request, console=console),
+        json_out=json_out,
+        command="snowball apply",
+    )
 
 
 @snowball_app.command("run")

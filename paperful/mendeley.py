@@ -714,6 +714,13 @@ class MendeleyBackend:
         )
         self._docs = None
 
+    def trash_note(self, note_key: str, *, parent_key: str = "") -> None:
+        del parent_key
+        raise LibraryError(
+            "Mendeley cannot trash a child note through Paperful. "
+            "Delete the annotation in Mendeley."
+        )
+
     def trash_attachment(self, file_id: str) -> None:
         """Delete one cloud file. Does not trash the document or the copy under out/."""
         self.client.delete(f"/files/{file_id}", accept=ACCEPT_FILE)

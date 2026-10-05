@@ -1322,6 +1322,18 @@ def test_lint_json(cfg_file, stub_zotero, monkeypatch, tmp_path):
     assert not (tmp_path / "state" / "last-run.json").exists()
 
 
+def test_lint_format_json(cfg_file, stub_zotero, monkeypatch):
+    monkeypatch.setattr("paperful.lint.lint_items", lambda *a, **k: [])
+    res = runner.invoke(
+        cli.app, ["lint", "-c", str(cfg_file), "--library", "--format", "json"]
+    )
+    assert res.exit_code == 0, res.stdout
+    body = json.loads(res.stdout)
+    assert body["schema"] == "paperful.agent.json.v1"
+    assert body["command"] == "lint"
+    assert body["summary"]["findings"] == 0
+
+
 def test_lint_strict_exits_1(cfg_file, stub_zotero, monkeypatch, tmp_path):
     from paperful.lint import Finding
 
@@ -2136,3 +2148,250 @@ def test_inbox_proposals_list_cli(cfg_file, stub_zotero, tmp_path):
     assert listed.exit_code == 0, listed.stdout
     assert "abc123" in listed.stdout
     assert "10.1000/prop" in listed.stdout
+    as_json = runner.invoke(
+        cli.app,
+        ["inbox", "proposals", "list", "-c", str(cfg_file), "--format", "json"],
+    )
+    assert as_json.exit_code == 0, as_json.stdout
+    body = json.loads(as_json.stdout)
+    assert body["schema"] == "paperful.agent.json.v1"
+    assert body["command"] == "inbox proposals list"
+    assert body["summary"]["count"] == 1
+    rejected = runner.invoke(
+        cli.app,
+        ["inbox", "proposals", "reject", "abc123", "-c", str(cfg_file), "--format", "json"],
+    )
+    assert rejected.exit_code == 0, rejected.stdout
+    rej = json.loads(rejected.stdout)
+    assert rej["command"] == "inbox proposals reject"
+    assert rej["summary"]["status"] == "rejected"
+
+
+def test_notes_delete_requires_filter(cfg_file, stub_zotero):
+    res = runner.invoke(cli.app, ["notes", "delete", "-c", str(cfg_file), "-C", "BBNJ"])
+    assert res.exit_code == 1
+    assert "--type" in res.stdout or "--all" in res.stdout
+
+
+def test_notes_delete_refuses_all_with_type(cfg_file, stub_zotero):
+    res = runner.invoke(
+        cli.app,
+        ["notes", "delete", "-c", str(cfg_file), "-C", "BBNJ", "--all", "--type", "summary"],
+    )
+    assert res.exit_code == 1
+    assert "--all" in res.stdout
+
+
+def test_notes_delete_format_json(cfg_file, stub_zotero, monkeypatch):
+    from paperful.notes import NoteHit
+
+    hits = [
+        NoteHit(
+            note_key="N1",
+            parent_key="I1",
+            title="Paper",
+            note_type="summary",
+            model="qwen",
+            verb="summarize",
+            tags=("paperful-summary",),
+            standalone=False,
+        )
+    ]
+    monkeypatch.setattr("paperful.notes.collect", lambda *a, **k: hits)
+    monkeypatch.setattr("paperful.notes.select", lambda *a, **k: hits)
+    res = runner.invoke(
+        cli.app,
+        [
+            "notes",
+            "delete",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--type",
+            "summary",
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    body = json.loads(res.stdout)
+    assert body["schema"] == "paperful.agent.json.v1"
+    assert body["command"] == "notes delete"
+    assert body["summary"]["matched"] == 1
+    assert body["flags"]["apply"] is False
+
+
+def test_notes_delete_apply_yes_json(cfg_file, stub_zotero, monkeypatch):
+    from paperful.notes import NoteHit
+
+    hits = [
+        NoteHit(
+            note_key="N1",
+            parent_key="I1",
+            title="Paper",
+            note_type="summary",
+            model="qwen",
+            verb="summarize",
+            tags=("paperful-summary",),
+            standalone=False,
+        )
+    ]
+    monkeypatch.setattr("paperful.notes.collect", lambda *a, **k: hits)
+    monkeypatch.setattr("paperful.notes.select", lambda *a, **k: hits)
+    monkeypatch.setattr("paperful.notes.apply_delete", lambda *a, **k: (1, []))
+    res = runner.invoke(
+        cli.app,
+        [
+            "notes",
+            "delete",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--all",
+            "--apply",
+            "--yes",
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    body = json.loads(res.stdout)
+    assert body["summary"]["trashed"] == 1
+    assert body["ok"] is True
+
+
+def test_notes_delete_apply_all_needs_yes_off_tty(cfg_file, stub_zotero, monkeypatch):
+    from paperful.notes import NoteHit
+
+    hits = [
+        NoteHit(
+            note_key="N1",
+            parent_key="I1",
+            title="Paper",
+            note_type="summary",
+            model="qwen",
+            verb="summarize",
+            tags=("paperful-summary",),
+            standalone=False,
+        )
+    ]
+    monkeypatch.setattr("paperful.notes.collect", lambda *a, **k: hits)
+    monkeypatch.setattr("paperful.notes.select", lambda *a, **k: hits)
+    res = runner.invoke(
+        cli.app,
+        ["notes", "delete", "-c", str(cfg_file), "-C", "BBNJ", "--all", "--apply"],
+    )
+    assert res.exit_code == 1
+    assert "--yes" in res.stdout
+
+
+def test_notes_delete_mixed_apply_exits_3(cfg_file, stub_zotero, monkeypatch):
+    from paperful.notes import NoteHit
+
+    hits = [
+        NoteHit(
+            note_key="N1",
+            parent_key="I1",
+            title="Paper",
+            note_type="summary",
+            model="qwen",
+            verb="summarize",
+            tags=("paperful-summary",),
+            standalone=False,
+        )
+    ]
+    monkeypatch.setattr("paperful.notes.collect", lambda *a, **k: hits)
+    monkeypatch.setattr("paperful.notes.select", lambda *a, **k: hits)
+    monkeypatch.setattr(
+        "paperful.notes.apply_delete", lambda *a, **k: (1, ["N2 is a journalArticle, not a note."])
+    )
+    res = runner.invoke(
+        cli.app,
+        [
+            "notes",
+            "delete",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--type",
+            "summary",
+            "--apply",
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 3, res.stdout
+    body = json.loads(res.stdout)
+    assert body["partial"] is True
+    assert body["ok"] is False
+    assert body["summary"]["trashed"] == 1
+    assert body["summary"]["errors"] == 1
+
+
+def test_lint_json_and_format_json_envelope_wins(cfg_file, stub_zotero, monkeypatch):
+    monkeypatch.setattr("paperful.lint.lint_items", lambda *a, **k: [])
+    res = runner.invoke(
+        cli.app,
+        ["lint", "-c", str(cfg_file), "--library", "--json", "--format", "json"],
+    )
+    assert res.exit_code == 0, res.stdout
+    body = json.loads(res.stdout)
+    assert body["schema"] == "paperful.agent.json.v1"
+    assert isinstance(body["summary"], dict)
+
+
+def test_import_format_json(cfg_file, tmp_path):
+    ris = tmp_path / "lib.ris"
+    ris.write_text("TY  - JOUR\nTI  - Hello seas\nER  - \n", encoding="utf-8")
+    res = runner.invoke(
+        cli.app, ["import", str(ris), "-c", str(cfg_file), "--format", "json"]
+    )
+    assert res.exit_code == 0, res.stdout
+    body = json.loads(res.stdout)
+    assert body["schema"] == "paperful.agent.json.v1"
+    assert body["command"] == "import"
+    assert body["summary"]["records"] == 1
+    assert "Dry run" not in res.stdout
+
+
+def test_restore_format_json(cfg_file, stub_zotero):
+    res = runner.invoke(
+        cli.app,
+        ["restore", "--library", "--dry-run", "-c", str(cfg_file), "--format", "json"],
+    )
+    assert res.exit_code == 0, res.stdout
+    body = json.loads(res.stdout)
+    assert body["schema"] == "paperful.agent.json.v1"
+    assert body["command"] == "restore"
+
+
+def test_ocr_empty_format_json(cfg_file, stub_zotero):
+    res = runner.invoke(
+        cli.app,
+        ["ocr", "-c", str(cfg_file), "--item", "I2", "--format", "json"],
+    )
+    assert res.exit_code == 0, res.stdout
+    body = json.loads(res.stdout)
+    assert body["schema"] == "paperful.agent.json.v1"
+    assert body["command"] == "ocr"
+    assert body["summary"]["ocr"] == 0
+
+
+def test_recover_dry_run_format_json(tmp_path, stub_zotero, monkeypatch):
+    cfg_file = _llm_cfg_file(tmp_path)
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model
+    )
+    res = runner.invoke(
+        cli.app,
+        ["recover", "-c", str(cfg_file), "--item", "I1", "--dry-run", "--format", "json"],
+    )
+    assert res.exit_code == 0, res.stdout
+    body = json.loads(res.stdout)
+    assert body["schema"] == "paperful.agent.json.v1"
+    assert body["command"] == "recover"
+    assert body["flags"]["dry_run"] is True
+    assert body["items"][0]["itemKey"] == "I1"
