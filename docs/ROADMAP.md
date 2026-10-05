@@ -215,7 +215,7 @@ Zotero has. Do not document either adapter as supported until testers say so.
   review queue) — never silent misfile. Builds on the Firefox-bridge
   create-parent ingest gap; keep DOI attach as the fast path when a miss already
   exists.
-- **OA honesty / miss taxonomy (next).** Project internal miss status to a frozen
+- **OA honesty / miss taxonomy (shipped).** Project internal miss status to a frozen
   surface enum for dry-run, `gaps`, and the run report:
   `no_doi | paywalled | no_oa | fetch_failed | license_blocked | import_ok`
   (one code → one plain string; keep rich detail on `attempts[]`). Stamp
@@ -330,6 +330,7 @@ for the end-to-end operator story.
 | 2 | [Inbox match ladder](#inbox-match-ladder) (defer quarantine, title/OCR, optional `llm_when_thin`) + [create-on-unmatched](#core-keep-sharpening) (gated proposals) | Shipped (`create_auto` unique-DOI only) |
 | 3 | `paperful ingest-dois` — DOI list → `-C`, `--dry-run` / `--apply`, `--tag` | Shipped |
 | 4 | Provenance tags on create (`--tag`, `[snowball]` / `[ingest]` default_tags, `from-<seed-slug>`) | Shipped |
+| 4b | OA honesty miss enum + license/OA stamps on `run --dry-run`, `gaps`, handoff list, run report | Shipped |
 | 5 | Grey playbook example packs (think-tanks, RFMOs, institute report hosts) via `[[grey_playbooks]]` | Ongoing |
 | 6 | Linked-URL health (Core above) | Later |
 | 7 | Non-DOI grey fingerprint (`norm(title)|year|registrant_host`; ISBN/report # when present) in snowball / dedupe / inbox ladder + inbox-create | Later |

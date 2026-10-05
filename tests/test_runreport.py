@@ -73,6 +73,12 @@ def test_run_report_required_keys_and_banner(cfg):
         "fields_corrected": [],
         "path": None,
         "error_type": None,
+        "miss_surface": "import_ok",
+        "miss_plain": "PDF imported",
+        "miss_detail": "",
+        "oa_status": "",
+        "license": "",
+        "version": "",
     }
     assert RUN_REPORT_ITEM_KEYS <= item.keys()
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ..oa_locations import rank_openalex_locations, stamp_from_openalex
 from ..zot import Item
 from .base import Candidate, Context, Outcome, http_json
 from .landing import looks_like_pdf_url, resolve_landings
@@ -18,11 +19,8 @@ def find(item: Item, ctx: Context) -> Candidate:
     )
     if data is None:
         return Candidate.miss(NAME, Outcome.NOT_FOUND)
-    locations = []
+    locations = rank_openalex_locations(data)
     best = data.get("best_oa_location")
-    if best:
-        locations.append(best)
-    locations.extend(data.get("locations") or [])
     pdfs: list[str] = []
     landings: list[str] = []
 
@@ -63,10 +61,13 @@ def find(item: Item, ctx: Context) -> Candidate:
         ),
         None,
     )
+    chosen = locations[0] if locations else {}
+    stamp = stamp_from_openalex(data, chosen) if chosen else {}
     return Candidate(
         url=pdfs[0],
         source=NAME,
         referer=landing,
         alternates=pdfs[1:],
         note="landing" if via_landing else "",
+        oa_stamp=stamp,
     )

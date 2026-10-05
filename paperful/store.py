@@ -65,6 +65,9 @@ class Record:
     md5: str | None = None
     reason: str = ""
     attempts: list[str] = field(default_factory=list)
+    oa_license: str = ""
+    oa_status: str = ""
+    oa_version: str = ""
     ts: float = field(default_factory=time.time)
 
     def to_json(self) -> str:
@@ -474,9 +477,10 @@ def fetch_block(
     pdf_doi: str | None,
     fetched_at: str | None = None,
     origin: str | None = None,
+    oa: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     when = fetched_at or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    return {
+    block: dict[str, Any] = {
         "source": source,
         "fetched_url": fetched_url,
         "fetched_at": when,
@@ -485,6 +489,9 @@ def fetch_block(
         "pdf_doi": pdf_doi,
         "origin": origin if origin is not None else source,
     }
+    if oa:
+        block["oa"] = {k: v for k, v in oa.items() if v}
+    return block
 
 
 def write_fetch_records(
@@ -495,6 +502,7 @@ def write_fetch_records(
     source: str | None,
     fetched_url: str | None,
     pdf_doi: str | None,
+    oa_stamp: dict[str, str] | None = None,
 ) -> list[Path]:
     """Write or refresh ``record.json`` beside each PDF. Fetch overwrites; catalogue stays."""
     fetched_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -511,9 +519,17 @@ def write_fetch_records(
             pdf_name=pdf.name,
             pdf_doi=pdf_doi,
             fetched_at=fetched_at,
+            oa=oa_stamp,
         )
         rec["fetch"] = fetch
         rec["pdf_doi"] = pdf_doi
+        if oa_stamp:
+            if oa_stamp.get("license"):
+                rec["oa_license"] = oa_stamp["license"]
+            if oa_stamp.get("oa_status"):
+                rec["oa_status"] = oa_stamp["oa_status"]
+            if oa_stamp.get("version"):
+                rec["oa_version"] = oa_stamp["version"]
         if item.title:
             rec["title"] = item.title
         write_json(dest, rec)

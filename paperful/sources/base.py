@@ -47,6 +47,7 @@ class Candidate:
         None  # pre-fetched PDF bytes (e.g. htmlpdf); skips HTTP download
     )
     playbook: str = ""  # grey playbook name when the direct lane hit one
+    oa_stamp: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def miss(cls, source: str, outcome: Outcome, note: str = "") -> Candidate:

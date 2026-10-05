@@ -226,6 +226,8 @@ class Config:
     snowball_refine: bool = False
     # Where plain-language lines are written. note | tag | off.
     remarks_surface: str = "note"
+    oa_honesty_stamp_fields: tuple[str, ...] = ("license", "oa_status", "version")
+    oa_honesty_license_block: tuple[str, ...] = ()
     # OCRmyPDF text layer for scanned PDFs. languages is a Tesseract -l list.
     ocr_languages: str = "eng"
     ocr_timeout_s: float = 600.0
@@ -883,6 +885,12 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
     remarks = raw.get("remarks")
     if isinstance(remarks, dict) and remarks.get("surface") not in (None, ""):
         cfg.remarks_surface = parse_remarks_surface(str(remarks["surface"]))
+    oa_honesty = raw.get("oa_honesty")
+    if isinstance(oa_honesty, dict):
+        if "stamp_fields" in oa_honesty:
+            cfg.oa_honesty_stamp_fields = _snowball_strs(oa_honesty["stamp_fields"])
+        if "license_block" in oa_honesty:
+            cfg.oa_honesty_license_block = _snowball_strs(oa_honesty["license_block"])
     attached = raw.get("attachments")
     if isinstance(attached, dict):
         if "fix_broken" in attached:

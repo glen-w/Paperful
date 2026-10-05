@@ -38,6 +38,12 @@ class ItemOutcome:
     fields_corrected: list[str] = field(default_factory=list)
     path: str | None = None
     error_type: str | None = None
+    miss_surface: str | None = None
+    miss_plain: str = ""
+    miss_detail: str = ""
+    oa_status: str = ""
+    license: str = ""
+    version: str = ""
 
 
 def classify_enrichment(notes: list[str]) -> list[str]:
@@ -142,6 +148,12 @@ RUN_REPORT_ITEM_KEYS = frozenset(
         "fields_corrected",
         "path",
         "error_type",
+        "miss_surface",
+        "miss_plain",
+        "miss_detail",
+        "oa_status",
+        "license",
+        "version",
     }
 )
 

@@ -43,6 +43,12 @@ class MissingPdf:
     url: str
     hint: str
     attempts: list[str]
+    miss_surface: str = ""
+    miss_plain: str = ""
+    miss_detail: str = ""
+    oa_status: str = ""
+    license: str = ""
+    version: str = ""
 
     @property
     def open_url(self) -> str:
@@ -92,6 +98,7 @@ def list_missing_pdfs(
     manifest: Manifest | None = None,
     *,
     openable_only: bool = False,
+    cfg: Config | None = None,
 ) -> list[MissingPdf]:
     """Items in scope with no stored PDF, enriched from the manifest when present."""
     rows: list[MissingPdf] = []
@@ -104,6 +111,11 @@ def list_missing_pdfs(
         hint = classify_missing_hint(doi=item.doi, url=url, attempts=attempts)
         if openable_only and hint != HINT_OPENABLE:
             continue
+        honesty: dict[str, str] = {}
+        if cfg is not None:
+            from .miss_surface import honesty_row_for_item
+
+            honesty = honesty_row_for_item(cfg, item, rec)
         rows.append(
             MissingPdf(
                 key=item.key,
@@ -112,6 +124,12 @@ def list_missing_pdfs(
                 url=url,
                 hint=hint,
                 attempts=attempts,
+                miss_surface=str(honesty.get("miss_surface") or ""),
+                miss_plain=str(honesty.get("miss_plain") or ""),
+                miss_detail=str(honesty.get("miss_detail") or ""),
+                oa_status=str(honesty.get("oa_status") or ""),
+                license=str(honesty.get("license") or ""),
+                version=str(honesty.get("version") or ""),
             )
         )
     rows.sort(key=lambda r: (0 if r.hint == HINT_OPENABLE else 1, r.title.lower()))
@@ -121,6 +139,8 @@ def list_missing_pdfs(
 def missing_from_run_outcomes(
     items_by_key: dict[str, Item],
     outcomes: list[dict],
+    *,
+    cfg: Config | None = None,
 ) -> list[MissingPdf]:
     """Soft-blocked / openable misses from a just-finished run report."""
     rows: list[MissingPdf] = []
@@ -140,6 +160,32 @@ def missing_from_run_outcomes(
             hint = HINT_OPENABLE
         if hint != HINT_OPENABLE:
             continue
+        miss_surface = str(row.get("miss_surface") or "")
+        miss_plain = str(row.get("miss_plain") or "")
+        miss_detail = str(row.get("miss_detail") or "")
+        oa_status = str(row.get("oa_status") or "")
+        license_ = str(row.get("license") or "")
+        version = str(row.get("version") or "")
+        if not miss_surface and cfg is not None:
+            from .miss_surface import row_from_item
+
+            honesty = row_from_item(
+                doi=item.doi,
+                arxiv_id=item.arxiv_id,
+                url=url,
+                status=status,
+                reason=reason,
+                attempts=attempts,
+                source=row.get("source"),
+                stamp_fields=cfg.oa_honesty_stamp_fields,
+                license_block_patterns=cfg.oa_honesty_license_block,
+            )
+            miss_surface = str(honesty.get("miss_surface") or "")
+            miss_plain = str(honesty.get("miss_plain") or "")
+            miss_detail = str(honesty.get("miss_detail") or "") or miss_detail
+            oa_status = oa_status or str(honesty.get("oa_status") or "")
+            license_ = license_ or str(honesty.get("license") or "")
+            version = version or str(honesty.get("version") or "")
         rows.append(
             MissingPdf(
                 key=key,
@@ -148,6 +194,12 @@ def missing_from_run_outcomes(
                 url=url,
                 hint=hint,
                 attempts=attempts,
+                miss_surface=miss_surface,
+                miss_plain=miss_plain,
+                miss_detail=miss_detail,
+                oa_status=oa_status,
+                license=license_,
+                version=version,
             )
         )
     rows.sort(key=lambda r: r.title.lower())
@@ -168,21 +220,51 @@ def write_missing_export(rows: list[MissingPdf], path: Path) -> Path:
         lines = [
             "# Missing PDFs",
             "",
-            "| Key | Title | DOI | URL | Hint |",
-            "| --- | --- | --- | --- | --- |",
+            "| Key | Title | DOI | URL | Hint | Miss | OA | License |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- |",
         ]
         for row in rows:
             title = row.title.replace("|", "\\|")
+            miss = row.miss_plain or row.miss_surface or "-"
             lines.append(
-                f"| {row.key} | {title} | {row.doi or '-'} | {row.url or '-'} | {row.hint} |"
+                f"| {row.key} | {title} | {row.doi or '-'} | {row.url or '-'} | "
+                f"{row.hint} | {miss} | {row.oa_status or '-'} | {row.license or '-'} |"
             )
         path.write_text("\n".join(lines) + "\n", encoding="utf-8")
         return path
     with path.open("w", encoding="utf-8", newline="") as fh:
         writer = csv.writer(fh, delimiter="\t")
-        writer.writerow(["key", "title", "doi", "url", "hint"])
+        writer.writerow(
+            [
+                "key",
+                "title",
+                "doi",
+                "url",
+                "hint",
+                "miss_surface",
+                "miss_plain",
+                "miss_detail",
+                "oa_status",
+                "license",
+                "version",
+            ]
+        )
         for row in rows:
-            writer.writerow([row.key, row.title, row.doi, row.url, row.hint])
+            writer.writerow(
+                [
+                    row.key,
+                    row.title,
+                    row.doi,
+                    row.url,
+                    row.hint,
+                    row.miss_surface,
+                    row.miss_plain,
+                    row.miss_detail,
+                    row.oa_status,
+                    row.license,
+                    row.version,
+                ]
+            )
     return path
 
 

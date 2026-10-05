@@ -94,6 +94,7 @@ def test_unpaywall_returns_best_then_alternates(ctx_factory):
     assert cand.outcome is Outcome.FOUND
     assert cand.urls == ["https://pub.test/best.pdf", "https://repo.test/copy.pdf"]
     assert cand.referer == "https://pub.test/land"
+    assert cand.oa_stamp == {}
 
 
 def test_unpaywall_skips_without_doi_or_email(ctx_factory, cfg):

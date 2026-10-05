@@ -6,6 +6,15 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+### Added
+
+- Frozen miss-surface enum (`no_doi`, `paywalled`, `no_oa`, `fetch_failed`,
+  `license_blocked`, `import_ok`) on `run --dry-run`, `gaps --list-missing`,
+  handoff exports, and `paperful.run_report.v1` items. Unpaywall / OpenAlex
+  stamp `license`, `oa_status`, and `version` on candidates, manifest rows, and
+  `record.json` (`fetch.oa`). Config: `[oa_honesty].stamp_fields` and
+  `license_block`.
+
 `paperful refs gap` scans collection PDFs for cited works that are not in the library and writes `state/refs-gaps/` (`paperful.refs_gap.pack.v1`). `paperful ingest-dois --from-file` (or `--from-pack`) creates metadata parents in `-C` only with `--apply`; dry-run reports exists / unresolved / held. Inbox can use a match ladder (`[inbox].match`) and gated or high-bar auto create-on-unmatched (`inbox proposals list|apply|reject`). Default inbox behaviour stays DOI attach only. Created parents take `--tag`, `[snowball]` / `[ingest].default_tags`, `from-<seed-slug>` (snowball seed or ingest file stem), `inbox-created`, and `inbox:<dirname>`.
 
 Pipeline tests that stub EZProxy now set a campus prefix, so the preflight that drops an unconfigured `ezproxy` source no longer skips those runs.

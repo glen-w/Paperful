@@ -858,6 +858,23 @@ class Pipeline:
         cand: Candidate,
         attempts: list[str],
     ) -> bool:
+        from .miss_surface import license_blocked_by_policy
+        from .oa_locations import apply_stamp_fields
+
+        oa_stamp = apply_stamp_fields(
+            dict(cand.oa_stamp or {}), self.cfg.oa_honesty_stamp_fields
+        )
+        if license_blocked_by_policy(
+            oa_stamp, self.cfg.oa_honesty_license_block
+        ):
+            lic = oa_stamp.get("license", "")
+            attempts.append(f"{cand.source}:license_blocked({lic})")
+            self._log_item(
+                item,
+                f"{escape(cand.source)}: [yellow]license blocked[/]"
+                + (f" ({escape(lic)})" if lic else ""),
+            )
+            return False
         dl = None
         if cand.content is not None:
             self._log_item(item, f"[dim]{cand.source}: downloading...[/]")
@@ -929,6 +946,7 @@ class Pipeline:
             source=cand.source,
             fetched_url=dl.final_url,
             pdf_doi=pdf_doi,
+            oa_stamp=oa_stamp or None,
         )
         mismatch = bool(pdf_doi and item.doi and pdf_doi != item.doi)
         if mismatch:
@@ -960,6 +978,9 @@ class Pipeline:
             md5=dl.md5,
             attempts=attempts,
             reason=hold_reason,
+            oa_license=oa_stamp.get("license", ""),
+            oa_status=oa_stamp.get("oa_status", ""),
+            oa_version=oa_stamp.get("version", ""),
         )
         self.manifest.write(rec)
         with self._stats_lock:
@@ -1225,6 +1246,8 @@ class Pipeline:
                 self._record(item, STATUS_CAPTCHA, attempts, reason="bot wall")
             else:
                 self._record(item, STATUS_NOT_FOUND, attempts, reason=REASON_CLOSED)
+        elif any(":license_blocked" in a for a in attempts):
+            self._record(item, STATUS_NOT_FOUND, attempts, reason="license_blocked")
         elif any(":captcha" in a for a in attempts):
             self._record(item, STATUS_CAPTCHA, attempts, reason="bot wall")
         elif any(
@@ -1265,7 +1288,21 @@ class Pipeline:
         self._add_outcome(rec)
 
     def _add_outcome(self, rec: Record, attach_code: str | None = None) -> None:
+        from .miss_surface import oa_stamp_from_record, row_from_item
+
         err = error_type_for(rec.status, rec.reason, attach_code)
+        honesty = row_from_item(
+            doi=rec.doi,
+            url=rec.url,
+            has_pdf=rec.status in {"ok", "attached"},
+            status=rec.status,
+            reason=rec.reason,
+            attempts=list(rec.attempts),
+            source=rec.source,
+            oa_stamp=oa_stamp_from_record(rec),
+            stamp_fields=self.cfg.oa_honesty_stamp_fields,
+            license_block_patterns=self.cfg.oa_honesty_license_block,
+        )
         with self._stats_lock:
             fields = self._item_fields.pop(rec.itemKey, [])
             self.stats.add_item(
@@ -1281,6 +1318,12 @@ class Pipeline:
                     fields_corrected=fields,
                     path=rec.path,
                     error_type=err,
+                    miss_surface=honesty.get("miss_surface"),
+                    miss_plain=str(honesty.get("miss_plain") or ""),
+                    miss_detail=str(honesty.get("miss_detail") or ""),
+                    oa_status=str(honesty.get("oa_status") or ""),
+                    license=str(honesty.get("license") or ""),
+                    version=str(honesty.get("version") or ""),
                 )
             )
 

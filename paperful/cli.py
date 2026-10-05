@@ -2287,7 +2287,7 @@ def gaps(
         return
 
     manifest = Manifest(cfg.manifest_path)
-    missing = list_missing_pdfs(items, manifest)
+    missing = list_missing_pdfs(items, manifest, cfg=cfg)
     if to is not None:
         path = write_missing_export(missing, to)
         console.print(f"Wrote {len(missing)} rows to {path}")
@@ -2303,6 +2303,12 @@ def gaps(
                             "doi": r.doi,
                             "url": r.url,
                             "hint": r.hint,
+                            "miss_surface": r.miss_surface,
+                            "miss_plain": r.miss_plain,
+                            "miss_detail": r.miss_detail,
+                            "oa_status": r.oa_status,
+                            "license": r.license,
+                            "version": r.version,
                         }
                         for r in missing
                     ],
@@ -2320,6 +2326,8 @@ def gaps(
         t.add_column("DOI")
         t.add_column("URL")
         t.add_column("Hint")
+        t.add_column("Miss")
+        t.add_column("OA")
         for row in missing:
             t.add_row(
                 row.key,
@@ -2327,6 +2335,8 @@ def gaps(
                 row.doi or "-",
                 (row.url or "-")[:48],
                 row.hint,
+                row.miss_plain or row.miss_surface or "-",
+                row.oa_status or "-",
             )
         console.print(t)
 
@@ -2578,14 +2588,20 @@ def run(
         table.add_column("Item", no_wrap=True, overflow="ellipsis", ratio=3)
         table.add_column("DOI (source)", no_wrap=True, overflow="ellipsis", ratio=2)
         table.add_column("Would-hit", no_wrap=True, overflow="ellipsis", ratio=2)
+        table.add_column("Miss", no_wrap=True, overflow="ellipsis", ratio=2)
         table.add_column("URL", no_wrap=True, overflow="ellipsis", ratio=1)
         table.add_column("Collections", no_wrap=True, overflow="ellipsis", ratio=1)
+        from .miss_surface import honesty_row_for_item
+
         for it in todo:
             if try_all or not cfg.source_routing:
                 lanes = source_list
             else:
                 lanes = sources_for_item(it, cfg, source_list)
             would = ", ".join(lanes) if lanes else "-"
+            rec = manifest.get(it.key)
+            honesty = honesty_row_for_item(cfg, it, rec)
+            miss = honesty.get("miss_plain") or honesty.get("miss_surface") or "-"
             table.add_row(
                 it.key,
                 it.item_type,
@@ -2596,6 +2612,7 @@ def run(
                     else ("arXiv:" + it.arxiv_id if it.arxiv_id else "-")
                 ),
                 would,
+                miss,
                 (it.url or "-")[:60],
                 "; ".join(it.collection_paths),
             )
@@ -2915,7 +2932,7 @@ def _run_session_handoff(
         for o in stats.items
     ]
     by_key = {it.key: it for it in catalog}
-    missing = missing_from_run_outcomes(by_key, outcomes)
+    missing = missing_from_run_outcomes(by_key, outcomes, cfg=cfg)
     if not missing:
         console.print("[dim]No openable soft-blocked PDFs to hand off.[/]")
         return

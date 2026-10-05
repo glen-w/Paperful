@@ -33,6 +33,14 @@ the PDF. The parent item also gets a readable line ("Free copy from
 Unpaywall.", or "This PDF's DOI does not match the record.").
 `[remarks].surface` chooses a child note (default), a parent tag, or `off`.
 The source of record remains the manifest `source` field (and `attempts`).
+Unpaywall and OpenAlex hits also stamp `license`, `oa_status`, and `version`
+on `out/.../record.json` (`fetch.oa`) and on the manifest row when configured
+in `[oa_honesty].stamp_fields`.
+
+Miss taxonomy (dry-run, `gaps --list-missing`, `--handoff list`) uses a frozen
+surface code: `no_doi`, `paywalled`, `no_oa`, `fetch_failed`, `license_blocked`,
+or `import_ok`, plus a plain-string column and optional `oa_status` / `license`
+when stamped. Rich detail stays on `attempts[]` as `miss_detail`.
 
 Until you are looking at that note, reconstruct origin from disk:
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ..oa_locations import rank_unpaywall_locations, stamp_from_unpaywall
 from ..zot import Item
 from .base import Candidate, Context, Outcome, http_json
 from .landing import looks_like_pdf_url, resolve_landings
@@ -21,10 +22,7 @@ def find(item: Item, ctx: Context) -> Candidate:
     )
     if data is None:
         return Candidate.miss(NAME, Outcome.NOT_FOUND)
-    locations = []
-    if data.get("best_oa_location"):
-        locations.append(data["best_oa_location"])
-    locations.extend(data.get("oa_locations") or [])
+    locations = rank_unpaywall_locations(data)
     pdfs: list[str] = []
     landings: list[str] = []
 
@@ -60,10 +58,20 @@ def find(item: Item, ctx: Context) -> Candidate:
     landing = next(
         (loc.get("url_for_landing_page") or loc.get("url") for loc in locations), None
     )
+    chosen: dict = {}
+    if pdfs:
+        for loc in locations:
+            if loc.get("url_for_pdf") == pdfs[0]:
+                chosen = loc
+                break
+    if not chosen and locations:
+        chosen = locations[0]
+    stamp = stamp_from_unpaywall(data, chosen) if chosen else {}
     return Candidate(
         url=pdfs[0],
         source=NAME,
         referer=landing,
         alternates=pdfs[1:],
         note="landing" if via_landing else "",
+        oa_stamp=stamp,
     )

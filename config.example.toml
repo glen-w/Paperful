@@ -34,6 +34,11 @@ state_dir = "state"
 # [remarks]
 # surface = "note"   # note | tag | off
 
+# OA honesty: stamp license / oa_status / version on record.json; optional block list.
+# [oa_honesty]
+# stamp_fields = ["license", "oa_status", "version"]
+# license_block = []   # substring match on license, e.g. "cc-by-nc-nd"
+
 # Source order. Open-access first, then EZProxy, then HTML→PDF.
 # Google Scholar is opt-in (CAPTCHA / session login). Append "scholar" when you
 # want it, after `paperful session login scholar`. Remove "ezproxy" / "htmlpdf"
