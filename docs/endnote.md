@@ -35,6 +35,7 @@ fail.
 | Groups | `groups.spec` XML for the name; `groups.members` BLOB for membership. There is no join table in a real library. Online-search groups (`TYPE;6` in spec) are skipped. Group *sets* are not in XML. |
 | PDFs | `file_res.file_path` (prefer `file_type` 1 or 4), else `internal-pdf://` in URL fields, else a filename match under `PDF/` |
 | Notes | `research_notes` and `notes` columns, exposed as child notes |
+| Change feed | Paperful uses `sdb.eni` mtime as a synthetic library version for `changes(since)`. Unchanged mtime → empty delta; a bump re-reads live refs. Mirror-first reads work; still seeking testers. |
 
 Item keys are integers. `out/` folder names accept them.
 

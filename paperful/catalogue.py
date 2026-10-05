@@ -64,7 +64,12 @@ class MirrorCatalogue:
     def age_line(self) -> str:
         state = self.state()
         if state and state.get("synced_at"):
-            return f"the mirror as of {state['synced_at']}"
+            line = f"the mirror as of {state['synced_at']}"
+            written = state.get("last_written")
+            gone = state.get("last_gone")
+            if isinstance(written, int) and isinstance(gone, int):
+                line += f" (last refresh: {written} written, {gone} gone)"
+            return line
         return "the mirror (never refreshed with paperful sync)"
 
     # ---- collections --------------------------------------------------------
@@ -195,7 +200,10 @@ class MirrorCatalogue:
         """The manager's payload for ``key``, rebuilt from the record."""
         record = load_record(self.out_dir, key)
         if record is None:
-            return None
+            standalone = self._standalone_record(key)
+            if standalone is None:
+                return None
+            return self._raw_from_standalone(key, standalone)
         fields = record.get("fields")
         data: dict[str, Any] = dict(fields) if isinstance(fields, dict) else {}
         data.update(
@@ -223,6 +231,63 @@ class MirrorCatalogue:
         if "DOI" not in data and record.get("doi_source") == "field":
             data["DOI"] = record.get("library_doi") or record.get("doi") or ""
         return {"key": key, "version": record.get("version"), "data": data, "meta": {}}
+
+    def _standalone_record(self, key: str) -> dict[str, Any] | None:
+        for kind in ("_notes", "_attachments"):
+            path = self.out_dir / kind / key / "record.json"
+            body = load_json(path)
+            if isinstance(body, dict):
+                return body
+        return None
+
+    def _raw_from_standalone(
+        self, key: str, record: dict[str, Any]
+    ) -> dict[str, Any]:
+        kind = record.get("item_type") or "note"
+        tags = [{"tag": t} for t in (record.get("tags") or []) if t]
+        data: dict[str, Any] = {
+            "key": key,
+            "itemType": kind,
+            "title": record.get("title") or "",
+            "tags": tags,
+            "collections": list(record.get("collections") or []),
+        }
+        if kind == "note":
+            note_path = (
+                self.out_dir / "_notes" / key / str(record.get("note_file") or "note.html")
+            )
+            data["note"] = (
+                note_path.read_text(encoding="utf-8") if note_path.is_file() else ""
+            )
+        elif kind == "attachment":
+            data.update(
+                {
+                    "filename": record.get("filename"),
+                    "contentType": record.get("contentType"),
+                    "linkMode": record.get("linkMode"),
+                    "md5": record.get("md5"),
+                }
+            )
+        return {"key": key, "data": data, "meta": {}}
+
+    def find_collection_note_keys(self, collection_key: str, tag: str) -> list[str]:
+        want = tag.strip().lower()
+        out: list[str] = []
+        root = self.out_dir / "_notes"
+        if not root.is_dir():
+            return out
+        for folder in root.iterdir():
+            if not folder.is_dir():
+                continue
+            meta = load_json(folder / "record.json") or {}
+            if not isinstance(meta, dict):
+                continue
+            if collection_key not in (meta.get("collections") or []):
+                continue
+            tags = [str(t).lower() for t in (meta.get("tags") or [])]
+            if want in tags:
+                out.append(str(meta.get("key") or folder.name))
+        return out
 
     def children(self, key: str) -> list[dict[str, Any]]:
         """Attachment and note rows for ``key``, in the manager's shape."""
@@ -414,8 +479,12 @@ class MirrorFirstBackend:
         return fn() if callable(fn) else None
 
     def find_collection_note_keys(self, collection_key: str, tag: str) -> list[str]:
-        # Standalone notes are not in the mirror.
-        return self._need_live().find_collection_note_keys(collection_key, tag)
+        keys = self.catalogue.find_collection_note_keys(collection_key, tag)
+        if keys:
+            return keys
+        if self.live is None:
+            return keys
+        return self.live.find_collection_note_keys(collection_key, tag)
 
     def apply_patch(self, item_key: str, fields: dict[str, Any]) -> None:
         self._need_live().apply_patch(item_key, fields)
@@ -441,9 +510,29 @@ class MirrorFirstBackend:
     def create_or_update_collection_note(
         self, collection_key: str, html: str, tags: list[str]
     ) -> str:
-        return self._need_live().create_or_update_collection_note(
+        key = self._need_live().create_or_update_collection_note(
             collection_key, html, tags
         )
+        folder = self._cfg.out_dir / "_notes" / key
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "note.html").write_text(html, encoding="utf-8")
+        from .store import write_json
+        from .sync import STANDALONE_SCHEMA
+
+        write_json(
+            folder / "record.json",
+            {
+                "schema": STANDALONE_SCHEMA,
+                "key": key,
+                "item_type": "note",
+                "title": "",
+                "tags": list(tags),
+                "collections": [collection_key],
+                "note_file": "note.html",
+            },
+        )
+        self.catalogue.forget()
+        return key
 
     def ensure_collection_path(self, path: str) -> str:
         key = self._need_live().ensure_collection_path(path)

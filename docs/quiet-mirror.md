@@ -58,6 +58,8 @@ out/_index.jsonl
 out/_collections.json
 out/_sync.json              # library version last refreshed to
 out/_history.json
+out/_notes/<KEY>/           # standalone (collection) notes
+out/_attachments/<KEY>/     # standalone attachments
 ```
 
 `record.json` is the restore unit (`paperful.item.v1`, **0.x may add keys**).
@@ -70,9 +72,9 @@ hardlinked, `record.json` is copied.
 
 | Mode | What happens to a PDF the manager already holds |
 | --- | --- |
-| `all` (default) | Copied into the item folder. `paperful sync` works through the whole library once and can be stopped and run again; after that only changed items are looked at. Skips linked-URL-only items |
+| `all` (default) | Copied into the item folder. Non-PDF stored attachments (snapshots, EPUB, …) are copied too. `paperful sync` works through the whole library once and can be stopped and run again; after that only changed items are looked at. Skips linked-URL-only items |
 | `lazy` | Copied into the item folder the first time a command needs it (`lint`, `summarize`, `ocr`, `export`). `additional` is the old name and still loads |
-| `none` | Kept out of the mirror. A command that needs one makes a throwaway copy under `state/pdf-cache/`. Does not delete a PDF that is already on disk |
+| `none` | Kept out of the mirror. A command that needs one makes a throwaway copy under `state/pdf-cache/`. Does not delete a PDF that is already on disk. `paperful cache clean` removes cache files already absorbed into `out/` or stale vs the record MD5 |
 
 `run` always writes a PDF it downloads. That setting does not turn fetching off.
 

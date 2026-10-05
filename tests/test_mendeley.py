@@ -37,9 +37,12 @@ class FakeMendeley:
                 "abstract": "An abstract.",
                 "websites": ["https://example.org/p"],
                 "created": "2021-01-01T00:00:00.000Z",
+                "last_modified": "2021-01-02T00:00:00.000Z",
                 "notes": "<p>library note</p>",
+                "folder_uuids": ["f1"],
             }
         }
+        self.deleted: dict[str, str] = {}  # id -> last_modified when deleted
         self.membership = {"f1": [DOC_ID]}
         self.files: dict[str, list[dict]] = {DOC_ID: []}
         self.file_bytes: dict[str, bytes] = {}
@@ -74,11 +77,30 @@ class FakeMendeley:
             self.membership.setdefault(fid, []).append(did)
             return _json({"id": did}, 201)
         if path == "/documents" and method == "GET":
-            return _json(list(self.docs.values()))
+            params = request.url.params
+            modified_since = params.get("modified_since")
+            deleted_since = params.get("deleted_since")
+            if deleted_since is not None:
+                return _json(
+                    [
+                        {"id": did}
+                        for did, when in self.deleted.items()
+                        if when > deleted_since
+                    ]
+                )
+            docs = list(self.docs.values())
+            if modified_since is not None:
+                docs = [
+                    d
+                    for d in docs
+                    if str(d.get("last_modified") or "") > modified_since
+                ]
+            return _json(docs)
         if path == "/documents" and method == "POST":
             body = _body(request)
             self.seq += 1
             did = f"new-{self.seq}"
+            now = "2026-01-01T00:00:00.000Z"
             doc = {
                 "id": did,
                 "title": body.get("title") or "",
@@ -91,6 +113,8 @@ class FakeMendeley:
                 "tags": body.get("tags") or [],
                 "abstract": body.get("abstract") or "",
                 "websites": body.get("websites") or [],
+                "created": now,
+                "last_modified": now,
             }
             self.docs[did] = doc
             self.files[did] = []
@@ -98,11 +122,14 @@ class FakeMendeley:
             return _json(doc, 201)
         if path.startswith("/documents/") and path.endswith("/trash") and method == "POST":
             did = path.split("/")[2]
-            self.docs.pop(did, None)
+            doc = self.docs.pop(did, None)
+            if doc is not None:
+                self.deleted[did] = str(doc.get("last_modified") or "2026-01-01T00:00:00.000Z")
             return httpx.Response(204)
         if path.startswith("/documents/") and method == "PATCH":
             did = path.split("/")[2]
             self.docs.setdefault(did, {"id": did}).update(_body(request))
+            self.docs[did]["last_modified"] = "2026-06-01T00:00:00.000Z"
             return _json(self.docs[did])
         if path.startswith("/documents/") and method == "GET":
             did = path.split("/")[2]
@@ -368,3 +395,40 @@ def test_mendeley_trash_posts_to_trash_not_delete(cfg):
     assert ("POST", f"/documents/{DOC_ID}/trash") in calls
     assert not any(method == "DELETE" for method, _ in calls)
     assert DOC_ID not in fake.docs
+
+
+def test_mendeley_changes_full_delta_and_deleted(cfg):
+    from paperful.catalogue import has_change_feed
+    from paperful.sync import run_sync
+
+    fake = FakeMendeley()
+    backend = _backend(cfg, fake)
+    assert has_change_feed(backend)
+
+    full = backend.changes(None)
+    assert full.full and DOC_ID in full.top_keys
+    assert full.version is not None
+    assert full.library_id == "p1"
+    assert not full.track_child_keys
+    assert any(r.get("key") == DOC_ID for r in full.rows)
+    assert (full.rows[0].get("data") or {}).get("collections") == ["f1"]
+
+    empty = backend.changes(full.version)
+    assert not empty.full and empty.rows == [] and empty.trashed == []
+
+    fake.docs[DOC_ID]["title"] = "Revised title"
+    fake.docs[DOC_ID]["last_modified"] = "2026-07-01T00:00:00.000Z"
+    delta = backend.changes(full.version)
+    assert len(delta.rows) == 1
+    assert (delta.rows[0].get("data") or {}).get("title") == "Revised title"
+
+    stats = run_sync(cfg, backend, pdfs="none")
+    assert stats.written >= 1
+    assert (cfg.out_dir / "_sync.json").is_file()
+
+    backend.trash_item(DOC_ID)
+    # Bump the deleted watermark past the synced version.
+    fake.deleted[DOC_ID] = "2026-08-01T00:00:00.000Z"
+    gone = backend.changes(full.version)
+    assert any(t.get("key") == DOC_ID for t in gone.trashed)
+    assert DOC_ID not in gone.top_keys

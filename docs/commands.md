@@ -61,6 +61,9 @@ uv run paperful rag ingest --library                 # index PDFs + abstracts; O
 uv run paperful rag status                           # index vs mirror
 uv run paperful rag search "impact assessment thresholds" -C ocean/BBNJ   # passages, no chat model
 uv run paperful ask "What does the Agreement require for EIAs?" -C ocean/BBNJ
+uv run paperful ask --from-file questions.txt -C ocean/BBNJ
+uv run paperful rag questions -C ocean/BBNJ
+uv run paperful rag answered --from-extract -C ocean/BBNJ
 uv run paperful ask                                  # prompt for several questions
 
 # optional LLM verbs — off until [llm].enabled; setup in docs/llm.md
@@ -77,6 +80,8 @@ uv run paperful synthesize -C BBNJ                   # report on disk and a note
 uv run paperful sync --dry-run                  # what changed in the library since last time
 uv run paperful sync                            # refresh, and copy library PDFs in (pdfs = all)
 uv run paperful sync --full                     # read the whole library again
+uv run paperful cache clean                     # list absorbed/stale pdf-cache files
+uv run paperful cache clean --apply             # delete them
 uv run paperful --offline gaps -C BBNJ          # work from the mirror; do not contact Zotero
 uv run paperful snapshot -C BBNJ --dry-run      # re-read one collection in full
 uv run paperful snapshot -C BBNJ --pdfs all
@@ -387,6 +392,9 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
 - `state/authorwatch/<name>/` — people lists (`paperful.authorwatch.v1`), inbox, seen, applied. Cursor baseline does not open the library. See [authorwatch.md](authorwatch.md).
 - `state/inbox/proposals/` — gated inbox create/attach proposals (`paperful.inbox.proposal.v1`).
 - `state/pdf-cache/` — PDFs exported from the manager so lint can read text
+  when `[mirror].pdfs = "none"`. `paperful sync` moves matching files into
+  item folders; `paperful cache clean` removes absorbed or stale leftovers
+  (dry-run unless `--apply`).
   on disk (`pdftotext`, then `pypdf`).
 - `state/last-run.json` — latest auditable `run` or `recover` report (summary + per-item
   outcomes). Other commands do not replace it. Historical copies land in

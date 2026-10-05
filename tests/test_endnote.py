@@ -265,3 +265,40 @@ def test_endnote_copy_on_lock_includes_journal(cfg, tmp_path, monkeypatch):
     assert conn.execute("SELECT COUNT(*) FROM refs").fetchone()[0] == 1
     assert "sdb.eni" in copied
     assert "sdb.eni-journal" in copied
+
+
+def test_endnote_changes_full_noop_and_gone(cfg, tmp_path):
+    import os
+    import time
+
+    from paperful.catalogue import has_change_feed
+    from paperful.sync import run_sync
+
+    enl = make_endnote_library(tmp_path)
+    backend = _backend(cfg, enl)
+    assert has_change_feed(backend)
+
+    full = backend.changes(None)
+    assert full.full and "1" in full.top_keys
+    assert full.version == int(backend.eni.stat().st_mtime)
+    assert not full.track_child_keys
+    assert any(r.get("key") == "1" for r in full.rows)
+    assert (full.rows[0].get("data") or {}).get("collections") == ["10"]
+
+    noop = backend.changes(full.version)
+    assert not noop.full and noop.rows == [] and noop.version == full.version
+
+    stats = run_sync(cfg, backend, pdfs="none")
+    assert stats.written >= 1
+    assert (cfg.out_dir / "_sync.json").is_file()
+
+    conn = sqlite3.connect(str(backend.eni))
+    conn.execute("UPDATE refs SET trash_state = 1 WHERE id = 1")
+    conn.commit()
+    conn.close()
+    time.sleep(1.05)
+    os.utime(backend.eni, None)
+    after = backend.changes(full.version)
+    assert after.full
+    assert "1" not in after.top_keys
+    assert any(t.get("key") == "1" for t in after.trashed)

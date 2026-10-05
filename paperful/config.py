@@ -274,6 +274,10 @@ class Config:
     rag_hybrid: bool = True  # vector + full-text; falls back to vector only
     rag_abstracts: bool = True  # index the abstract when an item has no readable PDF
     rag_model: str = ""  # chat model for `ask`; empty → llm.model
+    rag_focus: str = "default"  # default | questions | gaps | methods | answered
+    rag_prompt: str = ""  # custom system prompt file for ask; empty → focus preset
+    rag_dest: str = "disk"  # disk | zotero | both — batch note writes (needs --apply)
+    rag_extract_questions_llm: bool = False  # LLM lane for `rag questions`
     # Attachment hygiene. Off until `paperful attachments --apply`.
     attachments_fix_broken: bool = False
     attachments_merge_files: bool = False
@@ -725,6 +729,17 @@ def parse_dest(value: str, *, key: str = "dest") -> str:
 _RAG_OCR_MODES = frozenset({"auto", "off"})
 _RAG_PARSERS = frozenset({"light", "docling"})
 _RAG_EMBED_PROVIDERS = frozenset({"ollama", "litellm"})
+_RAG_FOCI = frozenset({"default", "questions", "gaps", "methods", "answered"})
+
+
+def parse_rag_focus(value: str) -> str:
+    focus = str(value).strip().lower() or "default"
+    if focus not in _RAG_FOCI:
+        raise ValueError(
+            f"config [rag].focus {value!r} must be one of: "
+            + ", ".join(sorted(_RAG_FOCI))
+        )
+    return focus
 
 
 def parse_rag_ocr(value: str) -> str:
@@ -1067,6 +1082,16 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             cfg.rag_abstracts = bool(rag["abstracts"])
         if "model" in rag:
             cfg.rag_model = str(rag["model"]).strip()
+        if "focus" in rag:
+            cfg.rag_focus = parse_rag_focus(str(rag["focus"]))
+        if "prompt" in rag:
+            cfg.rag_prompt = _resolve_prompt_path(str(rag["prompt"]), source)
+            if cfg.rag_prompt == "default":
+                cfg.rag_prompt = ""
+        if "dest" in rag:
+            cfg.rag_dest = parse_dest(str(rag["dest"]), key="[rag].dest")
+        if "extract_questions_llm" in rag:
+            cfg.rag_extract_questions_llm = bool(rag["extract_questions_llm"])
         # Overlap must leave room for new text in every chunk.
         cfg.rag_chunk_overlap = min(cfg.rag_chunk_overlap, cfg.rag_chunk_chars // 2)
     men = raw.get("mendeley")

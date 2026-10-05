@@ -223,6 +223,12 @@ collections_app = typer.Typer(
     help="Collection tree and membership batch (add existing keys).",
 )
 app.add_typer(collections_app, name="collections")
+cache_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Manage throwaway files under state/pdf-cache/.",
+)
+app.add_typer(cache_app, name="cache")
 
 # Canonical top-level verbs. tests/test_cli.py asserts this matches `paperful --help`.
 JOBS: dict[str, tuple[str, ...]] = {
@@ -5552,6 +5558,32 @@ def _print_sync(stats, *, dry_run: bool) -> None:
         )
 
 
+@cache_app.command("clean")
+def cache_clean(
+    apply: bool = ApplyOpt,
+    config: Path | None = ConfigOpt,
+    agent: bool = AgentFormatOpt,
+) -> None:
+    """Remove pdf-cache files already in the mirror (or stale vs the record MD5).
+
+    Dry-run unless ``--apply``. Does not touch ``out/``.
+    """
+    from .sync import clean_pdf_cache
+
+    cfg = load_config(config)
+    report = clean_pdf_cache(cfg, apply=apply)
+    if agent:
+        _print_agent(report)
+        return
+    action = "Removed" if apply else "Would remove"
+    console.print(
+        f"{action} {report['removed'] if apply else report['removable']} "
+        f"file(s) under {report['cache_dir']}; kept {report['kept']}."
+    )
+    if not apply and report["removable"]:
+        console.print("[dim]Re-run with --apply to delete them.[/]")
+
+
 @app.command()
 def sync(
     full: bool = typer.Option(
@@ -7192,6 +7224,263 @@ def rag_search(
     _print_hits(hits)
 
 
+@rag_app.command("questions")
+def rag_questions(
+    item: list[str] = typer.Option([], "--item", help="Item key (repeatable)."),
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path under the mirror (repeatable)."
+    ),
+    library: bool = typer.Option(False, "--library", help="Every indexed item."),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    llm: bool | None = typer.Option(
+        None,
+        "--llm/--no-llm",
+        help="Also run the grounded LLM extract lane. Default is [rag].extract_questions_llm.",
+    ),
+    limit: int | None = typer.Option(None, "--limit", help="Max items this run."),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Print counts; do not write state/rag/questions/."
+    ),
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Extract research questions from indexed papers (rules; optional LLM)."""
+    from dataclasses import asdict
+
+    from .agent_json import batch_exit, envelope
+    from .llm import get_client
+    from .llm.preflight import validate_llm_for_ask
+    from .llm.validate import LlmConfigError
+    from .rag.questions import extract_scope, write_item
+
+    cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    _rag_require(cfg)
+    if not (item or collection or library):
+        console.print("[red]Pass --item, -C, or --library.[/]")
+        raise typer.Exit(1)
+    use_llm = cfg.rag_extract_questions_llm if llm is None else llm
+    client = None
+    if use_llm:
+        try:
+            validate_llm_for_ask(cfg)
+        except LlmConfigError as exc:
+            console.print(str(exc), markup=False, style="red")
+            raise typer.Exit(1) from exc
+        client = get_client(cfg)
+    types = _resolve_types(item_type)
+    _, ledger = _rag_open(cfg)
+    started = time.time()
+    items = extract_scope(
+        cfg,
+        ledger=ledger,
+        collections=None if library and not collection else collection,
+        item_keys=item,
+        year_from=year_from,
+        year_to=year_to,
+        item_types=types,
+        use_llm=use_llm,
+        client=client,
+        limit=limit,
+    )
+    total_q = sum(len(it.questions) for it in items)
+    if not dry_run:
+        for it in items:
+            write_item(cfg, it)
+    if not json_out:
+        action = "Would extract" if dry_run else "Extracted"
+        console.print(
+            f"{action} {total_q} question(s) from {len(items)} item(s)"
+            + (" (LLM on)" if use_llm else "")
+            + "."
+        )
+        for it in items:
+            if not it.questions:
+                continue
+            console.print(f"[bold]{it.item_key}[/] {it.title}", markup=False)
+            for q in it.questions:
+                console.print(
+                    f"  [{q.provenance}] {q.text}", markup=False, highlight=False
+                )
+    write_command_report(
+        cfg,
+        command="rag-questions",
+        scope=", ".join(collection) or ("library" if library else "items"),
+        summary={
+            "items": len(items),
+            "questions": total_q,
+            "dry_run": dry_run,
+            "llm": use_llm,
+        },
+        items=[asdict(it) for it in items],
+        flags={"limit": limit, "llm": use_llm},
+        started=started,
+    )
+    code = batch_exit(ok=len(items), failed=0)
+    if json_out:
+        payload = envelope(
+            command="rag-questions",
+            summary={"items": len(items), "questions": total_q, "dry_run": dry_run},
+            items=[asdict(it) for it in items],
+            flags={"read_only": dry_run, "llm": use_llm},
+            exit_code=code,
+        )
+        _emit_agent(payload, json_out=True, human=lambda: None)
+
+
+@rag_app.command("answered")
+def rag_answered(
+    from_file: Path | None = typer.Option(
+        None, "--from-file", help="Questions file (one per line) or '-'."
+    ),
+    from_extract: bool = typer.Option(
+        False,
+        "--from-extract",
+        help="Use questions under state/rag/questions/.",
+    ),
+    after_item: str | None = typer.Option(
+        None,
+        "--after-item",
+        help="Only search items newer than this paper's year; exclude the asker.",
+    ),
+    item: list[str] = typer.Option(
+        [],
+        "--item",
+        help="With --from-extract: only these asking items. Else: scope keys.",
+    ),
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path under the mirror (repeatable)."
+    ),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    top_k: int | None = typer.Option(None, "-k", "--top-k", help="Passages per question."),
+    force: bool = typer.Option(False, "--force", help="Ignore batch answer cache."),
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Ask whether the corpus already answers research questions."""
+    from dataclasses import asdict
+
+    from .agent_json import batch_exit, envelope
+    from .llm import get_client, llm_egress_is_remote
+    from .llm.preflight import validate_llm_for_ask
+    from .llm.validate import LlmConfigError
+    from .rag.answered import (
+        file_questions,
+        questions_from_extract,
+        run_answered,
+        write_pack,
+    )
+    from .rag.retrieve import scope_keys
+    from .snowball.command import SnowballError
+
+    cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    _rag_require(cfg)
+    if not from_file and not from_extract:
+        console.print("[red]Pass --from-file or --from-extract.[/]")
+        raise typer.Exit(1)
+    try:
+        validate_llm_for_ask(cfg)
+    except LlmConfigError as exc:
+        console.print(str(exc), markup=False, style="red")
+        raise typer.Exit(1) from exc
+    if llm_egress_is_remote(cfg) and not json_out:
+        console.print(
+            "[yellow]Remote LLM — excerpts from your PDFs leave this machine.[/]"
+        )
+    types = _resolve_types(item_type)
+    embedder = _rag_embedder(cfg)
+    index, ledger = _rag_open(cfg)
+    keys = scope_keys(
+        ledger,
+        collections=collection,
+        item_keys=[] if from_extract else item,
+        year_from=year_from,
+        year_to=year_to,
+        item_types=types,
+    )
+    questions: list[tuple[str, str, int | None]] = []
+    if from_file is not None:
+        try:
+            questions.extend(file_questions(str(from_file)))
+        except SnowballError as exc:
+            console.print(str(exc), markup=False, style="red")
+            raise typer.Exit(1) from exc
+    if from_extract:
+        extract_keys = list(item) if item else None
+        questions.extend(questions_from_extract(cfg, item_keys=extract_keys))
+    if not questions:
+        console.print("[red]No questions to check.[/]")
+        raise typer.Exit(1)
+    started = time.time()
+    client = get_client(cfg)
+    pack = run_answered(
+        cfg,
+        questions,
+        keys=keys,
+        after_item=after_item,
+        k=top_k,
+        force=force,
+        scope={
+            "collections": list(collection),
+            "year_from": year_from,
+            "year_to": year_to,
+            "after_item": after_item,
+        },
+        client=client,
+        embedder=embedder,
+        index=index,
+        ledger=ledger,
+    )
+    folder = write_pack(cfg, pack)
+    if not json_out:
+        console.print(
+            f"Answered {pack.answered} · partial {pack.partial} · "
+            f"not_found {pack.not_found} · failed {pack.failed} → {folder}"
+        )
+    write_command_report(
+        cfg,
+        command="rag-answered",
+        scope=", ".join(collection) or "index",
+        summary={
+            "questions": pack.questions,
+            "answered": pack.answered,
+            "partial": pack.partial,
+            "not_found": pack.not_found,
+            "failed": pack.failed,
+            "pack": str(folder),
+        },
+        items=[asdict(r) for r in pack.rows],
+        flags={"focus": "answered", "after_item": after_item},
+        started=started,
+    )
+    code = batch_exit(
+        ok=pack.answered + pack.partial + pack.not_found, failed=pack.failed
+    )
+    if json_out:
+        payload = envelope(
+            command="rag-answered",
+            summary={
+                "questions": pack.questions,
+                "answered": pack.answered,
+                "partial": pack.partial,
+                "not_found": pack.not_found,
+                "pack": str(folder),
+            },
+            items=[asdict(r) for r in pack.rows],
+            flags={"read_only": True, "after_item": after_item},
+            exit_code=code,
+        )
+        _emit_agent(payload, json_out=True, human=lambda: None)
+        return
+    if pack.failed:
+        raise typer.Exit(1)
+
+
 def _ask_once(
     cfg: Config,
     question: str,
@@ -7201,6 +7490,8 @@ def _ask_once(
     history: list[dict[str, str]] | None = None,
     retrieve_as: str | None = None,
     quiet: bool = False,
+    focus: str | None = None,
+    prompt_path: str | None = None,
     **retrieval: Any,
 ) -> dict[str, Any]:
     """Answer one question on the terminal and return it for the run report."""
@@ -7211,6 +7502,8 @@ def _ask_once(
         question,
         history=history or (),
         retrieve_as=retrieve_as,
+        focus=focus,
+        prompt_path=prompt_path,
         **retrieval,
     )
     if quiet:
@@ -7294,6 +7587,32 @@ def ask(
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
+    from_file: Path | None = typer.Option(
+        None,
+        "--from-file",
+        help="Batch: one question per line (file or '-'). Writes state/ask-batch/.",
+    ),
+    focus: str | None = typer.Option(
+        None,
+        "--focus",
+        help="Prompt preset: default, questions, gaps, methods, answered.",
+    ),
+    prompt: Path | None = typer.Option(
+        None, "--prompt", help="Override system prompt file for this run."
+    ),
+    force: bool = typer.Option(
+        False, "--force", help="Batch: re-answer even when a cached row matches."
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Batch: write a Zotero collection note when --to includes zotero.",
+    ),
+    to: WriteDest | None = typer.Option(
+        None,
+        "--to",
+        help="Batch note destination: disk, zotero, or both. Default is [rag].dest.",
+    ),
     no_stream: bool = typer.Option(
         False, "--no-stream", help="Print the answer when it is complete."
     ),
@@ -7312,14 +7631,19 @@ def ask(
     from .llm import LLMClientError, get_client, llm_egress_is_remote
     from .llm.preflight import validate_llm_for_ask
     from .llm.validate import LlmConfigError
+    from .rag.prompt import parse_focus
     from .rag.retrieve import scope_keys
     from .agent_json import batch_exit
     from .agent_ops import ask_envelope
 
     cfg = _cfg(config)
     json_out = _agent_json(fmt)
-    if json_out and question is None:
+    batch_mode = from_file is not None
+    if json_out and question is None and not batch_mode:
         console.print("[red]ask --format json needs a question.[/]")
+        raise typer.Exit(1)
+    if batch_mode and thread is not None:
+        console.print("[red]ask --from-file cannot use --thread.[/]")
         raise typer.Exit(1)
     if json_out:
         no_stream = True
@@ -7329,6 +7653,14 @@ def ask(
     except LlmConfigError as exc:
         console.print(str(exc), markup=False, style="red")
         raise typer.Exit(1) from exc
+    try:
+        focus_name = parse_focus(focus if focus is not None else cfg.rag_focus)
+    except ValueError as exc:
+        console.print(str(exc), markup=False, style="red")
+        raise typer.Exit(1) from exc
+    prompt_path = str(prompt.expanduser().resolve()) if prompt is not None else (
+        cfg.rag_prompt or None
+    )
     types = _resolve_types(item_type)
     embedder = _rag_embedder(cfg)
     if llm_egress_is_remote(cfg) and not json_out:
@@ -7346,6 +7678,123 @@ def ask(
     )
     client = get_client(cfg)
     started = time.time()
+
+    if batch_mode:
+        from dataclasses import asdict as _asdict
+
+        from .rag.batch import read_questions, run_batch, write_pack
+        from .snowball.command import SnowballError
+
+        try:
+            questions = read_questions(str(from_file))
+        except SnowballError as exc:
+            console.print(str(exc), markup=False, style="red")
+            raise typer.Exit(1) from exc
+        if not questions:
+            console.print("[red]No questions in --from-file.[/]")
+            raise typer.Exit(1)
+        dest = (to.value if to is not None else cfg.rag_dest) or "disk"
+        if apply and wants_zotero(dest) and wants_disk(dest) is False and not collection:
+            console.print(
+                "[red]ask --apply with --to zotero needs a single -C for the note.[/]"
+            )
+            raise typer.Exit(1)
+        if apply and wants_zotero(dest) and len(collection) != 1:
+            console.print(
+                "[red]ask --apply to Zotero needs exactly one -C collection.[/]"
+            )
+            raise typer.Exit(1)
+        pack = run_batch(
+            cfg,
+            questions,
+            keys=keys,
+            focus=focus_name,
+            prompt_path=prompt_path,
+            k=top_k,
+            force=force,
+            scope={
+                "collections": list(collection),
+                "item": list(item),
+                "year_from": year_from,
+                "year_to": year_to,
+            },
+            client=client,
+            embedder=embedder,
+            index=index,
+            ledger=ledger,
+        )
+        folder = write_pack(cfg, pack)
+        if apply and wants_zotero(dest):
+            from .notehtml import wrap
+            from .summarize import to_note_html
+
+            backend = get_backend(cfg)
+            body = (folder / "answers.md").read_text(encoding="utf-8")
+            html = wrap(
+                to_note_html(body),
+                note_type="review",
+                verb="ask",
+                model=pack.model,
+            )
+            target = backend.resolve_collection(collection[0])
+            backend.create_or_update_collection_note(
+                target.key, html, "paperful-ask-batch"
+            )
+            if not json_out:
+                console.print(
+                    f"[green]Zotero collection note updated for {collection[0]}.[/]"
+                )
+        if not json_out:
+            console.print(
+                f"Batch: {pack.answered} answered, {pack.skipped} skipped, "
+                f"{pack.failed} failed → {folder}"
+            )
+        write_command_report(
+            cfg,
+            command="ask",
+            scope=", ".join(collection) or "index",
+            summary={
+                "questions": pack.questions,
+                "answered": pack.answered,
+                "skipped": pack.skipped,
+                "failed": pack.failed,
+                "pack": str(folder),
+            },
+            items=[_asdict(r) for r in pack.rows],
+            flags={
+                "top_k": top_k or cfg.rag_top_k,
+                "model": pack.model,
+                "focus": pack.focus,
+                "from_file": str(from_file),
+                "batch": True,
+            },
+            started=started,
+        )
+        code = batch_exit(ok=pack.answered + pack.skipped, failed=pack.failed)
+        if json_out:
+            payload = ask_envelope(
+                items=[_asdict(r) for r in pack.rows],
+                summary={
+                    "questions": pack.questions,
+                    "answered": pack.answered,
+                    "skipped": pack.skipped,
+                    "failed": pack.failed,
+                    "pack": str(folder),
+                },
+                flags={
+                    "read_only": not apply,
+                    "batch": True,
+                    "focus": pack.focus,
+                    "top_k": top_k or cfg.rag_top_k,
+                },
+                exit_code=code,
+            )
+            _emit_agent(payload, json_out=True, human=lambda: None)
+            return
+        if pack.failed:
+            raise typer.Exit(1)
+        return
+
     answered: list[dict[str, Any]] = []
     failures = 0
     from .rag.thread import load_thread, new_id, rewrite_query, save_thread
@@ -7376,6 +7825,8 @@ def ask(
                 retrieve_as=retrieve_as,
                 k=top_k,
                 keys=keys,
+                focus=focus_name,
+                prompt_path=prompt_path,
                 client=client,
                 embedder=embedder,
                 index=index,
@@ -7383,6 +7834,7 @@ def ask(
                 quiet=json_out,
             )
             row["retrieve_as"] = retrieve_as
+            row["focus"] = focus_name
             answered.append(row)
             if use_thread:
                 turns.append({"role": "user", "content": asked})
@@ -7419,6 +7871,7 @@ def ask(
                 "top_k": top_k or cfg.rag_top_k,
                 "model": cfg.rag_model or cfg.llm_model,
                 "embed_model": cfg.rag_embed_model,
+                "focus": focus_name,
                 **({"thread": thread_id} if thread_id else {}),
             },
             started=started,
@@ -7440,6 +7893,7 @@ def ask(
             flags={
                 "read_only": True,
                 "top_k": top_k or cfg.rag_top_k,
+                "focus": focus_name,
                 **({"thread": thread_id} if thread_id else {}),
             },
             exit_code=code,

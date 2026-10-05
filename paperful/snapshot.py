@@ -34,7 +34,7 @@ from .store import (
     record_path,
     write_json,
 )
-from .zot import Collection, Item
+from .zot import Collection, Item, is_pdf_attachment
 
 _PROMOTED = frozenset(
     {
@@ -292,6 +292,54 @@ def maybe_export_pdf(
     return True
 
 
+def maybe_export_attachments(
+    primary: Path,
+    extras: list[Path],
+    backend: Any,
+    children: list[dict[str, Any]],
+    pdfs: str,
+    *,
+    dry_run: bool,
+) -> int:
+    """Copy stored non-PDF attachments into the item folder when ``pdfs=all``."""
+    if pdfs != "all" or dry_run:
+        return 0
+    export_fn = getattr(backend, "export_attachment", None)
+    if not callable(export_fn):
+        return 0
+    n = 0
+    for ch in children:
+        data = ch.get("data") or {}
+        if data.get("itemType") != "attachment":
+            continue
+        if data.get("linkMode") == "linked_url":
+            continue
+        if is_pdf_attachment(data):
+            continue
+        key = ch.get("key")
+        if not key:
+            continue
+        name = data.get("filename") or data.get("title") or f"{key}.bin"
+        safe = Path(str(name)).name or f"{key}.bin"
+        dest = primary / safe
+        if dest.is_file():
+            continue
+        got = export_fn(str(key), dest)
+        if got is None or not Path(got).is_file():
+            continue
+        n += 1
+        for extra in extras:
+            extra.mkdir(parents=True, exist_ok=True)
+            target = extra / Path(got).name
+            if target.exists():
+                continue
+            try:
+                target.hardlink_to(got)
+            except OSError:
+                shutil.copyfile(got, target)
+    return n
+
+
 def _preserve_fetch(rec: dict[str, Any], item_dir: Path) -> None:
     existing = load_json(record_path(item_dir))
     if not existing:
@@ -368,6 +416,10 @@ def write_item(
     exported = backend is not None and maybe_export_pdf(
         item, primary, extras, backend, attachments, pdfs, dry_run=dry_run
     )
+    if backend is not None:
+        maybe_export_attachments(
+            primary, extras, backend, children, pdfs, dry_run=dry_run
+        )
     if exported:
         for row in attachments:
             row.setdefault("origin", "zotero_export")

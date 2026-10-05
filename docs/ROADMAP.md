@@ -286,17 +286,22 @@ is six requests.
 
 Still open:
 
-- **Mendeley and EndNote** have no change feed, so their reads stay with the
-  manager. A `changes(since)` on either adapter moves it to the mirror path.
-- **Non-PDF attachments** (web snapshots, EPUB) have a row in the record and
-  no bytes in the mirror. Standalone notes and standalone attachments are
-  not mirrored.
 - **`attachments`** still reads each item's children from the manager. It
   no longer downloads files to test for them.
-- **Freshness on screen.** An offline command says when the mirror was last
-  refreshed; it does not say how many items changed since.
-- **`state/pdf-cache/`** is emptied into the mirror by `paperful sync` one
-  file at a time as items are reached. There is no separate clean-up verb.
+
+Closed in this pass:
+
+- **Mendeley and EndNote** implement `changes(since)` (Mendeley via
+  `modified_since` / `deleted_since`; EndNote via `sdb.eni` mtime). Their
+  reads take the mirror-first path when the feed is present. Still seeking
+  testers.
+- **Non-PDF attachments** copy into the item folder when `[mirror].pdfs =
+  "all"`. Standalone notes and attachments land under `out/_notes/` and
+  `out/_attachments/`.
+- **Freshness on screen** includes last-refresh written/gone counts from
+  `_sync.json`.
+- **`paperful cache clean`** removes absorbed or stale files under
+  `state/pdf-cache/` (dry-run unless `--apply`).
 
 Not in scope: reading `zotero.sqlite` or `storage/` directly, and any sync
 daemon.
@@ -326,7 +331,7 @@ for the end-to-end operator story.
 | 13 | Handoff list ranking (Core handoff) | Shipped (cite count × miss severity) |
 | 14 | Opt-in academic HTML→PDF snapshot (Core `htmlpdf`) | Shipped (`[htmlpdf].academic` off\|gated\|auto; snapshot tier; `--upgrade-snapshot`) |
 | 15 | Agent JSON + documented exit codes on batch verbs; MCP after those are stable | **Shipped** — `paperful.agent.json.v1` + exits 0/1/2/3 on batch verbs; thin optional `paperful mcp` (`refs_gap`, `ask`) |
-| 16 | Author-site PDF (registry + packs + co-author crawl; **snowball co-author preflight** / `grey:author_site`) | Opt-in in tree (promote packs; SearXNG local-only) |
+| 16 | Author-site PDF (registry + packs + co-author crawl; **snowball co-author preflight** / `grey:author_site`) | Shipped (opt-in; promote packs; SearXNG local-only) |
 | 17 | ResearchGate request-from-author (**handoff-only**; config off by default; you click) | Shipped (`[request].channels`; `state/author-requests.jsonl`; `paperful reachout --handoff tabs`) |
 | 18 | Twenty CRM — lookup cache plus `twenty sync` (create/enrich, Paperful note, late `author_site` before Scholar, opt-in listing write-back) | Shipped (`paperful twenty lookup` / `twenty sync`; `[twenty].enabled`; `--twenty-writeback`) |
 | 19 | Typed note provenance (`paperful.note.v1`) + scannable **first-line** prefixes on all Paperful note writers | Shipped (summarize / synthesize / remarks / snowball / briefing) |
@@ -565,59 +570,41 @@ shipped. Still proposals on disk; never a silent library write. **Note cleanup**
 
 ### Zotero-RAG integration (later; question-centric layer)
 
-**Status:** foundation shipped — see [rag.md](rag.md). The index is built in
-Paperful from the on-disk mirror (no separate zotero-rag install, no reference
-manager calls): `paperful rag ingest | search | status` and `paperful ask`
-(one cited answer per question, or a prompt loop). Opt-in under `[rag]`;
-`auto_ingest` is off by default. The numbered directions below are still
-roadmap.
+**Status:** CLI question-centric layer shipped — see [rag.md](rag.md). The index
+is built in Paperful from the on-disk mirror (no separate zotero-rag install, no
+reference manager calls): `paperful rag ingest | search | status | questions |
+answered` and `paperful ask` (one cited answer, TTY/`--thread` follow-ups, or
+`--from-file` batch). Opt-in under `[rag]`; `auto_ingest` is off by default.
 
-**Chat-over-library is a 2.0 goal.** Multi-turn conversation over a scoped
-collection ships with the 2.0 GUI **Ask** mode — see [GUI](#gui) — and may land
-in the terminal first. The foundation is built for it: the LLM layer has a
-messages-based streaming call (`chat_stream`), and `rag.answer(question,
-history=...)` already takes earlier turns. What is missing is the loop that
-keeps a thread, rewrites a follow-up into a standalone retrieval query, and
-stores threads on disk. Today each `ask` question is answered on its own.
+**Chat-over-library GUI is a 2.0 goal** (parked until a GUI exists) — see
+[GUI](#gui). Terminal multi-turn is shipped: `ask --thread` rewrites follow-ups
+for retrieval and stores threads under `state/rag/threads/`.
 
 Reuse the house LLM pattern: global `[llm]` + per-verb overrides (same spirit
 as `[summarize].model`, `[browser_agent].model`, `[rag].model`).
 
 **Direction:**
 
-1. **Batch Q&A with citations** — ingest a file or stdin of questions (one per
-   line or structured batch); run each against the indexed collection; write
-   answers with **citations** to items/chunks on disk (`state/` report JSON +
-   optional Zotero child notes). Resume-safe skips when question hash + index
-   version unchanged. Not a silent library write without `--apply` where notes
-   are involved.
+1. **Batch Q&A with citations** — **Shipped:** `ask --from-file` →
+   `state/ask-batch/` (`paperful.ask_batch.v1`); resume via question hash +
+   focus + index tip; optional Zotero collection note with `--apply` + `-C`.
 2. **Question generation from summaries** — optional LLM pass over existing
    `summarize` outputs (and/or `synthesize` sections) to propose **unanswered**
    or **open** research questions for the corpus; land in a reviewable queue
-   before batch RAG (same patch / dry-run honesty as other LLM verbs).
-3. **Prompt variants and `--focus`** — keep today’s summary-oriented default;
-   add alternate bundled prompts (e.g. **questions-only** brief, gap list,
-   methods comparison) and a `--focus` (or profile field) that selects prompt
-   template + retrieval knobs without hand-editing files every time. Custom
-   `--prompt FILE` stays the escape hatch.
-4. **Extract questions posed by papers** — two lanes, composable:
-   **deterministic** (section headings, “we ask whether”, numbered RQs in
-   abstract/introduction via rules + optional first-page text) and **LLM**
-   (grounded in local PDF excerpt / summary note; reject ungrounded). Store
-   extracted RQs on disk keyed by `item_key` with provenance (`rule` vs
-   `llm`).
-5. **Corpus-wide RAG on those questions** — take questions from extraction,
-   from summary generation, or from an operator file; query the **whole**
-   collection (or `-C` / year / type scope) to see whether other papers
-   **already answered** or **later addressed** the same question. Filters
-   (e.g. `--year-from` / `--year-to`, “only items after the asking paper”) are
-   first-class so temporal stories (“did 2020 papers already answer this 2015
-   RQ?”) are explicit in the report, not implicit in model memory.
-6. **Config** — global defaults under `[rag]` (shipped); **per-task** overrides
-   on the CLI and in `profiles/*.toml` (batch path, focus, scope, generation
-   gates, citation format). `doctor` ambers when the index is missing or its
-   embedding model is unavailable; `paperful rag status` compares the index
-   with the mirror. A stale-index amber in `doctor` is still to do.
+   before batch RAG (same patch / dry-run honesty as other LLM verbs). Still
+   roadmap (deferred; batch/`rag answered` already accept operator files).
+3. **Prompt variants and `--focus`** — **Shipped:** `--focus`
+   default|questions|gaps|methods|answered; `[rag].focus`; `--prompt FILE`;
+   profile `focus` field.
+4. **Extract questions posed by papers** — **Shipped:** `rag questions`
+   (deterministic rules + optional `--llm` / `[rag].extract_questions_llm`) →
+   `state/rag/questions/<key>.json` with provenance `rule`|`llm`.
+5. **Corpus-wide RAG on those questions** — **Shipped:** `rag answered`
+   `--from-file` / `--from-extract`, `--after-item`, year filters →
+   `state/rq-answered/` (`paperful.rq_answered.v1`).
+6. **Config** — **Shipped:** `[rag]` focus/prompt/dest/extract_questions_llm;
+   profile `focus` + existing SCOPE. `doctor` ambers when the index is missing,
+   the embedding model is unavailable, or the index is behind the mirror.
 
 **Non-goals for this lane:** replacing Zotero’s reader; cloud-default RAG;
 answers without citations; auto-mutating parent metadata from Q&A output;
@@ -855,10 +842,11 @@ Phases, in order. Each can stop without the next.
    run queue. Always dry-run / no PDFs. `watch digest` / `watch run --digest`
    writes the frontier rollup. Paperful does not schedule it; your
    own launchd or cron may call `watch run --digest`. See [snowball.md](snowball.md#watch).
-7. **Co-author site preflight (opt-in).** Before or alongside hop expansion,
-   derive a co-author graph from the seed + candidate author lists, discover
-   personal / institutional / static-site home pages for high-centrality names
-   (ORCID researcher URLs, then an optional CRM listing, then SearXNG), and write them into
+7. **Co-author site preflight (opt-in). Shipped:** Before or alongside hop
+   expansion, derive a co-author graph from the seed + candidate author lists,
+   discover personal / institutional / static-site home pages for
+   high-centrality names (ORCID researcher URLs, then an optional CRM listing,
+   then SearXNG), and write them into
    [field author packs](#maybe-later-not-core) for the profile scope so the
    following `run` / `fetch_pdfs` pass can try the `author_site` grey lane.
    Proposed packs only until `snowball packs promote`. Opt-in profile knob;
@@ -871,8 +859,9 @@ duplicate work is collapsed and library hits are applied **while the queue is
 built and before any parent is created**, not a one-shot merge at the end.
 Stragglers still use the same hygiene loop as any other ingest:
 `dedupe --dry-run` → read `state/dedupe-packs/` → `dedupe --apply` on the
-target collection. There is no `--dedupe-after` flag and no snowball step inside
-`paperful all` today.
+target collection. Optional `--dedupe-after` / `[snowball].dedupe_after`
+(`off` | `classify` | `apply`) can run that pack after create. There is
+still no snowball step inside `paperful all` today.
 
 Treat snowball dedupe and `paperful dedupe` as complementary:
 
@@ -1082,18 +1071,16 @@ prerequisites for the fetch / lint / attach loop.
    for several names on the author line; stamp which name triggered the lane.
    Co-author hints are suggestions until a win promotes them into the registry;
    disambiguate common surnames with ORCID / affiliation host when available.
-   **Snowball preflight (co-author graph → author sites).** Optional early phase
-   when `snowball` runs (dry-run or before `fetch_pdfs`): build a **co-author
-   graph** from seeds, queue rows, and OpenAlex author ids; rank nodes by
-   frequency in the frontier. For top authors, run bounded discovery (name +
-   affiliation + `filetype:pdf` / “personal page” heuristics) to find faculty,
-   GitHub Pages, Weebly, and similar **simple** hosts — then seed the
-   author-site registry and field pack for that profile’s `-C`. **Why before
-   bulk `run`:** those endpoints are more often static HTML or direct PDF links
-   and less often publisher Cloudflare / bot walls, so they pay off as **priority
-   grey sources** when the same names appear on items snowball is about to
-   create. Cap queries; no auto-promote without operator or a fetch win; same
-   `grey:author_site` stamps. Complements post-hoc co-author site crawl on misses.
+   **Snowball preflight (co-author graph → author sites). Shipped**
+   (opt-in; [snowball.md](snowball.md) / snowball phase 7): when `snowball`
+   runs (dry-run or before `fetch_pdfs`), build a **co-author graph** from
+   seeds, queue rows, and OpenAlex author ids; rank nodes by frequency in the
+   frontier. For top authors, run bounded discovery (ORCID researcher URLs,
+   optional CRM listing, then SearXNG remainder) to find faculty, GitHub Pages,
+   Weebly, and similar **simple** hosts — then write a **proposed** field pack
+   for that profile’s `-C`. Promote with `snowball packs promote` before
+   `grey:author_site` fetch. Caps on authors/queries; no auto-promote. Complements
+   post-hoc co-author site crawl on misses (still later, above).
    **ResearchGate “request from author” (config-gated, handoff-only).** When the
    item already has a `researchgate.net/publication` URL and `[request].channels`
    includes `rg`, `--handoff tabs` / `walk` on `gaps` / `run` / `paperful reachout`

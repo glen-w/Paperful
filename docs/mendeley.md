@@ -39,6 +39,7 @@ The official Python SDK is unmaintained. Paperful uses httpx.
 | --- | --- |
 | Auth | OAuth2 authorization code. Access tokens last **one hour**. Refresh tokens **rotate**. |
 | Versioning | Every resource needs a vendor `Accept` header (`application/vnd.mendeley-document.1+json`, folder, file, annotation, profile). |
+| Change feed | `GET /documents?modified_since=` and `deleted_since=` (ISO 8601). Paperful stores the max `last_modified` as Unix ms in `_sync.json` and implements `changes(since)` so mirror-first reads work. |
 | Pagination | `Link: <url>; rel="next"`. Follow the URL; do not replay the original query string. |
 | Folders | Nested via `parent_id`. Membership is `folder_uuids` on the document when present, else `GET /folders/{id}/documents`. |
 | Files | `POST /files` with raw PDF bytes, `Content-Disposition`, and `Link: <…/documents/{id}>; rel="document"`. **Not** multipart. `GET /files/{id}` **303**s to object storage. Paperful fetches the `Location` **without** the Bearer token (S3 rejects a forwarded `Authorization` header). |

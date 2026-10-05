@@ -64,10 +64,20 @@ PROFILE_KEYS = frozenset(
         "apply",
         "overwrite",
         "require_summarize",
+        "focus",
     }
 )
 SCOPE_KEYS = frozenset(
-    {"collections", "library", "types", "year_from", "year_to", "description", "limit"}
+    {
+        "collections",
+        "library",
+        "types",
+        "year_from",
+        "year_to",
+        "description",
+        "limit",
+        "focus",
+    }
 )
 RUN_KEYS = frozenset(
     {
@@ -91,6 +101,7 @@ _DUMP_ORDER = (
     "types",
     "year_from",
     "year_to",
+    "focus",
     "try_all",
     "retry_failed",
     "upgrade_linked",

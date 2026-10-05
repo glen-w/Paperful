@@ -360,6 +360,10 @@ gone = "mark"
 # hybrid = true                  # vector + full-text search
 # abstracts = true               # index the abstract when an item has no readable PDF
 # # model = ""                   # chat model for `ask`; empty uses [llm].model
+# focus = "default"              # default | questions | gaps | methods | answered
+# # prompt = ""                  # custom system prompt file; overrides focus when set
+# dest = "disk"                  # batch ask note writes: disk | zotero | both (needs --apply)
+# extract_questions_llm = false  # LLM lane for `rag questions` (rules always run)
 
 # Attachment layout. Off until `paperful attachments --apply`.
 # [attachments]

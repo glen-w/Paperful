@@ -8,6 +8,7 @@ import secrets
 import threading
 import time
 import webbrowser
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
@@ -18,7 +19,7 @@ import httpx
 from .attach import AttachResult, attach_failure_code
 from .config import Config
 from .interop.types import mendeley_to_zotero, zotero_to_mendeley
-from .library import LibraryError
+from .library import ChangeSet, LibraryError
 from .resolve import extract_arxiv_id, extract_doi, extract_pmid, normalize_doi
 from .zot import (
     UNCOLLECTED,
@@ -420,6 +421,67 @@ class MendeleyBackend:
     def ping(self) -> dict[str, Any]:
         return self.client.ping()
 
+    def changes(self, since: int | None) -> ChangeSet:
+        """Documents changed after ``since`` (Unix ms of last_modified), or all when None.
+
+        Uses Mendeley ``modified_since`` / ``deleted_since``. ``all_keys`` is
+        parents-only (``track_child_keys=False``); children are fetched when
+        each item is written.
+        """
+        self._docs = None
+        self._folder_docs = None
+        self._collections = None
+        cols = self.collections()
+        profile = self.client.ping()
+        library_id = str(profile.get("profile_id") or profile.get("id") or "")
+
+        if since is None:
+            docs = list(self._documents().values())
+            top_keys = {str(d["id"]) for d in docs if d.get("id")}
+        else:
+            top_keys = self._document_ids()
+            iso = _ms_to_iso(since)
+            modified = self.client.paginate(
+                "/documents",
+                accept=ACCEPT_DOC,
+                params={"view": "all", "modified_since": iso},
+            )
+            docs = [d for d in modified if isinstance(d, dict) and d.get("id")]
+            self._docs = {str(d["id"]): d for d in docs}
+
+        membership = self._membership_for_docs(docs)
+        rows = [_raw_from_doc(doc, _folder_keys_for(doc, membership)) for doc in docs]
+
+        trashed: list[dict[str, Any]] = []
+        if since is not None:
+            deleted = self.client.paginate(
+                "/documents",
+                accept=ACCEPT_DOC,
+                params={"deleted_since": _ms_to_iso(since)},
+            )
+            for row in deleted:
+                if isinstance(row, dict) and row.get("id"):
+                    trashed.append(
+                        {"key": str(row["id"]), "data": {"itemType": "document"}}
+                    )
+                elif isinstance(row, str):
+                    trashed.append({"key": row, "data": {"itemType": "document"}})
+
+        version = _max_modified_ms(docs)
+        if version is None:
+            version = since
+        return ChangeSet(
+            version=version,
+            full=since is None,
+            rows=rows,
+            top_keys=top_keys,
+            all_keys=set(top_keys),
+            trashed=trashed,
+            collections=cols,
+            library_id=library_id,
+            track_child_keys=False,
+        )
+
     def supports_write(self) -> bool:
         return True
 
@@ -623,6 +685,14 @@ class MendeleyBackend:
             except Exception:
                 return None
         return None
+
+    def export_attachment(self, attachment_key: str, dest: Path) -> Path | None:
+        """Download one Mendeley file by id (any content type)."""
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            return self.client.download_file(attachment_key, dest)
+        except Exception:
+            return None
 
     def attach(
         self,
@@ -953,6 +1023,54 @@ class MendeleyBackend:
             }
         return self._docs
 
+    def _document_ids(self) -> set[str]:
+        """All document ids. Prefer a light listing; fall back to the cached full view."""
+        if self._docs is not None:
+            return set(self._docs)
+        try:
+            rows = self.client.paginate("/documents", accept=ACCEPT_DOC)
+        except LibraryError:
+            return set(self._documents())
+        ids = {str(d["id"]) for d in rows if isinstance(d, dict) and d.get("id")}
+        if ids:
+            return ids
+        return set(self._documents())
+
+    def _membership_for_docs(
+        self, docs: list[dict[str, Any]]
+    ) -> dict[str, set[str]]:
+        """Folder membership for ``docs`` without forcing a whole-library document fetch."""
+        mapping: dict[str, set[str]] = {k: set() for k in self.collections()}
+        used_uuids = False
+        for doc in docs:
+            if not isinstance(doc, dict) or not doc.get("id"):
+                continue
+            doc_id = str(doc["id"])
+            uuids = doc.get("folder_uuids")
+            if not isinstance(uuids, list) or not uuids:
+                continue
+            used_uuids = True
+            for fid in uuids:
+                if fid:
+                    mapping.setdefault(str(fid), set()).add(doc_id)
+        if used_uuids:
+            return mapping
+        for key in self.collections():
+            try:
+                rows = self.client.paginate(
+                    f"/folders/{key}/documents", accept=ACCEPT_DOC
+                )
+            except LibraryError:
+                rows = []
+            ids: set[str] = set()
+            for row in rows:
+                if isinstance(row, dict) and row.get("id"):
+                    ids.add(str(row["id"]))
+                elif isinstance(row, str):
+                    ids.add(row)
+            mapping[key] = ids
+        return mapping
+
     def _folder_membership(self) -> dict[str, set[str]]:
         if self._folder_docs is None:
             mapping: dict[str, set[str]] = {k: set() for k in self.collections()}
@@ -1109,7 +1227,9 @@ def _item_from_doc(
     )
 
 
-def _raw_from_doc(doc: dict[str, Any]) -> dict[str, Any]:
+def _raw_from_doc(
+    doc: dict[str, Any], collection_keys: list[str] | None = None
+) -> dict[str, Any]:
     ident = doc.get("identifiers") if isinstance(doc.get("identifiers"), dict) else {}
     creators = []
     for a in doc.get("authors") or []:
@@ -1137,7 +1257,7 @@ def _raw_from_doc(doc: dict[str, Any]) -> dict[str, Any]:
         "extra": extra,
         "publicationTitle": doc.get("source") or "",
         "tags": tags,
-        "collections": [],
+        "collections": list(collection_keys or []),
         "dateAdded": doc.get("created"),
         "dateModified": doc.get("last_modified"),
         "key": doc.get("id"),
@@ -1159,6 +1279,7 @@ def _raw_from_doc(doc: dict[str, Any]) -> dict[str, Any]:
             "tags",
             "created",
             "last_modified",
+            "folder_uuids",
         }
     }
     data.update({k: v for k, v in fields.items() if k not in data})
@@ -1167,6 +1288,44 @@ def _raw_from_doc(doc: dict[str, Any]) -> dict[str, Any]:
         "version": doc.get("last_modified"),
         "data": data,
     }
+
+
+def _folder_keys_for(doc: dict[str, Any], membership: dict[str, set[str]]) -> list[str]:
+    doc_id = str(doc.get("id") or "")
+    uuids = doc.get("folder_uuids")
+    if isinstance(uuids, list) and uuids:
+        return [str(fid) for fid in uuids if fid]
+    return sorted(fid for fid, members in membership.items() if doc_id in members)
+
+
+def _modified_ms(doc: dict[str, Any]) -> int | None:
+    raw = doc.get("last_modified")
+    if not raw:
+        return None
+    if isinstance(raw, (int, float)):
+        return int(raw)
+    text = str(raw).strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        return int(datetime.fromisoformat(text).timestamp() * 1000)
+    except ValueError:
+        return None
+
+
+def _max_modified_ms(docs: list[dict[str, Any]]) -> int | None:
+    values = [v for v in (_modified_ms(d) for d in docs) if v is not None]
+    return max(values) if values else None
+
+
+def _ms_to_iso(ms: int) -> str:
+    return (
+        datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z")
+    )
 
 
 def _mark_note(html: str, tag: str) -> str:

@@ -65,8 +65,9 @@ Four verbs talk to the manager directly, because comparing it with the
 mirror is their job: `sync`, `snapshot`, `restore`, and `attachments`. They
 exit 2 when it is down. So does any `--apply`, attach, or note write.
 
-Mendeley and EndNote have no change feed. Their reads stay with the manager,
-as before; the write-through still applies.
+Mendeley and EndNote implement `changes(since)` and take the same
+mirror-first path as Zotero. They remain seeking testers; Zotero is the
+well-tested adapter.
 
 ## Data flow
 

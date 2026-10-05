@@ -20,7 +20,7 @@ from .attach import AttachResult
 from .config import Config
 from .interop.endnote_xml import records_to_endnote_xml
 from .interop.types import endnote_db_to_zotero, endnote_to_zotero, zotero_to_endnote
-from .library import LibraryError
+from .library import ChangeSet, LibraryError
 from .resolve import extract_arxiv_id, extract_doi, extract_pmid, normalize_doi
 from .zot import UNCOLLECTED, Collection, Item, parse_year, person_creators
 
@@ -160,6 +160,48 @@ class EndNoteBackend:
             "supports_write": True,
             "write_mode": "bundle",
         }
+
+    def changes(self, since: int | None) -> ChangeSet:
+        """Refs changed after ``since`` (``sdb.eni`` mtime as Unix seconds), or all.
+
+        EndNote has no delta API. An unchanged mtime yields an empty delta with
+        present-key sets; a bump re-reads every live ref. Children are fetched
+        when each item is written (``track_child_keys=False``).
+        """
+        version = int(self.eni.stat().st_mtime)
+        library_id = str(self.enl.resolve())
+        cols = self.collections()
+        top_keys = self._ref_ids(live_only=True)
+        all_keys = set(top_keys)
+        if since is not None and since == version:
+            return ChangeSet(
+                version=version,
+                full=False,
+                rows=[],
+                top_keys=top_keys,
+                all_keys=all_keys,
+                trashed=[],
+                collections=cols,
+                library_id=library_id,
+                track_child_keys=False,
+            )
+        rows = [
+            _raw_from_ref(row, self) for row in self._iter_refs()
+        ]
+        trashed = [
+            _raw_from_ref(row, self) for row in self._iter_refs(trashed_only=True)
+        ]
+        return ChangeSet(
+            version=version,
+            full=True,
+            rows=rows,
+            top_keys=top_keys,
+            all_keys=all_keys,
+            trashed=trashed,
+            collections=cols,
+            library_id=library_id,
+            track_child_keys=False,
+        )
 
     def supports_write(self) -> bool:
         return True
@@ -545,16 +587,35 @@ class EndNoteBackend:
         self._pending_by_key[item_key] = rec
         return rec
 
-    def _iter_refs(self) -> list[dict[str, Any]]:
+    def _iter_refs(self, *, trashed_only: bool = False) -> list[dict[str, Any]]:
         conn = self._db()
         if "refs" not in _tables(conn):
             return []
         cols = _columns(conn, "refs")
         where = ""
         if "trash_state" in cols:
-            where = " WHERE trash_state = 0 OR trash_state IS NULL"
+            if trashed_only:
+                where = " WHERE trash_state IS NOT NULL AND trash_state != 0"
+            else:
+                where = " WHERE trash_state = 0 OR trash_state IS NULL"
+        elif trashed_only:
+            return []
         rows = conn.execute(f"SELECT * FROM refs{where}").fetchall()
         return [dict(r) for r in rows]
+
+    def _ref_ids(self, *, live_only: bool = True) -> set[str]:
+        conn = self._db()
+        if "refs" not in _tables(conn):
+            return set()
+        cols = _columns(conn, "refs")
+        id_col = "id" if "id" in cols else ("refs_id" if "refs_id" in cols else None)
+        if id_col is None:
+            return set()
+        where = ""
+        if live_only and "trash_state" in cols:
+            where = " WHERE trash_state = 0 OR trash_state IS NULL"
+        rows = conn.execute(f"SELECT {id_col} FROM refs{where}").fetchall()
+        return {str(r[0]) for r in rows if r and r[0] is not None}
 
     def _ref_by_id(self, key: str) -> dict[str, Any] | None:
         conn = self._db()
@@ -993,6 +1054,7 @@ def _raw_from_ref(row: dict[str, Any], backend: EndNoteBackend) -> dict[str, Any
     authors = _split_authors(str(_ref_get(row, "author", "authors") or ""))
     keywords = str(_ref_get(row, "keywords", "keyword") or "")
     tags = [{"tag": k.strip()} for k in re.split(r"[;\r\n]+", keywords) if k.strip()]
+    collection_keys = list((backend._members_by_ref or {}).get(item.key, []))
     data = {
         "itemType": item.item_type,
         "title": item.title,
@@ -1004,7 +1066,7 @@ def _raw_from_ref(row: dict[str, Any], backend: EndNoteBackend) -> dict[str, Any
         "extra": item.extra or "",
         "publicationTitle": item.publication_title or "",
         "tags": tags,
-        "collections": [],
+        "collections": collection_keys,
         "key": item.key,
     }
     return {"key": item.key, "data": data}

@@ -256,6 +256,10 @@ walkthrough, model advice, Docker networking, and troubleshooting: [LLM](llm.md)
 | `[rag].hybrid` | `true` | Blend vector and full-text search; falls back to vector only |
 | `[rag].abstracts` | `true` | Index the abstract when an item has no readable PDF |
 | `[rag].model` | `""` | Chat model for `ask`; empty uses `[llm].model` |
+| `[rag].focus` | `default` | Prompt preset for `ask` / batch: `default`, `questions`, `gaps`, `methods`, `answered` |
+| `[rag].prompt` | `""` | Custom system prompt file; when set, overrides `focus` |
+| `[rag].dest` | `disk` | Batch ask note destination: `disk`, `zotero`, or `both` (Zotero needs `--apply` + one `-C`) |
+| `[rag].extract_questions_llm` | `false` | Default for `rag questions --llm` grounded extract lane |
 
 Timeouts, context budgets, prompt templates, tags, attachment hygiene, and
 browser-agent step caps: [Advanced](#advanced).

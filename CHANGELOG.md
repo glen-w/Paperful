@@ -8,6 +8,20 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ### Added
 
+- Mirror-first gaps: Mendeley and EndNote `changes(since)` (Mendeley
+  `modified_since` / `deleted_since`; EndNote `sdb.eni` mtime) so both take
+  the mirror path; offline freshness lines include last-refresh written/gone
+  counts; non-PDF stored attachments copy when `pdfs=all`; standalone notes /
+  attachments under `out/_notes/` and `out/_attachments/`; `paperful cache
+  clean` (dry-run unless `--apply`) for absorbed or stale `state/pdf-cache/`
+  files. `attachments` still reads live children (still open on the roadmap).
+- CLI question-centric RAG: `ask --from-file` batch packs
+  (`state/ask-batch/`, `paperful.ask_batch.v1`, resume-safe); `--focus`
+  presets (`default|questions|gaps|methods|answered`) and `--prompt FILE`;
+  `rag questions` (rules + optional `--llm`) → `state/rag/questions/`;
+  `rag answered` (`--from-file` / `--from-extract`, `--after-item`) →
+  `state/rq-answered/` (`paperful.rq_answered.v1`). Config:
+  `[rag].focus` / `prompt` / `dest` / `extract_questions_llm`; profile `focus`.
 - `paperful snowball digest --run-id` and `snowball watch digest` write a
   frontier rollup (`digest.md`): new / exists / version / deferred, overlap
   detail on the top new rows, a suggested `-C`, and queue / apply / resume

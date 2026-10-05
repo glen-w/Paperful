@@ -41,6 +41,9 @@ from .zot import SKIP_TYPES, Item, is_pdf_attachment, item_from_rows
 
 SYNC_SCHEMA = "paperful.sync.v1"
 _STATE_FILE = "_sync.json"
+STANDALONE_SCHEMA = "paperful.standalone.v1"
+NOTES_DIR = "_notes"
+ATTACHMENTS_DIR = "_attachments"
 
 
 @dataclass
@@ -112,11 +115,18 @@ def _plan_full(changes: ChangeSet) -> _Plan:
     plan = _Plan()
     for key, raw in parents.items():
         children = kids.get(key, [])
+        count = ((raw or {}).get("meta") or {}).get("numChildren")
+        # Zotero listings carry ``numChildren``; when it matches, the rows are
+        # complete. Mendeley/EndNote omit it and leave children out of ``rows``,
+        # so ``None`` asks ``_write_planned`` to fetch via ``backend.children``.
+        whole = isinstance(count, int) and count == len(children)
         plan.parents[key] = raw
-        plan.children[key] = children
-        plan.annotations[key] = [
-            a for ch in children for a in annos.get(str(ch.get("key")), [])
-        ]
+        plan.children[key] = children if whole else None
+        plan.annotations[key] = (
+            [a for ch in children for a in annos.get(str(ch.get("key")), [])]
+            if whole
+            else None
+        )
     return plan
 
 
@@ -147,13 +157,14 @@ def _plan_delta(
             affected.add(parent)
             annotated.add(parent)
     # A child removed in the manager is not in any listing. Its key going missing is the signal.
-    for child, parent in child_parent.items():
-        if child not in changes.all_keys:
-            affected.add(parent)
-    for anno, parent in anno_parent.items():
-        if anno not in changes.all_keys:
-            affected.add(parent)
-            annotated.add(parent)
+    if changes.track_child_keys:
+        for child, parent in child_parent.items():
+            if child not in changes.all_keys:
+                affected.add(parent)
+        for anno, parent in anno_parent.items():
+            if anno not in changes.all_keys:
+                affected.add(parent)
+                annotated.add(parent)
 
     plan = _Plan()
     for key in sorted(affected & changes.top_keys):
@@ -297,11 +308,12 @@ def copy_pdfs(
     *,
     track: Track | None = None,
 ) -> bool:
-    """Bring PDFs the manager holds into their item folders. Returns True when none are left.
+    """Bring files the manager holds into their item folders. Returns True when none are left.
 
     ``keys`` limits the pass; ``None`` walks the whole mirror. A file already
     exported to ``state/pdf-cache/`` is moved in instead of asked for again.
-    Safe to stop and run again: each file is done or not.
+    When ``pdfs=all``, non-PDF stored attachments are copied too. Safe to stop
+    and run again: each file is done or not.
     """
     index = mirror_index(cfg.out_dir)
     todo: list[tuple[str, Path, dict[str, Any]]] = []
@@ -310,41 +322,91 @@ def copy_pdfs(
         if not dirs:
             continue
         record = load_json(record_path(dirs[0]))
-        if record is not None and stored_pdf_missing(record, dirs[0]):
+        if record is None:
+            continue
+        if stored_pdf_missing(record, dirs[0]) or _non_pdf_missing(record, dirs[0]):
             todo.append((key, dirs[0], record))
     complete = True
     rows = track(todo) if track else todo
+    export_att = getattr(backend, "export_attachment", None)
     for key, folder, record in rows:
         item = item_from_record(record, folder, cfg.out_dir)
         if item is None:
             continue
-        dest = folder / item_filename(item)
-        cached = cfg.pdf_cache_dir / f"{key}.pdf"
-        got: Path | None = None
-        if _cache_is_current(cached, record):
-            shutil.move(str(cached), dest)
-            got = dest
-        else:
-            try:
-                got = backend.export_pdf(item, dest)
-            except LibraryError:
-                stats.unread += 1
-                complete = False
-                continue
-        if got is None or not Path(got).is_file():
-            # The row is there and the bytes are not: a ghost. Not ours to fix here.
-            stats.pdf_missing += 1
-            continue
-        stats.pdf_exports += 1
-        stats.pdf_keys.append(key)
-        for extra in index.dirs(key)[1:]:
-            target = extra / Path(got).name
-            if not target.exists():
+        if stored_pdf_missing(record, folder):
+            dest = folder / item_filename(item)
+            cached = cfg.pdf_cache_dir / f"{key}.pdf"
+            got: Path | None = None
+            if _cache_is_current(cached, record):
+                shutil.move(str(cached), dest)
+                got = dest
+            else:
                 try:
-                    target.hardlink_to(got)
-                except OSError:
-                    shutil.copyfile(got, target)
+                    got = backend.export_pdf(item, dest)
+                except LibraryError:
+                    stats.unread += 1
+                    complete = False
+                    continue
+            if got is None or not Path(got).is_file():
+                # The row is there and the bytes are not: a ghost. Not ours to fix here.
+                stats.pdf_missing += 1
+            else:
+                stats.pdf_exports += 1
+                stats.pdf_keys.append(key)
+                for extra in index.dirs(key)[1:]:
+                    target = extra / Path(got).name
+                    if not target.exists():
+                        try:
+                            target.hardlink_to(got)
+                        except OSError:
+                            shutil.copyfile(got, target)
+        if callable(export_att):
+            for row in record.get("attachments") or []:
+                if not isinstance(row, dict) or not row.get("key"):
+                    continue
+                if row.get("linkMode") == "linked_url":
+                    continue
+                if is_pdf_attachment(row) or row.get("contentType") == "application/pdf":
+                    continue
+                name = row.get("filename") or row.get("title") or f"{row['key']}.bin"
+                safe = Path(str(name)).name or f"{row['key']}.bin"
+                dest = folder / safe
+                if dest.is_file():
+                    continue
+                try:
+                    got = export_att(str(row["key"]), dest)
+                except LibraryError:
+                    stats.unread += 1
+                    complete = False
+                    continue
+                if got is None or not Path(got).is_file():
+                    continue
+                stats.pdf_exports += 1
+                for extra in index.dirs(key)[1:]:
+                    target = extra / Path(got).name
+                    if not target.exists():
+                        try:
+                            target.hardlink_to(got)
+                        except OSError:
+                            shutil.copyfile(got, target)
     return complete
+
+
+def _non_pdf_missing(record: dict[str, Any], folder: Path) -> bool:
+    if library_state(record) in GONE_STATES:
+        return False
+    for row in record.get("attachments") or []:
+        if not isinstance(row, dict) or not row.get("key"):
+            continue
+        if row.get("linkMode") == "linked_url":
+            continue
+        if is_pdf_attachment(row) or row.get("contentType") == "application/pdf":
+            continue
+        name = row.get("filename") or row.get("title") or f"{row['key']}.bin"
+        safe = Path(str(name)).name or f"{row['key']}.bin"
+        if not (folder / safe).is_file():
+            return True
+    return False
 
 
 def run_sync(
@@ -404,6 +466,7 @@ def run_sync(
         say(f"Writing {len(plan.parents)} item(s)…")
     written = _write_planned(cfg, backend, plan, changes, stats, track=track)
     _retire_gone(cfg, changes, index, stats, dry_run=False, accept_gone=True)
+    _write_standalones(cfg, backend, changes, stats, dry_run=False)
     if stats.index:
         merge_index(cfg.out_dir, stats.index)
     write_history(cfg.out_dir, cfg)
@@ -411,7 +474,7 @@ def run_sync(
     # The version moves only when everything it covers is on disk.
     pdfs_complete = bool(state.get("pdfs_complete"))
     if stats.unread == 0 and not stats.unwritten:
-        _write_state(cfg, changes, state, pdfs_complete=pdfs_complete and mode == "all")
+        _write_state(cfg, changes, state, stats, pdfs_complete=pdfs_complete and mode == "all")
 
     if mode == "all" and (backfill or not changes.full):
         # A command's own refresh never starts the whole-library copy, even
@@ -422,12 +485,98 @@ def run_sync(
             say("Copying PDFs into the mirror…")
         done = copy_pdfs(cfg, backend, keys, stats, track=pdf_track)
         if whole and done and stats.unread == 0 and not stats.unwritten:
-            _write_state(cfg, changes, state, pdfs_complete=True)
+            _write_state(cfg, changes, state, stats, pdfs_complete=True)
     return stats
 
 
+def _write_standalones(
+    cfg: Config,
+    backend: Any,
+    changes: ChangeSet,
+    stats: SyncStats,
+    *,
+    dry_run: bool,
+) -> None:
+    """Mirror top-level notes and attachments under ``out/_notes`` / ``out/_attachments``."""
+    if dry_run:
+        return
+    export_att = getattr(backend, "export_attachment", None)
+    for row in changes.rows:
+        data = row.get("data") or {}
+        if data.get("parentItem"):
+            continue
+        kind = data.get("itemType")
+        key = str(row.get("key") or "")
+        if not key:
+            continue
+        if kind == "note":
+            folder = cfg.out_dir / NOTES_DIR / key
+            folder.mkdir(parents=True, exist_ok=True)
+            html = str(data.get("note") or "")
+            (folder / "note.html").write_text(html, encoding="utf-8")
+            tags = [
+                str(t.get("tag"))
+                for t in (data.get("tags") or [])
+                if isinstance(t, dict) and t.get("tag")
+            ]
+            collections = [
+                str(c) for c in (data.get("collections") or []) if c
+            ]
+            write_json(
+                folder / "record.json",
+                {
+                    "schema": STANDALONE_SCHEMA,
+                    "key": key,
+                    "item_type": "note",
+                    "title": data.get("title") or "",
+                    "tags": tags,
+                    "collections": collections,
+                    "note_file": "note.html",
+                },
+            )
+            stats.notes += 1
+        elif kind == "attachment":
+            folder = cfg.out_dir / ATTACHMENTS_DIR / key
+            folder.mkdir(parents=True, exist_ok=True)
+            name = data.get("filename") or data.get("title") or f"{key}.bin"
+            safe = Path(str(name)).name or f"{key}.bin"
+            dest = folder / safe
+            if (
+                not dest.is_file()
+                and callable(export_att)
+                and data.get("linkMode") != "linked_url"
+            ):
+                try:
+                    export_att(key, dest)
+                except LibraryError:
+                    stats.unread += 1
+            collections = [
+                str(c) for c in (data.get("collections") or []) if c
+            ]
+            write_json(
+                folder / "record.json",
+                {
+                    "schema": STANDALONE_SCHEMA,
+                    "key": key,
+                    "item_type": "attachment",
+                    "title": data.get("title") or "",
+                    "filename": safe,
+                    "contentType": data.get("contentType"),
+                    "linkMode": data.get("linkMode"),
+                    "md5": data.get("md5"),
+                    "collections": collections,
+                    "file": safe if dest.is_file() else None,
+                },
+            )
+
+
 def _write_state(
-    cfg: Config, changes: ChangeSet, previous: dict[str, Any], *, pdfs_complete: bool
+    cfg: Config,
+    changes: ChangeSet,
+    previous: dict[str, Any],
+    stats: SyncStats,
+    *,
+    pdfs_complete: bool,
 ) -> None:
     now = _now()
     write_json(
@@ -440,8 +589,56 @@ def _write_state(
             "synced_at": now,
             "full_sync_at": now if changes.full else previous.get("full_sync_at"),
             "pdfs_complete": pdfs_complete,
+            "last_written": stats.written,
+            "last_gone": stats.gone,
         },
     )
+
+
+def clean_pdf_cache(
+    cfg: Config, *, apply: bool = False
+) -> dict[str, Any]:
+    """Remove ``state/pdf-cache/`` files already absorbed into ``out/`` or stale vs MD5.
+
+    Dry-run by default (``apply=False``). Returns counts of kept / removable / removed.
+    """
+    cache = cfg.pdf_cache_dir
+    removable: list[Path] = []
+    kept = 0
+    if cache.is_dir():
+        index = mirror_index(cfg.out_dir)
+        for path in sorted(cache.glob("*.pdf")):
+            key = path.stem
+            dirs = index.dirs(key)
+            record = load_json(record_path(dirs[0])) if dirs else None
+            in_mirror = bool(dirs) and (
+                (record is not None and record_pdf(dirs[0], record) is not None)
+                or any(dirs[0].glob("*.pdf"))
+            )
+            stale = record is not None and not _cache_is_current(path, record)
+            if in_mirror or stale:
+                removable.append(path)
+            else:
+                kept += 1
+    removed = 0
+    failed = 0
+    if apply:
+        for path in list(removable):
+            try:
+                path.unlink()
+                removed += 1
+            except OSError:
+                failed += 1
+                kept += 1
+    return {
+        "cache_dir": str(cache),
+        "kept": kept,
+        "removable": len(removable),
+        "removed": removed,
+        "failed": failed,
+        "apply": apply,
+        "paths": [str(p) for p in removable] if not apply else [],
+    }
 
 
 def sync_report(cfg: Config, stats: SyncStats, *, dry_run: bool, pdfs: str) -> dict[str, Any]:

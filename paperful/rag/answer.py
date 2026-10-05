@@ -9,7 +9,13 @@ from ..llm import ChatRequest, LLMClient, ctx_tokens_for, get_client
 from ..llm.embed import Embedder
 from .index import Index
 from .ledger import Ledger
-from .prompt import Source, build_context, build_messages, cited_markers
+from .prompt import (
+    Source,
+    build_context,
+    build_messages,
+    cited_markers,
+    resolve_system_prompt,
+)
 from .retrieve import Hit, search
 
 NO_HITS = "Nothing in the index matches that question."
@@ -60,6 +66,8 @@ def answer(
     retrieve_as: str | None = None,
     k: int | None = None,
     keys: set[str] | None = None,
+    focus: str | None = None,
+    prompt_path: str | None = None,
     client: LLMClient | None = None,
     embedder: Embedder | None = None,
     index: Index | None = None,
@@ -78,7 +86,11 @@ def answer(
         return AnswerStream([NO_HITS], [], [])
     context, sources = build_context(hits, cfg.rag_max_context_chars)
     used = {source.item_key for source in sources}
-    messages = build_messages(question, context, history)
+    system, _, _ = resolve_system_prompt(
+        focus=focus if focus is not None else cfg.rag_focus,
+        prompt_path=prompt_path if prompt_path is not None else (cfg.rag_prompt or None),
+    )
+    messages = build_messages(question, context, history, system=system)
     prompt_chars = "".join(m["content"] for m in messages)
     request = ChatRequest(
         model=(cfg.rag_model or cfg.llm_model).strip(),

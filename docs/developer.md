@@ -163,7 +163,8 @@ to `MirroredBackend` (refresh the item after), and to `MirrorFirstBackend`
 (pass through, refuse offline).
 
 **A manager.** Implement `LibraryBackend`. With a `changes(since)` method it
-gets the mirror-first path for free. Without one, its reads stay live.
+gets the mirror-first path for free. Zotero, Mendeley, and EndNote all
+expose one. Without one, reads stay live.
 
 ## Tests
 

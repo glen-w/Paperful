@@ -171,14 +171,16 @@ uv run paperful rag search "environmental impact assessment thresholds" -C ocean
 uv run paperful ask "What does the BBNJ Agreement require for EIAs?" -C ocean/BBNJ
 uv run paperful ask "…" --show-context     # also list the passages used
 uv run paperful ask "…" --format json      # one paperful.agent.json.v1 object (implies --no-stream)
+uv run paperful ask "…" --focus gaps       # prompt preset (default|questions|gaps|methods|answered)
+uv run paperful ask --from-file questions.txt -C ocean/BBNJ   # batch → state/ask-batch/
 uv run paperful ask                        # prompt for several; follow-ups share a thread
 uv run paperful ask --thread new "…"       # start a stored thread
 uv run paperful ask --thread <id> "and the EIA part?"
 ```
 
-`--format json` needs a question on the command line (no TTY multi-question
-loop). Agents that can shell out should prefer that over `paperful mcp`
-(`ask` tool returns the same envelope). Exit codes follow the
+`--format json` needs a question on the command line (or `--from-file`; no TTY
+multi-question loop). Agents that can shell out should prefer that over
+`paperful mcp` (`ask` tool returns the same envelope). Exit codes follow the
 [commands](commands.md#exits) table.
 
 `ask` prints the answer as it is written, then the sources it cited:
@@ -201,6 +203,31 @@ thread under `state/rag/threads/`. Follow-ups are rewritten into a standalone
 search query before retrieval; the model still sees the conversation. Piped
 lines and a one-shot `paperful ask "question"` stay independent unless you
 pass `--thread`.
+
+### Batch, focus, and research questions
+
+`--from-file` (or `-`) runs one question per line with no thread rewrite.
+Results land in `state/ask-batch/<stamp>/` (`pack.json` =
+`paperful.ask_batch.v1`, plus `answers.md`). Unchanged question + focus +
+index tip rows are skipped unless `--force`. Optional
+`--apply -C … --to zotero|both` writes a collection note (never a silent
+parent edit).
+
+`--focus` selects a bundled system prompt (`default`, `questions`, `gaps`,
+`methods`, `answered`). `[rag].focus` sets the default; `--prompt FILE` wins
+over focus. Named run profiles may set `focus` alongside scope keys.
+
+```bash
+uv run paperful rag questions -C ocean/BBNJ          # rules → state/rag/questions/
+uv run paperful rag questions --library --llm        # also grounded LLM extract
+uv run paperful rag answered --from-extract -C ocean/BBNJ
+uv run paperful rag answered --from-file qs.txt --after-item AAAA1111
+```
+
+`rag questions` writes per-item JSON with provenance `rule` or `llm`.
+`rag answered` reuses the batch engine with `--focus answered` and writes
+`state/rq-answered/<stamp>/` (`paperful.rq_answered.v1`). `--after-item`
+keeps only newer years and drops the asking paper from retrieval.
 
 Answers are only as good as the passages found. The model is told to answer
 from the excerpts alone and to say when they do not contain the answer, but a

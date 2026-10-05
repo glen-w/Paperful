@@ -748,6 +748,10 @@ def _mirror_check(cfg: Config) -> Check:
     state = sync_state(cfg.out_dir)
     if state and state.get("synced_at"):
         when = f"refreshed {state['synced_at']} (library v{state.get('version')})"
+        written = state.get("last_written")
+        gone = state.get("last_gone")
+        if isinstance(written, int) and isinstance(gone, int):
+            when += f"; last refresh {written} written, {gone} gone"
     else:
         when = "not refreshed yet (the first command does it, or paperful sync)"
     detail = f"pdfs={cfg.mirror_pdfs}; {when}"

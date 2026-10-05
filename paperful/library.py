@@ -155,6 +155,9 @@ class ChangeSet:
     trashed: list[dict[str, Any]]  # raw rows in the manager's trash
     collections: dict[str, Collection]
     library_id: str = ""  # changes when the manager is pointed at another database
+    # When False, ``all_keys`` is parents-only (Mendeley / EndNote). Sync must not
+    # treat every mirrored child key as gone.
+    track_child_keys: bool = True
 
 
 def mirrored(cfg: Config, backend: LibraryBackend) -> LibraryBackend:
@@ -257,6 +260,30 @@ class MirroredBackend:
     def create_or_update_note(self, item_key: str, html: str, tag: str) -> str:
         key = self._inner.create_or_update_note(item_key, html, tag)
         self.refresh(item_key)
+        return key
+
+    def create_or_update_collection_note(
+        self, collection_key: str, html: str, tags: list[str]
+    ) -> str:
+        key = self._inner.create_or_update_collection_note(collection_key, html, tags)
+        folder = self._cfg.out_dir / "_notes" / key
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "note.html").write_text(html, encoding="utf-8")
+        from .store import write_json
+        from .sync import STANDALONE_SCHEMA
+
+        write_json(
+            folder / "record.json",
+            {
+                "schema": STANDALONE_SCHEMA,
+                "key": key,
+                "item_type": "note",
+                "title": "",
+                "tags": list(tags),
+                "collections": [collection_key],
+                "note_file": "note.html",
+            },
+        )
         return key
 
     def attach(
@@ -578,22 +605,28 @@ class ZoteroBackend:
             key = ch.get("key")
             if not key:
                 continue
-            try:
-                locate = getattr(self.zl, "file_path", None)
-                path = locate(key) if callable(locate) else None
-                if path is not None and path.is_file():
-                    # Same disk: copy the file Zotero pointed at, not a download of it.
-                    shutil.copyfile(path, dest)
-                    return dest
-                self.zl.zot.dump(key, dest.name, str(dest.parent))
-            except Exception:
-                # A row whose bytes never arrived (a ghost) fails here.
-                return None
-            dumped = dest.parent / dest.name
-            if dumped.exists():
-                if dumped != dest:
-                    dumped.replace(dest)
+            got = self.export_attachment(str(key), dest)
+            if got is not None:
+                return got
+        return None
+
+    def export_attachment(self, attachment_key: str, dest: Path) -> Path | None:
+        """Copy one stored attachment (any content type) to ``dest``."""
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            locate = getattr(self.zl, "file_path", None)
+            path = locate(attachment_key) if callable(locate) else None
+            if path is not None and path.is_file():
+                shutil.copyfile(path, dest)
                 return dest
+            self.zl.zot.dump(attachment_key, dest.name, str(dest.parent))
+        except Exception:
+            return None
+        dumped = dest.parent / dest.name
+        if dumped.exists():
+            if dumped != dest:
+                dumped.replace(dest)
+            return dest
         return None
 
     def apply_patch(self, item_key: str, fields: dict[str, Any]) -> None:

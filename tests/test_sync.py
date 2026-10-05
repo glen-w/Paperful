@@ -194,6 +194,10 @@ def test_first_refresh_writes_everything_without_a_request_per_item(cfg):
     assert zot.calls["changes"] == 1 and zot.reads() == 0
     state = sync_state(cfg.out_dir)
     assert state["version"] == zot.version and state["library"] == "LIB-ONE"
+    assert state["last_written"] == 3 and state["last_gone"] == 0
+    from paperful.catalogue import MirrorCatalogue
+
+    assert "3 written, 0 gone" in MirrorCatalogue(cfg.out_dir).age_line()
     items = {i.key: i for i in items_in_mirror(cfg.out_dir)}
     assert sorted(items) == ["ITEM0001", "ITEM0002", "ITEM0003"]
     assert items["ITEM0001"].has_pdf and not items["ITEM0002"].has_pdf
@@ -212,6 +216,61 @@ def test_a_refresh_with_nothing_changed_reads_and_writes_nothing(cfg):
     assert not stats.full and stats.written == 0 and not stats.changed
     assert zot.calls == Counter(changes=1)
     assert {p: p.read_bytes() for p in cfg.out_dir.rglob("record.json")} == before
+
+
+def test_standalone_notes_land_under_out_notes(cfg):
+    from paperful.catalogue import MirrorCatalogue
+
+    zot = FakeZotero()
+    zot.put(
+        "NOTESTAND",
+        itemType="note",
+        note="<p>collection report</p>",
+        tags=[{"tag": "paperful-report"}],
+        collections=["COLA"],
+        title="",
+    )
+    # Top-level note must not carry a parentItem.
+    zot.rows["NOTESTAND"]["data"].pop("parentItem", None)
+    run_sync(cfg, zot, pdfs="none")
+    note_dir = cfg.out_dir / "_notes" / "NOTESTAND"
+    assert (note_dir / "note.html").read_text() == "<p>collection report</p>"
+    cat = MirrorCatalogue(cfg.out_dir)
+    assert cat.find_collection_note_keys("COLA", "paperful-report") == ["NOTESTAND"]
+    raw = cat.raw_item("NOTESTAND")
+    assert raw is not None and raw["data"]["itemType"] == "note"
+
+
+def test_non_pdf_attachment_bytes_copy_when_pdfs_all(cfg):
+    zot = _library(cfg, n=1)
+    zot.put(
+        "SNAP0001",
+        itemType="attachment",
+        parentItem="ITEM0001",
+        linkMode="imported_file",
+        contentType="text/html",
+        filename="snapshot.html",
+        title="Snapshot",
+    )
+    zot.files["SNAP0001"] = b"<html>snap</html>"
+
+    def export_attachment(key, dest):
+        data = zot.files.get(key)
+        if data is None:
+            return None
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(data)
+        return dest
+
+    zot.export_attachment = export_attachment  # type: ignore[attr-defined]
+    run_sync(cfg, zot, pdfs="all")
+    folders = [
+        p.parent
+        for p in cfg.out_dir.rglob("record.json")
+        if "ITEM0001" in p.parent.name
+    ]
+    assert folders
+    assert (folders[0] / "snapshot.html").read_bytes() == b"<html>snap</html>"
 
 
 def test_dry_run_writes_nothing(cfg):

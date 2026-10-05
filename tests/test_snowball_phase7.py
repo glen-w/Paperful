@@ -513,3 +513,19 @@ def test_doctor_author_packs_proposed(tmp_path: Path):
     check = _author_packs_check(cfg)
     assert check.status == "green"
     assert "proposed" in check.detail
+
+
+def test_roadmap_phase7_shipped_and_parked_stance():
+    text = (Path(__file__).resolve().parents[1] / "docs" / "ROADMAP.md").read_text(
+        encoding="utf-8"
+    )
+    assert "**Co-author site preflight (opt-in). Shipped:**" in text
+    assert "Shipped (opt-in; promote packs; SearXNG local-only)" in text
+    assert "**Snowball preflight (co-author graph → author sites). Shipped**" in text
+    assert "There is no `--dedupe-after` flag" not in text
+    assert "[snowball].dedupe_after" in text
+    assert "#### Parked (snowball lane — thicker “ongoing”)" in text
+    assert "Align `snowball apply` with saved `dedupe_scope`" in text
+    assert "In-run create index" in text
+    assert "expand = cited_authors" in text
+    assert "**Smart inbox (optional, later).**" in text
