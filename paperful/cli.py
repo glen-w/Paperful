@@ -9117,7 +9117,8 @@ def snowball_collection(
 
 def _print_briefing(briefing: Any, *, apply: bool, collection: str, cfg: Config) -> None:
     counts = briefing.counts
-    summary = " · ".join(f"{key} {counts[key]}" for key in ("new", "exists", "deferred"))
+    order = ("new", "exists", "deferred", "inbox")
+    summary = " · ".join(f"{key} {counts[key]}" for key in order if key in counts)
     console.print(summary)
     console.print(f"Wrote [bold]{briefing.path}[/]")
     if not apply:
@@ -9166,6 +9167,34 @@ def snowball_briefing(
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
     _print_briefing(briefing, apply=apply, collection=collection, cfg=cfg)
+
+
+@snowball_app.command("digest")
+def snowball_digest(
+    run_id: str = typer.Option(
+        ..., "--run-id", help="Queue under state/snowball/<run-id>/."
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Also file a collection note tagged paperful:frontier-briefing. Needs -C.",
+    ),
+    collection: str = typer.Option(
+        "", "--collection", "-C", help="Collection for the note when --apply."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Write a ranked frontier digest for a saved queue. Does not create items."""
+    from .snowball.command import SnowballError
+    from .snowball.digest import write_run_digest
+
+    cfg = _cfg(config)
+    try:
+        digest = write_run_digest(cfg, run_id)
+    except SnowballError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(exc.code) from exc
+    _print_briefing(digest, apply=apply, collection=collection, cfg=cfg)
 
 
 @snowball_app.command("resume")
@@ -9612,16 +9641,26 @@ def snowball_watch_save(
 def snowball_watch_run(
     name: str = typer.Argument(..., help="Watch name."),
     dedupe_scope: str | None = DedupeScopeOpt,
+    digest: bool = typer.Option(
+        False,
+        "--digest",
+        help="Also write watches/<name>/digest.md after a successful run.",
+    ),
     config: Path | None = ConfigOpt,
 ) -> None:
     """Baseline on first run; later runs write only unseen new works to the inbox."""
     cfg = _cfg(config)
+    from .snowball.digest import write_watch_digest
     from .snowball.watch import run_watch
 
-    _run_snowball(
-        cfg,
-        lambda c: run_watch(c, name, console=console, dedupe_scope=dedupe_scope),
-    )
+    def _run(c: Config):
+        result = run_watch(c, name, console=console, dedupe_scope=dedupe_scope)
+        if digest and not result.exit_code:
+            written = write_watch_digest(c, name)
+            _print_briefing(written, apply=False, collection="", cfg=c)
+        return result
+
+    _run_snowball(cfg, _run)
 
 
 @snowball_watch_app.command("show")
@@ -9665,6 +9704,32 @@ def snowball_watch_briefing(
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
     _print_briefing(briefing, apply=apply, collection=collection, cfg=cfg)
+
+
+@snowball_watch_app.command("digest")
+def snowball_watch_digest(
+    name: str = typer.Argument(..., help="Watch name."),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Also file a collection note tagged paperful:frontier-briefing. Needs -C.",
+    ),
+    collection: str = typer.Option(
+        "", "--collection", "-C", help="Collection for the note when --apply."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Write a ranked frontier digest for a watch. Does not create items."""
+    from .snowball.command import SnowballError
+    from .snowball.digest import write_watch_digest
+
+    cfg = _cfg(config)
+    try:
+        digest = write_watch_digest(cfg, name)
+    except SnowballError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(exc.code) from exc
+    _print_briefing(digest, apply=apply, collection=collection, cfg=cfg)
 
 
 def _authorwatch_call(action: Callable[[], Any]) -> Any:

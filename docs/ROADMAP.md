@@ -320,7 +320,7 @@ for the end-to-end operator story.
 | 7 | Non-DOI grey fingerprint (`norm(title)|year|registrant_host`; ISBN/report # when present) in snowball / dedupe / inbox ladder + inbox-create | Shipped (ISBN/report like DOI; title\|year\|host is review-tier; host mismatch is not `exists`) |
 | 8 | `paperful collections add --keys-file` — membership batch, dry-run / apply | Shipped |
 | 9 | Acronym allowlist harvest (Core `fix-metadata`) | Shipped (`paperful acronyms`; Title Case consumes `state/acronyms/`) |
-| 10 | [Frontier digest](#frontier-digest-later-watch--external-ingest); thin [snowball briefing](#frontier-digest-later-watch--external-ingest) export before full digest | Thin v0 shipped (`snowball briefing`, `watch briefing`); full digest later |
+| 10 | [Frontier digest](#frontier-digest-later-watch--external-ingest); thin [snowball briefing](#frontier-digest-later-watch--external-ingest) export before full digest | Shipped (`snowball digest`, `watch digest`, `watch run --digest`); newsletter ingest later |
 | 11 | Scholar late tail + latch + opt-in SerpApi | Shipped (`[fetch].order` policy; interleave with `browser_agent`; `[handoff].scholar`; `[serpapi].enabled` / `max_calls`) |
 | 12 | Authors/orgs frequency report from `-C` (`state/reports/…`; seed **field author packs**) | Shipped (`paperful authors`; `--apply` writes report + proposed pack) |
 | 13 | Handoff list ranking (Core handoff) | Shipped (cite count × miss severity) |
@@ -672,21 +672,27 @@ possible.
 
 ### Frontier digest (later; watch + external ingest)
 
-**Status:** roadmap — snowball **watch** is shipped (baseline, `inbox.jsonl`,
-dry-run, no PDFs); a **digest** is the human-readable rollup on top.
+**Status:** digest shipped. Newsletter / alert ingest stays later. Snowball
+**watch** stays dry-run and does not download PDFs. There is still **no**
+built-in scheduler.
 
-**Digest (Paperful):** after `snowball watch run` (or on demand), emit a short
-report: new vs `exists` vs deferred, overlap hints, suggested `-C`, links to
-queue paths — file under `state/` or stdout; still **no** built-in scheduler
-(launchd / cron calls `watch run` + digest; document launchd/systemd examples
-only). Complements watch inbox review.
+**Digest (Paperful):** `paperful snowball digest --run-id`,
+`snowball watch digest`, or `snowball watch run --digest` writes
+`digest.md` (run dir, or `state/snowball/watches/<name>/`). The report is
+new vs `exists` vs version vs deferred, overlap hints on the top new rows
+(`score`, `why`, hop, `overlap`), a suggested `-C` from the profile or
+`[snowball].target_collection`, and paths for the queue, `apply`, and
+`resume`. `--apply -C` files a collection note tagged
+`paperful:frontier-briefing`. After `watch run` the queue file holds only
+new proposals; `already seen` is the overlap with the prior frontier.
+launchd / systemd / cron examples are in [snowball.md](snowball.md#watch).
 
-**Thin v0 (shipped):** `paperful snowball briefing --run-id …` /
+**Thin briefing (still shipped):** `paperful snowball briefing --run-id …` /
 `snowball watch briefing <name>` → markdown export of the dry-run or watch queue
 (no silent creates; optional collection note `paperful:frontier-briefing` with
 `--apply -C`). Surface
 grey-vs-peer / OA stamp hints in briefing tables where provenance
-exists (`grey:…`, `oa:…`). Full digest and newsletter ingest stay later.
+exists (`grey:…`, `oa:…`).
 
 **Newsletter / alert ingest (rollup bridge):** optional plug-in or HTTP client
 to sibling **[rollup](Documents/rollup)**-style ingest architecture — pull
@@ -846,8 +852,9 @@ Phases, in order. Each can stop without the next.
 6. **Watch. Shipped:** `snowball watch save` / `run` / `show` re-runs a saved
    profile, baselines the frontier on the first run, and proposes only unseen
    arrivals into `state/snowball/watches/<name>/inbox.jsonl` plus a normal
-   run queue. Always dry-run / no PDFs. Paperful does not schedule it; your
-   own launchd or cron may call `watch run`. See [snowball.md](snowball.md#watch).
+   run queue. Always dry-run / no PDFs. `watch digest` / `watch run --digest`
+   writes the frontier rollup. Paperful does not schedule it; your
+   own launchd or cron may call `watch run --digest`. See [snowball.md](snowball.md#watch).
 7. **Co-author site preflight (opt-in).** Before or alongside hop expansion,
    derive a co-author graph from the seed + candidate author lists, discover
    personal / institutional / static-site home pages for high-centrality names
@@ -1087,10 +1094,12 @@ prerequisites for the fetch / lint / attach loop.
    `grey:author_site` stamps. Complements post-hoc co-author site crawl on misses.
    **ResearchGate “request from author” (config-gated, handoff-only).** When the
    item already has a `researchgate.net/publication` URL and `[request].channels`
-   includes `rg`, `--handoff tabs` / `walk` opens that page in the **system**
+   includes `rg`, `--handoff tabs` / `walk` on `gaps` / `run` / `paperful reachout`
+   opens that page in the **system**
    browser. **You** click Request full-text. Paperful never automates the click
    (RG ToS / rate limits) and never searches ResearchGate for a URL. Fulfillment
    is async (email from authors). Ledger: `state/author-requests.jsonl`.
+   `reachout` is the contact-only verb (no grab modalities; CSV of emails).
    **Twenty CRM integration (opt-in).** When `[twenty].enabled` and env
    `TWENTY_API_KEY` plus `[twenty].base_url` point at the operator’s
    [Twenty](https://twenty.com) workspace, `paperful twenty lookup -C …` resolves
@@ -1167,8 +1176,8 @@ Larger product bets. Park until the ledger and core loop justify them.
    distinct from shipped `gaps`); [structured section
    extract](#structured-section-extract-mvp-later); [annotation
    mirror](#annotation-mirror-later); [frontier
-   digest](#frontier-digest-later-watch--external-ingest) (watch rollup + optional
-   rollup newsletter bridge, Scholar alerts first); [author watch
+   digest](#frontier-digest-later-watch--external-ingest) (watch rollup shipped;
+   optional rollup newsletter bridge, Scholar alerts first, still later); [author watch
    lists](#author-watch-lists-later-people-you-follow--their-papers) (ORCID-backed
    people lists **in tree**; optional HTML import from RG / LinkedIn / Academia follows later). **[Run
    witness](#run-witness-later-trust-thicken)** ties batches to config/model/index
@@ -1289,7 +1298,7 @@ Ship in layers:
 0. **Research pack playbook** — [research-pack.md](research-pack.md) (narrative spine for `-C` topic builds):
    seed greys + seed papers → `refs gap` → `ingest-dois --dry-run` → `--apply`
    with provenance tags → `run` / handoff / inbox for PDFs → `dedupe` hygiene →
-   optional `snowball watch` + [briefing export](#frontier-digest-later-watch--external-ingest)
+   optional `snowball watch` + [frontier digest](#frontier-digest-later-watch--external-ingest)
    → `summarize` / RAG only after the ledger is honest.
 1. **Example commands and templates** — copy-paste invocations plus
    `profiles/*.toml` and config snippets for recurring flows: `-C` / collection

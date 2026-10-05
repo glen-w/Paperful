@@ -8,6 +8,13 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ### Added
 
+- `paperful snowball digest --run-id` and `snowball watch digest` write a
+  frontier rollup (`digest.md`): new / exists / version / deferred, overlap
+  detail on the top new rows, a suggested `-C`, and queue / apply / resume
+  paths. `snowball watch run --digest` writes the watch file after a
+  successful run. Still no scheduler and no silent creates; `--apply -C`
+  files the same `paperful:frontier-briefing` note as thin briefing.
+  launchd / systemd / cron examples are in [snowball.md](docs/snowball.md#watch).
 - `paperful authors -C …`: authors/orgs frequency from scope (`--min-count`,
   `--max-authors`, `--format json`). Dry-run prints tables. `--apply` writes
   `state/reports/<scope>-authors.json` (`paperful.authors_report.v1`) and seeds

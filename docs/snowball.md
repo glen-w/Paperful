@@ -7,7 +7,8 @@ OpenAlex keywords, depth up to 5 under caps, gates
 `dry-run` / `approve-each` / `approve-batch` / `auto`, overlap ranking,
 `--fetch-pdfs`, `--dedupe-scope` per invocation, optional `--dedupe-after`,
 opt-in author-site preflight / `snowball packs promote`, and pull-only `watch`
-are implemented. Config honors `dedupe_scope`, `tag_prefix`, `default_tags`,
+are implemented, plus a frontier `digest` on a saved queue or watch.
+Config honors `dedupe_scope`, `tag_prefix`, `default_tags`,
 `types`, `oa_only`, venues, `languages`, `min_seed_citations`,
 `note_provenance`, and `backends`. `--refine` writes query suggestions when
 `[llm]` is on and does not create items. `expand = cited_authors` stays off.
@@ -36,7 +37,9 @@ paperful snowball orcid 0000-0002-9162-9618 --gate auto --fetch-pdfs full -C "Sn
 paperful snowball search "high seas EIA" --gate dry-run --format json
 paperful snowball apply <run-id> -C "Inbox/Snowball" --format json
 paperful snowball watch save bbnj --profile keyword-scout
-paperful snowball watch run bbnj
+paperful snowball watch run bbnj --digest
+paperful snowball watch digest bbnj
+paperful snowball digest --run-id <run-id>
 paperful snowball watch briefing bbnj
 ```
 
@@ -69,9 +72,11 @@ this profile watch.
 ```text
 paperful snowball watch save bbnj --profile keyword-scout
 paperful snowball watch run bbnj          # first time: baseline, inbox empty
-paperful snowball watch run bbnj          # later: N new in the inbox
+paperful snowball watch run bbnj --digest # later: N new, then digest.md
 paperful snowball watch show bbnj
-paperful snowball watch briefing bbnj     # markdown; --apply -C files a collection note
+paperful snowball watch digest bbnj       # ranked rollup; --apply -C files a note
+paperful snowball digest --run-id <run-id>
+paperful snowball watch briefing bbnj     # thin markdown; same note tag
 paperful snowball briefing --run-id <run-id>
 paperful snowball apply <run-id> -C Inbox/Snowball   # only if you want parents
 ```
@@ -84,12 +89,90 @@ Ledger under `state/snowball/watches/<name>/`:
 | `seen.json` | Identities already recorded (`doi:` or `openalex:`) |
 | `inbox.jsonl` | Append-only proposed `status = new` rows |
 | `briefing.md` | Thin markdown export (`watch briefing`) |
+| `digest.md` | Frontier digest (`watch digest` or `watch run --digest`) |
 
-`paperful snowball briefing --run-id` writes the same kind of markdown next to
-`candidates.jsonl`. Neither command creates library items. `--apply` with `-C`
-files a collection note tagged `paperful:frontier-briefing`. OA / grey stamps
-already on the row (`oa:…`, `grey:…`, `is_oa`, `oa_status`) are printed; there
-is no extra API call. Full digest / newsletter ingest stays later.
+`paperful snowball briefing --run-id` writes thin markdown next to
+`candidates.jsonl`. `paperful snowball digest --run-id` writes `digest.md`
+there: new / exists / version / deferred, overlap detail on the top 25 new
+rows (`score`, `why`, hop, `overlap`), a suggested `-C` from
+`[snowball].target_collection` (or the watch profile’s `target_collection`),
+and copy-paste paths for the queue, `apply`, and `resume`. A watch digest
+reads the **last run queue**. After `watch run` that file holds only the new
+proposals, so an exists split is empty there; `already seen` on the summary
+is the overlap with the prior frontier. If OpenAlex stopped early,
+`summary.json` still says `deferred` and the digest points at `resume`.
+`snowball digest --run-id` on a normal crawl queue still splits new / exists
+/ version / deferred. The inbox count is separate, because the inbox is
+new-only and keeps older proposals. Neither command creates library items. `--apply` with
+`-C` files a collection note tagged `paperful:frontier-briefing`. OA / grey
+stamps already on the row (`oa:…`, `grey:…`, `is_oa`, `oa_status`) are
+printed; there is no extra API call. Newsletter ingest stays later.
+
+### Schedule it yourself
+
+Paperful does not run a timer. Point cron, launchd, or a systemd user timer
+at `watch run --digest`. Replace the paths and the watch name.
+
+```cron
+15 7 * * 1 cd /path/to/library && uv run paperful snowball watch run bbnj --digest
+```
+
+launchd (`~/Library/LaunchAgents/paperful.watch.bbnj.plist`):
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>paperful.watch.bbnj</string>
+  <key>WorkingDirectory</key>
+  <string>/path/to/library</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/path/to/uv</string>
+    <string>run</string>
+    <string>paperful</string>
+    <string>snowball</string>
+    <string>watch</string>
+    <string>run</string>
+    <string>bbnj</string>
+    <string>--digest</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key>
+    <integer>1</integer>
+    <key>Hour</key>
+    <integer>7</integer>
+    <key>Minute</key>
+    <integer>15</integer>
+  </dict>
+</dict>
+</plist>
+```
+
+systemd user units (`~/.config/systemd/user/paperful-watch-bbnj.service` and
+`.timer`):
+
+```ini
+# paperful-watch-bbnj.service
+[Service]
+Type=oneshot
+WorkingDirectory=/path/to/library
+ExecStart=/path/to/uv run paperful snowball watch run bbnj --digest
+
+# paperful-watch-bbnj.timer
+[Timer]
+OnCalendar=Mon *-*-* 07:15:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+Then `systemctl --user enable --now paperful-watch-bbnj.timer`. Read
+`state/snowball/watches/bbnj/digest.md` when it finishes.
 
 Each `watch run` also writes a normal `state/snowball/<run-id>/` queue. After
 baseline, that queue is empty (`baseline N · proposed 0`). After a later run,
