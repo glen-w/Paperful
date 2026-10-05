@@ -15,7 +15,7 @@ from ..remarks import linked_sentence, say
 from ..routing import with_recover_lane, with_serpapi_lane
 from ..store import Manifest
 from ..lint import normalize_saved_title, usable_work_title
-from ..zot import Item
+from ..zot import Item, person_creators
 from .candidate import Candidate
 
 TAG = "paperful-snowball"
@@ -178,6 +178,7 @@ def create_new(
         )
         if line:
             say(backend, key, "linked", line, surface=remarks_surface)
+        creators = _creators(authors)
         first = authors[0].split()[-1] if authors else None
         created_items.append(
             Item(
@@ -191,6 +192,8 @@ def create_new(
                 first_author=first,
                 collection_paths=[collection],
                 doi_source="crossref" if record["doi"] else "none",
+                creator_surnames=[c.get("lastName") or c.get("name") or "" for c in creators],
+                creator_people=person_creators(creators),
             )
         )
     return created_items, {"created": created, "skipped_exists": skipped_exists, "failed": failed}
@@ -214,6 +217,7 @@ def pending_pdf_items(rows: list[Any], created: list[Item], manifest: Any) -> li
         biblio = getattr(row, "biblio", None) or {}
         authors = list(biblio.get("authors") or [])
         year = biblio.get("year")
+        creators = _creators(authors)
         pending.append(
             Item(
                 key=key,
@@ -225,6 +229,8 @@ def pending_pdf_items(rows: list[Any], created: list[Item], manifest: Any) -> li
                 year=int(year) if isinstance(year, int) else None,
                 first_author=authors[0].split()[-1] if authors else None,
                 collection_paths=[],
+                creator_surnames=[c.get("lastName") or c.get("name") or "" for c in creators],
+                creator_people=person_creators(creators),
             )
         )
         seen.add(key)
@@ -326,12 +332,7 @@ def _run_fill(
     return pipe.run(items)
 
 
-def _fill_sources(cfg: Config, items: list[Item]) -> list[str]:
-    sources = list(cfg.sources)
-    from .authors import matching_author
+def _fill_sources(cfg: Config, _items: list[Item]) -> list[str]:
+    from ..routing import with_author_site_lane
 
-    if "author_site" in sources:
-        return sources
-    if any(matching_author(item, cfg) is not None for item in items):
-        return ["author_site", *sources]
-    return sources
+    return with_author_site_lane(cfg, list(cfg.sources))

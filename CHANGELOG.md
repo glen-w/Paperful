@@ -46,9 +46,15 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
   click Request full-text. Paperful never automates the click (RG ToS) and does
   not search ResearchGate. Ledger: `state/author-requests.jsonl`. `--request-rg`
   / `--re-request` on `gaps` / `run --handoff`.
-- Opt-in Twenty CRM author lookup: `[twenty].enabled` plus `TWENTY_API_KEY` and
-  `paperful twenty lookup -C …` (dry-run; `--apply` writes proposed author-pack
-  websites and `state/author-contacts/`). Read-only; no mail send.
+- `paperful twenty sync -C …` creates or enriches Twenty People from library
+  authors (`--apply`; dry-run default). Fills blank homepage/email and appends
+  extras. Keywords include `paperful` plus the collection slug, and a note
+  titled Paperful records the action. `lookup` stays CRM-read-only.
+  `author_site` runs after open-access and campus lanes and before Scholar,
+  using a promoted pack, `state/author-contacts/`, then a capped People
+  website lookup. `--twenty-writeback` on `run` or snowball preflight appends
+  a SearXNG personal page onto a unique Person and does not create one.
+  No mail. Guide: [Twenty and SearXNG](docs/snowball.md#twenty-and-searxng).
 - `paperful playbooks probe --corpus FILE` fetches each grey-playbook target
   and passes only when the first candidate is a real PDF (at least
   `--min-bytes`, default 10KB). `--save` writes a replay snapshot. The public

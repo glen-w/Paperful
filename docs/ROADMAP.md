@@ -328,7 +328,7 @@ for the end-to-end operator story.
 | 15 | Agent JSON + documented exit codes on batch verbs; MCP after those are stable | **Shipped** — `paperful.agent.json.v1` + exits 0/1/2/3 on batch verbs; thin optional `paperful mcp` (`refs_gap`, `ask`) |
 | 16 | Author-site PDF (registry + packs + co-author crawl; **snowball co-author preflight** / `grey:author_site`) | Opt-in in tree (promote packs; SearXNG local-only) |
 | 17 | ResearchGate request-from-author (**handoff-only**; config off by default; you click) | Shipped (`[request].channels`; `state/author-requests.jsonl`; `paperful reachout --handoff tabs`) |
-| 18 | Twenty CRM — author lookup (website → proposed pack; email cache; no mail / no CRM write) | Shipped (`paperful twenty lookup`; `[twenty].enabled`; `paperful reachout` reads the cache) |
+| 18 | Twenty CRM — lookup cache plus `twenty sync` (create/enrich, Paperful note, late `author_site` before Scholar, opt-in listing write-back) | Shipped (`paperful twenty lookup` / `twenty sync`; `[twenty].enabled`; `--twenty-writeback`) |
 | 19 | Typed note provenance (`paperful.note.v1`) + scannable **first-line** prefixes on all Paperful note writers | Shipped (summarize / synthesize / remarks / snowball / briefing) |
 | 20 | `paperful notes delete` (or equivalent) — scoped filters: type, model, `--except-model`, tags; dry-run / `--apply` | Shipped (`--type`, `--model` / `--except-model`, `--all` + confirm / `--yes`) |
 | 21 | [Author watch lists](#author-watch-lists-later-people-you-follow--their-papers) — ORCID / OpenAlex resolve + `run` / `apply`; file import of follows | **In tree** (`paperful authorwatch`; social HTML scrape later) |
@@ -858,7 +858,7 @@ Phases, in order. Each can stop without the next.
 7. **Co-author site preflight (opt-in).** Before or alongside hop expansion,
    derive a co-author graph from the seed + candidate author lists, discover
    personal / institutional / static-site home pages for high-centrality names
-   (ORCID researcher-urls, then optional local SearXNG), and write them into
+   (ORCID researcher URLs, then an optional CRM listing, then SearXNG), and write them into
    [field author packs](#maybe-later-not-core) for the profile scope so the
    following `run` / `fetch_pdfs` pass can try the `author_site` grey lane.
    Proposed packs only until `snowball packs promote`. Opt-in profile knob;
@@ -1031,8 +1031,10 @@ prerequisites for the fetch / lint / attach loop.
    [libgenesis-api](https://pypi.org/project/libgenesis-api/) first; same
    opt-in + disclaimer bar as Sci-Hub; no third-party HTTP gateways);
    **opt-in SearXNG** for author / personal-site / institutional-repo PDFs that
-   Unpaywall / OpenAIRE / CORE never indexed — thin client against a local
-   instance (`SEARXNG_BASE_URL`), not a public meta-search. Reuse the fetch +
+   Unpaywall / OpenAIRE / CORE never indexed. **Shipped** as author-site
+   remainder search against `[searxng].base_url` (your instance, or a public
+   one that serves JSON — [Twenty and SearXNG](snowball.md#twenty-and-searxng)).
+   Not a default `run` source. Reuse the fetch +
    engine-rotation + disk-cache pattern from folk directory
    `ingest/scrape_searxng.py`; do not port the county×event grid. Query by
    title/author/`filetype:pdf` (or DOI), hand URLs to the existing download +
@@ -1100,25 +1102,16 @@ prerequisites for the fetch / lint / attach loop.
    (RG ToS / rate limits) and never searches ResearchGate for a URL. Fulfillment
    is async (email from authors). Ledger: `state/author-requests.jsonl`.
    `reachout` is the contact-only verb (no grab modalities; CSV of emails).
-   **Twenty CRM integration (opt-in).** When `[twenty].enabled` and env
-   `TWENTY_API_KEY` plus `[twenty].base_url` point at the operator’s
-   [Twenty](https://twenty.com) workspace, `paperful twenty lookup -C …` resolves
-   item `creator` names against **People** (and linked **Companies** for
-   affiliation when present):
-   pull **website** into a **proposed** author-site pack when
-   `classify_listing_url` accepts it; cache **work email** on disk
-   (`state/author-contacts/`) for later **mail merge** — never send mail
-   from Paperful without an explicit verb and template (`paperful request draft`
-   TBD). Twenty is a first-class CRM the operator already curates, so it can beat
-   web search for contact data on people you have met or filed. **RG vs email:**
+   **Twenty CRM (opt-in, shipped).** Lookup, sync, late `author_site`, and
+   listing write-back are [Twenty and SearXNG](snowball.md#twenty-and-searxng).
+   Paperful does not send mail. **RG vs email:**
    both channels can annoy the same author if mis-timed; treat as a **policy**
    knob, not one hardcoded path — e.g. `request_channels = rg | email | both |
    rg_then_email_after_days` with per-item “already requested” ledger
    (`handoff_opened` records channel + date). Email may cut through
    inbox noise when RG requests are ignored; RG may be faster when the author is
-   active there — operator chooses. No CRM write-back unless `--apply` on an
-   explicit sync verb; read-only search by default. Fits MCP/agent surface when
-   Twenty tools are available on the workstation.
+   active there — operator chooses. CRM writes stay on `twenty sync --apply`
+   and `--twenty-writeback`; lookup stays read-only.
    **Marketing copy (later — ship only when the lanes above exist).** Draft
    positioning for site / README / comparison once learned grey playbooks,
    author-site registry, field packs, and co-author site crawl are real (local
@@ -1213,11 +1206,10 @@ Larger product bets. Park until the ledger and core loop justify them.
    optional stdio wrap of `refs_gap` + `ask` over the same envelope — not a second API
    and not a prerequisite for research-ops. Writes stay CLI `--apply`. `collections add`
    is CLI-only (not an MCP tool).
-   **Later:** mail-merge / `paperful request draft` using Twenty contact cache;
-   CRM write-back only with `--apply` on an explicit sync verb. Request-channel
-   policy stays config (`[request].channels`), not agent-default. Lookup itself
-   is `paperful twenty lookup` (REST, read-only). Contact surface without fetch
-   is `paperful reachout` (CSV + optional RG tabs; metadata then Twenty emails).
+   **Shipped:** Twenty sync, lookup, and `--twenty-writeback` —
+   [Twenty and SearXNG](snowball.md#twenty-and-searxng).
+   Request-channel policy stays config (`[request].channels`), not agent-default.
+   Contact surface without fetch is `paperful reachout` (CSV + optional RG tabs).
 8. **Collaboration without SaaS** — shared `state/` over syncthing/git; attach
    locks; optional headless fetch node. Aligns with the house
    [quiet mirror](quiet-mirror.md) stance: Syncthing (or similar) is transport;

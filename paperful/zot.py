@@ -115,6 +115,35 @@ class Collection:
 
 
 @dataclass
+class CreatorPerson:
+    """A person creator (not a corporate ``name``-only row)."""
+
+    first: str = ""
+    last: str = ""
+    display: str = ""
+
+
+def person_creators(creators: list[Any] | None) -> list[CreatorPerson]:
+    """Zotero-shaped creators with a last name. Corporate single-field names are skipped."""
+    out: list[CreatorPerson] = []
+    for row in creators or []:
+        if not isinstance(row, dict):
+            continue
+        last = str(row.get("lastName") or "").strip()
+        first = str(row.get("firstName") or "").strip()
+        bare = str(row.get("name") or "").strip()
+        if bare and not last and not first:
+            continue
+        if not last:
+            last = bare
+        if not last:
+            continue
+        display = " ".join(part for part in (first, last) if part)
+        out.append(CreatorPerson(first=first, last=last, display=display))
+    return out
+
+
+@dataclass
 class Item:
     key: str
     item_type: str
@@ -142,6 +171,8 @@ class Item:
     creator_count: int = 0
     abstract: str | None = None
     creator_surnames: list[str] = field(default_factory=list)
+    # Person creators with given name when the manager stored one.
+    creator_people: list[CreatorPerson] = field(default_factory=list)
     # Creators stored as a single ``name`` (no lastName/firstName), e.g. FAO.
     corporate_creators: list[str] = field(default_factory=list)
     isbn: str | None = None
@@ -640,6 +671,7 @@ def item_from_json(
         creator_count=len(creators),
         abstract=abstract,
         creator_surnames=surnames,
+        creator_people=person_creators(creators),
         corporate_creators=corporate,
         isbn=isbn,
         report_number=report_number,

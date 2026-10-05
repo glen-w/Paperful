@@ -106,9 +106,9 @@ for personal-site PDF fetch, use `paperful authors -C …` (then promote). See
 [Workflows § field author packs](workflows.md#6-field-author-packs-corpus-frequency--author_site).
 
 To **ask authors** instead of fetching, `paperful reachout` writes a CSV
-(emails from item metadata, then Twenty contacts) and can open existing
-ResearchGate publication URLs so you click Request. It never downloads and
-never sends mail. [Workflows § reachout](workflows.md#7-reachout-ask-authors-do-not-fetch).
+(emails from the item) and can open existing ResearchGate publication URLs
+so you click Request. It never downloads and never sends mail.
+[Workflows § reachout](workflows.md#7-reachout-ask-authors-do-not-fetch).
 
 ## Slowing down
 

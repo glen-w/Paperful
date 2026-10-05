@@ -16,9 +16,9 @@ _TITLE_MIN = 0.55
 
 
 def find(item: Item, ctx: Context) -> Candidate:
-    from ..snowball.authors import matching_author
+    from ..twenty import resolve_listing
 
-    author = matching_author(item, ctx.config)
+    author = resolve_listing(item, ctx.config, live=True)
     if author is None:
         return Candidate.miss(NAME, Outcome.SKIPPED, "no pack match")
     listing = (author.listing_url or "").strip()
@@ -32,6 +32,7 @@ def find(item: Item, ctx: Context) -> Candidate:
             url=listing,
             source=NAME,
             playbook="author_site",
+            referer=listing,
             note=f"{author.name or author.fingerprint} listing pdf",
         )
     try:
@@ -70,6 +71,7 @@ def find(item: Item, ctx: Context) -> Candidate:
         url=picked[0],
         source=NAME,
         playbook="author_site",
+        referer=listing,
         note=f"{author.name or author.fingerprint} {author.base_host}",
         alternates=picked[1:],
     )

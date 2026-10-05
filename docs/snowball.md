@@ -328,10 +328,11 @@ Opt-in `--author-site-preflight` writes `coauthors.json` and a **proposed**
 pack under `state/author-packs/`. `paperful authors -C … --apply` also seeds a
 proposed pack from in-library creator frequency (see [commands](commands.md)).
 `snowball packs promote <slug>` makes it available to the `author_site` grey
-lane (`grey:author_site`). SearXNG is used only when `[searxng].base_url` or
-`SEARXNG_BASE_URL` is set. `[twenty].lookup_on_preflight` (with
-`[twenty].enabled`) may add CRM websites to that proposed pack. Promote before
-fetch; Paperful does not send mail.
+lane (`grey:author_site`). Preflight tries ORCID researcher URLs first.
+A CRM and a metasearch can fill the rest; that is
+[Twenty and SearXNG](#twenty-and-searxng). On fetch, `author_site` is a late
+lane (after open access and campus, before Scholar). Promote before relying
+on the pack. Paperful does not send mail.
 
 ## One-shot PDFs
 
@@ -474,8 +475,10 @@ author_site_max_authors = 15
 author_site_max_queries = 20
 ```
 
-`[searxng].base_url` (or `SEARXNG_BASE_URL`) is a **local** instance for
+`[searxng].base_url` (or `SEARXNG_BASE_URL`) is an optional metasearch for
 author-site remainder discovery. It is never in `sources` by default.
+What that engine is, and which hosts answer it:
+[Twenty and SearXNG](#twenty-and-searxng).
 
 `enabled = false` until you opt in, the same posture as `[llm]`. `doctor`
 reports that flag, whether keys are present, and whether a backend answers.
@@ -557,7 +560,72 @@ not seeds.
 
 ## Advanced
 
-Rate limits, API keys, and hosting a snapshot. Skip this for a small dry-run.
+Rate limits, API keys, a CRM, a metasearch, and hosting a snapshot. Skip this
+for a small dry-run.
+
+### Twenty and SearXNG
+
+Neither is on for a normal library fill. Use them when you already keep
+author pages in a CRM, or when you want a metasearch to find a personal site
+after ORCID has none.
+
+#### Twenty
+
+[Twenty](https://twenty.com) is an open-source CRM: people, companies, and
+notes. You can use [Twenty Cloud](https://twenty.com) or a workspace you host
+yourself. The product and the API are in the
+[Twenty docs](https://docs.twenty.com/).
+
+Paperful talks to **People** in a workspace you already run. It needs
+`[twenty].enabled`, `[twenty].base_url` (or `TWENTY_BASE_URL`), and env
+`TWENTY_API_KEY`. It never sends mail. Knobs:
+[config](config.md#twenty-and-searxng).
+
+- `paperful twenty lookup` reads People. `--apply` writes a proposed author
+  pack and `state/author-contacts/` only. It does not change the CRM.
+- `paperful twenty sync --apply` creates a Person for a unique author who is
+  not already a unique match, and enriches a unique match. A blank homepage
+  or email is filled. Extra pages and emails are appended. A primary homepage
+  or email you already set is left alone. Ambiguous names and corporate
+  creators (FAO, and other single-field names) are skipped. New and updated
+  People get the keyword `paperful`, the collection slug (for example
+  `ocean-bbnj`), and a note titled Paperful. `--limit` caps the batch.
+  Fifty or more creates ask on a terminal unless you pass `--yes`. A resume
+  ledger under `state/twenty-sync/` skips fingerprints already written.
+- On fetch, `author_site` runs late (after open access and campus, before
+  Scholar). The listing comes from a promoted pack, then the contact cache,
+  then a capped live People lookup (`[twenty].fetch_listing_max`, default 20)
+  for items that still have no PDF. That lookup does not create People.
+- `--twenty-writeback` (or `[twenty].writeback_listings`) appends a personal
+  page found by SearXNG or by a successful `author_site` fetch onto a
+  **unique** Person. It does not create one, and it does not replace a
+  primary link.
+- `[twenty].lookup_on_preflight` can add CRM websites to a snowball
+  `--author-site-preflight` proposed pack. It does not call `sync`.
+
+`reachout --lookup` uses the same People search for a contact CSV. It still
+does not send mail.
+
+#### SearXNG
+
+[SearXNG](https://docs.searxng.org/) is a metasearch engine, the maintained
+fork of [SearX](https://searx.github.io/searx/). It asks other search engines
+and returns their hits. Paperful uses it in one place: author-site preflight,
+after ORCID researcher URLs and any Twenty or cache listing, to find a
+personal or faculty page. It is not a `run` source and it is not in
+`sources` by default.
+
+Set `[searxng].base_url` or `SEARXNG_BASE_URL` to an instance that answers
+`GET /search?format=json`. Public instances are listed at
+[searx.space](https://searx.space/). Many of them leave JSON off, so a host
+from that list works only when its [search API](https://docs.searxng.org/dev/search_api.html)
+includes `json`. Otherwise run your own
+([install](https://docs.searxng.org/admin/installation.html)) and enable the
+JSON format in its settings. Paperful does not ship an instance.
+
+A hit is cached under `state/snowball/cache/searxng/`. With
+`--twenty-writeback`, a page found this way can be appended to a unique
+Twenty Person, as above.
 
 ### OpenAlex and Semantic Scholar keys
 
@@ -649,6 +717,6 @@ BibTeX citekeys still make sense. Snowball does not depend on that plugin.
 - [research-pack](research-pack.md) — refs gap → ingest → run / handoff → dedupe
 - [comparison](comparison.md) — paperscraper, findpapers, in-Zotero plugins
 - [config](config.md#run-configs-profiles) — profile precedence this lane reuses
-- [config Advanced](config.md#advanced) — fetch tuning and OpenAlex snapshot store
+- [config Advanced](config.md#advanced) — fetch tuning, Twenty / SearXNG knobs, and OpenAlex snapshot store
 - [commands](commands.md) — `run`, which `fetch_pdfs` calls
 - [authorwatch](authorwatch.md) — people lists, not a snowball hop

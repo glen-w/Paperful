@@ -43,8 +43,7 @@ and [architecture](architecture.md).
 | `[handoff].scholar` | `true` | Put a Scholar results URL on miss rows and open it in the system browser when there is no direct PDF URL |
 | `[request].channels` | `off` | Author-request policy: `off` \| `rg` \| `email` \| `both` \| `rg_then_email_after_days`. **`rg` is handoff-only:** opens an existing ResearchGate publication URL in your system browser so **you** click Request full-text (RG ToS). Paperful never clicks and does not search RG. `email` / delay are recorded for later mail-merge; Paperful does not send mail. Override one `gaps` / `run --handoff` / `reachout` with `--request-rg` / `--no-request-rg`. `--re-request` ignores the `state/author-requests.jsonl` ledger |
 | `[request].email_after_days` | `14` | Used when `channels = rg_then_email_after_days` (policy only until a draft verb exists) |
-| `[twenty].enabled` | `false` | Read-only Twenty People lookup. Needs env `TWENTY_API_KEY` and `[twenty].base_url` (or `TWENTY_BASE_URL`). `paperful twenty lookup -C …` dry-run; `--apply` writes proposed author-pack websites and `state/author-contacts/`. `paperful reachout` reads that cache (and `--lookup` can search live). No CRM writes, no mail |
-| `[twenty].lookup_on_preflight` | `false` | When Twenty is ready, enrich snowball `--author-site-preflight` proposed packs from CRM websites |
+| `[twenty]` / `[searxng]` | off | Optional CRM and metasearch for author pages. Not part of a normal fill. Knobs and what the products are: [Twenty and SearXNG](#twenty-and-searxng) |
 | `verify_doi` | `true` | Check library DOIs against Crossref/OpenAlex before fetching; may swap DOI **in memory** for that run. `false` leaves an existing DOI as `doi_verified=unknown` and does not swap |
 | `core_api_key` | `""` | CORE API bearer token; empty skips the `core` source |
 | `ezproxy_base` | `""` (disabled) | Campus proxy prefix ending in `url=` — see [Campus EZProxy](ezproxy.md) |
@@ -240,7 +239,7 @@ walkthrough, model advice, Docker networking, and troubleshooting: [LLM](llm.md)
 | `[snowball].dedupe_after` | `off` | After create: `off`, `classify` (`state/dedupe-packs/`), or `apply` (merge high-DOI extras) |
 | `[snowball].author_site_preflight` | `false` | Co-author graph + proposed `state/author-packs/`. Promote before `author_site` fetch. Corpus frequency without a snowball run is `paperful authors -C … --apply` |
 | `[authorwatch]` | — | Not parsed. Caps are `authorwatch run --max-authors` / `--per-author-limit`. `doctor` ambers lists with people and no ORCID/OpenAlex id. No social scrape |
-| `[searxng].base_url` | `""` | Local SearXNG for author-site remainder discovery. Or `SEARXNG_BASE_URL`. Never a default `run` source |
+| `[searxng].base_url` | `""` | SearXNG JSON endpoint for author-site remainder discovery, or `SEARXNG_BASE_URL`. Never a default `run` source. [Twenty and SearXNG](#twenty-and-searxng) |
 | `[ingest].dedupe_scope` | `library` | `library` or `collection` when skipping `exists` |
 | `[ocr].languages` | `eng` | Tesseract languages for `paperful ocr` (`eng+fra` or `eng fra`) |
 | `[rag].enabled` | `false` | Master switch for `paperful rag` and `paperful ask`. Needs `paperful[rag]`. See [rag.md](rag.md) |
@@ -308,6 +307,27 @@ run misbehaves or you host infrastructure yourself.
 | `[attachments].merge_files` | `false` | With `--apply`, trash extra PDF children on the same parent that share an MD5 |
 | `[attachments].rename` | `false` | With `--apply`, rename files under `out/` to the mirror stem |
 | `[attachments].link` | `false` | With `--apply`, stored-to-linked under `out/` (personal Zotero library only) |
+
+### Twenty and SearXNG
+
+Off unless you set them. [Twenty](https://twenty.com) is an open-source CRM
+([docs](https://docs.twenty.com/)). [SearXNG](https://docs.searxng.org/) is a
+metasearch engine, the maintained fork of SearX; public instances are listed
+at [searx.space](https://searx.space/). How Paperful uses them, including
+which public instances can answer, is
+[snowball Advanced](snowball.md#twenty-and-searxng).
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `[twenty].enabled` | `false` | Talk to a Twenty workspace. Needs env `TWENTY_API_KEY` and `[twenty].base_url` (or `TWENTY_BASE_URL`). `twenty lookup` does not write the CRM (`--apply` caches contacts and a proposed pack). `twenty sync --apply` creates or enriches People. `reachout` can read the cache. No mail |
+| `[twenty].lookup_on_preflight` | `false` | When Twenty is ready, add CRM websites to a snowball `--author-site-preflight` proposed pack. Does not call `sync` |
+| `[twenty].fetch_listing_max` | `20` | Live People website lookups per run after the contact cache, for the late `author_site` lane |
+| `[twenty].writeback_listings` | `false` | With `--twenty-writeback` on `run` or snowball preflight, append a SearXNG or author-site personal page onto a unique Person. Does not create People |
+| `[twenty].retry_max` | `8` | Retries after HTTP 429 or 5xx (`Retry-After`, else backoff from `retry_base_seconds`) |
+| `[twenty].retry_base_seconds` | `1` | Backoff base when the response has no `Retry-After` |
+| `[twenty].sync_note_title` | `Paperful` | Title of the note stamped on create and enrich |
+| `[twenty].provenance_keyword` | `paperful` | Keyword added beside the collection slug |
+| `[searxng].base_url` | `""` | Instance root, or `SEARXNG_BASE_URL`. Paperful calls `GET /search?format=json`. A public host works only when that instance enables JSON; otherwise run your own ([install](https://docs.searxng.org/admin/installation.html)) |
 
 ### OpenAlex API limits and snapshot store
 

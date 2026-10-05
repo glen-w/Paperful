@@ -432,7 +432,7 @@ def test_apply_library_default_skips_other_collection_hit(tmp_path: Path):
     assert lib2.created
 
 
-def test_fill_sources_prepends_author_site(tmp_path: Path):
+def test_fill_sources_appends_author_site(tmp_path: Path):
     from paperful.snowball.authors import pack_path
 
     cfg = _cfg(tmp_path)
@@ -463,7 +463,8 @@ def test_fill_sources_prepends_author_site(tmp_path: Path):
         collection_paths=["Inbox/Snowball"],
         creator_surnames=["Lovelace"],
     )
-    assert _fill_sources(cfg, [item])[0] == "author_site"
+    assert _fill_sources(cfg, [item])[-1] == "author_site"
+    assert _fill_sources(cfg, [item])[0] == "unpaywall"
     cfg.sources = ["author_site", "unpaywall"]
     assert _fill_sources(cfg, [item]) == ["author_site", "unpaywall"]
 

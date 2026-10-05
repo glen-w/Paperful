@@ -133,7 +133,8 @@ flowchart LR
 | `state/reports/<slug>.html` | `synthesize` literature review; sibling `<slug>.json` records source hashes |
 | `state/reports/<slug>-authors.json` | `authors --apply` creator frequency (`paperful.authors_report.v1`); seeds proposed field packs |
 | `state/author-packs/` | Proposed / promoted field author packs (`paperful.author_pack.v1`). From `authors --apply`, snowball preflight, or `twenty lookup --apply` |
-| `state/author-contacts/` | Twenty People cache (`paperful.author_contact.v1`). From `twenty lookup --apply` or `reachout --lookup`. No CRM write |
+| `state/author-contacts/` | Twenty People cache (`paperful.author_contact.v1`). From `twenty lookup --apply`, `twenty sync --apply`, or `reachout --lookup`. No mail. What Twenty is: [Twenty and SearXNG](snowball.md#twenty-and-searxng) |
+| `state/twenty-sync/<slug>.jsonl` | Resume ledger for `twenty sync --apply` (fingerprint, action, Twenty id). Under `state/` (backup-excluded) |
 | `state/author-requests.jsonl` | ResearchGate handoff ledger (you click Request). `gaps` / `run --handoff` / `reachout --handoff` |
 | `state/sessions/` | Chromium profile + `meta.json` (login timestamps, no secrets). Netscape dumps for httpx |
 | `state/fetch-wins.jsonl` | One line per vault or browser-agent PDF (host and path; query string dropped). Input to `paperful playbooks propose` |
@@ -403,6 +404,7 @@ stop at `no_identifier`.
 - [commands.md](commands.md) — CLI and disk artifacts
 - [dedupe.md](dedupe.md) — duplicate packs and the post-ingest hygiene loop
 - [config.md](config.md) — `config.toml` keys and grey playbooks
+- [snowball.md](snowball.md#twenty-and-searxng) — optional Twenty CRM and SearXNG author-page search
 - [ezproxy.md](ezproxy.md) / [sessions.md](sessions.md) — campus proxy and browser vault
 - [docker.md](docker.md) — build-local image (host Zotero + headed login stay outside)
 - [zotero.md](zotero.md) — local API, write keys, attachment modes, ghosts

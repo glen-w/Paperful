@@ -68,7 +68,8 @@ large `fix-metadata` recase if titles are ALL CAPS with corpus tokens
 (BBNJ, FAO, OECD). For frequent creators and institutional authors in the
 same slice, `paperful authors -C COLLECTION --apply` writes
 `state/reports/<scope>-authors.json` and a proposed field author pack; then
-`twenty lookup` / `snowball packs promote` before relying on `author_site`.
+`snowball packs promote` before relying on `author_site`. Optional CRM
+lookup is [Twenty and SearXNG](snowball.md#twenty-and-searxng).
 
 ## Exits (same table as commands)
 

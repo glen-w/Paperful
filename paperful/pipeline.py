@@ -49,6 +49,7 @@ from .routing import (
     prior_playwright_miss,
     publisher_host,
     sources_for_item,
+    with_author_site_lane,
     with_serpapi_lane,
 )
 from .page_signals import (
@@ -336,7 +337,9 @@ class Pipeline:
         self.cfg = cfg
         self.manifest = manifest
         self.console = console
-        self.sources = with_serpapi_lane(cfg, list(sources or cfg.sources))
+        self.sources = with_author_site_lane(
+            cfg, with_serpapi_lane(cfg, list(sources or cfg.sources))
+        )
         self.try_all = try_all if try_all is not None else not cfg.source_routing
         self.attacher = attacher
         self.strict_pdf_doi = strict_pdf_doi
@@ -1203,6 +1206,18 @@ class Pipeline:
             oa_version=oa_stamp.get("version", ""),
         )
         self.manifest.write(rec)
+        if (
+            cand.source == "author_site"
+            and cand.referer
+            and getattr(self.cfg, "twenty_writeback_listings", False)
+            and not hold_reason
+        ):
+            try:
+                from .twenty import writeback_item_listing
+
+                writeback_item_listing(self.cfg, item, cand.referer, source="author_site")
+            except Exception as exc:
+                self._log_item(item, f"[dim]twenty writeback skipped[/] {exc}")
         with self._stats_lock:
             self.stats.bump(STATUS_OK, cand.source)
         self._log_item(

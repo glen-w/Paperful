@@ -251,9 +251,10 @@ def item_from_record(
         for c in creators
         if isinstance(c, dict) and (c.get("lastName") or c.get("name"))
     ]
-    from .zot import corporate_creator_names
+    from .zot import corporate_creator_names, person_creators
 
     corporate = corporate_creator_names(creators)
+    people = person_creators(creators)
     year = rec.get("year")
     if not isinstance(year, int):
         year = None
@@ -279,6 +280,7 @@ def item_from_record(
         creator_count=len(creators),
         abstract=rec.get("abstract") or None,
         creator_surnames=surnames,
+        creator_people=people,
         corporate_creators=corporate,
     )
 

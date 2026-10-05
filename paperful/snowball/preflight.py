@@ -66,6 +66,13 @@ def run_author_site_preflight(
                         break
             except OrcidError:
                 url = ""
+        if not url and cfg.twenty_enabled:
+            from ..twenty import listing_for_author, twenty_ready
+
+            if twenty_ready(cfg):
+                url = listing_for_author(cfg, author)
+                if url:
+                    source = "twenty"
         if not url and searxng_base_url(cfg) and queries < query_cap and author.name:
             queries += 1
             hits = search_author_site(
@@ -84,6 +91,16 @@ def run_author_site_preflight(
             author.listing_url = url
             author.base_host = host_of(url)
             author.source = source
+            if source == "searxng" and getattr(cfg, "twenty_writeback_listings", False):
+                from ..twenty import writeback_author_listing
+
+                writeback_author_listing(
+                    cfg,
+                    author,
+                    url,
+                    collection=collection,
+                    source="searxng",
+                )
         people.append(author)
     slug = pack_slug(collection)
     pack = AuthorPack(

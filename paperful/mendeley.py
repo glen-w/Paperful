@@ -20,7 +20,14 @@ from .config import Config
 from .interop.types import mendeley_to_zotero, zotero_to_mendeley
 from .library import LibraryError
 from .resolve import extract_arxiv_id, extract_doi, extract_pmid, normalize_doi
-from .zot import UNCOLLECTED, Collection, Item, build_collection_tree, parse_year
+from .zot import (
+    UNCOLLECTED,
+    Collection,
+    Item,
+    build_collection_tree,
+    parse_year,
+    person_creators,
+)
 
 API = "https://api.mendeley.com"
 AUTHORIZE = f"{API}/oauth/authorize"
@@ -1089,6 +1096,16 @@ def _item_from_doc(
         creator_count=len(authors) if isinstance(authors, list) else 0,
         abstract=(doc.get("abstract") or "").strip() or None,
         creator_surnames=surnames,
+        creator_people=person_creators(
+            [
+                {
+                    "firstName": str(a.get("first_name") or ""),
+                    "lastName": str(a.get("last_name") or ""),
+                }
+                for a in authors
+                if isinstance(a, dict)
+            ]
+        ),
     )
 
 

@@ -119,6 +119,12 @@ class Config:
     twenty_enabled: bool = False
     twenty_base_url: str = ""
     twenty_lookup_on_preflight: bool = False
+    twenty_retry_max: int = 8
+    twenty_retry_base_seconds: float = 1.0
+    twenty_sync_note_title: str = "Paperful"
+    twenty_provenance_keyword: str = "paperful"
+    twenty_fetch_listing_max: int = 20
+    twenty_writeback_listings: bool = False
     circuit_breaker_threshold: int = (
         3  # captcha/block failures before a source pauses, then one probe
     )
@@ -885,6 +891,18 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             cfg.twenty_base_url = str(twenty["base_url"]).strip().rstrip("/")
         if "lookup_on_preflight" in twenty:
             cfg.twenty_lookup_on_preflight = bool(twenty["lookup_on_preflight"])
+        if "retry_max" in twenty:
+            cfg.twenty_retry_max = max(0, int(twenty["retry_max"]))
+        if "retry_base_seconds" in twenty:
+            cfg.twenty_retry_base_seconds = max(0.0, float(twenty["retry_base_seconds"]))
+        if "sync_note_title" in twenty:
+            cfg.twenty_sync_note_title = str(twenty["sync_note_title"]).strip() or "Paperful"
+        if "provenance_keyword" in twenty:
+            cfg.twenty_provenance_keyword = str(twenty["provenance_keyword"]).strip() or "paperful"
+        if "fetch_listing_max" in twenty:
+            cfg.twenty_fetch_listing_max = max(0, int(twenty["fetch_listing_max"]))
+        if "writeback_listings" in twenty:
+            cfg.twenty_writeback_listings = bool(twenty["writeback_listings"])
     gaps = raw.get("gaps")
     if isinstance(gaps, dict):
         if "handoff" in gaps:

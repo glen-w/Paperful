@@ -202,7 +202,10 @@ app.add_typer(refs_app, name="refs")
 twenty_app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
-    help="Read-only Twenty CRM author lookup (opt-in). Never sends mail or writes the CRM.",
+    help=(
+        "Twenty CRM author lookup and sync (opt-in). "
+        "lookup is read-only. sync --apply writes People. Never sends mail."
+    ),
 )
 app.add_typer(twenty_app, name="twenty")
 authorwatch_app = typer.Typer(
@@ -338,6 +341,14 @@ AuthorSitePreflightOpt = typer.Option(
     None,
     "--author-site-preflight/--no-author-site-preflight",
     help="Opt-in co-author graph and proposed field pack. Default: config.",
+)
+TwentyWritebackOpt = typer.Option(
+    None,
+    "--twenty-writeback/--no-twenty-writeback",
+    help=(
+        "Append SearXNG or author-site personal pages onto a unique Twenty Person. "
+        "Does not create People. Default: [twenty].writeback_listings (off)."
+    ),
 )
 RequestRgOpt = typer.Option(
     None,
@@ -1014,7 +1025,7 @@ def jobs() -> None:
         "Snowball grows the library (metadata parents). "
         "Run fills PDFs for items already there. "
         "Reachout lists missing PDFs for author contact (no fetch, no mail). "
-        "Twenty lookup is read-only CRM search."
+        "Twenty lookup caches CRM contacts locally. twenty sync --apply writes People."
     )
 
 
@@ -3532,6 +3543,7 @@ def run(
     ),
     request_rg: bool | None = RequestRgOpt,
     re_request: bool = ReRequestOpt,
+    twenty_writeback: bool | None = TwentyWritebackOpt,
     promote: str | None = typer.Option(
         None,
         "--promote",
@@ -3549,6 +3561,8 @@ def run(
     from .author_request import apply_request_rg_override
 
     apply_request_rg_override(cfg, request_rg)
+    if twenty_writeback is not None:
+        cfg.twenty_writeback_listings = twenty_writeback
     json_out = _agent_json(fmt)
     if isinstance(promote, str):
         from .config import parse_playbooks_promote
@@ -5150,6 +5164,144 @@ def twenty_lookup_cmd(
         )
     else:
         console.print("[dim]Dry-run. Pass --apply to write proposed packs and contacts.[/]")
+
+
+@twenty_app.command("sync")
+def twenty_sync_cmd(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Create and enrich Twenty People. Default is dry-run.",
+    ),
+    limit: int = typer.Option(
+        0, "--limit", "-n", help="Only the first N person authors (0 = all)."
+    ),
+    yes: bool = typer.Option(
+        False, "--yes", help="Skip confirm when --apply would create many People."
+    ),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Create or enrich Twenty People from collection authors. Dry-run unless --apply."""
+    from .agent_json import EXIT_PARTIAL, envelope
+    from .twenty import apply_sync_actions, plan_sync, twenty_ready
+
+    if _scope_unset(collection, library, profile, run_config):
+        _refuse_missing_scope()
+    cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    if not cfg.twenty_enabled:
+        console.print(
+            "[red]Twenty is off.[/] Set [twenty].enabled = true and TWENTY_API_KEY."
+        )
+        raise typer.Exit(1)
+    if not twenty_ready(cfg):
+        console.print(
+            "[red]Twenty is not ready.[/] Set [twenty].base_url (or TWENTY_BASE_URL) "
+            "and env TWENTY_API_KEY."
+        )
+        raise typer.Exit(1)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    if not collection and not library:
+        _refuse_missing_scope()
+    _require_manager(cfg)
+    backend = _connect(cfg)
+    loaded = _load_scope(
+        backend,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    label = collection[0] if collection else "library"
+    if not loaded.items:
+        console.print(f"[yellow]No items in scope ({label}).[/]")
+        raise typer.Exit(1)
+    actions = plan_sync(cfg, loaded.items, collection=label, limit=limit)
+    creates = [row for row in actions if row.action == "create"]
+    if apply and len(creates) >= 50 and not yes:
+        import sys
+
+        if not sys.stdin.isatty():
+            console.print(
+                f"[red]{len(creates)} People would be created.[/] Pass --yes to confirm."
+            )
+            raise typer.Exit(1)
+        if not typer.confirm(f"Create {len(creates)} Twenty People?"):
+            raise typer.Exit(1)
+    if apply:
+        actions = apply_sync_actions(cfg, actions, collection=label)
+    wrote = sum(1 for row in actions if row.note == "wrote")
+    failed = sum(1 for row in actions if row.action == "miss-http")
+
+    def _human() -> None:
+        table = Table(title=f"Twenty sync ({'apply' if apply else 'dry-run'})")
+        table.add_column("Name")
+        table.add_column("Action")
+        table.add_column("Note")
+        for row in actions:
+            table.add_row(row.name, row.action, (row.note or "-")[:80])
+        console.print(table)
+        console.print(
+            f"{len(actions)} rows · "
+            f"{sum(1 for row in actions if row.action == 'create')} create · "
+            f"{sum(1 for row in actions if row.action == 'enrich')} enrich · "
+            f"{sum(1 for row in actions if row.action == 'ambiguous')} ambiguous · "
+            f"{sum(1 for row in actions if row.action == 'skip-corporate')} orgs · "
+            f"{failed} http"
+        )
+        if apply:
+            console.print(
+                "Wrote People (keywords + a Paperful note) and state/author-contacts/. "
+                "Paperful does not send mail."
+            )
+        else:
+            console.print("[dim]Dry-run. Pass --apply to create and enrich People.[/]")
+
+    code = 0
+    if failed and wrote:
+        code = EXIT_PARTIAL
+    elif failed and apply:
+        code = 1
+    payload = envelope(
+        command="twenty sync",
+        summary={
+            "rows": len(actions),
+            "create": sum(1 for row in actions if row.action == "create"),
+            "enrich": sum(1 for row in actions if row.action == "enrich"),
+            "ambiguous": sum(1 for row in actions if row.action == "ambiguous"),
+            "skip_corporate": sum(1 for row in actions if row.action == "skip-corporate"),
+            "http_errors": failed,
+            "items": len(loaded.items),
+        },
+        items=[
+            {"name": row.name, "action": row.action, "note": row.note, "twenty_id": row.twenty_id}
+            for row in actions
+        ],
+        flags={"apply": apply, "collection": label, "limit": limit},
+        exit_code=code,
+    )
+    _emit_agent(payload, json_out=json_out, human=_human)
 
 
 @app.command("ingest-dois")
@@ -8595,9 +8747,12 @@ def _snowball_request(
     dedupe_scope: str | None = None,
     dedupe_after: str | None = None,
     author_site_preflight: bool | None = None,
+    twenty_writeback: bool | None = None,
 ) -> Any:
     from .snowball.command import SnowballRequest
 
+    if twenty_writeback is not None:
+        cfg.twenty_writeback_listings = twenty_writeback
     return SnowballRequest(
         gate=gate or cfg.snowball_gate,
         collection=(collection or cfg.snowball_target_collection or ""),
@@ -8765,6 +8920,7 @@ def snowball_search(
     dedupe_scope: str | None = DedupeScopeOpt,
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
+    twenty_writeback: bool | None = TwentyWritebackOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
@@ -8797,6 +8953,7 @@ def snowball_search(
         dedupe_scope=dedupe_scope,
         dedupe_after=dedupe_after,
         author_site_preflight=author_site_preflight,
+        twenty_writeback=twenty_writeback,
     )
     from .snowball.command import run_search
 
@@ -8848,6 +9005,7 @@ def snowball_hybrid(
     dedupe_scope: str | None = DedupeScopeOpt,
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
+    twenty_writeback: bool | None = TwentyWritebackOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
@@ -8879,6 +9037,7 @@ def snowball_hybrid(
         dedupe_scope=dedupe_scope,
         dedupe_after=dedupe_after,
         author_site_preflight=author_site_preflight,
+        twenty_writeback=twenty_writeback,
     )
     from .snowball.command import run_hybrid
 
@@ -8926,6 +9085,7 @@ def snowball_doi(
     dedupe_scope: str | None = DedupeScopeOpt,
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
+    twenty_writeback: bool | None = TwentyWritebackOpt,
     seeds_file: str | None = SeedsFileOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
@@ -8954,6 +9114,7 @@ def snowball_doi(
         dedupe_scope=dedupe_scope,
         dedupe_after=dedupe_after,
         author_site_preflight=author_site_preflight,
+        twenty_writeback=twenty_writeback,
     )
     from .snowball.command import SnowballError, run_doi
 
@@ -9001,6 +9162,7 @@ def snowball_orcid(
     dedupe_scope: str | None = DedupeScopeOpt,
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
+    twenty_writeback: bool | None = TwentyWritebackOpt,
     seeds_file: str | None = SeedsFileOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
@@ -9029,6 +9191,7 @@ def snowball_orcid(
         dedupe_scope=dedupe_scope,
         dedupe_after=dedupe_after,
         author_site_preflight=author_site_preflight,
+        twenty_writeback=twenty_writeback,
     )
     from .snowball.command import SnowballError, run_orcid
 
@@ -9076,6 +9239,7 @@ def snowball_collection(
     dedupe_scope: str | None = DedupeScopeOpt,
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
+    twenty_writeback: bool | None = TwentyWritebackOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
@@ -9104,6 +9268,7 @@ def snowball_collection(
         dedupe_scope=dedupe_scope,
         dedupe_after=dedupe_after,
         author_site_preflight=author_site_preflight,
+        twenty_writeback=twenty_writeback,
     )
     from .snowball.command import run_collection
 
@@ -9293,11 +9458,14 @@ def snowball_run(
     dedupe_scope: str | None = DedupeScopeOpt,
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
+    twenty_writeback: bool | None = TwentyWritebackOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
     """Run a saved snowball profile (keyword, DOI, ORCID, or collection)."""
     cfg = _cfg(config)
+    if twenty_writeback is not None:
+        cfg.twenty_writeback_listings = twenty_writeback
     json_out = _agent_json(fmt)
     out = _snowball_console(json_out=json_out)
     from .snowball.command import (

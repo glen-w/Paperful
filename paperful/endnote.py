@@ -22,7 +22,7 @@ from .interop.endnote_xml import records_to_endnote_xml
 from .interop.types import endnote_db_to_zotero, endnote_to_zotero, zotero_to_endnote
 from .library import LibraryError
 from .resolve import extract_arxiv_id, extract_doi, extract_pmid, normalize_doi
-from .zot import UNCOLLECTED, Collection, Item, parse_year
+from .zot import UNCOLLECTED, Collection, Item, parse_year, person_creators
 
 _PATH_UNSAFE = re.compile(r"[\\/:*?\"<>|\x00-\x1f]")
 
@@ -984,6 +984,7 @@ def _item_from_ref(row: dict[str, Any], backend: EndNoteBackend) -> Item:
         creator_count=len(authors),
         abstract=str(_ref_get(row, "abstract") or "") or None,
         creator_surnames=[a["lastName"] for a in authors],
+        creator_people=person_creators(authors),
     )
 
 
@@ -1072,6 +1073,7 @@ def _item_from_pending(rec: dict[str, Any]) -> Item:
         creator_count=len(creators),
         abstract=rec.get("abstract"),
         creator_surnames=surnames,
+        creator_people=person_creators(creators if isinstance(creators, list) else []),
     )
 
 

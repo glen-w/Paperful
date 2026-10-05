@@ -189,12 +189,20 @@ mirror_failures_before_skip = 3
 # channels = "off"               # off | rg | email | both | rg_then_email_after_days
 # email_after_days = 14
 
-# Twenty CRM (read-only). Never a default. API key in env TWENTY_API_KEY only.
-# paperful twenty lookup -C … --apply caches contacts; reachout --lookup can too.
+# Twenty is an open-source CRM (https://twenty.com, docs https://docs.twenty.com).
+# Opt-in. Never a default. API key in env TWENTY_API_KEY only.
+# Behavior (lookup cache, sync, late author_site, write-back): docs/snowball.md
+# under "Twenty and SearXNG". Paperful does not send mail.
 # [twenty]
 # enabled = false
 # base_url = ""                  # or TWENTY_BASE_URL
 # lookup_on_preflight = false    # with snowball --author-site-preflight; still proposed packs
+# retry_max = 8
+# retry_base_seconds = 1.0
+# sync_note_title = "Paperful"
+# provenance_keyword = "paperful"
+# fetch_listing_max = 20         # live People website lookups per run, after the cache
+# writeback_listings = false     # or pass --twenty-writeback on snowball / run
 
 # Manual PDF handoff after soft-blocked OA misses (gaps --list-missing / --handoff).
 # [gaps]
@@ -318,8 +326,12 @@ gone = "mark"
 # (`--max-authors` 50, `--per-author-limit` 200). No [authorwatch] table is
 # parsed. No scrape of social follows; import a CSV. See docs/authorwatch.md.
 
+# SearXNG is a metasearch engine (docs https://docs.searxng.org/).
+# Public instances: https://searx.space/ — Paperful needs GET /search?format=json,
+# which many public hosts leave off. Run your own if JSON is disabled.
+# Never a default run source. See docs/snowball.md "Twenty and SearXNG".
 # [searxng]
-# base_url = ""                  # local instance; or SEARXNG_BASE_URL. never a default run source
+# base_url = ""                  # instance root; or SEARXNG_BASE_URL
 
 # Text layer for scanned PDFs (paperful ocr). Needs ocrmypdf on PATH.
 # The Compose image ships English. Add tesseract language packs for the rest.

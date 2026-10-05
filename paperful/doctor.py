@@ -247,7 +247,8 @@ def remediation_text(
         return (
             f"Edit {cfg_hint} [twenty]: enabled = true, base_url = your workspace "
             "(or TWENTY_BASE_URL), and set env TWENTY_API_KEY. Then: "
-            "paperful twenty lookup -C … (dry-run) / --apply. Read-only; no mail."
+            "paperful twenty lookup -C … (dry-run) / --apply caches contacts. "
+            "paperful twenty sync -C … --apply creates or enriches People. No mail."
         )
     return None
 
@@ -577,7 +578,7 @@ def run_checks(
 
         if twenty_api_key() and twenty_base_url(cfg):
             checks.append(
-                Check("Twenty", "green", "enabled (no live probe; lookup is read-only)")
+                Check("Twenty", "green", "enabled (no live probe; sync --apply writes People)")
             )
         else:
             checks.append(

@@ -91,8 +91,9 @@ URLs (`author_request` hint) so you can click Request full-text yourself —
 Paperful never automates that click (RG ToS) and never searches ResearchGate.
 For contact-only (no Unpaywall, proxy, or Sci-Hub), use
 `paperful reachout -C … --to reachout.csv` instead of `gaps`/`run`. That verb
-never fetches; `--handoff tabs` opens RG URLs only. Emails come from the item
-then Twenty. Paperful does not send mail.
+never fetches; `--handoff tabs` opens RG URLs only. Emails come from the item,
+then an optional contact cache
+([Twenty and SearXNG](snowball.md#twenty-and-searxng)). Paperful does not send mail.
 `watch`
 opens those tabs, then polls `[inbox].dir` until Ctrl+C or idle timeout:
 match by DOI extracted from the PDF, else FIFO against the openable-miss

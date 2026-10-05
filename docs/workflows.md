@@ -355,19 +355,21 @@ in the report; only people go into the pack. Promote before fetch.
 ```sh
 uv run paperful authors -C BBNJ                    # dry-run tables
 uv run paperful authors -C BBNJ --apply            # report + proposed pack
-uv run paperful twenty lookup -C BBNJ --apply      # optional: CRM websites
 uv run paperful snowball packs promote bbnj        # enable author_site
 uv run paperful run -C BBNJ                        # grey:author_site when names match
 ```
 
 Snowball `--author-site-preflight` is the frontier/co-author path to the same
 `state/author-packs/` files; `authors` is the in-library frequency path.
+A CRM and a metasearch can feed the same packs later; that setup is
+[Twenty and SearXNG](snowball.md#twenty-and-searxng).
 
 ## 7. Reachout (ask authors, do not fetch)
 
 When you want contact data instead of grab modalities: no Unpaywall, no
 proxy, no Sci-Hub. Missing PDFs only. Emails come from the item (`extra`,
-`mailto:`, abstract) then Twenty contacts. Paperful never sends mail.
+`mailto:`, abstract). An optional CRM cache is
+[Twenty and SearXNG](snowball.md#twenty-and-searxng). Paperful never sends mail.
 
 ```sh
 uv run paperful reachout -C ocean/BBNJ --to reachout.csv
@@ -375,8 +377,8 @@ uv run paperful reachout -C ocean/BBNJ --non-oa-only --lookup --to reachout.csv
 uv run paperful reachout -C ocean/BBNJ --request-rg --handoff tabs
 ```
 
-`--lookup` needs `[twenty].enabled` plus `TWENTY_API_KEY`. `--handoff tabs`
-opens existing ResearchGate publication URLs; you click Request full-text.
+`--lookup` is that optional CRM search. `--handoff tabs` opens existing
+ResearchGate publication URLs; you click Request full-text.
 
 ## What this is not
 

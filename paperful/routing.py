@@ -39,8 +39,8 @@ _HTMLPDF_ITEM_TYPES = frozenset(
 # Playwright vault lanes. `run` auto-appends `browser_agent` after the last of
 # these, and only invokes the agent when one of them was tried and failed.
 BROWSER_LANES = frozenset({"scholar", "ezproxy", "htmlpdf"})
-_POLICY_TAIL = ("scholar", "browser_agent", "htmlpdf", "serpapi", "scihub")
-_POLICY_ALWAYS_TAIL = frozenset({"scholar", "browser_agent", "serpapi", "scihub"})
+_POLICY_TAIL = ("author_site", "scholar", "browser_agent", "htmlpdf", "serpapi", "scihub")
+_POLICY_ALWAYS_TAIL = frozenset({"author_site", "scholar", "browser_agent", "serpapi", "scihub"})
 _SERIAL_FOR_ORDER = frozenset(
     {"scihub", "ezproxy", "htmlpdf", "scholar", "browser_agent", "author_site", "serpapi"}
 )
@@ -196,6 +196,20 @@ def with_serpapi_lane(cfg: Config, sources: list[str]) -> list[str]:
     return listed
 
 
+def with_author_site_lane(cfg: Config, sources: list[str]) -> list[str]:
+    """Append ``author_site`` when a pack, contact cache, or Twenty workspace can supply a page.
+
+    Policy order places it immediately before Scholar. List mode keeps ``sources`` as written.
+    """
+    if "author_site" in sources:
+        return list(sources)
+    from .twenty import author_site_lane_wanted
+
+    if author_site_lane_wanted(cfg):
+        return [*sources, "author_site"]
+    return list(sources)
+
+
 def scholar_pairs_with_agent(cfg: Config, sources: list[str]) -> bool:
     """True when Scholar should run one-item-at-a-time before ``browser_agent``."""
     if "scholar" not in sources or "browser_agent" not in sources:
@@ -246,6 +260,8 @@ def order_run(cfg: Config, sources: list[str]) -> list[SerialStep]:
             steps.append(SerialStep(name))
     has_scholar = "scholar" in serial
     has_agent = "browser_agent" in serial
+    if "author_site" in serial:
+        steps.append(SerialStep("author_site"))
     if scholar_pairs_with_agent(cfg, serial):
         steps.append(SerialStep("scholar", partner="browser_agent"))
     else:
@@ -350,9 +366,9 @@ def source_applicable(item: Item, cfg: Config, name: str) -> bool:
     if name in {"scholar", "serpapi"}:
         return bool(item.doi or (item.title and len(item.title) >= 20))
     if name == "author_site":
-        from .snowball.authors import matching_author
+        from .twenty import author_site_ready
 
-        return matching_author(item, cfg) is not None
+        return author_site_ready(item, cfg)
     if name == "direct":
         from .sources.landing import grey_target
 
