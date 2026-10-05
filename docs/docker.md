@@ -133,7 +133,11 @@ The image does not ship the `rag` extra (LanceDB), so `paperful rag` and
 ## Custom playbook packs
 
 Put extra grey-playbook TOML files in `packs/` (under the data dir) and set in
-config:
+config. Optional energy and international-org copies (IEA/IRENA,
+OECD/WHO/UNEP/UNDP) ship inside the package as
+`paperful/data/grey_playbooks_examples/`. Copy those files into `packs/`.
+That examples folder does not include the ocean builtin, which is already on
+by default.
 
 ```toml
 grey_playbooks_dir = "packs"

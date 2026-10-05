@@ -47,6 +47,7 @@ ezproxy
 research-ops
 sessions
 scihub
+serpapi
 llm
 rag
 ```

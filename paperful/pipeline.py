@@ -43,10 +43,13 @@ from .resolve import (
     version_link,
 )
 from .routing import (
+    academic_htmlpdf_item,
     is_publisher_url,
+    order_run,
     prior_playwright_miss,
     publisher_host,
     sources_for_item,
+    with_serpapi_lane,
 )
 from .page_signals import (
     host_label,
@@ -86,7 +89,17 @@ from .store import (
 from .zot import Item
 
 # Sources that share a browser/session or are heavy — keep serial & polite.
-_SERIAL_SOURCES = frozenset({"scihub", "ezproxy", "htmlpdf", "scholar", "browser_agent", "author_site"})
+_SERIAL_SOURCES = frozenset(
+    {
+        "scihub",
+        "ezproxy",
+        "htmlpdf",
+        "scholar",
+        "browser_agent",
+        "author_site",
+        "serpapi",
+    }
+)
 _DIRECT_PDF_CAP = 12
 _LANDING_CAP = 6
 # Soft-block vault retries that land on campus CAS; trip EZProxy after this many.
@@ -262,6 +275,16 @@ def _scholar_blocked(cand: Candidate) -> bool:
     return cand.outcome is Outcome.ERROR and note in {"HTTP 429", "HTTP 503"}
 
 
+def _serpapi_blocked(cand: Candidate) -> bool:
+    """Paid Scholar search is out of quota or refused; do not burn the key."""
+    if cand.outcome is Outcome.CAPTCHA:
+        return True
+    note = (cand.note or "").lower()
+    if cand.outcome is not Outcome.ERROR:
+        return False
+    return "429" in note or "quota" in note or "run out" in note
+
+
 def _is_soft_block_error(exc: DownloadError) -> bool:
     msg = str(exc)
     return "too small" in msg or msg.startswith("not a PDF")
@@ -313,7 +336,7 @@ class Pipeline:
         self.cfg = cfg
         self.manifest = manifest
         self.console = console
-        self.sources = sources or cfg.sources
+        self.sources = with_serpapi_lane(cfg, list(sources or cfg.sources))
         self.try_all = try_all if try_all is not None else not cfg.source_routing
         self.attacher = attacher
         self.strict_pdf_doi = strict_pdf_doi
@@ -333,6 +356,9 @@ class Pipeline:
         self._ezproxy_down_offered = False
         self._browser_agent_down = False
         self._scholar_down = False
+        self._serpapi_down = False
+        self._serpapi_calls = 0
+        self._serpapi_capped = False
         self._blocked_hosts: set[str] = set()
         self._transport_fail_hosts: dict[str, int] = {}
         self._vault_sso_misses = 0
@@ -357,6 +383,12 @@ class Pipeline:
         if "core" in self.sources and not self.cfg.core_api_key:
             self.sources = [s for s in self.sources if s != "core"]
             disabled.append("core (no CORE API key)")
+        if "serpapi" in self.sources:
+            from .routing import serpapi_ready
+
+            if not serpapi_ready(self.cfg):
+                self.sources = [s for s in self.sources if s != "serpapi"]
+                disabled.append("serpapi (disabled or no SERPAPI_API_KEY)")
         if disabled:
             self.stats.sources_disabled = disabled
 
@@ -445,6 +477,12 @@ class Pipeline:
             s for s in self.sources if s not in _SERIAL_SOURCES and s in REGISTRY
         ]
         serial = [s for s in self.sources if s in _SERIAL_SOURCES and s in REGISTRY]
+        steps = order_run(self.cfg, serial)
+        serial_names: list[str] = []
+        for step in steps:
+            serial_names.append(step.name)
+            if step.partner:
+                serial_names.append(step.partner)
         pending: list[tuple[Item, list[str]]] = []
         queue_lock = threading.Lock()
 
@@ -455,7 +493,7 @@ class Pipeline:
             if attempts is None:
                 return  # resolved (ok or terminal)
             lanes = self._lanes_for(item)
-            next_serial = next((s for s in serial if s in lanes), None)
+            next_serial = next((s for s in serial_names if s in lanes), None)
             if next_serial:
                 with queue_lock:
                     pending.append((item, attempts))
@@ -478,15 +516,19 @@ class Pipeline:
 
         if pending and not self._stop.is_set():
             still = pending
-            for name in serial:
+            for step in steps:
                 if self._stop.is_set():
                     return
-                if name == "browser_agent":
+                if step.name == "browser_agent" or step.partner == "browser_agent":
                     release_browser_for_agent(self)
-                if name == "scihub":
+                if step.partner:
+                    still = self._phase_interleave(still, step.name, step.partner)
+                elif step.name == "scihub":
                     still = self._phase_scihub(still)
                 else:
-                    still = self._phase_serial(still, name)
+                    still = self._phase_serial(
+                        still, step.name, htmlpdf_scope=step.htmlpdf_scope
+                    )
             if self._stop.is_set():
                 return
             for item, attempts in still:
@@ -549,17 +591,76 @@ class Pipeline:
         return attempts
 
     # ---- phase 2: campus EZProxy, serial ------------------------------------
+    def _htmlpdf_deferred(
+        self, item: Item, name: str, htmlpdf_scope: str
+    ) -> bool:
+        if name != "htmlpdf" or htmlpdf_scope == "all":
+            return False
+        academic = academic_htmlpdf_item(item, self.cfg)
+        if htmlpdf_scope == "web" and academic:
+            return True
+        return htmlpdf_scope == "academic" and not academic
+
+    def _phase_one(
+        self, name: str, item: Item, attempts: list[str]
+    ) -> tuple[str, bool]:
+        """Try one serial source on one item.
+
+        Returns ``(status, called_find)``. Status is hit, still, ezproxy_down,
+        scholar_down, agent_down, or serpapi_down.
+        """
+        lanes = self._lanes_for(item)
+        if self._skip_source(item, name, lanes, attempts):
+            return "still", False
+        if skip_recover_without_lane_failure(self, name, item, attempts):
+            return "still", False
+        self._log_item(item, f"[dim]{name}: checking...[/]")
+        cand = REGISTRY[name].find(item, self.ctx)
+        if name == "browser_agent" and cand.outcome is Outcome.FOUND:
+            self._note_agent_after_playwright(item, cand, attempts)
+        note = f"({cand.note})" if cand.note else ""
+        attempts.append(f"{name}:{cand.outcome.value}{note}")
+        with self._stats_lock:
+            self.stats.note_source(name, cand.outcome.value)
+        self._log_source_result(item, name, cand)
+        self._maybe_trip_circuit(name, cand)
+        if cand.outcome is Outcome.FOUND and self._try_download(item, cand, attempts):
+            self.progress()
+            return "hit", True
+        if cand.outcome is Outcome.ERROR and "session expired" in (cand.note or ""):
+            self._mark_ezproxy_down()
+            return "ezproxy_down", True
+        if name == "browser_agent" and cand.outcome is Outcome.CAPTCHA:
+            self._mark_browser_agent_down()
+            return "agent_down", True
+        if name == "scholar" and _scholar_blocked(cand):
+            self._mark_scholar_down(cand.note or cand.outcome.value)
+            return "scholar_down", True
+        if name == "serpapi" and _serpapi_blocked(cand):
+            self._mark_serpapi_down(cand.note or cand.outcome.value)
+            return "serpapi_down", True
+        return "still", True
+
     def _phase_serial(
-        self, queue: list[tuple[Item, list[str]]], name: str
+        self,
+        queue: list[tuple[Item, list[str]]],
+        name: str,
+        *,
+        htmlpdf_scope: str = "all",
     ) -> list[tuple[Item, list[str]]]:
-        """Try a serial source; return items that still need Sci-Hub / finish_miss."""
-        self._emit(f"[bold]-- {name}[/] ({len(queue)} remaining)")
+        """Try a serial source; return items that still need later phases."""
+        label = name if htmlpdf_scope == "all" else f"{name} ({htmlpdf_scope})"
+        self._emit(f"[bold]-- {label}[/] ({len(queue)} remaining)")
         if name == "ezproxy" and self._ezproxy_down:
             return self._skip_ezproxy(queue)
         if name == "browser_agent" and self._browser_agent_down:
             return self._skip_browser_agent(queue)
         if name == "scholar" and self._scholar_down:
             return self._skip_scholar(queue)
+        if name == "serpapi" and self._serpapi_down:
+            return self._skip_serpapi(queue, reason="quota")
+        if name == "serpapi" and self._serpapi_over_budget():
+            return self._skip_serpapi(queue, reason="max_calls")
         still: list[tuple[Item, list[str]]] = []
         lo, hi = self.cfg.delay_scihub_s
         first = True
@@ -567,46 +668,88 @@ class Pipeline:
             if self._stop.is_set():
                 still.extend(queue[idx:])
                 return still
+            if self._htmlpdf_deferred(item, name, htmlpdf_scope):
+                still.append((item, attempts))
+                continue
             if not first:
                 time.sleep(random.uniform(min(lo, 1.0), min(hi, 3.0)))
             first = False
-            lanes = self._lanes_for(item)
-            if self._skip_source(item, name, lanes, attempts):
-                still.append((item, attempts))
+            status, called = self._phase_one(name, item, attempts)
+            if name == "serpapi" and called:
+                self._serpapi_calls += 1
+            if status == "hit":
                 continue
-            if skip_recover_without_lane_failure(self, name, item, attempts):
-                still.append((item, attempts))
-                continue
-            self._log_item(item, f"[dim]{name}: checking...[/]")
-            cand = REGISTRY[name].find(item, self.ctx)
-            if name == "browser_agent" and cand.outcome is Outcome.FOUND:
-                self._note_agent_after_playwright(item, cand, attempts)
-            note = f"({cand.note})" if cand.note else ""
-            attempts.append(f"{name}:{cand.outcome.value}{note}")
-            with self._stats_lock:
-                self.stats.note_source(name, cand.outcome.value)
-            self._log_source_result(item, name, cand)
-            self._maybe_trip_circuit(name, cand)
-            if cand.outcome is Outcome.FOUND and self._try_download(
-                item, cand, attempts
-            ):
-                self.progress()
-                continue
-            if cand.outcome is Outcome.ERROR and "session expired" in (cand.note or ""):
-                self._mark_ezproxy_down()
-                still.append((item, attempts))
-                still.extend(self._skip_ezproxy(queue[idx + 1 :]))
+            still.append((item, attempts))
+            rest = queue[idx + 1 :]
+            if status == "ezproxy_down":
+                still.extend(self._skip_ezproxy(rest))
                 return still
-            if name == "browser_agent" and cand.outcome is Outcome.CAPTCHA:
-                self._mark_browser_agent_down()
-                still.append((item, attempts))
-                still.extend(self._skip_browser_agent(queue[idx + 1 :]))
+            if status == "agent_down":
+                still.extend(self._skip_browser_agent(rest))
                 return still
-            if name == "scholar" and _scholar_blocked(cand):
-                self._mark_scholar_down(cand.note or cand.outcome.value)
-                still.append((item, attempts))
-                still.extend(self._skip_scholar(queue[idx + 1 :]))
+            if status == "scholar_down":
+                still.extend(self._skip_scholar(rest))
                 return still
+            if status == "serpapi_down":
+                still.extend(self._skip_serpapi(rest, reason="quota"))
+                return still
+            if name == "serpapi" and self._serpapi_over_budget():
+                still.extend(self._skip_serpapi(rest, reason="max_calls"))
+                return still
+        return still
+
+    def _phase_interleave(
+        self,
+        queue: list[tuple[Item, list[str]]],
+        first: str,
+        second: str,
+    ) -> list[tuple[Item, list[str]]]:
+        """One ``first`` try, then ``second`` on the same item if still missing.
+
+        Sleep between Scholar queries only when the previous Scholar call was
+        not followed by ``browser_agent`` (the agent wall clock is the backoff).
+        """
+        self._emit(f"[bold]-- {first}+{second}[/] ({len(queue)} remaining)")
+        still: list[tuple[Item, list[str]]] = []
+        lo, hi = self.cfg.delay_scihub_s
+        need_gap = False
+        for idx, (item, attempts) in enumerate(queue):
+            if self._stop.is_set():
+                still.extend(queue[idx:])
+                return still
+            if first == "scholar" and self._scholar_down:
+                self._note_scholar_skipped(item, attempts)
+            else:
+                if first == "scholar" and need_gap:
+                    time.sleep(random.uniform(min(lo, 1.0), min(hi, 3.0)))
+                    need_gap = False
+                status, called = self._phase_one(first, item, attempts)
+                if status == "hit":
+                    if first == "scholar" and called:
+                        need_gap = True
+                    continue
+                if status == "ezproxy_down":
+                    still.append((item, attempts))
+                    still.extend(self._skip_ezproxy(queue[idx + 1 :]))
+                    return still
+                if status == "scholar_down":
+                    pass  # still try the agent on this item
+                elif first == "scholar" and called:
+                    need_gap = True
+            ran_second = False
+            if second == "browser_agent" and self._browser_agent_down:
+                self._note_agent_skipped(item, attempts)
+            else:
+                status, called_second = self._phase_one(second, item, attempts)
+                ran_second = called_second
+                if status == "hit":
+                    continue
+                if status == "agent_down":
+                    still.append((item, attempts))
+                    still.extend(self._skip_browser_agent(queue[idx + 1 :]))
+                    return still
+            if ran_second and first == "scholar":
+                need_gap = False
             still.append((item, attempts))
         return still
 
@@ -619,16 +762,61 @@ class Pipeline:
             "this run.[/] Use --handoff for the remaining misses."
         )
 
+    def _note_scholar_skipped(self, item: Item, attempts: list[str]) -> None:
+        if "scholar" not in self._applicable(item):
+            return
+        attempts.append("scholar:skipped(blocked)")
+        with self._stats_lock:
+            self.stats.note_source("scholar", "skipped")
+        self._log_item(item, "scholar: [dim]skipped[/] (blocked this run)")
+
     def _skip_scholar(
         self, queue: list[tuple[Item, list[str]]]
     ) -> list[tuple[Item, list[str]]]:
         for item, attempts in queue:
-            if "scholar" not in self._applicable(item):
+            self._note_scholar_skipped(item, attempts)
+        return queue
+
+    def _note_agent_skipped(self, item: Item, attempts: list[str]) -> None:
+        attempts.append("browser_agent:skipped(bot wall)")
+        with self._stats_lock:
+            self.stats.note_source("browser_agent", "skipped")
+        self._log_item(item, "browser_agent: [dim]skipped[/] (bot wall)")
+
+    def _serpapi_over_budget(self) -> bool:
+        cap = self.cfg.serpapi_max_calls
+        return cap > 0 and self._serpapi_calls >= cap
+
+    def _mark_serpapi_down(self, why: str) -> None:
+        if self._serpapi_down:
+            return
+        self._serpapi_down = True
+        self._emit(
+            f"[yellow]serpapi blocked ({escape(why)}); skipping it for the rest of "
+            "this run.[/]"
+        )
+
+    def _skip_serpapi(
+        self,
+        queue: list[tuple[Item, list[str]]],
+        *,
+        reason: str = "quota",
+    ) -> list[tuple[Item, list[str]]]:
+        if reason == "max_calls" and not self._serpapi_capped:
+            self._serpapi_capped = True
+            cap = self.cfg.serpapi_max_calls
+            self._emit(
+                f"[yellow]serpapi hit max_calls ({cap}); skipping it for the rest of "
+                "this run.[/]"
+            )
+        label = "max_calls" if reason == "max_calls" else "quota"
+        for item, attempts in queue:
+            if "serpapi" not in self._applicable(item):
                 continue
-            attempts.append("scholar:skipped(blocked)")
+            attempts.append(f"serpapi:skipped({label})")
             with self._stats_lock:
-                self.stats.note_source("scholar", "skipped")
-            self._log_item(item, "scholar: [dim]skipped[/] (blocked this run)")
+                self.stats.note_source("serpapi", "skipped")
+            self._log_item(item, f"serpapi: [dim]skipped[/] ({label} this run)")
         return queue
 
     def _mark_browser_agent_down(self) -> None:
@@ -644,10 +832,7 @@ class Pipeline:
     ) -> list[tuple[Item, list[str]]]:
         still: list[tuple[Item, list[str]]] = []
         for item, attempts in queue:
-            attempts.append("browser_agent:skipped(bot wall)")
-            with self._stats_lock:
-                self.stats.note_source("browser_agent", "skipped")
-            self._log_item(item, "browser_agent: [dim]skipped[/] (bot wall)")
+            self._note_agent_skipped(item, attempts)
             still.append((item, attempts))
         return still
 
@@ -841,9 +1026,13 @@ class Pipeline:
     def _applicable(self, item: Item) -> list[str]:
         configured = [s for s in self.sources if s in REGISTRY]
         if self.try_all:
-            from .routing import place_academic_htmlpdf
+            from .routing import apply_fetch_order, place_academic_htmlpdf
 
-            return place_academic_htmlpdf(configured, self.cfg, item)
+            return apply_fetch_order(
+                self.cfg,
+                place_academic_htmlpdf(configured, self.cfg, item),
+                item,
+            )
         return sources_for_item(item, self.cfg, configured)
 
     def _lanes_for(self, item: Item) -> list[str]:

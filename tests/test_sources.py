@@ -49,6 +49,7 @@ def test_registry_has_every_planned_source_and_scihub_is_opt_in():
         "core",
         "openaire",
         "scholar",
+        "serpapi",
         "direct",
         "ezproxy",
         "htmlpdf",
@@ -67,6 +68,7 @@ def test_registry_has_every_planned_source_and_scihub_is_opt_in():
     assert all(s in REGISTRY for s in DEFAULT_SOURCES)
     assert "scihub" in REGISTRY
     assert "scholar" in REGISTRY
+    assert "serpapi" in REGISTRY
 
 
 # ---- unpaywall ---------------------------------------------------------------

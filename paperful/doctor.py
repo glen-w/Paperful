@@ -236,6 +236,19 @@ def remediation_text(
             "`paperful snapshot -C …` (or `--library`) to move them into "
             "item folders. `[mirror].pdfs` is all, lazy, or none."
         )
+    if check.name == "ResearchGate request":
+        return (
+            "Opt-in [request].channels includes rg. Paperful only opens an existing "
+            "ResearchGate publication URL in your system browser. Click Request "
+            "full-text yourself (RG ToS). There is no vault click and no RG search. "
+            "Items without a researchgate.net/publication URL are skipped."
+        )
+    if check.name == "Twenty":
+        return (
+            f"Edit {cfg_hint} [twenty]: enabled = true, base_url = your workspace "
+            "(or TWENTY_BASE_URL), and set env TWENTY_API_KEY. Then: "
+            "paperful twenty lookup -C … (dry-run) / --apply. Read-only; no mail."
+        )
     return None
 
 
@@ -522,6 +535,59 @@ def run_checks(
             )
     else:
         checks.append(Check("Scholar", "green", "not in sources"))
+
+    if cfg.serpapi_enabled:
+        from .routing import serpapi_api_key
+
+        if serpapi_api_key():
+            checks.append(
+                Check(
+                    "SerpApi",
+                    "green",
+                    f"SERPAPI_API_KEY set; max_calls={cfg.serpapi_max_calls} "
+                    "(0 = unlimited; no paid probe)",
+                )
+            )
+        else:
+            checks.append(
+                Check(
+                    "SerpApi",
+                    "amber",
+                    "enabled but SERPAPI_API_KEY is unset",
+                    code="serpapi_key",
+                )
+            )
+
+    from .author_request import rg_handoff_enabled
+
+    if rg_handoff_enabled(cfg):
+        checks.append(
+            Check(
+                "ResearchGate request",
+                "amber",
+                "handoff-only (ToS: you click Request full-text). Needs an existing "
+                "researchgate.net/publication URL on the item. Paperful never clicks "
+                "and does not search RG.",
+                code="rg_handoff",
+            )
+        )
+
+    if cfg.twenty_enabled:
+        from .twenty import twenty_api_key, twenty_base_url
+
+        if twenty_api_key() and twenty_base_url(cfg):
+            checks.append(
+                Check("Twenty", "green", "enabled (no live probe; lookup is read-only)")
+            )
+        else:
+            checks.append(
+                Check(
+                    "Twenty",
+                    "amber",
+                    "enabled but TWENTY_API_KEY or [twenty].base_url is unset",
+                    code="twenty_key",
+                )
+            )
 
     if shutil.which("pdftotext"):
         checks.append(Check("pdftotext", "green", "on PATH"))

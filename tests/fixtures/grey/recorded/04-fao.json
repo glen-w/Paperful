@@ -1,0 +1,24 @@
+{
+  "playbook": "fao",
+  "url": "https://www.fao.org/3/ca9229en/ca9229en.htm",
+  "extra": "",
+  "note": "document: SOFIA 2020 /3/{code}/ rewrite",
+  "stamp": "fao",
+  "status": "miss",
+  "chosen": "https://www.fao.org/3/ca9229en/ca9229en.pdf",
+  "resolved": "https://www.fao.org/3/ca9229en/ca9229en.pdf",
+  "detail": "ConnectTimeout",
+  "nbytes": 0,
+  "checked": [
+    {
+      "url": "https://www.fao.org/3/ca9229en/ca9229en.pdf",
+      "pdf": false,
+      "nbytes": 0,
+      "status_code": 0,
+      "detail": "ConnectTimeout"
+    }
+  ],
+  "probed_at": "2026-10-05T14:43:35+00:00",
+  "anchors": [],
+  "metas": []
+}

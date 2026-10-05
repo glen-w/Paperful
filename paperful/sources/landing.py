@@ -210,20 +210,10 @@ def extract_pdf_urls(
             href, combined, scrape_pbs
         )
         if href_hit or text_hit or scrape_hit:
-            prefer = href_hit or looks_like_pdf_url(href) or scrape_hit
-            abs_u = urljoin(base_url, href.strip())
-            host = (urlparse(abs_u).hostname or "").lower()
-            if (
-                base_host
-                and host
-                and (
-                    host == base_host
-                    or host.endswith("." + base_host)
-                    or base_host.endswith("." + host)
-                )
-            ):
-                prefer = True
-            add(href, prefer=prefer)
+            # PDF-shaped hrefs outrank section paths (/meetings/, /iris/, a bare
+            # "download"). Same-origin menu hits stay in the second bucket so
+            # they cannot hide a PDF, including one on another host.
+            add(href, prefer=href_hit or looks_like_pdf_url(href))
 
     m = re.search(r"/pii/([A-Z0-9]+)", base_url, re.I) or re.search(
         r"/pii/([A-Z0-9]+)", html, re.I

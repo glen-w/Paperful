@@ -88,9 +88,22 @@ def test_source_applicable_by_metadata(cfg):
     )
 
 
-def test_sources_for_item_preserves_config_order(cfg):
+def test_sources_for_item_policy_moves_scihub_to_the_tail(cfg):
     item = make_item(doi="10.1000/x")
     cfg.email = "test@example.org"
+    ordered = ["openalex", "unpaywall", "scihub", "direct"]
+    assert sources_for_item(item, cfg, ordered) == [
+        "openalex",
+        "unpaywall",
+        "direct",
+        "scihub",
+    ]
+
+
+def test_sources_for_item_list_order_preserves_config(cfg):
+    item = make_item(doi="10.1000/x")
+    cfg.email = "test@example.org"
+    cfg.fetch_order = "list"
     ordered = ["openalex", "unpaywall", "scihub", "direct"]
     assert sources_for_item(item, cfg, ordered) == [
         "openalex",

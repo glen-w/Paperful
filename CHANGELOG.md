@@ -8,6 +8,30 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ### Added
 
+- `paperful playbooks probe --corpus FILE` fetches each grey-playbook target
+  and passes only when the first candidate is a real PDF (at least
+  `--min-bytes`, default 10KB). `--save` writes a replay snapshot. The public
+  corpus is `tests/fixtures/grey/corpus.toml`. PDF-shaped links rank ahead of
+  section paths such as `/meetings/` or `/iris/`.
+- Scholar late tail: `[fetch].order = "policy"` (default) runs opted-in Google
+  Scholar after campus/grey, interleaved with `browser_agent` when that lane is
+  on (`[scholar].when = auto|phase|interleave`). `[handoff].scholar` adds a
+  Scholar results URL for misses. Opt-in `[serpapi].enabled` plus env
+  `SERPAPI_API_KEY` is a paid Scholar **link-discovery** lane after local
+  routes (`[serpapi].max_calls`, default 20, `0` unlimited; `--serpapi-max`
+  per run). See [SerpApi](docs/serpapi.md).
+
+### Changed
+
+- The builtin ocean grey pack adds `rfmo-docs`, `iucn-dosi`, and
+  `thinktank-ocean`, and no longer includes IEA, IRENA, OECD, or WHO.
+  Those four, plus UNEP and UNDP, ship as optional copies in
+  `paperful/data/grey_playbooks_examples/`. Point `grey_playbooks_dir` at
+  that folder, or copy the files into your own packs directory. The ocean
+  builtin stays on by default and is not in that folder.
+
+### Added
+
 - Snowball `--dedupe-scope` on crawl/run/resume/apply/watch; `--seeds-file`
   (DOI/ORCID lists); trailing `*` keyword stem expansion; `--dedupe-after
   classify|apply`; opt-in `--author-site-preflight` (co-author graph + proposed

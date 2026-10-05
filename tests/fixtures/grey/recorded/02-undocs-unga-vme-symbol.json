@@ -1,0 +1,24 @@
+{
+  "playbook": "undocs-unga-vme-symbol",
+  "url": "",
+  "extra": "UNGA A/RES/61/105",
+  "note": "document: symbol in Extra, no item URL",
+  "stamp": "undocs-unga-vme-symbol",
+  "status": "miss",
+  "chosen": "https://undocs.org/pdf?symbol=A%2FRES%2F61%2F105",
+  "resolved": "https://undocs.org/pdf?symbol=A%2FRES%2F61%2F105",
+  "detail": "not a PDF",
+  "nbytes": 3916,
+  "checked": [
+    {
+      "url": "https://docs.un.org/pdf?symbol=A%2FRES%2F61%2F105",
+      "pdf": false,
+      "nbytes": 3916,
+      "status_code": 200,
+      "detail": "not a PDF"
+    }
+  ],
+  "probed_at": "2026-10-05T14:43:17+00:00",
+  "anchors": [],
+  "metas": []
+}

@@ -103,7 +103,8 @@ app_name = "paperful"
 mirror_failures_before_skip = 3
 
 # Grey literature playbooks (rewrite / scrape / synthesize). Builtin pack =
-# UNGA/undocs · BBNJ/DOALOS · ISA (+ FAO, OECD, IEA, WHO examples) — not product core.
+# UNGA/undocs · BBNJ/DOALOS · ISA + FAO, RFMO, IUCN/DOSI, IDDRI/Pew.
+# Optional copies (IEA/IRENA, OECD/WHO/UNEP/UNDP): paperful/data/grey_playbooks_examples/
 # grey_playbooks_builtin = true
 # Optional directory of extra pack TOML files (merged after builtin, before inline).
 # Relative paths resolve against this config file's folder (Compose: packs/ under /data).
@@ -165,9 +166,19 @@ mirror_failures_before_skip = 3
 # [browser_agent]
 # max_steps = 20
 # max_wall_s = 300
-# during_run = true              # last serial lane after Scholar / EZProxy / htmlpdf fail
+# during_run = true              # last serial lane; policy mode pairs Scholar immediately before it
 #                                # override per run: --browser-agent / --no-browser-agent
 # # model = "qwen2.5:14b"        # larger model for browsing only
+
+# [fetch]
+# order = "policy"               # policy | list — list honors the sources array as written
+# [scholar]
+# when = "auto"                  # auto | phase | interleave (auto pairs with browser_agent)
+# [serpapi]
+# enabled = false                # paid Scholar link discovery; needs SERPAPI_API_KEY
+# max_calls = 20                 # paid searches this run; 0 = unlimited. --serpapi-max overrides
+# [handoff]
+# scholar = true                 # open Scholar in the system browser when there is no PDF URL
 
 # Manual PDF handoff after soft-blocked OA misses (gaps --list-missing / --handoff).
 # [gaps]

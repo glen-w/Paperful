@@ -1,0 +1,24 @@
+{
+  "playbook": "undocs-unga-vme",
+  "url": "https://undocs.org/en/A/75/157",
+  "extra": "",
+  "note": "document: SG report symbol rewrite",
+  "stamp": "undocs-unga-vme",
+  "status": "miss",
+  "chosen": "https://undocs.org/pdf?symbol=A%2F75%2F157",
+  "resolved": "https://undocs.org/pdf?symbol=A%2F75%2F157",
+  "detail": "not a PDF",
+  "nbytes": 3916,
+  "checked": [
+    {
+      "url": "https://docs.un.org/pdf?symbol=A%2F75%2F157",
+      "pdf": false,
+      "nbytes": 3916,
+      "status_code": 200,
+      "detail": "not a PDF"
+    }
+  ],
+  "probed_at": "2026-10-05T14:43:16+00:00",
+  "anchors": [],
+  "metas": []
+}

@@ -49,12 +49,18 @@ The landing page is the short version of this story.
 Default order: Unpaywall, OpenAlex, arXiv, bioRxiv/medRxiv, Europe PMC,
 Semantic Scholar, CORE, OpenAIRE, the item’s own URL, campus EZProxy, then
 print-to-PDF for web items. Google Scholar and Sci-Hub stay off until you
-put them in `sources`. Sci-Hub coverage after about 2021 is thin; recent
+put them in `sources`. When Scholar is on, it runs **late** (one try before
+browser recovery, or one late phase if recovery is off), not in the middle of
+campus/grey. `[fetch].order = "list"` keeps the `sources` array order instead.
+Sci-Hub coverage after about 2021 is thin; recent
 paywalled papers are a campus-access problem when your library has the
 subscription.
 
-Open-access sources can run in parallel. Scholar, Sci-Hub, EZProxy, and
-print-to-PDF stay one-at-a-time — they share a browser profile.
+Open-access sources can run in parallel. Scholar, Sci-Hub, EZProxy,
+print-to-PDF, and opt-in [SerpApi](serpapi.md) stay one-at-a-time — they share a browser
+profile or a paid quota. SerpApi is never a silent default; when you turn it
+on, `[serpapi].max_calls` (default 20, `0` unlimited) or `--serpapi-max`
+limits paid searches that run.
 
 Per-item routing is on by default: a journal article with a DOI is not sent
 to every site. The log line `trying: …` is that shorter lane, not the full

@@ -1,13 +1,19 @@
-# Pre-rolled ocean / governance grey-lit packs — not product core.
+# Ocean / governance grey-lit example pack — proposed builtin replacement.
 # Disable with grey_playbooks_builtin = false, or override any name via [[grey_playbooks]].
 #
-# Named packs (BBNJ product):
-#   undocs-unga-vme      — UNGA resolutions & SG reports (undocs / daccess)
-#   bbnj-doalos-prepcom  — BBNJ Agreement + DOALOS landings (+ NGO mirrors)
-#   isa-deepdata         — International Seabed Authority document landings
-# Plus generic examples: FAO rewrite, IRENA/OECD/IEA/WHO scrape hints.
+# Diff vs current shipped file: DROP iea/irena/oecd/who (moved to energy + intl-orgs
+# example files for grey_playbooks_dir). ADD rfmo-docs, iucn-dosi, thinktank-ocean.
+#
+# Named playbooks:
+#   undocs-unga-vme (+ -symbol) — UNGA resolutions & SG reports
+#   bbnj-doalos-prepcom          — BBNJ + DOALOS (+ HSA / IISD mirrors)
+#   isa-deepdata                 — ISA document landings
+#   fao                          — FAO /3/{code} rewrite
+#   rfmo-docs                    — SPRFMO / NEAFC / CCAMLR landings
+#   iucn-dosi                    — IUCN / DOSI briefs
+#   thinktank-ocean              — IDDRI + Pew only (not High Seas Alliance)
 
-# --- Pack: undocs-unga-vme ---------------------------------------------------
+# --- undocs-unga-vme ---------------------------------------------------------
 
 [[grey_playbooks]]
 name = "undocs-unga-vme"
@@ -28,28 +34,26 @@ match_re = '''(?ix)\b(
 )\b'''
 pdf_template = "https://undocs.org/pdf?symbol={0}"
 
-# --- Pack: bbnj-doalos-prepcom -----------------------------------------------
+# --- bbnj-doalos-prepcom -----------------------------------------------------
 
 [[grey_playbooks]]
 name = "bbnj-doalos-prepcom"
 kind = "scrape"
-# Direct .pdf under /bbnjagreement/ or /depts/los/ is handled by direct (no rewrite).
-# Landing scrape: same-origin PDF / Download / sites/default/files.
-# NGO mirrors (highseasalliance, ENB/IISD) as secondary PDF link hosts.
+# Owns all of un.org (first-match-wins). Do not add un.org hosts to intl-orgs.
+# NGO mirrors: highseasalliance, ENB/IISD.
 hosts = ["un.org", "highseasalliance.org", "iisd.org"]
 href_re = '''(?i)\.pdf(?:\?|$)|/sites/default/files/|/wp-content/uploads/|/bitstream/|download|/depts/los/|/bbnjagreement/'''
 
-# --- Pack: isa-deepdata ------------------------------------------------------
+# --- isa-deepdata ------------------------------------------------------------
 
 [[grey_playbooks]]
 name = "isa-deepdata"
 kind = "scrape"
-# isa.org.jm news / documents / Deep Data announcements → same-origin PDF/download.
-# OBIS/ODIS cross-links are reference-only (href_re does not treat APIs as PDFs).
+# OBIS/ODIS cross-links are reference-only.
 hosts = ["isa.org.jm"]
 href_re = '''(?i)\.pdf(?:\?|$)|/wp-content/uploads/|/documents/|/bitstream/|download'''
 
-# --- Other ocean/gov examples ------------------------------------------------
+# --- fao ---------------------------------------------------------------------
 
 [[grey_playbooks]]
 name = "fao"
@@ -58,26 +62,28 @@ hosts = ["fao.org", "documents.fao.org"]
 url_re = '''(?i)(?:www\.)?(?:documents\.)?fao\.org/3/(?P<code>[a-z0-9]+)/'''
 pdf_template = "https://www.fao.org/3/{code}/{code}.pdf"
 
-[[grey_playbooks]]
-name = "irena_scrape"
-kind = "scrape"
-hosts = ["irena.org"]
-href_re = '''(?i)\.pdf(?:\?|$)'''
+# --- rfmo-docs (NEW) ---------------------------------------------------------
 
 [[grey_playbooks]]
-name = "oecd_scrape"
+name = "rfmo-docs"
 kind = "scrape"
-hosts = ["oecd.org", "oecd-ilibrary.org"]
-href_re = '''(?i)/download/|\.pdf(?:\?|$)'''
+# FAO stays on `fao`. Do not add fao.org here.
+hosts = ["sprfmo.int", "neafc.org", "ccamlr.org"]
+href_re = '''(?i)\.pdf(?:\?|$)|/publications/|/documents/|/wp-content/uploads/|download|/meetings/'''
+
+# --- iucn-dosi (NEW) ---------------------------------------------------------
 
 [[grey_playbooks]]
-name = "iea_scrape"
+name = "iucn-dosi"
 kind = "scrape"
-hosts = ["iea.org"]
-href_re = '''(?i)/files/|/dl/|\.pdf(?:\?|$)'''
+hosts = ["iucn.org", "dosi-project.org"]
+href_re = '''(?i)\.pdf(?:\?|$)|/sites/default/files/|/wp-content/uploads/|/resources/|download'''
+
+# --- thinktank-ocean (NEW) ---------------------------------------------------
 
 [[grey_playbooks]]
-name = "who_scrape"
+name = "thinktank-ocean"
 kind = "scrape"
-hosts = ["who.int"]
-href_re = '''(?i)/iris/|\.pdf(?:\?|$)|download'''
+# High Seas Alliance stays on bbnj-doalos-prepcom — do not list it here.
+hosts = ["iddri.org", "pewtrusts.org"]
+href_re = '''(?i)\.pdf(?:\?|$)|/sites/default/files/|/wp-content/uploads/|/en/publications/|download'''

@@ -159,7 +159,7 @@ below.
 | `summarize` | `llm.enabled` | `state/summaries/<key>.html` when dest includes disk | child note unless `--to disk` |
 | `synthesize` | `llm.enabled` | `state/reports/<slug>.html` when dest includes disk | standalone note in the scoped collection unless `--to disk` |
 
-`browser_agent` is a registered **serial** source but never in `DEFAULT_SOURCES`. `run` auto-appends it after Scholar / EZProxy / htmlpdf when `[llm].enabled` and `[browser_agent].during_run` (default on) and the extra is importable; the agent runs only if one of those vault lanes was tried and failed. `--browser-agent` / `--no-browser-agent` on `run` or `all` override `during_run` for that invocation. Before that phase the pipeline closes `BrowserSession` so browser-use can own the vault Chromium profile. `paperful recover --item` builds the pipeline with `use_browser=False` and only that source. Hard CAPTCHAs end as `captcha`, not auto-solved. `summarize` refuses items the gated identity check flags unless `--force`.
+`browser_agent` is a registered **serial** source but never in `DEFAULT_SOURCES`. `run` auto-appends it when `[llm].enabled` and `[browser_agent].during_run` (default on) and the extra is importable. Default `[fetch].order = "policy"` places Scholar (if opted in) immediately before the agent, **interleaved** per item so a Scholar hit skips the agent; `[fetch].order = "list"` inserts the agent after the last of scholar / ezproxy / htmlpdf as before. The agent runs only if one of those vault lanes was tried and failed. `--browser-agent` / `--no-browser-agent` on `run` or `all` override `during_run` for that invocation. Before that phase the pipeline closes `BrowserSession` so browser-use can own the vault Chromium profile. Opt-in **SerpApi** (`[serpapi].enabled`, env `SERPAPI_API_KEY`) is a later serial Scholar-engine search; `[serpapi].max_calls` / `--serpapi-max` cap paid calls (see [SerpApi](serpapi.md)). `paperful recover --item` builds the pipeline with `use_browser=False` and only that source. Hard CAPTCHAs end as `captcha`, not auto-solved. `summarize` refuses items the gated identity check flags unless `--force`.
 
 ## Identifiers and lint
 
@@ -343,8 +343,12 @@ dir pack (names start with `learned-`); it is not shipped in the wheel.
 Knobs and the propose/promote commands: [Sessions](sessions.md) and
 [Configuration](config.md). A builtin
 **ocean/governance example pack** (`paperful/data/grey_playbooks_ocean.toml`)
-ships named grey-lit packs plus FAO/OECD/IEA/WHO examples — not core product
-logic; set `grey_playbooks_builtin = false` or override by `name`.
+ships the named grey-lit packs below, plus FAO, RFMO, IUCN/DOSI, and IDDRI/Pew.
+IEA/IRENA and OECD/WHO/UNEP/UNDP are optional files in
+`paperful/data/grey_playbooks_examples/` (load them with `grey_playbooks_dir`).
+The pack is not core product logic; set `grey_playbooks_builtin = false` or
+override by `name`. A matching host is a URL→PDF recipe for an item already in
+the library. Provenance stays `grey:<playbook-name>`.
 Skip-host item URLs (YouTube, Scholar, …) still allow Extra/title synthesize.
 Domain-agnostic OA rewrites (PMC, arXiv, HAL) and DSpace/OAI stay in code.
 DOI-less `report` / `document` items can fall through to `htmlpdf`. Campus
@@ -359,6 +363,23 @@ DOI-less items (no quota burn on institutional reports).
 | `undocs-unga-vme-symbol` | Extra/title symbols `A/RES/…`, `A/N/N`, `A/CONF.…`, `A/AC.…`, `ISBA/…`, `S/…` | `synthesize` → same undocs PDF URL |
 | `bbnj-doalos-prepcom` | `un.org` (`/bbnjagreement/`, `/depts/los/`), `highseasalliance.org`, `iisd.org` (ENB) | `scrape` first same-origin `.pdf` / `sites/default/files` / Download; direct `.pdf` URLs need no rewrite |
 | `isa-deepdata` | `isa.org.jm` (documents / news landings) | `scrape` same-origin PDF/download; OBIS/ODIS links are not treated as PDF sources |
+| `fao` | `fao.org`, `documents.fao.org` | `rewrite` `/3/{code}/` → `https://www.fao.org/3/{code}/{code}.pdf` |
+| `rfmo-docs` | `sprfmo.int`, `neafc.org`, `ccamlr.org` | `scrape` PDF / meetings / documents. `fao.org` stays on `fao` |
+| `iucn-dosi` | `iucn.org`, `dosi-project.org` | `scrape` PDF / `sites/default/files` / `/resources/` |
+| `thinktank-ocean` | `iddri.org`, `pewtrusts.org` | `scrape` PDF / `/en/publications/`. `highseasalliance.org` stays on `bbnj-doalos-prepcom` |
+
+Optional example packs (not loaded unless `grey_playbooks_dir` includes them):
+
+| Pack id | Hosts | File |
+| --- | --- | --- |
+| `iea_scrape` | `iea.org` | `grey_playbooks_examples/grey_playbooks_energy.toml` |
+| `irena_scrape` | `irena.org` (`.pdf` only) | same energy file |
+| `oecd_scrape` | `oecd.org`, `oecd-ilibrary.org` | `grey_playbooks_examples/grey_playbooks_intl_orgs.toml` |
+| `who_scrape` | `who.int` (`/iris/`) | same intl-orgs file |
+| `unep_scrape` | `unep.org`, `wedocs.unep.org` | same intl-orgs file |
+| `undp_scrape` | `undp.org` | same intl-orgs file |
+
+`un.org` belongs to `bbnj-doalos-prepcom`. The intl-orgs file does not list it.
 
 Smoke collections (dry-run): `HKF7T7EI` (UNGA/VME), `7R77ZJFH` / `XFD86ZFP` (BBNJ/PrepCom), `J2SEXDC5` (ISA).
 

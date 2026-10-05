@@ -1,0 +1,345 @@
+{
+  "playbook": "rfmo-docs",
+  "url": "https://www.neafc.org/managing_fisheries/measures",
+  "extra": "",
+  "note": "listing: NEAFC measures",
+  "stamp": "rfmo-docs",
+  "status": "miss",
+  "chosen": "https://www.neafc.org/basictexts",
+  "resolved": "https://www.neafc.org/managing_fisheries/measures",
+  "detail": "not a PDF",
+  "nbytes": 0,
+  "checked": [
+    {
+      "url": "https://www.neafc.org/basictexts",
+      "pdf": false,
+      "nbytes": 41455,
+      "status_code": 200,
+      "detail": "not a PDF"
+    }
+  ],
+  "probed_at": "2026-10-05T14:44:03+00:00",
+  "anchors": [
+    {
+      "href": "#main-content",
+      "text": "Skip to main content"
+    },
+    {
+      "href": "/",
+      "text": ""
+    },
+    {
+      "href": "/",
+      "text": "North-East Atlantic Fisheries Commission"
+    },
+    {
+      "href": "/",
+      "text": "Home"
+    },
+    {
+      "href": "/about",
+      "text": "About"
+    },
+    {
+      "href": "/basictexts",
+      "text": "Basic Texts"
+    },
+    {
+      "href": "/tor",
+      "text": "Terms of Reference - Committees and Working Groups"
+    },
+    {
+      "href": "/tor/pecmac",
+      "text": "Terms of Reference: PECMAC"
+    },
+    {
+      "href": "/tor/pecmas",
+      "text": "Terms of Reference: PECMAS"
+    },
+    {
+      "href": "/tor/jagdm",
+      "text": "Terms of Reference: JAGDM"
+    },
+    {
+      "href": "/tor/wgfn",
+      "text": "Terms of Reference: WGFN"
+    },
+    {
+      "href": "/tor/wgstats",
+      "text": "Terms of Reference: WGStats"
+    },
+    {
+      "href": "/page/18",
+      "text": "The Structure of NEAFC"
+    },
+    {
+      "href": "/neafc-subsidiary-bodies",
+      "text": "NEAFC Committees"
+    },
+    {
+      "href": "/page/29",
+      "text": "NEAFC Secretariat"
+    },
+    {
+      "href": "/coastalstates",
+      "text": "Coastal States"
+    },
+    {
+      "href": "/neafcguide",
+      "text": "FAQs About the Organisation"
+    },
+    {
+      "href": "/becomingacp",
+      "text": "Becoming a Contracting Party"
+    },
+    {
+      "href": "/performance-reviews",
+      "text": "Performance Reviews"
+    },
+    {
+      "href": "/press",
+      "text": "Press Releases"
+    },
+    {
+      "href": "/news",
+      "text": "News and Jobs"
+    },
+    {
+      "href": "/managing_fisheries",
+      "text": "Managing Fisheries"
+    },
+    {
+      "href": "/managing_fisheries/measures",
+      "text": "Management Measures"
+    },
+    {
+      "href": "/managing_fisheries/measures/current",
+      "text": "Current Measures"
+    },
+    {
+      "href": "/managing_fisheries/measures/pending",
+      "text": "Pending Measures"
+    },
+    {
+      "href": "/managing_fisheries/measures/objections-to-recommendations",
+      "text": "Objections to Recommendations"
+    },
+    {
+      "href": "/managing_fisheries/measures/historic",
+      "text": "Historic Measures"
+    },
+    {
+      "href": "/mcs/scheme",
+      "text": "About the NEAFC Scheme"
+    },
+    {
+      "href": "/scheme/ERS-Schemes",
+      "text": "NEAFC Scheme"
+    },
+    {
+      "href": "/scheme-changes",
+      "text": "Summarised Lists of Changes"
+    },
+    {
+      "href": "/managing_fisheries/measures/ra_map",
+      "text": "Map of the NEAFC Regulatory Areas"
+    },
+    {
+      "href": "/managing_fisheries/vmec",
+      "text": "VME and Closures"
+    },
+    {
+      "href": "/closures/coordinates",
+      "text": "Closed area Coordinates"
+    },
+    {
+      "href": "/page/closures",
+      "text": "Map: NEAFC Regulatory Areas with All Closures and Existing Areas"
+    },
+    {
+      "href": "/page/existingfishingareas",
+      "text": "Map: Existing Bottom Fishing Areas 2015 -2027"
+    },
+    {
+      "href": "/closures/blueling",
+      "text": "Map: Blue Ling Seasonal Closure 2013 - 2027"
+    },
+    {
+      "href": "/closures/hatton-rockall",
+      "text": "Map: Closures on the Hatton and Rockall Banks 2015 - 2027"
+    },
+    {
+      "href": "/closures/mid-atlantic",
+      "text": "Map: Mid-Atlantic VME Closures 2009 - 2027"
+    },
+    {
+      "href": "https://www.neafc.org/oecm",
+      "text": "Other Effective Area Based Conservation Measures (OECM)"
+    },
+    {
+      "href": "/neafc-vessel-register",
+      "text": "Notified Vessels"
+    },
+    {
+      "href": "/mdr",
+      "text": "Master Data Register"
+    },
+    {
+      "href": "/mcs",
+      "text": "Illegal Fishing"
+    },
+    {
+      "href": "/mcs/iuu",
+      "text": "NEAFC A and B Lists"
+    },
+    {
+      "href": "/mcs/iuu/alist",
+      "text": "IUU A List"
+    },
+    {
+      "href": "/mcs/iuu/blist",
+      "text": "IUU B List"
+    },
+    {
+      "href": "/mcs/iuu/delisted",
+      "text": "Vessels De-Listed from NEAFC IUU B List"
+    },
+    {
+      "href": "/mcs/iuu/guide",
+      "text": "Guide to the A and B List system"
+    },
+    {
+      "href": "/mcs/psc",
+      "text": "About Port-State Control"
+    },
+    {
+      "href": "/past_meetings",
+      "text": "Reports Archive"
+    },
+    {
+      "href": "/past_meetings",
+      "text": "Meeting Report Archive"
+    },
+    {
+      "href": "/pecmas/symposium",
+      "text": "PECMAS Symposium 2012"
+    },
+    {
+      "href": "https://psc.neafc.org",
+      "text": "psc.neafc.org"
+    },
+    {
+      "href": "/user/login",
+      "text": "Log in"
+    },
+    {
+      "href": "/user/register",
+      "text": "Create new account"
+    },
+    {
+      "href": "/user/password",
+      "text": "Request new password"
+    },
+    {
+      "href": "/managing_fisheries",
+      "text": "Managing Fisheries"
+    },
+    {
+      "href": "/managing_fisheries/measures",
+      "text": "Management Measures"
+    },
+    {
+      "href": "/managing_fisheries/measures/current",
+      "text": "Current Measures"
+    },
+    {
+      "href": "/managing_fisheries/measures/pending",
+      "text": "Pending Measures"
+    },
+    {
+      "href": "/managing_fisheries/measures/objections-to-recommendations",
+      "text": "Objections to Recommendations"
+    },
+    {
+      "href": "/managing_fisheries/measures/historic",
+      "text": "Historic Measures"
+    },
+    {
+      "href": "/mcs/scheme",
+      "text": "About the NEAFC Scheme"
+    },
+    {
+      "href": "/managing_fisheries/measures/ra_map",
+      "text": "Map of the NEAFC Regulatory Areas"
+    },
+    {
+      "href": "/managing_fisheries/vmec",
+      "text": "VME and Closures"
+    },
+    {
+      "href": "/neafc-vessel-register",
+      "text": "Notified Vessels"
+    },
+    {
+      "href": "/mdr",
+      "text": "Master Data Register"
+    },
+    {
+      "href": "/page/16",
+      "text": "Contact Us"
+    },
+    {
+      "href": "/basictexts",
+      "text": "Basic Texts"
+    },
+    {
+      "href": "/neafc-meetings",
+      "text": "NEAFC Meetings"
+    },
+    {
+      "href": "/coastalstatemeetings",
+      "text": "Coastal State Meetings"
+    },
+    {
+      "href": "/page/27",
+      "text": "Convention and Regulatory Areas"
+    },
+    {
+      "href": "/scheme/ERS-Schemes",
+      "text": "NEAFC Scheme"
+    },
+    {
+      "href": "/catch-stats",
+      "text": "Catch Statistics"
+    },
+    {
+      "href": "/collective-arrangement",
+      "text": "OSPAR/NEAFC Collective Arrangement"
+    },
+    {
+      "href": "/articles",
+      "text": "Articles"
+    },
+    {
+      "href": "/compliance",
+      "text": "Compliance"
+    },
+    {
+      "href": "/neafc-vessel-register",
+      "text": "Notified Vessels"
+    },
+    {
+      "href": "/oecm",
+      "text": "NEAFC-OECM"
+    },
+    {
+      "href": "/convention",
+      "text": "Article 5 of the NEAFC Convention"
+    },
+    {
+      "href": "http://www.ices.dk",
+      "text": "The International Council for the Exploration of the Sea (ICES)"
+    }
+  ],
+  "metas": []
+}

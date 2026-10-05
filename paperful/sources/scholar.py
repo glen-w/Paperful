@@ -84,12 +84,19 @@ def session_ok(ctx: Context) -> tuple[bool, str]:
     return False, f"unexpected response ({resp.status_code})"
 
 
-def find(item: Item, ctx: Context) -> Candidate:
+def search_url(item: Item) -> str | None:
+    """Google Scholar results URL for this item, or None when there is no query."""
     query = item.doi or item.title
     if not query or (not item.doi and len(item.title) < 20):
-        return Candidate.miss(NAME, Outcome.SKIPPED, "no query")
+        return None
     q = f'"{item.doi}"' if item.doi else item.title
-    url = f"https://scholar.google.com/scholar?q={quote_plus(q)}&hl=en&as_sdt=0%2C5"
+    return f"https://scholar.google.com/scholar?q={quote_plus(q)}&hl=en&as_sdt=0%2C5"
+
+
+def find(item: Item, ctx: Context) -> Candidate:
+    url = search_url(item)
+    if not url:
+        return Candidate.miss(NAME, Outcome.SKIPPED, "no query")
     try:
         if ctx.browser is not None and ctx.browser.available():
             body, final_url = ctx.browser.fetch_html(url)

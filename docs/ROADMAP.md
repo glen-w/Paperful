@@ -98,45 +98,28 @@ Zotero has. Do not document either adapter as supported until testers say so.
   `snapshot_only`. `run --upgrade-snapshot` retries native lanes and replaces
   the print unless `--keep-snapshot`. A snapshot is miss-surface `snapshot`,
   not `import_ok`.
-- **Google Scholar — out of core `run`, handoff + API research (next).** Today
-  `scholar` is an opt-in serial source that replays cookies from the session
-  vault (same Chromium profile family as EZProxy). In practice it rarely stays
-  healthy: sessions expire, fingerprint drift, and Google serves `/sorry/` CAPTCHA
-  (`doctor --probe` ambers are common). **Direction:** remove automated Scholar
-  from the reliable fetch loop (not from the repo overnight — deprecate in docs
-  and presets first, then drop the `run` source once handoff covers the workflow).
-  **Replace with end-of-run handoff:** after OA, EZProxy, grey playbooks, and
-  optional `browser_agent`, open remaining misses via `--handoff list|tabs|walk|watch`
-  so the operator uses their **usual working browser** (logged-in Google, campus
-  extensions, saved passwords) — not isolated vault Chromium — to find PDFs and
-  save into `[inbox].dir` → `inbox drain`. Scholar URLs belong in that tab list,
-  not as a bot lane mid-batch. Same posture as the parked Firefox extension
-  **PDFs from open tabs** (tab cookies, confirm checklist, paced download).
-  **Research before any new automated Scholar lane:** spike third-party Scholar
-  APIs and metadata-only discovery (e.g. [SerpApi Google Scholar
-  API](https://serpapi.com/google-scholar-api) — structured results, pagination,
-  `cites` / `cluster`; paid key, quota, and ToS vs local scrape). Evaluate for
-  **link discovery and bibliographic fill**, not bulk download or a silent cloud
-  default; must fit opt-in config, circuit breaker, and the OA honesty miss enum.
-  **SerpApi already exercised elsewhere:** [Google Maps via
-  SerpApi](https://serpapi.com/google-maps-api) worked well in recent work —
-  borrow that repo’s client patterns, env key / quota handling, and test
-  credentials when spiking Scholar (or other SerpApi engines) so Paperful does
-  not invent a second third-party API stack.
-  OpenAlex / Semantic Scholar / Crossref remain the programmatic defaults; Scholar
-  stays out of snowball backends. CAPTCHA solve services stay out of scope (see
-  CAPTCHA section).
-  **Near-term run behaviour (while `scholar` is still on `run`):** the serial
-  Scholar phase queues every OA miss and then hits Google once per item (~
-  `delay_scihub_s` apart). HTTP **429** is recorded as `error`, not `captcha`, so
-  the circuit breaker still ignores it (429 is excluded for API `Retry-After`
-  lanes). **Shipped (latch):** the first Scholar 429, 503, or CAPTCHA /
-  `/sorry/` page skips Scholar for the rest of the run, across batches; queued
-  items get `scholar:skipped(blocked)` and end `retryable`. **Spreading load:** shuffling queue
-  order alone does not help much; what helps is fewer requests after a clear block
-  and/or spacing attempts across the whole run (shared rate limiter, per-item
-  Scholar only after long jitter, or interleaving with other work) instead of one
-  end-of-batch burst after parallel OA.
+- **Google Scholar — late tail + handoff (shipped).** `scholar` stays **opt-in**
+  (not in `DEFAULT_SOURCES`; first-run CAPTCHA ambers if it were). **Policy**
+  (`[fetch].order = "policy"`, default) pulls it out of the reliable loop:
+  OA, campus, grey, then a **late** Scholar try. When `browser_agent` is on
+  this run, `[scholar].when = "auto"` **interleaves**: one Scholar query, then
+  the agent only if that miss remains — the agent wall clock is the backoff
+  (no extra `delay_scihub_s` after an agent call). Agent off: one late Scholar
+  phase with the existing latch. `[scholar].when = "phase"` keeps a Scholar
+  burst then the agent; `"interleave"` always pairs. `[fetch].order = "list"`
+  honors the `sources` array (field-specific escape). **Handoff:**
+  `[handoff].scholar` (default on) adds a Scholar results URL to miss rows and
+  opens it in the **system** browser when there is no direct PDF URL.
+  **SerpApi** (`[serpapi].enabled` + env `SERPAPI_API_KEY`) is a paid link-discovery
+  lane after local tail steps, never a silent cloud default; stamp `web:serpapi`.
+  `[serpapi].max_calls` (default 20, `0` unlimited) and `--serpapi-max` cap
+  paid searches this run. `doctor` ambers when enabled without a key (no paid probe).
+  OpenAlex / Semantic Scholar / Crossref remain the programmatic defaults; Scholar stays
+  out of snowball backends. CAPTCHA solve services stay out of scope.
+  **Latch (unchanged):** the first Scholar 429, 503, or CAPTCHA / `/sorry/`
+  page skips Scholar for the rest of the run; queued items get
+  `scholar:skipped(blocked)` and still reach `browser_agent`. SerpApi quota
+  uses its own latch and does not trip Scholar.
 - **Inbox create-on-unmatched (config, shipped).** Optional `[inbox]` mode so
   `watch` / `drain` still ingests when no missing-PDF parent matches: create a
   parent in a configured collection (or a routed target once smart inbox exists),
@@ -332,13 +315,13 @@ for the end-to-end operator story.
 | 3 | `paperful ingest-dois` — DOI list → `-C`, `--dry-run` / `--apply`, `--tag` | Shipped |
 | 4 | Provenance tags on create (`--tag`, `[snowball]` / `[ingest]` default_tags, `from-<seed-slug>`) | Shipped |
 | 4b | OA honesty miss enum + license/OA stamps on `run --dry-run`, `gaps`, handoff list, run report | Shipped |
-| 5 | Grey playbook example packs (think-tanks, RFMOs, institute report hosts) via `[[grey_playbooks]]` | Ongoing |
+| 5 | Grey playbook example packs (think-tanks, RFMOs, institute report hosts) via `[[grey_playbooks]]` | Shipped — ocean builtin (`rfmo-docs`, `iucn-dosi`, `thinktank-ocean`) plus `paperful/data/grey_playbooks_examples/` (IEA/IRENA, OECD/WHO/UNEP/UNDP) |
 | 6 | Linked-URL health (Core above) | Shipped (`paperful urls check`; `--apply` only via a known playbook rewrite) |
 | 7 | Non-DOI grey fingerprint (`norm(title)|year|registrant_host`; ISBN/report # when present) in snowball / dedupe / inbox ladder + inbox-create | Shipped (ISBN/report like DOI; title\|year\|host is review-tier; host mismatch is not `exists`) |
 | 8 | `paperful collections add --keys-file` — membership batch, dry-run / apply | Parked (Agent §7) |
 | 9 | Acronym allowlist harvest (Core `fix-metadata`) | Shipped (`paperful acronyms`; Title Case consumes `state/acronyms/`) |
 | 10 | [Frontier digest](#frontier-digest-later-watch--external-ingest); thin [snowball briefing](#frontier-digest-later-watch--external-ingest) export before full digest | Thin v0 shipped (`snowball briefing`, `watch briefing`); full digest later |
-| 11 | Scholar 429 latch (Core Scholar) | Shipped |
+| 11 | Scholar late tail + latch + opt-in SerpApi | Shipped (`[fetch].order` policy; interleave with `browser_agent`; `[handoff].scholar`; `[serpapi].enabled` / `max_calls`) |
 | 12 | Authors/orgs frequency report from `-C` (`state/reports/…`; seed **field author packs**) | Later |
 | 13 | Handoff list ranking (Core handoff) | Shipped (cite count × miss severity) |
 | 14 | Opt-in academic HTML→PDF snapshot (Core `htmlpdf`) | Shipped (`[htmlpdf].academic` off\|gated\|auto; snapshot tier; `--upgrade-snapshot`) |
@@ -390,8 +373,9 @@ agents); model and doc posture below; CAPTCHA posture in the next subsection.
 Python **≥3.11**). Wired in `paperful/browser_agent.py`: **`ChatOllama`** or
 **`ChatLiteLLM`**, session-vault **Chrome**, **`use_vision=False`**, PDF success
 only when bytes pass **`min_pdf_bytes`** and size stabilizes (never trust agent
-`done` alone). **`run`** auto-appends the lane after Scholar / EZProxy / htmlpdf
-when `[llm].enabled`, `[browser_agent].during_run`, and the extra are on;
+`done` alone). **`run`** auto-appends the lane when `[llm].enabled`,
+`[browser_agent].during_run`, and the extra are on (policy order: one Scholar
+try immediately before the agent when Scholar is opted in);
 **`paperful recover --item`** runs the same runner in isolation. Docker image
 **excludes** browser-use (host-only: vault login + Chrome).
 
@@ -1041,7 +1025,9 @@ prerequisites for the fetch / lint / attach loop.
    manual handoff / PDF inbox (`--handoff`, `inbox watch` / `drain`);
    **pluggable grey-lit PDF playbooks** in
    `direct`/`landing` with builtin packs (UNGA/undocs · BBNJ/DOALOS · ISA;
-   plus FAO/OECD/IEA/WHO — extend via `[[grey_playbooks]]`). **Shipped:**
+   plus FAO, RFMO, IUCN/DOSI, IDDRI/Pew). IEA/IRENA and OECD/WHO/UNEP/UNDP
+   are optional files in `paperful/data/grey_playbooks_examples/` — extend
+   via `grey_playbooks_dir` or `[[grey_playbooks]]`. **Shipped:**
    **inbox match ladder** and **inbox create-on-unmatched** (config; unique-DOI
    `create_auto`; gated proposals). Still parked: **smart inbox** routing (Core
    above — snowball/recent-run context + ladder

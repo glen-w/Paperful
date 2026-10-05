@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import re
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
@@ -37,6 +39,20 @@ _HTMLPDF_ITEM_TYPES = frozenset(
 # Playwright vault lanes. `run` auto-appends `browser_agent` after the last of
 # these, and only invokes the agent when one of them was tried and failed.
 BROWSER_LANES = frozenset({"scholar", "ezproxy", "htmlpdf"})
+_POLICY_TAIL = ("scholar", "browser_agent", "htmlpdf", "serpapi", "scihub")
+_POLICY_ALWAYS_TAIL = frozenset({"scholar", "browser_agent", "serpapi", "scihub"})
+_SERIAL_FOR_ORDER = frozenset(
+    {"scihub", "ezproxy", "htmlpdf", "scholar", "browser_agent", "author_site", "serpapi"}
+)
+
+
+@dataclass(frozen=True)
+class SerialStep:
+    """One serial phase, or Scholar paired with ``browser_agent``."""
+
+    name: str
+    partner: str | None = None
+    htmlpdf_scope: str = "all"  # all | web | academic
 _BIORXIV_DOI = re.compile(r"^10\.1101/", re.IGNORECASE)
 _BIORXIV_URL = re.compile(
     r"(?:bio|med)rxiv\.org/content/(?:[^/\s]+/)*(10\.1101/\d+(?:\.\d+)*)(?:v\d+)?",
@@ -63,7 +79,8 @@ def sources_for_item(item: Item, cfg: Config, sources: list[str]) -> list[str]:
     after ``browser_agent`` and before Sci-Hub.
     """
     lanes = [name for name in sources if source_applicable(item, cfg, name)]
-    return place_academic_htmlpdf(lanes, cfg, item)
+    lanes = place_academic_htmlpdf(lanes, cfg, item)
+    return apply_fetch_order(cfg, lanes, item)
 
 
 def prior_playwright_miss(attempts: list[str]) -> str | None:
@@ -148,6 +165,101 @@ def with_recover_lane(
     last = max(i for i, name in enumerate(listed) if name in BROWSER_LANES)
     listed.insert(last + 1, "browser_agent")
     return listed
+
+
+def serpapi_api_key() -> str:
+    return os.environ.get("SERPAPI_API_KEY", "").strip()
+
+
+def serpapi_ready(cfg: Config) -> bool:
+    return bool(cfg.serpapi_enabled and serpapi_api_key())
+
+
+def with_serpapi_lane(cfg: Config, sources: list[str]) -> list[str]:
+    """Keep or inject ``serpapi`` only when enabled and ``SERPAPI_API_KEY`` is set.
+
+    Policy mode appends it before Sci-Hub even if the operator omitted it from
+    ``sources``. List mode keeps the array: present and ready stays; otherwise
+    it is dropped.
+    """
+    listed = [name for name in sources if name != "serpapi"]
+    if not serpapi_ready(cfg):
+        return listed
+    if cfg.fetch_order == "list":
+        if "serpapi" in sources:
+            return list(sources)
+        return listed
+    if "scihub" in listed:
+        listed.insert(listed.index("scihub"), "serpapi")
+    else:
+        listed.append("serpapi")
+    return listed
+
+
+def scholar_pairs_with_agent(cfg: Config, sources: list[str]) -> bool:
+    """True when Scholar should run one-item-at-a-time before ``browser_agent``."""
+    if "scholar" not in sources or "browser_agent" not in sources:
+        return False
+    if cfg.scholar_when == "phase":
+        return False
+    if cfg.scholar_when == "interleave":
+        return True
+    return True  # auto
+
+
+def academic_htmlpdf_item(item: Item, cfg: Config) -> bool:
+    from .sources.htmlpdf import academic_mode
+
+    return academic_mode(item, cfg) in {"gated", "auto"}
+
+
+def apply_fetch_order(
+    cfg: Config, lanes: list[str], item: Item | None = None
+) -> list[str]:
+    """Reorder a per-item lane list. ``list`` keeps configured order."""
+    if cfg.fetch_order != "policy":
+        return list(lanes)
+    tail_names = set(_POLICY_ALWAYS_TAIL)
+    if item is not None and academic_htmlpdf_item(item, cfg):
+        tail_names.add("htmlpdf")
+    head = [name for name in lanes if name not in tail_names]
+    tail: list[str] = []
+    for name in _POLICY_TAIL:
+        if name in lanes and name not in head and name not in tail:
+            tail.append(name)
+    return head + tail
+
+
+def order_run(cfg: Config, sources: list[str]) -> list[SerialStep]:
+    """Serial phases for one batch, after parallel OA."""
+    serial = [name for name in sources if name in _SERIAL_FOR_ORDER]
+    if cfg.fetch_order == "list":
+        return [SerialStep(name) for name in serial]
+    split_htmlpdf = cfg.htmlpdf_academic in {"gated", "auto"} and "htmlpdf" in serial
+    tail_always = set(_POLICY_ALWAYS_TAIL)
+    head = [name for name in serial if name not in tail_always]
+    steps: list[SerialStep] = []
+    for name in head:
+        if name == "htmlpdf" and split_htmlpdf:
+            steps.append(SerialStep("htmlpdf", htmlpdf_scope="web"))
+        else:
+            steps.append(SerialStep(name))
+    has_scholar = "scholar" in serial
+    has_agent = "browser_agent" in serial
+    if scholar_pairs_with_agent(cfg, serial):
+        steps.append(SerialStep("scholar", partner="browser_agent"))
+    else:
+        if has_scholar:
+            steps.append(SerialStep("scholar"))
+        if has_agent:
+            steps.append(SerialStep("browser_agent"))
+    if split_htmlpdf:
+        steps.append(SerialStep("htmlpdf", htmlpdf_scope="academic"))
+    if "serpapi" in serial:
+        steps.append(SerialStep("serpapi"))
+    if "scihub" in serial:
+        steps.append(SerialStep("scihub"))
+    return steps
 
 
 def place_academic_htmlpdf(
@@ -235,7 +347,7 @@ def source_applicable(item: Item, cfg: Config, name: str) -> bool:
         return bool(item.doi or item.arxiv_id)
     if name == "core":
         return bool(item.doi and cfg.core_api_key)
-    if name == "scholar":
+    if name in {"scholar", "serpapi"}:
         return bool(item.doi or (item.title and len(item.title) >= 20))
     if name == "author_site":
         from .snowball.authors import matching_author

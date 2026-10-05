@@ -1,0 +1,337 @@
+{
+  "playbook": "isa-deepdata",
+  "url": "https://www.isa.org.jm/documents/",
+  "extra": "",
+  "note": "listing: ISA documents",
+  "stamp": "isa-deepdata",
+  "status": "miss",
+  "chosen": "",
+  "resolved": "https://isa.org.jm/documents/",
+  "detail": "no PDF-shaped link on the landing",
+  "nbytes": 0,
+  "checked": [],
+  "probed_at": "2026-10-05T14:43:54+00:00",
+  "anchors": [
+    {
+      "href": "#content",
+      "text": "Skip to content"
+    },
+    {
+      "href": "https://isa.org.jm/",
+      "text": ""
+    },
+    {
+      "href": "https://isa.org.jm/",
+      "text": "International Seabed Authority"
+    },
+    {
+      "href": "https://www.linkedin.com/company/isbahq/",
+      "text": ""
+    },
+    {
+      "href": "https://www.instagram.com/isa_seabed",
+      "text": ""
+    },
+    {
+      "href": "https://www.facebook.com/ISBAHeadquarters",
+      "text": ""
+    },
+    {
+      "href": "https://www.youtube.com/channel/UCocsSo1icTK8iI45SKS60sQ",
+      "text": ""
+    },
+    {
+      "href": "https://www.flickr.com/photos/isbahq/",
+      "text": ""
+    },
+    {
+      "href": "https://isa.org.jm/rss.xml",
+      "text": ""
+    },
+    {
+      "href": "#",
+      "text": "About the Authority"
+    },
+    {
+      "href": "https://isa.org.jm/about-isa/",
+      "text": "About ISA"
+    },
+    {
+      "href": "https://isa.org.jm/organs/",
+      "text": "Organs"
+    },
+    {
+      "href": "https://isa.org.jm/organs/the-assembly/",
+      "text": "The Assembly"
+    },
+    {
+      "href": "https://isa.org.jm/organs/the-council/",
+      "text": "The Council"
+    },
+    {
+      "href": "https://isa.org.jm/organs/the-secretariat/",
+      "text": "The Secretariat"
+    },
+    {
+      "href": "https://isa.org.jm/organs/the-finance-committee/",
+      "text": "The Finance Committee"
+    },
+    {
+      "href": "https://isa.org.jm/organs/the-legal-and-technical-commission/",
+      "text": "The Legal and Technical Commission"
+    },
+    {
+      "href": "https://isa.org.jm/organs/the-enterprise/",
+      "text": "The Enterprise"
+    },
+    {
+      "href": "https://isa.org.jm/the-secretary-general/",
+      "text": "The Secretary-General"
+    },
+    {
+      "href": "https://isa.org.jm/the-secretary-general/statements-speeches/",
+      "text": "Statements & speeches"
+    },
+    {
+      "href": "https://isa.org.jm/the-secretary-general/secretary-general-opinion-pieces/",
+      "text": "Opinion pieces"
+    },
+    {
+      "href": "https://isa.org.jm/secretary-general-annual-report-2024/",
+      "text": "Annual Report 2024"
+    },
+    {
+      "href": "https://isa.org.jm/secretary-general-annual-report-2023/",
+      "text": "Annual Report 2023"
+    },
+    {
+      "href": "https://isa.org.jm/secretary-general-annual-report-2022/",
+      "text": "Annual Report 2022"
+    },
+    {
+      "href": "https://isa.org.jm/secretary-general-annual-report-2020/",
+      "text": "Annual Report 2020"
+    },
+    {
+      "href": "https://isa.org.jm/member-states/",
+      "text": "Member States"
+    },
+    {
+      "href": "https://isa.org.jm/contributions-dashboard/",
+      "text": "Contributions Dashboard"
+    },
+    {
+      "href": "https://isa.org.jm/member-states/manual-of-protocol/",
+      "text": "Manual of Protocol"
+    },
+    {
+      "href": "https://isa.org.jm/observers/",
+      "text": "Observers"
+    },
+    {
+      "href": "https://isa.org.jm/strategic-plan/",
+      "text": "Strategic Plan 2019-2023"
+    },
+    {
+      "href": "https://isa.org.jm/strategic-plan-2024-2028/",
+      "text": "Strategic Plan 2024-2028"
+    },
+    {
+      "href": "https://isa.org.jm/isa-and-the-2030-agenda/",
+      "text": "ISA\u2019s contributions to the 2030 Agenda"
+    },
+    {
+      "href": "https://isa.org.jm/stakeholder-engagement/",
+      "text": "Stakeholder engagement"
+    },
+    {
+      "href": "https://isa.org.jm/career-opportunities/",
+      "text": "Career opportunities"
+    },
+    {
+      "href": "https://isa.org.jm/career-opportunities/senior-professional-programmes/",
+      "text": "Senior Professional Officer Programme"
+    },
+    {
+      "href": "https://isa.org.jm/career-opportunities/junior-professional-programmes-2/",
+      "text": "Junior Professional Officer Programme"
+    },
+    {
+      "href": "https://isa.org.jm/career-opportunities/career-opportunities-faqs/",
+      "text": "Career opportunities: FAQs"
+    },
+    {
+      "href": "https://isa.org.jm/joint-appeals-board/",
+      "text": "Internal Justice"
+    },
+    {
+      "href": "https://isa.org.jm/joint-appeals-board/",
+      "text": "Joint Appeals Board"
+    },
+    {
+      "href": "https://isa.org.jm/joint-disciplinary-committee/",
+      "text": "Joint Disciplinary Committee"
+    },
+    {
+      "href": "https://isa.org.jm/contact-us/",
+      "text": "Contact us"
+    },
+    {
+      "href": "#",
+      "text": "Our Work"
+    },
+    {
+      "href": "https://isa.org.jm/deepdata-database/",
+      "text": "Data Management"
+    },
+    {
+      "href": "https://isa.org.jm/deepdata-database/reporting-templates/",
+      "text": "Reporting templates"
+    },
+    {
+      "href": "https://isa.org.jm/deepdata-database/maps/",
+      "text": "Maps"
+    },
+    {
+      "href": "https://isa.org.jm/the-mining-code/",
+      "text": "The Mining Code"
+    },
+    {
+      "href": "#",
+      "text": "Exploration"
+    },
+    {
+      "href": "https://isa.org.jm/the-mining-code/exploration-regulations/",
+      "text": "Exploration regulations"
+    },
+    {
+      "href": "https://isa.org.jm/mining-code-recommendations/",
+      "text": "Recommendations and guidance"
+    },
+    {
+      "href": "#",
+      "text": "Exploitation"
+    },
+    {
+      "href": "https://isa.org.jm/the-mining-code/draft-exploitation-regulations-2/",
+      "text": "Draft exploitation regulations"
+    },
+    {
+      "href": "https://isa.org.jm/the-mining-code/standards-and-guidelines/",
+      "text": "Draft standards and guidelines"
+    },
+    {
+      "href": "https://isa.org.jm/the-mining-code/official-documents/",
+      "text": "Official documents"
+    },
+    {
+      "href": "https://isa.org.jm/the-mining-code/working-groups/",
+      "text": "Working groups"
+    },
+    {
+      "href": "https://isa.org.jm/the-mining-code/studies-reports-and-workshop-reports/",
+      "text": "Studies, reports and workshop reports"
+    },
+    {
+      "href": "https://isa.org.jm/exploration-contracts/",
+      "text": "Exploration Contracts"
+    },
+    {
+      "href": "https://isa.org.jm/exploration-contracts/polymetallic-nodules/",
+      "text": "Polymetallic nodules"
+    },
+    {
+      "href": "https://isa.org.jm/exploration-contracts/polymetallic-sulphides/",
+      "text": "Polymetallic sulphides"
+    },
+    {
+      "href": "https://isa.org.jm/exploration-contracts/cobalt-rich-ferromanganese-crusts/",
+      "text": "Cobalt-rich ferromanganese crusts"
+    },
+    {
+      "href": "https://isa.org.jm/exploration-contracts/exploration-areas/",
+      "text": "Exploration areas"
+    },
+    {
+      "href": "https://isa.org.jm/exploration-contracts/reserved-areas/",
+      "text": "Reserved areas"
+    },
+    {
+      "href": "https://isa.org.jm/immediate-measures/",
+      "text": "Immediate measures"
+    },
+    {
+      "href": "https://isa.org.jm/protection-of-the-marine-environment/",
+      "text": "Protection of the marine environment"
+    },
+    {
+      "href": "https://isa.org.jm/protection-of-the-marine-environment/environmental-impact-assessments/",
+      "text": "Environmental impact assessments"
+    },
+    {
+      "href": "https://isa.org.jm/protection-of-the-marine-environment/regional-environmental-management-plans/",
+      "text": "Regional environmental management plans"
+    },
+    {
+      "href": "https://isa.org.jm/protection-of-the-marine-environment/environment-thresholds/",
+      "text": "Environmental Thresholds"
+    },
+    {
+      "href": "https://isa.org.jm/marine-scientific-research/",
+      "text": "Marine scientific research"
+    },
+    {
+      "href": "https://isa.org.jm/area-2030/",
+      "text": "AREA2030"
+    },
+    {
+      "href": "https://isa.org.jm/sski/",
+      "text": "SSKI Sustainable Seabed Knowledge Initiative"
+    },
+    {
+      "href": "https://isa.org.jm/call-for-action/",
+      "text": "Call for action"
+    },
+    {
+      "href": "https://isa.org.jm/equitable-sharing-of-benefits/",
+      "text": "Equitable sharing of benefits"
+    },
+    {
+      "href": "https://isa.org.jm/capacity-development-training-and-technical-assistance/",
+      "text": "Capacity development and training"
+    },
+    {
+      "href": "https://capacitybuilding.isa.org.jm:4431/",
+      "text": "ISA-Capacity Development Dashboard"
+    },
+    {
+      "href": "https://isa.org.jm/join-the-isa-capacity-development-alumni-network-ican/",
+      "text": "ISA-Capacity Development Alumni Network (iCAN)"
+    },
+    {
+      "href": "https://isa.org.jm/isa-voluntary-commitments/sgs-award-for-excellence-in-deep-sea-research/",
+      "text": "ISA Secretary-General\u2019s Award for Excellence in Deep-Sea Research"
+    },
+    {
+      "href": "https://isa.org.jm/deep-dive/",
+      "text": "Deep Dive"
+    },
+    {
+      "href": "https://isa.org.jm/capacity-development-training-and-technical-assistance/widsr-project/",
+      "text": "Women in Deep-Sea Research Project"
+    },
+    {
+      "href": "https://isa.org.jm/capacity-development-training-and-technical-assistance/widsr-project/see-her-exceed/",
+      "text": "See Her Exceed (SHE) Mentorship Programme"
+    },
+    {
+      "href": "https://isa.org.jm/women-in-blue-initiative/",
+      "text": "Women In Blue (WIB) initiative"
+    },
+    {
+      "href": "https://isa.org.jm/capacity-development-training-and-technical-assistance/contractor-training-programme/",
+      "text": "Contractors\u2019 Training Programme"
+    }
+  ],
+  "metas": []
+}

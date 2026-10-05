@@ -17,7 +17,8 @@ lists that lane, not the full `sources` list.
 | `biorxiv` | `10.1101/…` DOI (including from a bioRxiv/medRxiv URL) |
 | `semanticscholar` | DOI or arXiv id |
 | `core` | DOI and `core_api_key` |
-| `scholar` | DOI, or title at least 20 characters (**opt-in** — not in default `sources`) |
+| `scholar` | DOI, or title at least 20 characters (**opt-in** — not in default `sources`). Policy order runs it late, paired with `browser_agent` when that lane is on |
+| `serpapi` | Same query as Scholar. **Opt-in:** `[serpapi].enabled` and env `SERPAPI_API_KEY`. Policy order after local Scholar / agent. Cap with `[serpapi].max_calls` / `--serpapi-max`. See [SerpApi](serpapi.md) |
 | `direct` | HTTP(S) URL that is not a resolver/aggregator/video host after playbook rewrite/synthesize, **or** Extra/title match from a `synthesize` playbook (e.g. UN symbol → undocs) |
 | `ezproxy` | `ezproxy_base` plus a session (vault or cookie file), **and** a DOI or a URL on a [known publisher host](ezproxy.md#what-ezproxy-will-try) |
 | `htmlpdf` | `webpage` / `blogPost` / `newspaperArticle` / `magazineArticle` / `forumPost` (or DOI-less `document` / `report`) with an HTTP(S) URL; needs Playwright Chromium — see [HTML→PDF](#htmlpdf-web-news-blogs) |

@@ -1,0 +1,16 @@
+{
+  "playbook": "who_scrape",
+  "url": "https://iris.who.int/handle/10665/43432",
+  "extra": "",
+  "note": "document: World health report 2006 handle",
+  "stamp": "who_scrape",
+  "status": "error",
+  "chosen": "",
+  "resolved": "https://iris.who.int/handle/10665/43432",
+  "detail": "ConnectTimeout",
+  "nbytes": 0,
+  "checked": [],
+  "probed_at": "2026-10-05T14:44:22+00:00",
+  "anchors": [],
+  "metas": []
+}

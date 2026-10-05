@@ -1,0 +1,368 @@
+{
+  "playbook": "iucn-dosi",
+  "url": "https://www.dosi-project.org/",
+  "extra": "",
+  "note": "listing: DOSI home",
+  "stamp": "iucn-dosi",
+  "status": "alternate",
+  "chosen": "https://www.dosi-project.org/wp-content/uploads/MIAB_hires.pdf",
+  "resolved": "https://www.dosi-project.org/",
+  "detail": "pdf",
+  "nbytes": 10017034,
+  "checked": [
+    {
+      "url": "https://www.dosi-project.org/wp-content/uploads/TreasuresOfTheDeep_PDF-ebook-small.pdf",
+      "pdf": false,
+      "nbytes": 0,
+      "status_code": 404,
+      "detail": "HTTP 404"
+    },
+    {
+      "url": "https://www.dosi-project.org/wp-content/uploads/MIAB_hires.pdf",
+      "pdf": true,
+      "nbytes": 10017034,
+      "status_code": 200,
+      "detail": "pdf"
+    }
+  ],
+  "probed_at": "2026-10-05T14:44:13+00:00",
+  "anchors": [
+    {
+      "href": "#",
+      "text": ""
+    },
+    {
+      "href": "#",
+      "text": ""
+    },
+    {
+      "href": "https://www.dosi-project.org/",
+      "text": "Home"
+    },
+    {
+      "href": "https://www.dosi-project.org/about/",
+      "text": "About"
+    },
+    {
+      "href": "https://www.dosi-project.org/leadership/",
+      "text": "Meet the team"
+    },
+    {
+      "href": "https://www.dosi-project.org/dosi-institutional-brochure/",
+      "text": "DOSI Brochure"
+    },
+    {
+      "href": "https://www.dosi-project.org/working-groups/",
+      "text": "Working Groups"
+    },
+    {
+      "href": "https://www.dosi-project.org/minerals/",
+      "text": "Minerals"
+    },
+    {
+      "href": "https://www.dosi-project.org/biodiversity-beyond-national-jurisdiction-bbnj/",
+      "text": "Biodiversity Beyond National Jurisdiction (BBNJ)"
+    },
+    {
+      "href": "https://www.dosi-project.org/climate-change/",
+      "text": "Climate Change"
+    },
+    {
+      "href": "https://www.dosi-project.org/fisheries/",
+      "text": "Fisheries"
+    },
+    {
+      "href": "https://www.dosi-project.org/offshore-energy/",
+      "text": "Offshore Energy"
+    },
+    {
+      "href": "https://www.dosi-project.org/marine-genetic-resources/",
+      "text": "Marine Genetic Resources"
+    },
+    {
+      "href": "https://www.dosi-project.org/pollution/",
+      "text": "Pollution"
+    },
+    {
+      "href": "https://www.dosi-project.org/decade-of-deep-ocean-action/",
+      "text": "Decade of Deep-Ocean Action"
+    },
+    {
+      "href": "https://www.dosi-project.org/biodiversity-task-force/",
+      "text": "Biodiversity Task Force"
+    },
+    {
+      "href": "https://www.dosi-project.org/art-science-and-policy-task-force/",
+      "text": "Art Science and Policy Task Force"
+    },
+    {
+      "href": "https://www.dosi-project.org/resources/",
+      "text": "Resources"
+    },
+    {
+      "href": "https://www.dosi-project.org/annual-reports/",
+      "text": "Annual reports"
+    },
+    {
+      "href": "https://www.dosi-project.org/deep-sea-life/",
+      "text": "Deep Sea Life"
+    },
+    {
+      "href": "https://www.dosi-project.org/information-sheets/",
+      "text": "Information Sheets"
+    },
+    {
+      "href": "https://www.dosi-project.org/our-networks/",
+      "text": "Our Networks"
+    },
+    {
+      "href": "https://www.dosi-project.org/policy-briefs/",
+      "text": "Policy Briefs"
+    },
+    {
+      "href": "https://www.dosi-project.org/posters/",
+      "text": "Posters"
+    },
+    {
+      "href": "https://www.dosi-project.org/publications/",
+      "text": "Publications"
+    },
+    {
+      "href": "https://www.dosi-project.org/submissions/",
+      "text": "Submissions"
+    },
+    {
+      "href": "https://www.dosi-project.org/think-deep-podcast/",
+      "text": "Think Deep! Podcast"
+    },
+    {
+      "href": "https://www.dosi-project.org/dosi-institutional-brochure/",
+      "text": "DOSI Brochure"
+    },
+    {
+      "href": "https://www.dosi-project.org/wp-content/uploads/TreasuresOfTheDeep_PDF-ebook-small.pdf",
+      "text": "Treasures of the Deep"
+    },
+    {
+      "href": "https://www.dosi-project.org/wp-content/uploads/MIAB_hires.pdf",
+      "text": "Message in a Bottle"
+    },
+    {
+      "href": "https://www.youtube.com/@DeepStewardship",
+      "text": "Youtube"
+    },
+    {
+      "href": "https://www.dosi-project.org/news-2/",
+      "text": "News"
+    },
+    {
+      "href": "http://www.dosi-project.org/events/",
+      "text": "Events"
+    },
+    {
+      "href": "https://www.dosi-project.org/contact-us/",
+      "text": "Contact Us"
+    },
+    {
+      "href": "https://www.dosi-project.org/",
+      "text": "DOSI Deep Ocean Stewardship Initiative"
+    },
+    {
+      "href": "https://www.dosi-project.org/",
+      "text": "Home"
+    },
+    {
+      "href": "https://www.dosi-project.org/about/",
+      "text": "About"
+    },
+    {
+      "href": "https://www.dosi-project.org/leadership/",
+      "text": "Meet the team"
+    },
+    {
+      "href": "https://www.dosi-project.org/dosi-institutional-brochure/",
+      "text": "DOSI Brochure"
+    },
+    {
+      "href": "https://www.dosi-project.org/working-groups/",
+      "text": "Working Groups"
+    },
+    {
+      "href": "https://www.dosi-project.org/minerals/",
+      "text": "Minerals"
+    },
+    {
+      "href": "https://www.dosi-project.org/biodiversity-beyond-national-jurisdiction-bbnj/",
+      "text": "Biodiversity Beyond National Jurisdiction (BBNJ)"
+    },
+    {
+      "href": "https://www.dosi-project.org/climate-change/",
+      "text": "Climate Change"
+    },
+    {
+      "href": "https://www.dosi-project.org/fisheries/",
+      "text": "Fisheries"
+    },
+    {
+      "href": "https://www.dosi-project.org/offshore-energy/",
+      "text": "Offshore Energy"
+    },
+    {
+      "href": "https://www.dosi-project.org/marine-genetic-resources/",
+      "text": "Marine Genetic Resources"
+    },
+    {
+      "href": "https://www.dosi-project.org/pollution/",
+      "text": "Pollution"
+    },
+    {
+      "href": "https://www.dosi-project.org/decade-of-deep-ocean-action/",
+      "text": "Decade of Deep-Ocean Action"
+    },
+    {
+      "href": "https://www.dosi-project.org/biodiversity-task-force/",
+      "text": "Biodiversity Task Force"
+    },
+    {
+      "href": "https://www.dosi-project.org/art-science-and-policy-task-force/",
+      "text": "Art Science and Policy Task Force"
+    },
+    {
+      "href": "https://www.dosi-project.org/resources/",
+      "text": "Resources"
+    },
+    {
+      "href": "https://www.dosi-project.org/annual-reports/",
+      "text": "Annual reports"
+    },
+    {
+      "href": "https://www.dosi-project.org/deep-sea-life/",
+      "text": "Deep Sea Life"
+    },
+    {
+      "href": "https://www.dosi-project.org/information-sheets/",
+      "text": "Information Sheets"
+    },
+    {
+      "href": "https://www.dosi-project.org/our-networks/",
+      "text": "Our Networks"
+    },
+    {
+      "href": "https://www.dosi-project.org/policy-briefs/",
+      "text": "Policy Briefs"
+    },
+    {
+      "href": "https://www.dosi-project.org/posters/",
+      "text": "Posters"
+    },
+    {
+      "href": "https://www.dosi-project.org/publications/",
+      "text": "Publications"
+    },
+    {
+      "href": "https://www.dosi-project.org/submissions/",
+      "text": "Submissions"
+    },
+    {
+      "href": "https://www.dosi-project.org/think-deep-podcast/",
+      "text": "Think Deep! Podcast"
+    },
+    {
+      "href": "https://www.dosi-project.org/dosi-institutional-brochure/",
+      "text": "DOSI Brochure"
+    },
+    {
+      "href": "https://www.dosi-project.org/wp-content/uploads/TreasuresOfTheDeep_PDF-ebook-small.pdf",
+      "text": "Treasures of the Deep"
+    },
+    {
+      "href": "https://www.dosi-project.org/wp-content/uploads/MIAB_hires.pdf",
+      "text": "Message in a Bottle"
+    },
+    {
+      "href": "https://www.youtube.com/@DeepStewardship",
+      "text": "Youtube"
+    },
+    {
+      "href": "https://www.dosi-project.org/news-2/",
+      "text": "News"
+    },
+    {
+      "href": "http://www.dosi-project.org/events/",
+      "text": "Events"
+    },
+    {
+      "href": "https://www.dosi-project.org/contact-us/",
+      "text": "Contact Us"
+    },
+    {
+      "href": "https://x.com/themes_ancora",
+      "text": ""
+    },
+    {
+      "href": "https://www.facebook.com/AncoraThemes/",
+      "text": ""
+    },
+    {
+      "href": "https://dribbble.com/AncoraThemes",
+      "text": ""
+    },
+    {
+      "href": "https://www.instagram.com/ancora_themes/",
+      "text": ""
+    },
+    {
+      "href": "https://dosi-project.org/about/",
+      "text": "Learn more"
+    },
+    {
+      "href": "https://tanyayoungart.com/wordpress/wp-content/uploads/2013/05/Five-Vulnerable-Neep-Ocean-Habitats-650H.jpg",
+      "text": "Artwork by Tanya Young, 2013"
+    },
+    {
+      "href": "https://dosi-project.us4.list-manage.com/subscribe?u=1e5643f2d1e15ed5b6108e939&id=570f6dc7e9",
+      "text": "Join DOSI"
+    },
+    {
+      "href": "https://dosi-project.org/pollution-and-debris/",
+      "text": ""
+    },
+    {
+      "href": "https://dosi-project.org/offshore-energy/",
+      "text": ""
+    },
+    {
+      "href": "https://dosi-project.org/biodiversity-beyond-national-jurisdiction-bbnj/",
+      "text": ""
+    },
+    {
+      "href": "https://dosi-project.org/fisheries/",
+      "text": ""
+    },
+    {
+      "href": "https://dosi-project.org/climate-change/",
+      "text": ""
+    },
+    {
+      "href": "https://dosi-project.org/marine-genetic-resources/",
+      "text": ""
+    },
+    {
+      "href": "https://dosi-project.org/decade-of-deep-ocean-action/",
+      "text": ""
+    },
+    {
+      "href": "https://dosi-project.org/biodiversity-task-force/",
+      "text": ""
+    },
+    {
+      "href": "https://dosi-project.org/minerals/",
+      "text": ""
+    },
+    {
+      "href": "https://www.dosi-project.org/art-science-and-policy-task-force/",
+      "text": ""
+    }
+  ],
+  "metas": []
+}

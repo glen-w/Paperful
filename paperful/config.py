@@ -108,6 +108,17 @@ class Config:
     source_routing: bool = (
         True  # skip sources that look inapplicable from item metadata
     )
+    fetch_order: str = "policy"  # policy | list
+    scholar_when: str = "auto"  # auto | phase | interleave
+    serpapi_enabled: bool = False
+    serpapi_max_calls: int = 20  # 0 = no cap; counts paid Scholar searches this run
+    handoff_scholar: bool = True
+    request_channels: str = "off"  # off | rg | email | both | rg_then_email_after_days
+    request_email_after_days: int = 14
+    request_rg_override: bool | None = None
+    twenty_enabled: bool = False
+    twenty_base_url: str = ""
+    twenty_lookup_on_preflight: bool = False
     circuit_breaker_threshold: int = (
         3  # captcha/block failures before a source pauses, then one probe
     )
@@ -335,6 +346,14 @@ class Config:
     @property
     def htmlpdf_proposals_dir(self) -> Path:
         return self.state_dir / "htmlpdf" / "proposals"
+
+    @property
+    def author_requests_path(self) -> Path:
+        return self.state_dir / "author-requests.jsonl"
+
+    @property
+    def author_contacts_dir(self) -> Path:
+        return self.state_dir / "author-contacts"
 
     def effective_synthesize_timeout(self) -> float:
         if self.synthesize_timeout_s > 0:
@@ -831,6 +850,41 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             cfg.synthesize_dest = parse_dest(str(synth["dest"]), key="[synthesize].dest")
         if "timeout_s" in synth:
             cfg.synthesize_timeout_s = float(synth["timeout_s"])
+    fetch = raw.get("fetch")
+    if isinstance(fetch, dict) and "order" in fetch:
+        cfg.fetch_order = _one_of("[fetch].order", fetch["order"], ("policy", "list"))
+    scholar_tbl = raw.get("scholar")
+    if isinstance(scholar_tbl, dict) and "when" in scholar_tbl:
+        cfg.scholar_when = _one_of(
+            "[scholar].when", scholar_tbl["when"], ("auto", "phase", "interleave")
+        )
+    serpapi = raw.get("serpapi")
+    if isinstance(serpapi, dict):
+        if "enabled" in serpapi:
+            cfg.serpapi_enabled = bool(serpapi["enabled"])
+        if "max_calls" in serpapi:
+            cfg.serpapi_max_calls = max(0, int(serpapi["max_calls"]))
+    handoff_tbl = raw.get("handoff")
+    if isinstance(handoff_tbl, dict) and "scholar" in handoff_tbl:
+        cfg.handoff_scholar = bool(handoff_tbl["scholar"])
+    req = raw.get("request")
+    if isinstance(req, dict):
+        if "channels" in req:
+            cfg.request_channels = _one_of(
+                "[request].channels",
+                req["channels"],
+                ("off", "rg", "email", "both", "rg_then_email_after_days"),
+            )
+        if "email_after_days" in req:
+            cfg.request_email_after_days = max(0, int(req["email_after_days"]))
+    twenty = raw.get("twenty")
+    if isinstance(twenty, dict):
+        if "enabled" in twenty:
+            cfg.twenty_enabled = bool(twenty["enabled"])
+        if "base_url" in twenty:
+            cfg.twenty_base_url = str(twenty["base_url"]).strip().rstrip("/")
+        if "lookup_on_preflight" in twenty:
+            cfg.twenty_lookup_on_preflight = bool(twenty["lookup_on_preflight"])
     gaps = raw.get("gaps")
     if isinstance(gaps, dict):
         if "handoff" in gaps:

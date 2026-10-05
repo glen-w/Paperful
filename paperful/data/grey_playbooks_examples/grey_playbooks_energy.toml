@@ -1,0 +1,16 @@
+# Energy grey-lit example pack. Not loaded with the ocean builtin.
+# Copy this file into grey_playbooks_dir, or point that setting at
+# paperful/data/grey_playbooks_examples/ (this folder has no ocean builtin).
+# Same name as a builtin rule replaces it; these names are not in the ocean pack.
+
+[[grey_playbooks]]
+name = "iea_scrape"
+kind = "scrape"
+hosts = ["iea.org"]
+href_re = '''(?i)/files/|/dl/|\.pdf(?:\?|$)'''
+
+[[grey_playbooks]]
+name = "irena_scrape"
+kind = "scrape"
+hosts = ["irena.org"]
+href_re = '''(?i)\.pdf(?:\?|$)'''

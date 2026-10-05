@@ -1111,6 +1111,30 @@ def _execute(
             collection=request.collection,
             console=console,
         )
+        if cfg.twenty_enabled and cfg.twenty_lookup_on_preflight:
+            from ..twenty import lookup_authors, twenty_ready
+            from .authors import load_pack_file, pack_path, pack_slug
+
+            if twenty_ready(cfg):
+                slug = pack_slug(request.collection)
+                pack = load_pack_file(pack_path(cfg, slug, promoted=False))
+                people = list(pack.authors) if pack is not None else []
+                if people:
+                    lookup_authors(
+                        cfg,
+                        people,
+                        collection=request.collection,
+                        apply=True,
+                    )
+                    console.print(
+                        "twenty lookup on preflight · proposed pack/contacts updated "
+                        "(promote before author_site fetch; no mail)"
+                    )
+            else:
+                console.print(
+                    "[yellow]twenty lookup_on_preflight skipped[/] "
+                    "(need TWENTY_API_KEY and [twenty].base_url)"
+                )
     _print_table(console, rows)
     exit_code = 1 if failed or oa.deferred else 0
     if oa.deferred:

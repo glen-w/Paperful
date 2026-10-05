@@ -1,0 +1,29 @@
+# International-orgs grey-lit example pack. Not loaded with the ocean builtin.
+# Copy this file into grey_playbooks_dir, or point that setting at
+# paperful/data/grey_playbooks_examples/ (this folder has no ocean builtin).
+# un.org stays on bbnj-doalos-prepcom. UNEP and UNDP are separate hosts.
+# iea.org stays in the energy example pack.
+
+[[grey_playbooks]]
+name = "oecd_scrape"
+kind = "scrape"
+hosts = ["oecd.org", "oecd-ilibrary.org"]
+href_re = '''(?i)/download/|\.pdf(?:\?|$)'''
+
+[[grey_playbooks]]
+name = "who_scrape"
+kind = "scrape"
+hosts = ["who.int"]
+href_re = '''(?i)/iris/|\.pdf(?:\?|$)|download'''
+
+[[grey_playbooks]]
+name = "unep_scrape"
+kind = "scrape"
+hosts = ["unep.org", "wedocs.unep.org"]
+href_re = '''(?i)\.pdf(?:\?|$)|/bitstream/|/publications/|download'''
+
+[[grey_playbooks]]
+name = "undp_scrape"
+kind = "scrape"
+hosts = ["undp.org"]
+href_re = '''(?i)\.pdf(?:\?|$)|/publications/|/wp-content/uploads/|download'''

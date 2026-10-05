@@ -1,0 +1,16 @@
+{
+  "playbook": "thinktank-ocean",
+  "url": "https://www.pewtrusts.org/en/research-and-analysis/reports",
+  "extra": "",
+  "note": "listing: Pew reports",
+  "stamp": "",
+  "status": "miss",
+  "chosen": "",
+  "resolved": "https://www.pew.org/en/research-and-analysis/reports",
+  "detail": "HTTP 404",
+  "nbytes": 0,
+  "checked": [],
+  "probed_at": "2026-10-05T14:44:17+00:00",
+  "anchors": [],
+  "metas": []
+}

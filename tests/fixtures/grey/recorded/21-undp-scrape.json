@@ -1,0 +1,16 @@
+{
+  "playbook": "undp_scrape",
+  "url": "https://www.undp.org/publications/human-development-report-2023-24",
+  "extra": "",
+  "note": "document: Human Development Report 2023/24",
+  "stamp": "undp_scrape",
+  "status": "miss",
+  "chosen": "",
+  "resolved": "https://www.undp.org/publications/human-development-report-2023-24",
+  "detail": "HTTP 403",
+  "nbytes": 0,
+  "checked": [],
+  "probed_at": "2026-10-05T14:44:48+00:00",
+  "anchors": [],
+  "metas": []
+}

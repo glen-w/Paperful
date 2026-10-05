@@ -1,0 +1,349 @@
+{
+  "playbook": "bbnj-doalos-prepcom",
+  "url": "https://www.un.org/bbnjagreement/",
+  "extra": "",
+  "note": "listing: BBNJ agreement site",
+  "stamp": "bbnj-doalos-prepcom",
+  "status": "pass",
+  "chosen": "https://treaties.un.org/doc/Publication/CN/2025/CN.447.2025-Eng.pdf",
+  "resolved": "https://www.un.org/bbnjagreement/en",
+  "detail": "pdf",
+  "nbytes": 54322,
+  "checked": [
+    {
+      "url": "https://treaties.un.org/doc/Publication/CN/2025/CN.447.2025-Eng.pdf",
+      "pdf": true,
+      "nbytes": 54322,
+      "status_code": 200,
+      "detail": "pdf"
+    }
+  ],
+  "probed_at": "2026-10-05T14:43:51+00:00",
+  "anchors": [
+    {
+      "href": "#main-content",
+      "text": "Skip to main content"
+    },
+    {
+      "href": "https://www.un.org/",
+      "text": "Welcome to the United Nations"
+    },
+    {
+      "href": "/bbnjagreement/ar",
+      "text": "\u0627\u0644\u0639\u0631\u0628\u064a\u0629"
+    },
+    {
+      "href": "/bbnjagreement/zh",
+      "text": "\u4e2d\u6587"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "English"
+    },
+    {
+      "href": "/bbnjagreement/fr",
+      "text": "Fran\u00e7ais"
+    },
+    {
+      "href": "/bbnjagreement/ru",
+      "text": "\u0420\u0443\u0441\u0441\u043a\u0438\u0439"
+    },
+    {
+      "href": "/bbnjagreement/es",
+      "text": "Espa\u00f1ol"
+    },
+    {
+      "href": "https://www.un.org/en",
+      "text": ""
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Agreement on Marine Biological Diversity of Areas beyond National Jurisdiction"
+    },
+    {
+      "href": "/bbnjagreement/ar",
+      "text": "\u0627\u0644\u0639\u0631\u0628\u064a\u0629"
+    },
+    {
+      "href": "/bbnjagreement/zh",
+      "text": "\u4e2d\u6587"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "English"
+    },
+    {
+      "href": "/bbnjagreement/fr",
+      "text": "Fran\u00e7ais"
+    },
+    {
+      "href": "/bbnjagreement/ru",
+      "text": "\u0420\u0443\u0441\u0441\u043a\u0438\u0439"
+    },
+    {
+      "href": "/bbnjagreement/es",
+      "text": "Espa\u00f1ol"
+    },
+    {
+      "href": "/bbnjagreement/ar",
+      "text": "\u0627\u0644\u0639\u0631\u0628\u064a\u0629"
+    },
+    {
+      "href": "/bbnjagreement/zh",
+      "text": "\u4e2d\u6587"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "English"
+    },
+    {
+      "href": "/bbnjagreement/fr",
+      "text": "Fran\u00e7ais"
+    },
+    {
+      "href": "/bbnjagreement/ru",
+      "text": "\u0420\u0443\u0441\u0441\u043a\u0438\u0439"
+    },
+    {
+      "href": "/bbnjagreement/es",
+      "text": "Espa\u00f1ol"
+    },
+    {
+      "href": "#global_search_block--wrapper",
+      "text": "Search"
+    },
+    {
+      "href": "#region-menu",
+      "text": "Menu"
+    },
+    {
+      "href": "#tab--panel",
+      "text": "News"
+    },
+    {
+      "href": "#tab--2--panel",
+      "text": "Our work"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Global"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Health"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Local"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Human rights"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Peace and security"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Covid-19"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Events and news"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Get involved"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Live now"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Global"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Health"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Local"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Human rights"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Peace and security"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Covid-19"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Events and news"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Get involved"
+    },
+    {
+      "href": "/bbnjagreement/en",
+      "text": "Live now"
+    },
+    {
+      "href": "/bbnjagreement/en/bbnj-agreement",
+      "text": "Home"
+    },
+    {
+      "href": "/bbnjagreement/en/bbnj-agreement/about-agreement",
+      "text": "About the Agreement"
+    },
+    {
+      "href": "/bbnjagreement/en/bbnj-agreement/text-bbnj-agreement",
+      "text": "Text of the Agreement"
+    },
+    {
+      "href": "/bbnjagreement/en/bbnj-agreement/becoming-party",
+      "text": "Becoming a Party"
+    },
+    {
+      "href": "/bbnjagreement/en/bbnj-agreement/history",
+      "text": "History"
+    },
+    {
+      "href": "https://www.un.org/bbnjagreement/en/bbnj-agreement/general-assembly-resolutions-and-decisions",
+      "text": "General Assembly resolutions and decisions"
+    },
+    {
+      "href": "/bbnjagreement/en/notifications",
+      "text": "Notifications"
+    },
+    {
+      "href": "/bbnjagreement/en/focal-points-formal-communications",
+      "text": "Focal points for formal communications"
+    },
+    {
+      "href": "/bbnjagreement/en/mgr-notifications",
+      "text": "Notifications under article 12"
+    },
+    {
+      "href": "/bbnjagreement/en/Information-sharing/CBTMT",
+      "text": "Capacity-building and the transfer of marine technology"
+    },
+    {
+      "href": "/bbnjagreement/en/meetings/preparatory-commission/background",
+      "text": "Background"
+    },
+    {
+      "href": "/bbnjagreement/en/meetings/preparatory-commission/officers",
+      "text": "Officers"
+    },
+    {
+      "href": "/bbnjagreement/en/meetings/preparatory-commission/participation/participation",
+      "text": "Participation"
+    },
+    {
+      "href": "/bbnjagreement/en/meetings/preparatory-commission/participation/credentials-and-registration",
+      "text": "Credentials and Registration"
+    },
+    {
+      "href": "/bbnjagreement/en/meetings/preparatory-commission/participation/bbnj-trust-fund",
+      "text": "Trust Fund"
+    },
+    {
+      "href": "/bbnjagreement/en/meetings/preparatory-commission/documents/first-session",
+      "text": "First session"
+    },
+    {
+      "href": "/bbnjagreement/en/second-session-18-29-august-2025",
+      "text": "Second session"
+    },
+    {
+      "href": "/bbnjagreement/en/third-session-23-march-2-april-2026",
+      "text": "Third session"
+    },
+    {
+      "href": "/bbnjagreement/en/meetings/preparatory-commission/documents/organizational-meeting",
+      "text": "Organizational Meeting"
+    },
+    {
+      "href": "/bbnjagreement/en/capacity-building-and-technical-assistance/overview",
+      "text": "Overview"
+    },
+    {
+      "href": "/bbnjagreement/en/capacity-building-and-technical-assistance/regional-workshops",
+      "text": "Regional Workshops"
+    },
+    {
+      "href": "/bbnjagreement/en/capacity-building-and-technical-assistance/technical-assistance-national-level",
+      "text": "Technical Assistance"
+    },
+    {
+      "href": "/bbnjagreement/en/capacity-building-and-technical-assistance/briefings",
+      "text": "Briefings"
+    },
+    {
+      "href": "/bbnjagreement/en/capacity-building-and-technical-assistance/side-events",
+      "text": "Side Events"
+    },
+    {
+      "href": "/bbnjagreement/en/capacity-building-and-technical-assistance/tools-and-materials",
+      "text": "Tools and Materials"
+    },
+    {
+      "href": "/bbnjagreement/en/capacity-building-and-technical-assistance/global-environment-facility-gef-support",
+      "text": "GEF Support"
+    },
+    {
+      "href": "/bbnjagreement/en/explainer-video",
+      "text": "Explainer Video"
+    },
+    {
+      "href": "/bbnjagreement/en/media/press-releases",
+      "text": "Press Releases"
+    },
+    {
+      "href": "/bbnjagreement/en/media/meeting-coverage",
+      "text": "Meeting Coverage"
+    },
+    {
+      "href": "/bbnjagreement/en/media/webcast",
+      "text": "Webcast"
+    },
+    {
+      "href": "/bbnjagreement/en/resources",
+      "text": "Resources"
+    },
+    {
+      "href": "/bbnjagreement/en/secretariat-0",
+      "text": "Interim Secretariat"
+    },
+    {
+      "href": "/bbnjagreement/en/vacancies",
+      "text": "Vacancies"
+    },
+    {
+      "href": "/bbnjagreement/en/bbnj-agreement",
+      "text": "Home"
+    },
+    {
+      "href": "/bbnjagreement/en/bbnj-agreement/about-agreement",
+      "text": "About the Agreement"
+    },
+    {
+      "href": "/bbnjagreement/en/bbnj-agreement/text-bbnj-agreement",
+      "text": "Text of the Agreement"
+    },
+    {
+      "href": "https://treaties.un.org/doc/Publication/CN/2025/CN.447.2025-Eng.pdf",
+      "text": "C.N.447.2025.TREATIES-XXI.10"
+    }
+  ],
+  "metas": []
+}

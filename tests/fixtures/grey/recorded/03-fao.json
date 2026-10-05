@@ -1,0 +1,24 @@
+{
+  "playbook": "fao",
+  "url": "https://www.fao.org/3/cc0461en/cc0461en.htm",
+  "extra": "",
+  "note": "document: SOFIA 2022 /3/{code}/ rewrite",
+  "stamp": "fao",
+  "status": "miss",
+  "chosen": "https://www.fao.org/3/cc0461en/cc0461en.pdf",
+  "resolved": "https://www.fao.org/3/cc0461en/cc0461en.pdf",
+  "detail": "ConnectTimeout",
+  "nbytes": 0,
+  "checked": [
+    {
+      "url": "https://www.fao.org/3/cc0461en/cc0461en.pdf",
+      "pdf": false,
+      "nbytes": 0,
+      "status_code": 0,
+      "detail": "ConnectTimeout"
+    }
+  ],
+  "probed_at": "2026-10-05T14:43:18+00:00",
+  "anchors": [],
+  "metas": []
+}

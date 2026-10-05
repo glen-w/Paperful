@@ -1,0 +1,465 @@
+{
+  "playbook": "rfmo-docs",
+  "url": "https://www.sprfmo.int/fisheries/conservation-and-management-measures",
+  "extra": "",
+  "note": "listing: SPRFMO CMMs",
+  "stamp": "rfmo-docs",
+  "status": "pass",
+  "chosen": "https://www.sprfmo.int/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-01-2026-Trachurus-murphyi.pdf",
+  "resolved": "https://www.sprfmo.int/fisheries/conservation-and-management-measures",
+  "detail": "pdf",
+  "nbytes": 239098,
+  "checked": [
+    {
+      "url": "https://www.sprfmo.int/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-01-2026-Trachurus-murphyi.pdf",
+      "pdf": true,
+      "nbytes": 239098,
+      "status_code": 200,
+      "detail": "pdf"
+    }
+  ],
+  "probed_at": "2026-10-05T14:43:58+00:00",
+  "anchors": [
+    {
+      "href": "/about/secretariat/",
+      "text": "Contact"
+    },
+    {
+      "href": "Security/login?BackURL=/fisheries/conservation-and-management-measures",
+      "text": "Login"
+    },
+    {
+      "href": "/",
+      "text": ""
+    },
+    {
+      "href": "/",
+      "text": "Home"
+    },
+    {
+      "href": "/about",
+      "text": "About \u25be \u25be"
+    },
+    {
+      "href": "/about/docs",
+      "text": "Basic Documents"
+    },
+    {
+      "href": "/about/participation",
+      "text": "Participation"
+    },
+    {
+      "href": "/about/chairpersons",
+      "text": "Chairpersons"
+    },
+    {
+      "href": "/about/convention-area",
+      "text": "Convention Area"
+    },
+    {
+      "href": "/about/secretariat",
+      "text": "Secretariat"
+    },
+    {
+      "href": "/about/becoming-a-member-of-sprfmo",
+      "text": "Becoming a Member of SPRFMO"
+    },
+    {
+      "href": "/meetings",
+      "text": "Meetings \u25be \u25be"
+    },
+    {
+      "href": "/meetings/comm",
+      "text": "Commission Meetings \uff0b \u25be"
+    },
+    {
+      "href": "/meetings/comm/comm15-2027",
+      "text": "COMM15 2027"
+    },
+    {
+      "href": "/meetings/comm/14th-commission-meeting",
+      "text": "COMM14 2026"
+    },
+    {
+      "href": "/meetings/comm/13th-commission-2025",
+      "text": "COMM13 2025"
+    },
+    {
+      "href": "/meetings/comm/comm12",
+      "text": "COMM12 2024"
+    },
+    {
+      "href": "/meetings/comm/comm11",
+      "text": "COMM11 2023"
+    },
+    {
+      "href": "/meetings/comm/10th-commission-2022",
+      "text": "COMM10 2022"
+    },
+    {
+      "href": "/meetings/comm/9th-commission-2021",
+      "text": "COMM9 2021"
+    },
+    {
+      "href": "/meetings/comm/8th-commission-2020",
+      "text": "COMM8 2020"
+    },
+    {
+      "href": "/meetings/comm/7th-commission-2019",
+      "text": "COMM7 2019"
+    },
+    {
+      "href": "/meetings/comm/comm6",
+      "text": "COMM6 2018"
+    },
+    {
+      "href": "/meetings/comm/5th-commission-2017-comm5",
+      "text": "COMM5 2017"
+    },
+    {
+      "href": "/meetings/comm/4th-commission-2016-comm4",
+      "text": "COMM4 2016"
+    },
+    {
+      "href": "/meetings/comm/3rd-commission-2015-comm3",
+      "text": "COMM3 2015"
+    },
+    {
+      "href": "/meetings/comm/2",
+      "text": "COMM2 2014"
+    },
+    {
+      "href": "/meetings/comm/1",
+      "text": "COMM1 2013"
+    },
+    {
+      "href": "/meetings/ctc",
+      "text": "CTC Meetings \uff0b \u25be"
+    },
+    {
+      "href": "/meetings/ctc/13th-ctc-2026",
+      "text": "13th CTC 2026"
+    },
+    {
+      "href": "/meetings/ctc/12th-ctc-2025",
+      "text": "12th CTC 2025"
+    },
+    {
+      "href": "/meetings/ctc/11th-ctc-2024",
+      "text": "11th CTC 2024"
+    },
+    {
+      "href": "/meetings/ctc/10th-ctc-2023",
+      "text": "10th CTC 2023"
+    },
+    {
+      "href": "/meetings/ctc/9th-ctc-2022",
+      "text": "9th CTC 2022"
+    },
+    {
+      "href": "/meetings/ctc/8th-ctc-2021",
+      "text": "8th CTC 2021"
+    },
+    {
+      "href": "/meetings/ctc/7th-ctc-2020",
+      "text": "7th CTC 2020"
+    },
+    {
+      "href": "/meetings/ctc/6th-ctc-2019",
+      "text": "6th CTC 2019"
+    },
+    {
+      "href": "/meetings/ctc/5th-ctc-2018",
+      "text": "5th CTC 2018"
+    },
+    {
+      "href": "/meetings/ctc/4th-ctc-2017",
+      "text": "4th CTC 2017"
+    },
+    {
+      "href": "/meetings/ctc/3",
+      "text": "3rd CTC 2016"
+    },
+    {
+      "href": "/meetings/ctc/2",
+      "text": "2nd CTC 2015"
+    },
+    {
+      "href": "/meetings/ctc/1",
+      "text": "1st CTC 2014"
+    },
+    {
+      "href": "/meetings/fac",
+      "text": "FAC Meetings \uff0b \u25be"
+    },
+    {
+      "href": "/meetings/fac/13th-fac-2026",
+      "text": "13th FAC 2026"
+    },
+    {
+      "href": "/meetings/fac/12th-fac-2025",
+      "text": "12th FAC 2025"
+    },
+    {
+      "href": "/meetings/fac/11th-fac-2024",
+      "text": "11th FAC 2024"
+    },
+    {
+      "href": "/meetings/fac/10th-fac-2023",
+      "text": "10th FAC 2023"
+    },
+    {
+      "href": "/meetings/fac/9th-fac-2022",
+      "text": "9th FAC 2022"
+    },
+    {
+      "href": "/meetings/fac/8th-fac-2021",
+      "text": "8th FAC 2021"
+    },
+    {
+      "href": "/meetings/fac/7th-fac-2020",
+      "text": "7th FAC 2020"
+    },
+    {
+      "href": "/meetings/fac/6th-fac-2019",
+      "text": "6th FAC 2019"
+    },
+    {
+      "href": "/meetings/fac/5th-fac-2018",
+      "text": "5th FAC 2018"
+    },
+    {
+      "href": "/meetings/fac/fac4",
+      "text": "4th FAC 2017"
+    },
+    {
+      "href": "/meetings/fac/3rd-fac-2016",
+      "text": "3rd FAC 2016"
+    },
+    {
+      "href": "/meetings/fac/2nd-fac-2015",
+      "text": "2nd FAC 2015"
+    },
+    {
+      "href": "/meetings/fac/1st-fac-2014",
+      "text": "1st FAC 2014"
+    },
+    {
+      "href": "/meetings/scientific-committee",
+      "text": "SC Meetings \uff0b \u25be"
+    },
+    {
+      "href": "/meetings/scientific-committee/sc-workshops",
+      "text": "SC workshops"
+    },
+    {
+      "href": "/meetings/scientific-committee/14th-sc-2026",
+      "text": "14th SC 2026"
+    },
+    {
+      "href": "/meetings/scientific-committee/13th-sc-2025",
+      "text": "13th SC 2025"
+    },
+    {
+      "href": "/meetings/scientific-committee/12th-sc-2024",
+      "text": "12th SC 2024"
+    },
+    {
+      "href": "/meetings/scientific-committee/11th-sc-2023",
+      "text": "11th SC 2023"
+    },
+    {
+      "href": "/meetings/scientific-committee/10th-sc-2022",
+      "text": "10th SC 2022"
+    },
+    {
+      "href": "/meetings/scientific-committee/9th-sc-2021",
+      "text": "9th SC 2021"
+    },
+    {
+      "href": "/meetings/scientific-committee/8th-sc-2020",
+      "text": "8th SC 2020"
+    },
+    {
+      "href": "/meetings/scientific-committee/7th-sc-2019",
+      "text": "7th SC 2019"
+    },
+    {
+      "href": "/meetings/scientific-committee/6th-sc-2018",
+      "text": "6th SC 2018"
+    },
+    {
+      "href": "/meetings/scientific-committee/5th-sc-2017",
+      "text": "5th SC 2017"
+    },
+    {
+      "href": "/meetings/scientific-committee/4th-sc-2016",
+      "text": "4th SC 2016"
+    },
+    {
+      "href": "/meetings/scientific-committee/3rd-sc-2015",
+      "text": "3rd SC 2015"
+    },
+    {
+      "href": "/meetings/scientific-committee/2nd-sc-2014",
+      "text": "2nd SC 2014"
+    },
+    {
+      "href": "/meetings/scientific-committee/1st-sc-2013",
+      "text": "1st SC 2013"
+    },
+    {
+      "href": "/meetings/meeting-archive",
+      "text": "Meeting Archive \uff0b \u25be"
+    },
+    {
+      "href": "/meetings/meeting-archive/international-consultations-and-preparatory-conference",
+      "text": "Int Cons & Prep Conf"
+    },
+    {
+      "href": "/meetings/meeting-archive/new-meetingpage-Science-Working-Group",
+      "text": "Science Working Group"
+    },
+    {
+      "href": "/meetings/meeting-archive/new-meetingpage-Data-and-Information-Working-Group",
+      "text": "Data & Information Working Group"
+    },
+    {
+      "href": "/meetings/meeting-archive/eastern-sub-regional-committee",
+      "text": "ESRMC Meetings"
+    },
+    {
+      "href": "/meetings/meeting-archive/new-meetingpage-Science-Working-Group/swg-meetings",
+      "text": "SWG Meetings (Pre SPRFMO)"
+    },
+    {
+      "href": "/meetings/meeting-reports",
+      "text": "Meeting reports"
+    },
+    {
+      "href": "/fisheries",
+      "text": "Fisheries \u25be \u25be"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-01-2026-Trachurus-murphyi.pdf",
+      "text": "View CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-02-2026-Data-Standards.pdf",
+      "text": "View\u00a0CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-03-2025-Bottom-Fishing_CONSEQ2026.pdf",
+      "text": "View\u00a0CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-03a-2026-Deepwater-Species.pdf",
+      "text": "View\u00a0CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2025-CMMs/CMM-04-2025-IUU-Vessel-List-.pdf",
+      "text": "View CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-05-2026-Record-of-Vessels.pdf",
+      "text": "View\u00a0CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-06-2023-Commission-VMS_CONSEQ2026.pdf",
+      "text": "View\u00a0CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-07-2026-Port-Inspections-a.pdf",
+      "text": "View CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2023-CMMs/CMM-08-2023-Gillnets_29Mar23.pdf",
+      "text": "View\u00a0CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-09-2026-Seabirds.pdf",
+      "text": "View\u00a0CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2021-CMMs/CMM-10-2020-CMS-31Mar20.pdf",
+      "text": "View CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-11-2023-Boarding-and-Inspection_CONSEQ2026.pdf",
+      "text": "View\u00a0CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-12-2024-Transhipment_CONSEQ2026.pdf",
+      "text": "View\u00a0CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-13-2024-Exploratory-Fisheries_CONSEQ2026.pdf",
+      "text": "View\u00a0CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-14b-2024-Exploratory-Trapping-COK_CONSEQ2026.pdf",
+      "text": "View\u00a0CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-14e-2024-Exploratory-Toothfish-EU_CONSEQ2026.pdf",
+      "text": "View\u00a0CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-14f-2024-Exploratory-Toothfish-AUS_CONSEQ2026.pdf",
+      "text": "View\u00a0CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-14g-2024-Exploratory-Hapuka-COK_CONSEQ2026.pdf",
+      "text": "View\u00a0CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2025-CMMs/CMM-14h-2025-KOR-Exploratory-Toothfish-Fishery-a.pdf",
+      "text": "View CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2025-CMMs/CMM-14i-2025-NZ-Exploratory-Toothfish-Fishery.pdf",
+      "text": "View CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2021-CMMs/CMM-15-2016-Stateless-Vessels_FormattedMay2019.pdf",
+      "text": "View CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-16-2025-Observer-Programme_CONSEQ2026.pdf",
+      "text": "View\u00a0CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2022-CMMs/CMM-17-2022-Marine-Pollution-7Mar22.pdf",
+      "text": "View CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-18-2026-Squid.pdf",
+      "text": "View\u00a0CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-19-2021-Vessel-Markings_CONSEQ2026.pdf",
+      "text": "View\u00a0CMM"
+    },
+    {
+      "href": "/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-20-2026-Electronic-Monitoring-Standards.pdf",
+      "text": "View CMM"
+    },
+    {
+      "href": "/assets/Basic-Documents/Convention-and-Final-Act/Article-16-Decisions/Decision-02-2018-Rules-for-CNCPs_format2019.pdf",
+      "text": "Decision 02-2018"
+    },
+    {
+      "href": "/assets/Basic-Documents/Convention-and-Final-Act/Article-16-Decisions/Decision-13-2023-Decision-on-Climate-Change_29Mar23.pdf",
+      "text": "Decision 13-2023"
+    },
+    {
+      "href": "/assets/Basic-Documents/Convention-and-Final-Act/Article-16-Decisions/Decision-17-2024-to-protect-the-Salas-y-Gomez-and-Nazca-ridges-area-1Mar2024.pdf",
+      "text": "Decision 17-2024"
+    },
+    {
+      "href": "/assets/Basic-Documents/Convention-and-Final-Act/Article-16-Decisions/Decision-18-2024-Labour-Standards-in-SPRFMO-1Mar2024.pdf",
+      "text": "Decision 18-2024"
+    }
+  ],
+  "metas": []
+}

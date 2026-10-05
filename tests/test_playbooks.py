@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from paperful.config import load_config
 from paperful.playbooks import (
     GreyPlaybook,
     apply_rewrite,
     apply_synthesize,
     load_builtin_pack,
+    load_pack_dir,
     merge_playbooks,
     rewrite_playbook_name,
+    scrape_playbooks_for_host,
 )
 from paperful.sources.landing import (
     extract_pdf_urls,
@@ -18,6 +22,13 @@ from paperful.sources.landing import (
     rewrite_known_pdf_url,
 )
 from tests.conftest import make_item
+
+_EXAMPLES = (
+    Path(__file__).resolve().parents[1]
+    / "paperful"
+    / "data"
+    / "grey_playbooks_examples"
+)
 
 _NAMED_PACKS = (
     "undocs-unga-vme",
@@ -34,8 +45,12 @@ def test_builtin_ocean_pack_loads():
         assert name in names
     assert "undocs-unga-vme-symbol" in names
     assert "fao" in names
-    assert "oecd_scrape" in names
-    assert "who_scrape" in names
+    assert "rfmo-docs" in names
+    assert "iucn-dosi" in names
+    assert "thinktank-ocean" in names
+    # Energy and intl-orgs live in grey_playbooks_examples/, not the builtin.
+    for moved in ("oecd_scrape", "who_scrape", "iea_scrape", "irena_scrape"):
+        assert moved not in names
 
 
 def test_undocs_unga_vme_rewrite_and_synthesize():
@@ -184,12 +199,156 @@ pdf_template = "https://acme.test/pdf/{0}"
     )
 
 
-def test_who_scrape_playbook():
-    html = """
-    <html><body><a href="/iris/bitstream/123/file.pdf">Download</a></body></html>
-    """
-    urls = extract_pdf_urls(html, "https://www.who.int/publications/foo")
-    assert any(u.endswith(".pdf") for u in urls)
+def _books_with_examples() -> list:
+    load_builtin_pack.cache_clear()
+    return merge_playbooks(True, extra=load_pack_dir(_EXAMPLES))
+
+
+def test_example_packs_are_separate_from_builtin():
+    """Energy and intl-orgs load only from the examples directory."""
+    books = load_pack_dir(_EXAMPLES)
+    names = {p.name for p in books}
+    assert names == {
+        "iea_scrape",
+        "irena_scrape",
+        "oecd_scrape",
+        "who_scrape",
+        "unep_scrape",
+        "undp_scrape",
+    }
+    builtin = {p.name for p in load_builtin_pack()}
+    assert names.isdisjoint(builtin)
+
+
+def test_example_pack_host_ownership():
+    """Contested hosts stay on one playbook after the examples are merged."""
+    books = _books_with_examples()
+
+    def names(host: str) -> list[str]:
+        return [p.name for p in scrape_playbooks_for_host(host, books)]
+
+    assert names("www.un.org") == ["bbnj-doalos-prepcom"]
+    assert names("www.highseasalliance.org") == ["bbnj-doalos-prepcom"]
+    assert names("enb.iisd.org") == ["bbnj-doalos-prepcom"]
+    assert names("www.fao.org") == []
+    assert names("www.iea.org") == ["iea_scrape"]
+    assert names("www.irena.org") == ["irena_scrape"]
+    assert names("www.unep.org") == ["unep_scrape"]
+    assert names("wedocs.unep.org") == ["unep_scrape"]
+    assert names("www.undp.org") == ["undp_scrape"]
+    assert names("www.who.int") == ["who_scrape"]
+    assert names("www.oecd.org") == ["oecd_scrape"]
+    assert names("www.oecd-ilibrary.org") == ["oecd_scrape"]
+    assert names("www.sprfmo.int") == ["rfmo-docs"]
+    assert names("www.neafc.org") == ["rfmo-docs"]
+    assert names("www.ccamlr.org") == ["rfmo-docs"]
+    assert names("portals.iucn.org") == ["iucn-dosi"]
+    assert names("www.dosi-project.org") == ["iucn-dosi"]
+    assert names("www.iddri.org") == ["thinktank-ocean"]
+    assert names("www.pewtrusts.org") == ["thinktank-ocean"]
+
+    builtin = load_builtin_pack()
+    assert scrape_playbooks_for_host("www.iea.org", builtin) == []
+    assert scrape_playbooks_for_host("www.who.int", builtin) == []
+    assert scrape_playbooks_for_host("www.unep.org", builtin) == []
+
+
+def test_new_ocean_scrape_playbooks():
+    """One landing fixture per playbook added to the ocean builtin."""
+    books = load_builtin_pack()
+    cases = (
+        (
+            "https://www.sprfmo.int/meetings/comm/12",
+            "/meetings/2024/comm12-report",
+            "https://www.sprfmo.int/meetings/2024/comm12-report",
+        ),
+        (
+            "https://www.iucn.org/resources",
+            "/resources/marine-brief",
+            "https://www.iucn.org/resources/marine-brief",
+        ),
+        (
+            "https://www.iddri.org/en/publications",
+            "/en/publications/ocean-brief",
+            "https://www.iddri.org/en/publications/ocean-brief",
+        ),
+    )
+    for base, href, expected in cases:
+        html = f'<html><body><a href="{href}">Annex</a><a href="/about/team">About</a></body></html>'
+        urls = extract_pdf_urls(html, base, books)
+        assert expected in urls
+        assert not any(u.endswith("/about/team") for u in urls)
+
+    # High Seas Alliance stays on bbnj; the think-tank path is not a bbnj hint.
+    hsa = extract_pdf_urls(
+        '<html><body><a href="/en/publications/ocean-brief">Annex</a></body></html>',
+        "https://www.highseasalliance.org/resources/",
+        books,
+    )
+    assert hsa == []
+    # FAO stays on the rewrite playbook; RFMO meeting paths do not apply.
+    fao = extract_pdf_urls(
+        '<html><body><a href="/meetings/2024/comm12-report">Annex</a></body></html>',
+        "https://www.fao.org/fishery/",
+        books,
+    )
+    assert fao == []
+
+
+def test_energy_and_intl_scrape_playbooks():
+    """One landing fixture per playbook in the optional example packs."""
+    books = _books_with_examples()
+    cases = (
+        (
+            "https://www.iea.org/reports/renewables",
+            "/files/renewables-2024",
+            "https://www.iea.org/files/renewables-2024",
+        ),
+        (
+            "https://www.who.int/publications/i/item/9789240099999",
+            "/iris/handle/10665/345678",
+            "https://www.who.int/iris/handle/10665/345678",
+        ),
+        (
+            "https://www.unep.org/resources",
+            "/publications/frontiers-2024",
+            "https://www.unep.org/publications/frontiers-2024",
+        ),
+        (
+            "https://www.undp.org/publications",
+            "/publications/hdr2024",
+            "https://www.undp.org/publications/hdr2024",
+        ),
+        (
+            "https://www.oecd.org/en/publications/outlook.html",
+            "/download/outlook-2024",
+            "https://www.oecd.org/download/outlook-2024",
+        ),
+    )
+    for base, href, expected in cases:
+        html = f'<html><body><a href="{href}">Annex</a><a href="/about/team">About</a></body></html>'
+        urls = extract_pdf_urls(html, base, books)
+        assert expected in urls
+        assert not any(u.endswith("/about/team") for u in urls)
+
+    # IRENA is PDF-only: a publications path is not a scrape hit.
+    irena = extract_pdf_urls(
+        '<html><body><a href="/publications/2024/Jan/report">Annex</a>'
+        '<a href="/media/Files/IRENA/report.pdf">PDF</a></body></html>',
+        "https://www.irena.org/Publications/2024/Jan/Report",
+        books,
+    )
+    assert any(u.endswith("report.pdf") for u in irena)
+    assert not any("/publications/2024/Jan/report" in u for u in irena)
+
+    # These hosts do nothing until the example packs are loaded.
+    builtin = load_builtin_pack()
+    bare = extract_pdf_urls(
+        '<html><body><a href="/files/renewables-2024">Annex</a></body></html>',
+        "https://www.iea.org/reports/renewables",
+        builtin,
+    )
+    assert bare == []
 
 
 def test_documents_fao_rewrite():

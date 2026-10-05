@@ -1,0 +1,16 @@
+{
+  "playbook": "oecd_scrape",
+  "url": "https://www.oecd.org/en/publications.html",
+  "extra": "",
+  "note": "listing: OECD publications",
+  "stamp": "oecd_scrape",
+  "status": "miss",
+  "chosen": "",
+  "resolved": "https://www.oecd.org/en/publications.html",
+  "detail": "HTTP 403",
+  "nbytes": 0,
+  "checked": [],
+  "probed_at": "2026-10-05T14:44:21+00:00",
+  "anchors": [],
+  "metas": []
+}

@@ -1,0 +1,359 @@
+{
+  "playbook": "iucn-dosi",
+  "url": "https://www.iucn.org/resources",
+  "extra": "",
+  "note": "listing: IUCN resources",
+  "stamp": "iucn-dosi",
+  "status": "miss",
+  "chosen": "https://iucn.org/resources/contributions-nature-platform",
+  "resolved": "https://iucn.org/resources",
+  "detail": "not a PDF",
+  "nbytes": 0,
+  "checked": [
+    {
+      "url": "https://iucn.org/resources/conservation-tool/contributions-nature-platform",
+      "pdf": false,
+      "nbytes": 69630,
+      "status_code": 200,
+      "detail": "not a PDF"
+    },
+    {
+      "url": "https://iucn.org/resources/conservation-tool/iucn-global-ecosystem-typology",
+      "pdf": false,
+      "nbytes": 73121,
+      "status_code": 200,
+      "detail": "not a PDF"
+    },
+    {
+      "url": "https://iucn.org/resources/information-brief/freshwater-biodiversity-cbd-cop17-close-inland-waters-implementation",
+      "pdf": false,
+      "nbytes": 69898,
+      "status_code": 200,
+      "detail": "not a PDF"
+    }
+  ],
+  "probed_at": "2026-10-05T14:44:10+00:00",
+  "anchors": [
+    {
+      "href": "#main-content",
+      "text": "Skip to main content"
+    },
+    {
+      "href": "/about-iucn",
+      "text": "About IUCN"
+    },
+    {
+      "href": "/news-events",
+      "text": "News & Events"
+    },
+    {
+      "href": "/press",
+      "text": "Press"
+    },
+    {
+      "href": "/blog",
+      "text": "Blog"
+    },
+    {
+      "href": "/our-work/region/asia",
+      "text": "Asia"
+    },
+    {
+      "href": "/our-work/region/eastern-and-southern-africa",
+      "text": "Eastern and Southern Africa"
+    },
+    {
+      "href": "/our-work/region/eastern-europe-and-central-asia",
+      "text": "Eastern Europe and Central Asia"
+    },
+    {
+      "href": "/our-work/region/europe",
+      "text": "Europe"
+    },
+    {
+      "href": "/our-work/region/mediterranean",
+      "text": "Mediterranean"
+    },
+    {
+      "href": "/our-work/region/mexico-central-america-and-caribbean",
+      "text": "Mexico, Central America and the Caribbean"
+    },
+    {
+      "href": "/our-work/region/north-america",
+      "text": "North America"
+    },
+    {
+      "href": "/our-work/region/oceania",
+      "text": "Oceania"
+    },
+    {
+      "href": "/our-work/region/south-america",
+      "text": "South America"
+    },
+    {
+      "href": "/our-work/region/west-and-central-africa",
+      "text": "West and Central Africa"
+    },
+    {
+      "href": "/our-work/region/west-asia",
+      "text": "West Asia"
+    },
+    {
+      "href": "http://www.iucnacademy.org/",
+      "text": "IUCN Academy"
+    },
+    {
+      "href": "https://www.iucncontributionsfornature.org",
+      "text": "IUCN Contributions for Nature"
+    },
+    {
+      "href": "https://portals.iucn.org/library/",
+      "text": "IUCN Library"
+    },
+    {
+      "href": "https://www.iucnredlist.org/",
+      "text": "IUCN Red List of Threatened Species TM"
+    },
+    {
+      "href": "https://iucngreenlist.org/",
+      "text": "IUCN Green List of Protected and Conserved Areas"
+    },
+    {
+      "href": "https://worldheritageoutlook.iucn.org/",
+      "text": "IUCN World Heritage Outlook"
+    },
+    {
+      "href": "https://iucnleadersforum.org/",
+      "text": "IUCN Leaders Forum"
+    },
+    {
+      "href": "https://www.ecolex.org/",
+      "text": "ECOLEX"
+    },
+    {
+      "href": "https://www.protectedplanet.net/en",
+      "text": "Protected Planet"
+    },
+    {
+      "href": "https://portals.iucn.org/union",
+      "text": "Union Portal (login required)"
+    },
+    {
+      "href": "https://engage.iucn.org/",
+      "text": "IUCN Engage (login required)"
+    },
+    {
+      "href": "https://portals.iucn.org/commissions/",
+      "text": "Commission portal (login required)"
+    },
+    {
+      "href": "#",
+      "text": ""
+    },
+    {
+      "href": "/",
+      "text": ""
+    },
+    {
+      "href": "/vision-and-programme",
+      "text": "Our Vision"
+    },
+    {
+      "href": "/vision-and-programme",
+      "text": "Vision and Programme"
+    },
+    {
+      "href": "/vision-and-programme/iucn-programme-2026-2029",
+      "text": "IUCN PROGRAMME 2026 - 2029"
+    },
+    {
+      "href": "/resources/contributions-nature-platform",
+      "text": "CONTRIBUTIONS FOR NATURE"
+    },
+    {
+      "href": "/our-work",
+      "text": "Our Work"
+    },
+    {
+      "href": "/our-work",
+      "text": "Our work"
+    },
+    {
+      "href": "/our-work/biodiversity",
+      "text": "Biodiversity"
+    },
+    {
+      "href": "/our-work/business-finance-and-economics",
+      "text": "Business engagement"
+    },
+    {
+      "href": "/our-work/climate-change",
+      "text": "Climate change"
+    },
+    {
+      "href": "/our-work/freshwater-and-water-security",
+      "text": "Freshwater and water security"
+    },
+    {
+      "href": "/our-work/governance-law-and-rights",
+      "text": "Governance - law and rights"
+    },
+    {
+      "href": "/our-work/nature-based-solutions",
+      "text": "Nature-based Solutions"
+    },
+    {
+      "href": "/our-work/oceans-and-coasts",
+      "text": "Ocean and coasts"
+    },
+    {
+      "href": "/our-work/protected-areas-and-land-use",
+      "text": "Protected areas and land use"
+    },
+    {
+      "href": "/our-work/region/asia",
+      "text": "Asia"
+    },
+    {
+      "href": "/our-work/region/eastern-and-southern-africa",
+      "text": "Eastern and Southern Africa"
+    },
+    {
+      "href": "/our-work/region/eastern-europe-and-central-asia",
+      "text": "Eastern Europe and Central Asia"
+    },
+    {
+      "href": "/our-work/region/europe",
+      "text": "Europe"
+    },
+    {
+      "href": "/our-work/region/mediterranean",
+      "text": "Mediterranean"
+    },
+    {
+      "href": "/our-work/region/mexico-central-america-and-caribbean",
+      "text": "Mexico, Central America and the Caribbean"
+    },
+    {
+      "href": "/our-work/region/north-america",
+      "text": "North America"
+    },
+    {
+      "href": "/our-work/region/oceania",
+      "text": "Oceania"
+    },
+    {
+      "href": "/our-work/region/south-america",
+      "text": "South America"
+    },
+    {
+      "href": "/our-work/region/west-and-central-africa",
+      "text": "West and Central Africa"
+    },
+    {
+      "href": "/our-work/region/west-asia",
+      "text": "West Asia"
+    },
+    {
+      "href": "/our-work/science-led-approach",
+      "text": "SCIENCE-LED APPROACH"
+    },
+    {
+      "href": "/our-work/Informing-policy",
+      "text": "INFORMING POLICY"
+    },
+    {
+      "href": "/our-work/supporting-conservation-action",
+      "text": "SUPPORTING CONSERVATION ACTION"
+    },
+    {
+      "href": "/our-work/gef-and-gcf-implementation",
+      "text": "GEF AND GCF IMPLEMENTATION"
+    },
+    {
+      "href": "/our-work/iucn-convening",
+      "text": "IUCN CONVENING"
+    },
+    {
+      "href": "/our-work/iucn-academy",
+      "text": "IUCN ACADEMY"
+    },
+    {
+      "href": "https://iucn.org/our-union/expert-commissions/youth-engagement-iucn",
+      "text": "IUCN YOUTH ENGAGEMENT"
+    },
+    {
+      "href": "/our-union",
+      "text": "Our Union"
+    },
+    {
+      "href": "/our-union",
+      "text": "Our Union"
+    },
+    {
+      "href": "/our-union/members",
+      "text": "Members"
+    },
+    {
+      "href": "/our-union/expert-commissions",
+      "text": "Expert Commissions"
+    },
+    {
+      "href": "/our-union/secretariat-and-director-general",
+      "text": "Secretariat and Director General"
+    },
+    {
+      "href": "/about-iucn/iucn-governance/iucn-president-and-council",
+      "text": "IUCN Council"
+    },
+    {
+      "href": "/our-union/iucn-world-conservation-congress",
+      "text": "IUCN WORLD CONSERVATION CONGRESS"
+    },
+    {
+      "href": "/our-union/iucn-world-conservation-congress/regional-conservation-fora",
+      "text": "REGIONAL CONSERVATION FORA"
+    },
+    {
+      "href": "/resources/contributions-nature-platform",
+      "text": "CONTRIBUTIONS FOR NATURE"
+    },
+    {
+      "href": "https://engage.iucn.org/",
+      "text": "IUCN ENGAGE (LOGIN REQUIRED)"
+    },
+    {
+      "href": "/resources",
+      "text": "Resources"
+    },
+    {
+      "href": "/resources",
+      "text": "Resources"
+    },
+    {
+      "href": "/resources#resources",
+      "text": "Search all resources"
+    },
+    {
+      "href": "/resources?rstype=1100#resources",
+      "text": "IUCN Briefs"
+    },
+    {
+      "href": "/resources#resource_types-resource_type_publication",
+      "text": "IUCN Publications"
+    },
+    {
+      "href": "/resources#resource_types-resource_type_conservation_tool",
+      "text": "Conservation Tools"
+    },
+    {
+      "href": "/our-work/science-led-approach/iucn-libraries",
+      "text": "IUCN LIBRARY"
+    },
+    {
+      "href": "/about-iucn",
+      "text": "About IUCN"
+    }
+  ],
+  "metas": []
+}

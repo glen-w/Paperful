@@ -1,0 +1,16 @@
+{
+  "playbook": "irena_scrape",
+  "url": "https://www.irena.org/Publications/2024/Mar/Renewable-Capacity-Statistics-2024",
+  "extra": "",
+  "note": "document: Renewable capacity statistics 2024",
+  "stamp": "irena_scrape",
+  "status": "miss",
+  "chosen": "",
+  "resolved": "https://www.irena.org/Publications/2024/Mar/Renewable-Capacity-Statistics-2024",
+  "detail": "HTTP 403",
+  "nbytes": 0,
+  "checked": [],
+  "probed_at": "2026-10-05T14:44:21+00:00",
+  "anchors": [],
+  "metas": []
+}

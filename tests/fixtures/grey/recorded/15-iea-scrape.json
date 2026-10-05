@@ -1,0 +1,16 @@
+{
+  "playbook": "iea_scrape",
+  "url": "https://www.iea.org/reports/world-energy-outlook-2024",
+  "extra": "",
+  "note": "document: World Energy Outlook 2024",
+  "stamp": "iea_scrape",
+  "status": "miss",
+  "chosen": "",
+  "resolved": "https://www.iea.org/reports/world-energy-outlook-2024",
+  "detail": "HTTP 403",
+  "nbytes": 0,
+  "checked": [],
+  "probed_at": "2026-10-05T14:44:19+00:00",
+  "anchors": [],
+  "metas": []
+}

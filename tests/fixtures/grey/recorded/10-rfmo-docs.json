@@ -1,0 +1,249 @@
+{
+  "playbook": "rfmo-docs",
+  "url": "https://www.ccamlr.org/en/conservation-and-management/conservation-measures",
+  "extra": "",
+  "note": "listing: CCAMLR conservation measures",
+  "stamp": "rfmo-docs",
+  "status": "pass",
+  "chosen": "https://www.ccamlr.org/en/system/files/EN%20-%20schedule%202025-26.pdf",
+  "resolved": "https://www.ccamlr.org/en/conservation-and-management/conservation-measures",
+  "detail": "pdf",
+  "nbytes": 4613516,
+  "checked": [
+    {
+      "url": "https://www.ccamlr.org/en/system/files/EN%20-%20schedule%202025-26.pdf",
+      "pdf": true,
+      "nbytes": 4613516,
+      "status_code": 200,
+      "detail": "pdf"
+    }
+  ],
+  "probed_at": "2026-10-05T14:44:06+00:00",
+  "anchors": [
+    {
+      "href": "/en",
+      "text": ""
+    },
+    {
+      "href": "/en",
+      "text": "CCAMLR"
+    },
+    {
+      "href": "/en",
+      "text": "Home"
+    },
+    {
+      "href": "#content",
+      "text": "Skip to Content"
+    },
+    {
+      "href": "/en/user/login",
+      "text": "Log in"
+    },
+    {
+      "href": "/en/organisation/about-ccamlr",
+      "text": "About CCAMLR"
+    },
+    {
+      "href": "/en/conservation-and-management/conservation-measures",
+      "text": "Conservation measures"
+    },
+    {
+      "href": "/en/science/science",
+      "text": "Science"
+    },
+    {
+      "href": "/en/fisheries/fisheries",
+      "text": "Fisheries"
+    },
+    {
+      "href": "/en/compliance/compliance",
+      "text": "Compliance"
+    },
+    {
+      "href": "/en/data/ccamlr-data",
+      "text": "Data"
+    },
+    {
+      "href": "https://meetings.ccamlr.org/en",
+      "text": "Meetings"
+    },
+    {
+      "href": "/en/publications/publications",
+      "text": "Publications"
+    },
+    {
+      "href": "https://circs.ccamlr.org",
+      "text": "Circulars"
+    },
+    {
+      "href": "/en/conservation-and-management/conservation-measures",
+      "text": "English"
+    },
+    {
+      "href": "/fr/conservation-and-management/conservation-and-management",
+      "text": "Fran\u00e7ais"
+    },
+    {
+      "href": "/ru/conservation-and-management/%D0%BC%D0%B5%D1%80%D1%8B-%D0%BF%D0%BE-%D1%81%D0%BE%D1%85%D1%80%D0%B0%D0%BD%D0%B5%D0%BD%D0%B8%D1%8E",
+      "text": "\u0420\u0443\u0441\u0441\u043a\u0438\u0439"
+    },
+    {
+      "href": "/es/conservation-and-management/medidas-de-conservaci%C3%B3n",
+      "text": "Espa\u00f1ol"
+    },
+    {
+      "href": "/en",
+      "text": "Home"
+    },
+    {
+      "href": "/en/conservation-and-management/conservation-measures",
+      "text": "Conservation measures"
+    },
+    {
+      "href": "/en/conservation-and-management/conservation-measures",
+      "text": "Conservation measures"
+    },
+    {
+      "href": "/en/conservation-and-management/conservation-measures",
+      "text": "Conservation measures"
+    },
+    {
+      "href": "https://cm.ccamlr.org/",
+      "text": "Browse conservation measures"
+    },
+    {
+      "href": "https://www.ccamlr.org/en/node/127636/",
+      "text": "Current schedule of conservation measures in force"
+    },
+    {
+      "href": "/en/publications/past-and-present-conservation-measures",
+      "text": "Past and present conservation measures"
+    },
+    {
+      "href": "/en/conservation-and-management/additional-information-related-conservation-measures-force",
+      "text": "Additional information related to conservation measures in force"
+    },
+    {
+      "href": "/en/document/conservation-and-management/schedule-conservation-measures-force-2025/26",
+      "text": "Schedule of Conservation Measures in Force 2025/26"
+    },
+    {
+      "href": "/en/document/conservation-and-management/schedule-conservation-measures-force-2024/25",
+      "text": "Schedule of Conservation Measures in Force 2024/25"
+    },
+    {
+      "href": "http://www.ccamlr.org/en/organisation/camlr-convention-text#IX",
+      "text": "Article IX.6 of the Convention"
+    },
+    {
+      "href": "https://cm.ccamlr.org/",
+      "text": "Browse conservation measures"
+    },
+    {
+      "href": "/en/document/conservation-and-management/schedule-conservation-measures-force-2025/26",
+      "text": "Schedule of Conservation Measures in Force 2025/26"
+    },
+    {
+      "href": "https://www.ccamlr.org/en/system/files/EN%20-%20schedule%202025-26.pdf",
+      "text": "4.4 MB"
+    },
+    {
+      "href": "/en/publications/past-and-present-conservation-measures",
+      "text": "Past and present conservation measures"
+    },
+    {
+      "href": "/en/organisation/contact-us",
+      "text": "Contact us"
+    },
+    {
+      "href": "/en/organisation/contact-us",
+      "text": ""
+    },
+    {
+      "href": "/en/organisation/opportunities",
+      "text": "Job vacancies"
+    },
+    {
+      "href": "/en/compliance/list-authorised-vessels",
+      "text": "List of authorised vessels"
+    },
+    {
+      "href": "/en/document/conservation-and-management/schedule-conservation-measures-force-2025/26",
+      "text": "Schedule of Conservation Measures in Force 2025/26"
+    },
+    {
+      "href": "/en/data/ccamlr-data-forms",
+      "text": "CCAMLR data forms"
+    },
+    {
+      "href": "https://meetings.ccamlr.org",
+      "text": ""
+    },
+    {
+      "href": "https://meetings.ccamlr.org/en/wg-fsa-2026",
+      "text": "WG-FSA-2026"
+    },
+    {
+      "href": "https://meetings.ccamlr.org/en/scic-2026",
+      "text": "SCIC-2026"
+    },
+    {
+      "href": "https://meetings.ccamlr.org/en/sc-camlr-45",
+      "text": "SC-CAMLR-45"
+    },
+    {
+      "href": "https://meetings.ccamlr.org/en/ccamlr-45",
+      "text": "CCAMLR-45"
+    },
+    {
+      "href": "https://meetings.ccamlr.org/en/scaf-2026",
+      "text": "SCAF-2026"
+    },
+    {
+      "href": "https://ecds.ccamlr.org",
+      "text": "e-CDS"
+    },
+    {
+      "href": "/en/user/login",
+      "text": "Log in"
+    },
+    {
+      "href": "https://groups.ccamlr.org",
+      "text": "CCAMLR e-groups"
+    },
+    {
+      "href": "https://discussions.ccamlr.org/",
+      "text": "CCAMLR Discussions"
+    },
+    {
+      "href": "/en/organisation/help/support",
+      "text": "Support"
+    },
+    {
+      "href": "/en/organisation/copyright-notice",
+      "text": "Copyright"
+    },
+    {
+      "href": "/en/organisation/disclaimer-and-privacy-policy",
+      "text": "Disclaimer and Privacy Policy"
+    },
+    {
+      "href": "/en/sitemap",
+      "text": "Sitemap"
+    },
+    {
+      "href": "https://webmail.ccamlr.org/",
+      "text": "Webmail"
+    },
+    {
+      "href": "#page",
+      "text": "Top of page"
+    },
+    {
+      "href": "http://www.eightyoptions.com.au",
+      "text": "Eighty Options"
+    }
+  ],
+  "metas": []
+}

@@ -767,6 +767,7 @@ def test_serial_chain_ezproxy_htmlpdf_then_scihub(pipe_factory):
 
 
 def test_scihub_miss_still_tries_later_serial(pipe_factory):
+    """Policy puts htmlpdf before Sci-Hub, so a print can attach without Sci-Hub."""
     sh = StubSource("scihub", default=Outcome.NOT_FOUND)
     hp = StubSource(
         "htmlpdf",
@@ -782,12 +783,13 @@ def test_scihub_miss_still_tries_later_serial(pipe_factory):
     )
     pipe.try_all = True
     pipe.run([make_item(key="J", doi="10.1000/j", item_type="journalArticle")])
-    assert sh.calls == ["J"]
     assert hp.calls == ["J"]
+    assert sh.calls == []
     assert manifest.get("J").source == "htmlpdf"
 
 
-def test_scihub_captcha_does_not_fall_through(pipe_factory):
+def test_scihub_captcha_does_not_fall_through(pipe_factory, cfg):
+    cfg.fetch_order = "list"
     sh = StubSource(
         "scihub",
         {"J": Candidate.miss("scihub", Outcome.CAPTCHA, "captcha")},
@@ -804,7 +806,8 @@ def test_scihub_captcha_does_not_fall_through(pipe_factory):
     assert manifest.get("J").status == STATUS_CAPTCHA
 
 
-def test_scihub_error_does_not_fall_through(pipe_factory):
+def test_scihub_error_does_not_fall_through(pipe_factory, cfg):
+    cfg.fetch_order = "list"
     sh = StubSource(
         "scihub",
         {"J": Candidate.miss("scihub", Outcome.ERROR, "HTTP 502")},
@@ -1615,3 +1618,135 @@ def test_attach_record_with_a_missing_file_is_an_attach_failure(pipe_factory):
     assert saved.status == STATUS_ATTACH_FAILED
     assert saved.reason.startswith("file missing")
     assert pipe.stats.attach_failed_by_code == {"other": 1}
+
+
+def test_pipeline_policy_runs_ezproxy_before_scholar(pipe_factory):
+    ez = StubSource("ezproxy", default=Outcome.NOT_FOUND)
+    gs = StubSource(
+        "scholar", {"A": Candidate(url="https://open.test/a.pdf", source="scholar")}
+    )
+    pipe, manifest = pipe_factory(
+        {"ezproxy": ez, "scholar": gs}, ["scholar", "ezproxy"]
+    )
+    pipe.try_all = True
+    pipe.run([make_item(key="A")])
+    assert ez.calls == ["A"]
+    assert gs.calls == ["A"]
+    assert manifest.get("A").source == "scholar"
+
+
+def test_pipeline_interleave_skips_agent_on_scholar_hit(pipe_factory, cfg):
+    cfg.llm_enabled = True
+    gs = StubSource(
+        "scholar", {"A": Candidate(url="https://open.test/a.pdf", source="scholar")}
+    )
+    agent = StubSource(
+        "browser_agent",
+        {"A": Candidate(url="https://agent.test/a.pdf", source="browser_agent")},
+    )
+    pipe, manifest = pipe_factory(
+        {"scholar": gs, "browser_agent": agent},
+        ["scholar", "browser_agent"],
+    )
+    pipe.try_all = True
+    pipe.run([make_item(key="A")])
+    assert gs.calls == ["A"]
+    assert agent.calls == []
+    assert manifest.get("A").source == "scholar"
+
+
+def test_pipeline_interleave_agent_after_scholar_miss(pipe_factory, cfg):
+    cfg.llm_enabled = True
+    gs = StubSource("scholar", default=Outcome.NOT_FOUND)
+    agent = StubSource(
+        "browser_agent",
+        {"A": Candidate(url="", source="browser_agent", content=PDF_BYTES)},
+    )
+    pipe, manifest = pipe_factory(
+        {"scholar": gs, "browser_agent": agent},
+        ["scholar", "browser_agent"],
+    )
+    pipe.try_all = True
+    pipe.run([make_item(key="A")])
+    assert gs.calls == ["A"]
+    assert agent.calls == ["A"]
+    assert manifest.get("A").source == "browser_agent"
+
+
+def test_pipeline_scholar_latch_still_runs_agent(pipe_factory, cfg):
+    cfg.llm_enabled = True
+    gs = StubSource(
+        "scholar",
+        {"A": Candidate.miss("scholar", Outcome.CAPTCHA, "scholar blocked/captcha")},
+    )
+    agent = StubSource(
+        "browser_agent",
+        {
+            "A": Candidate(url="", source="browser_agent", content=PDF_BYTES),
+            "B": Candidate(url="", source="browser_agent", content=PDF_BYTES),
+        },
+    )
+    pipe, manifest = pipe_factory(
+        {"scholar": gs, "browser_agent": agent},
+        ["scholar", "browser_agent"],
+    )
+    pipe.try_all = True
+    pipe.run([make_item(key="A"), make_item(key="B")])
+    assert gs.calls == ["A"]
+    assert agent.calls == ["A", "B"]
+    assert "scholar:skipped(blocked)" in manifest.get("B").attempts
+    assert manifest.get("B").source == "browser_agent"
+
+
+def test_pipeline_serpapi_after_scholar_before_scihub(pipe_factory, cfg, monkeypatch):
+    cfg.serpapi_enabled = True
+    monkeypatch.setenv("SERPAPI_API_KEY", "sk-test")
+    gs = StubSource("scholar", default=Outcome.NOT_FOUND)
+    sp = StubSource(
+        "serpapi", {"A": Candidate(url="https://repo.test/a.pdf", source="serpapi")}
+    )
+    sh = StubSource(
+        "scihub", {"A": Candidate(url="https://m.test/a.pdf", source="scihub")}
+    )
+    pipe, manifest = pipe_factory(
+        {"scholar": gs, "serpapi": sp, "scihub": sh},
+        ["scholar", "scihub"],
+    )
+    pipe.try_all = True
+    pipe.run([make_item(key="A")])
+    assert gs.calls == ["A"]
+    assert sp.calls == ["A"]
+    assert sh.calls == []
+    assert manifest.get("A").source == "serpapi"
+
+
+def test_pipeline_serpapi_max_calls_skips_rest(pipe_factory, cfg, monkeypatch):
+    cfg.serpapi_enabled = True
+    cfg.serpapi_max_calls = 1
+    monkeypatch.setenv("SERPAPI_API_KEY", "sk-test")
+    gs = StubSource("scholar", default=Outcome.NOT_FOUND)
+    sp = StubSource("serpapi", default=Outcome.NOT_FOUND)
+    pipe, manifest = pipe_factory(
+        {"scholar": gs, "serpapi": sp},
+        ["scholar"],
+    )
+    pipe.try_all = True
+    pipe.run([make_item(key="A"), make_item(key="B")])
+    assert sp.calls == ["A"]
+    assert "serpapi:skipped(max_calls)" in manifest.get("B").attempts
+
+
+def test_pipeline_serpapi_max_calls_zero_is_unlimited(pipe_factory, cfg, monkeypatch):
+    cfg.serpapi_enabled = True
+    cfg.serpapi_max_calls = 0
+    monkeypatch.setenv("SERPAPI_API_KEY", "sk-test")
+    gs = StubSource("scholar", default=Outcome.NOT_FOUND)
+    sp = StubSource("serpapi", default=Outcome.NOT_FOUND)
+    pipe, _manifest = pipe_factory(
+        {"scholar": gs, "serpapi": sp},
+        ["scholar"],
+    )
+    pipe.try_all = True
+    pipe.run([make_item(key="A"), make_item(key="B")])
+    assert sp.calls == ["A", "B"]
+

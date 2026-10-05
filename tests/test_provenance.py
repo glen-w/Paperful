@@ -10,6 +10,7 @@ def test_oa_campus_pirate_and_web_labels():
     assert provenance_label("scihub") == "pirate:scihub"
     assert provenance_label("htmlpdf") == "snapshot:htmlpdf"
     assert provenance_label("scholar") == "web:scholar"
+    assert provenance_label("serpapi") == "web:serpapi"
     assert provenance_label("browser_agent") == "web:browser_agent"
     assert provenance_label("direct") == "web:direct"
     assert provenance_label("direct", playbook="undocs-unga-vme") == "grey:undocs-unga-vme"
@@ -32,6 +33,7 @@ def test_provenance_sentences():
     assert provenance_sentence("author_site") == "Saved from an author site."
     assert provenance_sentence("direct", playbook="undocs") == "Saved from undocs."
     assert provenance_sentence("scholar") == "Found via Google Scholar."
+    assert provenance_sentence("serpapi") == "Found via Google Scholar (SerpApi)."
     assert provenance_sentence("htmlpdf") == "Printed page snapshot, not a publisher PDF."
     assert provenance_sentence("browser_agent") == "Found by the browser recovery."
     assert (

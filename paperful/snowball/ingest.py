@@ -12,7 +12,7 @@ from ..interop.load import parent_payload
 from ..library import LibraryBackend, LibraryError
 from ..pipeline import Pipeline, RunStats
 from ..remarks import linked_sentence, say
-from ..routing import with_recover_lane
+from ..routing import with_recover_lane, with_serpapi_lane
 from ..store import Manifest
 from ..lint import normalize_saved_title, usable_work_title
 from ..zot import Item
@@ -267,7 +267,7 @@ def fill_pdfs(
     left = [it for it in items if manifest.should_process(it.key, False)]
     if not left:
         return fast
-    sources = with_recover_lane(cfg, fill_sources)
+    sources = with_serpapi_lane(cfg, with_recover_lane(cfg, fill_sources))
     if "scihub" in sources:
         console.print(f"[red]{SCIHUB_DISCLAIMER}[/]")
     if "browser_agent" in sources:

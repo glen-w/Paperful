@@ -1,0 +1,114 @@
+# Public landings for `paperful playbooks probe`.
+# A pass means the first candidate served %PDF- and at least --min-bytes.
+# A listing page can pass on whatever PDF appears first. Notes say which
+# targets are a single document and which are listings.
+
+[[targets]]
+playbook = "undocs-unga-vme"
+url = "https://undocs.org/A/RES/61/105"
+note = "document: UNGA 61/105 rewrite"
+
+[[targets]]
+playbook = "undocs-unga-vme"
+url = "https://undocs.org/en/A/75/157"
+note = "document: SG report symbol rewrite"
+
+[[targets]]
+playbook = "undocs-unga-vme-symbol"
+extra = "UNGA A/RES/61/105"
+note = "document: symbol in Extra, no item URL"
+
+[[targets]]
+playbook = "fao"
+url = "https://www.fao.org/3/cc0461en/cc0461en.htm"
+note = "document: SOFIA 2022 /3/{code}/ rewrite"
+
+[[targets]]
+playbook = "fao"
+url = "https://www.fao.org/3/ca9229en/ca9229en.htm"
+note = "document: SOFIA 2020 /3/{code}/ rewrite"
+
+[[targets]]
+playbook = "bbnj-doalos-prepcom"
+url = "https://www.un.org/bbnjagreement/"
+note = "listing: BBNJ agreement site"
+
+[[targets]]
+playbook = "bbnj-doalos-prepcom"
+url = "https://enb.iisd.org/negotiations/marine-biodiversity-beyond-national-jurisdiction"
+note = "listing: IISD ENB BBNJ"
+
+[[targets]]
+playbook = "isa-deepdata"
+url = "https://www.isa.org.jm/documents/"
+note = "listing: ISA documents"
+
+[[targets]]
+playbook = "rfmo-docs"
+url = "https://www.sprfmo.int/fisheries/conservation-and-management-measures"
+note = "listing: SPRFMO CMMs"
+
+[[targets]]
+playbook = "rfmo-docs"
+url = "https://www.neafc.org/managing_fisheries/measures"
+note = "listing: NEAFC measures"
+
+[[targets]]
+playbook = "rfmo-docs"
+url = "https://www.ccamlr.org/en/conservation-and-management/conservation-measures"
+note = "listing: CCAMLR conservation measures"
+
+[[targets]]
+playbook = "iucn-dosi"
+url = "https://www.iucn.org/resources"
+note = "listing: IUCN resources"
+
+[[targets]]
+playbook = "iucn-dosi"
+url = "https://www.dosi-project.org/"
+note = "listing: DOSI home"
+
+[[targets]]
+playbook = "thinktank-ocean"
+url = "https://www.iddri.org/en/publications"
+note = "listing: IDDRI publications"
+
+[[targets]]
+playbook = "thinktank-ocean"
+url = "https://www.pewtrusts.org/en/research-and-analysis/reports"
+note = "listing: Pew reports"
+
+[[targets]]
+playbook = "iea_scrape"
+url = "https://www.iea.org/reports/world-energy-outlook-2024"
+note = "document: World Energy Outlook 2024"
+
+[[targets]]
+playbook = "irena_scrape"
+url = "https://www.irena.org/Publications/2024/Jul/Renewable-energy-statistics-2024"
+note = "document: Renewable energy statistics 2024"
+
+[[targets]]
+playbook = "irena_scrape"
+url = "https://www.irena.org/Publications/2024/Mar/Renewable-Capacity-Statistics-2024"
+note = "document: Renewable capacity statistics 2024"
+
+[[targets]]
+playbook = "oecd_scrape"
+url = "https://www.oecd.org/en/publications.html"
+note = "listing: OECD publications"
+
+[[targets]]
+playbook = "who_scrape"
+url = "https://iris.who.int/handle/10665/43432"
+note = "document: World health report 2006 handle"
+
+[[targets]]
+playbook = "unep_scrape"
+url = "https://www.unep.org/resources/emissions-gap-report-2024"
+note = "document: Emissions Gap Report 2024"
+
+[[targets]]
+playbook = "undp_scrape"
+url = "https://www.undp.org/publications/human-development-report-2023-24"
+note = "document: Human Development Report 2023/24"

@@ -1,0 +1,16 @@
+{
+  "playbook": "bbnj-doalos-prepcom",
+  "url": "https://enb.iisd.org/negotiations/marine-biodiversity-beyond-national-jurisdiction",
+  "extra": "",
+  "note": "listing: IISD ENB BBNJ",
+  "stamp": "bbnj-doalos-prepcom",
+  "status": "miss",
+  "chosen": "",
+  "resolved": "https://enb.iisd.org/negotiations/marine-biodiversity-beyond-national-jurisdiction",
+  "detail": "HTTP 403",
+  "nbytes": 0,
+  "checked": [],
+  "probed_at": "2026-10-05T14:43:53+00:00",
+  "anchors": [],
+  "metas": []
+}

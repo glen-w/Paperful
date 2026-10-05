@@ -1,0 +1,444 @@
+{
+  "probed_at": "2026-10-05T14:43:14+00:00",
+  "counts": {
+    "pass": 3,
+    "alternate": 1,
+    "miss": 17,
+    "wrong-playbook": 0,
+    "error": 1
+  },
+  "rows": [
+    {
+      "playbook": "undocs-unga-vme",
+      "url": "https://undocs.org/A/RES/61/105",
+      "extra": "",
+      "note": "document: UNGA 61/105 rewrite",
+      "stamp": "undocs-unga-vme",
+      "status": "miss",
+      "chosen": "https://undocs.org/pdf?symbol=A%2FRES%2F61%2F105",
+      "resolved": "https://undocs.org/pdf?symbol=A%2FRES%2F61%2F105",
+      "detail": "not a PDF",
+      "nbytes": 3916,
+      "checked": [
+        {
+          "url": "https://docs.un.org/pdf?symbol=A%2FRES%2F61%2F105",
+          "pdf": false,
+          "nbytes": 3916,
+          "status_code": 200,
+          "detail": "not a PDF"
+        }
+      ],
+      "probed_at": "2026-10-05T14:43:14+00:00"
+    },
+    {
+      "playbook": "undocs-unga-vme",
+      "url": "https://undocs.org/en/A/75/157",
+      "extra": "",
+      "note": "document: SG report symbol rewrite",
+      "stamp": "undocs-unga-vme",
+      "status": "miss",
+      "chosen": "https://undocs.org/pdf?symbol=A%2F75%2F157",
+      "resolved": "https://undocs.org/pdf?symbol=A%2F75%2F157",
+      "detail": "not a PDF",
+      "nbytes": 3916,
+      "checked": [
+        {
+          "url": "https://docs.un.org/pdf?symbol=A%2F75%2F157",
+          "pdf": false,
+          "nbytes": 3916,
+          "status_code": 200,
+          "detail": "not a PDF"
+        }
+      ],
+      "probed_at": "2026-10-05T14:43:16+00:00"
+    },
+    {
+      "playbook": "undocs-unga-vme-symbol",
+      "url": "",
+      "extra": "UNGA A/RES/61/105",
+      "note": "document: symbol in Extra, no item URL",
+      "stamp": "undocs-unga-vme-symbol",
+      "status": "miss",
+      "chosen": "https://undocs.org/pdf?symbol=A%2FRES%2F61%2F105",
+      "resolved": "https://undocs.org/pdf?symbol=A%2FRES%2F61%2F105",
+      "detail": "not a PDF",
+      "nbytes": 3916,
+      "checked": [
+        {
+          "url": "https://docs.un.org/pdf?symbol=A%2FRES%2F61%2F105",
+          "pdf": false,
+          "nbytes": 3916,
+          "status_code": 200,
+          "detail": "not a PDF"
+        }
+      ],
+      "probed_at": "2026-10-05T14:43:17+00:00"
+    },
+    {
+      "playbook": "fao",
+      "url": "https://www.fao.org/3/cc0461en/cc0461en.htm",
+      "extra": "",
+      "note": "document: SOFIA 2022 /3/{code}/ rewrite",
+      "stamp": "fao",
+      "status": "miss",
+      "chosen": "https://www.fao.org/3/cc0461en/cc0461en.pdf",
+      "resolved": "https://www.fao.org/3/cc0461en/cc0461en.pdf",
+      "detail": "ConnectTimeout",
+      "nbytes": 0,
+      "checked": [
+        {
+          "url": "https://www.fao.org/3/cc0461en/cc0461en.pdf",
+          "pdf": false,
+          "nbytes": 0,
+          "status_code": 0,
+          "detail": "ConnectTimeout"
+        }
+      ],
+      "probed_at": "2026-10-05T14:43:18+00:00"
+    },
+    {
+      "playbook": "fao",
+      "url": "https://www.fao.org/3/ca9229en/ca9229en.htm",
+      "extra": "",
+      "note": "document: SOFIA 2020 /3/{code}/ rewrite",
+      "stamp": "fao",
+      "status": "miss",
+      "chosen": "https://www.fao.org/3/ca9229en/ca9229en.pdf",
+      "resolved": "https://www.fao.org/3/ca9229en/ca9229en.pdf",
+      "detail": "ConnectTimeout",
+      "nbytes": 0,
+      "checked": [
+        {
+          "url": "https://www.fao.org/3/ca9229en/ca9229en.pdf",
+          "pdf": false,
+          "nbytes": 0,
+          "status_code": 0,
+          "detail": "ConnectTimeout"
+        }
+      ],
+      "probed_at": "2026-10-05T14:43:35+00:00"
+    },
+    {
+      "playbook": "bbnj-doalos-prepcom",
+      "url": "https://www.un.org/bbnjagreement/",
+      "extra": "",
+      "note": "listing: BBNJ agreement site",
+      "stamp": "bbnj-doalos-prepcom",
+      "status": "pass",
+      "chosen": "https://treaties.un.org/doc/Publication/CN/2025/CN.447.2025-Eng.pdf",
+      "resolved": "https://www.un.org/bbnjagreement/en",
+      "detail": "pdf",
+      "nbytes": 54322,
+      "checked": [
+        {
+          "url": "https://treaties.un.org/doc/Publication/CN/2025/CN.447.2025-Eng.pdf",
+          "pdf": true,
+          "nbytes": 54322,
+          "status_code": 200,
+          "detail": "pdf"
+        }
+      ],
+      "probed_at": "2026-10-05T14:43:51+00:00"
+    },
+    {
+      "playbook": "bbnj-doalos-prepcom",
+      "url": "https://enb.iisd.org/negotiations/marine-biodiversity-beyond-national-jurisdiction",
+      "extra": "",
+      "note": "listing: IISD ENB BBNJ",
+      "stamp": "bbnj-doalos-prepcom",
+      "status": "miss",
+      "chosen": "",
+      "resolved": "https://enb.iisd.org/negotiations/marine-biodiversity-beyond-national-jurisdiction",
+      "detail": "HTTP 403",
+      "nbytes": 0,
+      "checked": [],
+      "probed_at": "2026-10-05T14:43:53+00:00"
+    },
+    {
+      "playbook": "isa-deepdata",
+      "url": "https://www.isa.org.jm/documents/",
+      "extra": "",
+      "note": "listing: ISA documents",
+      "stamp": "isa-deepdata",
+      "status": "miss",
+      "chosen": "",
+      "resolved": "https://isa.org.jm/documents/",
+      "detail": "no PDF-shaped link on the landing",
+      "nbytes": 0,
+      "checked": [],
+      "probed_at": "2026-10-05T14:43:54+00:00"
+    },
+    {
+      "playbook": "rfmo-docs",
+      "url": "https://www.sprfmo.int/fisheries/conservation-and-management-measures",
+      "extra": "",
+      "note": "listing: SPRFMO CMMs",
+      "stamp": "rfmo-docs",
+      "status": "pass",
+      "chosen": "https://www.sprfmo.int/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-01-2026-Trachurus-murphyi.pdf",
+      "resolved": "https://www.sprfmo.int/fisheries/conservation-and-management-measures",
+      "detail": "pdf",
+      "nbytes": 239098,
+      "checked": [
+        {
+          "url": "https://www.sprfmo.int/assets/Fisheries/Conservation-and-Management-Measures/2026-CMMs/CMM-01-2026-Trachurus-murphyi.pdf",
+          "pdf": true,
+          "nbytes": 239098,
+          "status_code": 200,
+          "detail": "pdf"
+        }
+      ],
+      "probed_at": "2026-10-05T14:43:58+00:00"
+    },
+    {
+      "playbook": "rfmo-docs",
+      "url": "https://www.neafc.org/managing_fisheries/measures",
+      "extra": "",
+      "note": "listing: NEAFC measures",
+      "stamp": "rfmo-docs",
+      "status": "miss",
+      "chosen": "https://www.neafc.org/basictexts",
+      "resolved": "https://www.neafc.org/managing_fisheries/measures",
+      "detail": "not a PDF",
+      "nbytes": 0,
+      "checked": [
+        {
+          "url": "https://www.neafc.org/basictexts",
+          "pdf": false,
+          "nbytes": 41455,
+          "status_code": 200,
+          "detail": "not a PDF"
+        }
+      ],
+      "probed_at": "2026-10-05T14:44:03+00:00"
+    },
+    {
+      "playbook": "rfmo-docs",
+      "url": "https://www.ccamlr.org/en/conservation-and-management/conservation-measures",
+      "extra": "",
+      "note": "listing: CCAMLR conservation measures",
+      "stamp": "rfmo-docs",
+      "status": "pass",
+      "chosen": "https://www.ccamlr.org/en/system/files/EN%20-%20schedule%202025-26.pdf",
+      "resolved": "https://www.ccamlr.org/en/conservation-and-management/conservation-measures",
+      "detail": "pdf",
+      "nbytes": 4613516,
+      "checked": [
+        {
+          "url": "https://www.ccamlr.org/en/system/files/EN%20-%20schedule%202025-26.pdf",
+          "pdf": true,
+          "nbytes": 4613516,
+          "status_code": 200,
+          "detail": "pdf"
+        }
+      ],
+      "probed_at": "2026-10-05T14:44:06+00:00"
+    },
+    {
+      "playbook": "iucn-dosi",
+      "url": "https://www.iucn.org/resources",
+      "extra": "",
+      "note": "listing: IUCN resources",
+      "stamp": "iucn-dosi",
+      "status": "miss",
+      "chosen": "https://iucn.org/resources/contributions-nature-platform",
+      "resolved": "https://iucn.org/resources",
+      "detail": "not a PDF",
+      "nbytes": 0,
+      "checked": [
+        {
+          "url": "https://iucn.org/resources/conservation-tool/contributions-nature-platform",
+          "pdf": false,
+          "nbytes": 69630,
+          "status_code": 200,
+          "detail": "not a PDF"
+        },
+        {
+          "url": "https://iucn.org/resources/conservation-tool/iucn-global-ecosystem-typology",
+          "pdf": false,
+          "nbytes": 73121,
+          "status_code": 200,
+          "detail": "not a PDF"
+        },
+        {
+          "url": "https://iucn.org/resources/information-brief/freshwater-biodiversity-cbd-cop17-close-inland-waters-implementation",
+          "pdf": false,
+          "nbytes": 69898,
+          "status_code": 200,
+          "detail": "not a PDF"
+        }
+      ],
+      "probed_at": "2026-10-05T14:44:10+00:00"
+    },
+    {
+      "playbook": "iucn-dosi",
+      "url": "https://www.dosi-project.org/",
+      "extra": "",
+      "note": "listing: DOSI home",
+      "stamp": "iucn-dosi",
+      "status": "alternate",
+      "chosen": "https://www.dosi-project.org/wp-content/uploads/MIAB_hires.pdf",
+      "resolved": "https://www.dosi-project.org/",
+      "detail": "pdf",
+      "nbytes": 10017034,
+      "checked": [
+        {
+          "url": "https://www.dosi-project.org/wp-content/uploads/TreasuresOfTheDeep_PDF-ebook-small.pdf",
+          "pdf": false,
+          "nbytes": 0,
+          "status_code": 404,
+          "detail": "HTTP 404"
+        },
+        {
+          "url": "https://www.dosi-project.org/wp-content/uploads/MIAB_hires.pdf",
+          "pdf": true,
+          "nbytes": 10017034,
+          "status_code": 200,
+          "detail": "pdf"
+        }
+      ],
+      "probed_at": "2026-10-05T14:44:13+00:00"
+    },
+    {
+      "playbook": "thinktank-ocean",
+      "url": "https://www.iddri.org/en/publications",
+      "extra": "",
+      "note": "listing: IDDRI publications",
+      "stamp": "thinktank-ocean",
+      "status": "miss",
+      "chosen": "",
+      "resolved": "https://www.iddri.org/en/publications",
+      "detail": "HTTP 404",
+      "nbytes": 0,
+      "checked": [],
+      "probed_at": "2026-10-05T14:44:16+00:00"
+    },
+    {
+      "playbook": "thinktank-ocean",
+      "url": "https://www.pewtrusts.org/en/research-and-analysis/reports",
+      "extra": "",
+      "note": "listing: Pew reports",
+      "stamp": "",
+      "status": "miss",
+      "chosen": "",
+      "resolved": "https://www.pew.org/en/research-and-analysis/reports",
+      "detail": "HTTP 404",
+      "nbytes": 0,
+      "checked": [],
+      "probed_at": "2026-10-05T14:44:17+00:00"
+    },
+    {
+      "playbook": "iea_scrape",
+      "url": "https://www.iea.org/reports/world-energy-outlook-2024",
+      "extra": "",
+      "note": "document: World Energy Outlook 2024",
+      "stamp": "iea_scrape",
+      "status": "miss",
+      "chosen": "",
+      "resolved": "https://www.iea.org/reports/world-energy-outlook-2024",
+      "detail": "HTTP 403",
+      "nbytes": 0,
+      "checked": [],
+      "probed_at": "2026-10-05T14:44:19+00:00"
+    },
+    {
+      "playbook": "irena_scrape",
+      "url": "https://www.irena.org/Publications/2024/Jul/Renewable-energy-statistics-2024",
+      "extra": "",
+      "note": "document: Renewable energy statistics 2024",
+      "stamp": "irena_scrape",
+      "status": "miss",
+      "chosen": "",
+      "resolved": "https://www.irena.org/Publications/2024/Jul/Renewable-energy-statistics-2024",
+      "detail": "HTTP 403",
+      "nbytes": 0,
+      "checked": [],
+      "probed_at": "2026-10-05T14:44:20+00:00"
+    },
+    {
+      "playbook": "irena_scrape",
+      "url": "https://www.irena.org/Publications/2024/Mar/Renewable-Capacity-Statistics-2024",
+      "extra": "",
+      "note": "document: Renewable capacity statistics 2024",
+      "stamp": "irena_scrape",
+      "status": "miss",
+      "chosen": "",
+      "resolved": "https://www.irena.org/Publications/2024/Mar/Renewable-Capacity-Statistics-2024",
+      "detail": "HTTP 403",
+      "nbytes": 0,
+      "checked": [],
+      "probed_at": "2026-10-05T14:44:21+00:00"
+    },
+    {
+      "playbook": "oecd_scrape",
+      "url": "https://www.oecd.org/en/publications.html",
+      "extra": "",
+      "note": "listing: OECD publications",
+      "stamp": "oecd_scrape",
+      "status": "miss",
+      "chosen": "",
+      "resolved": "https://www.oecd.org/en/publications.html",
+      "detail": "HTTP 403",
+      "nbytes": 0,
+      "checked": [],
+      "probed_at": "2026-10-05T14:44:21+00:00"
+    },
+    {
+      "playbook": "who_scrape",
+      "url": "https://iris.who.int/handle/10665/43432",
+      "extra": "",
+      "note": "document: World health report 2006 handle",
+      "stamp": "who_scrape",
+      "status": "error",
+      "chosen": "",
+      "resolved": "https://iris.who.int/handle/10665/43432",
+      "detail": "ConnectTimeout",
+      "nbytes": 0,
+      "checked": [],
+      "probed_at": "2026-10-05T14:44:22+00:00"
+    },
+    {
+      "playbook": "unep_scrape",
+      "url": "https://www.unep.org/resources/emissions-gap-report-2024",
+      "extra": "",
+      "note": "document: Emissions Gap Report 2024",
+      "stamp": "unep_scrape",
+      "status": "miss",
+      "chosen": "https://wedocs.unep.org/bitstream/handle/20.500.11822/46404/EGR2024.pdf?sequence=3&isAllowed=y",
+      "resolved": "https://www.unep.org/resources/emissions-gap-report-2024",
+      "detail": "not a PDF",
+      "nbytes": 0,
+      "checked": [
+        {
+          "url": "https://wedocs.unep.org/items/31ad9a4b-0c90-408e-adc0-921538ead02a",
+          "pdf": false,
+          "nbytes": 66030,
+          "status_code": 200,
+          "detail": "not a PDF"
+        },
+        {
+          "url": "https://wedocs.unep.org/items/31ad9a4b-0c90-408e-adc0-921538ead02a",
+          "pdf": false,
+          "nbytes": 67750,
+          "status_code": 200,
+          "detail": "not a PDF"
+        }
+      ],
+      "probed_at": "2026-10-05T14:44:38+00:00"
+    },
+    {
+      "playbook": "undp_scrape",
+      "url": "https://www.undp.org/publications/human-development-report-2023-24",
+      "extra": "",
+      "note": "document: Human Development Report 2023/24",
+      "stamp": "undp_scrape",
+      "status": "miss",
+      "chosen": "",
+      "resolved": "https://www.undp.org/publications/human-development-report-2023-24",
+      "detail": "HTTP 403",
+      "nbytes": 0,
+      "checked": [],
+      "probed_at": "2026-10-05T14:44:48+00:00"
+    }
+  ]
+}

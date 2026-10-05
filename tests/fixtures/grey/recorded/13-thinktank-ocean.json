@@ -1,0 +1,16 @@
+{
+  "playbook": "thinktank-ocean",
+  "url": "https://www.iddri.org/en/publications",
+  "extra": "",
+  "note": "listing: IDDRI publications",
+  "stamp": "thinktank-ocean",
+  "status": "miss",
+  "chosen": "",
+  "resolved": "https://www.iddri.org/en/publications",
+  "detail": "HTTP 404",
+  "nbytes": 0,
+  "checked": [],
+  "probed_at": "2026-10-05T14:44:16+00:00",
+  "anchors": [],
+  "metas": []
+}

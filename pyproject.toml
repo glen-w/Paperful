@@ -57,3 +57,6 @@ exclude = ["config.toml", "out/", "state/", "packs/", ".cursor/", ".claude/", ".
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "grey_live: network probe of tests/fixtures/grey/corpus.toml (set PAPERFUL_GREY_LIVE=1)",
+]

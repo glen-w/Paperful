@@ -1,0 +1,356 @@
+{
+  "playbook": "unep_scrape",
+  "url": "https://www.unep.org/resources/emissions-gap-report-2024",
+  "extra": "",
+  "note": "document: Emissions Gap Report 2024",
+  "stamp": "unep_scrape",
+  "status": "miss",
+  "chosen": "https://wedocs.unep.org/bitstream/handle/20.500.11822/46404/EGR2024.pdf?sequence=3&isAllowed=y",
+  "resolved": "https://www.unep.org/resources/emissions-gap-report-2024",
+  "detail": "not a PDF",
+  "nbytes": 0,
+  "checked": [
+    {
+      "url": "https://wedocs.unep.org/items/31ad9a4b-0c90-408e-adc0-921538ead02a",
+      "pdf": false,
+      "nbytes": 66030,
+      "status_code": 200,
+      "detail": "not a PDF"
+    },
+    {
+      "url": "https://wedocs.unep.org/items/31ad9a4b-0c90-408e-adc0-921538ead02a",
+      "pdf": false,
+      "nbytes": 67750,
+      "status_code": 200,
+      "detail": "not a PDF"
+    }
+  ],
+  "probed_at": "2026-10-05T14:44:38+00:00",
+  "anchors": [
+    {
+      "href": "#main-content",
+      "text": "Skip to main content"
+    },
+    {
+      "href": "/news-and-stories",
+      "text": "News, Stories & Speeches"
+    },
+    {
+      "href": "/events",
+      "text": "Events"
+    },
+    {
+      "href": "/get-involved",
+      "text": "Get Involved"
+    },
+    {
+      "href": "#",
+      "text": "Language"
+    },
+    {
+      "href": "/resources/emissions-gap-report-2024",
+      "text": "English"
+    },
+    {
+      "href": "/ar/resources/tqryr-fjwt-alanbathat-lam-2024",
+      "text": "\u0627\u0644\u0639\u0631\u0628\u064a\u0629"
+    },
+    {
+      "href": "/es/resources/informe-sobre-la-brecha-de-emisiones-2024",
+      "text": "Espa\u00f1ol"
+    },
+    {
+      "href": "/fr/resources/rapport-2024-sur-lecart-entre-les-besoins-et-les-perspectives-en-matiere-de-reduction-des",
+      "text": "Fran\u00e7ais"
+    },
+    {
+      "href": "/pt-br/resources/relatorio-sobre-lacuna-de-emissoes-2024",
+      "text": "Portugu\u00eas"
+    },
+    {
+      "href": "/ru/resources/doklad-o-razryve-v-urovne-vybrosov-za-2024-god",
+      "text": "\u0420\u0443\u0441\u0441\u043a\u0438\u0439"
+    },
+    {
+      "href": "/zh-hans/resources/2024nianpaifangchajubaogao",
+      "text": "\u7b80\u4f53\u4e2d\u6587"
+    },
+    {
+      "href": "/about-un-environment",
+      "text": "About Us"
+    },
+    {
+      "href": "/about-un-environment/why-does-un-environment-matter/structure-and-leadership",
+      "text": "Structure and leadership"
+    },
+    {
+      "href": "/cpr",
+      "text": "Committee of Permanent Representatives"
+    },
+    {
+      "href": "https://www.unep.org/environmentassembly/",
+      "text": "UN Environment Assembly"
+    },
+    {
+      "href": "/about-un-environment-programme/funding-and-partnerships",
+      "text": "Funding and partnerships"
+    },
+    {
+      "href": "/about-un-environment/policies-and-strategies",
+      "text": "Policies and strategies"
+    },
+    {
+      "href": "/evaluation-office",
+      "text": "Evaluation Office"
+    },
+    {
+      "href": "/about-un-environment/why-does-un-environment-matter/secretariats-and-conventions",
+      "text": "Secretariats and Conventions"
+    },
+    {
+      "href": "/who-we-are/contact-us",
+      "text": "Contact Us"
+    },
+    {
+      "href": "/regions/africa",
+      "text": "Africa"
+    },
+    {
+      "href": "/regions/asia-and-pacific",
+      "text": "Asia and the Pacific"
+    },
+    {
+      "href": "/regions/europe",
+      "text": "Europe"
+    },
+    {
+      "href": "/regions/latin-america-and-caribbean",
+      "text": "Latin America and the Caribbean"
+    },
+    {
+      "href": "/regions/new-york-office",
+      "text": "New York Office"
+    },
+    {
+      "href": "/regions/north-america",
+      "text": "North America"
+    },
+    {
+      "href": "/regions/west-asia",
+      "text": "West Asia"
+    },
+    {
+      "href": "/explore-topics/climate-action",
+      "text": "Climate action"
+    },
+    {
+      "href": "/explore-topics/ecosystems-and-biodiversity",
+      "text": "Nature and land action"
+    },
+    {
+      "href": "/explore-topics/chemicals-waste",
+      "text": "Chemicals and pollution action"
+    },
+    {
+      "href": "/explore-topics/climate-action",
+      "text": "Climate action"
+    },
+    {
+      "href": "/explore-topics/ecosystems-and-biodiversity",
+      "text": "Nature and land action"
+    },
+    {
+      "href": "/explore-topics/chemicals-waste",
+      "text": "Chemicals and pollution action"
+    },
+    {
+      "href": "/explore-topics/air-quality",
+      "text": "Air quality"
+    },
+    {
+      "href": "/explore-topics/biosafety",
+      "text": "Biosafety"
+    },
+    {
+      "href": "/explore-topics/cities",
+      "text": "Cities"
+    },
+    {
+      "href": "/explore-topics/digital-transformations",
+      "text": "Digital Transformations"
+    },
+    {
+      "href": "/explore-topics/disasters-conflicts",
+      "text": "Disasters and conflicts"
+    },
+    {
+      "href": "/explore-topics/energy",
+      "text": "Energy"
+    },
+    {
+      "href": "/explore-topics/environment-under-review",
+      "text": "Environment under review"
+    },
+    {
+      "href": "/explore-topics/environmental-law-and-governance",
+      "text": "Environmental law and governance"
+    },
+    {
+      "href": "/explore-topics/extractives",
+      "text": "Extractives"
+    },
+    {
+      "href": "/topics/finance-and-economic-transformations",
+      "text": "Finance and Economic Transformations"
+    },
+    {
+      "href": "/topics/food-systems",
+      "text": "Food Systems"
+    },
+    {
+      "href": "/explore-topics/forests",
+      "text": "Forests"
+    },
+    {
+      "href": "/explore-topics/fresh-water",
+      "text": "Fresh Water"
+    },
+    {
+      "href": "/explore-topics/gender",
+      "text": "Gender"
+    },
+    {
+      "href": "/explore-topics/ocean-seas-and-coasts",
+      "text": "Ocean, seas and coasts"
+    },
+    {
+      "href": "/topics/peatlands",
+      "text": "Peatlands"
+    },
+    {
+      "href": "/topics/sustainable-development-goals",
+      "text": "Sustainable Development Goals"
+    },
+    {
+      "href": "/explore-topics/transport",
+      "text": "Transport"
+    },
+    {
+      "href": "/explore-topics/education-environment",
+      "text": "Youth, education and environment"
+    },
+    {
+      "href": "/publications-data",
+      "text": "Publications & Knowledge"
+    },
+    {
+      "href": "/explore-topics/sdgs",
+      "text": ""
+    },
+    {
+      "href": "/",
+      "text": ""
+    },
+    {
+      "href": "/",
+      "text": ""
+    },
+    {
+      "href": "/about-un-environment",
+      "text": "About Us"
+    },
+    {
+      "href": "/about-un-environment/why-does-un-environment-matter/structure-and-leadership",
+      "text": "Structure and leadership"
+    },
+    {
+      "href": "/cpr",
+      "text": "Committee of Permanent Representatives"
+    },
+    {
+      "href": "https://www.unep.org/environmentassembly/",
+      "text": "UN Environment Assembly"
+    },
+    {
+      "href": "/about-un-environment-programme/funding-and-partnerships",
+      "text": "Funding and partnerships"
+    },
+    {
+      "href": "/about-un-environment/policies-and-strategies",
+      "text": "Policies and strategies"
+    },
+    {
+      "href": "/evaluation-office",
+      "text": "Evaluation Office"
+    },
+    {
+      "href": "/about-un-environment/why-does-un-environment-matter/secretariats-and-conventions",
+      "text": "Secretariats and Conventions"
+    },
+    {
+      "href": "/who-we-are/contact-us",
+      "text": "Contact Us"
+    },
+    {
+      "href": "/regions/africa",
+      "text": "Africa"
+    },
+    {
+      "href": "/regions/asia-and-pacific",
+      "text": "Asia and the Pacific"
+    },
+    {
+      "href": "/regions/europe",
+      "text": "Europe"
+    },
+    {
+      "href": "/regions/latin-america-and-caribbean",
+      "text": "Latin America and the Caribbean"
+    },
+    {
+      "href": "/regions/new-york-office",
+      "text": "New York Office"
+    },
+    {
+      "href": "/regions/north-america",
+      "text": "North America"
+    },
+    {
+      "href": "/regions/west-asia",
+      "text": "West Asia"
+    },
+    {
+      "href": "/explore-topics/climate-action",
+      "text": "Climate action"
+    },
+    {
+      "href": "/explore-topics/ecosystems-and-biodiversity",
+      "text": "Nature and land action"
+    },
+    {
+      "href": "/explore-topics/chemicals-waste",
+      "text": "Chemicals and pollution action"
+    },
+    {
+      "href": "/explore-topics/climate-action",
+      "text": "Climate action"
+    },
+    {
+      "href": "/explore-topics/ecosystems-and-biodiversity",
+      "text": "Nature and land action"
+    },
+    {
+      "href": "/explore-topics/chemicals-waste",
+      "text": "Chemicals and pollution action"
+    },
+    {
+      "href": "/explore-topics/air-quality",
+      "text": "Air quality"
+    },
+    {
+      "href": "https://wedocs.unep.org/bitstream/handle/20.500.11822/46404/EGR2024.pdf?sequence=3&isAllowed=y",
+      "text": "Full report"
+    }
+  ],
+  "metas": []
+}

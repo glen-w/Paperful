@@ -48,6 +48,7 @@ from .routing import (
     filter_sources_for_year_scope,
     sources_for_item,
     with_recover_lane,
+    with_serpapi_lane,
 )
 from .run_config import (
     ProfileListing,
@@ -140,7 +141,7 @@ playbooks_app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
     help=(
-        "Propose and promote learned PDF playbooks from local fetch wins. "
+        "Propose, promote, and probe grey-lit PDF playbooks. "
         "Not run-config profiles."
     ),
 )
@@ -198,10 +199,16 @@ refs_app = typer.Typer(
     help="Bibliography coverage: cited-in-PDF works missing from the library.",
 )
 app.add_typer(refs_app, name="refs")
+twenty_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Read-only Twenty CRM author lookup (opt-in). Never sends mail or writes the CRM.",
+)
+app.add_typer(twenty_app, name="twenty")
 
 # Canonical top-level verbs. tests/test_cli.py asserts this matches `paperful --help`.
 JOBS: dict[str, tuple[str, ...]] = {
-    "library": ("collections", "import", "export", "snowball", "ingest-dois"),
+    "library": ("collections", "import", "export", "snowball", "ingest-dois", "twenty"),
     "find": ("run", "attach", "recover", "gaps", "inbox", "urls", "htmlpdf"),
     "completeness": (
         "lint",
@@ -306,6 +313,19 @@ AuthorSitePreflightOpt = typer.Option(
     None,
     "--author-site-preflight/--no-author-site-preflight",
     help="Opt-in co-author graph and proposed field pack. Default: config.",
+)
+RequestRgOpt = typer.Option(
+    None,
+    "--request-rg/--no-request-rg",
+    help=(
+        "Open existing ResearchGate publication URLs in the system browser "
+        "so you can click Request full-text. Paperful never clicks. Default: [request].channels."
+    ),
+)
+ReRequestOpt = typer.Option(
+    False,
+    "--re-request",
+    help="Open ResearchGate handoff tabs even if state/author-requests.jsonl already recorded them.",
 )
 SeedsFileOpt = typer.Option(
     None,
@@ -966,7 +986,8 @@ def jobs() -> None:
         console.print(f"[bold]{name}[/]: {', '.join(verbs)}")
     console.print(
         "Snowball grows the library (metadata parents). "
-        "Run fills PDFs for items already there."
+        "Run fills PDFs for items already there. "
+        "Twenty lookup is read-only CRM search."
     )
 
 
@@ -2592,6 +2613,8 @@ def gaps(
         "--downloads-dir",
         help="Directory for --handoff walk newest-PDF pickup (default ~/Downloads).",
     ),
+    request_rg: bool | None = RequestRgOpt,
+    re_request: bool = ReRequestOpt,
     to: Path | None = typer.Option(
         None,
         "--to",
@@ -2620,6 +2643,9 @@ def gaps(
     if _scope_unset(collection, library, profile, run_config):
         _refuse_missing_scope()
     cfg = _cfg(config)
+    from .author_request import apply_request_rg_override
+
+    apply_request_rg_override(cfg, request_rg)
     json_out, as_json = _agent_wins(fmt, as_json)
     bound = _bind_run(
         cfg,
@@ -2748,7 +2774,7 @@ def gaps(
         return
 
     manifest = Manifest(cfg.manifest_path)
-    missing = list_missing_pdfs(items, manifest, cfg=cfg)
+    missing = list_missing_pdfs(items, manifest, cfg=cfg, re_request=re_request)
     if to is not None:
         path = write_missing_export(missing, to)
         console.print(f"Wrote {len(missing)} rows to {path}")
@@ -2770,6 +2796,8 @@ def gaps(
                             "oa_status": r.oa_status,
                             "license": r.license,
                             "version": r.version,
+                            "scholar_url": r.scholar_url,
+                            "request_url": r.request_url,
                         }
                         for r in missing
                     ],
@@ -2790,6 +2818,8 @@ def gaps(
                 "url": r.url,
                 "hint": r.hint,
                 "miss_surface": r.miss_surface,
+                "scholar_url": r.scholar_url,
+                "request_url": r.request_url,
             }
             for r in missing
         ]
@@ -2802,6 +2832,8 @@ def gaps(
         t.add_column("Title")
         t.add_column("DOI")
         t.add_column("URL")
+        t.add_column("Scholar")
+        t.add_column("Request")
         t.add_column("Hint")
         t.add_column("Miss")
         t.add_column("OA")
@@ -2810,7 +2842,9 @@ def gaps(
                 row.key,
                 row.title[:50],
                 row.doi or "-",
-                (row.url or "-")[:48],
+                (row.url or "-")[:40],
+                (row.scholar_url or "-")[:40],
+                (row.request_url or "-")[:40],
                 row.hint,
                 row.miss_plain or row.miss_surface or "-",
                 row.oa_status or "-",
@@ -2829,7 +2863,13 @@ def gaps(
             )
             return answer in {"y", "yes"}
 
-        opened = open_tabs(missing, include_doi_tabs=include_doi_tabs, confirm=_confirm)
+        opened = open_tabs(
+            missing,
+            include_doi_tabs=include_doi_tabs,
+            confirm=_confirm,
+            scholar=cfg.handoff_scholar,
+            cfg=cfg,
+        )
         console.print(f"Opened {opened} tab(s) in your browser.")
         if mode == "tabs" and not (
             cfg.inbox_watch_after_handoff and cfg.inbox_path is not None
@@ -2930,6 +2970,11 @@ def run(
         "--htmlpdf",
         help="Academic HTML snapshot for this run: off, gated, or auto. Default off.",
     ),
+    serpapi_max: int | None = typer.Option(
+        None,
+        "--serpapi-max",
+        help="Cap paid SerpApi Scholar searches this run (0 = unlimited). Default [serpapi].max_calls.",
+    ),
     strict_pdf_doi: bool | None = StrictPdfDoiOpt,
     handoff: str | None = typer.Option(
         None,
@@ -2949,6 +2994,8 @@ def run(
         "--downloads-dir",
         help="Downloads dir for --handoff walk (default ~/Downloads).",
     ),
+    request_rg: bool | None = RequestRgOpt,
+    re_request: bool = ReRequestOpt,
     promote: str | None = typer.Option(
         None,
         "--promote",
@@ -2963,6 +3010,9 @@ def run(
     if _scope_unset(collection, library, profile, run_config):
         _refuse_missing_scope()
     cfg = _cfg(config)
+    from .author_request import apply_request_rg_override
+
+    apply_request_rg_override(cfg, request_rg)
     json_out = _agent_json(fmt)
     if isinstance(promote, str):
         from .config import parse_playbooks_promote
@@ -3013,6 +3063,8 @@ def run(
         except ValueError as exc:
             console.print(f"[red]{exc}[/]")
             raise typer.Exit(2)
+    if isinstance(serpapi_max, int):
+        cfg.serpapi_max_calls = max(0, serpapi_max)
     if isinstance(upgrade_snapshot, bool):
         want_snapshot_upgrade = upgrade_snapshot
     elif bound.upgrade_snapshot is not None:
@@ -3055,6 +3107,7 @@ def run(
     )
     source_list = filter_sources_for_year_scope(source_list, year_from)
     source_list = with_recover_lane(cfg, source_list, during_run=browser_agent)
+    source_list = with_serpapi_lane(cfg, source_list)
     if not json_out:
         _warn_if_scihub(source_list)
         _warn_if_recover(source_list)
@@ -3281,6 +3334,7 @@ def run(
             handoff=handoff,
             include_doi_tabs=include_doi_tabs,
             downloads_dir=downloads_dir,
+            re_request=re_request,
         )
 
 
@@ -3450,6 +3504,7 @@ def _run_session_handoff(
     handoff: str,
     include_doi_tabs: bool,
     downloads_dir: Path | None,
+    re_request: bool = False,
 ) -> None:
     from .handoff import (
         missing_from_run_outcomes,
@@ -3475,7 +3530,9 @@ def _run_session_handoff(
         for o in stats.items
     ]
     by_key = {it.key: it for it in catalog}
-    missing = missing_from_run_outcomes(by_key, outcomes, cfg=cfg)
+    missing = missing_from_run_outcomes(
+        by_key, outcomes, cfg=cfg, re_request=re_request
+    )
     if not missing:
         console.print("[dim]No openable soft-blocked PDFs to hand off.[/]")
         return
@@ -3490,7 +3547,13 @@ def _run_session_handoff(
             )
             return answer in {"y", "yes"}
 
-        opened = open_tabs(missing, include_doi_tabs=include_doi_tabs, confirm=_confirm)
+        opened = open_tabs(
+            missing,
+            include_doi_tabs=include_doi_tabs,
+            confirm=_confirm,
+            scholar=cfg.handoff_scholar,
+            cfg=cfg,
+        )
         console.print(f"Opened {opened} tab(s).")
         enter_watch = mode == "watch" or (
             mode == "tabs"
@@ -4452,6 +4515,102 @@ def refs_gap(
         )
 
     _emit_agent(payload, json_out=json_out, human=_human_gap)
+
+
+@twenty_app.command("lookup")
+def twenty_lookup_cmd(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Write proposed author-pack listings and state/author-contacts/. Default is dry-run.",
+    ),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Match collection authors against Twenty People. Read-only unless --apply."""
+    from .twenty import authors_from_items, lookup_authors, twenty_ready
+
+    if _scope_unset(collection, library, profile, run_config):
+        _refuse_missing_scope()
+    cfg = _cfg(config)
+    if not cfg.twenty_enabled:
+        console.print(
+            "[red]Twenty is off.[/] Set [twenty].enabled = true and TWENTY_API_KEY."
+        )
+        raise typer.Exit(1)
+    if not twenty_ready(cfg):
+        console.print(
+            "[red]Twenty is not ready.[/] Set [twenty].base_url (or TWENTY_BASE_URL) "
+            "and env TWENTY_API_KEY. Paperful never probes Twenty from doctor."
+        )
+        raise typer.Exit(1)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    if not collection and not library:
+        _refuse_missing_scope()
+    _require_manager(cfg)
+    backend = _connect(cfg)
+    loaded = _load_scope(
+        backend,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    authors = authors_from_items(loaded.items)
+    label = collection[0] if collection else "library"
+    rows = lookup_authors(
+        cfg,
+        authors,
+        collection=label,
+        apply=apply,
+    )
+    table = Table(title=f"Twenty lookup ({'apply' if apply else 'dry-run'})")
+    table.add_column("Name")
+    table.add_column("Status")
+    table.add_column("Website")
+    table.add_column("Email")
+    table.add_column("Note")
+    for row in rows:
+        table.add_row(
+            row.query_name,
+            row.status,
+            (row.listing_url or (row.hit.website if row.hit else ""))[:50] or "-",
+            (row.emails[0] if row.emails else "-"),
+            row.note or "-",
+        )
+    console.print(table)
+    matched = sum(1 for r in rows if r.status == "match")
+    console.print(
+        f"{len(rows)} authors · {matched} unique matches · "
+        f"{sum(1 for r in rows if r.status == 'ambiguous')} ambiguous · "
+        f"{sum(1 for r in rows if r.status == 'miss')} miss"
+    )
+    if apply:
+        console.print(
+            "Wrote proposed pack listings (promote before author_site fetch) "
+            "and contacts under state/author-contacts/. Paperful does not send mail."
+        )
+    else:
+        console.print("[dim]Dry-run. Pass --apply to write proposed packs and contacts.[/]")
 
 
 @app.command("ingest-dois")
@@ -7145,6 +7304,11 @@ def all_cmd(
         "--require-summarize/--no-require-summarize",
         help="Exit 1 instead of skipping summarize when llm.enabled is false.",
     ),
+    serpapi_max: int | None = typer.Option(
+        None,
+        "--serpapi-max",
+        help="Cap paid SerpApi Scholar searches on the run step (0 = unlimited).",
+    ),
     label: str | None = typer.Option(
         None, "--label", help="Pack label when this command opens a pack."
     ),
@@ -7234,7 +7398,12 @@ def all_cmd(
                 console.print(f"\n[bold]all[/] · {step}")
             try:
                 _dispatch_all_step(
-                    step, bound, scope, dry_run=dry_run, browser_agent=browser_agent
+                    step,
+                    bound,
+                    scope,
+                    dry_run=dry_run,
+                    browser_agent=browser_agent,
+                    serpapi_max=serpapi_max if isinstance(serpapi_max, int) else None,
                 )
                 steps_done.append({"step": step, "status": "ok"})
             except typer.Exit as exc:
@@ -7274,6 +7443,7 @@ def _dispatch_all_step(
     *,
     dry_run: bool,
     browser_agent: bool | None = None,
+    serpapi_max: int | None = None,
 ) -> None:
     if step == "gaps":
         _call_step(
@@ -7307,6 +7477,7 @@ def _dispatch_all_step(
             include_doi_tabs=False,
             downloads_dir=None,
             ezproxy_relogin=None,
+            serpapi_max=serpapi_max,
             fmt="text",
         )
         return
@@ -7438,6 +7609,112 @@ def _profile_bind_kwargs(
         "skip": skip,
         "require_summarize": require_summarize,
     }
+
+
+@playbooks_app.command("probe")
+def playbooks_probe(
+    corpus: Path = typer.Option(
+        ...,
+        "--corpus",
+        help="TOML file of [[targets]] (playbook, url or extra, note).",
+        exists=True,
+        dir_okay=False,
+    ),
+    config: Path | None = ConfigOpt,
+    examples: bool = typer.Option(
+        True,
+        "--examples/--no-examples",
+        help="Merge paperful/data/grey_playbooks_examples/ under the config playbooks.",
+    ),
+    check: int = typer.Option(
+        3, "--check", help="How many extracted links to download per landing."
+    ),
+    min_bytes: int = typer.Option(
+        10_000, "--min-bytes", help="Smallest body that counts as a PDF."
+    ),
+    delay: float = typer.Option(
+        0.4, "--delay", help="Seconds to wait between targets."
+    ),
+    save: Path | None = typer.Option(
+        None,
+        "--save",
+        help="Write one JSON per target plus index.json. Pass rows include the links needed to replay offline.",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Print the rows as JSON."),
+) -> None:
+    """Fetch each corpus landing and require the first candidate to be a PDF.
+
+    Exit 0 when every target passes. A pass is a %PDF body of at least
+    --min-bytes. It does not prove the file is the record a listing page
+    describes. This command talks to the network.
+    """
+    import httpx
+
+    from .grey_probe import load_corpus, playbooks_for_probe, probe_corpus, save_recorded
+
+    if check < 1:
+        console.print("[red]--check must be >= 1[/]")
+        raise typer.Exit(2)
+    if min_bytes < 1:
+        console.print("[red]--min-bytes must be >= 1[/]")
+        raise typer.Exit(2)
+    try:
+        targets = load_corpus(corpus)
+    except (OSError, ValueError) as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(2) from exc
+    cfg = _cfg(config)
+    books = playbooks_for_probe(cfg.grey_playbooks, examples=examples)
+    timeout = httpx.Timeout(20.0, connect=15.0)
+    with httpx.Client(
+        headers={"User-Agent": cfg.user_agent, "Accept-Language": "en-US,en;q=0.9"},
+        follow_redirects=True,
+        timeout=timeout,
+    ) as client:
+        rows = probe_corpus(
+            targets,
+            books,
+            client,
+            check=check,
+            min_bytes=min_bytes,
+            delay_s=max(0.0, delay),
+        )
+    if save is not None:
+        path = save_recorded(save, rows)
+        console.print(f"Wrote {path}")
+    counts: dict[str, int] = {}
+    for row in rows:
+        counts[row.status] = counts.get(row.status, 0) + 1
+    if as_json:
+        console.print(
+            json.dumps(
+                {
+                    "counts": counts,
+                    "rows": [row.to_dict() for row in rows],
+                },
+                indent=2,
+            )
+        )
+    else:
+        table = Table(title="Grey playbook probe")
+        table.add_column("Status")
+        table.add_column("Playbook")
+        table.add_column("Landing")
+        table.add_column("Chosen")
+        table.add_column("Detail")
+        for row in rows:
+            table.add_row(
+                row.status,
+                row.playbook,
+                row.url or row.extra,
+                row.chosen,
+                row.detail,
+            )
+        console.print(table)
+        summary = ", ".join(f"{k} {v}" for k, v in sorted(counts.items()))
+        console.print(summary)
+    if any(row.status != "pass" for row in rows):
+        raise typer.Exit(1)
 
 
 @playbooks_app.command("propose")

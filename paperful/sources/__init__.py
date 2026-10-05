@@ -17,6 +17,7 @@ from . import (
     scholar,
     scihub,
     semanticscholar,
+    serpapi_scholar,
     unpaywall,
 )
 from .base import Candidate, Context, Outcome, Source
@@ -31,6 +32,7 @@ REGISTRY: dict[str, Source] = {
     "core": core,
     "openaire": openaire,
     "scholar": scholar,
+    "serpapi": serpapi_scholar,
     "direct": direct,
     "ezproxy": ezproxy,
     "htmlpdf": htmlpdf,

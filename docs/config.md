@@ -11,8 +11,11 @@ cookies live. `paperful doctor` ambers when that happens.
 **Grey literature and no-DOI items** — Unpaywall and most DOI sources cannot
 resolve PrepCom papers, many DOALOS/UN docs, or undocs without a DOI. `direct`
 uses **declarative grey playbooks** (rewrite / scrape / synthesize). Grey-lit
-packs: UNGA/undocs · BBNJ/DOALOS · ISA (plus FAO/OECD/IEA/WHO examples). Add
-your own hosts in `config.toml`. Skip-host URLs (YouTube, Scholar, …) still
+packs: UNGA/undocs · BBNJ/DOALOS · ISA, plus FAO and ocean hosts
+(RFMOs, IUCN/DOSI, IDDRI/Pew). Energy (IEA, IRENA) and other international
+orgs (OECD, WHO, UNEP, UNDP) ship as optional example files under
+`paperful/data/grey_playbooks_examples/`. Add your own hosts in `config.toml`.
+Skip-host URLs (YouTube, Scholar, …) still
 synthesize from Extra/title when a playbook matches. Then `htmlpdf` can print
 DOI-less `document` / `report` pages. Otherwise the manifest records
 `no_identifier`. See [Grey literature playbooks](#grey-literature-playbooks)
@@ -32,7 +35,12 @@ and [architecture](architecture.md).
 | `[oa_honesty].stamp_fields` | `license`, `oa_status`, `version` | Which Unpaywall / OpenAlex fields are written to `record.json` (`fetch.oa`) and the manifest on successful fetch |
 | `[oa_honesty].license_block` | `[]` | Substrings; when a stamped `license` matches, the run records `license_blocked` and does not save the PDF |
 | `[remarks].surface` | `note` | Where the readable lines go: where a PDF came from, which duplicate to keep, and why a snowball hit belongs. `note` (child note), `tag` (parent tag), or `off`. The PDF attachment stamp stays the machine token |
-| `sources` | `unpaywall` → `openalex` → `arxiv` → `biorxiv` → `europepmc` → `semanticscholar` → `core` → `openaire` → `direct` → `ezproxy` → `htmlpdf` | Source order; `--sources` overrides per run. `scholar` and `scihub` are **not** included unless you opt in. `core` is skipped until `core_api_key` is set. `openaire` looks up repository copies by DOI |
+| `sources` | `unpaywall` → `openalex` → `arxiv` → `biorxiv` → `europepmc` → `semanticscholar` → `core` → `openaire` → `direct` → `ezproxy` → `htmlpdf` | Default **head** of a run. `[fetch].order = "policy"` (default) still runs these first; `scholar` and `scihub` are **not** included unless you opt in. When `scholar` is in `sources`, policy places it in the **late tail** (one try before `browser_agent` when that lane is on). `order = "list"` honors this array. `core` is skipped until `core_api_key` is set. `openaire` looks up repository copies by DOI |
+| `[fetch].order` | `policy` | `policy` late-tails Scholar / SerpApi / Sci-Hub (and academic `htmlpdf`). `list` is the configured `sources` order |
+| `[scholar].when` | `auto` | `auto`: interleave with `browser_agent` when that lane is on, else one late Scholar phase. `phase`: Scholar burst then agent. `interleave`: always pair |
+| `[serpapi].enabled` | `false` | Paid Google Scholar **link discovery** after local routes. Needs env `SERPAPI_API_KEY`. Never a silent default. See [SerpApi](serpapi.md) |
+| `[serpapi].max_calls` | `20` | Paid Scholar searches this run. `0` = no cap. `--serpapi-max` overrides one run |
+| `[handoff].scholar` | `true` | Put a Scholar results URL on miss rows and open it in the system browser when there is no direct PDF URL |
 | `verify_doi` | `true` | Check library DOIs against Crossref/OpenAlex before fetching; may swap DOI **in memory** for that run. `false` leaves an existing DOI as `doi_verified=unknown` and does not swap |
 | `core_api_key` | `""` | CORE API bearer token; empty skips the `core` source |
 | `ezproxy_base` | `""` (disabled) | Campus proxy prefix ending in `url=` — see [Campus EZProxy](ezproxy.md) |
@@ -49,7 +57,10 @@ and [architecture](architecture.md).
 
 Leave `ezproxy_base` empty (or remove `ezproxy` from `sources`) if you do not
 use a library proxy. Google Scholar is off until you add `scholar` to
-`sources` (and usually run `session login scholar`). Sci-Hub is off until
+`sources` (and usually run `session login scholar`). Policy mode then runs it
+**late**, not in the middle of campus/grey. Paid [SerpApi](serpapi.md) Scholar
+search is off until `[serpapi].enabled` and `SERPAPI_API_KEY`; cap with
+`[serpapi].max_calls` / `--serpapi-max`. Sci-Hub is off until
 you add `"scihub"` to `sources` or pass `--scihub` — see [Sci-Hub](scihub.md).
 Items dated after 2021 are not sent to Sci-Hub; a `--year-from` past that
 year drops it from the run list.
@@ -136,16 +147,27 @@ Host-specific PDF rules are **data**, not forever-hardcoded Python. Kinds:
 | Kind | When | Example |
 | --- | --- | --- |
 | `rewrite` | Zero-fetch URL → PDF (`url_re` + `pdf_template`, or `parser = "undocs"`) | FAO `/3/{code}/` |
-| `scrape` | Prefer matching hrefs on that host’s HTML landing | OECD `/download/`, WHO `/iris/` |
+| `scrape` | Prefer matching hrefs on that host’s HTML landing | ISA `/documents/`, RFMO `/meetings/` |
 | `synthesize` | Extra/title (or skip-host URL + Extra) → PDF URL | UN document symbol → undocs |
 
 The packaged file
 [`paperful/data/grey_playbooks_ocean.toml`](https://github.com/glen-w/Paperful/blob/main/paperful/data/grey_playbooks_ocean.toml)
 is an **ocean/governance example pack** — grey-lit packs **UNGA/undocs ·
-BBNJ/DOALOS · ISA**, plus FAO/OECD/IEA/WHO examples — on by default via
-`grey_playbooks_builtin = true`. Optionally set `grey_playbooks_dir = "packs"`
-to load every `*.toml` in that directory (same schema). Merge order: builtin →
-dir packs → inline `[[grey_playbooks]]` (same `name` replaces earlier entries).
+BBNJ/DOALOS · ISA**, plus FAO, RFMO, IUCN/DOSI, and IDDRI/Pew — on by default
+via `grey_playbooks_builtin = true`. IEA/IRENA and OECD/WHO/UNEP/UNDP are
+optional copies in
+[`paperful/data/grey_playbooks_examples/`](https://github.com/glen-w/Paperful/tree/main/paperful/data/grey_playbooks_examples).
+Copy those files into `grey_playbooks_dir`, or point that setting at the
+examples folder. That folder does not contain the ocean builtin, so it will
+not replace the shipped pack by name. Optionally set
+`grey_playbooks_dir = "packs"` to load every `*.toml` in that directory (same
+schema). Merge order: builtin → dir packs → inline `[[grey_playbooks]]`
+(same `name` replaces earlier entries). Host ownership in the shipped files:
+`un.org`, `highseasalliance.org`, and `iisd.org` belong to
+`bbnj-doalos-prepcom`; `fao.org` belongs to `fao`; `iea.org` belongs to the
+energy example. These rules turn a library item’s URL into a PDF. A matching
+host does not mean Paperful indexes that organisation. Provenance stays
+`grey:<playbook-name>`.
 `paperful playbooks promote` adds `learned.toml` in that directory from local
 fetch wins. Those recipes are not in the package. `[playbooks].promote = "auto"`
 writes them during `run` and may promote a fluke; the default is `gated`.
@@ -189,7 +211,7 @@ walkthrough, model advice, Docker networking, and troubleshooting: [LLM](llm.md)
 | `[summarize].dest` | `both` | `disk` (`state/summaries/`), `zotero` (child note), or `both`. `--to` overrides |
 | `[summarize].order` | `library` | Summarize queue order before `--limit`: `library` (manager order), `newest`, or `oldest`. `--order` overrides. Undated items stay last under `newest` / `oldest`. Type stays a filter (`-T`) |
 | `[synthesize].dest` | `both` | `disk` (`state/reports/`), `zotero` (standalone note in the collection), or `both` |
-| `[browser_agent].during_run` | `true` | When `[llm].enabled` and the extra is installed, `run` appends `browser_agent` after Scholar / EZProxy / htmlpdf. Override per run with `--browser-agent` / `--no-browser-agent` |
+| `[browser_agent].during_run` | `true` | When `[llm].enabled` and the extra is installed, `run` appends `browser_agent`. Policy order tries Scholar once immediately before it. Override per run with `--browser-agent` / `--no-browser-agent` |
 | `[gaps].handoff` | `list` | Default for `gaps --handoff` when the flag is omitted: `list`, `tabs`, `walk`, or `watch`. `run` only handoffs when you pass `--handoff` |
 | `[gaps].downloads_dir` | `~/Downloads` | Newest `*.pdf` pickup for `--handoff walk` (empty → home Downloads) |
 | `[inbox].dir` | `""` | PDF drop folder for `--handoff watch` / `paperful inbox` (empty = off). Not snowball’s watch `inbox.jsonl`. `inbox watch` / `drain` match by PDF DOI across the whole library by default; pass `-C` to narrow |
@@ -247,7 +269,7 @@ run misbehaves or you host infrastructure yourself.
 | --- | --- | --- |
 | `doi_suspect_score` | `0.70` | Title similarity below this marks a library DOI as suspect (eligible for in-memory swap). API failure is `unknown` and **keeps** the original DOI |
 | `crossref_min_score` | `0.90` | Title-similarity threshold for accepting a title→DOI match (Crossref, then OpenAlex, then Semantic Scholar) |
-| `concurrency_oa` | `4` | Parallel workers for open-access sources (Scholar, EZProxy, htmlpdf, and Sci-Hub are serial) |
+| `concurrency_oa` | `4` | Parallel workers for open-access sources (Scholar, EZProxy, htmlpdf, SerpApi, and Sci-Hub are serial) |
 | `min_pdf_bytes` | `10000` | Smaller downloads are rejected as error pages |
 | `gate_short_pdfs` | `true` | One-page density gate: soft-reject sparse stubs; hold denser one-pagers for attach |
 | `short_pdf_min_words` | `200` | Below this word count, a one-page PDF is treated as sparse (not a paper) |

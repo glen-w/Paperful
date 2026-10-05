@@ -33,6 +33,7 @@ TABS_CONFIRM_AFTER = 20
 HINT_OPENABLE = "openable_url"
 HINT_DOI = "doi_only"
 HINT_HARD = "hard_miss"
+HINT_AUTHOR_REQUEST = "author_request"
 
 
 @dataclass
@@ -49,6 +50,18 @@ class MissingPdf:
     oa_status: str = ""
     license: str = ""
     version: str = ""
+    scholar_url: str = ""
+    request_url: str = ""
+
+    def tab_url(self, *, scholar: bool = True) -> str:
+        """URL to open: a direct PDF if we have one, else RG request, Scholar, else doi.org."""
+        if self.hint == HINT_OPENABLE and self.url:
+            return self.open_url
+        if self.hint == HINT_AUTHOR_REQUEST and self.request_url:
+            return self.request_url
+        if scholar and self.scholar_url:
+            return self.scholar_url
+        return self.open_url
 
     @property
     def open_url(self) -> str:
@@ -57,6 +70,14 @@ class MissingPdf:
         if self.doi:
             return f"https://doi.org/{self.doi}"
         return ""
+
+
+def _scholar_results_url(item: Item, cfg: Config | None) -> str:
+    if cfg is not None and not cfg.handoff_scholar:
+        return ""
+    from .sources.scholar import search_url
+
+    return search_url(item) or ""
 
 
 def parse_handoff(raw: str | None, *, default: str = "list") -> str:
@@ -93,12 +114,47 @@ def _url_looks_like_pdf(url: str) -> bool:
     return path.endswith(".pdf") or "/downloadpdf/" in path or "/pdf/" in path
 
 
+def apply_rg_handoff(
+    rows: list[MissingPdf],
+    items_by_key: dict[str, Item],
+    cfg: Config | None,
+    *,
+    re_request: bool = False,
+) -> list[MissingPdf]:
+    """Tag misses that already have a ResearchGate publication URL (no search)."""
+    if cfg is None:
+        return rows
+    from .author_request import (
+        already_requested,
+        researchgate_publication_url,
+        rg_handoff_enabled,
+    )
+
+    if not rg_handoff_enabled(cfg):
+        return rows
+    for row in rows:
+        if row.hint == HINT_OPENABLE:
+            continue
+        item = items_by_key.get(row.key)
+        if item is None:
+            continue
+        rg = researchgate_publication_url(item)
+        if not rg:
+            continue
+        if not re_request and already_requested(cfg, row.key):
+            continue
+        row.request_url = rg
+        row.hint = HINT_AUTHOR_REQUEST
+    return rows
+
+
 def list_missing_pdfs(
     items: list[Item],
     manifest: Manifest | None = None,
     *,
     openable_only: bool = False,
     cfg: Config | None = None,
+    re_request: bool = False,
 ) -> list[MissingPdf]:
     """Items in scope with no stored PDF, enriched from the manifest when present."""
     rows: list[MissingPdf] = []
@@ -130,8 +186,11 @@ def list_missing_pdfs(
                 oa_status=str(honesty.get("oa_status") or ""),
                 license=str(honesty.get("license") or ""),
                 version=str(honesty.get("version") or ""),
+                scholar_url=_scholar_results_url(item, cfg),
             )
         )
+    by_key = {it.key: it for it in items}
+    apply_rg_handoff(rows, by_key, cfg, re_request=re_request)
     if cfg is not None:
         from .handoff_rank import rank_missing
 
@@ -145,6 +204,7 @@ def missing_from_run_outcomes(
     outcomes: list[dict],
     *,
     cfg: Config | None = None,
+    re_request: bool = False,
 ) -> list[MissingPdf]:
     """Soft-blocked / openable misses from a just-finished run report."""
     rows: list[MissingPdf] = []
@@ -162,8 +222,19 @@ def missing_from_run_outcomes(
         hint = classify_missing_hint(doi=item.doi, url=url, attempts=attempts)
         if reason == "soft block" or soft_attempts(attempts) or _url_looks_like_pdf(url):
             hint = HINT_OPENABLE
+        scholar_url = _scholar_results_url(item, cfg)
         if hint != HINT_OPENABLE:
-            continue
+            from .author_request import researchgate_publication_url, rg_handoff_enabled
+
+            keep_rg = (
+                cfg is not None
+                and rg_handoff_enabled(cfg)
+                and bool(researchgate_publication_url(item))
+            )
+            if not keep_rg and not (
+                cfg is not None and cfg.handoff_scholar and scholar_url
+            ):
+                continue
         miss_surface = str(row.get("miss_surface") or "")
         miss_plain = str(row.get("miss_plain") or "")
         miss_detail = str(row.get("miss_detail") or "")
@@ -204,8 +275,10 @@ def missing_from_run_outcomes(
                 oa_status=oa_status,
                 license=license_,
                 version=version,
+                scholar_url=scholar_url,
             )
         )
+    apply_rg_handoff(rows, items_by_key, cfg, re_request=re_request)
     if cfg is not None:
         from .handoff_rank import rank_missing
 
@@ -228,15 +301,16 @@ def write_missing_export(rows: list[MissingPdf], path: Path) -> Path:
         lines = [
             "# Missing PDFs",
             "",
-            "| Key | Title | DOI | URL | Hint | Miss | OA | License |",
-            "| --- | --- | --- | --- | --- | --- | --- | --- |",
+            "| Key | Title | DOI | URL | Scholar | Request | Hint | Miss | OA | License |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
         ]
         for row in rows:
             title = row.title.replace("|", "\\|")
             miss = row.miss_plain or row.miss_surface or "-"
             lines.append(
                 f"| {row.key} | {title} | {row.doi or '-'} | {row.url or '-'} | "
-                f"{row.hint} | {miss} | {row.oa_status or '-'} | {row.license or '-'} |"
+                f"{row.scholar_url or '-'} | {row.request_url or '-'} | {row.hint} | {miss} | "
+                f"{row.oa_status or '-'} | {row.license or '-'} |"
             )
         path.write_text("\n".join(lines) + "\n", encoding="utf-8")
         return path
@@ -255,6 +329,8 @@ def write_missing_export(rows: list[MissingPdf], path: Path) -> Path:
                 "oa_status",
                 "license",
                 "version",
+                "scholar_url",
+                "request_url",
             ]
         )
         for row in rows:
@@ -271,6 +347,8 @@ def write_missing_export(rows: list[MissingPdf], path: Path) -> Path:
                     row.oa_status,
                     row.license,
                     row.version,
+                    row.scholar_url,
+                    row.request_url,
                 ]
             )
     return path
@@ -280,22 +358,47 @@ def openable_rows(rows: list[MissingPdf]) -> list[MissingPdf]:
     return [r for r in rows if r.hint == HINT_OPENABLE and r.open_url]
 
 
+def handoff_targets(
+    rows: list[MissingPdf],
+    *,
+    include_doi_tabs: bool = False,
+    scholar: bool = True,
+) -> list[MissingPdf]:
+    """Rows to open: PDF URLs first, then RG request, Scholar (or doi.org) for the rest."""
+    targets: list[MissingPdf] = []
+    seen: set[str] = set()
+    for row in rows:
+        url = row.tab_url(scholar=scholar)
+        if row.hint == HINT_OPENABLE and row.open_url:
+            url = row.open_url
+        elif row.hint == HINT_AUTHOR_REQUEST and row.request_url:
+            url = row.request_url
+        elif scholar and row.scholar_url:
+            url = row.scholar_url
+        elif include_doi_tabs and row.hint == HINT_DOI and row.open_url:
+            url = row.open_url
+        else:
+            continue
+        if not url or row.key in seen:
+            continue
+        seen.add(row.key)
+        targets.append(row)
+    return targets
+
+
 def open_tabs(
     rows: list[MissingPdf],
     *,
     include_doi_tabs: bool = False,
     confirm: Callable[[int], bool] | None = None,
     opener: Callable[[str], bool] | None = None,
+    scholar: bool = True,
+    cfg: Config | None = None,
 ) -> int:
     """Open URLs in the user's default browser. Returns how many tabs were opened."""
-    targets = openable_rows(rows)
-    if include_doi_tabs:
-        extra = [
-            r
-            for r in rows
-            if r.hint == HINT_DOI and r.open_url and r not in targets
-        ]
-        targets = targets + extra
+    targets = handoff_targets(
+        rows, include_doi_tabs=include_doi_tabs, scholar=scholar
+    )
     if not targets:
         return 0
     if len(targets) > TABS_CONFIRM_AFTER:
@@ -305,8 +408,23 @@ def open_tabs(
     open_fn = opener or webbrowser.open
     opened = 0
     for row in targets:
-        if open_fn(row.open_url):
+        url = row.tab_url(scholar=scholar)
+        if row.hint == HINT_OPENABLE and row.open_url:
+            url = row.open_url
+        elif row.hint == HINT_AUTHOR_REQUEST and row.request_url:
+            url = row.request_url
+        if open_fn(url):
             opened += 1
+            if cfg is not None and row.hint == HINT_AUTHOR_REQUEST and row.request_url:
+                from .author_request import record_request
+
+                record_request(
+                    cfg,
+                    key=row.key,
+                    url=row.request_url,
+                    doi=row.doi,
+                    title=row.title,
+                )
     return opened
 
 
@@ -404,20 +522,38 @@ def walk_missing(
     opener: Callable[[str], bool] | None = None,
     on_status: Callable[[str], None] | None = None,
 ) -> WalkResult:
-    """Interactive open → download → ingest loop for ``openable_url`` rows."""
+    """Interactive open → download → ingest loop for misses."""
     open_fn = opener or webbrowser.open
     say = on_status or (lambda _msg: None)
     attached = skipped = 0
-    targets = openable_rows(rows)
+    scholar = cfg.handoff_scholar
+    targets = handoff_targets(rows, scholar=scholar)
     for idx, row in enumerate(targets, start=1):
         item = items_by_key.get(row.key)
         if item is None:
             skipped += 1
             continue
+        url = row.tab_url(scholar=scholar)
+        if row.hint == HINT_OPENABLE and row.open_url:
+            url = row.open_url
+        elif row.hint == HINT_AUTHOR_REQUEST and row.request_url:
+            url = row.request_url
         say(f"[{idx}/{len(targets)}] {row.key} — {row.title}")
-        say(f"  opening {row.open_url}")
+        if row.hint == HINT_AUTHOR_REQUEST:
+            say("  ResearchGate: click Request full-text yourself (ToS; Paperful does not click).")
+        say(f"  opening {url}")
         opened_at = datetime.now(tz=timezone.utc).timestamp()
-        open_fn(row.open_url)
+        open_fn(url)
+        if row.hint == HINT_AUTHOR_REQUEST and row.request_url:
+            from .author_request import record_request
+
+            record_request(
+                cfg,
+                key=row.key,
+                url=row.request_url,
+                doi=row.doi,
+                title=row.title,
+            )
         reply = prompt(
             "PDF path, Enter=newest in downloads dir, s=skip, q=quit: "
         ).strip()

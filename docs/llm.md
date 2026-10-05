@@ -139,7 +139,9 @@ Model choice (Ollama tags, VRAM bands, acceptance test):
 [browser-agent-models.md](browser-agent-models.md).
 
 On `run`, when `[llm].enabled` and `paperful[browser-agent]` are available,
-Paperful appends `browser_agent` after Scholar / EZProxy / htmlpdf. The agent
+Paperful appends `browser_agent` as a late serial lane. Policy order tries
+Scholar once immediately before the agent (the agent wall clock spaces Scholar
+requests). The agent
 fires only if one of those vault lanes was tried and failed (not merely
 skipped as inapplicable). Playwright releases the session profile first.
 `[browser_agent].during_run = false` turns that auto-lane off for every run.
