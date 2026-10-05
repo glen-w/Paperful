@@ -287,6 +287,21 @@ is not tagged 1.0 yet (`paperful.item.v1` is still open).
 | `summary.write_api` | `true` / `false` / `null` (null when the run did not probe write support) |
 | `items[]` | Per-item: `itemKey`, `title`, `status`, `source`, `reason`, `doi`, `doi_verified`, `attempts`, `fields_corrected`, `path`, `error_type` |
 
+`--format json` on `run`, `refs gap`, `ingest-dois`, and `inbox drain` prints
+`paperful.agent.json.v1` (`schema`, `command`, `exit`, `ok`, `partial`,
+`summary`, `items`, `paths`, `flags`, optional nested `report`). Exit **3** is
+a mixed batch. `paperful mcp` wraps the same payloads for `refs_gap` (never
+creates parents) and `ask` (index only). `collections add` is parked and is
+not a tool.
+
+Child notes from summarize / synthesize / remarks / snowball / briefing start
+with a scannable line and a `<!-- paperful.note.v1 {…} -->` comment (`type`,
+`verb`, `model`, `run_id`, `prompt_sha`).
+
+Ask follow-ups with `--thread` (or a TTY prompt loop) live in
+`state/rag/threads/<id>.json` (`paperful.rag.thread.v1`). Retrieval uses a
+rewritten standalone query; the chat model still sees the turns.
+
 Manifest `counts` keys match ledger statuses (`ok`, `attached`, `not_found`, …).
 
 `gaps`, `lint`, `summarize`, and `fix-metadata` (dry-run and `--apply`) write the same schema under `state/runs/` and do not replace `last-run.json`. Their `summary` adds command-specific keys (`no_stored_pdf`, `findings` / `findings_by_code`, `summarized` / `failed`, `patches_proposed`). A dry-run `fix-metadata` report omits `patches_applied`.

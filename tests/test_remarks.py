@@ -27,7 +27,11 @@ def test_say_replaces_note_and_prefixed_tag():
     lib = _Notes()
     say(lib, "K", "found", "Free copy from Unpaywall.", surface="note")
     say(lib, "K", "found", "Free copy from OpenAlex.", surface="note")
-    assert lib.notes == [("K", "<p>Free copy from OpenAlex.</p>", "paperful-found")]
+    assert len(lib.notes) == 1
+    assert lib.notes[0][0] == "K" and lib.notes[0][2] == "paperful-found"
+    assert "Attach:" in lib.notes[0][1]
+    assert "OpenAlex" in lib.notes[0][1]
+    assert "paperful.note.v1" in lib.notes[0][1]
     say(lib, "K", "found", "Free copy from Unpaywall.", surface="tag")
     say(lib, "K", "duplicate", "Same paper as Smith 2019.", surface="tag")
     say(lib, "K", "found", "Downloaded through your library login.", surface="tag")
@@ -123,7 +127,9 @@ def test_create_new_writes_collection_cites_not_a_single_seed():
     lib = _Create()
     index = LocalCites(by_openalex={"W9": {"KEEP"}}, library=False)
     create_new(lib, [_row()], "Inbox", note_provenance=False, local_cites=index)
-    assert lib.notes == [("paperful-linked", "<p>Cited by 1 paper in this collection.</p>")]
+    assert lib.notes[0][0] == "paperful-linked"
+    assert "Cited by 1 paper in this collection." in lib.notes[0][1]
+    assert "Linked:" in lib.notes[0][1]
 
     lib.notes.clear()
     create_new(

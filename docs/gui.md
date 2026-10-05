@@ -173,7 +173,8 @@ posture: scope is always visible in the chrome; answers must show **citations**
 (item key, title, page / snippet — not free-floating model text). Maps to the
 CLI layer in [rag.md](rag.md) and [ROADMAP — Zotero-RAG
 integration](ROADMAP.md#zotero-rag-integration-later-question-centric-layer).
-The single-question path (`paperful ask`) is shipped; threads are a 2.0 goal.
+The single-question path (`paperful ask`) is shipped; `--thread` stores follow-ups
+under `state/rag/threads/` and retrieves on a rewritten query.
 
 | Action | Maps to (Capability API) | Notes |
 | --- | --- | --- |

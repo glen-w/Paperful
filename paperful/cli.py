@@ -197,6 +197,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "rag",
         "ask",
         "refs",
+        "acronyms",
         "all",
     ),
     "mirror": ("sync", "snapshot", "restore"),
@@ -209,6 +210,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "pack",
         "profile",
         "playbooks",
+        "mcp",
     ),
     "utility": ("report", "version", "jobs"),
 }
@@ -217,6 +219,11 @@ console = Console(highlight=False)
 
 ConfigOpt = typer.Option(
     None, "--config", "-c", help="Path to config.toml", exists=True, dir_okay=False
+)
+AgentFormatOpt = typer.Option(
+    "text",
+    "--format",
+    help="text (default) or json for agents. JSON is paperful.agent.json.v1.",
 )
 FetchPdfsOpt = typer.Option(
     None,
@@ -726,17 +733,17 @@ def _mirror_first(cfg: Config, live: LibraryBackend, *, quiet: bool) -> LibraryB
         _exit_env(str(exc), cfg)
 
 
-def _open_library(cfg: Config) -> tuple[LibraryBackend | None, str]:
+def _open_library(cfg: Config, *, quiet: bool = False) -> tuple[LibraryBackend | None, str]:
     """The library, or (None, reason) when the manager is not reachable.
 
     A missing manager does not stop work that can stay on the local mirror.
     """
     if _offline():
         return None, "offline was asked for"
-    live, reason = _try_live(cfg)
+    live, reason = _try_live(cfg, quiet=quiet)
     if live is None:
         return None, reason
-    return _mirror_first(cfg, live, quiet=False), ""
+    return _mirror_first(cfg, live, quiet=quiet), ""
 
 
 def _live_backend(cfg: Config, *, quiet: bool = False) -> LibraryBackend:
@@ -914,6 +921,14 @@ def jobs() -> None:
         "Snowball grows the library (metadata parents). "
         "Run fills PDFs for items already there."
     )
+
+
+@app.command()
+def mcp(config: Path | None = ConfigOpt) -> None:
+    """Stdio MCP: refs_gap (dry-run) and ask (index read-only)."""
+    from .mcp_server import serve_stdio
+
+    serve_stdio(_cfg(config))
 
 
 @app.command()
@@ -2551,11 +2566,13 @@ def run(
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Fill PDFs into the local mirror. Copies into the library when it is reachable. --dry-run does not write."""
     if _scope_unset(collection, library, profile, run_config):
         _refuse_missing_scope()
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
     if isinstance(promote, str):
         from .config import parse_playbooks_promote
 
@@ -2603,14 +2620,15 @@ def run(
         _refuse_missing_scope()
     _require_manager(cfg)
     source_list = _source_list(cfg, sources, scihub, preset)
-    backend, offline_reason = _open_library(cfg)
+    backend, offline_reason = _open_library(cfg, quiet=json_out)
     mirror_only = backend is None
     if mirror_only:
         manager = _manager_name(cfg)
-        console.print(
-            f"[yellow]{manager} is not reachable ({offline_reason}). "
-            "Continuing from the local mirror. Nothing will be copied to the library.[/]"
-        )
+        if not json_out:
+            console.print(
+                f"[yellow]{manager} is not reachable ({offline_reason}). "
+                "Continuing from the local mirror. Nothing will be copied to the library.[/]"
+            )
         catalog = items_from_mirror(cfg.out_dir, None if library else collection)
         scope = "library" if library else ", ".join(collection)
         keys = None
@@ -2623,8 +2641,9 @@ def run(
     source_list = filter_sources_for_item_types(source_list, types)
     source_list = filter_sources_for_year_scope(source_list, year_from)
     source_list = with_recover_lane(cfg, source_list, during_run=browser_agent)
-    _warn_if_scihub(source_list)
-    _warn_if_recover(source_list)
+    if not json_out:
+        _warn_if_scihub(source_list)
+        _warn_if_recover(source_list)
 
     manifest = Manifest(cfg.manifest_path)
     item_filter = year_from is not None or year_to is not None or types is not None
@@ -2632,7 +2651,7 @@ def run(
     # and the PDF todo all come from that list.
     if not mirror_only:
         assert backend is not None
-        with _spinner("Loading items from library…"):
+        with _spinner("Loading items from library…", json_out=json_out):
             catalog = backend.items_in_scope(keys)
     if item_filter:
         scoped, scope = _apply_item_filters(
@@ -2658,12 +2677,16 @@ def run(
     linked_note = (
         f", {linked_skipped} linked URL only (skipped)" if linked_skipped else ""
     )
-    console.print(
-        f"Scope: [bold]{scope}[/] - {len(items)} items without PDF, {skipped_manifest} already handled, "
-        f"{len(todo)} to process{linked_note}. Sources: {', '.join(source_list)}"
-    )
+    if not json_out:
+        console.print(
+            f"Scope: [bold]{scope}[/] - {len(items)} items without PDF, {skipped_manifest} already handled, "
+            f"{len(todo)} to process{linked_note}. Sources: {', '.join(source_list)}"
+        )
 
     if dry_run:
+        from .agent_json import envelope
+        from .miss_surface import honesty_row_for_item
+
         table = Table(title="Dry run", expand=True)
         table.add_column("Key", style="dim", no_wrap=True)
         table.add_column("Type", no_wrap=True, max_width=14)
@@ -2673,8 +2696,7 @@ def run(
         table.add_column("Miss", no_wrap=True, overflow="ellipsis", ratio=2)
         table.add_column("URL", no_wrap=True, overflow="ellipsis", ratio=1)
         table.add_column("Collections", no_wrap=True, overflow="ellipsis", ratio=1)
-        from .miss_surface import honesty_row_for_item
-
+        dry_items: list[dict[str, Any]] = []
         for it in todo:
             if try_all or not cfg.source_routing:
                 lanes = source_list
@@ -2684,6 +2706,15 @@ def run(
             rec = manifest.get(it.key)
             honesty = honesty_row_for_item(cfg, it, rec)
             miss = honesty.get("miss_plain") or honesty.get("miss_surface") or "-"
+            dry_items.append(
+                {
+                    "itemKey": it.key,
+                    "title": it.label,
+                    "would_hit": would,
+                    "miss_surface": honesty.get("miss_surface") or "",
+                    "miss_plain": honesty.get("miss_plain") or "",
+                }
+            )
             table.add_row(
                 it.key,
                 it.item_type,
@@ -2698,9 +2729,19 @@ def run(
                 (it.url or "-")[:60],
                 "; ".join(it.collection_paths),
             )
-        console.print(table)
-        if mirror_only:
-            _mirror_deferred(cfg)
+        payload = envelope(
+            command="run",
+            summary={"todo": len(todo), "dry_run": True},
+            items=dry_items,
+            flags={"dry_run": True},
+        )
+
+        def _human_dry() -> None:
+            console.print(table)
+            if mirror_only:
+                _mirror_deferred(cfg)
+
+        _emit_agent(payload, json_out=json_out, human=_human_dry)
         raise typer.Exit(0)
 
     attacher = None
@@ -2744,6 +2785,7 @@ def run(
             scope=scope,
             flags=run_flags,
             write_api=write_api,
+            json_out=json_out,
         )
         if mirror_only:
             _mirror_deferred(cfg)
@@ -2799,6 +2841,7 @@ def run(
         scope=scope,
         flags=run_flags,
         write_api=write_api,
+        json_out=json_out,
     )
     if backend is not None:
         _flush(backend)
@@ -3161,6 +3204,28 @@ def _run_flags(**kwargs) -> dict:
     return {k: v for k, v in kwargs.items() if v}
 
 
+def _agent_json(fmt: str) -> bool:
+    if not isinstance(fmt, str):
+        return False
+    kind = (fmt or "text").strip().lower()
+    if kind not in {"text", "json"}:
+        console.print("[red]--format must be text or json.[/]")
+        raise typer.Exit(1)
+    return kind == "json"
+
+
+def _emit_agent(payload: dict[str, Any], *, json_out: bool, human: Callable[[], None]) -> None:
+    from .agent_json import dumps
+
+    if json_out:
+        console.print(dumps(payload), markup=False, highlight=False, soft_wrap=True)
+    else:
+        human()
+    code = int(payload.get("exit") or 0)
+    if code:
+        raise typer.Exit(code)
+
+
 def _finish_run(
     cfg: Config,
     stats: RunStats,
@@ -3168,12 +3233,32 @@ def _finish_run(
     scope: str,
     flags: dict,
     write_api: bool | None = None,
+    json_out: bool = False,
 ) -> None:
+    from .agent_json import batch_exit, envelope
+
     report = build_report(
         stats, cfg, command="run", scope=scope, flags=flags, write_api=write_api
     )
     path = write_run_report(cfg, report)
-    print_run_summary(console, report, path)
+    summary = report.get("summary") or {}
+    attached = int(summary.get("attached") or 0)
+    attach_failed = int(summary.get("attach_failed") or 0)
+    code = batch_exit(ok=attached, failed=attach_failed)
+    payload = envelope(
+        command="run",
+        summary=summary if isinstance(summary, dict) else {},
+        items=list(report.get("items") or []),
+        paths={"report": str(path) if path else ""},
+        flags=flags,
+        report=report,
+        exit_code=code,
+    )
+
+    def _human() -> None:
+        print_run_summary(console, report, path)
+
+    _emit_agent(payload, json_out=json_out, human=_human)
 
 
 def _load_last_run(cfg: Config) -> dict | None:
@@ -3398,6 +3483,7 @@ def inbox_drain(
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
     tag: list[str] = CreateTagOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """One-shot: ingest current PDFs in inbox.dir (DOI match only).
 
@@ -3413,6 +3499,7 @@ def inbox_drain(
 
     library = _inbox_library_when_unscoped(collection, library, profile, run_config)
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
     bound = _bind_run(
         cfg,
         profile=profile,
@@ -3427,7 +3514,7 @@ def inbox_drain(
     if not collection and not library:
         _refuse_missing_scope()
     _require_manager(cfg)
-    backend = _connect(cfg)
+    backend = _connect(cfg, quiet=json_out)
     if not backend.supports_write():
         _exit_env("inbox drain needs library write support.", cfg)
     try:
@@ -3437,6 +3524,7 @@ def inbox_drain(
         raise typer.Exit(1) from exc
     loaded = _load_scope(
         backend,
+        json_out=json_out,
         collection=collection,
         library=bool(library),
         year_from=year_from,
@@ -3446,7 +3534,8 @@ def inbox_drain(
     items, scope = loaded.items, loaded.label
     manifest = Manifest(cfg.manifest_path)
     started = time.time()
-    console.print(f"[bold]Inbox[/] draining {root} for {scope}")
+    if not json_out:
+        console.print(f"[bold]Inbox[/] draining {root} for {scope}")
     stats = process_candidates(
         cfg,
         backend,
@@ -3456,27 +3545,43 @@ def inbox_drain(
         once=True,
         collection=collection[0] if collection else "",
         extra_tags=tag,
-        on_status=lambda msg: console.print(msg),
+        on_status=None if json_out else (lambda msg: console.print(msg)),
     )
     _flush(backend)
     _rag_auto(cfg, started)
+    summary = summary_from_stats(stats)
+    items_out = events_as_report_items(stats.events)
     path = write_command_report(
         cfg,
         command="inbox",
         scope=scope,
-        summary=summary_from_stats(stats),
-        items=events_as_report_items(stats.events),
+        summary=summary,
+        items=items_out,
         flags={"once": True, "fifo": False},
         started=started,
         extra_paths={"inbox_dir": str(root)},
     )
-    console.print(
-        f"Inbox attached {stats.attached}, unmatched {stats.unmatched}, "
-        f"created_gated {stats.created_gated}, created_auto {stats.created_auto}, "
-        f"errors {stats.errors}, skipped {stats.skipped}"
+    from .agent_json import batch_exit, envelope
+
+    payload = envelope(
+        command="inbox drain",
+        summary=summary,
+        items=items_out,
+        paths={"report": str(path) if path else "", "inbox_dir": str(root)},
+        flags={"once": True},
+        exit_code=batch_exit(ok=int(stats.attached or 0), failed=int(stats.errors or 0)),
     )
-    if path is not None:
-        console.print(f"Inbox report: {path}")
+
+    def _human_drain() -> None:
+        console.print(
+            f"Inbox attached {stats.attached}, unmatched {stats.unmatched}, "
+            f"created_gated {stats.created_gated}, created_auto {stats.created_auto}, "
+            f"errors {stats.errors}, skipped {stats.skipped}"
+        )
+        if path is not None:
+            console.print(f"Inbox report: {path}")
+
+    _emit_agent(payload, json_out=json_out, human=_human_drain)
 
 
 inbox_proposals_app = typer.Typer(
@@ -3581,6 +3686,7 @@ def refs_gap(
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Works cited inside collection PDFs that are not in the library. Never writes."""
     from .identity import LibraryFingerprint
@@ -3596,6 +3702,7 @@ def refs_gap(
     if _scope_unset(collection, library, profile, run_config) and not item and not pdf:
         _refuse_missing_scope()
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
     bound = _bind_run(
         cfg,
         profile=profile,
@@ -3607,9 +3714,10 @@ def refs_gap(
         item_type=item_type,
     )
     collection, library, year_from, year_to, item_type = _take_scope(bound)
-    backend = _connect(cfg)
+    backend = _connect(cfg, quiet=json_out)
     loaded = _load_scope(
         backend,
+        json_out=json_out,
         collection=collection,
         library=bool(library) or not collection,
         year_from=year_from,
@@ -3654,27 +3762,46 @@ def refs_gap(
                 refs.append(row)
     folder = write_pack(cfg.state_dir, scope, refs, findings)
     missing = [r for r in refs if not r.already_exists]
-    table = Table(title="refs gap")
-    table.add_column("n")
-    table.add_column("DOI")
-    table.add_column("Title")
-    table.add_column("Action")
-    for row in sorted(missing, key=lambda r: (-len(r.citing_keys), r.doi or r.title))[:50]:
-        table.add_row(
-            str(len(row.citing_keys)),
-            row.doi or "",
-            (row.title or "")[:50],
-            row.suggested_action,
+    ocr_n = sum(1 for f in findings if f.finding == "needs_ocr")
+    from .agent_json import envelope
+
+    payload = envelope(
+        command="refs gap",
+        summary={"cited": len(refs), "missing": len(missing), "needs_ocr": ocr_n},
+        items=[
+            {
+                "doi": r.doi,
+                "title": r.title,
+                "cited_by_count_in_scope": len(r.citing_keys),
+                "suggested_action": r.suggested_action,
+            }
+            for r in sorted(missing, key=lambda r: (-len(r.citing_keys), r.doi or r.title))
+        ],
+        paths={"pack": str(folder)},
+        flags={"dry_run": True, "dedupe_scope": dedupe_scope},
+    )
+
+    def _human_gap() -> None:
+        table = Table(title="refs gap")
+        table.add_column("n")
+        table.add_column("DOI")
+        table.add_column("Title")
+        table.add_column("Action")
+        for row in sorted(missing, key=lambda r: (-len(r.citing_keys), r.doi or r.title))[:50]:
+            table.add_row(
+                str(len(row.citing_keys)),
+                row.doi or "",
+                (row.title or "")[:50],
+                row.suggested_action,
+            )
+        console.print(table)
+        console.print(f"Cited {len(refs)} · missing {len(missing)} · needs_ocr {ocr_n}")
+        console.print(f"Pack: {folder}")
+        console.print(
+            f"Next: paperful ingest-dois --from-file {folder / 'dois.txt'} -C <collection> --dry-run"
         )
-    console.print(table)
-    console.print(
-        f"Cited {len(refs)} · missing {len(missing)} · "
-        f"needs_ocr {sum(1 for f in findings if f.finding == 'needs_ocr')}"
-    )
-    console.print(f"Pack: {folder}")
-    console.print(
-        f"Next: paperful ingest-dois --from-file {folder / 'dois.txt'} -C <collection> --dry-run"
-    )
+
+    _emit_agent(payload, json_out=json_out, human=_human_gap)
 
 
 @app.command("ingest-dois")
@@ -3697,6 +3824,7 @@ def ingest_dois_cmd(
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Create metadata parents from a DOI list. Dry-run unless --apply. Then run fills PDFs."""
     from .identity import LibraryFingerprint
@@ -3714,6 +3842,7 @@ def ingest_dois_cmd(
         console.print("[red]Pass either --dry-run or --apply, not both.[/]")
         raise typer.Exit(1)
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
     bound = _bind_run(cfg, profile=profile, run_config=run_config, collection=collection)
     collection, _library, _yf, _yt, _types = _take_scope(bound)
     if not collection:
@@ -3731,7 +3860,7 @@ def ingest_dois_cmd(
     if not dois:
         console.print("No DOIs to ingest.")
         raise typer.Exit(0)
-    backend = _connect(cfg)
+    backend = _connect(cfg, quiet=json_out)
     all_items = list(backend.items_in_scope(None)) if hasattr(backend, "items_in_scope") else []
     fingerprint = LibraryFingerprint.from_items(
         all_items,
@@ -3763,23 +3892,38 @@ def ingest_dois_cmd(
         )
         _flush(backend)
     folder = write_summary(cfg.state_dir, collection[0], batch)
-    table = Table(title="ingest-dois")
-    table.add_column("DOI")
-    table.add_column("Status")
-    table.add_column("Title")
-    table.add_column("Detail")
-    for row in batch.rows:
-        table.add_row(row.doi, row.status, (row.title or "")[:50], row.detail)
-    console.print(table)
     counts = batch.counts()
-    console.print(
-        f"created {counts['created']} · exists {counts['exists']} · "
-        f"unresolved {counts['unresolved']} · held {counts['held']}"
-        + (" (dry-run)" if not apply else "")
+    from dataclasses import asdict as _asdict
+
+    from .agent_json import envelope
+
+    payload = envelope(
+        command="ingest-dois",
+        summary=counts,
+        items=[_asdict(row) for row in batch.rows],
+        paths={"summary": str(folder)},
+        flags={"apply": apply, "dry_run": not apply},
     )
-    console.print(f"Summary: {folder}")
-    if apply and counts["created"]:
-        console.print(f"Next: paperful run -C {collection[0]}")
+
+    def _human_ingest() -> None:
+        table = Table(title="ingest-dois")
+        table.add_column("DOI")
+        table.add_column("Status")
+        table.add_column("Title")
+        table.add_column("Detail")
+        for row in batch.rows:
+            table.add_row(row.doi, row.status, (row.title or "")[:50], row.detail)
+        console.print(table)
+        console.print(
+            f"created {counts['created']} · exists {counts['exists']} · "
+            f"unresolved {counts['unresolved']} · held {counts['held']}"
+            + (" (dry-run)" if not apply else "")
+        )
+        console.print(f"Summary: {folder}")
+        if apply and counts["created"]:
+            console.print(f"Next: paperful run -C {collection[0]}")
+
+    _emit_agent(payload, json_out=json_out, human=_human_ingest)
 
 
 @app.command()
@@ -5423,12 +5567,20 @@ def _ask_once(
     *,
     stream: bool,
     show_context: bool,
+    history: list[dict[str, str]] | None = None,
+    retrieve_as: str | None = None,
     **retrieval: Any,
 ) -> dict[str, Any]:
     """Answer one question on the terminal and return it for the run report."""
     from .rag.answer import answer
 
-    reply = answer(cfg, question, **retrieval)
+    reply = answer(
+        cfg,
+        question,
+        history=history or (),
+        retrieve_as=retrieve_as,
+        **retrieval,
+    )
     if show_context and reply.hits:
         console.print("[bold]Passages[/]")
         _print_hits(reply.hits)
@@ -5512,6 +5664,11 @@ def ask(
     show_context: bool = typer.Option(
         False, "--show-context", help="List the passages the answer is built from."
     ),
+    thread: str | None = typer.Option(
+        None,
+        "--thread",
+        help="Follow-up thread under state/rag/threads/. 'new' starts one; omit for a one-shot.",
+    ),
     config: Path | None = ConfigOpt,
 ) -> None:
     """Answer a question from the indexed library, with sources. Needs `rag ingest` first."""
@@ -5546,22 +5703,48 @@ def ask(
     started = time.time()
     answered: list[dict[str, Any]] = []
     failures = 0
+    from .rag.thread import load_thread, new_id, rewrite_query, save_thread
+
+    use_thread = thread is not None or (question is None and sys.stdin.isatty())
+    thread_id = None
+    turns: list[dict[str, str]] = []
+    if use_thread:
+        raw_id = (thread or "").strip()
+        thread_id = new_id() if raw_id in {"", "new"} else raw_id
+        loaded = load_thread(cfg.state_dir, thread_id)
+        turns = list(loaded.turns)
+        if use_thread:
+            console.print(f"[dim]Thread {thread_id} ({len(turns) // 2} turns)[/]")
     for asked in _ask_questions(question):
+        retrieve_as = asked
+        if turns:
+            retrieve_as = rewrite_query(cfg, asked, turns, client=client)
         try:
-            answered.append(
-                _ask_once(
-                    cfg,
-                    asked,
-                    stream=not no_stream,
-                    show_context=show_context,
-                    k=top_k,
-                    keys=keys,
-                    client=client,
-                    embedder=embedder,
-                    index=index,
-                    ledger=ledger,
-                )
+            row = _ask_once(
+                cfg,
+                asked,
+                stream=not no_stream,
+                show_context=show_context,
+                history=turns,
+                retrieve_as=retrieve_as,
+                k=top_k,
+                keys=keys,
+                client=client,
+                embedder=embedder,
+                index=index,
+                ledger=ledger,
             )
+            row["retrieve_as"] = retrieve_as
+            answered.append(row)
+            if use_thread:
+                turns.append({"role": "user", "content": asked})
+                turns.append({"role": "assistant", "content": row.get("answer") or ""})
+                from .rag.thread import Thread
+
+                save_thread(
+                    cfg.state_dir,
+                    Thread(thread_id=thread_id, turns=turns, last_query=retrieve_as),
+                )
         except KeyboardInterrupt:
             console.print("\n[yellow]Cancelled.[/]")
             failures += 1
@@ -5576,12 +5759,17 @@ def ask(
             cfg,
             command="ask",
             scope=", ".join(collection) or "index",
-            summary={"questions": len(answered) + failures, "answered": len(answered)},
+            summary={
+                "questions": len(answered) + failures,
+                "answered": len(answered),
+                **({"thread": thread_id} if thread_id else {}),
+            },
             items=answered,
             flags={
                 "top_k": top_k or cfg.rag_top_k,
                 "model": cfg.rag_model or cfg.llm_model,
                 "embed_model": cfg.rag_embed_model,
+                **({"thread": thread_id} if thread_id else {}),
             },
             started=started,
         )

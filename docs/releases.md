@@ -18,6 +18,8 @@ the contract; extra report keys may still be added.
 | Schema | Policy at 0.9 | 1.0 |
 | --- | --- | --- |
 | `paperful.run_report.v1` | Required keys frozen; extra keys may be added | Same |
+| `paperful.agent.json.v1` | Additive stdout envelope for `--format json` | Revisit with the agent surface |
+| `paperful.note.v1` | HTML comment + first-line prefix | Revisit with notes delete |
 | `paperful.item.v1` | Named. 0.x may add keys. Do not tag 1.0 until removal of a required key is a break | Lock |
 | `paperful.snowball.candidate.v1` | Shipped and tested. Additive keys allowed | Revisit with the item lock |
 | Snapshot / restore | Behaviour shipped. Round-trip is not a 1.0 promise yet | Lock |

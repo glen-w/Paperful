@@ -132,6 +132,10 @@ def list_missing_pdfs(
                 version=str(honesty.get("version") or ""),
             )
         )
+    if cfg is not None:
+        from .handoff_rank import rank_missing
+
+        return rank_missing(rows, cfg.state_dir)
     rows.sort(key=lambda r: (0 if r.hint == HINT_OPENABLE else 1, r.title.lower()))
     return rows
 
@@ -202,6 +206,10 @@ def missing_from_run_outcomes(
                 version=version,
             )
         )
+    if cfg is not None:
+        from .handoff_rank import rank_missing
+
+        return rank_missing(rows, cfg.state_dir)
     rows.sort(key=lambda r: r.title.lower())
     return rows
 

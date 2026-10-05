@@ -68,6 +68,7 @@ large `fix-metadata` recase if titles are ALL CAPS with corpus tokens
 | 0 | Success, including an empty dry-run or a classify with held rows |
 | 1 | User error (unknown collection, missing `--from-file`, `--apply` without `-C` on a briefing note) |
 | 2 | Manager unreachable on a write, or no mirror yet on a read that needs the library |
+| 3 | Partial batch (`inbox drain` mixed attach/errors; `run` mixed attach) |
 
 ## Out of this playbook
 

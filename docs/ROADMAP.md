@@ -337,13 +337,13 @@ for the end-to-end operator story.
 | 10 | [Frontier digest](#frontier-digest-later-watch--external-ingest); thin [snowball briefing](#frontier-digest-later-watch--external-ingest) export before full digest | Thin v0 shipped (`snowball briefing`, `watch briefing`); full digest later |
 | 11 | Scholar 429 latch (Core Scholar) | Shipped |
 | 12 | Authors/orgs frequency report from `-C` (`state/reports/…`; seed **field author packs**) | Later |
-| 13 | Handoff list ranking (Core handoff) | Later |
+| 13 | Handoff list ranking (Core handoff) | Shipped (cite count × miss severity) |
 | 14 | Opt-in academic HTML→PDF snapshot (Core `htmlpdf`) | Later |
-| 15 | Agent JSON + documented exit codes on batch verbs; MCP after those are stable | Next / Later |
+| 15 | Agent JSON + documented exit codes on batch verbs; MCP after those are stable | JSON + exit 3 shipped on `run` / `refs gap` / `ingest-dois` / `inbox drain`; thin `paperful mcp` |
 | 16 | Author-site PDF (registry + packs + co-author crawl; **snowball co-author preflight** / `grey:author_site`) | Later |
 | 17 | ResearchGate request-from-author (logged-in vault; config off by default) | Later / explore |
 | 18 | Twenty CRM — author lookup (website → registry; email for mail merge / PDF request; channel policy vs RG) | Later / explore |
-| 19 | Typed note provenance (`paperful.note.v1`) + scannable **first-line** prefixes on all Paperful note writers | Next |
+| 19 | Typed note provenance (`paperful.note.v1`) + scannable **first-line** prefixes on all Paperful note writers | Shipped (summarize / synthesize / remarks / snowball / briefing) |
 | 20 | `paperful notes delete` (or equivalent) — scoped filters: type, model, `--except-model`, tags; dry-run / `--apply` | Later |
 | 21 | [Author watch lists](#author-watch-lists-later-people-you-follow--their-papers) — ORCID resolve + list `run`; optional import from RG / LinkedIn / Academia follows | Later |
 

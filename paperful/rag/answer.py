@@ -57,6 +57,7 @@ def answer(
     question: str,
     *,
     history: Iterable[dict[str, str]] = (),
+    retrieve_as: str | None = None,
     k: int | None = None,
     keys: set[str] | None = None,
     client: LLMClient | None = None,
@@ -64,13 +65,15 @@ def answer(
     index: Index | None = None,
     ledger: Ledger | None = None,
 ) -> AnswerStream:
-    """Retrieve passages for ``question`` and start a cited answer.
+    """Retrieve passages and start a cited answer.
 
     ``history`` is earlier ``{"role", "content"}`` turns, oldest first; they go
-    to the model ahead of this question. Retrieval uses this question alone.
-    Nothing is sent to the chat model when no passage matches.
+    to the model ahead of this question. Retrieval uses ``retrieve_as`` when
+    given (a rewritten follow-up), otherwise this question. Nothing is sent
+    to the chat model when no passage matches.
     """
-    hits = search(cfg, question, k=k, keys=keys, embedder=embedder, index=index, ledger=ledger)
+    query = (retrieve_as if retrieve_as is not None else question) or ""
+    hits = search(cfg, query, k=k, keys=keys, embedder=embedder, index=index, ledger=ledger)
     if not hits:
         return AnswerStream([NO_HITS], [], [])
     context, sources = build_context(hits, cfg.rag_max_context_chars)

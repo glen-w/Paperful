@@ -587,7 +587,7 @@ def test_summarize_normalises_markdown_output(llm_cfg, monkeypatch):
     html = summarize.summarize_item(
         llm_cfg, make_item(has_pdf=True), None, None
     ).read_text()
-    assert html.startswith("<h2>Objective</h2>") and "<strong>bold</strong>" in html
+    assert "<h2>Objective</h2>" in html and "<strong>bold</strong>" in html
 
 
 def test_to_note_html_mixed_markdown_headings_with_html_paragraphs():
@@ -742,7 +742,7 @@ def test_synthesize_one_pass_and_sidecar(llm_cfg):
         llm_cfg, loaded[0], loaded[1], "BBNJ, years 2019–2020", client=stub
     )
     assert chunks == 1 and len(stub.calls) == 1
-    assert html.startswith("<h1>Paperful report:")
+    assert "Paperful report:" in html
     assert "<h2>Sources</h2>" in html and "key D" in html
     assert "Not included" in html and "key M" in html
     assert "Unmatched citations" in html and "[Nobody 1999]" in html

@@ -188,7 +188,15 @@ def render_summary(
     footer = f"<p><em>paperful · {cfg.llm_model} · {stamp} · prompt {sha}</em></p>"
     if llm_egress_is_remote(cfg):
         footer = f"<p><em>paperful · remote LLM · {cfg.llm_model} · {stamp}</em></p>"
-    return f"{html_body}\n{footer}"
+    from .notehtml import wrap
+
+    return wrap(
+        f"{html_body}\n{footer}",
+        note_type="summary",
+        verb="summarize",
+        model=cfg.llm_model,
+        prompt_sha=sha,
+    )
 
 
 def write_summary_disk(cfg: Config, item: Item, html: str) -> Path:
@@ -527,4 +535,14 @@ def apply_summary_note(
         if not path.is_file():
             raise FileNotFoundError(path)
         html = path.read_text(encoding="utf-8")
+    from .notehtml import wrap
+
+    prov = parse_summary_provenance(html) or {}
+    html = wrap(
+        html,
+        note_type="summary",
+        verb="summarize",
+        model=str(prov.get("model") or cfg.llm_model),
+        prompt_sha=str(prov.get("prompt_sha") or ""),
+    )
     return backend.create_or_update_note(item.key, html, cfg.summarize_tag)

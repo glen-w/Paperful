@@ -316,7 +316,16 @@ def assemble_report(
             f"<p><em>paperful · {_esc(cfg.llm_model)} · {stamp} · prompt {prompt_sha} · {detail}</em></p>"
         )
     parts.append(footer)
-    return "\n".join(parts)
+    from .notehtml import wrap
+
+    return wrap(
+        "\n".join(parts),
+        note_type="review",
+        verb="synthesize",
+        model=cfg.llm_model,
+        prompt_sha=prompt_sha,
+        extra=scope_label,
+    )
 
 
 def render_synthesis(

@@ -153,6 +153,15 @@ def create_new(
             f"run: {row.run_id}</p>"
         )
         if note_provenance:
+            from ..notehtml import wrap
+
+            note = wrap(
+                note,
+                note_type="snowball",
+                verb="snowball",
+                extra=f"{row.direction} hop {row.hop}",
+                run_id=str(row.run_id or ""),
+            )
             backend.create_or_update_note(key, note, prefix)
         cite_count = 0
         if local_cites is not None:

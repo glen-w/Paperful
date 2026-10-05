@@ -191,7 +191,9 @@ def _html(
             continue
         items = "".join(f"<li>{html.escape(_row_line(row))}</li>" for row in rows)
         parts.append(f"<ul>{items}</ul>")
-    return "\n".join(parts)
+    from ..notehtml import wrap
+
+    return wrap("\n".join(parts), note_type="briefing", verb="snowball briefing")
 
 
 def _read_inbox(path: Path) -> list[Candidate]:

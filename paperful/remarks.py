@@ -6,7 +6,6 @@ human copy, written through ``[remarks].surface``.
 
 from __future__ import annotations
 
-import html
 from typing import Any
 
 from .zot import Item
@@ -38,8 +37,12 @@ def say(backend: Any, item_key: str, kind: str, sentence: str, *, surface: str) 
     writer = getattr(backend, "create_or_update_note", None)
     if writer is None:
         return
+    from .notehtml import wrap
+
+    note_type = {"found": "attach", "duplicate": "duplicate", "linked": "linked"}[kind]
+    body = wrap("", note_type=note_type, verb="remarks", extra=text)
     try:
-        writer(item_key, f"<p>{html.escape(text)}</p>", note_tag)
+        writer(item_key, body, note_tag)
     except Exception:
         return
 

@@ -1994,6 +1994,36 @@ def test_refs_gap_cli_writes_pack_without_creates(cfg_file, stub_zotero, tmp_pat
     assert "Pack:" in res.stdout
 
 
+def test_refs_gap_format_json(cfg_file, stub_zotero, tmp_path, monkeypatch):
+    pdf = tmp_path / "seed.json.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+    monkeypatch.setattr(
+        "paperful.refs_gap.text_from_pdf",
+        lambda *_a, **_k: "https://doi.org/10.1000/json-gap\nA cited title about oceans.\n",
+    )
+    res = runner.invoke(
+        cli.app,
+        [
+            "refs",
+            "gap",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--pdf",
+            str(pdf),
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    body = json.loads(res.stdout)
+    assert body["schema"] == "paperful.agent.json.v1"
+    assert body["command"] == "refs gap"
+    assert body["flags"]["dry_run"] is True
+    assert "Pack:" not in res.stdout
+
+
 def test_ingest_dois_cli_dry_run_does_not_create(cfg_file, stub_zotero, tmp_path, monkeypatch):
     from paperful.resolve import WorkMeta
 
@@ -2035,6 +2065,46 @@ def test_ingest_dois_cli_dry_run_does_not_create(cfg_file, stub_zotero, tmp_path
     payload = json.loads(summaries[0].read_text())
     assert payload["schema"] == "paperful.ingest_dois.v1"
     assert payload["applied"] is False
+
+
+def test_ingest_dois_format_json(cfg_file, stub_zotero, tmp_path, monkeypatch):
+    from paperful.resolve import WorkMeta
+
+    dois = tmp_path / "dois-json.txt"
+    dois.write_text("10.1000/cli-json\n")
+    monkeypatch.setattr(
+        "paperful.ingest_dois.default_resolver",
+        lambda email: (
+            lambda doi: WorkMeta(
+                doi=doi,
+                title="A sufficiently long ingested title for tests",
+                year=2021,
+                source="crossref",
+                work_type="journal-article",
+            )
+        ),
+    )
+    res = runner.invoke(
+        cli.app,
+        [
+            "ingest-dois",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--from-file",
+            str(dois),
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    body = json.loads(res.stdout)
+    assert body["schema"] == "paperful.agent.json.v1"
+    assert body["command"] == "ingest-dois"
+    assert body["flags"]["dry_run"] is True
+    assert body["items"][0]["status"] == "create"
+    assert body["items"][0]["doi"] == "10.1000/cli-json"
 
 
 def test_snowball_doi_help_names_tag():

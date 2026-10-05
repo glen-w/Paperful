@@ -91,6 +91,10 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `sources/` | One fetch lane each. Return bytes or a miss | `sources.base` |
 | `pipeline.py` | Order the lanes, save, attach, write the manifest | most things |
 | `cli.py` | Flags, progress, exits. No logic of its own | everything |
+| `agent_json.py` | `--format json` envelope (`paperful.agent.json.v1`) and exit 3 | none |
+| `notehtml.py` | First-line prefixes + `paperful.note.v1` comment | none |
+| `handoff_rank.py` | Missing-PDF sort: refs-gap cites × miss severity | `handoff` |
+| `mcp_server.py` | Stdio MCP: dry-run `refs_gap`, read-only `ask` | JSON channel + catalogue |
 
 ## The refresh
 
@@ -123,6 +127,9 @@ Every step can be repeated. A crash leaves valid records and an old version.
 | `paperful.annotations.v1` | `annotations.json` | New |
 | `paperful.collections.v1` | `out/_collections.json` | Read by the catalogue |
 | `paperful.run_report.v1` | `state/runs/*.json` | Required keys frozen |
+| `paperful.agent.json.v1` | stdout of `--format json` | Additive 0.x envelope around existing reports |
+| `paperful.note.v1` | HTML comment in child notes | Prefix + type/verb/model/run/prompt sha |
+| `paperful.rag.thread.v1` | `state/rag/threads/*.json` | Ask follow-up turns; under `state/` (backup-excluded) |
 
 The catalogue rebuilds an `Item` from a record. The test
 `test_item_from_record_matches_the_live_listing` holds the two equal field

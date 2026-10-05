@@ -231,6 +231,7 @@ calls the reference manager. Setup: [Ask your library](docs/rag.md).
 uv sync --extra rag && ollama pull nomic-embed-text   # then set [rag] enabled = true
 uv run paperful rag ingest -C COLLECTION     # scans get OCR; text PDFs do not
 uv run paperful ask "What do these papers say about X?" -C COLLECTION
+uv run paperful ask --thread new "…" -C COLLECTION   # follow-ups rewrite retrieval
 ```
 
 ## Develop

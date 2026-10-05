@@ -251,6 +251,20 @@ def test_answer_uses_rag_model_and_passes_history(built):
     assert built["embedder"].queries[-1] == "And in summer?"
 
 
+def test_answer_retrieves_on_retrieve_as_keeps_the_question(built):
+    chat = StubChat()
+    reply = answer(
+        built["cfg"],
+        "and the EIA part?",
+        retrieve_as="BBNJ EIA procedure",
+        client=chat,
+        **_tools(built),
+    )
+    reply.read()
+    assert built["embedder"].queries[-1] == "BBNJ EIA procedure"
+    assert chat.requests[0].messages[-1]["content"].endswith("Question: and the EIA part?")
+
+
 def test_answer_ignores_markers_that_were_not_offered(built):
     chat = StubChat(pieces=["Invented [S9] and real [S1]."])
     reply = answer(built["cfg"], "krill", client=chat, **_tools(built))

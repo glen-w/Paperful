@@ -170,7 +170,9 @@ prints one line and `rag ingest` catches up later. It is off by default.
 uv run paperful rag search "environmental impact assessment thresholds" -C ocean/BBNJ
 uv run paperful ask "What does the BBNJ Agreement require for EIAs?" -C ocean/BBNJ
 uv run paperful ask "…" --show-context     # also list the passages used
-uv run paperful ask                        # prompt for several questions; :q to leave
+uv run paperful ask                        # prompt for several; follow-ups share a thread
+uv run paperful ask --thread new "…"       # start a stored thread
+uv run paperful ask --thread <id> "and the EIA part?"
 ```
 
 `ask` prints the answer as it is written, then the sources it cited:
@@ -188,10 +190,11 @@ item key. When the model cites nothing, the retrieved papers are listed as
 `--year-from`, `--year-to` and `--type` narrow what is searched. Each run
 writes `state/runs/<stamp>-ask.json` with the questions, answers and sources.
 
-Without a question, `ask` prompts for one at a time. Questions are answered
-independently: a follow-up does not see the previous answer. Conversation with
-memory is a 2.0 goal ([ROADMAP](ROADMAP.md#zotero-rag-integration-later-question-centric-layer)).
-Piped input is read as one question per line.
+Without a question on a TTY, `ask` prompts for one at a time and keeps a
+thread under `state/rag/threads/`. Follow-ups are rewritten into a standalone
+search query before retrieval; the model still sees the conversation. Piped
+lines and a one-shot `paperful ask "question"` stay independent unless you
+pass `--thread`.
 
 Answers are only as good as the passages found. The model is told to answer
 from the excerpts alone and to say when they do not contain the answer, but a

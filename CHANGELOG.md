@@ -15,6 +15,15 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
   markdown from a saved queue or watch inbox. No silent creates; `--apply -C`
   files a collection note tagged `paperful:frontier-briefing`.
 - Research-pack playbook: [docs/research-pack.md](docs/research-pack.md).
+- `--format json` (`paperful.agent.json.v1`) and exit **3** (partial batch) on
+  `run`, `refs gap`, `ingest-dois`, and `inbox drain`. `paperful mcp` is a thin
+  stdio server for dry-run `refs_gap` and read-only `ask`.
+- Paperful notes lead with scannable prefixes (`Summary (model):`, `Attach:`,
+  `Duplicate:`, `Linked:`) plus a `paperful.note.v1` HTML comment.
+- Handoff lists rank by in-corpus cite count from the newest refs-gap pack ×
+  miss-surface severity, then openable URLs.
+- `paperful ask --thread` stores turns under `state/rag/threads/` and retrieves
+  on a rewritten follow-up query. Prompted `ask` always threads.
 
 - Frozen miss-surface enum (`no_doi`, `paywalled`, `no_oa`, `fetch_failed`,
   `license_blocked`, `import_ok`) on `run --dry-run`, `gaps --list-missing`,
