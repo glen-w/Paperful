@@ -9,9 +9,12 @@ Required keys on `paperful.run_report.v1` from `build_report()` are frozen
 `paperful.item.v1` may still move. This tree is not tagged 1.0.
 
 **1.0** (not tagged) still owes a lock on `paperful.item.v1` and on
-snapshot/restore behaviour. Required `paperful.run_report.v1` keys and
-imported-file attach (typed `attach_failed`, provenance note) are already
-the contract; extra report keys may still be added.
+snapshot/restore behaviour, a **workbench GUI** over the CLI capability API,
+and **interactive Ask** (chat-over-collection RAG in the GUI). Required
+`paperful.run_report.v1` keys and imported-file attach (typed `attach_failed`,
+provenance note) are already the contract; extra report keys may still be added.
+**Post-1.0:** local OpenAlex snapshot phases beyond opt-in v1, Firefox
+extension, newsletter/alert ingest — see [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10).
 
 ## Schema compatibility (0.9, not frozen as 1.0)
 
@@ -71,4 +74,6 @@ before 1.0. See [LLM](llm.md).
 | Locked report JSON schema | Required `paperful.run_report.v1` keys frozen; additive keys still allowed. Not tagged 1.0 |
 | Locked item record + snapshot/restore | `paperful.item.v1` named; 0.x may add keys |
 | Mendeley and EndNote adapters | In the tree. Seeking testers. Zotero is the well-tested path |
+| Workbench GUI (run / review / apply CLI workflows) | Roadmap — [gui.md](gui.md) |
+| Interactive Ask in GUI (cited chat-over-collection) | Roadmap — CLI `ask` / threads shipped |
 | Fresh-clone doctor stays quiet without Scholar | Shipped (0.9): `scholar` opt-in like `scihub` |

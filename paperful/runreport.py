@@ -502,6 +502,65 @@ def write_command_report(
     return write_run_report(cfg, report, as_last_run=False)
 
 
+_RECOVER_FROM_LAST_MODES = frozenset(
+    {"browser_agent_miss", "missing", "browser_agent_not_found"}
+)
+
+
+def recover_item_keys_from_report(
+    report: dict,
+    *,
+    mode: str = "browser_agent_miss",
+) -> list[str]:
+    """Item keys from a run report suitable for ``recover --from-last-run``."""
+    if mode not in _RECOVER_FROM_LAST_MODES:
+        mode = "browser_agent_miss"
+    items = report.get("items") or []
+    if not isinstance(items, list):
+        return []
+    keys: list[str] = []
+    seen: set[str] = set()
+    for row in items:
+        if not isinstance(row, dict):
+            continue
+        key = str(row.get("itemKey") or "").strip()
+        if not key or key in seen:
+            continue
+        attempts = row.get("attempts") or []
+        if not isinstance(attempts, list):
+            attempts = []
+        if mode == "missing":
+            status = str(row.get("status") or "")
+            if status not in ("not_found", "retryable"):
+                continue
+        elif mode == "browser_agent_not_found":
+            if not any(
+                isinstance(a, str) and a.startswith("browser_agent:not_found(")
+                for a in attempts
+            ):
+                continue
+        else:
+            if not _browser_agent_miss_row(row, attempts):
+                continue
+        seen.add(key)
+        keys.append(key)
+    return keys
+
+
+def _browser_agent_miss_row(row: dict, attempts: list) -> bool:
+    for attempt in attempts:
+        if not isinstance(attempt, str) or not attempt.startswith("browser_agent:"):
+            continue
+        if attempt.startswith("browser_agent:not_found("):
+            return True
+        if attempt.startswith("browser_agent:captcha("):
+            return True
+        if "step budget" in attempt or "steps " in attempt:
+            return True
+    reason = str(row.get("reason") or "")
+    return "step budget" in reason
+
+
 def print_run_summary(
     console: Console, report: dict[str, Any], report_path: Path | None = None
 ) -> None:

@@ -199,8 +199,9 @@ pdf_template = "https://example.org/docs/{code}/{code}.pdf"
 
 Off by default. Install extras: `uv sync --extra llm` (LiteLLM for paid APIs),
 `uv sync --extra browser-agent` (Python 3.11+ only, for the `browser_agent` run
-lane and `recover`). Setup
-walkthrough, model advice, Docker networking, and troubleshooting: [LLM](llm.md).
+lane and `recover`). Batch recover: `recover --from-last-run` reads
+`state/last-run.json` (`--from-last-run-mode`, `--limit`). Setup walkthrough,
+model advice, Docker networking, and troubleshooting: [LLM](llm.md).
 
 | Table / key | Default | Role |
 | --- | --- | --- |
@@ -306,6 +307,8 @@ run misbehaves or you host infrastructure yourself.
 | `[synthesize].timeout_s` | `max([llm].timeout_s, 300)` | Per-completion timeout for the report |
 | `[browser_agent].max_steps` / `max_wall_s` | `20` / `300` | Step and wall-clock caps for `recover` (agent stops early once a valid PDF lands) |
 | `[browser_agent].model` | (`[llm].model`) | Larger tool-capable model for browsing only; `doctor` warns under ~10B; see [browser-agent-models.md](browser-agent-models.md) |
+| `[browser_agent].fallback_model` | `""` | One retry with this tag before final `not_found` (skipped after captcha / bot wall). LiteLLM ids (`provider/model`) need `llm.allow_remote` when `llm.provider` is Ollama |
+| `[browser_agent].use_vision` | `false` | Send page screenshots to the model; requires a vision-capable tag (`qwen2.5vl`, etc.) |
 | `[ocr].timeout_s` | `600` | Seconds allowed per PDF |
 | `[attachments].fix_broken` | `false` | With `attachments --apply`, refill a ghost or broken link from `out/` when the MD5 matches |
 | `[attachments].merge_files` | `false` | With `--apply`, trash extra PDF children on the same parent that share an MD5 |

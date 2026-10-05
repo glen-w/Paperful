@@ -1,4 +1,4 @@
-# Read the Docs scaffold. Do not publish a live hostname until the project exists.
+# Optional RTD mirror; production guide ships on GitHub Pages (paperful.app/guide/).
 
 version: 2
 
@@ -9,7 +9,7 @@ build:
 
 sphinx:
   configuration: docs/conf.py
-  fail_on_warning: false
+  fail_on_warning: true
 
 python:
   install:

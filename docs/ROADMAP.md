@@ -7,23 +7,40 @@ lint / attach / summarise as the core loop. **Zotero is the well-tested
 adapter.** Mendeley and EndNote are in the tree and seeking testers. See
 [architecture.md](architecture.md) and [why.md](why.md).
 
-Surfaces like a Zotero plugin, Firefox extension, or web GUI are **not** the
-1.0 product direction. Optional thin bridges (`paperful session login`, and a
-parked Firefox extension below) capture a local browser profile or shell CLI
-verbs; they do not rewrite the fetcher.
+Optional thin bridges (`paperful session login`) capture a local browser profile;
+they do not rewrite the fetcher. A **Zotero plugin** is not the 1.0 bet.
+**Firefox extension**, **local OpenAlex snapshot** (beyond today’s opt-in v1),
+and **newsletter / alert ingest** are **post-1.0** — see [Product split](#product-split-10-vs-post-10).
 
-**1.0** is that loop, the trust checklist below, and a locked item record
-(`paperful.item.v1` plus `snapshot` / `restore`), proven on **Zotero**. Mendeley
-and EndNote adapters are not 1.0 until testers have exercised them. Not a GUI,
-not a full-text reading index, not a WebDAV client, and not “AI fetch everything.”
-`paperful ocr` is the optional text layer for scans.
+**1.0** is the trust checklist below, a locked item record (`paperful.item.v1`
+plus `snapshot` / `restore`), proven on **Zotero**, a **workbench GUI** that
+runs, illuminates, and simplifies the full CLI surface ([GUI](#gui)), and
+**interactive Ask** — chat-over-collection / library RAG with citations in that
+GUI ([Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer)).
+Mendeley and EndNote adapters are not 1.0 until testers have exercised them.
+Still not a full-text reading index, not a WebDAV client, and not “AI fetch
+everything.” `paperful ocr` is the optional text layer for scans.
+
+(product-split-10-vs-post-10)=
+## Product split: 1.0 vs post-1.0
+
+Contributor decisions (not a calendar). **1.0** is CLI honesty plus the
+operator workbench; **post-1.0** items stay on the map for power users and
+integrations.
+
+| **1.0** | **Post-1.0** |
+| --- | --- |
+| Trust checklist, locked `paperful.run_report.v1` / `paperful.item.v1`, snapshot contract | **Local OpenAlex parquet store** — phases 2B/2C (`works_citing`, full search parity, `local_duckdb` / `http`). Live OpenAlex API is enough for most installs; v1 `ssh_duckdb` remains opt-in for institutions |
+| **GUI workbench** — capability API over existing verbs; dry-run default, explicit Apply; illuminate every CLI job without memorizing flags | **Firefox extension** — native messaging → CLI ([section below](#optional-thin-bridge--firefox-extension-post-10)) |
+| **Ask 2.0 in the GUI** — multi-turn, scoped chat-over-collection / library with citations (`[rag]` + `[llm]` gates) | **Newsletter / alert ingest** — rollup bridge, Scholar alerts first ([Frontier digest](#frontier-digest-later-watch--external-ingest)) |
+| Zotero-proven path; Mendeley / EndNote when real-library testers confirm | SaaS tenancy polish, remote-manager parity beyond what 1.0 open/Docker needs |
 
 (trust-10)=
 ## 0.1 → 1.0 (trust + mirror contract)
 
 `0.1` is a first usable helper for a reference library. Do not call it **1.0**
-until these land. Do **not** grow this list into a second product (no GUI, no
-auto Sci-Hub, no “AI fetch everything”).
+until these land. Do **not** grow this list into a second product (no auto
+Sci-Hub, no “AI fetch everything”).
 
 | Step | UX outcome | Status |
 | --- | --- | --- |
@@ -36,6 +53,8 @@ auto Sci-Hub, no “AI fetch everything”).
 | Lock `paperful.item.v1` and `snapshot` / `restore` (additive keys only after 1.0) | Trust for the disk ledger | Named schema; 0.x may add keys. Behaviour shipped |
 | Strip legacy flat-PDF migrate + mixed-layout doctor amber | Day-0 mirror never steers people into a whole-library layout cleanup | **Shipped (0.1 → 1.0)** |
 | **Mendeley and EndNote adapters** | The ledger survives a manager change | In the tree. **Seeking testers.** Zotero stays the well-tested path. See below |
+| **Workbench GUI** | Run, review, and apply CLI workflows without the terminal as the only surface | Roadmap — [GUI](#gui); capability API + dry-run / Apply parity |
+| **Interactive Ask (GUI)** | Chat-over-collection / library with cited RAG | Roadmap — CLI foundation shipped (`ask`, `--thread`, batch); GUI is the 1.0 conversational layer |
 
 Nice-to-have (not 1.0 blockers): colour glossary next to `doctor` (documented);
 collection picker hint on fuzzy `--collection` miss.
@@ -359,12 +378,10 @@ Py 3.11+), `fix-metadata` title proposals (`[fix_metadata].llm_title`), `lint`
 default, a collection note). Image PDFs need `paperful ocr --apply` first.
 See [architecture § LLM layer](architecture.md#llm-layer-optional-local-first).
 URL recipes from vault/agent wins are already `playbooks propose` / `promote`
-← `state/fetch-wins.jsonl` (below). Still later: **second-model fallback** on
-`browser_agent` / `recover` (one retry with
-`[browser_agent].fallback_model` — prefer a larger local tag or LiteLLM when
-`allow_remote` — before `not_found` / `captcha`; not a cascade); Browser Use
-Cloud / BU2; batch `recover --from-last-run`; mining richer playbooks from
-agent *step* traces (beyond host/path wins); venue/date cleanup; **vault /
+← `state/fetch-wins.jsonl` (below), including agent step traces when the
+agent lands a PDF. **Shipped:** `[browser_agent].fallback_model` (one retry),
+`use_vision`, `recover --from-last-run`. Still later: Browser Use Cloud / BU2;
+venue/date cleanup; **vault /
 agent Chromium extensions** when the profile can load them safely (small
 operator allowlist — e.g. cookie-consent dismiss, PDF/link helpers — so models
 spend fewer steps on CMP noise and missed download controls; spike Playwright +
@@ -390,10 +407,10 @@ try immediately before the agent when Scholar is opted in);
 | --- | --- |
 | [llm.md](llm.md) | Install extras, `[llm]` / `[browser_agent]` keys, `recover` behaviour, troubleshooting table |
 | [browser-agent-models.md](browser-agent-models.md) | **Local Ollama tag guidance** for PDF UI loops (VRAM bands, avoid list, acceptance test) |
-| [config.md](config.md#llm-optional-local-first) | Key table: `during_run`, `max_steps`, `max_wall_s`, `model` override |
+| [config.md](config.md#llm-optional-local-first) | Key table: `model`, `fallback_model`, `use_vision`, `during_run`, caps |
 | [architecture.md](architecture.md) | Serial source ordering, Playwright handoff before agent, CAPTCHA → skip lane for run |
 | [sessions.md](sessions.md) | Vault profile shared with recover; no concurrent vault users |
-| [commands.md](commands.md) | `--browser-agent` / `--no-browser-agent` on `run` / `all` |
+| [commands.md](commands.md) | `recover --from-last-run`, `--browser-agent` / `--no-browser-agent` on `run` / `all` |
 | [docker.md](docker.md) | Explicit non-shipment of browser-use in container |
 | `assessments/2026-09-29-ollama-browser-use-pdf-download-models.md` | Full research note (Infra rank + honesty/engineering cuts); **user-facing summary lives in `browser-agent-models.md`** |
 
@@ -413,6 +430,8 @@ timeout_s = 120
 
 [browser_agent]
 # model = "qwen3:14b"            # override for browsing only; omit → [llm].model
+# fallback_model = "qwen3:30b"   # one retry before final not_found (not on captcha)
+# use_vision = false             # true only with VL tags (qwen2.5vl, etc.)
 during_run = true                # false → recover --item only unless --browser-agent
 max_steps = 20                   # stop early when PDF lands
 max_wall_s = 300
@@ -422,7 +441,7 @@ max_wall_s = 300
 | --- | --- |
 | **`[browser_agent].model`** | Always treat as **separate** from `[llm].model`. Browsing wants **tool-capable 14B+**; other verbs stay on 7B–12B. |
 | **`doctor`** | Name-pattern amber under **~10B**; message points at **14b+ class** tag. |
-| **`use_vision`** | Hard-coded **False** until config + VL tag path is designed (avoid Ollama 400 on text models). |
+| **`use_vision`** | Default **false**; set true only with a VL-capable `[browser_agent].model`. |
 | **Vault** | Same **`user_data_dir`** as `session login`; extensions (uBlock, cookie banner) reduce step waste. |
 | **Honesty** | Task + `_RECOVER_SYSTEM_EXT` forbid search engines, purchase, pirate hosts; hard CAPTCHA → **`captcha`** and lane silence for the run. |
 
@@ -454,12 +473,12 @@ no invented URL — not parameter count or model marketing copy.
 
 | Item | Notes |
 | --- | --- |
-| **`[browser_agent].fallback_model`** | Roadmapped one retry (larger local or LiteLLM) before final `not_found` — **not shipped**. |
-| **`use_vision` + VL tag** | Opt-in `[browser_agent].use_vision` + model hint for **`qwen2.5vl:*`** when DOM index fails. |
+| **`[browser_agent].fallback_model`** | **Shipped:** one retry before final `not_found` (not on captcha). |
+| **`use_vision` + VL tag** | **Shipped:** opt-in `[browser_agent].use_vision`; preflight/doctor check tag shape. |
 | **`num_ctx` / temperature** | Pass through to `ChatOllama` or document Modelfile recipe; agent DOM dumps need **16k–32k+**. |
 | **Schema hardening** | Nested JSON examples in `extend_system_message`; log parse failures to run report. |
-| **Batch recover** | `recover --from-last-run` — still later. |
-| **Playbooks from wins** | `state/fetch-wins.jsonl` + `playbooks promote` today; **step-trace** mining still later. |
+| **Batch recover** | **Shipped:** `recover --from-last-run` + `--from-last-run-mode`. |
+| **Playbooks from wins** | **Shipped:** agent successes write promotable `click:` / `rewrite` wins + optional `steps` in `fetch-wins.jsonl`. |
 | **Browser Use Cloud / BU2** | Stealth / CAPTCHA — explicit non-default; no bypass product. |
 | **Controlled bakeoff** | No Paperful CI fixture for “Springer cookie → PDF” per model; optional **`assessments/`** protocol later. |
 
@@ -559,8 +578,9 @@ llm_title = false            # MVP gate; requires [llm].enabled
 **Non-goals for the MVP:** blank-slate auto-tagging of the whole library,
 rewriting abstracts, silent cloud defaults, applying patches without `--apply`.
 Staged tagging (below) is **later**, not part of the title / PDF-identity MVP.
-Chat-over-library was out of scope for this MVP only; it is a **2.0 goal** (see
-[Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer)).
+Chat-over-library in the **GUI** is a **1.0 goal** (see
+[Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer));
+terminal `ask` / `--thread` remain the CLI path.
 
 **Later LLM verbs:** venue/date cleanup from the first page. Title proposals,
 the PDF identity check, and grounded briefs (`summarize` / `synthesize`) are
@@ -576,9 +596,11 @@ reference manager calls): `paperful rag ingest | search | status | questions |
 answered` and `paperful ask` (one cited answer, TTY/`--thread` follow-ups, or
 `--from-file` batch). Opt-in under `[rag]`; `auto_ingest` is off by default.
 
-**Chat-over-library GUI is a 2.0 goal** (parked until a GUI exists) — see
-[GUI](#gui). Terminal multi-turn is shipped: `ask --thread` rewrites follow-ups
-for retrieval and stores threads under `state/rag/threads/`.
+**Interactive Ask in the GUI is a 1.0 goal** — see [GUI](#gui) and [Product
+split](#product-split-10-vs-post-10). Terminal multi-turn is shipped:
+`ask --thread` rewrites follow-ups for retrieval and stores threads under
+`state/rag/threads/`; the workbench should expose the same thread model with
+visible scope (collection / filters) and citations.
 
 Reuse the house LLM pattern: global `[llm]` + per-verb overrides (same spirit
 as `[summarize].model`, `[browser_agent].model`, `[rag].model`).
@@ -681,7 +703,7 @@ launchd / systemd / cron examples are in [snowball.md](snowball.md#watch).
 grey-vs-peer / OA stamp hints in briefing tables where provenance
 exists (`grey:…`, `oa:…`).
 
-**Newsletter / alert ingest (rollup bridge):** optional plug-in or HTTP client
+**Newsletter / alert ingest (rollup bridge; post-1.0):** optional plug-in or HTTP client
 to sibling **[rollup](Documents/rollup)**-style ingest architecture — pull
 candidate papers from the operator’s **newsletters and alerts**, first source
 **Google Scholar** email/alert feeds (opt-in; same honesty bar as Scholar in
@@ -987,9 +1009,10 @@ snapshot](https://help.openalex.org/access/snapshot/) and point
   `works_by_ids` with API fallback for misses. Docs:
   [config Advanced](config.md#openalex-api-limits-and-snapshot-store),
   [snowball Advanced](snowball.md#advanced).
-- **Next (2B):** `works_citing` plus text search (`cites-query`) from the
-  snapshot (likely an inverted cites index or careful scan strategy).
-- **Later (2C):** keyword / ORCID / `search` parity; `local_duckdb` and `http`
+- **Post-1.0 (2B):** `works_citing` plus text search (`cites-query`) from the
+  snapshot (likely an inverted cites index or careful scan strategy). Not required
+  for 1.0 — the public API is generous for typical snowball / ingest loads.
+- **Post-1.0 (2C):** keyword / ORCID / `search` parity; `local_duckdb` and `http`
   backends for campus hosting without SSH.
 
 ## Maybe later, not core
@@ -1218,9 +1241,9 @@ Larger product bets. Park until the ledger and core loop justify them.
 - Shipping Sci-Hub or proxy abuse as defaults (opt-in + presets stay as today)
 - Jeffersonian transcription / qualitative coding apps
 
-## Optional thin bridge — Firefox extension (parked)
+## Optional thin bridge — Firefox extension (post-1.0)
 
-**Status:** design-only; **not** a 1.0 deliverable and **not** a replacement
+**Status:** design-only; **post-1.0** ([Product split](#product-split-10-vs-post-10)) — **not** a replacement
 for the Zotero Connector. Same Control posture as the CLI (dry-run default,
 explicit Apply, fail closed if Paperful is unreachable). Feasibility +
 contracts researched 2026-09-29 (local notes; substance locked below).
@@ -1236,8 +1259,8 @@ Three explicit toolbar actions (no single “grab everything”):
 **v0 transport (room lock):** Extension → **`nativeMessaging`** host → shells
 `paperful` CLI (dry-run JSON → confirm → write). No new daemon and no invented
 localhost Capability API for these three actions. Thin `paperful serve` /
-Capability API later only if doctor/status needs a sticky probe (GUI 2.0 still
-targets HTTP — [gui.md](gui.md)). **Wrong:** extension → Zotero `:23119`
+Capability API for the 1.0 workbench targets HTTP — [gui.md](gui.md). The
+extension may reuse the same API later via native messaging. **Wrong:** extension → Zotero `:23119`
 directly (skips quiet mirror + provenance; do not replace Connector for
 cite-save).
 
@@ -1269,8 +1292,8 @@ DownThemAll / Pull Tabs for paced tab-download UX only.
 ## Documentation (thicken)
 
 **Status:** roadmap — reference docs exist; playbooks and media do not yet match
-the depth of the CLI. Not a 1.0 blocker; raises trust before install and after
-the first confusing run.
+the depth of the CLI. Raises trust before install; **GUI 1.0** should ship with
+worked examples and screenshots for the main workbench modes (see [GUI](#gui)).
 
 Ship in layers:
 
@@ -1326,24 +1349,27 @@ second doc tree that drifts from the CLI.
 - [snowball.md](snowball.md) — library-building from a keyword, multi-DOI / multi-ORCID, or collection
 - Site career / domain timeline plan (consumer of durable tags):
   `/Users/89298/Documents/website/glen-w.github.io/docs/dev/career-timeline-plan.md`
-- Firefox extension (parked thin bridge) — section above; not a separate doc yet
+- Firefox extension (post-1.0 thin bridge) — section above; not a separate doc yet
 
 ## GUI
 
-Parked **2.0 vision** only — not a 1.0 deliverable. Web-native workbench
-sketch (open / Docker / SaaS): [gui.md](gui.md). The Firefox extension above
-is a thinner optional bridge; it does not wait on the full GUI Capability API.
+**1.0 deliverable** — web-native workbench sketch (open / Docker first; SaaS
+later): [gui.md](gui.md). The CLI stays the source of truth; the GUI **runs,
+illuminates, and simplifies** the same verbs (`run`, snowball gates, inbox,
+`refs gap`, `lint` / `fix-metadata`, `dedupe`, handoff, doctor status, …) via a
+**capability API** with the same Control posture (dry-run default, explicit
+Apply, fail closed). It is not a second fetch stack or a replacement for
+Zotero’s reader. The **Firefox extension** is post-1.0 and may call the same API
+when it ships.
 
-**Built-in chat with collection (2.0 goal, opt-in):** a scoped **Ask** mode in
-the workbench — conversational Q&A over the current collection (and the same
-year / type / profile filters as other modes), with **citations** back to
-items and PDF passages via the `[rag]` index (`rag.answer` with turn history).
-Not the default landing experience and not a replacement for Zotero’s reader;
-requires `[llm].enabled`, `[rag].enabled` and an up-to-date index
-(`paperful rag ingest`). The
-Capability API exposes the same verbs as CLI batch Q&A ([Zotero-RAG
-integration](#zotero-rag-integration-later-question-centric-layer)): turn
-history, `--focus` / prompt presets, optional “promote this thread to batch
-report on disk,” and explicit scope chrome so SaaS / shared workspaces never
-imply library-wide answers without a visible filter. GUI ships **after** CLI
-batch ingest and cited answers are stable.
+**Built-in Ask (1.0, opt-in):** a scoped **chat-with-collection** mode —
+conversational Q&A over the current collection (and the same year / type /
+profile filters as other modes), with **citations** back to items and PDF
+passages via the `[rag]` index (`rag.answer` with turn history). Not the only
+landing experience; requires `[llm].enabled`, `[rag].enabled`, and an
+up-to-date index (`paperful rag ingest`). Reuse CLI batch Q&A and threads
+([Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer)):
+turn history, `--focus` / prompt presets, optional promote-to-disk report, and
+**visible scope chrome** so operators never get library-wide answers without
+choosing a filter. CLI `ask` / `--thread` / `--from-file` remain supported for
+scripts and agents.

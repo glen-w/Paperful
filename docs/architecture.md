@@ -141,7 +141,7 @@ flowchart LR
 | `state/twenty-sync/<slug>.jsonl` | Resume ledger for `twenty sync --apply` (fingerprint, action, Twenty id). Under `state/` (backup-excluded) |
 | `state/author-requests.jsonl` | ResearchGate handoff ledger (you click Request). `gaps` / `run --handoff` / `reachout --handoff` |
 | `state/sessions/` | Chromium profile + `meta.json` (login timestamps, no secrets). Netscape dumps for httpx |
-| `state/fetch-wins.jsonl` | One line per vault or browser-agent PDF (host and path; query string dropped). Input to `paperful playbooks propose` |
+| `state/fetch-wins.jsonl` | One line per vault or browser-agent PDF (host and path; query string dropped). Agent rows may include a `steps` trace and promotable `click:` / `rewrite` wins. Input to `paperful playbooks propose` |
 | `state/playbooks-proposed.toml` | Draft learned pack from `playbooks propose`. Not loaded until `playbooks promote` |
 | `state/last-run.json` | Latest `run` or `recover` report (`paperful.run_report.v1`). Other verbs do not replace it |
 | `state/runs/<stamp>-<command>.json` | One report per `run`, `recover`, `gaps`, `reachout`, `lint`, `fix-metadata` (dry-run and `--apply`), `attachments` (dry-run and `--apply`), `summarize`, `synthesize`, and `snapshot` |
@@ -165,13 +165,13 @@ below.
 
 | Verb | Gate | Output | Library write |
 | --- | --- | --- | --- |
-| `run` (`browser_agent`) / `recover --item` | `llm.enabled` + `paperful[browser-agent]` (Py 3.11+) | PDF in `out/`, manifest `source=browser_agent` | existing attach |
+| `run` (`browser_agent`) / `recover` (`--item` or `--from-last-run`) | `llm.enabled` + `paperful[browser-agent]` (Py 3.11+) | PDF in `out/`, manifest `source=browser_agent` | existing attach |
 | `fix-metadata` title proposals | `[fix_metadata].llm_title` | `Patch(source="llm_title")` | `--apply` |
 | `lint` identity check | `[lint].llm_pdf_match` | finding `pdf_identity_mismatch` | none |
 | `summarize` | `llm.enabled` | `state/summaries/<key>.html` when dest includes disk | child note unless `--to disk` |
 | `synthesize` | `llm.enabled` | `state/reports/<slug>.html` when dest includes disk | standalone note in the scoped collection unless `--to disk` |
 
-`browser_agent` is a registered **serial** source but never in `DEFAULT_SOURCES`. `run` auto-appends it when `[llm].enabled` and `[browser_agent].during_run` (default on) and the extra is importable. Default `[fetch].order = "policy"` places Scholar (if opted in) immediately before the agent, **interleaved** per item so a Scholar hit skips the agent; `[fetch].order = "list"` inserts the agent after the last of scholar / ezproxy / htmlpdf as before. The agent runs only if one of those vault lanes was tried and failed. `--browser-agent` / `--no-browser-agent` on `run` or `all` override `during_run` for that invocation. Before that phase the pipeline closes `BrowserSession` so browser-use can own the vault Chromium profile. Opt-in **SerpApi** (`[serpapi].enabled`, env `SERPAPI_API_KEY`) is a later serial Scholar-engine search; `[serpapi].max_calls` / `--serpapi-max` cap paid calls (see [SerpApi](serpapi.md)). `paperful recover --item` builds the pipeline with `use_browser=False` and only that source. Hard CAPTCHAs end as `captcha`, not auto-solved. `summarize` refuses items the gated identity check flags unless `--force`.
+`browser_agent` is a registered **serial** source but never in `DEFAULT_SOURCES`. `run` auto-appends it when `[llm].enabled` and `[browser_agent].during_run` (default on) and the extra is importable. Default `[fetch].order = "policy"` places Scholar (if opted in) immediately before the agent, **interleaved** per item so a Scholar hit skips the agent; `[fetch].order = "list"` inserts the agent after the last of scholar / ezproxy / htmlpdf as before. The agent runs only if one of those vault lanes was tried and failed. `--browser-agent` / `--no-browser-agent` on `run` or `all` override `during_run` for that invocation. Before that phase the pipeline closes `BrowserSession` so browser-use can own the vault Chromium profile. Opt-in **SerpApi** (`[serpapi].enabled`, env `SERPAPI_API_KEY`) is a later serial Scholar-engine search; `[serpapi].max_calls` / `--serpapi-max` cap paid calls (see [SerpApi](serpapi.md)). `paperful recover --item` (or `--from-last-run` with a mode such as `browser_agent_miss`) builds the pipeline with `use_browser=False` and only that source; batch selection reads `state/last-run.json`. Optional `[browser_agent].fallback_model` runs one retry per item before a final miss (skipped after captcha). Hard CAPTCHAs end as `captcha`, not auto-solved. `summarize` refuses items the gated identity check flags unless `--force`.
 
 ## Identifiers and lint
 

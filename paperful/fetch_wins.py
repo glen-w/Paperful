@@ -99,6 +99,7 @@ def record_win(
     final_url: str,
     win: str,
     playbook: str = "",
+    steps: list[dict] | None = None,
 ) -> None:
     """Append one vault or browser-agent success. Never raises."""
     try:
@@ -116,6 +117,8 @@ def record_win(
         }
         if playbook:
             row["playbook"] = playbook
+        if steps:
+            row["steps"] = steps
         append_win(cfg, row)
         if cfg.playbooks_promote == "auto":
             _auto_promote(cfg, row)
@@ -168,16 +171,25 @@ def recipes_from_wins(rows: list[dict], *, min_hits: int) -> list[GreyPlaybook]:
 
 def recipe_from_row(row: dict) -> GreyPlaybook | None:
     win = str(row.get("win") or "")
-    if not promotable(win):
-        return None
     start = str(row.get("start_url") or "")
     final = str(row.get("final_url") or "")
+    steps = row.get("steps")
+    if win == "agent" and isinstance(steps, list) and steps:
+        for step in reversed(steps):
+            if not isinstance(step, dict):
+                continue
+            url = str(step.get("url") or "").strip()
+            if url and url != final:
+                final = url
+                break
+    if not promotable(win):
+        return None
     host = host_label(final or start)
     if not host or is_search_engine_host(host):
         return None
     if host_label(start) and host_label(start) != host and not same_enough(start, final):
         return None
-    rewritten = _rewrite_between(start, final)
+    rewritten = rewrite_between_urls(start, final)
     slug = _slug(host, "rewrite" if rewritten else _win_slug(win))
     name = f"learned-{slug}"
     if not name.startswith("learned-"):
@@ -215,7 +227,7 @@ def _slug(host: str, kind: str) -> str:
     return slug[:60] or "host"
 
 
-def _rewrite_between(start: str, final: str) -> tuple[str, str] | None:
+def rewrite_between_urls(start: str, final: str) -> tuple[str, str] | None:
     """Stable path transform (e.g. ``/doi/abs/`` → ``/doi/pdfdirect/``)."""
     su, fu = urlparse(start), urlparse(final)
     if host_label(start) != host_label(final) or not host_label(start):

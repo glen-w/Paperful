@@ -58,6 +58,7 @@ __all__ = [
     "OllamaClient",
     "get_client",
     "llm_egress_is_remote",
+    "agent_model_uses_litellm",
     "llm_model_for_agent",
     "reject_litellm_ollama_model",
     "validate_llm_for_recover",
@@ -69,5 +70,14 @@ def get_client(cfg: Config) -> LLMClient:
     return get_client_impl(cfg)
 
 
-def llm_model_for_agent(cfg: Config) -> str:
+def llm_model_for_agent(cfg: Config, *, fallback: bool = False) -> str:
+    if fallback:
+        return cfg.browser_agent_fallback_model.strip()
     return (cfg.browser_agent_model or cfg.llm_model).strip()
+
+
+def agent_model_uses_litellm(cfg: Config, model: str) -> bool:
+    """True when browser-use should use ChatLiteLLM for this model tag."""
+    if cfg.llm_provider == "litellm":
+        return True
+    return "/" in (model or "")

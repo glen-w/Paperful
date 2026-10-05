@@ -23,6 +23,12 @@ fi
 OUT="${DOCS_BUILD_DIR:-docs/_build/html}"
 mkdir -p "$(dirname "$OUT")"
 echo "Building Sphinx HTML → ${OUT}"
-# Warnings are allowed until a public hosted hostname is live.
-"$SPHINX_BUILD" -b html docs "$OUT"
+
+SPHINX_ARGS=(-b html docs "$OUT")
+if [[ "${DOCS_STRICT:-0}" == "1" ]]; then
+  echo "Strict mode: sphinx warnings fail the build (DOCS_STRICT=1)"
+  SPHINX_ARGS+=(-W)
+fi
+
+"$SPHINX_BUILD" "${SPHINX_ARGS[@]}"
 echo "OK: open ${OUT}/index.html"

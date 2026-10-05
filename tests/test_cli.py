@@ -1536,7 +1536,8 @@ def _llm_cfg_file(tmp_path, extra=""):
 
 def test_recover_requires_item(cfg_file):
     res = runner.invoke(cli.app, ["recover", "-c", str(cfg_file)])
-    assert res.exit_code == 1 and "--item" in res.stdout
+    assert res.exit_code == 1
+    assert "--item" in res.stdout or "--from-last-run" in res.stdout
 
 
 def test_recover_exits_when_llm_disabled(cfg_file, stub_zotero):
@@ -1555,6 +1556,51 @@ def test_recover_python_gate(cfg_file, monkeypatch):
     monkeypatch.setattr(cli, "sys", fake)
     res = runner.invoke(cli.app, ["recover", "-c", str(cfg_file), "--item", "I1"])
     assert res.exit_code == 1 and "3.11" in res.stdout
+
+
+def test_recover_rejects_item_and_from_last_run_together(cfg_file):
+    res = runner.invoke(
+        cli.app, ["recover", "-c", str(cfg_file), "--item", "I1", "--from-last-run"]
+    )
+    assert res.exit_code == 1
+    assert "not both" in res.stdout
+
+
+def test_recover_from_last_run_dry_run(tmp_path, stub_zotero, monkeypatch):
+    from tests.conftest import make_item
+
+    cfg_file = _llm_cfg_file(tmp_path)
+    state = tmp_path / "state"
+    state.mkdir(parents=True)
+    (state / "last-run.json").write_text(
+        json.dumps(
+            {
+                "schema": "paperful.run_report.v1",
+                "items": [
+                    {
+                        "itemKey": "I1",
+                        "status": "not_found",
+                        "attempts": ["browser_agent:not_found(paywall @x)"],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model
+    )
+    monkeypatch.setattr(
+        cli,
+        "get_backend",
+        lambda cfg, zl: type("B", (), {"get_item": lambda self, k: make_item(key=k)})(),
+    )
+    res = runner.invoke(
+        cli.app,
+        ["recover", "-c", str(cfg_file), "--from-last-run", "--dry-run"],
+    )
+    assert res.exit_code == 0, res.stdout
+    assert "https://doi.org/10.1000/test.doi" in res.stdout
 
 
 def test_recover_dry_run_prints_start_url(tmp_path, stub_zotero, monkeypatch):

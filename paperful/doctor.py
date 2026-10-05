@@ -790,8 +790,40 @@ def _llm_checks(cfg) -> list[Check]:
     except Exception as exc:  # unreachable daemon etc.
         out.append(Check("LLM", "amber", f"{type(exc).__name__}: {exc}"))
     if browser_agent_extra_available():
+        from .llm.preflight import agent_model_looks_multimodal
+
         agent_model = (cfg.browser_agent_model or cfg.llm_model).strip()
-        if _model_below_agent_floor(agent_model):
+        fallback = cfg.browser_agent_fallback_model.strip()
+        if cfg.browser_agent_use_vision and not agent_model_looks_multimodal(
+            agent_model
+        ):
+            out.append(
+                Check(
+                    "browser-agent extra",
+                    "amber",
+                    "use_vision is on but the agent model tag does not look "
+                    "vision-capable — see browser-agent-models.md",
+                )
+            )
+        elif fallback and fallback == agent_model:
+            out.append(
+                Check(
+                    "browser-agent extra",
+                    "amber",
+                    "fallback_model matches the primary agent model",
+                )
+            )
+        elif fallback and "/" in fallback and not cfg.llm_allow_remote:
+            if cfg.llm_provider != "litellm":
+                out.append(
+                    Check(
+                        "browser-agent extra",
+                        "amber",
+                        "fallback_model looks like a remote LiteLLM id — "
+                        "set llm.allow_remote = true",
+                    )
+                )
+        elif _model_below_agent_floor(agent_model):
             out.append(
                 Check(
                     "browser-agent extra",

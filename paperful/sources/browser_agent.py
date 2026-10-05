@@ -43,13 +43,15 @@ def find(item: Item, ctx: Context) -> Candidate:
     if result.pdf_bytes:
         from ..fetch_wins import record_win
 
+        win = result.agent_win or "agent"
         record_win(
             ctx.config,
             item_key=item.key,
             source=NAME,
             start_url=url,
-            final_url=url,
-            win="agent",
+            final_url=result.final_url or url,
+            win=win,
+            steps=result.trace,
         )
     return _candidate_from_result(result)
 
@@ -64,4 +66,7 @@ def _candidate_from_result(result: RecoverResult) -> Candidate:
             note=result.note or "browser_agent",
             content=result.pdf_bytes,
         )
-    return Candidate.miss(NAME, Outcome.NOT_FOUND, result.note or "not found")
+    note = result.note or "not found"
+    if result.attempts_note:
+        note = f"{result.attempts_note}; {note}"
+    return Candidate.miss(NAME, Outcome.NOT_FOUND, note)

@@ -8,9 +8,12 @@ on:
       - "docs/**"
       - "scripts/release/build_docs.sh"
       - "scripts/release/assemble_pages_site.sh"
+      - "scripts/release/build_docs.sh"
+      - "tests/test_sphinx_docs.py"
       - "pyproject.toml"
       - "Makefile"
       - ".github/workflows/pages.yml"
+      - "website/CNAME"
   workflow_dispatch:
 
 permissions:
@@ -31,9 +34,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --extra docs
-      - name: Assemble marketing site + Sphinx guide
-        run: bash scripts/release/assemble_pages_site.sh
+      - run: uv sync --extra docs --group dev
+      - name: Verify guide corpus and assemble site
+        run: |
+          uv run pytest tests/test_sphinx_docs.py -q
+          DOCS_STRICT=1 bash scripts/release/assemble_pages_site.sh
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

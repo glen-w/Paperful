@@ -14,12 +14,14 @@ See [ROADMAP § browser-use](ROADMAP.md#browser-use-integration-models-docs-conf
 
 | Topic | Paperful behaviour |
 | --- | --- |
-| LLM | `[browser_agent].model` if set, else `[llm].model`; Ollama → `ChatOllama`, LiteLLM → `ChatLiteLLM` |
-| Vision | **`use_vision=False`** by default — text/DOM index path only. Text-only Ollama models error if vision is on. |
+| LLM | `[browser_agent].model` if set, else `[llm].model`; Ollama → `ChatOllama`, LiteLLM → `ChatLiteLLM`. Optional **`fallback_model`**: one full retry on miss (not on captcha / bot wall). Tags with `/` (e.g. `openai/gpt-4o-mini`) use LiteLLM on the fallback attempt and need `llm.allow_remote` when `provider = "ollama"`. |
+| Vision | **`[browser_agent].use_vision = false`** by default — DOM / element index only. Set **`true`** only with a VL-capable tag (`qwen2.5vl`, etc.); `doctor` / `recover` preflight reject text-only tags when vision is on. |
 | Browser | System **Chrome** (`channel="chrome"`), same profile as `session login`; uBlock + cookie extensions on |
 | Success | Valid PDF on disk (`min_pdf_bytes`, stable size) — **not** agent `done` alone |
 | Task | Stay on DOI/landing; no search engines; no purchase; stop on CAPTCHA / paywall / 403 |
 | Caps | `[browser_agent].max_steps`, `max_wall_s`; agent stopped early when PDF lands |
+| Batch recover | `paperful recover --from-last-run` replays keys from `state/last-run.json` (`--from-last-run-mode`, `--limit`). Same runner as `--item`. |
+| Learned playbooks | Agent PDFs append `state/fetch-wins.jsonl` with promotable `click:` / `rewrite` wins and optional `steps` trace → `playbooks propose` / `promote`. |
 
 Operator setup: [LLM § recover](llm.md#a-recover--browser-agent-pdf-recovery), [sessions](sessions.md), [config § browser_agent](config.md#llm-optional-local-first).
 
@@ -31,7 +33,7 @@ recover; thinking models can burn step/wall time.
 
 | VRAM (rough) | Good defaults | Notes |
 | --- | --- | --- |
-| **24 GB+** | `qwen2.5vl:32b` (hard UI + vision), `qwen3:32b` / `qwen3:30b`, `qwen2.5:32b` | Best local band for publisher cookie → PDF clicks. VL needs Paperful vision support (today: text-only). |
+| **24 GB+** | `qwen2.5vl:32b` (hard UI + vision), `qwen3:32b` / `qwen3:30b`, `qwen2.5:32b` | Best local band for publisher cookie → PDF clicks. For VL tags set `use_vision = true`. |
 | **12–16 GB** | `qwen3:14b`, `qwen2.5:14b` | **Documented floor** for recover; more retries, tight prompts. Match `use_vision=False`. |
 | **~8 GB** | Prototype only: `llama3.1:8b`, `qwen2.5vl:7b` | Official docs’ Ollama example is `llama3.1:8b` — connects, often fails soft walls. |
 
@@ -41,7 +43,7 @@ Paperful **`doctor`** ambers agent models whose **name** looks under **~10B**
 
 ### Ranked starting points (PDF / publisher UI)
 
-1. **`qwen2.5vl:32b`** — vision + layout; best when controls are icon-only or missing from the a11y tree *(needs `use_vision=True` when Paperful exposes it)*.
+1. **`qwen2.5vl:32b`** — vision + layout; best when controls are icon-only or missing from the a11y tree — set **`[browser_agent].use_vision = true`** and this tag as `model` (or `fallback_model`).
 2. **`qwen3:32b`** / **`qwen3:30b`** — strong tool/agent loops (Ollama tool docs use Qwen3).
 3. **`qwen2.5:32b`** — proven text JSON / multi-step UI in community reports.
 4. **`mistral-small:24b`** — function-calling specialist; fits mid VRAM.
@@ -79,7 +81,8 @@ maintainers note that **smaller local models struggle with tool-calling**
 Before trusting a tag for a collection run:
 
 1. Pick one article URL you **already** may access (OA or campus session in the vault).
-2. `paperful recover --item <KEY> --dry-run` then run without dry-run.
+2. `paperful recover --item <KEY> --dry-run` then run without dry-run (or
+   `recover --from-last-run --dry-run` after a `run` that hit the agent).
 3. **Pass** = PDF under `out/` with sane bytes — not a polite `done` in logs.
 4. **Fail** = invents a new host, opens a search engine, or claims success with no file
    ([Playwright download caveat](https://stackoverflow.com/questions/79384448/issue-with-downloading-file-via-browser-use)).

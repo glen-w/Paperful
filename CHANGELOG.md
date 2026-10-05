@@ -6,8 +6,19 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+### Changed
+
+- **Roadmap / 1.0 scope:** 1.0 now includes the workbench GUI (illuminate and
+  run CLI workflows) and interactive Ask (chat-over-collection RAG in the GUI).
+  Post-1.0: local OpenAlex snapshot phases 2B/2C, Firefox extension,
+  newsletter/alert ingest (rollup bridge). See [ROADMAP](docs/ROADMAP.md#product-split-10-vs-post-10).
+
 ### Added
 
+- Browser agent: `[browser_agent].fallback_model` (one retry before final
+  `not_found`, not on captcha), documented `use_vision` with preflight/doctor
+  checks, `recover --from-last-run` / `--from-last-run-mode` / `--limit`, and
+  promotable fetch-wins from agent step traces (`steps` in `fetch-wins.jsonl`).
 - Mirror-first gaps: Mendeley and EndNote `changes(since)` (Mendeley
   `modified_since` / `deleted_since`; EndNote `sdb.eni` mtime) so both take
   the mirror path; offline freshness lines include last-refresh written/gone

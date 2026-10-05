@@ -1,16 +1,17 @@
-# Paperful GUI (2.0 vision)
+# Paperful GUI (1.0 workbench)
 
-**Status: parked.** This is a sketch of a **GUI-enabled 2.0**, not a 0.x or
-1.0 deliverable. Today Paperful is a **local CLI** with a quiet disk mirror.
-An operator console (commands / settings / RAG), SPA, or Capability API is
-**not** Wave D and **not** 1.0. Surfaces like a Zotero plugin are still not
-the product direction for 1.0. See [ROADMAP](ROADMAP.md) (trust checklist,
-“Not a GUI”) and [quiet mirror](quiet-mirror.md).
+**Status: roadmap — 1.0 deliverable.** Today Paperful is a **local CLI** with a
+quiet disk mirror; **1.0** adds a **web-native workbench** that runs,
+illuminates, and simplifies the same verbs without a second fetch stack. A
+**Zotero plugin** is not the bet. **Firefox extension**, local OpenAlex
+snapshot (beyond opt-in v1), and newsletter ingest are **post-1.0** — see
+[ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10) and
+[quiet mirror](quiet-mirror.md).
 
-The sketch is intentionally ambitious: a **web-native workbench** over the
-same five jobs, the same ledger (`out/`, `state/`), and the same library
-adapters — deployable as **open (self-host)**, **Docker**, or **SaaS**.
-Nothing here blocks tagging 1.0.
+The sketch is intentionally ambitious: one shell over the same five jobs, the
+same ledger (`out/`, `state/`), and the same library adapters — deployable as
+**open (self-host)** and **Docker** for 1.0; **SaaS** remains a later deploy
+mode.
 
 ---
 
@@ -18,24 +19,23 @@ Nothing here blocks tagging 1.0.
 
 | In this document | Not in this document |
 | --- | --- |
-| Long-horizon UI for a GUI-enabled 2.0 | Shipping UI code, wireframes as commitments, or dates |
-| Browser-first product surface | A Zotero / Firefox extension as the primary bet |
+| 1.0 workbench IA and capability API shape | Shipping UI code, wireframes as commitments, or dates |
+| Browser-first operator surface (CLI remains for scripts/agents) | A Zotero / Firefox extension as the primary bet (Firefox is post-1.0) |
 | Same Control posture as the CLI (dry-run, explicit apply) | Silent library writes or silent cloud source defaults |
-| SaaS as a **2.0 deploy mode** | Hosted multi-user service as a near-term ROADMAP item |
+| **Ask** chat-with-collection as a **1.0** mode (opt-in, gated on `[rag]` + `[llm]`) | Hosted multi-user SaaS as a 1.0 requirement |
 
-**Non-goals even for the 2.0 sketch**
+**Non-goals even for the 1.0 workbench**
 
 - Systematic-review screening as the primary UX
 - A citation-graph playground as the main surface
-- Chat-over-library as the **default** way to use Paperful (a built-in,
-  opt-in **Ask / chat with collection** mode is in scope for 2.0 — see
-  [§ Ask](#ask-chat-with-collection) and [ROADMAP — GUI](ROADMAP.md#gui))
+- Chat-over-library as the **default** landing (built-in **Ask** is in scope for
+  1.0 — see [§ Ask](#ask-chat-with-collection) and [ROADMAP — GUI](ROADMAP.md#gui))
 - Replacing Zotero sync or becoming a WebDAV client
 - Assuming `localhost:23119` inside SaaS without a remote adapter path
 - Shipping Sci-Hub, Scholar, or LLM as on-by-default
 
 PDF preview in the browser is a convenience. The citation manager can remain
-the annotation / reader of record unless a later 2.0 decision claims that
+the annotation / reader of record unless a later product decision claims that
 job explicitly.
 
 ---
@@ -227,7 +227,7 @@ Hard rules for every deploy mode:
 (ASGI / FastAPI-class) wrapping existing `paperful.*` entrypoints. The same
 API backs open, Docker, and SaaS.
 
-**Not the 2.0 primary product:** Textual, Tk, PyQt, or Tauri-first. Optional
+**Not the 1.0 primary product:** Textual, Tk, PyQt, or Tauri-first. Optional
 later: a thin native shell that loads the same web app; optional early TUI
 only for queue review.
 
@@ -259,20 +259,22 @@ workspaces or stays unimplemented.
 
 ---
 
-## 7. Phased path to GUI-enabled 2.0
+## 7. Phased path to the 1.0 workbench
 
-Planning ladder, not a calendar. Each phase can stop without the next.
+Planning ladder toward the **1.0 tag**, not a calendar. Each phase can stop
+without the next; **1.0** expects P0–P3b on open/Docker. **P4 (SaaS)** is
+post-1.0.
 
 | Phase | Outcome | Deploy focus |
 | --- | --- | --- |
-| **P0** | Lock schemas; carve a stable capability API from today’s CLI (still 1.0 work) | CLI only |
+| **P0** | Lock schemas; carve a stable capability API from today’s CLI | CLI + API skeleton |
 | **P1** | Web **read-only** review: snowball queues, patch list, dedupe / version packs | Open + Docker |
 | **P2** | Gated write-back over HTTP: `keep` / `apply`, patches, scoped `run` | Open + Docker |
-| **P3** | Full workbench modes + in-browser PDF preview | Open + Docker |
-| **P3b** | **Ask** — chat with collection (cited RAG over scoped index; `[llm]` + index gates) | Open + Docker |
-| **P4** | SaaS tenancy (auth, workspace isolation, remote manager adapters) + polish (export, tagging UI if that lane exists; Ask when remote index + LLM policy allow) | SaaS |
+| **P3** | Full workbench modes + in-browser PDF preview (illuminate CLI verbs) | Open + Docker |
+| **P3b** | **Ask 2.0** — interactive chat with collection (cited RAG; `[llm]` + index gates) | Open + Docker — **1.0** |
+| **P4** | SaaS tenancy (auth, workspace isolation, remote manager adapters) + polish | Post-1.0 |
 
-P0 does not ship a GUI. It makes a later GUI honest.
+P0–P3b together are the 1.0 GUI bar; the CLI remains the automation surface.
 
 ---
 

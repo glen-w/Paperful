@@ -14,7 +14,7 @@ help:
 	@echo "  docker-doctor     Run paperful doctor in the container"
 	@echo ""
 	@echo "Docs:"
-	@echo "  docs              Build Sphinx HTML into docs/_build/html (requires .[docs])"
+	@echo "  docs              Build Sphinx HTML into docs/_build/html (requires .[docs]; DOCS_STRICT=1 for CI parity)"
 	@echo "  docs-clean        Remove Sphinx build artifacts"
 	@echo "  pages-site        Assemble website/ + Sphinx guide into _site/ (GitHub Pages)"
 	@echo ""

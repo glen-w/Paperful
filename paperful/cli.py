@@ -6553,6 +6553,19 @@ def recover(
     item: list[str] = typer.Option(
         [], "--item", help="Zotero item key to recover (repeatable)."
     ),
+    from_last_run: bool = typer.Option(
+        False,
+        "--from-last-run",
+        help="Recover items from state/last-run.json (see --from-last-run-mode).",
+    ),
+    from_last_run_mode: str = typer.Option(
+        "browser_agent_miss",
+        "--from-last-run-mode",
+        help="browser_agent_miss | missing | browser_agent_not_found",
+    ),
+    limit: int | None = typer.Option(
+        None, "--limit", "-n", help="Stop after N items (batch recover)."
+    ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show start URL only; no browser agent."
     ),
@@ -6564,12 +6577,16 @@ def recover(
 ) -> None:
     """Browser-agent PDF recovery for named items (also auto-fires at the end of run)."""
     from .browser_agent import recover_start_url
-    from .llm import llm_egress_is_remote
+    from .llm import agent_model_uses_litellm, llm_egress_is_remote
     from .llm.preflight import validate_llm_for_recover
     from .llm.validate import LlmConfigError
+    from .runreport import recover_item_keys_from_report
 
-    if not item:
-        console.print("[red]Give at least one --item KEY.[/]")
+    if not item and not from_last_run:
+        console.print("[red]Give --item KEY or --from-last-run.[/]")
+        raise typer.Exit(1)
+    if item and from_last_run:
+        console.print("[red]Use --item or --from-last-run, not both.[/]")
         raise typer.Exit(1)
     if sys.version_info < (3, 11):
         console.print(
@@ -6587,15 +6604,37 @@ def recover(
         raise typer.Exit(1)
     if not json_out:
         console.print(f"[orange3]{RECOVER_DISCLAIMER}[/]")
-        if llm_egress_is_remote(cfg):
+        remote = llm_egress_is_remote(cfg)
+        fb = cfg.browser_agent_fallback_model.strip()
+        if fb and agent_model_uses_litellm(cfg, fb):
+            remote = True
+        if remote:
             console.print(
                 "[orange3]Remote LLM provider — page text may leave this machine.[/]"
             )
     backend = _connect(cfg, quiet=json_out)
     manifest = Manifest(cfg.manifest_path)
+    item_keys = list(item)
+    scope = f"items:{','.join(item_keys)}"
+    if from_last_run:
+        last = _load_last_run(cfg)
+        if not last or last.get("schema") != "paperful.run_report.v1":
+            console.print(
+                "[red]No auditable last run at state/last-run.json — run paperful run first.[/]"
+            )
+            raise typer.Exit(1)
+        item_keys = recover_item_keys_from_report(last, mode=from_last_run_mode)
+        if limit is not None and limit > 0:
+            item_keys = item_keys[:limit]
+        scope = f"from-last-run:{from_last_run_mode}"
+        if not item_keys:
+            console.print("[yellow]No items matched the last-run filter.[/]")
+            raise typer.Exit(0)
+    elif limit is not None and limit > 0:
+        item_keys = item_keys[:limit]
     todo: list = []
     preview: list[dict[str, Any]] = []
-    for key in item:
+    for key in item_keys:
         it = backend.get_item(key)
         if it is None:
             console.print(f"[red]Unknown item key {key}[/]")
@@ -6652,8 +6691,8 @@ def recover(
         stats,
         cfg,
         command="recover",
-        scope=f"items:{','.join(item)}",
-        flags=_run_flags(no_attach=no_attach),
+        scope=scope,
+        flags=_run_flags(no_attach=no_attach, from_last_run=from_last_run),
     )
     path = write_run_report(cfg, report)
     from .agent_json import batch_exit, envelope

@@ -126,11 +126,13 @@ Live: [paperful.app](https://paperful.app/).
 
 Yes, if you use Zotero, want an on-disk mirror, and will run a **CLI in Docker**.
 Maybe, if Zotero’s own “find available PDF” already covers you.
-**Today is CLI-first.** An operator console (commands / settings / RAG UI) is
-**post-1.0**. Paperful is not Zotero-in-the-browser, not a sync/mobile/WebDAV
-client, and not every paywalled PDF. `paperful ocr` exists for scans on disk;
-it is not a GUI product. Mendeley and EndNote are not proven.
-[Why](docs/why.md) · [Comparison](docs/comparison.md) · parked [GUI sketch](docs/gui.md).
+**Today is CLI-first; 1.0 adds a workbench GUI** (run / review / apply the same
+verbs, plus interactive Ask over your collection). Paperful is not
+Zotero-in-the-browser, not a sync/mobile/WebDAV client, and not every paywalled
+PDF. `paperful ocr` exists for scans on disk. Mendeley and EndNote are not
+proven. Post-1.0: Firefox extension, local OpenAlex snapshot beyond opt-in v1,
+newsletter ingest.
+[Why](docs/why.md) · [Comparison](docs/comparison.md) · [GUI](docs/gui.md) · [Roadmap](docs/ROADMAP.md).
 
 ## Quick start
 

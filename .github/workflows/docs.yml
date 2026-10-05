@@ -19,9 +19,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --extra docs
-      - name: Sphinx HTML build
-        run: make docs
+      - run: uv sync --extra docs --group dev
+      - name: Guide corpus + strict Sphinx build
+        run: |
+          uv run pytest tests/test_sphinx_docs.py -q
+          DOCS_STRICT=1 make docs
       - name: Upload docs HTML
         if: always()
         uses: actions/upload-artifact@v4

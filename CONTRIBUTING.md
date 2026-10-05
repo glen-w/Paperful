@@ -17,8 +17,11 @@ cp config.example.toml config.toml   # personal — never commit config.toml
 ```
 
 Hosted docs: `uv sync --extra docs && make docs` (Sphinx HTML) or
-`make pages-site` (`website/` + `/guide/` in `_site/`). Markdown under `docs/`
-is the corpus.
+`make pages-site` (`website/` + `/guide/` in `_site/`). The guide corpus is
+only `docs/*.md`; every page must appear in `docs/index.md` toctrees
+(`tests/test_sphinx_docs.py`). CI and Pages deploy use `DOCS_STRICT=1` (Sphinx
+`-W`). Live site: [paperful.app](https://paperful.app/) with the guide at
+[paperful.app/guide/](https://paperful.app/guide/).
 
 Zotero must be running with the local API enabled for integration tests that touch the CLI; most tests use stubs and run offline.
 
@@ -26,9 +29,13 @@ Zotero must be running with the local API enabled for integration tests that tou
 
 ```sh
 uv run pytest
+DOCS_STRICT=1 make docs   # after: uv sync --extra docs
 ```
 
-CI runs the same suite on every push and pull request (see `.github/workflows/ci.yml`).
+CI runs pytest on every push and PR (`.github/workflows/ci.yml`). The Docs
+workflow (`.github/workflows/docs.yml`) runs the guide corpus tests and a strict
+Sphinx build; pushes to `main` that touch `docs/` or `website/` also redeploy
+Pages (`.github/workflows/pages.yml`).
 User-facing changes: note them in [CHANGELOG.md](CHANGELOG.md) and
 [docs/releases.md](docs/releases.md) when they affect 0.x vs 1.0 promises.
 

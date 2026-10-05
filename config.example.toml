@@ -169,6 +169,8 @@ mirror_failures_before_skip = 3
 # during_run = true              # last serial lane; policy mode pairs Scholar immediately before it
 #                                # override per run: --browser-agent / --no-browser-agent
 # # model = "qwen2.5:14b"        # larger model for browsing only
+# # fallback_model = "qwen3:30b" # one retry before final not_found (not on captcha)
+# # use_vision = false           # true needs a VL tag; see browser-agent-models.md
 
 # [fetch]
 # order = "policy"               # policy | list — list honors the sources array as written

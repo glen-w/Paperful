@@ -95,6 +95,24 @@ def test_corrupt_win_line_is_skipped(cfg):
     assert len(rows) == 1
 
 
+def test_agent_click_win_proposes_after_min_hits(cfg, tmp_path):
+    packs = tmp_path / "packs"
+    cfg.grey_playbooks_dir = packs
+    for key in ("A", "B"):
+        record_win(
+            cfg,
+            item_key=key,
+            source="browser_agent",
+            start_url="https://pub.example.com/article/1",
+            final_url="https://pub.example.com/article/1.pdf",
+            win="click:Download PDF",
+            steps=[{"action": "click", "detail": "Download PDF"}],
+        )
+    text = propose_toml(load_wins(cfg.state_dir / "fetch-wins.jsonl"), min_hits=2)
+    assert "learned-pub-example-com-click" in text
+    assert "href_re" in text
+
+
 def test_propose_then_promote(cfg, tmp_path):
     packs = tmp_path / "packs"
     cfg.grey_playbooks_dir = packs

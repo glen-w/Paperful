@@ -218,6 +218,61 @@ def test_run_recover_requires_vault(cfg, monkeypatch):
         ba.run_recover(cfg, make_item(), "https://x")
 
 
+def test_merge_fallback_miss_combines_notes():
+    first = RecoverResult(None, "paywall @springer.com")
+    second = RecoverResult(None, "step budget @springer.com; steps 8/8")
+    got = ba._merge_fallback_miss(first, second, "qwen3:30b")
+    assert "primary:" in got.note
+    assert "fallback qwen3:30b" in got.note
+    assert got.attempts_note == "fallback:qwen3:30b"
+
+
+def test_browser_runner_retries_with_fallback_model(cfg, monkeypatch):
+    calls: list[str] = []
+
+    async def fake_async(cfg, item, url, *, model):
+        calls.append(model)
+        if len(calls) == 1:
+            return RecoverResult(None, "not found")
+        return RecoverResult(PDF_BYTES, "browser_agent download")
+
+    monkeypatch.setattr(ba, "_async_recover", fake_async)
+    cfg.browser_agent_model = "qwen3:14b"
+    cfg.browser_agent_fallback_model = "qwen3:30b"
+    got = ba._BrowserUseRunner().run(cfg, make_item(), "https://doi.org/10.1/x")
+    assert got.pdf_bytes == PDF_BYTES
+    assert calls == ["qwen3:14b", "qwen3:30b"]
+
+
+def test_browser_runner_skips_fallback_after_captcha(cfg, monkeypatch):
+    calls: list[str] = []
+
+    async def fake_async(cfg, item, url, *, model):
+        calls.append(model)
+        return RecoverResult(None, "cloudflare", captcha=True)
+
+    monkeypatch.setattr(ba, "_async_recover", fake_async)
+    cfg.browser_agent_fallback_model = "qwen3:30b"
+    got = ba._BrowserUseRunner().run(cfg, make_item(), "https://x")
+    assert got.captcha
+    assert len(calls) == 1
+
+
+def test_agent_win_from_trace_click_label():
+    trace = [{"action": "click", "detail": 'Clicked "Download PDF"'}]
+    assert ba.agent_win_from_trace(
+        trace, start_url="https://x.test/a", final_url="https://x.test/a.pdf"
+    ) == "click:Download PDF"
+
+
+def test_agent_win_from_trace_rewrite():
+    start = "https://onlinelibrary.wiley.com/doi/abs/10.1002/foo"
+    final = "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1002/foo"
+    assert (
+        ba.agent_win_from_trace([], start_url=start, final_url=final) == "rewrite"
+    )
+
+
 def test_run_recover_uses_injected_runner(cfg, monkeypatch):
     monkeypatch.setattr(ba, "browser_agent_extra_available", lambda: True)
     monkeypatch.setattr(ba, "profile_ready", lambda cfg: True)
@@ -493,9 +548,16 @@ def test_finish_recover_names_paywall_and_steps(tmp_path):
 def test_finish_recover_notes_how_a_download_was_clicked(tmp_path):
     (tmp_path / "a.pdf").write_bytes(PDF_BYTES)
 
+    class Result:
+        extracted_content = 'Clicked "Download PDF"'
+        long_term_memory = None
+
     class Hist:
         def action_names(self):
             return ["click"]
+
+        def action_results(self):
+            return [Result()]
 
         def urls(self):
             return ["https://utpjournals.press/doi/pdf/10.1/x"]
@@ -506,13 +568,28 @@ def test_finish_recover_notes_how_a_download_was_clicked(tmp_path):
         def number_of_steps(self):
             return 3
 
+        def extracted_content(self):
+            return []
+
+        def model_thoughts(self):
+            return []
+
     class Agent:
         history = Hist()
 
-    got = ba._finish_recover(Agent(), tmp_path, 1000, "no PDF in download folder", 8)
+    got = ba._finish_recover(
+        Agent(),
+        tmp_path,
+        1000,
+        "no PDF in download folder",
+        8,
+        start_url="https://utpjournals.press/doi/pdf/10.1/x",
+    )
     assert got.pdf_bytes == PDF_BYTES
     assert got.note.startswith("browser_agent download")
     assert "via click @utpjournals.press" in got.note
+    assert got.agent_win == "click:Download PDF"
+    assert got.trace and got.trace[0]["action"] == "click"
 
 
 def test_result_from_downloads_prefers_pdf_over_miss(tmp_path):

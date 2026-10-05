@@ -111,11 +111,13 @@ max_wall_s = 300
 # during_run = true                 # false keeps recover as --item only
 #                                     # also: --no-browser-agent on one run
 # model = "qwen2.5:14b"             # override [llm].model for browsing only
+# fallback_model = "qwen3:30b"      # one retry before final not_found (not on captcha)
+# use_vision = false                # true needs a VL tag; see browser-agent-models.md
 ```
 
 Full key table: [Configuration § LLM](config.md#llm-optional-local-first).
 Ollama tag ranking and acceptance tests: [browser-agent-models.md](browser-agent-models.md).
-Roadmap gaps (`fallback_model`, vision, `num_ctx`): [ROADMAP § browser-use](ROADMAP.md#browser-use-integration-models-docs-config).
+`fallback_model`, `use_vision`, and `recover --from-last-run` are documented in [config.md](config.md#llm-optional-local-first). Remaining gap: `num_ctx` pass-through — [ROADMAP § browser-use](ROADMAP.md#browser-use-integration-models-docs-config).
 
 ## 3. Check
 
@@ -156,6 +158,8 @@ lanes:
 uv run paperful recover --item ABCD1234 --dry-run   # shows the start URL only
 uv run paperful recover --item ABCD1234             # runs the agent, attaches on success
 uv run paperful recover --item K1 --item K2 --no-attach
+uv run paperful recover --from-last-run              # default mode: browser_agent_miss
+uv run paperful recover --from-last-run --from-last-run-mode missing -n 5
 ```
 
 - Start URL is `https://doi.org/<DOI>` when the item has a DOI, else its URL.
@@ -322,8 +326,12 @@ and start Ollama bound to all interfaces on the host
 | `recover requires Python 3.11+` | `uv python pin 3.12 && uv sync --extra browser-agent` |
 | `browser-use is not installed` | `uv sync --extra browser-agent` |
 | `session vault not ready` | `paperful session login scholar` (headed, on the host) |
-| `recover` ends `not_found` quickly | Model too small or wrong class for UI tools; try 14B+ via `[browser_agent].model` — [browser-agent-models.md](browser-agent-models.md) |
+| `recover` ends `not_found` quickly | Model too small or wrong class for UI tools; try 14B+ via `[browser_agent].model`, or a one-shot `[browser_agent].fallback_model` — [browser-agent-models.md](browser-agent-models.md) |
 | `recover` never starts during `run` | Extra missing, `[llm].enabled` false, `[browser_agent].during_run = false`, or `--no-browser-agent` |
+| `use_vision is true but model … does not look vision-capable` | Use a VL tag (`qwen2.5vl:…`) or set `use_vision = false` |
+| `fallback_model must differ` / remote fallback blocked | Set a different tag than `model`; for `provider/model` ids on Ollama provider set `llm.allow_remote = true` |
+| `--from-last-run` finds no keys | Last report had no `browser_agent` miss (try `--from-last-run-mode missing`) or run `paperful run` first |
+| Multimodal / 400 from Ollama on recover | `use_vision` on with a text-only tag — fix tag or turn vision off |
 | Summary note shows raw `##` | Update Paperful (0.5+ converts Markdown); re-run `summarize` |
 | `could not extract PDF text` | Scanned PDF. Run `paperful ocr -C …` then `--apply`, and summarize again |
 | Report seems to ignore half the notes | Ollama truncated the prompt. Lower `[synthesize].max_context_chars` or raise `[llm].max_num_ctx`, and confirm the model supports that window |
@@ -339,4 +347,4 @@ and start Ollama bound to all interfaces on the host
 - [commands.md](commands.md) — `recover` / `summarize` / `synthesize` flags and exit codes
 - [architecture.md](architecture.md#llm-layer-optional-local-first) — layer, gates, note write path
 - [sessions.md](sessions.md) — vault profile ownership during `recover`
-- [ROADMAP.md](ROADMAP.md#optional-llm-assist-local-litellm) — what is later (Cloud/BU2, playbook mining)
+- [ROADMAP.md](ROADMAP.md#optional-llm-assist-local-litellm) — what is later (Cloud/BU2, `num_ctx` pass-through)

@@ -22,6 +22,7 @@ from paperful.runreport import (
     low_download_advice,
     outcome_banner,
     print_run_summary,
+    recover_item_keys_from_report,
     write_run_report,
 )
 from paperful.sources.base import Candidate, Outcome
@@ -519,3 +520,35 @@ def test_show_payload_omits_missing_child_items(cfg):
     )
     assert headline("synthesize", {"included": 5, "missing": 1}) == "included 5, missing 1"
     assert headline("other", {"ok": True, "n": 2}) == "n 2"
+
+
+def test_recover_item_keys_from_report_modes():
+    report = {
+        "items": [
+            {
+                "itemKey": "A",
+                "status": "not_found",
+                "attempts": ["browser_agent:not_found(paywall @x)"],
+            },
+            {
+                "itemKey": "B",
+                "status": "ok",
+                "attempts": ["unpaywall:found"],
+            },
+            {
+                "itemKey": "C",
+                "status": "not_found",
+                "attempts": ["unpaywall:not_found"],
+            },
+            {
+                "itemKey": "D",
+                "status": "retryable",
+                "attempts": ["browser_agent:captcha(cloudflare @y)"],
+            },
+        ]
+    }
+    assert recover_item_keys_from_report(report) == ["A", "D"]
+    assert recover_item_keys_from_report(report, mode="missing") == ["A", "C", "D"]
+    assert recover_item_keys_from_report(report, mode="browser_agent_not_found") == [
+        "A"
+    ]

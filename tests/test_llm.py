@@ -325,6 +325,57 @@ def test_preflight_litellm_rejects_ollama_prefix(cfg):
         validate_llm_for_verb(cfg)
 
 
+def test_browser_agent_config_loads_fallback_and_vision(tmp_path):
+    from paperful.config import load_config
+
+    path = tmp_path / "config.toml"
+    path.write_text(
+        'email = "a@b.c"\nstate_dir = "state"\nout_dir = "out"\n'
+        "[browser_agent]\n"
+        'fallback_model = "qwen3:30b"\n'
+        "use_vision = true\n",
+        encoding="utf-8",
+    )
+    cfg = load_config(path)
+    assert cfg.browser_agent_fallback_model == "qwen3:30b"
+    assert cfg.browser_agent_use_vision is True
+
+
+def test_agent_model_uses_litellm_on_slash_tag(cfg):
+    from paperful.llm import agent_model_uses_litellm
+
+    cfg.llm_provider = "ollama"
+    assert agent_model_uses_litellm(cfg, "openai/gpt-4o-mini")
+    assert not agent_model_uses_litellm(cfg, "qwen3:14b")
+    cfg.llm_provider = "litellm"
+    assert agent_model_uses_litellm(cfg, "qwen3:14b")
+
+
+def test_preflight_recover_rejects_vision_on_text_model(cfg, monkeypatch):
+    cfg.llm_enabled = True
+    cfg.browser_agent_use_vision = True
+    cfg.llm_model = "qwen2.5:14b"
+    monkeypatch.setattr(
+        "paperful.llm.preflight.get_client_impl",
+        lambda c: type("C", (), {"check_config": lambda self, m: (True, "")})(),
+    )
+    with pytest.raises(LlmConfigError, match="use_vision"):
+        validate_llm_for_recover(cfg)
+
+
+def test_preflight_recover_validates_fallback_model(cfg, monkeypatch):
+    cfg.llm_enabled = True
+    cfg.llm_model = "qwen2.5:14b"
+    cfg.browser_agent_model = "qwen2.5:14b"
+    cfg.browser_agent_fallback_model = "qwen2.5:14b"
+    monkeypatch.setattr(
+        "paperful.llm.preflight.get_client_impl",
+        lambda c: type("C", (), {"check_config": lambda self, m: (True, "")})(),
+    )
+    with pytest.raises(LlmConfigError, match="fallback_model"):
+        validate_llm_for_recover(cfg)
+
+
 def test_preflight_recover_rejects_ollama_prefixed_agent_model(cfg, monkeypatch):
     cfg.llm_enabled = True
     cfg.llm_provider = "litellm"

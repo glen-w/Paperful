@@ -50,13 +50,13 @@ scihub
 serpapi
 llm
 rag
+browser-agent-models
 ```
 
 ```{toctree}
 :maxdepth: 1
 :caption: Product
 
-TERMS
 comparison
 comparison-reference
 snowball

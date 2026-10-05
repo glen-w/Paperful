@@ -28,6 +28,10 @@ class RecoverResult:
     pdf_bytes: bytes | None
     note: str
     captcha: bool = False
+    trace: list[dict[str, Any]] | None = None
+    final_url: str = ""
+    agent_win: str = ""
+    attempts_note: str = ""
 
 
 class RecoverRunner(Protocol):
@@ -164,21 +168,56 @@ def run_recover(
 
 class _BrowserUseRunner:
     def run(self, cfg: Config, item: Item, url: str) -> RecoverResult:
-        return asyncio.run(_async_recover(cfg, item, url))
+        primary = llm_model_for_agent(cfg)
+        first = asyncio.run(_async_recover(cfg, item, url, model=primary))
+        if first.pdf_bytes or first.captcha:
+            return first
+        fallback = cfg.browser_agent_fallback_model.strip()
+        if not fallback:
+            return first
+        second = asyncio.run(_async_recover(cfg, item, url, model=fallback))
+        if second.pdf_bytes:
+            return second
+        return _merge_fallback_miss(first, second, fallback)
 
 
-async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
-    from browser_use import Agent, Browser
+def _merge_fallback_miss(
+    first: RecoverResult, second: RecoverResult, fallback_model: str
+) -> RecoverResult:
+    """Keep the fallback attempt note but record that the primary model also missed."""
+    note = second.note
+    if first.note and first.note != note:
+        note = f"primary: {first.note}; fallback {fallback_model}: {note}"
+    elif first.note:
+        note = f"primary: {first.note}; fallback {fallback_model}"
+    else:
+        note = f"fallback {fallback_model}: {note}"
+    return RecoverResult(
+        None,
+        note,
+        captcha=second.captcha,
+        attempts_note=f"fallback:{fallback_model}",
+    )
+
+
+def _build_agent_llm(cfg: Config, model: str) -> Any:
     from browser_use.llm.ollama.chat import ChatOllama
 
-    if cfg.llm_provider == "litellm":
+    from .llm import agent_model_uses_litellm
+
+    if agent_model_uses_litellm(cfg, model):
         from browser_use.llm.litellm.chat import ChatLiteLLM
 
-        llm = ChatLiteLLM(model=llm_model_for_agent(cfg))
-    else:
-        host = cfg.llm_base_url.rstrip("/")
-        host = host.removesuffix("/v1")
-        llm = ChatOllama(model=llm_model_for_agent(cfg), host=host)
+        return ChatLiteLLM(model=model)
+    host = cfg.llm_base_url.rstrip("/")
+    host = host.removesuffix("/v1")
+    return ChatOllama(model=model, host=host)
+
+
+async def _async_recover(cfg: Config, item: Item, url: str, *, model: str) -> RecoverResult:
+    from browser_use import Agent, Browser
+
+    llm = _build_agent_llm(cfg, model)
 
     with tempfile.TemporaryDirectory(prefix="paperful-recover-") as tmp:
         downloads = Path(tmp)
@@ -236,6 +275,7 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
                 cfg.min_pdf_bytes,
                 "timeout",
                 cfg.browser_agent_max_steps,
+                start_url=url,
             )
         except InterruptedError:
             miss = stop_reason.get("miss") or "stopped"
@@ -246,6 +286,7 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
                 miss,
                 cfg.browser_agent_max_steps,
                 captcha=_miss_is_bot_wall(miss),
+                start_url=url,
             )
         except Exception as exc:
             miss = "captcha" if "captcha" in str(exc).lower() else type(exc).__name__
@@ -256,6 +297,7 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
                 miss,
                 cfg.browser_agent_max_steps,
                 captcha=miss == "captcha",
+                start_url=url,
             )
         if stop_reason.get("miss"):
             miss = stop_reason["miss"]
@@ -266,6 +308,7 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
                 miss,
                 cfg.browser_agent_max_steps,
                 captcha=_miss_is_bot_wall(miss),
+                start_url=url,
             )
         return _finish_recover(
             agent,
@@ -273,6 +316,7 @@ async def _async_recover(cfg: Config, item: Item, url: str) -> RecoverResult:
             cfg.min_pdf_bytes,
             "no PDF in download folder",
             cfg.browser_agent_max_steps,
+            start_url=url,
         )
 
 
@@ -536,6 +580,71 @@ async def _stop_when_pdf_lands(
         await asyncio.sleep(interval_s)
 
 
+_CLICK_LABELS = (
+    "Download PDF",
+    "View PDF",
+    "Full text PDF",
+    "pdf-download",
+    "pdfLink",
+    "pdfft",
+)
+
+
+def _agent_step_trace(agent: Any) -> list[dict[str, Any]]:
+    history = getattr(agent, "history", None)
+    if history is None:
+        return []
+    names = _call(history, "action_names") or []
+    urls = _call(history, "urls") or []
+    results = _call(history, "action_results") or []
+    if not isinstance(names, list):
+        return []
+    trace: list[dict[str, Any]] = []
+    for i, name in enumerate(names):
+        if not isinstance(name, str) or not name:
+            continue
+        step: dict[str, Any] = {"action": name}
+        if isinstance(urls, list) and urls:
+            idx = min(i, len(urls) - 1)
+            if isinstance(urls[idx], str) and urls[idx]:
+                step["url"] = urls[idx]
+        if isinstance(results, list) and i < len(results):
+            result = results[i]
+            for attr in ("extracted_content", "long_term_memory"):
+                val = getattr(result, attr, None)
+                if isinstance(val, str) and val.strip():
+                    step["detail"] = val.strip()[:240]
+                    break
+        trace.append(step)
+    return trace
+
+
+def agent_win_from_trace(
+    trace: list[dict[str, Any]] | None,
+    *,
+    start_url: str,
+    final_url: str,
+) -> str:
+    """Derive a promotable fetch-win label from an agent step trace."""
+    from .fetch_wins import rewrite_between_urls
+
+    start = (start_url or "").strip()
+    final = (final_url or "").strip()
+    if start and final and rewrite_between_urls(start, final):
+        return "rewrite"
+    blob = ""
+    if trace:
+        blob = "\n".join(
+            f"{s.get('action', '')} {s.get('detail', '')}" for s in trace
+        ).lower()
+    for label in _CLICK_LABELS:
+        if label.lower() in blob:
+            return f"click:{label}"
+    if final and final.lower().endswith(".pdf"):
+        return "meta"
+    return "agent"
+
+
 def _finish_recover(
     agent: Any,
     downloads: Path,
@@ -544,6 +653,7 @@ def _finish_recover(
     max_steps: int,
     *,
     captcha: bool = False,
+    start_url: str = "",
 ) -> RecoverResult:
     """Attach page, step, and download context to a generic miss or a hit."""
     result = _result_from_downloads(
@@ -553,6 +663,12 @@ def _finish_recover(
         how = _success_how(agent)
         if how:
             result.note = f"{result.note}; {how}"
+        page_url, _, _ = _agent_observation(agent)
+        result.final_url = page_url or ""
+        result.trace = _agent_step_trace(agent)
+        result.agent_win = agent_win_from_trace(
+            result.trace, start_url=start_url, final_url=result.final_url
+        )
         return result
     token = _history_price_token(agent)
     if miss not in {"no PDF in download folder", "stopped", "timeout"}:
