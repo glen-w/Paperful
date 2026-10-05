@@ -26,6 +26,7 @@ docker
 zotero
 commands
 workflows
+research-pack
 dedupe
 config
 architecture

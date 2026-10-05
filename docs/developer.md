@@ -87,7 +87,7 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `sync.py` | The refresh: delta or full, version last | `snapshot`, `mirror`, `library` |
 | `catalogue.py` | `MirrorCatalogue`, `MirrorFirstBackend`, `open_library` | `sync`, `mirror`, `library` |
 | `scope.py` | Collection, year, type selection | `library` errors |
-| `resolve.py`, `lint.py`, `metadata.py`, `dedupe.py`, `pdfid.py` | Identifier and hygiene logic. Take a backend; never name a manager | the protocol |
+| `resolve.py`, `lint.py`, `acronyms.py`, `metadata.py`, `dedupe.py`, `pdfid.py` | Identifier and hygiene logic. Take a backend; never name a manager | the protocol |
 | `sources/` | One fetch lane each. Return bytes or a miss | `sources.base` |
 | `pipeline.py` | Order the lanes, save, attach, write the manifest | most things |
 | `cli.py` | Flags, progress, exits. No logic of its own | everything |

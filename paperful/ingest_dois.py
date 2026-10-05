@@ -102,6 +102,7 @@ def classify_rows(
     fingerprint: LibraryFingerprint,
     *,
     resolve: ResolveFn,
+    allowlist: frozenset[str] | None = None,
 ) -> IngestBatch:
     batch = IngestBatch()
     for doi in dois:
@@ -112,7 +113,7 @@ def classify_rows(
             )
             batch.unresolved += 1
             continue
-        title = normalize_saved_title(work.title)
+        title = normalize_saved_title(work.title, allowlist)
         if not usable_work_title(title):
             batch.rows.append(
                 IngestRow(
@@ -189,6 +190,7 @@ def apply_creates(
     *,
     works: dict[str, WorkMeta],
     tags: list[str],
+    allowlist: frozenset[str] | None = None,
 ) -> IngestBatch:
     collection_key = backend.ensure_collection_path(collection)
     for row in batch.rows:
@@ -200,7 +202,7 @@ def apply_creates(
             row.detail = "missing resolved work"
             batch.failed += 1
             continue
-        record = _record_from_work(work, tags)
+        record = _record_from_work(work, tags, allowlist=allowlist)
         payload = parent_payload(record, [collection_key])
         try:
             key = backend.create_parent(payload)
@@ -249,12 +251,14 @@ def default_resolver(email: str) -> ResolveFn:
     return resolve
 
 
-def _record_from_work(work: WorkMeta, tags: list[str]) -> dict[str, Any]:
+def _record_from_work(
+    work: WorkMeta, tags: list[str], *, allowlist: frozenset[str] | None = None
+) -> dict[str, Any]:
     authors = [work.first_author] if work.first_author else []
     item_type = _item_type(work.work_type or "")
     record: dict[str, Any] = {
         "item_type": item_type,
-        "title": normalize_saved_title(work.title),
+        "title": normalize_saved_title(work.title, allowlist),
         "creators": _creators(authors),
         "date": work.date or (str(work.year) if work.year else ""),
         "doi": work.doi,

@@ -6,7 +6,8 @@ process. Individual commands stay available and can still be chained with
 `&&`.
 
 This is not a scheduler and not a GUI. There is no cron helper and no saved
-dashboard. Recipes below are copy-paste commands.
+dashboard. Recipes below are copy-paste commands. The research-pack
+(cited works → parents → PDFs) is [research-pack](research-pack.md).
 
 ## Do not conflate
 
@@ -322,9 +323,11 @@ uv run paperful all -C COLLECTION \
 
 ## 5. Research pack (cited works → parents → PDFs)
 
+The operator playbook is [research-pack](research-pack.md). Short form:
+
 Cited inside collection PDFs, not already in the library. Always dry-run the
 gap pack and `ingest-dois` classify before `--apply`. Then `run` (or inbox)
-fills PDFs.
+fills PDFs. Then `dedupe`.
 
 ```sh
 docker compose run --rm paperful refs gap -C BBNJ
@@ -333,6 +336,7 @@ docker compose run --rm paperful ingest-dois --from-pack state/refs-gaps/<stamp>
 docker compose run --rm paperful ingest-dois --from-file state/refs-gaps/<stamp>/dois.txt -C BBNJ --apply --tag bbnj
 docker compose run --rm paperful run -C BBNJ
 docker compose run --rm paperful inbox drain    # optional: PDFs dropped into [inbox].dir
+docker compose run --rm paperful dedupe -C BBNJ --apply
 ```
 
 Contributors: the same verbs with `uv run paperful …`.

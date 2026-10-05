@@ -249,13 +249,11 @@ Zotero has. Do not document either adapter as supported until testers say so.
   PubMed, PDF-text DOI via pdftotext then pypdf) with explicit `--apply`.
   **Shipped:** verified PDF-DOI → patch; date precision guard; HTML title cleanup;
   ALL CAPS → Title Case; title hygiene findings (`title_html` / `title_all_caps` /
-  `title_filename`). Filename titles stay findings-only. De-allcaps today only keeps
-  two-letter tokens (UN, EU); longer corpus acronyms (BBNJ, FAO, OECD, …) still
-  get Title-Cased. **Next:** collection-scoped NER / acronym harvest — scan titles,
-  abstracts, and venues once, write a durable allowlist under `state/`, and feed it
-  into `title_to_title_case` so known all-caps entities stay uppercase on recase.
-  Deterministic first (freq + shape heuristics); optional LLM NER only as a later
-  assist behind the existing `[llm]` gate.
+  `title_filename`). Filename titles stay findings-only.   De-allcaps today only keeps
+  two-letter tokens (UN, EU); longer corpus acronyms (BBNJ, FAO, OECD, …) stay
+  uppercase when they appear in `state/acronyms/` (`paperful acronyms -C … --apply`,
+  frequency + shape; optional `extra` list). Deterministic first; optional LLM NER
+  only as a later assist behind the existing `[llm]` gate.
 - Collection-scoped duplicate packs: `paperful dedupe` (DOI, then title+year).
   Trash is explicit `--apply`; title+year needs `--apply-medium`. See
   [dedupe](dedupe.md).
@@ -335,8 +333,8 @@ for the end-to-end operator story.
 | 6 | Linked-URL health (Core above) | Later |
 | 7 | Non-DOI grey fingerprint (`norm(title)|year|registrant_host`; ISBN/report # when present) in snowball / dedupe / inbox ladder + inbox-create | Later |
 | 8 | `paperful collections add --keys-file` — membership batch, dry-run / apply | Parked (Agent §7) |
-| 9 | Acronym allowlist harvest (Core `fix-metadata` next) | Next |
-| 10 | [Frontier digest](#frontier-digest-later-watch--external-ingest); thin [snowball briefing](#frontier-digest-later-watch--external-ingest) export before full digest | Later |
+| 9 | Acronym allowlist harvest (Core `fix-metadata`) | Shipped (`paperful acronyms`; Title Case consumes `state/acronyms/`) |
+| 10 | [Frontier digest](#frontier-digest-later-watch--external-ingest); thin [snowball briefing](#frontier-digest-later-watch--external-ingest) export before full digest | Thin v0 shipped (`snowball briefing`, `watch briefing`); full digest later |
 | 11 | Scholar 429 latch (Core Scholar) | Shipped |
 | 12 | Authors/orgs frequency report from `-C` (`state/reports/…`; seed **field author packs**) | Later |
 | 13 | Handoff list ranking (Core handoff) | Later |
@@ -696,11 +694,12 @@ queue paths — file under `state/` or stdout; still **no** built-in scheduler
 (launchd / cron calls `watch run` + digest; document launchd/systemd examples
 only). Complements watch inbox review.
 
-**Thin v0 before full digest:** `paperful snowball briefing --run-id …` /
+**Thin v0 (shipped):** `paperful snowball briefing --run-id …` /
 `snowball watch briefing <name>` → markdown export of the dry-run or watch queue
-(no silent creates; optional child note `paperful:frontier-briefing`). Surface
-grey-vs-peer / OA stamp hints in briefing and coverage tables where provenance
-exists (`grey:…`, `oa:…`, seed tags).
+(no silent creates; optional collection note `paperful:frontier-briefing` with
+`--apply -C`). Surface
+grey-vs-peer / OA stamp hints in briefing tables where provenance
+exists (`grey:…`, `oa:…`). Full digest and newsletter ingest stay later.
 
 **Newsletter / alert ingest (rollup bridge):** optional plug-in or HTTP client
 to sibling **[rollup](Documents/rollup)**-style ingest architecture — pull
@@ -1329,7 +1328,7 @@ the first confusing run.
 
 Ship in layers:
 
-0. **Research pack playbook** (narrative spine for `-C` topic builds):
+0. **Research pack playbook** — [research-pack.md](research-pack.md) (narrative spine for `-C` topic builds):
    seed greys + seed papers → `refs gap` → `ingest-dois --dry-run` → `--apply`
    with provenance tags → `run` / handoff / inbox for PDFs → `dedupe` hygiene →
    optional `snowball watch` + [briefing export](#frontier-digest-later-watch--external-ingest)

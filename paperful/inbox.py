@@ -662,13 +662,17 @@ def _create_inbox_parent(
     work: WorkMeta | None = None,
     extra_tags: list[str] | None = None,
 ) -> Item:
-    from .snowball.ingest import _creators, _item_type
+    from .acronyms import load_acronym_allowlist
     from .lint import normalize_saved_title, usable_work_title
+    from .snowball.ingest import _creators, _item_type
 
     doi = normalize_doi(data.get("doi")) or ""
     if work is None and doi:
         work = (resolve_work or _default_resolve(cfg))(doi)
-    title = normalize_saved_title(str((work.title if work else "") or data.get("title") or ""))
+    title = normalize_saved_title(
+        str((work.title if work else "") or data.get("title") or ""),
+        load_acronym_allowlist(cfg.state_dir),
+    )
     if not usable_work_title(title):
         raise ValueError("unusable title for inbox create")
     collection = str(data.get("collection") or "").strip()

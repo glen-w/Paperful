@@ -84,6 +84,12 @@ class SnowballError(Exception):
         self.code = code
 
 
+def _title_allowlist(cfg: Config) -> frozenset[str]:
+    from ..acronyms import load_acronym_allowlist
+
+    return load_acronym_allowlist(cfg.state_dir)
+
+
 @dataclass
 class SnowballRequest:
     gate: str = "dry-run"
@@ -572,6 +578,7 @@ def run_resume(
                 remarks_surface=cfg.remarks_surface,
                 local_cites=_local_cites(cfg, lib, request.collection),
                 console=console,
+                allowlist=_title_allowlist(cfg),
             )
             _write_cached_pdfs(cfg, items, settled)
             if _pdf_mode(request) != "off" and items:
@@ -625,6 +632,7 @@ def _resume_saved_queue(
             else request.note_provenance,
             remarks_surface=cfg.remarks_surface,
             console=console,
+            allowlist=_title_allowlist(cfg),
         )
         failed = int(counts.get("failed") or 0)
     if mode != "off":
@@ -687,6 +695,7 @@ def run_apply(
         note_provenance=note,
         console=console,
         remarks_surface=cfg.remarks_surface,
+        allowlist=_title_allowlist(cfg),
         local_cites=_local_cites(cfg, lib, collection),
     )
     if counts.get("failed"):
@@ -1067,6 +1076,7 @@ def _execute(
             tally=tally,
             remarks_surface=cfg.remarks_surface,
             local_cites=_local_cites(cfg, lib, request.collection),
+            allowlist=_title_allowlist(cfg),
         )
     except LibraryError as exc:
         tally.stop()

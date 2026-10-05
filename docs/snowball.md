@@ -33,6 +33,7 @@ paperful snowball search "high seas EIA" --gate auto --fetch-pdfs fast -C "Inbox
 paperful snowball orcid 0000-0002-9162-9618 --gate auto --fetch-pdfs full -C "Snowball/0000-0002-9162-9618"
 paperful snowball watch save bbnj --profile keyword-scout
 paperful snowball watch run bbnj
+paperful snowball watch briefing bbnj
 ```
 `search`, `hybrid`, `doi`, `orcid`, and `collection` are seeds under one verb.
 `search` and `hybrid` take one or more keyword terms (AND by default; `--or`
@@ -56,6 +57,8 @@ paperful snowball watch save bbnj --profile keyword-scout
 paperful snowball watch run bbnj          # first time: baseline, inbox empty
 paperful snowball watch run bbnj          # later: N new in the inbox
 paperful snowball watch show bbnj
+paperful snowball watch briefing bbnj     # markdown; --apply -C files a collection note
+paperful snowball briefing --run-id <run-id>
 paperful snowball apply <run-id> -C Inbox/Snowball   # only if you want parents
 ```
 
@@ -66,6 +69,13 @@ Ledger under `state/snowball/watches/<name>/`:
 | `watch.json` | `paperful.snowball.watch.v1` — profile name, `baseline_at`, `last_run_at`, `last_run_id` |
 | `seen.json` | Identities already recorded (`doi:` or `openalex:`) |
 | `inbox.jsonl` | Append-only proposed `status = new` rows |
+| `briefing.md` | Thin markdown export (`watch briefing`) |
+
+`paperful snowball briefing --run-id` writes the same kind of markdown next to
+`candidates.jsonl`. Neither command creates library items. `--apply` with `-C`
+files a collection note tagged `paperful:frontier-briefing`. OA / grey stamps
+already on the row (`oa:…`, `grey:…`, `is_oa`, `oa_status`) are printed; there
+is no extra API call. Full digest / newsletter ingest stays later.
 
 Each `watch run` also writes a normal `state/snowball/<run-id>/` queue. After
 baseline, that queue is empty (`baseline N · proposed 0`). After a later run,
@@ -501,6 +511,7 @@ BibTeX citekeys still make sense. Snowball does not depend on that plugin.
 ## Related docs
 
 - [ROADMAP](ROADMAP.md#snowball) — phases
+- [research-pack](research-pack.md) — refs gap → ingest → run / handoff → dedupe
 - [comparison](comparison.md) — paperscraper, findpapers, in-Zotero plugins
 - [config](config.md#run-configs-profiles) — profile precedence this lane reuses
 - [config Advanced](config.md#advanced) — fetch tuning and OpenAlex snapshot store

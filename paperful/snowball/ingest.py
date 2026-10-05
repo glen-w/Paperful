@@ -60,6 +60,7 @@ def create_new(
     tally: Any = None,
     remarks_surface: str = "note",
     local_cites: Any = None,
+    allowlist: frozenset[str] | None = None,
 ) -> tuple[list[Item], dict[str, int]]:
     """Create status=new rows. One LibraryError does not abort the rest."""
     collection_key = backend.ensure_collection_path(collection)
@@ -87,7 +88,7 @@ def create_new(
         biblio = row.biblio
         year = biblio.get("year")
         authors = list(biblio.get("authors") or [])
-        title = normalize_saved_title(str(biblio.get("title") or ""))
+        title = normalize_saved_title(str(biblio.get("title") or ""), allowlist)
         if not usable_work_title(title):
             failed += 1
             row.status = "error"

@@ -26,6 +26,19 @@ https://doi.org/10.1000/b  # comment
     assert parse_doi_lines(text) == ["10.1000/a", "10.1000/b"]
 
 
+def test_classify_title_case_keeps_allowlist_acronyms():
+    fp = LibraryFingerprint.from_items([])
+    work = _work("10.1000/caps", "THE BBNJ AGREEMENT AND FAO FISHERIES", 2021)
+    batch = classify_rows(
+        ["10.1000/caps"],
+        fp,
+        resolve=lambda d: work,
+        allowlist=frozenset({"BBNJ", "FAO"}),
+    )
+    assert batch.rows[0].status == "create"
+    assert batch.rows[0].title == "The BBNJ Agreement and FAO Fisheries"
+
+
 def test_classify_exists_unresolved_held_create():
     fp = LibraryFingerprint.from_items(
         [

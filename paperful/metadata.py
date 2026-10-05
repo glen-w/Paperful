@@ -13,6 +13,7 @@ import httpx
 from .progress import Track
 from .config import Config
 from .library import LibraryBackend
+from .acronyms import load_acronym_allowlist
 from .lint import (
     Finding,
     lint_item,
@@ -68,12 +69,16 @@ def propose_patch(
     overwrite: bool = False,
     cache: IdentifierCache | None = None,
     prepared: bool = False,
+    allowlist: frozenset[str] | None = None,
 ) -> Patch | None:
     """Build a field whitelist patch from lint findings + work metadata.
 
     When ``prepared`` is True (caller already ran ``lint_item`` / ``prepare_identifiers``),
     skip a second network prepare pass.
     """
+    allowed = (
+        load_acronym_allowlist(cfg.state_dir) if allowlist is None else allowlist
+    )
     if not prepared:
         prepare_identifiers(
             client,
@@ -135,13 +140,13 @@ def propose_patch(
         if candidate_date and _should_set_date(item.date, candidate_date, overwrite):
             after["date"] = candidate_date
         if work.title and overwrite:
-            after["title"] = normalize_saved_title(work.title)
+            after["title"] = normalize_saved_title(work.title, allowed)
         elif (
             work.title
             and usable_work_title(work.title)
             and not usable_work_title(item.title)
         ):
-            after["title"] = normalize_saved_title(work.title)
+            after["title"] = normalize_saved_title(work.title, allowed)
         if source != "pdf":
             source = work.source or source
 
@@ -153,7 +158,7 @@ def propose_patch(
             and (title_is_all_caps(candidate) or title_is_all_lower(candidate))
             and not title_looks_like_filename(candidate)
         ):
-            cased = title_to_title_case(candidate)
+            cased = title_to_title_case(candidate, allowed)
             if cased and cased != item.title.strip():
                 after["title"] = cased
                 if source == "prepare":
@@ -261,6 +266,7 @@ def collect_patches(
 ) -> list[Patch]:
     """Lint each item once, then propose a whitelist patch. Deduped by item key."""
     cache = IdentifierCache()
+    allowed = load_acronym_allowlist(cfg.state_dir)
     patches: list[Patch] = []
     for item in track(items) if track else items:
         try:
@@ -277,6 +283,7 @@ def collect_patches(
             overwrite=overwrite,
             cache=cache,
             prepared=True,
+            allowlist=allowed,
         )
         if patch:
             patches.append(patch)

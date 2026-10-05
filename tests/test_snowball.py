@@ -2192,6 +2192,9 @@ def test_keyless_promotes_to_one_key():
     assert "https://openalex.org/settings/api" in notice
     assert "VPN" in notice
     assert "more reliable" in notice
+    keyed_notice = keyless_limit_message(has_key=True)
+    assert keyed_notice == "OpenAlex free allowance exhausted; switching to API key."
+    assert "VPN" not in keyed_notice
 
 
 def test_openalex_rejected_key_is_not_a_budget_stop():

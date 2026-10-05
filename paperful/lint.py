@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -131,13 +132,17 @@ _TITLE_SMALL = frozenset(
 _LEAD_TRAIL = re.compile(r"^(\W*)(.*?)(\W*)$", re.UNICODE)
 
 
-def title_to_title_case(title: str) -> str:
+def title_to_title_case(
+    title: str, allowlist: Iterable[str] | None = None
+) -> str:
     """Recase an ALL CAPS (or mostly-caps) scholarly title.
 
     Deterministic: same words, Chicago-ish Title Case. Two-letter tokens that
-    are not small words stay acronyms (UN, EU, UK). Filename-like titles should
-    be skipped by the caller.
+    are not small words stay acronyms (UN, EU, UK). Longer tokens stay
+    uppercase only when they are in ``allowlist`` (harvested under
+    ``state/acronyms/``). Filename-like titles should be skipped by the caller.
     """
+    allowed = _allowset(allowlist)
     parts = (title or "").split()
     if not parts:
         return title or ""
@@ -145,22 +150,30 @@ def title_to_title_case(title: str) -> str:
     out: list[str] = []
     for i, part in enumerate(parts):
         force = i == 0 or i == last or (i > 0 and parts[i - 1].endswith(":"))
-        out.append(_title_case_hyphenated(part, force=force))
+        out.append(_title_case_hyphenated(part, force=force, allowlist=allowed))
     return " ".join(out)
 
 
-def _title_case_hyphenated(token: str, *, force: bool) -> str:
+def _allowset(allowlist: Iterable[str] | None) -> frozenset[str]:
+    if not allowlist:
+        return frozenset()
+    return frozenset(str(token).upper() for token in allowlist if str(token).strip())
+
+
+def _title_case_hyphenated(
+    token: str, *, force: bool, allowlist: frozenset[str]
+) -> str:
     bits = token.split("-")
     if len(bits) == 1:
-        return _title_case_piece(bits[0], force=force)
+        return _title_case_piece(bits[0], force=force, allowlist=allowlist)
     n = len(bits)
     return "-".join(
-        _title_case_piece(bit, force=j == 0 or j == n - 1)
+        _title_case_piece(bit, force=j == 0 or j == n - 1, allowlist=allowlist)
         for j, bit in enumerate(bits)
     )
 
 
-def _title_case_piece(piece: str, *, force: bool) -> str:
+def _title_case_piece(piece: str, *, force: bool, allowlist: frozenset[str]) -> str:
     m = _LEAD_TRAIL.match(piece)
     if not m:
         return piece
@@ -170,6 +183,9 @@ def _title_case_piece(piece: str, *, force: bool) -> str:
     low = core.lower()
     if not force and low in _TITLE_SMALL:
         return f"{lead}{low}{trail}"
+    upper = core.upper()
+    if len(upper) >= 3 and upper in allowlist and upper.isalnum():
+        return f"{lead}{upper}{trail}"
     if len(core) == 2 and core.isalpha() and low not in _TITLE_SMALL:
         return f"{lead}{core.upper()}{trail}"
     return f"{lead}{_cap_apostrophe(core)}{trail}"
@@ -200,11 +216,14 @@ def title_looks_like_filename(title: str) -> bool:
     return False
 
 
-def normalize_saved_title(title: str) -> str:
+def normalize_saved_title(
+    title: str, allowlist: Iterable[str] | None = None
+) -> str:
     """Strip HTML and Title-Case uniform ALL CAPS or all-lowercase titles.
 
     Filename-shaped titles are left alone (same rule as ``fix-metadata``).
-    Idempotent on already-cased titles.
+    Idempotent on already-cased titles. ``allowlist`` keeps harvested acronyms
+    uppercase (see ``title_to_title_case``).
     """
     raw = (title or "").strip()
     if not raw:
@@ -213,7 +232,7 @@ def normalize_saved_title(title: str) -> str:
     if title_looks_like_filename(cleaned):
         return cleaned
     if title_is_all_caps(cleaned) or title_is_all_lower(cleaned):
-        return title_to_title_case(cleaned)
+        return title_to_title_case(cleaned, allowlist)
     return cleaned
 
 

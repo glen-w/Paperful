@@ -8,6 +8,14 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ### Added
 
+- `paperful acronyms` harvests collection-scoped all-caps tokens into
+  `state/acronyms/` (`paperful.acronyms.v1`). `fix-metadata` and parent create
+  keep those tokens uppercase when recasing ALL CAPS titles.
+- `paperful snowball briefing --run-id` and `snowball watch briefing` write
+  markdown from a saved queue or watch inbox. No silent creates; `--apply -C`
+  files a collection note tagged `paperful:frontier-briefing`.
+- Research-pack playbook: [docs/research-pack.md](docs/research-pack.md).
+
 - Frozen miss-surface enum (`no_doi`, `paywalled`, `no_oa`, `fetch_failed`,
   `license_blocked`, `import_ok`) on `run --dry-run`, `gaps --list-missing`,
   handoff exports, and `paperful.run_report.v1` items. Unpaywall / OpenAlex

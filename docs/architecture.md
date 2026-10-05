@@ -175,7 +175,7 @@ below.
 | `pmid_no_doi` | PMID present, converter failed |
 | `pdf_doi_mismatch` | PDF-text DOI ≠ library DOI and ≠ prepared DOI |
 | `title_html` | Scholarly title contains HTML tags or entities |
-| `title_all_caps` | Scholarly title is mostly ALL CAPS (`fix-metadata` recases to Title Case) |
+| `title_all_caps` | Scholarly title is mostly ALL CAPS (`fix-metadata` recases to Title Case; `state/acronyms/` tokens stay uppercase) |
 | `title_filename` | Scholarly title looks like a filename or path (finding only) |
 | `title_unusable` | Scholarly title is blank or a citation string, not the work title |
 | `no_identifier` | No DOI, arXiv id, PMID, or URL |
@@ -183,7 +183,7 @@ below.
 
 `--json` prints only findings. Exit 0 unless `--strict`. Lint prefers a file already on disk (`item.pdf_path` or manifest `path`) and calls `export_pdf` only when `has_pdf` and nothing is on disk.
 
-[`paperful/metadata.py`](../paperful/metadata.py) whitelist: `doi`, `title`, `date`, `publicationTitle`. Default fills empty venue/date (richest Crossref/OpenAlex date available) and replaces a blank or citation-shaped title from the DOI work. `--overwrite` may replace title/date/venue when the candidate is at least as precise. Verified `pdf_doi_mismatch` can propose a DOI (`source=pdf`). HTML markup in titles is stripped into a title patch; ALL CAPS titles are recased to Title Case (`source=title_case`); filename titles stay lint-only. The same ALL CAPS → Title Case pass runs when creating parents (`parent_payload` / snowball ingest) and when a DOI work title is written by `fix-metadata`, so new items do not land ALL CAPS in Zotero. Never invents creators. `state/metadata-patches.jsonl` is an append-only audit log (one patch per item key per invocation); not a curated re-apply queue.
+[`paperful/metadata.py`](../paperful/metadata.py) whitelist: `doi`, `title`, `date`, `publicationTitle`. Default fills empty venue/date (richest Crossref/OpenAlex date available) and replaces a blank or citation-shaped title from the DOI work. `--overwrite` may replace title/date/venue when the candidate is at least as precise. Verified `pdf_doi_mismatch` can propose a DOI (`source=pdf`). HTML markup in titles is stripped into a title patch; ALL CAPS titles are recased to Title Case (`source=title_case`); tokens in `state/acronyms/` stay uppercase; filename titles stay lint-only. The same ALL CAPS → Title Case pass runs when creating parents (`parent_payload` / snowball ingest) and when a DOI work title is written by `fix-metadata`, so new items do not land ALL CAPS in Zotero. Never invents creators. `state/metadata-patches.jsonl` is an append-only audit log (one patch per item key per invocation); not a curated re-apply queue.
 
 ## PDF text
 

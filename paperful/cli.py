@@ -1218,6 +1218,88 @@ def lint(
         raise typer.Exit(1)
 
 
+@app.command()
+def acronyms(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    min_count: int = typer.Option(
+        2, "--min-count", min=1, help="Items a short token must appear in."
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Write state/acronyms/<scope>.json. Default prints the list only.",
+    ),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Harvest all-caps tokens from mixed-case titles, abstracts, and venues.
+
+    Frequency and shape only. Does not call a model and does not recase titles.
+    ``fix-metadata`` uses the written list when it Title-Cases an ALL CAPS title.
+    """
+    from .acronyms import file_slug, harvest, write_allowlist
+
+    if _scope_unset(collection, library, profile, run_config):
+        _refuse_missing_scope()
+    cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    if not collection and not library:
+        _refuse_missing_scope()
+    backend = _connect(cfg, quiet=False)
+    loaded = _load_scope(
+        backend,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    rows = harvest(loaded.items, min_count=min_count)
+    slug = file_slug(collection, library=library or not collection)
+    console.print(
+        f"Scope: [bold]{loaded.label}[/] — {len(loaded.items)} items, "
+        f"{len(rows)} acronym{'s' if len(rows) != 1 else ''}"
+    )
+    if rows:
+        table = Table(title="Acronyms")
+        table.add_column("Token")
+        table.add_column("Items", justify="right")
+        for row in rows:
+            table.add_row(row.token, str(row.count))
+        console.print(table)
+    else:
+        console.print("[green]No acronyms at this count.[/]")
+    if not apply:
+        console.print("[dim]Dry-run. Pass --apply to write the allowlist.[/]")
+        return
+    path = write_allowlist(
+        cfg.state_dir,
+        slug,
+        scope=loaded.label,
+        rows=rows,
+        min_count=min_count,
+        n_items=len(loaded.items),
+    )
+    console.print(f"Wrote [bold]{path}[/]")
+
+
 @app.command("fix-metadata")
 def fix_metadata(
     collection: list[str] = typer.Option(
@@ -3665,7 +3747,10 @@ def ingest_dois_cmd(
             works[doi] = work
         return work
 
-    batch = classify_rows(dois, fingerprint, resolve=resolve)
+    from .acronyms import load_acronym_allowlist
+
+    allowed = load_acronym_allowlist(cfg.state_dir)
+    batch = classify_rows(dois, fingerprint, resolve=resolve, allowlist=allowed)
     tags = ingest_tags(
         cli_tags=tag, default_tags=cfg.ingest_default_tags, from_file=source_path
     )
@@ -3673,7 +3758,9 @@ def ingest_dois_cmd(
         _require_manager(cfg)
         if not backend.supports_write():
             _exit_env("ingest-dois --apply needs library write support.", cfg)
-        apply_creates(backend, batch, collection[0], works=works, tags=tags)
+        apply_creates(
+            backend, batch, collection[0], works=works, tags=tags, allowlist=allowed
+        )
         _flush(backend)
     folder = write_summary(cfg.state_dir, collection[0], batch)
     table = Table(title="ingest-dois")
@@ -6927,6 +7014,59 @@ def snowball_collection(
     )
 
 
+def _print_briefing(briefing: Any, *, apply: bool, collection: str, cfg: Config) -> None:
+    counts = briefing.counts
+    summary = " · ".join(f"{key} {counts[key]}" for key in ("new", "exists", "deferred"))
+    console.print(summary)
+    console.print(f"Wrote [bold]{briefing.path}[/]")
+    if not apply:
+        return
+    if not collection.strip():
+        console.print("[red]--apply needs -C so the note has a collection.[/]")
+        raise typer.Exit(1)
+    backend = _connect(cfg)
+    if not backend.supports_write():
+        _exit_env("A briefing note needs library write support.", cfg)
+    try:
+        col = backend.resolve_collection(collection.strip())
+        key = backend.create_or_update_collection_note(
+            col.key, briefing.html, ["paperful:frontier-briefing"]
+        )
+    except LibraryError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(2) from exc
+    _flush(backend)
+    console.print(f"Note [bold]{key}[/] in {col.path or collection}")
+
+
+@snowball_app.command("briefing")
+def snowball_briefing(
+    run_id: str = typer.Option(
+        ..., "--run-id", help="Queue under state/snowball/<run-id>/."
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Also file a collection note tagged paperful:frontier-briefing. Needs -C.",
+    ),
+    collection: str = typer.Option(
+        "", "--collection", "-C", help="Collection for the note when --apply."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Write markdown for a saved snowball queue. Does not create items."""
+    from .snowball.briefing import write_run_briefing
+    from .snowball.command import SnowballError
+
+    cfg = _cfg(config)
+    try:
+        briefing = write_run_briefing(cfg, run_id)
+    except SnowballError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(exc.code) from exc
+    _print_briefing(briefing, apply=apply, collection=collection, cfg=cfg)
+
+
 @snowball_app.command("resume")
 def snowball_resume(
     run_id: str = typer.Argument(
@@ -7302,6 +7442,32 @@ def snowball_watch_show(
     except SnowballError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
+
+
+@snowball_watch_app.command("briefing")
+def snowball_watch_briefing(
+    name: str = typer.Argument(..., help="Watch name."),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Also file a collection note tagged paperful:frontier-briefing. Needs -C.",
+    ),
+    collection: str = typer.Option(
+        "", "--collection", "-C", help="Collection for the note when --apply."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Write markdown for a watch inbox. Does not create items."""
+    from .snowball.briefing import write_watch_briefing
+    from .snowball.command import SnowballError
+
+    cfg = _cfg(config)
+    try:
+        briefing = write_watch_briefing(cfg, name)
+    except SnowballError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(exc.code) from exc
+    _print_briefing(briefing, apply=apply, collection=collection, cfg=cfg)
 
 
 if __name__ == "__main__":
