@@ -445,7 +445,7 @@ def test_mutating_commands_name_the_write_gate():
         "import": "--apply",
         "attach": "dry-run",
         "snapshot": "--dry-run",
-        "snowball": "dry-run",
+        "ingest-dois": "--apply",
     }
     for name, token in tokens.items():
         res = runner.invoke(cli.app, [name, "--help"])
@@ -1964,3 +1964,105 @@ def test_pack_show_human_table_and_empty(cfg_file, stub_zotero, tmp_path):
     assert "no PDF" in shown.stdout
     assert "missing DOI" in shown.stdout
     assert not (tmp_path / "state" / "last-run.json").exists()
+
+
+def test_refs_gap_cli_writes_pack_without_creates(cfg_file, stub_zotero, tmp_path, monkeypatch):
+    pdf = tmp_path / "seed.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+    monkeypatch.setattr(
+        "paperful.refs_gap.text_from_pdf",
+        lambda *_a, **_k: (
+            "\nReferences\n[1] Ada. (2019). First paper title. Journal.\n"
+            "https://doi.org/10.1000/cli-gap\n"
+        ),
+    )
+    created: list[str] = []
+    monkeypatch.setattr(
+        "paperful.library.ZoteroBackend.create_parent",
+        lambda self, payload: created.append(str(payload.get("DOI") or "")) or "X",
+    )
+    res = runner.invoke(
+        cli.app,
+        ["refs", "gap", "-c", str(cfg_file), "-C", "BBNJ", "--pdf", str(pdf)],
+    )
+    assert res.exit_code == 0, res.stdout
+    assert created == []
+    packs = list((tmp_path / "state" / "refs-gaps").glob("*/pack.json"))
+    assert packs
+    data = json.loads(packs[0].read_text())
+    assert data["schema"] == "paperful.refs_gap.pack.v1"
+    assert "Pack:" in res.stdout
+
+
+def test_ingest_dois_cli_dry_run_does_not_create(cfg_file, stub_zotero, tmp_path, monkeypatch):
+    from paperful.resolve import WorkMeta
+
+    dois = tmp_path / "dois.txt"
+    dois.write_text("10.1000/cli-new\n")
+    monkeypatch.setattr(
+        "paperful.ingest_dois.default_resolver",
+        lambda email: (
+            lambda doi: WorkMeta(
+                doi=doi,
+                title="A sufficiently long ingested title for tests",
+                year=2021,
+                source="crossref",
+                work_type="journal-article",
+            )
+        ),
+    )
+    created: list[str] = []
+    monkeypatch.setattr(
+        "paperful.library.ZoteroBackend.create_parent",
+        lambda self, payload: created.append(str(payload.get("DOI") or "")) or "X",
+    )
+    res = runner.invoke(
+        cli.app,
+        [
+            "ingest-dois",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--from-file",
+            str(dois),
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    assert created == []
+    summaries = list((tmp_path / "state" / "ingest").glob("*/summary.json"))
+    assert summaries
+    payload = json.loads(summaries[0].read_text())
+    assert payload["schema"] == "paperful.ingest_dois.v1"
+    assert payload["applied"] is False
+
+
+def test_snowball_doi_help_names_tag():
+    res = runner.invoke(cli.app, ["snowball", "doi", "--help"])
+    assert res.exit_code == 0
+    assert "--tag" in plain_text(res.stdout)
+
+
+def test_inbox_proposals_list_cli(cfg_file, stub_zotero, tmp_path):
+    empty = runner.invoke(cli.app, ["inbox", "proposals", "list", "-c", str(cfg_file)])
+    assert empty.exit_code == 0, empty.stdout
+    assert "No inbox proposals" in empty.stdout
+    folder = tmp_path / "state" / "inbox" / "proposals"
+    folder.mkdir(parents=True)
+    (folder / "abc123.json").write_text(
+        json.dumps(
+            {
+                "schema": "paperful.inbox.proposal.v1",
+                "id": "abc123",
+                "status": "pending",
+                "action": "create",
+                "doi": "10.1000/prop",
+                "title": "Gated create proposal",
+            }
+        )
+        + "\n"
+    )
+    listed = runner.invoke(cli.app, ["inbox", "proposals", "list", "-c", str(cfg_file)])
+    assert listed.exit_code == 0, listed.stdout
+    assert "abc123" in listed.stdout
+    assert "10.1000/prop" in listed.stdout

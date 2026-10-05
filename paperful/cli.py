@@ -174,10 +174,16 @@ rag_app = typer.Typer(
     ),
 )
 app.add_typer(rag_app, name="rag")
+refs_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Bibliography coverage: cited-in-PDF works missing from the library.",
+)
+app.add_typer(refs_app, name="refs")
 
 # Canonical top-level verbs. tests/test_cli.py asserts this matches `paperful --help`.
 JOBS: dict[str, tuple[str, ...]] = {
-    "library": ("collections", "import", "export", "snowball"),
+    "library": ("collections", "import", "export", "snowball", "ingest-dois"),
     "find": ("run", "attach", "recover", "gaps", "inbox"),
     "completeness": (
         "lint",
@@ -190,6 +196,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "synthesize",
         "rag",
         "ask",
+        "refs",
         "all",
     ),
     "mirror": ("sync", "snapshot", "restore"),
@@ -253,6 +260,11 @@ CitesQueryOpt = typer.Option(
         "Only references and citing works that match this OpenAlex search "
         "(title, abstract, or full text). Needs refs or cites in the direction, and depth of at least 1."
     ),
+)
+CreateTagOpt = typer.Option(
+    [],
+    "--tag",
+    help="Extra tags on created parents (repeatable). Combined with config default_tags and from-<seed-slug>.",
 )
 DIRECTION_HELP = (
     "refs, cites, both, keywords, similar, refs+keywords, cites+keywords, "
@@ -3185,6 +3197,7 @@ def inbox_watch(
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
+    tag: list[str] = CreateTagOpt,
 ) -> None:
     """Long-running sidecar: poll inbox.dir and attach by PDF DOI (no FIFO).
 
@@ -3244,6 +3257,8 @@ def inbox_watch(
         fifo_queue=None,
         once=False,
         idle_seconds=idle,
+        collection=collection[0] if collection else "",
+        extra_tags=tag,
         on_status=lambda msg: console.print(msg),
     )
     _flush(backend)
@@ -3260,6 +3275,7 @@ def inbox_watch(
     )
     console.print(
         f"Inbox attached {stats.attached}, unmatched {stats.unmatched}, "
+        f"created_gated {stats.created_gated}, created_auto {stats.created_auto}, "
         f"errors {stats.errors}, skipped {stats.skipped}"
         + (f" ({stats.quit_reason})" if stats.quit_reason else "")
     )
@@ -3282,6 +3298,7 @@ def inbox_drain(
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
+    tag: list[str] = CreateTagOpt,
 ) -> None:
     """One-shot: ingest current PDFs in inbox.dir (DOI match only).
 
@@ -3338,6 +3355,8 @@ def inbox_drain(
         items,
         fifo_queue=None,
         once=True,
+        collection=collection[0] if collection else "",
+        extra_tags=tag,
         on_status=lambda msg: console.print(msg),
     )
     _flush(backend)
@@ -3354,10 +3373,309 @@ def inbox_drain(
     )
     console.print(
         f"Inbox attached {stats.attached}, unmatched {stats.unmatched}, "
+        f"created_gated {stats.created_gated}, created_auto {stats.created_auto}, "
         f"errors {stats.errors}, skipped {stats.skipped}"
     )
     if path is not None:
         console.print(f"Inbox report: {path}")
+
+
+inbox_proposals_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Gated inbox create/attach proposals. Never silent parent create.",
+)
+inbox_app.add_typer(inbox_proposals_app, name="proposals")
+
+
+@inbox_proposals_app.command("list")
+def inbox_proposals_list(
+    status: str = typer.Option("pending", "--status", help="pending, applied, rejected, or all."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    from .inbox_match import list_proposals
+
+    cfg = _cfg(config)
+    want = None if status == "all" else status
+    rows = list_proposals(cfg, status=want)
+    if not rows:
+        console.print("No inbox proposals.")
+        return
+    table = Table(title="inbox proposals")
+    table.add_column("id")
+    table.add_column("action")
+    table.add_column("doi")
+    table.add_column("title")
+    table.add_column("status")
+    for row in rows:
+        table.add_row(
+            str(row.get("id") or ""),
+            str(row.get("action") or ""),
+            str(row.get("doi") or ""),
+            str(row.get("title") or "")[:60],
+            str(row.get("status") or ""),
+        )
+    console.print(table)
+
+
+@inbox_proposals_app.command("apply")
+def inbox_proposals_apply(
+    proposal_id: str = typer.Argument(..., help="Proposal id from inbox proposals list."),
+    tag: list[str] = CreateTagOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    from .inbox import apply_proposal
+
+    cfg = _cfg(config)
+    _require_manager(cfg)
+    backend = _connect(cfg)
+    if not backend.supports_write():
+        _exit_env("inbox proposals apply needs library write support.", cfg)
+    manifest = Manifest(cfg.manifest_path)
+    try:
+        data = apply_proposal(cfg, backend, manifest, proposal_id, extra_tags=tag)
+    except (FileNotFoundError, ValueError, LibraryError) as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    _flush(backend)
+    console.print(f"Applied proposal {proposal_id} → {data.get('item_key') or data.get('action')}")
+
+
+@inbox_proposals_app.command("reject")
+def inbox_proposals_reject(
+    proposal_id: str = typer.Argument(..., help="Proposal id from inbox proposals list."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    from .inbox import reject_proposal
+
+    cfg = _cfg(config)
+    try:
+        reject_proposal(cfg, proposal_id)
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    console.print(f"Rejected proposal {proposal_id}")
+
+
+@refs_app.command("gap")
+def refs_gap(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    item: list[str] = typer.Option([], "--item", help="Seed item keys (repeatable)."),
+    pdf: list[Path] = typer.Option(
+        [],
+        "--pdf",
+        help="Extra PDF paths to scan (repeatable).",
+        exists=True,
+        dir_okay=False,
+    ),
+    dedupe_scope: str = typer.Option(
+        "library",
+        "--dedupe-scope",
+        help="Fingerprint exists against library or collection.",
+    ),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Works cited inside collection PDFs that are not in the library. Never writes."""
+    from .identity import LibraryFingerprint
+    from .mirror import pdf_for
+    from .refs_gap import (
+        ScanFinding,
+        aggregate_citations,
+        scan_items,
+        scan_pdf_citations,
+        write_pack,
+    )
+
+    if _scope_unset(collection, library, profile, run_config) and not item and not pdf:
+        _refuse_missing_scope()
+    cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    backend = _connect(cfg)
+    loaded = _load_scope(
+        backend,
+        collection=collection,
+        library=bool(library) or not collection,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    items = loaded.items
+    scope = loaded.label
+    if item:
+        want = set(item)
+        items = [it for it in items if it.key in want]
+        if not items and not pdf:
+            console.print("[red]No matching --item keys in scope.[/]")
+            raise typer.Exit(1)
+    fingerprint = LibraryFingerprint.from_items(
+        list(backend.items_in_scope(None)) if hasattr(backend, "items_in_scope") else items,
+        scope=dedupe_scope,
+        collection=collection[0] if collection else "",
+    )
+
+    def _pdf(it):
+        return pdf_for(cfg.out_dir, it)
+
+    refs, findings = scan_items(items, _pdf, fingerprint)
+    extra_sources = []
+    for path in pdf:
+        entries, finding = scan_pdf_citations(path)
+        findings.append(ScanFinding(item_key=f"pdf:{path.name}", path=str(path), finding=finding))
+        if finding == "ok":
+            extra_sources.append((f"pdf:{path.name}", entries))
+    if extra_sources:
+        extra_refs = aggregate_citations(extra_sources, fingerprint)
+        by_id = {(r.doi or r.title, r.year): r for r in refs}
+        for row in extra_refs:
+            ident = (row.doi or row.title, row.year)
+            if ident in by_id:
+                host = by_id[ident]
+                for key in row.citing_keys:
+                    if key not in host.citing_keys:
+                        host.citing_keys.append(key)
+            else:
+                refs.append(row)
+    folder = write_pack(cfg.state_dir, scope, refs, findings)
+    missing = [r for r in refs if not r.already_exists]
+    table = Table(title="refs gap")
+    table.add_column("n")
+    table.add_column("DOI")
+    table.add_column("Title")
+    table.add_column("Action")
+    for row in sorted(missing, key=lambda r: (-len(r.citing_keys), r.doi or r.title))[:50]:
+        table.add_row(
+            str(len(row.citing_keys)),
+            row.doi or "",
+            (row.title or "")[:50],
+            row.suggested_action,
+        )
+    console.print(table)
+    console.print(
+        f"Cited {len(refs)} · missing {len(missing)} · "
+        f"needs_ocr {sum(1 for f in findings if f.finding == 'needs_ocr')}"
+    )
+    console.print(f"Pack: {folder}")
+    console.print(
+        f"Next: paperful ingest-dois --from-file {folder / 'dois.txt'} -C <collection> --dry-run"
+    )
+
+
+@app.command("ingest-dois")
+def ingest_dois_cmd(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Target collection for new parents."
+    ),
+    from_file: Path | None = typer.Option(
+        None, "--from-file", help="Text file: one DOI per line.", exists=True, dir_okay=False
+    ),
+    from_pack: Path | None = typer.Option(
+        None,
+        "--from-pack",
+        help="paperful.refs_gap.pack.v1 JSON (or its parent folder).",
+        exists=True,
+    ),
+    apply: bool = typer.Option(False, "--apply", help="Create parents. Default is dry-run."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Classify only (default)."),
+    tag: list[str] = typer.Option([], "--tag", help="Extra tags on created parents (repeatable)."),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Create metadata parents from a DOI list. Dry-run unless --apply. Then run fills PDFs."""
+    from .identity import LibraryFingerprint
+    from .ingest_dois import (
+        apply_creates,
+        classify_rows,
+        default_resolver,
+        dois_from_file,
+        dois_from_refs_pack,
+        ingest_tags,
+        write_summary,
+    )
+
+    if apply and dry_run:
+        console.print("[red]Pass either --dry-run or --apply, not both.[/]")
+        raise typer.Exit(1)
+    cfg = _cfg(config)
+    bound = _bind_run(cfg, profile=profile, run_config=run_config, collection=collection)
+    collection, _library, _yf, _yt, _types = _take_scope(bound)
+    if not collection:
+        _refuse_missing_scope()
+    if from_file is None and from_pack is None:
+        console.print("[red]Pass --from-file dois.txt or --from-pack state/refs-gaps/.../pack.json[/]")
+        raise typer.Exit(1)
+    if from_pack is not None:
+        pack_path = from_pack / "pack.json" if from_pack.is_dir() else from_pack
+        dois = dois_from_refs_pack(pack_path)
+        source_path = pack_path
+    else:
+        dois = dois_from_file(from_file)
+        source_path = from_file
+    if not dois:
+        console.print("No DOIs to ingest.")
+        raise typer.Exit(0)
+    backend = _connect(cfg)
+    all_items = list(backend.items_in_scope(None)) if hasattr(backend, "items_in_scope") else []
+    fingerprint = LibraryFingerprint.from_items(
+        all_items,
+        scope=cfg.ingest_dedupe_scope,
+        collection=collection[0],
+    )
+    works = {}
+    resolver = default_resolver(cfg.email)
+
+    def resolve(doi: str):
+        work = resolver(doi)
+        if work is not None:
+            works[doi] = work
+        return work
+
+    batch = classify_rows(dois, fingerprint, resolve=resolve)
+    tags = ingest_tags(
+        cli_tags=tag, default_tags=cfg.ingest_default_tags, from_file=source_path
+    )
+    if apply:
+        _require_manager(cfg)
+        if not backend.supports_write():
+            _exit_env("ingest-dois --apply needs library write support.", cfg)
+        apply_creates(backend, batch, collection[0], works=works, tags=tags)
+        _flush(backend)
+    folder = write_summary(cfg.state_dir, collection[0], batch)
+    table = Table(title="ingest-dois")
+    table.add_column("DOI")
+    table.add_column("Status")
+    table.add_column("Title")
+    table.add_column("Detail")
+    for row in batch.rows:
+        table.add_row(row.doi, row.status, (row.title or "")[:50], row.detail)
+    console.print(table)
+    counts = batch.counts()
+    console.print(
+        f"created {counts['created']} · exists {counts['exists']} · "
+        f"unresolved {counts['unresolved']} · held {counts['held']}"
+        + (" (dry-run)" if not apply else "")
+    )
+    console.print(f"Summary: {folder}")
+    if apply and counts["created"]:
+        console.print(f"Next: paperful run -C {collection[0]}")
 
 
 @app.command()
@@ -4496,6 +4814,12 @@ def ocr(
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n"),
+    max_minutes: float | None = typer.Option(
+        None,
+        "--max-minutes",
+        min=0,
+        help="Stop after this many minutes (finishes the PDF in hand).",
+    ),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
@@ -4545,15 +4869,18 @@ def ocr(
     if limit:
         items = items[:limit]
     started = time.time()
+    deadline = (
+        started + max_minutes * 60.0 if max_minutes is not None and max_minutes > 0 else None
+    )
     if not items:
         console.print("[yellow]No items with PDFs in scope.[/]")
         write_command_report(
             cfg,
             command="ocr",
             scope=scope,
-            summary={"ocr": 0, "skipped": 0, "failed": 0, "would": 0},
+            summary={"ocr": 0, "skipped": 0, "failed": 0, "would": 0, "not_reached": 0},
             items=[],
-            flags={"apply": apply, "attach": attach},
+            flags={"apply": apply, "attach": attach, "max_minutes": max_minutes},
             started=started,
         )
         raise typer.Exit(0)
@@ -4567,6 +4894,7 @@ def ocr(
                 apply=apply,
                 attach=attach,
                 track=_track(progress, "Running OCR" if apply else "Checking PDFs"),
+                deadline=deadline,
             )
     except OcrUnavailable as exc:
         console.print(f"[red]{exc}[/]")
@@ -4602,14 +4930,20 @@ def ocr(
             "skipped": batch.skipped,
             "failed": batch.failed,
             "would": batch.would,
+            "not_reached": batch.not_reached,
         },
         items=outcomes,
-        flags={"apply": apply, "attach": attach},
+        flags={"apply": apply, "attach": attach, "max_minutes": max_minutes},
         started=started,
     )
     if apply:
         console.print(
             f"OCR {batch.ocr}, skipped {batch.skipped}, failed {batch.failed}."
+            + (
+                f" Not checked: {batch.not_reached}."
+                if batch.not_reached
+                else ""
+            )
         )
     else:
         console.print(
@@ -5191,6 +5525,18 @@ def summarize(
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n"),
+    max_new: int | None = typer.Option(
+        None,
+        "--max-new",
+        min=1,
+        help="Stop after this many new model summaries (skips do not count).",
+    ),
+    max_minutes: float | None = typer.Option(
+        None,
+        "--max-minutes",
+        min=0,
+        help="Stop after this many minutes (finishes the paper in hand).",
+    ),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
@@ -5260,9 +5606,16 @@ def summarize(
     if limit:
         items = items[:limit]
     started = time.time()
+    deadline = (
+        started + max_minutes * 60.0 if max_minutes is not None and max_minutes > 0 else None
+    )
 
     def _finish(
-        outcomes: list[dict], summarized: int, failed: int, skipped: int
+        outcomes: list[dict],
+        summarized: int,
+        failed: int,
+        skipped: int,
+        not_reached: int = 0,
     ) -> None:
         write_command_report(
             cfg,
@@ -5272,11 +5625,17 @@ def summarize(
                 "summarized": summarized,
                 "failed": failed,
                 "skipped": skipped,
+                "not_reached": not_reached,
                 "dest": dest,
                 "order": queue_order,
             },
             items=outcomes,
-            flags={"to": dest, "order": queue_order},
+            flags={
+                "to": dest,
+                "order": queue_order,
+                "max_new": max_new,
+                "max_minutes": max_minutes,
+            },
             started=started,
         )
 
@@ -5307,6 +5666,8 @@ def summarize(
             force=force,
             on_row=_show,
             track=_track(progress, "Summarizing"),
+            max_new=max_new,
+            deadline=deadline,
         )
     outcomes = [
         {
@@ -5317,12 +5678,20 @@ def summarize(
         }
         for row in batch.rows
     ]
-    _finish(outcomes, batch.summarized, batch.failed, batch.skipped)
+    _finish(
+        outcomes,
+        batch.summarized,
+        batch.failed,
+        batch.skipped,
+        batch.not_reached,
+    )
     if batch.fatal:
         console.print(f"[red]{batch.fatal}[/]")
         raise typer.Exit(1)
     where = cfg.summaries_dir if wants_disk(dest) else "Zotero"
     console.print(f"Summarized {batch.summarized}/{len(items)} items under {where}")
+    if batch.not_reached:
+        console.print(f"Not reached: {batch.not_reached} (time or --max-new limit).")
     if batch.skipped:
         console.print(
             f"Skipped {batch.skipped} already summarized for this model "
@@ -6166,6 +6535,7 @@ def _snowball_request(
     backends: str | None = None,
     hybrid_seeds: int | None = None,
     refine: bool | None = None,
+    tags: list[str] | None = None,
 ) -> Any:
     from .snowball.command import SnowballRequest
 
@@ -6191,6 +6561,7 @@ def _snowball_request(
         hybrid_seeds=hybrid_seeds,
         refine=refine,
         link_versions=True,
+        tags=tuple(str(t).strip() for t in (tags or []) if str(t).strip()),
     )
 
 
@@ -6264,6 +6635,7 @@ def snowball_search(
     refine: bool | None = typer.Option(
         None, "--refine/--no-refine", help="Ask the LLM for query suggestions."
     ),
+    tag: list[str] = CreateTagOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Search OpenAlex and write a candidate queue. Creates items only with --gate auto."""
@@ -6289,6 +6661,7 @@ def snowball_search(
         note_provenance=note_provenance,
         backends=backends,
         refine=refine,
+        tags=tag,
     )
     from .snowball.command import run_search
     from .snowball.expand import compose_keyword_query
@@ -6332,6 +6705,7 @@ def snowball_hybrid(
     languages: str | None = typer.Option(None, "--languages"),
     min_seed_citations: int | None = typer.Option(None, "--min-seed-citations"),
     refine: bool | None = typer.Option(None, "--refine/--no-refine"),
+    tag: list[str] = CreateTagOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Keyword hits, then one hop from the top DOIs. Not a separate harvest command."""
@@ -6356,6 +6730,7 @@ def snowball_hybrid(
         min_seed_citations=min_seed_citations,
         hybrid_seeds=hybrid_seeds,
         refine=refine,
+        tags=tag,
     )
     from .snowball.command import run_hybrid
     from .snowball.expand import compose_keyword_query
@@ -6393,6 +6768,7 @@ def snowball_doi(
         "", "--collection", "-C", help="Target collection for --gate auto."
     ),
     fetch_pdfs: str | None = FetchPdfsOpt,
+    tag: list[str] = CreateTagOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Bibliography and/or citing works of each DOI. Creates items only with --gate auto."""
@@ -6413,6 +6789,7 @@ def snowball_doi(
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
         cites_query=(cites_query or "").strip(),
+        tags=tag,
     )
     from .snowball.command import run_doi
 
@@ -6444,6 +6821,7 @@ def snowball_orcid(
         "", "--collection", "-C", help="Target collection for --gate auto."
     ),
     fetch_pdfs: str | None = FetchPdfsOpt,
+    tag: list[str] = CreateTagOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """People's works (ORCID + OpenAlex), then references/citations those works expand to."""
@@ -6464,6 +6842,7 @@ def snowball_orcid(
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
         cites_query=(cites_query or "").strip(),
+        tags=tag,
     )
     from .snowball.command import run_orcid
 
@@ -6500,6 +6879,7 @@ def snowball_collection(
         help="Target collection for --gate auto (defaults to the seed collection).",
     ),
     fetch_pdfs: str | None = FetchPdfsOpt,
+    tag: list[str] = CreateTagOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Expand DOIs already in a collection. Creates items only with --gate auto."""
@@ -6521,6 +6901,7 @@ def snowball_collection(
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
         cites_query=(cites_query or "").strip(),
+        tags=tag,
     )
     from .snowball.command import run_collection
 
@@ -6540,6 +6921,7 @@ def snowball_resume(
     gate: str | None = typer.Option(
         None, "--gate", help="dry-run or auto. Default: config."
     ),
+    tag: list[str] = CreateTagOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Continue OpenAlex work saved when the daily budget was spent. Same API key."""
@@ -6553,6 +6935,7 @@ def snowball_resume(
         max_candidates=None,
         year_from=None,
         year_to=None,
+        tags=tag,
     )
     from .snowball.command import run_resume
 
@@ -6564,6 +6947,7 @@ def snowball_apply(
     run_id: str = typer.Argument(..., help="Run id under state/snowball/<run-id>/."),
     collection: str = typer.Option("", "--collection", "-C", help="Target collection."),
     fetch_pdfs: str | None = FetchPdfsOpt,
+    tag: list[str] = CreateTagOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Create keep=true rows from a prior queue (approve-batch or edited dry-run)."""
@@ -6577,6 +6961,7 @@ def snowball_apply(
         max_candidates=None,
         year_from=None,
         year_to=None,
+        tags=tag,
     )
     from .snowball.command import run_apply
 
@@ -6593,6 +6978,7 @@ def snowball_run(
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
     cites_query: str | None = CitesQueryOpt,
+    tag: list[str] = CreateTagOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
     """Run a saved snowball profile (keyword, DOI, ORCID, or collection)."""
@@ -6610,6 +6996,10 @@ def snowball_run(
     try:
         raw = load_profile(cfg, profile)
         request = request_from_profile(raw, cfg)
+        if tag:
+            from .identity import merge_tags
+
+            request.tags = tuple(merge_tags(request.tags, tag))
         if direction.strip():
             request.direction = direction.strip()
         if keyword_limit is not None:

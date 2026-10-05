@@ -144,7 +144,10 @@ def _pypdf_text(path: Path, max_pages: int | None) -> str:
     except Exception:
         return ""
     chunks: list[str] = []
-    pages = reader.pages if max_pages is None else reader.pages[:max_pages]
+    try:
+        pages = reader.pages if max_pages is None else reader.pages[:max_pages]
+    except Exception:
+        return ""
     for page in pages:
         try:
             chunks.append(page.extract_text() or "")

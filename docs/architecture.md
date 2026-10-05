@@ -122,6 +122,9 @@ flowchart LR
 | `state/cites/<hash>.json` | OpenAlex reference lists for one DOI set, inverted so snowball can say how many items in the target collection cite a new work. Reused until that DOI set changes |
 | `state/version-packs/` | Preprint/published review packs (`paperful.version_pack.v1`) |
 | `state/versions-applied.jsonl` | One line per work updated by `versions --apply` |
+| `state/refs-gaps/<stamp>/` | `refs gap` review pack (`paperful.refs_gap.pack.v1`, `pack.md`, `dois.txt`). Always dry-run |
+| `state/ingest/<stamp>/` | `ingest-dois` summary (`paperful.ingest_dois.v1`). Dry-run unless `--apply` |
+| `state/inbox/proposals/` | Gated inbox create/attach proposals (`paperful.inbox.proposal.v1`) |
 | `state/pdf-cache/` | Throwaway copies of manager PDFs, only when `[mirror].pdfs = "none"`. Otherwise an exported PDF goes into its item folder, and `sync` moves older cache files there |
 | `state/summaries/<key>.html` | `summarize` output when dest includes disk; the Zotero child note is the other copy |
 | `state/reports/<slug>.html` | `synthesize` literature review; sibling `<slug>.json` records source hashes |
@@ -142,7 +145,7 @@ Commands hold a `MirrorFirstBackend`: the same protocol, with reads served
 from `out/` and writes passed to the manager adapter. The adapter itself is
 below.
 
-[`paperful/library.py`](../paperful/library.py) defines `LibraryBackend`: report what changed since a library version (`changes`, Zotero only), list items, fetch one item by key (`get_item`), export a PDF **onto disk**, apply a field patch, merge a duplicate parent (children and better fields, then trash), attach a file, create-or-update a **tagged child note** (`create_or_update_note`, used by `summarize`), create-or-update a **standalone collection note** (`create_or_update_collection_note`, used by `synthesize`), and `flush_writes()` (EndNote stages `state/endnote-import/<stamp>/`; others no-op). The tag makes re-runs update instead of duplicate. Identifier and dedupe logic (`resolve`, `lint`, `pdfid`, `metadata`, `dedupe`) must not import a manager except through this protocol. Notes are skipped by `items_in_scope`, so a report note never enters `run` / `lint` / `gaps`. Canonical item types are Zotero ids; [`paperful/interop/`](../paperful/interop/) maps RIS / BibTeX / EndNote XML at the edge. `paperful import` / `export` use that layer. **Zotero is well tested.** [Mendeley](mendeley.md) and [EndNote](endnote.md) are seeking testers.
+[`paperful/library.py`](../paperful/library.py) defines `LibraryBackend`: report what changed since a library version (`changes`, Zotero only), list items, fetch one item by key (`get_item`), export a PDF **onto disk**, apply a field patch, merge a duplicate parent (children and better fields, then trash), attach a file, create-or-update a **tagged child note** (`create_or_update_note`, used by `summarize`), create-or-update a **standalone collection note** (`create_or_update_collection_note`, used by `synthesize`), and `flush_writes()` (EndNote stages `state/endnote-import/<stamp>/`; others no-op). The tag makes re-runs update instead of duplicate. Identifier and dedupe logic (`resolve`, `lint`, `pdfid`, `metadata`, `dedupe`, `identity`) must not import a manager except through this protocol. [`paperful/identity.py`](../paperful/identity.py) is the shared DOI then title+year fingerprint used by snowball, `refs gap`, `ingest-dois`, and inbox title-match. [`paperful/refs_gap.py`](../paperful/refs_gap.py) and [`paperful/ingest_dois.py`](../paperful/ingest_dois.py) create review packs / parents through the adapter; they do not fetch PDFs. [`paperful/inbox_match.py`](../paperful/inbox_match.py) is the drop-folder match ladder. Notes are skipped by `items_in_scope`, so a report note never enters `run` / `lint` / `gaps`. Canonical item types are Zotero ids; [`paperful/interop/`](../paperful/interop/) maps RIS / BibTeX / EndNote XML at the edge. `paperful import` / `export` use that layer. **Zotero is well tested.** [Mendeley](mendeley.md) and [EndNote](endnote.md) are seeking testers.
 
 ## LLM layer (optional, local-first)
 
@@ -234,7 +237,7 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
 - `paperful run --dry-run` — no downloads. Per item: **Would-hit** is the
   routed source list in order (full `sources` when `--try-all`).
 - `paperful lint` / `paperful fix-metadata` — identifier hygiene; apply is explicit.
-- `paperful dedupe` / `paperful gaps` — duplicate packs and PDF/DOI counts.
+- `paperful dedupe` / `paperful gaps` / `paperful refs gap` — duplicate packs, PDF/DOI counts, and cited-in-PDF missing-from-library packs. `refs gap` is always dry-run (`state/refs-gaps/`). `ingest-dois` creates parents from that pack or a DOI file only with `--apply`.
   `dedupe` writes `state/dedupe-packs/` and merges only with `--apply`
   (the spare-copy line is written then; title+year also needs `--apply-medium`).
   `versions` writes `state/version-packs/` and updates a preprint only with

@@ -48,7 +48,8 @@ treat them as proven. Why this shape: [Why Paperful](docs/why.md). Not sure
 this is the right tool? [How Paperful compares](docs/comparison.md).
 
 **Library.** Collections, years, and item types are the scope. `import` and
-`export` speak RIS, BibTeX, and EndNote XML.
+`export` speak RIS, BibTeX, and EndNote XML. `ingest-dois` creates metadata
+parents from a DOI list (dry-run unless `--apply`). See [Commands](docs/commands.md).
 
 **Snowball grows. Run fills.** `snowball` proposes new works and creates
 metadata parents only when the gate says so. `run` fetches PDFs for items
@@ -82,10 +83,13 @@ DOI-less item. The PDF keeps a provenance stamp (`paperful oa:unpaywall`,
 ("Free copy from Unpaywall."), as a note unless `[remarks].surface` is `tag`
 or `off`. One-page stubs and DOI mismatches can hold the file on disk until you
 **attach** them (`attach --allow-short-pdf` / `--allow-pdf-doi-mismatch`) — see
-[research-ops](docs/research-ops.md#wrong-work-pdfs). Walkthrough:
+[research-ops](docs/research-ops.md#wrong-work-pdfs). Drop-folder PDFs:
+`inbox watch` / `drain` ([inbox](docs/commands.md)). Walkthrough:
 [How it works](docs/how-it-works.md).
 
-**Completeness.** `gaps` counts what is missing. `lint` and `fix-metadata`
+**Completeness.** `gaps` counts what is missing. `refs gap` lists works
+**cited inside** collection PDFs that are not in the library (always
+dry-run; then `ingest-dois`). `lint` and `fix-metadata`
 propose patches on disk; `--apply` writes them. `dedupe` reviews duplicates.
 `--apply` writes "Same paper as Smith 2019, which already has the PDF." on
 the spare copy, then merges that parent's PDF, notes, and better fields onto

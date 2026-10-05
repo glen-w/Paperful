@@ -64,7 +64,8 @@ list. Details: [Source routing](sources.md).
 
 Hygiene is a separate loop. Nothing is merged or rewritten until you say so.
 
-**Before a fetch**, `gaps` counts missing PDFs. `run --dry-run` prints a
+**Before a fetch**, `gaps` counts missing PDFs. `refs gap` lists works cited
+inside those PDFs that are not in the library (always dry-run). `run --dry-run` prints a
 **Would-hit** column (sources in order) and does not write the library.
 
 **Before a messy ingest**, `dedupe` writes a review pack on disk. With

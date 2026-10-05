@@ -180,6 +180,18 @@ mirror_failures_before_skip = 3
 # poll_seconds = 2.0
 # settle_seconds = 1.5             # size must stay stable before ingest
 # idle_seconds = 0                 # 0 = wait forever (Ctrl+C)
+# match = "doi_only"               # doi_only | doi+title | doi+title+ocr | full
+# quarantine_after_s = 0           # hold unmatched PDFs before unmatched/
+# ocr_for_match = false
+# llm_match = "off"                # off | when_thin | always
+# llm_match_min_confidence = 0.75
+# llm_auto_attach_min = 0.92
+# create = "attach_only"           # attach_only | create_gated | create_auto
+# title_resolve = false            # Crossref/OpenAlex title search when local match is thin
+# manager_metadata_s = 0           # wait after attach for a manager recognizer
+# [ingest]
+# default_tags = []
+# dedupe_scope = "library"
 
 # Named run configs (not grey-lit playbooks). Same keys work in profiles/<name>.toml
 # beside this file. Select with: paperful all --profile bbnj-journal
@@ -253,6 +265,7 @@ gone = "mark"
 # fetch_pdfs = "off"     # off | fast | full. true means fast
 # dedupe_scope = "library"   # library | collection | none
 # tag_prefix = "paperful-snowball"
+# default_tags = []
 # types = ["article", "review"]  # empty = journal-article-shaped
 # oa_only = false
 # venue_include = []

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -228,6 +229,7 @@ class SummaryBatch:
     summarized: int
     failed: int
     skipped: int = 0
+    not_reached: int = 0
 
     @property
     def fatal(self) -> str | None:
@@ -418,6 +420,8 @@ def summarize_items(
     force: bool = False,
     on_row: Callable[[SummaryRow], None] | None = None,
     track: Track | None = None,
+    max_new: int | None = None,
+    deadline: float | None = None,
 ) -> SummaryBatch:
     """Summarize each item.
 
@@ -430,7 +434,13 @@ def summarize_items(
     ok = 0
     failed = 0
     skipped = 0
-    for it in track(items) if track else items:
+    fresh = 0
+    not_reached = 0
+    queue = track(items) if track else items
+    for idx, it in enumerate(queue):
+        if deadline is not None and time.time() >= deadline:
+            not_reached = len(items) - idx
+            break
         try:
             if not force:
                 reused = _reuse_existing_summary(cfg, it, backend, dest=dest)
@@ -444,6 +454,7 @@ def summarize_items(
                         on_row(reused)
                     continue
             html = render_summary(cfg, it, manifest, backend, force=force)
+            fresh += 1
             disk_path = ""
             note_key = ""
             if wants_disk(dest):
@@ -484,13 +495,24 @@ def summarize_items(
             if on_row is not None:
                 on_row(row)
             return SummaryBatch(
-                rows=rows, summarized=ok, failed=failed, skipped=skipped
+                rows=rows,
+                summarized=ok,
+                failed=failed,
+                skipped=skipped,
+                not_reached=not_reached,
             )
         rows.append(row)
         if on_row is not None:
             on_row(row)
+        if max_new is not None and fresh >= max_new:
+            not_reached = len(items) - idx - 1
+            break
     return SummaryBatch(
-        rows=rows, summarized=ok, failed=failed, skipped=skipped
+        rows=rows,
+        summarized=ok,
+        failed=failed,
+        skipped=skipped,
+        not_reached=not_reached,
     )
 
 

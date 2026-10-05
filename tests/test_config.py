@@ -166,6 +166,14 @@ def test_mirror_pdfs_mode(tmp_path):
         load_config(bad)
 
 
+def test_snowball_default_tags(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text(
+        'email = "me@example.org"\n\n[snowball]\ndefault_tags = ["bbnj", "grey"]\n'
+    )
+    assert load_config(p).snowball_default_tags == ("bbnj", "grey")
+
+
 def test_remarks_surface(tmp_path):
     p = tmp_path / "config.toml"
     p.write_text('email = "me@example.org"\n\n[remarks]\nsurface = "tag"\n')

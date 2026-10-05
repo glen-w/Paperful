@@ -53,7 +53,7 @@ packages = ["paperful"]
 
 [tool.hatch.build.targets.sdist]
 # Personal config (email), runtime state/output and editor files never ship.
-exclude = ["config.toml", "out/", "state/", "packs/", ".cursor/", ".coverage", "*.log"]
+exclude = ["config.toml", "out/", "state/", "packs/", ".cursor/", ".claude/", ".coverage", "*.log"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

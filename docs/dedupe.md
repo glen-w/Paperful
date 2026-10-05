@@ -94,5 +94,5 @@ identifiers.
 
 ## Not this command
 
-Adding new items from a Crossref year query (`ingest-dois`) is later. So are
-summary notes, moving items between collections, and Sci-Hub.
+Adding new items from a DOI list is `paperful ingest-dois` (dry-run unless
+`--apply`). `dedupe` does not create parents.

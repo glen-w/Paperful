@@ -263,9 +263,12 @@ def collect_patches(
     cache = IdentifierCache()
     patches: list[Patch] = []
     for item in track(items) if track else items:
-        findings = lint_item(
-            client, cfg, item, backend=backend, manifest=manifest, cache=cache
-        )
+        try:
+            findings = lint_item(
+                client, cfg, item, backend=backend, manifest=manifest, cache=cache
+            )
+        except Exception:
+            continue
         patch = propose_patch(
             client,
             cfg,

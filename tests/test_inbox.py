@@ -79,12 +79,12 @@ def test_match_pdf_doi_then_fifo(tmp_path: Path, monkeypatch):
     )
     by_key = {"FIFO1": fifo_item}
 
-    monkeypatch.setattr("paperful.inbox.doi_from_pdf", lambda _p: "10.1000/match")
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: "10.1000/match")
     hit = match_pdf(pdf, doi_index=index, fifo_queue=queue, items_by_key=by_key)
     assert hit.item is item and hit.how == "doi"
     assert len(queue) == 1
 
-    monkeypatch.setattr("paperful.inbox.doi_from_pdf", lambda _p: None)
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: None)
     hit = match_pdf(pdf, doi_index={}, fifo_queue=queue, items_by_key=by_key)
     assert hit.item is fifo_item and hit.how == "fifo"
     assert len(queue) == 0
@@ -133,7 +133,7 @@ def test_seen_ledger_skips_repeat(cfg, tmp_path: Path, monkeypatch):
 
             return R()
 
-    monkeypatch.setattr("paperful.inbox.doi_from_pdf", lambda _p: "10.1000/a")
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: "10.1000/a")
     stats = process_candidates(
         cfg,
         Backend(),
@@ -152,7 +152,7 @@ def test_seen_ledger_skips_repeat(cfg, tmp_path: Path, monkeypatch):
     pdf2 = root / "b.pdf"
     pdf2.write_bytes(b"%PDF-1.4 " + b"x" * 2000)
     item2 = make_item(key="K2", doi="10.1000/b", has_pdf=False)
-    monkeypatch.setattr("paperful.inbox.doi_from_pdf", lambda _p: "10.1000/b")
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: "10.1000/b")
     stats2 = process_candidates(
         cfg,
         Backend(),
@@ -193,7 +193,7 @@ def test_process_unmatched_moves_file(cfg, tmp_path: Path, monkeypatch):
     ensure_inbox_dirs(cfg)
     pdf = root / "nope.pdf"
     pdf.write_bytes(b"%PDF-1.4 " + b"y" * 200)
-    monkeypatch.setattr("paperful.inbox.doi_from_pdf", lambda _p: "10.1000/missing")
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: "10.1000/missing")
 
     class Backend:
         def supports_write(self):
@@ -225,7 +225,7 @@ def test_process_attach_by_doi(cfg, tmp_path: Path, monkeypatch):
     pdf = root / "paper.pdf"
     pdf.write_bytes(b"%PDF-1.4 " + b"z" * 2000)
     item = make_item(key="ATT1", doi="10.1000/ok", has_pdf=False, collection_paths=["Col"])
-    monkeypatch.setattr("paperful.inbox.doi_from_pdf", lambda _p: "10.1000/ok")
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: "10.1000/ok")
     attached: list[str] = []
 
     class Backend:
@@ -268,7 +268,7 @@ def test_process_fifo_when_no_doi(cfg, tmp_path: Path, monkeypatch):
     pdf = root / "hand.pdf"
     pdf.write_bytes(b"%PDF-1.4 " + b"f" * 2000)
     item = make_item(key="FIFO2", doi="10.1000/fifo2", has_pdf=False, collection_paths=["Col"])
-    monkeypatch.setattr("paperful.inbox.doi_from_pdf", lambda _p: None)
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: None)
     attached: list[str] = []
 
     class Backend:
@@ -341,3 +341,301 @@ def test_idle_stops_watch_loop(cfg, tmp_path: Path):
     )
     assert stats.quit_reason == "idle"
     assert stats.attached == 0
+
+
+def test_title_fingerprint_attach(cfg, tmp_path: Path, monkeypatch):
+    root = tmp_path / "inbox"
+    cfg.inbox_dir = str(root)
+    cfg.state_dir = tmp_path / "state"
+    cfg.out_dir = tmp_path / "out"
+    cfg.state_dir.mkdir()
+    cfg.min_pdf_bytes = 1000
+    cfg.inbox_match = "doi+title"
+    ensure_inbox_dirs(cfg)
+    pdf = root / "Marine governance thresholds 2021.pdf"
+    pdf.write_bytes(b"%PDF-1.4 " + b"z" * 2000)
+    item = make_item(
+        key="T1",
+        doi=None,
+        title="Marine governance thresholds",
+        year=2021,
+        has_pdf=False,
+        collection_paths=["Col"],
+    )
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: None)
+    monkeypatch.setattr(
+        "paperful.inbox_match.text_from_pdf",
+        lambda *_a, **_k: "Marine governance thresholds\n2021 ocean policy",
+    )
+    monkeypatch.setattr("paperful.pdfid._pypdf_title", lambda _p: "")
+    attached: list[str] = []
+
+    class Backend:
+        def supports_write(self):
+            return True
+
+        def attach(self, key, path, title=None, note=None):
+            attached.append(key)
+
+            class R:
+                ok = True
+                reason = "ok"
+
+            return R()
+
+    stats = process_candidates(
+        cfg,
+        Backend(),
+        Manifest(cfg.manifest_path),
+        [item],
+        once=True,
+        settle_seconds=0.0,
+    )
+    assert stats.attached == 1
+    assert attached == ["T1"]
+    assert stats.events[0].how == "title_fingerprint"
+
+
+def test_hold_before_unmatched(cfg, tmp_path: Path, monkeypatch):
+    root = tmp_path / "inbox"
+    cfg.inbox_dir = str(root)
+    cfg.state_dir = tmp_path / "state"
+    cfg.out_dir = tmp_path / "out"
+    cfg.state_dir.mkdir()
+    cfg.min_pdf_bytes = 100
+    cfg.inbox_quarantine_after_s = 60.0
+    ensure_inbox_dirs(cfg)
+    pdf = root / "later.pdf"
+    pdf.write_bytes(b"%PDF-1.4 " + b"y" * 200)
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: None)
+
+    class Backend:
+        def supports_write(self):
+            return True
+
+        def attach(self, *a, **k):
+            raise AssertionError("should not attach")
+
+    stats = process_candidates(
+        cfg,
+        Backend(),
+        Manifest(cfg.manifest_path),
+        [make_item(key="Z", doi="10.1000/other", has_pdf=False)],
+        once=True,
+        settle_seconds=0.0,
+    )
+    assert stats.held == 1
+    assert pdf.is_file()
+    assert not (root / "unmatched" / "later.pdf").exists()
+
+
+def test_gated_proposal_apply_reject(cfg, tmp_path: Path, monkeypatch):
+    from paperful.inbox import apply_proposal, reject_proposal
+    from paperful.inbox_match import list_proposals
+    from paperful.resolve import WorkMeta
+
+    root = tmp_path / "inbox"
+    cfg.inbox_dir = str(root)
+    cfg.state_dir = tmp_path / "state"
+    cfg.out_dir = tmp_path / "out"
+    cfg.state_dir.mkdir()
+    cfg.min_pdf_bytes = 1000
+    cfg.inbox_create = "create_gated"
+    ensure_inbox_dirs(cfg)
+    pdf = root / "drop.pdf"
+    pdf.write_bytes(b"%PDF-1.4 " + b"z" * 2000)
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: "10.1000/new")
+
+    class Backend:
+        def supports_write(self):
+            return True
+
+        def attach(self, *a, **k):
+            class R:
+                ok = True
+                reason = "ok"
+
+            return R()
+
+        def ensure_collection_path(self, path):
+            return "CK"
+
+        def create_parent(self, payload):
+            return "NEWP"
+
+        def items_in_scope(self, keys):
+            return []
+
+    stats = process_candidates(
+        cfg,
+        Backend(),
+        Manifest(cfg.manifest_path),
+        [],
+        once=True,
+        settle_seconds=0.0,
+        collection="BBNJ",
+    )
+    assert stats.created_gated == 1
+    rows = list_proposals(cfg)
+    assert len(rows) == 1
+    pid = rows[0]["id"]
+    reject_proposal(cfg, pid)
+    assert list_proposals(cfg) == []
+    # restore pending for apply
+    rows[0]["status"] = "pending"
+    from paperful.inbox_match import save_proposal
+
+    save_proposal({**rows[0], "_path": rows[0]["_path"]})
+    monkeypatch.setattr(
+        "paperful.inbox._default_resolve",
+        lambda _cfg: lambda doi: WorkMeta(
+            doi=doi,
+            title="A sufficiently long new work title",
+            year=2022,
+            source="crossref",
+            work_type="journal-article",
+        ),
+    )
+    # PDF was moved to review/
+    review = list((root / "review").glob("*.pdf"))
+    assert review
+    data = apply_proposal(
+        cfg,
+        Backend(),
+        Manifest(cfg.manifest_path),
+        pid,
+    )
+    assert data["status"] == "applied"
+    assert data["item_key"] == "NEWP"
+
+
+def test_create_auto_unique_doi(cfg, tmp_path: Path, monkeypatch):
+    from paperful.resolve import WorkMeta
+
+    root = tmp_path / "inbox"
+    cfg.inbox_dir = str(root)
+    cfg.state_dir = tmp_path / "state"
+    cfg.out_dir = tmp_path / "out"
+    cfg.state_dir.mkdir()
+    cfg.min_pdf_bytes = 1000
+    cfg.inbox_create = "create_auto"
+    ensure_inbox_dirs(cfg)
+    pdf = root / "auto.pdf"
+    pdf.write_bytes(b"%PDF-1.4 " + b"z" * 2000)
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: "10.1000/auto")
+    created: list[str] = []
+    attached: list[str] = []
+    tags: list[str] = []
+
+    class Backend:
+        def supports_write(self):
+            return True
+
+        def items_in_scope(self, keys):
+            return []
+
+        def ensure_collection_path(self, path):
+            return "CK"
+
+        def create_parent(self, payload):
+            created.append(payload["DOI"])
+            tags.extend(t["tag"] for t in payload.get("tags") or [])
+            return "AUTO1"
+
+        def attach(self, key, path, title=None, note=None):
+            attached.append(key)
+
+            class R:
+                ok = True
+                reason = "ok"
+
+            return R()
+
+    work = WorkMeta(
+        doi="10.1000/auto",
+        title="A sufficiently long auto created title",
+        year=2021,
+        source="crossref",
+        work_type="journal-article",
+    )
+    stats = process_candidates(
+        cfg,
+        Backend(),
+        Manifest(cfg.manifest_path),
+        [],
+        once=True,
+        settle_seconds=0.0,
+        collection="BBNJ",
+        resolve_work=lambda doi: work,
+        extra_tags=["bbnj"],
+    )
+    assert stats.created_auto == 1
+    assert created == ["10.1000/auto"]
+    assert attached == ["AUTO1"]
+    assert "inbox-created" in tags
+    assert "inbox:inbox" in tags
+    assert "bbnj" in tags
+
+
+def test_create_auto_title_only_fail_closed(cfg, tmp_path: Path, monkeypatch):
+    root = tmp_path / "inbox"
+    cfg.inbox_dir = str(root)
+    cfg.state_dir = tmp_path / "state"
+    cfg.out_dir = tmp_path / "out"
+    cfg.state_dir.mkdir()
+    cfg.min_pdf_bytes = 100
+    cfg.inbox_create = "create_auto"
+    ensure_inbox_dirs(cfg)
+    pdf = root / "nodoi.pdf"
+    pdf.write_bytes(b"%PDF-1.4 " + b"y" * 200)
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: None)
+
+    class Backend:
+        def supports_write(self):
+            return True
+
+        def create_parent(self, payload):
+            raise AssertionError("no create")
+
+        def attach(self, *a, **k):
+            raise AssertionError("no attach")
+
+    stats = process_candidates(
+        cfg,
+        Backend(),
+        Manifest(cfg.manifest_path),
+        [],
+        once=True,
+        settle_seconds=0.0,
+        collection="BBNJ",
+    )
+    assert stats.unmatched == 1
+    assert (root / "unmatched" / "nodoi.pdf").is_file()
+
+
+def test_llm_when_thin_logs_without_auto_attach(cfg, tmp_path: Path, monkeypatch):
+    from paperful.inbox_match import match_ladder
+    from tests.test_llm_verbs import StubLLM
+
+    cfg.llm_enabled = True
+    cfg.inbox_match = "full"
+    cfg.inbox_llm_match = "when_thin"
+    cfg.inbox_llm_match_min_confidence = 0.5
+    cfg.inbox_llm_auto_attach_min = 0.95
+    item = make_item(key="L1", doi="10.1000/l", title="LLM candidate paper title", year=2020, has_pdf=False)
+    stub = StubLLM(data={"match": True, "confidence": 0.6, "item_key": "L1", "reason": "maybe"})
+    monkeypatch.setattr("paperful.llm.get_client", lambda _cfg: stub)
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: None)
+    monkeypatch.setattr(
+        "paperful.inbox_match.text_from_pdf",
+        lambda *_a, **_k: "LLM candidate paper title excerpt about oceans " * 4,
+    )
+    pdf = tmp_path / "x.pdf"
+    pdf.write_bytes(b"%PDF")
+    from paperful.inbox import _llm_match
+
+    hit = _llm_match(cfg, pdf, "LLM candidate paper title excerpt about oceans " * 4, [item])
+    assert hit is not None
+    assert hit.how == "llm"
+    assert hit.confidence == 0.6
+    assert hit.confidence < cfg.inbox_llm_auto_attach_min

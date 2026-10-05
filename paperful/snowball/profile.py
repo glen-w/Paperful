@@ -81,6 +81,9 @@ def request_from_profile(raw: dict[str, Any], cfg: Config) -> SnowballRequest:
         cites_query=str(raw.get("cites_query") or "").strip(),
         dedupe_scope=str(raw["dedupe_scope"]) if raw.get("dedupe_scope") else None,
         tag_prefix=str(raw["tag_prefix"]) if raw.get("tag_prefix") else None,
+        tags=_strs(raw.get("default_tags") or raw.get("tags"))
+        if ("default_tags" in raw or "tags" in raw)
+        else (),
         types=_strs(raw.get("types")) if "types" in raw else None,
         oa_only=bool(raw["oa_only"]) if "oa_only" in raw else None,
         venue_include=_strs(raw.get("venue_include")) if "venue_include" in raw else None,

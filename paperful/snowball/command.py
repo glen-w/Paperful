@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import re
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -16,6 +15,7 @@ from ..config import Config, parse_cap, parse_fetch_pdfs, parse_per_hop_rank
 from ..dedupe import normalize_dedupe_title
 from ..catalogue import open_library
 from ..library import LibraryError
+from ..identity import library_lookup, merge_tags
 from ..resolve import normalize_doi
 from .candidate import Candidate
 from .crawl import NoKeywordSeeds, doi_candidates, hybrid_candidates, orcid_candidates, search_candidates
@@ -51,7 +51,6 @@ def get_backend(cfg: Config) -> Any:
     return open_library(cfg)
 
 
-_PREPRINT_DOI_LINE = re.compile(r"(?im)^Preprint DOI:\s*(\S+)")
 Decider = Callable[[Candidate], bool]
 KNOWN_BACKENDS = ("openalex", "crossref", "semanticscholar", "orcid", "europepmc", "pdf")
 
@@ -102,6 +101,7 @@ class SnowballRequest:
     keyword_min_score: float | None = None
     dedupe_scope: str | None = None
     tag_prefix: str | None = None
+    tags: tuple[str, ...] = ()
     types: tuple[str, ...] | None = None
     oa_only: bool | None = None
     venue_include: tuple[str, ...] | None = None
@@ -565,6 +565,7 @@ def run_resume(
                 settled,
                 request.collection,
                 tag_prefix=request.tag_prefix or cfg.snowball_tag_prefix,
+                extra_tags=_extra_tags(cfg, request),
                 note_provenance=cfg.snowball_note_provenance
                 if request.note_provenance is None
                 else request.note_provenance,
@@ -618,6 +619,7 @@ def _resume_saved_queue(
             creatable,
             request.collection,
             tag_prefix=request.tag_prefix or cfg.snowball_tag_prefix,
+            extra_tags=_extra_tags(cfg, request),
             note_provenance=cfg.snowball_note_provenance
             if request.note_provenance is None
             else request.note_provenance,
@@ -681,6 +683,7 @@ def run_apply(
         creatable,
         collection,
         tag_prefix=request.tag_prefix or cfg.snowball_tag_prefix,
+        extra_tags=_extra_tags(cfg, request),
         note_provenance=note,
         console=console,
         remarks_surface=cfg.remarks_surface,
@@ -722,6 +725,10 @@ def _print_fetch_result(
     )
     if advice:
         console.print(f"[yellow]{advice}[/]")
+
+
+def _extra_tags(cfg: Config, request: SnowballRequest) -> list[str]:
+    return merge_tags(cfg.snowball_default_tags, request.tags)
 
 
 def _pdf_mode(request: SnowballRequest) -> str:
@@ -1054,6 +1061,7 @@ def _execute(
             creatable,
             request.collection,
             tag_prefix=tag_prefix,
+            extra_tags=_extra_tags(cfg, request),
             note_provenance=note_provenance,
             console=console,
             tally=tally,
@@ -1089,59 +1097,7 @@ def _execute(
 
 
 def _library_lookup(backend: Any, *, scope: str, collection: str) -> Lookup:
-    items = None
-    if hasattr(backend, "items_in_scope"):
-        try:
-            items = list(backend.items_in_scope(None))
-        except Exception:
-            items = None
-    if items is not None:
-        if scope == "collection":
-            want = collection.strip()
-            items = [item for item in items if want and want in (item.collection_paths or [])]
-        by_doi: dict[str, str] = {}
-        by_title_year: dict[tuple[str, int], str] = {}
-        for item in items:
-            doi = normalize_doi(item.doi) if getattr(item, "doi", None) else None
-            if doi:
-                by_doi.setdefault(doi, item.key)
-            arxiv_id = getattr(item, "arxiv_id", None)
-            if arxiv_id:
-                arxiv_doi = normalize_doi(f"10.48550/arxiv.{arxiv_id}")
-                if arxiv_doi:
-                    by_doi.setdefault(arxiv_doi, item.key)
-            extra = getattr(item, "extra", "") or ""
-            preprint_line = _PREPRINT_DOI_LINE.search(extra)
-            if preprint_line:
-                preprint = normalize_doi(preprint_line.group(1))
-                if preprint:
-                    by_doi.setdefault(preprint, item.key)
-            title = normalize_dedupe_title(getattr(item, "title", None))
-            year = publication_year(getattr(item, "year", None))
-            if title and year is not None:
-                by_title_year.setdefault((title, year), item.key)
-
-        def indexed(doi: str | None, title: str | None, year: int | None = None) -> Any:
-            found = normalize_doi(doi) if doi else None
-            if found and found in by_doi:
-                return by_doi[found], "doi"
-            key = normalize_dedupe_title(title)
-            parsed = publication_year(year)
-            if key and parsed is not None and (key, parsed) in by_title_year:
-                return by_title_year[(key, parsed)], "title_year"
-            return None
-
-        return indexed
-
-    zl = getattr(backend, "zl", None)
-
-    def lookup(doi: str | None, title: str | None, year: int | None = None) -> str | None:
-        del year
-        if zl is None:
-            return None
-        return zl.find_top_item_key(doi=doi, title=title)
-
-    return lookup
+    return library_lookup(backend, scope=scope, collection=collection)
 
 
 def _mark_exists(

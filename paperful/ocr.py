@@ -6,9 +6,11 @@ This module rewrites that file. It does not edit the manager's storage.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import subprocess
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -48,6 +50,7 @@ class OcrBatch:
     skipped: int = 0
     failed: int = 0
     would: int = 0
+    not_reached: int = 0
 
 
 def ocrmypdf_available() -> bool:
@@ -207,6 +210,7 @@ def ocr_items(
     attach: bool = False,
     track: Track | None = None,
     classify: Callable[[Path], str | None] | None = None,
+    deadline: float | None = None,
 ) -> OcrBatch:
     """Classify each PDF. With ``apply``, rewrite image files under ``out/``.
 
@@ -220,7 +224,11 @@ def ocr_items(
             "or apt install ocrmypdf tesseract-ocr-eng."
         )
     batch = OcrBatch()
-    for item in track(items) if track else items:
+    queue = track(items) if track else items
+    for idx, item in enumerate(queue):
+        if deadline is not None and time.time() >= deadline:
+            batch.not_reached = len(items) - idx
+            break
         durable, probe = _probe_pdf(cfg, item, manifest, backend)
         sample = probe or durable
         if sample is None:
@@ -259,3 +267,31 @@ def ocr_items(
         else:
             batch.failed += 1
     return batch
+
+
+def ocr_text_for_match(cfg: Config, src: Path) -> str:
+    """Transient OCR for inbox matching. Does not rewrite ``src``."""
+    if not src.is_file() or not ocrmypdf_available():
+        return ""
+    cfg.pdf_cache_dir.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.md5(str(src.resolve()).encode()).hexdigest()[:16]
+    dest = cfg.pdf_cache_dir / f"inbox-ocr-{digest}.pdf"
+    if dest.is_file() and dest.stat().st_size > 0:
+        return text_from_pdf(dest, max_pages=2)
+    tmp = dest.with_name(dest.stem + ".tmp.pdf")
+    try:
+        code, _err = _run_ocrmypdf(
+            src,
+            tmp,
+            langs=tesseract_langs(cfg.ocr_languages),
+            thin=True,
+            timeout_s=min(cfg.ocr_timeout_s or _DEFAULT_TIMEOUT_S, 120.0),
+        )
+        if code != 0 or not tmp.is_file() or tmp.stat().st_size == 0:
+            return ""
+        os.replace(tmp, dest)
+    except OSError:
+        return ""
+    finally:
+        tmp.unlink(missing_ok=True)
+    return text_from_pdf(dest, max_pages=2)

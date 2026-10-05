@@ -7,6 +7,7 @@ from typing import Any
 from rich.console import Console
 
 from ..config import RECOVER_DISCLAIMER, SCIHUB_DISCLAIMER, Config, parse_fetch_pdfs
+from ..identity import from_seed_tag, merge_tags
 from ..interop.load import parent_payload
 from ..library import LibraryBackend, LibraryError
 from ..pipeline import Pipeline, RunStats
@@ -53,6 +54,7 @@ def create_new(
     collection: str,
     *,
     tag_prefix: str = TAG,
+    extra_tags: list[str] | None = None,
     note_provenance: bool = True,
     console: Console | None = None,
     tally: Any = None,
@@ -94,6 +96,12 @@ def create_new(
             if tally is not None:
                 tally.advance(1)
             continue
+        tags = [
+            {"tag": prefix},
+            {"tag": f"{prefix}:{row.provenance.get('backend') or 'openalex'}"},
+        ]
+        for extra in merge_tags(extra_tags, [from_seed_tag(row.seed)]):
+            tags.append({"tag": extra})
         record = {
             "item_type": _item_type(str(biblio.get("type") or "")),
             "title": title,
@@ -102,7 +110,7 @@ def create_new(
             "doi": row.ids.get("doi") or "",
             "url": biblio.get("oa_url") or "",
             "publication_title": "",
-            "tags": [{"tag": prefix}, {"tag": f"{prefix}:{row.provenance.get('backend') or 'openalex'}"}],
+            "tags": tags,
         }
         if record["item_type"] == "bookSection":
             book = (

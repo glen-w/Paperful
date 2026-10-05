@@ -59,6 +59,15 @@ def test_missing_file():
     assert doi_from_pdf(Path("/no/such.pdf")) is None
 
 
+def test_corrupt_pdf_does_not_raise(tmp_path, monkeypatch):
+    monkeypatch.setattr(pdfid, "_PDFTOTEXT", None)
+    monkeypatch.setattr(pdfid.shutil, "which", lambda name: None)
+    path = tmp_path / "bad.pdf"
+    path.write_bytes(b"%PDF-1.4\n<< /Type /Catalog /Pages 2 0 R >>\n%%EOF\n")
+    assert text_from_pdf(path) == ""
+    assert doi_from_pdf(path) is None
+
+
 def test_doi_from_pdf_bytes(tmp_path, monkeypatch):
     from paperful.pdfid import doi_from_pdf_bytes
 

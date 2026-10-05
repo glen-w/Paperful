@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 from paperful.attach import AttachResult
@@ -69,6 +70,21 @@ def test_ocr_languages_from_config(tmp_path):
     )
     assert cfg.ocr_languages == "eng+spa"
     assert cfg.ocr_timeout_s == 30
+
+
+def test_deadline_leaves_not_reached(tmp_path, monkeypatch):
+    pdfs = [_blank_pdf(tmp_path / f"scan{i}.pdf") for i in range(3)]
+    monkeypatch.setattr("paperful.ocr.text_from_pdf", lambda *a, **k: "")
+    batch = ocr_items(
+        _cfg(tmp_path),
+        [_item(p) for p in pdfs],
+        Manifest(tmp_path / "state" / "manifest.jsonl"),
+        None,
+        apply=False,
+        deadline=time.time() - 1,
+    )
+    assert batch.not_reached == 3
+    assert batch.rows == []
 
 
 def test_text_pdf_is_skipped(tmp_path, monkeypatch):

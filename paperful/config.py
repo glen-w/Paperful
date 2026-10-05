@@ -171,6 +171,19 @@ class Config:
     inbox_poll_seconds: float = 2.0
     inbox_settle_seconds: float = 1.5
     inbox_idle_seconds: float = 0.0  # 0 → wait forever (Ctrl+C)
+    inbox_match: str = "doi_only"  # doi_only | doi+title | doi+title+ocr | full
+    inbox_quarantine_after_s: float = 0.0  # 0 → unmatched immediately
+    inbox_ocr_for_match: bool = False
+    inbox_llm_match: str = "off"  # off | when_thin | always
+    inbox_llm_match_min_confidence: float = 0.75
+    inbox_llm_auto_attach_min: float = 0.92
+    inbox_model: str = ""
+    inbox_provider: str = ""
+    inbox_create: str = "attach_only"  # attach_only | create_gated | create_auto
+    inbox_title_resolve: bool = False
+    inbox_manager_metadata_s: float = 0.0
+    ingest_default_tags: tuple[str, ...] = ()
+    ingest_dedupe_scope: str = "library"
     snowball_enabled: bool = False
     snowball_max_candidates: int = 200
     snowball_per_hop_limit: int = 50
@@ -185,6 +198,7 @@ class Config:
     snowball_fetch_pdfs: str = "off"  # off | fast | full
     snowball_dedupe_scope: str = "library"  # library | collection | none
     snowball_tag_prefix: str = "paperful-snowball"
+    snowball_default_tags: tuple[str, ...] = ()
     snowball_types: tuple[str, ...] = ()
     snowball_oa_only: bool = False
     # Opt-in OpenAlex snapshot store (SSH+DuckDB v1). Empty backend = API only.
@@ -298,6 +312,14 @@ class Config:
     @property
     def inbox_seen_path(self) -> Path:
         return self.state_dir / "inbox-seen.jsonl"
+
+    @property
+    def inbox_holds_path(self) -> Path:
+        return self.state_dir / "inbox-holds.json"
+
+    @property
+    def inbox_proposals_dir(self) -> Path:
+        return self.state_dir / "inbox" / "proposals"
 
     def effective_synthesize_timeout(self) -> float:
         if self.synthesize_timeout_s > 0:
@@ -521,6 +543,8 @@ def _apply_snowball(raw: Any, cfg: Config) -> None:
         cfg.snowball_dedupe_scope = str(raw["dedupe_scope"]).strip()
     if "tag_prefix" in raw and raw["tag_prefix"]:
         cfg.snowball_tag_prefix = str(raw["tag_prefix"]).strip()
+    if "default_tags" in raw:
+        cfg.snowball_default_tags = _snowball_strs(raw["default_tags"])
     if "types" in raw:
         cfg.snowball_types = _snowball_strs(raw["types"])
     if "oa_only" in raw:
@@ -788,6 +812,56 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             cfg.inbox_settle_seconds = max(0.0, float(inbox["settle_seconds"]))
         if "idle_seconds" in inbox:
             cfg.inbox_idle_seconds = max(0.0, float(inbox["idle_seconds"]))
+        if "match" in inbox:
+            cfg.inbox_match = _one_of(
+                "[inbox].match",
+                inbox["match"],
+                ("doi_only", "doi+title", "doi+title+ocr", "full"),
+            )
+        if "quarantine_after_s" in inbox:
+            cfg.inbox_quarantine_after_s = max(0.0, float(inbox["quarantine_after_s"]))
+        if "ocr_for_match" in inbox:
+            cfg.inbox_ocr_for_match = bool(inbox["ocr_for_match"])
+        if "llm_match" in inbox:
+            cfg.inbox_llm_match = _one_of(
+                "[inbox].llm_match",
+                inbox["llm_match"],
+                ("off", "when_thin", "always"),
+            )
+        if "llm_match_min_confidence" in inbox:
+            cfg.inbox_llm_match_min_confidence = min(
+                1.0, max(0.0, float(inbox["llm_match_min_confidence"]))
+            )
+        if "llm_auto_attach_min" in inbox:
+            cfg.inbox_llm_auto_attach_min = min(
+                1.0, max(0.0, float(inbox["llm_auto_attach_min"]))
+            )
+        if "model" in inbox:
+            cfg.inbox_model = str(inbox["model"]).strip()
+        if "provider" in inbox:
+            cfg.inbox_provider = str(inbox["provider"]).strip()
+        if "create" in inbox:
+            cfg.inbox_create = _one_of(
+                "[inbox].create",
+                inbox["create"],
+                ("attach_only", "create_gated", "create_auto"),
+            )
+        if "title_resolve" in inbox:
+            cfg.inbox_title_resolve = bool(inbox["title_resolve"])
+        if "manager_metadata_s" in inbox:
+            cfg.inbox_manager_metadata_s = max(
+                0.0, float(inbox["manager_metadata_s"])
+            )
+    ingest = raw.get("ingest")
+    if isinstance(ingest, dict):
+        if "default_tags" in ingest:
+            cfg.ingest_default_tags = _snowball_strs(ingest["default_tags"])
+        if "dedupe_scope" in ingest:
+            cfg.ingest_dedupe_scope = _one_of(
+                "[ingest].dedupe_scope",
+                ingest["dedupe_scope"],
+                ("library", "collection"),
+            )
     learned = raw.get("playbooks")
     if isinstance(learned, dict):
         if "promote" in learned:

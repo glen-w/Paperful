@@ -47,6 +47,12 @@ Mendeley and EndNote do not get the PDF stamp. They do get the readable
 parent line, as an annotation or an import-bundle note, or as a tag when
 `[remarks].surface` is `tag`.
 
+New metadata parents from `ingest-dois`, snowball `--gate auto` / `apply`,
+and inbox create take tags: `--tag`, `[ingest]` / `[snowball].default_tags`,
+`from-<seed-slug>` (DOI list stem or snowball seed), plus `inbox-created` and
+`inbox:<dirname>` on inbox create. Those are library tags, not the PDF stamp
+above. See [config](config.md) and [snowball](snowball.md).
+
 ## Wrong-work PDFs
 
 By default `run` still saves and attaches when the PDF’s DOI differs from the
@@ -75,7 +81,8 @@ Open the file under `out/` first if you need to decide whether it is a real
 letter or still junk. Manual `attach --item --file` and handoff walk/inbox
 reject sparse one-pagers but attach denser ones (you already chose the file).
 `inbox watch` / `drain` (shared `[inbox].dir`) default to whole-library DOI
-match; use `-C` only when you want a narrower index. See [sources](sources.md).
+match; set `[inbox].match` for title/OCR/LLM, `[inbox].create` for gated
+proposals. Use `-C` only when you want a narrower index. See [sources](sources.md).
 
 An in-memory DOI swap during fetch changes which work is requested. It does
 not write the library until `fix-metadata --apply`. Run `lint` before a large

@@ -6,6 +6,8 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ## Unreleased
 
+`paperful refs gap` scans collection PDFs for cited works that are not in the library and writes `state/refs-gaps/` (`paperful.refs_gap.pack.v1`). `paperful ingest-dois --from-file` (or `--from-pack`) creates metadata parents in `-C` only with `--apply`; dry-run reports exists / unresolved / held. Inbox can use a match ladder (`[inbox].match`) and gated or high-bar auto create-on-unmatched (`inbox proposals list|apply|reject`). Default inbox behaviour stays DOI attach only. Created parents take `--tag`, `[snowball]` / `[ingest].default_tags`, `from-<seed-slug>` (snowball seed or ingest file stem), `inbox-created`, and `inbox:<dirname>`.
+
 Pipeline tests that stub EZProxy now set a campus prefix, so the preflight that drops an unconfigured `ezproxy` source no longer skips those runs.
 
 Docs: Wave D honesty. Compose-first stranger path names CI job `docker`

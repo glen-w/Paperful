@@ -75,12 +75,9 @@ Zotero has. Do not document either adapter as supported until testers say so.
   for the rest of the run; transport timeouts use a short connect budget and do
   not permanently block a publisher on a single blip. Manual
   handoff: `run` / `gaps --handoff list|tabs|walk|watch` and `paperful inbox
-  watch` / `drain` against `[inbox].dir` (today: PDF **DOI-only** attach to
-  missing-PDF parents; `inbox` defaults to whole-library scope so one drop
-  folder serves every topic; anything else → `unmatched/` immediately). Operator
-  pain: Zotero **Retrieve Metadata** often recognizes the same PDFs Paperful
-  quarantined — inbox does not call the manager recognizer or wait before
-  quarantine ([match ladder](#inbox-match-ladder) below). Distinct from snowball
+  watch` / `drain` against `[inbox].dir` (default: PDF **DOI-only** attach to
+  missing-PDF parents, whole-library scope; `[inbox].match` / `[inbox].create`
+  opt in to the [match ladder](#inbox-match-ladder) and gated create). Distinct from snowball
   watch `inbox.jsonl`. **Later (handoff):**
   rank `--handoff list` by in-corpus cite count (from [refs gap](#bibliography-gap-scan-later-not-gaps))
   × miss severity so limited browser time hits high-value PDFs first. CLI
@@ -137,7 +134,7 @@ Zotero has. Do not document either adapter as supported until testers say so.
   and/or spacing attempts across the whole run (shared rate limiter, per-item
   Scholar only after long jitter, or interleaving with other work) instead of one
   end-of-batch burst after parallel OA.
-- **Inbox create-on-unmatched (config, later).** Optional `[inbox]` mode so
+- **Inbox create-on-unmatched (config, shipped).** Optional `[inbox]` mode so
   `watch` / `drain` still ingests when no missing-PDF parent matches: create a
   parent in a configured collection (or a routed target once smart inbox exists),
   attach the PDF, and fill bibliographic fields from Paperful’s identifier
@@ -150,12 +147,12 @@ Zotero has. Do not document either adapter as supported until testers say so.
   `review/` when resolution is thin. **Gated UX:** write
   `state/inbox/proposals/<id>.json` (`paperful.inbox.proposal.v1`);
   `paperful inbox proposals list|apply|reject` — never silent parent create.
-  Tag parents `inbox-created` for later `dedupe` / `refs gap`. Optional
-  multi-root `[inbox].dir` list with provenance `inbox:<dirname>`. End-of-drain
+  Tag parents `inbox-created` and `inbox:<dirname>` for later `dedupe` / `refs gap`. Optional
+  multi-root `[inbox].dir` list is still later. End-of-drain
   one-liner + JSON (attached / created_gated / unmatched), same honesty as
   `run`. Today’s default stays DOI attach only — no silent create-parent.
 (inbox-match-ladder)=
-- **Inbox match ladder (before `unmatched/`, config, later).** Optional stages
+- **Inbox match ladder (before `unmatched/`, config, shipped).** Optional stages
   run **in order** after a stable PDF lands in `[inbox].dir`, each toggled in
   config, before `move_unmatched`. Goal: attach (or propose attach) using the
   same missing-PDF index as today without requiring the operator to rescue files
@@ -198,11 +195,8 @@ Zotero has. Do not document either adapter as supported until testers say so.
   `manager_metadata` | `none`. **Not in scope:** guessing parents outside the
   missing-PDF index without create-on-unmatched; bulk OCR of the whole library
   inside `watch`.
-- **Smart inbox (optional, later).** Today `inbox` only attaches a PDF onto an
-  existing missing-PDF parent by DOI (or FIFO in a handoff session). It does not
-  choose a collection or create parents. Builds on **create-on-unmatched** and the
-  **match ladder** above (ladder = *which parent* among missing-PDF rows; smart
-  inbox = *which collection* when creating or routing).
+- **Smart inbox (optional, later).** Create-on-unmatched and the match ladder
+  can attach or propose a parent; they still do not choose a collection.
   A smarter drop-folder lane would
   **route** (and optionally ingest) each PDF toward the right collection using
   **deterministic** signals first — ongoing / recent snowball runs and watches
@@ -325,17 +319,17 @@ daemon.
 
 ### Near-term research-ops
 
-**Status:** next — thicken and ship verbs already named on this page; not a second
-product. Same bars: dry-run default, explicit `--apply`, fail closed, no silent
-library writes. See [Documentation (thicken) — research pack](#documentation-thicken)
+**Status:** rows 1–4 shipped; remaining rows thicken the same product. Same bars:
+dry-run default, explicit `--apply`, fail closed, no silent library writes. See
+[Documentation (thicken) — research pack](#documentation-thicken)
 for the end-to-end operator story.
 
 | Priority | Item | Status |
 | --- | --- | --- |
-| 1 | [`paperful refs gap`](#bibliography-gap-scan-later-not-gaps) — cited-in-PDF, not-in-library pack | Next |
-| 2 | [Inbox match ladder](#inbox-match-ladder) (defer quarantine, title/OCR, optional `llm_when_thin`) + [create-on-unmatched](#core-keep-sharpening) (gated proposals) | Next |
-| 3 | `paperful ingest-dois` — DOI list → `-C`, `--dry-run` / `--apply`, `--tag` | Parked (Identity §3) |
-| 4 | Provenance tags on create (`--tag`, `[snowball]` / `[ingest]` default_tags, `from-<seed-slug>`) | Next (with 1–3) |
+| 1 | [`paperful refs gap`](#bibliography-gap-scan-later-not-gaps) — cited-in-PDF, not-in-library pack | Shipped |
+| 2 | [Inbox match ladder](#inbox-match-ladder) (defer quarantine, title/OCR, optional `llm_when_thin`) + [create-on-unmatched](#core-keep-sharpening) (gated proposals) | Shipped (`create_auto` unique-DOI only) |
+| 3 | `paperful ingest-dois` — DOI list → `-C`, `--dry-run` / `--apply`, `--tag` | Shipped |
+| 4 | Provenance tags on create (`--tag`, `[snowball]` / `[ingest]` default_tags, `from-<seed-slug>`) | Shipped |
 | 5 | Grey playbook example packs (think-tanks, RFMOs, institute report hosts) via `[[grey_playbooks]]` | Ongoing |
 | 6 | Linked-URL health (Core above) | Later |
 | 7 | Non-DOI grey fingerprint (`norm(title)|year|registrant_host`; ISBN/report # when present) in snowball / dedupe / inbox ladder + inbox-create | Later |
@@ -647,22 +641,23 @@ scheduling nightly “ask everything” jobs without an explicit operator comman
 `summarize` / `synthesize` — summaries stay the human-readable layer; RAG stays
 the evidence-linked Q&A layer.
 
-### Bibliography gap scan (later; not `gaps`)
+(bibliography-gap-scan-later-not-gaps)=
+### Bibliography gap scan (shipped; not `gaps`)
 
-**Status:** roadmap — pieces exist; a collection-scoped **verb** does not.
+**Status:** shipped — `paperful refs gap` writes `state/refs-gaps/` (`paperful.refs_gap.pack.v1`). Always dry-run.
 
-| Today | Roadmap gap scan |
+| Today | Bibliography gap scan |
 | --- | --- |
-| **`paperful gaps`** (shipped) | **Bibliography gap scan** (planned) |
+| **`paperful gaps`** (shipped) | **`paperful refs gap`** (shipped) |
 | Items **already in scope** missing a stored PDF, linked-only URL, or DOI | Works **cited inside** your collection’s PDFs (or seed items) that are **not** in the library fingerprint |
 | Drives `run` / handoff | Drives review pack → optional `ingest-dois` / snowball seed / gated create |
 
-**Already in the tree (reuse, do not reinvent):** snowball bibliography parsing
+**Already in the tree:** snowball bibliography parsing
 (`paperful/snowball/bibliography.py` — landing HTML, open-PDF reference
 sections, `parse_bibliography_entries`); OpenAlex reference lists cached under
 `state/cites/` for in-collection overlap remarks; Europe PMC / remote ref
-recovery on hops. None of that is yet “scan every PDF in `-C` and emit
-**missing-from-library** rows” as one operator-facing command.
+recovery on hops. `refs gap` walks collection PDFs (mirror-first) and emits
+**missing-from-library** rows as one operator-facing command.
 
 **Direction:** `paperful refs gap` — inputs `-C`, seed item keys, and/or seed PDF
 paths; always dry-run (never auto-create). Match: same fingerprint family as
@@ -1063,12 +1058,10 @@ prerequisites for the fetch / lint / attach loop.
    manual handoff / PDF inbox (`--handoff`, `inbox watch` / `drain`);
    **pluggable grey-lit PDF playbooks** in
    `direct`/`landing` with builtin packs (UNGA/undocs · BBNJ/DOALOS · ISA;
-   plus FAO/OECD/IEA/WHO — extend via `[[grey_playbooks]]`). Still
-   parked: **inbox match ladder** (defer quarantine; OCR-for-match on sparse
-   scans; deterministic title/fingerprint attach; optional grounded LLM when
-   thin — reuse `llm_pdf_match` posture); **inbox create-on-unmatched** (config;
-   metadata resolve + optional wait for manager PDF metadata after attach);
-   **smart inbox** routing (Core above — snowball/recent-run context + ladder
+   plus FAO/OECD/IEA/WHO — extend via `[[grey_playbooks]]`). **Shipped:**
+   **inbox match ladder** and **inbox create-on-unmatched** (config; unique-DOI
+   `create_auto`; gated proposals). Still parked: **smart inbox** routing (Core
+   above — snowball/recent-run context + ladder
    signals; LLM `off` | `when_thin` | `always`; model global + per-function;
    gated or auto);
    SI/dataset/code siblings;
@@ -1182,12 +1175,13 @@ prerequisites for the fetch / lint / attach loop.
    it does not trash or merge existing parents. Preprint ↔ version of record is
    `paperful versions`: the older parent keeps the published citation and PDF,
    and the preprint stays as a version (snowball may tag a candidate `version`
-   without running that merge).    **Next (research-ops):** `paperful ingest-dois --from-file dois.txt -C BBNJ
+   without running that merge).    **Shipped (research-ops):** `paperful ingest-dois --from-file dois.txt -C BBNJ
    --dry-run` then `--apply` (resolve Crossref/OpenAlex; skip `exists` under
    dedupe scope; report created / exists / unresolved / **held** on ambiguous
-   title mismatch; repeatable `--tag` / profile `[ingest].default_tags`; hand off
+   title mismatch; repeatable `--tag` / `[ingest].default_tags`; hand off
    to `run` for PDFs). `paperful collections add --keys-file keys.txt -C …`
-   — membership-only batch (dry-run / apply; added / already-in / not-found).
+   — membership-only batch (dry-run / apply; added / already-in / not-found) is
+   still later.
    Complements `ingest-dois` (create parents) vs add (file existing keys). No
    scheduled bot inside Paperful. **Grey identity:** fingerprint
    `norm(title)|year|registrant_host` (plus ISBN/report number when present) for
@@ -1290,7 +1284,7 @@ Three explicit toolbar actions (no single “grab everything”):
 | Action | Maps to | Priority |
 | --- | --- | --- |
 | **Snowball this DOI** — detect DOI on the current page → `paperful snowball doi` | CLI already writes `paperful.snowball.candidate.v1`; dry-run → optional Apply + `-C` | **P0** |
-| **Ingest to quiet mirror** — current page → `out/` (`paperful.item.v1`) → Zotero upsert via LibraryBackend | Needs a Paperful-owned create-parent ingest verb; today’s `inbox` attaches only | **P1** |
+| **Ingest to quiet mirror** — current page → `out/` (`paperful.item.v1`) → Zotero upsert via LibraryBackend | `ingest-dois` / inbox create exist on the CLI; extension still needs a thin ingest action | **P1** |
 | **PDFs from open tabs** — enumerate tabs, confirm checklist, download with tab cookies into `[inbox].dir`, then `inbox drain` | Campus entitlement strength; refuse pirate hosts; park unattended mass download | **P1** spike |
 
 **v0 transport (room lock):** Extension → **`nativeMessaging`** host → shells

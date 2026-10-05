@@ -320,6 +320,23 @@ uv run paperful all -C COLLECTION \
 
 (`summarize` is skipped; dedupe and `run` do not apply merges or downloads.)
 
+## 5. Research pack (cited works → parents → PDFs)
+
+Cited inside collection PDFs, not already in the library. Always dry-run the
+gap pack and `ingest-dois` classify before `--apply`. Then `run` (or inbox)
+fills PDFs.
+
+```sh
+docker compose run --rm paperful refs gap -C BBNJ
+# read state/refs-gaps/*/pack.md
+docker compose run --rm paperful ingest-dois --from-pack state/refs-gaps/<stamp> -C BBNJ
+docker compose run --rm paperful ingest-dois --from-file state/refs-gaps/<stamp>/dois.txt -C BBNJ --apply --tag bbnj
+docker compose run --rm paperful run -C BBNJ
+docker compose run --rm paperful inbox drain    # optional: PDFs dropped into [inbox].dir
+```
+
+Contributors: the same verbs with `uv run paperful …`.
+
 ## What this is not
 
 - Not a workflow engine. Steps are a list, not a graph.

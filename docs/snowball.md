@@ -5,7 +5,7 @@ collection seeds, `hybrid` (keyword hits, then one hop), refs, cited-by, and
 OpenAlex keywords, depth up to 5 under caps, gates
 `dry-run` / `approve-each` / `approve-batch` / `auto`, overlap ranking,
 `--fetch-pdfs`, and pull-only `watch` (baseline then propose new arrivals) are
-implemented. Config honors `dedupe_scope`, `tag_prefix`,
+implemented. Config honors `dedupe_scope`, `tag_prefix`, `default_tags`,
 `types`, `oa_only`, venues, `languages`, `min_seed_citations`,
 `note_provenance`, and `backends`. `--refine` writes query suggestions when
 `[llm]` is on and does not create items. `expand = cited_authors` stays off.
@@ -285,7 +285,8 @@ Schema `paperful.snowball.candidate.v1`:
 
 The dry-run table shows title, year, DOI, why, in library, hop/direction,
 and backend, with `new` rows first. Created items are tagged
-`paperful-snowball` and `paperful-snowball:<backend>`. A child note holds the
+`paperful-snowball`, `paperful-snowball:<backend>`, `from-<seed-slug>` from
+the candidate's seed, `[snowball].default_tags`, and any `--tag` values. A child note holds the
 seed, direction, hop, why, run id, and schema version when `note_provenance`
 is on. API keys and the mailto address never go in that note.
 
@@ -321,6 +322,7 @@ target_collection = ""
 dedupe_scope = "library" # library | collection | none
 fetch_pdfs = "off"       # off | fast | full. true means fast
 tag_prefix = "paperful-snowball"
+default_tags = []
 note_provenance = true
 backends = ["openalex", "crossref", "semanticscholar", "orcid", "europepmc", "pdf"]
 languages = []           # empty = do not filter; a missing language is kept

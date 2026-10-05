@@ -195,6 +195,18 @@ walkthrough, model advice, Docker networking, and troubleshooting: [LLM](llm.md)
 | `[inbox].poll_seconds` | `2.0` | Poll interval while watching |
 | `[inbox].settle_seconds` | `1.5` | Require stable file size before ingest |
 | `[inbox].idle_seconds` | `0` | Stop after this many idle seconds (`0` = until Ctrl+C); `--idle` on `inbox watch` overrides |
+| `[inbox].match` | `doi_only` | `doi_only` \| `doi+title` \| `doi+title+ocr` \| `full` (title + OCR + LLM when thin) |
+| `[inbox].quarantine_after_s` | `0` | Seconds to keep an unmatched PDF in the drop folder before `unmatched/` (`0` = immediately) |
+| `[inbox].ocr_for_match` | `false` | Transient OCR for matching only; does not rewrite the drop file |
+| `[inbox].llm_match` | `off` | `off` \| `when_thin` \| `always`. Needs `[llm].enabled`. Below confidence → no auto-attach |
+| `[inbox].llm_match_min_confidence` | `0.75` | LLM `match: true` below this does not auto-attach |
+| `[inbox].llm_auto_attach_min` | `0.92` | High bar for auto-attach; otherwise a gated proposal |
+| `[inbox].create` | `attach_only` | `attach_only` \| `create_gated` (proposals) \| `create_auto` (unique DOI + resolve only) |
+| `[inbox].title_resolve` | `false` | Opt-in Crossref/OpenAlex title search when local title+year is thin (not silent create) |
+| `[inbox].manager_metadata_s` | `0` | Wait after attach so a manager recognizer can run (`0` when the backend has none) |
+| `[ingest].default_tags` | `()` | Tags on `ingest-dois --apply` and inbox-created parents |
+| `[snowball].default_tags` | `()` | Extra tags on snowball `--gate auto` / `apply` creates, with `--tag` and `from-<seed-slug>` |
+| `[ingest].dedupe_scope` | `library` | `library` or `collection` when skipping `exists` |
 | `[ocr].languages` | `eng` | Tesseract languages for `paperful ocr` (`eng+fra` or `eng fra`) |
 | `[rag].enabled` | `false` | Master switch for `paperful rag` and `paperful ask`. Needs `paperful[rag]`. See [rag.md](rag.md) |
 | `[rag].auto_ingest` | `false` | Index new PDFs after `run`, `attach`, `inbox`, `snapshot`, `ocr --apply` and `snowball` |
@@ -246,6 +258,7 @@ run misbehaves or you host infrastructure yourself.
 | `[llm].timeout_s` | `120` | Per-completion timeout |
 | `[llm].max_num_ctx` | `32768` | Cap on the Ollama context window for `summarize` and `synthesize`. The model tag must support it |
 | `[lint].llm_pdf_match_min_confidence` | `0.6` | A `match: true` below this confidence is still flagged |
+| `[inbox].model` / `[inbox].provider` | `""` | Per-function LLM override for inbox match; empty uses `[llm]` |
 | `[summarize].prompt_template` | `default` | Or path to a custom prompt file (relative to the config file); its SHA is stamped in the note footer |
 | `[summarize].max_context_chars` | `24000` | Budget for PDF text sent to the model (head + headings + tail) |
 | `[summarize].tag` | `paperful-summary` | Zotero child-note tag; re-runs update the note carrying it |

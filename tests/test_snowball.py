@@ -3635,6 +3635,49 @@ def test_create_new_skips_a_citation_title():
     assert row.status == "error"
 
 
+def test_create_new_adds_provenance_tags():
+    from paperful.snowball.ingest import create_new
+
+    class Lib(_CreateLib):
+        def __init__(self):
+            super().__init__()
+            self.payloads: list[dict] = []
+
+        def create_parent(self, payload):
+            self.payloads.append(payload)
+            return super().create_parent(payload)
+
+    lib = Lib()
+    row = Candidate(
+        "r",
+        {"type": "doi", "value": "10.1000/seed"},
+        1,
+        "refs",
+        {"doi": "10.1000/new"},
+        {
+            "title": "A sufficiently long paper title about oceans",
+            "year": 2021,
+            "authors": ["Ada"],
+            "type": "article",
+        },
+        "ref of 10.1000/seed",
+        "new",
+        {"backend": "openalex"},
+        "auto",
+    )
+    items, counts = create_new(
+        lib, [row], "BBNJ", extra_tags=["bbnj", "from-10-1000-seed"]
+    )
+    assert counts["created"] == 1 and items
+    tags = {t["tag"] for t in lib.payloads[0]["tags"]}
+    assert tags >= {
+        "paperful-snowball",
+        "paperful-snowball:openalex",
+        "bbnj",
+        "from-10-1000-seed",
+    }
+
+
 def test_similar_ranks_coupled_work_above_a_one_off(tmp_path: Path):
     works = {
         "S1": _work("S1", "10.1000/seed", "Seed", 2020, 10, ["A", "B"]),
