@@ -260,7 +260,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "notes",
         "all",
     ),
-    "mirror": ("sync", "snapshot", "restore"),
+    "mirror": ("sync", "snapshot", "restore", "cache"),
     "control": (
         "doctor",
         "session",
@@ -5560,9 +5560,9 @@ def _print_sync(stats, *, dry_run: bool) -> None:
 
 @cache_app.command("clean")
 def cache_clean(
-    apply: bool = ApplyOpt,
+    apply: bool | None = ApplyOpt,
     config: Path | None = ConfigOpt,
-    agent: bool = AgentFormatOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Remove pdf-cache files already in the mirror (or stale vs the record MD5).
 
@@ -5572,16 +5572,24 @@ def cache_clean(
 
     cfg = load_config(config)
     report = clean_pdf_cache(cfg, apply=apply)
-    if agent:
-        _print_agent(report)
-        return
-    action = "Removed" if apply else "Would remove"
-    console.print(
-        f"{action} {report['removed'] if apply else report['removable']} "
-        f"file(s) under {report['cache_dir']}; kept {report['kept']}."
-    )
-    if not apply and report["removable"]:
-        console.print("[dim]Re-run with --apply to delete them.[/]")
+    payload = {
+        "schema": "paperful.agent.json.v1",
+        "command": "cache clean",
+        "exit": 0,
+        "summary": report,
+    }
+
+    def _human() -> None:
+        action = "Removed" if apply else "Would remove"
+        console.print(
+            f"{action} {report['removed'] if apply else report['removable']} "
+            f"file(s) under {report['cache_dir']}; kept {report['kept']}."
+        )
+        if not apply and report["removable"]:
+            console.print("[dim]Re-run with --apply to delete them.[/]")
+
+    json_out, _ = _agent_wins(fmt)
+    _emit_agent(payload, json_out=json_out, human=_human)
 
 
 @app.command()
@@ -7358,6 +7366,8 @@ def rag_answered(
     item_type: list[str] = ItemTypeOpt,
     top_k: int | None = typer.Option(None, "-k", "--top-k", help="Passages per question."),
     force: bool = typer.Option(False, "--force", help="Ignore batch answer cache."),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
@@ -7379,6 +7389,24 @@ def rag_answered(
 
     cfg = _cfg(config)
     json_out = _agent_json(fmt)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=None,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    if bound.collections:
+        collection = list(bound.collections)
+    if bound.year_from is not None:
+        year_from = bound.year_from
+    if bound.year_to is not None:
+        year_to = bound.year_to
+    if bound.types:
+        item_type = list(bound.types)
     _rag_require(cfg)
     if not from_file and not from_extract:
         console.print("[red]Pass --from-file or --from-extract.[/]")
@@ -7624,6 +7652,8 @@ def ask(
         "--thread",
         help="Follow-up thread under state/rag/threads/. 'new' starts one; omit for a one-shot.",
     ),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
@@ -7647,6 +7677,25 @@ def ask(
         raise typer.Exit(1)
     if json_out:
         no_stream = True
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=None,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        focus=focus,
+    )
+    if bound.collections:
+        collection = list(bound.collections)
+    if bound.year_from is not None:
+        year_from = bound.year_from
+    if bound.year_to is not None:
+        year_to = bound.year_to
+    if bound.types:
+        item_type = list(bound.types)
     _rag_require(cfg)
     try:
         validate_llm_for_ask(cfg)
@@ -7654,7 +7703,9 @@ def ask(
         console.print(str(exc), markup=False, style="red")
         raise typer.Exit(1) from exc
     try:
-        focus_name = parse_focus(focus if focus is not None else cfg.rag_focus)
+        focus_name = parse_focus(
+            focus if focus is not None else (bound.focus or cfg.rag_focus)
+        )
     except ValueError as exc:
         console.print(str(exc), markup=False, style="red")
         raise typer.Exit(1) from exc
@@ -7694,9 +7745,9 @@ def ask(
             console.print("[red]No questions in --from-file.[/]")
             raise typer.Exit(1)
         dest = (to.value if to is not None else cfg.rag_dest) or "disk"
-        if apply and wants_zotero(dest) and wants_disk(dest) is False and not collection:
+        if apply and dest == "disk":
             console.print(
-                "[red]ask --apply with --to zotero needs a single -C for the note.[/]"
+                "[red]--apply writes a Zotero note; it conflicts with --to disk.[/]"
             )
             raise typer.Exit(1)
         if apply and wants_zotero(dest) and len(collection) != 1:

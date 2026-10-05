@@ -42,3 +42,41 @@ def test_cache_clean_dry_run_and_apply(tmp_path):
     assert not absorbed.is_file()
     assert not wrong.is_file()
     assert orphan.is_file()  # no mirror folder / no matching record → kept
+
+
+def test_cache_clean_cli_dry_run(tmp_path):
+    from typer.testing import CliRunner
+
+    from paperful import cli
+
+    cfg_path = tmp_path / "config.toml"
+    out = tmp_path / "out"
+    state = tmp_path / "state"
+    out.mkdir()
+    state.mkdir()
+    cfg_path.write_text(
+        f'out_dir = "{out}"\nstate_dir = "{state}"\n', encoding="utf-8"
+    )
+    cache = state / "pdf-cache"
+    cache.mkdir()
+    (cache / "ORPHAN01.pdf").write_bytes(b"%PDF orphan")
+
+    runner = CliRunner()
+    res = runner.invoke(cli.app, ["cache", "clean", "-c", str(cfg_path)])
+    assert res.exit_code == 0, (res.exit_code, res.stdout, res.stderr, res.exception)
+    assert "Would remove" in res.stdout
+    assert (cache / "ORPHAN01.pdf").is_file()
+
+    help_res = runner.invoke(cli.app, ["cache", "clean", "--help"])
+    assert help_res.exit_code == 0
+    assert "--apply" in help_res.stdout
+
+    js = runner.invoke(
+        cli.app, ["cache", "clean", "-c", str(cfg_path), "--format", "json"]
+    )
+    assert js.exit_code == 0, (js.exit_code, js.stdout, js.stderr)
+    import json
+
+    body = json.loads(js.stdout)
+    assert body["command"] == "cache clean"
+    assert "removable" in body["summary"]

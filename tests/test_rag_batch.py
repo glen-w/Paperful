@@ -161,3 +161,80 @@ def test_keys_after_item_and_verdict(mirror):
     assert "AAAA1111" not in keys
     assert "BBBB2222" in keys
     assert parse_verdict("PARTIAL\nSome evidence [S1].") == "partial"
+
+
+def test_prompt_file_wins_over_focus(mirror, tmp_path):
+    _ingest(mirror)
+    prompt = tmp_path / "custom.txt"
+    prompt.write_text("You are a custom asker. Cite with [S#] only.")
+    res = _run(
+        [
+            "ask",
+            "What do krill eat?",
+            "--focus",
+            "gaps",
+            "--prompt",
+            str(prompt),
+            "--no-stream",
+        ],
+        mirror["config"],
+    )
+    assert res.exit_code == 0, plain_text(res.stdout)
+    system = mirror["chat"].requests[0].messages[0]["content"]
+    assert "custom asker" in system
+    assert "gaps" not in system.lower() or "custom" in system.lower()
+
+
+def test_batch_force_reanswers(mirror, tmp_path):
+    _ingest(mirror)
+    qfile = tmp_path / "one.txt"
+    qfile.write_text("What do krill eat?\n")
+    _run(["ask", "--from-file", str(qfile), "--format", "json"], mirror["config"])
+    n = len(mirror["chat"].requests)
+    _run(["ask", "--from-file", str(qfile), "--format", "json"], mirror["config"])
+    assert len(mirror["chat"].requests) == n
+    _run(
+        ["ask", "--from-file", str(qfile), "--force", "--format", "json"],
+        mirror["config"],
+    )
+    assert len(mirror["chat"].requests) == n + 1
+
+
+def test_batch_apply_conflicts_with_disk(mirror, tmp_path):
+    _ingest(mirror)
+    qfile = tmp_path / "one.txt"
+    qfile.write_text("What do krill eat?\n")
+    res = _run(
+        [
+            "ask",
+            "--from-file",
+            str(qfile),
+            "--apply",
+            "--to",
+            "disk",
+            "-C",
+            "ocean",
+        ],
+        mirror["config"],
+    )
+    assert res.exit_code == 1
+    assert "conflicts with --to disk" in plain_text(res.stdout)
+
+
+def test_profile_focus_applies_to_ask(mirror, tmp_path):
+    _ingest(mirror)
+    profiles = mirror["cfg"].config_path.parent / "profiles"
+    profiles.mkdir(exist_ok=True)
+    (profiles / "gaps.toml").write_text(
+        'description = "gaps ask"\ncollections = ["law"]\nfocus = "gaps"\n'
+    )
+    res = _run(
+        ["ask", "What gaps remain?", "--profile", "gaps", "--no-stream"],
+        mirror["config"],
+    )
+    assert res.exit_code == 0, plain_text(res.stdout)
+    system = mirror["chat"].requests[0].messages[0]["content"]
+    assert "gaps" in system.lower()
+    # Scope from profile: only law (BBBB2222 abstract), not ocean PDF alone.
+    user = mirror["chat"].requests[0].messages[-1]["content"]
+    assert "Seabed" in user or "Silva" in user or "BBBB2222" in user or "royalties" in user.lower()

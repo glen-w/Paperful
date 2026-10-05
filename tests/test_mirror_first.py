@@ -392,3 +392,41 @@ def test_only_the_adapter_modules_touch_the_zotero_client():
 def test_the_zotero_adapter_is_not_what_commands_hold():
     """``_connect`` hands commands the mirror-first backend when the manager has a change feed."""
     assert callable(getattr(ZoteroBackend, "changes", None))
+
+
+def test_collection_notes_read_from_mirror_without_live(cfg):
+    from paperful.sync import STANDALONE_SCHEMA
+    from paperful.store import write_json
+
+    zot = _library()
+    run_sync(cfg, zot, pdfs="none")
+    note_dir = cfg.out_dir / "_notes" / "NOTECOL1"
+    note_dir.mkdir(parents=True)
+    (note_dir / "note.html").write_text("<p>report</p>", encoding="utf-8")
+    write_json(
+        note_dir / "record.json",
+        {
+            "schema": STANDALONE_SCHEMA,
+            "key": "NOTECOL1",
+            "item_type": "note",
+            "title": "",
+            "tags": ["paperful-report"],
+            "collections": ["COLA"],
+            "note_file": "note.html",
+        },
+    )
+    backend = MirrorFirstBackend(cfg, MirrorCatalogue(cfg.out_dir), live=None)
+    assert backend.find_collection_note_keys("COLA", "paperful-report") == ["NOTECOL1"]
+    raw = backend.raw_item("NOTECOL1")
+    assert raw is not None
+    assert "report" in str((raw.get("data") or {}).get("note") or "")
+
+
+def test_doctor_mirror_row_includes_last_refresh_counts(cfg):
+    from paperful.doctor import _mirror_check
+
+    zot = _library()
+    run_sync(cfg, zot, pdfs="none")
+    check = _mirror_check(cfg)
+    assert check.name == "Mirror"
+    assert "written" in check.detail and "gone" in check.detail

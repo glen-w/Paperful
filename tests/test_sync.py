@@ -273,6 +273,74 @@ def test_non_pdf_attachment_bytes_copy_when_pdfs_all(cfg):
     assert (folders[0] / "snapshot.html").read_bytes() == b"<html>snap</html>"
 
 
+def test_standalone_attachment_lands_under_out_attachments(cfg):
+    zot = FakeZotero()
+    zot.put(
+        "FILESTAND",
+        itemType="attachment",
+        linkMode="imported_file",
+        contentType="application/epub+zip",
+        filename="book.epub",
+        title="Standalone EPUB",
+        collections=["COLA"],
+    )
+    zot.rows["FILESTAND"]["data"].pop("parentItem", None)
+    zot.files["FILESTAND"] = b"PK\x03\x04epub"
+
+    def export_attachment(key, dest):
+        data = zot.files.get(key)
+        if data is None:
+            return None
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(data)
+        return dest
+
+    zot.export_attachment = export_attachment  # type: ignore[attr-defined]
+    run_sync(cfg, zot, pdfs="none")
+    folder = cfg.out_dir / "_attachments" / "FILESTAND"
+    assert (folder / "record.json").is_file()
+    assert (folder / "book.epub").read_bytes() == b"PK\x03\x04epub"
+
+
+def test_parents_only_feed_empty_delta_does_not_rewrite_children(cfg):
+    """Mendeley/EndNote set track_child_keys=False; empty delta must not touch parents."""
+    from paperful.library import ChangeSet
+    from paperful.zot import Collection
+
+    zot = _library(cfg, n=1)
+    zot.attach("ITEM0001", "ATT00001")
+    run_sync(cfg, zot, pdfs="none")
+    before = {
+        p: p.read_bytes()
+        for p in cfg.out_dir.rglob("record.json")
+        if "_notes" not in str(p) and "_attachments" not in str(p)
+    }
+
+    def changes(since):
+        return ChangeSet(
+            version=zot.version,
+            full=False,
+            rows=[],
+            top_keys={"ITEM0001"},
+            all_keys={"ITEM0001"},  # parents-only on purpose
+            trashed=[],
+            collections={
+                "COLA": Collection("COLA", "Alpha", None, "Alpha", "Alpha"),
+            },
+            library_id=zot.library_id,
+            track_child_keys=False,
+        )
+
+    zot.changes = changes  # type: ignore[method-assign]
+    stats = run_sync(cfg, zot, pdfs="none")
+    assert stats.written == 0
+    assert {
+        p: p.read_bytes()
+        for p in cfg.out_dir.rglob("record.json")
+        if "_notes" not in str(p) and "_attachments" not in str(p)
+    } == before
+
+
 def test_dry_run_writes_nothing(cfg):
     zot = _library(cfg)
     stats = run_sync(cfg, zot, dry_run=True)

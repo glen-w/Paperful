@@ -142,6 +142,7 @@ class ResolvedRunConfig:
     types: list[str] = field(default_factory=list)
     year_from: int | None = None
     year_to: int | None = None
+    focus: str | None = None
     try_all: bool = False
     retry_failed: bool = False
     upgrade_linked: bool = False
@@ -236,6 +237,7 @@ def resolve_run_config(
     steps: str | list[str] | None = None,
     skip: list[str] | None = None,
     require_summarize: bool | None = None,
+    focus: str | None = None,
 ) -> ResolvedRunConfig:
     """Merge builtin ``all`` policy, named profile, file, then explicit CLI flags.
 
@@ -297,6 +299,7 @@ def resolve_run_config(
         steps=steps,
         skip=skip,
         require_summarize=require_summarize,
+        focus=focus,
     )
     if collection or library is not None or (item_type or []) or year_from is not None or year_to is not None or any(
         flag is not None
@@ -315,6 +318,7 @@ def resolve_run_config(
             preset,
             steps,
             require_summarize,
+            focus,
         )
     ) or (skip or []):
         origins.append("cli")
@@ -450,6 +454,8 @@ def format_effective(resolved: ResolvedRunConfig) -> str:
         body["library"] = True
     if resolved.types:
         body["types"] = list(resolved.types)
+    if resolved.focus:
+        body["focus"] = resolved.focus
     if resolved.year_from is not None:
         body["year_from"] = resolved.year_from
     if resolved.year_to is not None:
@@ -561,6 +567,8 @@ def _apply_cli(body: dict[str, Any], **flags: Any) -> None:
         body["types"] = [str(item) for item in item_type]
     if flags["limit"] is not None:
         body["limit"] = flags["limit"]
+    if flags.get("focus") is not None and str(flags["focus"]).strip():
+        body["focus"] = str(flags["focus"]).strip().lower()
     for key in (
         "try_all",
         "retry_failed",
@@ -626,6 +634,14 @@ def _finalize(body: dict[str, Any], *, for_all: bool) -> ResolvedRunConfig:
         known = ", ".join(sorted(SOURCE_PRESETS))
         raise RunConfigError(f"Unknown preset {preset!r}. Known: {known}")
     sources = [str(item) for item in body.get("sources") or []]
+    focus_raw = body.get("focus")
+    focus = str(focus_raw).strip().lower() if focus_raw not in (None, "") else None
+    if focus is not None:
+        from .rag.prompt import FOCI
+
+        if focus not in FOCI:
+            known = ", ".join(sorted(FOCI))
+            raise RunConfigError(f"Unknown focus {focus!r}. Known: {known}")
     return ResolvedRunConfig(
         description=str(body.get("description") or ""),
         collections=[str(item) for item in body.get("collections") or []],
@@ -633,6 +649,7 @@ def _finalize(body: dict[str, Any], *, for_all: bool) -> ResolvedRunConfig:
         types=sorted(canon) if canon else [],
         year_from=year_from,
         year_to=year_to,
+        focus=focus,
         try_all=bool(body.get("try_all")),
         retry_failed=bool(body.get("retry_failed")),
         upgrade_linked=bool(body.get("upgrade_linked")),
@@ -711,6 +728,8 @@ def _normalize(raw: dict[str, Any], *, expect_name: str | None) -> dict[str, Any
             out[key] = _as_int(key, raw[key])
     if "preset" in raw and raw["preset"] is not None:
         out["preset"] = _as_str("preset", raw["preset"])
+    if "focus" in raw and raw["focus"] is not None:
+        out["focus"] = _as_str("focus", raw["focus"]).strip().lower()
     return out
 
 
