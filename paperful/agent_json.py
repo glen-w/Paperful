@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+import sys
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Any, Iterator
 
 SCHEMA = "paperful.agent.json.v1"
 
@@ -65,3 +68,28 @@ def batch_exit(*, ok: int, failed: int) -> int:
 
 def dumps(payload: dict[str, Any]) -> str:
     return json.dumps(payload, indent=2, ensure_ascii=False, default=str)
+
+
+_suppress_stdout: ContextVar[bool] = ContextVar("agent_json_suppress_stdout", default=False)
+
+
+def stdout_suppressed() -> bool:
+    return bool(_suppress_stdout.get())
+
+
+@contextmanager
+def suppress_stdout() -> Iterator[None]:
+    """Skip writing the envelope (nested ``all`` substeps). Exit codes still apply."""
+    token = _suppress_stdout.set(True)
+    try:
+        yield
+    finally:
+        _suppress_stdout.reset(token)
+
+
+def emit_stdout(payload: dict[str, Any]) -> None:
+    """One JSON object on stdout. No-op when nested under ``all --format json``."""
+    if stdout_suppressed():
+        return
+    sys.stdout.write(dumps(payload) + "\n")
+    sys.stdout.flush()

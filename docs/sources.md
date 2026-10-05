@@ -85,7 +85,11 @@ uv run paperful inbox watch -C Inbox/Fitzpatrick  # optional narrow
 ```
 
 `--handoff list` (default) only prints/exports. `tabs` opens each
-`openable_url` in your default browser (confirms when more than 20). `watch`
+`openable_url` in your default browser (confirms when more than 20). Opt-in
+`[request].channels = "rg"` also opens **existing** ResearchGate publication
+URLs (`author_request` hint) so you can click Request full-text yourself —
+Paperful never automates that click (RG ToS) and never searches ResearchGate.
+`watch`
 opens those tabs, then polls `[inbox].dir` until Ctrl+C or idle timeout:
 match by DOI extracted from the PDF, else FIFO against the openable-miss
 queue from this handoff. `walk` opens one URL at a time, waits for you to

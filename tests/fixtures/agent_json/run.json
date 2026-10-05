@@ -1,0 +1,11 @@
+{
+  "schema": "paperful.agent.json.v1",
+  "command": "run",
+  "exit": 0,
+  "ok": true,
+  "partial": false,
+  "summary": {"attached": 0, "attach_failed": 0},
+  "items": [],
+  "paths": {"report": ""},
+  "flags": {"dry_run": true}
+}

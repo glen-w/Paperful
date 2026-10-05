@@ -145,7 +145,7 @@ Commands hold a `MirrorFirstBackend`: the same protocol, with reads served
 from `out/` and writes passed to the manager adapter. The adapter itself is
 below.
 
-[`paperful/library.py`](../paperful/library.py) defines `LibraryBackend`: report what changed since a library version (`changes`, Zotero only), list items, fetch one item by key (`get_item`), export a PDF **onto disk**, apply a field patch, merge a duplicate parent (children and better fields, then trash), trash a **note** (`trash_note` — never a parent), attach a file, create-or-update a **tagged child note** (`create_or_update_note`, used by `summarize`), create-or-update a **standalone collection note** (`create_or_update_collection_note`, used by `synthesize`), and `flush_writes()` (EndNote stages `state/endnote-import/<stamp>/`; others no-op). The tag makes re-runs update instead of duplicate. Identifier and dedupe logic (`resolve`, `lint`, `pdfid`, `metadata`, `dedupe`, `identity`) must not import a manager except through this protocol. [`paperful/identity.py`](../paperful/identity.py) is the shared DOI then title+year fingerprint used by snowball, `refs gap`, `ingest-dois`, and inbox title-match. [`paperful/refs_gap.py`](../paperful/refs_gap.py) and [`paperful/ingest_dois.py`](../paperful/ingest_dois.py) create review packs / parents through the adapter; they do not fetch PDFs. [`paperful/inbox_match.py`](../paperful/inbox_match.py) is the drop-folder match ladder. Notes are skipped by `items_in_scope`, so a report note never enters `run` / `lint` / `gaps`. Canonical item types are Zotero ids; [`paperful/interop/`](../paperful/interop/) maps RIS / BibTeX / EndNote XML at the edge. `paperful import` / `export` use that layer. **Zotero is well tested.** [Mendeley](mendeley.md) and [EndNote](endnote.md) are seeking testers.
+[`paperful/library.py`](../paperful/library.py) defines `LibraryBackend`: report what changed since a library version (`changes`, Zotero only), list items, fetch one item by key (`get_item`), export a PDF **onto disk**, apply a field patch, merge a duplicate parent (children and better fields, then trash), trash a **note** (`trash_note` — never a parent), attach a file, create-or-update a **tagged child note** (`create_or_update_note`, used by `summarize`), create-or-update a **standalone collection note** (`create_or_update_collection_note`, used by `synthesize`), and `flush_writes()` (EndNote stages `state/endnote-import/<stamp>/`; others no-op). The tag makes re-runs update instead of duplicate. Identifier and dedupe logic (`resolve`, `lint`, `pdfid`, `metadata`, `dedupe`, `identity`) must not import a manager except through this protocol. [`paperful/identity.py`](../paperful/identity.py) is the shared DOI then title+year fingerprint used by snowball, `authorwatch`, `refs gap`, `ingest-dois`, and inbox title-match. [`paperful/refs_gap.py`](../paperful/refs_gap.py) and [`paperful/ingest_dois.py`](../paperful/ingest_dois.py) create review packs / parents through the adapter; they do not fetch PDFs. [`paperful/inbox_match.py`](../paperful/inbox_match.py) is the drop-folder match ladder. Notes are skipped by `items_in_scope`, so a report note never enters `run` / `lint` / `gaps`. Canonical item types are Zotero ids; [`paperful/interop/`](../paperful/interop/) maps RIS / BibTeX / EndNote XML at the edge. `paperful import` / `export` use that layer. **Zotero is well tested.** [Mendeley](mendeley.md) and [EndNote](endnote.md) are seeking testers.
 
 ## LLM layer (optional, local-first)
 
@@ -288,14 +288,15 @@ is not tagged 1.0 yet (`paperful.item.v1` is still open).
 | `items[]` | Per-item: `itemKey`, `title`, `status`, `source`, `reason`, `doi`, `doi_verified`, `attempts`, `fields_corrected`, `path`, `error_type` |
 
 `--format json` on `run`, `refs gap`, `ingest-dois`, `inbox drain`, `gaps`, `lint`,
-`fix-metadata`, `dedupe`, `snowball apply`, `summarize`, `synthesize`, `restore`,
-`import`, `recover`, `ocr`, `all`, `inbox proposals list|apply|reject`, and `notes delete`
-prints `paperful.agent.json.v1` (`schema`, `command`, `exit`, `ok`, `partial`,
-`summary`, `items`, `paths`, `flags`, optional nested `report`). Exit **3** is
-a mixed batch. Legacy `--json` on `lint` / `gaps` / `dedupe` keeps its old shape
-unless `--format json` is also passed. `paperful mcp` wraps the same payloads for `refs_gap` (never
-creates parents) and `ask` (index only). `collections add` is parked and is
-not a tool.
+`fix-metadata`, `dedupe`, snowball crawl (`search` / `hybrid` / `doi` / `orcid` /
+`collection`) plus `run` / `resume` / `apply`, `summarize`, `synthesize`, `restore`,
+`import`, `recover`, `ocr`, `all`, `ask`, `inbox proposals list|apply|reject`, and `notes delete`
+prints **one** `paperful.agent.json.v1` object on stdout (`schema`, `command`, `exit`, `ok`, `partial`,
+`summary`, `items`, `paths`, `flags`, optional nested `report`). Progress and logs go to **stderr**.
+Exit **3** is a mixed **write** batch (`run` uses attached vs attach_failed). Legacy `--json` on `lint` / `gaps` / `dedupe` keeps its old shape
+unless `--format json` is also passed. `paperful mcp` is optional stdio sugar for the same
+payloads on `refs_gap` (never creates parents) and `ask` (index only). Prefer `… --format json`
+from a shell. `collections add` is parked and is not a tool.
 
 TTY-only paths (a GUI must not claim them): `session login`, `doctor --guide`,
 and mid-run EZProxy re-login.

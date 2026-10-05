@@ -76,6 +76,19 @@ def test_actionable_checks_order(cfg):
     assert names == ["email", "Scholar session"]
 
 
+def test_remediation_rg_and_twenty(cfg):
+    rg = remediation_text(
+        Check("ResearchGate request", "amber", "handoff-only", code="rg_handoff"),
+        cfg,
+    )
+    assert rg and "vault click" in rg.lower()
+    tw = remediation_text(
+        Check("Twenty", "amber", "no key", code="twenty_key"),
+        cfg,
+    )
+    assert tw and "TWENTY_API_KEY" in tw and "twenty lookup" in tw
+
+
 def test_remediation_playwright(cfg):
     missing = Check("Playwright", "amber", "missing — run: uv sync")
     text = remediation_text(missing, cfg, docker=False)

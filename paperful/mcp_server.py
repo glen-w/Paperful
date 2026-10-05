@@ -1,19 +1,18 @@
 """Thin MCP stdio server over the same JSON channel as ``--format json``.
 
 Tools: ``refs_gap`` (never writes parents) and ``ask`` (index read + LLM).
-No ``collections add`` — that verb is parked.
+No ``collections add`` — that verb is parked. Prefer CLI ``--format json``.
 """
 
 from __future__ import annotations
 
 import json
 import sys
-from typing import Any, TextIO
+from typing import Any, BinaryIO, TextIO
 
-from .agent_json import dumps, envelope
+from .agent_json import dumps
+from .agent_ops import run_ask, run_refs_gap
 from .config import Config
-from .library import LibraryError
-from .scope import ScopeError, load_scope
 from . import __version__
 
 PROTOCOL = "2024-11-05"
@@ -57,33 +56,51 @@ TOOLS = [
 ]
 
 
-def _read_message(stdin: TextIO) -> dict[str, Any] | None:
+def _as_binary(stream: TextIO | BinaryIO) -> BinaryIO:
+    buf = getattr(stream, "buffer", None)
+    if buf is not None:
+        return buf
+    return stream  # type: ignore[return-value]
+
+
+def _read_message(stdin: TextIO | BinaryIO) -> dict[str, Any] | None:
+    buf = _as_binary(stdin)
     headers: dict[str, str] = {}
     while True:
-        line = stdin.readline()
-        if line == "":
+        line = buf.readline()
+        if line == b"" or line == "":
             return None
-        if line in ("\r\n", "\n"):
+        if line in (b"\r\n", b"\n", "\r\n", "\n"):
             break
-        if ":" not in line:
-            # JSON-RPC newline mode (tests / simple clients).
+        text = line.decode("utf-8") if isinstance(line, (bytes, bytearray)) else line
+        stripped = text.strip()
+        if stripped.startswith("{"):
             try:
-                return json.loads(line)
+                return json.loads(stripped)
             except json.JSONDecodeError:
                 return None
-        key, value = line.split(":", 1)
+        if ":" not in text:
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                return None
+        key, value = text.split(":", 1)
         headers[key.strip().lower()] = value.strip()
     n = int(headers.get("content-length") or "0")
     if n < 1:
         return None
-    body = stdin.read(n)
-    return json.loads(body)
+    body = buf.read(n)
+    if isinstance(body, str):
+        return json.loads(body)
+    return json.loads(body.decode("utf-8"))
 
 
-def _write_message(stdout: TextIO, payload: dict[str, Any]) -> None:
-    raw = json.dumps(payload, ensure_ascii=False)
-    stdout.write(f"Content-Length: {len(raw.encode())}\r\n\r\n{raw}")
-    stdout.flush()
+def _write_message(stdout: TextIO | BinaryIO, payload: dict[str, Any]) -> None:
+    raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    header = f"Content-Length: {len(raw)}\r\n\r\n".encode("ascii")
+    buf = _as_binary(stdout)
+    buf.write(header + raw)
+    buf.flush()
 
 
 def _result(req_id: Any, result: Any) -> dict[str, Any]:
@@ -114,100 +131,11 @@ def handle_tools_list(req_id: Any) -> dict[str, Any]:
 
 
 def call_refs_gap(cfg: Config, collection: str) -> dict[str, Any]:
-    from .catalogue import open_library
-    from .identity import LibraryFingerprint
-    from .mirror import pdf_for
-    from .refs_gap import scan_items, write_pack
-
-    spec = (collection or "").strip()
-    if not spec:
-        return envelope(
-            command="refs gap",
-            exit_code=1,
-            summary={"error": "collection is required"},
-        )
-    try:
-        backend = open_library(cfg)
-        loaded = load_scope(backend, collections=[spec], library=False)
-    except (LibraryError, ScopeError) as exc:
-        return envelope(
-            command="refs gap",
-            exit_code=2 if isinstance(exc, LibraryError) else 1,
-            summary={"error": str(exc)},
-        )
-    items = loaded.items
-    fingerprint = LibraryFingerprint.from_items(
-        list(backend.items_in_scope(None)) if hasattr(backend, "items_in_scope") else items,
-        scope="library",
-        collection=spec,
-    )
-    refs, findings = scan_items(items, lambda it: pdf_for(cfg.out_dir, it), fingerprint)
-    folder = write_pack(cfg.state_dir, loaded.label, refs, findings)
-    missing = [r for r in refs if not r.already_exists]
-    items_out = [
-        {
-            "doi": r.doi,
-            "title": r.title,
-            "cited_by_count_in_scope": len(r.citing_keys),
-            "suggested_action": r.suggested_action,
-        }
-        for r in missing[:100]
-    ]
-    return envelope(
-        command="refs gap",
-        summary={
-            "cited": len(refs),
-            "missing": len(missing),
-            "needs_ocr": sum(1 for f in findings if f.finding == "needs_ocr"),
-        },
-        items=items_out,
-        paths={"pack": str(folder)},
-        flags={"dry_run": True},
-    )
+    return run_refs_gap(cfg, collection)
 
 
 def call_ask(cfg: Config, question: str, collection: str = "") -> dict[str, Any]:
-    from .llm import LLMClientError
-    from .rag.answer import answer
-    from .rag.retrieve import scope_keys
-
-    q = (question or "").strip()
-    if not q:
-        return envelope(command="ask", exit_code=1, summary={"error": "question is required"})
-    if not cfg.rag_enabled:
-        return envelope(
-            command="ask",
-            exit_code=1,
-            summary={"error": "rag.enabled is false"},
-        )
-    try:
-        from .rag.index import Index, ledger_path
-        from .rag.ledger import Ledger
-
-        index = Index.open(cfg)
-        ledger = Ledger(ledger_path(cfg))
-        keys = None
-        if (collection or "").strip():
-            keys = scope_keys(ledger, collections=[collection.strip()])
-        reply = answer(cfg, q, keys=keys, index=index, ledger=ledger)
-        text = reply.read()
-        cited = reply.cited() or reply.sources
-        return envelope(
-            command="ask",
-            summary={"question": q},
-            items=[
-                {
-                    "answer": text,
-                    "sources": [
-                        {"marker": s.marker, "itemKey": s.item_key, "title": s.title}
-                        for s in cited
-                    ],
-                }
-            ],
-            flags={"read_only": True},
-        )
-    except (LLMClientError, Exception) as exc:
-        return envelope(command="ask", exit_code=1, summary={"error": str(exc)})
+    return run_ask(cfg, question, collection)
 
 
 def handle_tools_call(cfg: Config, req_id: Any, params: dict[str, Any]) -> dict[str, Any]:
@@ -246,10 +174,14 @@ def dispatch(cfg: Config, message: dict[str, Any]) -> dict[str, Any] | None:
     return _error(req_id, -32601, f"unknown method {method}")
 
 
-def serve_stdio(cfg: Config, stdin: TextIO | None = None, stdout: TextIO | None = None) -> None:
+def serve_stdio(
+    cfg: Config,
+    stdin: TextIO | BinaryIO | None = None,
+    stdout: TextIO | BinaryIO | None = None,
+) -> None:
     """MCP JSON-RPC over stdio (Content-Length framing, or one JSON object per line)."""
-    inn = stdin or sys.stdin
-    out = stdout or sys.stdout
+    inn = stdin if stdin is not None else sys.stdin
+    out = stdout if stdout is not None else sys.stdout
     while True:
         try:
             message = _read_message(inn)

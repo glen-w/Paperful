@@ -84,8 +84,8 @@ Zotero has. Do not document either adapter as supported until testers say so.
   `--browser-agent` / `--no-browser-agent` overrides `[browser_agent].during_run`
   for one `run` / `all`. **Later (author-site + RG):** personal-site PDF discovery
   via opt-in web search ([Acquire §2](#maybe-later-not-core)); ResearchGate
-  request-from-author only behind config when vault/handoff already has an RG
-  session ([same section](#maybe-later-not-core)).
+  request-from-author is **handoff-only** (existing RG URL → system browser;
+  you click Request full-text; ToS) behind `[request].channels` ([same section](#maybe-later-not-core)).
 - **Academic HTML→PDF snapshot (shipped, opt-in).** Web/news (and DOI-less
   `document` / `report`) still print when the page is the article. Journal and
   other DOI items stay off unless `[htmlpdf].academic` is `gated` or `auto`
@@ -325,13 +325,13 @@ for the end-to-end operator story.
 | 12 | Authors/orgs frequency report from `-C` (`state/reports/…`; seed **field author packs**) | Later |
 | 13 | Handoff list ranking (Core handoff) | Shipped (cite count × miss severity) |
 | 14 | Opt-in academic HTML→PDF snapshot (Core `htmlpdf`) | Shipped (`[htmlpdf].academic` off\|gated\|auto; snapshot tier; `--upgrade-snapshot`) |
-| 15 | Agent JSON + documented exit codes on batch verbs; MCP after those are stable | JSON + exit 3 on the batch verbs; thin `paperful mcp` |
+| 15 | Agent JSON + documented exit codes on batch verbs; MCP after those are stable | **Shipped** — `paperful.agent.json.v1` + exits 0/1/2/3 on batch verbs; thin optional `paperful mcp` (`refs_gap`, `ask`) |
 | 16 | Author-site PDF (registry + packs + co-author crawl; **snowball co-author preflight** / `grey:author_site`) | Opt-in in tree (promote packs; SearXNG local-only) |
-| 17 | ResearchGate request-from-author (logged-in vault; config off by default) | Later / explore |
-| 18 | Twenty CRM — author lookup (website → registry; email for mail merge / PDF request; channel policy vs RG) | Later / explore |
+| 17 | ResearchGate request-from-author (**handoff-only**; config off by default; you click) | Shipped (`[request].channels`; `state/author-requests.jsonl`) |
+| 18 | Twenty CRM — author lookup (website → proposed pack; email cache; no mail / no CRM write) | Shipped (`paperful twenty lookup`; `[twenty].enabled`) |
 | 19 | Typed note provenance (`paperful.note.v1`) + scannable **first-line** prefixes on all Paperful note writers | Shipped (summarize / synthesize / remarks / snowball / briefing) |
 | 20 | `paperful notes delete` (or equivalent) — scoped filters: type, model, `--except-model`, tags; dry-run / `--apply` | Shipped (`--type`, `--model` / `--except-model`, `--all` + confirm / `--yes`) |
-| 21 | [Author watch lists](#author-watch-lists-later-people-you-follow--their-papers) — ORCID resolve + list `run`; optional import from RG / LinkedIn / Academia follows | Later |
+| 21 | [Author watch lists](#author-watch-lists-later-people-you-follow--their-papers) — ORCID / OpenAlex resolve + `run` / `apply`; file import of follows | **In tree** (`paperful authorwatch`; social HTML scrape later) |
 
 **Spike acceptance (one week, eng):** `refs gap` dry-run pack with zero manager
 writes; `ingest-dois` idempotent apply + `held` on ambiguous resolve; `collections
@@ -700,34 +700,18 @@ shared message shapes before hard-wiring repos.
 (author-watch-lists-later-people-you-follow--their-papers)=
 ### Author watch lists (later; people you follow → their papers)
 
-**Status:** roadmap — distinct from collection-scoped [`snowball watch`](snowball.md#watch)
+**Status:** in tree — `paperful authorwatch`. Distinct from collection-scoped [`snowball watch`](snowball.md#watch)
 (keyword / DOI / ORCID **seed** profiles and hop expansion). Here the seed is a
-**named author list** the operator curates: people they already care about on
-social or academic networks, turned into a **local** watch for **new research
-outputs**, not career posts.
+**named author list** the operator curates: people they already care about,
+turned into a **local** watch for **new research outputs**, not career posts.
+Social HTML scrape stays later; v1 is `--orcid` plus CSV/JSON/ORCID file import.
 
 **Direction:**
 
-- **Lists on disk** — `paperful authorwatch list save|add|remove|show` (names
-  TBD) maintains people under `state/authorwatch/<name>/` (display name, ORCID
-  when known, optional affiliation host / disambiguation notes). Resolve missing
-  ORCID via OpenAlex / Crossref author search; **held** on ambiguity (same bar as
-  snowball ORCID fill).
-- **Watch run** — `paperful authorwatch run` polls bibliographic APIs (OpenAlex
-  first; snapshot store when configured) for works **newer than baseline** per
-  list member; baseline + `seen` ledger mirrors `snowball watch`. Proposals land
-  in `inbox.jsonl` and/or a normal snowball-style queue — dry-run default, library
-  fingerprint (`exists`), optional gate to `-C` + provenance tags. PDFs only via
-  the usual `run` / handoff loop after explicit create. Paperful does not
-  schedule; launchd / cron like `watch run` + optional [frontier digest](#frontier-digest-later-watch--external-ingest).
-- **Import from existing follow lists (opt-in, explore)** — seed or refresh the
-  list from sources the operator already maintains: ResearchGate “following”,
-  LinkedIn researcher lists, Academia.edu follows, institutional directory
-  pages, CSV/JSON export when available. Prefer read-only APIs; where only HTML
-  exists, headed handoff or session vault with explicit config, rate limits, and
-  ToS / AUP disclaimer — **not** a silent default scrape bot. Normalise rows to
-  name + ORCID (or held) before watch starts; dedupe against the list and the
-  library fingerprint.
+- **Lists on disk** — `paperful authorwatch save|add|remove|show` maintains people under `state/authorwatch/<name>/` (display name, ORCID
+  when known, optional affiliation host). `resolve` fills missing ORCID / OpenAlex ids; **held** on ambiguity.
+- **Watch run** — `paperful authorwatch run` sets a cursor baseline (no full-oeuvre fetch) then polls OpenAlex for works indexed after that cursor. `--backfill-from` proposes by **publication** date. `exists` stays out of the inbox. `authorwatch apply -C` creates parents (independent of `[snowball] enabled`). PDFs via `paperful run`. Paperful does not schedule.
+- **Import** — CSV/JSON/ORCID files. `import --source rg|linkedin|academia` without `--file` prints an export recipe. HTML scrape stays later.
 
 **Pitch (ship when the lane is real):** Get what really matters from the people
 you already follow — **their research**. Social follow graphs surface jobs,
@@ -1100,26 +1084,27 @@ prerequisites for the fetch / lint / attach loop.
    grey sources** when the same names appear on items snowball is about to
    create. Cap queries; no auto-promote without operator or a fetch win; same
    `grey:author_site` stamps. Complements post-hoc co-author site crawl on misses.
-   **ResearchGate “request from author” (explore; config-gated).** When the
-   publication page has no PDF but shows **Request full-text PDF** (logged-in RG
-   account), optional automation: session vault or headed handoff opens the page;
-   if `[researchgate].request_from_author` (name TBD) is enabled, click the request
-   button and record `deferred:author_request` on the item — no silent download,
-   same honesty as handoff. Default off; requires explicit opt-in, RG ToS / rate
-   limits, and operator awareness that fulfillment is async (email from authors).
-   **Twenty CRM integration (later; opt-in).** When `[twenty]` (or env) points at
-   the operator’s [Twenty](https://twenty.com) workspace, resolve item `creator`
-   names against **People** (and linked **Companies** for affiliation disambiguation):
-   pull **website** into the author-site registry when the CRM row has one; cache
-   **work email** on disk (`state/author-contacts/` or keyed fields on registry
-   rows) for later **mail merge** or polite PDF-request drafts — never send mail
+   **ResearchGate “request from author” (config-gated, handoff-only).** When the
+   item already has a `researchgate.net/publication` URL and `[request].channels`
+   includes `rg`, `--handoff tabs` / `walk` opens that page in the **system**
+   browser. **You** click Request full-text. Paperful never automates the click
+   (RG ToS / rate limits) and never searches ResearchGate for a URL. Fulfillment
+   is async (email from authors). Ledger: `state/author-requests.jsonl`.
+   **Twenty CRM integration (opt-in).** When `[twenty].enabled` and env
+   `TWENTY_API_KEY` plus `[twenty].base_url` point at the operator’s
+   [Twenty](https://twenty.com) workspace, `paperful twenty lookup -C …` resolves
+   item `creator` names against **People** (and linked **Companies** for
+   affiliation when present):
+   pull **website** into a **proposed** author-site pack when
+   `classify_listing_url` accepts it; cache **work email** on disk
+   (`state/author-contacts/`) for later **mail merge** — never send mail
    from Paperful without an explicit verb and template (`paperful request draft`
    TBD). Twenty is a first-class CRM the operator already curates, so it can beat
    web search for contact data on people you have met or filed. **RG vs email:**
    both channels can annoy the same author if mis-timed; treat as a **policy**
    knob, not one hardcoded path — e.g. `request_channels = rg | email | both |
-   rg_then_email_after_days` with per-author “already requested” ledger on the
-   item (`deferred:author_request` records channel + date). Email may cut through
+   rg_then_email_after_days` with per-item “already requested” ledger
+   (`handoff_opened` records channel + date). Email may cut through
    inbox noise when RG requests are ignored; RG may be faster when the author is
    active there — operator chooses. No CRM write-back unless `--apply` on an
    explicit sync verb; read-only search by default. Fits MCP/agent surface when
@@ -1185,7 +1170,7 @@ Larger product bets. Park until the ledger and core loop justify them.
    digest](#frontier-digest-later-watch--external-ingest) (watch rollup + optional
    rollup newsletter bridge, Scholar alerts first); [author watch
    lists](#author-watch-lists-later-people-you-follow--their-papers) (ORCID-backed
-   people lists + optional import from RG / LinkedIn / Academia follows). **[Run
+   people lists **in tree**; optional HTML import from RG / LinkedIn / Academia follows later). **[Run
    witness](#run-witness-later-trust-thicken)** ties batches to config/model/index
    for reproducibility.
 6. **Writing & export** — CSL / BibLaTeX / Quarto sync; living review / gap lists;
@@ -1212,14 +1197,17 @@ Larger product bets. Park until the ledger and core loop justify them.
    report (which hosts / win kinds paid off); **allowlisted extensions** on the
    vault profile for agent ergonomics (see Optional LLM — extensions bullet);
    **user-agent switcher** spike (CAPTCHA open question #3 under Optional LLM)
-   for between-item or mid-run rotation vs stable profile UA. **Next:** stable `--format json`
-   (or machine channel beside the human banner) on batch verbs (`run`, `refs gap`,
-   `ingest-dois`, `inbox drain`, `collections add`); one documented exit-code
-   table (`0` ok, `2` manager down, partial batch, …). **MCP** wraps the same
-   verbs after JSON + exits are boring — not a prerequisite for research-ops.
-   **Later:** optional **Twenty** workspace lookup for author website / email
-   ([Acquire §2](#maybe-later-not-core) CRM row) via MCP or a thin API client —
-   read-only by default; request-channel policy stays config, not agent-default.
+   for between-item or mid-run rotation vs stable profile UA. **Shipped:** `--format json`
+   (`paperful.agent.json.v1`) on batch verbs (`run`, `refs gap`,
+   `ingest-dois`, `inbox drain`, `ask`, snowball crawl/apply, …); documented exit-code
+   table (`0` ok, `1` user, `2` manager down, `3` partial write batch). **MCP** is a thin
+   optional stdio wrap of `refs_gap` + `ask` over the same envelope — not a second API
+   and not a prerequisite for research-ops. Writes stay CLI `--apply`. `collections add`
+   stays parked.
+   **Later:** mail-merge / `paperful request draft` using Twenty contact cache;
+   CRM write-back only with `--apply` on an explicit sync verb. Request-channel
+   policy stays config (`[request].channels`), not agent-default. Lookup itself
+   is `paperful twenty lookup` (REST, read-only).
 8. **Collaboration without SaaS** — shared `state/` over syncthing/git; attach
    locks; optional headless fetch node. Aligns with the house
    [quiet mirror](quiet-mirror.md) stance: Syncthing (or similar) is transport;

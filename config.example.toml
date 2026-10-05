@@ -180,6 +180,20 @@ mirror_failures_before_skip = 3
 # [handoff]
 # scholar = true                 # open Scholar in the system browser when there is no PDF URL
 
+# Author PDF requests. Default off. ResearchGate is handoff-only: Paperful opens an
+# existing researchgate.net/publication URL in your system browser. You click
+# Request full-text (RG ToS). Paperful never clicks and does not search RG.
+# email / both / delay are policy only in this version (no mail send).
+# [request]
+# channels = "off"               # off | rg | email | both | rg_then_email_after_days
+# email_after_days = 14
+
+# Twenty CRM (read-only). Never a default. API key in env TWENTY_API_KEY only.
+# [twenty]
+# enabled = false
+# base_url = ""                  # or TWENTY_BASE_URL
+# lookup_on_preflight = false    # with snowball --author-site-preflight; still proposed packs
+
 # Manual PDF handoff after soft-blocked OA misses (gaps --list-missing / --handoff).
 # [gaps]
 # handoff = "list"                 # list | tabs | walk | watch
@@ -293,6 +307,12 @@ gone = "mark"
 # approve_each_max = 20
 # hybrid_seeds = 5
 # refine = false
+
+# People lists (`paperful authorwatch`). No scrape of social follows; import a CSV.
+# Caps also exist as CLI flags on `authorwatch run`.
+# [authorwatch]
+# max_authors = 50
+# per_author_limit = 200
 # dedupe_after = "off"           # off | classify | apply
 # author_site_preflight = false
 # author_site_max_authors = 15

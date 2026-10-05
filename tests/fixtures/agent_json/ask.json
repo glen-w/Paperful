@@ -1,0 +1,17 @@
+{
+  "schema": "paperful.agent.json.v1",
+  "command": "ask",
+  "exit": 0,
+  "ok": true,
+  "partial": false,
+  "summary": {"question": "What is BBNJ?", "questions": 1, "answered": 1},
+  "items": [
+    {
+      "question": "What is BBNJ?",
+      "answer": "A treaty.",
+      "sources": []
+    }
+  ],
+  "paths": {},
+  "flags": {"read_only": true}
+}

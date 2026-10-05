@@ -8,6 +8,23 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ### Added
 
+- `paperful authorwatch`: ORCID/OpenAlex people lists, cursor `run` (optional
+  `--backfill-from`), `apply -C` (no `[snowball] enabled`). CSV/JSON/ORCID
+  import; social `--source` without `--file` prints the export recipe (no scrape).
+  Ledger: `state/authorwatch/<name>/`. See [authorwatch.md](docs/authorwatch.md).
+- `paperful ask --format json` (`paperful.agent.json.v1`; implies `--no-stream`).
+  Snowball `search` / `hybrid` / `doi` / `orcid` / `collection` / `run` /
+  `resume` share the envelope with `snowball apply`. `--format json` writes one
+  object on stdout (progress on stderr). `paperful mcp` stays optional stdio
+  sugar for `refs_gap` and `ask` over the same builders.
+- Opt-in ResearchGate request **handoff**: `[request].channels = "rg"` opens an
+  existing `researchgate.net/publication` URL in the system browser so **you**
+  click Request full-text. Paperful never automates the click (RG ToS) and does
+  not search ResearchGate. Ledger: `state/author-requests.jsonl`. `--request-rg`
+  / `--re-request` on `gaps` / `run --handoff`.
+- Opt-in Twenty CRM author lookup: `[twenty].enabled` plus `TWENTY_API_KEY` and
+  `paperful twenty lookup -C …` (dry-run; `--apply` writes proposed author-pack
+  websites and `state/author-contacts/`). Read-only; no mail send.
 - `paperful playbooks probe --corpus FILE` fetches each grey-playbook target
   and passes only when the first candidate is a real PDF (at least
   `--min-bytes`, default 10KB). `--save` writes a replay snapshot. The public

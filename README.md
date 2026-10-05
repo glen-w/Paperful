@@ -54,7 +54,9 @@ parents from a DOI list (dry-run unless `--apply`). See [Commands](docs/commands
 **Snowball grows. Run fills.** `snowball` proposes new works and creates
 metadata parents only when the gate says so. `run` fetches PDFs for items
 already in the library. Dry-run is the default for snowball; `run` attaches
-on Zotero 10+ unless you pass `--dry-run`. See [Snowball](docs/snowball.md)
+on Zotero 10+ unless you pass `--dry-run`. `authorwatch` is people you
+follow → their papers (no hop); see [Author watch](docs/authorwatch.md).
+See [Snowball](docs/snowball.md)
 and [how a hop is cut](docs/snowball.md#how-a-hop-is-cut).
 
 ```sh

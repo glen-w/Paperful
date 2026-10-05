@@ -1,0 +1,11 @@
+{
+  "schema": "paperful.agent.json.v1",
+  "command": "ingest-dois",
+  "exit": 0,
+  "ok": true,
+  "partial": false,
+  "summary": {"rows": 0, "created": 0, "exists": 0, "unresolved": 0, "held": 0, "failed": 0},
+  "items": [],
+  "paths": {"summary": ""},
+  "flags": {"apply": false, "dry_run": true}
+}

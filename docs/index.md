@@ -60,6 +60,7 @@ TERMS
 comparison
 comparison-reference
 snowball
+authorwatch
 ROADMAP
 gui
 ```

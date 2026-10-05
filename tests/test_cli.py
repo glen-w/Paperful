@@ -2395,3 +2395,349 @@ def test_recover_dry_run_format_json(tmp_path, stub_zotero, monkeypatch):
     assert body["command"] == "recover"
     assert body["flags"]["dry_run"] is True
     assert body["items"][0]["itemKey"] == "I1"
+
+
+def _one_json(stdout: str) -> dict:
+    return json.loads(stdout)
+
+
+def test_run_dry_run_format_json_is_one_object(cfg_file, stub_zotero):
+    from tests.conftest import make_item
+
+    stub_zotero.items_in_scope = lambda keys: [
+        make_item(key="I1", year=2024, collection_paths=["BBNJ/EIA _ SEA"]),
+    ]
+    res = runner.invoke(
+        cli.app,
+        [
+            "run",
+            "-c",
+            str(cfg_file),
+            "--collection",
+            "BBNJ/EIA / SEA",
+            "--dry-run",
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    body = _one_json(res.stdout)
+    assert body["schema"] == "paperful.agent.json.v1"
+    assert body["command"] == "run"
+    assert body["flags"].get("dry_run") is True
+    assert "Would-hit" not in res.stdout
+
+
+def test_finish_run_partial_exits_3(cfg_file, capsys):
+    import typer
+
+    from paperful.config import load_config
+    from paperful.pipeline import RunStats
+
+    cfg = load_config(cfg_file)
+    stats = RunStats()
+    stats.attached = 1
+    stats.attach_failed = 1
+    try:
+        cli._finish_run(
+            cfg, stats, scope="BBNJ", flags={"dry_run": False}, json_out=True
+        )
+    except typer.Exit as exc:
+        assert exc.exit_code == 3
+    else:
+        raise AssertionError("expected typer.Exit 3")
+    body = _one_json(capsys.readouterr().out)
+    assert body["partial"] is True
+    assert body["ok"] is False
+    assert body["command"] == "run"
+
+
+def test_fix_metadata_apply_mixed_exits_3(cfg_file, stub_zotero, monkeypatch):
+    from paperful.metadata import Patch
+
+    monkeypatch.setattr(
+        "paperful.metadata.collect_patches",
+        lambda *a, **k: [
+            Patch(
+                itemKey="I1",
+                title="T",
+                before={},
+                after={"title": "Clean"},
+                source="crossref",
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        "paperful.metadata.apply_patches", lambda *a, **k: (1, ["I2 failed"])
+    )
+    monkeypatch.setattr("paperful.metadata.write_patches", lambda *a, **k: None)
+    res = runner.invoke(
+        cli.app,
+        [
+            "fix-metadata",
+            "-c",
+            str(cfg_file),
+            "--library",
+            "--apply",
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 3, res.stdout
+    body = _one_json(res.stdout)
+    assert body["partial"] is True
+    assert body["command"] == "fix-metadata"
+
+
+def test_dedupe_apply_mixed_exits_3(cfg_file, stub_zotero, monkeypatch):
+    from paperful.dedupe import DedupeGroup
+
+    group = DedupeGroup(
+        phase="high_doi",
+        reason="doi",
+        keep="I1",
+        trash=["I2"],
+        held=False,
+        needs_review=False,
+        doi="10.1000/dup",
+    )
+    monkeypatch.setattr("paperful.dedupe.classify", lambda *a, **k: [group])
+    monkeypatch.setattr(
+        "paperful.dedupe.write_pack",
+        lambda *a, **k: (cfg_file.parent / "p.json", cfg_file.parent / "p.md"),
+    )
+    monkeypatch.setattr("paperful.dedupe.attach_merge_previews", lambda *a, **k: None)
+    monkeypatch.setattr("paperful.dedupe.apply_merge", lambda *a, **k: (1, ["merge failed"]))
+    monkeypatch.setattr("paperful.remarks.remark_duplicates", lambda *a, **k: None)
+    res = runner.invoke(
+        cli.app,
+        [
+            "dedupe",
+            "-c",
+            str(cfg_file),
+            "--library",
+            "--apply",
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 3, res.stdout
+    body = _one_json(res.stdout)
+    assert body["partial"] is True
+
+
+def test_inbox_drain_mixed_exits_3(cfg_file, stub_zotero, tmp_path, monkeypatch):
+    from paperful.inbox import WatchStats
+
+    drop = tmp_path / "drop"
+    drop.mkdir()
+    cfg_file.write_text(
+        cfg_file.read_text() + f'\n[inbox]\ndir = "{drop}"\n'
+    )
+    stats = WatchStats(attached=1, errors=1)
+    monkeypatch.setattr("paperful.inbox.process_candidates", lambda *a, **k: stats)
+    res = runner.invoke(
+        cli.app,
+        ["inbox", "drain", "-c", str(cfg_file), "--library", "--format", "json"],
+    )
+    assert res.exit_code == 3, res.stdout
+    body = _one_json(res.stdout)
+    assert body["command"] == "inbox drain"
+    assert body["partial"] is True
+
+
+def test_ingest_dois_held_stays_exit_0(cfg_file, stub_zotero, tmp_path, monkeypatch):
+    from paperful.ingest_dois import IngestBatch, IngestRow
+
+    dois = tmp_path / "held.txt"
+    dois.write_text("10.1000/held-row\n")
+    monkeypatch.setattr(
+        "paperful.ingest_dois.classify_rows",
+        lambda *a, **k: IngestBatch(
+            rows=[IngestRow(doi="10.1000/held-row", status="held", detail="title")],
+            held=1,
+        ),
+    )
+    res = runner.invoke(
+        cli.app,
+        [
+            "ingest-dois",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--from-file",
+            str(dois),
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    body = _one_json(res.stdout)
+    assert body["summary"]["held"] == 1
+    assert body["partial"] is False
+
+
+def test_ingest_dois_apply_mixed_exits_3(cfg_file, stub_zotero, tmp_path, monkeypatch):
+    from paperful.library import LibraryError
+    from paperful.resolve import WorkMeta
+
+    dois = tmp_path / "mix.txt"
+    dois.write_text("10.1000/ok-create\n10.1000/fail-create\n")
+    monkeypatch.setattr(
+        "paperful.ingest_dois.default_resolver",
+        lambda email: (
+            lambda doi: WorkMeta(
+                doi=doi,
+                title="A sufficiently long ingested title for tests",
+                year=2021,
+                source="crossref",
+                work_type="journal-article",
+            )
+        ),
+    )
+    n = {"i": 0}
+
+    def create(self, payload):
+        n["i"] += 1
+        if n["i"] == 1:
+            raise LibraryError("create failed")
+        return "OK1"
+
+    monkeypatch.setattr("paperful.library.ZoteroBackend.create_parent", create)
+    res = runner.invoke(
+        cli.app,
+        [
+            "ingest-dois",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--from-file",
+            str(dois),
+            "--apply",
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 3, res.stdout
+    body = _one_json(res.stdout)
+    assert body["partial"] is True
+    assert body["summary"]["created"] == 1
+    assert body["summary"]["failed"] == 1
+
+
+def test_snowball_apply_format_json_partial(cfg_file, stub_zotero, tmp_path, monkeypatch):
+    from paperful.snowball.command import PathResult
+
+    run_dir = tmp_path / "state" / "snowball" / "r1"
+    run_dir.mkdir(parents=True)
+
+    def fake_apply(cfg, run_id, request, console=None, **k):
+        return PathResult(run_dir, 3, summary={"created": 1, "failed": 1})
+
+    monkeypatch.setattr("paperful.snowball.command.run_apply", fake_apply)
+    res = runner.invoke(
+        cli.app,
+        [
+            "snowball",
+            "apply",
+            "r1",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 3, res.stdout
+    body = _one_json(res.stdout)
+    assert body["command"] == "snowball apply"
+    assert body["partial"] is True
+    assert "items created" not in res.stdout.lower()
+
+
+def test_snowball_search_format_json(cfg_file, stub_zotero, tmp_path, monkeypatch):
+    from paperful.snowball.command import PathResult
+
+    run_dir = tmp_path / "state" / "snowball" / "s1"
+    run_dir.mkdir(parents=True)
+
+    def fake_search(cfg, query, request, console=None, **k):
+        assert query
+        return PathResult(run_dir, 0, summary={"new": 2, "exists": 1})
+
+    monkeypatch.setattr("paperful.snowball.command.run_search", fake_search)
+    res = runner.invoke(
+        cli.app,
+        [
+            "snowball",
+            "search",
+            "BBNJ",
+            "-c",
+            str(cfg_file),
+            "--gate",
+            "dry-run",
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    body = _one_json(res.stdout)
+    assert body["command"] == "snowball search"
+    assert body["paths"]["run"] == str(run_dir)
+    assert body["summary"]["new"] == 2
+    assert "candidates ready" not in res.stdout.lower()
+
+
+def test_ask_format_json(cfg_file, monkeypatch):
+    monkeypatch.setattr(cli, "_rag_require", lambda cfg: None)
+    monkeypatch.setattr(cli, "_rag_embedder", lambda cfg: None)
+    monkeypatch.setattr(cli, "_rag_open", lambda cfg: (None, None))
+    monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_ask", lambda cfg: None)
+    monkeypatch.setattr("paperful.llm.get_client", lambda cfg: object())
+    monkeypatch.setattr("paperful.rag.retrieve.scope_keys", lambda *a, **k: None)
+    monkeypatch.setattr(
+        cli,
+        "_ask_once",
+        lambda *a, **k: {
+            "question": "What is BBNJ?",
+            "answer": "A treaty.",
+            "cited": [],
+            "sources": [],
+        },
+    )
+    res = runner.invoke(
+        cli.app,
+        ["ask", "What is BBNJ?", "-c", str(cfg_file), "--format", "json"],
+    )
+    assert res.exit_code == 0, res.stdout
+    body = _one_json(res.stdout)
+    assert body["command"] == "ask"
+    assert body["items"][0]["answer"] == "A treaty."
+    assert "A treaty." in res.stdout
+    assert body["flags"]["read_only"] is True
+
+
+def test_ask_format_json_needs_question(cfg_file):
+    res = runner.invoke(cli.app, ["ask", "-c", str(cfg_file), "--format", "json"])
+    assert res.exit_code == 1
+    assert "needs a question" in res.stdout
+
+
+def test_all_format_json_one_envelope(cfg_file, stub_zotero, monkeypatch):
+    monkeypatch.setattr(
+        cli,
+        "_dispatch_all_step",
+        lambda *a, **k: None,
+    )
+    res = runner.invoke(
+        cli.app,
+        ["all", "-c", str(cfg_file), "-C", "BBNJ", "--dry-run", "--format", "json"],
+    )
+    assert res.exit_code == 0, res.stdout
+    body = _one_json(res.stdout)
+    assert body["command"] == "all"
+    assert "Pack" not in res.stdout
+    assert all(row["status"] == "ok" or row["status"] == "skipped" for row in body["items"])

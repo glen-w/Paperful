@@ -21,7 +21,19 @@ def _people_payload(people: list[dict]) -> dict:
     return {"data": {"people": people}}
 
 
-def test_classify_listing_rejects_researchgate():
+def test_homepage_preferred_over_linkedin():
+    from paperful.twenty import parse_person
+
+    hit = parse_person(
+        {
+            "id": "1",
+            "name": {"firstName": "Ada", "lastName": "Lovelace"},
+            "linkedinLink": {"primaryLinkUrl": "https://www.linkedin.com/in/ada"},
+            "homepage": "https://lovelace.github.io/papers/",
+        }
+    )
+    assert hit is not None
+    assert "github.io" in hit.website
     assert classify_listing_url("https://www.researchgate.net/profile/Ada") == ""
 
 
@@ -92,15 +104,12 @@ def test_lookup_ambiguous_and_empty_do_not_write(cfg, monkeypatch):
             ]
         )
 
-    authors = [PackAuthor(name="Ada Lovelace", fingerprint="lovelace|a")]
+    authors = [PackAuthor(name="Lovelace", fingerprint="lovelace|")]
     rows = lookup_authors(
         cfg, authors, getter=getter, collection="BBNJ", apply=True
     )
     assert rows[0].status == "ambiguous"
-    assert not pack_path(cfg, "bbnj", promoted=False).is_file() or not any(
-        a.listing_url
-        for a in (load_pack_file(pack_path(cfg, "bbnj", promoted=False)).authors)
-    )
+    assert not pack_path(cfg, "bbnj", promoted=False).is_file()
     assert not list((cfg.state_dir / "author-contacts").glob("*.json"))
 
 

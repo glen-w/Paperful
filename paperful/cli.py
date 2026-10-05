@@ -205,10 +205,27 @@ twenty_app = typer.Typer(
     help="Read-only Twenty CRM author lookup (opt-in). Never sends mail or writes the CRM.",
 )
 app.add_typer(twenty_app, name="twenty")
+authorwatch_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help=(
+        "People lists: poll OpenAlex for those authors' new papers. "
+        "Not snowball watch, not the PDF inbox folder. Does not scrape social sites."
+    ),
+)
+app.add_typer(authorwatch_app, name="authorwatch")
 
 # Canonical top-level verbs. tests/test_cli.py asserts this matches `paperful --help`.
 JOBS: dict[str, tuple[str, ...]] = {
-    "library": ("collections", "import", "export", "snowball", "ingest-dois", "twenty"),
+    "library": (
+        "collections",
+        "import",
+        "export",
+        "snowball",
+        "ingest-dois",
+        "twenty",
+        "authorwatch",
+    ),
     "find": ("run", "attach", "recover", "gaps", "inbox", "urls", "htmlpdf"),
     "completeness": (
         "lint",
@@ -875,8 +892,9 @@ def _no_write(backend: LibraryBackend) -> str:
 
 def _flush(backend: LibraryBackend) -> None:
     behind = getattr(backend, "unrefreshed", None)
+    err = Console(stderr=True, highlight=False)
     if behind:
-        console.print(
+        err.print(
             f"[yellow]{len(behind)} item(s) changed in the library but not yet in "
             f"the mirror. paperful snapshot brings them in.[/]"
         )
@@ -886,8 +904,8 @@ def _flush(backend: LibraryBackend) -> None:
     path = fn()
     if path is None:
         return
-    console.print(f"[green]EndNote import bundle[/] {path}")
-    console.print(
+    err.print(f"[green]EndNote import bundle[/] {path}")
+    err.print(
         "[dim]In EndNote: File → Import → File → paperful.xml "
         "(import option: EndNote Generated XML).[/]"
     )
@@ -993,7 +1011,7 @@ def jobs() -> None:
 
 @app.command()
 def mcp(config: Path | None = ConfigOpt) -> None:
-    """Stdio MCP: refs_gap (dry-run) and ask (index read-only)."""
+    """Optional stdio MCP: refs_gap (dry-run) and ask (index read-only). Prefer --format json."""
     from .mcp_server import serve_stdio
 
     serve_stdio(_cfg(config))
@@ -3696,11 +3714,11 @@ def _agent_json(fmt: str) -> bool:
 
 
 def _emit_agent(payload: dict[str, Any], *, json_out: bool, human: Callable[[], None]) -> None:
-    from .agent_json import dumps
+    from .agent_json import emit_stdout, stdout_suppressed
 
     if json_out:
-        console.print(dumps(payload), markup=False, highlight=False, soft_wrap=True)
-    else:
+        emit_stdout(payload)
+    elif not stdout_suppressed():
         human()
     code = int(payload.get("exit") or 0)
     if code:
@@ -4476,22 +4494,13 @@ def refs_gap(
     folder = write_pack(cfg.state_dir, scope, refs, findings)
     missing = [r for r in refs if not r.already_exists]
     ocr_n = sum(1 for f in findings if f.finding == "needs_ocr")
-    from .agent_json import envelope
+    from .agent_ops import refs_gap_envelope
 
-    payload = envelope(
-        command="refs gap",
-        summary={"cited": len(refs), "missing": len(missing), "needs_ocr": ocr_n},
-        items=[
-            {
-                "doi": r.doi,
-                "title": r.title,
-                "cited_by_count_in_scope": len(r.citing_keys),
-                "suggested_action": r.suggested_action,
-            }
-            for r in sorted(missing, key=lambda r: (-len(r.citing_keys), r.doi or r.title))
-        ],
-        paths={"pack": str(folder)},
-        flags={"dry_run": True, "dedupe_scope": dedupe_scope},
+    payload = refs_gap_envelope(
+        refs=refs,
+        findings=findings,
+        folder=folder,
+        flags={"dedupe_scope": dedupe_scope},
     )
 
     def _human_gap() -> None:
@@ -4705,6 +4714,7 @@ def ingest_dois_cmd(
     from dataclasses import asdict as _asdict
 
     from .agent_json import envelope
+    from .agent_ops import ingest_dois_exit
 
     payload = envelope(
         command="ingest-dois",
@@ -4712,6 +4722,9 @@ def ingest_dois_cmd(
         items=[_asdict(row) for row in batch.rows],
         paths={"summary": str(folder)},
         flags={"apply": apply, "dry_run": not apply},
+        exit_code=ingest_dois_exit(
+            apply=apply, created=int(counts["created"]), failed=int(counts["failed"])
+        ),
     )
 
     def _human_ingest() -> None:
@@ -6505,6 +6518,7 @@ def _ask_once(
     show_context: bool,
     history: list[dict[str, str]] | None = None,
     retrieve_as: str | None = None,
+    quiet: bool = False,
     **retrieval: Any,
 ) -> dict[str, Any]:
     """Answer one question on the terminal and return it for the run report."""
@@ -6517,32 +6531,36 @@ def _ask_once(
         retrieve_as=retrieve_as,
         **retrieval,
     )
-    if show_context and reply.hits:
+    if quiet:
+        reply.read()
+    elif show_context and reply.hits:
         console.print("[bold]Passages[/]")
         _print_hits(reply.hits)
         console.print()
-    # Answers carry [S1]-style markers; Rich would read them as markup and drop them.
-    if stream:
-        for piece in reply:
-            console.out(piece, end="", highlight=False)
-        console.out("", highlight=False)
-    else:
-        with _spinner("Thinking…"):
-            reply.read()
-        console.print(reply.text, markup=False, highlight=False)
+    if not quiet:
+        # Answers carry [S1]-style markers; Rich would read them as markup and drop them.
+        if stream:
+            for piece in reply:
+                console.out(piece, end="", highlight=False)
+            console.out("", highlight=False)
+        else:
+            with _spinner("Thinking…"):
+                reply.read()
+            console.print(reply.text, markup=False, highlight=False)
+        cited = reply.cited()
+        listed = cited or reply.sources
+        if listed:
+            heading = "Sources" if cited else "Retrieved, not cited"
+            console.print(f"\n[bold]{heading}[/]")
+            for source in listed:
+                pages = f" {', '.join(source.pages)}." if source.pages else ""
+                console.print(
+                    f"[{source.marker}] {source.citation}. {source.title}.{pages} "
+                    f"[{source.item_key}]",
+                    markup=False,
+                    highlight=False,
+                )
     cited = reply.cited()
-    listed = cited or reply.sources
-    if listed:
-        heading = "Sources" if cited else "Retrieved, not cited"
-        console.print(f"\n[bold]{heading}[/]")
-        for source in listed:
-            pages = f" {', '.join(source.pages)}." if source.pages else ""
-            console.print(
-                f"[{source.marker}] {source.citation}. {source.title}.{pages} "
-                f"[{source.item_key}]",
-                markup=False,
-                highlight=False,
-            )
     return {
         "question": question,
         "answer": reply.text,
@@ -6606,14 +6624,23 @@ def ask(
         help="Follow-up thread under state/rag/threads/. 'new' starts one; omit for a one-shot.",
     ),
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Answer a question from the indexed library, with sources. Needs `rag ingest` first."""
     from .llm import LLMClientError, get_client, llm_egress_is_remote
     from .llm.preflight import validate_llm_for_ask
     from .llm.validate import LlmConfigError
     from .rag.retrieve import scope_keys
+    from .agent_json import batch_exit
+    from .agent_ops import ask_envelope
 
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    if json_out and question is None:
+        console.print("[red]ask --format json needs a question.[/]")
+        raise typer.Exit(1)
+    if json_out:
+        no_stream = True
     _rag_require(cfg)
     try:
         validate_llm_for_ask(cfg)
@@ -6622,7 +6649,7 @@ def ask(
         raise typer.Exit(1) from exc
     types = _resolve_types(item_type)
     embedder = _rag_embedder(cfg)
-    if llm_egress_is_remote(cfg):
+    if llm_egress_is_remote(cfg) and not json_out:
         console.print(
             "[yellow]Remote LLM — excerpts from your PDFs leave this machine.[/]"
         )
@@ -6641,7 +6668,9 @@ def ask(
     failures = 0
     from .rag.thread import load_thread, new_id, rewrite_query, save_thread
 
-    use_thread = thread is not None or (question is None and sys.stdin.isatty())
+    use_thread = thread is not None or (
+        (not json_out) and question is None and sys.stdin.isatty()
+    )
     thread_id = None
     turns: list[dict[str, str]] = []
     if use_thread:
@@ -6649,7 +6678,7 @@ def ask(
         thread_id = new_id() if raw_id in {"", "new"} else raw_id
         loaded = load_thread(cfg.state_dir, thread_id)
         turns = list(loaded.turns)
-        if use_thread:
+        if use_thread and not json_out:
             console.print(f"[dim]Thread {thread_id} ({len(turns) // 2} turns)[/]")
     for asked in _ask_questions(question):
         retrieve_as = asked
@@ -6660,7 +6689,7 @@ def ask(
                 cfg,
                 asked,
                 stream=not no_stream,
-                show_context=show_context,
+                show_context=show_context and not json_out,
                 history=turns,
                 retrieve_as=retrieve_as,
                 k=top_k,
@@ -6669,6 +6698,7 @@ def ask(
                 embedder=embedder,
                 index=index,
                 ledger=ledger,
+                quiet=json_out,
             )
             row["retrieve_as"] = retrieve_as
             answered.append(row)
@@ -6682,13 +6712,15 @@ def ask(
                     Thread(thread_id=thread_id, turns=turns, last_query=retrieve_as),
                 )
         except KeyboardInterrupt:
-            console.print("\n[yellow]Cancelled.[/]")
+            if not json_out:
+                console.print("\n[yellow]Cancelled.[/]")
             failures += 1
         except LLMClientError as exc:
-            console.print()
-            console.print(str(exc), markup=False, style="red")
+            if not json_out:
+                console.print()
+                console.print(str(exc), markup=False, style="red")
             failures += 1
-        if question is None:
+        if question is None and not json_out:
             console.print()
     if answered or failures:
         write_command_report(
@@ -6709,6 +6741,29 @@ def ask(
             },
             started=started,
         )
+    code = batch_exit(ok=len(answered), failed=failures)
+    if json_out:
+        first = (question or "").strip()
+        summary = {
+            "questions": len(answered) + failures,
+            "answered": len(answered),
+        }
+        if first:
+            summary["question"] = first
+        if thread_id:
+            summary["thread"] = thread_id
+        payload = ask_envelope(
+            items=answered,
+            summary=summary,
+            flags={
+                "read_only": True,
+                "top_k": top_k or cfg.rag_top_k,
+                **({"thread": thread_id} if thread_id else {}),
+            },
+            exit_code=code,
+        )
+        _emit_agent(payload, json_out=True, human=lambda: None)
+        return
     if question is not None and failures:
         raise typer.Exit(1)
 
@@ -7356,7 +7411,8 @@ def all_cmd(
         _refuse_missing_scope()
     opened = False
     if pack_join_disabled():
-        console.print("[dim]PAPERFUL_PACK=off — reports are not grouped.[/]")
+        if not json_out:
+            console.print("[dim]PAPERFUL_PACK=off — reports are not grouped.[/]")
     elif current_id(cfg) is None:
         try:
             pack = open_pack(cfg, label=label or bound.name or "all")
@@ -7364,12 +7420,16 @@ def all_cmd(
             console.print(f"[red]{exc}[/]")
             raise typer.Exit(1) from exc
         opened = True
-        console.print(f"[dim]Pack {pack['id']} opened.[/]")
+        if not json_out:
+            console.print(f"[dim]Pack {pack['id']} opened.[/]")
     else:
-        console.print(f"[dim]Pack {current_id(cfg)} joined.[/]")
+        if not json_out:
+            console.print(f"[dim]Pack {current_id(cfg)} joined.[/]")
     scope = _all_scope(bound, config)
     steps_done: list[dict[str, Any]] = []
     chain_exit = 0
+    from .agent_json import suppress_stdout
+
     try:
         for step in bound.steps:
             if step == "summarize" and dry_run:
@@ -7397,14 +7457,28 @@ def all_cmd(
             if not json_out:
                 console.print(f"\n[bold]all[/] · {step}")
             try:
-                _dispatch_all_step(
-                    step,
-                    bound,
-                    scope,
-                    dry_run=dry_run,
-                    browser_agent=browser_agent,
-                    serpapi_max=serpapi_max if isinstance(serpapi_max, int) else None,
-                )
+                if json_out:
+                    with suppress_stdout():
+                        _dispatch_all_step(
+                            step,
+                            bound,
+                            scope,
+                            dry_run=dry_run,
+                            browser_agent=browser_agent,
+                            serpapi_max=serpapi_max
+                            if isinstance(serpapi_max, int)
+                            else None,
+                            json_out=True,
+                        )
+                else:
+                    _dispatch_all_step(
+                        step,
+                        bound,
+                        scope,
+                        dry_run=dry_run,
+                        browser_agent=browser_agent,
+                        serpapi_max=serpapi_max if isinstance(serpapi_max, int) else None,
+                    )
                 steps_done.append({"step": step, "status": "ok"})
             except typer.Exit as exc:
                 code = int(exc.exit_code or 0)
@@ -7444,7 +7518,9 @@ def _dispatch_all_step(
     dry_run: bool,
     browser_agent: bool | None = None,
     serpapi_max: int | None = None,
+    json_out: bool = False,
 ) -> None:
+    fmt = "json" if json_out else "text"
     if step == "gaps":
         _call_step(
             gaps,
@@ -7454,8 +7530,10 @@ def _dispatch_all_step(
             handoff=None,
             include_doi_tabs=False,
             downloads_dir=None,
+            request_rg=None,
+            re_request=False,
             to=None,
-            fmt="text",
+            fmt=fmt,
         )
         return
     if step == "run":
@@ -7476,13 +7554,15 @@ def _dispatch_all_step(
             handoff=None,
             include_doi_tabs=False,
             downloads_dir=None,
+            request_rg=None,
+            re_request=False,
             ezproxy_relogin=None,
             serpapi_max=serpapi_max,
-            fmt="text",
+            fmt=fmt,
         )
         return
     if step == "lint":
-        _call_step(lint, **scope, limit=bound.limit, as_json=False, strict=False, fmt="text")
+        _call_step(lint, **scope, limit=bound.limit, as_json=False, strict=False, fmt=fmt)
         return
     if step == "fix-metadata":
         _call_step(
@@ -7491,7 +7571,7 @@ def _dispatch_all_step(
             limit=bound.limit,
             apply=False if dry_run else bound.apply,
             overwrite=bound.overwrite,
-            fmt="text",
+            fmt=fmt,
         )
         return
     if step == "ocr":
@@ -7502,7 +7582,7 @@ def _dispatch_all_step(
             limit=bound.limit,
             apply=False if dry_run else bound.apply,
             attach=False,
-            fmt="text",
+            fmt=fmt,
         )
         return
     if step == "summarize":
@@ -7515,7 +7595,7 @@ def _dispatch_all_step(
             to=None,
             prompt=None,
             force=False,
-            fmt="text",
+            fmt=fmt,
         )
         return
     if step == "snapshot":
@@ -7531,7 +7611,7 @@ def _dispatch_all_step(
             apply_medium=False,
             phase="all",
             as_json=False,
-            fmt="text",
+            fmt=fmt,
         )
         return
     if step == "restore":
@@ -7541,7 +7621,7 @@ def _dispatch_all_step(
             limit=bound.limit,
             dry_run=dry_run,
             apply=False if dry_run else bound.apply,
-            fmt="text",
+            fmt=fmt,
         )
         return
     if step == "synthesize":
@@ -7555,7 +7635,7 @@ def _dispatch_all_step(
             dry_run=dry_run,
             force=False,
             limit=bound.limit,
-            fmt="text",
+            fmt=fmt,
         )
         return
     console.print(f"[red]Unknown step {step!r}.[/]")
@@ -8068,6 +8148,12 @@ def _profile_queries(body: dict[str, Any], queries: list[str], *, or_mode: bool)
     if or_mode:
         body["query_op"] = "or"
 
+def _snowball_console(*, json_out: bool) -> Console:
+    if json_out:
+        return Console(file=sys.stderr, highlight=False, quiet=True)
+    return console
+
+
 def _run_snowball(
     cfg: Config,
     action: Any,
@@ -8082,7 +8168,10 @@ def _run_snowball(
     try:
         result = action(cfg)
     except SnowballError as exc:
-        console.print(f"[red]{exc}[/]")
+        if json_out:
+            Console(stderr=True, highlight=False).print(f"[red]{exc}[/]")
+        else:
+            console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
     _rag_auto(cfg, snowball_started)
     summary = getattr(result, "summary", None) or {}
@@ -8147,9 +8236,12 @@ def snowball_search(
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Search OpenAlex and write a candidate queue. Creates items only with --gate auto."""
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    out = _snowball_console(json_out=json_out)
     request = _snowball_request(
         cfg,
         gate=gate,
@@ -8183,7 +8275,12 @@ def snowball_search(
     except ValueError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(2) from exc
-    _run_snowball(cfg, lambda c: run_search(c, query, request, console=console))
+    _run_snowball(
+        cfg,
+        lambda c: run_search(c, query, request, console=out),
+        json_out=json_out,
+        command="snowball search",
+    )
 
 
 @snowball_app.command("hybrid")
@@ -8222,9 +8319,12 @@ def snowball_hybrid(
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Keyword hits, then one hop from the top DOIs. Not a separate harvest command."""
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    out = _snowball_console(json_out=json_out)
     request = _snowball_request(
         cfg,
         gate=gate,
@@ -8257,7 +8357,12 @@ def snowball_hybrid(
     except ValueError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(2) from exc
-    _run_snowball(cfg, lambda c: run_hybrid(c, query, request, console=console))
+    _run_snowball(
+        cfg,
+        lambda c: run_hybrid(c, query, request, console=out),
+        json_out=json_out,
+        command="snowball hybrid",
+    )
 
 
 @snowball_app.command("doi")
@@ -8293,9 +8398,12 @@ def snowball_doi(
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
     seeds_file: str | None = SeedsFileOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Bibliography and/or citing works of each DOI. Creates items only with --gate auto."""
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    out = _snowball_console(json_out=json_out)
     request = _snowball_request(
         cfg,
         gate=gate,
@@ -8324,7 +8432,12 @@ def snowball_doi(
     except SnowballError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
-    _run_snowball(cfg, lambda c: run_doi(c, seeds, request, console=console))
+    _run_snowball(
+        cfg,
+        lambda c: run_doi(c, seeds, request, console=out),
+        json_out=json_out,
+        command="snowball doi",
+    )
 
 
 @snowball_app.command("orcid")
@@ -8360,9 +8473,12 @@ def snowball_orcid(
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
     seeds_file: str | None = SeedsFileOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """People's works (ORCID + OpenAlex), then references/citations those works expand to."""
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    out = _snowball_console(json_out=json_out)
     request = _snowball_request(
         cfg,
         gate=gate,
@@ -8391,7 +8507,9 @@ def snowball_orcid(
     except SnowballError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
-    _run_snowball(cfg, lambda c: run_orcid(c, seeds, request, console=console))
+    _run_snowball(
+        cfg, lambda c: run_orcid(c, seeds, request, console=out), json_out=json_out, command="snowball orcid"
+    )
 
 
 @snowball_app.command("collection")
@@ -8429,9 +8547,12 @@ def snowball_collection(
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Expand DOIs already in a collection. Creates items only with --gate auto."""
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    out = _snowball_console(json_out=json_out)
     target = collection or seed_collection
     request = _snowball_request(
         cfg,
@@ -8457,7 +8578,10 @@ def snowball_collection(
     from .snowball.command import run_collection
 
     _run_snowball(
-        cfg, lambda c: run_collection(c, seed_collection, request, console=console)
+        cfg,
+        lambda c: run_collection(c, seed_collection, request, console=out),
+        json_out=json_out,
+        command="snowball collection",
     )
 
 
@@ -8529,9 +8653,12 @@ def snowball_resume(
     dedupe_scope: str | None = DedupeScopeOpt,
     dedupe_after: str | None = DedupeAfterOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Continue OpenAlex work saved when the daily budget was spent. Same API key."""
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    out = _snowball_console(json_out=json_out)
     request = _snowball_request(
         cfg,
         gate=gate,
@@ -8547,7 +8674,12 @@ def snowball_resume(
     )
     from .snowball.command import run_resume
 
-    _run_snowball(cfg, lambda c: run_resume(c, run_id, request, console=console))
+    _run_snowball(
+        cfg,
+        lambda c: run_resume(c, run_id, request, console=out),
+        json_out=json_out,
+        command="snowball resume",
+    )
 
 
 @snowball_app.command("apply")
@@ -8564,6 +8696,7 @@ def snowball_apply(
     """Create keep=true rows from a prior queue (approve-batch or edited dry-run)."""
     cfg = _cfg(config)
     json_out = _agent_json(fmt)
+    out = _snowball_console(json_out=json_out)
     request = _snowball_request(
         cfg,
         gate="auto",
@@ -8581,7 +8714,7 @@ def snowball_apply(
 
     _run_snowball(
         cfg,
-        lambda c: run_apply(c, run_id, request, console=console),
+        lambda c: run_apply(c, run_id, request, console=out),
         json_out=json_out,
         command="snowball apply",
     )
@@ -8602,9 +8735,12 @@ def snowball_run(
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
     """Run a saved snowball profile (keyword, DOI, ORCID, or collection)."""
     cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    out = _snowball_console(json_out=json_out)
     from .snowball.command import (
         SnowballError,
         run_collection,
@@ -8639,25 +8775,33 @@ def snowball_run(
         if author_site_preflight is not None:
             request.author_site_preflight = author_site_preflight
         description = str(raw.get("description") or "").strip()
-        if description:
+        if description and not json_out:
             console.print(description)
         mode = str(raw.get("mode") or "")
         if mode == "search":
             query = composed_query_from_profile(raw)
-            action = lambda c: run_search(c, query, request, console=console)
+
+            def action(c):
+                return run_search(c, query, request, console=out)
         elif mode == "hybrid":
             query = composed_query_from_profile(raw)
-            action = lambda c: run_hybrid(c, query, request, console=console)
+
+            def action(c):
+                return run_hybrid(c, query, request, console=out)
         elif mode == "doi":
             dois = [str(item) for item in (raw.get("dois") or [])]
-            action = lambda c: run_doi(c, dois, request, console=console)
+
+            def action(c):
+                return run_doi(c, dois, request, console=out)
         elif mode == "orcid":
             from .snowball.profile import orcids_from_profile
 
             orcids = orcids_from_profile(raw)
             if not orcids:
                 raise SnowballError(f"Profile {profile!r} needs orcid or orcids.")
-            action = lambda c: run_orcid(c, orcids, request, console=console)
+
+            def action(c):
+                return run_orcid(c, orcids, request, console=out)
         elif mode == "collection":
             seed = str(
                 raw.get("seed_collection") or raw.get("collection") or ""
@@ -8666,7 +8810,9 @@ def snowball_run(
                 raise SnowballError(f"Profile {profile!r} needs seed_collection.")
             if not request.collection.strip():
                 request.collection = seed
-            action = lambda c: run_collection(c, seed, request, console=console)
+
+            def action(c):
+                return run_collection(c, seed, request, console=out)
         else:
             raise SnowballError(
                 f"Profile {profile!r} mode must be search, hybrid, doi, orcid, or collection."
@@ -8674,7 +8820,7 @@ def snowball_run(
     except SnowballError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
-    _run_snowball(cfg, action)
+    _run_snowball(cfg, action, json_out=json_out, command="snowball run")
 
 
 snowball_profile_app = typer.Typer(
@@ -8989,6 +9135,205 @@ def snowball_watch_briefing(
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
     _print_briefing(briefing, apply=apply, collection=collection, cfg=cfg)
+
+
+def _authorwatch_call(action: Callable[[], Any]) -> Any:
+    from .authorwatch import AuthorwatchError
+
+    try:
+        return action()
+    except AuthorwatchError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(exc.code) from exc
+
+
+@authorwatch_app.command("save")
+def authorwatch_save(
+    name: str = typer.Argument(..., help="List name under state/authorwatch/<name>/."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Create an empty people list. No API keys."""
+    from .authorwatch import save_list
+
+    cfg = _cfg(config)
+    path = _authorwatch_call(lambda: save_list(cfg, name))
+    console.print(f"Wrote [bold]{path}[/]")
+
+
+@authorwatch_app.command("add")
+def authorwatch_add(
+    name: str = typer.Argument(..., help="List name."),
+    orcid: str = typer.Option("", "--orcid", help="ORCID iD (URL or XXXX-XXXX-XXXX-XXXX)."),
+    display_name: str = typer.Option("", "--name", help="Display name when ORCID is unknown."),
+    affiliation: str = typer.Option(
+        "", "--affiliation", help="Host or institution hint for resolve."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Append a person. --orcid is enough; --name stays unresolved until resolve."""
+    from .authorwatch import add_person
+
+    cfg = _cfg(config)
+    person = _authorwatch_call(
+        lambda: add_person(
+            cfg,
+            name,
+            orcid=orcid,
+            display_name=display_name,
+            affiliation_host=affiliation,
+        )
+    )
+    console.print(
+        f"Added {person.display_name or person.id} · {person.status} · {person.identity()}"
+    )
+
+
+@authorwatch_app.command("remove")
+def authorwatch_remove(
+    name: str = typer.Argument(..., help="List name."),
+    orcid: str = typer.Option("", "--orcid", help="ORCID iD to drop."),
+    person_id: str = typer.Option("", "--id", help="Person id from people.jsonl."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Drop a member by ORCID or id."""
+    from .authorwatch import remove_person
+
+    cfg = _cfg(config)
+    person = _authorwatch_call(
+        lambda: remove_person(cfg, name, orcid=orcid, person_id=person_id)
+    )
+    console.print(f"Removed {person.display_name or person.id}")
+
+
+@authorwatch_app.command("show")
+def authorwatch_show(
+    name: str = typer.Argument(..., help="List name."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """People counts, held candidates, baseline, next step. Does not open the library."""
+    from .authorwatch import show_list
+
+    cfg = _cfg(config)
+    _authorwatch_call(lambda: show_list(cfg, name, console=console))
+
+
+@authorwatch_app.command("resolve")
+def authorwatch_resolve(
+    name: str = typer.Argument(..., help="List name."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Fill missing ORCID/OpenAlex ids. Ambiguous names stay held."""
+    from .authorwatch import resolve_people
+
+    cfg = _cfg(config)
+    people = _authorwatch_call(lambda: resolve_people(cfg, name))
+    ok = sum(1 for row in people if row.is_ok())
+    held = sum(1 for row in people if row.status == "held")
+    unresolved = sum(1 for row in people if row.status == "unresolved")
+    console.print(f"ok {ok} · held {held} · unresolved {unresolved}")
+
+
+@authorwatch_app.command("import")
+def authorwatch_import(
+    name: str = typer.Argument(..., help="List name."),
+    path: Path | None = typer.Option(None, "--file", help="CSV, JSON, or ORCID list."),
+    source: str = typer.Option(
+        "csv",
+        "--source",
+        help="csv, json, orcid; rg/linkedin/academia need --file (no scrape).",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Import people from a file. Social --source without --file prints the export recipe."""
+    from .authorwatch import import_file
+
+    cfg = _cfg(config)
+    added = _authorwatch_call(
+        lambda: import_file(cfg, name, path=path, source=source)
+    )
+    console.print(f"Imported {len(added)} row(s)")
+
+
+@authorwatch_app.command("run")
+def authorwatch_run(
+    name: str = typer.Argument(..., help="List name."),
+    backfill_from: str | None = typer.Option(
+        None,
+        "--backfill-from",
+        help="YYYY-MM-DD publication date; propose recent works on this run.",
+    ),
+    max_authors: int = typer.Option(50, "--max-authors", help="Cap OpenAlex author polls."),
+    per_author_limit: int = typer.Option(
+        200, "--per-author-limit", help="Max works per author this run."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Cursor baseline (proposes 0) unless --backfill-from. Never creates library items."""
+    from .authorwatch import run_list
+
+    cfg = _cfg(config)
+    _authorwatch_call(
+        lambda: run_list(
+            cfg,
+            name,
+            console=console,
+            backfill_from=backfill_from,
+            max_authors=max_authors,
+            per_author_limit=per_author_limit,
+        )
+    )
+
+
+@authorwatch_app.command("briefing")
+def authorwatch_briefing(
+    name: str = typer.Argument(..., help="List name."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Write markdown from the inbox. Does not create items."""
+    from .authorwatch import write_briefing
+
+    cfg = _cfg(config)
+    path = _authorwatch_call(lambda: write_briefing(cfg, name))
+    console.print(f"Wrote [bold]{path}[/]")
+
+
+@authorwatch_app.command("apply")
+def authorwatch_apply_cmd(
+    name: str = typer.Argument(..., help="List name."),
+    collection: str = typer.Option(
+        ..., "--collection", "-C", help="Target collection path."
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Create metadata parents. Default is dry-run. PDFs stay paperful run.",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Create inbox rows in -C. Independent of [snowball] enabled."""
+    from .authorwatch import apply_list
+
+    cfg = _cfg(config)
+    backend = None
+    if apply:
+        _require_manager(cfg)
+        backend = _connect(cfg)
+        if not backend.supports_write():
+            _exit_env(_no_write(backend), cfg)
+
+    def _go() -> Any:
+        return apply_list(
+            cfg,
+            name,
+            collection,
+            console=console,
+            apply=apply,
+            backend=backend,
+        )
+
+    result = _authorwatch_call(_go)
+    if result.failed and result.created:
+        raise typer.Exit(3)
 
 
 if __name__ == "__main__":

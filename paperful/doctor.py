@@ -617,6 +617,7 @@ def run_checks(
     checks.extend(_rag_checks(cfg))
     checks.append(_snowball_check(cfg))
     checks.append(_author_packs_check(cfg))
+    checks.append(_authorwatch_check(cfg))
 
     return checks
 
@@ -675,6 +676,27 @@ def _author_packs_check(cfg: Config) -> Check:
             f"{len(promoted)} promoted · {stale} older than 180 days",
         )
     return Check("author packs", "green", f"{len(promoted)} promoted")
+
+
+def _authorwatch_check(cfg: Config) -> Check:
+    from .authorwatch import list_summaries
+
+    rows = list_summaries(cfg)
+    if not rows:
+        return Check("authorwatch", "green", "none")
+    empty_ok = [name for name, people, ok in rows if people and ok == 0]
+    if empty_ok:
+        return Check(
+            "authorwatch",
+            "amber",
+            f"{len(empty_ok)} list(s) with people but no ORCID/OpenAlex id",
+            code="authorwatch_held",
+        )
+    return Check(
+        "authorwatch",
+        "green",
+        f"{len(rows)} list(s)",
+    )
 
 
 def _openalex_probe_status(status: int, *, keyed: bool) -> str:

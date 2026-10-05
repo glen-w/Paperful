@@ -1,0 +1,11 @@
+{
+  "schema": "paperful.agent.json.v1",
+  "command": "inbox drain",
+  "exit": 0,
+  "ok": true,
+  "partial": false,
+  "summary": {"attached": 0, "errors": 0},
+  "items": [],
+  "paths": {"report": "", "inbox_dir": ""},
+  "flags": {"once": true}
+}

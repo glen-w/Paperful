@@ -525,6 +525,75 @@ class OpenAlexClient:
             params["sort"] = sort
         return self._collect("/works", params, limit)
 
+    def search_authors(self, name: str, *, limit: int = 8) -> list[dict[str, Any]]:
+        """OpenAlex author search. Callers fail closed when more than one hit remains."""
+        text = (name or "").strip()
+        if not text:
+            return []
+        self.stage = self.stage or f"OpenAlex authors {text}"
+        return self._collect(
+            "/authors",
+            {
+                "search": text,
+                "select": "id,display_name,orcid,last_known_institutions,works_count",
+            },
+            max(1, limit),
+        )
+
+    def author_by_orcid(self, orcid: str) -> dict[str, Any] | None:
+        cleaned = normalize_orcid(orcid)
+        if not cleaned:
+            return None
+        self.stage = self.stage or f"OpenAlex author {cleaned}"
+        rows = self._collect(
+            "/authors",
+            {
+                "filter": f"orcid:{cleaned}",
+                "select": "id,display_name,orcid,last_known_institutions,works_count",
+            },
+            2,
+        )
+        return rows[0] if rows else None
+
+    def works_by_author(
+        self,
+        *,
+        orcid: str = "",
+        openalex: str = "",
+        limit: int,
+        year_from: int | None = None,
+        year_to: int | None = None,
+        from_created_date: str | None = None,
+        from_publication_date: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Works for an ORCID or OpenAlex author id. Name-only is refused by callers."""
+        cleaned = normalize_orcid(orcid)
+        oa = short_id(openalex) if openalex else ""
+        if cleaned:
+            filters = [f"author.orcid:{cleaned}"]
+            label = cleaned
+        elif oa:
+            filters = [f"author.id:{oa}"]
+            label = oa
+        else:
+            return []
+        if year_from is not None:
+            filters.append(f"from_publication_date:{year_from}-01-01")
+        if year_to is not None:
+            filters.append(f"to_publication_date:{year_to}-12-31")
+        pub = (from_publication_date or "").strip()
+        if pub:
+            filters.append(f"from_publication_date:{pub[:10]}")
+        created = self._created_filter(from_created_date)
+        if created:
+            filters.append(f"from_created_date:{created}")
+        self.stage = self.stage or f"OpenAlex author {label}"
+        return self._collect(
+            "/works",
+            {"filter": ",".join(filters), "select": SELECT},
+            limit,
+        )
+
     def works_by_author_orcid(
         self,
         orcid: str,
@@ -533,24 +602,16 @@ class OpenAlexClient:
         year_from: int | None = None,
         year_to: int | None = None,
         from_created_date: str | None = None,
+        from_publication_date: str | None = None,
     ) -> list[dict[str, Any]]:
         """OpenAlex works for an ORCID (fills gaps left by the ORCID public API)."""
-        cleaned = normalize_orcid(orcid)
-        if not cleaned:
-            return []
-        filters = [f"author.orcid:{cleaned}"]
-        if year_from is not None:
-            filters.append(f"from_publication_date:{year_from}-01-01")
-        if year_to is not None:
-            filters.append(f"to_publication_date:{year_to}-12-31")
-        created = self._created_filter(from_created_date)
-        if created:
-            filters.append(f"from_created_date:{created}")
-        self.stage = self.stage or f"OpenAlex author {cleaned}"
-        return self._collect(
-            "/works",
-            {"filter": ",".join(filters), "select": SELECT},
-            limit,
+        return self.works_by_author(
+            orcid=orcid,
+            limit=limit,
+            year_from=year_from,
+            year_to=year_to,
+            from_created_date=from_created_date,
+            from_publication_date=from_publication_date,
         )
 
 

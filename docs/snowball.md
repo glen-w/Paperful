@@ -33,10 +33,19 @@ paperful snowball apply <run-id> -C "Inbox/Snowball"
 paperful snowball hybrid "high seas EIA" --hybrid-seeds 5 --direction refs
 paperful snowball search "high seas EIA" --gate auto --fetch-pdfs fast -C "Inbox/Snowball"
 paperful snowball orcid 0000-0002-9162-9618 --gate auto --fetch-pdfs full -C "Snowball/0000-0002-9162-9618"
+paperful snowball search "high seas EIA" --gate dry-run --format json
+paperful snowball apply <run-id> -C "Inbox/Snowball" --format json
 paperful snowball watch save bbnj --profile keyword-scout
 paperful snowball watch run bbnj
 paperful snowball watch briefing bbnj
 ```
+
+`--format json` on crawl (`search` / `hybrid` / `doi` / `orcid` / `collection`),
+`run`, `resume`, and `apply` prints one
+[`paperful.agent.json.v1`](commands.md#exits) object on stdout (run path +
+summary; progress on stderr). Mixed `apply` writes exit **3**. Prefer that
+over MCP for shell agents.
+
 `search`, `hybrid`, `doi`, `orcid`, and `collection` are seeds under one verb.
 `search` and `hybrid` take one or more keyword terms (AND by default; `--or`
 matches any). `doi` and `orcid` take one or more seeds in a single crawl
@@ -53,6 +62,9 @@ Later runs write only works that were not in that set. Creating items stays on
 `snowball apply` (or a separate writing-gate crawl). Watch always forces
 `gate = dry-run` and `fetch_pdfs = off`, so a profile with `gate = auto` cannot
 create parents or download PDFs from a watch.
+
+People you follow (ORCID lists, no hop) are [`authorwatch`](authorwatch.md), not
+this profile watch.
 
 ```text
 paperful snowball watch save bbnj --profile keyword-scout
@@ -222,6 +234,8 @@ Opt-in `--author-site-preflight` writes `coauthors.json` and a **proposed**
 pack under `state/author-packs/`. `snowball packs promote <slug>` makes it
 available to the `author_site` grey lane (`grey:author_site`). SearXNG is
 used only when `[searxng].base_url` or `SEARXNG_BASE_URL` is set.
+`[twenty].lookup_on_preflight` (with `[twenty].enabled`) may add CRM websites
+to that proposed pack. Promote before fetch; Paperful does not send mail.
 
 ## One-shot PDFs
 

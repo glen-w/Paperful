@@ -170,10 +170,16 @@ prints one line and `rag ingest` catches up later. It is off by default.
 uv run paperful rag search "environmental impact assessment thresholds" -C ocean/BBNJ
 uv run paperful ask "What does the BBNJ Agreement require for EIAs?" -C ocean/BBNJ
 uv run paperful ask "…" --show-context     # also list the passages used
+uv run paperful ask "…" --format json      # one paperful.agent.json.v1 object (implies --no-stream)
 uv run paperful ask                        # prompt for several; follow-ups share a thread
 uv run paperful ask --thread new "…"       # start a stored thread
 uv run paperful ask --thread <id> "and the EIA part?"
 ```
+
+`--format json` needs a question on the command line (no TTY multi-question
+loop). Agents that can shell out should prefer that over `paperful mcp`
+(`ask` tool returns the same envelope). Exit codes follow the
+[commands](commands.md#exits) table.
 
 `ask` prints the answer as it is written, then the sources it cited:
 

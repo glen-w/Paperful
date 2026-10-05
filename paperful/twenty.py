@@ -164,11 +164,16 @@ def work_emails(emails: list[str]) -> list[str]:
 
 
 def _website_from(row: dict[str, Any]) -> str:
-    for key in ("website", "websiteUrl", "url"):
-        text = _text(row.get(key))
-        if text.lower().startswith("http"):
-            return text
-    for key in ("linkedinLink", "xLink", "websiteLink"):
+    for key in (
+        "homepage",
+        "facultyPage",
+        "website",
+        "websiteUrl",
+        "url",
+        "linkedinLink",
+        "xLink",
+        "websiteLink",
+    ):
         text = _text(row.get(key))
         if text.lower().startswith("http"):
             return text
@@ -272,7 +277,11 @@ def names_match(hit: PersonHit, last: str, first: str = "") -> bool:
         return False
     if hit_first == want_first:
         return True
-    return hit_first.startswith(want_first[:1]) and want_first.startswith(hit_first[:1])
+    if len(want_first) == 1:
+        return hit_first.startswith(want_first)
+    if len(hit_first) == 1:
+        return want_first.startswith(hit_first)
+    return hit_first.startswith(want_first) or want_first.startswith(hit_first)
 
 
 def unique_match(hits: list[PersonHit], last: str, first: str = "") -> PersonHit | None:
@@ -374,6 +383,7 @@ def lookup_authors(
 ) -> list[LookupRow]:
     rows: list[LookupRow] = []
     pack: AuthorPack | None = None
+    wrote_listing = False
     slug = pack_slug(collection)
     if apply:
         dest = pack_path(cfg, slug, promoted=False)
@@ -423,6 +433,7 @@ def lookup_authors(
             write_contact(cfg, author, hit)
             if listing and pack is not None:
                 merge_listing_into_pack(pack, author, listing)
-    if apply and pack is not None:
+                wrote_listing = True
+    if apply and pack is not None and wrote_listing:
         write_pack(pack_path(cfg, slug, promoted=False), pack)
     return rows

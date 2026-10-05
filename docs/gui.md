@@ -44,8 +44,9 @@ job explicitly.
 
 Paperful’s jobs stay [library, find, completeness, mirror, control](why.md).
 The GUI is another **surface** on a shared **capability API** — the same
-verbs the CLI (and a future MCP) already express. It does not invent a
-second fetch stack or a second item schema.
+verbs the CLI already expresses (`--format json` / optional thin `paperful mcp`
+for `refs_gap` + `ask`). It does not invent a second fetch stack or a second
+item schema.
 
 ```text
   Browser UI  ──HTTP──►  Capability API  ──►  paperful.* (snowball, run, lint, …)

@@ -138,3 +138,55 @@ def test_mcp_unknown_tool_and_disabled_ask():
     off = type("C", (), {"rag_enabled": False})()
     body = call_ask(off, "What is BBNJ?")
     assert body["exit"] == 1 and "rag.enabled" in body["summary"]["error"]
+
+
+def test_golden_envelopes_have_required_keys():
+    folder = Path(__file__).parent / "fixtures" / "agent_json"
+    for name in ("run", "refs_gap", "ingest_dois", "inbox_drain", "ask"):
+        body = json.loads((folder / f"{name}.json").read_text(encoding="utf-8"))
+        assert all(k in body for k in REQUIRED_KEYS)
+        assert body["schema"] == SCHEMA
+
+
+def test_mcp_content_length_roundtrip():
+    from io import BytesIO
+
+    from paperful.mcp_server import _read_message, _write_message
+
+    payload = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+    buf = BytesIO()
+    _write_message(buf, payload)
+    raw = buf.getvalue()
+    assert raw.startswith(b"Content-Length: ")
+    buf.seek(0)
+    assert _read_message(buf) == payload
+    # Non-ASCII body: length is bytes, not characters.
+    wide = {"jsonrpc": "2.0", "id": 2, "result": {"msg": "café"}}
+    out = BytesIO()
+    _write_message(out, wide)
+    out.seek(0)
+    assert _read_message(out) == wide
+
+
+def test_mcp_newline_json():
+    from io import BytesIO
+
+    from paperful.mcp_server import _read_message
+
+    line = b'{"jsonrpc":"2.0","id":1,"method":"initialize"}\n'
+    assert _read_message(BytesIO(line))["method"] == "initialize"
+
+
+def test_mcp_refs_gap_empty_collection_does_not_open_library(monkeypatch):
+    from paperful.mcp_server import call_refs_gap
+
+    opened: list[int] = []
+    monkeypatch.setattr(
+        "paperful.catalogue.open_library",
+        lambda cfg: opened.append(1) or (_ for _ in ()).throw(RuntimeError("opened")),
+    )
+    body = call_refs_gap(type("C", (), {})(), "  ")
+    assert body["command"] == "refs gap"
+    assert body["exit"] == 1
+    assert opened == []
+    assert "collection is required" in body["summary"]["error"]

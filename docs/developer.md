@@ -92,10 +92,12 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `pipeline.py` | Order the lanes, save, attach, write the manifest | most things |
 | `cli.py` | Flags, progress, exits. No logic of its own | everything |
 | `agent_json.py` | `--format json` envelope (`paperful.agent.json.v1`) and exit 3 | none |
+| `agent_ops.py` | Shared refs-gap / ask builders for CLI JSON and MCP | `agent_json`, catalogue, rag |
 | `notehtml.py` | First-line prefixes + `paperful.note.v1` comment | none |
 | `notes.py` | Classify and trash Paperful-owned notes | `notehtml`, library protocol |
 | `handoff_rank.py` | Missing-PDF sort: refs-gap cites × miss severity | `handoff` |
-| `mcp_server.py` | Stdio MCP: dry-run `refs_gap`, read-only `ask` | JSON channel + catalogue |
+| `mcp_server.py` | Optional stdio MCP: dry-run `refs_gap`, read-only `ask` (same envelopes as CLI) | `agent_ops` |
+| `authorwatch.py` | People lists → OpenAlex new works; `apply` creates parents | OpenAlex client, `identity`, `snowball.ingest` |
 
 ## The refresh
 
@@ -131,6 +133,8 @@ Every step can be repeated. A crash leaves valid records and an old version.
 | `paperful.agent.json.v1` | stdout of `--format json` | Additive 0.x envelope around existing reports |
 | `paperful.note.v1` | HTML comment in child notes | Prefix + type/verb/model/run/prompt sha |
 | `paperful.rag.thread.v1` | `state/rag/threads/*.json` | Ask follow-up turns; under `state/` (backup-excluded) |
+| `paperful.authorwatch.v1` | `state/authorwatch/<name>/watch.json` | People-list cursor; under `state/` (backup-excluded) |
+| `paperful.authorwatch.person.v1` | `state/authorwatch/<name>/people.jsonl` | List members; backup-excluded |
 
 The catalogue rebuilds an `Item` from a record. The test
 `test_item_from_record_matches_the_live_listing` holds the two equal field

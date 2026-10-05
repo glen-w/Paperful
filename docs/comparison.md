@@ -59,8 +59,10 @@ proxy, playbooks, and an opt-in AI browser after the scripted lanes fail.
 (`snapshot` / `restore`; `snapshot --pdfs all` also copies PDFs already in
 Zotero). **(3)** is `paperful attachments`: a report by default, and
 `--fix-broken`, `--merge-files`, `--rename`, or `--link` only with
-`--apply`. **(4)** is other tools. **(5)** is partial here: the same opt-in
-summaries, plus one-item `recover`. A chat agent stays with zotero-mcp.
+`--apply`. **(4)** is other tools. **(5)** here is CLI `--format json`
+(`paperful.agent.json.v1` + exits) on batch verbs, plus a thin optional
+`paperful mcp` for dry-run `refs_gap` and read-only `ask`. A chat agent over
+the live Zotero catalogue stays with zotero-mcp.
 Scanned PDFs get a text layer from `paperful ocr`; two-up split and shrink
 stay with zotero-agent `pdf-prep`. **Library** is the catalogue you already
 have, grown with `snowball` when you ask. **Control** is disk-first

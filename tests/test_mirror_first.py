@@ -285,6 +285,7 @@ READ_VERBS = [
     ["export", "OUT.ris", "-C", "BBNJ"],
     ["ocr", "-C", "BBNJ"],
     ["run", "-C", "BBNJ", "--dry-run"],
+    ["authorwatch", "save", "ocean-people"],
 ]
 
 
@@ -311,6 +312,7 @@ WRITE_VERBS = [
     ["sync"],
     ["restore", "-C", "BBNJ"],
     ["attachments", "-C", "BBNJ"],
+    ["authorwatch", "apply", "ocean-people", "-C", "BBNJ", "--apply"],
 ]
 
 

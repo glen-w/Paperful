@@ -1,0 +1,11 @@
+{
+  "schema": "paperful.agent.json.v1",
+  "command": "refs gap",
+  "exit": 0,
+  "ok": true,
+  "partial": false,
+  "summary": {"cited": 0, "missing": 0, "needs_ocr": 0},
+  "items": [],
+  "paths": {"pack": ""},
+  "flags": {"dry_run": true}
+}
