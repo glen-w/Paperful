@@ -1,9 +1,8 @@
-# E2E all-in: NBA 2025–2026
+# E2E all-in: NBA (reference dogfood)
 
-Opt-in **all-in** end-to-end against a throwaway Zotero collection
-`e2e/NBA`. Keyword seed `NBA`, years 2025–2026. Grow (snowball → ORCID) →
-full PDF fetch (default lanes + browser-agent) → hygiene / summarize →
-author packs → Twenty / SearXNG when configured → reachout CSV → handoff.
+First shipped dogfood for the generic [E2E stack](e2e-stack.md): topic `NBA`,
+effort `low`, collection `e2e/NBA`. For any other topic or tier, use
+`scripts/e2e_stack.py` or `/e2e-watch`.
 
 This is **not** in default CI. Sci-Hub stays off. Paperful never sends mail.
 
@@ -11,7 +10,7 @@ This is **not** in default CI. Sci-Hub stays off. Paperful never sends mail.
 
 | Rule | Detail |
 | --- | --- |
-| Opt-in | `PAPERFUL_E2E=1` or `scripts/e2e_nba.py --force` |
+| Opt-in | `PAPERFUL_E2E=1` or `scripts/e2e_stack.py --force` |
 | Isolated writes | Only `-C e2e/NBA` (created on first snowball `--gate auto`) |
 | Soft-skip | Twenty, SearXNG, headed tabs, Scholar/EZProxy when not ready |
 | No Sci-Hub | Not in the harness; see [scihub](scihub.md) if you opt in yourself |
@@ -32,7 +31,7 @@ This is **not** in default CI. Sci-Hub stays off. Paperful never sends mail.
 
 | File | Kind | Role |
 | --- | --- | --- |
-| [`profiles/e2e-nba-search.toml`](../profiles/e2e-nba-search.toml) | snowball | Dry-run scout (`gate = dry-run`); harness overrides `--gate auto` |
+| [`profiles/e2e-nba-search.toml`](../profiles/e2e-nba-search.toml) | snowball | Same caps as harness (`gate = auto`, `fetch_pdfs = full`) |
 | [`profiles/e2e-nba-run.toml`](../profiles/e2e-nba-run.toml) | run | `all --profile e2e-nba-run` slice on `e2e/NBA` |
 
 ## One command
@@ -40,24 +39,25 @@ This is **not** in default CI. Sci-Hub stays off. Paperful never sends mail.
 ```sh
 make e2e-nba
 # or:
-PAPERFUL_E2E=1 uv run python scripts/e2e_nba.py
+PAPERFUL_E2E=1 uv run python scripts/e2e_stack.py --topic NBA --effort low
 ```
 
-Resume after a failed phase:
+Resume after a failed phase (keep the same `--topic` and `--effort`):
 
 ```sh
-PAPERFUL_E2E=1 uv run python scripts/e2e_nba.py --from-phase run_fetch --run-id <id>
-PAPERFUL_E2E=1 uv run python scripts/e2e_nba.py --phase reachout --run-id <id>
+PAPERFUL_E2E=1 uv run python scripts/e2e_stack.py --topic NBA --effort low \
+  --from-phase run_fetch --run-id <id>
 ```
 
-Machine witness: `state/e2e-nba/<run-id>/report.json` and `REPORT.md`.
+Machine witness: `state/e2e/<run-id>/report.json` and `REPORT.md` (older runs may
+be under `state/e2e-nba/`).
 
 ## Phases
 
 | # | Phase | What runs | Required |
 | --- | --- | --- | --- |
 | 0 | `doctor` | `paperful doctor --no-guide` | yes (exit 2 fails) |
-| 1 | `snowball_search` | Dry-run then `snowball search NBA … --gate auto --fetch-pdfs full -C e2e/NBA` (caps) | yes |
+| 1 | `snowball_search` | `snowball search NBA … --gate auto --fetch-pdfs full -C e2e/NBA` (optional `--dry-run-search` prelude) | yes |
 | 2 | `snowball_orcid` | ORCIDs from `candidates.jsonl` → `snowball orcid … --author-site-preflight` | yes if ≥1 ORCID, else skip |
 | 3 | `run_fetch` | `run -C e2e/NBA --try-all --retry-failed --upgrade-linked --browser-agent` | yes |
 | 4 | `hygiene` | `all … --steps lint,fix-metadata,summarize --apply` | yes (summarize soft if LLM off) |
@@ -89,7 +89,8 @@ SearXNG is only used inside snowball `--author-site-preflight`, not as a
 
 Do not fire-and-forget. Use Cursor `/watch` (or the same discipline by hand):
 
-1. Open `assessments/YYYY-MM-DD-e2e-nba-watch.md` (gitignored).
+1. Use `/e2e-watch` or copy [`templates/e2e-watch-assessment.md`](templates/e2e-watch-assessment.md)
+   into `assessments/YYYY-MM-DD-e2e-<topic>-watch.md` (gitignored).
 2. Record command, terminal path, start time.
 3. Poll the terminal. Progress (new phase lines) is not a hang.
 4. Hang quiet window: **10 minutes** (longer for one browser-agent item or a
@@ -100,7 +101,7 @@ Do not fire-and-forget. Use Cursor `/watch` (or the same discipline by hand):
 6. On hang: kill only that PID; then the failure path.
 7. Finalize the assessment: `completed` or `blocked`, duration, `git diff --stat`.
 
-Harness log: `state/e2e-nba/<run-id>/watch.log`.  
+Harness log: `state/e2e/<run-id>/watch.log`.  
 Assessment file: human/agent narrative. Keep both.
 
 ## Hermetic tests

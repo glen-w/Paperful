@@ -28,6 +28,7 @@ browser-agent = [
     "browser-use>=0.11; python_version >= '3.11'",
     "ollama>=0.4; python_version >= '3.11'",
 ]
+serve = ["fastapi>=0.115", "uvicorn>=0.32"]
 docs = [
     "sphinx>=7.0.0",
     "myst-parser>=2.0.0",
@@ -42,7 +43,7 @@ paperful = "paperful.cli:app"
 
 [dependency-groups]
 # lancedb here so CI runs the index tests.
-dev = ["pytest>=8", "lancedb>=0.39,<1"]
+dev = ["pytest>=8", "lancedb>=0.39,<1", "fastapi>=0.115", "uvicorn>=0.32", "httpx>=0.27"]
 
 [build-system]
 requires = ["hatchling"]

@@ -283,6 +283,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "profile",
         "playbooks",
         "mcp",
+        "serve",
     ),
     "utility": ("report", "version", "jobs"),
 }
@@ -1057,6 +1058,24 @@ def mcp(config: Path | None = ConfigOpt) -> None:
     from .mcp_server import serve_stdio
 
     serve_stdio(_cfg(config))
+
+
+@app.command()
+def serve(
+    host: str = typer.Option(
+        "127.0.0.1",
+        help="Bind address. Default is localhost only.",
+    ),
+    port: int = typer.Option(8765, help="TCP port."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Localhost HTTP API over CLI builders. Dry-run. Needs paperful[serve]. No library writes."""
+    from .serve import SERVE_HINT, fastapi_available, run_server
+
+    if not fastapi_available():
+        console.print(f"[red]{SERVE_HINT}[/]")
+        raise typer.Exit(1)
+    run_server(_cfg(config), host=host, port=port)
 
 
 @app.command()
@@ -4663,7 +4682,13 @@ def restore(
     fmt: str = AgentFormatOpt,
 ) -> None:
     """Recreate missing library items from out/. Dry-run unless --apply. Never overwrites fields."""
-    from .restore import apply_restore, iter_records, plan_restore, record_in_scope
+    from .restore import (
+        apply_restore,
+        dedupe_restore_records,
+        iter_records,
+        plan_restore,
+        record_in_scope,
+    )
 
     if _scope_unset(collection, library, profile, run_config):
         _refuse_missing_scope()
@@ -4721,6 +4746,7 @@ def restore(
             pair[1], year_from=year_from, year_to=year_to, item_types=types
         )
     ]
+    records = dedupe_restore_records(records)
     if limit:
         records = records[:limit]
     keys, _scope = _scope_keys(backend, collection, library)
@@ -4759,6 +4785,7 @@ def restore(
                 f"{len(records)} restore folder(s) · "
                 f"create {counts.get('create_item', 0)} · "
                 f"exists {counts.get('exists', 0)} · "
+                f"skip {counts.get('skip', 0)} · "
                 f"attach {counts.get('attach_pdf', 0)} · "
                 f"notes {counts.get('create_note', 0)}"
             )
@@ -7686,7 +7713,9 @@ def _profile_queries(body: dict[str, Any], queries: list[str], *, or_mode: bool)
 
 def _snowball_console(*, json_out: bool) -> Console:
     if json_out:
-        return Console(file=sys.stderr, highlight=False, quiet=True)
+        # Live E2E babysits long snowball phases; keep progress on stderr.
+        quiet = os.environ.get("PAPERFUL_E2E") != "1"
+        return Console(file=sys.stderr, highlight=False, quiet=quiet)
     return console
 
 

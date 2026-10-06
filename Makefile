@@ -2,7 +2,7 @@
 
 .DEFAULT_GOAL := help
 
-.PHONY: help docs docs-clean pages-site docker-build docker-doctor e2e-nba
+.PHONY: help docs docs-clean pages-site docker-build docker-doctor e2e-nba e2e-stack
 
 help:
 	@echo "paperful Makefile"
@@ -19,7 +19,8 @@ help:
 	@echo "  pages-site        Assemble website/ + Sphinx guide into _site/ (GitHub Pages)"
 	@echo ""
 	@echo "E2E (opt-in, not CI):"
-	@echo "  e2e-nba           All-in live E2E on e2e/NBA (PAPERFUL_E2E=1; see docs/e2e-nba.md)"
+	@echo "  e2e-stack         All-in live E2E: TOPIC=... EFFORT=low|med|high (see docs/e2e-stack.md)"
+	@echo "  e2e-nba           Alias: TOPIC=NBA EFFORT=low"
 	@echo ""
 	@echo "Usage: uv run paperful <cmd>"
 	@echo "       docker compose run --rm paperful <cmd>   # optional image"
@@ -42,5 +43,9 @@ docs-clean:
 pages-site:
 	@bash scripts/release/assemble_pages_site.sh
 
+e2e-stack:
+	@test -n "$(TOPIC)" || (echo "Usage: make e2e-stack TOPIC='your keyword' EFFORT=low|med|high"; exit 1)
+	PAPERFUL_E2E=1 uv run python scripts/e2e_stack.py --topic "$(TOPIC)" --effort "$(or $(EFFORT),low)"
+
 e2e-nba:
-	PAPERFUL_E2E=1 uv run python scripts/e2e_nba.py
+	$(MAKE) e2e-stack TOPIC=NBA EFFORT=low

@@ -20,6 +20,41 @@ from .zot import Item
 ITEM_SCHEMA = "paperful.item.v1"
 HISTORY_SCHEMA = "paperful.history.v1"
 COLLECTIONS_SCHEMA = "paperful.collections.v1"
+# Required on every record.json. Removing or renaming a key is a break.
+# Additive extras (library, oa_*, fetch.oa, attachments[].origin, …) are allowed.
+ITEM_RECORD_KEYS = frozenset(
+    {
+        "schema",
+        "item_key",
+        "item_type",
+        "version",
+        "date_added",
+        "date_modified",
+        "title",
+        "creators",
+        "year",
+        "date",
+        "publication_title",
+        "doi",
+        "library_doi",
+        "doi_source",
+        "doi_verified",
+        "pdf_doi",
+        "arxiv_id",
+        "pmid",
+        "url",
+        "extra",
+        "abstract",
+        "tags",
+        "relations",
+        "fields",
+        "collections",
+        "collection_paths",
+        "attachments",
+        "fetch",
+        "notes",
+    }
+)
 PDF_MODES = frozenset({"all", "lazy", "none"})
 _KEY_MARK = " -- "
 # Zotero keys are 8 alphanumeric; Mendeley ids are UUIDs; EndNote ids are integers.
@@ -528,9 +563,11 @@ def write_fetch_records(
     """Write or refresh ``record.json`` beside each PDF. Fetch overwrites; catalogue stays."""
     fetched_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     written: list[Path] = []
+    shell = empty_item_record(item)
     for pdf in pdfs:
         dest = record_path(pdf.parent)
-        rec = load_json(dest) or empty_item_record(item)
+        existing = load_json(dest) or {}
+        rec = {**shell, **existing}
         rec["schema"] = ITEM_SCHEMA
         rec["item_key"] = item.key
         fetch = fetch_block(

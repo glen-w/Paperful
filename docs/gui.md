@@ -267,7 +267,7 @@ post-1.0.
 
 | Phase | Outcome | Deploy focus |
 | --- | --- | --- |
-| **P0** | Lock schemas; carve a stable capability API from today’s CLI | CLI + API skeleton |
+| **P0** | Lock schemas; localhost HTTP capability API (`paperful serve`) | **Landed** — CLI + API skeleton |
 | **P1** | Web **read-only** review: snowball queues, patch list, dedupe / version packs | Open + Docker |
 | **P2** | Gated write-back over HTTP: `keep` / `apply`, patches, scoped `run` | Open + Docker |
 | **P3** | Full workbench modes + in-browser PDF preview (illuminate CLI verbs) | Open + Docker |
@@ -275,6 +275,20 @@ post-1.0.
 | **P4** | SaaS tenancy (auth, workspace isolation, remote manager adapters) + polish | Post-1.0 |
 
 P0–P3b together are the 1.0 GUI bar; the CLI remains the automation surface.
+
+**P0 routes** (sync, bind `127.0.0.1`, dry-run; needs `uv sync --extra serve`):
+
+| Method | Path | Behaviour |
+| --- | --- | --- |
+| GET | `/health` | `{ok, version}` |
+| GET | `/v1/doctor` | same payload as `doctor --json` (no `--guide`) |
+| GET | `/v1/collections` | collection tree |
+| GET | `/v1/runs/last` | `state/last-run.json` or `report: null` |
+| POST | `/v1/refs-gap` | `{collection}` → `paperful.agent.json.v1` |
+| POST | `/v1/ask` | `{question, collection?}` → same envelope as MCP `ask` |
+
+No `--apply` over HTTP. Long jobs / SSE wait for P1. Compose does not yet
+ship a workbench UI+API profile.
 
 ---
 

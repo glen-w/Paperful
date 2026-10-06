@@ -136,7 +136,7 @@ Every step can be repeated. A crash leaves valid records and an old version.
 
 | Schema | File | State |
 | --- | --- | --- |
-| `paperful.item.v1` | `record.json` | 0.x may add keys. Do not rename or remove one |
+| `paperful.item.v1` | `record.json` | Required keys frozen. Extra keys may be added |
 | `paperful.sync.v1` | `out/_sync.json` | New. Internal to the refresh |
 | `paperful.annotations.v1` | `annotations.json` | New |
 | `paperful.collections.v1` | `out/_collections.json` | Read by the catalogue |

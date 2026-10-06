@@ -62,7 +62,8 @@ out/_notes/<KEY>/           # standalone (collection) notes
 out/_attachments/<KEY>/     # standalone attachments
 ```
 
-`record.json` is the restore unit (`paperful.item.v1`, **0.x may add keys**).
+`record.json` is the restore unit (`paperful.item.v1`, **required keys frozen**;
+additive extras allowed).
 It holds identity, creators, abstract, tags, Extra, leftover type-specific
 fields, collection membership, attachment rows, fetch provenance, and the note
 filenames. An item in several collections gets one folder per path: the PDF is
@@ -94,9 +95,12 @@ still in.
 
 `paperful restore` reads these folders. Without `--apply` it only counts.
 `--apply` creates a missing collection path and a missing parent (matched by
-item key, then DOI, then title+year), attaches a local PDF when the live item
-has none, and adds a note that is not already there. It does not trash items
-and does not overwrite bibliographic fields.
+DOI, then item key, then title+year), attaches a local PDF when the live item
+has none, and adds a note that is not already there. It does not trash items,
+does not overwrite bibliographic fields, and skips records marked
+`library.state` trashed/gone or lacking `paperful.item.v1`. One `item_key` in
+several collection folders is restored once. Annotations and non-PDF
+attachments are not restored. Created parents get a new manager key.
 
 ## What “quiet” means
 

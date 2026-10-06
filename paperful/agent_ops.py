@@ -144,6 +144,69 @@ def run_ask(cfg: Config, question: str, collection: str = "") -> dict[str, Any]:
         return envelope(command="ask", exit_code=EXIT_USER, summary={"error": str(exc)})
 
 
+def doctor_checks(cfg: Config, *, probe: bool = False) -> list[Any]:
+    """Same checks as ``paperful doctor`` (no TTY guide)."""
+    from .doctor import run_checks
+    from .zot import ZoteroLocal
+
+    try:
+        return run_checks(cfg, ZoteroLocal(), probe=probe)
+    except Exception:
+        return run_checks(cfg, None, probe=probe)
+
+
+def doctor_payload(cfg: Config, *, probe: bool = False) -> list[dict[str, Any]]:
+    """``paperful doctor --json`` body."""
+    return [
+        {
+            "name": c.name,
+            "status": c.status,
+            "code": c.code,
+            "detail": c.detail,
+        }
+        for c in doctor_checks(cfg, probe=probe)
+    ]
+
+
+def collections_tree(cfg: Config) -> dict[str, Any]:
+    """Collection paths with item counts. Read-only."""
+    from .catalogue import open_library
+
+    try:
+        backend = open_library(cfg)
+        cols = backend.collections()
+        counts = backend.collection_counts()
+    except LibraryError as exc:
+        return {"ok": False, "exit": 2, "error": str(exc), "collections": []}
+    rows = []
+    for c in sorted(cols.values(), key=lambda c: c.path.lower()):
+        n, missing = counts.get(c.key, (0, 0))
+        rows.append(
+            {
+                "path": c.path,
+                "name": c.name,
+                "key": c.key,
+                "items": n,
+                "missing_pdf": missing,
+            }
+        )
+    return {"ok": True, "collections": rows}
+
+
+def last_run(cfg: Config) -> dict[str, Any] | None:
+    """``state/last-run.json`` when present."""
+    import json
+
+    path = cfg.state_dir / "last-run.json"
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def ingest_dois_exit(*, apply: bool, created: int, failed: int) -> int:
     """Held/unresolved stay findings (exit 0). Mixed create+error on --apply is 3."""
     if not apply:

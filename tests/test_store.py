@@ -101,6 +101,9 @@ def test_write_fetch_records_sits_beside_each_copy(tmp_path):
     assert cards[1]["fetch"]["pdf"] == extras[0].name
     assert cards[0]["fetch"]["fetched_at"] == cards[1]["fetch"]["fetched_at"]
     assert cards[0]["publication_title"] == "Marine Policy"
+    from paperful.store import ITEM_RECORD_KEYS
+
+    assert ITEM_RECORD_KEYS <= cards[0].keys()
     write_fetch_records(
         [primary],
         item,
@@ -294,3 +297,35 @@ def test_mirror_row_fields_and_fallbacks(tmp_path):
     assert item.collection_paths == ["A"]
     assert item.has_pdf is False and item.pdf_path is None
     assert item.doi == "10.1000/x"
+
+
+def test_empty_item_record_required_keys():
+    from paperful.store import ITEM_RECORD_KEYS, empty_item_record
+
+    rec = empty_item_record(_item())
+    assert set(rec) == ITEM_RECORD_KEYS
+
+
+def test_write_fetch_fills_missing_required_keys(tmp_path):
+    import json
+
+    from paperful.store import ITEM_RECORD_KEYS, record_path, write_fetch_records
+
+    content = b"%PDF-1.4 fake"
+    md5 = hashlib.md5(content).hexdigest()
+    item = _item()
+    primary, _extras = save_pdf(tmp_path, item, content, md5)
+    dest = record_path(primary.parent)
+    dest.write_text(json.dumps({"schema": "paperful.item.v1", "item_key": item.key, "kept": 1}))
+    write_fetch_records(
+        [primary],
+        item,
+        md5=md5,
+        source="unpaywall",
+        fetched_url="https://oa.test/a.pdf",
+        pdf_doi="10.1/x",
+    )
+    rec = json.loads(dest.read_text())
+    assert ITEM_RECORD_KEYS <= rec.keys()
+    assert rec["kept"] == 1
+    assert rec["fetch"]["source"] == "unpaywall"

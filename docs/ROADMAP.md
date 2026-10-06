@@ -50,10 +50,10 @@ Sci-Hub, no “AI fetch everything”).
 | Exit **2** + next-steps when Zotero is down (`collections` / `run` / `attach`) | Fresh clone never dead-ends | Shipped |
 | Slim README + [CHANGELOG](../CHANGELOG.md) known limits | Trust before install | Shipped |
 | Lock `paperful.run_report.v1` | Trust for agents | Required keys frozen; extra keys may be added. Not tagged 1.0 |
-| Lock `paperful.item.v1` and `snapshot` / `restore` (additive keys only after 1.0) | Trust for the disk ledger | Named schema; 0.x may add keys. Behaviour shipped |
+| Lock `paperful.item.v1` and `snapshot` / `restore` (additive keys only after 1.0) | Trust for the disk ledger | **Shipped** — required keys frozen; restore is create-missing (not lossless round-trip) |
 | Strip legacy flat-PDF migrate + mixed-layout doctor amber | Day-0 mirror never steers people into a whole-library layout cleanup | **Shipped (0.1 → 1.0)** |
 | **Mendeley and EndNote adapters** | The ledger survives a manager change | In the tree. **Seeking testers.** Zotero stays the well-tested path. See below |
-| **Workbench GUI** | Run, review, and apply CLI workflows without the terminal as the only surface | Roadmap — [GUI](#gui); capability API + dry-run / Apply parity |
+| **Workbench GUI** | Run, review, and apply CLI workflows without the terminal as the only surface | P0 landed (`paperful serve`); P1–P3b still roadmap — [GUI](#gui); capability API + dry-run / Apply parity |
 | **Interactive Ask (GUI)** | Chat-over-collection / library with cited RAG | Roadmap — CLI foundation shipped (`ask`, `--thread`, batch); GUI is the 1.0 conversational layer |
 
 Nice-to-have (not 1.0 blockers): colour glossary next to `doctor` (documented);
@@ -1355,7 +1355,9 @@ second doc tree that drifts from the CLI.
 ## GUI
 
 **1.0 deliverable** — web-native workbench sketch (open / Docker first; SaaS
-later): [gui.md](gui.md). The CLI stays the source of truth; the GUI **runs,
+later): [gui.md](gui.md). **P0 landed:** required `paperful.item.v1` keys are
+frozen, restore is create-missing, and `paperful serve` is a localhost HTTP
+skeleton. P1–P3b remain. The CLI stays the source of truth; the GUI **runs,
 illuminates, and simplifies** the same verbs (`run`, snowball gates, inbox,
 `refs gap`, `lint` / `fix-metadata`, `dedupe`, handoff, doctor status, …) via a
 **capability API** with the same Control posture (dry-run default, explicit

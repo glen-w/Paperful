@@ -1,8 +1,9 @@
 # Changelog
 
 All notable user-facing changes. Paperful is **0.x** and is not tagged 1.0.
-Required `paperful.run_report.v1` keys are frozen; extra keys and
-`paperful.item.v1` may still move. See [releases](docs/releases.md).
+Required `paperful.run_report.v1` keys are frozen; extra report keys may still
+be added. Required `paperful.item.v1` keys are frozen the same way (additive
+extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ## Unreleased
 
@@ -20,6 +21,11 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
 
 ### Added
 
+- **GUI P0:** required `paperful.item.v1` keys frozen (additive extras survive
+  snapshot); restore is create-missing (DOI → key → title+year; skip gone /
+  foreign schema; one folder per key). `paperful serve` is a localhost HTTP
+  skeleton (`uv sync --extra serve`) over the same builders as `--format json`
+  / MCP. No SPA, no `--apply` over HTTP. See [gui.md](docs/gui.md).
 - Opt-in all-in E2E for keyword `NBA` (2025–2026) on throwaway `-C e2e/NBA`:
   `make e2e-nba` / `scripts/e2e_nba.py`, profiles `e2e-nba-search` /
   `e2e-nba-run`, hermetic `tests/test_e2e_nba.py`, marker `e2e_live`
@@ -398,8 +404,9 @@ agent matches `session login`. Default browser-use extensions stay on (popup /
 cookie helpers); empty cached ``.crx`` files are dropped so a failed download
 is retried instead of breaking extraction.
 
-Shared 1.0 review leftovers that stay deferred: freeze `paperful.item.v1` +
-snapshot/restore lock (still the SemVer gate for calling **1.0**).
+Shared 1.0 leftovers that remain after the item/restore lock: workbench GUI
+P1–P3b (read-only review through Ask in the browser). Snapshot/restore is
+create-missing, not a lossless identity round-trip.
 
 ## 0.8.0 — 2026-09-22
 

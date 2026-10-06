@@ -123,6 +123,7 @@ uv run paperful authorwatch add ocean-people --orcid 0000-0002-1825-0097
 uv run paperful authorwatch run ocean-people --backfill-from 2025-01-01
 uv run paperful authorwatch apply ocean-people -C Watch/Ocean          # dry-run
 uv run paperful mcp                           # optional stdio: refs_gap + ask; prefer --format json
+uv run paperful serve                         # localhost HTTP (needs uv sync --extra serve)
 uv run paperful ingest-dois --from-pack state/refs-gaps/<stamp> -C BBNJ
 uv run paperful ingest-dois --from-file dois.txt -C BBNJ --apply --tag bbnj
 uv run paperful acronyms -C BBNJ              # harvest ALL CAPS tokens (dry-run)
@@ -213,6 +214,7 @@ uv run paperful pack show
 | `ingest-dois` | DOI list → metadata parents in `-C`. Dry-run unless `--apply`. Reports created / exists / unresolved / **held**. `--format json`. `--tag` plus `[ingest].default_tags` and `from-<file-stem>`. Does not fetch PDFs (`run` after). |
 | `collections` | `list` (or bare `collections`) — collection tree with “No PDF” counts. `add --keys-file` — file **existing** item keys into `-C` (membership only; dry-run unless `--apply`; added / already-in / not-found). `--format json`. Complements `ingest-dois` (create parents). Zotero / Mendeley; EndNote refuses `--apply`. Not an MCP tool. |
 | `mcp` | Optional stdio MCP over the same JSON channel. Tools: `refs_gap` (never writes parents) and `ask` (index read-only). Prefer `paperful … --format json` from a shell. `collections add` is CLI-only and is not exposed. |
+| `serve` | Localhost HTTP capability API (`127.0.0.1:8765`). Needs `paperful[serve]` (`uv sync --extra serve`). Health, doctor JSON, collections, last-run, dry-run `refs-gap` / `ask`. No library writes. Not in the Docker image extra set. |
 | `all` | `gaps` → `run --try-all --retry-failed --upgrade-linked` → `lint` → `fix-metadata --apply` → `summarize --apply`. Stops on the first failure. `--dry-run` skips `summarize` and does not apply metadata. `--browser-agent` / `--no-browser-agent` pass through to the `run` step. `--profile` / `-f` load a saved run config. Opens a pack when none is open. `--format json` prints one envelope for the whole sequence (nested substeps stay quiet on stdout). See [Workflows](workflows.md). |
 | `profile` | `list` / `show` / `save` — named run configs beside `config.toml` (`profiles/<name>.toml` or `[profiles.*]`). `show` prints the merge `all` would use. `save` does not edit `config.toml`. |
 | `snowball` | Grow a library from one or more keywords, one or more DOIs, one or more ORCIDs, or a collection (`search`, `hybrid`, `doi`, `orcid`, `collection`, `apply`, `run --profile`, `resume`, `profile save`, `watch save` / `run` / `show` / `briefing` / `digest`, `briefing --run-id`, `digest --run-id`). `search` / `hybrid` take several keyword terms (AND by default; `--or`
@@ -345,7 +347,7 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
 - `out/<collection>/<Author - Year - Title -- KEY>/record.json` — restore
   record (`paperful.item.v1`). Identity, full creators, abstract, tags, Extra,
   type-specific fields, collection membership, attachment rows, fetch
-  provenance, and note filenames. **0.x may add keys.** `run` writes this when
+  provenance, and note filenames. **Required keys frozen; extras may be added.** `run` writes this when
   it saves a PDF. A refresh writes one for every item, including items with
   no PDF, and rewrites it after each change in the library.
 - `out/<collection>/<Author - Year - Title -- KEY>/<file>.pdf` — the PDF, when

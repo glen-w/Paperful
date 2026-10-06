@@ -9,14 +9,37 @@ from pathlib import Path
 import pytest
 
 from paperful.e2e_nba import (
+    DEFAULT_FETCH_PDFS,
     PHASES,
     SCHEMA,
     E2ERunner,
+    build_e2e_plan,
+    collection_for_topic,
     extract_orcids_from_candidates,
     main,
+    normalize_effort,
+    pack_slug_for_topic,
     phase_index,
     soft_skip_matrix,
 )
+
+
+def test_e2e_plan_effort_caps():
+    low = build_e2e_plan("ocean governance", "low", year_from=2024, year_to=2025)
+    assert low.max_candidates == 25
+    assert low.depth == 1
+    assert low.collection == "e2e/ocean governance"
+    assert low.pack_slug == "e2e-ocean-governance"
+    high = build_e2e_plan("BBNJ", "high", year_from=2020, year_to=2026)
+    assert high.max_candidates == 3000
+    assert high.depth == 2
+    assert normalize_effort("MED") == "med"
+    assert low.fetch_pdfs == DEFAULT_FETCH_PDFS
+
+
+def test_collection_for_topic_nba():
+    assert collection_for_topic("NBA") == "e2e/NBA"
+    assert pack_slug_for_topic("NBA") == "e2e-nba"
 
 
 def test_phase_order_stable():
@@ -167,6 +190,17 @@ def test_report_schema_and_resume(tmp_path: Path, monkeypatch):
     runner._paperful = paperful_with_state
     code = runner.run()
     assert code == 0
+    snowball_search = [
+        c for c in calls if len(c) >= 2 and c[0] == "snowball" and c[1] == "search"
+    ]
+    assert snowball_search
+    assert "--gate" in snowball_search[0]
+    assert snowball_search[0][snowball_search[0].index("--gate") + 1] == "auto"
+    assert "--fetch-pdfs" in snowball_search[0]
+    assert (
+        snowball_search[0][snowball_search[0].index("--fetch-pdfs") + 1]
+        == DEFAULT_FETCH_PDFS
+    )
     report = json.loads((state / "run1" / "report.json").read_text(encoding="utf-8"))
     assert report["schema"] == SCHEMA
     assert report["ok"] is True
@@ -180,5 +214,5 @@ def test_report_schema_and_resume(tmp_path: Path, monkeypatch):
 def test_e2e_live_opt_in():
     if os.environ.get("PAPERFUL_E2E") != "1":
         pytest.skip("set PAPERFUL_E2E=1 for the live all-in E2E")
-    code = main(["--no-dry-run-search"])
+    code = main([])
     assert code == 0

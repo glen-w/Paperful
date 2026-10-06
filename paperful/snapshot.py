@@ -21,6 +21,7 @@ from .progress import Track
 from .config import Config
 from .library import LibraryError, LibraryReadError
 from .mirror import place_item_dirs
+from .resolve import normalize_doi
 from .store import (
     COLLECTIONS_SCHEMA,
     HISTORY_SCHEMA,
@@ -53,6 +54,7 @@ _PROMOTED = frozenset(
         "dateModified",
         "key",
         "version",
+        "DOI",
     }
 )
 _NOTE_NAME = re.compile(r"[^\w.-]+")
@@ -99,6 +101,9 @@ def record_from_raw(
     url = (data.get("url") or "").strip()
     if url:
         rec["url"] = url
+    doi_field = data.get("DOI")
+    if doi_field:
+        rec["doi"] = normalize_doi(str(doi_field)) or rec.get("doi")
     tags: list[dict[str, Any]] = []
     for tag in data.get("tags") or []:
         if isinstance(tag, dict) and tag.get("tag"):
@@ -349,6 +354,11 @@ def _preserve_fetch(rec: dict[str, Any], item_dir: Path) -> None:
         rec["pdf_doi"] = existing.get("pdf_doi")
     if existing.get("notes") and not rec.get("notes"):
         rec["notes"] = existing["notes"]
+    for key, value in existing.items():
+        if key == "library":
+            continue
+        if key not in rec:
+            rec[key] = value
 
 
 def _link_pdfs(dirs: list[Path]) -> None:

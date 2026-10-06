@@ -1,9 +1,10 @@
 """Rebuild missing Zotero items from ``out/`` restore folders.
 
-Match an on-disk record to a live item by key, then DOI, then title+year.
+Match an on-disk record to a live item by DOI, then item key, then title+year.
 Existing items are left alone: no field overwrites, no trash. A local PDF is
 attached only when the match has no imported PDF. Notes are created only when
-that tag or key is not already a child.
+that tag or key is not already a child. Create-missing only: no annotation
+restore, no non-PDF attach restore, new manager keys on create.
 """
 
 from __future__ import annotations
@@ -12,15 +13,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .mirror import record_pdf
+from .mirror import GONE_STATES, library_state, record_pdf
 from .progress import Track
-from .store import is_item_dirname, load_json
+from .store import ITEM_SCHEMA, _record_weight, is_item_dirname, item_key_from_dirname, load_json
 from .zot import Item, normalize_doi
 
 
 @dataclass
 class RestoreAction:
-    kind: str  # create_item | attach_pdf | create_note | exists
+    kind: str  # create_item | attach_pdf | create_note | exists | skip
     item_key: str
     title: str
     detail: str
@@ -60,6 +61,25 @@ def iter_records(out_dir: Path, collection_prefixes: list[str] | None) -> list[P
                 continue
         found.append(rec)
     return sorted(found)
+
+
+def dedupe_restore_records(
+    records: list[tuple[Path, dict[str, Any]]],
+) -> list[tuple[Path, dict[str, Any]]]:
+    """One folder per ``item_key``; keep the fullest record (snapshot beats fetch shell)."""
+    by_key: dict[str, tuple[Path, dict[str, Any], tuple[int, int]]] = {}
+    no_key: list[tuple[Path, dict[str, Any]]] = []
+    for path, rec in records:
+        key = str(rec.get("item_key") or item_key_from_dirname(path.parent.name) or "")
+        if not key:
+            no_key.append((path, rec))
+            continue
+        weight = _record_weight(rec)
+        prev = by_key.get(key)
+        if prev is None or weight > prev[2]:
+            by_key[key] = (path, rec, weight)
+    picked = [(p, r) for p, r, _ in by_key.values()]
+    return sorted(picked + no_key, key=lambda row: str(row[0]))
 
 
 def match_item(record: dict[str, Any], items: list[Item]) -> Item | None:
@@ -127,6 +147,28 @@ def plan_restore(
         item_dir = path.parent
         key = str(record.get("item_key") or "")
         title = str(record.get("title") or "")
+        if record.get("schema") != ITEM_SCHEMA:
+            plan.actions.append(
+                RestoreAction(
+                    kind="skip",
+                    item_key=key,
+                    title=title,
+                    detail="not paperful.item.v1",
+                    record_dir=item_dir,
+                )
+            )
+            continue
+        if library_state(record) in GONE_STATES:
+            plan.actions.append(
+                RestoreAction(
+                    kind="skip",
+                    item_key=key,
+                    title=title,
+                    detail=f"library.state={library_state(record)}",
+                    record_dir=item_dir,
+                )
+            )
+            continue
         match = match_item(record, library)
         if match is None:
             plan.actions.append(
@@ -206,7 +248,7 @@ def apply_restore(
     done = {"create_item": 0, "attach_pdf": 0, "create_note": 0}
     created: dict[Path, str] = {}
     for action in track(plan.actions) if track else plan.actions:
-        if action.kind == "exists":
+        if action.kind in {"exists", "skip"}:
             continue
         if action.kind == "create_item":
             record = load_json(action.record_dir / "record.json") or {}

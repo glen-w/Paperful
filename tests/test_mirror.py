@@ -147,6 +147,30 @@ def test_item_from_record_matches_the_live_listing(tmp_path, raw, children):
     assert asdict(mirrored) == asdict(live)
 
 
+def test_item_v1_golden_record_from_raw():
+    from pathlib import Path
+
+    from paperful.store import ITEM_RECORD_KEYS
+
+    raw = RAW_ITEMS[0]
+    live = item_from_json(raw, COLS, None, has_pdf=False)
+    rec = record_from_raw(raw, live, COLS)
+    assert ITEM_RECORD_KEYS <= rec.keys()
+    assert rec["doi"] == "10.1000/abc.1"
+    assert "DOI" not in rec["fields"]
+    golden = json.loads(
+        (Path(__file__).resolve().parent / "fixtures" / "item_v1" / "record.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert rec["schema"] == golden["schema"]
+    assert rec["item_key"] == golden["item_key"]
+    assert rec["doi"] == golden["doi"]
+    assert rec["publication_title"] == golden["publication_title"]
+    assert rec["abstract"] == golden["abstract"]
+    assert rec["fields"] == golden["fields"]
+
+
 def test_selected_collections_limit_paths_like_a_scoped_listing(tmp_path):
     out = tmp_path / "out"
     raw = RAW_ITEMS[0]

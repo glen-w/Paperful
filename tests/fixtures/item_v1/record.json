@@ -1,0 +1,15 @@
+{
+  "schema": "paperful.item.v1",
+  "item_key": "ARTICLE1",
+  "item_type": "journalArticle",
+  "doi": "10.1000/abc.1",
+  "publication_title": "Marine Policy",
+  "abstract": "An abstract.",
+  "fields": {
+    "pages": "1-9",
+    "volume": "12"
+  },
+  "notes": [],
+  "attachments": [],
+  "fetch": null
+}

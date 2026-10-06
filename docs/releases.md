@@ -6,15 +6,16 @@ There is no `docker pull` and no `pip install paperful`.
 
 Required keys on `paperful.run_report.v1` from `build_report()` are frozen
 (removed or renamed required keys are a break; extra keys may still be added).
-`paperful.item.v1` may still move. This tree is not tagged 1.0.
+Required keys on `paperful.item.v1` from `empty_item_record()` are frozen the
+same way. This tree is not tagged 1.0.
 
-**1.0** (not tagged) still owes a lock on `paperful.item.v1` and on
-snapshot/restore behaviour, a **workbench GUI** over the CLI capability API,
-and **interactive Ask** (chat-over-collection RAG in the GUI). Required
+**1.0** (not tagged) still owes a **workbench GUI** over the CLI capability API
+and **interactive Ask** (chat-over-collection RAG in the GUI). Item records and
+create-missing restore are locked; extra item keys may still be added. Required
 `paperful.run_report.v1` keys and imported-file attach (typed `attach_failed`,
-provenance note) are already the contract; extra report keys may still be added.
-**Post-1.0:** local OpenAlex snapshot phases beyond opt-in v1, Firefox
-extension, newsletter/alert ingest — see [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10).
+provenance note) are already the contract. **Post-1.0:** local OpenAlex snapshot
+phases beyond opt-in v1, Firefox extension, newsletter/alert ingest — see
+[ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10).
 
 ## Schema compatibility (0.9, not frozen as 1.0)
 
@@ -23,9 +24,9 @@ extension, newsletter/alert ingest — see [ROADMAP — Product split](ROADMAP.m
 | `paperful.run_report.v1` | Required keys frozen; extra keys may be added | Same |
 | `paperful.agent.json.v1` | Additive stdout envelope for `--format json` | Revisit with the agent surface |
 | `paperful.note.v1` | HTML comment + first-line prefix | Revisit with notes delete |
-| `paperful.item.v1` | Named. 0.x may add keys. Do not tag 1.0 until removal of a required key is a break | Lock |
+| `paperful.item.v1` | Required keys frozen; extra keys may be added | Same |
 | `paperful.snowball.candidate.v1` | Shipped and tested. Additive keys allowed | Revisit with the item lock |
-| Snapshot / restore | Behaviour shipped. Round-trip is not a 1.0 promise yet | Lock |
+| Snapshot / restore | Create-missing locked (DOI → key → title+year; no field overwrite; skip trashed/gone). Not a lossless round-trip | Same |
 | Library index (`state/rag/`) | A rebuildable cache. Folder layout, ledger and table columns may change in any release; `rag ingest` rebuilds it | Not a promise |
 
 Install claim tested in CI (`.github/workflows/ci.yml`, job `docker`): clone,
@@ -72,8 +73,8 @@ before 1.0. See [LLM](llm.md).
 | Trust inside Zotero (attachment provenance stamp) | Shipped on Zotero attachment notes. A readable parent line follows `[remarks].surface`. Manifest `source` stays the record |
 | One-line end-of-run banner + write-API yes/no | Shipped (`downloaded · attached · deferred · not_found · write-api`) |
 | Locked report JSON schema | Required `paperful.run_report.v1` keys frozen; additive keys still allowed. Not tagged 1.0 |
-| Locked item record + snapshot/restore | `paperful.item.v1` named; 0.x may add keys |
+| Locked item record + snapshot/restore | Required `paperful.item.v1` keys frozen; restore is create-missing (not identity round-trip) |
 | Mendeley and EndNote adapters | In the tree. Seeking testers. Zotero is the well-tested path |
-| Workbench GUI (run / review / apply CLI workflows) | Roadmap — [gui.md](gui.md) |
+| Workbench GUI (run / review / apply CLI workflows) | P0 HTTP skeleton (`paperful serve`); P1–P3b still roadmap — [gui.md](gui.md) |
 | Interactive Ask in GUI (cited chat-over-collection) | Roadmap — CLI `ask` / threads shipped |
 | Fresh-clone doctor stays quiet without Scholar | Shipped (0.9): `scholar` opt-in like `scihub` |

@@ -42,6 +42,7 @@ class _Backend:
                 ],
                 "abstractNote": "The abstract.",
                 "tags": [{"tag": "bbnj"}],
+                "DOI": "10.1000/ABC",
                 "volume": "12",
                 "pages": "1-9",
                 "collections": ["COL1"],
@@ -81,6 +82,11 @@ def test_snapshot_pdf_modes_and_record_roundtrip(tmp_path):
     rec_path = record_path(cfg.out_dir / "BBNJ" / item_dirname(item))
     rec = json.loads(rec_path.read_text())
     assert rec["schema"] == "paperful.item.v1"
+    from paperful.store import ITEM_RECORD_KEYS
+
+    assert ITEM_RECORD_KEYS <= rec.keys()
+    assert "DOI" not in rec.get("fields", {})
+    assert rec["doi"] == "10.1000/abc"
     assert rec["creators"][0]["firstName"] == "Ada"
     assert rec["tags"] == [{"tag": "bbnj"}]
     assert rec["fields"]["volume"] == "12"
@@ -149,6 +155,7 @@ def test_restore_matches_and_does_not_overwrite(tmp_path):
         "doi": "10.1000/abc",
         "creators": [{"creatorType": "author", "lastName": "Smith"}],
         "collection_paths": ["BBNJ"],
+        "fields": {"volume": "12", "pages": "1-9"},
         "notes": [{"file": "paperful-summary.html", "tag": "paperful-summary"}],
         "fetch": {"pdf": "Smith - 2020 - A paper.pdf"},
     }
@@ -166,7 +173,9 @@ def test_restore_matches_and_does_not_overwrite(tmp_path):
     kinds = [a.kind for a in missing.actions]
     assert kinds == ["create_item", "attach_pdf", "create_note"]
     assert missing.actions[0].payload["title"] == "A paper"
-    assert "volume" not in missing.actions[0].payload or True
+    assert missing.actions[0].payload["volume"] == "12"
+    assert missing.actions[0].payload["pages"] == "1-9"
+    assert missing.actions[0].payload["DOI"] == "10.1000/abc"
 
     other = {
         **record,
@@ -351,6 +360,116 @@ def test_snapshot_copies_summary_and_hardlinks_second_collection(tmp_path):
     rec = json.loads((primary / "record.json").read_text())
     assert rec["attachments"][0]["origin"] == "zotero_export"
     assert any(n["file"] == "paperful-summary.html" for n in rec["notes"])
+
+
+def test_snapshot_keeps_additive_item_keys(tmp_path):
+    from paperful.store import ITEM_RECORD_KEYS, record_path, write_json
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    item = _item()
+    folder = cfg.out_dir / "BBNJ" / item_dirname(item)
+    folder.mkdir(parents=True)
+    rec = {
+        "schema": "paperful.item.v1",
+        "item_key": item.key,
+        "oa_license": "cc-by",
+        "oa_status": "gold",
+        "custom_extra": "keep-me",
+        "library": {"state": "trashed"},
+    }
+    write_json(record_path(folder), rec)
+    run_snapshot(cfg, _Backend(), [item], pdfs="none", dry_run=False, manifest=None)
+    got = json.loads(record_path(folder).read_text())
+    assert ITEM_RECORD_KEYS <= got.keys()
+    assert got["oa_license"] == "cc-by"
+    assert got["oa_status"] == "gold"
+    assert got["custom_extra"] == "keep-me"
+    assert "library" not in got
+
+
+def test_restore_skips_gone_and_foreign_schema(tmp_path):
+    from paperful.restore import plan_restore
+
+    folder = tmp_path / "BBNJ" / item_dirname(_item())
+    folder.mkdir(parents=True)
+    gone = {
+        "schema": "paperful.item.v1",
+        "item_key": "ABCD1234",
+        "title": "A paper",
+        "library": {"state": "trashed"},
+    }
+    (folder / "record.json").write_text(json.dumps(gone))
+    plan = plan_restore([(folder / "record.json", gone)], [])
+    assert [a.kind for a in plan.actions] == ["skip"]
+    assert "trashed" in plan.actions[0].detail
+
+    foreign = {**gone, "schema": "other.v1", "library": {}}
+    plan2 = plan_restore([(folder / "record.json", foreign)], [])
+    assert plan2.actions[0].kind == "skip"
+    assert "paperful.item.v1" in plan2.actions[0].detail
+
+
+def test_restore_dedupes_multi_folder_records(tmp_path):
+    from paperful.restore import dedupe_restore_records, plan_restore
+    from paperful.store import item_dirname
+
+    item = _item()
+    a = tmp_path / "BBNJ" / item_dirname(item)
+    b = tmp_path / "AO" / item_dirname(item)
+    a.mkdir(parents=True)
+    b.mkdir(parents=True)
+    thin = {
+        "schema": "paperful.item.v1",
+        "item_key": item.key,
+        "title": "A paper",
+        "item_type": "journalArticle",
+        "year": 2020,
+        "doi": "10.1000/abc",
+    }
+    full = {**thin, "version": 4, "fields": {"volume": "12"}, "abstract": "x"}
+    (a / "record.json").write_text(json.dumps(thin))
+    (b / "record.json").write_text(json.dumps(full))
+    picked = dedupe_restore_records(
+        [(a / "record.json", thin), (b / "record.json", full)]
+    )
+    assert len(picked) == 1
+    assert picked[0][1]["version"] == 4
+    plan = plan_restore(picked, [])
+    assert [a.kind for a in plan.actions] == ["create_item"]
+
+
+def test_restore_create_title_cases_all_lower():
+    from paperful.restore import parent_payload
+
+    payload = parent_payload(
+        {
+            "item_type": "journalArticle",
+            "title": "an untitled ocean paper",
+            "fields": {"volume": "3"},
+        },
+        [],
+    )
+    assert payload["title"] == "An Untitled Ocean Paper"
+    assert payload["volume"] == "3"
+
+
+def test_restore_ignores_annotations_json(tmp_path):
+    folder = tmp_path / "BBNJ" / item_dirname(_item())
+    folder.mkdir(parents=True)
+    (folder / "annotations.json").write_text(
+        json.dumps({"schema": "paperful.annotations.v1", "annotations": [{"key": "N1"}]})
+    )
+    record = {
+        "schema": "paperful.item.v1",
+        "item_key": "ABCD1234",
+        "item_type": "journalArticle",
+        "title": "A paper",
+        "year": 2020,
+        "doi": "10.1000/abc",
+    }
+    (folder / "record.json").write_text(json.dumps(record))
+    plan = plan_restore([(folder / "record.json", record)], [])
+    assert [a.kind for a in plan.actions] == ["create_item"]
 
 
 def test_dirname_keeps_key_when_title_is_long():

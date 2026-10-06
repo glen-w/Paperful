@@ -1,7 +1,8 @@
-"""All-in E2E harness: NBA keyword (2025–2026) → ORCID → fetch → CRM → reachout.
+"""All-in E2E harness: topic snowball → ORCID → fetch → hygiene → CRM → reachout.
 
-Opt-in live run only (``PAPERFUL_E2E=1`` or ``--force``). Default CI stays offline;
-see ``tests/test_e2e_nba.py`` and ``docs/e2e-nba.md``.
+User picks **topic** and **effort** (``low`` / ``med`` / ``high``); every tier runs
+the same phase stack. Opt-in live only (``PAPERFUL_E2E=1`` or ``--force``). Default
+CI stays offline; see ``tests/test_e2e_nba.py`` and ``docs/e2e-stack.md``.
 """
 
 from __future__ import annotations
@@ -12,21 +13,150 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import webbrowser
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-SCHEMA = "paperful.e2e_nba.report.v1"
-COLLECTION = "e2e/NBA"
-QUERY = "NBA"
-YEAR_FROM = 2025
-YEAR_TO = 2026
-MAX_CANDIDATES = 12
-MAX_ORCIDS = 3
-TWENTY_LIMIT = 5
+SCHEMA = "paperful.e2e_stack.report.v1"
+DEFAULT_TOPIC = "NBA"
+DEFAULT_EFFORT = "low"
+DEFAULT_FETCH_PDFS = "full"  # snowball gate auto + ORCID hop (Sci-Hub stays off)
 ORCID_RE = re.compile(r"\d{4}-\d{4}-\d{4}-\d{3}[\dX]", re.I)
+
+_EFFORT_PRESETS: dict[str, dict[str, int]] = {
+    # low: short smoke (~25 new queue rows); med: single-hop growth; high: 2-hop cap ~3k
+    "low": {
+        "max_candidates": 25,
+        "depth": 1,
+        "per_hop_limit": 8,
+        "max_orcids": 2,
+        "twenty_limit": 5,
+    },
+    "med": {
+        "max_candidates": 250,
+        "depth": 1,
+        "per_hop_limit": 30,
+        "max_orcids": 3,
+        "twenty_limit": 10,
+    },
+    "high": {
+        "max_candidates": 3000,
+        "depth": 2,
+        "per_hop_limit": 50,
+        "max_orcids": 5,
+        "twenty_limit": 25,
+    },
+}
+EFFORT_CHOICES = tuple(_EFFORT_PRESETS.keys())
+
+
+@dataclass(frozen=True)
+class E2EPlan:
+    """Resolved topic + effort caps for one live stack run."""
+
+    topic: str
+    query: str
+    collection: str
+    pack_slug: str
+    effort: str
+    year_from: int
+    year_to: int
+    max_candidates: int
+    depth: int
+    per_hop_limit: int
+    max_orcids: int
+    twenty_limit: int
+    fetch_pdfs: str
+
+
+def default_year_window() -> tuple[int, int]:
+    year = datetime.now(timezone.utc).year
+    return year - 1, year
+
+
+def normalize_effort(effort: str) -> str:
+    key = (effort or DEFAULT_EFFORT).strip().lower()
+    if key not in _EFFORT_PRESETS:
+        raise ValueError(f"effort must be one of {EFFORT_CHOICES}, got {effort!r}")
+    return key
+
+
+def collection_for_topic(topic: str) -> str:
+    raw = (topic or "").strip()
+    if not raw:
+        raise ValueError("topic is required")
+    seg = re.sub(r"[^\w\s./-]+", "", raw, flags=re.UNICODE)
+    seg = re.sub(r"\s+", " ", seg).strip().replace("/", "-")
+    if not seg:
+        seg = "topic"
+    return f"e2e/{seg}"
+
+
+def pack_slug_for_topic(topic: str) -> str:
+    seg = collection_for_topic(topic).split("/", 1)[-1]
+    safe = re.sub(r"[^\w-]+", "-", seg.lower()).strip("-") or "topic"
+    return f"e2e-{safe}"
+
+
+def build_e2e_plan(
+    topic: str,
+    effort: str = DEFAULT_EFFORT,
+    *,
+    year_from: int | None = None,
+    year_to: int | None = None,
+    collection: str | None = None,
+) -> E2EPlan:
+    t = (topic or DEFAULT_TOPIC).strip()
+    if not t:
+        raise ValueError("topic is required")
+    eff = normalize_effort(effort)
+    preset = _EFFORT_PRESETS[eff]
+    yf, yt = default_year_window()
+    if year_from is not None:
+        yf = year_from
+    if year_to is not None:
+        yt = year_to
+    coll = (collection or collection_for_topic(t)).strip()
+    return E2EPlan(
+        topic=t,
+        query=t,
+        collection=coll,
+        pack_slug=pack_slug_for_topic(t),
+        effort=eff,
+        year_from=yf,
+        year_to=yt,
+        max_candidates=preset["max_candidates"],
+        depth=preset["depth"],
+        per_hop_limit=preset["per_hop_limit"],
+        max_orcids=preset["max_orcids"],
+        twenty_limit=preset["twenty_limit"],
+        fetch_pdfs=DEFAULT_FETCH_PDFS,
+    )
+
+
+_default_plan = build_e2e_plan(DEFAULT_TOPIC, DEFAULT_EFFORT)
+COLLECTION = _default_plan.collection
+QUERY = _default_plan.query
+YEAR_FROM = _default_plan.year_from
+YEAR_TO = _default_plan.year_to
+MAX_CANDIDATES = _default_plan.max_candidates
+MAX_ORCIDS = _default_plan.max_orcids
+TWENTY_LIMIT = _default_plan.twenty_limit
+
+
+def resolve_e2e_state_dir(
+    root: Path, run_id: str, state_dir: Path | None = None
+) -> Path:
+    if state_dir is not None:
+        return state_dir
+    for sub in ("e2e", "e2e-nba"):
+        candidate = root / "state" / sub / run_id
+        if candidate.is_dir():
+            return candidate
+    return root / "state" / "e2e" / run_id
 
 PHASES = (
     "doctor",
@@ -134,18 +264,19 @@ class E2ERunner:
     def __init__(
         self,
         *,
+        plan: E2EPlan | None = None,
         state_dir: Path | None = None,
         run_id: str | None = None,
         from_phase: str = "doctor",
         only_phase: str | None = None,
-        dry_run_search: bool = True,
+        dry_run_search: bool = False,
         paperful: Callable[..., subprocess.CompletedProcess[str]] | None = None,
         env: dict[str, str] | None = None,
     ) -> None:
         self.root = _repo_root()
         self.run_id = run_id or _utc_stamp()
-        base = state_dir or (self.root / "state" / "e2e-nba" / self.run_id)
-        self.dest = base
+        self.plan = plan or build_e2e_plan(DEFAULT_TOPIC, DEFAULT_EFFORT)
+        self.dest = resolve_e2e_state_dir(self.root, self.run_id, state_dir)
         self.dest.mkdir(parents=True, exist_ok=True)
         self.from_phase = from_phase
         self.only_phase = only_phase
@@ -156,29 +287,79 @@ class E2ERunner:
         self.meta: dict[str, Any] = {
             "schema": SCHEMA,
             "run_id": self.run_id,
-            "collection": COLLECTION,
-            "query": QUERY,
-            "year_from": YEAR_FROM,
-            "year_to": YEAR_TO,
+            "topic": self.plan.topic,
+            "effort": self.plan.effort,
+            "collection": self.plan.collection,
+            "query": self.plan.query,
+            "year_from": self.plan.year_from,
+            "year_to": self.plan.year_to,
+            "max_candidates": self.plan.max_candidates,
+            "depth": self.plan.depth,
+            "per_hop_limit": self.plan.per_hop_limit,
+            "pack_slug": self.plan.pack_slug,
             "started_at": datetime.now(timezone.utc).isoformat(),
         }
         self.snowball_run_id: str | None = None
         self.orcid_run_id: str | None = None
 
-    def _default_paperful(self, args: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    def _default_paperful(
+        self, args: list[str], *, phase: str = "paperful", **kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
         cmd = ["uv", "run", "paperful", *args]
-        return subprocess.run(
+        cwd = str(self.root)
+        proc = subprocess.Popen(
             cmd,
-            cwd=str(self.root),
+            cwd=cwd,
             env=self.env,
             text=True,
-            capture_output=True,
-            check=False,
-            **kwargs,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            bufsize=1,
+            **{k: v for k, v in kwargs.items() if k not in ("phase",)},
         )
+        out_chunks: list[str] = []
+        err_chunks: list[str] = []
+        out_path = self.dest / f"{phase}.stdout.txt"
+        err_path = self.dest / f"{phase}.stderr.txt"
+        out_path.write_text("", encoding="utf-8")
+        err_path.write_text("", encoding="utf-8")
+
+        def _pump(
+            stream: Any, chunks: list[str], mirror: Any, log_path: Path
+        ) -> None:
+            if stream is None:
+                return
+            with log_path.open("a", encoding="utf-8") as log:
+                for line in stream:
+                    chunks.append(line)
+                    mirror.write(line)
+                    mirror.flush()
+                    log.write(line)
+                    log.flush()
+
+        threads = [
+            threading.Thread(
+                target=_pump,
+                args=(proc.stdout, out_chunks, sys.stdout, out_path),
+                daemon=True,
+            ),
+            threading.Thread(
+                target=_pump,
+                args=(proc.stderr, err_chunks, sys.stderr, err_path),
+                daemon=True,
+            ),
+        ]
+        for thread in threads:
+            thread.start()
+        proc.wait()
+        for thread in threads:
+            thread.join()
+        stdout = "".join(out_chunks)
+        stderr = "".join(err_chunks)
+        return subprocess.CompletedProcess(cmd, proc.returncode, stdout, stderr)
 
     def _log(self, msg: str) -> None:
-        line = f"[e2e-nba {self.run_id}] {msg}"
+        line = f"[e2e {self.run_id}] {msg}"
         print(line, flush=True)
         with (self.dest / "watch.log").open("a", encoding="utf-8") as handle:
             handle.write(line + "\n")
@@ -228,7 +409,7 @@ class E2ERunner:
         if want_json and "--format" not in full:
             full.extend(["--format", "json"])
         self._log("$ uv run paperful " + " ".join(full))
-        proc = self._paperful(full)
+        proc = self._paperful(full, phase=phase)
         (self.dest / f"{phase}.stdout.txt").write_text(proc.stdout or "", encoding="utf-8")
         (self.dest / f"{phase}.stderr.txt").write_text(proc.stderr or "", encoding="utf-8")
         payload = self._parse_agent_json(proc.stdout or "") if want_json else None
@@ -265,6 +446,32 @@ class E2ERunner:
         )
         return result, payload
 
+    def _snowball_search_argv(
+        self, *, gate: str, fetch_pdfs: str, with_collection: bool = True
+    ) -> list[str]:
+        argv = [
+            "snowball",
+            "search",
+            self.plan.query,
+            "--year-from",
+            str(self.plan.year_from),
+            "--year-to",
+            str(self.plan.year_to),
+            "--max-candidates",
+            str(self.plan.max_candidates),
+            "--depth",
+            str(self.plan.depth),
+            "--per-hop-limit",
+            str(self.plan.per_hop_limit),
+            "--gate",
+            gate,
+            "--fetch-pdfs",
+            fetch_pdfs,
+        ]
+        if with_collection:
+            argv.extend(["-C", self.plan.collection])
+        return argv
+
     def phase_doctor(self) -> PhaseResult:
         result, _ = self._run_cmd(["doctor", "--no-guide"], phase="doctor", required=True)
         # doctor: 0 ok, 1 warnings, 2 env/manager missing
@@ -280,23 +487,9 @@ class E2ERunner:
     def phase_snowball_search(self) -> PhaseResult:
         if self.dry_run_search:
             dry, _ = self._run_cmd(
-                [
-                    "snowball",
-                    "search",
-                    QUERY,
-                    "--year-from",
-                    str(YEAR_FROM),
-                    "--year-to",
-                    str(YEAR_TO),
-                    "--max-candidates",
-                    str(MAX_CANDIDATES),
-                    "--depth",
-                    "1",
-                    "--gate",
-                    "dry-run",
-                    "--fetch-pdfs",
-                    "off",
-                ],
+                self._snowball_search_argv(
+                    gate="dry-run", fetch_pdfs="off", with_collection=False
+                ),
                 phase="snowball_search_dry",
                 required=True,
                 want_json=True,
@@ -309,25 +502,7 @@ class E2ERunner:
                 return self._record(dry)
 
         result, payload = self._run_cmd(
-            [
-                "snowball",
-                "search",
-                QUERY,
-                "--year-from",
-                str(YEAR_FROM),
-                "--year-to",
-                str(YEAR_TO),
-                "--max-candidates",
-                str(MAX_CANDIDATES),
-                "--depth",
-                "1",
-                "--gate",
-                "auto",
-                "--fetch-pdfs",
-                "full",
-                "-C",
-                COLLECTION,
-            ],
+            self._snowball_search_argv(gate="auto", fetch_pdfs=self.plan.fetch_pdfs),
             phase="snowball_search",
             required=True,
             want_json=True,
@@ -344,7 +519,10 @@ class E2ERunner:
                 result.summary["candidate_count"] = n
                 if n < 1:
                     result.status = "fail"
-                    result.reason = "no OpenAlex hits for NBA 2025–2026"
+                    result.reason = (
+                        f"no OpenAlex hits for {self.plan.query!r} "
+                        f"{self.plan.year_from}–{self.plan.year_to}"
+                    )
         elif result.status == "ok":
             # Try newest snowball dir
             newest = self._newest_snowball_run()
@@ -400,7 +578,9 @@ class E2ERunner:
                     reason="no candidates.jsonl to extract ORCIDs from",
                 )
             )
-        orcids = extract_orcids_from_candidates(queue, limit=MAX_ORCIDS)
+        orcids = extract_orcids_from_candidates(
+            queue, limit=self.plan.max_orcids
+        )
         if not orcids:
             return self._record(
                 PhaseResult(
@@ -416,19 +596,21 @@ class E2ERunner:
             "orcid",
             *orcids,
             "--year-from",
-            str(YEAR_FROM),
+            str(self.plan.year_from),
             "--year-to",
-            str(YEAR_TO),
+            str(self.plan.year_to),
             "--max-candidates",
-            str(MAX_CANDIDATES),
+            str(self.plan.max_candidates),
             "--depth",
-            "1",
+            str(self.plan.depth),
+            "--per-hop-limit",
+            str(self.plan.per_hop_limit),
             "--gate",
             "auto",
             "--fetch-pdfs",
-            "full",
+            self.plan.fetch_pdfs,
             "-C",
-            COLLECTION,
+            self.plan.collection,
             "--author-site-preflight",
         ]
         result, payload = self._run_cmd(
@@ -449,11 +631,11 @@ class E2ERunner:
             [
                 "run",
                 "-C",
-                COLLECTION,
+                self.plan.collection,
                 "--year-from",
-                str(YEAR_FROM),
+                str(self.plan.year_from),
                 "--year-to",
-                str(YEAR_TO),
+                str(self.plan.year_to),
                 "--try-all",
                 "--retry-failed",
                 "--upgrade-linked",
@@ -470,11 +652,11 @@ class E2ERunner:
             [
                 "all",
                 "-C",
-                COLLECTION,
+                self.plan.collection,
                 "--year-from",
-                str(YEAR_FROM),
+                str(self.plan.year_from),
                 "--year-to",
-                str(YEAR_TO),
+                str(self.plan.year_to),
                 "--steps",
                 "lint,fix-metadata,summarize",
                 "--apply",
@@ -488,12 +670,12 @@ class E2ERunner:
 
     def phase_authors_pack(self) -> PhaseResult:
         apply_res, _ = self._run_cmd(
-            ["authors", "-C", COLLECTION, "--apply"],
+            ["authors", "-C", self.plan.collection, "--apply"],
             phase="authors_apply",
             required=False,
             want_json=True,
         )
-        slug = "e2e-nba"
+        slug = self.plan.pack_slug
         promote, _ = self._run_cmd(
             ["snowball", "packs", "promote", slug],
             phase="authors_promote",
@@ -503,7 +685,7 @@ class E2ERunner:
             [
                 "run",
                 "-C",
-                COLLECTION,
+                self.plan.collection,
                 "--dry-run",
                 "--no-browser-agent",
                 "--retry-failed",
@@ -533,7 +715,7 @@ class E2ERunner:
     def phase_twenty(self) -> PhaseResult:
         # lookup has no --limit / --format; sync does.
         probe, _ = self._run_cmd(
-            ["twenty", "lookup", "-C", COLLECTION],
+            ["twenty", "lookup", "-C", self.plan.collection],
             phase="twenty_probe",
             required=False,
             want_json=False,
@@ -558,7 +740,7 @@ class E2ERunner:
                 )
             )
         lookup, _ = self._run_cmd(
-            ["twenty", "lookup", "-C", COLLECTION, "--apply"],
+            ["twenty", "lookup", "-C", self.plan.collection, "--apply"],
             phase="twenty_lookup",
             required=False,
             want_json=False,
@@ -568,10 +750,10 @@ class E2ERunner:
                 "twenty",
                 "sync",
                 "-C",
-                COLLECTION,
+                self.plan.collection,
                 "--apply",
                 "--limit",
-                str(TWENTY_LIMIT),
+                str(self.plan.twenty_limit),
                 "--yes",
             ],
             phase="twenty_sync",
@@ -593,7 +775,7 @@ class E2ERunner:
 
     def phase_reachout(self) -> PhaseResult:
         csv_path = self.dest / "reachout.csv"
-        args = ["reachout", "-C", COLLECTION, "--to", str(csv_path)]
+        args = ["reachout", "-C", self.plan.collection, "--to", str(csv_path)]
         # --lookup when Twenty may be ready; CLI soft-ignores if not
         args.append("--lookup")
         result, _ = self._run_cmd(args, phase="reachout", required=True, want_json=True)
@@ -632,7 +814,7 @@ class E2ERunner:
                 [
                     "gaps",
                     "-C",
-                    COLLECTION,
+                    self.plan.collection,
                     "--list-missing",
                     "--handoff",
                     mode,
@@ -685,10 +867,12 @@ class E2ERunner:
             json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
         )
         lines = [
-            f"# E2E NBA report `{self.run_id}`",
+            f"# E2E stack report `{self.run_id}`",
             "",
-            f"- Collection: `{COLLECTION}`",
-            f"- Query: `{QUERY}` ({YEAR_FROM}–{YEAR_TO})",
+            f"- Topic: `{self.plan.topic}` (effort `{self.plan.effort}`)",
+            f"- Collection: `{self.plan.collection}`",
+            f"- Query: `{self.plan.query}` ({self.plan.year_from}–{self.plan.year_to})",
+            f"- Snowball cap: {self.plan.max_candidates} candidates, depth {self.plan.depth}",
             f"- OK: **{payload['ok']}**",
             "",
             "| Phase | Status | Required | Reason |",
@@ -746,7 +930,38 @@ class E2ERunner:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Paperful all-in E2E (NBA 2025–2026)")
+    parser = argparse.ArgumentParser(
+        description="Paperful all-in E2E stack (topic + effort; see docs/e2e-stack.md)"
+    )
+    parser.add_argument(
+        "--topic",
+        default=DEFAULT_TOPIC,
+        help=f"OpenAlex keyword seed (default: {DEFAULT_TOPIC}).",
+    )
+    parser.add_argument(
+        "--effort",
+        default=DEFAULT_EFFORT,
+        choices=EFFORT_CHOICES,
+        help="low (~25 rows), med (~250), high (2-hop, cap ~3000).",
+    )
+    parser.add_argument(
+        "--year-from",
+        type=int,
+        default=None,
+        help="Year filter (default: previous calendar year).",
+    )
+    parser.add_argument(
+        "--year-to",
+        type=int,
+        default=None,
+        help="Year filter (default: current calendar year).",
+    )
+    parser.add_argument(
+        "-C",
+        "--collection",
+        default=None,
+        help="Zotero collection override (default: e2e/<topic>).",
+    )
     parser.add_argument(
         "--force",
         action="store_true",
@@ -765,28 +980,40 @@ def main(argv: list[str] | None = None) -> int:
         help="Run only this phase.",
     )
     parser.add_argument(
-        "--no-dry-run-search",
+        "--dry-run-search",
         action="store_true",
-        help="Skip the snowball dry-run before gate auto.",
+        help="Run a snowball dry-run (no Zotero writes, no PDFs) before gate auto.",
     )
     parser.add_argument(
         "--run-id",
         default=None,
-        help="Reuse an existing state/e2e-nba/<run-id> directory.",
+        help="Reuse an existing state/e2e/<run-id> (or legacy state/e2e-nba/) directory.",
     )
     args = parser.parse_args(argv)
     if os.environ.get("PAPERFUL_E2E") != "1" and not args.force:
         print(
             "Refusing live E2E: set PAPERFUL_E2E=1 or pass --force. "
-            "See docs/e2e-nba.md.",
+            "See docs/e2e-stack.md.",
             file=sys.stderr,
         )
         return 2
+    try:
+        plan = build_e2e_plan(
+            args.topic,
+            args.effort,
+            year_from=args.year_from,
+            year_to=args.year_to,
+            collection=args.collection,
+        )
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     runner = E2ERunner(
+        plan=plan,
         run_id=args.run_id,
         from_phase=args.from_phase,
         only_phase=args.phase,
-        dry_run_search=not args.no_dry_run_search,
+        dry_run_search=args.dry_run_search,
     )
     return runner.run()
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Legacy CLI entry (same as scripts/e2e_stack.py). Prefer: make e2e-stack"""
+"""CLI entry for the topic + effort all-in E2E stack. See docs/e2e-stack.md."""
 
 from __future__ import annotations
 
