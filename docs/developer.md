@@ -90,6 +90,10 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `resolve.py`, `lint.py`, `acronyms.py`, `authors_report.py`, `metadata.py`, `dedupe.py`, `pdfid.py` | Identifier, hygiene, and corpus-frequency logic. Take a backend; never name a manager | the protocol |
 | `sources/` | One fetch lane each. Return bytes or a miss | `sources.base` |
 | `pipeline.py` | Order the lanes, save, attach, write the manifest | most things |
+| `pipeline_save.py` | Save a fetched PDF, write the manifest, attach when allowed | `store`, `pdfid` |
+| `run_hooks.py` | EZProxy recovery, handoff, dry-run rows for `run` | `pipeline`, `handoff` |
+| `gaps_cmd.py` | `gaps` body after the CLI parses flags | `handoff`, `run_hooks` |
+| `run_cmd.py` | `run` body after the CLI parses flags | `pipeline`, `run_hooks` |
 | `cli.py` | Flags, progress, exits. No logic of its own | everything |
 | `agent_json.py` | `--format json` envelope (`paperful.agent.json.v1`) and exit 3 | none |
 | `agent_ops.py` | Shared refs-gap / ask builders for CLI JSON and MCP | `agent_json`, catalogue, rag |

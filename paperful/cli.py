@@ -3419,218 +3419,35 @@ def run(
     relogin = (
         ezproxy_relogin if isinstance(ezproxy_relogin, bool) else cfg.ezproxy_relogin
     )
-    if not collection and not library:
-        _refuse_missing_scope()
-    _require_manager(cfg)
-    source_list = _source_list(cfg, sources, scihub, preset)
-    backend, offline_reason = _open_library(cfg, quiet=json_out)
-    mirror_only = backend is None
-    if mirror_only:
-        manager = _manager_name(cfg)
-        if not json_out:
-            console.print(
-                f"[yellow]{manager} is not reachable ({offline_reason}). "
-                "Continuing from the local mirror. Nothing will be copied to the library.[/]"
-            )
-        catalog = items_from_mirror(cfg.out_dir, None if library else collection)
-        scope = "library" if library else ", ".join(collection)
-        keys = None
-    else:
-        keys, scope = _scope_keys(backend, collection, library)
-    types = _resolve_types(item_type)
-    # Drop sources that can never hit this -T / year scope (e.g. htmlpdf on
-    # journals, Sci-Hub when --year-from is past its ~2021 coverage), including
-    # under --try-all.
-    source_list = filter_sources_for_item_types(
-        source_list,
-        types,
-        academic_htmlpdf=cfg.htmlpdf_academic != "off",
-    )
-    source_list = filter_sources_for_year_scope(source_list, year_from)
-    source_list = with_recover_lane(cfg, source_list, during_run=browser_agent)
-    source_list = with_serpapi_lane(cfg, source_list)
-    if not json_out:
-        _warn_if_scihub(source_list)
-        _warn_if_recover(source_list)
+    from .run_cmd import run_fetch
 
-    manifest = Manifest(cfg.manifest_path)
-    item_filter = year_from is not None or year_to is not None or types is not None
-    # One library listing. Year and type filters, the linked-URL skip count,
-    # and the PDF todo all come from that list.
-    if not mirror_only:
-        assert backend is not None
-        with _spinner("Loading items from library…", json_out=json_out):
-            catalog = backend.items_in_scope(keys)
-    if item_filter:
-        scoped, scope = _apply_item_filters(
-            catalog,
-            scope,
-            year_from=year_from,
-            year_to=year_to,
-            item_types=types,
-        )
-        linked_skipped = 0 if upgrade_linked else linked_url_only_count(scoped)
-    else:
-        scoped = catalog
-        linked_skipped = (
-            0
-            if upgrade_linked
-            else linked_url_only_count(scoped, skip_empty_paths=keys is not None)
-        )
-    items = items_without_stored_pdf(
-        scoped,
-        upgrade_linked=upgrade_linked,
-        upgrade_snapshot=want_snapshot_upgrade,
-    )
-    todo = [it for it in items if manifest.should_process(it.key, retry_failed)]
-    skipped_manifest = len(items) - len(todo)
-    if limit:
-        todo = todo[:limit]
-    linked_note = (
-        f", {linked_skipped} linked URL only (skipped)" if linked_skipped else ""
-    )
-    if not json_out:
-        console.print(
-            f"Scope: [bold]{scope}[/] - {len(items)} items without PDF, {skipped_manifest} already handled, "
-            f"{len(todo)} to process{linked_note}. Sources: {', '.join(source_list)}"
-        )
-
-    if dry_run:
-        run_dry_run_table_and_payload(
-            console,
-            cfg,
-            todo=todo,
-            try_all=try_all,
-            source_list=source_list,
-            manifest=manifest,
-            mirror_only=mirror_only,
-            mirror_deferred=lambda: _mirror_deferred(cfg),
-            json_out=json_out,
-            emit_agent=_emit_agent,
-        )
-        raise typer.Exit(0)
-
-    attacher = None
-    if backend is not None and cfg.attach and not no_attach:
-        attacher = backend
-        if not backend.supports_write():
-            console.print(
-                "[yellow]Attach disabled: this library has no write support. PDFs still saved to disk.[/]"
-            )
-            attacher = None
-
-    run_flags = _run_flags(
-        dry_run=False,
+    run_fetch(
+        console,
+        cfg,
+        collection=collection,
+        library=library,
+        dry_run=dry_run,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=limit,
         no_attach=no_attach,
         retry_failed=retry_failed,
         try_all=try_all,
-        upgrade_linked=upgrade_linked,
-        scihub=scihub,
-        no_browser_agent=True if browser_agent is False else None,
-        browser_agent=True if browser_agent is True else None,
-        preset=preset,
         sources=sources,
-        year_from=year_from,
-        year_to=year_to,
-        item_types=",".join(sorted(types)) if types else None,
+        preset=preset,
+        scihub=scihub,
+        relogin=relogin,
+        browser_agent=browser_agent,
+        upgrade_linked=upgrade_linked,
+        want_snapshot_upgrade=want_snapshot_upgrade,
         strict_pdf_doi=strict_pdf_doi,
-        ezproxy_relogin=relogin,
-    )
-    write_api = None if mirror_only else _library_write_api(backend)
-
-    if not todo:
-        stats = RunStats(
-            skipped_manifest=skipped_manifest, linked_url_skipped=linked_skipped
-        )
-        stats.scope = scope
-        stats.sources_configured = list(source_list)
-        stats.finished_at = stats.started_at
-        _finish_run(
-            cfg,
-            stats,
-            scope=scope,
-            flags=run_flags,
-            write_api=write_api,
-            json_out=json_out,
-        )
-        if mirror_only:
-            _mirror_deferred(cfg)
-        return
-
-    pipe = Pipeline(
-        cfg,
-        manifest,
-        console,
-        sources=source_list,
-        attacher=attacher,
-        try_all=True if try_all else None,
-        strict_pdf_doi=bool(strict_pdf_doi),
-    )
-    pipe.on_ezproxy_down = mid_run_ezproxy_hook(console, cfg, pipe, enabled=relogin)
-    preflight_ezproxy_session(console, cfg, pipe, source_list, enabled=relogin)
-    interrupted = False
-    with _item_progress() as progress:
-        task_id = progress.add_task("Fetching PDFs", total=len(todo))
-        pipe.progress = lambda: progress.advance(task_id)
-        pipe.live_progress = progress
-        try:
-            stats = pipe.run(todo)
-        except KeyboardInterrupt:
-            interrupted = True
-            console.print(
-                "\n[yellow]Interrupted - progress is in the manifest; rerun to resume.[/]"
-            )
-            stats = pipe.stats
-            if not stats.finished_at:
-                stats.finished_at = time.time()
-        stats = pipe.stats
-        pipe.live_progress = None
-    # Fetch bar is done and pipe.run has closed the vault browser. Re-login
-    # happens here, still before the report and before --handoff opens tabs.
-    if not interrupted:
-        try:
-            maybe_ezproxy_relogin(console, cfg, pipe, todo, enabled=relogin)
-        except KeyboardInterrupt:
-            console.print(
-                "\n[yellow]Interrupted during EZProxy re-login - "
-                "progress is in the manifest.[/]"
-            )
-            if not pipe.stats.finished_at:
-                pipe.stats.finished_at = time.time()
-        stats = pipe.stats
-    stats.skipped_manifest = skipped_manifest
-    stats.linked_url_skipped = linked_skipped
-    stats.scope = scope
-    _finish_run(
-        cfg,
-        stats,
-        scope=scope,
-        flags=run_flags,
-        write_api=write_api,
+        handoff=handoff,
+        include_doi_tabs=include_doi_tabs,
+        downloads_dir=downloads_dir,
+        re_request=re_request,
         json_out=json_out,
     )
-    if backend is not None:
-        _flush(backend)
-    if mirror_only:
-        _mirror_deferred(cfg)
-    if not dry_run and not interrupted:
-        _rag_auto(cfg, stats.started_at)
-    if handoff and not dry_run:
-        # Tabs use the default browser. Release the vault profile first so
-        # those tabs do not land in the EZProxy login window.
-        if pipe.browser is not None:
-            pipe.browser.close()
-        _run_session_handoff(
-            cfg,
-            backend,
-            manifest,
-            catalog,
-            stats,
-            handoff=handoff,
-            include_doi_tabs=include_doi_tabs,
-            downloads_dir=downloads_dir,
-            re_request=re_request,
-        )
 
 
 def _ezproxy_headed_login_and_probe(cfg: Config, pipe: Pipeline) -> bool:
