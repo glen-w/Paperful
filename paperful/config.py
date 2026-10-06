@@ -7,6 +7,7 @@ import sys
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 from .playbooks import (
@@ -800,60 +801,86 @@ def _resolve_prompt_path(value: str, source: Path) -> str:
     return str(path)
 
 
+def _clamp01(value: Any) -> float:
+    return min(1.0, max(0.0, float(value)))
+
+
+def _apply_config_table(
+    table: Any,
+    cfg: Config,
+    fields: list[tuple[str, str, Callable[[Any], Any]]],
+) -> None:
+    if not isinstance(table, dict):
+        return
+    for key, attr, coerce in fields:
+        if key in table:
+            setattr(cfg, attr, coerce(table[key]))
+
+
 def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None:
-    llm = raw.get("llm")
-    if isinstance(llm, dict):
-        if "enabled" in llm:
-            cfg.llm_enabled = bool(llm["enabled"])
-        if "provider" in llm:
-            cfg.llm_provider = str(llm["provider"]).strip().lower() or "ollama"
-        if "model" in llm:
-            cfg.llm_model = str(llm["model"]).strip()
-        if "base_url" in llm:
-            cfg.llm_base_url = str(llm["base_url"]).strip()
-        if "api_base" in llm:
-            cfg.llm_api_base = str(llm["api_base"]).strip()
-        if "allow_remote" in llm:
-            cfg.llm_allow_remote = bool(llm["allow_remote"])
-        if "timeout_s" in llm:
-            cfg.llm_timeout_s = float(llm["timeout_s"])
-        if "max_num_ctx" in llm:
-            cfg.llm_max_num_ctx = max(1024, int(llm["max_num_ctx"]))
-    ba = raw.get("browser_agent")
-    if isinstance(ba, dict):
-        if "max_steps" in ba:
-            cfg.browser_agent_max_steps = max(1, int(ba["max_steps"]))
-        if "max_wall_s" in ba:
-            cfg.browser_agent_max_wall_s = float(ba["max_wall_s"])
-        if "model" in ba:
-            cfg.browser_agent_model = str(ba["model"]).strip()
-        if "fallback_model" in ba:
-            cfg.browser_agent_fallback_model = str(ba["fallback_model"]).strip()
-        if "during_run" in ba:
-            cfg.browser_agent_during_run = bool(ba["during_run"])
-        if "use_vision" in ba:
-            cfg.browser_agent_use_vision = bool(ba["use_vision"])
-        if "use_thinking" in ba:
-            cfg.browser_agent_use_thinking = bool(ba["use_thinking"])
-    fm = raw.get("fix_metadata")
-    if isinstance(fm, dict) and "llm_title" in fm:
-        cfg.fix_metadata_llm_title = bool(fm["llm_title"])
-    lint = raw.get("lint")
-    if isinstance(lint, dict):
-        if "llm_pdf_match" in lint:
-            cfg.lint_llm_pdf_match = bool(lint["llm_pdf_match"])
-        if "llm_pdf_match_min_confidence" in lint:
-            cfg.lint_llm_pdf_match_min_confidence = min(
-                1.0, max(0.0, float(lint["llm_pdf_match_min_confidence"]))
-            )
+    _apply_config_table(
+        raw.get("llm"),
+        cfg,
+        [
+            ("enabled", "llm_enabled", bool),
+            (
+                "provider",
+                "llm_provider",
+                lambda v: str(v).strip().lower() or "ollama",
+            ),
+            ("model", "llm_model", lambda v: str(v).strip()),
+            ("base_url", "llm_base_url", lambda v: str(v).strip()),
+            ("api_base", "llm_api_base", lambda v: str(v).strip()),
+            ("allow_remote", "llm_allow_remote", bool),
+            ("timeout_s", "llm_timeout_s", float),
+            ("max_num_ctx", "llm_max_num_ctx", lambda v: max(1024, int(v))),
+        ],
+    )
+    _apply_config_table(
+        raw.get("browser_agent"),
+        cfg,
+        [
+            ("max_steps", "browser_agent_max_steps", lambda v: max(1, int(v))),
+            ("max_wall_s", "browser_agent_max_wall_s", float),
+            ("model", "browser_agent_model", lambda v: str(v).strip()),
+            ("fallback_model", "browser_agent_fallback_model", lambda v: str(v).strip()),
+            ("during_run", "browser_agent_during_run", bool),
+            ("use_vision", "browser_agent_use_vision", bool),
+            ("use_thinking", "browser_agent_use_thinking", bool),
+        ],
+    )
+    _apply_config_table(
+        raw.get("fix_metadata"),
+        cfg,
+        [("llm_title", "fix_metadata_llm_title", bool)],
+    )
+    _apply_config_table(
+        raw.get("lint"),
+        cfg,
+        [
+            ("llm_pdf_match", "lint_llm_pdf_match", bool),
+            ("llm_pdf_match_min_confidence", "lint_llm_pdf_match_min_confidence", _clamp01),
+        ],
+    )
     summ = raw.get("summarize")
     if isinstance(summ, dict):
-        if "prompt_template" in summ:
-            cfg.summarize_prompt_template = str(summ["prompt_template"]).strip()
-        if "max_context_chars" in summ:
-            cfg.summarize_max_context_chars = max(1000, int(summ["max_context_chars"]))
-        if "tag" in summ:
-            cfg.summarize_tag = str(summ["tag"]).strip() or "paperful-summary"
+        _apply_config_table(
+            summ,
+            cfg,
+            [
+                ("prompt_template", "summarize_prompt_template", lambda v: str(v).strip()),
+                (
+                    "max_context_chars",
+                    "summarize_max_context_chars",
+                    lambda v: max(1000, int(v)),
+                ),
+                (
+                    "tag",
+                    "summarize_tag",
+                    lambda v: str(v).strip() or "paperful-summary",
+                ),
+            ],
+        )
         if "dest" in summ:
             cfg.summarize_dest = parse_dest(str(summ["dest"]), key="[summarize].dest")
         if "order" in summ:
@@ -862,18 +889,30 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             )
     synth = raw.get("synthesize")
     if isinstance(synth, dict):
-        if "prompt_template" in synth:
-            cfg.synthesize_prompt_template = str(synth["prompt_template"]).strip()
-        if "max_context_chars" in synth:
-            cfg.synthesize_max_context_chars = max(
-                1000, int(synth["max_context_chars"])
-            )
-        if "tag" in synth:
-            cfg.synthesize_tag = str(synth["tag"]).strip() or "paperful-report"
+        _apply_config_table(
+            synth,
+            cfg,
+            [
+                (
+                    "prompt_template",
+                    "synthesize_prompt_template",
+                    lambda v: str(v).strip(),
+                ),
+                (
+                    "max_context_chars",
+                    "synthesize_max_context_chars",
+                    lambda v: max(1000, int(v)),
+                ),
+                (
+                    "tag",
+                    "synthesize_tag",
+                    lambda v: str(v).strip() or "paperful-report",
+                ),
+                ("timeout_s", "synthesize_timeout_s", float),
+            ],
+        )
         if "dest" in synth:
             cfg.synthesize_dest = parse_dest(str(synth["dest"]), key="[synthesize].dest")
-        if "timeout_s" in synth:
-            cfg.synthesize_timeout_s = float(synth["timeout_s"])
     fetch = raw.get("fetch")
     if isinstance(fetch, dict) and "order" in fetch:
         cfg.fetch_order = _one_of("[fetch].order", fetch["order"], ("policy", "list"))
@@ -882,12 +921,14 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
         cfg.scholar_when = _one_of(
             "[scholar].when", scholar_tbl["when"], ("auto", "phase", "interleave")
         )
-    serpapi = raw.get("serpapi")
-    if isinstance(serpapi, dict):
-        if "enabled" in serpapi:
-            cfg.serpapi_enabled = bool(serpapi["enabled"])
-        if "max_calls" in serpapi:
-            cfg.serpapi_max_calls = max(0, int(serpapi["max_calls"]))
+    _apply_config_table(
+        raw.get("serpapi"),
+        cfg,
+        [
+            ("enabled", "serpapi_enabled", bool),
+            ("max_calls", "serpapi_max_calls", lambda v: max(0, int(v))),
+        ],
+    )
     handoff_tbl = raw.get("handoff")
     if isinstance(handoff_tbl, dict) and "scholar" in handoff_tbl:
         cfg.handoff_scholar = bool(handoff_tbl["scholar"])
@@ -901,26 +942,33 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             )
         if "email_after_days" in req:
             cfg.request_email_after_days = max(0, int(req["email_after_days"]))
-    twenty = raw.get("twenty")
-    if isinstance(twenty, dict):
-        if "enabled" in twenty:
-            cfg.twenty_enabled = bool(twenty["enabled"])
-        if "base_url" in twenty:
-            cfg.twenty_base_url = str(twenty["base_url"]).strip().rstrip("/")
-        if "lookup_on_preflight" in twenty:
-            cfg.twenty_lookup_on_preflight = bool(twenty["lookup_on_preflight"])
-        if "retry_max" in twenty:
-            cfg.twenty_retry_max = max(0, int(twenty["retry_max"]))
-        if "retry_base_seconds" in twenty:
-            cfg.twenty_retry_base_seconds = max(0.0, float(twenty["retry_base_seconds"]))
-        if "sync_note_title" in twenty:
-            cfg.twenty_sync_note_title = str(twenty["sync_note_title"]).strip() or "Paperful"
-        if "provenance_keyword" in twenty:
-            cfg.twenty_provenance_keyword = str(twenty["provenance_keyword"]).strip() or "paperful"
-        if "fetch_listing_max" in twenty:
-            cfg.twenty_fetch_listing_max = max(0, int(twenty["fetch_listing_max"]))
-        if "writeback_listings" in twenty:
-            cfg.twenty_writeback_listings = bool(twenty["writeback_listings"])
+    _apply_config_table(
+        raw.get("twenty"),
+        cfg,
+        [
+            ("enabled", "twenty_enabled", bool),
+            ("base_url", "twenty_base_url", lambda v: str(v).strip().rstrip("/")),
+            ("lookup_on_preflight", "twenty_lookup_on_preflight", bool),
+            ("retry_max", "twenty_retry_max", lambda v: max(0, int(v))),
+            (
+                "retry_base_seconds",
+                "twenty_retry_base_seconds",
+                lambda v: max(0.0, float(v)),
+            ),
+            (
+                "sync_note_title",
+                "twenty_sync_note_title",
+                lambda v: str(v).strip() or "Paperful",
+            ),
+            (
+                "provenance_keyword",
+                "twenty_provenance_keyword",
+                lambda v: str(v).strip() or "paperful",
+            ),
+            ("fetch_listing_max", "twenty_fetch_listing_max", lambda v: max(0, int(v))),
+            ("writeback_listings", "twenty_writeback_listings", bool),
+        ],
+    )
     gaps = raw.get("gaps")
     if isinstance(gaps, dict):
         if "handoff" in gaps:
@@ -931,55 +979,50 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             cfg.gaps_downloads_dir = str(gaps["downloads_dir"]).strip()
     inbox = raw.get("inbox")
     if isinstance(inbox, dict):
-        if "dir" in inbox:
-            cfg.inbox_dir = str(inbox["dir"]).strip()
-        if "watch_after_handoff" in inbox:
-            cfg.inbox_watch_after_handoff = bool(inbox["watch_after_handoff"])
-        if "poll_seconds" in inbox:
-            cfg.inbox_poll_seconds = max(0.2, float(inbox["poll_seconds"]))
-        if "settle_seconds" in inbox:
-            cfg.inbox_settle_seconds = max(0.0, float(inbox["settle_seconds"]))
-        if "idle_seconds" in inbox:
-            cfg.inbox_idle_seconds = max(0.0, float(inbox["idle_seconds"]))
+        _apply_config_table(
+            inbox,
+            cfg,
+            [
+                ("dir", "inbox_dir", lambda v: str(v).strip()),
+                ("watch_after_handoff", "inbox_watch_after_handoff", bool),
+                ("poll_seconds", "inbox_poll_seconds", lambda v: max(0.2, float(v))),
+                ("settle_seconds", "inbox_settle_seconds", lambda v: max(0.0, float(v))),
+                ("idle_seconds", "inbox_idle_seconds", lambda v: max(0.0, float(v))),
+                (
+                    "quarantine_after_s",
+                    "inbox_quarantine_after_s",
+                    lambda v: max(0.0, float(v)),
+                ),
+                ("ocr_for_match", "inbox_ocr_for_match", bool),
+                ("llm_match_min_confidence", "inbox_llm_match_min_confidence", _clamp01),
+                ("llm_auto_attach_min", "inbox_llm_auto_attach_min", _clamp01),
+                ("model", "inbox_model", lambda v: str(v).strip()),
+                ("provider", "inbox_provider", lambda v: str(v).strip()),
+                ("title_resolve", "inbox_title_resolve", bool),
+                (
+                    "manager_metadata_s",
+                    "inbox_manager_metadata_s",
+                    lambda v: max(0.0, float(v)),
+                ),
+            ],
+        )
         if "match" in inbox:
             cfg.inbox_match = _one_of(
                 "[inbox].match",
                 inbox["match"],
                 ("doi_only", "doi+title", "doi+title+ocr", "full"),
             )
-        if "quarantine_after_s" in inbox:
-            cfg.inbox_quarantine_after_s = max(0.0, float(inbox["quarantine_after_s"]))
-        if "ocr_for_match" in inbox:
-            cfg.inbox_ocr_for_match = bool(inbox["ocr_for_match"])
         if "llm_match" in inbox:
             cfg.inbox_llm_match = _one_of(
                 "[inbox].llm_match",
                 inbox["llm_match"],
                 ("off", "when_thin", "always"),
             )
-        if "llm_match_min_confidence" in inbox:
-            cfg.inbox_llm_match_min_confidence = min(
-                1.0, max(0.0, float(inbox["llm_match_min_confidence"]))
-            )
-        if "llm_auto_attach_min" in inbox:
-            cfg.inbox_llm_auto_attach_min = min(
-                1.0, max(0.0, float(inbox["llm_auto_attach_min"]))
-            )
-        if "model" in inbox:
-            cfg.inbox_model = str(inbox["model"]).strip()
-        if "provider" in inbox:
-            cfg.inbox_provider = str(inbox["provider"]).strip()
         if "create" in inbox:
             cfg.inbox_create = _one_of(
                 "[inbox].create",
                 inbox["create"],
                 ("attach_only", "create_gated", "create_auto"),
-            )
-        if "title_resolve" in inbox:
-            cfg.inbox_title_resolve = bool(inbox["title_resolve"])
-        if "manager_metadata_s" in inbox:
-            cfg.inbox_manager_metadata_s = max(
-                0.0, float(inbox["manager_metadata_s"])
             )
     htmlpdf = raw.get("htmlpdf")
     if isinstance(htmlpdf, dict):
@@ -989,10 +1032,14 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
                 htmlpdf["academic"],
                 ("off", "gated", "auto"),
             )
-        if "upgrade" in htmlpdf:
-            cfg.htmlpdf_upgrade = bool(htmlpdf["upgrade"])
-        if "keep_snapshot" in htmlpdf:
-            cfg.htmlpdf_keep_snapshot = bool(htmlpdf["keep_snapshot"])
+        _apply_config_table(
+            htmlpdf,
+            cfg,
+            [
+                ("upgrade", "htmlpdf_upgrade", bool),
+                ("keep_snapshot", "htmlpdf_keep_snapshot", bool),
+            ],
+        )
     ingest = raw.get("ingest")
     if isinstance(ingest, dict):
         if "default_tags" in ingest:
@@ -1013,14 +1060,15 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
                 raise ValueError("[playbooks].auto_min_hits must be >= 1")
             cfg.playbooks_auto_min_hits = hits
     mirror = raw.get("mirror")
-    if isinstance(mirror, dict) and "pdfs" in mirror:
-        cfg.mirror_pdfs = parse_pdfs(str(mirror["pdfs"]))
-    if isinstance(mirror, dict) and "gone" in mirror:
-        cfg.mirror_gone = _one_of("[mirror].gone", mirror["gone"], ("mark", "trash"))
-    if isinstance(mirror, dict) and "refresh" in mirror:
-        cfg.mirror_refresh = _one_of(
-            "[mirror].refresh", mirror["refresh"], ("auto", "manual")
-        )
+    if isinstance(mirror, dict):
+        if "pdfs" in mirror:
+            cfg.mirror_pdfs = parse_pdfs(str(mirror["pdfs"]))
+        if "gone" in mirror:
+            cfg.mirror_gone = _one_of("[mirror].gone", mirror["gone"], ("mark", "trash"))
+        if "refresh" in mirror:
+            cfg.mirror_refresh = _one_of(
+                "[mirror].refresh", mirror["refresh"], ("auto", "manual")
+            )
     remarks = raw.get("remarks")
     if isinstance(remarks, dict) and remarks.get("surface") not in (None, ""):
         cfg.remarks_surface = parse_remarks_surface(str(remarks["surface"]))
@@ -1030,79 +1078,78 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
             cfg.oa_honesty_stamp_fields = _snowball_strs(oa_honesty["stamp_fields"])
         if "license_block" in oa_honesty:
             cfg.oa_honesty_license_block = _snowball_strs(oa_honesty["license_block"])
-    attached = raw.get("attachments")
-    if isinstance(attached, dict):
-        if "fix_broken" in attached:
-            cfg.attachments_fix_broken = bool(attached["fix_broken"])
-        if "merge_files" in attached:
-            cfg.attachments_merge_files = bool(attached["merge_files"])
-        if "rename" in attached:
-            cfg.attachments_rename = bool(attached["rename"])
-        if "link" in attached:
-            cfg.attachments_link = bool(attached["link"])
-    ocr = raw.get("ocr")
-    if isinstance(ocr, dict):
-        if "languages" in ocr:
-            cfg.ocr_languages = str(ocr["languages"]).strip() or "eng"
-        if "timeout_s" in ocr:
-            cfg.ocr_timeout_s = max(1.0, float(ocr["timeout_s"]))
+    _apply_config_table(
+        raw.get("attachments"),
+        cfg,
+        [
+            ("fix_broken", "attachments_fix_broken", bool),
+            ("merge_files", "attachments_merge_files", bool),
+            ("rename", "attachments_rename", bool),
+            ("link", "attachments_link", bool),
+        ],
+    )
+    _apply_config_table(
+        raw.get("ocr"),
+        cfg,
+        [
+            ("languages", "ocr_languages", lambda v: str(v).strip() or "eng"),
+            ("timeout_s", "ocr_timeout_s", lambda v: max(1.0, float(v))),
+        ],
+    )
     rag = raw.get("rag")
     if isinstance(rag, dict):
-        if "enabled" in rag:
-            cfg.rag_enabled = bool(rag["enabled"])
-        if "auto_ingest" in rag:
-            cfg.rag_auto_ingest = bool(rag["auto_ingest"])
-        if "ocr" in rag:
-            cfg.rag_ocr = parse_rag_ocr(str(rag["ocr"]))
-        if "parser" in rag:
-            cfg.rag_parser = parse_rag_parser(str(rag["parser"]))
-        if "embed_provider" in rag:
-            cfg.rag_embed_provider = parse_rag_embed_provider(
-                str(rag["embed_provider"])
-            )
+        _apply_config_table(
+            rag,
+            cfg,
+            [
+                ("enabled", "rag_enabled", bool),
+                ("auto_ingest", "rag_auto_ingest", bool),
+                ("ocr", "rag_ocr", lambda v: parse_rag_ocr(str(v))),
+                ("parser", "rag_parser", lambda v: parse_rag_parser(str(v))),
+                (
+                    "embed_provider",
+                    "rag_embed_provider",
+                    lambda v: parse_rag_embed_provider(str(v)),
+                ),
+                ("embed_base_url", "rag_embed_base_url", lambda v: str(v).strip()),
+                ("embed_api_base", "rag_embed_api_base", lambda v: str(v).strip()),
+                ("embed_batch_size", "rag_embed_batch_size", lambda v: max(1, int(v))),
+                ("chunk_chars", "rag_chunk_chars", lambda v: max(200, int(v))),
+                ("chunk_overlap", "rag_chunk_overlap", lambda v: max(0, int(v))),
+                ("top_k", "rag_top_k", lambda v: max(1, int(v))),
+                (
+                    "max_context_chars",
+                    "rag_max_context_chars",
+                    lambda v: max(1000, int(v)),
+                ),
+                ("hybrid", "rag_hybrid", bool),
+                ("abstracts", "rag_abstracts", bool),
+                ("model", "rag_model", lambda v: str(v).strip()),
+                ("focus", "rag_focus", lambda v: parse_rag_focus(str(v))),
+                ("dest", "rag_dest", lambda v: parse_dest(str(v), key="[rag].dest")),
+                ("extract_questions_llm", "rag_extract_questions_llm", bool),
+            ],
+        )
         if "embed_model" in rag:
             model = str(rag["embed_model"]).strip()
             if not model:
                 raise ValueError("config [rag].embed_model is empty")
             cfg.rag_embed_model = model
-        if "embed_base_url" in rag:
-            cfg.rag_embed_base_url = str(rag["embed_base_url"]).strip()
-        if "embed_api_base" in rag:
-            cfg.rag_embed_api_base = str(rag["embed_api_base"]).strip()
-        if "embed_batch_size" in rag:
-            cfg.rag_embed_batch_size = max(1, int(rag["embed_batch_size"]))
-        if "chunk_chars" in rag:
-            cfg.rag_chunk_chars = max(200, int(rag["chunk_chars"]))
-        if "chunk_overlap" in rag:
-            cfg.rag_chunk_overlap = max(0, int(rag["chunk_overlap"]))
-        if "top_k" in rag:
-            cfg.rag_top_k = max(1, int(rag["top_k"]))
-        if "max_context_chars" in rag:
-            cfg.rag_max_context_chars = max(1000, int(rag["max_context_chars"]))
-        if "hybrid" in rag:
-            cfg.rag_hybrid = bool(rag["hybrid"])
-        if "abstracts" in rag:
-            cfg.rag_abstracts = bool(rag["abstracts"])
-        if "model" in rag:
-            cfg.rag_model = str(rag["model"]).strip()
-        if "focus" in rag:
-            cfg.rag_focus = parse_rag_focus(str(rag["focus"]))
         if "prompt" in rag:
             cfg.rag_prompt = _resolve_prompt_path(str(rag["prompt"]), source)
             if cfg.rag_prompt == "default":
                 cfg.rag_prompt = ""
-        if "dest" in rag:
-            cfg.rag_dest = parse_dest(str(rag["dest"]), key="[rag].dest")
-        if "extract_questions_llm" in rag:
-            cfg.rag_extract_questions_llm = bool(rag["extract_questions_llm"])
-        # Overlap must leave room for new text in every chunk.
         cfg.rag_chunk_overlap = min(cfg.rag_chunk_overlap, cfg.rag_chunk_chars // 2)
     men = raw.get("mendeley")
     if isinstance(men, dict):
-        if "client_id" in men:
-            cfg.mendeley_client_id = str(men["client_id"]).strip()
-        if "client_secret" in men:
-            cfg.mendeley_client_secret = str(men["client_secret"]).strip()
+        _apply_config_table(
+            men,
+            cfg,
+            [
+                ("client_id", "mendeley_client_id", lambda v: str(v).strip()),
+                ("client_secret", "mendeley_client_secret", lambda v: str(v).strip()),
+            ],
+        )
         if "redirect_uri" in men and men["redirect_uri"]:
             cfg.mendeley_redirect_uri = str(men["redirect_uri"]).strip()
     en = raw.get("endnote")
@@ -1111,22 +1158,26 @@ def _apply_nested_tables(raw: dict[str, Any], cfg: Config, source: Path) -> None
         if not lib.is_absolute():
             lib = (source.parent / lib).resolve()
         cfg.endnote_library = lib
-    store = raw.get("openalex_store")
-    if isinstance(store, dict):
-        if "backend" in store:
-            cfg.openalex_store_backend = str(store["backend"]).strip().lower()
-        if "ssh_host" in store:
-            cfg.openalex_store_ssh_host = str(store["ssh_host"]).strip()
-        if "ssh_user" in store:
-            cfg.openalex_store_ssh_user = str(store["ssh_user"]).strip()
-        if "parquet_glob" in store:
-            cfg.openalex_store_parquet_glob = str(store["parquet_glob"]).strip()
-        if "duckdb_bin" in store:
-            cfg.openalex_store_duckdb_bin = (
-                str(store["duckdb_bin"]).strip() or "duckdb"
-            )
-        if "timeout_s" in store:
-            cfg.openalex_store_timeout_s = max(1.0, float(store["timeout_s"]))
+    _apply_config_table(
+        raw.get("openalex_store"),
+        cfg,
+        [
+            (
+                "backend",
+                "openalex_store_backend",
+                lambda v: str(v).strip().lower(),
+            ),
+            ("ssh_host", "openalex_store_ssh_host", lambda v: str(v).strip()),
+            ("ssh_user", "openalex_store_ssh_user", lambda v: str(v).strip()),
+            ("parquet_glob", "openalex_store_parquet_glob", lambda v: str(v).strip()),
+            (
+                "duckdb_bin",
+                "openalex_store_duckdb_bin",
+                lambda v: str(v).strip() or "duckdb",
+            ),
+            ("timeout_s", "openalex_store_timeout_s", lambda v: max(1.0, float(v))),
+        ],
+    )
     searx = raw.get("searxng")
     if isinstance(searx, dict) and searx.get("base_url"):
         cfg.searxng_base_url = str(searx["base_url"]).strip().rstrip("/")
