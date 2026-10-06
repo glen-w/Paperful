@@ -34,6 +34,7 @@ from .pdfid import doi_from_pdf, probe_pdf_bytes, short_pdf_verdict
 from .mirror import pdf_for_key
 from .pipeline_attach import attach_after_remap
 from .pipeline_browser import release_browser_for_agent, skip_recover_without_lane_failure
+from .pipeline_save import commit_download
 from .playbooks import looks_like_pdf_url
 from .resolve import (
     IdentifierCache,
@@ -630,6 +631,15 @@ class Pipeline:
         if cand.outcome is Outcome.FOUND and self._try_download(item, cand, attempts):
             self.progress()
             return "hit", True
+        if name == "scihub":
+            if cand.outcome is Outcome.CAPTCHA:
+                self._record(item, STATUS_CAPTCHA, attempts, reason=cand.note)
+                self.progress()
+                return "terminal", True
+            if cand.outcome is Outcome.ERROR:
+                self._record(item, STATUS_ERROR, attempts, reason=cand.note)
+                self.progress()
+                return "terminal", True
         if cand.outcome is Outcome.ERROR and "session expired" in (cand.note or ""):
             self._mark_ezproxy_down()
             return "ezproxy_down", True
@@ -650,6 +660,7 @@ class Pipeline:
         name: str,
         *,
         htmlpdf_scope: str = "all",
+        scihub_delay: bool = False,
     ) -> list[tuple[Item, list[str]]]:
         """Try a serial source; return items that still need later phases."""
         label = name if htmlpdf_scope == "all" else f"{name} ({htmlpdf_scope})"
@@ -675,12 +686,15 @@ class Pipeline:
                 still.append((item, attempts))
                 continue
             if not first:
-                time.sleep(random.uniform(min(lo, 1.0), min(hi, 3.0)))
+                if scihub_delay:
+                    time.sleep(random.uniform(lo, hi))
+                else:
+                    time.sleep(random.uniform(min(lo, 1.0), min(hi, 3.0)))
             first = False
             status, called = self._phase_one(name, item, attempts)
             if name == "serpapi" and called:
                 self._serpapi_calls += 1
-            if status == "hit":
+            if status in {"hit", "terminal"}:
                 continue
             still.append((item, attempts))
             rest = queue[idx + 1 :]
@@ -980,50 +994,10 @@ class Pipeline:
             item.doi = saved
         return False
 
-    # ---- phase 3: Sci-Hub, serial --------------------------------------------
     def _phase_scihub(
         self, queue: list[tuple[Item, list[str]]]
     ) -> list[tuple[Item, list[str]]]:
-        """Try Sci-Hub. CAPTCHA and ERROR end the item; misses stay queued."""
-        self._emit(f"[bold]-- scihub[/] ({len(queue)} remaining)")
-        still: list[tuple[Item, list[str]]] = []
-        lo, hi = self.cfg.delay_scihub_s
-        first = True
-        for idx, (item, attempts) in enumerate(queue):
-            if self._stop.is_set():
-                still.extend(queue[idx:])
-                return still
-            lanes = self._lanes_for(item)
-            if self._skip_source(item, "scihub", lanes, attempts):
-                still.append((item, attempts))
-                continue
-            if not first:
-                time.sleep(random.uniform(lo, hi))
-            first = False
-            self._log_item(item, "[dim]scihub: checking...[/]")
-            cand = REGISTRY["scihub"].find(item, self.ctx)
-            attempts.append(
-                f"scihub:{cand.outcome.value}" + (f"({cand.note})" if cand.note else "")
-            )
-            with self._stats_lock:
-                self.stats.note_source("scihub", cand.outcome.value)
-            self._log_source_result(item, "scihub", cand)
-            self._maybe_trip_circuit("scihub", cand)
-            if cand.outcome is Outcome.FOUND and self._try_download(
-                item, cand, attempts
-            ):
-                self.progress()
-                continue
-            if cand.outcome is Outcome.CAPTCHA:
-                self._record(item, STATUS_CAPTCHA, attempts, reason=cand.note)
-                self.progress()
-                continue
-            if cand.outcome is Outcome.ERROR:
-                self._record(item, STATUS_ERROR, attempts, reason=cand.note)
-                self.progress()
-                continue
-            still.append((item, attempts))
-        return still
+        return self._phase_serial(queue, "scihub", scihub_delay=True)
 
     # ---- helpers ----------------------------------------------------------------
     def _applicable(self, item: Item) -> list[str]:
@@ -1160,88 +1134,15 @@ class Pipeline:
                     f"(sparse one-page PDF, {probe.words} words)",
                 )
                 return False
-        primary, extras = save_pdf(self.cfg.out_dir, item, dl.content, dl.md5)
-        pdf_doi = doi_from_pdf(primary)
-        write_fetch_records(
-            [primary, *extras],
+        return commit_download(
+            self,
             item,
-            md5=dl.md5,
-            source=cand.source,
-            fetched_url=dl.final_url,
-            pdf_doi=pdf_doi,
-            oa_stamp=oa_stamp or None,
+            cand,
+            dl,
+            attempts,
+            oa_stamp=oa_stamp,
+            short_verdict=short_verdict,
         )
-        mismatch = bool(pdf_doi and item.doi and pdf_doi != item.doi)
-        if mismatch:
-            self._log_item(
-                item,
-                f"[yellow]pdf DOI {escape(pdf_doi)} differs from {escape(item.doi)}[/]",
-            )
-        defer_mismatch = mismatch and self.strict_pdf_doi
-        defer_short = short_verdict == "dense_short"
-        hold_reason = ""
-        if defer_mismatch:
-            hold_reason = REASON_STRICT_PDF_DOI
-        elif defer_short:
-            hold_reason = REASON_SHORT_PDF
-        rec = Record(
-            itemKey=item.key,
-            status=STATUS_OK,
-            title=item.title,
-            doi=item.doi,
-            doi_source=item.doi_source,
-            library_doi=item.library_doi,
-            doi_verified=item.doi_verified,
-            pdf_doi=pdf_doi,
-            source=cand.source,
-            playbook=cand.playbook,
-            url=dl.final_url,
-            path=str(primary),
-            extra_paths=relpaths(self.cfg.out_dir, extras),
-            md5=dl.md5,
-            attempts=attempts,
-            reason=hold_reason,
-            oa_license=oa_stamp.get("license", ""),
-            oa_status=oa_stamp.get("oa_status", ""),
-            oa_version=oa_stamp.get("version", ""),
-        )
-        self.manifest.write(rec)
-        if (
-            cand.source == "author_site"
-            and cand.referer
-            and getattr(self.cfg, "twenty_writeback_listings", False)
-            and not hold_reason
-        ):
-            try:
-                from .twenty import writeback_item_listing
-
-                writeback_item_listing(self.cfg, item, cand.referer, source="author_site")
-            except Exception as exc:
-                self._log_item(item, f"[dim]twenty writeback skipped[/] {exc}")
-        with self._stats_lock:
-            self.stats.bump(STATUS_OK, cand.source)
-        self._log_item(
-            item,
-            f"[green]ok[/] {escape('[' + cand.source + ']')} -> {escape(str(primary.relative_to(self.cfg.out_dir)))}",
-        )
-        if defer_mismatch:
-            self._log_item(
-                item,
-                "[yellow]saved, not attached (--strict-pdf-doi)[/]",
-            )
-            self._add_outcome(rec)
-        elif defer_short:
-            self._log_item(
-                item,
-                "[yellow]saved, not attached (short PDF — "
-                "admit with attach --allow-short-pdf)[/]",
-            )
-            self._add_outcome(rec)
-        elif self.attacher:
-            self.attach_record(rec)
-        else:
-            self._add_outcome(rec)
-        return True
 
     def _fetch_url(
         self, item: Item, cand: Candidate, url: str, attempts: list[str]
