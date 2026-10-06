@@ -7,6 +7,13 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ## Unreleased
 
+### Added
+
+- **GUI thickening:** per-item summarize in Wanted/Library drawers (`/item/{key}/summary`);
+  collection synthesize on Index; Discover runs full snowball kinds (search/hybrid/doi/orcid/collection),
+  profile run, resume, watch via `save_watch`; authorwatch list create/add/resolve/run on Discover.
+  Removed broken `/briefs` page (logic on Index + drawers).
+
 ### Changed
 
 - **Roadmap / 1.0 scope:** 1.0 now includes the workbench GUI (illuminate and
@@ -21,6 +28,12 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ### Added
 
+- **Index Ask:** Advanced Index page runs cited, threaded `ask` when `[rag]` and
+  `[llm]` are on and the index has rows. Collection chip is the scope; turns
+  persist under `state/rag/threads/` (`paperful.rag.thread.v1`). `rag ingest`,
+  `rag search`, and batch Ask (`state/ask-batch/`) are on Index; synthesize on
+  Index; per-item summarize in drawers. Advanced **Briefs** runs collection
+  `summarize` / `synthesize`. See [gui.md](docs/gui.md).
 - **GUI P0:** required `paperful.item.v1` keys frozen (additive extras survive
   snapshot); restore is create-missing (DOI → key → title+year; skip gone /
   foreign schema; one folder per key). `paperful serve` is a localhost HTTP

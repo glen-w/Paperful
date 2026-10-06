@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -17,24 +17,37 @@ from . import commands, jobs
 from .doctor_steps import next_step
 from .pages import (
     ASK_ERROR_MESSAGES,
+    DEST_OPTIONS,
+    SUMMARIZE_ORDERS,
     ask_page_flags,
     authorwatch_inbox_rows,
+    authorwatch_lists,
+    authorwatch_people_rows,
+    briefs_page_flags,
+    dest_options,
     focus_options,
     following_lists,
     last_ask_result,
+    last_job_result,
+    library_item_rows,
+    list_ask_packs,
+    list_html_stems,
+    list_snowball_profiles,
     list_threads,
     newest_snowball_queue,
     repair_queues,
+    safe_child,
+    snowball_deferred_run_id,
     thread_for_display,
     wanted_rows,
     MIRROR_VERBS,
 )
+from .snowball_form import parse_discover_topic
 from .prefs import (
     COOKIE_ADVANCED,
     COOKIE_ATTACH_VERIFIED,
     COOKIE_COLLECTION,
     COOKIE_PRESET,
-    WorkbenchPrefs,
     prefs_from_request,
     set_cookie,
 )
@@ -114,6 +127,27 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             **extra,
         }
 
+    def _page_url(path: str, **kwargs: Any) -> str:
+        from urllib.parse import urlencode
+
+        pairs = [(k, str(v)) for k, v in kwargs.items() if v not in (None, "")]
+        return path + (("?" + urlencode(pairs)) if pairs else "")
+
+    def _optional_int(raw: object, *, positive: bool = False) -> int | None:
+        text = str(raw or "").strip()
+        if not text:
+            return None
+        value = int(text)
+        if positive and value <= 0:
+            raise ValueError("limit")
+        return value
+
+    def _parse_dest(raw: object, default: str) -> str:
+        value = str(raw or "").strip() or default
+        if value not in DEST_OPTIONS:
+            raise ValueError("dest")
+        return value
+
     @app.get("/")
     def root() -> RedirectResponse:
         return RedirectResponse(url="/wanted", status_code=302)
@@ -129,6 +163,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             except Exception as exc:
                 error = str(exc)
         rows = data.get(tab, []) if tab in {"have", "held", "missing"} else data["missing"]
+        briefs = briefs_page_flags(cfg)
         return templates.TemplateResponse(
             request,
             "wanted.html",
@@ -139,8 +174,50 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 rows=rows,
                 counts=data["counts"],
                 error=error,
+                briefs=briefs,
+                dest_options=dest_options(),
             ),
         )
+
+    @app.post("/wanted/summarize")
+    async def wanted_summarize(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        key = str(form.get("key") or "").strip()
+        if not cfg.llm_enabled:
+            return RedirectResponse(url="/wanted?error=llm", status_code=303)
+        if not key:
+            return RedirectResponse(url="/wanted", status_code=303)
+        try:
+            dest = _parse_dest(form.get("dest"), cfg.summarize_dest)
+        except ValueError:
+            return RedirectResponse(url="/wanted?error=dest", status_code=303)
+        force = form.get("force") == "1"
+
+        def work(cmd_id: str) -> None:
+            jobs.summarize(
+                cfg,
+                cmd_id,
+                collection=prefs.collection,
+                year_from=None,
+                year_to=None,
+                limit=None,
+                max_new=None,
+                dest=dest,
+                order=cfg.summarize_order,
+                force=force,
+                item_keys=[key],
+            )
+
+        cmd_id = commands.enqueue(cfg, "summarize_item", work)
+        return RedirectResponse(url=f"/wanted?run={cmd_id}", status_code=303)
+
+    @app.get("/item/{key}/summary", response_model=None)
+    def item_summary(key: str):
+        path = safe_child(cfg.summaries_dir, f"{key}.html")
+        if path is None:
+            return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+        return FileResponse(path, media_type="text/html; charset=utf-8")
 
     @app.post("/wanted/preview")
     async def wanted_preview(request: Request) -> RedirectResponse:
@@ -178,8 +255,15 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         return RedirectResponse(url="/wanted", status_code=303)
 
     @app.get("/discover", response_class=HTMLResponse)
-    def page_discover(request: Request) -> HTMLResponse:
+    def page_discover(request: Request, list_name: str = "") -> HTMLResponse:
         run_id, candidates = newest_snowball_queue(cfg)
+        active_list = (list_name or "followed").strip()
+        people: list[dict[str, Any]] = []
+        if active_list:
+            try:
+                people = authorwatch_people_rows(cfg, active_list)
+            except Exception:
+                people = []
         return templates.TemplateResponse(
             request,
             "discover.html",
@@ -190,6 +274,11 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 candidates=candidates,
                 following=following_lists(cfg),
                 inbox=authorwatch_inbox_rows(cfg),
+                aw_lists=authorwatch_lists(cfg),
+                aw_list=active_list,
+                aw_people=people,
+                profiles=list_snowball_profiles(cfg),
+                deferred_run=snowball_deferred_run_id(cfg),
                 error="",
             ),
         )
@@ -198,17 +287,12 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     async def discover_topic(request: Request) -> RedirectResponse:
         prefs = prefs_from_request(request)
         form = await request.form()
-        query = str(form.get("query") or "")
-        direction = str(form.get("direction") or "").strip() or None
-        if not prefs.advanced:
-            direction = None
+        payload = parse_discover_topic(form, advanced=prefs.advanced)
 
         def work(cmd_id: str) -> None:
-            jobs.track_topic(
-                cfg, cmd_id, query=query, collection=prefs.collection, direction=direction
-            )
+            jobs.snowball_run(cfg, cmd_id, payload=payload, collection=prefs.collection)
 
-        commands.enqueue(cfg, "snowball_search", work)
+        commands.enqueue(cfg, f"snowball_{payload.kind}", work)
         return RedirectResponse(url="/discover", status_code=303)
 
     @app.post("/discover/follow")
@@ -276,14 +360,146 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     @app.post("/discover/watch")
     async def discover_watch(request: Request) -> RedirectResponse:
         form = await request.form()
-        name = str(form.get("watch_name") or "topic-watch")
-        dest = cfg.state_dir / "snowball" / "watches" / name
-        dest.mkdir(parents=True, exist_ok=True)
-        (dest / "watch.json").write_text("{}", encoding="utf-8")
+        name = str(form.get("watch_name") or "topic-watch").strip()
+        profile = str(form.get("profile") or "").strip()
+        if profile:
+            from ..snowball.watch import save_watch
+
+            try:
+                save_watch(cfg, name, profile)
+            except Exception:
+                return RedirectResponse(url="/discover?error=watch", status_code=303)
+        else:
+            dest = cfg.state_dir / "snowball" / "watches" / name
+            dest.mkdir(parents=True, exist_ok=True)
+            (dest / "watch.json").write_text('{"schema":"paperful.snowball.watch.v1"}\n', encoding="utf-8")
         return RedirectResponse(url="/discover", status_code=303)
+
+    @app.post("/discover/resume")
+    async def discover_resume(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        run_id = str(form.get("run_id") or snowball_deferred_run_id(cfg)).strip()
+        if not run_id:
+            return RedirectResponse(url="/discover", status_code=303)
+
+        def work(cmd_id: str) -> None:
+            from ..snowball.command import SnowballRequest, run_resume
+
+            req = SnowballRequest(gate="dry-run", collection=prefs.collection or "")
+            run_resume(cfg, run_id, req, console=jobs._quiet_console())
+
+        commands.enqueue(cfg, "snowball_resume", work)
+        return RedirectResponse(url="/discover", status_code=303)
+
+    @app.post("/discover/profile-run")
+    async def discover_profile_run(request: Request) -> RedirectResponse:
+        form = await request.form()
+        profile = str(form.get("profile") or "").strip()
+        if not profile:
+            return RedirectResponse(url="/discover", status_code=303)
+
+        def work(cmd_id: str) -> None:
+            from ..snowball.command import (
+                SnowballError,
+                run_collection,
+                run_doi,
+                run_hybrid,
+                run_orcid,
+                run_search,
+            )
+            from ..snowball.profile import (
+                composed_query_from_profile,
+                load_profile,
+                orcids_from_profile,
+                request_from_profile,
+            )
+
+            console = jobs._quiet_console()
+            raw = load_profile(cfg, profile)
+            req = request_from_profile(raw, cfg)
+            mode = str(raw.get("mode") or "")
+            if mode == "search":
+                run_search(cfg, composed_query_from_profile(raw), req, console=console)
+            elif mode == "hybrid":
+                run_hybrid(cfg, composed_query_from_profile(raw), req, console=console)
+            elif mode == "doi":
+                dois = [str(x) for x in (raw.get("dois") or [])]
+                run_doi(cfg, dois, req, console=console)
+            elif mode == "orcid":
+                run_orcid(cfg, orcids_from_profile(raw), req, console=console)
+            elif mode == "collection":
+                seed = str(raw.get("seed_collection") or raw.get("collection") or "").strip()
+                run_collection(cfg, seed, req, console=console)
+            else:
+                raise SnowballError(f"Profile {profile!r} has unknown mode.")
+
+        commands.enqueue(cfg, "snowball_profile", work)
+        return RedirectResponse(url="/discover", status_code=303)
+
+    @app.post("/discover/aw/save")
+    async def discover_aw_save(request: Request) -> RedirectResponse:
+        form = await request.form()
+        name = str(form.get("name") or "").strip()
+        if not name:
+            return RedirectResponse(url="/discover", status_code=303)
+        from ..authorwatch import save_list
+
+        save_list(cfg, name)
+        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+
+    @app.post("/discover/aw/add")
+    async def discover_aw_add(request: Request) -> RedirectResponse:
+        form = await request.form()
+        name = str(form.get("list_name") or "followed").strip()
+        orcid = str(form.get("orcid") or "").strip()
+        display = str(form.get("display_name") or "").strip()
+        from ..authorwatch import add_person
+
+        add_person(cfg, name, orcid=orcid, display_name=display)
+        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+
+    @app.post("/discover/aw/remove")
+    async def discover_aw_remove(request: Request) -> RedirectResponse:
+        form = await request.form()
+        name = str(form.get("list_name") or "").strip()
+        person_id = str(form.get("person_id") or "").strip()
+        orcid = str(form.get("orcid") or "").strip()
+        from ..authorwatch import remove_person
+
+        remove_person(cfg, name, orcid=orcid, person_id=person_id)
+        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+
+    @app.post("/discover/aw/resolve")
+    async def discover_aw_resolve(request: Request) -> RedirectResponse:
+        form = await request.form()
+        name = str(form.get("list_name") or "").strip()
+
+        def work(_cmd_id: str) -> None:
+            from ..authorwatch import resolve_people
+
+            resolve_people(cfg, name)
+
+        commands.enqueue(cfg, "authorwatch_resolve", work)
+        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+
+    @app.post("/discover/aw/run")
+    async def discover_aw_run(request: Request) -> RedirectResponse:
+        form = await request.form()
+        name = str(form.get("list_name") or "").strip()
+        backfill = str(form.get("backfill_from") or "").strip() or None
+
+        def work(_cmd_id: str) -> None:
+            from ..authorwatch import run_list
+
+            run_list(cfg, name, console=jobs._quiet_console(), backfill_from=backfill)
+
+        commands.enqueue(cfg, "authorwatch_run", work)
+        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
 
     @app.get("/library", response_class=HTMLResponse)
     def page_library(request: Request) -> HTMLResponse:
+        prefs = prefs_from_request(request)
         tree = collections_tree(cfg)
         error = ""
         rows = []
@@ -291,10 +507,26 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             rows = tree.get("collections") or []
         else:
             error = str(tree.get("error") or "Library unavailable")
+        items: list[dict[str, Any]] = []
+        if prefs.collection:
+            try:
+                scope_items, manifest = jobs._load_scope_items(cfg, prefs.collection)
+                items = library_item_rows(cfg, scope_items, manifest)
+            except Exception as exc:
+                error = error or str(exc)
+        briefs = briefs_page_flags(cfg)
         return templates.TemplateResponse(
             request,
             "library.html",
-            ctx(request, "library", collections=rows, error=error),
+            ctx(
+                request,
+                "library",
+                collections=rows,
+                items=items,
+                error=error,
+                briefs=briefs,
+                dest_options=dest_options(),
+            ),
         )
 
     @app.get("/activity", response_class=HTMLResponse)
@@ -344,7 +576,6 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
 
     @app.post("/settings")
     async def save_settings(request: Request) -> RedirectResponse:
-        prefs = prefs_from_request(request)
         form = await request.form()
         email = str(form.get("email") or "")
         host = str(form.get("zotero_host") or "")
@@ -461,14 +692,26 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         thread: str = "",
         run: str = "",
         error: str = "",
+        q: str = "",
+        k: str = "",
+        year_from: str = "",
+        year_to: str = "",
     ) -> HTMLResponse:
         flags = ask_page_flags(cfg)
-        if flags["ready"]:
-            msg = "Ask a question over the indexed mirror. Scope follows the collection chip."
+        if flags["rag_on"] and flags["llm_on"]:
+            msg = (
+                "Ingest the mirror, search passages, then ask. "
+                "Scope follows the collection chip."
+            )
+        elif flags["rag_on"]:
+            msg = (
+                "Ingest and search are on. Turn on [llm] in config.toml "
+                "for Ask and batch Ask (Settings does not toggle it)."
+            )
         else:
             msg = (
-                "Turn on [rag] and [llm] in config.toml "
-                "(Settings does not toggle them yet) to use Index."
+                "Turn on [rag] in config.toml to ingest and search. "
+                "Ask also needs [llm]. Settings does not toggle them."
             )
         active = (thread or "").strip()
         turns: list[dict[str, str]] = []
@@ -476,7 +719,56 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         if active:
             turns = thread_for_display(cfg, active)
             result = last_ask_result(cfg, active)
-        poll_run = (run or "").strip()
+        hits: list[dict[str, Any]] = []
+        search_q = (q or "").strip()
+        search_error = ""
+        if search_q and flags["can_search"]:
+            try:
+                from ..llm.preflight import validate_embedder
+                from ..rag.index import Index, ledger_path
+                from ..rag.ledger import Ledger
+                from ..rag.retrieve import scope_keys, search
+
+                prefs = prefs_from_request(request)
+                y_from = _optional_int(year_from)
+                y_to = _optional_int(year_to)
+                top_k = _optional_int(k, positive=True)
+                index = Index.open(cfg)
+                ledger = Ledger(ledger_path(cfg))
+                keys = scope_keys(
+                    ledger,
+                    collections=[prefs.collection] if prefs.collection else None,
+                    year_from=y_from,
+                    year_to=y_to,
+                )
+                found = search(
+                    cfg,
+                    search_q,
+                    k=top_k,
+                    keys=keys,
+                    embedder=validate_embedder(cfg),
+                    index=index,
+                    ledger=ledger,
+                )
+                for hit in found:
+                    text = hit.text or ""
+                    if len(text) > 280:
+                        text = text[:277] + "…"
+                    hits.append(
+                        {
+                            "score": f"{hit.score:.3f}",
+                            "item_key": hit.item_key,
+                            "title": hit.title,
+                            "pages": hit.pages,
+                            "year": hit.year,
+                            "text": text,
+                        }
+                    )
+            except ValueError:
+                search_error = ASK_ERROR_MESSAGES["year"] if error != "limit" else ASK_ERROR_MESSAGES["limit"]
+            except Exception as exc:
+                search_error = str(exc) or ASK_ERROR_MESSAGES["search"]
+        err = ASK_ERROR_MESSAGES.get(error, error) or search_error
         return templates.TemplateResponse(
             request,
             "index.html",
@@ -485,17 +777,125 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 "index",
                 page_title="Index",
                 message=msg,
-                enabled=flags["ready"],
+                enabled=flags["rag_on"],
                 flags=flags,
                 status=flags["status"],
                 threads=list_threads(cfg),
                 turns=turns,
                 active_thread_id=active,
                 last_result=result,
+                ingest_result=last_job_result(cfg, "rag_ingest"),
+                batch_result=last_job_result(cfg, "ask_batch"),
+                packs=list_ask_packs(cfg),
+                hits=hits,
+                search_q=search_q,
+                search_k=k,
+                year_from=year_from,
+                year_to=year_to,
+                dest_options=dest_options(),
+                rag_dest=cfg.rag_dest or "disk",
                 focus_options=focus_options(),
-                poll_run=poll_run,
-                error=ASK_ERROR_MESSAGES.get(error, error),
+                poll_run=(run or "").strip(),
+                error=err,
+                synthesize_result=last_job_result(cfg, "synthesize"),
+                reports=list_html_stems(cfg.reports_dir),
+                synth_dest_options=dest_options(),
+                synth_dest=cfg.synthesize_dest,
             ),
+        )
+
+    @app.post("/index/synthesize")
+    async def index_synthesize(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        if not cfg.llm_enabled:
+            return RedirectResponse(url=_page_url("/index", error="llm"), status_code=303)
+        dry_run = str(form.get("dry_run") or "1") != "0"
+        try:
+            year_from = _optional_int(form.get("year_from"))
+            year_to = _optional_int(form.get("year_to"))
+            limit = _optional_int(form.get("limit"), positive=True)
+        except ValueError:
+            return RedirectResponse(url=_page_url("/index", error="limit"), status_code=303)
+        try:
+            dest = _parse_dest(form.get("dest"), cfg.synthesize_dest)
+        except ValueError:
+            return RedirectResponse(url=_page_url("/index", error="dest"), status_code=303)
+        from ..config import wants_zotero
+
+        if wants_zotero(dest) and not prefs.collection and not dry_run:
+            return RedirectResponse(url=_page_url("/index", error="collection"), status_code=303)
+        force = form.get("force") == "1"
+
+        def work(cmd_id: str) -> None:
+            jobs.synthesize(
+                cfg,
+                cmd_id,
+                collection=prefs.collection,
+                year_from=year_from,
+                year_to=year_to,
+                limit=limit,
+                dest=dest,
+                dry_run=dry_run,
+                force=force,
+            )
+
+        cmd_id = commands.enqueue(cfg, "synthesize", work)
+        return RedirectResponse(url=_page_url("/index", run=cmd_id), status_code=303)
+
+    @app.get("/index/report/{slug}", response_model=None)
+    def index_report(slug: str):
+        path = safe_child(cfg.reports_dir, f"{slug}.html")
+        if path is None:
+            return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+        return FileResponse(path, media_type="text/html; charset=utf-8")
+
+    @app.post("/index/ingest")
+    async def index_ingest(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        if not cfg.rag_enabled:
+            return RedirectResponse(url=_page_url("/index", error="rag"), status_code=303)
+        dry_run = str(form.get("dry_run") or "1") != "0"
+        try:
+            year_from = _optional_int(form.get("year_from"))
+            year_to = _optional_int(form.get("year_to"))
+        except ValueError:
+            return RedirectResponse(url=_page_url("/index", error="year"), status_code=303)
+        try:
+            limit = _optional_int(form.get("limit"), positive=True)
+        except ValueError:
+            return RedirectResponse(url=_page_url("/index", error="limit"), status_code=303)
+
+        def work(cmd_id: str) -> None:
+            jobs.rag_ingest(
+                cfg,
+                cmd_id,
+                collection=prefs.collection,
+                year_from=year_from,
+                year_to=year_to,
+                limit=limit,
+                dry_run=dry_run,
+            )
+
+        cmd_id = commands.enqueue(cfg, "rag_ingest", work)
+        return RedirectResponse(url=_page_url("/index", run=cmd_id), status_code=303)
+
+    @app.post("/index/search")
+    async def index_search(request: Request) -> RedirectResponse:
+        form = await request.form()
+        q = str(form.get("q") or "").strip()
+        if not q:
+            return RedirectResponse(url=_page_url("/index", error="empty"), status_code=303)
+        return RedirectResponse(
+            url=_page_url(
+                "/index",
+                q=q,
+                k=str(form.get("k") or "").strip(),
+                year_from=str(form.get("year_from") or "").strip(),
+                year_to=str(form.get("year_to") or "").strip(),
+            ),
+            status_code=303,
         )
 
     @app.post("/index/ask")
@@ -505,27 +905,20 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         question = str(form.get("question") or "").strip()
         thread_id = str(form.get("thread_id") or "").strip()
         focus_raw = str(form.get("focus") or "").strip() or None
-        year_from_raw = str(form.get("year_from") or "").strip()
-        year_to_raw = str(form.get("year_to") or "").strip()
 
         def _redir(*, err: str = "", tid: str = "", run: str = "") -> RedirectResponse:
-            parts: list[str] = []
-            if tid:
-                parts.append(f"thread={tid}")
-            if run:
-                parts.append(f"run={run}")
-            if err:
-                parts.append(f"error={err}")
-            qs = ("?" + "&".join(parts)) if parts else ""
-            return RedirectResponse(url=f"/index{qs}", status_code=303)
+            return RedirectResponse(
+                url=_page_url("/index", thread=tid, run=run, error=err),
+                status_code=303,
+            )
 
         if not (cfg.rag_enabled and cfg.llm_enabled):
             return _redir(err="disabled", tid=thread_id)
         if not question:
             return _redir(err="empty", tid=thread_id)
         try:
-            year_from = int(year_from_raw) if year_from_raw else None
-            year_to = int(year_to_raw) if year_to_raw else None
+            year_from = _optional_int(form.get("year_from"))
+            year_to = _optional_int(form.get("year_to"))
         except ValueError:
             return _redir(err="year", tid=thread_id)
         try:
@@ -553,6 +946,197 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
 
         cmd_id = commands.enqueue(cfg, "ask", work)
         return _redir(tid=thread_id, run=cmd_id)
+
+    @app.post("/index/ask-batch")
+    async def index_ask_batch(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        if not (cfg.rag_enabled and cfg.llm_enabled):
+            return RedirectResponse(url=_page_url("/index", error="disabled"), status_code=303)
+        from ..snowball.seeds import parse_seed_lines
+
+        questions = parse_seed_lines(str(form.get("questions") or ""))
+        if not questions:
+            return RedirectResponse(url=_page_url("/index", error="questions"), status_code=303)
+        try:
+            year_from = _optional_int(form.get("year_from"))
+            year_to = _optional_int(form.get("year_to"))
+        except ValueError:
+            return RedirectResponse(url=_page_url("/index", error="year"), status_code=303)
+        try:
+            dest = _parse_dest(form.get("dest"), cfg.rag_dest or "disk")
+        except ValueError:
+            return RedirectResponse(url=_page_url("/index", error="dest"), status_code=303)
+        apply = form.get("apply") == "1"
+        if apply and (dest == "disk" or not prefs.collection):
+            return RedirectResponse(url=_page_url("/index", error="apply"), status_code=303)
+        focus_raw = str(form.get("focus") or "").strip() or None
+        try:
+            from ..rag.prompt import parse_focus
+
+            parse_focus(focus_raw if focus_raw is not None else cfg.rag_focus)
+        except ValueError:
+            return RedirectResponse(url=_page_url("/index", error="focus"), status_code=303)
+
+        def work(cmd_id: str) -> None:
+            jobs.ask_batch(
+                cfg,
+                cmd_id,
+                questions=questions,
+                collection=prefs.collection,
+                year_from=year_from,
+                year_to=year_to,
+                focus=focus_raw,
+                dest=dest,
+                apply=apply,
+            )
+
+        cmd_id = commands.enqueue(cfg, "ask_batch", work)
+        return RedirectResponse(url=_page_url("/index", run=cmd_id), status_code=303)
+
+    @app.get("/index/batch/{stamp}", response_model=None)
+    def index_batch_pack(stamp: str):
+        from ..rag.batch import batch_dir
+
+        path = safe_child(batch_dir(cfg), stamp, "answers.md")
+        if path is None:
+            return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+        return FileResponse(path, media_type="text/plain; charset=utf-8")
+
+    @app.get("/briefs", response_class=HTMLResponse)
+    def page_briefs(
+        request: Request,
+        run: str = "",
+        error: str = "",
+    ) -> HTMLResponse:
+        flags = briefs_page_flags(cfg)
+        if flags["llm_on"]:
+            msg = (
+                "Summarize PDFs in scope, then synthesize a collection review. "
+                "Scope follows the collection chip."
+            )
+        else:
+            msg = (
+                "Turn on [llm] in config.toml to summarize and synthesize. "
+                "Settings does not toggle it."
+            )
+        err = ASK_ERROR_MESSAGES.get(error, error)
+        return templates.TemplateResponse(
+            request,
+            "briefs.html",
+            ctx(
+                request,
+                "briefs",
+                message=msg,
+                flags=flags,
+                dest_options=dest_options(),
+                orders=SUMMARIZE_ORDERS,
+                summaries=list_html_stems(cfg.summaries_dir),
+                reports=list_html_stems(cfg.reports_dir),
+                summarize_result=last_job_result(cfg, "summarize"),
+                synthesize_result=last_job_result(cfg, "synthesize"),
+                poll_run=(run or "").strip(),
+                error=err,
+            ),
+        )
+
+    @app.post("/briefs/summarize")
+    async def briefs_summarize(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        if not cfg.llm_enabled:
+            return RedirectResponse(url=_page_url("/briefs", error="llm"), status_code=303)
+        try:
+            year_from = _optional_int(form.get("year_from"))
+            year_to = _optional_int(form.get("year_to"))
+        except ValueError:
+            return RedirectResponse(url=_page_url("/briefs", error="year"), status_code=303)
+        try:
+            limit = _optional_int(form.get("limit"), positive=True)
+            max_new = _optional_int(form.get("max_new"), positive=True)
+        except ValueError:
+            return RedirectResponse(url=_page_url("/briefs", error="limit"), status_code=303)
+        try:
+            dest = _parse_dest(form.get("dest"), cfg.summarize_dest)
+        except ValueError:
+            return RedirectResponse(url=_page_url("/briefs", error="dest"), status_code=303)
+        order = str(form.get("order") or "").strip() or cfg.summarize_order
+        if order not in SUMMARIZE_ORDERS:
+            return RedirectResponse(url=_page_url("/briefs", error="order"), status_code=303)
+        force = form.get("force") == "1"
+
+        def work(cmd_id: str) -> None:
+            jobs.summarize(
+                cfg,
+                cmd_id,
+                collection=prefs.collection,
+                year_from=year_from,
+                year_to=year_to,
+                limit=limit,
+                max_new=max_new,
+                dest=dest,
+                order=order,
+                force=force,
+            )
+
+        cmd_id = commands.enqueue(cfg, "summarize", work)
+        return RedirectResponse(url=_page_url("/briefs", run=cmd_id), status_code=303)
+
+    @app.post("/briefs/synthesize")
+    async def briefs_synthesize(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        if not cfg.llm_enabled:
+            return RedirectResponse(url=_page_url("/briefs", error="llm"), status_code=303)
+        dry_run = str(form.get("dry_run") or "1") != "0"
+        try:
+            year_from = _optional_int(form.get("year_from"))
+            year_to = _optional_int(form.get("year_to"))
+        except ValueError:
+            return RedirectResponse(url=_page_url("/briefs", error="year"), status_code=303)
+        try:
+            limit = _optional_int(form.get("limit"), positive=True)
+        except ValueError:
+            return RedirectResponse(url=_page_url("/briefs", error="limit"), status_code=303)
+        try:
+            dest = _parse_dest(form.get("dest"), cfg.synthesize_dest)
+        except ValueError:
+            return RedirectResponse(url=_page_url("/briefs", error="dest"), status_code=303)
+        from ..config import wants_zotero
+
+        if wants_zotero(dest) and not prefs.collection and not dry_run:
+            return RedirectResponse(url=_page_url("/briefs", error="collection"), status_code=303)
+        force = form.get("force") == "1"
+
+        def work(cmd_id: str) -> None:
+            jobs.synthesize(
+                cfg,
+                cmd_id,
+                collection=prefs.collection,
+                year_from=year_from,
+                year_to=year_to,
+                limit=limit,
+                dest=dest,
+                dry_run=dry_run,
+                force=force,
+            )
+
+        cmd_id = commands.enqueue(cfg, "synthesize", work)
+        return RedirectResponse(url=_page_url("/briefs", run=cmd_id), status_code=303)
+
+    @app.get("/briefs/summary/{key}", response_model=None)
+    def briefs_summary(key: str):
+        path = safe_child(cfg.summaries_dir, f"{key}.html")
+        if path is None:
+            return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+        return FileResponse(path, media_type="text/html; charset=utf-8")
+
+    @app.get("/briefs/report/{slug}", response_model=None)
+    def briefs_report(slug: str):
+        path = safe_child(cfg.reports_dir, f"{slug}.html")
+        if path is None:
+            return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+        return FileResponse(path, media_type="text/html; charset=utf-8")
 
     @app.get("/v1/runs/{cmd_id}")
     def run_status(cmd_id: str) -> JSONResponse:

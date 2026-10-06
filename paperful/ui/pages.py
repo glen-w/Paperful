@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any
 
 from ..config import Config
@@ -12,12 +11,17 @@ from ..store import Manifest, STATUS_ATTACHED, STATUS_OK
 from .verify import file_verification
 
 
-def _item_row_base(item: Any) -> dict[str, Any]:
+def _has_summary(cfg: Config, key: str) -> bool:
+    return (cfg.summaries_dir / f"{key}.html").is_file()
+
+
+def _item_row_base(cfg: Config, item: Any) -> dict[str, Any]:
     return {
         "key": item.key,
         "title": item.title or "",
         "doi": item.doi or "",
         "year": getattr(item, "year", None),
+        "has_summary": _has_summary(cfg, item.key),
     }
 
 
@@ -32,7 +36,7 @@ def wanted_rows(
 
     for item in items:
         rec = manifest.records.get(item.key)
-        base = _item_row_base(item)
+        base = _item_row_base(cfg, item)
         if item.has_pdf or (
             rec is not None and rec.status in {STATUS_OK, STATUS_ATTACHED}
         ):
@@ -155,6 +159,99 @@ def authorwatch_inbox_rows(cfg: Config) -> list[dict[str, Any]]:
     return out
 
 
+def library_item_rows(cfg: Config, items: list[Any], manifest: Manifest) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for item in sorted(items, key=lambda i: (i.year or 9999, (i.title or "").lower())):
+        rec = manifest.records.get(item.key)
+        base = _item_row_base(cfg, item)
+        has_pdf = bool(
+            item.has_pdf
+            or (rec is not None and rec.status in {STATUS_OK, STATUS_ATTACHED})
+        )
+        rows.append({**base, "has_pdf": has_pdf})
+    return rows
+
+
+def snowball_deferred_run_id(cfg: Config) -> str:
+    root = cfg.state_dir / "snowball"
+    if not root.is_dir():
+        return ""
+    for path in sorted(root.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+        if path.is_dir() and (path / "deferred.json").is_file():
+            return path.name
+    return ""
+
+
+def list_snowball_profiles(cfg: Config) -> list[str]:
+    from ..run_config import profiles_dir
+
+    names: list[str] = []
+    folder = profiles_dir(cfg)
+    if folder.is_dir():
+        for path in sorted(folder.glob("*.toml")):
+            try:
+                import sys
+
+                if sys.version_info >= (3, 11):
+                    import tomllib as _toml
+                else:
+                    import tomli as _toml
+                raw = _toml.loads(path.read_bytes())
+            except Exception:
+                continue
+            if isinstance(raw, dict) and str(raw.get("kind") or "") == "snowball":
+                names.append(path.stem)
+    for name, table in (cfg.run_profiles or {}).items():
+        if isinstance(table, dict) and str(table.get("kind") or "") == "snowball":
+            if name not in names:
+                names.append(name)
+    return sorted(names)
+
+
+def authorwatch_lists(cfg: Config) -> list[dict[str, Any]]:
+    from ..authorwatch import inbox_count, load_people, load_watch
+
+    root = cfg.state_dir / "authorwatch"
+    if not root.is_dir():
+        return []
+    out: list[dict[str, Any]] = []
+    for path in sorted(root.iterdir()):
+        if not path.is_dir() or not (path / "watch.json").is_file():
+            continue
+        name = path.name
+        try:
+            watch = load_watch(cfg, name)
+        except Exception:
+            watch = {}
+        people = load_people(cfg, name)
+        out.append(
+            {
+                "name": name,
+                "people": len(people),
+                "inbox": inbox_count(cfg, name),
+                "baseline": bool(watch.get("baseline_at")),
+            }
+        )
+    return out
+
+
+def authorwatch_people_rows(cfg: Config, name: str) -> list[dict[str, Any]]:
+    from ..authorwatch import load_people
+
+    rows: list[dict[str, Any]] = []
+    for person in load_people(cfg, name):
+        rows.append(
+            {
+                "id": person.id,
+                "display_name": person.display_name or person.id,
+                "orcid": person.orcid,
+                "status": person.status,
+                "identity": person.identity(),
+            }
+        )
+    return rows
+
+
 def following_lists(cfg: Config) -> list[dict[str, Any]]:
     """Snowball watches and authorwatch lists for Discover."""
     out: list[dict[str, Any]] = []
@@ -201,7 +298,19 @@ ASK_ERROR_MESSAGES = {
     "year": "Year from and year to must be integers.",
     "focus": "Focus must be default, questions, gaps, methods, or answered.",
     "disabled": "Turn on [rag] and [llm] in config.toml to use Ask.",
+    "llm": "Turn on [llm] in config.toml to summarize and synthesize.",
+    "rag": "Turn on [rag] in config.toml to ingest and search.",
+    "limit": "Limit and top-k must be positive integers.",
+    "dest": "Destination must be disk, zotero, or both.",
+    "collection": "Pick a collection in the chip, or set destination to disk.",
+    "order": "Order must be library, newest, or oldest.",
+    "questions": "Enter at least one question (one per line).",
+    "apply": "A Zotero collection note needs dest zotero or both, and a collection.",
+    "search": "Search failed. Check that the index exists and the embedder is up.",
 }
+
+DEST_OPTIONS = ("disk", "zotero", "both")
+SUMMARIZE_ORDERS = ("library", "newest", "oldest")
 
 
 def list_threads(cfg: Config, limit: int = 12) -> list[dict[str, Any]]:
@@ -254,9 +363,11 @@ def ask_page_flags(cfg: Config) -> dict[str, Any]:
     from ..llm import embed_egress_is_remote, llm_egress_is_remote
     from ..rag.status import index_status
 
-    ready = bool(cfg.rag_enabled and cfg.llm_enabled)
+    rag_on = bool(cfg.rag_enabled)
+    llm_on = bool(cfg.llm_enabled)
+    ready = rag_on and llm_on
     status: dict[str, Any] = {}
-    if ready:
+    if rag_on:
         try:
             status = dict(index_status(cfg) or {})
         except Exception as exc:
@@ -264,12 +375,119 @@ def ask_page_flags(cfg: Config) -> dict[str, Any]:
     problem = str(status.get("problem") or status.get("error") or "")
     items = int(status.get("items") or 0)
     exists = bool(status.get("exists"))
+    indexed = exists and items > 0 and not problem
     return {
+        "rag_on": rag_on,
+        "llm_on": llm_on,
         "ready": ready,
-        "can_ask": ready and exists and items > 0 and not problem,
-        "remote_llm": ready and llm_egress_is_remote(cfg),
-        "remote_embed": ready and embed_egress_is_remote(cfg),
+        "can_ingest": rag_on,
+        "can_search": rag_on and indexed,
+        "can_ask": ready and indexed,
+        "remote_llm": llm_on and llm_egress_is_remote(cfg),
+        "remote_embed": rag_on and embed_egress_is_remote(cfg),
         "status": status,
+    }
+
+
+def last_job_result(cfg: Config, verb: str) -> dict[str, Any]:
+    from . import commands
+
+    for rec in commands.list_commands(cfg, limit=50):
+        if rec.get("verb") != verb:
+            continue
+        result = rec.get("result") if isinstance(rec.get("result"), dict) else {}
+        return {
+            "status": rec.get("status") or "",
+            "error": rec.get("error") or "",
+            **result,
+        }
+    return {}
+
+
+def list_ask_packs(cfg: Config, limit: int = 12) -> list[dict[str, Any]]:
+    from ..rag.batch import batch_dir
+
+    root = batch_dir(cfg)
+    if not root.is_dir():
+        return []
+    dirs = [
+        p
+        for p in root.iterdir()
+        if p.is_dir() and p.name != "by-hash" and (p / "answers.md").is_file()
+    ]
+    dirs.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    out: list[dict[str, Any]] = []
+    for path in dirs[:limit]:
+        questions = answered = failed = 0
+        pack = path / "pack.json"
+        if pack.is_file():
+            try:
+                body = json.loads(pack.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError, ValueError):
+                body = {}
+            if isinstance(body, dict):
+                questions = int(body.get("questions") or 0)
+                answered = int(body.get("answered") or 0)
+                failed = int(body.get("failed") or 0)
+        out.append(
+            {
+                "stamp": path.name,
+                "questions": questions,
+                "answered": answered,
+                "failed": failed,
+                "mtime": path.stat().st_mtime,
+            }
+        )
+    return out
+
+
+def list_html_stems(folder: Any, limit: int = 20) -> list[dict[str, Any]]:
+    from pathlib import Path
+
+    root = Path(folder)
+    if not root.is_dir():
+        return []
+    files = sorted(
+        (p for p in root.glob("*.html") if p.is_file()),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    return [{"name": p.stem, "mtime": p.stat().st_mtime} for p in files[:limit]]
+
+
+def safe_child(root: Any, *parts: str) -> Any:
+    """Return a file under ``root``, or None if the name is unsafe or missing."""
+    from pathlib import Path
+
+    dest = Path(root)
+    if not parts:
+        return None
+    for part in parts:
+        if not part or any(ch in part for ch in "/\\") or part in {".", ".."}:
+            return None
+    try:
+        base = dest.resolve()
+        path = base.joinpath(*parts).resolve()
+        path.relative_to(base)
+    except (OSError, ValueError):
+        return None
+    return path if path.is_file() else None
+
+
+def dest_options() -> tuple[str, ...]:
+    return DEST_OPTIONS
+
+
+def briefs_page_flags(cfg: Config) -> dict[str, Any]:
+    from ..llm import llm_egress_is_remote
+
+    llm_on = bool(cfg.llm_enabled)
+    return {
+        "llm_on": llm_on,
+        "remote_llm": llm_on and llm_egress_is_remote(cfg),
+        "summarize_dest": cfg.summarize_dest,
+        "synthesize_dest": cfg.synthesize_dest,
+        "summarize_order": cfg.summarize_order,
     }
 
 

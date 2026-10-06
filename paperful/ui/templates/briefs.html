@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Briefs — Paperful{% endblock %}
+{% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
+{% block content %}
+<h1>Briefs</h1>
+{% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
+<p>{{ message }}</p>
+{% if flags.remote_llm %}<p class="warn-remote">Remote LLM — PDF or summary text may leave this machine.</p>{% endif %}
+<p class="counts">Scope: {% if prefs.collection %}{{ prefs.collection }}{% else %}entire library{% endif %}</p>
+
+{% if flags.llm_on %}
+<h2>Summarize</h2>
+{% if summarize_result.queued is defined %}
+<p class="counts">Last run: {{ summarize_result.summarized }} summarized · {{ summarize_result.skipped }} skipped · {{ summarize_result.failed }} failed
+  · {{ summarize_result.not_reached }} not reached ({{ summarize_result.dest }})</p>
+{% elif summarize_result.error %}
+<p class="error-banner">{{ summarize_result.error }}</p>
+{% endif %}
+<form method="post" action="/briefs/summarize">
+  <p>
+    <label>Order
+      <select name="order">
+        {% for o in orders %}
+        <option value="{{ o }}" {% if o == flags.summarize_order %}selected{% endif %}>{{ o }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Dest
+      <select name="dest">
+        {% for d in dest_options %}
+        <option value="{{ d }}" {% if d == flags.summarize_dest %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Limit <input type="number" name="limit" min="1"></label>
+    <label>Max new <input type="number" name="max_new" min="1"></label>
+    <label>Year from <input type="number" name="year_from"></label>
+    <label>Year to <input type="number" name="year_to"></label>
+    <label><input type="checkbox" name="force" value="1"> Force</label>
+  </p>
+  <p><button type="submit">Summarize</button></p>
+</form>
+{% if summaries %}
+<p>Recent summaries</p>
+<ul>
+  {% for s in summaries %}
+  <li><a href="/briefs/summary/{{ s.name }}">{{ s.name }}</a></li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<h2>Synthesize</h2>
+{% if synthesize_result.slug %}
+<p class="counts">{% if synthesize_result.dry_run %}Dry-run{% else %}Report{% endif %} {{ synthesize_result.slug }}:
+  disk {{ synthesize_result.sources_disk }} · notes {{ synthesize_result.sources_note }}
+  · missing {{ synthesize_result.missing }} · chunks {{ synthesize_result.chunks }}
+  {% if synthesize_result.skipped %} · {{ synthesize_result.skipped }}{% endif %}</p>
+{% elif synthesize_result.error %}
+<p class="error-banner">{{ synthesize_result.error }}</p>
+{% endif %}
+<form method="post" action="/briefs/synthesize">
+  <p>
+    <label>Dest
+      <select name="dest">
+        {% for d in dest_options %}
+        <option value="{{ d }}" {% if d == flags.synthesize_dest %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Limit <input type="number" name="limit" min="1"></label>
+    <label>Year from <input type="number" name="year_from"></label>
+    <label>Year to <input type="number" name="year_to"></label>
+    <label><input type="checkbox" name="force" value="1"> Force</label>
+  </p>
+  <p>
+    <button type="submit" name="dry_run" value="1">Dry-run</button>
+    <button type="submit" name="dry_run" value="0">Write report</button>
+  </p>
+</form>
+{% if reports %}
+<p>Recent reports</p>
+<ul>
+  {% for r in reports %}
+  <li><a href="/briefs/report/{{ r.name }}">{{ r.name }}</a></li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endif %}
+{% endblock %}

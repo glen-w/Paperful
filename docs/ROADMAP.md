@@ -55,7 +55,7 @@ Sci-Hub, no “AI fetch everything”).
 | Strip legacy flat-PDF migrate + mixed-layout doctor amber | Day-0 mirror never steers people into a whole-library layout cleanup | **Shipped (0.1 → 1.0)** |
 | **Mendeley and EndNote adapters** | The ledger survives a manager change | In the tree. **Seeking testers.** Zotero stays the well-tested path. See below |
 | **Workbench GUI** | Discover, Wanted, Preview/Grab; Advanced for full CLI | Landed — [GUI](#gui); `paperful serve` + `paperful/ui/`; Compose `gui` profile. Not tagged 1.0 |
-| **Interactive Ask (GUI)** | Index page when `[rag]` + `[llm]` enabled | **Shipped** — Index form, CLI threads, citations |
+| **Interactive Ask (GUI)** | Index page when `[rag]` + `[llm]` enabled | **Shipped** — Index form, CLI threads, citations; ingest/search/batch on Index; Briefs for summarize/synthesize |
 
 Nice-to-have (not 1.0 blockers): colour glossary next to `doctor` (documented);
 collection picker hint on fuzzy `--collection` miss.
@@ -601,7 +601,7 @@ answered` and `paperful ask` (one cited answer, TTY/`--thread` follow-ups, or
 split](#product-split-10-vs-post-10). Terminal multi-turn and the Index page
 share `ask --thread`: follow-ups are rewritten for retrieval and stored under
 `state/rag/threads/` with visible scope (collection chip, optional years) and
-citations. Batch `--from-file`, `--item`, and custom `--prompt` stay CLI-only.
+citations. Batch `--item` and custom `--prompt` stay CLI-only.
 
 Reuse the house LLM pattern: global `[llm]` + per-verb overrides (same spirit
 as `[summarize].model`, `[browser_agent].model`, `[rag].model`).
@@ -1368,5 +1368,7 @@ default and explicit Apply. Not a second fetch stack or Zotero’s reader.
 
 **Ask (Index, opt-in):** **Shipped** — scoped chat with citations when `[llm]` and
 `[rag]` are on and the index has rows. Collection chip is the scope; threads live
-under `state/rag/threads/` (same as `ask --thread`). CLI `ask` remains for
-scripts, batch, and `--item` filters. See [Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer).
+under `state/rag/threads/` (same as `ask --thread`). Index also runs `rag ingest`,
+`rag search`, and batch Ask. **Briefs** (Advanced) runs `summarize` and
+`synthesize`. CLI `ask` remains for scripts, `--item` filters, and custom prompts.
+See [Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer).

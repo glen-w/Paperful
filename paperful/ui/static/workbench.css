@@ -145,6 +145,12 @@ dialog.wb-drawer {
   padding: 1rem;
   max-width: 32rem;
 }
+iframe.summary-frame {
+  width: 100%;
+  min-height: 12rem;
+  border: 1px solid var(--line);
+  margin: 0.5rem 0;
+}
 
 .tabs {
   display: flex;

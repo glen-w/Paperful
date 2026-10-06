@@ -4,8 +4,9 @@
 <h1>Discover</h1>
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
 <section class="toolbar">
+  <h2>Topic</h2>
   <form method="post" action="/discover/topic">
-    <label>Track a topic <input name="query" required></label>
+    <label>Track a topic <input name="query"></label>
     {% if prefs.advanced %}
     <label>Kind
       <select name="kind">
@@ -17,17 +18,87 @@
       </select>
     </label>
     <label>Direction <input name="direction" placeholder="refs"></label>
-    <label>Seeds <input name="seeds" placeholder="doi or orcid list"></label>
+    <label>Depth <input name="depth" type="number" min="0"></label>
+    <label>Year from <input name="year_from" type="number"></label>
+    <label>Year to <input name="year_to" type="number"></label>
+    <label>Max candidates <input name="max_candidates" placeholder="all"></label>
+    <label>Per-hop limit <input name="per_hop_limit" placeholder="all"></label>
+    <label>Hybrid seeds <input name="hybrid_seeds" type="number"></label>
+    <label><input type="checkbox" name="or_mode" value="1"> OR keywords</label>
+    <label>Seeds <textarea name="seeds" rows="3" placeholder="DOIs / ORCIDs, one per line"></textarea></label>
     {% endif %}
     <button type="submit">Search</button>
   </form>
+  {% if prefs.advanced and profiles %}
+  <form method="post" action="/discover/profile-run" class="toolbar">
+    <label>Run profile <select name="profile">{% for p in profiles %}<option value="{{ p }}">{{ p }}</option>{% endfor %}</select></label>
+    <button type="submit" class="secondary">Run profile</button>
+  </form>
+  {% endif %}
+  {% if deferred_run %}
+  <form method="post" action="/discover/resume">
+    <input type="hidden" name="run_id" value="{{ deferred_run }}">
+    <button type="submit" class="secondary">Resume {{ deferred_run }}</button>
+  </form>
+  {% endif %}
+</section>
+<section class="toolbar">
+  <h2>People</h2>
+  <form method="post" action="/discover/aw/save">
+    <label>New list <input name="name" placeholder="my-list"></label>
+    <button type="submit" class="secondary">Create list</button>
+  </form>
   <form method="post" action="/discover/follow">
-    <label>Follow a person (ORCID) <input name="orcid" placeholder="0000-0002-1825-0097"></label>
-    <label>List name <input name="list_name" value="followed"></label>
+    <label>Follow (ORCID) <input name="orcid" placeholder="0000-0002-1825-0097"></label>
+    <label>List <input name="list_name" value="{{ aw_list }}"></label>
     <label>Since <input name="backfill_from" type="date"></label>
     <button type="submit">Follow</button>
   </form>
+  <form method="post" action="/discover/aw/add">
+    <input type="hidden" name="list_name" value="{{ aw_list }}">
+    <label>Add ORCID <input name="orcid"></label>
+    <label>Name <input name="display_name"></label>
+    <button type="submit" class="secondary">Add person</button>
+  </form>
+  <form method="post" action="/discover/aw/resolve">
+    <input type="hidden" name="list_name" value="{{ aw_list }}">
+    <button type="submit" class="secondary">Resolve {{ aw_list }}</button>
+  </form>
+  <form method="post" action="/discover/aw/run">
+    <input type="hidden" name="list_name" value="{{ aw_list }}">
+    <label>Backfill from <input name="backfill_from" type="date"></label>
+    <button type="submit" class="secondary">Run list</button>
+  </form>
 </section>
+{% if aw_lists %}
+<h3>Lists</h3>
+<ul>
+{% for L in aw_lists %}
+  <li><a href="/discover?list_name={{ L.name }}">{{ L.name }}</a> — {{ L.people }} people · inbox {{ L.inbox }}{% if L.baseline %} · baseline{% endif %}</li>
+{% endfor %}
+</ul>
+{% endif %}
+{% if aw_people %}
+<table class="wb-table">
+  <thead><tr><th>Name</th><th>ORCID</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for p in aw_people %}
+  <tr>
+    <td>{{ p.display_name }}</td>
+    <td>{{ p.orcid }}</td>
+    <td>{{ p.status }}</td>
+    <td>
+      <form method="post" action="/discover/aw/remove">
+        <input type="hidden" name="list_name" value="{{ aw_list }}">
+        <input type="hidden" name="person_id" value="{{ p.id }}">
+        <button type="submit" class="secondary">Remove</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
 {% if run_id %}
 <form method="post" action="/discover/apply">
   <input type="hidden" name="run_id" value="{{ run_id }}">
@@ -38,19 +109,25 @@
 <form method="post" action="/discover/watch">
   <input type="hidden" name="run_id" value="{{ run_id }}">
   <label>Watch name <input name="watch_name" value="topic-watch"></label>
+  {% if profiles %}<label>Profile <select name="profile"><option value="">—</option>{% for p in profiles %}<option value="{{ p }}">{{ p }}</option>{% endfor %}</select></label>{% endif %}
   <button type="submit" class="secondary">Keep an eye on this</button>
 </form>
 {% endif %}
 {% if inbox %}
 <h2>Person inbox</h2>
 <table class="wb-table">
-  <thead><tr><th>List</th><th>Title</th></tr></thead>
+  <thead><tr><th>List</th><th>Title</th><th>DOI</th></tr></thead>
   <tbody>
   {% for row in inbox %}
-  <tr><td>{{ row.list }}</td><td>{{ row.title }}</td></tr>
+  <tr><td>{{ row.list }}</td><td>{{ row.title }}</td><td>{{ row.doi }}</td></tr>
   {% endfor %}
   </tbody>
 </table>
+<form method="post" action="/discover/apply">
+  <input type="hidden" name="kind" value="authorwatch">
+  <input type="hidden" name="list_name" value="{{ aw_list }}">
+  <button type="submit">Apply inbox ({{ aw_list }})</button>
+</form>
 {% endif %}
 <h2>Queue</h2>
 <table class="wb-table">

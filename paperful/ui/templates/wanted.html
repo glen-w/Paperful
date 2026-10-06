@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Wanted — Paperful{% endblock %}
+{% block body_attrs %}{% if request.query_params.get('run') or request.query_params.get('poll') %} data-poll-run="{{ request.query_params.get('run') or request.query_params.get('poll') }}"{% endif %}{% endblock %}
 {% block content %}
 <h1>Wanted</h1>
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
@@ -30,6 +31,18 @@
         {% if row.source %}<p>Source {{ row.source }}</p>{% endif %}
         {% if row.state %}<p>Verification {{ row.state }}{% if row.reason %} ({{ row.reason }}){% endif %}</p>{% endif %}
         {% if row.miss_plain %}<p>{{ row.miss_plain }}</p>{% endif %}
+        {% if row.has_summary %}
+        <p><a href="/item/{{ row.key }}/summary" target="_blank" rel="noopener">Open summary</a></p>
+        <iframe class="summary-frame" sandbox="" src="/item/{{ row.key }}/summary" title="Summary"></iframe>
+        {% endif %}
+        {% if prefs.advanced and briefs.llm_on and tab != 'missing' %}
+        <form method="post" action="/wanted/summarize" class="toolbar">
+          <input type="hidden" name="key" value="{{ row.key }}">
+          <label>Dest <select name="dest">{% for d in dest_options %}<option value="{{ d }}">{{ d }}</option>{% endfor %}</select></label>
+          <label><input type="checkbox" name="force" value="1"> Force</label>
+          <button type="submit">Summarize this</button>
+        </form>
+        {% endif %}
         <form method="dialog"><button class="secondary">Close</button></form>
       </dialog>
     </td>
@@ -39,6 +52,7 @@
       {% elif row.state == 'doi_mismatch' %}<span class="stamp-check">check</span>
       {% elif row.state %}{{ row.state }}{% if row.reason %} ({{ row.reason }}){% endif %}
       {% endif %}
+      {% if row.has_summary %}<span class="stamp-found">summary</span>{% endif %}
     </td>
   </tr>
   {% endfor %}

@@ -74,10 +74,11 @@ Same shell; extra verbs map 1:1 to CLI (`JOBS` in `cli.py`). Discover adds hops,
 seeds, `refs gap` → `ingest-dois`, `authors`, digests. Wanted adds `recover`,
 handoff, inbox, `reachout`. **Repair** queues: `lint`, `fix-metadata`, `dedupe`,
 `versions`, `attachments`, `ocr`. **Mirror**: `sync`, `snapshot`, `restore`,
-`cache clean`. **Index**: cited Ask (threads under `state/rag/threads/`) when
-`[rag]` and `[llm]` are on and the index has rows; collection chip is the
-scope. `rag ingest` / `search`, `summarize`, `synthesize`, and batch Ask stay
-CLI. **Settings** writes `config.toml`; it does not enable `[rag]` or `[llm]`.
+`cache clean`. **Index**: `rag ingest` / `search` when `[rag]` is on; cited Ask and batch
+Ask (`state/ask-batch/`) when `[rag]` and `[llm]` are on and the index has
+rows. Collection chip is the scope. **Synthesize** reports on Index when `[llm]` is on.
+Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
+`config.toml`; it does not enable `[rag]` or `[llm]`.
 
 ---
 
@@ -93,9 +94,17 @@ CLI. **Settings** writes `config.toml`; it does not enable `[rag]` or `[llm]`.
 | POST | `/v1/refs-gap` | Dry-run `refs gap` envelope |
 | POST | `/v1/ask` | Same as MCP `ask` (not linked from simple HTML) |
 | POST | `/index/ask` | Enqueue cited Ask turn; redirect to `/index?thread=&run=` |
+| POST | `/index/ingest` | Enqueue `rag ingest` (Preview dry-run or Build); redirect `?run=` |
+| POST | `/index/search` | Redirect to `/index?q=` (sync search on GET) |
+| POST | `/index/ask-batch` | Enqueue `ask --from-file` batch; redirect `?run=` |
+| GET | `/index/batch/{stamp}` | `answers.md` under `state/ask-batch/<stamp>/` |
+| POST | `/briefs/summarize` | Enqueue `summarize`; redirect `/briefs?run=` |
+| POST | `/briefs/synthesize` | Enqueue `synthesize` (dry-run or write); redirect `?run=` |
+| GET | `/briefs/summary/{key}` | HTML under `state/summaries/` |
+| GET | `/briefs/report/{slug}` | HTML under `state/reports/` |
 
 HTML routes: `/discover`, `/wanted`, `/library`, `/activity`, `/system`, plus
-advanced `/repair`, `/mirror`, `/index`, `/settings`. `GET /` → `/wanted`.
+advanced `/repair`, `/mirror`, `/index`, `/briefs`, `/settings`. `GET /` → `/wanted`.
 `POST /index/ask` enqueues a cited Ask turn (not linked from the simple shell).
 
 Writes over HTTP use review tokens under `state/gui/reviews/`; stale library

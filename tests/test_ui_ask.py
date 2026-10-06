@@ -17,9 +17,9 @@ def _ops(monkeypatch) -> None:
     import paperful.agent_ops as ops
     import paperful.ui.app as ui_app
 
-    payload = lambda _cfg, probe=False: [
-        {"name": "x", "status": "green", "code": "", "detail": ""}
-    ]
+    def payload(_cfg, probe=False):
+        return [{"name": "x", "status": "green", "code": "", "detail": ""}]
+
     monkeypatch.setattr(ops, "doctor_payload", payload)
     monkeypatch.setattr(ui_app, "doctor_payload", payload)
     monkeypatch.setattr(
@@ -71,7 +71,7 @@ def test_index_gate_requires_both_rag_and_llm(tmp_path, monkeypatch):
     res = client.get("/index")
     assert res.status_code == 200
     assert 'action="/index/ask"' not in res.text
-    assert "[rag]" in res.text
+    assert "[llm]" in res.text
 
 
 def test_run_ask_turn_rejects_empty_question(tmp_path):
@@ -219,3 +219,93 @@ def test_index_empty_question_redirects(tmp_path, monkeypatch):
     assert res.status_code == 303
     assert "error=empty" in (res.headers.get("location") or "")
     assert commands.list_commands(cfg) == []
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_index_bad_focus_and_disabled_post(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.rag_enabled = True
+    cfg.llm_enabled = True
+    _ops(monkeypatch)
+    client = TestClient(create_app(cfg))
+    bad = client.post(
+        "/index/ask",
+        data={"question": "hello", "focus": "not-a-focus"},
+        follow_redirects=False,
+    )
+    assert bad.status_code == 303
+    assert "error=focus" in (bad.headers.get("location") or "")
+    assert commands.list_commands(cfg) == []
+
+    cfg.llm_enabled = False
+    off = client.post(
+        "/index/ask",
+        data={"question": "hello", "focus": "default"},
+        follow_redirects=False,
+    )
+    assert off.status_code == 303
+    assert "error=disabled" in (off.headers.get("location") or "")
+
+
+def test_run_ask_turn_requires_rag(tmp_path):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.rag_enabled = False
+    with pytest.raises(ValueError, match="rag.enabled"):
+        run_ask_turn(
+            cfg,
+            question="What is BBNJ?",
+            thread_id=None,
+            collection="",
+            year_from=None,
+            year_to=None,
+            focus=None,
+        )
+
+
+def test_list_threads_skips_corrupt(tmp_path):
+    from paperful.ui.pages import list_threads
+    from paperful.rag.thread import Thread, save_thread
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    save_thread(
+        cfg.state_dir,
+        Thread(
+            thread_id="goodthread01",
+            turns=[
+                {"role": "user", "content": "q"},
+                {"role": "assistant", "content": "a"},
+            ],
+        ),
+    )
+    bad = cfg.state_dir / "rag" / "threads" / "broken.json"
+    bad.write_text("{not json", encoding="utf-8")
+    rows = list_threads(cfg)
+    ids = {r["id"] for r in rows}
+    assert "goodthread01" in ids
+    assert "broken" not in ids
+
+
+def test_ask_page_flags_need_both_and_index_rows(tmp_path, monkeypatch):
+    from paperful.ui.pages import ask_page_flags
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.rag_enabled = True
+    cfg.llm_enabled = True
+    monkeypatch.setattr(
+        "paperful.rag.status.index_status",
+        lambda _cfg, entries=None: {"exists": False, "items": 0, "problem": ""},
+    )
+    flags = ask_page_flags(cfg)
+    assert flags["ready"] is True
+    assert flags["can_ask"] is False
+    assert flags["can_ingest"] is True
+    assert flags["can_search"] is False
+    cfg.llm_enabled = False
+    flags = ask_page_flags(cfg)
+    assert flags["ready"] is False
+    assert flags["can_ask"] is False
+    assert flags["can_ingest"] is True
