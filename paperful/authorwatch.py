@@ -104,6 +104,14 @@ class Person:
 
 
 @dataclass
+class PollBatch:
+    proposed: list[Candidate]
+    seen: set[str]
+    exists: int
+    polled: int
+
+
+@dataclass
 class RunResult:
     proposed: int
     exists: int
@@ -641,6 +649,130 @@ def _call_lookup(lookup: Lookup, row: Candidate) -> Any:
         return lookup(doi, title)
 
 
+def _poll_authorwatch_people(
+    cfg: Config,
+    name: str,
+    *,
+    console: Console,
+    client: Any,
+    body: dict[str, Any],
+    ok_people: list[Person],
+    backfill: str,
+    is_baseline: bool,
+    max_authors: int,
+    per_author_limit: int,
+    lookup: Lookup | None,
+    backend: Any,
+) -> PollBatch:
+    proposed: list[Candidate] = []
+    exists = 0
+    polled = 0
+    seen = load_seen(cfg, name)
+    should_poll = bool(backfill) or not is_baseline
+    finder = _lookup(cfg, lookup, backend) if should_poll else None
+    if not should_poll:
+        return PollBatch(proposed=proposed, seen=seen, exists=exists, polled=polled)
+    oa = _openalex_client(cfg, client)
+    capped = ok_people[: max(0, max_authors)]
+    if len(ok_people) > len(capped):
+        console.print(
+            f"[yellow]capped at {len(capped)} authors "
+            f"(of {len(ok_people)}); pass --max-authors[/]"
+        )
+    created_cursor = None if backfill else _cursor_date(
+        body.get("last_run_at") or body.get("baseline_at")
+    )
+    try:
+        for person in capped:
+            polled += 1
+            works = oa.works_by_author(
+                orcid=person.orcid,
+                openalex=person.openalex,
+                limit=max(1, per_author_limit),
+                from_created_date=None if backfill else created_cursor,
+                from_publication_date=backfill or None,
+            )
+            for work in works:
+                row = _candidate_from_work(work, name=name, person=person)
+                key = row.identity
+                if not key:
+                    continue
+                if key in seen:
+                    continue
+                if finder is not None:
+                    found = _call_lookup(finder, row)
+                    if found:
+                        exists += 1
+                        seen.add(key)
+                        continue
+                seen.add(key)
+                proposed.append(row)
+    except OpenAlexBudgetExceeded as exc:
+        reset_at = getattr(exc, "reset_at", None)
+        wait = f" Wait until {reset_at}." if reset_at else ""
+        raise AuthorwatchError(
+            "OpenAlex daily budget is spent. "
+            f"Set OPENALEX_API_KEY ({KEY_URL}) if this IP is sharing the "
+            f"no-key pool, then: paperful authorwatch run {name}."
+            + wait
+        ) from exc
+    return PollBatch(proposed=proposed, seen=seen, exists=exists, polled=polled)
+
+
+def _record_authorwatch_run(
+    cfg: Config,
+    name: str,
+    body: dict[str, Any],
+    batch: PollBatch,
+    *,
+    backfill: str,
+    is_baseline: bool,
+) -> None:
+    if batch.proposed:
+        append_inbox(cfg, name, batch.proposed)
+    save_seen(cfg, name, batch.seen)
+    now = _now()
+    body.update(
+        {
+            "last_run_at": now,
+            "backfill_from": backfill or body.get("backfill_from"),
+        }
+    )
+    if is_baseline:
+        body["baseline_at"] = now
+    _write_watch(cfg, name, body)
+
+
+def _print_authorwatch_run_summary(
+    console: Console,
+    name: str,
+    *,
+    batch: PollBatch,
+    ok_n: int,
+    held_n: int,
+    unresolved_n: int,
+    skipped_held: int,
+    is_baseline: bool,
+    backfill: str,
+) -> None:
+    if is_baseline and not backfill:
+        console.print(
+            f"baseline · proposed 0 · ok {ok_n} · held {held_n} · unresolved {unresolved_n}"
+        )
+        console.print(
+            f"Next: paperful authorwatch run {name} --backfill-from YYYY-MM-DD"
+        )
+        return
+    console.print(
+        f"ok {ok_n} · held {held_n} · unresolved {unresolved_n} · "
+        f"proposed {len(batch.proposed)} · exists {batch.exists} · skipped_held {skipped_held}"
+    )
+    if batch.proposed:
+        console.print(f"Next: paperful authorwatch apply {name} -C <collection> --apply")
+    else:
+        console.print(f"Next: paperful authorwatch run {name}")
+
+
 def run_list(
     cfg: Config,
     name: str,
@@ -661,99 +793,44 @@ def run_list(
     ok_n, held_n, unresolved_n = _status_counts(people)
     is_baseline = not body.get("baseline_at")
     backfill = _parse_date(backfill_from) if backfill_from else ""
-    seen = load_seen(cfg, name)
-    proposed: list[Candidate] = []
-    exists = 0
-    polled = 0
-
-    should_poll = bool(backfill) or not is_baseline
-    finder = _lookup(cfg, lookup, backend) if should_poll else None
-    if should_poll:
-        oa = _openalex_client(cfg, client)
-        capped = ok_people[: max(0, max_authors)]
-        if len(ok_people) > len(capped):
-            console.print(
-                f"[yellow]capped at {len(capped)} authors "
-                f"(of {len(ok_people)}); pass --max-authors[/]"
-            )
-        created_cursor = None if backfill else _cursor_date(
-            body.get("last_run_at") or body.get("baseline_at")
-        )
-        try:
-            for person in capped:
-                polled += 1
-                works = oa.works_by_author(
-                    orcid=person.orcid,
-                    openalex=person.openalex,
-                    limit=max(1, per_author_limit),
-                    from_created_date=None if backfill else created_cursor,
-                    from_publication_date=backfill or None,
-                )
-                for work in works:
-                    row = _candidate_from_work(work, name=name, person=person)
-                    key = row.identity
-                    if not key:
-                        continue
-                    if key in seen:
-                        continue
-                    if finder is not None:
-                        found = _call_lookup(finder, row)
-                        if found:
-                            exists += 1
-                            seen.add(key)
-                            continue
-                    seen.add(key)
-                    proposed.append(row)
-        except OpenAlexBudgetExceeded as exc:
-            reset_at = getattr(exc, "reset_at", None)
-            wait = f" Wait until {reset_at}." if reset_at else ""
-            raise AuthorwatchError(
-                "OpenAlex daily budget is spent. "
-                f"Set OPENALEX_API_KEY ({KEY_URL}) if this IP is sharing the "
-                f"no-key pool, then: paperful authorwatch run {name}."
-                + wait
-            ) from exc
-
-    now = _now()
-    if proposed:
-        append_inbox(cfg, name, proposed)
-    save_seen(cfg, name, seen)
-    body.update(
-        {
-            "last_run_at": now,
-            "backfill_from": backfill or body.get("backfill_from"),
-        }
+    batch = _poll_authorwatch_people(
+        cfg,
+        name,
+        console=console,
+        client=client,
+        body=body,
+        ok_people=ok_people,
+        backfill=backfill,
+        is_baseline=is_baseline,
+        max_authors=max_authors,
+        per_author_limit=per_author_limit,
+        lookup=lookup,
+        backend=backend,
     )
-    if is_baseline:
-        body["baseline_at"] = now
-    _write_watch(cfg, name, body)
-
-    if is_baseline and not backfill:
-        console.print(
-            f"baseline · proposed 0 · ok {ok_n} · held {held_n} · unresolved {unresolved_n}"
-        )
-        console.print(
-            f"Next: paperful authorwatch run {name} --backfill-from YYYY-MM-DD"
-        )
-    else:
-        console.print(
-            f"ok {ok_n} · held {held_n} · unresolved {unresolved_n} · "
-            f"proposed {len(proposed)} · exists {exists} · skipped_held {skipped_held}"
-        )
-        if proposed:
-            console.print(f"Next: paperful authorwatch apply {name} -C <collection> --apply")
-        else:
-            console.print(f"Next: paperful authorwatch run {name}")
+    _record_authorwatch_run(
+        cfg, name, body, batch, backfill=backfill, is_baseline=is_baseline
+    )
+    _print_authorwatch_run_summary(
+        console,
+        name,
+        batch=batch,
+        ok_n=ok_n,
+        held_n=held_n,
+        unresolved_n=unresolved_n,
+        skipped_held=skipped_held,
+        is_baseline=is_baseline,
+        backfill=backfill,
+    )
     return RunResult(
-        proposed=len(proposed),
-        exists=exists,
+        proposed=len(batch.proposed),
+        exists=batch.exists,
         skipped_held=skipped_held,
         ok=ok_n,
         held=held_n,
         unresolved=unresolved_n,
         baseline=is_baseline,
         backfill_from=backfill,
-        polled=polled,
+        polled=batch.polled,
     )
 
 
