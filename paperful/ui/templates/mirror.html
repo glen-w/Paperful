@@ -1,17 +1,30 @@
 {% extends "base.html" %}
 {% block title %}Mirror — Paperful{% endblock %}
+{% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
 {% block content %}
 <h1>Mirror</h1>
-{% if message %}<p>{{ message }}</p>{% endif %}
+{% if error == 'collection' %}<div class="error-banner">Pick a collection in the chip for snapshot and restore.</div>{% endif %}
+{% if run_rec %}
+<p>Last run: {{ run_rec.verb }} — {{ run_rec.status }}{% if run_rec.error %} — {{ run_rec.error }}{% endif %}</p>
+{% if run_rec.summary %}<pre>{{ run_rec.summary }}</pre>{% endif %}
+{% endif %}
 <p>Open <code>out/</code> on this machine. Restore creates missing items only.</p>
 {% for verb in verbs %}
 <form method="post" action="/mirror/preview" class="toolbar">
   <input type="hidden" name="verb" value="{{ verb }}">
+  {% if verb in ['sync', 'snapshot'] %}
+  <label>PDFs <select name="pdfs"><option value="lazy">lazy</option><option value="all">all</option><option value="none">none</option></select></label>
+  {% endif %}
+  {% if verb == 'sync' %}
+  <label><input type="checkbox" name="accept_gone" value="1"> Accept gone (dangerous)</label>
+  {% endif %}
   <button type="submit">Preview {{ verb }}</button>
 </form>
+{% if run_rec and run_rec.verb == verb and run_rec.review_token and run_rec.status == 'done' %}
 <form method="post" action="/mirror/apply" class="toolbar">
-  <input type="hidden" name="verb" value="{{ verb }}">
+  <input type="hidden" name="review_token" value="{{ run_rec.review_token }}">
   <button type="submit">Apply {{ verb }}</button>
 </form>
+{% endif %}
 {% endfor %}
 {% endblock %}

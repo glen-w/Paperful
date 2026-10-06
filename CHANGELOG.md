@@ -16,6 +16,10 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
   resume, queue briefing/digest, watch via `save_watch` (profile required);
   authorwatch list create/add/remove/resolve/run/import + people briefing; Preview apply
   before snowball/inbox apply. Route table: [gui.md](docs/gui.md).
+- **Repair / Mirror (Advanced):** Preview runs real library cores and writes review
+  tokens under `state/gui/previews/`; Apply consumes the token (409 when the preview
+  file changed). Covers `lint` (read-only), `fix-metadata`, `dedupe`, `versions`,
+  `attachments`, `ocr`, plus `sync`, `snapshot`, `restore`, and `cache clean`.
 
 ### Changed
 

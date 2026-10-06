@@ -35,6 +35,7 @@ from .pages import (
     list_snowball_profiles,
     list_threads,
     newest_snowball_queue,
+    command_by_id,
     repair_queues,
     safe_child,
     snowball_deferred_run_id,
@@ -748,7 +749,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         return resp
 
     @app.get("/repair", response_class=HTMLResponse)
-    def page_repair(request: Request) -> HTMLResponse:
+    def page_repair(request: Request, run: str = "", error: str = "") -> HTMLResponse:
+        run_rec = command_by_id(cfg, run) if run else None
         return templates.TemplateResponse(
             request,
             "repair.html",
@@ -757,66 +759,123 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 "repair",
                 queues=repair_queues(cfg),
                 message="",
+                run_rec=run_rec,
+                poll_run=run,
+                error=error,
             ),
         )
 
     @app.post("/repair/preview")
-    async def repair_preview(request: Request) -> RedirectResponse:
+    async def repair_preview_route(request: Request) -> RedirectResponse:
+        from .repair_mirror_jobs import GuiScopeError
+
         prefs = prefs_from_request(request)
         form = await request.form()
         verb = str(form.get("verb") or "dedupe")
+        if verb not in {"lint", "fix-metadata", "dedupe", "versions", "attachments", "ocr"}:
+            return RedirectResponse(url="/repair?error=verb", status_code=303)
+        if not prefs.collection:
+            return RedirectResponse(url="/repair?error=collection", status_code=303)
+        overwrite = form.get("overwrite") == "1"
+        apply_medium = form.get("apply_medium") == "1"
+        surgery = {
+            "fix_broken": form.get("fix_broken") == "1",
+            "merge_files": form.get("merge_files") == "1",
+            "rename": form.get("rename") == "1",
+            "link": form.get("link") == "1",
+        }
 
         def work(cmd_id: str) -> None:
-            jobs.repair_preview(cfg, cmd_id, verb=verb, collection=prefs.collection)
+            try:
+                jobs.repair_preview(
+                    cfg,
+                    cmd_id,
+                    verb=verb,
+                    collection=prefs.collection,
+                    overwrite=overwrite,
+                    apply_medium=apply_medium,
+                    surgery=surgery,
+                )
+            except GuiScopeError as exc:
+                rec = commands.read_command(cfg, cmd_id) or {}
+                rec["status"] = "failed"
+                rec["error"] = str(exc)
+                commands.write_command(cfg, rec)
+                raise
 
-        commands.enqueue(cfg, f"repair_{verb}", work)
-        return RedirectResponse(url="/repair", status_code=303)
+        cmd_id = commands.enqueue(cfg, f"repair_{verb}", work)
+        return RedirectResponse(url=f"/repair?run={cmd_id}", status_code=303)
 
     @app.post("/repair/apply", response_model=None)
-    async def repair_apply(request: Request) -> JSONResponse | RedirectResponse:
+    async def repair_apply_route(request: Request) -> JSONResponse | RedirectResponse:
         form = await request.form()
-        overwrite = form.get("overwrite") == "1"
         token = str(form.get("review_token") or "")
         if not token:
-            for c in commands.list_commands(cfg, limit=8):
-                if str(c.get("verb") or "").startswith("repair_") and c.get("review_token"):
-                    token = c["review_token"]
-                    break
-        ok, msg = jobs.repair_apply(cfg, token=token, overwrite=overwrite)
+            return JSONResponse({"ok": False, "error": "missing review token"}, status_code=409)
+        ok, msg = jobs.repair_apply(cfg, token=token)
         if not ok:
             return JSONResponse({"ok": False, "error": msg}, status_code=409)
         return RedirectResponse(url="/repair", status_code=303)
 
     @app.get("/mirror", response_class=HTMLResponse)
-    def page_mirror(request: Request) -> HTMLResponse:
+    def page_mirror(request: Request, run: str = "", error: str = "") -> HTMLResponse:
+        run_rec = command_by_id(cfg, run) if run else None
         return templates.TemplateResponse(
             request,
             "mirror.html",
-            ctx(request, "mirror", verbs=MIRROR_VERBS, message=""),
+            ctx(
+                request,
+                "mirror",
+                verbs=MIRROR_VERBS,
+                message="",
+                run_rec=run_rec,
+                poll_run=run,
+                error=error,
+            ),
         )
 
     @app.post("/mirror/preview")
-    async def mirror_preview(request: Request) -> RedirectResponse:
+    async def mirror_preview_route(request: Request) -> RedirectResponse:
+        from .repair_mirror_jobs import GuiScopeError
+
         prefs = prefs_from_request(request)
         form = await request.form()
         verb = str(form.get("verb") or "sync")
+        if verb not in set(MIRROR_VERBS):
+            return RedirectResponse(url="/mirror?error=verb", status_code=303)
+        scoped = verb in {"snapshot", "restore"}
+        if scoped and not prefs.collection:
+            return RedirectResponse(url="/mirror?error=collection", status_code=303)
+        pdfs = str(form.get("pdfs") or "lazy")
+        accept_gone = form.get("accept_gone") == "1"
 
         def work(cmd_id: str) -> None:
-            jobs.mirror_preview(cfg, cmd_id, verb=verb, collection=prefs.collection)
+            try:
+                jobs.mirror_preview(
+                    cfg,
+                    cmd_id,
+                    verb=verb,
+                    collection=prefs.collection,
+                    pdfs=pdfs,
+                    accept_gone=accept_gone,
+                )
+            except GuiScopeError as exc:
+                rec = commands.read_command(cfg, cmd_id) or {}
+                rec["status"] = "failed"
+                rec["error"] = str(exc)
+                commands.write_command(cfg, rec)
+                raise
 
-        commands.enqueue(cfg, f"mirror_{verb}", work)
-        return RedirectResponse(url="/mirror", status_code=303)
+        cmd_id = commands.enqueue(cfg, f"mirror_{verb.replace(' ', '_')}", work)
+        return RedirectResponse(url=f"/mirror?run={cmd_id}", status_code=303)
 
     @app.post("/mirror/apply", response_model=None)
-    async def mirror_apply(request: Request) -> JSONResponse | RedirectResponse:
+    async def mirror_apply_route(request: Request) -> JSONResponse | RedirectResponse:
         prefs = prefs_from_request(request)
         form = await request.form()
         token = str(form.get("review_token") or "")
         if not token:
-            for c in commands.list_commands(cfg, limit=8):
-                if str(c.get("verb") or "").startswith("mirror_") and c.get("review_token"):
-                    token = c["review_token"]
-                    break
+            return JSONResponse({"ok": False, "error": "missing review token"}, status_code=409)
         ok, msg = jobs.mirror_apply(cfg, token=token, collection=prefs.collection)
         if not ok:
             return JSONResponse({"ok": False, "error": msg}, status_code=409)

@@ -1,8 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Repair — Paperful{% endblock %}
+{% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
 {% block content %}
 <h1>Repair</h1>
-{% if message %}<p>{{ message }}</p>{% endif %}
+{% if error == 'collection' %}<div class="error-banner">Pick a collection in the chip first.</div>{% endif %}
+{% if run_rec %}
+<p>Last run: {{ run_rec.verb }} — {{ run_rec.status }}{% if run_rec.error %} — {{ run_rec.error }}{% endif %}</p>
+{% if run_rec.summary %}<pre>{{ run_rec.summary }}</pre>{% endif %}
+{% endif %}
 {% for q in queues %}
 <h2>{{ q.verb }}</h2>
 <ul>
@@ -12,14 +17,25 @@
 </ul>
 <form method="post" action="/repair/preview" class="toolbar">
   <input type="hidden" name="verb" value="{{ q.verb }}">
+  {% if q.verb == 'fix-metadata' %}
+  <label><input type="checkbox" name="overwrite" value="1"> Overwrite edited title/date/venue (preview)</label>
+  {% endif %}
+  {% if q.verb == 'dedupe' %}
+  <label><input type="checkbox" name="apply_medium" value="1"> Include title+year merges (preview)</label>
+  {% endif %}
+  {% if q.verb == 'attachments' %}
+  <label><input type="checkbox" name="fix_broken" value="1"> Fix broken</label>
+  <label><input type="checkbox" name="merge_files" value="1"> Merge files</label>
+  <label><input type="checkbox" name="rename" value="1"> Rename</label>
+  <label><input type="checkbox" name="link" value="1"> Link (personal library)</label>
+  {% endif %}
   <button type="submit">Preview</button>
 </form>
+{% if q.verb != 'lint' and run_rec and run_rec.verb == q.verb and run_rec.review_token and run_rec.status == 'done' %}
 <form method="post" action="/repair/apply" class="toolbar">
-  <input type="hidden" name="verb" value="{{ q.verb }}">
-  {% if q.verb == 'fix-metadata' %}
-  <label><input type="checkbox" name="overwrite" value="1"> Overwrite edited title/date/venue</label>
-  {% endif %}
+  <input type="hidden" name="review_token" value="{{ run_rec.review_token }}">
   <button type="submit">Apply</button>
 </form>
+{% endif %}
 {% endfor %}
 {% endblock %}
