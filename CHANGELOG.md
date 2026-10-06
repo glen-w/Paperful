@@ -12,8 +12,10 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 - **GUI thickening:** Index runs `rag ingest`, `rag search`, batch Ask, and collection
   `synthesize`; Advanced **Briefs** runs collection `summarize` / `synthesize`.
   Per-item summarize in Wanted/Library drawers (`/item/{key}/summary`, `/wanted/summarize`).
-  Discover runs full snowball kinds (search/hybrid/doi/orcid/collection), profile run,
-  resume, watch via `save_watch`; authorwatch list create/add/resolve/run on Discover.
+  Discover: snowball kinds (search/hybrid/doi/orcid/collection), keep/skip, profile run,
+  resume, queue briefing/digest, watch via `save_watch` (profile required);
+  authorwatch list create/add/remove/resolve/run/import + people briefing; Preview apply
+  before snowball/inbox apply. Route table: [gui.md](docs/gui.md).
 - **Repair / Mirror (Advanced):** Preview runs real library cores and writes review
   tokens under `state/gui/previews/`; Apply consumes the token (409 when the preview
   file changed). Covers `lint` (read-only), `fix-metadata`, `dedupe`, `versions`,

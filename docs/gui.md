@@ -19,8 +19,8 @@ Two jobs sit on the default nav:
 | **Wanted** | `gaps`, `run`, `attach` | See missing PDFs, preview fetch, grab to `out/`, attach verified copies |
 
 **Library**, **Activity**, and **System** support the loop. **Repair**, **Mirror**,
-**Index**, and **Settings** appear only when **Advanced** is on (reveal only;
-does not enable Scholar, Sci-Hub, or LLM).
+**Index**, **Briefs**, and **Settings** appear only when **Advanced** is on
+(reveal only; does not enable Scholar, Sci-Hub, or LLM).
 
 ```text
   Browser  ──HTTP──►  paperful serve  ──►  paperful.* (same as CLI)
@@ -53,11 +53,15 @@ Bind `127.0.0.1`. Compose `gui` profile publishes `127.0.0.1:8765:8765` only.
 
 ## Simple loop
 
-1. **Discover** — Track a topic (`snowball search`, dry-run queue) or **Follow a
-   person** (`authorwatch`, cursor from “now” unless backfill date). **Add
-   selected** → `snowball apply` / `authorwatch apply` (metadata only). **Fill
-   PDFs** opens Wanted for new keys. **Keep an eye on this** + **Check again**
-   for watches (no digest auto-create on the simple path).
+1. **Discover** — **Topic:** keyword search (`snowball search` dry-run queue),
+   per-row Keep/Skip, then **Preview apply** → **Add selected**
+   (`snowball apply`, metadata only). **Fill PDFs** opens Wanted.
+   **Briefing** / **Digest** write queue notes (shown on the page; digests are
+   not auto-created). **Keep an eye on this** saves a topic watch only when a
+   snowball **profile** is chosen. **People:** create a list, Follow (ORCID +
+   optional backfill), add/remove, resolve, run, import CSV/JSON/ORCID, people
+   briefing; inbox uses the same Preview → apply pattern (`authorwatch apply`).
+   **Check again** re-runs a saved topic watch or person list.
 2. **Wanted** — Miss rows use `MISS_SURFACE_PLAIN` only. **Held** tab: on-disk
    PDFs with `doi_match` / `doi_mismatch` / `unverified` / `snapshot` (not
    “% complete”). **Preview** / **Grab** (selected vs all). Grab attaches only
@@ -70,20 +74,24 @@ Bind `127.0.0.1`. Compose `gui` profile publishes `127.0.0.1:8765:8765` only.
 
 ## Advanced surfaces
 
-Same shell; extra verbs map 1:1 to CLI (`JOBS` in `cli.py`). Discover adds hops,
-seeds, `refs gap` → `ingest-dois`, `authors`, digests. Wanted adds `recover`,
-handoff, inbox, `reachout`. **Repair** queues: `lint`, `fix-metadata`, `dedupe`,
-`versions`, `attachments`, `ocr`. **Mirror**: `sync`, `snapshot`, `restore`,
-`cache clean`. **Index**: `rag ingest` / `search` when `[rag]` is on; cited Ask and batch
-Ask (`state/ask-batch/`) when `[rag]` and `[llm]` are on and the index has
-rows. Collection chip is the scope. **Synthesize** on Index when `[llm]` is on.
-**Briefs**: collection **summarize** / **synthesize** when `[llm]` is on.
-Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
-`config.toml`; it does not enable `[rag]` or `[llm]`.
+Same shell; extra verbs map 1:1 to CLI (`JOBS` in `cli.py`). Discover adds snowball
+kinds (hybrid/doi/orcid/collection), hops, seeds, profile run, resume, briefing,
+and frontier digest. Wanted adds `recover`, handoff, inbox, `reachout`. **Repair**
+queues: `lint`, `fix-metadata`, `dedupe`, `versions`, `attachments`, `ocr`.
+**Mirror**: `sync`, `snapshot`, `restore`, `cache clean`. **Index**: `rag ingest` /
+`search` when `[rag]` is on; cited Ask and batch Ask (`state/ask-batch/`) when
+`[rag]` and `[llm]` are on and the index has rows. Collection chip is the scope.
+**Synthesize** on Index when `[llm]` is on. **Briefs**: collection **summarize** /
+**synthesize** when `[llm]` is on. Per-item **summarize** in Wanted/Library
+drawers (Advanced). **Settings** writes `config.toml`; it does not enable
+`[rag]` or `[llm]`.
 
 ---
 
 ## HTTP capability API (P0 + GUI)
+
+JSON capability routes live on `paperful serve` (`serve.py`). HTML + form POSTs
+are mounted by `paperful.ui` (`mount_ui`).
 
 | Method | Path | Behaviour |
 | --- | --- | --- |
@@ -94,6 +102,36 @@ Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
 | GET | `/v1/runs/{id}` | GUI command record under `state/gui/commands/` |
 | POST | `/v1/refs-gap` | Dry-run `refs gap` envelope |
 | POST | `/v1/ask` | Same as MCP `ask` (not linked from simple HTML) |
+| POST | `/v1/gui/noop` | Smoke / readiness for the GUI process |
+| POST | `/wanted/preview` | Review token for Grab |
+| POST | `/wanted/grab` | Consume token; fetch + attach per policy |
+| POST | `/wanted/summarize` | Enqueue single-item `summarize`; redirect `?run=` |
+| GET | `/item/{key}/summary` | Per-item HTML under `state/summaries/` |
+| POST | `/discover/topic` | Enqueue snowball kind (Advanced) or keyword search |
+| POST | `/discover/follow` | Follow ORCID into a list (`authorwatch` run) |
+| POST | `/discover/keep` | Mark queue DOI keep/skip |
+| POST | `/discover/check-again` | Re-run topic watch or person list |
+| POST | `/discover/resume` | Enqueue `snowball resume` |
+| POST | `/discover/profile-run` | Enqueue snowball from a named profile |
+| POST | `/discover/briefing` | Write queue `briefing.md`; show on Discover |
+| POST | `/discover/digest` | Write queue `digest.md`; show on Discover |
+| POST | `/discover/watch` | `save_watch` (profile required) |
+| POST | `/discover/apply-preview` | Review token for snowball/authorwatch apply |
+| POST | `/discover/apply` | Consume token; `snowball apply` / `authorwatch apply` |
+| POST | `/discover/aw/save` | Create authorwatch list |
+| POST | `/discover/aw/add` | Add ORCID (optional display name) |
+| POST | `/discover/aw/remove` | Remove person from list |
+| POST | `/discover/aw/resolve` | Enqueue `authorwatch resolve` |
+| POST | `/discover/aw/run` | Enqueue `authorwatch run` (optional backfill) |
+| POST | `/discover/aw/import` | CSV/JSON/ORCID upload → list (`resolve` off); files under `state/gui/uploads/` |
+| POST | `/discover/aw/briefing` | Write list `briefing.md` |
+| POST | `/prefs/advanced` | Toggle Advanced cookie |
+| POST | `/prefs/collection` | Remember collection chip cookie |
+| POST | `/settings` | Write allowed `config.toml` fields |
+| POST | `/repair/preview` | Review token for repair verb |
+| POST | `/repair/apply` | Consume token; run repair verb |
+| POST | `/mirror/preview` | Review token for mirror verb |
+| POST | `/mirror/apply` | Consume token; run mirror verb |
 | POST | `/index/ask` | Enqueue cited Ask turn; redirect to `/index?thread=&run=` |
 | POST | `/index/ingest` | Enqueue `rag ingest` (Preview dry-run or Build); redirect `?run=` |
 | POST | `/index/search` | Redirect to `/index?q=` (sync search on GET) |
@@ -101,18 +139,6 @@ Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
 | GET | `/index/batch/{stamp}` | `answers.md` under `state/ask-batch/<stamp>/` |
 | POST | `/index/synthesize` | Enqueue `synthesize` (dry-run or write); redirect `?run=` |
 | GET | `/index/report/{slug}` | HTML under `state/reports/` |
-| GET | `/item/{key}/summary` | Per-item HTML under `state/summaries/` |
-| POST | `/wanted/summarize` | Enqueue single-item `summarize`; redirect `?run=` |
-| POST | `/discover/topic` | Enqueue snowball kind (Advanced) or keyword search |
-| POST | `/discover/resume` | Enqueue `snowball resume` |
-| POST | `/discover/profile-run` | Enqueue `snowball run --profile` |
-| POST | `/discover/briefing` | Write queue `briefing.md`; show on Discover |
-| POST | `/discover/digest` | Write queue `digest.md`; show on Discover |
-| POST | `/discover/watch` | `save_watch` (profile required) |
-| POST | `/discover/apply-preview` | Review token for snowball/authorwatch apply |
-| POST | `/discover/apply` | Consume token; `snowball apply` / `authorwatch apply` |
-| POST | `/discover/aw/import` | CSV/JSON/ORCID file → list (`resolve` off) |
-| POST | `/discover/aw/briefing` | Write list `briefing.md` |
 | POST | `/briefs/summarize` | Enqueue `summarize`; redirect `/briefs?run=` |
 | POST | `/briefs/synthesize` | Enqueue `synthesize` (dry-run or write); redirect `?run=` |
 | GET | `/briefs/summary/{key}` | HTML under `state/summaries/` |
@@ -125,9 +151,10 @@ posts `review_token` from that command record (stale previews return HTTP 409).
 `POST /index/ask` enqueues a cited Ask turn (not linked from the simple shell).
 
 Writes over HTTP use review tokens under `state/gui/reviews/`; stale library
-fingerprints return **409**. Discover **Add selected** / inbox apply require
-**Preview apply** first. **Keep an eye on this** needs an existing snowball
-profile (`save_watch`); it does not write an empty `watch.json`.
+fingerprints return **409**. Discover **Add selected** / inbox apply and Wanted
+**Grab** require **Preview** first. **Keep an eye on this** needs an existing
+snowball profile (`save_watch`); it does not write an empty `watch.json`.
+Long jobs land under `state/gui/commands/`; Activity polls `GET /v1/runs/{id}`.
 
 ---
 

@@ -65,3 +65,23 @@ def test_toctree_has_no_duplicate_entries():
             dupes.append(entry)
         seen.add(entry)
     assert not dupes, f"duplicate toctree entries in docs/index.md: {', '.join(sorted(set(dupes)))}"
+
+
+def test_gui_md_documents_discover_and_wanted_routes():
+    """Keep gui.md route table aligned with the workbench thicken wave."""
+    text = (DOCS / "gui.md").read_text(encoding="utf-8")
+    required = (
+        "/discover/topic",
+        "/discover/follow",
+        "/discover/keep",
+        "/discover/check-again",
+        "/discover/aw/import",
+        "/discover/aw/briefing",
+        "/wanted/preview",
+        "/wanted/grab",
+        "/briefs/summarize",
+        "/index/ask",
+        "Briefs",
+    )
+    missing = [path for path in required if path not in text]
+    assert not missing, f"docs/gui.md missing workbench routes/surfaces: {', '.join(missing)}"
