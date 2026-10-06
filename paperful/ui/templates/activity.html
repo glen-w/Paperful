@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Activity — Paperful{% endblock %}
+{% block content %}
+<h1>Activity</h1>
+{% if trust_line %}<p class="counts">{{ trust_line }}</p>{% endif %}
+<table class="wb-table">
+  <thead><tr><th>ID</th><th>Verb</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for cmd in commands %}
+  <tr data-run-id="{{ cmd.id }}">
+    <td>{{ cmd.id }}</td>
+    <td>{{ cmd.verb }}</td>
+    <td class="cmd-status">{{ cmd.status }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

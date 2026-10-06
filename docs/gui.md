@@ -1,313 +1,122 @@
-# Paperful GUI (1.0 workbench)
+# Paperful workbench
 
-**Status: roadmap — 1.0 deliverable.** Today Paperful is a **local CLI** with a
-quiet disk mirror; **1.0** adds a **web-native workbench** that runs,
-illuminates, and simplifies the same verbs without a second fetch stack. A
-**Zotero plugin** is not the bet. **Firefox extension**, local OpenAlex
-snapshot (beyond opt-in v1), and newsletter ingest are **post-1.0** — see
-[ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10) and
-[quiet mirror](quiet-mirror.md).
-
-The sketch is intentionally ambitious: one shell over the same five jobs, the
-same ledger (`out/`, `state/`), and the same library adapters — deployable as
-**open (self-host)** and **Docker** for 1.0; **SaaS** remains a later deploy
-mode.
+**Status: 1.0 target.** Paperful stays a **local CLI** with a quiet disk mirror.
+**1.0** adds a **server-rendered workbench** on `paperful serve` that grows the
+library and fills PDFs without a second fetch stack. Zotero remains the
+catalogue and reader. **Interactive Ask** is on **Index** (opt-in `[rag]` +
+`[llm]`), not the home page. A **Firefox extension** and
+hosted SaaS are **post-1.0** — see [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10).
 
 ---
 
-## 1. Status and non-goals
+## Product framing
 
-| In this document | Not in this document |
-| --- | --- |
-| 1.0 workbench IA and capability API shape | Shipping UI code, wireframes as commitments, or dates |
-| Browser-first operator surface (CLI remains for scripts/agents) | A Zotero / Firefox extension as the primary bet (Firefox is post-1.0) |
-| Same Control posture as the CLI (dry-run, explicit apply) | Silent library writes or silent cloud source defaults |
-| **Ask** chat-with-collection as a **1.0** mode (opt-in, gated on `[rag]` + `[llm]`) | Hosted multi-user SaaS as a 1.0 requirement |
+Two jobs sit on the default nav:
 
-**Non-goals even for the 1.0 workbench**
+| Nav | CLI verbs | Job |
+| --- | --- | --- |
+| **Discover** | `snowball`, `authorwatch`, watches | Find new works (topic or person), review, add metadata parents |
+| **Wanted** | `gaps`, `run`, `attach` | See missing PDFs, preview fetch, grab to `out/`, attach verified copies |
 
-- Systematic-review screening as the primary UX
-- A citation-graph playground as the main surface
-- Chat-over-library as the **default** landing (built-in **Ask** is in scope for
-  1.0 — see [§ Ask](#ask-chat-with-collection) and [ROADMAP — GUI](ROADMAP.md#gui))
-- Replacing Zotero sync or becoming a WebDAV client
-- Assuming `localhost:23119` inside SaaS without a remote adapter path
-- Shipping Sci-Hub, Scholar, or LLM as on-by-default
-
-PDF preview in the browser is a convenience. The citation manager can remain
-the annotation / reader of record unless a later product decision claims that
-job explicitly.
-
----
-
-## 2. Product framing
-
-Paperful’s jobs stay [library, find, completeness, mirror, control](why.md).
-The GUI is another **surface** on a shared **capability API** — the same
-verbs the CLI already expresses (`--format json` / optional thin `paperful mcp`
-for `refs_gap` + `ask`). It does not invent a second fetch stack or a second
-item schema.
+**Library**, **Activity**, and **System** support the loop. **Repair**, **Mirror**,
+**Index**, and **Settings** appear only when **Advanced** is on (reveal only;
+does not enable Scholar, Sci-Hub, or LLM).
 
 ```text
-  Browser UI  ──HTTP──►  Capability API  ──►  paperful.* (snowball, run, lint, …)
+  Browser  ──HTTP──►  paperful serve  ──►  paperful.* (same as CLI)
                               │
-                              ├── LibraryBackend (Zotero / Mendeley / EndNote / …)
-                              └── Ledger: out/ + state/  (per workspace in SaaS)
+                              ├── LibraryBackend (Zotero / …)
+                              └── Ledger: out/ + state/
   CLI / MCP  ─────────────────┘
 ```
 
-**Deploy matrix**
-
-| Mode | Who runs it | Ledger | Manager connect |
-| --- | --- | --- | --- |
-| **Open** | Operator self-hosts UI + API | Local or mounted `out/` / `state/` | Local Zotero API when on the same host; proven remote adapters when available |
-| **Docker** | Compose serves UI + API | Volumes for ledger | Same as open; headed `session login` / Zotero desktop still need the host where applicable ([docker.md](docker.md)) |
-| **SaaS** | Hosted multi-tenant | **Per-workspace isolated** ledger | OAuth / Web API-class adapters — not localhost Zotero inside the cloud |
-
-Control rules are identical in all three modes: dry-run before write, explicit
-Apply, opt-in Scholar / Sci-Hub / LLM / browser-agent.
+Control rules match the CLI: dry-run before bulk fetch, **Preview → Grab** with a
+**review token** (refuse if the library changed), opt-in Scholar / Sci-Hub / LLM /
+browser-agent. No built-in scheduler — **Check again** on Discover, not cron.
 
 ---
 
-## 3. Information architecture
+## Shell chrome
 
-One shell, not a dashboard of unrelated widgets. Scope is always visible;
-the center pane changes with the job mode.
-
-```text
-┌──────────────────────────────────────────────────────────────────────────┐
-│  Paperful   [collection tree ▾]  year · type · profile · pack            │
-│  write-API: yes/no     dry-run ▸   preset ▾                              │
-├────────────┬─────────────────────────────────────────────┬───────────────┤
-│  Grow      │  Mode table                                 │  Detail       │
-│  Fill      │  (candidates / items / patches / packs)     │  biblio card  │
-│  Repair    │                                             │  PDF preview  │
-│  Mirror    │                                             │  (if on disk) │
-│  Reports   │                                             │               │
-│  Ask       │                                             │  citations    │
-│  Doctor    │                                             │               │
-├────────────┴─────────────────────────────────────────────┴───────────────┤
-│  Run rail: banner  downloaded N · attached M · …   │  live log / errors │
-└──────────────────────────────────────────────────────────────────────────┘
-```
-
-| Region | Role |
+| Control | Role |
 | --- | --- |
-| **Scope chrome** | Collection path (adapter + `out/_collections.json`), year/type filters, active run profile, open pack |
-| **Job modes** | Grow · Fill · Repair · Mirror · Reports · Ask · Doctor / Setup |
-| **Center table** | Mode-specific rows with multi-select and status |
-| **Detail** | Title, authors, year, venue, ids, notes, attachments; PDF when present under `out/` |
-| **Run rail** | Dry-run default, gate/preset, one-line trust banner, write-API indicator, streamed log |
+| **Collection** chip | Scoped collection (remembered in a cookie) |
+| **Preset** chip | Open access (`oa`) or Campus (`eoi`) — the simple source choice |
+| **Health** dot | Worst `doctor` status |
+| **Advanced** toggle | Cookie only; reveals extra nav and form fields |
+
+Layout: table-first rows, native `<dialog>` drawer (no embedded PDF viewer).
+Long jobs return a **command id**; Activity polls `GET /v1/runs/{id}` (SSE later).
+Bind `127.0.0.1`. Compose `gui` profile publishes `127.0.0.1:8765:8765` only.
 
 ---
 
-## 4. Modes (verbs and disk artifacts)
+## Simple loop
 
-Every panel maps to an existing verb or ledger path. The UI marshals
-arguments; the server runs `paperful.*`.
-
-### Grow
-
-Snowball, snowball watch, authorwatch, and field author packs. See
-[snowball.md](snowball.md), [authorwatch.md](authorwatch.md), and
-[Workflows § field author packs](workflows.md#6-field-author-packs-corpus-frequency--author_site).
-
-| Action | Maps to | Ledger |
-| --- | --- | --- |
-| Keyword / DOI(s) / ORCID(s) / collection / hybrid seed | `snowball search\|doi\|orcid\|collection\|hybrid` (`doi` / `orcid` accept several seeds) | `state/snowball/<run-id>/` |
-| Candidate table | Parse `paperful.snowball.candidate.v1` | `candidates.jsonl`, `summary.json` |
-| Toggle keep / batch approve | Edit `keep` then `snowball apply` | Same queue |
-| Gates | `dry-run` · `approve-each` · `approve-batch` · `auto` | Request + config |
-| Watch inbox | `snowball watch run` / `show` | `state/snowball/watches/<name>/inbox.jsonl` |
-| Frontier digest | `snowball watch digest` or `watch run --digest` | `state/snowball/watches/<name>/digest.md` |
-| People lists | `authorwatch save` / `run` / `apply` | `state/authorwatch/<name>/` |
-| Corpus author/org frequency | `authors` (`--apply` seeds proposed pack) | `state/reports/*-authors.json`, `state/author-packs/` |
-
-Default gate in the UI is **dry-run**. Writing gates require a target
-collection. Watch never auto-schedules: show last run and **Run now**, then
-open `digest.md`. launchd / cron stay outside Paperful
-([Watch](snowball.md#watch)).
-
-### Fill
-
-Missing PDFs for items already in the library.
-
-| Action | Maps to | Notes |
-| --- | --- | --- |
-| Gap count | `gaps` | Same scope filters as CLI |
-| Would-hit / fetch | `run --dry-run` then `run` | Resume, `--retry-failed`, `--upgrade-linked`, presets |
-| One hard item | `recover --item` | Opt-in LLM / browser-agent |
-| Scanned PDF text layer | `ocr` / `ocr --apply` | Before summarize / LLM lint |
-
-### Repair
-
-Completeness without pretending to be a full metadata editor.
-
-| Action | Maps to | Ledger |
-| --- | --- | --- |
-| Findings | `lint` | Findings in report / UI table |
-| Patch queue | `fix-metadata` then `--apply` | `state/metadata-patches.jsonl` |
-| Duplicates | `dedupe` then gated apply | `state/dedupe-packs/` |
-| Preprint ↔ VoR | `versions` | `state/version-packs/` |
-| Attachment hygiene | `attachments` + flagged `--apply` | Report first; surgery only on apply |
-
-### Mirror
-
-Browse and thicken the quiet mirror — not a second sync product.
-
-| Action | Maps to | Ledger |
-| --- | --- | --- |
-| Browse items | Read `record.json` (+ PDF) | `out/<collection>/<stem -- KEY>/` |
-| Snapshot | `snapshot` | `out/_index.jsonl`, `_collections.json`, `_history.json` |
-| Restore | `restore` then `--apply` | Create missing only; never overwrite live fields |
-
-### Reports
-
-| Action | Maps to | Ledger |
-| --- | --- | --- |
-| Last run / filters | `report` | `state/last-run.json`, `state/runs/` |
-| Pack witness | `pack open` … `close` | `state/packs/` |
-| Grounded briefs | `summarize` / `synthesize` | `state/summaries/`, `state/reports/`; apply still explicit |
-
-`[llm].enabled` stays off until the operator turns it on (setup pane or
-config). Proposals never mutate the library alone.
-
-### Ask (chat with collection)
-
-Built-in, **opt-in** conversational surface over the **scoped** library
-(PDFs under the quiet mirror, indexed by `paperful rag ingest`). Same Control
-posture: scope is always visible in the chrome; answers must show **citations**
-(item key, title, page / snippet — not free-floating model text). Maps to the
-CLI layer in [rag.md](rag.md) and [ROADMAP — Zotero-RAG
-integration](ROADMAP.md#zotero-rag-integration-later-question-centric-layer).
-The single-question path (`paperful ask`) is shipped; `--thread` stores follow-ups
-under `state/rag/threads/` and retrieves on a rewritten query.
-
-| Action | Maps to (Capability API) | Notes |
-| --- | --- | --- |
-| New thread | `rag.answer(question, keys=scope)` with scope = active `-C` + filters | Requires index freshness; `paperful rag status` shows what is stale |
-| Follow-up | `rag.answer(question, history=turns)` plus `paperful ask --thread` / `state/rag/threads/` | Follow-up query rewrite is shipped on the CLI; no silent widening of scope mid-thread |
-| Focus / prompt preset | `--focus` or profile field | Question-centric vs summary-style system prompts |
-| Export thread | Write `state/rag/…` report JSON; optional child note | Explicit Apply for Zotero writes |
-| Batch from file | Upload / paste questions → cited answer table | Parity with CLI batch ingest |
-
-UI patterns: chat pane in the center (or split with detail), citation chips
-that open the **Detail** biblio card and PDF preview when on disk; optional
-side panel for “questions extracted from this item” when that lane exists.
-Not a general web search box — retrieval stays local to the workspace ledger.
-
-### Doctor / Setup
-
-| Action | Maps to |
-| --- | --- |
-| Readiness | `doctor` (amber/red, next-steps when adapter down) |
-| Collections probe | `collections` |
-| Profiles | `profile list` / `show` / save — same TOML as CLI |
-| Sessions | `session status` / login (open & Docker: host-capable path; SaaS: adapter-appropriate OAuth) |
+1. **Discover** — Track a topic (`snowball search`, dry-run queue) or **Follow a
+   person** (`authorwatch`, cursor from “now” unless backfill date). **Add
+   selected** → `snowball apply` / `authorwatch apply` (metadata only). **Fill
+   PDFs** opens Wanted for new keys. **Keep an eye on this** + **Check again**
+   for watches (no digest auto-create on the simple path).
+2. **Wanted** — Miss rows use `MISS_SURFACE_PLAIN` only. **Held** tab: on-disk
+   PDFs with `doi_match` / `doi_mismatch` / `unverified` / `snapshot` (not
+   “% complete”). **Preview** / **Grab** (selected vs all). Grab attaches only
+   `doi_match` when attach-verified is on.
+3. **Library** — Collection list with have / held / missing counts; pick scope.
+4. **Activity** — Command history + trust line from `last-run.json`.
+5. **System** — `doctor` rows with one next step each.
 
 ---
 
-## 5. Control invariants
+## Advanced surfaces
 
-Hard rules for every deploy mode:
-
-1. **Dry-run before write** for bulk jobs; UI defaults match CLI stranger-safe defaults.
-2. **Explicit Apply** for library writes, merges, restores, and attachment surgery.
-3. **Opt-in only:** Scholar, Sci-Hub, LLM, browser-agent recovery.
-4. **No built-in watch scheduler** — Run now / last-run only.
-5. **Config is shared** — profile and config edits write the same TOML the CLI reads (open/Docker) or the workspace-equivalent store (SaaS).
-6. **Secrets never in the browser** — API keys and OAuth tokens live in a server-side vault / env.
-7. **One-line trust banner** after runs: `downloaded N · attached M · deferred K · not_found J` plus write-API yes/no.
-
----
-
-## 6. Architecture (web-native first)
-
-**Chosen default:** browser SPA (or light SSR) + **HTTP capability API**
-(ASGI / FastAPI-class) wrapping existing `paperful.*` entrypoints. The same
-API backs open, Docker, and SaaS.
-
-**Not the 1.0 primary product:** Textual, Tk, PyQt, or Tauri-first. Optional
-later: a thin native shell that loads the same web app; optional early TUI
-only for queue review.
-
-```mermaid
-flowchart LR
-  spa[Browser_SPA]
-  api[Capability_API]
-  core[paperful_core]
-  ledger[out_and_state]
-  adapter[LibraryBackend]
-  spa -->|HTTP_SSE| api --> core
-  core --> ledger
-  core --> adapter
-```
-
-| Concern | Approach |
-| --- | --- |
-| Long jobs | Async run ids; progress via SSE or WebSocket; cancellable |
-| Fetch / OpenAlex / snowball | Server only — UI never reimplements lanes |
-| Refresh | Server owns writes; UI subscribes to run events and reloads tables |
-| Auth (open) | Single-user or reverse-proxy SSO |
-| Auth (SaaS) | Workspace accounts; per-workspace ledger isolation; secrets vault |
-| Docker | First-class compose profile for UI + API + ledger volumes; document host GUI needs for Zotero authorize / headed login |
-
-SaaS must not pretend the cloud pod can reach the user’s desktop Zotero.
-Remote-capable adapters (Web API / OAuth) are a prerequisite for that mode;
-until those exist, SaaS is limited to ledger-only / import-export style
-workspaces or stays unimplemented.
+Same shell; extra verbs map 1:1 to CLI (`JOBS` in `cli.py`). Discover adds hops,
+seeds, `refs gap` → `ingest-dois`, `authors`, digests. Wanted adds `recover`,
+handoff, inbox, `reachout`. **Repair** queues: `lint`, `fix-metadata`, `dedupe`,
+`versions`, `attachments`, `ocr`. **Mirror**: `sync`, `snapshot`, `restore`,
+`cache clean`. **Index**: cited Ask (threads under `state/rag/threads/`) when
+`[rag]` and `[llm]` are on and the index has rows; collection chip is the
+scope. `rag ingest` / `search`, `summarize`, `synthesize`, and batch Ask stay
+CLI. **Settings** writes `config.toml`; it does not enable `[rag]` or `[llm]`.
 
 ---
 
-## 7. Phased path to the 1.0 workbench
-
-Planning ladder toward the **1.0 tag**, not a calendar. Each phase can stop
-without the next; **1.0** expects P0–P3b on open/Docker. **P4 (SaaS)** is
-post-1.0.
-
-| Phase | Outcome | Deploy focus |
-| --- | --- | --- |
-| **P0** | Lock schemas; localhost HTTP capability API (`paperful serve`) | **Landed** — CLI + API skeleton |
-| **P1** | Web **read-only** review: snowball queues, patch list, dedupe / version packs | Open + Docker |
-| **P2** | Gated write-back over HTTP: `keep` / `apply`, patches, scoped `run` | Open + Docker |
-| **P3** | Full workbench modes + in-browser PDF preview (illuminate CLI verbs) | Open + Docker |
-| **P3b** | **Ask 2.0** — interactive chat with collection (cited RAG; `[llm]` + index gates) | Open + Docker — **1.0** |
-| **P4** | SaaS tenancy (auth, workspace isolation, remote manager adapters) + polish | Post-1.0 |
-
-P0–P3b together are the 1.0 GUI bar; the CLI remains the automation surface.
-
-**P0 routes** (sync, bind `127.0.0.1`, dry-run; needs `uv sync --extra serve`):
+## HTTP capability API (P0 + GUI)
 
 | Method | Path | Behaviour |
 | --- | --- | --- |
 | GET | `/health` | `{ok, version}` |
-| GET | `/v1/doctor` | same payload as `doctor --json` (no `--guide`) |
-| GET | `/v1/collections` | collection tree |
-| GET | `/v1/runs/last` | `state/last-run.json` or `report: null` |
-| POST | `/v1/refs-gap` | `{collection}` → `paperful.agent.json.v1` |
-| POST | `/v1/ask` | `{question, collection?}` → same envelope as MCP `ask` |
+| GET | `/v1/doctor` | Same as `doctor --json` |
+| GET | `/v1/collections` | Collection tree |
+| GET | `/v1/runs/last` | `state/last-run.json` |
+| GET | `/v1/runs/{id}` | GUI command record under `state/gui/commands/` |
+| POST | `/v1/refs-gap` | Dry-run `refs gap` envelope |
+| POST | `/v1/ask` | Same as MCP `ask` (not linked from simple HTML) |
+| POST | `/index/ask` | Enqueue cited Ask turn; redirect to `/index?thread=&run=` |
 
-No `--apply` over HTTP. Long jobs / SSE wait for P1. Compose does not yet
-ship a workbench UI+API profile.
+HTML routes: `/discover`, `/wanted`, `/library`, `/activity`, `/system`, plus
+advanced `/repair`, `/mirror`, `/index`, `/settings`. `GET /` → `/wanted`.
+`POST /index/ask` enqueues a cited Ask turn (not linked from the simple shell).
+
+Writes over HTTP use review tokens under `state/gui/reviews/`; stale library
+fingerprints return **409**.
 
 ---
 
-## 8. Risks and open questions
+## Non-goals
 
-- **Remote Zotero / manager parity** — SaaS is blocked on adapters that do not need localhost.
-- **Session / EZProxy in the browser product** — headed Chromium login remains host-sensitive; SaaS may never offer campus SSO the same way open/Docker do.
-- **Multi-writer ledgers** — Syncthing-style shared `state/` vs SaaS workspace isolation need different conflict stories; do not blur them.
-- **Capability API shape** — prefer one typed surface for CLI, HTTP, and MCP rather than three parallel wrappers.
-- **Reader of record** — decide deliberately if PDF annotation moves into Paperful or stays in the manager.
+- Second Zotero (reader, annotations, collection drag-and-drop)
+- Systematic-review screening as the primary UX
+- Chat-over-library as the default landing
+- Sci-Hub on simple pages or in Preview
+- Replacing Zotero sync or WebDAV
 
 ---
 
 ## Related docs
 
-- [ROADMAP](ROADMAP.md) — 1.0 trust checklist; GUI section points here
-- [architecture.md](architecture.md) — disk-first adapters and data flow
-- [why.md](why.md) — five jobs
-- [snowball.md](snowball.md) — candidates, gates, watch
-- [workflows.md](workflows.md) — `all` / profiles (CLI today)
-- [quiet-mirror.md](quiet-mirror.md) — `out/` as the copy you keep
-- [docker.md](docker.md) — operator image and host GUI constraints
+- [ROADMAP — GUI](ROADMAP.md#gui)
+- [architecture.md](architecture.md)
+- [why.md](why.md)
+- [commands.md](commands.md)
+- [docker.md](docker.md)

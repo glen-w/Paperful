@@ -1,0 +1,206 @@
+:root {
+  --paper: #f7f1e8;
+  --paper-deep: #eadfcf;
+  --accent: #c46a2a;
+  --ink: #101820;
+  --ink-soft: #3d4a55;
+  --line: rgba(16, 24, 32, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.45;
+}
+
+header.wb-chrome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-deep);
+}
+
+header.wb-chrome a.brand {
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.chip {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  font-size: 0.9rem;
+}
+
+.health-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.health-green { background: #2d6a4f; }
+.health-amber { background: #b08900; }
+.health-red { background: #9b2226; }
+
+nav.wb-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+nav.wb-nav a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+nav.wb-nav a.active {
+  text-decoration: underline;
+}
+
+main {
+  padding: 1rem;
+  max-width: 1100px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  align-items: center;
+}
+
+button, .btn {
+  font: inherit;
+  padding: 0.4rem 0.75rem;
+  border-radius: 4px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+button.secondary {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--line);
+}
+button.spinning {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+table.wb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+table.wb-table th,
+table.wb-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 0.45rem 0.35rem;
+  text-align: left;
+  vertical-align: top;
+}
+table.wb-table th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft);
+}
+
+.counts {
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+
+.stamp-found {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+.stamp-check {
+  border: 1px solid var(--accent);
+  padding: 0 0.25rem;
+  font-size: 0.75rem;
+}
+
+dialog.wb-drawer {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1rem;
+  max-width: 32rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.tabs a {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--line);
+  text-decoration: none;
+  color: var(--ink);
+  border-radius: 4px;
+}
+.tabs a.active {
+  background: var(--paper-deep);
+  font-weight: 600;
+}
+
+.error-banner {
+  background: #fde8e8;
+  border: 1px solid #9b2226;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+  border-radius: 4px;
+}
+
+.warn-remote {
+  background: #f7edd0;
+  border: 1px solid #b08900;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+  border-radius: 4px;
+}
+
+.ask-turn {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.5rem;
+  background: var(--paper);
+}
+.ask-user {
+  background: var(--paper-deep);
+}
+.ask-role {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft);
+  margin: 0 0 0.25rem;
+}
+.ask-turn pre {
+  white-space: pre-wrap;
+  margin: 0;
+  font: inherit;
+}
+.ask-sources {
+  margin: 0.75rem 0 1rem;
+}

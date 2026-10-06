@@ -3730,6 +3730,8 @@ rag-docling = [
 ]
 serve = [
     { name = "fastapi" },
+    { name = "jinja2" },
+    { name = "python-multipart" },
     { name = "uvicorn" },
 ]
 
@@ -3751,6 +3753,7 @@ requires-dist = [
     { name = "fonttools", specifier = ">=4.0" },
     { name = "furo", marker = "extra == 'docs'", specifier = ">=2023.9.10" },
     { name = "httpx", specifier = ">=0.27" },
+    { name = "jinja2", marker = "extra == 'serve'", specifier = ">=3.1" },
     { name = "lancedb", marker = "extra == 'rag'", specifier = ">=0.39,<1" },
     { name = "litellm", marker = "extra == 'llm'", specifier = ">=1.70,<2" },
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=2.0.0" },
@@ -3758,6 +3761,7 @@ requires-dist = [
     { name = "playwright", specifier = ">=1.60" },
     { name = "playwright", marker = "extra == 'htmlpdf'", specifier = ">=1.60" },
     { name = "pypdf", specifier = ">=5.0" },
+    { name = "python-multipart", marker = "extra == 'serve'", specifier = ">=0.0.9" },
     { name = "pyzotero", specifier = ">=1.15.1,<1.16" },
     { name = "rich", specifier = ">=13" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=7.0.0" },

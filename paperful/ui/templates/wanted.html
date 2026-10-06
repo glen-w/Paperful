@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Wanted — Paperful{% endblock %}
+{% block content %}
+<h1>Wanted</h1>
+{% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
+<p class="counts">Have {{ counts.have }} · Held {{ counts.held }} · Missing {{ counts.missing }}</p>
+<div class="tabs">
+  <a href="/wanted?tab=missing" {% if tab == 'missing' %}class="active"{% endif %}>Missing</a>
+  <a href="/wanted?tab=held" {% if tab == 'held' %}class="active"{% endif %}>Held</a>
+  <a href="/wanted?tab=have" {% if tab == 'have' %}class="active"{% endif %}>Have</a>
+</div>
+<form method="post" action="/wanted/preview" id="wanted-form" class="toolbar">
+  <button type="submit" id="preview-btn" data-label-all="Preview all" data-label-sel="Preview selected">Preview all</button>
+  <button type="submit" formaction="/wanted/grab" id="grab-btn" data-label-all="Grab all" data-label-sel="Grab selected">Grab all</button>
+  <button type="submit" formaction="/wanted/grab" class="secondary" {% if prefs.attach_verified %}hidden{% endif %}>Attach N PDFs to this Zotero library</button>
+</form>
+<table class="wb-table">
+  <thead><tr><th></th><th>Title</th><th>Detail</th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+  <tr>
+    <td><input type="checkbox" name="keys" value="{{ row.key }}" form="wanted-form" class="row-select"
+      {% if tab == 'held' and not row.ticked %}disabled{% endif %}></td>
+    <td>{{ row.title }}
+      <button type="button" class="secondary" onclick="document.getElementById('d-{{ row.key }}').showModal()">Detail</button>
+      <dialog class="wb-drawer" id="d-{{ row.key }}">
+        <p><strong>{{ row.title }}</strong></p>
+        <p>Key {{ row.key }}{% if row.year %} · {{ row.year }}{% endif %}</p>
+        {% if row.doi %}<p>DOI {{ row.doi }}</p>{% endif %}
+        {% if row.source %}<p>Source {{ row.source }}</p>{% endif %}
+        {% if row.state %}<p>Verification {{ row.state }}{% if row.reason %} ({{ row.reason }}){% endif %}</p>{% endif %}
+        {% if row.miss_plain %}<p>{{ row.miss_plain }}</p>{% endif %}
+        <form method="dialog"><button class="secondary">Close</button></form>
+      </dialog>
+    </td>
+    <td>
+      {% if row.miss_plain %}{{ row.miss_plain }}
+      {% elif row.state == 'doi_match' %}<span class="stamp-found">found</span>
+      {% elif row.state == 'doi_mismatch' %}<span class="stamp-check">check</span>
+      {% elif row.state %}{{ row.state }}{% if row.reason %} ({{ row.reason }}){% endif %}
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

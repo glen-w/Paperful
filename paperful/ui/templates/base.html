@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Paperful{% endblock %}</title>
+  <link rel="stylesheet" href="/static/workbench.css">
+</head>
+<body{% block body_attrs %}{% endblock %}>
+  <header class="wb-chrome">
+    <a class="brand" href="/wanted">Paperful</a>
+    <span class="chip" title="Collection">{% if prefs.collection %}{{ prefs.collection }}{% else %}no collection{% endif %}</span>
+    <span class="chip" title="Preset">{% if prefs.preset == 'eoi' %}Campus{% else %}Open access{% endif %}</span>
+    <span class="health-dot health-{{ health }}" title="System health"></span>
+    <form method="post" action="/prefs/advanced" style="margin-left:auto">
+      <label>
+        <input type="checkbox" name="advanced" value="1" {% if prefs.advanced %}checked{% endif %}
+               onchange="this.form.submit()"> Advanced
+      </label>
+    </form>
+  </header>
+  <nav class="wb-nav">
+    <a href="/discover" {% if active == 'discover' %}class="active"{% endif %}>Discover</a>
+    <a href="/wanted" {% if active == 'wanted' %}class="active"{% endif %}>Wanted</a>
+    <a href="/library" {% if active == 'library' %}class="active"{% endif %}>Library</a>
+    <a href="/activity" {% if active == 'activity' %}class="active"{% endif %}>Activity</a>
+    <a href="/system" {% if active == 'system' %}class="active"{% endif %}>System</a>
+    {% if prefs.advanced %}
+    <a href="/repair" {% if active == 'repair' %}class="active"{% endif %}>Repair</a>
+    <a href="/mirror" {% if active == 'mirror' %}class="active"{% endif %}>Mirror</a>
+    <a href="/index" {% if active == 'index' %}class="active"{% endif %}>Index</a>
+    <a href="/settings" {% if active == 'settings' %}class="active"{% endif %}>Settings</a>
+    {% endif %}
+  </nav>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <script src="/static/workbench.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Library — Paperful{% endblock %}
+{% block content %}
+<h1>Library</h1>
+{% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
+<table class="wb-table">
+  <thead><tr><th>Collection</th><th>Items</th><th>Missing PDF</th><th></th></tr></thead>
+  <tbody>
+  {% for row in collections %}
+  <tr>
+    <td>{{ row.path }}</td>
+    <td>{{ row.items }}</td>
+    <td>{{ row.missing_pdf }}</td>
+    <td>
+      <form method="post" action="/prefs/collection">
+        <input type="hidden" name="collection" value="{{ row.path }}">
+        <button type="submit" class="secondary">Set scope</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Mirror — Paperful{% endblock %}
+{% block content %}
+<h1>Mirror</h1>
+{% if message %}<p>{{ message }}</p>{% endif %}
+<p>Open <code>out/</code> on this machine. Restore creates missing items only.</p>
+{% for verb in verbs %}
+<form method="post" action="/mirror/preview" class="toolbar">
+  <input type="hidden" name="verb" value="{{ verb }}">
+  <button type="submit">Preview {{ verb }}</button>
+</form>
+<form method="post" action="/mirror/apply" class="toolbar">
+  <input type="hidden" name="verb" value="{{ verb }}">
+  <button type="submit">Apply {{ verb }}</button>
+</form>
+{% endfor %}
+{% endblock %}

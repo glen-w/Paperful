@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}System — Paperful{% endblock %}
+{% block content %}
+<h1>System</h1>
+<table class="wb-table">
+  <thead><tr><th>Check</th><th>Status</th><th>Next step</th></tr></thead>
+  <tbody>
+  {% for row in checks %}
+  <tr>
+    <td>{{ row.name }}</td>
+    <td>{{ row.status }}</td>
+    <td>{{ row.next }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

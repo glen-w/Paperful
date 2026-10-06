@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Index — Paperful{% endblock %}
+{% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
+{% block content %}
+<h1>Index</h1>
+{% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
+<p>{{ message }}</p>
+{% if flags.remote_llm %}<p class="warn-remote">Remote LLM — excerpts from your PDFs leave this machine.</p>{% endif %}
+{% if flags.remote_embed %}<p class="warn-remote">Remote embedding model — passage text leaves this machine.</p>{% endif %}
+{% if enabled %}
+<table class="wb-table">
+  <thead><tr><th>Field</th><th>Value</th></tr></thead>
+  <tbody>
+  {% for k, v in status.items() %}
+  <tr><td>{{ k }}</td><td>{{ v }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if enabled and not flags.can_ask %}
+<p>Nothing in the index yet, or the index has a problem. Run <code>paperful rag ingest</code> against the mirror, then reload.</p>
+{% endif %}
+
+{% if flags.can_ask %}
+<p class="counts">Searching: {% if prefs.collection %}{{ prefs.collection }}{% else %}entire mirror{% endif %}</p>
+<p>
+  <a href="/index">New thread</a>
+  {% for t in threads %}
+  · <a href="/index?thread={{ t.id }}" {% if t.id == active_thread_id %}class="active"{% endif %}>{{ t.id }} ({{ t.turns }})</a>
+  {% endfor %}
+</p>
+<div class="ask-thread">
+  {% for turn in turns %}
+  <div class="ask-turn ask-{{ turn.role }}">
+    <p class="ask-role">{{ turn.role }}</p>
+    <pre>{{ turn.content }}</pre>
+  </div>
+  {% endfor %}
+</div>
+{% if last_result.sources %}
+<div class="ask-sources">
+  <p><strong>{% if last_result.cited %}Sources{% else %}Retrieved, not cited{% endif %}</strong></p>
+  <ul>
+  {% for s in last_result.sources %}
+    <li>[{{ s.marker }}] {{ s.citation }} {{ s.title }}{% if s.pages %} {{ s.pages | join(", ") }}{% endif %} [{{ s.itemKey }}]</li>
+  {% endfor %}
+  </ul>
+</div>
+{% endif %}
+<form method="post" action="/index/ask">
+  <input type="hidden" name="thread_id" value="{{ active_thread_id or '' }}">
+  <p><label>Question<br>
+    <textarea name="question" rows="3" cols="60" required></textarea>
+  </label></p>
+  <p><label>Focus
+    <select name="focus">
+      {% for f in focus_options %}
+      <option value="{{ f }}" {% if f == (last_result.focus or 'default') %}selected{% endif %}>{{ f }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Year from <input type="number" name="year_from"></label>
+  <label>Year to <input type="number" name="year_to"></label>
+  </p>
+  <p><button type="submit">Ask</button></p>
+</form>
+{% endif %}
+{% endblock %}

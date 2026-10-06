@@ -28,7 +28,7 @@ browser-agent = [
     "browser-use>=0.11; python_version >= '3.11'",
     "ollama>=0.4; python_version >= '3.11'",
 ]
-serve = ["fastapi>=0.115", "uvicorn>=0.32"]
+serve = ["fastapi>=0.115", "uvicorn>=0.32", "jinja2>=3.1", "python-multipart>=0.0.9"]
 docs = [
     "sphinx>=7.0.0",
     "myst-parser>=2.0.0",

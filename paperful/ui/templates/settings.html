@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Settings — Paperful{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+{% if saved %}<p>Saved.</p>{% endif %}
+<form method="post" action="/settings">
+  <p><label>Unpaywall email <input name="email" value="{{ email }}"></label></p>
+  <p><label>out/ path <input name="out_dir" value="{{ out_dir }}"></label></p>
+  <p><label>Preset
+    <select name="preset">
+      <option value="oa" {% if prefs.preset == 'oa' %}selected{% endif %}>Open access</option>
+      <option value="eoi" {% if prefs.preset == 'eoi' %}selected{% endif %}>Campus</option>
+    </select>
+  </label></p>
+  <p><label><input type="checkbox" name="attach_verified" value="1" {% if prefs.attach_verified %}checked{% endif %}>
+    Attach verified automatically</label></p>
+  <button type="submit">Save</button>
+</form>
+{% endblock %}

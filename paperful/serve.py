@@ -60,6 +60,10 @@ def create_app(cfg: Config) -> Any:
             str(payload.get("collection") or ""),
         )
 
+    from .ui.app import mount_ui
+
+    mount_ui(app, cfg)
+
     return app
 
 

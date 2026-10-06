@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Discover — Paperful{% endblock %}
+{% block content %}
+<h1>Discover</h1>
+{% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
+<section class="toolbar">
+  <form method="post" action="/discover/topic">
+    <label>Track a topic <input name="query" required></label>
+    {% if prefs.advanced %}
+    <label>Kind
+      <select name="kind">
+        <option value="search">search</option>
+        <option value="hybrid">hybrid</option>
+        <option value="doi">doi</option>
+        <option value="orcid">orcid</option>
+        <option value="collection">collection</option>
+      </select>
+    </label>
+    <label>Direction <input name="direction" placeholder="refs"></label>
+    <label>Seeds <input name="seeds" placeholder="doi or orcid list"></label>
+    {% endif %}
+    <button type="submit">Search</button>
+  </form>
+  <form method="post" action="/discover/follow">
+    <label>Follow a person (ORCID) <input name="orcid" placeholder="0000-0002-1825-0097"></label>
+    <label>List name <input name="list_name" value="followed"></label>
+    <label>Since <input name="backfill_from" type="date"></label>
+    <button type="submit">Follow</button>
+  </form>
+</section>
+{% if run_id %}
+<form method="post" action="/discover/apply">
+  <input type="hidden" name="run_id" value="{{ run_id }}">
+  <input type="hidden" name="kind" value="snowball">
+  <button type="submit">Add selected</button>
+  <a href="/wanted">Fill PDFs</a>
+</form>
+<form method="post" action="/discover/watch">
+  <input type="hidden" name="run_id" value="{{ run_id }}">
+  <label>Watch name <input name="watch_name" value="topic-watch"></label>
+  <button type="submit" class="secondary">Keep an eye on this</button>
+</form>
+{% endif %}
+{% if inbox %}
+<h2>Person inbox</h2>
+<table class="wb-table">
+  <thead><tr><th>List</th><th>Title</th></tr></thead>
+  <tbody>
+  {% for row in inbox %}
+  <tr><td>{{ row.list }}</td><td>{{ row.title }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+<h2>Queue</h2>
+<table class="wb-table">
+  <thead><tr><th>Title</th><th>DOI</th><th>Keep</th></tr></thead>
+  <tbody>
+  {% for row in candidates %}
+  <tr>
+    <td>{{ row.title }}</td>
+    <td>{{ row.doi }}</td>
+    <td>
+      {{ row.keep }}
+      <form method="post" action="/discover/keep" style="display:inline">
+        <input type="hidden" name="run_id" value="{{ row.run_id }}">
+        <input type="hidden" name="doi" value="{{ row.doi }}">
+        <button type="submit" name="keep" value="1" class="secondary">Keep</button>
+        <button type="submit" name="keep" value="0" class="secondary">Skip</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<h2>Following</h2>
+<ul>
+  {% for f in following %}
+  <li>{{ f.kind }}: {{ f.name }}
+    <form method="post" action="/discover/check-again" style="display:inline">
+      <input type="hidden" name="kind" value="{{ f.kind }}">
+      <input type="hidden" name="name" value="{{ f.name }}">
+      <button type="submit" class="secondary">Check again</button>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

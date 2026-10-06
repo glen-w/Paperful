@@ -9,8 +9,10 @@ Required keys on `paperful.run_report.v1` from `build_report()` are frozen
 Required keys on `paperful.item.v1` from `empty_item_record()` are frozen the
 same way. This tree is not tagged 1.0.
 
-**1.0** (not tagged) still owes a **workbench GUI** over the CLI capability API
-and **interactive Ask** (chat-over-collection RAG in the GUI). Item records and
+**1.0** (not tagged) still owes polish on the **workbench** on
+`paperful serve` (Discover + Wanted simple loop, command ids, review tokens are
+in tree). **Interactive Ask** is on **Index**, opt-in after `[rag]` + `[llm]`.
+Item records and
 create-missing restore are locked; extra item keys may still be added. Required
 `paperful.run_report.v1` keys and imported-file attach (typed `attach_failed`,
 provenance note) are already the contract. **Post-1.0:** local OpenAlex snapshot
@@ -75,6 +77,6 @@ before 1.0. See [LLM](llm.md).
 | Locked report JSON schema | Required `paperful.run_report.v1` keys frozen; additive keys still allowed. Not tagged 1.0 |
 | Locked item record + snapshot/restore | Required `paperful.item.v1` keys frozen; restore is create-missing (not identity round-trip) |
 | Mendeley and EndNote adapters | In the tree. Seeking testers. Zotero is the well-tested path |
-| Workbench GUI (run / review / apply CLI workflows) | P0 HTTP skeleton (`paperful serve`); P1–P3b still roadmap — [gui.md](gui.md) |
-| Interactive Ask in GUI (cited chat-over-collection) | Roadmap — CLI `ask` / threads shipped |
+| Workbench GUI (Discover, Wanted, Preview/Grab) | Landed on `paperful serve` (Jinja workbench, review tokens, Compose `gui` profile) — [gui.md](gui.md). Not tagged 1.0 |
+| Interactive Ask in GUI (cited chat-over-collection) | **Shipped** on Index (opt-in `[rag]` + `[llm]`; CLI threads) |
 | Fresh-clone doctor stays quiet without Scholar | Shipped (0.9): `scholar` opt-in like `scihub` |

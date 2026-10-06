@@ -13,10 +13,11 @@ they do not rewrite the fetcher. A **Zotero plugin** is not the 1.0 bet.
 and **newsletter / alert ingest** are **post-1.0** — see [Product split](#product-split-10-vs-post-10).
 
 **1.0** is the trust checklist below, a locked item record (`paperful.item.v1`
-plus `snapshot` / `restore`), proven on **Zotero**, a **workbench GUI** that
-runs, illuminates, and simplifies the full CLI surface ([GUI](#gui)), and
-**interactive Ask** — chat-over-collection / library RAG with citations in that
-GUI ([Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer)).
+plus `snapshot` / `restore`), proven on **Zotero**, and the **workbench**
+([GUI](#gui)): Discover + Wanted on the default nav, Preview/Grab
+with review tokens, full CLI surface behind **Advanced**. **Interactive Ask** is
+opt-in under Index (`[rag]` + `[llm]`), not the home page
+([Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer)).
 Mendeley and EndNote adapters are not 1.0 until testers have exercised them.
 Still not a full-text reading index, not a WebDAV client, and not “AI fetch
 everything.” `paperful ocr` is the optional text layer for scans.
@@ -31,8 +32,8 @@ integrations.
 | **1.0** | **Post-1.0** |
 | --- | --- |
 | Trust checklist, locked `paperful.run_report.v1` / `paperful.item.v1`, snapshot contract | **Local OpenAlex parquet store** — phases 2B/2C (`works_citing`, full search parity, `local_duckdb` / `http`). Live OpenAlex API is enough for most installs; v1 `ssh_duckdb` remains opt-in for institutions |
-| **GUI workbench** — capability API over existing verbs; dry-run default, explicit Apply; illuminate every CLI job without memorizing flags | **Firefox extension** — native messaging → CLI ([section below](#optional-thin-bridge--firefox-extension-post-10)) |
-| **Ask 2.0 in the GUI** — multi-turn, scoped chat-over-collection / library with citations (`[rag]` + `[llm]` gates) | **Newsletter / alert ingest** — rollup bridge, Scholar alerts first ([Frontier digest](#frontier-digest-later-watch--external-ingest)) |
+| **GUI workbench** — Discover + Wanted simple loop; command ids; review tokens; Advanced reveals remaining verbs | **Firefox extension** — native messaging → CLI ([section below](#optional-thin-bridge--firefox-extension-post-10)) |
+| **Ask in GUI (Index)** — scoped chat with citations when `[rag]` + `[llm]` on | **Newsletter / alert ingest** — rollup bridge, Scholar alerts first ([Frontier digest](#frontier-digest-later-watch--external-ingest)) |
 | Zotero-proven path; Mendeley / EndNote when real-library testers confirm | SaaS tenancy polish, remote-manager parity beyond what 1.0 open/Docker needs |
 
 (trust-10)=
@@ -53,8 +54,8 @@ Sci-Hub, no “AI fetch everything”).
 | Lock `paperful.item.v1` and `snapshot` / `restore` (additive keys only after 1.0) | Trust for the disk ledger | **Shipped** — required keys frozen; restore is create-missing (not lossless round-trip) |
 | Strip legacy flat-PDF migrate + mixed-layout doctor amber | Day-0 mirror never steers people into a whole-library layout cleanup | **Shipped (0.1 → 1.0)** |
 | **Mendeley and EndNote adapters** | The ledger survives a manager change | In the tree. **Seeking testers.** Zotero stays the well-tested path. See below |
-| **Workbench GUI** | Run, review, and apply CLI workflows without the terminal as the only surface | P0 landed (`paperful serve`); P1–P3b still roadmap — [GUI](#gui); capability API + dry-run / Apply parity |
-| **Interactive Ask (GUI)** | Chat-over-collection / library with cited RAG | Roadmap — CLI foundation shipped (`ask`, `--thread`, batch); GUI is the 1.0 conversational layer |
+| **Workbench GUI** | Discover, Wanted, Preview/Grab; Advanced for full CLI | Landed — [GUI](#gui); `paperful serve` + `paperful/ui/`; Compose `gui` profile. Not tagged 1.0 |
+| **Interactive Ask (GUI)** | Index page when `[rag]` + `[llm]` enabled | **Shipped** — Index form, CLI threads, citations |
 
 Nice-to-have (not 1.0 blockers): colour glossary next to `doctor` (documented);
 collection picker hint on fuzzy `--collection` miss.
@@ -596,11 +597,11 @@ reference manager calls): `paperful rag ingest | search | status | questions |
 answered` and `paperful ask` (one cited answer, TTY/`--thread` follow-ups, or
 `--from-file` batch). Opt-in under `[rag]`; `auto_ingest` is off by default.
 
-**Interactive Ask in the GUI is a 1.0 goal** — see [GUI](#gui) and [Product
-split](#product-split-10-vs-post-10). Terminal multi-turn is shipped:
-`ask --thread` rewrites follow-ups for retrieval and stores threads under
-`state/rag/threads/`; the workbench should expose the same thread model with
-visible scope (collection / filters) and citations.
+**Interactive Ask in the GUI is shipped** — see [GUI](#gui) and [Product
+split](#product-split-10-vs-post-10). Terminal multi-turn and the Index page
+share `ask --thread`: follow-ups are rewritten for retrieval and stored under
+`state/rag/threads/` with visible scope (collection chip, optional years) and
+citations. Batch `--from-file`, `--item`, and custom `--prompt` stay CLI-only.
 
 Reuse the house LLM pattern: global `[llm]` + per-verb overrides (same spirit
 as `[summarize].model`, `[browser_agent].model`, `[rag].model`).
@@ -1354,25 +1355,18 @@ second doc tree that drifts from the CLI.
 
 ## GUI
 
-**1.0 deliverable** — web-native workbench sketch (open / Docker first; SaaS
-later): [gui.md](gui.md). **P0 landed:** required `paperful.item.v1` keys are
-frozen, restore is create-missing, and `paperful serve` is a localhost HTTP
-skeleton. P1–P3b remain. The CLI stays the source of truth; the GUI **runs,
-illuminates, and simplifies** the same verbs (`run`, snowball gates, inbox,
-`refs gap`, `lint` / `fix-metadata`, `dedupe`, handoff, doctor status, …) via a
-**capability API** with the same Control posture (dry-run default, explicit
-Apply, fail closed). It is not a second fetch stack or a replacement for
-Zotero’s reader. The **Firefox extension** is post-1.0 and may call the same API
-when it ships.
+**1.0 deliverable** — workbench (open / Docker first): [gui.md](gui.md).
+**Landed:** `paperful.item.v1` lock, `paperful serve` HTTP + server-rendered UI
+under `paperful/ui/` — default nav **Discover** and **Wanted**, Preview/Grab with
+review tokens, command ids under `state/gui/commands/`. **Advanced** (cookie)
+reveals Repair, Mirror, Index, Settings and extra form fields without enabling
+opt-in sources. **Not tagged 1.0.**
 
-**Built-in Ask (1.0, opt-in):** a scoped **chat-with-collection** mode —
-conversational Q&A over the current collection (and the same year / type /
-profile filters as other modes), with **citations** back to items and PDF
-passages via the `[rag]` index (`rag.answer` with turn history). Not the only
-landing experience; requires `[llm].enabled`, `[rag].enabled`, and an
-up-to-date index (`paperful rag ingest`). Reuse CLI batch Q&A and threads
-([Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer)):
-turn history, `--focus` / prompt presets, optional promote-to-disk report, and
-**visible scope chrome** so operators never get library-wide answers without
-choosing a filter. CLI `ask` / `--thread` / `--from-file` remain supported for
-scripts and agents.
+The CLI stays the source of truth; the GUI marshals the same verbs with dry-run
+default and explicit Apply. Not a second fetch stack or Zotero’s reader.
+**Firefox extension** is post-1.0.
+
+**Ask (Index, opt-in):** **Shipped** — scoped chat with citations when `[llm]` and
+`[rag]` are on and the index has rows. Collection chip is the scope; threads live
+under `state/rag/threads/` (same as `ask --thread`). CLI `ask` remains for
+scripts, batch, and `--item` filters. See [Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer).

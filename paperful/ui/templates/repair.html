@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Repair — Paperful{% endblock %}
+{% block content %}
+<h1>Repair</h1>
+{% if message %}<p>{{ message }}</p>{% endif %}
+{% for q in queues %}
+<h2>{{ q.verb }}</h2>
+<ul>
+  {% for name in q.files %}
+  <li>{{ name }}</li>
+  {% endfor %}
+</ul>
+<form method="post" action="/repair/preview" class="toolbar">
+  <input type="hidden" name="verb" value="{{ q.verb }}">
+  <button type="submit">Preview</button>
+</form>
+<form method="post" action="/repair/apply" class="toolbar">
+  <input type="hidden" name="verb" value="{{ q.verb }}">
+  {% if q.verb == 'fix-metadata' %}
+  <label><input type="checkbox" name="overwrite" value="1"> Overwrite edited title/date/venue</label>
+  {% endif %}
+  <button type="submit">Apply</button>
+</form>
+{% endfor %}
+{% endblock %}

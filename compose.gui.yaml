@@ -1,0 +1,23 @@
+# Optional GUI profile: paperful serve on localhost only.
+#
+#   docker compose -f compose.yaml -f compose.gui.yaml --profile gui up paperful-gui
+#
+# Requires paperful[serve] in the image (Dockerfile uv sync --extra serve).
+
+services:
+  paperful-gui:
+    profiles: [gui]
+    image: paperful:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /data
+    environment:
+      PAPERFUL_ZOTERO_HOST: ${PAPERFUL_ZOTERO_HOST:-host.docker.internal}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ${PAPERFUL_DATA:-../paperful-data}:/data
+    ports:
+      - "127.0.0.1:8765:8765"
+    command: ["serve", "--host", "0.0.0.0", "--port", "8765"]

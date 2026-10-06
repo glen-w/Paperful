@@ -112,9 +112,15 @@ that header even when the TCP peer is `host.docker.internal`.
 
 The image ships neither `litellm` nor `browser-use`, so the `browser_agent` lane
 (`run` auto-recover and `paperful recover`) is host-only (it also needs the
-headed-login vault). The workbench extra (`paperful[serve]`, FastAPI) is also
-host-only for now — there is no Compose profile for UI + API; `paperful serve`
-is `uv run` on the host. `fix-metadata` title
+headed-login vault). The image **does** include `paperful[serve]` (FastAPI/Jinja)
+for the Compose `gui` profile. It binds in the container on `0.0.0.0:8765` and
+**publishes only** `127.0.0.1:8765:8765` (no LAN):
+
+```sh
+docker compose -f compose.yaml -f compose.gui.yaml --profile gui up paperful-gui
+```
+
+Host-only `uv run paperful serve` remains the contributor path. `fix-metadata` title
 proposals, the `lint` identity check, `summarize`, and `synthesize` work from the container
 against an Ollama running on the host:
 
