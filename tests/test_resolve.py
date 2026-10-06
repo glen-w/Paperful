@@ -49,20 +49,29 @@ def test_normalize_doi_strips_springer_crumbs_and_unicode_hyphens():
         "10.1007/978-3-642-32060-6_50"
     )
     assert (
-        normalize_doi(
-            "10.1002/1520-6629(198601)14:1<6::aid-jcop2290140103>3.0.co;2-i"
-        )
+        normalize_doi("10.1002/1520-6629(198601)14:1<6::aid-jcop2290140103>3.0.co;2-i")
         == "10.1002/1520-6629(198601)14:1<6::aid-jcop2290140103>3.0.co;2-i"
     )
     assert (
-        normalize_doi(
-            "10.1002/(sici)1097-4598(199910)22:10<1380:aid-mus7>3.0.co;2-u"
-        )
+        normalize_doi("10.1002/(sici)1097-4598(199910)22:10<1380:aid-mus7>3.0.co;2-u")
         == "10.1002/(sici)1097-4598(199910)22:10<1380::aid-mus7>3.0.co;2-u"
     )
     assert normalize_doi("") is None
     assert normalize_doi("not a doi") is None
     assert normalize_doi(None) is None
+
+
+def test_normalize_doi_edge_cleanup_offline():
+    assert (
+        normalize_doi("https://doi.org/10.1038/nature12373/") == "10.1038/nature12373"
+    )
+    assert (
+        normalize_doi("10.1007/s10484-020-09456-1/abstract")
+        == "10.1007/s10484-020-09456-1"
+    )
+    assert normalize_doi("(doi:10.1016/j.marpol.2017.05.011)") == (
+        "10.1016/j.marpol.2017.05.011"
+    )
 
 
 def test_extract_doi_from_extra_field():
@@ -126,7 +135,9 @@ def test_crossref_preprint_relations():
     preprint = version_from_crossref(
         {
             "relation": {
-                "is-preprint-of": [{"id-type": "doi", "id": "10.1038/s41586-020-2649-2"}]
+                "is-preprint-of": [
+                    {"id-type": "doi", "id": "10.1038/s41586-020-2649-2"}
+                ]
             }
         },
         "10.1101/2020.01.01.123456",
@@ -211,7 +222,11 @@ def test_arxiv_and_biorxiv_published_doi():
 
 
 def test_openalex_related_works_do_not_link():
-    from paperful.resolve import version_from_crossref, version_from_openalex, version_link
+    from paperful.resolve import (
+        version_from_crossref,
+        version_from_openalex,
+        version_link,
+    )
 
     payload = {
         "related_works": ["https://openalex.org/W123"],
