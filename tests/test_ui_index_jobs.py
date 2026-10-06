@@ -226,3 +226,37 @@ def test_index_batch_empty_and_disabled(tmp_path, monkeypatch):
     )
     assert "error=disabled" in (off.headers.get("location") or "")
     assert commands.list_commands(cfg) == []
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_index_synthesize_enqueues(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.rag_enabled = True
+    cfg.llm_enabled = True
+    _ops(monkeypatch)
+    seen: list[bool] = []
+
+    def fake(cfg, cmd_id, **kw):
+        seen.append(kw["dry_run"])
+        return {"dry_run": True, "slug": "lib", "sources_disk": 1, "sources_note": 0, "missing": 0, "chunks": 1}
+
+    jobs.synthesize_fn = fake
+    try:
+        client = TestClient(create_app(cfg))
+        page = client.get("/index")
+        assert 'action="/index/synthesize"' in page.text
+        res = client.post(
+            "/index/synthesize",
+            data={"dry_run": "1", "dest": "disk"},
+            follow_redirects=False,
+        )
+        assert res.status_code == 303
+        cmd_id = (res.headers.get("location") or "").split("run=")[1].split("&")[0]
+        rec = _wait_done(client, cmd_id)
+        assert rec.get("status") == "done"
+        assert seen == [True]
+    finally:
+        jobs.synthesize_fn = None

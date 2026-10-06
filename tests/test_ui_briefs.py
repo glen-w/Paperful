@@ -157,3 +157,51 @@ def test_briefs_requires_llm(tmp_path, monkeypatch):
     assert off.status_code == 303
     assert "error=llm" in (off.headers.get("location") or "")
     assert commands.list_commands(cfg) == []
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_briefs_synthesize_dry_run(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    import paperful.ui.app as ui_app
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.llm_enabled = True
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(ui_app, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    seen: list[bool] = []
+
+    def fake(cfg, cmd_id, **kw):
+        seen.append(kw["dry_run"])
+        return {
+            "dry_run": True,
+            "slug": "ocean-bbnj",
+            "sources_disk": 2,
+            "sources_note": 0,
+            "missing": 1,
+            "chunks": 1,
+        }
+
+    jobs.synthesize_fn = fake
+    try:
+        client = TestClient(create_app(cfg))
+        res = client.post(
+            "/briefs/synthesize",
+            data={"dry_run": "1", "dest": "disk"},
+            follow_redirects=False,
+        )
+        assert res.status_code == 303
+        cmd_id = (res.headers.get("location") or "").split("run=")[1].split("&")[0]
+        deadline = time.time() + 3
+        while time.time() < deadline:
+            rec = client.get(f"/v1/runs/{cmd_id}").json()
+            if rec.get("status") in {"done", "failed"}:
+                break
+            time.sleep(0.02)
+        assert rec.get("status") == "done"
+        assert seen == [True]
+    finally:
+        jobs.synthesize_fn = None

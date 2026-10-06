@@ -76,7 +76,8 @@ handoff, inbox, `reachout`. **Repair** queues: `lint`, `fix-metadata`, `dedupe`,
 `versions`, `attachments`, `ocr`. **Mirror**: `sync`, `snapshot`, `restore`,
 `cache clean`. **Index**: `rag ingest` / `search` when `[rag]` is on; cited Ask and batch
 Ask (`state/ask-batch/`) when `[rag]` and `[llm]` are on and the index has
-rows. Collection chip is the scope. **Synthesize** reports on Index when `[llm]` is on.
+rows. Collection chip is the scope. **Synthesize** on Index when `[llm]` is on.
+**Briefs**: collection **summarize** / **synthesize** when `[llm]` is on.
 Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
 `config.toml`; it does not enable `[rag]` or `[llm]`.
 
@@ -98,6 +99,10 @@ Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
 | POST | `/index/search` | Redirect to `/index?q=` (sync search on GET) |
 | POST | `/index/ask-batch` | Enqueue `ask --from-file` batch; redirect `?run=` |
 | GET | `/index/batch/{stamp}` | `answers.md` under `state/ask-batch/<stamp>/` |
+| POST | `/index/synthesize` | Enqueue `synthesize` (dry-run or write); redirect `?run=` |
+| GET | `/index/report/{slug}` | HTML under `state/reports/` |
+| GET | `/item/{key}/summary` | Per-item HTML under `state/summaries/` |
+| POST | `/wanted/summarize` | Enqueue single-item `summarize`; redirect `?run=` |
 | POST | `/briefs/summarize` | Enqueue `summarize`; redirect `/briefs?run=` |
 | POST | `/briefs/synthesize` | Enqueue `synthesize` (dry-run or write); redirect `?run=` |
 | GET | `/briefs/summary/{key}` | HTML under `state/summaries/` |

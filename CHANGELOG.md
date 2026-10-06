@@ -9,10 +9,11 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ### Added
 
-- **GUI thickening:** per-item summarize in Wanted/Library drawers (`/item/{key}/summary`);
-  collection synthesize on Index; Discover runs full snowball kinds (search/hybrid/doi/orcid/collection),
-  profile run, resume, watch via `save_watch`; authorwatch list create/add/resolve/run on Discover.
-  Removed broken `/briefs` page (logic on Index + drawers).
+- **GUI thickening:** Index runs `rag ingest`, `rag search`, batch Ask, and collection
+  `synthesize`; Advanced **Briefs** runs collection `summarize` / `synthesize`.
+  Per-item summarize in Wanted/Library drawers (`/item/{key}/summary`, `/wanted/summarize`).
+  Discover runs full snowball kinds (search/hybrid/doi/orcid/collection), profile run,
+  resume, watch via `save_watch`; authorwatch list create/add/resolve/run on Discover.
 
 ### Changed
 
