@@ -6,7 +6,44 @@ import pytest
 
 from paperful.config import Config
 from paperful.serve import create_app, fastapi_available
-from paperful.ui import commands
+from paperful.ui import commands, jobs
+
+
+def test_repair_preview_enqueues_lint_hook(tmp_path):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    calls: list[str] = []
+
+    from paperful.ui import repair_mirror_jobs
+
+    def hook(cfg, cmd_id, **kwargs):
+        calls.append(kwargs.get("verb", ""))
+        rec = commands.read_command(cfg, cmd_id) or {}
+        rec["status"] = "done"
+        rec["verb"] = "lint"
+        rec["summary"] = {"findings": 0}
+        commands.write_command(cfg, rec)
+
+    repair_mirror_jobs.repair_preview_core_fn = hook
+    try:
+        cmd_id = commands.enqueue(
+            cfg,
+            "repair_lint",
+            lambda cid: jobs.repair_preview(
+                cfg, cid, verb="lint", collection="BBNJ"
+            ),
+        )
+        import time
+
+        deadline = time.time() + 2
+        while time.time() < deadline:
+            rec = commands.read_command(cfg, cmd_id)
+            if rec and rec.get("status") == "done":
+                break
+            time.sleep(0.02)
+        assert calls == ["lint"]
+    finally:
+        repair_mirror_jobs.repair_preview_core_fn = None
 
 
 def test_repair_stale_token_refused(tmp_path):

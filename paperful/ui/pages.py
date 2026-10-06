@@ -389,6 +389,14 @@ def ask_page_flags(cfg: Config) -> dict[str, Any]:
     }
 
 
+def command_by_id(cfg: Config, cmd_id: str) -> dict[str, Any] | None:
+    from . import commands
+
+    if not cmd_id:
+        return None
+    return commands.read_command(cfg, cmd_id)
+
+
 def last_job_result(cfg: Config, verb: str) -> dict[str, Any]:
     from . import commands
 

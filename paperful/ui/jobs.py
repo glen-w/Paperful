@@ -269,56 +269,75 @@ def snowball_run(
         raise
 
 
-def repair_preview(cfg: Config, cmd_id: str, *, verb: str, collection: str) -> str:
-    from .pages import queue_fingerprint
+def repair_preview(
+    cfg: Config,
+    cmd_id: str,
+    *,
+    verb: str,
+    collection: str,
+    overwrite: bool = False,
+    apply_medium: bool = False,
+    surgery: dict[str, bool] | None = None,
+) -> None:
+    from .repair_mirror_jobs import run_repair_preview
 
-    fp = queue_fingerprint(cfg, verb)
-    return commands.create_review_token(
+    run_repair_preview(
         cfg,
+        cmd_id,
         verb=verb,
         collection=collection,
-        preset="oa",
-        keys=[verb],
-        fingerprint=fp,
-        command_id=cmd_id,
+        overwrite=overwrite,
+        apply_medium=apply_medium,
+        surgery=surgery,
     )
 
 
-def repair_apply(cfg: Config, *, token: str, overwrite: bool = False) -> tuple[bool, str]:
-    from .pages import queue_fingerprint
+def repair_apply(
+    cfg: Config,
+    *,
+    token: str,
+    overwrite: bool = False,
+    apply_medium: bool = False,
+    surgery: dict[str, bool] | None = None,
+) -> tuple[bool, str]:
+    from .repair_mirror_jobs import run_repair_apply
 
-    review = commands.load_review(cfg, token)
-    if review is None:
-        return False, "unknown token"
-    verb = str(review.get("verb") or "")
-    fp = queue_fingerprint(cfg, verb)
-    return commands.consume_review(cfg, token, fingerprint=fp, keys=None)
-
-
-def mirror_preview(cfg: Config, cmd_id: str, *, verb: str, collection: str) -> str:
-    import hashlib
-
-    fp = hashlib.sha256(f"{verb}|{collection}".encode("utf-8")).hexdigest()
-    return commands.create_review_token(
+    ok, msg, _summary = run_repair_apply(
         cfg,
+        token=token,
+        overwrite=overwrite,
+        apply_medium=apply_medium,
+        surgery=surgery,
+    )
+    return ok, msg
+
+
+def mirror_preview(
+    cfg: Config,
+    cmd_id: str,
+    *,
+    verb: str,
+    collection: str,
+    pdfs: str = "lazy",
+    accept_gone: bool = False,
+) -> None:
+    from .repair_mirror_jobs import run_mirror_preview
+
+    run_mirror_preview(
+        cfg,
+        cmd_id,
         verb=verb,
         collection=collection,
-        preset="oa",
-        keys=[verb],
-        fingerprint=fp,
-        command_id=cmd_id,
+        pdfs=pdfs,
+        accept_gone=accept_gone,
     )
 
 
 def mirror_apply(cfg: Config, *, token: str, collection: str) -> tuple[bool, str]:
-    import hashlib
+    from .repair_mirror_jobs import run_mirror_apply
 
-    review = commands.load_review(cfg, token)
-    if review is None:
-        return False, "unknown token"
-    verb = str(review.get("verb") or "")
-    fp = hashlib.sha256(f"{verb}|{collection}".encode("utf-8")).hexdigest()
-    return commands.consume_review(cfg, token, fingerprint=fp, keys=None)
+    ok, msg, _summary = run_mirror_apply(cfg, token=token, collection=collection)
+    return ok, msg
 
 
 def follow_person(
