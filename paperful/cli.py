@@ -67,6 +67,18 @@ from .runreport import (
     write_command_report,
     write_run_report,
 )
+from . import run_hooks
+from .run_hooks import (
+    ezproxy_headed_login_and_probe,
+    ensure_ezproxy_session,
+    gaps_downloads_dir,
+    inbox_handoff_session,
+    maybe_ezproxy_relogin,
+    mid_run_ezproxy_hook,
+    preflight_ezproxy_session,
+    run_dry_run_table_and_payload,
+    run_session_handoff,
+)
 from .scope import ScopeError, filter_scope_items, load_scope, resolve_keys
 from .sources import Context
 from .sources.scihub import ping_mirrors
@@ -276,6 +288,10 @@ JOBS: dict[str, tuple[str, ...]] = {
 }
 
 console = Console(highlight=False)
+
+
+def _stdin_is_tty() -> bool:
+    return sys.stdin.isatty()
 
 ConfigOpt = typer.Option(
     None, "--config", "-c", help="Path to config.toml", exists=True, dir_okay=False
@@ -3225,7 +3241,7 @@ def gaps(
     if not backend.supports_write():
         console.print("[red]--handoff walk needs library write support.[/]")
         raise typer.Exit(1)
-    dl = _gaps_downloads_dir(cfg, downloads_dir)
+    dl = gaps_downloads_dir(cfg, downloads_dir)
     by_key = {it.key: it for it in items}
     walk_started = time.time()
     result = walk_missing(
@@ -3244,15 +3260,6 @@ def gaps(
         f"Walk attached {result.attached}, skipped {result.skipped}"
         + (" (quit early)" if result.quit_early else "")
     )
-
-
-def _gaps_downloads_dir(cfg: Config, override: Path | None) -> Path:
-    if override is not None:
-        return override.expanduser()
-    raw = (cfg.gaps_downloads_dir or "").strip()
-    if raw:
-        return Path(raw).expanduser()
-    return Path.home() / "Downloads"
 
 
 @app.command()
@@ -3457,7 +3464,7 @@ def reachout(
     if not backend.supports_write():
         console.print("[red]--handoff walk needs library write support.[/]")
         raise typer.Exit(1)
-    dl = _gaps_downloads_dir(cfg, downloads_dir)
+    dl = gaps_downloads_dir(cfg, downloads_dir)
     by_key = {it.key: it for it in items}
     result = walk_missing(
         cfg,
@@ -3711,64 +3718,18 @@ def run(
         )
 
     if dry_run:
-        from .agent_json import envelope
-        from .miss_surface import honesty_row_for_item
-
-        table = Table(title="Dry run", expand=True)
-        table.add_column("Key", style="dim", no_wrap=True)
-        table.add_column("Type", no_wrap=True, max_width=14)
-        table.add_column("Item", no_wrap=True, overflow="ellipsis", ratio=3)
-        table.add_column("DOI (source)", no_wrap=True, overflow="ellipsis", ratio=2)
-        table.add_column("Would-hit", no_wrap=True, overflow="ellipsis", ratio=2)
-        table.add_column("Miss", no_wrap=True, overflow="ellipsis", ratio=2)
-        table.add_column("URL", no_wrap=True, overflow="ellipsis", ratio=1)
-        table.add_column("Collections", no_wrap=True, overflow="ellipsis", ratio=1)
-        dry_items: list[dict[str, Any]] = []
-        for it in todo:
-            if try_all or not cfg.source_routing:
-                lanes = source_list
-            else:
-                lanes = sources_for_item(it, cfg, source_list)
-            would = ", ".join(lanes) if lanes else "-"
-            rec = manifest.get(it.key)
-            honesty = honesty_row_for_item(cfg, it, rec)
-            miss = honesty.get("miss_plain") or honesty.get("miss_surface") or "-"
-            dry_items.append(
-                {
-                    "itemKey": it.key,
-                    "title": it.label,
-                    "would_hit": would,
-                    "miss_surface": honesty.get("miss_surface") or "",
-                    "miss_plain": honesty.get("miss_plain") or "",
-                }
-            )
-            table.add_row(
-                it.key,
-                it.item_type,
-                it.label,
-                (
-                    f"{it.doi} ({it.doi_source})"
-                    if it.doi
-                    else ("arXiv:" + it.arxiv_id if it.arxiv_id else "-")
-                ),
-                would,
-                miss,
-                (it.url or "-")[:60],
-                "; ".join(it.collection_paths),
-            )
-        payload = envelope(
-            command="run",
-            summary={"todo": len(todo), "dry_run": True},
-            items=dry_items,
-            flags={"dry_run": True},
+        run_dry_run_table_and_payload(
+            console,
+            cfg,
+            todo=todo,
+            try_all=try_all,
+            source_list=source_list,
+            manifest=manifest,
+            mirror_only=mirror_only,
+            mirror_deferred=lambda: _mirror_deferred(cfg),
+            json_out=json_out,
+            emit_agent=_emit_agent,
         )
-
-        def _human_dry() -> None:
-            console.print(table)
-            if mirror_only:
-                _mirror_deferred(cfg)
-
-        _emit_agent(payload, json_out=json_out, human=_human_dry)
         raise typer.Exit(0)
 
     attacher = None
@@ -3827,8 +3788,8 @@ def run(
         try_all=True if try_all else None,
         strict_pdf_doi=bool(strict_pdf_doi),
     )
-    pipe.on_ezproxy_down = _mid_run_ezproxy_hook(cfg, pipe, enabled=relogin)
-    _preflight_ezproxy_session(cfg, pipe, source_list, enabled=relogin)
+    pipe.on_ezproxy_down = mid_run_ezproxy_hook(console, cfg, pipe, enabled=relogin)
+    preflight_ezproxy_session(console, cfg, pipe, source_list, enabled=relogin)
     interrupted = False
     with _item_progress() as progress:
         task_id = progress.add_task("Fetching PDFs", total=len(todo))
@@ -3850,7 +3811,7 @@ def run(
     # happens here, still before the report and before --handoff opens tabs.
     if not interrupted:
         try:
-            _maybe_ezproxy_relogin(cfg, pipe, todo, enabled=relogin)
+            maybe_ezproxy_relogin(console, cfg, pipe, todo, enabled=relogin)
         except KeyboardInterrupt:
             console.print(
                 "\n[yellow]Interrupted during EZProxy re-login - "
@@ -3894,42 +3855,8 @@ def run(
         )
 
 
-def _stdin_is_tty() -> bool:
-    return sys.stdin.isatty()
-
-
 def _ezproxy_headed_login_and_probe(cfg: Config, pipe: Pipeline) -> bool:
-    """Open headed EZProxy login, refresh the vault, and probe. True when ready."""
-    from . import session as sess
-    from .sources import ezproxy as ez
-
-    console.print("Opening a browser to refresh the EZProxy session.")
-    # session_ok / mid-run fetches may already hold the vault profile. System
-    # Chrome needs that user-data-dir exclusively or it exits with no window.
-    pipe.release_browser()
-    try:
-        sess.login_headed(
-            cfg,
-            "ezproxy",
-            confirm=_confirm_session_login,
-            on_note=lambda msg: console.print(f"[dim]{msg}[/]"),
-        )
-    except sess.SessionError as exc:
-        console.print(f"[red]{exc}[/]")
-        console.print("Run [bold]paperful session login ezproxy[/] and retry.")
-        return False
-    pipe.refresh_session()
-    ok, detail = ez.session_ok(pipe.ctx)
-    if not ok:
-        console.print(
-            f"[yellow]EZProxy session still not ready ({detail}).[/] "
-            "Run [bold]paperful session login ezproxy[/] and retry."
-        )
-        if pipe.browser is not None:
-            pipe.browser.close()
-        return False
-    console.print("[green]EZProxy session ready.[/]")
-    return True
+    return ezproxy_headed_login_and_probe(console, cfg, pipe)
 
 
 def _ensure_ezproxy_session(
@@ -3939,22 +3866,9 @@ def _ensure_ezproxy_session(
     enabled: bool,
     prompt: str,
 ) -> bool:
-    """Prompt for headed re-login and verify session_ok. Returns True if ready.
-
-    Pauses the fetch progress Live first so the prompt (and headed-login
-    Enter confirm) are not overwritten by the Rich bar.
-    """
-    if not enabled or not _stdin_is_tty():
-        return False
-    with pause_live(getattr(pipe, "live_progress", None)):
-        try:
-            answer = console.input(prompt).strip().lower()
-        except EOFError:
-            return False
-        if answer not in {"", "y", "yes"}:
-            console.print("[yellow]Skipping EZProxy re-login.[/]")
-            return False
-        return _ezproxy_headed_login_and_probe(cfg, pipe)
+    return ensure_ezproxy_session(
+        console, cfg, pipe, enabled=enabled, prompt=prompt
+    )
 
 
 def _preflight_ezproxy_session(
@@ -3964,45 +3878,13 @@ def _preflight_ezproxy_session(
     *,
     enabled: bool,
 ) -> None:
-    """Probe EZProxy before batch 1; offer login or skip wraps for this pass."""
-    if "ezproxy" not in source_list or not cfg.ezproxy_base:
-        return
-    from .sources import ezproxy as ez
-
-    ok, detail = ez.session_ok(pipe.ctx)
-    if ok:
-        return
-    console.print(f"[yellow]EZProxy session not ready ({detail}).[/]")
-    if _ensure_ezproxy_session(
-        cfg,
-        pipe,
-        enabled=enabled,
-        prompt="EZProxy session not ready — log in now? [Y/n] ",
-    ):
-        return
-    pipe._ezproxy_down = True
-    console.print(
-        "[yellow]Continuing without EZProxy wraps for this pass.[/] "
-        "Remaining proxy attempts will be skipped."
-    )
+    preflight_ezproxy_session(console, cfg, pipe, source_list, enabled=enabled)
 
 
 def _mid_run_ezproxy_hook(
     cfg: Config, pipe: Pipeline, *, enabled: bool
 ) -> Callable[[], bool] | None:
-    """Return a Pipeline.on_ezproxy_down callback, or None when mid-run pause is off."""
-    if not enabled:
-        return None
-
-    def bound() -> bool:
-        return _ensure_ezproxy_session(
-            cfg,
-            pipe,
-            enabled=enabled,
-            prompt="EZProxy session expired mid-run — re-login and continue? [Y/n] ",
-        )
-
-    return bound
+    return mid_run_ezproxy_hook(console, cfg, pipe, enabled=enabled)
 
 
 def _maybe_ezproxy_relogin(
@@ -4012,42 +3894,7 @@ def _maybe_ezproxy_relogin(
     *,
     enabled: bool,
 ) -> None:
-    """Pause after the fetch so the operator can refresh an expired EZProxy session.
-
-    The vault browser from the fetch is already closed. This opens a headed
-    login, retries only ``retryable`` / ``session expired`` items, then closes
-    that browser again. The report and ``--handoff`` tabs run after this
-    returns, so manual-download tabs are not opened in the login window.
-    Off, or not a terminal: leave those items for the next ``run``.
-    """
-    if not enabled or not _stdin_is_tty():
-        return
-    retry = session_expired_items(pipe.manifest, todo)
-    if not retry:
-        return
-    n = len(retry)
-    if not _ensure_ezproxy_session(
-        cfg,
-        pipe,
-        enabled=True,
-        prompt=f"Re-login and retry {n} EZProxy item(s)? [Y/n] ",
-    ):
-        return
-    console.print(f"Retrying {n} item(s).")
-    saved_sources = list(pipe.sources)
-    saved_progress = pipe.progress
-    pipe.sources = ["ezproxy"]
-    pipe.stats.drop_outcomes({it.key for it in retry})
-    try:
-        with _item_progress() as progress:
-            task_id = progress.add_task("EZProxy retry", total=n)
-            pipe.progress = lambda: progress.advance(task_id)
-            pipe.run(retry)
-    finally:
-        pipe.sources = saved_sources
-        pipe.progress = saved_progress
-        if pipe.browser is not None:
-            pipe.browser.close()
+    maybe_ezproxy_relogin(console, cfg, pipe, todo, enabled=enabled)
 
 
 def _run_session_handoff(
@@ -4062,97 +3909,17 @@ def _run_session_handoff(
     downloads_dir: Path | None,
     re_request: bool = False,
 ) -> None:
-    from .handoff import (
-        missing_from_run_outcomes,
-        open_tabs,
-        parse_handoff,
-        walk_missing,
-    )
-
-    try:
-        mode = parse_handoff(handoff)
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
-        return
-    if mode == "list":
-        return
-    outcomes = [
-        {
-            "itemKey": o.itemKey,
-            "status": o.status,
-            "reason": o.reason,
-            "attempts": list(o.attempts or []),
-        }
-        for o in stats.items
-    ]
-    by_key = {it.key: it for it in catalog}
-    missing = missing_from_run_outcomes(
-        by_key, outcomes, cfg=cfg, re_request=re_request
-    )
-    if not missing:
-        console.print("[dim]No openable soft-blocked PDFs to hand off.[/]")
-        return
-    console.print(f"[bold]Handoff[/] ({mode}): {len(missing)} openable miss(es)")
-    if mode in {"tabs", "watch"}:
-
-        def _confirm(n: int) -> bool:
-            answer = (
-                typer.prompt(f"Open {n} tabs in your browser?", default="y")
-                .strip()
-                .lower()
-            )
-            return answer in {"y", "yes"}
-
-        opened = open_tabs(
-            missing,
-            include_doi_tabs=include_doi_tabs,
-            confirm=_confirm,
-            scholar=cfg.handoff_scholar,
-            cfg=cfg,
-        )
-        console.print(f"Opened {opened} tab(s).")
-        enter_watch = mode == "watch" or (
-            mode == "tabs"
-            and cfg.inbox_watch_after_handoff
-            and cfg.inbox_path is not None
-        )
-        if not enter_watch:
-            return
-        if backend is None or not backend.supports_write():
-            console.print(
-                "[yellow]--handoff watch needs a writable library; skipped.[/]"
-            )
-            return
-        _inbox_handoff_session(
-            cfg,
-            backend,
-            manifest,
-            catalog,
-            missing,
-            scope="run handoff",
-            once=False,
-        )
-        return
-    if backend is None or not backend.supports_write():
-        console.print("[yellow]--handoff walk needs a writable library; skipped.[/]")
-        return
-    dl = _gaps_downloads_dir(cfg, downloads_dir)
-    walk_started = time.time()
-    result = walk_missing(
+    run_session_handoff(
+        console,
         cfg,
         backend,
         manifest,
-        by_key,
-        missing,
-        downloads_dir=dl,
-        prompt=lambda msg: typer.prompt(msg, default=""),
-        on_status=lambda msg: console.print(msg),
-    )
-    _flush(backend)
-    _rag_auto(cfg, walk_started)
-    console.print(
-        f"Walk attached {result.attached}, skipped {result.skipped}"
-        + (" (quit early)" if result.quit_early else "")
+        catalog,
+        stats,
+        handoff=handoff,
+        include_doi_tabs=include_doi_tabs,
+        downloads_dir=downloads_dir,
+        re_request=re_request,
     )
 
 
@@ -4168,57 +3935,18 @@ def _inbox_handoff_session(
     idle_seconds: float | None = None,
     use_fifo: bool = True,
 ) -> None:
-    """Openable-miss session: poll ``[inbox].dir``, match DOI then FIFO, report."""
-    from .inbox import (
-        ensure_inbox_dirs,
-        events_as_report_items,
-        fifo_from_missing,
-        process_candidates,
-        summary_from_stats,
-    )
-
-    started = time.time()
-    try:
-        root = ensure_inbox_dirs(cfg)
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1) from exc
-    console.print(
-        f"[bold]Inbox[/] watching {root} "
-        f"(DOI match"
-        + ("; FIFO for openable misses" if use_fifo else "")
-        + "; Ctrl+C to stop)"
-    )
-    fifo = fifo_from_missing(missing) if use_fifo else None
-    stats = process_candidates(
+    inbox_handoff_session(
+        console,
         cfg,
         backend,
         manifest,
-        list(items),
-        fifo_queue=fifo,
+        items,
+        missing,
+        scope=scope,
         once=once,
         idle_seconds=idle_seconds,
-        on_status=lambda msg: console.print(msg),
+        use_fifo=use_fifo,
     )
-    _flush(backend)
-    _rag_auto(cfg, started)
-    path = write_command_report(
-        cfg,
-        command="inbox",
-        scope=scope,
-        summary=summary_from_stats(stats),
-        items=events_as_report_items(stats.events),
-        flags={"once": once, "fifo": use_fifo},
-        started=started,
-        extra_paths={"inbox_dir": str(root)},
-    )
-    console.print(
-        f"Inbox attached {stats.attached}, unmatched {stats.unmatched}, "
-        f"errors {stats.errors}, skipped {stats.skipped}"
-        + (f" ({stats.quit_reason})" if stats.quit_reason else "")
-    )
-    if path is not None:
-        console.print(f"Inbox report: {path}")
 
 
 def _mirror_deferred(cfg: Config) -> None:
