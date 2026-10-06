@@ -39,6 +39,10 @@ Pages (`.github/workflows/pages.yml`).
 User-facing changes: note them in [CHANGELOG.md](CHANGELOG.md) and
 [docs/releases.md](docs/releases.md) when they affect 0.x vs 1.0 promises.
 
+Default pytest stays offline. The opt-in all-in E2E (`make e2e-nba`, marker
+`e2e_live`, env `PAPERFUL_E2E=1`) talks to a real Zotero collection `e2e/NBA`
+and is documented in [docs/e2e-nba.md](docs/e2e-nba.md). Do not enable it in CI.
+
 ## Pull requests
 
 - Keep changes focused; match existing style in `paperful/`.

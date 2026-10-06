@@ -353,11 +353,14 @@ for the `author_site` grey lane. Corporate `name`-only creators (FAO, …) stay
 in the report; only people go into the pack. Promote before fetch.
 
 ```sh
-uv run paperful authors -C BBNJ                    # dry-run tables
-uv run paperful authors -C BBNJ --apply            # report + proposed pack
-uv run paperful snowball packs promote bbnj        # enable author_site
-uv run paperful run -C BBNJ                        # grey:author_site when names match
+uv run paperful authors -C ocean/BBNJ                    # dry-run tables
+uv run paperful authors -C ocean/BBNJ --apply            # report + proposed pack
+uv run paperful snowball packs promote ocean-bbnj        # enable author_site
+uv run paperful run -C ocean/BBNJ                        # grey:author_site when names match
 ```
+
+This library’s BBNJ folder is **`ocean/BBNJ`**, not a top-level `BBNJ`.
+Dogfood on a small sibling: [BBNJ author lanes](bbnj-author-lanes.md).
 
 Snowball `--author-site-preflight` is the frontier/co-author path to the same
 `state/author-packs/` files; `authors` is the in-library frequency path.
@@ -379,6 +382,12 @@ uv run paperful reachout -C ocean/BBNJ --request-rg --handoff tabs
 
 `--lookup` is that optional CRM search. `--handoff tabs` opens existing
 ResearchGate publication URLs; you click Request full-text.
+
+## 8. All-in E2E (NBA throwaway)
+
+An opt-in harness that chains snowball → ORCID → full fetch → summarize →
+Twenty/reachout/handoff on `-C e2e/NBA` (not production BBNJ). Not in default
+CI. See [E2E NBA](e2e-nba.md) and `make e2e-nba`.
 
 ## What this is not
 

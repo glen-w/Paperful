@@ -162,6 +162,29 @@ def test_import_csv_json_and_social_without_file(cfg, tmp_path: Path):
         assert "does not scrape" in str(exc) or SOCIAL_EXPORT_HINT[:20] in str(exc)
 
 
+def test_poll_run_maps_openalex_budget_to_authorwatch_error(cfg):
+    from paperful.authorwatch import AuthorwatchError
+    from paperful.snowball.openalex import OpenAlexBudgetExceeded
+
+    add_person(cfg, "ocean", orcid=ORCID, display_name="Josiah")
+    run_list(cfg, "ocean", console=console, client=FakeOA())
+
+    class Spent(FakeOA):
+        def works_by_author(self, **kwargs):
+            raise OpenAlexBudgetExceeded(
+                "spent", reset_at="2099-01-01T00:00:00+00:00", reset_in_s=99
+            )
+
+    try:
+        run_list(cfg, "ocean", console=console, client=Spent())
+        raise AssertionError("expected budget error")
+    except AuthorwatchError as exc:
+        assert exc.code == 2
+        assert "OpenAlex daily budget" in str(exc)
+        assert "authorwatch run ocean" in str(exc)
+        assert "2099-01-01" in str(exc)
+
+
 def test_default_run_sets_baseline_without_polling(cfg):
     add_person(cfg, "ocean", orcid=ORCID, display_name="Josiah")
     client = FakeOA(works=[_work()])

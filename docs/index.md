@@ -61,6 +61,8 @@ comparison
 comparison-reference
 snowball
 authorwatch
+bbnj-author-lanes
+e2e-nba
 ROADMAP
 gui
 ```

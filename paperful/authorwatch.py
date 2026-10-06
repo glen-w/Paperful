@@ -26,7 +26,14 @@ from .snowball.authors import name_fingerprint
 from .snowball.candidate import Candidate
 from .snowball.command import SnowballError, _mark_exists, get_backend
 from .snowball.local_openalex import store_from_config
-from .snowball.openalex import OpenAlexClient, normalize_orcid, short_id, work_to_candidate
+from .snowball.openalex import (
+    KEY_URL,
+    OpenAlexBudgetExceeded,
+    OpenAlexClient,
+    normalize_orcid,
+    short_id,
+    work_to_candidate,
+)
 
 SCHEMA = "paperful.authorwatch.v1"
 PERSON_SCHEMA = "paperful.authorwatch.person.v1"
@@ -672,30 +679,40 @@ def run_list(
         created_cursor = None if backfill else _cursor_date(
             body.get("last_run_at") or body.get("baseline_at")
         )
-        for person in capped:
-            polled += 1
-            works = oa.works_by_author(
-                orcid=person.orcid,
-                openalex=person.openalex,
-                limit=max(1, per_author_limit),
-                from_created_date=None if backfill else created_cursor,
-                from_publication_date=backfill or None,
-            )
-            for work in works:
-                row = _candidate_from_work(work, name=name, person=person)
-                key = row.identity
-                if not key:
-                    continue
-                if key in seen:
-                    continue
-                if finder is not None:
-                    found = _call_lookup(finder, row)
-                    if found:
-                        exists += 1
-                        seen.add(key)
+        try:
+            for person in capped:
+                polled += 1
+                works = oa.works_by_author(
+                    orcid=person.orcid,
+                    openalex=person.openalex,
+                    limit=max(1, per_author_limit),
+                    from_created_date=None if backfill else created_cursor,
+                    from_publication_date=backfill or None,
+                )
+                for work in works:
+                    row = _candidate_from_work(work, name=name, person=person)
+                    key = row.identity
+                    if not key:
                         continue
-                seen.add(key)
-                proposed.append(row)
+                    if key in seen:
+                        continue
+                    if finder is not None:
+                        found = _call_lookup(finder, row)
+                        if found:
+                            exists += 1
+                            seen.add(key)
+                            continue
+                    seen.add(key)
+                    proposed.append(row)
+        except OpenAlexBudgetExceeded as exc:
+            reset_at = getattr(exc, "reset_at", None)
+            wait = f" Wait until {reset_at}." if reset_at else ""
+            raise AuthorwatchError(
+                "OpenAlex daily budget is spent. "
+                f"Set OPENALEX_API_KEY ({KEY_URL}) if this IP is sharing the "
+                f"no-key pool, then: paperful authorwatch run {name}."
+                + wait
+            ) from exc
 
     now = _now()
     if proposed:

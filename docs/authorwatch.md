@@ -33,6 +33,11 @@ tagged `paperful-authorwatch` and `from-<list-name>`. PDFs stay `paperful run`.
 Dry-run is the default; `--apply` needs a live write API (exit **2** when the
 manager is closed). Mixed create failures exit **3**.
 
+A poll `run` (after baseline, or with `--backfill-from`) talks to OpenAlex.
+When the daily budget is spent it exits **2** with next steps (`OPENALEX_API_KEY`,
+retry `authorwatch run`) — not a traceback. Cursor baseline still proposes 0
+without polling.
+
 ## Run semantics
 
 The first `authorwatch run` without `--backfill-from` records a **cursor

@@ -1347,6 +1347,7 @@ second doc tree that drifts from the CLI.
 - [releases.md](releases.md) — 0.x vs 1.0; known limits
 - [comparison.md](comparison.md) — what Paperful does and does not replace today
 - [snowball.md](snowball.md) — library-building from a keyword, multi-DOI / multi-ORCID, or collection
+- [bbnj-author-lanes.md](bbnj-author-lanes.md) — dogfood `author_site` + `authorwatch` on `ocean/BBNJ` / `ocean/BBNJ-test`
 - Site career / domain timeline plan (consumer of durable tags):
   `/Users/89298/Documents/website/glen-w.github.io/docs/dev/career-timeline-plan.md`
 - Firefox extension (post-1.0 thin bridge) — section above; not a separate doc yet

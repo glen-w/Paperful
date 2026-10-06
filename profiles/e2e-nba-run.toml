@@ -1,0 +1,12 @@
+# paperful run config. Select with: paperful all --profile e2e-nba-run
+name = "e2e-nba-run"
+description = "E2E all-in: e2e/NBA journal-ish slice 2025–2026"
+collections = ["e2e/NBA"]
+library = false
+year_from = 2025
+year_to = 2026
+try_all = true
+retry_failed = true
+upgrade_linked = true
+apply = true
+steps = ["gaps", "run", "lint", "fix-metadata", "summarize"]

@@ -2,7 +2,7 @@
 
 .DEFAULT_GOAL := help
 
-.PHONY: help docs docs-clean pages-site docker-build docker-doctor
+.PHONY: help docs docs-clean pages-site docker-build docker-doctor e2e-nba
 
 help:
 	@echo "paperful Makefile"
@@ -17,6 +17,9 @@ help:
 	@echo "  docs              Build Sphinx HTML into docs/_build/html (requires .[docs]; DOCS_STRICT=1 for CI parity)"
 	@echo "  docs-clean        Remove Sphinx build artifacts"
 	@echo "  pages-site        Assemble website/ + Sphinx guide into _site/ (GitHub Pages)"
+	@echo ""
+	@echo "E2E (opt-in, not CI):"
+	@echo "  e2e-nba           All-in live E2E on e2e/NBA (PAPERFUL_E2E=1; see docs/e2e-nba.md)"
 	@echo ""
 	@echo "Usage: uv run paperful <cmd>"
 	@echo "       docker compose run --rm paperful <cmd>   # optional image"
@@ -38,3 +41,6 @@ docs-clean:
 
 pages-site:
 	@bash scripts/release/assemble_pages_site.sh
+
+e2e-nba:
+	PAPERFUL_E2E=1 uv run python scripts/e2e_nba.py

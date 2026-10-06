@@ -1,0 +1,14 @@
+# paperful snowball profile. Select with: paperful snowball run --profile e2e-nba-search
+# Live E2E harness overrides --gate auto. Dry-run this profile first.
+kind = "snowball"
+mode = "search"
+query = "NBA"
+description = "E2E all-in: NBA keyword scout 2025–2026 (tight caps)"
+gate = "dry-run"
+target_collection = "e2e/NBA"
+fetch_pdfs = "off"
+year_from = 2025
+year_to = 2026
+max_candidates = 12
+depth = 1
+per_hop_limit = 8

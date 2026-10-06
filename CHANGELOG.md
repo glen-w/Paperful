@@ -12,9 +12,18 @@ Required `paperful.run_report.v1` keys are frozen; extra keys and
   run CLI workflows) and interactive Ask (chat-over-collection RAG in the GUI).
   Post-1.0: local OpenAlex snapshot phases 2B/2C, Firefox extension,
   newsletter/alert ingest (rollup bridge). See [ROADMAP](docs/ROADMAP.md#product-split-10-vs-post-10).
+- BBNJ author-site / authorwatch dogfood plan: [bbnj-author-lanes](docs/bbnj-author-lanes.md)
+  (`-C ocean/BBNJ`, test sibling `ocean/BBNJ-test`). Workflows pack slug is
+  `ocean-bbnj`, not `bbnj`.
+- `authorwatch run` maps a spent OpenAlex daily budget to exit 2 with a retry
+  line (no traceback).
 
 ### Added
 
+- Opt-in all-in E2E for keyword `NBA` (2025–2026) on throwaway `-C e2e/NBA`:
+  `make e2e-nba` / `scripts/e2e_nba.py`, profiles `e2e-nba-search` /
+  `e2e-nba-run`, hermetic `tests/test_e2e_nba.py`, marker `e2e_live`
+  (`PAPERFUL_E2E=1`). Playbook: [e2e-nba](docs/e2e-nba.md).
 - Browser agent: `[browser_agent].fallback_model` (one retry before final
   `not_found`, not on captcha), documented `use_vision` with preflight/doctor
   checks, `recover --from-last-run` / `--from-last-run-mode` / `--limit`, and
