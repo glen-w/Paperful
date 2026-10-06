@@ -262,3 +262,20 @@ def test_rag_table_rejects_unknown_values(tmp_path, table):
 
     with pytest.raises(ValueError, match=r"\[rag\]"):
         _from_dict({"rag": table}, tmp_path / "config.toml")
+
+
+def test_nested_tables_apply_through_config_tables(tmp_path, monkeypatch):
+    from paperful import config_tables
+    from paperful.config import _from_dict
+
+    original = config_tables.apply_nested_tables
+    seen: list[bool] = []
+
+    def wrapped(raw, cfg, source):
+        seen.append(True)
+        return original(raw, cfg, source)
+
+    monkeypatch.setattr(config_tables, "apply_nested_tables", wrapped)
+    cfg = _from_dict({"llm": {"enabled": True}}, tmp_path / "config.toml")
+    assert seen == [True]
+    assert cfg.llm_enabled is True

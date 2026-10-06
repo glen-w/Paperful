@@ -109,6 +109,23 @@ def pipe_factory(cfg, monkeypatch):
     return _make
 
 
+def test_found_pdf_commits_through_pipeline_save(pipe_factory, monkeypatch):
+    calls: list[str] = []
+
+    def fake_commit(pipe, item, cand, dl, attempts, *, oa_stamp, short_verdict):
+        calls.append(item.key)
+        return True
+
+    monkeypatch.setattr(pl, "commit_download", fake_commit)
+    src = StubSource(
+        "oa",
+        {"A": Candidate(url="https://x.test/a.pdf", source="oa")},
+    )
+    pipe, _manifest = pipe_factory({"oa": src}, ["oa"])
+    pipe.run([make_item(key="A")])
+    assert calls == ["A"]
+
+
 def test_oa_sources_run_in_order_and_scihub_only_after_all_miss(pipe_factory, cfg):
     oa1 = StubSource("oa1")
     oa2 = StubSource("oa2", {"B": Candidate(url="https://x.test/b.pdf", source="oa2")})

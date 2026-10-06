@@ -86,6 +86,42 @@ def test_hop_keywords_adds_overlap_work():
     assert any("WKEY" in str(r.ids.get("openalex") or r.identity) for r in rows)
 
 
+def test_expand_hops_dispatches_refs(monkeypatch):
+    from paperful.snowball.crawl import _expand_hops
+    from paperful.snowball.openalex import OpenAlexClient
+
+    seen: list[str] = []
+
+    def fake_refs(*args, **kwargs):
+        seen.append("refs")
+        return False
+
+    monkeypatch.setattr("paperful.snowball.hops.hop_refs", fake_refs)
+    monkeypatch.setattr(
+        "paperful.snowball.hops.hop_cites",
+        lambda *a, **k: seen.append("cites") or False,
+    )
+    seed = _work("WSEED", "10.1000/seed", "Seed", 2020, 3)
+    client = OpenAlexClient(
+        email="t@example.org", api_key="", sleep_s=0, getter=lambda p, q: {}
+    )
+    rows = _expand_hops(
+        client,
+        [seed],
+        run_id="r1",
+        seed={"type": "doi", "value": "10.1000/seed"},
+        gate="dry-run",
+        depth=1,
+        direction="refs",
+        per_hop_limit=10,
+        year_from=None,
+        year_to=None,
+        why_prefix="Seed",
+    )
+    assert rows == []
+    assert seen == ["refs"]
+
+
 def test_hop_similar_delegates_to_similar_neighbours(monkeypatch):
     called = {}
 

@@ -275,3 +275,19 @@ def test_normalize_doi_keeps_parentheses_inside_old_elsevier_dois():
         extract_doi("(https://doi.org/10.1016/0031-9384(69)90073-0)")
         == "10.1016/0031-9384(69)90073-0"
     )
+
+
+def test_resolve_package_keeps_stable_imports():
+    from pathlib import Path
+
+    import paperful.resolve as resolve
+    from paperful.resolve.enrich import prepare_identifiers
+    from paperful.resolve.ids import extract_doi as ids_extract_doi
+
+    assert resolve.__all__
+    for name in resolve.__all__:
+        assert hasattr(resolve, name), name
+    assert resolve.extract_doi is ids_extract_doi
+    assert resolve.prepare_identifiers is prepare_identifiers
+    pkg = Path(resolve.__file__).parent
+    assert (pkg / "ids.py").is_file() and (pkg / "enrich.py").is_file()
