@@ -165,20 +165,24 @@ def test_every_command_that_lands_pdfs_calls_the_hook():
     """Guards the wiring: a new landing path should add its own call."""
     import inspect
 
+    from paperful import gaps_cmd, run_hooks
+
     hooked = {
         "run": cli.run,
-        "gaps": cli.gaps,
+        "gaps": gaps_cmd.run_gaps,
         "attach": cli.attach,
         "inbox watch": cli.inbox_watch,
         "inbox drain": cli.inbox_drain,
         "snapshot": cli.snapshot,
         "ocr": cli.ocr,
-        "handoff walk": cli._run_session_handoff,
-        "handoff inbox": cli._inbox_handoff_session,
+        "handoff walk": run_hooks.run_session_handoff,
+        "handoff inbox": run_hooks.inbox_handoff_session,
         "snowball": cli._run_snowball,
     }
+    rag_markers = ("_rag_auto(", "rag_auto_after_command(")
     for name, fn in hooked.items():
-        assert "_rag_auto(" in inspect.getsource(fn), name
+        src = inspect.getsource(fn)
+        assert any(m in src for m in rag_markers), name
 
 
 # ---- doctor ------------------------------------------------------------------
