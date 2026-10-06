@@ -91,6 +91,7 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `sources/` | One fetch lane each. Return bytes or a miss | `sources.base` |
 | `pipeline.py` | Order the lanes, save, attach, write the manifest | most things |
 | `pipeline_save.py` | Save a fetched PDF, write the manifest, attach when allowed | `store`, `pdfid` |
+| `pipeline_phases.py` | OA parallel and serial fetch phases | `pipeline` helpers |
 | `run_hooks.py` | EZProxy recovery, handoff, dry-run rows for `run` | `pipeline`, `handoff` |
 | `gaps_cmd.py` | `gaps` body after the CLI parses flags | `handoff`, `run_hooks` |
 | `run_cmd.py` | `run` body after the CLI parses flags | `pipeline`, `run_hooks` |
