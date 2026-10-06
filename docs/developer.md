@@ -95,6 +95,7 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `gaps_cmd.py` | `gaps` body after the CLI parses flags | `handoff`, `run_hooks` |
 | `run_cmd.py` | `run` body after the CLI parses flags | `pipeline`, `run_hooks` |
 | `ask_cmd.py` | `ask` body after the CLI parses flags | `agent_ops`, rag |
+| `completeness_cmd.py` | `dedupe`, `attachments`, `summarize`, `synthesize` after flags | `run_hooks` helpers via cli |
 | `cli.py` | Flags, progress, exits. No logic of its own | everything |
 | `agent_json.py` | `--format json` envelope (`paperful.agent.json.v1`) and exit 3 | none |
 | `agent_ops.py` | Shared refs-gap / ask builders for CLI JSON and MCP | `agent_json`, catalogue, rag |
