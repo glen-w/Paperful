@@ -120,6 +120,8 @@ Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
 
 HTML routes: `/discover`, `/wanted`, `/library`, `/activity`, `/system`, plus
 advanced `/repair`, `/mirror`, `/index`, `/briefs`, `/settings`. `GET /` → `/wanted`.
+`/repair/preview` and `/mirror/preview` enqueue work and redirect with `?run=`; Apply
+posts `review_token` from that command record (stale previews return HTTP 409).
 `POST /index/ask` enqueues a cited Ask turn (not linked from the simple shell).
 
 Writes over HTTP use review tokens under `state/gui/reviews/`; stale library

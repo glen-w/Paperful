@@ -14,6 +14,10 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
   Per-item summarize in Wanted/Library drawers (`/item/{key}/summary`, `/wanted/summarize`).
   Discover runs full snowball kinds (search/hybrid/doi/orcid/collection), profile run,
   resume, watch via `save_watch`; authorwatch list create/add/resolve/run on Discover.
+- **Repair / Mirror (Advanced):** Preview runs real library cores and writes review
+  tokens under `state/gui/previews/`; Apply consumes the token (409 when the preview
+  file changed). Covers `lint` (read-only), `fix-metadata`, `dedupe`, `versions`,
+  `attachments`, `ocr`, plus `sync`, `snapshot`, `restore`, and `cache clean`.
 
 ### Changed
 
