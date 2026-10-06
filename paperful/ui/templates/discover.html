@@ -41,6 +41,16 @@
     <button type="submit" class="secondary">Resume {{ deferred_run }}</button>
   </form>
   {% endif %}
+  {% if run_id %}
+  <form method="post" action="/discover/briefing" class="toolbar">
+    <input type="hidden" name="run_id" value="{{ run_id }}">
+    <button type="submit" class="secondary">Briefing</button>
+  </form>
+  <form method="post" action="/discover/digest" class="toolbar">
+    <input type="hidden" name="run_id" value="{{ run_id }}">
+    <button type="submit" class="secondary">Digest</button>
+  </form>
+  {% endif %}
 </section>
 <section class="toolbar">
   <h2>People</h2>
@@ -68,6 +78,22 @@
     <input type="hidden" name="list_name" value="{{ aw_list }}">
     <label>Backfill from <input name="backfill_from" type="date"></label>
     <button type="submit" class="secondary">Run list</button>
+  </form>
+  <form method="post" action="/discover/aw/import" enctype="multipart/form-data">
+    <input type="hidden" name="list_name" value="{{ aw_list }}">
+    <label>Source
+      <select name="source">
+        <option value="csv">csv</option>
+        <option value="json">json</option>
+        <option value="orcid">orcid</option>
+      </select>
+    </label>
+    <label>File <input type="file" name="file"></label>
+    <button type="submit" class="secondary">Import</button>
+  </form>
+  <form method="post" action="/discover/aw/briefing">
+    <input type="hidden" name="list_name" value="{{ aw_list }}">
+    <button type="submit" class="secondary">People briefing</button>
   </form>
 </section>
 {% if aw_lists %}
@@ -100,9 +126,15 @@
 </table>
 {% endif %}
 {% if run_id %}
+<form method="post" action="/discover/apply-preview">
+  <input type="hidden" name="run_id" value="{{ run_id }}">
+  <input type="hidden" name="kind" value="snowball">
+  <button type="submit" class="secondary">Preview apply</button>
+</form>
 <form method="post" action="/discover/apply">
   <input type="hidden" name="run_id" value="{{ run_id }}">
   <input type="hidden" name="kind" value="snowball">
+  <input type="hidden" name="review_token" value="{{ snowball_token }}">
   <button type="submit">Add selected</button>
   <a href="/wanted">Fill PDFs</a>
 </form>
@@ -123,11 +155,23 @@
   {% endfor %}
   </tbody>
 </table>
+<form method="post" action="/discover/apply-preview">
+  <input type="hidden" name="kind" value="authorwatch">
+  <input type="hidden" name="list_name" value="{{ aw_list }}">
+  <button type="submit" class="secondary">Preview apply</button>
+</form>
 <form method="post" action="/discover/apply">
   <input type="hidden" name="kind" value="authorwatch">
   <input type="hidden" name="list_name" value="{{ aw_list }}">
+  <input type="hidden" name="review_token" value="{{ aw_token }}">
   <button type="submit">Apply inbox ({{ aw_list }})</button>
 </form>
+{% endif %}
+{% if note and note.markdown %}
+<section>
+  <h2>Note</h2>
+  <pre>{{ note.markdown }}</pre>
+</section>
 {% endif %}
 <h2>Queue</h2>
 <table class="wb-table">

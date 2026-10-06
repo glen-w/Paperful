@@ -205,3 +205,77 @@ def test_briefs_synthesize_dry_run(tmp_path, monkeypatch):
         assert seen == [True]
     finally:
         jobs.synthesize_fn = None
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_drawer_shows_iframe_when_file(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    from paperful.store import Manifest
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.summaries_dir.mkdir(parents=True)
+    (cfg.summaries_dir / "K1.html").write_text("<p>drawer</p>", encoding="utf-8")
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
+
+    class _Item:
+        key = "K1"
+        title = "Paper"
+        doi = "10.1/a"
+        has_pdf = True
+        year = 2024
+        arxiv_id = None
+        url = ""
+
+    monkeypatch.setattr(
+        jobs, "_load_scope_items", lambda _c, _col: ([_Item()], Manifest(cfg.manifest_path))
+    )
+    client = TestClient(create_app(cfg))
+    client.cookies.set("pf_collection", "ocean")
+    page = client.get("/wanted?tab=held")
+    assert page.status_code == 200
+    assert 'src="/item/K1/summary"' in page.text
+    assert "summary-frame" in page.text
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_wanted_summarize_enqueues_item(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.llm_enabled = True
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
+    seen: list[list[str] | None] = []
+
+    def fake(cfg, cmd_id, **kw):
+        seen.append(kw.get("item_keys"))
+        return {"summarized": 1}
+
+    jobs.summarize_fn = fake
+    try:
+        client = TestClient(create_app(cfg))
+        res = client.post(
+            "/wanted/summarize",
+            data={"key": "K1", "dest": "disk"},
+            follow_redirects=False,
+        )
+        assert res.status_code == 303
+        deadline = time.time() + 2
+        while time.time() < deadline:
+            if seen:
+                break
+            time.sleep(0.02)
+        assert seen == [["K1"]]
+    finally:
+        jobs.summarize_fn = None

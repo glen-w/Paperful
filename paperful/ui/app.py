@@ -254,8 +254,16 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             return JSONResponse({"ok": False, "error": msg}, status_code=409)
         return RedirectResponse(url="/wanted", status_code=303)
 
+    def _last_review_token(verb: str) -> str:
+        for rec in commands.list_commands(cfg, limit=20):
+            if rec.get("verb") == verb and rec.get("review_token"):
+                return str(rec["review_token"])
+        return ""
+
     @app.get("/discover", response_class=HTMLResponse)
-    def page_discover(request: Request, list_name: str = "") -> HTMLResponse:
+    def page_discover(
+        request: Request, list_name: str = "", error: str = ""
+    ) -> HTMLResponse:
         run_id, candidates = newest_snowball_queue(cfg)
         active_list = (list_name or "followed").strip()
         people: list[dict[str, Any]] = []
@@ -279,7 +287,14 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 aw_people=people,
                 profiles=list_snowball_profiles(cfg),
                 deferred_run=snowball_deferred_run_id(cfg),
-                error="",
+                snowball_token=_last_review_token("snowball_apply"),
+                aw_token=_last_review_token("authorwatch_apply"),
+                note=(
+                    last_job_result(cfg, "snowball_briefing")
+                    or last_job_result(cfg, "snowball_digest")
+                    or last_job_result(cfg, "authorwatch_briefing")
+                ),
+                error=error,
             ),
         )
 
@@ -316,16 +331,50 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         commands.enqueue(cfg, "authorwatch_run", work)
         return RedirectResponse(url="/discover", status_code=303)
 
-    @app.post("/discover/apply")
-    async def discover_apply(request: Request) -> RedirectResponse:
+    @app.post("/discover/apply-preview")
+    async def discover_apply_preview(request: Request) -> RedirectResponse:
         prefs = prefs_from_request(request)
         form = await request.form()
         kind = str(form.get("kind") or "snowball")
         run_id = str(form.get("run_id") or "")
-        if kind == "snowball" and run_id:
-            jobs.discover_apply_snowball(cfg, run_id, prefs.collection)
-        elif kind == "authorwatch":
-            jobs.discover_apply_authorwatch(cfg, str(form.get("list_name") or "followed"), prefs.collection)
+        list_name = str(form.get("list_name") or "followed")
+
+        def work(cmd_id: str) -> None:
+            jobs.discover_apply_preview(
+                cfg,
+                cmd_id,
+                kind=kind,
+                run_id=run_id,
+                list_name=list_name,
+                collection=prefs.collection,
+            )
+
+        verb = "authorwatch_apply" if kind == "authorwatch" else "snowball_apply"
+        commands.enqueue(cfg, verb, work)
+        return RedirectResponse(url="/discover", status_code=303)
+
+    @app.post("/discover/apply", response_model=None)
+    async def discover_apply(request: Request):
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        kind = str(form.get("kind") or "snowball")
+        run_id = str(form.get("run_id") or "")
+        list_name = str(form.get("list_name") or "followed")
+        token = str(form.get("review_token") or "")
+        if not token:
+            token = _last_review_token(
+                "authorwatch_apply" if kind == "authorwatch" else "snowball_apply"
+            )
+        ok, msg = jobs.discover_apply_consume(
+            cfg,
+            token=token,
+            kind=kind,
+            run_id=run_id,
+            list_name=list_name,
+            collection=prefs.collection,
+        )
+        if not ok:
+            return JSONResponse({"ok": False, "error": msg}, status_code=409)
         return RedirectResponse(url="/wanted", status_code=303)
 
     @app.post("/discover/check-again")
@@ -362,17 +411,14 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         form = await request.form()
         name = str(form.get("watch_name") or "topic-watch").strip()
         profile = str(form.get("profile") or "").strip()
-        if profile:
-            from ..snowball.watch import save_watch
+        if not profile:
+            return RedirectResponse(url="/discover?error=watch", status_code=303)
+        from ..snowball.watch import save_watch
 
-            try:
-                save_watch(cfg, name, profile)
-            except Exception:
-                return RedirectResponse(url="/discover?error=watch", status_code=303)
-        else:
-            dest = cfg.state_dir / "snowball" / "watches" / name
-            dest.mkdir(parents=True, exist_ok=True)
-            (dest / "watch.json").write_text('{"schema":"paperful.snowball.watch.v1"}\n', encoding="utf-8")
+        try:
+            save_watch(cfg, name, profile)
+        except Exception:
+            return RedirectResponse(url="/discover?error=watch", status_code=303)
         return RedirectResponse(url="/discover", status_code=303)
 
     @app.post("/discover/resume")
@@ -437,6 +483,46 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         commands.enqueue(cfg, "snowball_profile", work)
         return RedirectResponse(url="/discover", status_code=303)
 
+    @app.post("/discover/briefing")
+    async def discover_briefing(request: Request) -> RedirectResponse:
+        form = await request.form()
+        run_id = str(form.get("run_id") or "").strip()
+        if not run_id:
+            return RedirectResponse(url="/discover", status_code=303)
+
+        def work(cmd_id: str) -> None:
+            from ..snowball.briefing import write_run_briefing
+
+            briefing = write_run_briefing(cfg, run_id)
+            jobs._attach_result(
+                cfg,
+                cmd_id,
+                {"path": str(briefing.path), "markdown": briefing.markdown[:4000]},
+            )
+
+        commands.enqueue(cfg, "snowball_briefing", work)
+        return RedirectResponse(url="/discover", status_code=303)
+
+    @app.post("/discover/digest")
+    async def discover_digest(request: Request) -> RedirectResponse:
+        form = await request.form()
+        run_id = str(form.get("run_id") or "").strip()
+        if not run_id:
+            return RedirectResponse(url="/discover", status_code=303)
+
+        def work(cmd_id: str) -> None:
+            from ..snowball.digest import write_run_digest
+
+            digest = write_run_digest(cfg, run_id)
+            jobs._attach_result(
+                cfg,
+                cmd_id,
+                {"path": str(digest.path), "markdown": digest.markdown[:4000]},
+            )
+
+        commands.enqueue(cfg, "snowball_digest", work)
+        return RedirectResponse(url="/discover", status_code=303)
+
     @app.post("/discover/aw/save")
     async def discover_aw_save(request: Request) -> RedirectResponse:
         form = await request.form()
@@ -495,6 +581,43 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             run_list(cfg, name, console=jobs._quiet_console(), backfill_from=backfill)
 
         commands.enqueue(cfg, "authorwatch_run", work)
+        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+
+    @app.post("/discover/aw/import", response_model=None)
+    async def discover_aw_import(request: Request):
+        form = await request.form()
+        name = str(form.get("list_name") or "followed").strip()
+        source = str(form.get("source") or "csv").strip().lower()
+        upload = form.get("file")
+        filename = str(getattr(upload, "filename", "") or "")
+        if not filename or upload is None:
+            return JSONResponse({"ok": False, "error": "file required"}, status_code=400)
+        data = await upload.read()  # type: ignore[union-attr]
+        dest_dir = cfg.state_dir / "gui" / "uploads"
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / Path(filename).name
+        dest.write_bytes(data)
+        jobs.authorwatch_import(cfg, list_name=name, path=dest, source=source)
+        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+
+    @app.post("/discover/aw/briefing")
+    async def discover_aw_briefing(request: Request) -> RedirectResponse:
+        form = await request.form()
+        name = str(form.get("list_name") or "").strip()
+        if not name:
+            return RedirectResponse(url="/discover", status_code=303)
+
+        def work(cmd_id: str) -> None:
+            from ..authorwatch import write_briefing
+
+            path = write_briefing(cfg, name)
+            jobs._attach_result(
+                cfg,
+                cmd_id,
+                {"path": str(path), "markdown": path.read_text(encoding="utf-8")[:4000]},
+            )
+
+        commands.enqueue(cfg, "authorwatch_briefing", work)
         return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
 
     @app.get("/library", response_class=HTMLResponse)

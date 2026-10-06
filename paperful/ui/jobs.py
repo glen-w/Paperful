@@ -22,6 +22,7 @@ snowball_run_calls: list[dict[str, Any]] = []
 snowball_apply_fn: Callable[..., Any] | None = None
 authorwatch_run_fn: Callable[..., Any] | None = None
 authorwatch_apply_fn: Callable[..., Any] | None = None
+authorwatch_import_fn: Callable[..., Any] | None = None
 ask_turn_fn: Callable[..., dict[str, Any]] | None = None
 rag_ingest_fn: Callable[..., dict[str, Any]] | None = None
 ask_batch_fn: Callable[..., dict[str, Any]] | None = None
@@ -342,6 +343,98 @@ def follow_person(
     )
 
 
+def _snowball_apply_fingerprint(cfg: Config, run_id: str, collection: str) -> str:
+    import hashlib
+    import json
+
+    keeps: list[str] = []
+    path = cfg.state_dir / "snowball" / run_id / "candidates.jsonl"
+    if path.is_file():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                data = json.loads(line)
+            except ValueError:
+                continue
+            if data.get("keep") is False:
+                continue
+            doi = str(data.get("doi") or "")
+            if doi:
+                keeps.append(doi)
+    keeps.sort()
+    return hashlib.sha256(
+        f"snowball|{run_id}|{collection}|{','.join(keeps)}".encode()
+    ).hexdigest()
+
+
+def _authorwatch_apply_fingerprint(cfg: Config, list_name: str, collection: str) -> str:
+    import hashlib
+
+    from ..authorwatch import inbox_count
+
+    n = inbox_count(cfg, list_name)
+    return hashlib.sha256(
+        f"authorwatch|{list_name}|{collection}|{n}".encode()
+    ).hexdigest()
+
+
+def discover_apply_preview(
+    cfg: Config,
+    cmd_id: str,
+    *,
+    kind: str,
+    run_id: str,
+    list_name: str,
+    collection: str,
+) -> str:
+    if kind == "authorwatch":
+        fp = _authorwatch_apply_fingerprint(cfg, list_name, collection)
+        keys = [list_name]
+        verb = "authorwatch_apply"
+    else:
+        fp = _snowball_apply_fingerprint(cfg, run_id, collection)
+        keys = [run_id]
+        verb = "snowball_apply"
+    token = commands.create_review_token(
+        cfg,
+        verb=verb,
+        collection=collection,
+        preset="oa",
+        keys=keys,
+        fingerprint=fp,
+        command_id=cmd_id,
+    )
+    _attach_result(cfg, cmd_id, {"review_token": token, "kind": kind})
+    return token
+
+
+def discover_apply_consume(
+    cfg: Config,
+    *,
+    token: str,
+    kind: str,
+    run_id: str,
+    list_name: str,
+    collection: str,
+) -> tuple[bool, str]:
+    if kind == "authorwatch":
+        fp = _authorwatch_apply_fingerprint(cfg, list_name, collection)
+        keys = [list_name]
+    else:
+        fp = _snowball_apply_fingerprint(cfg, run_id, collection)
+        keys = [run_id]
+    ok, msg = commands.consume_review(cfg, token, fingerprint=fp, keys=keys)
+    if not ok:
+        return False, msg
+    if kind == "authorwatch":
+        discover_apply_authorwatch(cfg, list_name, collection)
+    else:
+        discover_apply_snowball(cfg, run_id, collection)
+    return True, ""
+
+
 def discover_apply_snowball(cfg: Config, run_id: str, collection: str) -> None:
     if snowball_apply_fn is not None:
         snowball_apply_fn(cfg, run_id=run_id, collection=collection)
@@ -359,6 +452,21 @@ def discover_apply_authorwatch(cfg: Config, list_name: str, collection: str) -> 
     from ..authorwatch import apply_list
 
     apply_list(_quiet_console(), cfg, list_name, collection, apply=True)
+
+
+def authorwatch_import(
+    cfg: Config,
+    *,
+    list_name: str,
+    path: Any,
+    source: str,
+) -> None:
+    if authorwatch_import_fn is not None:
+        authorwatch_import_fn(cfg, list_name=list_name, path=path, source=source)
+        return
+    from ..authorwatch import import_file
+
+    import_file(cfg, list_name, path=path, source=source, resolve=False)
 
 
 def ask_turn(

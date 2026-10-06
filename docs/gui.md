@@ -103,6 +103,16 @@ Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
 | GET | `/index/report/{slug}` | HTML under `state/reports/` |
 | GET | `/item/{key}/summary` | Per-item HTML under `state/summaries/` |
 | POST | `/wanted/summarize` | Enqueue single-item `summarize`; redirect `?run=` |
+| POST | `/discover/topic` | Enqueue snowball kind (Advanced) or keyword search |
+| POST | `/discover/resume` | Enqueue `snowball resume` |
+| POST | `/discover/profile-run` | Enqueue `snowball run --profile` |
+| POST | `/discover/briefing` | Write queue `briefing.md`; show on Discover |
+| POST | `/discover/digest` | Write queue `digest.md`; show on Discover |
+| POST | `/discover/watch` | `save_watch` (profile required) |
+| POST | `/discover/apply-preview` | Review token for snowball/authorwatch apply |
+| POST | `/discover/apply` | Consume token; `snowball apply` / `authorwatch apply` |
+| POST | `/discover/aw/import` | CSV/JSON/ORCID file → list (`resolve` off) |
+| POST | `/discover/aw/briefing` | Write list `briefing.md` |
 | POST | `/briefs/summarize` | Enqueue `summarize`; redirect `/briefs?run=` |
 | POST | `/briefs/synthesize` | Enqueue `synthesize` (dry-run or write); redirect `?run=` |
 | GET | `/briefs/summary/{key}` | HTML under `state/summaries/` |
@@ -113,7 +123,9 @@ advanced `/repair`, `/mirror`, `/index`, `/briefs`, `/settings`. `GET /` → `/w
 `POST /index/ask` enqueues a cited Ask turn (not linked from the simple shell).
 
 Writes over HTTP use review tokens under `state/gui/reviews/`; stale library
-fingerprints return **409**.
+fingerprints return **409**. Discover **Add selected** / inbox apply require
+**Preview apply** first. **Keep an eye on this** needs an existing snowball
+profile (`save_watch`); it does not write an empty `watch.json`.
 
 ---
 

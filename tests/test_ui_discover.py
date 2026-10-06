@@ -118,3 +118,124 @@ def test_discover_topic_kind_doi_enqueues(tmp_path, monkeypatch):
     assert "10.1000/example" in jobs.snowball_run_calls[-1]["seeds"]
     jobs.snowball_run_fn = None
     jobs.snowball_run_calls.clear()
+
+
+@pytest.mark.skipif(
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
+    reason="paperful[serve] extra missing",
+)
+def test_simple_ignores_kind(tmp_path, monkeypatch):
+    import time
+
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    from paperful.serve import create_app
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
+    jobs.snowball_run_calls.clear()
+    jobs.snowball_run_fn = lambda *a, **k: None
+    client = TestClient(create_app(cfg))
+    client.post(
+        "/discover/topic",
+        data={"kind": "doi", "seeds": "10.1000/example", "query": "BBNJ"},
+    )
+    deadline = time.time() + 2
+    while time.time() < deadline:
+        if jobs.snowball_run_calls:
+            break
+        time.sleep(0.02)
+    assert jobs.snowball_run_calls[-1]["kind"] == "search"
+    jobs.snowball_run_fn = None
+    jobs.snowball_run_calls.clear()
+
+
+@pytest.mark.skipif(
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
+    reason="paperful[serve] extra missing",
+)
+def test_resume_enqueues(tmp_path, monkeypatch):
+    import time
+
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    import paperful.snowball.command as snowball_command
+    from paperful.serve import create_app
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    deferred = cfg.state_dir / "snowball" / "run-deferred"
+    deferred.mkdir(parents=True)
+    (deferred / "deferred.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
+    seen: list[str] = []
+
+    def fake_resume(cfg, run_id, req, console=None):
+        seen.append(run_id)
+
+    monkeypatch.setattr(snowball_command, "run_resume", fake_resume)
+    client = TestClient(create_app(cfg))
+    page = client.get("/discover")
+    assert "Resume run-deferred" in page.text
+    res = client.post(
+        "/discover/resume",
+        data={"run_id": "run-deferred"},
+        follow_redirects=False,
+    )
+    assert res.status_code == 303
+    deadline = time.time() + 2
+    while time.time() < deadline:
+        if seen:
+            break
+        time.sleep(0.02)
+    assert seen == ["run-deferred"]
+
+
+@pytest.mark.skipif(
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
+    reason="paperful[serve] extra missing",
+)
+def test_watch_save_calls_save_watch(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    import paperful.snowball.watch as watch
+    from paperful.serve import create_app
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        watch, "save_watch", lambda cfg, name, profile: calls.append((name, profile))
+    )
+    client = TestClient(create_app(cfg))
+    empty = client.post(
+        "/discover/watch",
+        data={"watch_name": "topic-watch"},
+        follow_redirects=False,
+    )
+    assert empty.status_code == 303
+    assert "error=watch" in (empty.headers.get("location") or "")
+    assert not (
+        cfg.state_dir / "snowball" / "watches" / "topic-watch" / "watch.json"
+    ).exists()
+    ok = client.post(
+        "/discover/watch",
+        data={"watch_name": "topic-watch", "profile": "keyword-scout"},
+        follow_redirects=False,
+    )
+    assert ok.status_code == 303
+    assert calls == [("topic-watch", "keyword-scout")]
