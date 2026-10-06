@@ -890,6 +890,199 @@ def _live_tally(console: Console) -> Tally:
     return tally
 
 
+def _snowball_crawl_rows(
+    cfg: Config,
+    request: SnowballRequest,
+    *,
+    oa: OpenAlexClient,
+    run_id: str,
+    gate: str,
+    caps: tuple[int, int, str],
+    crawl: Callable,
+    expect_failures: bool,
+    expand_neighbors: bool,
+) -> tuple[list[Candidate], list[str]]:
+    failed: list[str] = []
+    saved: list[Candidate] = []
+    seen: set[str] = set()
+
+    def emit(batch: list[Candidate]) -> None:
+        changed = False
+        for row in batch:
+            key = row.identity or f"row:{id(row)}"
+            if key in seen:
+                continue
+            seen.add(key)
+            saved.append(row)
+            changed = True
+        if changed:
+            write_queue(cfg.state_dir, run_id, saved, oa, library_unread=True)
+
+    oa.emit = emit
+    try:
+        produced = crawl(oa, run_id, gate, caps)
+    except NoKeywordSeeds as exc:
+        raise SnowballError(str(exc)) from exc
+    except (Exception, KeyboardInterrupt) as exc:
+        if oa.deferred is None:
+            remaining = list(getattr(exc, "remaining", []) or [])
+            oa.deferred = {
+                "kind": "fill" if isinstance(exc, FillPaused) else "interrupted",
+                "backend": getattr(exc, "backend", ""),
+                "reset_at": getattr(exc, "reset_at", None),
+                "reset_in_s": getattr(exc, "reset_in_s", None),
+                "remaining_ids": remaining,
+                "keyed": bool(oa._using_key and oa.api_key),
+                "error": str(exc),
+                "expand_neighbors": expand_neighbors,
+            }
+        produced = (list(saved), []) if expect_failures else list(saved)
+        if isinstance(exc, KeyboardInterrupt) and not saved:
+            raise
+    if expect_failures:
+        rows, failed = produced
+    else:
+        rows = produced
+    return rows, failed
+
+
+def _snowball_prepare_queue(
+    cfg: Config,
+    request: SnowballRequest,
+    rows: list[Candidate],
+    *,
+    console: Console,
+    oa: OpenAlexClient,
+    run_id: str,
+    gate: str,
+    caps: tuple[int, int, str],
+    client: OpenAlexClient | None,
+    lookup: Lookup | None,
+    backend: Any,
+    backends: tuple[str, ...],
+    crossref_getter: Any,
+    s2_getter: Any,
+    expand_neighbors: bool,
+    decider: Decider | None,
+    refine_query: str,
+    suggester: Any,
+) -> tuple[list[Candidate], Path, bool, Any, BaseException | None, dict[str, Any]]:
+    scope = (request.dedupe_scope or cfg.snowball_dedupe_scope or "library").strip()
+    types = cfg.snowball_types if request.types is None else request.types
+    oa_only = cfg.snowball_oa_only if request.oa_only is None else request.oa_only
+    venue_include = (
+        cfg.snowball_venue_include if request.venue_include is None else request.venue_include
+    )
+    venue_exclude = (
+        cfg.snowball_venue_exclude if request.venue_exclude is None else request.venue_exclude
+    )
+    languages = cfg.snowball_languages if request.languages is None else request.languages
+    try:
+        direction = normalize_direction(request.direction)
+    except ValueError:
+        direction = "refs"
+    apply_overlap(rows)
+    rows, paused = _fill_metadata(
+        cfg,
+        request,
+        rows,
+        backends=backends,
+        console=console,
+        live=client is None,
+        crossref_getter=crossref_getter,
+        s2_getter=s2_getter,
+        europepmc_getter=getattr(oa, "epmc_getter", None),
+        europepmc_cache=getattr(oa, "epmc_cache_dir", None),
+        pdf_getter=getattr(oa, "pdf_getter", None),
+        per_hop_limit=caps[1],
+        direction=direction,
+        tally=oa.tally,
+        expand_neighbors=expand_neighbors,
+    )
+    repair_reference_titles(rows, oa, tally=oa.tally)
+    if paused and oa.deferred is None:
+        remaining = _blocked_dois(paused)
+        oa.deferred = {
+            "kind": "fill",
+            "backend": next(iter(paused)),
+            "remaining_ids": sorted(remaining),
+            "pauses": paused,
+            "error": next(iter(paused)),
+            "keyed": bool(oa._using_key and oa.api_key),
+            "per_hop_limit": caps[1],
+            "direction": direction,
+            "expand_neighbors": expand_neighbors,
+        }
+    apply_overlap(rows)
+    rows = apply_filters(
+        rows,
+        year_from=request.year_from,
+        year_to=request.year_to,
+        types=types,
+        oa_only=oa_only,
+        venue_include=venue_include,
+        venue_exclude=venue_exclude,
+        languages=languages,
+    )
+    rows = truncate(rows, caps[0])
+    if gate == "approve-batch":
+        for row in rows:
+            if row.keep is None and row.status == "new":
+                row.keep = False
+    library_unread = False
+    finder = lookup
+    lib = backend
+    unread_error: BaseException | None = None
+    if scope == "none":
+        console.print("[yellow]dedupe_scope none: not checking the library[/]")
+        finder = None
+        if gate in {"auto", "approve-each"} and lib is None:
+            try:
+                lib = get_backend(cfg)
+            except Exception as exc:
+                lib = None
+                unread_error = exc
+                library_unread = True
+    elif finder is None:
+        try:
+            lib = lib or get_backend(cfg)
+            finder = _library_lookup(lib, scope=scope, collection=request.collection)
+        except Exception as exc:
+            library_unread = True
+            finder = None
+            if gate in {"auto", "approve-each"}:
+                lib = None
+                unread_error = exc
+    if scope != "none" and finder is not None:
+        try:
+            _mark_exists(rows, finder, version_of=_version_of(cfg, request))
+        except Exception:
+            library_unread = True
+    elif scope != "none":
+        library_unread = True
+    if gate == "approve-each":
+        _approve_each(rows, request, cfg, console, decider, run_id)
+    filtered = sum(1 for row in rows if row.status == "filtered")
+    dest = write_queue(
+        cfg.state_dir,
+        run_id,
+        rows,
+        oa,
+        library_unread=library_unread,
+        meta=_summary_meta(
+            cfg,
+            request,
+            caps=caps,
+            filtered=filtered,
+            scope=scope,
+            refine_query=refine_query,
+            suggester=suggester,
+            console=console,
+        ),
+    )
+    return rows, dest, library_unread, lib, unread_error, paused
+
+
 def _execute(
     cfg: Config,
     request: SnowballRequest,
@@ -943,158 +1136,43 @@ def _execute(
         _cap(request.per_hop_limit, cfg.snowball_per_hop_limit),
         _rank(request.per_hop_rank, cfg.snowball_per_hop_rank),
     )
-    failed: list[str] = []
-    saved: list[Candidate] = []
-    seen: set[str] = set()
-
-    def emit(batch: list[Candidate]) -> None:
-        changed = False
-        for row in batch:
-            key = row.identity or f"row:{id(row)}"
-            if key in seen:
-                continue
-            seen.add(key)
-            saved.append(row)
-            changed = True
-        if changed:
-            write_queue(cfg.state_dir, run_id, saved, oa, library_unread=True)
-
-    oa.emit = emit
-    try:
-        produced = crawl(oa, run_id, gate, caps)
-    except NoKeywordSeeds as exc:
-        raise SnowballError(str(exc)) from exc
-    except (Exception, KeyboardInterrupt) as exc:
-        if oa.deferred is None:
-            remaining = list(getattr(exc, "remaining", []) or [])
-            oa.deferred = {
-                "kind": "fill" if isinstance(exc, FillPaused) else "interrupted",
-                "backend": getattr(exc, "backend", ""),
-                "reset_at": getattr(exc, "reset_at", None),
-                "reset_in_s": getattr(exc, "reset_in_s", None),
-                "remaining_ids": remaining,
-                "keyed": bool(oa._using_key and oa.api_key),
-                "error": str(exc),
-                "expand_neighbors": expand_neighbors,
-            }
-        produced = (list(saved), []) if expect_failures else list(saved)
-        if isinstance(exc, KeyboardInterrupt) and not saved:
-            raise
-    if expect_failures:
-        rows, failed = produced
-    else:
-        rows = produced
-    scope = (request.dedupe_scope or cfg.snowball_dedupe_scope or "library").strip()
-    types = cfg.snowball_types if request.types is None else request.types
-    oa_only = cfg.snowball_oa_only if request.oa_only is None else request.oa_only
-    venue_include = cfg.snowball_venue_include if request.venue_include is None else request.venue_include
-    venue_exclude = cfg.snowball_venue_exclude if request.venue_exclude is None else request.venue_exclude
-    languages = cfg.snowball_languages if request.languages is None else request.languages
-    tag_prefix = request.tag_prefix or cfg.snowball_tag_prefix
-    note_provenance = cfg.snowball_note_provenance if request.note_provenance is None else request.note_provenance
     backends = _backends(cfg, request)
-    try:
-        direction = normalize_direction(request.direction)
-    except ValueError:
-        direction = "refs"
-    apply_overlap(rows)
-    rows, paused = _fill_metadata(
+    rows, failed = _snowball_crawl_rows(
+        cfg,
+        request,
+        oa=oa,
+        run_id=run_id,
+        gate=gate,
+        caps=caps,
+        crawl=crawl,
+        expect_failures=expect_failures,
+        expand_neighbors=expand_neighbors,
+    )
+    rows, dest, library_unread, lib, _unread_error, paused = _snowball_prepare_queue(
         cfg,
         request,
         rows,
-        backends=backends,
         console=console,
-        live=client is None,
+        oa=oa,
+        run_id=run_id,
+        gate=gate,
+        caps=caps,
+        client=client,
+        lookup=lookup,
+        backend=backend,
+        backends=backends,
         crossref_getter=crossref_getter,
         s2_getter=s2_getter,
-        europepmc_getter=getattr(oa, "epmc_getter", None),
-        europepmc_cache=getattr(oa, "epmc_cache_dir", None),
-        pdf_getter=getattr(oa, "pdf_getter", None),
-        per_hop_limit=caps[1],
-        direction=direction,
-        tally=tally,
         expand_neighbors=expand_neighbors,
+        decider=decider,
+        refine_query=refine_query,
+        suggester=suggester,
     )
-    repair_reference_titles(rows, oa, tally=tally)
-    if paused and oa.deferred is None:
-        remaining = _blocked_dois(paused)
-        oa.deferred = {
-            "kind": "fill",
-            "backend": next(iter(paused)),
-            "remaining_ids": sorted(remaining),
-            "pauses": paused,
-            "error": next(iter(paused)),
-            "keyed": bool(oa._using_key and oa.api_key),
-            "per_hop_limit": caps[1],
-            "direction": direction,
-            "expand_neighbors": expand_neighbors,
-        }
-    apply_overlap(rows)
-    rows = apply_filters(
-        rows,
-        year_from=request.year_from,
-        year_to=request.year_to,
-        types=types,
-        oa_only=oa_only,
-        venue_include=venue_include,
-        venue_exclude=venue_exclude,
-        languages=languages,
-    )
-    rows = truncate(rows, caps[0])
-    if gate == "approve-batch":
-        for row in rows:
-            if row.keep is None and row.status == "new":
-                row.keep = False
-    library_unread = False
-    finder = lookup
-    lib = backend
-    _unread_error: BaseException | None = None
-    if scope == "none":
-        console.print("[yellow]dedupe_scope none: not checking the library[/]")
-        finder = None
-        if gate in {"auto", "approve-each"} and lib is None:
-            try:
-                lib = get_backend(cfg)
-            except Exception as exc:
-                lib = None
-                _unread_error = exc
-                library_unread = True
-    elif finder is None:
-        try:
-            lib = lib or get_backend(cfg)
-            finder = _library_lookup(lib, scope=scope, collection=request.collection)
-        except Exception as exc:
-            library_unread = True
-            finder = None
-            if gate in {"auto", "approve-each"}:
-                lib = None
-                _unread_error = exc
-    if scope != "none" and finder is not None:
-        try:
-            _mark_exists(rows, finder, version_of=_version_of(cfg, request))
-        except Exception:
-            library_unread = True
-    elif scope != "none":
-        library_unread = True
-    if gate == "approve-each":
-        _approve_each(rows, request, cfg, console, decider, run_id)
-    filtered = sum(1 for row in rows if row.status == "filtered")
-    dest = write_queue(
-        cfg.state_dir,
-        run_id,
-        rows,
-        oa,
-        library_unread=library_unread,
-        meta=_summary_meta(
-            cfg,
-            request,
-            caps=caps,
-            filtered=filtered,
-            scope=scope,
-            refine_query=refine_query,
-            suggester=suggester,
-            console=console,
-        ),
+    tag_prefix = request.tag_prefix or cfg.snowball_tag_prefix
+    note_provenance = (
+        cfg.snowball_note_provenance
+        if request.note_provenance is None
+        else request.note_provenance
     )
     want_preflight = (
         cfg.snowball_author_site_preflight
