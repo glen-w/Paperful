@@ -32,7 +32,7 @@ integrations.
 | **1.0** | **Post-1.0** |
 | --- | --- |
 | Trust checklist, locked `paperful.run_report.v1` / `paperful.item.v1`, snapshot contract | **Local OpenAlex parquet store** — phases 2B/2C (`works_citing`, full search parity, `local_duckdb` / `http`). Live OpenAlex API is enough for most installs; v1 `ssh_duckdb` remains opt-in for institutions |
-| **GUI workbench** — Discover + Wanted simple loop; command ids; review tokens; Advanced reveals remaining verbs | **Firefox extension** — native messaging → CLI ([section below](#optional-thin-bridge--firefox-extension-post-10)) |
+| **GUI workbench** — Discover + Wanted simple loop (topic + people); command ids; review tokens; Advanced reveals Briefs / Index / remaining verbs | **Firefox extension** — native messaging → CLI ([section below](#optional-thin-bridge--firefox-extension-post-10)) |
 | **Ask in GUI (Index)** — scoped chat with citations when `[rag]` + `[llm]` on | **Newsletter / alert ingest** — rollup bridge, Scholar alerts first ([Frontier digest](#frontier-digest-later-watch--external-ingest)) |
 | Zotero-proven path; Mendeley / EndNote when real-library testers confirm | SaaS tenancy polish, remote-manager parity beyond what 1.0 open/Docker needs |
 
@@ -1358,9 +1358,11 @@ second doc tree that drifts from the CLI.
 **1.0 deliverable** — workbench (open / Docker first): [gui.md](gui.md).
 **Landed:** `paperful.item.v1` lock, `paperful serve` HTTP + server-rendered UI
 under `paperful/ui/` — default nav **Discover** and **Wanted**, Preview/Grab with
-review tokens, command ids under `state/gui/commands/`. **Advanced** (cookie)
-reveals Repair, Mirror, Index, Settings and extra form fields without enabling
-opt-in sources. **Not tagged 1.0.**
+review tokens, command ids under `state/gui/commands/`. Discover covers topic
+queues (keep/skip, briefing, digest, profile run, resume, watches) and people
+lists (create/add/resolve/run/import, inbox apply). **Advanced** (cookie)
+reveals Repair, Mirror, Index, Briefs, Settings and extra form fields without
+enabling opt-in sources. **Not tagged 1.0.**
 
 The CLI stays the source of truth; the GUI marshals the same verbs with dry-run
 default and explicit Apply. Not a second fetch stack or Zotero’s reader.

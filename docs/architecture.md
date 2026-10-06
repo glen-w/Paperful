@@ -309,9 +309,12 @@ prints **one** `paperful.agent.json.v1` object on stdout (`schema`, `command`, `
 Exit **3** is a mixed **write** batch (`run` uses attached vs attach_failed). Legacy `--json` on `lint` / `gaps` / `dedupe` keeps its old shape
 unless `--format json` is also passed. `paperful mcp` is optional stdio sugar for the same
 payloads on `refs_gap` (never creates parents) and `ask` (index only). Prefer `… --format json`
-from a shell. `paperful serve` exposes health, doctor, collections, last-run,
-and dry-run `refs-gap` / `ask` over localhost HTTP (`paperful[serve]`).
-`collections add` is CLI-only (`--apply` writes) and is not an MCP tool.
+from a shell. `paperful serve` (`paperful[serve]`) binds localhost HTTP: JSON
+capability routes (health, doctor, collections, last-run, dry-run `refs-gap` /
+`ask`) plus the server-rendered workbench (`paperful.ui` — Discover, Wanted,
+Library, Activity, System; Advanced Repair / Mirror / Index / Briefs / Settings).
+See [gui.md](gui.md). `collections add` is CLI-only (`--apply` writes) and is
+not an MCP tool.
 
 TTY-only paths (a GUI must not claim them): `session login`, `doctor --guide`,
 and mid-run EZProxy re-login.

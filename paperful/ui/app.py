@@ -115,10 +115,23 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     templates = Jinja2Templates(directory=str(_ui_dir() / "templates"))
     static_dir = _ui_dir() / "static"
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+    # Health chip only — avoid re-running the full doctor on every HTML request.
+    _health_cache: dict[str, Any] = {"at": 0.0, "checks": []}
+
+    def _cached_doctor() -> list[dict[str, Any]]:
+        import time
+
+        now = time.time()
+        if now - float(_health_cache["at"]) < 30.0 and _health_cache["checks"]:
+            return list(_health_cache["checks"])
+        checks = doctor_payload(cfg)
+        _health_cache["at"] = now
+        _health_cache["checks"] = checks
+        return checks
 
     def ctx(request: Request, active: str, **extra: Any) -> dict[str, Any]:
         prefs = prefs_from_request(request)
-        checks = doctor_payload(cfg)
+        checks = _cached_doctor()
         return {
             "request": request,
             "prefs": prefs,

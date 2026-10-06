@@ -10,13 +10,14 @@ Required keys on `paperful.item.v1` from `empty_item_record()` are frozen the
 same way. This tree is not tagged 1.0.
 
 **1.0** (not tagged) still owes polish on the **workbench** on
-`paperful serve` (Discover + Wanted simple loop, command ids, review tokens are
-in tree). **Interactive Ask** is on **Index**, opt-in after `[rag]` + `[llm]`.
-Item records and
-create-missing restore are locked; extra item keys may still be added. Required
-`paperful.run_report.v1` keys and imported-file attach (typed `attach_failed`,
-provenance note) are already the contract. **Post-1.0:** local OpenAlex snapshot
-phases beyond opt-in v1, Firefox extension, newsletter/alert ingest — see
+`paperful serve` (Discover + Wanted simple loop, people lists, briefing/digest,
+command ids, review tokens are in tree). **Interactive Ask** is on **Index**,
+opt-in after `[rag]` + `[llm]`; Advanced **Briefs** runs summarize/synthesize.
+Item records and create-missing restore are locked; extra item keys may still
+be added. Required `paperful.run_report.v1` keys and imported-file attach
+(typed `attach_failed`, provenance note) are already the contract. **Post-1.0:**
+local OpenAlex snapshot phases beyond opt-in v1, Firefox extension,
+newsletter/alert ingest — see
 [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10).
 
 ## Schema compatibility (0.9, not frozen as 1.0)
@@ -77,6 +78,6 @@ before 1.0. See [LLM](llm.md).
 | Locked report JSON schema | Required `paperful.run_report.v1` keys frozen; additive keys still allowed. Not tagged 1.0 |
 | Locked item record + snapshot/restore | Required `paperful.item.v1` keys frozen; restore is create-missing (not identity round-trip) |
 | Mendeley and EndNote adapters | In the tree. Seeking testers. Zotero is the well-tested path |
-| Workbench GUI (Discover, Wanted, Preview/Grab) | Landed on `paperful serve` (Jinja workbench, review tokens, Compose `gui` profile) — [gui.md](gui.md). Not tagged 1.0 |
-| Interactive Ask in GUI (cited chat-over-collection) | **Shipped** on Index (opt-in `[rag]` + `[llm]`; CLI threads) |
+| Workbench GUI (Discover, Wanted, Preview/Grab) | Landed on `paperful serve` (Jinja workbench, Discover topic + people, review tokens, Compose `gui` profile) — [gui.md](gui.md). Not tagged 1.0 |
+| Interactive Ask in GUI (cited chat-over-collection) | **Shipped** on Index (opt-in `[rag]` + `[llm]`; CLI threads); Briefs for summarize/synthesize |
 | Fresh-clone doctor stays quiet without Scholar | Shipped (0.9): `scholar` opt-in like `scihub` |
