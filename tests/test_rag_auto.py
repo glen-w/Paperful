@@ -165,10 +165,10 @@ def test_every_command_that_lands_pdfs_calls_the_hook():
     """Guards the wiring: a new landing path should add its own call."""
     import inspect
 
-    from paperful import gaps_cmd, run_hooks
+    from paperful import gaps_cmd, run_cmd, run_hooks
 
     hooked = {
-        "run": cli.run,
+        "run": run_cmd.run_fetch,
         "gaps": gaps_cmd.run_gaps,
         "attach": cli.attach,
         "inbox watch": cli.inbox_watch,

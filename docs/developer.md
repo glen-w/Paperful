@@ -87,9 +87,17 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `sync.py` | The refresh: delta or full, version last | `snapshot`, `mirror`, `library` |
 | `catalogue.py` | `MirrorCatalogue`, `MirrorFirstBackend`, `open_library` | `sync`, `mirror`, `library` |
 | `scope.py` | Collection, year, type selection | `library` errors |
-| `resolve.py`, `lint.py`, `acronyms.py`, `authors_report.py`, `metadata.py`, `dedupe.py`, `pdfid.py` | Identifier, hygiene, and corpus-frequency logic. Take a backend; never name a manager | the protocol |
+| `resolve/` (`ids.py`, `enrich.py`), `lint.py`, `acronyms.py`, `authors_report.py`, `metadata.py`, `dedupe.py`, `pdfid.py` | Identifier, hygiene, and corpus-frequency logic. Take a backend; never name a manager | the protocol |
+| `config_tables.py` | Nested TOML sections applied onto `Config` | `config` parsers |
 | `sources/` | One fetch lane each. Return bytes or a miss | `sources.base` |
 | `pipeline.py` | Order the lanes, save, attach, write the manifest | most things |
+| `pipeline_save.py` | Save a fetched PDF, write the manifest, attach when allowed | `store`, `pdfid` |
+| `pipeline_phases.py` | OA parallel and serial fetch phases | `pipeline` helpers |
+| `run_hooks.py` | EZProxy recovery, handoff, dry-run rows for `run` | `pipeline`, `handoff` |
+| `gaps_cmd.py` | `gaps` body after the CLI parses flags | `handoff`, `run_hooks` |
+| `run_cmd.py` | `run` body after the CLI parses flags | `pipeline`, `run_hooks` |
+| `ask_cmd.py` | `ask` body after the CLI parses flags | `agent_ops`, rag |
+| `completeness_cmd.py` | `dedupe`, `attachments`, `summarize`, `synthesize` after flags | `run_hooks` helpers via cli |
 | `cli.py` | Flags, progress, exits. No logic of its own | everything |
 | `agent_json.py` | `--format json` envelope (`paperful.agent.json.v1`) and exit 3 | none |
 | `agent_ops.py` | Shared refs-gap / ask builders for CLI JSON and MCP | `agent_json`, catalogue, rag |
@@ -100,7 +108,7 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `twenty.py` | Twenty People lookup (local cache) and `sync` (CRM create/enrich). User guide: [Twenty and SearXNG](snowball.md#twenty-and-searxng) | httpx |
 | `mcp_server.py` | Optional stdio MCP: dry-run `refs_gap`, read-only `ask` (same envelopes as CLI) | `agent_ops` |
 | `authorwatch.py` | People lists → OpenAlex new works; `apply` creates parents | OpenAlex client, `identity`, `snowball.ingest` |
-| `snowball/` | Crawl, watch, thin briefing, frontier digest. Watch and digest do not create library items | OpenAlex; library protocol only on apply |
+| `snowball/` | Crawl, hops, watch, thin briefing, frontier digest. Watch and digest do not create library items | OpenAlex; library protocol only on apply |
 
 ## The refresh
 
