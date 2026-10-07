@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_miss_surface.html" import miss_surface_icon %}
+{% from "_miss_surface.html" import status_icon %}
 {% block title %}Wanted — Paperful{% endblock %}
 {% block body_attrs %}{% if request.query_params.get('run') or request.query_params.get('poll') %} data-poll-run="{{ request.query_params.get('run') or request.query_params.get('poll') }}"{% endif %}{% endblock %}
 {% block content %}
@@ -117,10 +117,8 @@
       </dialog>
     </td>
     <td>
-      {% if row.miss_plain %}{{ miss_surface_icon(row.miss_surface, row.miss_plain, row.miss_detail) }}
-      {% elif row.state == 'doi_match' %}<span class="stamp-found">found</span>
-      {% elif row.state == 'doi_mismatch' %}<span class="stamp-check">check</span>
-      {% elif row.state %}{{ row.state }}{% if row.reason %} ({{ row.reason }}){% endif %}
+      {% if row.miss_plain %}{{ status_icon(row.miss_surface, row.miss_plain, row.miss_detail) }}
+      {% elif row.state %}{{ status_icon(row.state, row.verify_plain, row.verify_tip) }}
       {% endif %}
       {% if row.has_summary %}<span class="stamp-found">summary</span>{% endif %}
     </td>

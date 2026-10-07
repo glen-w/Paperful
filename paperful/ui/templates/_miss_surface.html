@@ -1,4 +1,4 @@
-{% macro miss_surface_icon(code, plain, tip_extra='') %}
+{% macro status_icon(code, plain, tip_extra='') %}
 {% if plain %}
 <span class="miss-status{% if code %} miss-status--{{ code }}{% endif %}" role="img" aria-label="{{ plain }}" tabindex="0">
   <svg class="miss-status-glyph" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -22,8 +22,19 @@
     <rect x="2.5" y="3" width="11" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.35"/>
     <circle cx="5.5" cy="6" r="1.2" fill="currentColor"/>
     <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M3.5 11l3-2.5 2 1.5 2.5-2 3.5 3"/>
-    {% elif code == 'import_ok' %}
+    {% elif code == 'import_ok' or code == 'doi_match' %}
     <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" d="M3 8.5l3 3 7-7"/>
+    {% elif code == 'doi_mismatch' %}
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M4 3.5h5v5H4zM7 8.5v4.5M7 3.5V2"/>
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M9.5 5.5h2.5a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H6"/>
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M11.5 8.5l2 2M13.5 8.5l-2 2"/>
+    {% elif code == 'unverified' %}
+    <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.35"/>
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M8 6v3.5"/>
+    <circle cx="8" cy="11.2" r="0.55" fill="currentColor"/>
+    {% elif code == 'missing' %}
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M4 2.5h8l2 2v8.5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1z"/>
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M9.5 8.5l3 3M12.5 8.5l-3 3"/>
     {% else %}
     <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.35"/>
     <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M8 5v3.5M8 11h.01"/>
@@ -33,3 +44,4 @@
 </span>
 {% endif %}
 {% endmacro %}
+{% macro miss_surface_icon(code, plain, tip_extra='') %}{{ status_icon(code, plain, tip_extra) }}{% endmacro %}

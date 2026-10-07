@@ -69,12 +69,12 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
    (`authorwatch apply`). **Check again** re-runs a saved topic watch or
    person list. Advanced topic watches also offer **Watch briefing** /
    **Watch digest** (same optional collection note).
-2. **Wanted** — Miss rows show a compact status icon (hover for `MISS_SURFACE_PLAIN`).
-   **Held** tab: on-disk
-   PDFs with `doi_match` / `doi_mismatch` / `unverified` / `snapshot` (not
-   “% complete”). **Preview** → **Grab** (fetch to `out/` only; selected vs all)
-   → **Attach** (explicit Zotero write for `doi_match` plus hand-ticks). Grab
-   never writes the library.
+2. **Wanted** — **Missing** rows use miss-surface icons (hover for `MISS_SURFACE_PLAIN`).
+   **Held** / **Have** use the same icon+tooltip pattern for PDF verification
+   (`doi_match`, `doi_mismatch`, `unverified`, `snapshot`; not “% complete”).
+   **Preview** → **Grab** (fetch to `out/` only; selected vs all) → **Attach**
+   (explicit Zotero write for `doi_match` plus hand-ticks). Grab never writes
+   the library.
 3. **Library** — Nested collection collapsibles with item / missing-PDF counts; pick scope.
 4. **Activity** — Command history + trust line from `last-run.json`.
 5. **System** — `doctor` rows with one next step each.

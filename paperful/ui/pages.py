@@ -8,7 +8,7 @@ from typing import Any
 from ..config import Config
 from ..miss_surface import honesty_row_for_item, miss_surface_plain, project_miss_surface
 from ..store import Manifest, STATUS_ATTACHED, STATUS_OK
-from .verify import file_verification
+from .verify import file_verification, reason_plain, verification_plain
 
 
 def _has_summary(cfg: Config, key: str) -> bool:
@@ -41,7 +41,13 @@ def wanted_rows(
             rec is not None and rec.status in {STATUS_OK, STATUS_ATTACHED}
         ):
             ver = file_verification(rec, item_doi=item.doi)
-            row = {**base, **ver, "ticked": ver["state"] == "doi_match"}
+            row = {
+                **base,
+                **ver,
+                "verify_plain": verification_plain(ver["state"]),
+                "verify_tip": reason_plain(ver.get("reason") or ""),
+                "ticked": ver["state"] == "doi_match",
+            }
             state = ver["state"]
             if state == "doi_match":
                 have.append(row)

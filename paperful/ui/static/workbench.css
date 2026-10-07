@@ -274,8 +274,12 @@ table.wb-table th {
 .miss-status--license_blocked {
   color: #9b2226;
 }
-.miss-status--import_ok {
+.miss-status--import_ok,
+.miss-status--doi_match {
   color: #2d6a4f;
+}
+.miss-status--doi_mismatch {
+  color: var(--accent-deep);
 }
 .miss-status-tip {
   position: absolute;

@@ -12,49 +12,6 @@
 {% for q in queues %}
 <section>
   <h2>{{ q.verb }}</h2>
-<<<<<<< HEAD
-  <ul>
-  {% for name in q.files %}
-    <li>{{ name }}</li>
-  {% endfor %}
-  </ul>
-<form method="post" action="/repair/preview" class="toolbar">
-  <input type="hidden" name="verb" value="{{ q.verb }}">
-  {% if q.verb == 'fix-metadata' %}
-  <label><input type="checkbox" name="overwrite" value="1"> Overwrite edited title/date/venue (preview)</label>
-  {% endif %}
-  {% if q.verb == 'dedupe' %}
-  <label>Phase
-    <select name="phase">
-      <option value="all">all</option>
-      <option value="high_doi">high_doi</option>
-      <option value="medium_title_year">medium_title_year</option>
-      <option value="grey_id">grey_id</option>
-      <option value="grey_host">grey_host</option>
-    </select>
-  </label>
-  <label><input type="checkbox" name="apply_medium" value="1"> Include title+year merges (preview)</label>
-  {% endif %}
-  {% if q.verb == 'attachments' %}
-  <label><input type="checkbox" name="fix_broken" value="1"> Fix broken</label>
-  <label><input type="checkbox" name="merge_files" value="1"> Merge files</label>
-  <label><input type="checkbox" name="rename" value="1"> Rename</label>
-  <label><input type="checkbox" name="link" value="1"> Link (personal library)</label>
-  {% endif %}
-  {% if q.verb == 'ocr' %}
-  <label><input type="checkbox" name="attach" value="1"> Attach after OCR</label>
-  {% endif %}
-  <button type="submit">Preview</button>
-</form>
-{% if q.verb != 'lint' and run_rec and run_rec.verb == q.verb and run_rec.review_token and run_rec.status == 'done' %}
-<form method="post" action="/repair/apply" class="toolbar">
-  <input type="hidden" name="review_token" value="{{ run_rec.review_token }}">
-  <button type="submit">Apply</button>
-</form>
-{% elif q.verb == 'lint' %}
-<p class="counts">Lint is read-only; Preview writes the report.</p>
-{% endif %}
-=======
   {% if q.files %}
   <details>
     <summary>Queued files ({{ q.files|length }})</summary>
@@ -68,7 +25,7 @@
   <form method="post" action="/repair/preview" class="toolbar">
     <input type="hidden" name="verb" value="{{ q.verb }}">
     {% if q.verb == 'fix-metadata' %}
-    <label><input type="checkbox" name="overwrite" value="1"> Overwrite edited title/date/venue</label>
+    <label><input type="checkbox" name="overwrite" value="1"> Overwrite edited title/date/venue (preview)</label>
     {% endif %}
     {% if q.verb == 'dedupe' %}
     <label>Phase
@@ -80,29 +37,27 @@
         <option value="grey_host">grey_host</option>
       </select>
     </label>
-    <label><input type="checkbox" name="apply_medium" value="1"> Apply medium (title+year) merges</label>
+    <label><input type="checkbox" name="apply_medium" value="1"> Include title+year merges (preview)</label>
     {% endif %}
     {% if q.verb == 'attachments' %}
     <label><input type="checkbox" name="fix_broken" value="1"> Fix broken</label>
     <label><input type="checkbox" name="merge_files" value="1"> Merge files</label>
     <label><input type="checkbox" name="rename" value="1"> Rename</label>
-    <label><input type="checkbox" name="link" value="1"> Link</label>
+    <label><input type="checkbox" name="link" value="1"> Link (personal library)</label>
     {% endif %}
     {% if q.verb == 'ocr' %}
     <label><input type="checkbox" name="attach" value="1"> Attach after OCR</label>
     {% endif %}
     <button type="submit">Preview</button>
   </form>
+  {% if q.verb != 'lint' and run_rec and run_rec.verb == q.verb and run_rec.review_token and run_rec.status == 'done' %}
   <form method="post" action="/repair/apply" class="toolbar">
-    <input type="hidden" name="verb" value="{{ q.verb }}">
-    <input type="hidden" name="review_token" value="{{ tokens.get(q.verb, '') }}">
-    {% if q.verb != 'lint' %}
+    <input type="hidden" name="review_token" value="{{ run_rec.review_token }}">
     <button type="submit">Apply</button>
-    {% else %}
-    <p class="counts">Lint is read-only; Preview writes the report.</p>
-    {% endif %}
   </form>
->>>>>>> 288a773 (Fold long workbench archive lists into collapsibles.)
+  {% elif q.verb == 'lint' %}
+  <p class="counts">Lint is read-only; Preview writes the report.</p>
+  {% endif %}
 </section>
 {% endfor %}
 {% endblock %}
