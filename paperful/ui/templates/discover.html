@@ -4,65 +4,83 @@
 {% block content %}
 <h1>Discover</h1>
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
-<section class="toolbar">
+<section class="panel">
   <h2>Topic</h2>
-  <form method="post" action="/discover/topic">
-    <label>Track a topic <input name="query"></label>
+  <form method="post" action="/discover/topic" class="form-stack">
+    <div class="field-group">
+      <p class="field-legend">Search</p>
+      <label>Track a topic <input name="query"></label>
+      {% if prefs.advanced %}
+      <label>Kind
+        <select name="kind">
+          <option value="search">search</option>
+          <option value="hybrid">hybrid</option>
+          <option value="doi">doi</option>
+          <option value="orcid">orcid</option>
+          <option value="collection">collection</option>
+        </select>
+      </label>
+      {% endif %}
+      <button type="submit">Search</button>
+    </div>
     {% if prefs.advanced %}
-    <label>Kind
-      <select name="kind">
-        <option value="search">search</option>
-        <option value="hybrid">hybrid</option>
-        <option value="doi">doi</option>
-        <option value="orcid">orcid</option>
-        <option value="collection">collection</option>
-      </select>
-    </label>
-    <label>Direction <input name="direction" placeholder="refs"></label>
-    <label>Depth <input name="depth" type="number" min="0"></label>
-    <label>Year from <input name="year_from" type="number"></label>
-    <label>Year to <input name="year_to" type="number"></label>
-    <label>Max candidates <input name="max_candidates" placeholder="all"></label>
-    <label>Per-hop limit <input name="per_hop_limit" placeholder="all"></label>
-    <label>Hybrid seeds <input name="hybrid_seeds" type="number"></label>
-    <label>Per-hop rank
-      <select name="per_hop_rank">
-        <option value="">default</option>
-        <option value="most-cited">most-cited</option>
-        <option value="least-cited">least-cited</option>
-        <option value="random">random</option>
-      </select>
-    </label>
-    <label>Fetch PDFs
-      <select name="fetch_pdfs">
-        <option value="">off</option>
-        <option value="fast">fast</option>
-        <option value="full">full</option>
-      </select>
-    </label>
-    <label>Keyword limit <input name="keyword_limit"></label>
-    <label>Keyword hop limit <input name="keyword_hop_limit"></label>
-    <label>Keyword min score <input name="keyword_min_score"></label>
-    <label>Cites query <input name="cites_query"></label>
-    <label>Languages <input name="languages" placeholder="en,fr"></label>
-    <label>Min seed citations <input name="min_seed_citations" type="number"></label>
-    <label>Backends <input name="backends" placeholder="openalex,crossref"></label>
-    <label>Tags <input name="tags" placeholder="paperful:frontier"></label>
-    <label>Dedupe scope <input name="dedupe_scope"></label>
-    <label>Dedupe after <input name="dedupe_after"></label>
-    <label><input type="checkbox" name="or_mode" value="1"> OR keywords</label>
-    <label><input type="checkbox" name="note_provenance" value="1"> Note provenance</label>
-    <label><input type="checkbox" name="refine" value="1"> Refine</label>
-    <label><input type="checkbox" name="author_site_preflight" value="1"> Author-site preflight</label>
-    <label><input type="checkbox" name="twenty_writeback" value="1"> Twenty writeback</label>
-    <label>Seeds <textarea name="seeds" rows="3" placeholder="DOIs / ORCIDs, one per line"></textarea></label>
+    <div class="field-group">
+      <p class="field-legend">Graph</p>
+      <label>Direction <input name="direction" placeholder="refs"></label>
+      <label>Depth <input name="depth" type="number" min="0"></label>
+      <label>Year from <input name="year_from" type="number"></label>
+      <label>Year to <input name="year_to" type="number"></label>
+      <label>Max candidates <input name="max_candidates" placeholder="all"></label>
+      <label>Per-hop limit <input name="per_hop_limit" placeholder="all"></label>
+      <label>Hybrid seeds <input name="hybrid_seeds" type="number"></label>
+      <label>Per-hop rank
+        <select name="per_hop_rank">
+          <option value="">default</option>
+          <option value="most-cited">most-cited</option>
+          <option value="least-cited">least-cited</option>
+          <option value="random">random</option>
+        </select>
+      </label>
+      <label>Fetch PDFs
+        <select name="fetch_pdfs">
+          <option value="">off</option>
+          <option value="fast">fast</option>
+          <option value="full">full</option>
+        </select>
+      </label>
+    </div>
+    <div class="field-group">
+      <p class="field-legend">Keywords &amp; sources</p>
+      <label>Keyword limit <input name="keyword_limit"></label>
+      <label>Keyword hop limit <input name="keyword_hop_limit"></label>
+      <label>Keyword min score <input name="keyword_min_score"></label>
+      <label>Cites query <input name="cites_query"></label>
+      <label>Languages <input name="languages" placeholder="en,fr"></label>
+      <label>Min seed citations <input name="min_seed_citations" type="number"></label>
+      <label>Backends <input name="backends" placeholder="openalex,crossref"></label>
+      <label>Tags <input name="tags" placeholder="paperful:frontier"></label>
+      <label>Dedupe scope <input name="dedupe_scope"></label>
+      <label>Dedupe after <input name="dedupe_after"></label>
+    </div>
+    <div class="field-group">
+      <p class="field-legend">Options</p>
+      <label><input type="checkbox" name="or_mode" value="1"> OR keywords</label>
+      <label><input type="checkbox" name="note_provenance" value="1"> Note provenance</label>
+      <label><input type="checkbox" name="refine" value="1"> Refine</label>
+      <label><input type="checkbox" name="author_site_preflight" value="1"> Author-site preflight</label>
+      <label><input type="checkbox" name="twenty_writeback" value="1"> Twenty writeback</label>
+    </div>
+    <div class="field-group">
+      <p class="field-legend">Seeds</p>
+      <label>Seeds <textarea name="seeds" rows="3" placeholder="DOIs / ORCIDs, one per line"></textarea></label>
+    </div>
+    <div class="field-group">
+      <p class="field-legend">Profile</p>
+      <label>Save as profile <input name="profile_name" placeholder="my-topic"></label>
+      <label><input type="checkbox" name="force" value="1"> Overwrite</label>
+      <button type="submit" formaction="/discover/profile-save" class="secondary">Save profile</button>
+    </div>
     {% endif %}
-    {% if prefs.advanced %}
-    <label>Save as profile <input name="profile_name" placeholder="my-topic"></label>
-    <label><input type="checkbox" name="force" value="1"> Overwrite</label>
-    <button type="submit" formaction="/discover/profile-save" class="secondary">Save profile</button>
-    {% endif %}
-    <button type="submit">Search</button>
   </form>
   {% if prefs.advanced and profiles %}
   <form method="post" action="/discover/profile-run" class="toolbar">
@@ -71,7 +89,7 @@
   </form>
   {% endif %}
   {% if deferred_run %}
-  <form method="post" action="/discover/resume">
+  <form method="post" action="/discover/resume" class="toolbar">
     <input type="hidden" name="run_id" value="{{ deferred_run }}">
     <button type="submit" class="secondary">Resume {{ deferred_run }}</button>
   </form>
@@ -90,56 +108,62 @@
   {% endif %}
 </section>
 {% if prefs.advanced %}
-<section class="toolbar">
+<section class="panel">
   <h2>Grow (citations / DOIs / authors)</h2>
   <form method="post" action="/discover/refs-gap" class="toolbar">
+    <p class="field-legend">Citation gaps</p>
     <button type="submit" class="secondary">Refs gap (dry-run pack)</button>
   </form>
-  <form method="post" action="/discover/ingest-preview" class="toolbar" enctype="multipart/form-data">
-    <label>DOI file <input type="file" name="file"></label>
-    <label>Or pack path <input name="pack_path" placeholder="state/refs-gaps/.../pack.json"></label>
-    <button type="submit" class="secondary">Preview ingest-dois</button>
-  </form>
-  <form method="post" action="/discover/ingest-apply" class="toolbar">
-    <input type="hidden" name="review_token" value="{{ ingest_token }}">
-    <button type="submit">Apply ingest-dois</button>
-  </form>
+  <div class="cluster">
+    <p class="field-legend">Ingest DOIs</p>
+    <form method="post" action="/discover/ingest-preview" class="toolbar" enctype="multipart/form-data">
+      <label>DOI file <input type="file" name="file"></label>
+      <label>Or pack path <input name="pack_path" placeholder="state/refs-gaps/.../pack.json"></label>
+      <button type="submit" class="secondary">Preview ingest-dois</button>
+    </form>
+    <form method="post" action="/discover/ingest-apply" class="toolbar">
+      <input type="hidden" name="review_token" value="{{ ingest_token }}">
+      <button type="submit">Apply ingest-dois</button>
+    </form>
+  </div>
   <form method="post" action="/discover/authors" class="toolbar">
+    <p class="field-legend">Authors</p>
     <label>Min count <input name="min_count" type="number" value="2" min="1"></label>
     <label>Max authors <input name="max_authors" type="number" value="15" min="1"></label>
     <label><input type="checkbox" name="apply" value="1"> Write report + proposed pack</label>
     <button type="submit" class="secondary">Authors frequency</button>
   </form>
   <form method="post" action="/discover/packs-promote" class="toolbar">
+    <p class="field-legend">Packs</p>
     <label>Promote pack slug <input name="slug" placeholder="ocean-bbnj"></label>
     <button type="submit" class="secondary">Packs promote</button>
   </form>
 </section>
 {% endif %}
-<section class="toolbar">
+<section class="panel">
   <h2>People</h2>
-  <form method="post" action="/discover/aw/save">
+  <form method="post" action="/discover/aw/save" class="toolbar">
+    <p class="field-legend">Lists</p>
     <label>New list <input name="name" placeholder="my-list"></label>
     <button type="submit" class="secondary">Create list</button>
   </form>
-  <form method="post" action="/discover/follow">
+  <form method="post" action="/discover/follow" class="toolbar">
+    <p class="field-legend">Follow</p>
     <label>Follow (ORCID) <input name="orcid" placeholder="0000-0002-1825-0097"></label>
     <label>List <input name="list_name" value="{{ aw_list }}"></label>
     <label>Since <input name="backfill_from" type="date"></label>
     <button type="submit">Follow</button>
   </form>
-  <form method="post" action="/discover/aw/add">
+  <form method="post" action="/discover/aw/add" class="toolbar">
+    <p class="field-legend">Add person</p>
     <input type="hidden" name="list_name" value="{{ aw_list }}">
     <label>Add ORCID <input name="orcid"></label>
     <label>Name <input name="display_name"></label>
     {% if prefs.advanced %}<label>Affiliation <input name="affiliation"></label>{% endif %}
     <button type="submit" class="secondary">Add person</button>
   </form>
-  <form method="post" action="/discover/aw/resolve">
-    <input type="hidden" name="list_name" value="{{ aw_list }}">
-    <button type="submit" class="secondary">Resolve {{ aw_list }}</button>
-  </form>
-  <form method="post" action="/discover/aw/run">
+  <form method="post" action="/discover/aw/run" class="toolbar">
+    <p class="field-legend">Run</p>
     <input type="hidden" name="list_name" value="{{ aw_list }}">
     <label>Backfill from <input name="backfill_from" type="date"></label>
     {% if prefs.advanced %}
@@ -149,6 +173,7 @@
     <button type="submit" class="secondary">Run list</button>
   </form>
   <form method="post" action="/discover/aw/suggest" class="toolbar">
+    <p class="field-legend">Suggestions</p>
     <input type="hidden" name="list_name" value="{{ aw_list }}">
     <label>Method
       <select name="method">
@@ -162,7 +187,8 @@
     <label>Collection <input name="collection" value="{{ prefs.collection }}" placeholder="-C path"></label>
     <button type="submit" class="secondary">Get suggestions</button>
   </form>
-  <form method="post" action="/discover/aw/import" enctype="multipart/form-data">
+  <form method="post" action="/discover/aw/import" class="toolbar" enctype="multipart/form-data">
+    <p class="field-legend">Import</p>
     <input type="hidden" name="list_name" value="{{ aw_list }}">
     <label>Source
       <select name="source">
@@ -177,28 +203,36 @@
     <label>File <input type="file" name="file"></label>
     <button type="submit" class="secondary">Import</button>
   </form>
-  <form method="post" action="/discover/aw/briefing">
-    <input type="hidden" name="list_name" value="{{ aw_list }}">
-    <button type="submit" class="secondary">People briefing</button>
-  </form>
-  <form method="post" action="/discover/aw/delete" onsubmit="return confirm('Delete list {{ aw_list }} and all ledger files?');">
-    <input type="hidden" name="list_name" value="{{ aw_list }}">
-    <button type="submit" class="secondary">Delete list</button>
-  </form>
+  <div class="cluster">
+    <p class="field-legend">List actions</p>
+    <form method="post" action="/discover/aw/resolve" class="toolbar">
+      <input type="hidden" name="list_name" value="{{ aw_list }}">
+      <button type="submit" class="secondary">Resolve {{ aw_list }}</button>
+    </form>
+    <form method="post" action="/discover/aw/briefing" class="toolbar">
+      <input type="hidden" name="list_name" value="{{ aw_list }}">
+      <button type="submit" class="secondary">People briefing</button>
+    </form>
+    <form method="post" action="/discover/aw/delete" class="toolbar" onsubmit="return confirm('Delete list {{ aw_list }} and all ledger files?');">
+      <input type="hidden" name="list_name" value="{{ aw_list }}">
+      <button type="submit" class="secondary">Delete list</button>
+    </form>
+  </div>
 </section>
 {% if aw_lists %}
-<details>
-  <summary>Lists ({{ aw_lists|length }})</summary>
+<section class="panel">
+  <h2>Lists</h2>
   <ul>
   {% for L in aw_lists %}
     <li><a href="/discover?list_name={{ L.name }}">{{ L.name }}</a> — {{ L.people }} people · inbox {{ L.inbox }}{% if L.baseline %} · baseline{% endif %}</li>
   {% endfor %}
   </ul>
-</details>
+</section>
 {% endif %}
 {% if aw_suggestions %}
-<h3>Suggestions</h3>
-<form method="post" action="/discover/aw/accept">
+<section class="panel">
+  <h2>Suggestions</h2>
+<form method="post" action="/discover/aw/accept" class="form-stack">
   <input type="hidden" name="list_name" value="{{ aw_list }}">
   <table class="wb-table">
     <thead><tr><th></th><th>Name</th><th>ORCID</th><th>Score</th><th>Why</th></tr></thead>
@@ -214,12 +248,16 @@
     {% endfor %}
     </tbody>
   </table>
-  <label>Initial seed from <input name="seed_from" type="date"></label>
-  <button type="submit">Accept selected</button>
+  <div class="field-group">
+    <label>Initial seed from <input name="seed_from" type="date"></label>
+    <button type="submit">Accept selected</button>
+  </div>
 </form>
+</section>
 {% endif %}
 {% if aw_people %}
-<h3>Members</h3>
+<section class="panel">
+  <h2>Members</h2>
 <table class="wb-table">
   <thead><tr><th>Name</th><th>ORCID</th><th>Status</th><th></th></tr></thead>
   <tbody>
@@ -247,29 +285,11 @@
   {% endfor %}
   </tbody>
 </table>
-{% endif %}
-{% if run_id %}
-<form method="post" action="/discover/apply-preview">
-  <input type="hidden" name="run_id" value="{{ run_id }}">
-  <input type="hidden" name="kind" value="snowball">
-  <button type="submit" class="secondary">Preview apply</button>
-</form>
-<form method="post" action="/discover/apply">
-  <input type="hidden" name="run_id" value="{{ run_id }}">
-  <input type="hidden" name="kind" value="snowball">
-  <input type="hidden" name="review_token" value="{{ snowball_token }}">
-  <button type="submit">Add selected</button>
-  <a href="/wanted">Fill PDFs</a>
-</form>
-<form method="post" action="/discover/watch">
-  <input type="hidden" name="run_id" value="{{ run_id }}">
-  <label>Watch name <input name="watch_name" value="topic-watch"></label>
-  {% if profiles %}<label>Profile <select name="profile"><option value="">—</option>{% for p in profiles %}<option value="{{ p }}">{{ p }}</option>{% endfor %}</select></label>{% endif %}
-  <button type="submit" class="secondary">Keep an eye on this</button>
-</form>
+</section>
 {% endif %}
 {% if inbox %}
-<h2>Person inbox</h2>
+<section class="panel">
+  <h2>Person inbox</h2>
 <table class="wb-table">
   <thead><tr><th>List</th><th>Title</th><th>DOI</th></tr></thead>
   <tbody>
@@ -278,25 +298,53 @@
   {% endfor %}
   </tbody>
 </table>
-<form method="post" action="/discover/apply-preview">
-  <input type="hidden" name="kind" value="authorwatch">
-  <input type="hidden" name="list_name" value="{{ aw_list }}">
-  <button type="submit" class="secondary">Preview apply</button>
-</form>
-<form method="post" action="/discover/apply">
-  <input type="hidden" name="kind" value="authorwatch">
-  <input type="hidden" name="list_name" value="{{ aw_list }}">
-  <input type="hidden" name="review_token" value="{{ aw_token }}">
-  <button type="submit">Apply inbox ({{ aw_list }})</button>
-</form>
+  <div class="cluster">
+    <p class="field-legend">Apply</p>
+    <form method="post" action="/discover/apply-preview" class="toolbar">
+      <input type="hidden" name="kind" value="authorwatch">
+      <input type="hidden" name="list_name" value="{{ aw_list }}">
+      <button type="submit" class="secondary">Preview apply</button>
+    </form>
+    <form method="post" action="/discover/apply" class="toolbar">
+      <input type="hidden" name="kind" value="authorwatch">
+      <input type="hidden" name="list_name" value="{{ aw_list }}">
+      <input type="hidden" name="review_token" value="{{ aw_token }}">
+      <button type="submit">Apply inbox ({{ aw_list }})</button>
+    </form>
+  </div>
+</section>
 {% endif %}
 {% if note and note.markdown %}
-<section>
+<section class="panel">
   <h2>Note</h2>
   <pre>{{ note.markdown }}</pre>
 </section>
 {% endif %}
-<h2>Queue</h2>
+<section class="panel">
+  <h2>Queue</h2>
+  {% if run_id %}
+  <div class="cluster">
+    <p class="field-legend">Apply this run</p>
+    <form method="post" action="/discover/apply-preview" class="toolbar">
+      <input type="hidden" name="run_id" value="{{ run_id }}">
+      <input type="hidden" name="kind" value="snowball">
+      <button type="submit" class="secondary">Preview apply</button>
+    </form>
+    <form method="post" action="/discover/apply" class="toolbar">
+      <input type="hidden" name="run_id" value="{{ run_id }}">
+      <input type="hidden" name="kind" value="snowball">
+      <input type="hidden" name="review_token" value="{{ snowball_token }}">
+      <button type="submit">Add selected</button>
+      <a href="/wanted">Fill PDFs</a>
+    </form>
+    <form method="post" action="/discover/watch" class="toolbar">
+      <input type="hidden" name="run_id" value="{{ run_id }}">
+      <label>Watch name <input name="watch_name" value="topic-watch"></label>
+      {% if profiles %}<label>Profile <select name="profile"><option value="">—</option>{% for p in profiles %}<option value="{{ p }}">{{ p }}</option>{% endfor %}</select></label>{% endif %}
+      <button type="submit" class="secondary">Keep an eye on this</button>
+    </form>
+  </div>
+  {% endif %}
 <table class="wb-table">
   <thead><tr><th>Title</th><th>DOI</th><th>Keep</th></tr></thead>
   <tbody>
@@ -317,24 +365,25 @@
   {% endfor %}
   </tbody>
 </table>
+</section>
 {% if following %}
-<details>
-  <summary>Following ({{ following|length }})</summary>
+<section class="panel">
+  <h2>Following</h2>
 <ul>
   {% for f in following %}
   <li>{{ f.kind }}: {{ f.name }}
-    <form method="post" action="/discover/check-again" style="display:inline">
+    <form method="post" action="/discover/check-again" class="toolbar" style="display:inline">
       <input type="hidden" name="kind" value="{{ f.kind }}">
       <input type="hidden" name="name" value="{{ f.name }}">
       <button type="submit" class="secondary">Check again</button>
     </form>
     {% if prefs.advanced and f.kind == 'topic' %}
-    <form method="post" action="/discover/watch-briefing" style="display:inline">
+    <form method="post" action="/discover/watch-briefing" class="toolbar" style="display:inline">
       <input type="hidden" name="name" value="{{ f.name }}">
       <label><input type="checkbox" name="apply" value="1"> Note</label>
       <button type="submit" class="secondary">Watch briefing</button>
     </form>
-    <form method="post" action="/discover/watch-digest" style="display:inline">
+    <form method="post" action="/discover/watch-digest" class="toolbar" style="display:inline">
       <input type="hidden" name="name" value="{{ f.name }}">
       <label><input type="checkbox" name="apply" value="1"> Note</label>
       <button type="submit" class="secondary">Watch digest</button>
@@ -343,6 +392,6 @@
   </li>
   {% endfor %}
 </ul>
-</details>
+</section>
 {% endif %}
 {% endblock %}

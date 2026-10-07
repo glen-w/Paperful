@@ -9,7 +9,7 @@
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
   --font-brand: "Nunito", "Segoe UI", sans-serif;
   --font-body: "Source Sans 3", "Segoe UI", sans-serif;
-  --header-height: 3.75rem;
+  --header-height: 4.35rem;
 }
 
 *,
@@ -58,21 +58,21 @@ header.wb-chrome a.brand {
 
 .brand-mark {
   display: block;
-  width: 2.6rem;
-  height: 2.6rem;
+  width: 3.5rem;
+  height: 3.5rem;
   flex: 0 0 auto;
 }
 
 .brand-logo {
   display: block;
-  width: 2.6rem;
-  height: 2.6rem;
+  width: 3.5rem;
+  height: 3.5rem;
 }
 
 .brand-word {
   font-family: var(--font-brand);
   font-weight: 800;
-  font-size: 1.35rem;
+  font-size: 1.5rem;
   letter-spacing: -0.03em;
   line-height: 1;
 }
@@ -118,11 +118,12 @@ header.wb-chrome a.brand {
 
 nav.wb-nav {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.35rem 0.25rem;
   padding: 0.35rem 1.15rem 0.55rem;
   border-bottom: 1px solid var(--line);
   background: rgba(247, 241, 232, 0.72);
+  overflow-x: auto;
 }
 
 nav.wb-nav a {
@@ -168,9 +169,191 @@ h2 {
 .toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.55rem 0.75rem;
   margin-bottom: 1rem;
   align-items: center;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.75rem;
+  margin: 0 0 1.35rem;
+  padding: 1rem 1.1rem 1.15rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.46);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 10px 24px rgba(16, 24, 32, 0.045);
+}
+
+.panel > h2,
+.panel-summary {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+  margin: 0;
+  padding: 0 0 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+.panel-summary {
+  cursor: pointer;
+  list-style: none;
+}
+.panel-summary::-webkit-details-marker {
+  display: none;
+}
+.panel-summary::before {
+  content: "▸ ";
+  color: var(--ink-soft);
+}
+.panel > details[open] > .panel-summary::before {
+  content: "▾ ";
+}
+.panel > details[open] > .panel-summary {
+  margin-bottom: 0.5rem;
+}
+
+.panel > .toolbar,
+.panel form.toolbar {
+  margin-bottom: 0;
+}
+
+.panel > form,
+.panel > .toolbar {
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.45rem;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper-deep) 42%, #fff);
+}
+
+.panel > form.form-stack {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.45rem;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper-deep) 42%, #fff);
+}
+
+.cluster > form,
+.panel > .cluster > form,
+.panel > .cluster > .toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.75rem;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.panel > details,
+.panel > p,
+.panel > ul,
+.panel > .counts,
+.panel > .wb-table,
+.panel > .coll-tree,
+.panel > .ask-thread,
+.panel > .ask-sources,
+.panel > pre {
+  margin: 0;
+}
+
+.panel pre {
+  white-space: pre-wrap;
+  font-size: 0.9rem;
+}
+
+.panel > .wb-table {
+  background: color-mix(in srgb, var(--paper-deep) 22%, #fff);
+  border-radius: 0.45rem;
+}
+
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.field-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.85rem;
+  align-items: center;
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.45rem;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper-deep) 42%, #fff);
+}
+
+.field-legend {
+  flex: 1 0 100%;
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.panel label,
+.field-group label,
+.toolbar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.panel label:has(textarea),
+.field-group label:has(textarea) {
+  flex: 1 1 100%;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.panel textarea,
+.field-group textarea {
+  width: 100%;
+  min-height: 4.25rem;
+}
+
+.panel input[type="number"],
+.field-group input[type="number"] {
+  width: 7.5rem;
+}
+
+fieldset.rag-prompt {
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: color-mix(in srgb, var(--paper-deep) 42%, #fff);
+}
+fieldset.rag-prompt .field-group {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+fieldset.rag-prompt legend {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  padding: 0 0.35rem;
 }
 
 input, select, textarea {

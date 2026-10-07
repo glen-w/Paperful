@@ -3,6 +3,8 @@
 {% block content %}
 <h1>Activity</h1>
 {% if trust_line %}<p class="counts">{{ trust_line }}</p>{% endif %}
+<section class="panel">
+  <h2>Commands</h2>
 <table class="wb-table">
   <thead><tr><th>ID</th><th>Verb</th><th>Status</th></tr></thead>
   <tbody>
@@ -15,4 +17,5 @@
   {% endfor %}
   </tbody>
 </table>
+</section>
 {% endblock %}

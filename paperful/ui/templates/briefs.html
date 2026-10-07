@@ -9,6 +9,7 @@
 <p class="counts">Scope: {% if prefs.collection %}{{ prefs.collection }}{% else %}entire library{% endif %}</p>
 
 {% if flags.llm_on %}
+<section class="panel">
 <h2>Summarize</h2>
 {% if summarize_result.queued is defined %}
 <p class="counts">Last run: {{ summarize_result.summarized }} summarized · {{ summarize_result.skipped }} skipped · {{ summarize_result.failed }} failed
@@ -16,8 +17,9 @@
 {% elif summarize_result.error %}
 <p class="error-banner">{{ summarize_result.error }}</p>
 {% endif %}
-<form method="post" action="/briefs/summarize">
-  <p>
+<form method="post" action="/briefs/summarize" class="form-stack">
+  <div class="field-group">
+    <p class="field-legend">Filters</p>
     <label>Order
       <select name="order">
         {% for o in orders %}
@@ -37,8 +39,8 @@
     <label>Year from <input type="number" name="year_from"></label>
     <label>Year to <input type="number" name="year_to"></label>
     <label><input type="checkbox" name="force" value="1"> Force</label>
-  </p>
-  <p><button type="submit">Summarize</button></p>
+    <button type="submit">Summarize</button>
+  </div>
 </form>
 {% if summaries %}
 <details>
@@ -53,7 +55,9 @@
   </ul>
 </details>
 {% endif %}
+</section>
 
+<section class="panel">
 <h2>Synthesize</h2>
 {% if synthesize_result.slug %}
 <p class="counts">{% if synthesize_result.dry_run %}Dry-run{% else %}Report{% endif %} {{ synthesize_result.slug }}:
@@ -63,8 +67,9 @@
 {% elif synthesize_result.error %}
 <p class="error-banner">{{ synthesize_result.error }}</p>
 {% endif %}
-<form method="post" action="/briefs/synthesize">
-  <p>
+<form method="post" action="/briefs/synthesize" class="form-stack">
+  <div class="field-group">
+    <p class="field-legend">Filters</p>
     <label>Dest
       <select name="dest">
         {% for d in dest_options %}
@@ -76,11 +81,9 @@
     <label>Year from <input type="number" name="year_from"></label>
     <label>Year to <input type="number" name="year_to"></label>
     <label><input type="checkbox" name="force" value="1"> Force</label>
-  </p>
-  <p>
     <button type="submit" name="dry_run" value="1">Dry-run</button>
     <button type="submit" name="dry_run" value="0">Write report</button>
-  </p>
+  </div>
 </form>
 {% if reports %}
 <details>
@@ -92,5 +95,6 @@
   </ul>
 </details>
 {% endif %}
+</section>
 {% endif %}
 {% endblock %}

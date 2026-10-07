@@ -25,6 +25,8 @@
 {% endmacro %}
 <h1>Library</h1>
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
+<section class="panel">
+  <h2>Collections</h2>
 {% if collection_tree %}
 <div class="coll-tree">
   <div class="coll-head coll-labels" aria-hidden="true">
@@ -38,8 +40,10 @@
 {% else %}
 <p class="counts">No collections loaded.</p>
 {% endif %}
+</section>
 {% if prefs.collection and items %}
-<h2>Items in {{ prefs.collection }}</h2>
+<section class="panel">
+  <h2>Items in {{ prefs.collection }}</h2>
 <table class="wb-table">
   <thead><tr><th>Title</th><th>Year</th><th>PDF</th><th>Summary</th><th></th></tr></thead>
   <tbody>
@@ -70,6 +74,7 @@
   {% endfor %}
   </tbody>
 </table>
+</section>
 {% elif prefs.collection %}
 <p class="counts">No items loaded for this collection.</p>
 {% else %}
