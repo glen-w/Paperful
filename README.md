@@ -55,7 +55,8 @@ parents from a DOI list (dry-run unless `--apply`). See [Commands](docs/commands
 metadata parents only when the gate says so. `run` fetches PDFs for items
 already in the library. Dry-run is the default for snowball; `run` attaches
 on Zotero 10+ unless you pass `--dry-run`. `authorwatch` is people you
-follow → their papers (no hop); see [Author watch](docs/authorwatch.md).
+follow → their papers (no hop; optional corpus `suggest`); see
+[Author watch](docs/authorwatch.md).
 `snowball watch` re-runs a saved profile; `watch run --digest` writes the
 frontier rollup. See [Snowball](docs/snowball.md)
 and [Watch](docs/snowball.md#watch).
@@ -127,10 +128,11 @@ Live: [paperful.app](https://paperful.app/).
 Yes, if you use Zotero, want an on-disk mirror, and will run a **CLI in Docker**.
 Maybe, if Zotero’s own “find available PDF” already covers you.
 **Today is CLI-first.** The **1.0 workbench** on `paperful serve` (Discover /
-Wanted; Advanced Index Ask and Briefs) is landed but not tagged — see
-[gui.md](docs/gui.md). Paperful is not Zotero-in-the-browser, not a
+Wanted; Advanced Repair, Mirror, Index Ask, and Briefs) is landed but not
+tagged — see [gui.md](docs/gui.md). Paperful is not Zotero-in-the-browser, not a
 sync/mobile/WebDAV client, and not every paywalled PDF. `paperful ocr` exists
-for scans on disk. Mendeley and EndNote are not proven. Post-1.0: Firefox
+for scans on disk. Mendeley and EndNote adapters exist but are seeking testers
+(not 1.0 blockers). Post-1.0: Firefox
 extension, local OpenAlex snapshot beyond opt-in v1, newsletter ingest.
 [Why](docs/why.md) · [Comparison](docs/comparison.md) · [GUI](docs/gui.md) · [Roadmap](docs/ROADMAP.md).
 
@@ -164,9 +166,11 @@ list as the default today. [Configuration](docs/config.md).
 git clone https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env          # PAPERFUL_DATA=. keeps data in this checkout
+                              # .env.example sets PAPERFUL_IMAGE_MODE=heavy
 cp config.minimal.toml config.toml   # set email; full file is config.example.toml
-docker compose build
-docker compose run --rm paperful doctor          # TTY guide when stdin is a TTY
+docker compose build                 # heavy when set in .env; CI uses light
+docker compose run --rm paperful doctor          # once; --guide for Enter walk
+docker compose up                                # GUI at http://127.0.0.1:8765
 docker compose run --rm paperful collections
 docker compose run --rm paperful run --collection interesting --preset oa --dry-run
 
@@ -175,9 +179,9 @@ docker compose run --rm paperful run --collection interesting --preset eoi --dry
 ```
 
 Layout and the host/container split: [Docker](docs/docker.md)
-(`PAPERFUL_DATA` → `/data`; `out/` and `state/` live **inside** that mount).
-First-run `doctor` without Zotero is **exit 2** (amber/red Zotero row) — same
-as CI job `docker`.
+(`PAPERFUL_DATA` → `/data`; `out/` and `state/` live **inside** that mount;
+**light** vs **heavy** image packs). First-run `doctor` without Zotero is
+**exit 2** (amber/red Zotero row) — same as CI job `docker` (light).
 
 Optional (seeking testers): Mendeley via REST — register an app, then
 `paperful session login mendeley` on the host. [Mendeley](docs/mendeley.md).
@@ -202,7 +206,7 @@ docker compose run --rm paperful all --profile bbnj-journal
 
 Reference (same corpus as the hosted guide):
 
-- [Docker](docs/docker.md) — preferred operator install; Zotero stays on the host
+- [Docker](docs/docker.md) — preferred operator install; light/heavy packs; Zotero stays on the host
 - [Commands and output](docs/commands.md)
 - [Configuration](docs/config.md)
 - [Source routing](docs/sources.md)
@@ -232,10 +236,14 @@ uv run paperful synthesize -C COLLECTION     # report from those notes
 Optional library index (off until `[rag].enabled`): `paperful rag ingest`
 indexes the PDFs and abstracts in the mirror, and `paperful ask` answers
 questions from it with cited papers and pages. It reads `out/` only and never
-calls the reference manager. Setup: [Ask your library](docs/rag.md).
+calls the reference manager. Needs `paperful[rag]` on the host, or a **heavy**
+Compose image. Advanced **Index** on `paperful serve` runs the same Ask / batch /
+`rag questions` / `rag answered` verbs ([gui.md](docs/gui.md)). Setup:
+[Ask your library](docs/rag.md).
 
 ```sh
 uv sync --extra rag && ollama pull nomic-embed-text   # then set [rag] enabled = true
+# or: PAPERFUL_IMAGE_MODE=heavy docker compose build
 uv run paperful rag ingest -C COLLECTION     # scans get OCR; text PDFs do not
 uv run paperful ask "What do these papers say about X?" -C COLLECTION
 uv run paperful ask --thread new "…" -C COLLECTION   # follow-ups rewrite retrieval

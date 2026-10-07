@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -136,12 +137,19 @@ def parse_focus(value: str) -> str:
 
 
 def resolve_system_prompt(
-    *, focus: str = "default", prompt_path: str | Path | None = None
+    *,
+    focus: str = "default",
+    prompt_path: str | Path | None = None,
+    prompt_text: str | None = None,
 ) -> tuple[str, str, str]:
     """Return ``(system_prompt, focus_name, prompt_label)``.
 
-    ``prompt_path`` wins over ``focus`` when set (and not ``default``).
+    Precedence: ``prompt_text``, then ``prompt_path``, then ``focus``.
     """
+    inline = (prompt_text or "").strip()
+    if inline:
+        label = "inline:" + hashlib.sha256(inline.encode("utf-8")).hexdigest()[:16]
+        return inline, "custom", label
     if prompt_path not in (None, "", "default"):
         path = Path(prompt_path).expanduser()
         text = path.read_text(encoding="utf-8").strip()

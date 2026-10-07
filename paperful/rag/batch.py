@@ -141,6 +141,7 @@ def run_batch(
     keys: set[str] | None = None,
     focus: str | None = None,
     prompt_path: str | None = None,
+    prompt_text: str | None = None,
     k: int | None = None,
     force: bool = False,
     scope: dict[str, Any] | None = None,
@@ -150,9 +151,11 @@ def run_batch(
     ledger: Ledger | None = None,
 ) -> BatchPack:
     """Answer each question; reuse cache when the resume key matches."""
+    path = prompt_path if prompt_path is not None else (cfg.rag_prompt or None)
     system, focus_name, prompt_label = resolve_system_prompt(
         focus=focus if focus is not None else cfg.rag_focus,
-        prompt_path=prompt_path if prompt_path is not None else (cfg.rag_prompt or None),
+        prompt_path=path,
+        prompt_text=prompt_text,
     )
     del system  # answer() resolves the same way
     index_fp = index_fingerprint(cfg)
@@ -181,10 +184,9 @@ def run_batch(
                 q,
                 k=k,
                 keys=keys,
-                focus=focus_name if prompt_label != "custom" else "default",
-                prompt_path=prompt_path
-                if prompt_path is not None
-                else (cfg.rag_prompt or None),
+                focus=focus_name if focus_name != "custom" else "default",
+                prompt_path=path,
+                prompt_text=prompt_text,
                 client=client,
                 embedder=embedder,
                 index=index,

@@ -6,24 +6,33 @@ ORCID **crawl** that can hop) and from [`inbox watch`](commands.md) (a PDF drop
 folder). Paperful does not schedule runs; call `authorwatch run` yourself
 (launchd / cron if you want).
 
-**Does not scrape** ResearchGate, LinkedIn, or Academia.edu. Export a CSV if
-that is where the names live.
+**Does not live-scrape** ResearchGate, LinkedIn, or Academia.edu. Save the follows
+page as HTML or export CSV, then `import --file …`. Corpus-grounded
+`suggest` ranks people already in your `-C` collection (not cloud recommendations).
 
 ## Success loop
 
 ```text
 paperful authorwatch save ocean-people
 paperful authorwatch add ocean-people --orcid 0000-0002-1825-0097
+# or seed from the collection:
+paperful authorwatch suggest ocean-people -C ocean/BBNJ --method mix --limit 15
+paperful authorwatch accept ocean-people --id sug_…   # optional --seed-from YYYY-MM-DD
 paperful authorwatch run ocean-people --backfill-from 2025-01-01
 paperful authorwatch apply ocean-people -C Watch/Ocean --apply
 paperful run -C Watch/Ocean
 ```
 
-`--orcid` is the high-value path (OpenAlex may fill the display name). `--name`
-alone stays **unresolved** until `resolve` finds a unique OpenAlex author
-(ORCID **or** OpenAlex author id). `--affiliation` is an optional host hint
-(for example `stanford.edu`). Ambiguous names are **held** — `show` lists
-candidate iDs; `add --orcid` to confirm. Name-only rows are never polled.
+`--orcid` is the high-value path (OpenAlex may fill the display name). An
+OpenAlex author id alone is also `ok` and pollable. `--name` alone stays
+**unresolved** until `resolve` finds a unique OpenAlex author (ORCID **or**
+OpenAlex author id). `--affiliation` is an optional host hint (for example
+`stanford.edu`). Ambiguous names are **held** — `show` lists candidate iDs;
+`add --orcid` to confirm. Name-only rows are never polled.
+
+Discover (People) mirrors this: suggest method + limit, checkboxes + optional
+seed date, member edit/remove, list delete, and saved social HTML/CSV upload.
+See [gui.md](gui.md).
 
 `doctor` ambers when a list has people and **zero** `ok` members. It does not
 probe social sites.
@@ -58,19 +67,38 @@ out of the inbox. Caps: `--max-authors` (default 50) and `--per-author-limit`
 No hop: this is **their papers**, not cited-by / references. For that, use
 `paperful snowball orcid`.
 
+## Suggest people from a collection
+
+```text
+paperful authorwatch suggest ocean-people -C ocean/BBNJ --method mix --limit 15
+paperful authorwatch accept ocean-people --id sug_abcd1234 --seed-from 2025-01-01
+```
+
+Methods: `corpus` (frequency in `-C`), `most_cited` (OpenAlex `cited_by_count`
+after resolving names), `coauthor` (shared works with list members or promoted
+author pack), `mix` (blend corpus + cited). `suggest` **opens the library** for
+`-C` (unlike a cursor-only `run`). Pending rows live in `suggestions.jsonl`
+(`pollable` when ORCID or OpenAlex id is set). Accept moves checked ids onto
+`people.jsonl` (`--id` repeatable, or `--all-pending`; `--dismiss-rest` marks
+the rest dismissed). Optional `--seed-from` runs a backfill poll after accept.
+Repeat `suggest` to append more candidates (skips people already on the list or
+still pending). Spent OpenAlex budget exits **2** (same next steps as `run`).
+
 ## Import follows
 
 ```text
 paperful authorwatch import ocean-people --file follows.csv --source csv
+paperful authorwatch import ocean-people --file saved-rg.html --source rg
 paperful authorwatch import ocean-people --file orcids.txt --source orcid
 paperful authorwatch remove ocean-people --orcid 0000-0002-1825-0097
+paperful authorwatch delete ocean-people --yes
 ```
 
 CSV header: `name`, `orcid`, optional `affiliation`. JSON is a list of objects
 or `{ "people": [...] }`.
 
 `import --source rg|linkedin|academia` **without** `--file` exits 2 with the
-export recipe. HTML scrape is later and opt-in; it is not a `run` source.
+export recipe. With `--file`, parses operator-saved HTML/CSV only.
 
 ## Ledger
 
@@ -84,7 +112,15 @@ that tree):
 | `seen.json` | Identities already proposed or backfilled |
 | `inbox.jsonl` | Proposed works |
 | `applied.json` | Identities already created in the library |
+| `suggestions.jsonl` | `paperful.authorwatch.suggestion.v1` — pending/accepted/dismissed |
 | `briefing.md` | `authorwatch briefing` (markdown only; not a substitute for `apply`) |
+
+## Local dogfood (operator)
+
+Validate on a test collection without committing `state/` or pack edits. Example:
+`suggest bbnj-test-voices -C ocean/BBNJ --method mix`; accept a few; optional
+`--seed-from`; confirm OpenAlex budget exit **2** is actionable. See
+[bbnj-author-lanes.md](bbnj-author-lanes.md) Phase 3.
 
 ## Versus snowball
 

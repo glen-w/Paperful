@@ -77,12 +77,19 @@ def test_gui_md_documents_discover_and_wanted_routes():
         "/discover/check-again",
         "/discover/aw/import",
         "/discover/aw/briefing",
+        "/discover/watch-briefing",
+        "/discover/watch-digest",
+        "/discover/ingest-apply",
         "/wanted/preview",
         "/wanted/grab",
         "/wanted/attach",
+        "/wanted/recover",
+        "/repair/preview",
+        "/mirror/apply",
         "/briefs/summarize",
         "/index/ask",
         "Briefs",
+        "Stays CLI",
     )
     missing = [path for path in required if path not in text]
     assert not missing, f"docs/gui.md missing workbench routes/surfaces: {', '.join(missing)}"

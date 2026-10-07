@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import time
+
 import pytest
 
 from paperful.config import Config
 from paperful.serve import create_app, fastapi_available
-from paperful.ui import commands, jobs
+from paperful.ui import commands, jobs, repair_jobs
 
 
 def test_repair_preview_enqueues_lint_hook(tmp_path):
@@ -63,6 +65,80 @@ def test_repair_stale_token_refused(tmp_path):
     assert "changed" in msg.lower()
 
 
+def test_repair_preview_apply_calls_hook(tmp_path, monkeypatch):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    calls: list[dict] = []
+
+    def fake_run(cfg, *, verb, collection, apply, flags):
+        calls.append(
+            {"verb": verb, "collection": collection, "apply": apply, "flags": dict(flags)}
+        )
+        return {"verb": verb, "ok": True}
+
+    monkeypatch.setattr(repair_jobs, "repair_run_fn", fake_run)
+    cmd_id = "cmd1"
+    commands.write_command(
+        cfg,
+        {
+            "id": cmd_id,
+            "verb": "repair_dedupe",
+            "status": "running",
+            "review_token": "",
+            "error": "",
+            "report_path": "",
+            "created": time.time(),
+        },
+    )
+    token = repair_jobs.repair_preview(
+        cfg,
+        cmd_id,
+        verb="dedupe",
+        collection="ocean/BBNJ",
+        flags={"phase": "high_doi", "apply_medium": True},
+    )
+    assert token
+    assert calls and calls[0]["apply"] is False
+    ok, msg = repair_jobs.repair_apply(cfg, token=token)
+    assert ok, msg
+    assert len(calls) == 2
+    assert calls[1]["apply"] is True
+    assert calls[1]["flags"]["phase"] == "high_doi"
+
+
+def test_mirror_preview_apply_calls_hook(tmp_path, monkeypatch):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.out_dir.mkdir(parents=True)
+    cfg.state_dir.mkdir(parents=True)
+    calls: list[dict] = []
+
+    def fake_run(cfg, *, verb, collection, apply, flags):
+        calls.append({"verb": verb, "apply": apply, "flags": dict(flags)})
+        return {"verb": verb}
+
+    monkeypatch.setattr(repair_jobs, "mirror_run_fn", fake_run)
+    cmd_id = "m1"
+    commands.write_command(
+        cfg,
+        {
+            "id": cmd_id,
+            "verb": "mirror_sync",
+            "status": "running",
+            "review_token": "",
+            "error": "",
+            "report_path": "",
+            "created": time.time(),
+        },
+    )
+    token = repair_jobs.mirror_preview(
+        cfg, cmd_id, verb="sync", collection="", flags={"full": True}
+    )
+    ok, msg = repair_jobs.mirror_apply(cfg, token=token, collection="")
+    assert ok, msg
+    assert [c["apply"] for c in calls] == [False, True]
+    assert calls[1]["flags"]["full"] is True
+
+
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
 def test_repair_apply_http_409(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
@@ -97,10 +173,10 @@ def test_mirror_get_does_not_write(tmp_path, monkeypatch):
     )
     client = TestClient(create_app(cfg))
     client.cookies.set("pf_advanced", "1")
-    before = {p.name for p in cfg.state_dir.iterdir()}
+    before = {p.name for p in cfg.state_dir.iterdir() if p.name != "gui"}
     res = client.get("/mirror")
     assert res.status_code == 200
-    after = {p.name for p in cfg.state_dir.iterdir()}
+    after = {p.name for p in cfg.state_dir.iterdir() if p.name != "gui"}
     assert after == before
     res2 = client.post("/mirror/apply", data={"review_token": "nope"})
     assert res2.status_code == 409

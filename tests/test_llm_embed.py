@@ -181,7 +181,8 @@ def test_zero_vector_is_an_error(mock_ollama):
         OllamaEmbedder(model="bge-m3").embed_query("a")
 
 
-def test_ollama_refuses_remote_host_without_flag():
+def test_ollama_refuses_remote_host_without_flag(monkeypatch):
+    monkeypatch.delenv("PAPERFUL_OLLAMA_HOST", raising=False)
     embedder = OllamaEmbedder(model="bge-m3", base_url="http://10.0.0.5:11434")
     with pytest.raises(LlmConfigError, match="not local"):
         embedder.embed_query("a")
@@ -261,7 +262,8 @@ def test_litellm_missing_extra(monkeypatch):
 # ---- factory and preflight ---------------------------------------------------
 
 
-def test_get_embedder_by_config(cfg):
+def test_get_embedder_by_config(cfg, monkeypatch):
+    monkeypatch.delenv("PAPERFUL_OLLAMA_HOST", raising=False)
     assert isinstance(get_embedder(cfg), NullEmbedder)
     cfg.rag_enabled = True
     cfg.llm_base_url = "http://127.0.0.1:9999"
@@ -314,7 +316,8 @@ def test_validate_embedder_rejects_ollama_model_through_litellm(cfg):
         validate_embedder(cfg)
 
 
-def test_embed_egress(cfg):
+def test_embed_egress(cfg, monkeypatch):
+    monkeypatch.delenv("PAPERFUL_OLLAMA_HOST", raising=False)
     assert embed_egress_is_remote(cfg) is False
     cfg.rag_enabled = True
     assert embed_egress_is_remote(cfg) is False

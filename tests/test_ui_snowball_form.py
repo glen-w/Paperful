@@ -19,3 +19,21 @@ def test_advanced_parses_kind_and_seeds():
     assert payload.kind == "doi"
     assert payload.seeds == ["10.1/a", "10.2/b"]
     assert payload.direction == "cites"
+
+
+def test_advanced_parses_crawl_knobs():
+    payload = parse_discover_topic(
+        {
+            "kind": "search",
+            "query": "BBNJ",
+            "per_hop_rank": "most-cited",
+            "fetch_pdfs": "fast",
+            "twenty_writeback": "1",
+            "languages": "en,fr",
+        },
+        advanced=True,
+    )
+    assert payload.per_hop_rank == "most-cited"
+    assert payload.fetch_pdfs == "fast"
+    assert payload.twenty_writeback is True
+    assert payload.languages == ("en", "fr")

@@ -155,6 +155,13 @@ paperful authorwatch apply bbnj-test-voices -C ocean/BBNJ-test --apply
 paperful run -C ocean/BBNJ-test --dry-run --no-browser-agent
 ```
 
+Optional corpus seed (opens the library; does not create parents):
+
+```sh
+paperful authorwatch suggest bbnj-test-voices -C ocean/BBNJ --method mix --limit 15
+paperful authorwatch accept bbnj-test-voices --id sug_…   # or checkboxes in Discover
+```
+
 Cadence: weekly `authorwatch run` + review `state/authorwatch/bbnj-test-voices/inbox.jsonl`.
 Paperful does not schedule.
 

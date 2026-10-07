@@ -1,0 +1,46 @@
+{
+  "schema": "paperful.item.v1",
+  "item_key": "ARTICLE1",
+  "item_type": "journalArticle",
+  "version": null,
+  "date_added": null,
+  "date_modified": null,
+  "title": "Example",
+  "creators": [
+    {
+      "creatorType": "author",
+      "lastName": "Smith"
+    }
+  ],
+  "year": 2020,
+  "date": null,
+  "publication_title": "Marine Policy",
+  "doi": "10.1000/abc.1",
+  "library_doi": null,
+  "doi_source": "none",
+  "doi_verified": "missing",
+  "pdf_doi": null,
+  "arxiv_id": null,
+  "pmid": null,
+  "url": "https://example.org/paper",
+  "extra": "",
+  "abstract": "An abstract.",
+  "tags": [],
+  "relations": {},
+  "fields": {
+    "pages": "1-9",
+    "volume": "12"
+  },
+  "collections": [
+    {
+      "key": null,
+      "path": "Col"
+    }
+  ],
+  "collection_paths": [
+    "Col"
+  ],
+  "attachments": [],
+  "fetch": null,
+  "notes": []
+}

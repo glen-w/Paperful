@@ -5,8 +5,9 @@ first, `--apply` writes, PDFs come from `run` / handoff / inbox, not from
 ingest. This is not `paperful all` and not a grey-lit playbook.
 
 Seed greys and seed papers live in the collection before you start. After the
-ledger is honest, optional `snowball watch` or `authorwatch`, then the frontier
-digest (thin `briefing` is still there), then `summarize` / `ask`.
+ledger is honest, optional `snowball watch` or `authorwatch` (including
+`suggest -C` → `accept`), then the frontier digest (thin `briefing` is still
+there), then `summarize` / `ask`.
 
 ## Sequence
 

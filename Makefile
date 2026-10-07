@@ -2,7 +2,7 @@
 
 .DEFAULT_GOAL := help
 
-.PHONY: help docs docs-clean pages-site docker-build docker-doctor e2e-nba e2e-stack
+.PHONY: help docs docs-clean pages-site docker-build docker-build-heavy docker-doctor e2e-nba e2e-stack
 
 help:
 	@echo "paperful Makefile"
@@ -10,8 +10,9 @@ help:
 	@echo "Usual path: uv run paperful <cmd>  (see README)"
 	@echo ""
 	@echo "Docker (optional pack):"
-	@echo "  docker-build      Build the paperful image via Compose"
-	@echo "  docker-doctor     Run paperful doctor in the container"
+	@echo "  docker-build        Build image (PAPERFUL_IMAGE_MODE from .env, else light)"
+	@echo "  docker-build-heavy  Build heavy image (llm + rag + browser-agent)"
+	@echo "  docker-doctor       Run paperful doctor in the container"
 	@echo ""
 	@echo "Docs:"
 	@echo "  docs              Build Sphinx HTML into docs/_build/html (requires .[docs]; DOCS_STRICT=1 for CI parity)"
@@ -19,7 +20,7 @@ help:
 	@echo "  pages-site        Assemble website/ + Sphinx guide into _site/ (GitHub Pages)"
 	@echo ""
 	@echo "E2E (opt-in, not CI):"
-	@echo "  e2e-stack         All-in live E2E: TOPIC=... EFFORT=low|med|high (see docs/e2e-stack.md)"
+	@echo "  e2e-stack         All-in live E2E: TOPIC=... EFFORT=low|med|high [QUERY=] [YEAR_FROM=] [YEAR_TO=]"
 	@echo "  e2e-nba           Alias: TOPIC=NBA EFFORT=low"
 	@echo ""
 	@echo "Usage: uv run paperful <cmd>"
@@ -28,6 +29,9 @@ help:
 
 docker-build:
 	docker compose build
+
+docker-build-heavy:
+	PAPERFUL_IMAGE_MODE=heavy docker compose build
 
 docker-doctor:
 	docker compose run --rm paperful doctor --guide
@@ -44,8 +48,11 @@ pages-site:
 	@bash scripts/release/assemble_pages_site.sh
 
 e2e-stack:
-	@test -n "$(TOPIC)" || (echo "Usage: make e2e-stack TOPIC='your keyword' EFFORT=low|med|high"; exit 1)
-	PAPERFUL_E2E=1 uv run python scripts/e2e_stack.py --topic "$(TOPIC)" --effort "$(or $(EFFORT),low)"
+	@test -n "$(TOPIC)" || (echo "Usage: make e2e-stack TOPIC='your keyword' EFFORT=low|med|high [QUERY='...']"; exit 1)
+	PAPERFUL_E2E=1 uv run python scripts/e2e_stack.py --topic "$(TOPIC)" --effort "$(or $(EFFORT),low)" \
+		$(if $(QUERY),--query "$(QUERY)",) \
+		$(if $(YEAR_FROM),--year-from $(YEAR_FROM),) \
+		$(if $(YEAR_TO),--year-to $(YEAR_TO),)
 
 e2e-nba:
 	$(MAKE) e2e-stack TOPIC=NBA EFFORT=low

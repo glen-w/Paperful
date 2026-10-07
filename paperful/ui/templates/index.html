@@ -45,7 +45,7 @@
     <label>Query <input name="q" value="{{ search_q }}"></label>
     <label>Top-k <input name="k" value="{{ search_k or '' }}"></label>
     <label>Year from <input name="year_from" value="{{ year_from }}"></label>
-    <label>Year to <input name="year_to" value="{{ year_to }}"></label>
+    <label>Year to <input type="number" name="year_to" value="{{ year_to }}"></label>
     <button type="submit">Search</button>
   </form>
   {% if hits %}
@@ -65,11 +65,17 @@
 <section>
   <h2>Ask</h2>
   <p class="counts">Scope: {% if prefs.collection %}{{ prefs.collection }}{% else %}entire mirror{% endif %}</p>
-  <p><a href="/index">New thread</a>
-  {% for t in threads %}
-  · <a href="/index?thread={{ t.id }}" {% if t.id == active_thread_id %}class="active"{% endif %}>{{ t.id }} ({{ t.turns }})</a>
-  {% endfor %}
-  </p>
+  <p><a href="/index">New thread</a></p>
+  {% if threads %}
+  <details>
+    <summary>Threads ({{ threads|length }})</summary>
+    <ul>
+    {% for t in threads %}
+      <li><a href="/index?thread={{ t.id }}" {% if t.id == active_thread_id %}class="active"{% endif %}>{{ t.id }} ({{ t.turns }})</a></li>
+    {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
   <div class="ask-thread">
   {% for turn in turns %}
     <div class="ask-turn ask-{{ turn.role }}">
@@ -88,12 +94,12 @@
     </ul>
   </div>
   {% endif %}
-  <form method="post" action="/index/ask">
+  <form method="post" action="/index/ask" enctype="multipart/form-data">
     <input type="hidden" name="thread_id" value="{{ active_thread_id or '' }}">
     <p><label>Question<br><textarea name="question" rows="3" cols="60" required></textarea></label></p>
-    <p><label>Focus <select name="focus">{% for f in focus_options %}<option value="{{ f }}">{{ f }}</option>{% endfor %}</select></label>
-    <label>Year from <input type="number" name="year_from"></label>
-    <label>Year to <input type="number" name="year_to"></label></p>
+    <p class="toolbar">{% include "_rag_scope_fields.html" %}</p>
+    <p><label>Focus <select name="focus">{% for f in focus_options %}<option value="{{ f }}">{{ f }}</option>{% endfor %}</select></label></p>
+    {% include "_rag_prompt_fields.html" %}
     <button type="submit">Ask</button>
   </form>
 </section>
@@ -106,15 +112,61 @@
 {% if flags.llm_on and flags.rag_on %}
 <section>
   <h2>Batch Ask</h2>
-  <form method="post" action="/index/ask-batch">
-    <textarea name="questions" rows="4" cols="60" placeholder="One question per line"></textarea>
-    <label>Focus <select name="focus">{% for f in focus_options %}<option value="{{ f }}">{{ f }}</option>{% endfor %}</select></label>
+  <form method="post" action="/index/ask-batch" enctype="multipart/form-data">
+    <p><label>Questions<br><textarea name="questions" rows="4" cols="60" placeholder="One question per line"></textarea></label></p>
+    <p><label>Or upload <input type="file" name="questions_upload" accept=".md,.txt,text/plain"></label></p>
+    <p class="toolbar">{% include "_rag_scope_fields.html" %}</p>
+    <p><label>Focus <select name="focus">{% for f in focus_options %}<option value="{{ f }}">{{ f }}</option>{% endfor %}</select></label>
     <label>Dest <select name="dest">{% for d in dest_options %}<option value="{{ d }}" {% if d == rag_dest %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></label>
     <label><input type="checkbox" name="apply" value="1"> Write Zotero note</label>
+    <label><input type="checkbox" name="force" value="1"> Force re-answer</label></p>
+    {% include "_rag_prompt_fields.html" %}
     <button type="submit">Run batch</button>
   </form>
   {% if batch_result.stamp %}<p>Last batch: {{ batch_result.answered }}/{{ batch_result.questions }} <a href="/index/batch/{{ batch_result.stamp }}">answers</a></p>{% endif %}
+  {% if packs %}
+  <details>
+    <summary>Recent batches ({{ packs|length }})</summary>
+    <ul class="counts">{% for p in packs %}<li><a href="/index/batch/{{ p.stamp }}">{{ p.stamp }}</a> — {{ p.answered }}/{{ p.questions }}{% if p.failed %} ({{ p.failed }} failed){% endif %}</li>{% endfor %}</ul>
+  </details>
+  {% endif %}
 </section>
+
+<section>
+  <h2>Extract questions</h2>
+  {% if questions_result.questions is defined %}<p>Last: {{ questions_result.questions }} question(s) from {{ questions_result.items }} item(s){% if questions_result.dry_run %} (dry-run){% endif %}</p>{% endif %}
+  <form method="post" action="/index/rag-questions" enctype="multipart/form-data" class="toolbar">
+    <p class="toolbar">{% include "_rag_scope_fields.html" %}</p>
+    <label><input type="checkbox" name="whole_library" value="1"> Whole library (when no collection chip)</label>
+    <label><input type="checkbox" name="use_llm" value="1" {% if extract_questions_llm %}checked{% endif %}> LLM extract lane</label>
+    <label>Limit <input type="number" name="limit" min="1"></label>
+    <button type="submit" name="dry_run" value="1">Dry-run</button>
+    <button type="submit" name="dry_run" value="0">Extract</button>
+  </form>
+</section>
+
+<section>
+  <h2>Already answered?</h2>
+  {% if answered_result.stamp %}<p>Last: answered {{ answered_result.answered }} · partial {{ answered_result.partial }} · not found {{ answered_result.not_found }} <a href="/index/answered/{{ answered_result.stamp }}">report</a></p>{% endif %}
+  <form method="post" action="/index/rag-answered" enctype="multipart/form-data">
+    <p><label><input type="radio" name="question_mode" value="text" checked> Questions in form</label>
+    <label><input type="radio" name="question_mode" value="upload"> Upload file</label>
+    <label><input type="radio" name="question_mode" value="extract"> From extracted questions</label></p>
+    <p><textarea name="answered_questions" rows="3" cols="60" placeholder="One question per line"></textarea></p>
+    <p><label>Questions file <input type="file" name="answered_upload" accept=".md,.txt,text/plain"></label></p>
+    <p class="toolbar">{% include "_rag_scope_fields.html" %}</p>
+    <label>After item <input name="after_item" placeholder="item key"></label>
+    <label><input type="checkbox" name="force" value="1"> Force</label>
+    <button type="submit">Run answered check</button>
+  </form>
+  {% if answered_packs %}
+  <details>
+    <summary>Recent answered reports ({{ answered_packs|length }})</summary>
+    <ul class="counts">{% for p in answered_packs %}<li><a href="/index/answered/{{ p.stamp }}">{{ p.stamp }}</a> — {{ p.answered }}/{{ p.partial }}/{{ p.not_found }}{% if p.failed %} ({{ p.failed }} failed){% endif %}</li>{% endfor %}</ul>
+  </details>
+  {% endif %}
+</section>
+
 <section>
   <h2>Synthesize report</h2>
   {% if synthesize_result.slug %}<p>Last: {{ synthesize_result.slug }} {% if synthesize_result.skipped %}({{ synthesize_result.skipped }}){% endif %}</p>{% endif %}
@@ -128,7 +180,10 @@
     <button type="submit" name="dry_run" value="0">Write report</button>
   </form>
   {% if reports %}
-  <ul>{% for r in reports %}<li><a href="/index/report/{{ r.name }}" target="_blank">{{ r.name }}</a></li>{% endfor %}</ul>
+  <details>
+    <summary>Recent reports ({{ reports|length }})</summary>
+    <ul>{% for r in reports %}<li><a href="/index/report/{{ r.name }}" target="_blank">{{ r.name }}</a></li>{% endfor %}</ul>
+  </details>
   {% endif %}
 </section>
 {% endif %}

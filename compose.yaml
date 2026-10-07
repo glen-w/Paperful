@@ -1,9 +1,10 @@
-# Build-local one-shot CLI (no registry image) against host Zotero.
+# Build-local image against host Zotero / Ollama.
 #   cp .env.example .env
 #   # keep repo-local data: set PAPERFUL_DATA=. in .env
 #   # or: mkdir -p ../paperful-data && cp config.example.toml ../paperful-data/config.toml
 #   docker compose build
-#   docker compose run --rm paperful doctor   # TTY guide when amber/red
+#   docker compose up                 # GUI at http://127.0.0.1:8765 (assumes setup done)
+#   docker compose run --rm paperful doctor
 #   docker compose run --rm paperful run --collection interesting --dry-run
 
 services:
@@ -11,16 +12,26 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # light = serve only (CI default). heavy = llm + rag + browser-agent.
+        PAPERFUL_IMAGE_MODE: ${PAPERFUL_IMAGE_MODE:-light}
     image: paperful:local
     working_dir: /data
     environment:
       PAPERFUL_ZOTERO_HOST: ${PAPERFUL_ZOTERO_HOST:-host.docker.internal}
+      # Reach host Ollama; loopback [llm].base_url is rewritten the same way.
+      PAPERFUL_OLLAMA_HOST: ${PAPERFUL_OLLAMA_HOST:-host.docker.internal}
+      PAPERFUL_IMAGE_MODE: ${PAPERFUL_IMAGE_MODE:-light}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       # Sibling data dir by default (packs/, out/, state/, config.toml).
       - ${PAPERFUL_DATA:-../paperful-data}:/data
-    # Interactive doctor guide (Enter to re-check). Scripts: --no-guide or -T.
+    ports:
+      # Localhost only (no LAN). Same workbench as host `paperful serve`.
+      - "127.0.0.1:8765:8765"
+    # `compose up` → GUI. CLI one-shots: docker compose run --rm paperful <cmd>
+    command: ["serve", "--host", "0.0.0.0", "--port", "8765"]
+    # TTY for coloured CLI when using compose run. Scripts: -T.
     stdin_open: true
     tty: true
-    # No long-running daemon — always use: docker compose run --rm paperful <cmd>

@@ -18,7 +18,9 @@ plus `snapshot` / `restore`), proven on **Zotero**, and the **workbench**
 with review tokens, full CLI surface behind **Advanced**. **Interactive Ask** is
 opt-in under Index (`[rag]` + `[llm]`), not the home page
 ([Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer)).
-Mendeley and EndNote adapters are not 1.0 until testers have exercised them.
+**Mendeley and EndNote do not gate 1.0** — they stay in the tree with honest
+docs (“seeking testers”; Zotero well-tested). Do not market them as supported
+until real-library reports say so.
 Still not a full-text reading index, not a WebDAV client, and not “AI fetch
 everything.” `paperful ocr` is the optional text layer for scans.
 
@@ -32,9 +34,9 @@ integrations.
 | **1.0** | **Post-1.0** |
 | --- | --- |
 | Trust checklist, locked `paperful.run_report.v1` / `paperful.item.v1`, snapshot contract | **Local OpenAlex parquet store** — phases 2B/2C (`works_citing`, full search parity, `local_duckdb` / `http`). Live OpenAlex API is enough for most installs; v1 `ssh_duckdb` remains opt-in for institutions |
-| **GUI workbench** — Discover + Wanted simple loop (topic + people); command ids; review tokens; Advanced reveals Briefs / Index / remaining verbs | **Firefox extension** — native messaging → CLI ([section below](#optional-thin-bridge--firefox-extension-post-10)) |
+| **GUI workbench** — Discover + Wanted simple loop (topic + people); command ids; review tokens; Advanced Repair / Mirror / Index / Briefs and the non-TTY CLI verbs | **Firefox extension** — native messaging → CLI ([section below](#optional-thin-bridge--firefox-extension-post-10)) |
 | **Ask in GUI (Index)** — scoped chat with citations when `[rag]` + `[llm]` on | **Newsletter / alert ingest** — rollup bridge, Scholar alerts first ([Frontier digest](#frontier-digest-later-watch--external-ingest)) |
-| Zotero-proven path; Mendeley / EndNote when real-library testers confirm | SaaS tenancy polish, remote-manager parity beyond what 1.0 open/Docker needs |
+| Zotero-proven fetch/mirror path; honest adapter docs (Mendeley / EndNote seeking testers) | SaaS tenancy polish; promoting other managers to “supported” after field reports; remote-manager parity beyond what 1.0 open/Docker needs |
 
 (trust-10)=
 ## 0.1 → 1.0 (trust + mirror contract)
@@ -50,12 +52,12 @@ Sci-Hub, no “AI fetch everything”).
 | `--dry-run` **Would-hit** column (sources in order) | Trust before network | Shipped |
 | Exit **2** + next-steps when Zotero is down (`collections` / `run` / `attach`) | Fresh clone never dead-ends | Shipped |
 | Slim README + [CHANGELOG](../CHANGELOG.md) known limits | Trust before install | Shipped |
-| Lock `paperful.run_report.v1` | Trust for agents | Required keys frozen; extra keys may be added. Not tagged 1.0 |
+| Lock `paperful.run_report.v1` | Trust for agents | **Shipped** — required keys frozen (`RUN_REPORT_*_KEYS` incl. miss rollups); golden fixtures; extra keys may be added. Package tag may still wait on workbench polish |
 | Lock `paperful.item.v1` and `snapshot` / `restore` (additive keys only after 1.0) | Trust for the disk ledger | **Shipped** — required keys frozen; restore is create-missing (not lossless round-trip) |
 | Strip legacy flat-PDF migrate + mixed-layout doctor amber | Day-0 mirror never steers people into a whole-library layout cleanup | **Shipped (0.1 → 1.0)** |
-| **Mendeley and EndNote adapters** | The ledger survives a manager change | In the tree. **Seeking testers.** Zotero stays the well-tested path. See below |
-| **Workbench GUI** | Discover, Wanted, Preview/Grab; Advanced for full CLI | Landed — [GUI](#gui); `paperful serve` + `paperful/ui/`; Compose `gui` profile. Not tagged 1.0 |
-| **Interactive Ask (GUI)** | Index page when `[rag]` + `[llm]` enabled | **Shipped** — Index form, CLI threads, citations; ingest/search/batch on Index; Briefs for summarize/synthesize |
+| **Mendeley and EndNote adapters** (not a 1.0 blocker) | The ledger survives a manager change | In the tree. **Seeking testers.** Zotero stays the well-tested path. See below |
+| **Workbench GUI** | Discover, Wanted, Preview/Grab; Advanced Repair / Mirror / Discover grow / Wanted recover | Landed — [GUI](#gui); `paperful serve` + `paperful/ui/`; Compose `gui` profile. TTY and Sci-Hub stay CLI. Not tagged 1.0 |
+| **Interactive Ask (GUI)** | Index page when `[rag]` + `[llm]` enabled | **Shipped** — Index Ask + batch (scope, custom prompts, force); `rag questions` / `rag answered`; ingest/search; Briefs for summarize/synthesize |
 
 Nice-to-have (not 1.0 blockers): colour glossary next to `doctor` (documented);
 collection picker hint on fuzzy `--collection` miss.
@@ -63,7 +65,9 @@ collection picker hint on fuzzy `--collection` miss.
 ### Mendeley and EndNote (seeking testers)
 
 The code is in the tree. It has not been proven on real libraries the way
-Zotero has. Do not document either adapter as supported until testers say so.
+Zotero has. **1.0 does not wait on tester sign-off** — ship with clear limits
+in README, [why.md](why.md), [mendeley.md](mendeley.md), and [endnote.md](endnote.md).
+Do not call either adapter **supported** until field reports justify it.
 
 1. **Mendeley** — `MendeleyBackend` talks to `api.mendeley.com` (no official
    SDK). OAuth via `paperful session login mendeley`. `supports_write` is true
@@ -356,7 +360,7 @@ for the end-to-end operator story.
 | 18 | Twenty CRM — lookup cache plus `twenty sync` (create/enrich, Paperful note, late `author_site` before Scholar, opt-in listing write-back) | Shipped (`paperful twenty lookup` / `twenty sync`; `[twenty].enabled`; `--twenty-writeback`) |
 | 19 | Typed note provenance (`paperful.note.v1`) + scannable **first-line** prefixes on all Paperful note writers | Shipped (summarize / synthesize / remarks / snowball / briefing) |
 | 20 | `paperful notes delete` (or equivalent) — scoped filters: type, model, `--except-model`, tags; dry-run / `--apply` | Shipped (`--type`, `--model` / `--except-model`, `--all` + confirm / `--yes`) |
-| 21 | [Author watch lists](#author-watch-lists-later-people-you-follow--their-papers) — ORCID / OpenAlex resolve + `run` / `apply`; file import of follows | **In tree** (`paperful authorwatch`; social HTML scrape later) |
+| 21 | [Author watch lists](#author-watch-lists-later-people-you-follow--their-papers) — ORCID / OpenAlex resolve + `run` / `apply`; file import of follows; corpus suggestions | **Shipped** — `paperful authorwatch` (+ suggest/accept/delete); saved social HTML/CSV import; Discover list management |
 
 **Spike acceptance (one week, eng):** `refs gap` dry-run pack with zero manager
 writes; `ingest-dois` idempotent apply + `held` on ambiguous resolve; `collections
@@ -366,7 +370,7 @@ inbox drain dry-run on a fixture pack where DOI-less PDFs attach via title
 fingerprint (deterministic) and one `when_thin` LLM case logs confidence without
 auto-attach when below bar.
 Golden CI fixtures for `paperful.run_report.v1`, `paperful.refs_gap.pack.v1`, and
-`paperful.inbox.proposal.v1` when those land.
+`paperful.inbox.proposal.v1` — **shipped** (`tests/fixtures/` + `tests/test_schema_freeze.py`).
 
 ## Optional LLM assist (local / LiteLLM)
 
@@ -399,8 +403,9 @@ only when bytes pass **`min_pdf_bytes`** and size stabilizes (never trust agent
 `done` alone). **`run`** auto-appends the lane when `[llm].enabled`,
 `[browser_agent].during_run`, and the extra are on (policy order: one Scholar
 try immediately before the agent when Scholar is opted in);
-**`paperful recover --item`** runs the same runner in isolation. Docker image
-**excludes** browser-use (host-only: vault login + Chrome).
+**`paperful recover --item`** runs the same runner in isolation. **heavy**
+Compose images ship browser-use; **light** (CI default) does not. Headed
+vault login still stays on the host (shared `state/`).
 
 #### Documentation map (keep in sync)
 
@@ -412,7 +417,7 @@ try immediately before the agent when Scholar is opted in);
 | [architecture.md](architecture.md) | Serial source ordering, Playwright handoff before agent, CAPTCHA → skip lane for run |
 | [sessions.md](sessions.md) | Vault profile shared with recover; no concurrent vault users |
 | [commands.md](commands.md) | `recover --from-last-run`, `--browser-agent` / `--no-browser-agent` on `run` / `all` |
-| [docker.md](docker.md) | Explicit non-shipment of browser-use in container |
+| [docker.md](docker.md#image-mode-light-vs-heavy) | light vs heavy packs (`browser-use` in heavy) |
 | `assessments/2026-09-29-ollama-browser-use-pdf-download-models.md` | Full research note (Infra rank + honesty/engineering cuts); **user-facing summary lives in `browser-agent-models.md`** |
 
 When changing agent defaults, task text, or doctor floors, update **`llm.md`**
@@ -601,7 +606,9 @@ answered` and `paperful ask` (one cited answer, TTY/`--thread` follow-ups, or
 split](#product-split-10-vs-post-10). Terminal multi-turn and the Index page
 share `ask --thread`: follow-ups are rewritten for retrieval and stored under
 `state/rag/threads/` with visible scope (collection chip, optional years) and
-citations. Batch `--item` and custom `--prompt` stay CLI-only.
+citations. Index exposes batch scope (`--item`, years, types), custom prompts
+(inline, upload, path, saved under `state/prompts/`), and `rag questions` /
+`rag answered` when Advanced is on.
 
 Reuse the house LLM pattern: global `[llm]` + per-verb overrides (same spirit
 as `[summarize].model`, `[browser_agent].model`, `[rag].model`).
@@ -716,28 +723,29 @@ shared message shapes before hard-wiring repos.
 (author-watch-lists-later-people-you-follow--their-papers)=
 ### Author watch lists (in tree; people you follow → their papers)
 
-**Status:** in tree — `paperful authorwatch`. Distinct from collection-scoped [`snowball watch`](snowball.md#watch)
+**Status:** shipped — `paperful authorwatch`. Distinct from collection-scoped [`snowball watch`](snowball.md#watch)
 (keyword / DOI / ORCID **seed** profiles and hop expansion). Here the seed is a
 **named author list** the operator curates: people they already care about,
 turned into a **local** watch for **new research outputs**, not career posts.
-Social HTML scrape stays later; v1 is `--orcid` plus CSV/JSON/ORCID file import.
+Live social scraping is out of scope; saved HTML/CSV exports import with `--file`.
 
 **Direction:**
 
-- **Lists on disk** — `paperful authorwatch save|add|remove|show` maintains people under `state/authorwatch/<name>/` (display name, ORCID
+- **Lists on disk** — `paperful authorwatch save|add|remove|show|delete` maintains people under `state/authorwatch/<name>/` (display name, ORCID
   when known, optional affiliation host). `resolve` fills missing ORCID / OpenAlex ids; **held** on ambiguity.
+- **Suggestions** — `paperful authorwatch suggest -C … --method corpus|most_cited|coauthor|mix` ranks people from the collection (and OpenAlex where needed). `authorwatch accept --id …` (optional `--seed-from`) moves checked rows onto the list; ledger `suggestions.jsonl`.
 - **Watch run** — `paperful authorwatch run` sets a cursor baseline (no full-oeuvre fetch) then polls OpenAlex for works indexed after that cursor. `--backfill-from` proposes by **publication** date. `exists` stays out of the inbox. `authorwatch apply -C` creates parents (independent of `[snowball] enabled`). PDFs via `paperful run`. Paperful does not schedule.
-- **Import** — CSV/JSON/ORCID files. `import --source rg|linkedin|academia` without `--file` prints an export recipe. HTML scrape stays later.
+- **Import** — CSV/JSON/ORCID files; `import --source rg|linkedin|academia --file saved.html` parses operator-saved exports. Without `--file`, prints the export recipe.
 
 **Pitch:** Get what really matters from the people you already follow —
 **their research**. Social follow graphs surface jobs, posts, and noise;
 authorwatch turns that graph into a frontier of **new papers** from those
 names, in one place — **your machine** (`state/`, optional `-C`, same
-mirror and honesty contract as snowball). HTML follow import stays later.
+mirror and honesty contract as snowball).
 
 **Non-goals:** replacing RSS or social timelines; auto-friending or messaging on
-RG; cloud “who to follow” recommendations; treating LinkedIn/Academia HTML scrape
-as a core `run` source without opt-in.
+RG; cloud “who to follow” recommendations; live authenticated scraping of social
+follow pages; treating social HTML as a `run` PDF source.
 
 ### Structured section extract (MVP; later)
 
@@ -1182,8 +1190,8 @@ Larger product bets. Park until the ledger and core loop justify them.
    mirror](#annotation-mirror-later); [frontier
    digest](#frontier-digest-later-watch--external-ingest) (watch rollup shipped;
    optional rollup newsletter bridge, Scholar alerts first, still later); [author watch
-   lists](#author-watch-lists-later-people-you-follow--their-papers) (ORCID-backed
-   people lists **in tree**; optional HTML import from RG / LinkedIn / Academia follows later). **[Run
+   lists](#author-watch-lists-later-people-you-follow--their-papers) (shipped;
+   saved social HTML/CSV import; live scrape still out). **[Run
    witness](#run-witness-later-trust-thicken)** ties batches to config/model/index
    for reproducibility.
 6. **Writing & export** — CSL / BibLaTeX / Quarto sync; living review / gap lists;
@@ -1359,10 +1367,15 @@ second doc tree that drifts from the CLI.
 **Landed:** `paperful.item.v1` lock, `paperful serve` HTTP + server-rendered UI
 under `paperful/ui/` — default nav **Discover** and **Wanted**, Preview/Grab with
 review tokens, command ids under `state/gui/commands/`. Discover covers topic
-queues (keep/skip, briefing, digest, profile run, resume, watches) and people
-lists (create/add/resolve/run/import, inbox apply). **Advanced** (cookie)
-reveals Repair, Mirror, Index, Briefs, Settings and extra form fields without
-enabling opt-in sources. **Not tagged 1.0.**
+queues (keep/skip, briefing, digest, profile run, resume, watches), people
+lists (create/add/resolve/run/import, inbox apply), and Advanced grow tools
+(refs gap, ingest-dois, authors, packs promote). Queue/watch briefing and
+digest can file a collection note (`paperful:frontier-briefing`). **Advanced**
+(cookie) reveals Repair, Mirror, Index, Briefs, Settings and extra form fields
+without enabling opt-in sources. Repair/Mirror Preview is dry-run; Apply uses
+the same entrypoints as the CLI. TTY (`session login`, `doctor --guide`,
+mid-run EZProxy), `collections add`, `approve-each`, and Sci-Hub stay CLI.
+**Not tagged 1.0.** Polish left is tagging, screenshots, and SSE.
 
 The CLI stays the source of truth; the GUI marshals the same verbs with dry-run
 default and explicit Apply. Not a second fetch stack or Zotero’s reader.
@@ -1371,6 +1384,7 @@ default and explicit Apply. Not a second fetch stack or Zotero’s reader.
 **Ask (Index, opt-in):** **Shipped** — scoped chat with citations when `[llm]` and
 `[rag]` are on and the index has rows. Collection chip is the scope; threads live
 under `state/rag/threads/` (same as `ask --thread`). Index also runs `rag ingest`,
-`rag search`, and batch Ask. **Briefs** (Advanced) runs `summarize` and
-`synthesize`. CLI `ask` remains for scripts, `--item` filters, and custom prompts.
+`rag search`, batch Ask (item/year/type/top-k/force, custom prompts),
+`rag questions`, and `rag answered`. **Briefs** (Advanced) runs `summarize` and
+`synthesize`. CLI `ask` remains for scripts, TTY multi-turn, and run profiles.
 See [Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer).

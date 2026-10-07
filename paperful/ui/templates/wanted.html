@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% from "_miss_surface.html" import status_icon %}
+{% from "_icon_btn.html" import icon_button %}
 {% block title %}Wanted — Paperful{% endblock %}
 {% block body_attrs %}{% if request.query_params.get('run') or request.query_params.get('poll') %} data-poll-run="{{ request.query_params.get('run') or request.query_params.get('poll') }}"{% endif %}{% endblock %}
 {% block content %}
@@ -12,10 +14,78 @@
   <a href="/wanted?tab=have" {% if tab == 'have' %}class="active"{% endif %}>Have</a>
 </div>
 <form method="post" action="/wanted/preview" id="wanted-form" class="toolbar">
+  {% if prefs.advanced %}
+  <label>Year from <input name="year_from" type="number" style="width:6rem"></label>
+  <label>Year to <input name="year_to" type="number" style="width:6rem"></label>
+  <label>Type <input name="item_type" placeholder="journalArticle"></label>
+  <label>Limit <input name="limit" type="number" min="1" style="width:5rem"></label>
+  <label><input type="checkbox" name="retry_failed" value="1"> Retry failed</label>
+  <label><input type="checkbox" name="try_all" value="1"> Try all sources</label>
+  <label><input type="checkbox" name="upgrade_linked" value="1"> Upgrade linked</label>
+  <label><input type="checkbox" name="upgrade_snapshot" value="1"> Upgrade snapshot</label>
+  <label><input type="checkbox" name="browser_agent" value="1"> Browser agent</label>
+  {% endif %}
   <button type="submit" id="preview-btn" data-label-all="Preview all" data-label-sel="Preview selected">Preview all</button>
   <button type="submit" formaction="/wanted/grab" id="grab-btn" data-label-all="Grab all" data-label-sel="Grab selected">Grab all</button>
   <button type="submit" formaction="/wanted/attach" class="secondary">Attach N PDFs to this Zotero library</button>
 </form>
+{% if prefs.advanced %}
+<section class="toolbar">
+  <h2>Advanced</h2>
+  <form method="post" action="/wanted/attach/preview" class="toolbar keys-form">
+    <label><input type="checkbox" name="allow_mismatch" value="1"> Allow DOI mismatch</label>
+    <label><input type="checkbox" name="allow_short" value="1"> Allow short PDF</label>
+    <button type="submit" class="secondary">Preview attach</button>
+  </form>
+  <form method="post" action="/wanted/attach" class="toolbar">
+    <input type="hidden" name="review_token" value="{{ attach_token }}">
+    <button type="submit">Attach held PDFs</button>
+  </form>
+  <form method="post" action="/wanted/recover/preview" class="toolbar keys-form">
+    <label><input type="checkbox" name="from_last_run" value="1"> From last run</label>
+    <label>Mode
+      <select name="from_last_run_mode">
+        <option value="not_found">not_found</option>
+        <option value="retryable">retryable</option>
+        <option value="all">all</option>
+      </select>
+    </label>
+    <label>Limit <input name="recover_limit" type="number" min="1" style="width:5rem"></label>
+    <button type="submit" class="secondary">Preview recover</button>
+  </form>
+  <form method="post" action="/wanted/recover" class="toolbar">
+    <input type="hidden" name="review_token" value="{{ recover_token }}">
+    <button type="submit">Recover</button>
+  </form>
+  <form method="post" action="/wanted/handoff" class="toolbar keys-form">
+    <label>Mode
+      <select name="mode">
+        <option value="list">list</option>
+        <option value="tabs">tabs</option>
+        <option value="walk">walk</option>
+        <option value="watch">watch</option>
+      </select>
+    </label>
+    <label><input type="checkbox" name="include_doi_tabs" value="1"> Include DOI tabs</label>
+    <button type="submit" class="secondary">Handoff</button>
+  </form>
+  <form method="post" action="/wanted/inbox/drain" class="toolbar">
+    <button type="submit" class="secondary">Drain inbox</button>
+  </form>
+  <form method="post" action="/wanted/reachout" class="toolbar keys-form">
+    <label><input type="checkbox" name="non_oa_only" value="1"> Non-OA only</label>
+    <label><input type="checkbox" name="lookup" value="1"> Twenty lookup</label>
+    <label>Handoff
+      <select name="handoff_mode">
+        <option value="">export only</option>
+        <option value="tabs">tabs</option>
+        <option value="walk">walk</option>
+      </select>
+    </label>
+    <button type="submit" class="secondary">Reachout</button>
+  </form>
+</section>
+{% endif %}
 <table class="wb-table">
   <thead><tr><th></th><th>Title</th><th>Detail</th></tr></thead>
   <tbody>
@@ -24,7 +94,7 @@
     <td><input type="checkbox" name="keys" value="{{ row.key }}" form="wanted-form" class="row-select"
       {% if row.ticked %}checked{% endif %}></td>
     <td>{{ row.title }}
-      <button type="button" class="secondary" onclick="document.getElementById('d-{{ row.key }}').showModal()">Detail</button>
+      {{ icon_button('Detail', 'detail', onclick="document.getElementById('d-" ~ row.key ~ "').showModal()") }}
       <dialog class="wb-drawer" id="d-{{ row.key }}">
         <p><strong>{{ row.title }}</strong></p>
         <p>Key {{ row.key }}{% if row.year %} · {{ row.year }}{% endif %}</p>
@@ -33,7 +103,7 @@
         {% if row.state %}<p>Verification {{ row.state }}{% if row.reason %} ({{ row.reason }}){% endif %}</p>{% endif %}
         {% if row.miss_plain %}<p>{{ row.miss_plain }}</p>{% endif %}
         {% if row.has_summary %}
-        <p><a href="/item/{{ row.key }}/summary" target="_blank" rel="noopener">Open summary</a></p>
+        <p><a href="/briefs/summary/{{ row.key }}">Open summary</a></p>
         <iframe class="summary-frame" sandbox="" src="/item/{{ row.key }}/summary" title="Summary"></iframe>
         {% endif %}
         {% if prefs.advanced and briefs.llm_on and tab != 'missing' %}
@@ -48,10 +118,8 @@
       </dialog>
     </td>
     <td>
-      {% if row.miss_plain %}{{ row.miss_plain }}
-      {% elif row.state == 'doi_match' %}<span class="stamp-found">found</span>
-      {% elif row.state == 'doi_mismatch' %}<span class="stamp-check">check</span>
-      {% elif row.state %}{{ row.state }}{% if row.reason %} ({{ row.reason }}){% endif %}
+      {% if row.miss_plain %}{{ status_icon(row.miss_surface, row.miss_plain, row.miss_detail) }}
+      {% elif row.state %}{{ status_icon(row.state, row.verify_plain, row.verify_tip) }}
       {% endif %}
       {% if row.has_summary %}<span class="stamp-found">summary</span>{% endif %}
     </td>
@@ -59,4 +127,31 @@
   {% endfor %}
   </tbody>
 </table>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var main = document.getElementById("wanted-form");
+  if (!main) return;
+  document.querySelectorAll("form.keys-form").forEach(function (form) {
+    form.addEventListener("submit", function () {
+      main.querySelectorAll(".row-select:checked").forEach(function (box) {
+        var input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "keys";
+        input.value = box.value;
+        form.appendChild(input);
+      });
+      var lim = form.querySelector("[name=recover_limit]");
+      if (lim && lim.value) {
+        var hidden = document.createElement("input");
+        hidden.type = "hidden";
+        hidden.name = "limit";
+        hidden.value = lim.value;
+        form.appendChild(hidden);
+      }
+    });
+  });
+})();
+</script>
 {% endblock %}

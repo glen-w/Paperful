@@ -8,7 +8,7 @@ from typing import Any
 from ..config import Config
 from ..miss_surface import honesty_row_for_item, miss_surface_plain, project_miss_surface
 from ..store import Manifest, STATUS_ATTACHED, STATUS_OK
-from .verify import file_verification
+from .verify import file_verification, reason_plain, verification_plain
 
 
 def _has_summary(cfg: Config, key: str) -> bool:
@@ -41,7 +41,13 @@ def wanted_rows(
             rec is not None and rec.status in {STATUS_OK, STATUS_ATTACHED}
         ):
             ver = file_verification(rec, item_doi=item.doi)
-            row = {**base, **ver, "ticked": ver["state"] == "doi_match"}
+            row = {
+                **base,
+                **ver,
+                "verify_plain": verification_plain(ver["state"]),
+                "verify_tip": reason_plain(ver.get("reason") or ""),
+                "ticked": ver["state"] == "doi_match",
+            }
             state = ver["state"]
             if state == "doi_match":
                 have.append(row)
@@ -159,6 +165,67 @@ def authorwatch_inbox_rows(cfg: Config) -> list[dict[str, Any]]:
     return out
 
 
+def nest_collection_rows(
+    rows: list[dict[str, Any]], *, active: str = ""
+) -> list[dict[str, Any]]:
+    """Nest flat ``path`` rows so Library can render ``<details>`` groups.
+
+    ``item_count`` is used instead of ``items`` so Jinja does not shadow the
+    dict ``.items`` method.
+    """
+    by_path: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        path = str(row.get("path") or "").strip()
+        if not path:
+            continue
+        name = str(row.get("name") or "").strip() or path.rsplit("/", 1)[-1]
+        by_path[path] = {
+            "path": path,
+            "name": name,
+            "key": str(row.get("key") or ""),
+            "item_count": int(row.get("items") or 0),
+            "missing_pdf": int(row.get("missing_pdf") or 0),
+            "children": [],
+            "open": False,
+        }
+    for path in list(by_path):
+        parts = path.split("/")
+        for i in range(1, len(parts)):
+            parent = "/".join(parts[:i])
+            if parent in by_path:
+                continue
+            by_path[parent] = {
+                "path": parent,
+                "name": parts[i - 1],
+                "key": "",
+                "item_count": 0,
+                "missing_pdf": 0,
+                "children": [],
+                "open": False,
+            }
+    roots: list[dict[str, Any]] = []
+    for path, node in sorted(by_path.items(), key=lambda kv: kv[0].lower()):
+        parent = path.rsplit("/", 1)[0] if "/" in path else ""
+        if parent in by_path:
+            by_path[parent]["children"].append(node)
+        else:
+            roots.append(node)
+
+    active = (active or "").strip()
+
+    def _finish(nodes: list[dict[str, Any]]) -> None:
+        nodes.sort(key=lambda n: str(n["name"]).lower())
+        for node in nodes:
+            path = str(node["path"])
+            node["open"] = bool(
+                active and (active == path or active.startswith(path + "/"))
+            )
+            _finish(node["children"])
+
+    _finish(roots)
+    return roots
+
+
 def library_item_rows(cfg: Config, items: list[Any], manifest: Manifest) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for item in sorted(items, key=lambda i: (i.year or 9999, (i.title or "").lower())):
@@ -246,7 +313,30 @@ def authorwatch_people_rows(cfg: Config, name: str) -> list[dict[str, Any]]:
                 "display_name": person.display_name or person.id,
                 "orcid": person.orcid,
                 "status": person.status,
+                "affiliation": person.affiliation_host,
                 "identity": person.identity(),
+            }
+        )
+    return rows
+
+
+def authorwatch_suggestion_rows(cfg: Config, name: str) -> list[dict[str, Any]]:
+    from ..authorwatch import load_suggestions
+
+    rows: list[dict[str, Any]] = []
+    for row in load_suggestions(cfg, name):
+        if row.status != "pending":
+            continue
+        rows.append(
+            {
+                "id": row.id,
+                "display_name": row.display_name,
+                "orcid": row.orcid,
+                "openalex": row.openalex,
+                "method": row.method,
+                "score": row.score,
+                "why": row.why,
+                "pollable": row.pollable,
             }
         )
     return rows
@@ -307,6 +397,10 @@ ASK_ERROR_MESSAGES = {
     "questions": "Enter at least one question (one per line).",
     "apply": "A Zotero collection note needs dest zotero or both, and a collection.",
     "search": "Search failed. Check that the index exists and the embedder is up.",
+    "prompt": "Custom prompt is invalid, empty, or missing.",
+    "scope": "Pick a collection, item keys, or whole library.",
+    "upload": "Upload is empty or too large.",
+    "type": "Item type filter is invalid.",
 }
 
 DEST_OPTIONS = ("disk", "zotero", "both")
@@ -449,6 +543,47 @@ def list_ask_packs(cfg: Config, limit: int = 12) -> list[dict[str, Any]]:
     return out
 
 
+def list_answered_packs(cfg: Config, limit: int = 12) -> list[dict[str, Any]]:
+    from ..rag.answered import answered_dir
+
+    root = answered_dir(cfg)
+    if not root.is_dir():
+        return []
+    dirs = [
+        p
+        for p in root.iterdir()
+        if p.is_dir() and (p / "pack.md").is_file()
+    ]
+    dirs.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    out: list[dict[str, Any]] = []
+    for path in dirs[:limit]:
+        questions = answered = partial = not_found = failed = 0
+        pack = path / "pack.json"
+        if pack.is_file():
+            try:
+                body = json.loads(pack.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError, ValueError):
+                body = {}
+            if isinstance(body, dict):
+                questions = int(body.get("questions") or 0)
+                answered = int(body.get("answered") or 0)
+                partial = int(body.get("partial") or 0)
+                not_found = int(body.get("not_found") or 0)
+                failed = int(body.get("failed") or 0)
+        out.append(
+            {
+                "stamp": path.name,
+                "questions": questions,
+                "answered": answered,
+                "partial": partial,
+                "not_found": not_found,
+                "failed": failed,
+                "mtime": path.stat().st_mtime,
+            }
+        )
+    return out
+
+
 def list_html_stems(folder: Any, limit: int = 20) -> list[dict[str, Any]]:
     from pathlib import Path
 
@@ -461,6 +596,53 @@ def list_html_stems(folder: Any, limit: int = 20) -> list[dict[str, Any]]:
         reverse=True,
     )
     return [{"name": p.stem, "mtime": p.stat().st_mtime} for p in files[:limit]]
+
+
+def _summary_model(html: str) -> str:
+    from ..notehtml import parse
+    from ..summarize import parse_summary_provenance
+
+    meta = parse(html) or {}
+    model = str(meta.get("model") or "").strip()
+    if model:
+        return model
+    prov = parse_summary_provenance(html) or {}
+    return str(prov.get("model") or "").strip()
+
+
+def _summary_cite(cfg: Config, key: str) -> str:
+    try:
+        from ..catalogue import MirrorCatalogue
+
+        item = MirrorCatalogue(cfg.out_dir).get_item(key)
+    except OSError:
+        item = None
+    if item is None:
+        return key
+    return item.label
+
+
+def summary_meta(cfg: Config, key: str) -> dict[str, Any] | None:
+    """Cite, model, and mtime for ``state/summaries/<key>.html``."""
+    path = cfg.summaries_dir / f"{key}.html"
+    if not path.is_file():
+        return None
+    html = path.read_text(encoding="utf-8", errors="replace")
+    return {
+        "name": key,
+        "cite": _summary_cite(cfg, key),
+        "model": _summary_model(html),
+        "mtime": path.stat().st_mtime,
+    }
+
+
+def list_recent_summaries(cfg: Config, limit: int = 20) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for stem in list_html_stems(cfg.summaries_dir, limit):
+        meta = summary_meta(cfg, stem["name"])
+        if meta is not None:
+            rows.append(meta)
+    return rows
 
 
 def safe_child(root: Any, *parts: str) -> Any:

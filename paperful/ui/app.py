@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import time
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,7 @@ from .pages import (
     authorwatch_inbox_rows,
     authorwatch_lists,
     authorwatch_people_rows,
+    authorwatch_suggestion_rows,
     briefs_page_flags,
     dest_options,
     focus_options,
@@ -30,9 +32,13 @@ from .pages import (
     last_ask_result,
     last_job_result,
     library_item_rows,
+    nest_collection_rows,
     list_ask_packs,
+    list_answered_packs,
     list_html_stems,
+    list_recent_summaries,
     list_snowball_profiles,
+    summary_meta,
     list_threads,
     newest_snowball_queue,
     command_by_id,
@@ -42,6 +48,14 @@ from .pages import (
     thread_for_display,
     wanted_rows,
     MIRROR_VERBS,
+)
+from .rag_form import (
+    list_saved_prompts,
+    parse_rag_scope,
+    read_questions_upload,
+    resolve_prompt_from_form,
+    save_prompt_as,
+    scope_has_target,
 )
 from .snowball_form import parse_discover_topic
 from .prefs import (
@@ -58,6 +72,8 @@ def _ui_dir() -> Path:
 
 
 def _health_status(checks: list[dict[str, Any]]) -> str:
+    if not checks:
+        return "amber"
     if any(c.get("status") == "red" for c in checks):
         return "red"
     if any(c.get("status") == "amber" for c in checks):
@@ -134,19 +150,17 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     templates = Jinja2Templates(directory=str(_ui_dir() / "templates"))
     static_dir = _ui_dir() / "static"
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-    # Health chip only — avoid re-running the full doctor on every HTML request.
+    # Health chip: never run full doctor on HTML requests (15–30s with LLM/RAG).
+    # /system still calls doctor_payload and refreshes this cache for the chip.
     _health_cache: dict[str, Any] = {"at": 0.0, "checks": []}
 
-    def _cached_doctor() -> list[dict[str, Any]]:
-        import time
+    def _remember_doctor(checks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        _health_cache["at"] = time.time()
+        _health_cache["checks"] = list(checks)
+        return list(checks)
 
-        now = time.time()
-        if now - float(_health_cache["at"]) < 30.0 and _health_cache["checks"]:
-            return list(_health_cache["checks"])
-        checks = doctor_payload(cfg)
-        _health_cache["at"] = now
-        _health_cache["checks"] = checks
-        return checks
+    def _cached_doctor() -> list[dict[str, Any]]:
+        return list(_health_cache["checks"])
 
     def ctx(request: Request, active: str, **extra: Any) -> dict[str, Any]:
         prefs = prefs_from_request(request)
@@ -175,6 +189,37 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             raise ValueError("limit")
         return value
 
+    async def _upload_bytes(form: Any, key: str) -> bytes | None:
+        upload = form.get(key)
+        if upload is None or not getattr(upload, "filename", None):
+            return None
+        data = await upload.read()  # type: ignore[union-attr]
+        return data if data else None
+
+    async def _resolved_prompt(form: Any) -> Any:
+        upload = form.get("prompt_upload")
+        data = None
+        name = None
+        if upload is not None and getattr(upload, "filename", None):
+            name = str(upload.filename)
+            data = await upload.read()  # type: ignore[union-attr]
+            if not data:
+                data = None
+        return resolve_prompt_from_form(
+            cfg, form, upload_bytes=data, upload_name=name
+        )
+
+    def _save_prompt_if_asked(form: Any, resolved: Any) -> None:
+        if form.get("save_prompt") != "1":
+            return
+        name = str(form.get("prompt_save_name") or "").strip()
+        text = resolved.prompt_text
+        if not text and resolved.prompt_path:
+            text = Path(resolved.prompt_path).read_text(encoding="utf-8")
+        if not text:
+            return
+        save_prompt_as(cfg, name, text)
+
     def _parse_dest(raw: object, default: str) -> str:
         value = str(raw or "").strip() or default
         if value not in DEST_OPTIONS:
@@ -184,6 +229,33 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     @app.get("/")
     def root() -> RedirectResponse:
         return RedirectResponse(url="/wanted", status_code=302)
+
+    def _wanted_token(verb: str) -> str:
+        for rec in commands.list_commands(cfg, limit=30):
+            if rec.get("verb") == verb and rec.get("review_token"):
+                return str(rec["review_token"])
+        return ""
+
+    def _parse_int(raw: object) -> int | None:
+        text = str(raw or "").strip()
+        if not text:
+            return None
+        return int(text)
+
+    def _wanted_run_flags(form: Any) -> dict[str, Any]:
+        types = [t.strip() for t in str(form.get("item_type") or "").split(",") if t.strip()]
+        return {
+            "year_from": _parse_int(form.get("year_from")),
+            "year_to": _parse_int(form.get("year_to")),
+            "item_type": types,
+            "limit": _parse_int(form.get("limit")),
+            "retry_failed": form.get("retry_failed") == "1",
+            "try_all": form.get("try_all") == "1",
+            "upgrade_linked": form.get("upgrade_linked") == "1",
+            "upgrade_snapshot": form.get("upgrade_snapshot") == "1",
+            "browser_agent": form.get("browser_agent") == "1",
+            "htmlpdf": form.get("htmlpdf") == "1",
+        }
 
     @app.get("/wanted", response_class=HTMLResponse)
     def page_wanted(request: Request, tab: str = "missing", error: str = "") -> HTMLResponse:
@@ -223,6 +295,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 coach=coach,
                 briefs=briefs,
                 dest_options=dest_options(),
+                attach_token=_wanted_token("attach"),
+                recover_token=_wanted_token("recover"),
             ),
         )
 
@@ -271,6 +345,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         prefs = prefs_from_request(request)
         form = await request.form()
         keys = [str(k) for k in form.getlist("keys")]
+        flags = _wanted_run_flags(form) if prefs.advanced else {}
 
         def work(cmd_id: str) -> None:
             jobs.preview_run(
@@ -279,6 +354,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 collection=prefs.collection,
                 preset=prefs.preset,
                 keys=keys or None,
+                flags=flags,
             )
 
         cmd_id = commands.enqueue(cfg, "preview_run", work)
@@ -295,31 +371,141 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 if c.get("review_token"):
                     token = c["review_token"]
                     break
+        if not token:
+            token = _wanted_token("preview_run")
         ok, msg = jobs.grab_run(cfg, token=token)
         if not ok:
             return JSONResponse({"ok": False, "error": msg}, status_code=409)
         return RedirectResponse(url="/wanted", status_code=303)
 
-    @app.post("/wanted/attach", response_model=None)
-    async def wanted_attach(request: Request):
+    @app.post("/wanted/attach/preview")
+    async def wanted_attach_preview(request: Request) -> RedirectResponse:
         prefs = prefs_from_request(request)
         form = await request.form()
         keys = [str(k) for k in form.getlist("keys")]
-        ok, msg = jobs.attach_run(cfg, keys=keys, collection=prefs.collection)
-        if not ok:
-            from urllib.parse import quote
+        from . import wanted_jobs
 
-            return RedirectResponse(
-                url=f"/wanted?error={quote(msg or 'attach failed')}",
-                status_code=303,
+        def work(cmd_id: str) -> None:
+            wanted_jobs.attach_preview(
+                cfg,
+                cmd_id,
+                collection=prefs.collection,
+                keys=keys or None,
+                allow_mismatch=form.get("allow_mismatch") == "1",
+                allow_short=form.get("allow_short") == "1",
             )
+
+        cmd_id = commands.enqueue(cfg, "attach", work)
+        return RedirectResponse(url=f"/wanted?run={cmd_id}", status_code=303)
+
+    @app.post("/wanted/attach", response_model=None)
+    async def wanted_attach(request: Request):
+        form = await request.form()
+        from . import wanted_jobs
+
+        token = str(form.get("review_token") or "") or _wanted_token("attach")
+        ok, msg = wanted_jobs.attach_apply(cfg, token=token)
+        if not ok:
+            return JSONResponse({"ok": False, "error": msg}, status_code=409)
         return RedirectResponse(url="/wanted", status_code=303)
+
+    @app.post("/wanted/recover/preview")
+    async def wanted_recover_preview(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        keys = [str(k) for k in form.getlist("keys")]
+        from . import wanted_jobs
+
+        def work(cmd_id: str) -> None:
+            wanted_jobs.recover_preview(
+                cfg,
+                cmd_id,
+                collection=prefs.collection,
+                keys=keys,
+                from_last_run=form.get("from_last_run") == "1",
+                from_last_run_mode=str(form.get("from_last_run_mode") or "not_found"),
+                limit=_parse_int(form.get("limit")),
+            )
+
+        cmd_id = commands.enqueue(cfg, "recover", work)
+        return RedirectResponse(url=f"/wanted?run={cmd_id}", status_code=303)
+
+    @app.post("/wanted/recover", response_model=None)
+    async def wanted_recover(request: Request):
+        form = await request.form()
+        from . import wanted_jobs
+
+        token = str(form.get("review_token") or "") or _wanted_token("recover")
+        ok, msg = wanted_jobs.recover_apply(cfg, token=token)
+        if not ok:
+            return JSONResponse({"ok": False, "error": msg}, status_code=409)
+        return RedirectResponse(url="/wanted", status_code=303)
+
+    @app.post("/wanted/handoff")
+    async def wanted_handoff(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        keys = [str(k) for k in form.getlist("keys")]
+        from . import wanted_jobs
+
+        def work(cmd_id: str) -> None:
+            wanted_jobs.handoff_run(
+                cfg,
+                cmd_id,
+                collection=prefs.collection,
+                keys=keys or None,
+                mode=str(form.get("mode") or "list"),
+                include_doi_tabs=form.get("include_doi_tabs") == "1",
+            )
+
+        cmd_id = commands.enqueue(cfg, "handoff", work)
+        return RedirectResponse(url=f"/wanted?run={cmd_id}", status_code=303)
+
+    @app.post("/wanted/inbox/drain")
+    async def wanted_inbox_drain(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        from . import wanted_jobs
+
+        def work(cmd_id: str) -> None:
+            wanted_jobs.inbox_drain(cfg, cmd_id, collection=prefs.collection)
+
+        cmd_id = commands.enqueue(cfg, "inbox_drain", work)
+        return RedirectResponse(url=f"/wanted?run={cmd_id}", status_code=303)
+
+    @app.post("/wanted/reachout")
+    async def wanted_reachout(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        keys = [str(k) for k in form.getlist("keys")]
+        from . import wanted_jobs
+
+        def work(cmd_id: str) -> None:
+            wanted_jobs.reachout_run(
+                cfg,
+                cmd_id,
+                collection=prefs.collection,
+                keys=keys or None,
+                non_oa_only=form.get("non_oa_only") == "1",
+                lookup=form.get("lookup") == "1",
+                handoff_mode=str(form.get("handoff_mode") or ""),
+            )
+
+        cmd_id = commands.enqueue(cfg, "reachout", work)
+        return RedirectResponse(url=f"/wanted?run={cmd_id}", status_code=303)
 
     def _last_review_token(verb: str) -> str:
         for rec in commands.list_commands(cfg, limit=20):
             if rec.get("verb") == verb and rec.get("review_token"):
                 return str(rec["review_token"])
         return ""
+
+    def _safe_aw_suggestions(active: str) -> list[dict[str, Any]]:
+        if not active:
+            return []
+        try:
+            return authorwatch_suggestion_rows(cfg, active)
+        except Exception:
+            return []
 
     @app.get("/discover", response_class=HTMLResponse)
     def page_discover(
@@ -346,14 +532,18 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 aw_lists=authorwatch_lists(cfg),
                 aw_list=active_list,
                 aw_people=people,
+                aw_suggestions=_safe_aw_suggestions(active_list),
                 profiles=list_snowball_profiles(cfg),
                 deferred_run=snowball_deferred_run_id(cfg),
                 snowball_token=_last_review_token("snowball_apply"),
                 aw_token=_last_review_token("authorwatch_apply"),
+                ingest_token=_last_review_token("ingest_dois"),
                 note=(
                     last_job_result(cfg, "snowball_briefing")
                     or last_job_result(cfg, "snowball_digest")
                     or last_job_result(cfg, "authorwatch_briefing")
+                    or last_job_result(cfg, "refs_gap")
+                    or last_job_result(cfg, "authors")
                 ),
                 error=error,
             ),
@@ -370,6 +560,135 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
 
         commands.enqueue(cfg, f"snowball_{payload.kind}", work)
         return RedirectResponse(url="/discover", status_code=303)
+
+    @app.post("/discover/profile-save")
+    async def discover_profile_save(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        name = str(form.get("profile_name") or "").strip()
+        if not name:
+            return RedirectResponse(url="/discover?error=profile", status_code=303)
+        from .snowball_form import profile_body_from_payload
+        from ..snowball.profile import save_profile
+        from ..snowball.command import SnowballError
+
+        payload = parse_discover_topic(form, advanced=True)
+        try:
+            body = profile_body_from_payload(payload, collection=prefs.collection)
+            save_profile(cfg, name, body, force=form.get("force") == "1")
+        except (SnowballError, ValueError) as exc:
+            return RedirectResponse(
+                url=f"/discover?error={str(exc)[:80]}", status_code=303
+            )
+        return RedirectResponse(url="/discover", status_code=303)
+
+    @app.post("/discover/refs-gap")
+    async def discover_refs_gap(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+
+        def work(cmd_id: str) -> None:
+            from ..agent_ops import run_refs_gap
+
+            result = run_refs_gap(cfg, prefs.collection)
+            rec = commands.read_command(cfg, cmd_id) or {}
+            rec["result"] = result
+            commands.write_command(cfg, rec)
+
+        cmd_id = commands.enqueue(cfg, "refs_gap", work)
+        return RedirectResponse(url=f"/discover?run={cmd_id}", status_code=303)
+
+    @app.post("/discover/ingest-preview")
+    async def discover_ingest_preview(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        pack_path = str(form.get("pack_path") or "").strip()
+        upload = form.get("file")
+        dest = cfg.state_dir / "gui" / "uploads"
+        dest.mkdir(parents=True, exist_ok=True)
+        source_path = ""
+        if upload is not None and getattr(upload, "filename", None):
+            path = dest / Path(str(upload.filename)).name
+            path.write_bytes(await upload.read())
+            source_path = str(path)
+        elif pack_path:
+            source_path = pack_path
+
+        def work(cmd_id: str) -> None:
+            from . import discover_jobs
+
+            discover_jobs.ingest_preview(
+                cfg,
+                cmd_id,
+                collection=prefs.collection,
+                source_path=source_path,
+            )
+
+        cmd_id = commands.enqueue(cfg, "ingest_dois", work)
+        return RedirectResponse(url=f"/discover?run={cmd_id}", status_code=303)
+
+    @app.post("/discover/ingest-apply", response_model=None)
+    async def discover_ingest_apply(request: Request):
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        from . import discover_jobs
+
+        token = str(form.get("review_token") or "") or _last_review_token("ingest_dois")
+        ok, msg = discover_jobs.ingest_apply(
+            cfg, token=token, collection=prefs.collection
+        )
+        if not ok:
+            return JSONResponse({"ok": False, "error": msg}, status_code=409)
+        return RedirectResponse(url="/discover", status_code=303)
+
+    @app.post("/discover/authors")
+    async def discover_authors(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+
+        def work(cmd_id: str) -> None:
+            from rich.console import Console
+
+            from ..authors_cmd import run_authors
+
+            run_authors(
+                Console(quiet=True, file=None),
+                collection=[prefs.collection] if prefs.collection else [],
+                library=not bool(prefs.collection),
+                year_from=None,
+                year_to=None,
+                item_type=[],
+                min_count=int(form.get("min_count") or 2),
+                max_authors=int(form.get("max_authors") or 15),
+                apply=form.get("apply") == "1",
+                profile=None,
+                run_config=None,
+                config=cfg.config_path,
+                fmt="json",
+            )
+            rec = commands.read_command(cfg, cmd_id) or {}
+            rec["result"] = {"apply": form.get("apply") == "1"}
+            commands.write_command(cfg, rec)
+
+        cmd_id = commands.enqueue(cfg, "authors", work)
+        return RedirectResponse(url=f"/discover?run={cmd_id}", status_code=303)
+
+    @app.post("/discover/packs-promote")
+    async def discover_packs_promote(request: Request) -> RedirectResponse:
+        form = await request.form()
+        slug = str(form.get("slug") or "").strip()
+        if not slug:
+            return RedirectResponse(url="/discover?error=slug", status_code=303)
+
+        def work(cmd_id: str) -> None:
+            from ..snowball.preflight import promote_pack
+
+            path = promote_pack(cfg, slug)
+            rec = commands.read_command(cfg, cmd_id) or {}
+            rec["result"] = {"path": str(path)}
+            commands.write_command(cfg, rec)
+
+        cmd_id = commands.enqueue(cfg, "packs_promote", work)
+        return RedirectResponse(url=f"/discover?run={cmd_id}", status_code=303)
 
     @app.post("/discover/follow")
     async def discover_follow(request: Request) -> RedirectResponse:
@@ -544,10 +863,19 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         commands.enqueue(cfg, "snowball_profile", work)
         return RedirectResponse(url="/discover", status_code=303)
 
+    def _maybe_file_note(html: str, apply: bool, collection: str) -> str:
+        if not apply:
+            return ""
+        from . import discover_jobs
+
+        return discover_jobs.file_frontier_note(cfg, html, collection)
+
     @app.post("/discover/briefing")
     async def discover_briefing(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
         form = await request.form()
         run_id = str(form.get("run_id") or "").strip()
+        apply_note = form.get("apply") == "1"
         if not run_id:
             return RedirectResponse(url="/discover", status_code=303)
 
@@ -555,10 +883,15 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             from ..snowball.briefing import write_run_briefing
 
             briefing = write_run_briefing(cfg, run_id)
+            note_key = _maybe_file_note(briefing.html, apply_note, prefs.collection)
             jobs._attach_result(
                 cfg,
                 cmd_id,
-                {"path": str(briefing.path), "markdown": briefing.markdown[:4000]},
+                {
+                    "path": str(briefing.path),
+                    "markdown": briefing.markdown[:4000],
+                    "note_key": note_key,
+                },
             )
 
         commands.enqueue(cfg, "snowball_briefing", work)
@@ -566,8 +899,10 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
 
     @app.post("/discover/digest")
     async def discover_digest(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
         form = await request.form()
         run_id = str(form.get("run_id") or "").strip()
+        apply_note = form.get("apply") == "1"
         if not run_id:
             return RedirectResponse(url="/discover", status_code=303)
 
@@ -575,13 +910,72 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             from ..snowball.digest import write_run_digest
 
             digest = write_run_digest(cfg, run_id)
+            note_key = _maybe_file_note(digest.html, apply_note, prefs.collection)
             jobs._attach_result(
                 cfg,
                 cmd_id,
-                {"path": str(digest.path), "markdown": digest.markdown[:4000]},
+                {
+                    "path": str(digest.path),
+                    "markdown": digest.markdown[:4000],
+                    "note_key": note_key,
+                },
             )
 
         commands.enqueue(cfg, "snowball_digest", work)
+        return RedirectResponse(url="/discover", status_code=303)
+
+    @app.post("/discover/watch-briefing")
+    async def discover_watch_briefing(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        name = str(form.get("name") or "").strip()
+        apply_note = form.get("apply") == "1"
+        if not name:
+            return RedirectResponse(url="/discover", status_code=303)
+
+        def work(cmd_id: str) -> None:
+            from ..snowball.briefing import write_watch_briefing
+
+            briefing = write_watch_briefing(cfg, name)
+            note_key = _maybe_file_note(briefing.html, apply_note, prefs.collection)
+            jobs._attach_result(
+                cfg,
+                cmd_id,
+                {
+                    "path": str(briefing.path),
+                    "markdown": briefing.markdown[:4000],
+                    "note_key": note_key,
+                },
+            )
+
+        commands.enqueue(cfg, "watch_briefing", work)
+        return RedirectResponse(url="/discover", status_code=303)
+
+    @app.post("/discover/watch-digest")
+    async def discover_watch_digest(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        name = str(form.get("name") or "").strip()
+        apply_note = form.get("apply") == "1"
+        if not name:
+            return RedirectResponse(url="/discover", status_code=303)
+
+        def work(cmd_id: str) -> None:
+            from ..snowball.digest import write_watch_digest
+
+            digest = write_watch_digest(cfg, name)
+            note_key = _maybe_file_note(digest.html, apply_note, prefs.collection)
+            jobs._attach_result(
+                cfg,
+                cmd_id,
+                {
+                    "path": str(digest.path),
+                    "markdown": digest.markdown[:4000],
+                    "note_key": note_key,
+                },
+            )
+
+        commands.enqueue(cfg, "watch_digest", work)
         return RedirectResponse(url="/discover", status_code=303)
 
     @app.post("/discover/aw/save")
@@ -601,9 +995,16 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         name = str(form.get("list_name") or "followed").strip()
         orcid = str(form.get("orcid") or "").strip()
         display = str(form.get("display_name") or "").strip()
+        affiliation = str(form.get("affiliation") or "").strip()
         from ..authorwatch import add_person
 
-        add_person(cfg, name, orcid=orcid, display_name=display)
+        add_person(
+            cfg,
+            name,
+            orcid=orcid,
+            display_name=display,
+            affiliation_host=affiliation,
+        )
         return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
 
     @app.post("/discover/aw/remove")
@@ -635,11 +1036,23 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         form = await request.form()
         name = str(form.get("list_name") or "").strip()
         backfill = str(form.get("backfill_from") or "").strip() or None
+        max_authors = form.get("max_authors")
+        per_author = form.get("per_author_limit")
+        max_authors_n = int(max_authors) if str(max_authors or "").strip() else None
+        per_author_n = int(per_author) if str(per_author or "").strip() else None
 
         def work(_cmd_id: str) -> None:
             from ..authorwatch import run_list
 
-            run_list(cfg, name, console=jobs._quiet_console(), backfill_from=backfill)
+            kwargs: dict[str, Any] = {
+                "console": jobs._quiet_console(),
+                "backfill_from": backfill,
+            }
+            if max_authors_n is not None:
+                kwargs["max_authors"] = max_authors_n
+            if per_author_n is not None:
+                kwargs["per_author_limit"] = per_author_n
+            run_list(cfg, name, **kwargs)
 
         commands.enqueue(cfg, "authorwatch_run", work)
         return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
@@ -659,6 +1072,72 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         dest = dest_dir / Path(filename).name
         dest.write_bytes(data)
         jobs.authorwatch_import(cfg, list_name=name, path=dest, source=source)
+        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+
+    @app.post("/discover/aw/suggest")
+    async def discover_aw_suggest(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        name = str(form.get("list_name") or "").strip()
+        method = str(form.get("method") or "corpus").strip()
+        limit = int(str(form.get("limit") or "15") or "15")
+        collection = str(form.get("collection") or prefs.collection or "").strip()
+
+        def work(_cmd_id: str) -> None:
+            jobs.authorwatch_suggest(
+                cfg,
+                list_name=name,
+                collection=collection,
+                method=method,
+                limit=limit,
+            )
+
+        commands.enqueue(cfg, "authorwatch_suggest", work)
+        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+
+    @app.post("/discover/aw/accept")
+    async def discover_aw_accept(request: Request) -> RedirectResponse:
+        form = await request.form()
+        name = str(form.get("list_name") or "").strip()
+        ids = [str(v) for v in form.getlist("suggestion_id")]
+        seed_from = str(form.get("seed_from") or "").strip() or None
+
+        def work(_cmd_id: str) -> None:
+            jobs.authorwatch_accept(
+                cfg,
+                list_name=name,
+                suggestion_ids=ids,
+                seed_from=seed_from,
+            )
+
+        commands.enqueue(cfg, "authorwatch_accept", work)
+        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+
+    @app.post("/discover/aw/delete")
+    async def discover_aw_delete(request: Request) -> RedirectResponse:
+        form = await request.form()
+        name = str(form.get("list_name") or "").strip()
+        from ..authorwatch import delete_list
+
+        delete_list(cfg, name, yes=True)
+        return RedirectResponse(url="/discover", status_code=303)
+
+    @app.post("/discover/aw/edit")
+    async def discover_aw_edit(request: Request) -> RedirectResponse:
+        form = await request.form()
+        name = str(form.get("list_name") or "").strip()
+        person_id = str(form.get("person_id") or "").strip()
+        display = str(form.get("display_name") or "").strip()
+        affiliation = str(form.get("affiliation") or "").strip()
+        from ..authorwatch import update_person
+
+        update_person(
+            cfg,
+            name,
+            person_id,
+            display_name=display,
+            affiliation_host=affiliation,
+        )
         return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
 
     @app.post("/discover/aw/briefing")
@@ -687,8 +1166,10 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         tree = collections_tree(cfg)
         error = ""
         rows = []
+        nested: list[dict[str, Any]] = []
         if tree.get("ok"):
             rows = tree.get("collections") or []
+            nested = nest_collection_rows(rows, active=prefs.collection)
         else:
             error = str(tree.get("error") or "Library unavailable")
         items: list[dict[str, Any]] = []
@@ -706,6 +1187,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 request,
                 "library",
                 collections=rows,
+                collection_tree=nested,
                 items=items,
                 error=error,
                 briefs=briefs,
@@ -728,8 +1210,9 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
 
     @app.get("/system", response_class=HTMLResponse)
     def page_system(request: Request) -> HTMLResponse:
+        raw = _remember_doctor(doctor_payload(cfg))
         checks = []
-        for row in doctor_payload(cfg):
+        for row in raw:
             checks.append(
                 {
                     "name": row["name"],
@@ -793,6 +1276,38 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         set_cookie(resp, COOKIE_COLLECTION, coll)
         return resp
 
+    def _review_tokens_for(prefix: str) -> dict[str, str]:
+        out: dict[str, str] = {}
+        for c in commands.list_commands(cfg, limit=40):
+            verb = str(c.get("verb") or "")
+            token = str(c.get("review_token") or "")
+            if not token or not verb.startswith(prefix):
+                continue
+            short = verb[len(prefix) :]
+            if short and short not in out:
+                out[short] = token
+        return out
+
+    def _repair_flags(form: Any) -> dict[str, Any]:
+        return {
+            "overwrite": form.get("overwrite") == "1",
+            "apply_medium": form.get("apply_medium") == "1",
+            "phase": str(form.get("phase") or "all"),
+            "fix_broken": form.get("fix_broken") == "1",
+            "merge_files": form.get("merge_files") == "1",
+            "rename": form.get("rename") == "1",
+            "link": form.get("link") == "1",
+            "attach": form.get("attach") == "1",
+        }
+
+    def _mirror_flags(form: Any) -> dict[str, Any]:
+        pdfs = str(form.get("pdfs") or "").strip()
+        return {
+            "full": form.get("full") == "1",
+            "pdfs": pdfs,
+            "accept_gone": form.get("accept_gone") == "1",
+        }
+
     @app.get("/repair", response_class=HTMLResponse)
     def page_repair(request: Request, run: str = "", error: str = "") -> HTMLResponse:
         run_rec = command_by_id(cfg, run) if run else None
@@ -803,6 +1318,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 request,
                 "repair",
                 queues=repair_queues(cfg),
+                tokens=_review_tokens_for("repair_"),
                 message="",
                 run_rec=run_rec,
                 poll_run=run,
@@ -918,6 +1434,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     async def mirror_apply_route(request: Request) -> JSONResponse | RedirectResponse:
         prefs = prefs_from_request(request)
         form = await request.form()
+        verb = str(form.get("verb") or "")
         token = str(form.get("review_token") or "")
         if not token:
             return JSONResponse({"ok": False, "error": "missing review token"}, status_code=409)
@@ -1026,7 +1543,13 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 last_result=result,
                 ingest_result=last_job_result(cfg, "rag_ingest"),
                 batch_result=last_job_result(cfg, "ask_batch"),
+                questions_result=last_job_result(cfg, "rag_questions"),
+                answered_result=last_job_result(cfg, "rag_answered"),
                 packs=list_ask_packs(cfg),
+                answered_packs=list_answered_packs(cfg),
+                saved_prompts=list_saved_prompts(cfg),
+                rag_config_prompt=cfg.rag_prompt or "",
+                extract_questions_llm=cfg.rag_extract_questions_llm,
                 hits=hits,
                 search_q=search_q,
                 search_k=k,
@@ -1159,8 +1682,22 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         try:
             year_from = _optional_int(form.get("year_from"))
             year_to = _optional_int(form.get("year_to"))
-        except ValueError:
-            return _redir(err="year", tid=thread_id)
+            scope = parse_rag_scope(
+                form,
+                prefs.collection,
+                year_from=year_from,
+                year_to=year_to,
+            )
+            resolved = await _resolved_prompt(form)
+        except ValueError as exc:
+            msg = str(exc).lower()
+            if "year" in msg or "integer" in msg:
+                return _redir(err="year", tid=thread_id)
+            if "top_k" in msg or "positive" in msg:
+                return _redir(err="limit", tid=thread_id)
+            if "type" in msg or "item type" in msg:
+                return _redir(err="type", tid=thread_id)
+            return _redir(err="prompt", tid=thread_id)
         try:
             from ..rag.prompt import parse_focus
 
@@ -1171,6 +1708,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             from ..rag.thread import new_id
 
             thread_id = new_id()
+        _save_prompt_if_asked(form, resolved)
 
         def work(cmd_id: str) -> None:
             jobs.ask_turn(
@@ -1178,10 +1716,15 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 cmd_id,
                 question=question,
                 thread_id=thread_id,
-                collection=prefs.collection,
-                year_from=year_from,
-                year_to=year_to,
+                collection=scope.collection,
+                year_from=scope.year_from,
+                year_to=scope.year_to,
                 focus=focus_raw,
+                top_k=scope.top_k,
+                item_keys=scope.item_keys or None,
+                item_types=scope.item_types,
+                prompt_path=resolved.prompt_path,
+                prompt_text=resolved.prompt_text,
             )
 
         cmd_id = commands.enqueue(cfg, "ask", work)
@@ -1193,16 +1736,32 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         form = await request.form()
         if not (cfg.rag_enabled and cfg.llm_enabled):
             return RedirectResponse(url=_page_url("/index", error="disabled"), status_code=303)
-        from ..snowball.seeds import parse_seed_lines
-
-        questions = parse_seed_lines(str(form.get("questions") or ""))
-        if not questions:
-            return RedirectResponse(url=_page_url("/index", error="questions"), status_code=303)
         try:
+            q_upload = await _upload_bytes(form, "questions_upload")
+            questions = read_questions_upload(form, q_upload)
             year_from = _optional_int(form.get("year_from"))
             year_to = _optional_int(form.get("year_to"))
-        except ValueError:
-            return RedirectResponse(url=_page_url("/index", error="year"), status_code=303)
+            scope = parse_rag_scope(
+                form,
+                prefs.collection,
+                year_from=year_from,
+                year_to=year_to,
+                include_force=True,
+            )
+            resolved = await _resolved_prompt(form)
+        except ValueError as exc:
+            msg = str(exc).lower()
+            if "upload" in msg or "too large" in msg:
+                return RedirectResponse(url=_page_url("/index", error="upload"), status_code=303)
+            if "top_k" in msg or "positive" in msg:
+                return RedirectResponse(url=_page_url("/index", error="limit"), status_code=303)
+            if "type" in msg:
+                return RedirectResponse(url=_page_url("/index", error="type"), status_code=303)
+            if "year" in msg:
+                return RedirectResponse(url=_page_url("/index", error="year"), status_code=303)
+            return RedirectResponse(url=_page_url("/index", error="prompt"), status_code=303)
+        if not questions:
+            return RedirectResponse(url=_page_url("/index", error="questions"), status_code=303)
         try:
             dest = _parse_dest(form.get("dest"), cfg.rag_dest or "disk")
         except ValueError:
@@ -1217,21 +1776,138 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             parse_focus(focus_raw if focus_raw is not None else cfg.rag_focus)
         except ValueError:
             return RedirectResponse(url=_page_url("/index", error="focus"), status_code=303)
+        _save_prompt_if_asked(form, resolved)
 
         def work(cmd_id: str) -> None:
             jobs.ask_batch(
                 cfg,
                 cmd_id,
                 questions=questions,
-                collection=prefs.collection,
-                year_from=year_from,
-                year_to=year_to,
+                collection=scope.collection,
+                year_from=scope.year_from,
+                year_to=scope.year_to,
                 focus=focus_raw,
                 dest=dest,
                 apply=apply,
+                top_k=scope.top_k,
+                item_keys=scope.item_keys or None,
+                item_types=scope.item_types,
+                prompt_path=resolved.prompt_path,
+                prompt_text=resolved.prompt_text,
+                force=scope.force,
             )
 
         cmd_id = commands.enqueue(cfg, "ask_batch", work)
+        return RedirectResponse(url=_page_url("/index", run=cmd_id), status_code=303)
+
+    @app.post("/index/rag-questions")
+    async def index_rag_questions(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        if not cfg.rag_enabled:
+            return RedirectResponse(url=_page_url("/index", error="rag"), status_code=303)
+        dry_run = str(form.get("dry_run") or "1") != "0"
+        whole_library = form.get("whole_library") == "1"
+        use_llm = form.get("use_llm") == "1"
+        try:
+            year_from = _optional_int(form.get("year_from"))
+            year_to = _optional_int(form.get("year_to"))
+            limit = _optional_int(form.get("limit"), positive=True)
+            scope = parse_rag_scope(
+                form,
+                prefs.collection,
+                year_from=year_from,
+                year_to=year_to,
+            )
+        except ValueError:
+            return RedirectResponse(url=_page_url("/index", error="year"), status_code=303)
+        if not scope_has_target(scope, whole_library=whole_library):
+            return RedirectResponse(url=_page_url("/index", error="scope"), status_code=303)
+
+        def work(cmd_id: str) -> None:
+            jobs.rag_questions(
+                cfg,
+                cmd_id,
+                collection=scope.collection,
+                whole_library=whole_library,
+                year_from=scope.year_from,
+                year_to=scope.year_to,
+                item_keys=scope.item_keys or None,
+                item_types=scope.item_types,
+                use_llm=use_llm,
+                limit=limit,
+                dry_run=dry_run,
+            )
+
+        cmd_id = commands.enqueue(cfg, "rag_questions", work)
+        return RedirectResponse(url=_page_url("/index", run=cmd_id), status_code=303)
+
+    @app.post("/index/rag-answered")
+    async def index_rag_answered(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        if not (cfg.rag_enabled and cfg.llm_enabled):
+            return RedirectResponse(url=_page_url("/index", error="disabled"), status_code=303)
+        mode = str(form.get("question_mode") or "text").strip()
+        after_item = str(form.get("after_item") or "").strip() or None
+        try:
+            year_from = _optional_int(form.get("year_from"))
+            year_to = _optional_int(form.get("year_to"))
+            scope = parse_rag_scope(
+                form,
+                prefs.collection,
+                year_from=year_from,
+                year_to=year_to,
+                include_force=True,
+            )
+        except ValueError:
+            return RedirectResponse(url=_page_url("/index", error="year"), status_code=303)
+        questions: list[tuple[str, str, int | None]] = []
+        try:
+            if mode == "extract":
+                from ..rag.answered import questions_from_extract
+
+                extract_keys = scope.item_keys if scope.item_keys else None
+                questions = questions_from_extract(cfg, item_keys=extract_keys)
+            else:
+                upload = await _upload_bytes(form, "answered_upload")
+                if mode == "upload" or upload:
+                    if not upload:
+                        return RedirectResponse(
+                            url=_page_url("/index", error="upload"), status_code=303
+                        )
+                    from ..snowball.seeds import parse_seed_lines
+
+                    lines = parse_seed_lines(
+                        upload.decode("utf-8", errors="replace")
+                    )
+                    questions = [(q, "", None) for q in lines]
+                else:
+                    from ..snowball.seeds import parse_seed_lines
+
+                    lines = parse_seed_lines(str(form.get("answered_questions") or ""))
+                    questions = [(q, "", None) for q in lines]
+        except (ValueError, UnicodeError):
+            return RedirectResponse(url=_page_url("/index", error="upload"), status_code=303)
+        if not questions:
+            return RedirectResponse(url=_page_url("/index", error="questions"), status_code=303)
+
+        def work(cmd_id: str) -> None:
+            jobs.rag_answered(
+                cfg,
+                cmd_id,
+                collection=scope.collection,
+                year_from=scope.year_from,
+                year_to=scope.year_to,
+                item_keys=scope.item_keys or None,
+                item_types=scope.item_types,
+                questions=questions,
+                after_item=after_item,
+                top_k=scope.top_k,
+                force=scope.force,
+            )
+
+        cmd_id = commands.enqueue(cfg, "rag_answered", work)
         return RedirectResponse(url=_page_url("/index", run=cmd_id), status_code=303)
 
     @app.get("/index/batch/{stamp}", response_model=None)
@@ -1239,6 +1915,15 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         from ..rag.batch import batch_dir
 
         path = safe_child(batch_dir(cfg), stamp, "answers.md")
+        if path is None:
+            return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+        return FileResponse(path, media_type="text/plain; charset=utf-8")
+
+    @app.get("/index/answered/{stamp}", response_model=None)
+    def index_answered_pack(stamp: str):
+        from ..rag.answered import answered_dir
+
+        path = safe_child(answered_dir(cfg), stamp, "pack.md")
         if path is None:
             return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
         return FileResponse(path, media_type="text/plain; charset=utf-8")
@@ -1271,7 +1956,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 flags=flags,
                 dest_options=dest_options(),
                 orders=SUMMARIZE_ORDERS,
-                summaries=list_html_stems(cfg.summaries_dir),
+                summaries=list_recent_summaries(cfg),
                 reports=list_html_stems(cfg.reports_dir),
                 summarize_result=last_job_result(cfg, "summarize"),
                 synthesize_result=last_job_result(cfg, "synthesize"),
@@ -1364,12 +2049,22 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         cmd_id = commands.enqueue(cfg, "synthesize", work)
         return RedirectResponse(url=_page_url("/briefs", run=cmd_id), status_code=303)
 
-    @app.get("/briefs/summary/{key}", response_model=None)
-    def briefs_summary(key: str):
-        path = safe_child(cfg.summaries_dir, f"{key}.html")
-        if path is None:
+    @app.get("/briefs/summary/{key}", response_class=HTMLResponse)
+    def briefs_summary(request: Request, key: str):
+        meta = summary_meta(cfg, key)
+        if meta is None or safe_child(cfg.summaries_dir, f"{key}.html") is None:
             return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
-        return FileResponse(path, media_type="text/html; charset=utf-8")
+        return templates.TemplateResponse(
+            request,
+            "brief_summary.html",
+            ctx(
+                request,
+                "briefs",
+                key=meta["name"],
+                cite=meta["cite"],
+                model=meta["model"],
+            ),
+        )
 
     @app.get("/briefs/report/{slug}", response_model=None)
     def briefs_report(slug: str):

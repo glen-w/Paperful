@@ -84,10 +84,12 @@ Python, the Zotero local API, Ollama or LiteLLM, Docker.
 | EndNote (`manager = "endnote"`, local `.enl`) | Seeking testers. Reads `sdb.eni`. Writes stage `state/endnote-import/` for File → Import. Paperful does not edit the EndNote database, and it cannot trash items there |
 | Text layer for scanned PDFs | `paperful ocr` (OCRmyPDF on the disk file). Two-up page split stays with zotero-agent |
 | Linked-file cutover, hosted multi-user service, a second reading app | Cutover is `attachments --link --apply` (off by default; personal library only). Hosted service and a second reading app are not the product |
+| Local workbench (`paperful serve`) | Landed, not tagged 1.0. Discover / Wanted; Advanced Repair / Mirror / Index. Same verbs as the CLI; TTY and Sci-Hub stay the shell. [GUI](gui.md) |
 
 ## Related
 
 - [How it works](how-it-works.md) — fill pipeline
 - [Quiet mirror](quiet-mirror.md) — folder contract
 - [How Paperful compares](comparison.md)
-- [Roadmap](ROADMAP.md) — Zotero is the tested path; Mendeley and EndNote are seeking testers
+- [Roadmap](ROADMAP.md) — Zotero is the tested path; Mendeley and EndNote are seeking testers (not 1.0 blockers)
+- [Workbench](gui.md) — localhost HTML over the same CLI verbs

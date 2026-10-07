@@ -2,7 +2,8 @@
 
 Distinct from snowball watch (seed crawl + hops), inbox watch (PDF drop
 folder), and ResearchGate author-request handoff. Paperful does not schedule
-runs. Social sites are not scraped; import a CSV export instead.
+runs. Social sites are not live-scraped; import a saved HTML/CSV export or use
+`suggest` from a collection.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ import csv
 import json
 import re
 import secrets
+import shutil
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,6 +39,7 @@ from .snowball.openalex import (
 
 SCHEMA = "paperful.authorwatch.v1"
 PERSON_SCHEMA = "paperful.authorwatch.person.v1"
+SUGGESTION_SCHEMA = "paperful.authorwatch.suggestion.v1"
 TAG = "paperful-authorwatch"
 DEFAULT_MAX_AUTHORS = 50
 DEFAULT_PER_AUTHOR_LIMIT = 200
@@ -45,9 +48,9 @@ _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 FILE_SOURCES = ("csv", "json", "orcid")
 SOCIAL_SOURCES = ("rg", "researchgate", "linkedin", "academia")
 SOCIAL_EXPORT_HINT = (
-    "Paperful does not scrape ResearchGate, LinkedIn, or Academia.edu. "
-    "Export follows as CSV with name and orcid columns, then: "
-    "paperful authorwatch import <name> --file follows.csv --source csv"
+    "Paperful does not live-scrape ResearchGate, LinkedIn, or Academia.edu. "
+    "Save the follows page as HTML or export CSV (name, orcid), then: "
+    "paperful authorwatch import <name> --file follows.html --source rg"
 )
 Lookup = Callable[..., Any]
 
@@ -196,6 +199,7 @@ def save_list(cfg: Config, name: str) -> Path:
     for leaf, body in (
         ("people.jsonl", ""),
         ("inbox.jsonl", ""),
+        ("suggestions.jsonl", ""),
         ("seen.json", json.dumps({"identities": []}, indent=2) + "\n"),
         ("applied.json", json.dumps({"identities": []}, indent=2) + "\n"),
     ):
@@ -350,6 +354,7 @@ def add_person(
     name: str,
     *,
     orcid: str = "",
+    openalex: str = "",
     display_name: str = "",
     affiliation_host: str = "",
     source: str = "manual",
@@ -357,10 +362,11 @@ def add_person(
 ) -> Person:
     save_list(cfg, name)
     cleaned = normalize_orcid(orcid)
+    oa_id = short_id(openalex) if openalex else ""
     label = (display_name or "").strip()
     host = _host(affiliation_host)
-    if not cleaned and not label:
-        raise AuthorwatchError("Pass --orcid or --name.")
+    if not cleaned and not oa_id and not label:
+        raise AuthorwatchError("Pass --orcid, OpenAlex id, or --name.")
     if cleaned:
         oa = _openalex_client(cfg, client)
         hit = None
@@ -371,14 +377,22 @@ def add_person(
             hit = None
         if isinstance(hit, dict):
             label = label or str(hit.get("display_name") or "")
-            openalex = short_id(str(hit.get("id") or ""))
-        else:
-            openalex = ""
+            oa_id = oa_id or short_id(str(hit.get("id") or ""))
         person = Person(
             id=_new_person_id(),
             display_name=label or cleaned,
             orcid=cleaned,
-            openalex=openalex,
+            openalex=oa_id,
+            affiliation_host=host,
+            status="ok",
+            source=source,
+            added_at=_now(),
+        )
+    elif oa_id:
+        person = Person(
+            id=_new_person_id(),
+            display_name=label or oa_id,
+            openalex=oa_id,
             affiliation_host=host,
             status="ok",
             source=source,
@@ -403,6 +417,131 @@ def add_person(
     people.append(person)
     save_people(cfg, name, people)
     return person
+
+
+def load_suggestions(cfg: Config, name: str) -> list[Any]:
+    from .authorwatch_suggest import Suggestion
+
+    path = list_dir(cfg, name) / "suggestions.jsonl"
+    if not path.is_file():
+        return []
+    rows: list[Suggestion] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            raw = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(raw, dict):
+            rows.append(Suggestion.from_dict(raw))
+    return rows
+
+
+def save_suggestions(cfg: Config, name: str, rows: list[Any]) -> None:
+    path = list_dir(cfg, name) / "suggestions.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row.to_dict(), ensure_ascii=False) + "\n")
+
+
+def append_suggestions(cfg: Config, name: str, rows: list[Any]) -> None:
+    path = list_dir(cfg, name) / "suggestions.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row.to_dict(), ensure_ascii=False) + "\n")
+
+
+def update_person(
+    cfg: Config,
+    name: str,
+    person_id: str,
+    *,
+    display_name: str | None = None,
+    affiliation_host: str | None = None,
+) -> Person:
+    want = (person_id or "").strip()
+    if not want:
+        raise AuthorwatchError("Pass --id for the person to edit.")
+    people = load_people(cfg, name)
+    found: Person | None = None
+    for row in people:
+        if row.id != want:
+            continue
+        if display_name is not None and display_name.strip():
+            row.display_name = display_name.strip()
+        if affiliation_host is not None:
+            row.affiliation_host = _host(affiliation_host)
+        found = row
+        break
+    if found is None:
+        raise AuthorwatchError("No matching person on that list.")
+    save_people(cfg, name, people)
+    return found
+
+
+def delete_list(cfg: Config, name: str, *, yes: bool = False) -> None:
+    _check_name(name)
+    dest = list_dir(cfg, name)
+    if not dest.is_dir() or not (dest / "watch.json").is_file():
+        raise AuthorwatchError(f"Unknown authorwatch list {name!r}.")
+    if not yes:
+        raise AuthorwatchError(
+            f"Refusing to delete {name!r}. Pass --yes to remove state/authorwatch/{name}/."
+        )
+    shutil.rmtree(dest)
+
+
+def accept_suggestions(
+    cfg: Config,
+    name: str,
+    *,
+    ids: set[str] | None = None,
+    all_pending: bool = False,
+    dismiss_rest: bool = False,
+    client: Any = None,
+) -> list[Person]:
+    rows = load_suggestions(cfg, name)
+    if not rows:
+        raise AuthorwatchError("No suggestions on that list. Run authorwatch suggest first.")
+    want = {str(item).strip() for item in (ids or set()) if str(item).strip()}
+    if not want and not all_pending:
+        raise AuthorwatchError("Pass --id (repeatable) or --all-pending.")
+    accepted: list[Person] = []
+    for row in rows:
+        if row.status != "pending":
+            continue
+        pick = all_pending or row.id in want
+        if not pick:
+            if dismiss_rest:
+                row.status = "dismissed"
+            continue
+        person = add_person(
+            cfg,
+            name,
+            orcid=row.orcid,
+            openalex=row.openalex,
+            display_name=row.display_name,
+            source="suggest",
+            client=client,
+        )
+        if not person.is_ok() and row.display_name:
+            resolve_people(cfg, name, client=client)
+            for refreshed in load_people(cfg, name):
+                if refreshed.id == person.id:
+                    person = refreshed
+                    break
+        row.status = "accepted"
+        accepted.append(person)
+    if dismiss_rest:
+        for row in rows:
+            if row.status == "pending":
+                row.status = "dismissed"
+    save_suggestions(cfg, name, rows)
+    return accepted
 
 
 def remove_person(cfg: Config, name: str, *, orcid: str = "", person_id: str = "") -> Person:
@@ -970,13 +1109,33 @@ def import_file(
     client: Any = None,
     resolve: bool = True,
 ) -> list[Person]:
+    from .authorwatch_social import AuthorwatchSocialError, parse_social_file
+
     kind = _normalize_source(source)
     if kind in SOCIAL_SOURCES and path is None:
         raise AuthorwatchError(SOCIAL_EXPORT_HINT)
     if path is None:
         raise AuthorwatchError("Pass --file with a CSV, JSON, or ORCID list.")
     if kind in SOCIAL_SOURCES:
-        kind = "csv"
+        save_list(cfg, name)
+        added: list[Person] = []
+        try:
+            social_rows = parse_social_file(path.expanduser(), source=kind)
+        except AuthorwatchSocialError as exc:
+            raise AuthorwatchError(str(exc)) from exc
+        for row in social_rows:
+            person = add_person(
+                cfg,
+                name,
+                orcid=row.orcid,
+                display_name=row.display_name,
+                source=row.source or kind,
+                client=client,
+            )
+            added.append(person)
+        if resolve:
+            resolve_people(cfg, name, client=client)
+        return added
     if kind not in FILE_SOURCES:
         raise AuthorwatchError(
             f"Unknown import source {source!r}. Use csv, json, or orcid "

@@ -43,9 +43,18 @@ PAPERFUL_E2E=1 uv run python scripts/e2e_stack.py --topic "NBA" --effort low
 PAPERFUL_E2E=1 uv run python scripts/e2e_stack.py --topic "BBNJ" --effort high \
   --year-from 2020 --year-to 2026
 
+# Topic labels the collection; --query can be a richer OpenAlex seed
+PAPERFUL_E2E=1 uv run python scripts/e2e_stack.py --topic eco-surveys --effort med \
+  --year-from 2020 --year-to 2026 \
+  --query '(survey AND ("climate policy" OR "climate policies")) OR (survey AND degrowth AND (policy OR policies)) OR (survey AND ("ecosocial policy" OR "ecosocial policies" OR "eco-social policy" OR "eco-social policies"))'
+
 # Legacy alias (NBA + low effort)
 make e2e-nba
 ```
+
+Child `paperful` phases stream stdout/stderr live (`PYTHONUNBUFFERED=1`). With
+`--format json`, snowball and `run` keep human progress on stderr under
+`PAPERFUL_E2E=1` so the harness CLI stays readable.
 
 Resume after a failed phase:
 
@@ -78,10 +87,7 @@ into gitignored `assessments/`):
 Harness log: `state/e2e/<run-id>/watch.log`. While a phase runs, tail
 `state/e2e/<run-id>/<phase>.stderr.txt` (e.g. `snowball_search.stderr.txt`).
 Snowball also writes under `state/snowball/<run-id>/` (`candidates.jsonl`,
-`summary.json`) — list newest with `ls -lt state/snowball | head`. Child
-`paperful` phases stream stdout/stderr to your terminal when the harness is
-current; snowball progress uses stderr even with `--format json` when
-`PAPERFUL_E2E=1`.
+`summary.json`) — list newest with `ls -lt state/snowball | head`.
 
 ## Hermetic tests
 

@@ -199,16 +199,18 @@ pdf_template = "https://example.org/docs/{code}/{code}.pdf"
 
 Off by default. Install extras: `uv sync --extra llm` (LiteLLM for paid APIs),
 `uv sync --extra browser-agent` (Python 3.11+ only, for the `browser_agent` run
-lane and `recover`). Batch recover: `recover --from-last-run` reads
-`state/last-run.json` (`--from-last-run-mode`, `--limit`). Setup walkthrough,
-model advice, Docker networking, and troubleshooting: [LLM](llm.md).
+lane and `recover`), or build the **heavy** Compose image
+(`PAPERFUL_IMAGE_MODE=heavy`; see [Docker](docker.md#image-mode-light-vs-heavy)).
+Batch recover: `recover --from-last-run` reads `state/last-run.json`
+(`--from-last-run-mode`, `--limit`). Setup walkthrough, model advice, Docker
+networking, and troubleshooting: [LLM](llm.md).
 
 | Table / key | Default | Role |
 | --- | --- | --- |
 | `[llm].enabled` | `false` | Master gate |
 | `[llm].provider` | `ollama` | `ollama` or `litellm` |
 | `[llm].model` | `qwen2.5:7b` | Model id |
-| `[llm].base_url` | `http://127.0.0.1:11434` | Ollama API |
+| `[llm].base_url` | `http://127.0.0.1:11434` | Ollama API. Inside Compose, loopback is rewritten to `host.docker.internal` (`PAPERFUL_OLLAMA_HOST`) |
 | `[llm].api_base` | `""` | OpenAI-compatible base when `provider = litellm` |
 | `[fix_metadata].llm_title` | `false` | Grounded title proposals in `fix-metadata` |
 | `[lint].llm_pdf_match` | `false` | `pdf_identity_mismatch` finding; `summarize` refuses flagged items unless `--force` |
@@ -243,7 +245,7 @@ model advice, Docker networking, and troubleshooting: [LLM](llm.md).
 | `[searxng].base_url` | `""` | SearXNG JSON endpoint for author-site remainder discovery, or `SEARXNG_BASE_URL`. Never a default `run` source. [Twenty and SearXNG](#twenty-and-searxng) |
 | `[ingest].dedupe_scope` | `library` | `library` or `collection` when skipping `exists` |
 | `[ocr].languages` | `eng` | Tesseract languages for `paperful ocr` (`eng+fra` or `eng fra`) |
-| `[rag].enabled` | `false` | Master switch for `paperful rag` and `paperful ask`. Needs `paperful[rag]`. See [rag.md](rag.md) |
+| `[rag].enabled` | `false` | Master switch for `paperful rag` and `paperful ask`. Needs `paperful[rag]` (host `uv sync --extra rag` or **heavy** image). See [rag.md](rag.md) |
 | `[rag].auto_ingest` | `false` | Index new PDFs after `run`, `attach`, `inbox`, `snapshot`, `ocr --apply` and `snowball` |
 | `[rag].ocr` | `auto` | `auto` runs OCRmyPDF on scans during ingest and rewrites them under `out_dir`; `off` leaves them alone. PDFs with a text layer are never OCR'd |
 | `[rag].parser` | `light` | `light` (`pdftotext` / `pypdf`) or `docling` (needs `paperful[rag-docling]`) |
@@ -258,7 +260,7 @@ model advice, Docker networking, and troubleshooting: [LLM](llm.md).
 | `[rag].abstracts` | `true` | Index the abstract when an item has no readable PDF |
 | `[rag].model` | `""` | Chat model for `ask`; empty uses `[llm].model` |
 | `[rag].focus` | `default` | Prompt preset for `ask` / batch: `default`, `questions`, `gaps`, `methods`, `answered` |
-| `[rag].prompt` | `""` | Custom system prompt file; when set, overrides `focus` |
+| `[rag].prompt` | `""` | Custom system prompt file; when set, overrides `focus`. Index Ask/batch can override per run (inline, upload, path, or a file under `state/prompts/`) — see [rag.md](rag.md#workbench-advanced-index) |
 | `[rag].dest` | `disk` | Batch ask note destination: `disk`, `zotero`, or `both` (Zotero needs `--apply` + one `-C`) |
 | `[rag].extract_questions_llm` | `false` | Default for `rag questions --llm` grounded extract lane |
 
@@ -293,7 +295,7 @@ run misbehaves or you host infrastructure yourself.
 
 | Table / key | Default | Role |
 | --- | --- | --- |
-| `[llm].allow_remote` | `false` | Allow non-loopback Ollama (e.g. `host.docker.internal` from the image) |
+| `[llm].allow_remote` | `false` | Allow non-loopback Ollama (LAN / explicit remote). Not required for Compose’s auto `host.docker.internal` rewrite |
 | `[llm].timeout_s` | `120` | Per-completion timeout |
 | `[llm].max_num_ctx` | `32768` | Cap on the Ollama context window for `summarize` and `synthesize`. The model tag must support it |
 | `[lint].llm_pdf_match_min_confidence` | `0.6` | A `match: true` below this confidence is still flagged |

@@ -7,6 +7,7 @@ import hashlib
 from paperful.config import Config
 from paperful.sync import clean_pdf_cache, run_sync
 from tests.test_sync import FakeZotero, PDF
+from tests.textutil import plain_text
 
 
 def test_cache_clean_dry_run_and_apply(tmp_path):
@@ -69,7 +70,7 @@ def test_cache_clean_cli_dry_run(tmp_path):
 
     help_res = runner.invoke(cli.app, ["cache", "clean", "--help"])
     assert help_res.exit_code == 0
-    assert "--apply" in help_res.stdout
+    assert "--apply" in plain_text(help_res.stdout)
 
     js = runner.invoke(
         cli.app, ["cache", "clean", "-c", str(cfg_path), "--format", "json"]

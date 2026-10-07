@@ -122,6 +122,7 @@ RUN_REPORT_SUMMARY_KEYS = frozenset(
         "no_identifier",
         "captcha",
         "error",
+        "retryable",
         "skipped_manifest",
         "linked_url_skipped",
         "fields_corrected",
@@ -131,6 +132,10 @@ RUN_REPORT_SUMMARY_KEYS = frozenset(
         "sources_checked",
         "errors_by_type",
         "attach_failed_by_code",
+        "browser_misses",
+        "not_downloaded",
+        "paywall_prices",
+        "agent_after_playwright",
         "write_api",
     }
 )

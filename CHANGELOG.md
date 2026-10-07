@@ -9,29 +9,77 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ### Added
 
+- **`paperful authorwatch suggest` / `accept` / `delete`:** corpus-grounded people
+  suggestions (`--method corpus|most_cited|coauthor|mix`, `-C`, `--limit`);
+  `accept --id` (+ optional `--seed-from` backfill run). Social
+  `import --source rg|linkedin|academia --file` parses saved HTML/CSV (no live
+  scrape). Discover: suggestion checkboxes, member edit, delete list. Ledger:
+  `suggestions.jsonl`. Roadmap row 21 shipped. See [authorwatch.md](docs/authorwatch.md).
+- **Docker light/heavy packs:** `PAPERFUL_IMAGE_MODE=light` (default; `[serve]`
+  only, CI) or `heavy` (`[serve]` `[llm]` `[rag]` `[browser-agent]`). Set in
+  `.env` for a full local image; `make docker-build-heavy`. See [docker](docs/docker.md).
+- **GUI CLI parity (Wanted / Repair / Mirror / Discover):** Repair and Mirror
+  Preview run dry-run then Apply invokes the same domain entrypoints as the CLI
+  (`lint`, `fix-metadata`, `dedupe`, `versions`, `attachments`, `ocr`, `sync`,
+  `snapshot`, `restore`, `cache clean`). Wanted Advanced: attach, recover,
+  handoff, inbox drain, reachout, Grab year/type/retry/browser-agent flags.
+  Discover Advanced: crawl knobs (including Twenty writeback), profile save,
+  refs gap, ingest-dois, authors, packs promote; queue/watch briefing and
+  digest can file a collection note (`paperful:frontier-briefing`). Route
+  table: [gui.md](docs/gui.md).
 - **GUI thickening:** Index runs `rag ingest`, `rag search`, batch Ask, and collection
   `synthesize`; Advanced **Briefs** runs collection `summarize` / `synthesize`.
   Per-item summarize in Wanted/Library drawers (`/item/{key}/summary`, `/wanted/summarize`).
   Discover: snowball kinds (search/hybrid/doi/orcid/collection), keep/skip, profile run,
   resume, queue briefing/digest, watch via `save_watch` (profile required);
-  authorwatch list create/add/remove/resolve/run/import + people briefing; Preview apply
-  before snowball/inbox apply. Route table: [gui.md](docs/gui.md).
+  authorwatch list create/add/remove/resolve/run/import/suggest/accept/delete +
+  people briefing; Preview apply before snowball/inbox apply. Route table:
+  [gui.md](docs/gui.md).
 - **Repair / Mirror (Advanced):** Preview runs real library cores and writes review
   tokens under `state/gui/previews/`; Apply consumes the token (409 when the preview
   file changed). Covers `lint` (read-only), `fix-metadata`, `dedupe`, `versions`,
   `attachments`, `ocr`, plus `sync`, `snapshot`, `restore`, and `cache clean`.
+- **Index RAG/ask CLI parity:** Ask and batch Ask take item keys, types, years, top-k,
+  and custom system prompts (inline → upload → path → `state/prompts/` → `[rag].prompt`
+  / focus). Batch adds force and questions file upload. Index also runs
+  `rag questions` and `rag answered` (`state/rq-answered/`, `pack.md`). See
+  [rag.md](docs/rag.md#workbench-advanced-index) and [gui.md](docs/gui.md).
 
 ### Changed
 
+- **Workbench chrome:** product box mark + Nunito wordmark top-left; cream paper,
+  Fraunces / Nunito / Source Sans 3, and accent buttons match the public site.
+- **Library collections:** nested `<details>` groups by path (AO → Mini meta
+  studies → Coffee); item counts no longer render as a dict `.items` method.
+- **Compose `up` → GUI:** `docker compose up` serves the workbench at
+  http://127.0.0.1:8765 (assumes setup done). CLI one-shots stay
+  `docker compose run --rm paperful <cmd>`. `compose.gui.yaml` is a no-op shim.
+- **Docker doctor guide:** default `doctor` inside Compose no longer waits for
+  Enter. It prints fix steps once; opt in with
+  `docker compose run --rm paperful doctor --guide`.
+- **Schema freeze prep for 1.0:** `RUN_REPORT_SUMMARY_KEYS` now includes always-emitted
+  rollups (`retryable`, `browser_misses`, `not_downloaded`, `paywall_prices`,
+  `agent_after_playwright`). Frozen top-level keys for `refs_gap.pack.v1`,
+  `inbox.proposal.v1`, and `note.v1`. Golden fixtures under `tests/fixtures/` and
+  `tests/test_schema_freeze.py`. Registry + tiers in [developer.md](docs/developer.md);
+  releases revisit rows resolved. Package not tagged 1.0 yet.
+- **Docs:** workbench pages ([gui.md](docs/gui.md), roadmap, releases, commands,
+  architecture) now list Repair/Mirror Apply, watch briefing/digest, ingest-dois,
+  Twenty writeback, and what stays CLI.
 - **Roadmap / 1.0 scope:** 1.0 now includes the workbench GUI (illuminate and
   run CLI workflows) and interactive Ask (chat-over-collection RAG in the GUI).
   Post-1.0: local OpenAlex snapshot phases 2B/2C, Firefox extension,
   newsletter/alert ingest (rollup bridge). See [ROADMAP](docs/ROADMAP.md#product-split-10-vs-post-10).
+- **Roadmap / adapters:** Mendeley and EndNote no longer gate 1.0; docs stay
+  honest (seeking testers; Zotero well-tested).
 - BBNJ author-site / authorwatch dogfood plan: [bbnj-author-lanes](docs/bbnj-author-lanes.md)
   (`-C ocean/BBNJ`, test sibling `ocean/BBNJ-test`). Workflows pack slug is
   `ocean-bbnj`, not `bbnj`.
 - `authorwatch run` maps a spent OpenAlex daily budget to exit 2 with a retry
   line (no traceback).
+- **Workbench health chip:** ordinary HTML pages no longer run full `doctor`
+  (was 15–30s and felt like an endless load). The chip stays amber until
+  **System** refreshes it; `/system` still runs doctor. See [gui.md](docs/gui.md).
 
 ### Added
 

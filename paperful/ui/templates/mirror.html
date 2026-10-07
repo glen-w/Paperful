@@ -4,6 +4,7 @@
 {% block content %}
 <h1>Mirror</h1>
 {% if error == 'collection' %}<div class="error-banner">Pick a collection in the chip for snapshot and restore.</div>{% endif %}
+{% if error and error != 'collection' %}<div class="error-banner">{{ error }}</div>{% endif %}
 {% if run_rec %}
 <p>Last run: {{ run_rec.verb }} — {{ run_rec.status }}{% if run_rec.error %} — {{ run_rec.error }}{% endif %}</p>
 {% if run_rec.summary %}<pre>{{ run_rec.summary }}</pre>{% endif %}

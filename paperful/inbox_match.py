@@ -20,6 +20,8 @@ from .identity import publication_year
 from .zot import Item
 
 SCHEMA = "paperful.inbox.proposal.v1"
+# Required on every proposal written by write_proposal(). Extra keys may be added.
+INBOX_PROPOSAL_KEYS = frozenset({"schema", "id", "status", "created_at"})
 TAG_CREATED = "inbox-created"
 _YEAR_RE = re.compile(r"\b((?:19|20)\d{2})\b")
 _JUNK_STEMS = frozenset(

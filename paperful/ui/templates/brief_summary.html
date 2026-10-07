@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ cite }} — Paperful{% endblock %}
+{% block content %}
+<p><a href="/briefs">Briefs</a></p>
+<h1>{{ cite }}</h1>
+<p class="counts">{% if model %}{{ model }} · {% endif %}{{ key }}</p>
+<iframe class="summary-frame summary-frame-page" sandbox="" src="/item/{{ key }}/summary" title="Summary"></iframe>
+{% endblock %}

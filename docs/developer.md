@@ -98,6 +98,14 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `run_cmd.py` | `run` body after the CLI parses flags | `pipeline`, `run_hooks` |
 | `ask_cmd.py` | `ask` body after the CLI parses flags | `agent_ops`, rag |
 | `completeness_cmd.py` | `dedupe`, `attachments`, `summarize`, `synthesize` after flags | `run_hooks` helpers via cli |
+| `lint_cmd.py` | `lint` after flags | `lint` |
+| `fix_metadata_cmd.py` | `fix-metadata` after flags | `metadata` |
+| `ocr_cmd.py` | `ocr` after flags | `ocr` |
+| `recover_cmd.py` | `recover` after flags | `pipeline`, `browser_agent` |
+| `reachout_cmd.py` | `reachout` after flags | `reachout`, `handoff` |
+| `notes_delete_cmd.py` | `notes delete` after flags | `notes` |
+| `authors_cmd.py` | `authors` after flags | `authors_report` |
+| `all_cmd.py` | `all` chain + step dispatch after flags | Typer wrappers via `cli` |
 | `cli.py` | Flags, progress, exits. No logic of its own | everything |
 | `agent_json.py` | `--format json` envelope (`paperful.agent.json.v1`) and exit 3 | none |
 | `agent_ops.py` | Shared refs-gap / ask builders for CLI JSON and MCP | `agent_json`, catalogue, rag |
@@ -108,8 +116,10 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `twenty.py` | Twenty People lookup (local cache) and `sync` (CRM create/enrich). User guide: [Twenty and SearXNG](snowball.md#twenty-and-searxng) | httpx |
 | `mcp_server.py` | Optional stdio MCP: dry-run `refs_gap`, read-only `ask` (same envelopes as CLI) | `agent_ops` |
 | `serve.py` | Localhost FastAPI: JSON capability API + mounts `ui` when the `serve` extra is installed | `agent_ops`, `ui` |
-| `ui/` | Server-rendered workbench (Jinja): Discover / Wanted / …; review tokens; command ids under `state/gui/` | same builders as CLI / MCP |
-| `authorwatch.py` | People lists → OpenAlex new works; `apply` creates parents | OpenAlex client, `identity`, `snowball.ingest` |
+| `ui/` | Server-rendered workbench (Jinja). `app.py` mounts HTML + form POSTs; `jobs.py`, `wanted_jobs.py`, `repair_jobs.py`, `discover_jobs.py` call the same domain entrypoints as the CLI; review tokens under `state/gui/reviews/`; command ids under `state/gui/commands/` | CLI / MCP builders |
+| `authorwatch.py` | People lists → OpenAlex new works; `apply` creates parents; `accept` / `delete` | OpenAlex client, `identity`, `snowball.ingest` |
+| `authorwatch_suggest.py` | Corpus / cited / coauthor / mix suggestions → `suggestions.jsonl` | `authors_report`, OpenAlex, promoted packs |
+| `authorwatch_social.py` | Parse operator-saved RG / LinkedIn / Academia HTML or CSV (no network) | stdlib HTML/CSV |
 | `snowball/` | Crawl, hops, watch, thin briefing, frontier digest. Watch and digest do not create library items | OpenAlex; library protocol only on apply |
 
 ## The refresh
@@ -136,24 +146,60 @@ Every step can be repeated. A crash leaves valid records and an old version.
 
 ## Disk schemas
 
-| Schema | File | State |
-| --- | --- | --- |
-| `paperful.item.v1` | `record.json` | Required keys frozen. Extra keys may be added |
-| `paperful.sync.v1` | `out/_sync.json` | New. Internal to the refresh |
-| `paperful.annotations.v1` | `annotations.json` | New |
-| `paperful.collections.v1` | `out/_collections.json` | Read by the catalogue |
-| `paperful.run_report.v1` | `state/runs/*.json` | Required keys frozen |
-| `paperful.agent.json.v1` | stdout of `--format json` | Additive 0.x envelope around existing reports |
-| `paperful.note.v1` | HTML comment in child notes | Prefix + type/verb/model/run/prompt sha |
-| `paperful.rag.thread.v1` | `state/rag/threads/*.json` | Ask follow-up turns; under `state/` (backup-excluded) |
-| `paperful.authorwatch.v1` | `state/authorwatch/<name>/watch.json` | People-list cursor; under `state/` (backup-excluded) |
-| `paperful.authorwatch.person.v1` | `state/authorwatch/<name>/people.jsonl` | List members; backup-excluded |
-| `paperful.authors_report.v1` | `state/reports/<slug>-authors.json` | Creator frequency from `authors --apply` |
-| `paperful.author_pack.v1` | `state/author-packs/<slug>[.proposed].toml` | Field author pack; promote before `author_site` |
+Tier policy (1.0-ready contract; package tag may still wait on workbench polish):
+
+| Tier | Policy |
+| --- | --- |
+| **T0 Trust** | Required keys frozen in code (`*_KEYS`); rename/remove is a break; extras additive. Golden fixtures under `tests/fixtures/` |
+| **T1 Agent packs** | Same for top-level keys used by scripts |
+| **T2 Additive** | Schema string stable; keys may grow; no frozenset required |
+| **T3 Cache** | Layout may change any release; rebuild with `rag ingest` |
+
+| Schema | Location | Writer | Tier | Frozenset / golden |
+| --- | --- | --- | --- | --- |
+| `paperful.item.v1` | `out/.../record.json` | `store` / `snapshot` | T0 | `ITEM_RECORD_KEYS`; `tests/fixtures/item_v1/` |
+| `paperful.run_report.v1` | `state/runs/*.json`, `state/last-run.json` | `runreport` | T0 | `RUN_REPORT_*_KEYS`; `tests/fixtures/run_report_v1/` |
+| `paperful.agent.json.v1` | stdout `--format json` | `agent_json` | T0 | `REQUIRED_KEYS`; `tests/fixtures/agent_json*` |
+| `paperful.note.v1` | HTML comment in child notes | `notehtml` | T0 | `NOTE_BLOCK_KEYS`; `tests/fixtures/note_v1/` |
+| `paperful.refs_gap.pack.v1` | `state/refs-gaps/<stamp>/pack.json` | `refs_gap` | T1 | `REFS_GAP_PACK_KEYS`; `tests/fixtures/refs_gap_pack_v1/` |
+| `paperful.inbox.proposal.v1` | `state/inbox/proposals/*.json` | `inbox_match` | T1 | `INBOX_PROPOSAL_KEYS`; `tests/fixtures/inbox_proposal_v1/` |
+| `paperful.sync.v1` | `out/_sync.json` | `sync` | T2 | — |
+| `paperful.annotations.v1` | `annotations.json` | `snapshot` | T2 | — |
+| `paperful.collections.v1` | `out/_collections.json` | `store` | T2 | — |
+| `paperful.history.v1` | item history sidecar | `store` | T2 | — |
+| `paperful.standalone.v1` | standalone catalogue | `sync` | T2 | — |
+| `paperful.pack.v1` | `state/packs/<id>.json` | `pack` | T2 | — |
+| `paperful.dedupe_pack.v1` | `state/dedupe-packs/` | `dedupe` | T2 | — |
+| `paperful.version_pack.v1` | `state/version-packs/` | `versions` | T2 | — |
+| `paperful.ingest_dois.v1` | `state/ingest/<stamp>/` | `ingest_dois` | T2 | — |
+| `paperful.collections_add.v1` | `state/collections-add/<stamp>/` | `collections_add` | T2 | — |
+| `paperful.acronyms.v1` | `state/acronyms/<scope>.json` | `acronyms` | T2 | — |
+| `paperful.authors_report.v1` | `state/reports/<slug>-authors.json` | `authors_report` | T2 | — |
+| `paperful.author_pack.v1` | `state/author-packs/` | `snowball.authors` | T2 | — |
+| `paperful.author_contact.v1` | `state/author-contacts/` | `twenty` | T2 | — |
+| `paperful.author_request.v1` | reachout / request ledger | `author_request` | T2 | — |
+| `paperful.authorwatch.v1` | `state/authorwatch/<name>/watch.json` | `authorwatch` | T2 | — |
+| `paperful.authorwatch.person.v1` | `state/authorwatch/<name>/people.jsonl` | `authorwatch` | T2 | — |
+| `paperful.authorwatch.suggestion.v1` | `state/authorwatch/<name>/suggestions.jsonl` | `authorwatch_suggest` | T2 | — |
+| `paperful.snowball.candidate.v1` | `state/snowball/<run-id>/` | `snowball.candidate` | T2 | Additive through 1.x |
+| `paperful.snowball.watch.v1` | snowball watch cursor | `snowball.watch` | T2 | — |
+| `paperful.snowball.coauthors.v1` | co-author graph | `snowball.authors` | T2 | — |
+| `paperful.htmlpdf.proposal.v1` | `state/htmlpdf/proposals/` | `sources.htmlpdf` | T2 | — |
+| `paperful.synthesis.v1` | synthesize sidecar | `synthesize` | T2 | — |
+| `paperful.ask_batch.v1` | `state/ask-batch/<stamp>/` | `rag.batch` | T2 | — |
+| `paperful.rag.thread.v1` | `state/rag/threads/*.json` | `rag.thread` | T2 | — |
+| `paperful.rag.questions.v1` | `state/rag/questions/` | `rag.questions` | T2 | — |
+| `paperful.rq_answered.v1` | `state/rq-answered/` | `rag.answered` | T2 | — |
+| `paperful.rag.text.v1` | extracted text cache | `rag.extract` | T3 | Rebuildable |
+| `paperful.rag.index.v1` | LanceDB meta | `rag.index` | T3 | Not a promise |
+| `paperful.e2e_stack.report.v1` | e2e stack reports | `e2e_nba` | T2 | Internal / CI |
+
+**Consumers:** `recover --from-last-run`, GUI Activity, and `agent_ops` read `paperful.run_report.v1` (`state/last-run.json`). `restore` requires `paperful.item.v1`. Batch verbs and optional `paperful mcp` emit `paperful.agent.json.v1`.
 
 The catalogue rebuilds an `Item` from a record. The test
 `test_item_from_record_matches_the_live_listing` holds the two equal field
 for field. A new `Item` field needs a home in the record and a case there.
+Contract tests: `tests/test_schema_freeze.py`.
 
 ## Adding things
 
@@ -189,3 +235,35 @@ by a test.
 | `tests/test_write_through.py::FakeLibrary` | A manager with write calls. For `MirroredBackend` |
 
 Count requests when the point of a change is fewer of them: `FakeZotero.calls`.
+
+### CI and local pitfalls
+
+GitHub Actions (`.github/workflows/ci.yml`) runs `uv sync --group dev --extra
+serve` and `uv run pytest` on Ubuntu. A second job builds the Compose image and
+smokes `paperful doctor`; it can pass while pytest fails, so check the **test**
+job when CI is red.
+
+**CLI help assertions.** On CI, `CI` / `GITHUB_ACTIONS` is set and Typer/Rich
+style option names with ANSI codes. A flag like `--apply` is often split across
+escape sequences, so `assert "--apply" in result.stdout` fails even though help
+is correct. Strip SGR codes with `tests.textutil.plain_text` before matching
+tokens (see the comment in that module). For table layout, several CLI test
+modules widen the shared `cli.console` (`width=250`) so Rich does not ellipsize
+cells — follow `tests/test_cli.py` when adding help or table assertions.
+
+**Dev sync and LanceDB.** `uv sync --group dev` pulls `lancedb` for index/RAG
+tests. PyPI wheels cover Linux x86_64/arm64, Windows, and **macOS arm64**; there
+is no wheel for every macOS x86_64 / OS combo. If sync fails with “no wheel for
+the current platform”, use native **arm64** Python on Apple Silicon, run pytest
+inside the Linux dev container / CI image, or temporarily sync without the dev
+group only when you are not touching RAG tests.
+
+**Pytest inside Compose.** The runtime image is for operators (`paperful …`), not
+the full dev test suite. Reproduce CI with host `uv run pytest` or a
+`python:3.12-slim` container plus `uv sync --group dev --extra serve`. Do not
+expect host-only tests (for example default Zotero endpoint URLs) to pass when
+`PAPERFUL_ZOTERO_HOST` is set for container → host networking.
+
+**Docs CI.** Pushes that change `docs/` or `website/` also run strict Sphinx
+(`DOCS_STRICT=1`) and may deploy Pages; new guide pages must be linked from
+`docs/index.md` (`tests/test_sphinx_docs.py`).

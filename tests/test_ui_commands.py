@@ -8,7 +8,7 @@ import pytest
 
 from paperful.config import Config
 from paperful.serve import create_app, fastapi_available
-from paperful.ui import commands, jobs
+from paperful.ui import jobs
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")

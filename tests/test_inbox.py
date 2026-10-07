@@ -163,13 +163,27 @@ def test_seen_ledger_skips_repeat(cfg, tmp_path: Path, monkeypatch):
     )
     assert stats2.attached == 1
 
-    # Same file path+content fingerprint already recorded → skipped
-    pdf3 = root / "b.pdf"
-    pdf3.write_bytes(b"%PDF-1.4 " + b"x" * 2000)
-    # Force same fingerprint as pdf2 by using SeenLedger directly
-    ledger = SeenLedger(cfg.inbox_seen_path)
+    # Same path+size+digest as a prior ledger row → skipped (mtime must match;
+    # rewrite can cross a second boundary, so restore the recorded mtime).
+    import json
+    import os
+
     from paperful.inbox import _fingerprint
 
+    pdf3 = root / "b.pdf"
+    payload = b"%PDF-1.4 " + b"x" * 2000
+    pdf3.write_bytes(payload)
+    digest = __import__("hashlib").md5(payload).hexdigest()
+    resolved = str(pdf3.resolve())
+    for line in cfg.inbox_seen_path.read_text(encoding="utf-8").splitlines():
+        row = json.loads(line)
+        fp = str(row.get("fingerprint") or "")
+        parts = fp.split("|")
+        if len(parts) == 4 and parts[0] == resolved and parts[3] == digest:
+            mtime = int(parts[2])
+            os.utime(pdf3, (mtime, mtime))
+            break
+    ledger = SeenLedger(cfg.inbox_seen_path)
     assert ledger.has(_fingerprint(pdf3))
     stats3 = process_candidates(
         cfg,

@@ -131,9 +131,11 @@ flowchart LR
 | `state/inbox/proposals/` | Gated inbox create/attach proposals (`paperful.inbox.proposal.v1`) |
 | `state/pdf-cache/` | Throwaway copies of manager PDFs, only when `[mirror].pdfs = "none"`. Otherwise an exported PDF goes into its item folder, and `sync` moves older cache files there. `paperful cache clean` removes absorbed or stale leftovers |
 | `state/summaries/<key>.html` | `summarize` output when dest includes disk; the Zotero child note is the other copy |
-| `state/ask-batch/<stamp>/` | `ask --from-file` batch pack (`paperful.ask_batch.v1`, `answers.md`); resume cache under `by-hash/` |
-| `state/rag/questions/<key>.json` | `rag questions` extracted RQs (`paperful.rag.questions.v1`, provenance `rule`\|`llm`) |
-| `state/rq-answered/<stamp>/` | `rag answered` corpus Q&A (`paperful.rq_answered.v1`, `pack.md`) |
+| `state/ask-batch/<stamp>/` | `ask --from-file` / Index batch Ask pack (`paperful.ask_batch.v1`, `answers.md`); resume cache under `by-hash/` |
+| `state/rag/questions/<key>.json` | `rag questions` / Index extract RQs (`paperful.rag.questions.v1`, provenance `rule`\|`llm`) |
+| `state/rq-answered/<stamp>/` | `rag answered` / Index already-answered pack (`paperful.rq_answered.v1`, `pack.md`) |
+| `state/prompts/` | Operator-saved Ask system prompts from the Index form (“Save as…”); listed in the custom-prompt select |
+| `state/gui/uploads/` | Workbench uploads (Discover import, Index prompt/questions files); basename only |
 | `state/reports/<slug>.html` | `synthesize` literature review; sibling `<slug>.json` records source hashes |
 | `state/reports/<slug>-authors.json` | `authors --apply` creator frequency (`paperful.authors_report.v1`); seeds proposed field packs |
 | `state/author-packs/` | Proposed / promoted field author packs (`paperful.author_pack.v1`). From `authors --apply`, snowball preflight, or `twenty lookup --apply` |
@@ -273,8 +275,10 @@ from it. `sync`, `snapshot`, `restore`, `attachments`, `attach`, and any
 attach_failed_by_code, last_run? }`. `last_run` (when present) is the same object
 as `state/last-run.json`. The required key set below is frozen: a removed or
 renamed required key is a break. Extra keys may still be added. Required
-`paperful.item.v1` keys are frozen the same way. The package is not tagged 1.0
-yet (GUI P1–P3b remain).
+`paperful.item.v1` keys are frozen the same way. Summary miss rollups
+(`retryable`, `browser_misses`, `not_downloaded`, `paywall_prices`,
+`agent_after_playwright`) are part of the required summary key set. The package
+is not tagged 1.0 yet (workbench landed; polish remains).
 
 | Field | Meaning |
 | --- | --- |
@@ -288,9 +292,11 @@ yet (GUI P1–P3b remain).
 | `paths.out_dir` / `manifest` / `state_dir` | Absolute paths |
 | `summary.pdfs_downloaded` | Successful downloads (`ok` bumps) |
 | `summary.attached` / `attach_failed` | Write-back counts |
-| `summary.not_found` / `no_identifier` / `captcha` / `error` | Item outcomes |
+| `summary.not_found` / `no_identifier` / `captcha` / `error` / `retryable` | Item outcomes (required on every `build_report()` summary) |
+| `summary.browser_misses` | Browser-lane miss labels rolled up (`captcha`, `paywall`, …) |
 | `summary.not_downloaded` | Items with no PDF, one reason each. A page block (captcha, cloudflare, blocked, paywall, login) wins over a plain miss. Other reasons: session expired, paused, download failed, step budget, no identifier, error, not found |
 | `summary.paywall_prices` | Publisher prices the browser agent noted on items that were not saved, summed per currency (`articles`, `total`) |
+| `summary.agent_after_playwright` | Count of items where `browser_agent` saved after a Playwright miss |
 | `summary.skipped_manifest` / `linked_url_skipped` | Not attempted this run |
 | `summary.fields_corrected` / `fields_corrected_by_kind` | In-memory DOI enrichments (not library writes) |
 | `summary.identifiers_verified` | `verify:ok` count |
@@ -298,7 +304,7 @@ yet (GUI P1–P3b remain).
 | `summary.sources_checked` | Per-source outcome tallies |
 | `summary.errors_by_type` / `attach_failed_by_code` | Typed errors |
 | `summary.write_api` | `true` / `false` / `null` (null when the run did not probe write support) |
-| `items[]` | Per-item: `itemKey`, `title`, `status`, `source`, `reason`, `doi`, `doi_verified`, `attempts`, `fields_corrected`, `path`, `error_type` |
+| `items[]` | Per-item required keys: `itemKey`, `title`, `status`, `source`, `reason`, `doi`, `doi_verified`, `attempts`, `fields_corrected`, `path`, `error_type`, `miss_surface`, `miss_plain`, `miss_detail`, `oa_status`, `license`, `version` |
 
 `--format json` on `run`, `refs gap`, `ingest-dois`, `collections add`, `inbox drain`, `gaps`, `lint`,
 `fix-metadata`, `dedupe`, snowball crawl (`search` / `hybrid` / `doi` / `orcid` /
@@ -313,11 +319,12 @@ from a shell. `paperful serve` (`paperful[serve]`) binds localhost HTTP: JSON
 capability routes (health, doctor, collections, last-run, dry-run `refs-gap` /
 `ask`) plus the server-rendered workbench (`paperful.ui` — Discover, Wanted,
 Library, Activity, System; Advanced Repair / Mirror / Index / Briefs / Settings).
-See [gui.md](gui.md). `collections add` is CLI-only (`--apply` writes) and is
-not an MCP tool.
+GUI writes use review tokens (`state/gui/reviews/`) then the same domain
+entrypoints as the CLI — never silent `--apply`. See [gui.md](gui.md).
+`collections add` is CLI-only (`--apply` writes) and is not an MCP tool.
 
 TTY-only paths (a GUI must not claim them): `session login`, `doctor --guide`,
-and mid-run EZProxy re-login.
+mid-run EZProxy re-login, and snowball `approve-each`.
 
 Child notes from summarize / synthesize / remarks / snowball / briefing start
 with a scannable line and a `<!-- paperful.note.v1 {…} -->` comment (`type`,
@@ -416,7 +423,7 @@ stop at `no_identifier`.
 - [config.md](config.md) — `config.toml` keys and grey playbooks
 - [snowball.md](snowball.md#twenty-and-searxng) — optional Twenty CRM and SearXNG author-page search
 - [ezproxy.md](ezproxy.md) / [sessions.md](sessions.md) — campus proxy and browser vault
-- [docker.md](docker.md) — build-local image (host Zotero + headed login stay outside)
+- [docker.md](docker.md) — build-local light/heavy image (host Zotero + headed login stay outside)
 - [zotero.md](zotero.md) — local API, write keys, attachment modes, ghosts
 - [mendeley.md](mendeley.md) — REST, OAuth, annotations as notes (seeking testers)
 - [endnote.md](endnote.md) — SQLite read, XML import bundle (seeking testers)

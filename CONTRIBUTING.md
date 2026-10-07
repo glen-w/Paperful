@@ -3,11 +3,12 @@
 ## Setup
 
 Operators clone and `docker compose build`. Contributors use `uv`.
-[Docker](docs/docker.md) packs Python, Poppler, and Chromium; Zotero and
-headed session login still run on the host. A release checklist: version in
-`pyproject.toml` matches the README badge and the website footer, CHANGELOG
-has a section, and `docs/releases.md` still says install is clone plus
-Compose (no pull, no pip) unless a real artifact exists.
+[Docker](docs/docker.md) packs Python, Poppler, and Chromium
+(`PAPERFUL_IMAGE_MODE=light` or `heavy`); Zotero and headed session login
+still run on the host. A release checklist: version in `pyproject.toml`
+matches the README badge and the website footer, CHANGELOG has a section,
+and `docs/releases.md` still says install is clone plus Compose (no pull,
+no pip) unless a real artifact exists.
 
 ```sh
 git clone https://github.com/glen-w/Paperful.git
@@ -42,6 +43,11 @@ User-facing changes: note them in [CHANGELOG.md](CHANGELOG.md) and
 Default pytest stays offline. The opt-in all-in E2E (`make e2e-nba`, marker
 `e2e_live`, env `PAPERFUL_E2E=1`) talks to a real Zotero collection `e2e/NBA`
 and is documented in [docs/e2e-nba.md](docs/e2e-nba.md). Do not enable it in CI.
+
+**Issues to watch:** CI colours CLI help (use `plain_text()` for flag assertions),
+the dev group needs a LanceDB-compatible platform, and the Compose **docker** job
+is not a substitute for the full pytest job. Details:
+[developer guide — CI and local pitfalls](docs/developer.md#ci-and-local-pitfalls).
 
 ## Pull requests
 

@@ -80,6 +80,23 @@ def test_focus_presets_resolve():
     assert name == "gaps" == label and "gaps" in system.lower()
 
 
+def test_resolve_system_prompt_inline_overrides_focus():
+    system, name, label = resolve_system_prompt(
+        focus="gaps", prompt_text="Answer only in haiku."
+    )
+    assert name == "custom"
+    assert label.startswith("inline:")
+    assert "haiku" in system
+
+
+def test_batch_resume_key_depends_on_inline_prompt():
+    from paperful.rag.batch import resume_key
+
+    a = resume_key(question="q", focus="default", prompt_label="inline:aaa", index_fp="x")
+    b = resume_key(question="q", focus="default", prompt_label="inline:bbb", index_fp="x")
+    assert a != b
+
+
 def test_ask_focus_changes_system_prompt(mirror):
     _ingest(mirror)
     res = _run(["ask", "What gaps remain?", "--focus", "gaps", "--no-stream"], mirror["config"])

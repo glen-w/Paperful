@@ -388,3 +388,71 @@ def test_run_profile_does_not_imply_try_all(tmp_path):
     assert resolved.try_all is False
     assert resolved.retry_failed is False
     assert resolved.upgrade_linked is False
+
+
+def test_typer_opt_unwraps_optioninfo():
+    import inspect
+
+    from typer.models import OptionInfo
+
+    order_default = inspect.signature(cli.summarize).parameters["order"].default
+    assert isinstance(order_default, OptionInfo)
+    assert cli._typer_opt(order_default) is None
+    assert cli._typer_opt("keep") == "keep"
+    assert cli._typer_enum_value(order_default) is None
+    assert cli._typer_enum_value(cli.SummarizeOrder.newest) == "newest"
+
+
+def test_all_summarize_passes_order_none():
+    import inspect
+
+    from paperful import all_cmd
+
+    src = inspect.getsource(all_cmd._dispatch_all_step)
+    assert "order=None" in src
+    assert "max_new=None" in src
+    assert "max_minutes=None" in src
+
+
+def test_summarize_tolerates_optioninfo_defaults(monkeypatch):
+    """``all`` calls summarize as a function; Typer defaults must not crash."""
+    import inspect
+
+    from paperful import completeness_cmd
+
+    captured: dict = {}
+
+    def fake_run(*args, **kwargs):
+        captured.update(kwargs)
+        raise typer.Exit(0)
+
+    monkeypatch.setattr(completeness_cmd, "run_summarize", fake_run)
+    sig = inspect.signature(cli.summarize)
+    defaults = {name: param.default for name, param in sig.parameters.items()}
+    try:
+        cli.summarize(
+            item=[],
+            collection=["BBNJ"],
+            library=None,
+            apply=True,
+            to=defaults["to"],
+            prompt=None,
+            force=False,
+            order=defaults["order"],
+            year_from=None,
+            year_to=None,
+            item_type=[],
+            limit=None,
+            max_new=defaults["max_new"],
+            max_minutes=defaults["max_minutes"],
+            profile=None,
+            run_config=None,
+            config=None,
+            fmt="text",
+        )
+    except typer.Exit as exc:
+        assert exc.exit_code in (0, None)
+    assert captured.get("order_value") is None
+    assert captured.get("to_dest") is None
+    assert captured.get("max_new") is None
+    assert captured.get("max_minutes") is None

@@ -165,7 +165,7 @@ def test_every_command_that_lands_pdfs_calls_the_hook():
     """Guards the wiring: a new landing path should add its own call."""
     import inspect
 
-    from paperful import gaps_cmd, run_cmd, run_hooks
+    from paperful import gaps_cmd, ocr_cmd, run_cmd, run_hooks
 
     hooked = {
         "run": run_cmd.run_fetch,
@@ -174,7 +174,7 @@ def test_every_command_that_lands_pdfs_calls_the_hook():
         "inbox watch": cli.inbox_watch,
         "inbox drain": cli.inbox_drain,
         "snapshot": cli.snapshot,
-        "ocr": cli.ocr,
+        "ocr": ocr_cmd.run_ocr,
         "handoff walk": run_hooks.run_session_handoff,
         "handoff inbox": run_hooks.inbox_handoff_session,
         "snowball": cli._run_snowball,

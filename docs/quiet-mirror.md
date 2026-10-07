@@ -28,7 +28,7 @@ refresh and to explicit write-back. The rule and how the code follows it:
 | --- | --- |
 | **Zotero** | Catalogue, collections, citations, annotations; `storage/` holds `imported_file` attachments after attach; phone/WebDAV sync is Zotero’s job |
 | **`out/<collection>/<stem -- KEY>/`** | Quiet mirror. One folder per item: `record.json` (`paperful.item.v1`), optional PDF, `notes/`. A refresh keeps one for every item, including items with no PDF |
-| **`state/`** | Append-only history (manifest, patches, dedupe, runs, authorwatch lists) plus secrets. `out/_history.json` points at the ledgers and does not copy sessions, cookies, or the API key |
+| **`state/`** | Append-only history (manifest, patches, dedupe, runs, authorwatch lists including `suggestions.jsonl`) plus secrets. `out/_history.json` points at the ledgers and does not copy sessions, cookies, or the API key |
 
 **Dual store for now.** Attach stays **`imported_file`**: bytes land under `out/`,
 then upload into Zotero `storage/`. Duplicate bytes are acceptable.
@@ -131,6 +131,6 @@ notes are not mirrored.
 - [architecture.md](architecture.md) — disk-first adapters and data flow
 - [zotero.md](zotero.md) — attachment modes (`imported_file` vs linked)
 - [mendeley.md](mendeley.md) / [endnote.md](endnote.md) — other adapters (seeking testers)
-- [ROADMAP.md](ROADMAP.md) — the disk mirror is core; Zotero is the tested 1.0 path
+- [ROADMAP.md](ROADMAP.md) — the disk mirror is core; Zotero is the well-tested path (1.0 does not wait on other adapters)
 - [why.md](why.md) — storage, grey literature, and what is true today
 - [commands.md](commands.md) — `out/` path layout

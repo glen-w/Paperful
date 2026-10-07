@@ -44,6 +44,8 @@ uv run paperful rag ingest --library
 ```bash
 uv sync --extra rag                 # LanceDB
 ollama pull nomic-embed-text        # default embedding model
+# or build the heavy Compose image (includes [rag]):
+# PAPERFUL_IMAGE_MODE=heavy docker compose build
 ```
 
 `ask` also needs a chat model: follow [llm.md](llm.md) and set
@@ -52,8 +54,9 @@ ollama pull nomic-embed-text        # default embedding model
 LanceDB ships wheels for Apple Silicon, Linux (x86_64, aarch64) and Windows.
 There is no wheel for Intel macOS; on an Apple Silicon Mac make sure the
 environment uses an arm64 Python (`uv venv --python /opt/homebrew/bin/python3`)
-and not an x86_64 build under Rosetta. The Docker image does not include the
-`rag` extra yet.
+and not an x86_64 build under Rosetta. The **heavy** Compose image
+(`PAPERFUL_IMAGE_MODE=heavy`) includes `[rag]`; **light** (CI default) does
+not. See [Docker](docker.md#image-mode-light-vs-heavy).
 
 ## Configure
 
@@ -229,6 +232,23 @@ uv run paperful rag answered --from-file qs.txt --after-item AAAA1111
 `state/rq-answered/<stamp>/` (`paperful.rq_answered.v1`). `--after-item`
 keeps only newer years and drops the asking paper from retrieval.
 
+### Workbench (Advanced Index)
+
+With `[rag]` and `[llm]` on, Advanced **Index** runs the same verbs as the CLI:
+ingest, search, threaded Ask, batch Ask, extract questions, already-answered
+checks, and synthesize. Scope follows the collection chip (plus optional item
+keys, years, types, top-k). Custom system prompts on Ask/batch, in order:
+
+1. Inline textarea
+2. Uploaded `.md`/`.txt` (stored under `state/gui/uploads/`)
+3. Path field (resolved like `[rag].prompt`, relative to the config file)
+4. Saved file from `state/prompts/` (optional “Save as…” on the form)
+5. Else `[rag].prompt` / focus preset
+
+Batch packs list under `state/ask-batch/`; answered packs under
+`state/rq-answered/` (`pack.md`). Routes: [gui.md](gui.md). CLI still owns TTY
+multi-turn, `--show-context`, named run profiles, and `paperful all`.
+
 Answers are only as good as the passages found. The model is told to answer
 from the excerpts alone and to say when they do not contain the answer, but a
 local 7B model can still misread or over-claim; check the cited pages.
@@ -259,5 +279,6 @@ ingest would touch, how many scans wait for OCR, and how many PDFs failed.
 ## Related docs
 
 - [llm.md](llm.md): chat model setup for `ask`.
+- [gui.md](gui.md): Advanced Index forms and HTTP routes.
 - [quiet-mirror.md](quiet-mirror.md): the folder tree the index is built from.
 - [commands.md](commands.md): all verbs.

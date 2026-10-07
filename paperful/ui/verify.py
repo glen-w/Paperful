@@ -7,6 +7,34 @@ from typing import Any
 from ..resolve import normalize_doi
 from ..store import STATUS_ATTACHED, STATUS_OK
 
+VERIFICATION_PLAIN: dict[str, str] = {
+    "doi_match": "PDF on disk and DOI matches the library",
+    "doi_mismatch": "PDF on disk but DOI does not match the library",
+    "snapshot": "HTML page snapshot, not a publisher PDF",
+    "unverified": "PDF on disk, identity not verified",
+    "missing": "No PDF file on disk",
+}
+
+REASON_PLAIN: dict[str, str] = {
+    "no_file": "Nothing attached in the manifest",
+    "htmlpdf": "Saved from HTML conversion",
+    "doi_differs": "Embedded DOI differs from the library item",
+    "grey": "Grey-literature source",
+    "no_doi_in_file": "No DOI found inside the PDF",
+}
+
+
+def verification_plain(state: str | None) -> str:
+    if not state:
+        return ""
+    return VERIFICATION_PLAIN.get(state, state)
+
+
+def reason_plain(reason: str | None) -> str:
+    if not reason:
+        return ""
+    return REASON_PLAIN.get(reason, reason)
+
 
 def _doi_key(raw: str | None) -> str | None:
     norm = normalize_doi(raw)
