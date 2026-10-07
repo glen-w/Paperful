@@ -46,7 +46,6 @@ from .pages import (
 from .snowball_form import parse_discover_topic
 from .prefs import (
     COOKIE_ADVANCED,
-    COOKIE_ATTACH_VERIFIED,
     COOKIE_COLLECTION,
     COOKIE_PRESET,
     prefs_from_request,
@@ -64,6 +63,25 @@ def _health_status(checks: list[dict[str, Any]]) -> str:
     if any(c.get("status") == "amber" for c in checks):
         return "amber"
     return "green"
+
+
+def _health_label(checks: list[dict[str, Any]]) -> str:
+    """Short label for the worst doctor row (red, then amber)."""
+    for status in ("red", "amber"):
+        for row in checks:
+            if row.get("status") != status:
+                continue
+            code = str(row.get("code") or "")
+            if code == "zotero_down":
+                return "Zotero offline"
+            if code == "zotero_api_off":
+                return "Zotero API off"
+            name = str(row.get("name") or "").strip()
+            if name:
+                return name
+            if code:
+                return code.replace("_", " ")
+    return ""
 
 
 def _trust_line(cfg: Config) -> str:
@@ -138,6 +156,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             "prefs": prefs,
             "active": active,
             "health": _health_status(checks),
+            "health_label": _health_label(checks),
             **extra,
         }
 
@@ -167,17 +186,30 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         return RedirectResponse(url="/wanted", status_code=302)
 
     @app.get("/wanted", response_class=HTMLResponse)
-    def page_wanted(request: Request, tab: str = "missing") -> HTMLResponse:
+    def page_wanted(request: Request, tab: str = "missing", error: str = "") -> HTMLResponse:
         prefs = prefs_from_request(request)
-        error = ""
+        load_error = ""
         data = {"have": [], "held": [], "missing": [], "counts": {"have": 0, "held": 0, "missing": 0}}
         if prefs.collection:
             try:
                 data = _load_wanted(cfg, prefs.collection)
             except Exception as exc:
-                error = str(exc)
+                load_error = str(exc)
         rows = data.get(tab, []) if tab in {"have", "held", "missing"} else data["missing"]
         briefs = briefs_page_flags(cfg)
+        coach = ""
+        if not prefs.collection:
+            coach = "Pick a collection in Library, then return here to preview missing PDFs."
+        else:
+            for row in _cached_doctor():
+                code = str(row.get("code") or "")
+                if code in {"zotero_down", "zotero_api_off"} and row.get("status") in {
+                    "red",
+                    "amber",
+                }:
+                    coach = next_step(code, str(row.get("detail") or ""))
+                    break
+        banner = load_error or error
         return templates.TemplateResponse(
             request,
             "wanted.html",
@@ -187,7 +219,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 tab=tab,
                 rows=rows,
                 counts=data["counts"],
-                error=error,
+                error=banner,
+                coach=coach,
                 briefs=briefs,
                 dest_options=dest_options(),
             ),
@@ -254,7 +287,6 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
 
     @app.post("/wanted/grab", response_model=None)
     async def wanted_grab(request: Request):
-        prefs = prefs_from_request(request)
         form = await request.form()
         token = str(form.get("review_token") or "")
         if not token:
@@ -263,9 +295,24 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 if c.get("review_token"):
                     token = c["review_token"]
                     break
-        ok, msg = jobs.grab_run(cfg, token=token, attach_verified=prefs.attach_verified)
+        ok, msg = jobs.grab_run(cfg, token=token)
         if not ok:
             return JSONResponse({"ok": False, "error": msg}, status_code=409)
+        return RedirectResponse(url="/wanted", status_code=303)
+
+    @app.post("/wanted/attach", response_model=None)
+    async def wanted_attach(request: Request):
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        keys = [str(k) for k in form.getlist("keys")]
+        ok, msg = jobs.attach_run(cfg, keys=keys, collection=prefs.collection)
+        if not ok:
+            from urllib.parse import quote
+
+            return RedirectResponse(
+                url=f"/wanted?error={quote(msg or 'attach failed')}",
+                status_code=303,
+            )
         return RedirectResponse(url="/wanted", status_code=303)
 
     def _last_review_token(verb: str) -> str:
@@ -718,7 +765,6 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         host = str(form.get("zotero_host") or "")
         out_dir = str(form.get("out_dir") or "")
         preset = str(form.get("preset") or "oa")
-        attach = form.get("attach_verified") == "1"
         if email:
             _patch_config_field(cfg, "", "email", email)
         if host:
@@ -728,7 +774,6 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         resp = RedirectResponse(url="/settings?saved=1", status_code=303)
         if preset in {"oa", "eoi"}:
             set_cookie(resp, COOKIE_PRESET, preset)
-        set_cookie(resp, COOKIE_ATTACH_VERIFIED, "1" if attach else "0")
         return resp
 
     @app.post("/prefs/advanced")

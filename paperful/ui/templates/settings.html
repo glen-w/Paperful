@@ -12,8 +12,6 @@
       <option value="eoi" {% if prefs.preset == 'eoi' %}selected{% endif %}>Campus</option>
     </select>
   </label></p>
-  <p><label><input type="checkbox" name="attach_verified" value="1" {% if prefs.attach_verified %}checked{% endif %}>
-    Attach verified automatically</label></p>
   <button type="submit">Save</button>
 </form>
 {% endblock %}

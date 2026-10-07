@@ -95,8 +95,8 @@ def grab_run(
     cfg: Config,
     *,
     token: str,
-    attach_verified: bool,
 ) -> tuple[bool, str]:
+    """Fetch to out/ only (never attaches to Zotero)."""
     review = commands.load_review(cfg, token)
     if review is None:
         return False, "unknown token"
@@ -109,6 +109,7 @@ def grab_run(
     ok, msg = commands.consume_review(cfg, token, fingerprint=fp, keys=None)
     if not ok:
         return False, msg
+    item_keys = list(keyset)
     if run_fetch_fn is not None:
         run_fetch_fn(
             cfg,
@@ -117,7 +118,7 @@ def grab_run(
             dry_run=False,
             preset=preset,
             no_attach=True,
-            keys=list(keyset),
+            item_keys=item_keys,
         )
     else:
         from ..run_cmd import run_fetch
@@ -148,21 +149,31 @@ def grab_run(
             downloads_dir=None,
             re_request=False,
             json_out=True,
+            item_keys=item_keys,
         )
-    if attach_verified:
-        _attach_doi_match(cfg, manifest, items)
     return True, ""
 
 
-def _attach_doi_match(cfg: Config, manifest: Manifest, items: list[Any]) -> None:
-    from .verify import file_verification
+def attach_run(
+    cfg: Config,
+    *,
+    keys: list[str],
+    collection: str,
+) -> tuple[bool, str]:
+    """Attach selected pending PDFs to Zotero (doi_match defaults + hand-ticks)."""
+    selected = [k.strip() for k in keys if k and str(k).strip()]
+    if not selected:
+        return False, "no keys selected"
+    items, _manifest = _load_scope_items(cfg, collection)
+    keyset = set(selected)
+    scoped_keys = [it.key for it in items if it.key in keyset]
+    if not scoped_keys:
+        return False, "no matching items"
+    _attach_keys(cfg, scoped_keys)
+    return True, ""
 
-    keys = []
-    for item in items:
-        rec = manifest.records.get(item.key)
-        ver = file_verification(rec, item_doi=item.doi)
-        if ver["state"] == "doi_match":
-            keys.append(item.key)
+
+def _attach_keys(cfg: Config, keys: list[str]) -> None:
     if not keys:
         return
     if attach_fn is not None:

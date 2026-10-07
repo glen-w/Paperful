@@ -16,13 +16,11 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
 
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     cfg.state_dir.mkdir(parents=True)
-    monkeypatch.setattr(
-        ops,
-        "doctor_payload",
-        lambda _cfg, probe=False: [
-            {"name": "Zotero", "status": "red", "code": "zotero_down", "detail": "down"}
-        ],
-    )
+    doctor = lambda _cfg, probe=False: [
+        {"name": "Zotero", "status": "red", "code": "zotero_down", "detail": "down"}
+    ]
+    monkeypatch.setattr(ops, "doctor_payload", doctor)
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", doctor)
     monkeypatch.setattr(
         ops,
         "collections_tree",
@@ -35,7 +33,14 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
         res = client.get(path)
         assert res.status_code == 200
         assert "Paperful" in res.text
-    assert "/repair" not in res.text
+    wanted = client.get("/wanted")
+    assert wanted.status_code == 200
+    nav = wanted.text
+    assert nav.index('href="/wanted"') < nav.index('href="/discover"')
+    assert "Zotero offline" in wanted.text
+    assert "Start Zotero" in wanted.text or "Pick a collection" in wanted.text
+    assert 'formaction="/wanted/attach"' in wanted.text
+    assert "/repair" not in wanted.text
     client.cookies.set("pf_advanced", "1")
     res = client.get("/wanted")
     assert "/repair" in res.text

@@ -50,9 +50,21 @@ header.wb-chrome a.brand {
   border-radius: 50%;
   display: inline-block;
 }
-.health-green { background: #2d6a4f; }
-.health-amber { background: #b08900; }
-.health-red { background: #9b2226; }
+.health-chip {
+  font-size: 0.85rem;
+  text-decoration: none;
+  margin-left: 0.35rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.health-chip.health-green { border-color: #2d6a4f; color: #2d6a4f; }
+.health-chip.health-amber { border-color: #b08900; color: #7a5c00; background: #fff8e1; }
+.health-chip.health-red { border-color: #9b2226; color: #9b2226; background: #fdecea; }
+.health-dot.health-green { background: #2d6a4f; }
+.health-dot.health-amber { background: #b08900; }
+.health-dot.health-red { background: #9b2226; }
 
 nav.wb-nav {
   display: flex;
@@ -172,6 +184,14 @@ iframe.summary-frame {
 .error-banner {
   background: #fde8e8;
   border: 1px solid #9b2226;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+  border-radius: 4px;
+}
+
+.coach-banner {
+  background: #fff8e1;
+  border: 1px solid #b08900;
   padding: 0.5rem 0.75rem;
   margin-bottom: 1rem;
   border-radius: 4px;

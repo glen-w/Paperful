@@ -54,6 +54,7 @@ def run_fetch(
     downloads_dir: Path | None,
     re_request: bool,
     json_out: bool,
+    item_keys: list[str] | None = None,
 ) -> None:
     from . import cli as cli_mod
 
@@ -115,6 +116,9 @@ def run_fetch(
             if upgrade_linked
             else linked_url_only_count(scoped, skip_empty_paths=keys is not None)
         )
+    if item_keys:
+        wanted = set(item_keys)
+        scoped = [it for it in scoped if it.key in wanted]
     items = items_without_stored_pdf(
         scoped,
         upgrade_linked=upgrade_linked,
