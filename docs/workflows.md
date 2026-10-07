@@ -19,7 +19,7 @@ parents → PDFs) is [research-pack](research-pack.md).
 | **`--preset eoi`** | Source *policy*: open access plus campus EZProxy, no Scholar, no Sci-Hub | CLI flag or `preset` in a profile |
 | **Playbook** | URL → PDF rule (`rewrite` / `scrape` / `synthesize`), hand-written or learned from fetch wins | `[[grey_playbooks]]`, `packs/*.toml`, `packs/learned.toml` |
 | **Pack** | Witness for one *executed* sequence. Lists child reports. Not a template you re-run | `state/packs/<id>.json` |
-| **`authorwatch`** | Named people list → their new papers (ORCID / OpenAlex). Not a crawl hop | `state/authorwatch/<name>/` |
+| **`authorwatch`** | Named people list → their new papers (ORCID / OpenAlex). Optional `suggest` from `-C`. Not a crawl hop | `state/authorwatch/<name>/` |
 | **`authors`** | Creator frequency in `-C`; `--apply` seeds a proposed field author pack | `state/reports/*-authors.json`, `state/author-packs/` |
 | **`reachout`** | Missing PDFs → CSV / RG tabs for author contact. Never fetches, never sends mail | `paperful reachout` |
 | **`snowball watch`** | Re-run a saved snowball *profile*; propose unseen works. The rollup is `digest.md` ([Watch](snowball.md#watch)) | `state/snowball/watches/<name>/` |

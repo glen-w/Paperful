@@ -23,6 +23,7 @@ from .pages import (
     authorwatch_inbox_rows,
     authorwatch_lists,
     authorwatch_people_rows,
+    authorwatch_suggestion_rows,
     briefs_page_flags,
     dest_options,
     focus_options,
@@ -31,6 +32,7 @@ from .pages import (
     last_job_result,
     library_item_rows,
     list_ask_packs,
+    list_answered_packs,
     list_html_stems,
     list_snowball_profiles,
     list_threads,
@@ -42,6 +44,14 @@ from .pages import (
     thread_for_display,
     wanted_rows,
     MIRROR_VERBS,
+)
+from .rag_form import (
+    list_saved_prompts,
+    parse_rag_scope,
+    read_questions_upload,
+    resolve_prompt_from_form,
+    save_prompt_as,
+    scope_has_target,
 )
 from .snowball_form import parse_discover_topic
 from .prefs import (
@@ -174,6 +184,37 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         if positive and value <= 0:
             raise ValueError("limit")
         return value
+
+    async def _upload_bytes(form: Any, key: str) -> bytes | None:
+        upload = form.get(key)
+        if upload is None or not getattr(upload, "filename", None):
+            return None
+        data = await upload.read()  # type: ignore[union-attr]
+        return data if data else None
+
+    async def _resolved_prompt(form: Any) -> Any:
+        upload = form.get("prompt_upload")
+        data = None
+        name = None
+        if upload is not None and getattr(upload, "filename", None):
+            name = str(upload.filename)
+            data = await upload.read()  # type: ignore[union-attr]
+            if not data:
+                data = None
+        return resolve_prompt_from_form(
+            cfg, form, upload_bytes=data, upload_name=name
+        )
+
+    def _save_prompt_if_asked(form: Any, resolved: Any) -> None:
+        if form.get("save_prompt") != "1":
+            return
+        name = str(form.get("prompt_save_name") or "").strip()
+        text = resolved.prompt_text
+        if not text and resolved.prompt_path:
+            text = Path(resolved.prompt_path).read_text(encoding="utf-8")
+        if not text:
+            return
+        save_prompt_as(cfg, name, text)
 
     def _parse_dest(raw: object, default: str) -> str:
         value = str(raw or "").strip() or default
@@ -454,6 +495,14 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 return str(rec["review_token"])
         return ""
 
+    def _safe_aw_suggestions(active: str) -> list[dict[str, Any]]:
+        if not active:
+            return []
+        try:
+            return authorwatch_suggestion_rows(cfg, active)
+        except Exception:
+            return []
+
     @app.get("/discover", response_class=HTMLResponse)
     def page_discover(
         request: Request, list_name: str = "", error: str = ""
@@ -479,6 +528,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 aw_lists=authorwatch_lists(cfg),
                 aw_list=active_list,
                 aw_people=people,
+                aw_suggestions=_safe_aw_suggestions(active_list),
                 profiles=list_snowball_profiles(cfg),
                 deferred_run=snowball_deferred_run_id(cfg),
                 snowball_token=_last_review_token("snowball_apply"),
@@ -1020,6 +1070,72 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         jobs.authorwatch_import(cfg, list_name=name, path=dest, source=source)
         return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
 
+    @app.post("/discover/aw/suggest")
+    async def discover_aw_suggest(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        name = str(form.get("list_name") or "").strip()
+        method = str(form.get("method") or "corpus").strip()
+        limit = int(str(form.get("limit") or "15") or "15")
+        collection = str(form.get("collection") or prefs.collection or "").strip()
+
+        def work(_cmd_id: str) -> None:
+            jobs.authorwatch_suggest(
+                cfg,
+                list_name=name,
+                collection=collection,
+                method=method,
+                limit=limit,
+            )
+
+        commands.enqueue(cfg, "authorwatch_suggest", work)
+        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+
+    @app.post("/discover/aw/accept")
+    async def discover_aw_accept(request: Request) -> RedirectResponse:
+        form = await request.form()
+        name = str(form.get("list_name") or "").strip()
+        ids = [str(v) for v in form.getlist("suggestion_id")]
+        seed_from = str(form.get("seed_from") or "").strip() or None
+
+        def work(_cmd_id: str) -> None:
+            jobs.authorwatch_accept(
+                cfg,
+                list_name=name,
+                suggestion_ids=ids,
+                seed_from=seed_from,
+            )
+
+        commands.enqueue(cfg, "authorwatch_accept", work)
+        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+
+    @app.post("/discover/aw/delete")
+    async def discover_aw_delete(request: Request) -> RedirectResponse:
+        form = await request.form()
+        name = str(form.get("list_name") or "").strip()
+        from ..authorwatch import delete_list
+
+        delete_list(cfg, name, yes=True)
+        return RedirectResponse(url="/discover", status_code=303)
+
+    @app.post("/discover/aw/edit")
+    async def discover_aw_edit(request: Request) -> RedirectResponse:
+        form = await request.form()
+        name = str(form.get("list_name") or "").strip()
+        person_id = str(form.get("person_id") or "").strip()
+        display = str(form.get("display_name") or "").strip()
+        affiliation = str(form.get("affiliation") or "").strip()
+        from ..authorwatch import update_person
+
+        update_person(
+            cfg,
+            name,
+            person_id,
+            display_name=display,
+            affiliation_host=affiliation,
+        )
+        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+
     @app.post("/discover/aw/briefing")
     async def discover_aw_briefing(request: Request) -> RedirectResponse:
         form = await request.form()
@@ -1419,7 +1535,13 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 last_result=result,
                 ingest_result=last_job_result(cfg, "rag_ingest"),
                 batch_result=last_job_result(cfg, "ask_batch"),
+                questions_result=last_job_result(cfg, "rag_questions"),
+                answered_result=last_job_result(cfg, "rag_answered"),
                 packs=list_ask_packs(cfg),
+                answered_packs=list_answered_packs(cfg),
+                saved_prompts=list_saved_prompts(cfg),
+                rag_config_prompt=cfg.rag_prompt or "",
+                extract_questions_llm=cfg.rag_extract_questions_llm,
                 hits=hits,
                 search_q=search_q,
                 search_k=k,
@@ -1552,8 +1674,22 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         try:
             year_from = _optional_int(form.get("year_from"))
             year_to = _optional_int(form.get("year_to"))
-        except ValueError:
-            return _redir(err="year", tid=thread_id)
+            scope = parse_rag_scope(
+                form,
+                prefs.collection,
+                year_from=year_from,
+                year_to=year_to,
+            )
+            resolved = await _resolved_prompt(form)
+        except ValueError as exc:
+            msg = str(exc).lower()
+            if "year" in msg or "integer" in msg:
+                return _redir(err="year", tid=thread_id)
+            if "top_k" in msg or "positive" in msg:
+                return _redir(err="limit", tid=thread_id)
+            if "type" in msg or "item type" in msg:
+                return _redir(err="type", tid=thread_id)
+            return _redir(err="prompt", tid=thread_id)
         try:
             from ..rag.prompt import parse_focus
 
@@ -1564,6 +1700,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             from ..rag.thread import new_id
 
             thread_id = new_id()
+        _save_prompt_if_asked(form, resolved)
 
         def work(cmd_id: str) -> None:
             jobs.ask_turn(
@@ -1571,10 +1708,15 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 cmd_id,
                 question=question,
                 thread_id=thread_id,
-                collection=prefs.collection,
-                year_from=year_from,
-                year_to=year_to,
+                collection=scope.collection,
+                year_from=scope.year_from,
+                year_to=scope.year_to,
                 focus=focus_raw,
+                top_k=scope.top_k,
+                item_keys=scope.item_keys or None,
+                item_types=scope.item_types,
+                prompt_path=resolved.prompt_path,
+                prompt_text=resolved.prompt_text,
             )
 
         cmd_id = commands.enqueue(cfg, "ask", work)
@@ -1586,16 +1728,32 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         form = await request.form()
         if not (cfg.rag_enabled and cfg.llm_enabled):
             return RedirectResponse(url=_page_url("/index", error="disabled"), status_code=303)
-        from ..snowball.seeds import parse_seed_lines
-
-        questions = parse_seed_lines(str(form.get("questions") or ""))
-        if not questions:
-            return RedirectResponse(url=_page_url("/index", error="questions"), status_code=303)
         try:
+            q_upload = await _upload_bytes(form, "questions_upload")
+            questions = read_questions_upload(form, q_upload)
             year_from = _optional_int(form.get("year_from"))
             year_to = _optional_int(form.get("year_to"))
-        except ValueError:
-            return RedirectResponse(url=_page_url("/index", error="year"), status_code=303)
+            scope = parse_rag_scope(
+                form,
+                prefs.collection,
+                year_from=year_from,
+                year_to=year_to,
+                include_force=True,
+            )
+            resolved = await _resolved_prompt(form)
+        except ValueError as exc:
+            msg = str(exc).lower()
+            if "upload" in msg or "too large" in msg:
+                return RedirectResponse(url=_page_url("/index", error="upload"), status_code=303)
+            if "top_k" in msg or "positive" in msg:
+                return RedirectResponse(url=_page_url("/index", error="limit"), status_code=303)
+            if "type" in msg:
+                return RedirectResponse(url=_page_url("/index", error="type"), status_code=303)
+            if "year" in msg:
+                return RedirectResponse(url=_page_url("/index", error="year"), status_code=303)
+            return RedirectResponse(url=_page_url("/index", error="prompt"), status_code=303)
+        if not questions:
+            return RedirectResponse(url=_page_url("/index", error="questions"), status_code=303)
         try:
             dest = _parse_dest(form.get("dest"), cfg.rag_dest or "disk")
         except ValueError:
@@ -1610,21 +1768,138 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             parse_focus(focus_raw if focus_raw is not None else cfg.rag_focus)
         except ValueError:
             return RedirectResponse(url=_page_url("/index", error="focus"), status_code=303)
+        _save_prompt_if_asked(form, resolved)
 
         def work(cmd_id: str) -> None:
             jobs.ask_batch(
                 cfg,
                 cmd_id,
                 questions=questions,
-                collection=prefs.collection,
-                year_from=year_from,
-                year_to=year_to,
+                collection=scope.collection,
+                year_from=scope.year_from,
+                year_to=scope.year_to,
                 focus=focus_raw,
                 dest=dest,
                 apply=apply,
+                top_k=scope.top_k,
+                item_keys=scope.item_keys or None,
+                item_types=scope.item_types,
+                prompt_path=resolved.prompt_path,
+                prompt_text=resolved.prompt_text,
+                force=scope.force,
             )
 
         cmd_id = commands.enqueue(cfg, "ask_batch", work)
+        return RedirectResponse(url=_page_url("/index", run=cmd_id), status_code=303)
+
+    @app.post("/index/rag-questions")
+    async def index_rag_questions(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        if not cfg.rag_enabled:
+            return RedirectResponse(url=_page_url("/index", error="rag"), status_code=303)
+        dry_run = str(form.get("dry_run") or "1") != "0"
+        whole_library = form.get("whole_library") == "1"
+        use_llm = form.get("use_llm") == "1"
+        try:
+            year_from = _optional_int(form.get("year_from"))
+            year_to = _optional_int(form.get("year_to"))
+            limit = _optional_int(form.get("limit"), positive=True)
+            scope = parse_rag_scope(
+                form,
+                prefs.collection,
+                year_from=year_from,
+                year_to=year_to,
+            )
+        except ValueError:
+            return RedirectResponse(url=_page_url("/index", error="year"), status_code=303)
+        if not scope_has_target(scope, whole_library=whole_library):
+            return RedirectResponse(url=_page_url("/index", error="scope"), status_code=303)
+
+        def work(cmd_id: str) -> None:
+            jobs.rag_questions(
+                cfg,
+                cmd_id,
+                collection=scope.collection,
+                whole_library=whole_library,
+                year_from=scope.year_from,
+                year_to=scope.year_to,
+                item_keys=scope.item_keys or None,
+                item_types=scope.item_types,
+                use_llm=use_llm,
+                limit=limit,
+                dry_run=dry_run,
+            )
+
+        cmd_id = commands.enqueue(cfg, "rag_questions", work)
+        return RedirectResponse(url=_page_url("/index", run=cmd_id), status_code=303)
+
+    @app.post("/index/rag-answered")
+    async def index_rag_answered(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        if not (cfg.rag_enabled and cfg.llm_enabled):
+            return RedirectResponse(url=_page_url("/index", error="disabled"), status_code=303)
+        mode = str(form.get("question_mode") or "text").strip()
+        after_item = str(form.get("after_item") or "").strip() or None
+        try:
+            year_from = _optional_int(form.get("year_from"))
+            year_to = _optional_int(form.get("year_to"))
+            scope = parse_rag_scope(
+                form,
+                prefs.collection,
+                year_from=year_from,
+                year_to=year_to,
+                include_force=True,
+            )
+        except ValueError:
+            return RedirectResponse(url=_page_url("/index", error="year"), status_code=303)
+        questions: list[tuple[str, str, int | None]] = []
+        try:
+            if mode == "extract":
+                from ..rag.answered import questions_from_extract
+
+                extract_keys = scope.item_keys if scope.item_keys else None
+                questions = questions_from_extract(cfg, item_keys=extract_keys)
+            else:
+                upload = await _upload_bytes(form, "answered_upload")
+                if mode == "upload" or upload:
+                    if not upload:
+                        return RedirectResponse(
+                            url=_page_url("/index", error="upload"), status_code=303
+                        )
+                    from ..snowball.seeds import parse_seed_lines
+
+                    lines = parse_seed_lines(
+                        upload.decode("utf-8", errors="replace")
+                    )
+                    questions = [(q, "", None) for q in lines]
+                else:
+                    from ..snowball.seeds import parse_seed_lines
+
+                    lines = parse_seed_lines(str(form.get("answered_questions") or ""))
+                    questions = [(q, "", None) for q in lines]
+        except (ValueError, UnicodeError):
+            return RedirectResponse(url=_page_url("/index", error="upload"), status_code=303)
+        if not questions:
+            return RedirectResponse(url=_page_url("/index", error="questions"), status_code=303)
+
+        def work(cmd_id: str) -> None:
+            jobs.rag_answered(
+                cfg,
+                cmd_id,
+                collection=scope.collection,
+                year_from=scope.year_from,
+                year_to=scope.year_to,
+                item_keys=scope.item_keys or None,
+                item_types=scope.item_types,
+                questions=questions,
+                after_item=after_item,
+                top_k=scope.top_k,
+                force=scope.force,
+            )
+
+        cmd_id = commands.enqueue(cfg, "rag_answered", work)
         return RedirectResponse(url=_page_url("/index", run=cmd_id), status_code=303)
 
     @app.get("/index/batch/{stamp}", response_model=None)
@@ -1632,6 +1907,15 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         from ..rag.batch import batch_dir
 
         path = safe_child(batch_dir(cfg), stamp, "answers.md")
+        if path is None:
+            return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+        return FileResponse(path, media_type="text/plain; charset=utf-8")
+
+    @app.get("/index/answered/{stamp}", response_model=None)
+    def index_answered_pack(stamp: str):
+        from ..rag.answered import answered_dir
+
+        path = safe_child(answered_dir(cfg), stamp, "pack.md")
         if path is None:
             return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
         return FileResponse(path, media_type="text/plain; charset=utf-8")

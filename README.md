@@ -55,7 +55,8 @@ parents from a DOI list (dry-run unless `--apply`). See [Commands](docs/commands
 metadata parents only when the gate says so. `run` fetches PDFs for items
 already in the library. Dry-run is the default for snowball; `run` attaches
 on Zotero 10+ unless you pass `--dry-run`. `authorwatch` is people you
-follow → their papers (no hop); see [Author watch](docs/authorwatch.md).
+follow → their papers (no hop; optional corpus `suggest`); see
+[Author watch](docs/authorwatch.md).
 `snowball watch` re-runs a saved profile; `watch run --digest` writes the
 frontier rollup. See [Snowball](docs/snowball.md)
 and [Watch](docs/snowball.md#watch).
@@ -168,7 +169,7 @@ cp .env.example .env          # PAPERFUL_DATA=. keeps data in this checkout
                               # .env.example sets PAPERFUL_IMAGE_MODE=heavy
 cp config.minimal.toml config.toml   # set email; full file is config.example.toml
 docker compose build                 # heavy when set in .env; CI uses light
-docker compose run --rm paperful doctor          # TTY guide when stdin is a TTY
+docker compose run --rm paperful doctor          # fix steps; --guide for Enter walk
 docker compose run --rm paperful collections
 docker compose run --rm paperful run --collection interesting --preset oa --dry-run
 
@@ -235,7 +236,9 @@ Optional library index (off until `[rag].enabled`): `paperful rag ingest`
 indexes the PDFs and abstracts in the mirror, and `paperful ask` answers
 questions from it with cited papers and pages. It reads `out/` only and never
 calls the reference manager. Needs `paperful[rag]` on the host, or a **heavy**
-Compose image. Setup: [Ask your library](docs/rag.md).
+Compose image. Advanced **Index** on `paperful serve` runs the same Ask / batch /
+`rag questions` / `rag answered` verbs ([gui.md](docs/gui.md)). Setup:
+[Ask your library](docs/rag.md).
 
 ```sh
 uv sync --extra rag && ollama pull nomic-embed-text   # then set [rag] enabled = true

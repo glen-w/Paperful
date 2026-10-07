@@ -186,6 +186,9 @@ def test_index_batch_ask_enqueues(tmp_path, monkeypatch):
         client.cookies.set("pf_collection", "ocean/BBNJ")
         page = client.get("/index")
         assert 'action="/index/ask-batch"' in page.text
+        assert 'action="/index/rag-questions"' in page.text
+        assert 'action="/index/rag-answered"' in page.text
+        assert "prompt_inline" in page.text
         res = client.post(
             "/index/ask-batch",
             data={"questions": "What is BBNJ?\nWhat is EIA?", "focus": "gaps"},
@@ -226,6 +229,202 @@ def test_index_batch_empty_and_disabled(tmp_path, monkeypatch):
     )
     assert "error=disabled" in (off.headers.get("location") or "")
     assert commands.list_commands(cfg) == []
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_index_batch_force_and_prompt(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.rag_enabled = True
+    cfg.llm_enabled = True
+    _ops(monkeypatch)
+    _fresh_index(monkeypatch)
+    seen: list[dict] = []
+
+    def fake(cfg, cmd_id, **kw):
+        seen.append(kw)
+        return {"stamp": "x", "questions": 1, "answered": 1, "skipped": 0, "failed": 0}
+
+    jobs.ask_batch_fn = fake
+    try:
+        client = TestClient(create_app(cfg))
+        res = client.post(
+            "/index/ask-batch",
+            data={
+                "questions": "What is BBNJ?",
+                "force": "1",
+                "prompt_inline": "Custom batch prompt.",
+            },
+            follow_redirects=False,
+        )
+        assert res.status_code == 303
+        cmd_id = (res.headers.get("location") or "").split("run=")[1].split("&")[0]
+        rec = _wait_done(client, cmd_id)
+        assert rec.get("status") == "done"
+        assert seen[0]["force"] is True
+        assert seen[0]["prompt_text"] == "Custom batch prompt."
+    finally:
+        jobs.ask_batch_fn = None
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_index_rag_questions_scope_and_answered_pack(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.rag_enabled = True
+    cfg.llm_enabled = True
+    _ops(monkeypatch)
+    _fresh_index(monkeypatch)
+
+    scope_bad = TestClient(create_app(cfg)).post(
+        "/index/rag-questions",
+        data={"dry_run": "1"},
+        follow_redirects=False,
+    )
+    assert "error=scope" in (scope_bad.headers.get("location") or "")
+
+    jobs.rag_questions_fn = lambda cfg, cmd_id, **kw: {"items": 2, "questions": 5, "dry_run": True}
+    jobs.rag_answered_fn = lambda cfg, cmd_id, **kw: {
+        "stamp": "20260101T000000Z",
+        "answered": 1,
+        "partial": 0,
+        "not_found": 0,
+        "failed": 0,
+        "questions": 1,
+    }
+    try:
+        client = TestClient(create_app(cfg))
+        client.cookies.set("pf_collection", "ocean/BBNJ")
+        ok = client.post(
+            "/index/rag-questions",
+            data={"dry_run": "1"},
+            follow_redirects=False,
+        )
+        assert ok.status_code == 303
+        stamp_dir = cfg.state_dir / "rq-answered" / "20260101T000000Z"
+        stamp_dir.mkdir(parents=True)
+        (stamp_dir / "pack.md").write_text("# report\n", encoding="utf-8")
+        pack = client.get("/index/answered/20260101T000000Z")
+        assert pack.status_code == 200
+        assert b"# report" in pack.content
+        assert client.get("/index/answered/../secrets").status_code == 404
+    finally:
+        jobs.rag_questions_fn = None
+        jobs.rag_answered_fn = None
+
+
+def test_ask_batch_job_forwards_prompt_path(tmp_path, monkeypatch):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.rag_enabled = True
+    cfg.llm_enabled = True
+    seen: dict = {}
+
+    class Pack:
+        stamp = "20260101T000000Z"
+        questions = 1
+        answered = 1
+        skipped = 0
+        failed = 0
+        focus = "default"
+        model = "m"
+
+    def fake_run_batch(cfg, questions, **kw):
+        seen.update(kw)
+        return Pack()
+
+    monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_ask", lambda cfg: None)
+    monkeypatch.setattr("paperful.llm.preflight.validate_embedder", lambda cfg: object())
+    monkeypatch.setattr("paperful.llm.get_client", lambda cfg: object())
+    monkeypatch.setattr("paperful.rag.index.Index.open", lambda cfg: object())
+    monkeypatch.setattr("paperful.rag.ledger.Ledger", lambda *a, **k: object())
+    monkeypatch.setattr(
+        "paperful.rag.retrieve.scope_keys", lambda *a, **k: {"ABCD1234"}
+    )
+    monkeypatch.setattr("paperful.rag.batch.run_batch", fake_run_batch)
+    monkeypatch.setattr(
+        "paperful.rag.batch.write_pack",
+        lambda cfg, pack: cfg.state_dir / "ask-batch" / pack.stamp,
+    )
+    (cfg.state_dir / "ask-batch" / "20260101T000000Z").mkdir(parents=True)
+    (cfg.state_dir / "ask-batch" / "20260101T000000Z" / "answers.md").write_text(
+        "# a\n", encoding="utf-8"
+    )
+    from paperful.ui import commands
+
+    cmd_id = "cmdaskbatch01"
+    commands.write_command(
+        cfg, {"id": cmd_id, "verb": "ask_batch", "status": "running"}
+    )
+    jobs.ask_batch(
+        cfg,
+        cmd_id,
+        questions=["What is BBNJ?"],
+        collection="ocean/BBNJ",
+        year_from=None,
+        year_to=None,
+        focus="gaps",
+        dest="disk",
+        apply=False,
+        prompt_path="/tmp/custom-prompt.md",
+        force=True,
+    )
+    assert seen.get("prompt_path") == "/tmp/custom-prompt.md"
+    assert seen.get("force") is True
+    assert seen.get("focus") == "gaps"
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_index_rag_answered_enqueues_from_text(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.rag_enabled = True
+    cfg.llm_enabled = True
+    _ops(monkeypatch)
+    _fresh_index(monkeypatch)
+    seen: list[dict] = []
+
+    def fake(cfg, cmd_id, **kw):
+        seen.append(kw)
+        stamp = "20260102T000000Z"
+        folder = cfg.state_dir / "rq-answered" / stamp
+        folder.mkdir(parents=True)
+        (folder / "pack.md").write_text("# ok\n", encoding="utf-8")
+        return {
+            "stamp": stamp,
+            "questions": 1,
+            "answered": 1,
+            "partial": 0,
+            "not_found": 0,
+            "failed": 0,
+        }
+
+    jobs.rag_answered_fn = fake
+    try:
+        client = TestClient(create_app(cfg))
+        res = client.post(
+            "/index/rag-answered",
+            data={
+                "question_mode": "text",
+                "answered_questions": "Is EIA required?\n",
+                "force": "1",
+            },
+            follow_redirects=False,
+        )
+        assert res.status_code == 303
+        cmd_id = (res.headers.get("location") or "").split("run=")[1].split("&")[0]
+        rec = _wait_done(client, cmd_id)
+        assert rec.get("status") == "done"
+        assert seen[0]["force"] is True
+        assert seen[0]["questions"][0][0] == "Is EIA required?"
+    finally:
+        jobs.rag_answered_fn = None
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")

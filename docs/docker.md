@@ -49,8 +49,8 @@ mounts (`PAPERFUL_DATA`).
   dialog once on the host (key is stored under `state/`)
 - For Scholar / EZProxy sessions: a host `uv` install so you can run
   `paperful session login …`, then reuse the mounted `state/sessions/`
-  from the container. Interactive `doctor` (default on a TTY) walks you
-  through this and re-checks.
+  from the container. `doctor` prints fix steps; use `doctor --guide` via
+  `docker compose run` for step-by-step re-check (not `compose up`).
 
 ## Quick start
 
@@ -254,18 +254,12 @@ If bind-mounted `out/` / `state/` are not writable, fix ownership on the host
 Headed Chromium login and Zotero’s authorize dialog need the host GUI. Typical
 flow:
 
-1. `docker compose run --rm paperful doctor` — on a TTY, amber session checks
-   open a guide: run `paperful session login ezproxy` / `scholar` **on the host**
-   (same `PAPERFUL_DATA` / `state/` the container mounts), press Enter in the
-   container to re-check. Or skip with `--no-guide`.
+1. `docker compose run --rm paperful doctor` — prints fix steps for amber
+   session checks. Run `paperful session login ezproxy` / `scholar` **on the
+   host** (same `PAPERFUL_DATA` / `state/` the container mounts), then re-run
+   doctor. For Enter-to-re-check: `doctor --guide` (use `compose run`, not
+   `compose up`).
 2. Approve attach once on the host so `state/zotero-local-api-key.json` exists.
-3. Run fetch/attach from the container as above.
-
-Without the guide:
-
-1. On the host (`uv`): `paperful session login ezproxy` and/or `scholar`;
-   approve attach once so `state/zotero-local-api-key.json` exists.
-2. Ensure that `state/` is the same tree the container mounts.
 3. Run fetch/attach from the container as above.
 
 ## Usual path (`uv`)

@@ -535,7 +535,10 @@ class OpenAlexClient:
             "/authors",
             {
                 "search": text,
-                "select": "id,display_name,orcid,last_known_institutions,works_count",
+                "select": (
+                    "id,display_name,orcid,last_known_institutions,"
+                    "works_count,cited_by_count"
+                ),
             },
             max(1, limit),
         )
@@ -549,7 +552,10 @@ class OpenAlexClient:
             "/authors",
             {
                 "filter": f"orcid:{cleaned}",
-                "select": "id,display_name,orcid,last_known_institutions,works_count",
+                "select": (
+                    "id,display_name,orcid,last_known_institutions,"
+                    "works_count,cited_by_count"
+                ),
             },
             2,
         )

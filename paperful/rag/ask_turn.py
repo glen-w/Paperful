@@ -24,6 +24,10 @@ def run_ask_turn(
     year_to: int | None,
     focus: str | None,
     top_k: int | None = None,
+    item_keys: list[str] | None = None,
+    item_types: frozenset[str] | None = None,
+    prompt_path: str | None = None,
+    prompt_text: str | None = None,
 ) -> dict[str, Any]:
     """Answer one question, append to a thread, and return a GUI/CLI row."""
     q = (question or "").strip()
@@ -43,8 +47,10 @@ def run_ask_turn(
     keys = scope_keys(
         ledger,
         collections=[coll] if coll else [],
+        item_keys=item_keys or (),
         year_from=year_from,
         year_to=year_to,
+        item_types=item_types,
     )
     raw_id = (thread_id or "").strip()
     tid = new_id() if raw_id in {"", "new"} else raw_id
@@ -59,7 +65,8 @@ def run_ask_turn(
         k=top_k,
         keys=keys,
         focus=focus_name,
-        prompt_path=cfg.rag_prompt or None,
+        prompt_path=prompt_path if prompt_path is not None else (cfg.rag_prompt or None),
+        prompt_text=prompt_text,
         client=get_client(cfg),
         embedder=embedder,
         index=index,

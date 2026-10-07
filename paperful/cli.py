@@ -1089,6 +1089,20 @@ def _wait_doctor_continue() -> bool:
         console.print("\n[dim]Guide stopped.[/]")
         return False
 
+def _print_doctor_remediations(cfg: Config, checks: list[Check]) -> None:
+    """Print amber/red fix steps once (no Enter wait)."""
+    docker = in_docker()
+    pending = actionable_checks(checks, cfg, docker=docker)
+    if not pending:
+        return
+    console.print("\n[bold]Fixes[/] — apply these, then re-run doctor.\n")
+    for check, text in pending:
+        colour = "red" if check.status == "red" else "yellow"
+        console.print(f"[{colour}]• {check.name}[/] ({check.status})")
+        console.print(f"[dim]{check.detail}[/]")
+        console.print(text)
+        console.print()
+
 def _guide_doctor(
     cfg: Config, checks: list[Check], *, probe: bool = False
 ) -> list[Check]:
@@ -1174,18 +1188,26 @@ def doctor(
 
     actionable = actionable_checks(checks, cfg)
     if guide is None:
-        # Compose/Docker often reports isatty() False even with a real terminal.
-        want_guide = sys.stdin.isatty() or in_docker()
+        # Compose sets tty: true even for `docker compose up`, where Enter/Ctrl-C
+        # belong to Compose — not a usable interactive guide. Opt in with
+        # `docker compose run --rm paperful doctor --guide`.
+        want_guide = _stdin_is_tty() and not in_docker()
     else:
         want_guide = guide
     if want_guide and actionable:
         checks = _guide_doctor(cfg, checks, probe=probe)
     elif actionable and not want_guide:
-        console.print(
-            "\n[dim]Amber/red fixes available — re-run with[/] "
-            "[bold]paperful doctor --guide[/]"
-            + (" [dim](or omit --no-guide / -T)[/]" if in_docker() else "")
-        )
+        _print_doctor_remediations(cfg, checks)
+        if in_docker():
+            console.print(
+                "[dim]Step-by-step re-check:[/] "
+                "[bold]docker compose run --rm paperful doctor --guide[/]"
+            )
+        else:
+            console.print(
+                "[dim]Step-by-step re-check:[/] "
+                "[bold]paperful doctor --guide[/]"
+            )
 
     if has_red(checks):
         code = next((c.code for c in checks if c.status == "red" and c.code), "")
@@ -7500,6 +7522,91 @@ def authorwatch_resolve(
     held = sum(1 for row in people if row.status == "held")
     unresolved = sum(1 for row in people if row.status == "unresolved")
     console.print(f"ok {ok} · held {held} · unresolved {unresolved}")
+
+@authorwatch_app.command("suggest")
+def authorwatch_suggest_cmd(
+    name: str = typer.Argument(..., help="List name."),
+    collection: str = typer.Option(
+        ..., "--collection", "-C", help="Collection scope for ranking."
+    ),
+    method: str = typer.Option(
+        "corpus",
+        "--method",
+        help="corpus, most_cited, coauthor, or mix.",
+    ),
+    limit: int = typer.Option(15, "--limit", help="Max new suggestions this call."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Propose people to follow from a collection (local corpus / OpenAlex)."""
+    from .authorwatch_suggest import suggest_people
+
+    cfg = _cfg(config)
+    rows = _authorwatch_call(
+        lambda: suggest_people(
+            cfg,
+            name,
+            collection=collection,
+            method=method,
+            limit=limit,
+        )
+    )
+    console.print(f"Added {len(rows)} suggestion(s)")
+
+@authorwatch_app.command("accept")
+def authorwatch_accept_cmd(
+    name: str = typer.Argument(..., help="List name."),
+    suggestion_id: list[str] = typer.Option(
+        [], "--id", help="Suggestion id from suggestions.jsonl (repeatable)."
+    ),
+    all_pending: bool = typer.Option(
+        False, "--all-pending", help="Accept every pending suggestion."
+    ),
+    dismiss_rest: bool = typer.Option(
+        False, "--dismiss-rest", help="Mark unselected pending rows dismissed."
+    ),
+    seed_from: str | None = typer.Option(
+        None,
+        "--seed-from",
+        help="After accept, run authorwatch with --backfill-from (YYYY-MM-DD).",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Move checked suggestions onto the people list."""
+    from .authorwatch import accept_suggestions, run_list
+
+    cfg = _cfg(config)
+    accepted = _authorwatch_call(
+        lambda: accept_suggestions(
+            cfg,
+            name,
+            ids=set(suggestion_id),
+            all_pending=all_pending,
+            dismiss_rest=dismiss_rest,
+        )
+    )
+    console.print(f"Accepted {len(accepted)} person(s)")
+    if seed_from:
+        _authorwatch_call(
+            lambda: run_list(
+                cfg,
+                name,
+                console=console,
+                backfill_from=seed_from,
+            )
+        )
+
+@authorwatch_app.command("delete")
+def authorwatch_delete_cmd(
+    name: str = typer.Argument(..., help="List name."),
+    yes: bool = typer.Option(False, "--yes", help="Remove state/authorwatch/<name>/."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Delete a list and its ledger."""
+    from .authorwatch import delete_list
+
+    cfg = _cfg(config)
+    _authorwatch_call(lambda: delete_list(cfg, name, yes=yes))
+    console.print(f"Deleted list {name}")
 
 @authorwatch_app.command("import")
 def authorwatch_import(

@@ -131,9 +131,11 @@ flowchart LR
 | `state/inbox/proposals/` | Gated inbox create/attach proposals (`paperful.inbox.proposal.v1`) |
 | `state/pdf-cache/` | Throwaway copies of manager PDFs, only when `[mirror].pdfs = "none"`. Otherwise an exported PDF goes into its item folder, and `sync` moves older cache files there. `paperful cache clean` removes absorbed or stale leftovers |
 | `state/summaries/<key>.html` | `summarize` output when dest includes disk; the Zotero child note is the other copy |
-| `state/ask-batch/<stamp>/` | `ask --from-file` batch pack (`paperful.ask_batch.v1`, `answers.md`); resume cache under `by-hash/` |
-| `state/rag/questions/<key>.json` | `rag questions` extracted RQs (`paperful.rag.questions.v1`, provenance `rule`\|`llm`) |
-| `state/rq-answered/<stamp>/` | `rag answered` corpus Q&A (`paperful.rq_answered.v1`, `pack.md`) |
+| `state/ask-batch/<stamp>/` | `ask --from-file` / Index batch Ask pack (`paperful.ask_batch.v1`, `answers.md`); resume cache under `by-hash/` |
+| `state/rag/questions/<key>.json` | `rag questions` / Index extract RQs (`paperful.rag.questions.v1`, provenance `rule`\|`llm`) |
+| `state/rq-answered/<stamp>/` | `rag answered` / Index already-answered pack (`paperful.rq_answered.v1`, `pack.md`) |
+| `state/prompts/` | Operator-saved Ask system prompts from the Index form (“Save as…”); listed in the custom-prompt select |
+| `state/gui/uploads/` | Workbench uploads (Discover import, Index prompt/questions files); basename only |
 | `state/reports/<slug>.html` | `synthesize` literature review; sibling `<slug>.json` records source hashes |
 | `state/reports/<slug>-authors.json` | `authors --apply` creator frequency (`paperful.authors_report.v1`); seeds proposed field packs |
 | `state/author-packs/` | Proposed / promoted field author packs (`paperful.author_pack.v1`). From `authors --apply`, snowball preflight, or `twenty lookup --apply` |

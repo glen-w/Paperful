@@ -9,20 +9,27 @@ from typer.testing import CliRunner
 
 from paperful.authorwatch import (
     SOCIAL_EXPORT_HINT,
+    accept_suggestions,
     add_person,
     apply_list,
+    delete_list,
     import_file,
     load_inbox,
     load_people,
     load_seen,
+    load_suggestions,
     load_watch,
     remove_person,
     resolve_people,
     run_list,
     save_list,
     show_list,
+    update_person,
     write_briefing,
 )
+from paperful.authorwatch_social import parse_social_file
+from paperful.authorwatch_suggest import suggest_people
+from tests.conftest import make_item
 from paperful.cli import app
 from paperful.doctor import _authorwatch_check
 from paperful.snowball.candidate import Candidate
@@ -159,7 +166,7 @@ def test_import_csv_json_and_social_without_file(cfg, tmp_path: Path):
         import_file(cfg, "ocean", path=None, source="rg")
         raise AssertionError("expected export recipe")
     except Exception as exc:
-        assert "does not scrape" in str(exc) or SOCIAL_EXPORT_HINT[:20] in str(exc)
+        assert "scrape" in str(exc).lower() or SOCIAL_EXPORT_HINT[:20] in str(exc)
 
 
 def test_poll_run_maps_openalex_budget_to_authorwatch_error(cfg):
@@ -336,7 +343,7 @@ def test_cli_help_and_import_rg_without_file(cfg, tmp_path: Path):
         app, ["authorwatch", "import", "ocean", "--source", "rg", "-c", str(cfg_file)]
     )
     assert res.exit_code == 2
-    assert "does not scrape" in plain_text(res.stdout)
+    assert "does not live-scrape" in plain_text(res.stdout) or "does not scrape" in plain_text(res.stdout)
 
 
 def test_cli_save_and_add(tmp_path: Path):
@@ -454,3 +461,283 @@ def test_openalex_client_author_filters():
     filt = seen[-1][1]["filter"]
     assert "author.id:A123" in filt
     assert "from_created_date:2026-02-03" in filt
+    assert "cited_by_count" in seen[0][1]["select"]
+
+
+def test_load_collection_items_passes_scope_kwargs(cfg, monkeypatch):
+    from paperful import authorwatch_suggest as sug
+    from paperful import cli as cli_mod
+
+    class FakeLoaded:
+        items = [make_item(key="X1")]
+
+    seen: dict = {}
+
+    def fake_load(backend, *, json_out=False, **scope):
+        seen.update(scope)
+        seen["json_out"] = json_out
+        return FakeLoaded()
+
+    monkeypatch.setattr(cli_mod, "_connect", lambda cfg, quiet=False: object())
+    monkeypatch.setattr(cli_mod, "_load_scope", fake_load)
+    items = sug.load_collection_items(cfg, "AO/Coffee")
+    assert len(items) == 1
+    assert seen["collection"] == ["AO/Coffee"]
+    assert seen["library"] is False
+    assert seen["year_from"] is None
+    assert seen["item_type"] == []
+
+
+def test_suggest_corpus_accept_delete(cfg):
+    save_list(cfg, "lab")
+    items = [
+        make_item(
+            key="A1",
+            creator_surnames=["Wonder"],
+            first_author="Alice Wonder",
+        ),
+        make_item(
+            key="A2",
+            creator_surnames=["Wonder"],
+            first_author="Alice Wonder",
+        ),
+        make_item(
+            key="B1",
+            creator_surnames=["Smith"],
+            first_author="Bob Smith",
+        ),
+    ]
+    rows = suggest_people(
+        cfg,
+        "lab",
+        collection="Col",
+        method="corpus",
+        limit=5,
+        items=items,
+    )
+    assert rows
+    assert any("Wonder" in row.display_name for row in rows)
+    accepted = accept_suggestions(cfg, "lab", ids={rows[0].id})
+    assert len(accepted) == 1
+    assert len(load_people(cfg, "lab")) == 1
+    pending = [r for r in load_suggestions(cfg, "lab") if r.status == "pending"]
+    assert pending
+    from paperful.authorwatch import AuthorwatchError
+
+    try:
+        delete_list(cfg, "lab")
+        raise AssertionError("expected confirm")
+    except AuthorwatchError:
+        pass
+    delete_list(cfg, "lab", yes=True)
+    assert not (cfg.state_dir / "authorwatch" / "lab").exists()
+
+
+def test_suggest_most_cited_and_mix(cfg):
+    save_list(cfg, "lab")
+    items = [
+        make_item(key="A1", creator_surnames=["Wonder"], first_author="Alice Wonder"),
+        make_item(key="B1", creator_surnames=["Smith"], first_author="Bob Smith"),
+    ]
+
+    class NameOA(FakeOA):
+        def search_authors(self, name: str, *, limit: int = 8):
+            self.search_calls.append(name)
+            if "Wonder" in name:
+                return [
+                    {
+                        "id": "https://openalex.org/A9",
+                        "display_name": "Alice Wonder",
+                        "orcid": f"https://orcid.org/{ORCID}",
+                        "cited_by_count": 900,
+                        "last_known_institutions": [],
+                        "works_count": 10,
+                    }
+                ]
+            if "Smith" in name:
+                return [
+                    {
+                        "id": "https://openalex.org/A8",
+                        "display_name": "Bob Smith",
+                        "orcid": "https://orcid.org/0000-0001-2345-6789",
+                        "cited_by_count": 10,
+                        "last_known_institutions": [],
+                        "works_count": 2,
+                    }
+                ]
+            return []
+
+    client = NameOA()
+    rows = suggest_people(
+        cfg,
+        "lab",
+        collection="Col",
+        method="most_cited",
+        limit=5,
+        items=items,
+        client=client,
+    )
+    assert rows
+    alice = next(r for r in rows if "Wonder" in r.display_name)
+    assert alice.pollable
+    assert alice.orcid == ORCID
+    assert alice.score >= next(r for r in rows if "Smith" in r.display_name).score
+    mix = suggest_people(
+        cfg,
+        "lab2",
+        collection="Col",
+        method="mix",
+        limit=5,
+        items=items,
+        client=client,
+    )
+    assert mix
+    assert mix[0].method == "mix"
+
+
+def test_suggest_coauthor_from_works(cfg):
+    save_list(cfg, "lab")
+    add_person(cfg, "lab", orcid=ORCID, display_name="Seed Author")
+    work = {
+        "id": "https://openalex.org/W9",
+        "doi": "https://doi.org/10.1000/co",
+        "display_name": "Joint paper",
+        "publication_year": 2024,
+        "type": "article",
+        "cited_by_count": 2,
+        "language": "en",
+        "authorships": [
+            {
+                "author": {
+                    "id": "https://openalex.org/Aseed",
+                    "display_name": "Seed Author",
+                    "orcid": f"https://orcid.org/{ORCID}",
+                }
+            },
+            {
+                "author": {
+                    "id": "https://openalex.org/Aco",
+                    "display_name": "Co Author",
+                    "orcid": "https://orcid.org/0000-0001-2345-6789",
+                }
+            },
+        ],
+        "primary_location": {},
+        "open_access": {"is_oa": True},
+    }
+    client = FakeOA(works=[work])
+    rows = suggest_people(
+        cfg,
+        "lab",
+        collection="Col",
+        method="coauthor",
+        limit=5,
+        items=[],
+        client=client,
+    )
+    assert any(r.openalex == "Aco" or "Co Author" in r.display_name for r in rows)
+
+
+def test_accept_openalex_only_and_dismiss_rest(cfg):
+    from paperful.authorwatch import append_suggestions
+    from paperful.authorwatch_suggest import Suggestion
+
+    save_list(cfg, "lab")
+    append_suggestions(
+        cfg,
+        "lab",
+        [
+            Suggestion(
+                id="sug_oa",
+                display_name="OA Only",
+                openalex="A77",
+                pollable=True,
+            ),
+            Suggestion(
+                id="sug_skip",
+                display_name="Skip Me",
+                orcid=ORCID,
+                pollable=True,
+            ),
+        ],
+    )
+    accepted = accept_suggestions(
+        cfg, "lab", ids={"sug_oa"}, dismiss_rest=True
+    )
+    assert len(accepted) == 1
+    assert accepted[0].openalex == "A77"
+    assert accepted[0].is_ok()
+    statuses = {r.id: r.status for r in load_suggestions(cfg, "lab")}
+    assert statuses["sug_oa"] == "accepted"
+    assert statuses["sug_skip"] == "dismissed"
+
+
+def test_cli_accept_seed_from(cfg, monkeypatch):
+    from paperful.authorwatch import append_suggestions
+    from paperful.authorwatch_suggest import Suggestion
+
+    save_list(cfg, "lab")
+    append_suggestions(
+        cfg,
+        "lab",
+        [
+            Suggestion(
+                id="sug_seed",
+                display_name="Josiah Carberry",
+                orcid=ORCID,
+                pollable=True,
+            )
+        ],
+    )
+    called: list[str] = []
+
+    def fake_run(cfg, name, *, console, backfill_from=None, **kwargs):
+        called.append(backfill_from or "")
+        class R:
+            proposed = 0
+        return R()
+
+    monkeypatch.setattr("paperful.authorwatch.run_list", fake_run)
+    monkeypatch.setattr("paperful.cli._cfg", lambda _p=None: cfg)
+    result = runner.invoke(
+        app,
+        [
+            "authorwatch",
+            "accept",
+            "lab",
+            "--id",
+            "sug_seed",
+            "--seed-from",
+            "2025-01-01",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert called == ["2025-01-01"]
+    assert load_people(cfg, "lab")
+
+
+def test_social_html_import(cfg, tmp_path):
+    html = (
+        Path(__file__).resolve().parent / "fixtures" / "authorwatch" / "rg-follows.html"
+    )
+    save_list(cfg, "social")
+    added = import_file(cfg, "social", path=html, source="rg", resolve=False)
+    assert len(added) == 2
+    names = {row.display_name for row in added}
+    assert "Josiah Carberry" in names
+
+
+def test_parse_social_csv_orcid(tmp_path):
+    path = tmp_path / "follows.csv"
+    path.write_text("name,orcid\nJosiah Carberry,0000-0002-1825-0097\n", encoding="utf-8")
+    rows = parse_social_file(path, source="rg")
+    assert rows[0].orcid == "0000-0002-1825-0097"
+
+
+def test_update_person(cfg):
+    save_list(cfg, "lab")
+    person = add_person(cfg, "lab", display_name="Jane")
+    update_person(cfg, "lab", person.id, display_name="Jane Q", affiliation_host="mit.edu")
+    refreshed = load_people(cfg, "lab")[0]
+    assert refreshed.display_name == "Jane Q"
+    assert refreshed.affiliation_host == "mit.edu"

@@ -232,6 +232,23 @@ uv run paperful rag answered --from-file qs.txt --after-item AAAA1111
 `state/rq-answered/<stamp>/` (`paperful.rq_answered.v1`). `--after-item`
 keeps only newer years and drops the asking paper from retrieval.
 
+### Workbench (Advanced Index)
+
+With `[rag]` and `[llm]` on, Advanced **Index** runs the same verbs as the CLI:
+ingest, search, threaded Ask, batch Ask, extract questions, already-answered
+checks, and synthesize. Scope follows the collection chip (plus optional item
+keys, years, types, top-k). Custom system prompts on Ask/batch, in order:
+
+1. Inline textarea
+2. Uploaded `.md`/`.txt` (stored under `state/gui/uploads/`)
+3. Path field (resolved like `[rag].prompt`, relative to the config file)
+4. Saved file from `state/prompts/` (optional “Save as…” on the form)
+5. Else `[rag].prompt` / focus preset
+
+Batch packs list under `state/ask-batch/`; answered packs under
+`state/rq-answered/` (`pack.md`). Routes: [gui.md](gui.md). CLI still owns TTY
+multi-turn, `--show-context`, named run profiles, and `paperful all`.
+
 Answers are only as good as the passages found. The model is told to answer
 from the excerpts alone and to say when they do not contain the answer, but a
 local 7B model can still misread or over-claim; check the cited pages.
@@ -262,5 +279,6 @@ ingest would touch, how many scans wait for OCR, and how many PDFs failed.
 ## Related docs
 
 - [llm.md](llm.md): chat model setup for `ask`.
+- [gui.md](gui.md): Advanced Index forms and HTTP routes.
 - [quiet-mirror.md](quiet-mirror.md): the folder tree the index is built from.
 - [commands.md](commands.md): all verbs.

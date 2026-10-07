@@ -93,7 +93,8 @@ that chain; run it before `gaps` / `run` when the collection is messy.
 
 To follow **people** (not a keyword crawl), `paperful authorwatch` records a
 local list and polls OpenAlex for their papers. First `run` is a cursor only.
-That is not `snowball watch` and not the PDF `inbox watch`.
+`suggest -C` can propose people from a collection before you accept them onto
+the list. That is not `snowball watch` and not the PDF `inbox watch`.
 [Author watch](authorwatch.md).
 
 To follow a saved keyword or seed profile, `snowball watch` proposes works

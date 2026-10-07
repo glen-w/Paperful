@@ -1108,6 +1108,7 @@ def test_doctor_scholar_session_amber_without_vault(cfg_file, stub_zotero):
     assert "Scholar session" in res.stdout
     assert "paperful session login scholar" in res.stdout
     assert "\nGuide" not in res.stdout
+    assert "Fixes" in res.stdout
     assert "paperful doctor --guide" in res.stdout
 
 
@@ -1157,18 +1158,24 @@ def test_doctor_guide_docker_hints_host_login(cfg_file, stub_zotero, monkeypatch
     assert "PAPERFUL_DATA" in res.stdout
 
 
-def test_doctor_auto_guides_in_docker(cfg_file, stub_zotero, monkeypatch):
+def test_doctor_docker_prints_fixes_without_enter_wait(
+    cfg_file, stub_zotero, monkeypatch
+):
+    """Compose up/run without --guide must not block on Press Enter."""
     text = cfg_file.read_text()
     cfg_file.write_text(
         text + 'sources = ["unpaywall", "scholar", "direct", "ezproxy", "htmlpdf"]\n'
     )
     monkeypatch.setattr("paperful.doctor.shutil.which", lambda name: "/bin/pdftotext")
     monkeypatch.setattr("paperful.cli.in_docker", lambda: True)
-    monkeypatch.setattr("builtins.input", lambda _p="": "")
+    monkeypatch.setattr("paperful.cli._stdin_is_tty", lambda: True)
     res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file)])
     assert res.exit_code == 0
-    assert "Guide" in res.stdout
+    assert "Press Enter when done" not in res.stdout
+    assert "\nGuide" not in res.stdout
+    assert "Fixes" in res.stdout
     assert "session login scholar" in res.stdout
+    assert "docker compose run --rm paperful doctor --guide" in res.stdout
 
 
 def test_doctor_scholar_session_green_with_cookies(cfg_file, tmp_path, stub_zotero):

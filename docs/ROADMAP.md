@@ -57,7 +57,7 @@ Sci-Hub, no “AI fetch everything”).
 | Strip legacy flat-PDF migrate + mixed-layout doctor amber | Day-0 mirror never steers people into a whole-library layout cleanup | **Shipped (0.1 → 1.0)** |
 | **Mendeley and EndNote adapters** (not a 1.0 blocker) | The ledger survives a manager change | In the tree. **Seeking testers.** Zotero stays the well-tested path. See below |
 | **Workbench GUI** | Discover, Wanted, Preview/Grab; Advanced Repair / Mirror / Discover grow / Wanted recover | Landed — [GUI](#gui); `paperful serve` + `paperful/ui/`; Compose `gui` profile. TTY and Sci-Hub stay CLI. Not tagged 1.0 |
-| **Interactive Ask (GUI)** | Index page when `[rag]` + `[llm]` enabled | **Shipped** — Index form, CLI threads, citations; ingest/search/batch on Index; Briefs for summarize/synthesize |
+| **Interactive Ask (GUI)** | Index page when `[rag]` + `[llm]` enabled | **Shipped** — Index Ask + batch (scope, custom prompts, force); `rag questions` / `rag answered`; ingest/search; Briefs for summarize/synthesize |
 
 Nice-to-have (not 1.0 blockers): colour glossary next to `doctor` (documented);
 collection picker hint on fuzzy `--collection` miss.
@@ -360,7 +360,7 @@ for the end-to-end operator story.
 | 18 | Twenty CRM — lookup cache plus `twenty sync` (create/enrich, Paperful note, late `author_site` before Scholar, opt-in listing write-back) | Shipped (`paperful twenty lookup` / `twenty sync`; `[twenty].enabled`; `--twenty-writeback`) |
 | 19 | Typed note provenance (`paperful.note.v1`) + scannable **first-line** prefixes on all Paperful note writers | Shipped (summarize / synthesize / remarks / snowball / briefing) |
 | 20 | `paperful notes delete` (or equivalent) — scoped filters: type, model, `--except-model`, tags; dry-run / `--apply` | Shipped (`--type`, `--model` / `--except-model`, `--all` + confirm / `--yes`) |
-| 21 | [Author watch lists](#author-watch-lists-later-people-you-follow--their-papers) — ORCID / OpenAlex resolve + `run` / `apply`; file import of follows | **In tree** (`paperful authorwatch`; social HTML scrape later) |
+| 21 | [Author watch lists](#author-watch-lists-later-people-you-follow--their-papers) — ORCID / OpenAlex resolve + `run` / `apply`; file import of follows; corpus suggestions | **Shipped** — `paperful authorwatch` (+ suggest/accept/delete); saved social HTML/CSV import; Discover list management |
 
 **Spike acceptance (one week, eng):** `refs gap` dry-run pack with zero manager
 writes; `ingest-dois` idempotent apply + `held` on ambiguous resolve; `collections
@@ -606,7 +606,9 @@ answered` and `paperful ask` (one cited answer, TTY/`--thread` follow-ups, or
 split](#product-split-10-vs-post-10). Terminal multi-turn and the Index page
 share `ask --thread`: follow-ups are rewritten for retrieval and stored under
 `state/rag/threads/` with visible scope (collection chip, optional years) and
-citations. Batch `--item` and custom `--prompt` stay CLI-only.
+citations. Index exposes batch scope (`--item`, years, types), custom prompts
+(inline, upload, path, saved under `state/prompts/`), and `rag questions` /
+`rag answered` when Advanced is on.
 
 Reuse the house LLM pattern: global `[llm]` + per-verb overrides (same spirit
 as `[summarize].model`, `[browser_agent].model`, `[rag].model`).
@@ -721,28 +723,29 @@ shared message shapes before hard-wiring repos.
 (author-watch-lists-later-people-you-follow--their-papers)=
 ### Author watch lists (in tree; people you follow → their papers)
 
-**Status:** in tree — `paperful authorwatch`. Distinct from collection-scoped [`snowball watch`](snowball.md#watch)
+**Status:** shipped — `paperful authorwatch`. Distinct from collection-scoped [`snowball watch`](snowball.md#watch)
 (keyword / DOI / ORCID **seed** profiles and hop expansion). Here the seed is a
 **named author list** the operator curates: people they already care about,
 turned into a **local** watch for **new research outputs**, not career posts.
-Social HTML scrape stays later; v1 is `--orcid` plus CSV/JSON/ORCID file import.
+Live social scraping is out of scope; saved HTML/CSV exports import with `--file`.
 
 **Direction:**
 
-- **Lists on disk** — `paperful authorwatch save|add|remove|show` maintains people under `state/authorwatch/<name>/` (display name, ORCID
+- **Lists on disk** — `paperful authorwatch save|add|remove|show|delete` maintains people under `state/authorwatch/<name>/` (display name, ORCID
   when known, optional affiliation host). `resolve` fills missing ORCID / OpenAlex ids; **held** on ambiguity.
+- **Suggestions** — `paperful authorwatch suggest -C … --method corpus|most_cited|coauthor|mix` ranks people from the collection (and OpenAlex where needed). `authorwatch accept --id …` (optional `--seed-from`) moves checked rows onto the list; ledger `suggestions.jsonl`.
 - **Watch run** — `paperful authorwatch run` sets a cursor baseline (no full-oeuvre fetch) then polls OpenAlex for works indexed after that cursor. `--backfill-from` proposes by **publication** date. `exists` stays out of the inbox. `authorwatch apply -C` creates parents (independent of `[snowball] enabled`). PDFs via `paperful run`. Paperful does not schedule.
-- **Import** — CSV/JSON/ORCID files. `import --source rg|linkedin|academia` without `--file` prints an export recipe. HTML scrape stays later.
+- **Import** — CSV/JSON/ORCID files; `import --source rg|linkedin|academia --file saved.html` parses operator-saved exports. Without `--file`, prints the export recipe.
 
 **Pitch:** Get what really matters from the people you already follow —
 **their research**. Social follow graphs surface jobs, posts, and noise;
 authorwatch turns that graph into a frontier of **new papers** from those
 names, in one place — **your machine** (`state/`, optional `-C`, same
-mirror and honesty contract as snowball). HTML follow import stays later.
+mirror and honesty contract as snowball).
 
 **Non-goals:** replacing RSS or social timelines; auto-friending or messaging on
-RG; cloud “who to follow” recommendations; treating LinkedIn/Academia HTML scrape
-as a core `run` source without opt-in.
+RG; cloud “who to follow” recommendations; live authenticated scraping of social
+follow pages; treating social HTML as a `run` PDF source.
 
 ### Structured section extract (MVP; later)
 
@@ -1187,8 +1190,8 @@ Larger product bets. Park until the ledger and core loop justify them.
    mirror](#annotation-mirror-later); [frontier
    digest](#frontier-digest-later-watch--external-ingest) (watch rollup shipped;
    optional rollup newsletter bridge, Scholar alerts first, still later); [author watch
-   lists](#author-watch-lists-later-people-you-follow--their-papers) (ORCID-backed
-   people lists **in tree**; optional HTML import from RG / LinkedIn / Academia follows later). **[Run
+   lists](#author-watch-lists-later-people-you-follow--their-papers) (shipped;
+   saved social HTML/CSV import; live scrape still out). **[Run
    witness](#run-witness-later-trust-thicken)** ties batches to config/model/index
    for reproducibility.
 6. **Writing & export** — CSL / BibLaTeX / Quarto sync; living review / gap lists;
@@ -1381,6 +1384,7 @@ default and explicit Apply. Not a second fetch stack or Zotero’s reader.
 **Ask (Index, opt-in):** **Shipped** — scoped chat with citations when `[llm]` and
 `[rag]` are on and the index has rows. Collection chip is the scope; threads live
 under `state/rag/threads/` (same as `ask --thread`). Index also runs `rag ingest`,
-`rag search`, and batch Ask. **Briefs** (Advanced) runs `summarize` and
-`synthesize`. CLI `ask` remains for scripts, `--item` filters, and custom prompts.
+`rag search`, batch Ask (item/year/type/top-k/force, custom prompts),
+`rag questions`, and `rag answered`. **Briefs** (Advanced) runs `summarize` and
+`synthesize`. CLI `ask` remains for scripts, TTY multi-turn, and run profiles.
 See [Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer).

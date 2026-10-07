@@ -246,7 +246,30 @@ def authorwatch_people_rows(cfg: Config, name: str) -> list[dict[str, Any]]:
                 "display_name": person.display_name or person.id,
                 "orcid": person.orcid,
                 "status": person.status,
+                "affiliation": person.affiliation_host,
                 "identity": person.identity(),
+            }
+        )
+    return rows
+
+
+def authorwatch_suggestion_rows(cfg: Config, name: str) -> list[dict[str, Any]]:
+    from ..authorwatch import load_suggestions
+
+    rows: list[dict[str, Any]] = []
+    for row in load_suggestions(cfg, name):
+        if row.status != "pending":
+            continue
+        rows.append(
+            {
+                "id": row.id,
+                "display_name": row.display_name,
+                "orcid": row.orcid,
+                "openalex": row.openalex,
+                "method": row.method,
+                "score": row.score,
+                "why": row.why,
+                "pollable": row.pollable,
             }
         )
     return rows
@@ -307,6 +330,10 @@ ASK_ERROR_MESSAGES = {
     "questions": "Enter at least one question (one per line).",
     "apply": "A Zotero collection note needs dest zotero or both, and a collection.",
     "search": "Search failed. Check that the index exists and the embedder is up.",
+    "prompt": "Custom prompt is invalid, empty, or missing.",
+    "scope": "Pick a collection, item keys, or whole library.",
+    "upload": "Upload is empty or too large.",
+    "type": "Item type filter is invalid.",
 }
 
 DEST_OPTIONS = ("disk", "zotero", "both")
@@ -442,6 +469,47 @@ def list_ask_packs(cfg: Config, limit: int = 12) -> list[dict[str, Any]]:
                 "stamp": path.name,
                 "questions": questions,
                 "answered": answered,
+                "failed": failed,
+                "mtime": path.stat().st_mtime,
+            }
+        )
+    return out
+
+
+def list_answered_packs(cfg: Config, limit: int = 12) -> list[dict[str, Any]]:
+    from ..rag.answered import answered_dir
+
+    root = answered_dir(cfg)
+    if not root.is_dir():
+        return []
+    dirs = [
+        p
+        for p in root.iterdir()
+        if p.is_dir() and (p / "pack.md").is_file()
+    ]
+    dirs.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    out: list[dict[str, Any]] = []
+    for path in dirs[:limit]:
+        questions = answered = partial = not_found = failed = 0
+        pack = path / "pack.json"
+        if pack.is_file():
+            try:
+                body = json.loads(pack.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError, ValueError):
+                body = {}
+            if isinstance(body, dict):
+                questions = int(body.get("questions") or 0)
+                answered = int(body.get("answered") or 0)
+                partial = int(body.get("partial") or 0)
+                not_found = int(body.get("not_found") or 0)
+                failed = int(body.get("failed") or 0)
+        out.append(
+            {
+                "stamp": path.name,
+                "questions": questions,
+                "answered": answered,
+                "partial": partial,
+                "not_found": not_found,
                 "failed": failed,
                 "mtime": path.stat().st_mtime,
             }

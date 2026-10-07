@@ -61,9 +61,11 @@ Bind `127.0.0.1`. Compose `gui` profile publishes `127.0.0.1:8765:8765` only.
    **File collection note** (`--apply` + collection chip) to file a Zotero
    collection note tagged `paperful:frontier-briefing`. **Keep an eye on this**
    saves a topic watch only when a snowball **profile** is chosen. **People:**
-   create a list, Follow (ORCID + optional backfill), add/remove, resolve, run,
-   import CSV/JSON/ORCID, people briefing; inbox uses the same Preview → apply
-   pattern (`authorwatch apply`). **Check again** re-runs a saved topic watch or
+   create/delete a list, Follow (ORCID + optional backfill), add/edit/remove,
+   resolve, run, **Get suggestions** (method + limit + collection) → checkbox
+   **Accept** (+ optional seed date), import CSV/JSON/ORCID or saved social
+   HTML, people briefing; inbox uses the same Preview → apply pattern
+   (`authorwatch apply`). **Check again** re-runs a saved topic watch or
    person list. Advanced topic watches also offer **Watch briefing** /
    **Watch digest** (same optional collection note).
 2. **Wanted** — Miss rows use `MISS_SURFACE_PLAIN` only. **Held** tab: on-disk
@@ -91,6 +93,10 @@ plus Grab filters (`year` / type / retry / try-all / browser-agent / upgrade).
 **Mirror** Preview/Apply: `sync`, `snapshot`, `restore`, `cache clean`.
 **Index**: `rag ingest` / `search` when `[rag]` is on; cited Ask and batch Ask
 (`state/ask-batch/`) when `[rag]` and `[llm]` are on and the index has rows.
+Ask and batch support focus presets, custom prompts (inline, upload, path, or
+saved under `state/prompts/`), item keys, types, years, and top-k; batch adds
+`--force` and questions file upload. **Extract questions** (`rag questions`) and
+**Already answered?** (`rag answered`, `state/rq-answered/`) use the same scope.
 Collection chip is the scope. **Synthesize** on Index when `[llm]` is on.
 **Briefs**: collection **summarize** / **synthesize** when `[llm]` is on.
 Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
@@ -98,7 +104,8 @@ Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
 
 **Stays CLI** (no GUI control): `session login`, `doctor --guide`, mid-run
 EZProxy re-login, snowball `approve-each`, `collections add`, Sci-Hub source
-toggles. `paperful all` / named run configs stay [workflows](workflows.md).
+toggles; Ask TTY multi-turn, `--show-context`, and named run profiles.
+`paperful all` / named run configs stay [workflows](workflows.md).
 
 ---
 
@@ -152,7 +159,11 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/discover/aw/remove` | Remove person from list |
 | POST | `/discover/aw/resolve` | Enqueue `authorwatch resolve` |
 | POST | `/discover/aw/run` | Enqueue `authorwatch run` (optional backfill / caps) |
-| POST | `/discover/aw/import` | CSV/JSON/ORCID upload → list (`resolve` off); files under `state/gui/uploads/` |
+| POST | `/discover/aw/suggest` | Enqueue `authorwatch suggest` (method, limit, collection) |
+| POST | `/discover/aw/accept` | Enqueue accept checked suggestions (+ optional seed date) |
+| POST | `/discover/aw/edit` | Update member display name / affiliation |
+| POST | `/discover/aw/delete` | Delete list ledger (`--yes` on CLI) |
+| POST | `/discover/aw/import` | CSV/JSON/ORCID/saved social HTML upload → list (`resolve` off); files under `state/gui/uploads/` |
 | POST | `/discover/aw/briefing` | Write list `briefing.md` |
 | POST | `/prefs/advanced` | Toggle Advanced cookie |
 | POST | `/prefs/collection` | Remember collection chip cookie |
@@ -164,8 +175,11 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/index/ask` | Enqueue cited Ask turn; redirect to `/index?thread=&run=` |
 | POST | `/index/ingest` | Enqueue `rag ingest` (Preview dry-run or Build); redirect `?run=` |
 | POST | `/index/search` | Redirect to `/index?q=` (sync search on GET) |
-| POST | `/index/ask-batch` | Enqueue `ask --from-file` batch; redirect `?run=` |
+| POST | `/index/ask-batch` | Enqueue batch Ask; redirect `?run=` |
 | GET | `/index/batch/{stamp}` | `answers.md` under `state/ask-batch/<stamp>/` |
+| POST | `/index/rag-questions` | Enqueue `rag questions` (dry-run or write); redirect `?run=` |
+| POST | `/index/rag-answered` | Enqueue `rag answered`; redirect `?run=` |
+| GET | `/index/answered/{stamp}` | `pack.md` under `state/rq-answered/<stamp>/` |
 | POST | `/index/synthesize` | Enqueue `synthesize` (dry-run or write); redirect `?run=` |
 | GET | `/index/report/{slug}` | HTML under `state/reports/` |
 | POST | `/briefs/summarize` | Enqueue `summarize`; redirect `/briefs?run=` |
@@ -203,6 +217,7 @@ Activity polls `GET /v1/runs/{id}`.
 ## Related docs
 
 - [ROADMAP — GUI](ROADMAP.md#gui)
+- [rag.md](rag.md) — Index Ask / batch / questions / answered (CLI + workbench)
 - [architecture.md](architecture.md)
 - [why.md](why.md)
 - [commands.md](commands.md)

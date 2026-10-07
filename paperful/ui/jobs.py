@@ -26,6 +26,8 @@ authorwatch_import_fn: Callable[..., Any] | None = None
 ask_turn_fn: Callable[..., dict[str, Any]] | None = None
 rag_ingest_fn: Callable[..., dict[str, Any]] | None = None
 ask_batch_fn: Callable[..., dict[str, Any]] | None = None
+rag_questions_fn: Callable[..., dict[str, Any]] | None = None
+rag_answered_fn: Callable[..., dict[str, Any]] | None = None
 summarize_fn: Callable[..., dict[str, Any]] | None = None
 synthesize_fn: Callable[..., dict[str, Any]] | None = None
 noop_sleep: float = 0.05
@@ -530,7 +532,45 @@ def discover_apply_authorwatch(cfg: Config, list_name: str, collection: str) -> 
         return
     from ..authorwatch import apply_list
 
-    apply_list(_quiet_console(), cfg, list_name, collection, apply=True)
+    apply_list(cfg, list_name, collection, console=_quiet_console(), apply=True)
+
+
+def authorwatch_suggest(
+    cfg: Config,
+    *,
+    list_name: str,
+    collection: str,
+    method: str,
+    limit: int,
+) -> None:
+    from ..authorwatch_suggest import suggest_people
+
+    suggest_people(
+        cfg,
+        list_name,
+        collection=collection,
+        method=method,
+        limit=limit,
+    )
+
+
+def authorwatch_accept(
+    cfg: Config,
+    *,
+    list_name: str,
+    suggestion_ids: list[str],
+    seed_from: str | None,
+) -> None:
+    from ..authorwatch import accept_suggestions, run_list
+
+    accept_suggestions(cfg, list_name, ids=set(suggestion_ids))
+    if seed_from:
+        run_list(
+            cfg,
+            list_name,
+            console=_quiet_console(),
+            backfill_from=seed_from,
+        )
 
 
 def authorwatch_import(
@@ -558,6 +598,11 @@ def ask_turn(
     year_from: int | None,
     year_to: int | None,
     focus: str | None,
+    top_k: int | None = None,
+    item_keys: list[str] | None = None,
+    item_types: frozenset[str] | None = None,
+    prompt_path: str | None = None,
+    prompt_text: str | None = None,
 ) -> None:
     if ask_turn_fn is not None:
         result = ask_turn_fn(
@@ -569,6 +614,11 @@ def ask_turn(
             year_from=year_from,
             year_to=year_to,
             focus=focus,
+            top_k=top_k,
+            item_keys=item_keys,
+            item_types=item_types,
+            prompt_path=prompt_path,
+            prompt_text=prompt_text,
         )
     else:
         from ..rag.ask_turn import run_ask_turn
@@ -581,6 +631,11 @@ def ask_turn(
             year_from=year_from,
             year_to=year_to,
             focus=focus,
+            top_k=top_k,
+            item_keys=item_keys,
+            item_types=item_types,
+            prompt_path=prompt_path,
+            prompt_text=prompt_text,
         )
     rec = commands.read_command(cfg, cmd_id) or {}
     rec["result"] = result
@@ -662,6 +717,12 @@ def ask_batch(
     focus: str | None,
     dest: str,
     apply: bool,
+    top_k: int | None = None,
+    item_keys: list[str] | None = None,
+    item_types: frozenset[str] | None = None,
+    prompt_path: str | None = None,
+    prompt_text: str | None = None,
+    force: bool = False,
 ) -> None:
     if ask_batch_fn is not None:
         result = ask_batch_fn(
@@ -674,6 +735,12 @@ def ask_batch(
             focus=focus,
             dest=dest,
             apply=apply,
+            top_k=top_k,
+            item_keys=item_keys,
+            item_types=item_types,
+            prompt_path=prompt_path,
+            prompt_text=prompt_text,
+            force=force,
         )
         _attach_result(cfg, cmd_id, result)
         return
@@ -690,19 +757,27 @@ def ask_batch(
     focus_name = parse_focus(focus if focus is not None else cfg.rag_focus)
     index = Index.open(cfg)
     ledger = Ledger(ledger_path(cfg))
+    coll = (collection or "").strip()
     keys = scope_keys(
         ledger,
-        collections=[collection] if collection.strip() else None,
+        collections=[coll] if coll else None,
+        item_keys=item_keys or (),
         year_from=year_from,
         year_to=year_to,
+        item_types=item_types,
     )
     pack = run_batch(
         cfg,
         questions,
         keys=keys,
         focus=focus_name,
+        prompt_path=prompt_path,
+        prompt_text=prompt_text,
+        k=top_k,
+        force=force,
         scope={
-            "collections": [collection] if collection.strip() else [],
+            "collections": [coll] if coll else [],
+            "item": list(item_keys or []),
             "year_from": year_from,
             "year_to": year_to,
         },
@@ -741,6 +816,171 @@ def ask_batch(
             "failed": pack.failed,
             "focus": pack.focus,
             "note": note,
+        },
+    )
+
+
+def rag_questions(
+    cfg: Config,
+    cmd_id: str,
+    *,
+    collection: str,
+    whole_library: bool,
+    year_from: int | None,
+    year_to: int | None,
+    item_keys: list[str] | None,
+    item_types: frozenset[str] | None,
+    use_llm: bool,
+    limit: int | None,
+    dry_run: bool,
+) -> None:
+    if rag_questions_fn is not None:
+        result = rag_questions_fn(
+            cfg,
+            cmd_id,
+            collection=collection,
+            whole_library=whole_library,
+            year_from=year_from,
+            year_to=year_to,
+            item_keys=item_keys,
+            item_types=item_types,
+            use_llm=use_llm,
+            limit=limit,
+            dry_run=dry_run,
+        )
+        _attach_result(cfg, cmd_id, result)
+        return
+    if not cfg.rag_enabled:
+        raise ValueError("rag.enabled is false")
+    from ..llm import get_client
+    from ..llm.preflight import validate_llm_for_ask
+    from ..rag.index import ledger_path
+    from ..rag.ledger import Ledger
+    from ..rag.questions import extract_scope, write_item
+
+    coll = (collection or "").strip()
+    keys = item_keys or []
+    if not coll and not keys and not whole_library:
+        raise ValueError("scope required")
+    if whole_library and not coll:
+        collections: list[str] | None = None
+    elif coll:
+        collections = [coll]
+    else:
+        collections = []
+    client = None
+    if use_llm:
+        validate_llm_for_ask(cfg)
+        client = get_client(cfg)
+    ledger = Ledger(ledger_path(cfg))
+    items = extract_scope(
+        cfg,
+        ledger=ledger,
+        collections=collections,
+        item_keys=keys,
+        year_from=year_from,
+        year_to=year_to,
+        item_types=item_types,
+        use_llm=use_llm,
+        client=client,
+        limit=limit,
+    )
+    total_q = sum(len(it.questions) for it in items)
+    if not dry_run:
+        for it in items:
+            write_item(cfg, it)
+    _attach_result(
+        cfg,
+        cmd_id,
+        {
+            "dry_run": dry_run,
+            "items": len(items),
+            "questions": total_q,
+            "llm": use_llm,
+        },
+    )
+
+
+def rag_answered(
+    cfg: Config,
+    cmd_id: str,
+    *,
+    collection: str,
+    year_from: int | None,
+    year_to: int | None,
+    item_keys: list[str] | None,
+    item_types: frozenset[str] | None,
+    questions: list[tuple[str, str, int | None]],
+    after_item: str | None,
+    top_k: int | None,
+    force: bool,
+) -> None:
+    if rag_answered_fn is not None:
+        result = rag_answered_fn(
+            cfg,
+            cmd_id,
+            collection=collection,
+            year_from=year_from,
+            year_to=year_to,
+            item_keys=item_keys,
+            item_types=item_types,
+            questions=questions,
+            after_item=after_item,
+            top_k=top_k,
+            force=force,
+        )
+        _attach_result(cfg, cmd_id, result)
+        return
+    from ..llm import get_client
+    from ..llm.preflight import validate_embedder, validate_llm_for_ask
+    from ..rag.answered import run_answered, write_pack
+    from ..rag.index import Index, ledger_path
+    from ..rag.ledger import Ledger
+    from ..rag.retrieve import scope_keys
+
+    validate_llm_for_ask(cfg)
+    coll = (collection or "").strip()
+    index = Index.open(cfg)
+    ledger = Ledger(ledger_path(cfg))
+    keys = scope_keys(
+        ledger,
+        collections=[coll] if coll else None,
+        item_keys=item_keys or (),
+        year_from=year_from,
+        year_to=year_to,
+        item_types=item_types,
+    )
+    pack = run_answered(
+        cfg,
+        questions,
+        keys=keys,
+        after_item=(after_item or "").strip() or None,
+        k=top_k,
+        force=force,
+        scope={
+            "collections": [coll] if coll else [],
+            "item": list(item_keys or []),
+            "year_from": year_from,
+            "year_to": year_to,
+            "after_item": after_item,
+        },
+        client=get_client(cfg),
+        embedder=validate_embedder(cfg),
+        index=index,
+        ledger=ledger,
+    )
+    folder = write_pack(cfg, pack)
+    _attach_result(
+        cfg,
+        cmd_id,
+        {
+            "stamp": pack.stamp,
+            "pack": str(folder),
+            "questions": pack.questions,
+            "answered": pack.answered,
+            "partial": pack.partial,
+            "not_found": pack.not_found,
+            "failed": pack.failed,
         },
     )
 

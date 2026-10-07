@@ -117,7 +117,9 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `mcp_server.py` | Optional stdio MCP: dry-run `refs_gap`, read-only `ask` (same envelopes as CLI) | `agent_ops` |
 | `serve.py` | Localhost FastAPI: JSON capability API + mounts `ui` when the `serve` extra is installed | `agent_ops`, `ui` |
 | `ui/` | Server-rendered workbench (Jinja). `app.py` mounts HTML + form POSTs; `jobs.py`, `wanted_jobs.py`, `repair_jobs.py`, `discover_jobs.py` call the same domain entrypoints as the CLI; review tokens under `state/gui/reviews/`; command ids under `state/gui/commands/` | CLI / MCP builders |
-| `authorwatch.py` | People lists → OpenAlex new works; `apply` creates parents | OpenAlex client, `identity`, `snowball.ingest` |
+| `authorwatch.py` | People lists → OpenAlex new works; `apply` creates parents; `accept` / `delete` | OpenAlex client, `identity`, `snowball.ingest` |
+| `authorwatch_suggest.py` | Corpus / cited / coauthor / mix suggestions → `suggestions.jsonl` | `authors_report`, OpenAlex, promoted packs |
+| `authorwatch_social.py` | Parse operator-saved RG / LinkedIn / Academia HTML or CSV (no network) | stdlib HTML/CSV |
 | `snowball/` | Crawl, hops, watch, thin briefing, frontier digest. Watch and digest do not create library items | OpenAlex; library protocol only on apply |
 
 ## The refresh
@@ -178,6 +180,7 @@ Tier policy (1.0-ready contract; package tag may still wait on workbench polish)
 | `paperful.author_request.v1` | reachout / request ledger | `author_request` | T2 | — |
 | `paperful.authorwatch.v1` | `state/authorwatch/<name>/watch.json` | `authorwatch` | T2 | — |
 | `paperful.authorwatch.person.v1` | `state/authorwatch/<name>/people.jsonl` | `authorwatch` | T2 | — |
+| `paperful.authorwatch.suggestion.v1` | `state/authorwatch/<name>/suggestions.jsonl` | `authorwatch_suggest` | T2 | — |
 | `paperful.snowball.candidate.v1` | `state/snowball/<run-id>/` | `snowball.candidate` | T2 | Additive through 1.x |
 | `paperful.snowball.watch.v1` | snowball watch cursor | `snowball.watch` | T2 | — |
 | `paperful.snowball.coauthors.v1` | co-author graph | `snowball.authors` | T2 | — |

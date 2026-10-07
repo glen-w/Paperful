@@ -92,5 +92,5 @@ before 1.0. See [LLM](llm.md).
 | Locked item record + snapshot/restore | Required `paperful.item.v1` keys frozen; restore is create-missing (not identity round-trip) |
 | Mendeley and EndNote adapters | Not a 1.0 blocker. In the tree; seeking testers; Zotero is the well-tested path |
 | Workbench GUI (Discover, Wanted, Preview/Grab) | Landed on `paperful serve` (Jinja workbench; Advanced Repair / Mirror / Discover grow / Wanted recover; review tokens; Compose `gui` profile) — [gui.md](gui.md). Not tagged 1.0 |
-| Interactive Ask in GUI (cited chat-over-collection) | **Shipped** on Index (opt-in `[rag]` + `[llm]`; CLI threads); Briefs for summarize/synthesize |
+| Interactive Ask in GUI (cited chat-over-collection) | **Shipped** on Index (opt-in `[rag]` + `[llm]`; threads, batch, custom prompts, `rag questions` / `rag answered`); Briefs for summarize/synthesize |
 | Fresh-clone doctor stays quiet without Scholar | Shipped (0.9): `scholar` opt-in like `scihub` |

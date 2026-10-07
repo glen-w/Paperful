@@ -9,6 +9,12 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ### Added
 
+- **`paperful authorwatch suggest` / `accept` / `delete`:** corpus-grounded people
+  suggestions (`--method corpus|most_cited|coauthor|mix`, `-C`, `--limit`);
+  `accept --id` (+ optional `--seed-from` backfill run). Social
+  `import --source rg|linkedin|academia --file` parses saved HTML/CSV (no live
+  scrape). Discover: suggestion checkboxes, member edit, delete list. Ledger:
+  `suggestions.jsonl`. Roadmap row 21 shipped. See [authorwatch.md](docs/authorwatch.md).
 - **Docker light/heavy packs:** `PAPERFUL_IMAGE_MODE=light` (default; `[serve]`
   only, CI) or `heavy` (`[serve]` `[llm]` `[rag]` `[browser-agent]`). Set in
   `.env` for a full local image; `make docker-build-heavy`. See [docker](docs/docker.md).
@@ -26,15 +32,24 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
   Per-item summarize in Wanted/Library drawers (`/item/{key}/summary`, `/wanted/summarize`).
   Discover: snowball kinds (search/hybrid/doi/orcid/collection), keep/skip, profile run,
   resume, queue briefing/digest, watch via `save_watch` (profile required);
-  authorwatch list create/add/remove/resolve/run/import + people briefing; Preview apply
-  before snowball/inbox apply. Route table: [gui.md](docs/gui.md).
+  authorwatch list create/add/remove/resolve/run/import/suggest/accept/delete +
+  people briefing; Preview apply before snowball/inbox apply. Route table:
+  [gui.md](docs/gui.md).
 - **Repair / Mirror (Advanced):** Preview runs real library cores and writes review
   tokens under `state/gui/previews/`; Apply consumes the token (409 when the preview
   file changed). Covers `lint` (read-only), `fix-metadata`, `dedupe`, `versions`,
   `attachments`, `ocr`, plus `sync`, `snapshot`, `restore`, and `cache clean`.
+- **Index RAG/ask CLI parity:** Ask and batch Ask take item keys, types, years, top-k,
+  and custom system prompts (inline → upload → path → `state/prompts/` → `[rag].prompt`
+  / focus). Batch adds force and questions file upload. Index also runs
+  `rag questions` and `rag answered` (`state/rq-answered/`, `pack.md`). See
+  [rag.md](docs/rag.md#workbench-advanced-index) and [gui.md](docs/gui.md).
 
 ### Changed
 
+- **Docker doctor guide:** default `doctor` inside Compose no longer waits for
+  Enter (Compose owns Ctrl-C / stdin on `compose up`). It prints fix steps once;
+  opt in with `docker compose run --rm paperful doctor --guide`.
 - **Schema freeze prep for 1.0:** `RUN_REPORT_SUMMARY_KEYS` now includes always-emitted
   rollups (`retryable`, `browser_misses`, `not_downloaded`, `paywall_prices`,
   `agent_after_playwright`). Frozen top-level keys for `refs_gap.pack.v1`,

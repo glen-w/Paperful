@@ -289,6 +289,55 @@ def test_list_threads_skips_corrupt(tmp_path):
     assert "broken" not in ids
 
 
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_index_ask_forwards_prompt_and_scope(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.rag_enabled = True
+    cfg.llm_enabled = True
+    _ops(monkeypatch)
+    _fresh_index(monkeypatch)
+    seen: list[dict] = []
+
+    def fake(cfg, cmd_id, **kw):
+        seen.append(kw)
+        return {
+            "thread_id": kw.get("thread_id") or "t",
+            "question": kw["question"],
+            "retrieve_as": kw["question"],
+            "answer": "ok",
+            "cited": [],
+            "sources": [],
+            "focus": "default",
+        }
+
+    jobs.ask_turn_fn = fake
+    try:
+        client = TestClient(create_app(cfg))
+        client.cookies.set("pf_collection", "ocean/BBNJ")
+        res = client.post(
+            "/index/ask",
+            data={
+                "question": "What is BBNJ?",
+                "prompt_inline": "Be terse.",
+                "item_keys": "ABCD1234",
+                "top_k": "5",
+            },
+            follow_redirects=False,
+        )
+        assert res.status_code == 303
+        cmd_id = (res.headers.get("location") or "").split("run=")[1].split("&")[0]
+        rec = _wait_done(client, cmd_id)
+        assert rec.get("status") == "done"
+        assert seen[0]["prompt_text"] == "Be terse."
+        assert seen[0]["item_keys"] == ["ABCD1234"]
+        assert seen[0]["top_k"] == 5
+    finally:
+        jobs.ask_turn_fn = None
+
+
 def test_ask_page_flags_need_both_and_index_rows(tmp_path, monkeypatch):
     from paperful.ui.pages import ask_page_flags
 

@@ -147,6 +147,20 @@
     {% endif %}
     <button type="submit" class="secondary">Run list</button>
   </form>
+  <form method="post" action="/discover/aw/suggest" class="toolbar">
+    <input type="hidden" name="list_name" value="{{ aw_list }}">
+    <label>Method
+      <select name="method">
+        <option value="corpus">corpus frequency</option>
+        <option value="most_cited">most cited</option>
+        <option value="coauthor">coauthors</option>
+        <option value="mix">mix</option>
+      </select>
+    </label>
+    <label>Limit <input name="limit" type="number" value="15" min="1" max="100"></label>
+    <label>Collection <input name="collection" value="{{ prefs.collection }}" placeholder="-C path"></label>
+    <button type="submit" class="secondary">Get suggestions</button>
+  </form>
   <form method="post" action="/discover/aw/import" enctype="multipart/form-data">
     <input type="hidden" name="list_name" value="{{ aw_list }}">
     <label>Source
@@ -154,6 +168,9 @@
         <option value="csv">csv</option>
         <option value="json">json</option>
         <option value="orcid">orcid</option>
+        <option value="rg">rg (saved HTML/CSV)</option>
+        <option value="linkedin">linkedin (saved HTML)</option>
+        <option value="academia">academia (saved HTML)</option>
       </select>
     </label>
     <label>File <input type="file" name="file"></label>
@@ -162,6 +179,10 @@
   <form method="post" action="/discover/aw/briefing">
     <input type="hidden" name="list_name" value="{{ aw_list }}">
     <button type="submit" class="secondary">People briefing</button>
+  </form>
+  <form method="post" action="/discover/aw/delete" onsubmit="return confirm('Delete list {{ aw_list }} and all ledger files?');">
+    <input type="hidden" name="list_name" value="{{ aw_list }}">
+    <button type="submit" class="secondary">Delete list</button>
   </form>
 </section>
 {% if aw_lists %}
@@ -172,13 +193,44 @@
 {% endfor %}
 </ul>
 {% endif %}
+{% if aw_suggestions %}
+<h3>Suggestions</h3>
+<form method="post" action="/discover/aw/accept">
+  <input type="hidden" name="list_name" value="{{ aw_list }}">
+  <table class="wb-table">
+    <thead><tr><th></th><th>Name</th><th>ORCID</th><th>Score</th><th>Why</th></tr></thead>
+    <tbody>
+    {% for s in aw_suggestions %}
+    <tr>
+      <td><input type="checkbox" name="suggestion_id" value="{{ s.id }}" checked></td>
+      <td>{{ s.display_name }}{% if not s.pollable %} <span class="muted">(resolve)</span>{% endif %}</td>
+      <td>{{ s.orcid }}</td>
+      <td>{{ '%.2f'|format(s.score) }}</td>
+      <td>{{ s.why }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <label>Initial seed from <input name="seed_from" type="date"></label>
+  <button type="submit">Accept selected</button>
+</form>
+{% endif %}
 {% if aw_people %}
+<h3>Members</h3>
 <table class="wb-table">
   <thead><tr><th>Name</th><th>ORCID</th><th>Status</th><th></th></tr></thead>
   <tbody>
   {% for p in aw_people %}
   <tr>
-    <td>{{ p.display_name }}</td>
+    <td>
+      <form method="post" action="/discover/aw/edit" class="toolbar">
+        <input type="hidden" name="list_name" value="{{ aw_list }}">
+        <input type="hidden" name="person_id" value="{{ p.id }}">
+        <input name="display_name" value="{{ p.display_name }}">
+        <input name="affiliation" value="{{ p.affiliation }}" placeholder="affiliation host">
+        <button type="submit" class="secondary">Save</button>
+      </form>
+    </td>
     <td>{{ p.orcid }}</td>
     <td>{{ p.status }}</td>
     <td>

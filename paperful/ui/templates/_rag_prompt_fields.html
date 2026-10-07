@@ -1,0 +1,19 @@
+<fieldset class="rag-prompt">
+  <legend>Custom system prompt (optional)</legend>
+  {% if rag_config_prompt %}<p class="counts">Config default: {{ rag_config_prompt }}</p>{% endif %}
+  <p><label>Inline<br><textarea name="prompt_inline" rows="4" cols="60" placeholder="Overrides focus when set"></textarea></label></p>
+  <p><label>Upload <input type="file" name="prompt_upload" accept=".md,.txt,text/plain,text/markdown"></label></p>
+  <p><label>Path <input name="prompt_path" size="50" placeholder="prompts/ask.md"></label></p>
+  {% if saved_prompts %}
+  <p><label>Saved
+    <select name="prompt_saved">
+      <option value="default">—</option>
+      {% for p in saved_prompts %}
+      <option value="{{ p.name }}">{{ p.label }}</option>
+      {% endfor %}
+    </select>
+  </label></p>
+  {% endif %}
+  <p><label><input type="checkbox" name="save_prompt" value="1"> Save inline/upload as</label>
+  <input name="prompt_save_name" placeholder="my-prompt.md"></p>
+</fieldset>

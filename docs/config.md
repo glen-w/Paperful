@@ -260,7 +260,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[rag].abstracts` | `true` | Index the abstract when an item has no readable PDF |
 | `[rag].model` | `""` | Chat model for `ask`; empty uses `[llm].model` |
 | `[rag].focus` | `default` | Prompt preset for `ask` / batch: `default`, `questions`, `gaps`, `methods`, `answered` |
-| `[rag].prompt` | `""` | Custom system prompt file; when set, overrides `focus` |
+| `[rag].prompt` | `""` | Custom system prompt file; when set, overrides `focus`. Index Ask/batch can override per run (inline, upload, path, or a file under `state/prompts/`) — see [rag.md](rag.md#workbench-advanced-index) |
 | `[rag].dest` | `disk` | Batch ask note destination: `disk`, `zotero`, or `both` (Zotero needs `--apply` + one `-C`) |
 | `[rag].extract_questions_llm` | `false` | Default for `rag questions --llm` grounded extract lane |
 
