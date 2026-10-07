@@ -1049,7 +1049,7 @@ def serve(
     port: int = typer.Option(8765, help="TCP port."),
     config: Path | None = ConfigOpt,
 ) -> None:
-    """Localhost HTTP API over CLI builders. Dry-run. Needs paperful[serve]. No library writes."""
+    """Localhost workbench and JSON API. Needs paperful[serve]."""
     from .serve import SERVE_HINT, fastapi_available, run_server
 
     if not fastapi_available():

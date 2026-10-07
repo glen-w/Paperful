@@ -423,7 +423,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 collection=prefs.collection,
                 keys=keys,
                 from_last_run=form.get("from_last_run") == "1",
-                from_last_run_mode=str(form.get("from_last_run_mode") or "not_found"),
+                from_last_run_mode=str(form.get("from_last_run_mode") or "browser_agent_miss"),
                 limit=_parse_int(form.get("limit")),
             )
 

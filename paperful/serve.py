@@ -1,7 +1,9 @@
-"""Localhost HTTP capability API over the CLI envelope builders.
+"""Localhost HTTP: JSON capability API plus the server-rendered workbench.
 
-P0 skeleton: health, doctor, collections, last-run, dry-run refs-gap / ask.
-Writes stay on the CLI (``--apply``). Optional extra: ``paperful[serve]``.
+JSON routes (health, doctor, collections, last-run, dry-run refs-gap / ask)
+do not write the library. Workbench forms write only after a review token
+(Grab fetches to disk; Attach and Apply write the catalogue). Optional extra:
+``paperful[serve]``.
 """
 
 from __future__ import annotations

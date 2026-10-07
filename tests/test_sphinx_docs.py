@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 INDEX = DOCS / "index.md"
@@ -38,6 +40,7 @@ def _guide_markdown_stems() -> set[str]:
     return {p.stem for p in DOCS.glob("*.md") if p.stem not in _SKIP_STEMS}
 
 
+@pytest.mark.docs
 def test_every_guide_page_is_in_toctree():
     index_text = INDEX.read_text(encoding="utf-8")
     in_tree = _toctree_stems(index_text)
@@ -56,6 +59,7 @@ def test_every_guide_page_is_in_toctree():
     )
 
 
+@pytest.mark.docs
 def test_toctree_has_no_duplicate_entries():
     entries = _toctree_entries(INDEX.read_text(encoding="utf-8"))
     seen: set[str] = set()
@@ -90,6 +94,10 @@ def test_gui_md_documents_discover_and_wanted_routes():
         "/index/ask",
         "Briefs",
         "Stays CLI",
+        "docker compose up",
+        "browser_agent_miss",
+        "Grab never writes",
     )
     missing = [path for path in required if path not in text]
     assert not missing, f"docs/gui.md missing workbench routes/surfaces: {', '.join(missing)}"
+    assert "gui profile" not in text

@@ -125,11 +125,12 @@ Live: [paperful.app](https://paperful.app/).
 
 ## Is this the right tool?
 
-Yes, if you use Zotero, want an on-disk mirror, and will run a **CLI in Docker**.
-Maybe, if Zotero’s own “find available PDF” already covers you.
-**Today is CLI-first.** The **1.0 workbench** on `paperful serve` (Discover /
-Wanted; Advanced Repair, Mirror, Index Ask, and Briefs) is landed but not
-tagged — see [gui.md](docs/gui.md). Paperful is not Zotero-in-the-browser, not a
+Yes, if you use Zotero, want an on-disk mirror, and will run Docker on this
+machine. `docker compose up` opens the workbench (Wanted, then Discover;
+Advanced Repair, Mirror, Index, and Briefs). The CLI is the same verbs for
+scripts and one-shots. Maybe, if Zotero’s own “find available PDF” already
+covers you. The **1.0 workbench** is landed but not tagged — see
+[gui.md](docs/gui.md). Paperful is not Zotero-in-the-browser, not a
 sync/mobile/WebDAV client, and not every paywalled PDF. `paperful ocr` exists
 for scans on disk. Mendeley and EndNote adapters exist but are seeking testers
 (not 1.0 blockers). Post-1.0: Firefox
@@ -170,7 +171,8 @@ cp .env.example .env          # PAPERFUL_DATA=. keeps data in this checkout
 cp config.minimal.toml config.toml   # set email; full file is config.example.toml
 docker compose build                 # heavy when set in .env; CI uses light
 docker compose run --rm paperful doctor          # once; --guide for Enter walk
-docker compose up                                # GUI at http://127.0.0.1:8765
+docker compose up                                # stays up; GUI at http://127.0.0.1:8765
+# other terminal:
 docker compose run --rm paperful collections
 docker compose run --rm paperful run --collection interesting --preset oa --dry-run
 

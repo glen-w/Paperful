@@ -6,9 +6,9 @@ process. Individual commands stay available and can still be chained with
 `&&`.
 
 This is not a scheduler. There is no cron helper. Recipes below are copy-paste
-CLI commands (`paperful all` and named run configs). The browser workbench is
-separate: [gui.md](gui.md) (`paperful serve`). The research-pack (cited works →
-parents → PDFs) is [research-pack](research-pack.md).
+CLI commands (`paperful all` and named run configs). The same verbs are on the
+workbench (`docker compose up`, or `paperful serve`): [gui.md](gui.md). The
+research-pack (cited works → parents → PDFs) is [research-pack](research-pack.md).
 
 ## Do not conflate
 

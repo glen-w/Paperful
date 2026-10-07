@@ -61,4 +61,5 @@ testpaths = ["tests"]
 markers = [
     "grey_live: network probe of tests/fixtures/grey/corpus.toml (set PAPERFUL_GREY_LIVE=1)",
     "e2e_live: opt-in all-in E2E (NBA 2025–2026); set PAPERFUL_E2E=1 — see docs/e2e-nba.md",
+    "docs: guide corpus / Sphinx toctree hygiene (advisory in CI; see .github/workflows/docs.yml)",
 ]

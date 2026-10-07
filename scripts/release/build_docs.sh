@@ -26,7 +26,7 @@ echo "Building Sphinx HTML → ${OUT}"
 
 SPHINX_ARGS=(-b html docs "$OUT")
 if [[ "${DOCS_STRICT:-0}" == "1" ]]; then
-  echo "Strict mode: sphinx warnings fail the build (DOCS_STRICT=1)"
+  echo "Strict mode: sphinx warnings fail the build (DOCS_STRICT=1; CI does not set this)"
   SPHINX_ARGS+=(-W)
 fi
 

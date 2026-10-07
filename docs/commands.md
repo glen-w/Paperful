@@ -221,7 +221,9 @@ uv run paperful pack show
 | `ingest-dois` | DOI list → metadata parents in `-C`. Dry-run unless `--apply`. Reports created / exists / unresolved / **held**. `--format json`. `--tag` plus `[ingest].default_tags` and `from-<file-stem>`. Does not fetch PDFs (`run` after). |
 | `collections` | `list` (or bare `collections`) — collection tree with “No PDF” counts. `add --keys-file` — file **existing** item keys into `-C` (membership only; dry-run unless `--apply`; added / already-in / not-found). `--format json`. Complements `ingest-dois` (create parents). Zotero / Mendeley; EndNote refuses `--apply`. Not an MCP tool. |
 | `mcp` | Optional stdio MCP over the same JSON channel. Tools: `refs_gap` (never writes parents) and `ask` (index read-only). Prefer `paperful … --format json` from a shell. `collections add` is CLI-only and is not exposed. |
-| `serve` | Localhost HTTP (`127.0.0.1:8765`). Needs `paperful[serve]` (`uv sync --extra serve`). JSON capability API (health, doctor, collections, last-run, dry-run `refs-gap` / `ask`) plus Jinja workbench (Discover, Wanted, …; Advanced Index Ask/batch/`rag questions`/`rag answered` / Briefs / Repair / Mirror / Settings). Library writes only from Preview then Apply / Grab (review tokens). TTY, Sci-Hub, and `collections add` stay CLI. Every Compose image includes `serve` so the `gui` profile can run; **heavy** also has RAG/Ask extras for Index. See [gui.md](gui.md). |
+| `urls` | `urls check` probes metadata and linked-PDF URLs for a scope (HEAD/GET). Report only unless `--apply`, which rewrites a URL only when a grey playbook already knows the PDF target. `--limit`, `--format json`. |
+| `htmlpdf` | Academic page-snapshot proposals: `proposals list` / `apply` / `reject`. `[htmlpdf].academic = gated` writes `state/htmlpdf/proposals/`; `apply` attaches a snapshot-tier PDF. Printing web and news pages during `run` is the `htmlpdf` *source*, not this verb. See [sources](sources.md#htmlpdf-web-news-blogs). |
+| `serve` | Localhost workbench and JSON API (`127.0.0.1:8765`). Needs `paperful[serve]` (`uv sync --extra serve`). JSON routes: health, doctor, collections, last-run, dry-run `refs-gap` / `ask` (those do not write the library). HTML: Wanted, Discover, Library, Activity, System; Advanced Index (Ask, batch, `rag questions`, `rag answered`), Briefs, Repair, Mirror, Settings. **Grab** fetches to `out/` only. Catalogue writes (Attach, Discover apply, Repair/Mirror Apply) need Preview, then a review token. TTY, Sci-Hub, and `collections add` stay CLI. `docker compose up` serves this UI. **heavy** also has RAG/Ask extras for Index. See [gui.md](gui.md). |
 | `all` | `gaps` → `run --try-all --retry-failed --upgrade-linked` → `lint` → `fix-metadata --apply` → `summarize --apply`. Stops on the first failure. `--dry-run` skips `summarize` and does not apply metadata. `--browser-agent` / `--no-browser-agent` pass through to the `run` step. `--profile` / `-f` load a saved run config. Opens a pack when none is open. `--format json` prints one envelope for the whole sequence (nested substeps stay quiet on stdout). See [Workflows](workflows.md). |
 | `profile` | `list` / `show` / `save` — named run configs beside `config.toml` (`profiles/<name>.toml` or `[profiles.*]`). `show` prints the merge `all` would use. `save` does not edit `config.toml`. |
 | `snowball` | Grow a library from one or more keywords, one or more DOIs, one or more ORCIDs, or a collection (`search`, `hybrid`, `doi`, `orcid`, `collection`, `apply`, `run --profile`, `resume`, `profile save`, `watch save` / `run` / `show` / `briefing` / `digest`, `briefing --run-id`, `digest --run-id`). `search` / `hybrid` take several keyword terms (AND by default; `--or`
@@ -233,6 +235,7 @@ several positionals or `--seeds-file`; `profile save` repeats `--query` / `--doi
 | `sync` | Bring `out/` up to date with the library: rewrite the folders of items that changed since the last refresh, mark items that left, copy in PDFs the library holds (`--pdfs all\|lazy\|none`, default from `[mirror].pdfs`). `--full` reads the whole library. `--dry-run` reads and counts, writes nothing. Refuses to mark most of the mirror as gone (a different library) unless `--accept-gone`. Every other command runs the same refresh before it reads, without the whole-library PDF pass. |
 | `snapshot` | Re-read a collection (or `--library`) in full and rewrite its item folders (`record.json`, optional PDF, notes) plus index, collection tree, and ledger pointers. `--pdfs all\|lazy\|none`. `--dry-run` counts without writing. Year/type scope flags apply. Needs the manager running. |
 | `restore` | Recreate missing library items from those folders. Dry-run unless `--apply`. `--apply` creates missing items, attaches a local PDF when the live item has none, and adds missing notes. Does not overwrite bibliographic fields. Year/type scope flags apply. |
+| `cache` | `cache clean` lists throwaway files under `state/pdf-cache/` already absorbed into `out/` or stale versus the record MD5. Dry-run unless `--apply`. Does not delete `out/`. |
 | `import` | Load RIS, BibTeX, or EndNote XML into the configured manager. Dry-run unless `--apply`. |
 | `export` | Write the scoped library to RIS, BibTeX, or EndNote XML (`--pdfs` copies files for XML). |
 | `session` | Local browser vault: `login scholar\|ezproxy\|mendeley` (`--engine` is for the browser slots), `status`, `export` |
@@ -240,6 +243,7 @@ several positionals or `--seeds-file`; `profile save` repeats `--query` / `--doi
 | `ezproxy` | Wrapper: headed login (or Netscape fallback) / `--no-open` probe |
 | `scholar` | Wrapper: headed login (or Netscape fallback) / `--no-open` probe |
 | `mirrors` | Ping configured Sci-Hub mirrors |
+| `jobs` | Print verbs grouped by job (`library`, `find`, `completeness`, `mirror`, `control`, plus `utility`). |
 | `version` | Print the package version |
 
 Collections can be given as a path (`BBNJ/not undermine`), a unique name, or
@@ -405,10 +409,9 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
 - `state/authorwatch/<name>/` — people lists (`paperful.authorwatch.v1`), `people.jsonl`, `suggestions.jsonl`, inbox, seen, applied. Cursor baseline does not open the library; `suggest` does. See [authorwatch.md](authorwatch.md).
 - `state/inbox/proposals/` — gated inbox create/attach proposals (`paperful.inbox.proposal.v1`).
 - `state/pdf-cache/` — PDFs exported from the manager so lint can read text
-  when `[mirror].pdfs = "none"`. `paperful sync` moves matching files into
-  item folders; `paperful cache clean` removes absorbed or stale leftovers
-  (dry-run unless `--apply`).
-  on disk (`pdftotext`, then `pypdf`).
+  on disk (`pdftotext`, then `pypdf`) when `[mirror].pdfs = "none"`.
+  `paperful sync` moves matching files into item folders; `paperful cache clean`
+  removes absorbed or stale leftovers (dry-run unless `--apply`).
 - `state/last-run.json` — latest auditable `run` or `recover` report (summary + per-item
   outcomes). Other commands do not replace it. Historical copies land in
   `state/runs/<timestamp>-<command>.json` (`run`, `recover`, `gaps`, `reachout`, `lint`,

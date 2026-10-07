@@ -144,8 +144,8 @@ inside the container. Headed `session login` still stays on the host (shared
 
 After doctor is green, `docker compose up` starts the GUI. It binds in the
 container on `0.0.0.0:8765` and **publishes only** `127.0.0.1:8765:8765` (no
-LAN). Same workbench as host `paperful serve` ([gui.md](gui.md) — Discover /
-Wanted; Advanced Repair / Mirror / Index / Briefs):
+LAN). Same workbench as host `paperful serve` ([gui.md](gui.md) — Wanted, then
+Discover; Advanced Repair / Mirror / Index / Briefs):
 
 ```sh
 docker compose up
@@ -155,8 +155,9 @@ docker compose up
 Host-only `uv run paperful serve` remains the contributor path. `fix-metadata` title
 proposals, the `lint` identity check, `summarize`, and `synthesize` work from the container
 against an Ollama running on the host. Keep loopback in `config.toml`
-(`base_url = "http://127.0.0.1:11434"`); Paperful rewrites it to
+(`base_url = "http://127.0.0.1:11434"`); Paperful rewrites that loopback host to
 `host.docker.internal` inside the container via `PAPERFUL_OLLAMA_HOST`.
+A remote `base_url` stays as configured.
 
 On **Docker Desktop**, the default Ollama loopback bind is enough (same as
 Zotero). On **Linux Docker Engine**, bind with
@@ -209,7 +210,8 @@ http://127.0.0.1:8765. CLI one-shots use `compose run` (pass the subcommand —
 bare `run` would also start serve):
 
 ```sh
-docker compose up                                    # GUI
+docker compose up                                    # stays up; GUI
+# other terminal:
 docker compose run --rm paperful doctor
 docker compose run --rm paperful collections
 docker compose run --rm paperful run --collection interesting --dry-run
@@ -228,7 +230,8 @@ docker compose run --rm paperful run -C BBNJ --year-from 2023 -T journalArticle 
 ## Common commands
 
 ```sh
-docker compose up                           # GUI at http://127.0.0.1:8765
+docker compose up                           # stays up; GUI at http://127.0.0.1:8765
+# other terminal:
 docker compose run --rm paperful doctor
 docker compose run --rm paperful doctor --no-guide
 docker compose run --rm paperful collections

@@ -210,7 +210,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[llm].enabled` | `false` | Master gate |
 | `[llm].provider` | `ollama` | `ollama` or `litellm` |
 | `[llm].model` | `qwen2.5:7b` | Model id |
-| `[llm].base_url` | `http://127.0.0.1:11434` | Ollama API. Inside Compose, loopback is rewritten to `host.docker.internal` (`PAPERFUL_OLLAMA_HOST`) |
+| `[llm].base_url` | `http://127.0.0.1:11434` | Ollama API. Inside Compose, a loopback URL is rewritten to `host.docker.internal` (`PAPERFUL_OLLAMA_HOST`). A remote hostname stays as configured and still needs `allow_remote` |
 | `[llm].api_base` | `""` | OpenAI-compatible base when `provider = litellm` |
 | `[fix_metadata].llm_title` | `false` | Grounded title proposals in `fix-metadata` |
 | `[lint].llm_pdf_match` | `false` | `pdf_identity_mismatch` finding; `summarize` refuses flagged items unless `--force` |

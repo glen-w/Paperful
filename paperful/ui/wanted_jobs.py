@@ -186,7 +186,7 @@ def recover_apply(cfg: Config, *, token: str) -> tuple[bool, str]:
         Console(quiet=True, file=None),
         item=keys,
         from_last_run=bool(flags.get("from_last_run")),
-        from_last_run_mode=str(flags.get("from_last_run_mode") or "not_found"),
+        from_last_run_mode=str(flags.get("from_last_run_mode") or "browser_agent_miss"),
         limit=flags.get("limit"),
         dry_run=False,
         no_attach=False,

@@ -314,9 +314,11 @@ enabled = true
 base_url = "http://127.0.0.1:11434"   # rewritten inside the container
 ```
 
-Inside Docker, Paperful rewrites loopback to `host.docker.internal` (Compose
-sets `PAPERFUL_OLLAMA_HOST` and `extra_hosts`, same pattern as Zotero). That
-bridge is treated as local — you do **not** need `allow_remote = true` for it.
+Inside Docker, Paperful rewrites a loopback `[llm].base_url` to
+`host.docker.internal` (Compose sets `PAPERFUL_OLLAMA_HOST` and `extra_hosts`,
+same pattern as Zotero). A remote hostname stays as configured and still needs
+`allow_remote = true`. The Docker bridge is treated as local — you do **not**
+need `allow_remote = true` for it.
 
 **Docker Desktop (macOS/Windows):** leave Ollama on its default loopback bind
 (`127.0.0.1:11434`). Compose reaches it via `host.docker.internal` the same way

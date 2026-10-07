@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Watch: E2E stack — {{TOPIC}} ({{EFFORT}})
 
 **Date:** {{YYYY-MM-DD}}

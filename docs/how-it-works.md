@@ -154,4 +154,5 @@ EndNote XML — not a sync service.
 
 Why this shape: [Why Paperful](why.md). Commands: [Commands](commands.md).
 Architecture of the same flow: [Architecture](architecture.md). The same verbs
-on localhost HTTP: [Workbench](gui.md) (`paperful serve`).
+on localhost HTTP: [Workbench](gui.md). `docker compose up` serves it at
+http://127.0.0.1:8765. Grab fetches to disk; Attach writes Zotero.

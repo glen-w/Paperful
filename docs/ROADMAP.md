@@ -56,7 +56,7 @@ Sci-Hub, no “AI fetch everything”).
 | Lock `paperful.item.v1` and `snapshot` / `restore` (additive keys only after 1.0) | Trust for the disk ledger | **Shipped** — required keys frozen; restore is create-missing (not lossless round-trip) |
 | Strip legacy flat-PDF migrate + mixed-layout doctor amber | Day-0 mirror never steers people into a whole-library layout cleanup | **Shipped (0.1 → 1.0)** |
 | **Mendeley and EndNote adapters** (not a 1.0 blocker) | The ledger survives a manager change | In the tree. **Seeking testers.** Zotero stays the well-tested path. See below |
-| **Workbench GUI** | Discover, Wanted, Preview/Grab; Advanced Repair / Mirror / Discover grow / Wanted recover | Landed — [GUI](#gui); `paperful serve` + `paperful/ui/`; Compose `gui` profile. TTY and Sci-Hub stay CLI. Not tagged 1.0 |
+| **Workbench GUI** | Discover, Wanted, Preview/Grab; Advanced Repair / Mirror / Discover grow / Wanted recover | Landed — [GUI](#gui); `paperful serve` + `paperful/ui/`; `docker compose up` publishes `127.0.0.1:8765`. TTY and Sci-Hub stay CLI. Not tagged 1.0 |
 | **Interactive Ask (GUI)** | Index page when `[rag]` + `[llm]` enabled | **Shipped** — Index Ask + batch (scope, custom prompts, force); `rag questions` / `rag answered`; ingest/search; Briefs for summarize/synthesize |
 
 Nice-to-have (not 1.0 blockers): colour glossary next to `doctor` (documented);
@@ -1365,10 +1365,12 @@ second doc tree that drifts from the CLI.
 
 **1.0 deliverable** — workbench (open / Docker first): [gui.md](gui.md).
 **Landed:** `paperful.item.v1` lock, `paperful serve` HTTP + server-rendered UI
-under `paperful/ui/` — default nav **Discover** and **Wanted**, Preview/Grab with
-review tokens, command ids under `state/gui/commands/`. Discover covers topic
+under `paperful/ui/` — default nav **Wanted** (also `GET /`) then **Discover**,
+Preview → Grab (fetch to `out/` only) → Attach (explicit library write), with
+review tokens and command ids under `state/gui/commands/`. Empty Wanted shows a
+coach line when there is no collection or the library is down. Discover covers topic
 queues (keep/skip, briefing, digest, profile run, resume, watches), people
-lists (create/add/resolve/run/import, inbox apply), and Advanced grow tools
+lists (create/add/resolve/run/import/suggest/accept, inbox apply), and Advanced grow tools
 (refs gap, ingest-dois, authors, packs promote). Queue/watch briefing and
 digest can file a collection note (`paperful:frontier-briefing`). **Advanced**
 (cookie) reveals Repair, Mirror, Index, Briefs, Settings and extra form fields

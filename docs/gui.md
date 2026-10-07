@@ -45,10 +45,13 @@ browser-agent. No built-in scheduler — **Check again** on Discover, not cron.
 | **Preset** chip | Open access (`oa`) or Campus (`eoi`) — the simple source choice |
 | **Health** dot | Worst cached `doctor` status (amber until **System** runs doctor; pages never block on a full doctor) |
 | **Advanced** toggle | Cookie only; reveals extra nav and form fields |
+| **Row actions** | Icon buttons (detail drawer, set collection scope) with the action name as the tooltip |
+| **Long lists** | Discover lists, Index threads and batches, Briefs archives, and the Repair queue fold into collapsible sections |
 
 Layout: table-first rows, native `<dialog>` drawer (no embedded PDF viewer).
 Long jobs return a **command id**; Activity polls `GET /v1/runs/{id}` (SSE later).
 Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
+`compose.gui.yaml` is a no-op shim for older `-f compose.gui.yaml --profile gui` invocations.
 
 ---
 
@@ -69,12 +72,15 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
    (`authorwatch apply`). **Check again** re-runs a saved topic watch or
    person list. Advanced topic watches also offer **Watch briefing** /
    **Watch digest** (same optional collection note).
-2. **Wanted** — **Missing** rows use miss-surface icons (hover for `MISS_SURFACE_PLAIN`).
+2. **Wanted** — first nav item, and `GET /` lands here. With no collection, or
+   when the library is down, an amber coach line points at **System**.
+   **Missing** rows use miss-surface icons (hover for `MISS_SURFACE_PLAIN`).
    **Held** / **Have** use the same icon+tooltip pattern for PDF verification
    (`doi_match`, `doi_mismatch`, `unverified`, `snapshot`; not “% complete”).
    **Preview** → **Grab** (fetch to `out/` only; selected vs all) → **Attach**
    (explicit Zotero write for `doi_match` plus hand-ticks). Grab never writes
-   the library.
+   the library. The Attach control stays visible; there is no “attach verified
+   automatically” setting.
 3. **Library** — Nested collection collapsibles with item / missing-PDF counts; target icon sets scope (collection chip).
 4. **Activity** — Command history + trust line from `last-run.json`.
 5. **System** — `doctor` rows with one next step each.
@@ -88,7 +94,9 @@ adds snowball kinds (hybrid/doi/orcid/collection), crawl knobs (including
 **Twenty writeback** → `cfg.twenty_writeback_listings`), profile save/run,
 resume, briefing, frontier digest, **refs gap**, **ingest-dois**
 (Preview → Apply token), **authors**, and **packs promote**.
-Wanted adds attach (mismatch/short), `recover`, handoff, inbox drain, `reachout`,
+Wanted adds attach (mismatch/short), `recover` (from last run:
+`browser_agent_miss`, `missing`, `browser_agent_not_found` — same as
+`recover --from-last-run-mode`), handoff, inbox drain, `reachout`,
 plus Grab filters (`year` / type / retry / try-all / browser-agent / upgrade).
 **Repair** Preview runs dry-run then Apply writes: `lint` (read-only report),
 `fix-metadata`, `dedupe`, `versions`, `attachments`, `ocr`.
@@ -223,4 +231,4 @@ Activity polls `GET /v1/runs/{id}`.
 - [architecture.md](architecture.md)
 - [why.md](why.md)
 - [commands.md](commands.md)
-- [docker.md](docker.md) — Compose `gui` profile; **heavy** image for Index Ask / RAG extras
+- [docker.md](docker.md) — `docker compose up` serves the workbench; **heavy** image for Index Ask / RAG extras

@@ -13,7 +13,9 @@ Vocabulary: [Terms](TERMS.md).
 
 Operators clone the repo and run `docker compose build`. The image is
 build-local only: no `docker pull`, no PyPI. Packs are **light** (CI) or
-**heavy** (full local extras). [Docker](docker.md). Contributors use
+**heavy** (full local extras). [Docker](docker.md). `docker compose up` serves
+the workbench at `http://127.0.0.1:8765` ([GUI](gui.md)); CLI one-shots stay
+`docker compose run --rm paperful …`. Contributors use
 [`uv`](https://docs.astral.sh/uv/). **0.x** flags may still move; see
 [releases](releases.md). Why this shape: [Why Paperful](why.md).
 

@@ -115,13 +115,13 @@ at `watch run --digest`. Replace the paths and the watch name.
 
 Operators (Compose), from the repo:
 
-```cron
+```text
 15 7 * * 1 cd /path/to/paperful && docker compose run --rm paperful snowball watch run bbnj --digest
 ```
 
 Contributors, on a host checkout:
 
-```cron
+```text
 15 7 * * 1 cd /path/to/library && uv run paperful snowball watch run bbnj --digest
 ```
 

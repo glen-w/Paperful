@@ -9,7 +9,9 @@ install.
 - Logos live in [images/](images/) (copied from `docs/`): `logo.png` (ink wordmark for light backgrounds) and `logo-dark.png` (cream wordmark for dark backgrounds). The README picks via `prefers-color-scheme`.
 - Footer version should match [pyproject.toml](../pyproject.toml) `version` (currently **0.9.0**).
 - **0.x** is called out in the footer; stability story is [docs/releases.md](../docs/releases.md).
-- Install snippet matches README: `docker compose build`, then `doctor`, then a dry-run.
+- Install snippet matches README: `docker compose build`, then `doctor`, then
+  `docker compose up` (workbench at http://127.0.0.1:8765). CLI one-shots stay
+  `docker compose run --rm paperful …`.
   The image is build-local only (no `docker pull`, no PyPI). `.env.example` sets
   `PAPERFUL_IMAGE_MODE=heavy`; CI builds **light**. `uv` is the contributor path.
   Guide: `./guide/docker.html` (light vs heavy packs).

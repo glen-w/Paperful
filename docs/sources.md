@@ -135,3 +135,9 @@ uv run paperful run --collection interesting --retry-failed
 ```
 
 Soft paywall pages are treated as not found.
+
+Journal and other DOI items stay off this lane unless `[htmlpdf].academic` is
+`gated` or `auto` (`--htmlpdf` on one `run`). `gated` writes proposals under
+`state/htmlpdf/proposals/`. Review them with `paperful htmlpdf proposals list`,
+then `apply` or `reject`. `auto` attaches a snapshot-tier PDF only after the
+landing checks in [config](config.md). The stamp is `snapshot:htmlpdf`.

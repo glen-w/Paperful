@@ -1,5 +1,11 @@
 # Miss desk 1.0 GUI update plan
 
+**Status (2026-10-07): shipped in tree.** Grab is fetch-only, Attach is a real
+library write, selected keys are fetched, empty Wanted coaches, and Wanted is
+first in the nav. Operator description: [gui.md](../gui.md). The notes below
+are the assessment that drove that pass; they describe the tree **before**
+the fix (`baseline SHA` `6e416c4`).
+
 **Baseline SHA:** `6e416c4` (`main`)  
 **Assessment date:** 2026-10-07  
 **Revised:** 2026-10-07 (sanity check vs current tree; lean rewrite)  
@@ -116,7 +122,7 @@ Do **not** block P0 on renaming Grab → Apply.
 
 ## Packaging PASS (no work)
 
-- CLI / Compose GUI publish `127.0.0.1:8765` ([`compose.gui.yaml`](../../compose.gui.yaml))
+- CLI / Compose GUI publish `127.0.0.1:8765` (`docker compose up`; [`compose.gui.yaml`](../../compose.gui.yaml) is a no-op shim)
 - Found rows: source + `doi_match` / `doi_mismatch` / `unverified` ([`verify.py`](../../paperful/ui/verify.py))
 - Ask off default nav (Advanced → Index); `/v1/ask` JSON left as-is for Miss desk 1.0
 - Summary counts, not `% complete`

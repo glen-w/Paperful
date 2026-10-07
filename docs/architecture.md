@@ -317,10 +317,11 @@ unless `--format json` is also passed. `paperful mcp` is optional stdio sugar fo
 payloads on `refs_gap` (never creates parents) and `ask` (index only). Prefer `… --format json`
 from a shell. `paperful serve` (`paperful[serve]`) binds localhost HTTP: JSON
 capability routes (health, doctor, collections, last-run, dry-run `refs-gap` /
-`ask`) plus the server-rendered workbench (`paperful.ui` — Discover, Wanted,
+`ask`) plus the server-rendered workbench (`paperful.ui` — Wanted, Discover,
 Library, Activity, System; Advanced Repair / Mirror / Index / Briefs / Settings).
 GUI writes use review tokens (`state/gui/reviews/`) then the same domain
-entrypoints as the CLI — never silent `--apply`. See [gui.md](gui.md).
+entrypoints as the CLI. Grab fetches to `out/` only; Attach and Apply write the
+catalogue. See [gui.md](gui.md).
 `collections add` is CLI-only (`--apply` writes) and is not an MCP tool.
 
 TTY-only paths (a GUI must not claim them): `session login`, `doctor --guide`,

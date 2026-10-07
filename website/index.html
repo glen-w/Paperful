@@ -246,12 +246,22 @@
               larger run.
             </li>
           </ol>
+          <p>
+            After <code>doctor</code>, <code>docker compose up</code> opens the
+            local workbench at
+            <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a>
+            (Wanted, then Discover). CLI one-shots stay
+            <code>docker compose run</code>.
+          </p>
           <pre class="code"><code>git clone https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
 cp config.minimal.toml config.toml
 docker compose build
 docker compose run --rm paperful doctor
+docker compose up
+# stays in the foreground → http://127.0.0.1:8765
+# in another terminal:
 docker compose run --rm paperful run --collection interesting --preset oa --dry-run
 # campus: --preset eoi, after uv run paperful session login ezproxy on the host</code></pre>
           <p>

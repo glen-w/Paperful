@@ -63,9 +63,11 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
   `inbox.proposal.v1`, and `note.v1`. Golden fixtures under `tests/fixtures/` and
   `tests/test_schema_freeze.py`. Registry + tiers in [developer.md](docs/developer.md);
   releases revisit rows resolved. Package not tagged 1.0 yet.
-- **Docs:** workbench pages ([gui.md](docs/gui.md), roadmap, releases, commands,
-  architecture) now list Repair/Mirror Apply, watch briefing/digest, ingest-dois,
-  Twenty writeback, and what stays CLI.
+- **Docs:** command reference covers `urls`, `htmlpdf`, `cache`, and `jobs`.
+  Workbench pages, the public install snippet, and `paperful serve --help`
+  match Grab (disk only) → Attach (library write), `docker compose up` (no
+  `gui` profile), and loopback-only `PAPERFUL_OLLAMA_HOST` rewrites.
+  See [gui.md](docs/gui.md) and [commands.md](docs/commands.md).
 - **Roadmap / 1.0 scope:** 1.0 now includes the workbench GUI (illuminate and
   run CLI workflows) and interactive Ask (chat-over-collection RAG in the GUI).
   Post-1.0: local OpenAlex snapshot phases 2B/2C, Firefox extension,
