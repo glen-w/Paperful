@@ -239,3 +239,24 @@ def test_watch_save_calls_save_watch(tmp_path, monkeypatch):
     )
     assert ok.status_code == 303
     assert calls == [("topic-watch", "keyword-scout")]
+
+
+@pytest.mark.skipif(
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
+    reason="paperful[serve] extra missing",
+)
+def test_ingest_apply_http_409(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    from paperful.serve import create_app
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
+    client = TestClient(create_app(cfg))
+    res = client.post("/discover/ingest-apply", data={"review_token": "missing"})
+    assert res.status_code == 409

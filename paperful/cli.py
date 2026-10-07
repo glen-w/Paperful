@@ -611,6 +611,28 @@ def _cfg(path: Path | None) -> Config:
     cfg.state_dir.mkdir(parents=True, exist_ok=True)
     return cfg
 
+def _typer_opt(value: Any, default: Any = None) -> Any:
+    """Unwrap Typer OptionInfo/ArgumentInfo when a command is called as a function.
+
+    ``paperful all`` dispatches verbs via ``_call_step``; omitted options then
+    arrive as OptionInfo objects instead of their Python defaults.
+    """
+    from typer.models import ArgumentInfo, OptionInfo
+
+    if isinstance(value, (OptionInfo, ArgumentInfo)):
+        raw = value.default
+        if raw is ... or isinstance(raw, (OptionInfo, ArgumentInfo)):
+            return default
+        return raw
+    return value
+
+def _typer_enum_value(value: Any) -> str | None:
+    """``Enum.value`` after ``_typer_opt``, or None."""
+    value = _typer_opt(value)
+    if value is None:
+        return None
+    return value.value if hasattr(value, "value") else str(value)
+
 def _resolve_source_names(sources: str | None, preset: str | None) -> list[str] | None:
     """Return explicit source names from --sources or --preset, or None to use config."""
     if preset:
@@ -2348,6 +2370,11 @@ def run(
     from .author_request import apply_request_rg_override
 
     apply_request_rg_override(cfg, request_rg)
+    twenty_writeback = _typer_opt(twenty_writeback)
+    promote = _typer_opt(promote)
+    upgrade_snapshot = _typer_opt(upgrade_snapshot)
+    keep_snapshot = _typer_opt(keep_snapshot, False)
+    htmlpdf_mode = _typer_opt(htmlpdf_mode)
     if twenty_writeback is not None:
         cfg.twenty_writeback_listings = twenty_writeback
     json_out = _agent_json(fmt)
@@ -4797,7 +4824,7 @@ def ocr(
         year_to=year_to,
         item_type=item_type,
         limit=limit,
-        max_minutes=max_minutes,
+        max_minutes=_typer_opt(max_minutes),
         profile=profile,
         run_config=run_config,
         config=config,
@@ -5592,7 +5619,7 @@ def ask(
         prompt=prompt,
         force=force,
         apply=apply,
-        to_dest=to.value if to is not None else None,
+        to_dest=_typer_enum_value(to),
         no_stream=no_stream,
         show_context=show_context,
         thread=thread,
@@ -5667,16 +5694,16 @@ def summarize(
         collection=collection,
         library=library,
         apply=apply,
-        to_dest=to.value if to is not None else None,
+        to_dest=_typer_enum_value(to),
         prompt=prompt,
         force=force,
-        order_value=order.value if order is not None else None,
+        order_value=_typer_enum_value(order),
         year_from=year_from,
         year_to=year_to,
         item_type=item_type,
         limit=limit,
-        max_new=max_new,
-        max_minutes=max_minutes,
+        max_new=_typer_opt(max_new),
+        max_minutes=_typer_opt(max_minutes),
         profile=profile,
         run_config=run_config,
         config=config,
@@ -5728,7 +5755,7 @@ def synthesize(
         item=item,
         collection=collection,
         library=library,
-        to_dest=to.value if to is not None else None,
+        to_dest=_typer_enum_value(to),
         report_collection=report_collection,
         prompt=prompt,
         dry_run=dry_run,

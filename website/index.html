@@ -255,11 +255,15 @@ docker compose run --rm paperful doctor
 docker compose run --rm paperful run --collection interesting --preset oa --dry-run
 # campus: --preset eoi, after uv run paperful session login ezproxy on the host</code></pre>
           <p>
-            Rename is not enough: edit <code>.env</code> (data directory and
-            Zotero host) and set a real <code>email</code> in
+            Rename is not enough: edit <code>.env</code> (data directory,
+            Zotero host, and image pack) and set a real <code>email</code> in
             <code>config.toml</code>. The minimal config is open-access sources
             only — paths, Zotero as manager, no campus EZProxy.
+            <code>.env.example</code> sets <code>PAPERFUL_IMAGE_MODE=heavy</code>
+            (llm / rag / browser-agent); CI builds light.
             <a href="./guide/docker.html#environment-and-override">.env / Docker</a>
+            ·
+            <a href="./guide/docker.html#image-mode-light-vs-heavy">light vs heavy</a>
             ·
             <a href="./guide/config.html">config.toml</a>.
           </p>

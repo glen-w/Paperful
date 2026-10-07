@@ -132,7 +132,9 @@ The knobs and error names: [Source routing](sources.md).
 The tool never asks for or stores your institutional password. You log in
 once in a headed browser (`paperful session login ezproxy` or `scholar` on
 the host). `run` reuses that login until the campus session expires —
-typically hours to a few days. Confirm it is still live with
+typically hours to a few days. Being already logged in in your everyday
+browser does not count — Paperful does not read that cookie jar (see
+[Sessions](sessions.md)). Confirm the vault is still live with
 `paperful doctor --probe` or `paperful session status --probe` (file presence
 alone is not enough). When a publisher page is HTML, the same
 browser follows the PDF link or download control before giving up. Scholar
@@ -150,4 +152,5 @@ of those notes. A folder copy you can back up or export as RIS, BibTeX, or
 EndNote XML — not a sync service.
 
 Why this shape: [Why Paperful](why.md). Commands: [Commands](commands.md).
-Architecture of the same flow: [Architecture](architecture.md).
+Architecture of the same flow: [Architecture](architecture.md). The same verbs
+on localhost HTTP: [Workbench](gui.md) (`paperful serve`).

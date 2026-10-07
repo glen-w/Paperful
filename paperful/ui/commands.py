@@ -131,6 +131,7 @@ def create_review_token(
     keys: list[str],
     fingerprint: str,
     command_id: str,
+    flags: dict[str, Any] | None = None,
 ) -> str:
     token = secrets.token_urlsafe(16)
     data = {
@@ -142,6 +143,7 @@ def create_review_token(
         "fingerprint": fingerprint,
         "command_id": command_id,
         "consumed": False,
+        "flags": dict(flags or {}),
     }
     _atomic_write(_reviews_dir(cfg) / f"{token}.json", data)
     rec = read_command(cfg, command_id)

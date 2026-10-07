@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from paperful.config import Config
 from paperful.miss_surface import project_miss_surface
 from paperful.store import Record, STATUS_OK

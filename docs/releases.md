@@ -2,7 +2,10 @@
 
 **0.x** (including tagged `v0.9`) is a first usable release. The operator
 install is clone plus `docker compose build`. The image is build-local only.
-There is no `docker pull` and no `pip install paperful`.
+There is no `docker pull` and no `pip install paperful`. Image packs:
+**light** (`[serve]` only; CI default when unset) or **heavy**
+(`[serve]` `[llm]` `[rag]` `[browser-agent]`; set in `.env.example`). See
+[Docker](docker.md#image-mode-light-vs-heavy).
 
 Required keys on `paperful.run_report.v1` from `build_report()` are frozen
 (removed or renamed required keys are a break; extra keys may still be added).
@@ -10,8 +13,9 @@ Required keys on `paperful.item.v1` from `empty_item_record()` are frozen the
 same way. This tree is not tagged 1.0.
 
 **1.0** (not tagged) still owes polish on the **workbench** on
-`paperful serve` (Discover + Wanted simple loop, people lists, briefing/digest,
-command ids, review tokens are in tree). **Interactive Ask** is on **Index**,
+`paperful serve` (screenshots, SSE, a 1.0 tag). Discover + Wanted, people lists,
+briefing/digest (optional collection note), Repair/Mirror Preview→Apply,
+command ids, and review tokens are in tree. **Interactive Ask** is on **Index**,
 opt-in after `[rag]` + `[llm]`; Advanced **Briefs** runs summarize/synthesize.
 Item records and create-missing restore are locked; extra item keys may still
 be added. Required `paperful.run_report.v1` keys and imported-file attach
@@ -62,7 +66,8 @@ next-steps ladder (`paperful doctor`, enable local API, copy
 
 Off by default and additive: with `[llm].enabled = false` nothing in the PDF
 loop changes. Known limits: `recover` needs Python 3.11+ and a 14B-class
-local model to be useful; the Docker image does not include the LLM extras;
+local model to be useful; **light** images omit the LLM extras (use
+**heavy** or host `uv sync --extra llm --extra browser-agent`);
 identity/title verbs need a text layer (`paperful ocr` adds one to scans). `summarize` and
 `synthesize` default to writing both a disk file and a Zotero note
 (`--to disk` keeps the library tree clean). Config keys under `[llm]`,
@@ -78,6 +83,6 @@ before 1.0. See [LLM](llm.md).
 | Locked report JSON schema | Required `paperful.run_report.v1` keys frozen; additive keys still allowed. Not tagged 1.0 |
 | Locked item record + snapshot/restore | Required `paperful.item.v1` keys frozen; restore is create-missing (not identity round-trip) |
 | Mendeley and EndNote adapters | In the tree. Seeking testers. Zotero is the well-tested path |
-| Workbench GUI (Discover, Wanted, Preview/Grab) | Landed on `paperful serve` (Jinja workbench, Discover topic + people, review tokens, Compose `gui` profile) — [gui.md](gui.md). Not tagged 1.0 |
+| Workbench GUI (Discover, Wanted, Preview/Grab) | Landed on `paperful serve` (Jinja workbench; Advanced Repair / Mirror / Discover grow / Wanted recover; review tokens; Compose `gui` profile) — [gui.md](gui.md). Not tagged 1.0 |
 | Interactive Ask in GUI (cited chat-over-collection) | **Shipped** on Index (opt-in `[rag]` + `[llm]`; CLI threads); Briefs for summarize/synthesize |
 | Fresh-clone doctor stays quiet without Scholar | Shipped (0.9): `scholar` opt-in like `scihub` |

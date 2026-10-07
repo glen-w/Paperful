@@ -3,11 +3,12 @@
 ## Setup
 
 Operators clone and `docker compose build`. Contributors use `uv`.
-[Docker](docs/docker.md) packs Python, Poppler, and Chromium; Zotero and
-headed session login still run on the host. A release checklist: version in
-`pyproject.toml` matches the README badge and the website footer, CHANGELOG
-has a section, and `docs/releases.md` still says install is clone plus
-Compose (no pull, no pip) unless a real artifact exists.
+[Docker](docs/docker.md) packs Python, Poppler, and Chromium
+(`PAPERFUL_IMAGE_MODE=light` or `heavy`); Zotero and headed session login
+still run on the host. A release checklist: version in `pyproject.toml`
+matches the README badge and the website footer, CHANGELOG has a section,
+and `docs/releases.md` still says install is clone plus Compose (no pull,
+no pip) unless a real artifact exists.
 
 ```sh
 git clone https://github.com/glen-w/Paperful.git

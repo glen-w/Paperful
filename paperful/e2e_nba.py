@@ -105,6 +105,7 @@ def build_e2e_plan(
     topic: str,
     effort: str = DEFAULT_EFFORT,
     *,
+    query: str | None = None,
     year_from: int | None = None,
     year_to: int | None = None,
     collection: str | None = None,
@@ -112,6 +113,9 @@ def build_e2e_plan(
     t = (topic or DEFAULT_TOPIC).strip()
     if not t:
         raise ValueError("topic is required")
+    q = (query if query is not None else t).strip()
+    if not q:
+        raise ValueError("query is required")
     eff = normalize_effort(effort)
     preset = _EFFORT_PRESETS[eff]
     yf, yt = default_year_window()
@@ -122,7 +126,7 @@ def build_e2e_plan(
     coll = (collection or collection_for_topic(t)).strip()
     return E2EPlan(
         topic=t,
-        query=t,
+        query=q,
         collection=coll,
         pack_slug=pack_slug_for_topic(t),
         effort=eff,
@@ -283,6 +287,10 @@ class E2ERunner:
         self.dry_run_search = dry_run_search
         self._paperful = paperful or self._default_paperful
         self.env = env if env is not None else dict(os.environ)
+        # Child paperful processes inherit a pipe; unbuffered stdio keeps phase
+        # logs streaming in the harness CLI instead of arriving in late chunks.
+        self.env.setdefault("PYTHONUNBUFFERED", "1")
+        self.env.setdefault("PAPERFUL_E2E", "1")
         self.results: list[PhaseResult] = []
         self.meta: dict[str, Any] = {
             "schema": SCHEMA,
@@ -936,7 +944,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--topic",
         default=DEFAULT_TOPIC,
-        help=f"OpenAlex keyword seed (default: {DEFAULT_TOPIC}).",
+        help=f"Label for collection e2e/<topic> (default: {DEFAULT_TOPIC}).",
+    )
+    parser.add_argument(
+        "--query",
+        default=None,
+        help="OpenAlex keyword seed (default: same as --topic). Boolean OR/AND ok.",
     )
     parser.add_argument(
         "--effort",
@@ -1001,6 +1014,7 @@ def main(argv: list[str] | None = None) -> int:
         plan = build_e2e_plan(
             args.topic,
             args.effort,
+            query=args.query,
             year_from=args.year_from,
             year_to=args.year_to,
             collection=args.collection,

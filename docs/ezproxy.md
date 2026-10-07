@@ -180,6 +180,11 @@ paste the file.
 
 ## Alternatives and limits
 
+- **Everyday browser login**: already signed in to EZProxy in your usual browser
+  does **not** feed Paperful. It never reads Chrome/Safari/Firefox cookies.
+  Prefer `session login ezproxy`, or export Netscape `cookies.txt` (above).
+  Same rule under Docker: headed login stays on the host; the container only
+  reuses `state/` — see [Sessions](sessions.md) and [Docker](docker.md).
 - **Campus VPN**: if VPN alone gives you full publisher access without EZProxy,
   you can leave `ezproxy_base` empty and still use OA sources (and Sci-Hub
   only if you opt in); VPN does not replace a session for this tool’s EZProxy

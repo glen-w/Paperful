@@ -5,9 +5,10 @@ Operator sequences for one collection slice. A **run config** (also called a
 process. Individual commands stay available and can still be chained with
 `&&`.
 
-This is not a scheduler and not a GUI. There is no cron helper and no saved
-dashboard. Recipes below are copy-paste commands. The research-pack
-(cited works → parents → PDFs) is [research-pack](research-pack.md).
+This is not a scheduler. There is no cron helper. Recipes below are copy-paste
+CLI commands (`paperful all` and named run configs). The browser workbench is
+separate: [gui.md](gui.md) (`paperful serve`). The research-pack (cited works →
+parents → PDFs) is [research-pack](research-pack.md).
 
 ## Do not conflate
 
@@ -230,8 +231,9 @@ mkdir -p ../paperful-data/profiles
 docker compose run --rm paperful all --profile bbnj-journal --dry-run
 ```
 
-Same commands as `uv run`. Headed `session login` stays on the host. See
-[Docker](docker.md).
+Same commands as `uv run`. Headed `session login` stays on the host. For
+LLM / RAG / browser-agent inside the container, build **heavy**
+(`PAPERFUL_IMAGE_MODE=heavy`). See [Docker](docker.md).
 
 ## 4. Deep collection pass (example template)
 
@@ -243,8 +245,9 @@ label. Subcollections are included automatically when you pass a parent path.
 
 **Prerequisites:** Zotero 10+ with write API, a real Unpaywall `email`,
 `[llm].enabled` for `summarize` and the auto `browser_agent` lane on `run`,
-`uv sync --extra llm --extra browser-agent` (Python 3.11+), and headed
-`paperful session login ezproxy` / `scholar` when you use those sources.
+`uv sync --extra llm --extra browser-agent` on the host (Python 3.11+) or a
+**heavy** Compose image, and headed `paperful session login ezproxy` /
+`scholar` when you use those sources.
 Optional: `[inbox].dir` so `--handoff tabs` can continue into inbox watch.
 Campus-only policy: add `--preset eoi` on `run` / `all`.
 

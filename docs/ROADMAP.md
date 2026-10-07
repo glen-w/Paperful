@@ -32,7 +32,7 @@ integrations.
 | **1.0** | **Post-1.0** |
 | --- | --- |
 | Trust checklist, locked `paperful.run_report.v1` / `paperful.item.v1`, snapshot contract | **Local OpenAlex parquet store** — phases 2B/2C (`works_citing`, full search parity, `local_duckdb` / `http`). Live OpenAlex API is enough for most installs; v1 `ssh_duckdb` remains opt-in for institutions |
-| **GUI workbench** — Discover + Wanted simple loop (topic + people); command ids; review tokens; Advanced reveals Briefs / Index / remaining verbs | **Firefox extension** — native messaging → CLI ([section below](#optional-thin-bridge--firefox-extension-post-10)) |
+| **GUI workbench** — Discover + Wanted simple loop (topic + people); command ids; review tokens; Advanced Repair / Mirror / Index / Briefs and the non-TTY CLI verbs | **Firefox extension** — native messaging → CLI ([section below](#optional-thin-bridge--firefox-extension-post-10)) |
 | **Ask in GUI (Index)** — scoped chat with citations when `[rag]` + `[llm]` on | **Newsletter / alert ingest** — rollup bridge, Scholar alerts first ([Frontier digest](#frontier-digest-later-watch--external-ingest)) |
 | Zotero-proven path; Mendeley / EndNote when real-library testers confirm | SaaS tenancy polish, remote-manager parity beyond what 1.0 open/Docker needs |
 
@@ -54,7 +54,7 @@ Sci-Hub, no “AI fetch everything”).
 | Lock `paperful.item.v1` and `snapshot` / `restore` (additive keys only after 1.0) | Trust for the disk ledger | **Shipped** — required keys frozen; restore is create-missing (not lossless round-trip) |
 | Strip legacy flat-PDF migrate + mixed-layout doctor amber | Day-0 mirror never steers people into a whole-library layout cleanup | **Shipped (0.1 → 1.0)** |
 | **Mendeley and EndNote adapters** | The ledger survives a manager change | In the tree. **Seeking testers.** Zotero stays the well-tested path. See below |
-| **Workbench GUI** | Discover, Wanted, Preview/Grab; Advanced for full CLI | Landed — [GUI](#gui); `paperful serve` + `paperful/ui/`; Compose `gui` profile. Not tagged 1.0 |
+| **Workbench GUI** | Discover, Wanted, Preview/Grab; Advanced Repair / Mirror / Discover grow / Wanted recover | Landed — [GUI](#gui); `paperful serve` + `paperful/ui/`; Compose `gui` profile. TTY and Sci-Hub stay CLI. Not tagged 1.0 |
 | **Interactive Ask (GUI)** | Index page when `[rag]` + `[llm]` enabled | **Shipped** — Index form, CLI threads, citations; ingest/search/batch on Index; Briefs for summarize/synthesize |
 
 Nice-to-have (not 1.0 blockers): colour glossary next to `doctor` (documented);
@@ -399,8 +399,9 @@ only when bytes pass **`min_pdf_bytes`** and size stabilizes (never trust agent
 `done` alone). **`run`** auto-appends the lane when `[llm].enabled`,
 `[browser_agent].during_run`, and the extra are on (policy order: one Scholar
 try immediately before the agent when Scholar is opted in);
-**`paperful recover --item`** runs the same runner in isolation. Docker image
-**excludes** browser-use (host-only: vault login + Chrome).
+**`paperful recover --item`** runs the same runner in isolation. **heavy**
+Compose images ship browser-use; **light** (CI default) does not. Headed
+vault login still stays on the host (shared `state/`).
 
 #### Documentation map (keep in sync)
 
@@ -412,7 +413,7 @@ try immediately before the agent when Scholar is opted in);
 | [architecture.md](architecture.md) | Serial source ordering, Playwright handoff before agent, CAPTCHA → skip lane for run |
 | [sessions.md](sessions.md) | Vault profile shared with recover; no concurrent vault users |
 | [commands.md](commands.md) | `recover --from-last-run`, `--browser-agent` / `--no-browser-agent` on `run` / `all` |
-| [docker.md](docker.md) | Explicit non-shipment of browser-use in container |
+| [docker.md](docker.md#image-mode-light-vs-heavy) | light vs heavy packs (`browser-use` in heavy) |
 | `assessments/2026-09-29-ollama-browser-use-pdf-download-models.md` | Full research note (Infra rank + honesty/engineering cuts); **user-facing summary lives in `browser-agent-models.md`** |
 
 When changing agent defaults, task text, or doctor floors, update **`llm.md`**
@@ -1359,10 +1360,15 @@ second doc tree that drifts from the CLI.
 **Landed:** `paperful.item.v1` lock, `paperful serve` HTTP + server-rendered UI
 under `paperful/ui/` — default nav **Discover** and **Wanted**, Preview/Grab with
 review tokens, command ids under `state/gui/commands/`. Discover covers topic
-queues (keep/skip, briefing, digest, profile run, resume, watches) and people
-lists (create/add/resolve/run/import, inbox apply). **Advanced** (cookie)
-reveals Repair, Mirror, Index, Briefs, Settings and extra form fields without
-enabling opt-in sources. **Not tagged 1.0.**
+queues (keep/skip, briefing, digest, profile run, resume, watches), people
+lists (create/add/resolve/run/import, inbox apply), and Advanced grow tools
+(refs gap, ingest-dois, authors, packs promote). Queue/watch briefing and
+digest can file a collection note (`paperful:frontier-briefing`). **Advanced**
+(cookie) reveals Repair, Mirror, Index, Briefs, Settings and extra form fields
+without enabling opt-in sources. Repair/Mirror Preview is dry-run; Apply uses
+the same entrypoints as the CLI. TTY (`session login`, `doctor --guide`,
+mid-run EZProxy), `collections add`, `approve-each`, and Sci-Hub stay CLI.
+**Not tagged 1.0.** Polish left is tagging, screenshots, and SSE.
 
 The CLI stays the source of truth; the GUI marshals the same verbs with dry-run
 default and explicit Apply. Not a second fetch stack or Zotero’s reader.

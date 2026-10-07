@@ -137,13 +137,17 @@ mirror_failures_before_skip = 3
 #   ollama pull qwen2.5:7b          # local default; no Python extra needed
 #   uv sync --extra llm             # LiteLLM for paid / OpenAI-compatible APIs (keys via env)
 #   uv sync --extra browser-agent   # last `run` lane + `paperful recover` (Python 3.11+)
+# Docker Compose: keep loopback below. Paperful rewrites it to host.docker.internal
+# inside the container (PAPERFUL_OLLAMA_HOST). Docker Desktop: default ollama serve
+# is enough. Linux Engine: OLLAMA_HOST=0.0.0.0 ollama serve.
+# Explicit alternate: base_url = "http://host.docker.internal:11434" + allow_remote = true
 # [llm]
 # enabled = false
 # provider = "ollama"            # ollama | litellm
 # model = "qwen2.5:7b"           # LiteLLM: "openai/gpt-4.1-mini" etc. (never "ollama/…")
 # base_url = "http://127.0.0.1:11434"
 # # api_base = ""                # LiteLLM / OpenAI-compatible base URL
-# # allow_remote = false         # true for a non-loopback Ollama (Docker: host.docker.internal)
+# # allow_remote = false         # true for a non-loopback Ollama (LAN / explicit Docker URL)
 # timeout_s = 120
 # max_num_ctx = 32768             # cap for Ollama num_ctx on summarize / synthesize
 # [fix_metadata]

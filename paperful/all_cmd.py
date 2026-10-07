@@ -238,6 +238,9 @@ def _dispatch_all_step(
             scihub=bound.scihub,
             browser_agent=browser_agent,
             upgrade_linked=bound.upgrade_linked,
+            upgrade_snapshot=None,
+            keep_snapshot=False,
+            htmlpdf_mode=None,
             strict_pdf_doi=bound.strict_pdf_doi,
             handoff=None,
             include_doi_tabs=False,
@@ -246,6 +249,8 @@ def _dispatch_all_step(
             re_request=False,
             ezproxy_relogin=None,
             serpapi_max=serpapi_max,
+            twenty_writeback=None,
+            promote=None,
             fmt=fmt,
         )
         return
@@ -270,6 +275,7 @@ def _dispatch_all_step(
             limit=bound.limit,
             apply=False if dry_run else bound.apply,
             attach=False,
+            max_minutes=None,
             fmt=fmt,
         )
         return
@@ -283,6 +289,9 @@ def _dispatch_all_step(
             to=None,
             prompt=None,
             force=False,
+            order=None,
+            max_new=None,
+            max_minutes=None,
             fmt=fmt,
         )
         return

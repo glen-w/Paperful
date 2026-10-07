@@ -44,6 +44,8 @@ uv run paperful rag ingest --library
 ```bash
 uv sync --extra rag                 # LanceDB
 ollama pull nomic-embed-text        # default embedding model
+# or build the heavy Compose image (includes [rag]):
+# PAPERFUL_IMAGE_MODE=heavy docker compose build
 ```
 
 `ask` also needs a chat model: follow [llm.md](llm.md) and set
@@ -52,8 +54,9 @@ ollama pull nomic-embed-text        # default embedding model
 LanceDB ships wheels for Apple Silicon, Linux (x86_64, aarch64) and Windows.
 There is no wheel for Intel macOS; on an Apple Silicon Mac make sure the
 environment uses an arm64 Python (`uv venv --python /opt/homebrew/bin/python3`)
-and not an x86_64 build under Rosetta. The Docker image does not include the
-`rag` extra yet.
+and not an x86_64 build under Rosetta. The **heavy** Compose image
+(`PAPERFUL_IMAGE_MODE=heavy`) includes `[rag]`; **light** (CI default) does
+not. See [Docker](docker.md#image-mode-light-vs-heavy).
 
 ## Configure
 

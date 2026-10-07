@@ -10,8 +10,9 @@ install.
 - Footer version should match [pyproject.toml](../pyproject.toml) `version` (currently **0.9.0**).
 - **0.x** is called out in the footer; stability story is [docs/releases.md](../docs/releases.md).
 - Install snippet matches README: `docker compose build`, then `doctor`, then a dry-run.
-  The image is build-local only (no `docker pull`, no PyPI). `uv` is the contributor path.
-  Guide: `./guide/docker.html`.
+  The image is build-local only (no `docker pull`, no PyPI). `.env.example` sets
+  `PAPERFUL_IMAGE_MODE=heavy`; CI builds **light**. `uv` is the contributor path.
+  Guide: `./guide/docker.html` (light vs heavy packs).
 - Docs CTAs point at the **Sphinx HTML guide** published beside this landing (`./guide/`), rebuilt from `docs/` on every qualifying `main` push. The walkthrough is `./guide/how-it-works.html`.
 - The sticky header nav is shared with `/guide/` via `website/chrome/` (Sphinx injects the same chrome).
 - Cleaning Service offer: `cleaning-service.html` (nav item on landing + guide). `paperful.cloud` should redirect there once DNS/SSL is sorted.

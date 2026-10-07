@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from paperful.config import Config
 from paperful.store import Manifest, Record, STATUS_OK
 from paperful.ui import commands, jobs

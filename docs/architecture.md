@@ -274,7 +274,7 @@ attach_failed_by_code, last_run? }`. `last_run` (when present) is the same objec
 as `state/last-run.json`. The required key set below is frozen: a removed or
 renamed required key is a break. Extra keys may still be added. Required
 `paperful.item.v1` keys are frozen the same way. The package is not tagged 1.0
-yet (GUI P1–P3b remain).
+yet (workbench landed; polish remains).
 
 | Field | Meaning |
 | --- | --- |
@@ -313,11 +313,12 @@ from a shell. `paperful serve` (`paperful[serve]`) binds localhost HTTP: JSON
 capability routes (health, doctor, collections, last-run, dry-run `refs-gap` /
 `ask`) plus the server-rendered workbench (`paperful.ui` — Discover, Wanted,
 Library, Activity, System; Advanced Repair / Mirror / Index / Briefs / Settings).
-See [gui.md](gui.md). `collections add` is CLI-only (`--apply` writes) and is
-not an MCP tool.
+GUI writes use review tokens (`state/gui/reviews/`) then the same domain
+entrypoints as the CLI — never silent `--apply`. See [gui.md](gui.md).
+`collections add` is CLI-only (`--apply` writes) and is not an MCP tool.
 
 TTY-only paths (a GUI must not claim them): `session login`, `doctor --guide`,
-and mid-run EZProxy re-login.
+mid-run EZProxy re-login, and snowball `approve-each`.
 
 Child notes from summarize / synthesize / remarks / snowball / briefing start
 with a scannable line and a `<!-- paperful.note.v1 {…} -->` comment (`type`,
@@ -416,7 +417,7 @@ stop at `no_identifier`.
 - [config.md](config.md) — `config.toml` keys and grey playbooks
 - [snowball.md](snowball.md#twenty-and-searxng) — optional Twenty CRM and SearXNG author-page search
 - [ezproxy.md](ezproxy.md) / [sessions.md](sessions.md) — campus proxy and browser vault
-- [docker.md](docker.md) — build-local image (host Zotero + headed login stay outside)
+- [docker.md](docker.md) — build-local light/heavy image (host Zotero + headed login stay outside)
 - [zotero.md](zotero.md) — local API, write keys, attachment modes, ghosts
 - [mendeley.md](mendeley.md) — REST, OAuth, annotations as notes (seeking testers)
 - [endnote.md](endnote.md) — SQLite read, XML import bundle (seeking testers)

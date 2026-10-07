@@ -1,5 +1,9 @@
 # paperful — optional runtime pack (CLI against host Zotero).
 # syntax=docker/dockerfile:1
+#
+# PAPERFUL_IMAGE_MODE:
+#   light (default) — core + [serve] (CI / stranger path)
+#   heavy           — also [llm] [rag] [browser-agent] for a full local env
 
 FROM python:3.12-slim-bookworm AS builder
 
@@ -13,10 +17,26 @@ ENV UV_COMPILE_BYTECODE=1 \
 COPY pyproject.toml uv.lock README.md ./
 COPY paperful ./paperful
 
+ARG PAPERFUL_IMAGE_MODE=light
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --no-dev --no-editable --extra serve --reinstall-package paperful
+    case "${PAPERFUL_IMAGE_MODE}" in \
+      light) \
+        uv sync --no-dev --no-editable --extra serve \
+          --reinstall-package paperful ;; \
+      heavy) \
+        uv sync --no-dev --no-editable \
+          --extra serve --extra llm --extra rag --extra browser-agent \
+          --reinstall-package paperful ;; \
+      *) \
+        echo "Unknown PAPERFUL_IMAGE_MODE=${PAPERFUL_IMAGE_MODE} (use light|heavy)" >&2; \
+        exit 1 ;; \
+    esac
 
 FROM python:3.12-slim-bookworm AS runtime
+
+ARG PAPERFUL_IMAGE_MODE=light
+LABEL org.opencontainers.image.title="paperful" \
+      paperful.image.mode="${PAPERFUL_IMAGE_MODE}"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -30,7 +50,8 @@ RUN apt-get update \
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH" \
     PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
-    PAPERFUL_ZOTERO_HOST=host.docker.internal
+    PAPERFUL_ZOTERO_HOST=host.docker.internal \
+    PAPERFUL_IMAGE_MODE=${PAPERFUL_IMAGE_MODE}
 
 # Chromium + OS libs for htmlpdf / session vault reuse.
 RUN playwright install --with-deps chromium \

@@ -185,6 +185,33 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     def root() -> RedirectResponse:
         return RedirectResponse(url="/wanted", status_code=302)
 
+    def _wanted_token(verb: str) -> str:
+        for rec in commands.list_commands(cfg, limit=30):
+            if rec.get("verb") == verb and rec.get("review_token"):
+                return str(rec["review_token"])
+        return ""
+
+    def _parse_int(raw: object) -> int | None:
+        text = str(raw or "").strip()
+        if not text:
+            return None
+        return int(text)
+
+    def _wanted_run_flags(form: Any) -> dict[str, Any]:
+        types = [t.strip() for t in str(form.get("item_type") or "").split(",") if t.strip()]
+        return {
+            "year_from": _parse_int(form.get("year_from")),
+            "year_to": _parse_int(form.get("year_to")),
+            "item_type": types,
+            "limit": _parse_int(form.get("limit")),
+            "retry_failed": form.get("retry_failed") == "1",
+            "try_all": form.get("try_all") == "1",
+            "upgrade_linked": form.get("upgrade_linked") == "1",
+            "upgrade_snapshot": form.get("upgrade_snapshot") == "1",
+            "browser_agent": form.get("browser_agent") == "1",
+            "htmlpdf": form.get("htmlpdf") == "1",
+        }
+
     @app.get("/wanted", response_class=HTMLResponse)
     def page_wanted(request: Request, tab: str = "missing", error: str = "") -> HTMLResponse:
         prefs = prefs_from_request(request)
@@ -223,6 +250,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 coach=coach,
                 briefs=briefs,
                 dest_options=dest_options(),
+                attach_token=_wanted_token("attach"),
+                recover_token=_wanted_token("recover"),
             ),
         )
 
@@ -271,6 +300,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         prefs = prefs_from_request(request)
         form = await request.form()
         keys = [str(k) for k in form.getlist("keys")]
+        flags = _wanted_run_flags(form) if prefs.advanced else {}
 
         def work(cmd_id: str) -> None:
             jobs.preview_run(
@@ -279,6 +309,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 collection=prefs.collection,
                 preset=prefs.preset,
                 keys=keys or None,
+                flags=flags,
             )
 
         cmd_id = commands.enqueue(cfg, "preview_run", work)
@@ -295,25 +326,127 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 if c.get("review_token"):
                     token = c["review_token"]
                     break
+        if not token:
+            token = _wanted_token("preview_run")
         ok, msg = jobs.grab_run(cfg, token=token)
         if not ok:
             return JSONResponse({"ok": False, "error": msg}, status_code=409)
         return RedirectResponse(url="/wanted", status_code=303)
 
-    @app.post("/wanted/attach", response_model=None)
-    async def wanted_attach(request: Request):
+    @app.post("/wanted/attach/preview")
+    async def wanted_attach_preview(request: Request) -> RedirectResponse:
         prefs = prefs_from_request(request)
         form = await request.form()
         keys = [str(k) for k in form.getlist("keys")]
-        ok, msg = jobs.attach_run(cfg, keys=keys, collection=prefs.collection)
-        if not ok:
-            from urllib.parse import quote
+        from . import wanted_jobs
 
-            return RedirectResponse(
-                url=f"/wanted?error={quote(msg or 'attach failed')}",
-                status_code=303,
+        def work(cmd_id: str) -> None:
+            wanted_jobs.attach_preview(
+                cfg,
+                cmd_id,
+                collection=prefs.collection,
+                keys=keys or None,
+                allow_mismatch=form.get("allow_mismatch") == "1",
+                allow_short=form.get("allow_short") == "1",
             )
+
+        cmd_id = commands.enqueue(cfg, "attach", work)
+        return RedirectResponse(url=f"/wanted?run={cmd_id}", status_code=303)
+
+    @app.post("/wanted/attach", response_model=None)
+    async def wanted_attach(request: Request):
+        form = await request.form()
+        from . import wanted_jobs
+
+        token = str(form.get("review_token") or "") or _wanted_token("attach")
+        ok, msg = wanted_jobs.attach_apply(cfg, token=token)
+        if not ok:
+            return JSONResponse({"ok": False, "error": msg}, status_code=409)
         return RedirectResponse(url="/wanted", status_code=303)
+
+    @app.post("/wanted/recover/preview")
+    async def wanted_recover_preview(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        keys = [str(k) for k in form.getlist("keys")]
+        from . import wanted_jobs
+
+        def work(cmd_id: str) -> None:
+            wanted_jobs.recover_preview(
+                cfg,
+                cmd_id,
+                collection=prefs.collection,
+                keys=keys,
+                from_last_run=form.get("from_last_run") == "1",
+                from_last_run_mode=str(form.get("from_last_run_mode") or "not_found"),
+                limit=_parse_int(form.get("limit")),
+            )
+
+        cmd_id = commands.enqueue(cfg, "recover", work)
+        return RedirectResponse(url=f"/wanted?run={cmd_id}", status_code=303)
+
+    @app.post("/wanted/recover", response_model=None)
+    async def wanted_recover(request: Request):
+        form = await request.form()
+        from . import wanted_jobs
+
+        token = str(form.get("review_token") or "") or _wanted_token("recover")
+        ok, msg = wanted_jobs.recover_apply(cfg, token=token)
+        if not ok:
+            return JSONResponse({"ok": False, "error": msg}, status_code=409)
+        return RedirectResponse(url="/wanted", status_code=303)
+
+    @app.post("/wanted/handoff")
+    async def wanted_handoff(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        keys = [str(k) for k in form.getlist("keys")]
+        from . import wanted_jobs
+
+        def work(cmd_id: str) -> None:
+            wanted_jobs.handoff_run(
+                cfg,
+                cmd_id,
+                collection=prefs.collection,
+                keys=keys or None,
+                mode=str(form.get("mode") or "list"),
+                include_doi_tabs=form.get("include_doi_tabs") == "1",
+            )
+
+        cmd_id = commands.enqueue(cfg, "handoff", work)
+        return RedirectResponse(url=f"/wanted?run={cmd_id}", status_code=303)
+
+    @app.post("/wanted/inbox/drain")
+    async def wanted_inbox_drain(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        from . import wanted_jobs
+
+        def work(cmd_id: str) -> None:
+            wanted_jobs.inbox_drain(cfg, cmd_id, collection=prefs.collection)
+
+        cmd_id = commands.enqueue(cfg, "inbox_drain", work)
+        return RedirectResponse(url=f"/wanted?run={cmd_id}", status_code=303)
+
+    @app.post("/wanted/reachout")
+    async def wanted_reachout(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        keys = [str(k) for k in form.getlist("keys")]
+        from . import wanted_jobs
+
+        def work(cmd_id: str) -> None:
+            wanted_jobs.reachout_run(
+                cfg,
+                cmd_id,
+                collection=prefs.collection,
+                keys=keys or None,
+                non_oa_only=form.get("non_oa_only") == "1",
+                lookup=form.get("lookup") == "1",
+                handoff_mode=str(form.get("handoff_mode") or ""),
+            )
+
+        cmd_id = commands.enqueue(cfg, "reachout", work)
+        return RedirectResponse(url=f"/wanted?run={cmd_id}", status_code=303)
 
     def _last_review_token(verb: str) -> str:
         for rec in commands.list_commands(cfg, limit=20):
@@ -350,10 +483,13 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 deferred_run=snowball_deferred_run_id(cfg),
                 snowball_token=_last_review_token("snowball_apply"),
                 aw_token=_last_review_token("authorwatch_apply"),
+                ingest_token=_last_review_token("ingest_dois"),
                 note=(
                     last_job_result(cfg, "snowball_briefing")
                     or last_job_result(cfg, "snowball_digest")
                     or last_job_result(cfg, "authorwatch_briefing")
+                    or last_job_result(cfg, "refs_gap")
+                    or last_job_result(cfg, "authors")
                 ),
                 error=error,
             ),
@@ -370,6 +506,135 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
 
         commands.enqueue(cfg, f"snowball_{payload.kind}", work)
         return RedirectResponse(url="/discover", status_code=303)
+
+    @app.post("/discover/profile-save")
+    async def discover_profile_save(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        name = str(form.get("profile_name") or "").strip()
+        if not name:
+            return RedirectResponse(url="/discover?error=profile", status_code=303)
+        from .snowball_form import profile_body_from_payload
+        from ..snowball.profile import save_profile
+        from ..snowball.command import SnowballError
+
+        payload = parse_discover_topic(form, advanced=True)
+        try:
+            body = profile_body_from_payload(payload, collection=prefs.collection)
+            save_profile(cfg, name, body, force=form.get("force") == "1")
+        except (SnowballError, ValueError) as exc:
+            return RedirectResponse(
+                url=f"/discover?error={str(exc)[:80]}", status_code=303
+            )
+        return RedirectResponse(url="/discover", status_code=303)
+
+    @app.post("/discover/refs-gap")
+    async def discover_refs_gap(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+
+        def work(cmd_id: str) -> None:
+            from ..agent_ops import run_refs_gap
+
+            result = run_refs_gap(cfg, prefs.collection)
+            rec = commands.read_command(cfg, cmd_id) or {}
+            rec["result"] = result
+            commands.write_command(cfg, rec)
+
+        cmd_id = commands.enqueue(cfg, "refs_gap", work)
+        return RedirectResponse(url=f"/discover?run={cmd_id}", status_code=303)
+
+    @app.post("/discover/ingest-preview")
+    async def discover_ingest_preview(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        pack_path = str(form.get("pack_path") or "").strip()
+        upload = form.get("file")
+        dest = cfg.state_dir / "gui" / "uploads"
+        dest.mkdir(parents=True, exist_ok=True)
+        source_path = ""
+        if upload is not None and getattr(upload, "filename", None):
+            path = dest / Path(str(upload.filename)).name
+            path.write_bytes(await upload.read())
+            source_path = str(path)
+        elif pack_path:
+            source_path = pack_path
+
+        def work(cmd_id: str) -> None:
+            from . import discover_jobs
+
+            discover_jobs.ingest_preview(
+                cfg,
+                cmd_id,
+                collection=prefs.collection,
+                source_path=source_path,
+            )
+
+        cmd_id = commands.enqueue(cfg, "ingest_dois", work)
+        return RedirectResponse(url=f"/discover?run={cmd_id}", status_code=303)
+
+    @app.post("/discover/ingest-apply", response_model=None)
+    async def discover_ingest_apply(request: Request):
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        from . import discover_jobs
+
+        token = str(form.get("review_token") or "") or _last_review_token("ingest_dois")
+        ok, msg = discover_jobs.ingest_apply(
+            cfg, token=token, collection=prefs.collection
+        )
+        if not ok:
+            return JSONResponse({"ok": False, "error": msg}, status_code=409)
+        return RedirectResponse(url="/discover", status_code=303)
+
+    @app.post("/discover/authors")
+    async def discover_authors(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+
+        def work(cmd_id: str) -> None:
+            from rich.console import Console
+
+            from ..authors_cmd import run_authors
+
+            run_authors(
+                Console(quiet=True, file=None),
+                collection=[prefs.collection] if prefs.collection else [],
+                library=not bool(prefs.collection),
+                year_from=None,
+                year_to=None,
+                item_type=[],
+                min_count=int(form.get("min_count") or 2),
+                max_authors=int(form.get("max_authors") or 15),
+                apply=form.get("apply") == "1",
+                profile=None,
+                run_config=None,
+                config=cfg.config_path,
+                fmt="json",
+            )
+            rec = commands.read_command(cfg, cmd_id) or {}
+            rec["result"] = {"apply": form.get("apply") == "1"}
+            commands.write_command(cfg, rec)
+
+        cmd_id = commands.enqueue(cfg, "authors", work)
+        return RedirectResponse(url=f"/discover?run={cmd_id}", status_code=303)
+
+    @app.post("/discover/packs-promote")
+    async def discover_packs_promote(request: Request) -> RedirectResponse:
+        form = await request.form()
+        slug = str(form.get("slug") or "").strip()
+        if not slug:
+            return RedirectResponse(url="/discover?error=slug", status_code=303)
+
+        def work(cmd_id: str) -> None:
+            from ..snowball.preflight import promote_pack
+
+            path = promote_pack(cfg, slug)
+            rec = commands.read_command(cfg, cmd_id) or {}
+            rec["result"] = {"path": str(path)}
+            commands.write_command(cfg, rec)
+
+        cmd_id = commands.enqueue(cfg, "packs_promote", work)
+        return RedirectResponse(url=f"/discover?run={cmd_id}", status_code=303)
 
     @app.post("/discover/follow")
     async def discover_follow(request: Request) -> RedirectResponse:
@@ -544,10 +809,19 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         commands.enqueue(cfg, "snowball_profile", work)
         return RedirectResponse(url="/discover", status_code=303)
 
+    def _maybe_file_note(html: str, apply: bool, collection: str) -> str:
+        if not apply:
+            return ""
+        from . import discover_jobs
+
+        return discover_jobs.file_frontier_note(cfg, html, collection)
+
     @app.post("/discover/briefing")
     async def discover_briefing(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
         form = await request.form()
         run_id = str(form.get("run_id") or "").strip()
+        apply_note = form.get("apply") == "1"
         if not run_id:
             return RedirectResponse(url="/discover", status_code=303)
 
@@ -555,10 +829,15 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             from ..snowball.briefing import write_run_briefing
 
             briefing = write_run_briefing(cfg, run_id)
+            note_key = _maybe_file_note(briefing.html, apply_note, prefs.collection)
             jobs._attach_result(
                 cfg,
                 cmd_id,
-                {"path": str(briefing.path), "markdown": briefing.markdown[:4000]},
+                {
+                    "path": str(briefing.path),
+                    "markdown": briefing.markdown[:4000],
+                    "note_key": note_key,
+                },
             )
 
         commands.enqueue(cfg, "snowball_briefing", work)
@@ -566,8 +845,10 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
 
     @app.post("/discover/digest")
     async def discover_digest(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
         form = await request.form()
         run_id = str(form.get("run_id") or "").strip()
+        apply_note = form.get("apply") == "1"
         if not run_id:
             return RedirectResponse(url="/discover", status_code=303)
 
@@ -575,13 +856,72 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             from ..snowball.digest import write_run_digest
 
             digest = write_run_digest(cfg, run_id)
+            note_key = _maybe_file_note(digest.html, apply_note, prefs.collection)
             jobs._attach_result(
                 cfg,
                 cmd_id,
-                {"path": str(digest.path), "markdown": digest.markdown[:4000]},
+                {
+                    "path": str(digest.path),
+                    "markdown": digest.markdown[:4000],
+                    "note_key": note_key,
+                },
             )
 
         commands.enqueue(cfg, "snowball_digest", work)
+        return RedirectResponse(url="/discover", status_code=303)
+
+    @app.post("/discover/watch-briefing")
+    async def discover_watch_briefing(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        name = str(form.get("name") or "").strip()
+        apply_note = form.get("apply") == "1"
+        if not name:
+            return RedirectResponse(url="/discover", status_code=303)
+
+        def work(cmd_id: str) -> None:
+            from ..snowball.briefing import write_watch_briefing
+
+            briefing = write_watch_briefing(cfg, name)
+            note_key = _maybe_file_note(briefing.html, apply_note, prefs.collection)
+            jobs._attach_result(
+                cfg,
+                cmd_id,
+                {
+                    "path": str(briefing.path),
+                    "markdown": briefing.markdown[:4000],
+                    "note_key": note_key,
+                },
+            )
+
+        commands.enqueue(cfg, "watch_briefing", work)
+        return RedirectResponse(url="/discover", status_code=303)
+
+    @app.post("/discover/watch-digest")
+    async def discover_watch_digest(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        name = str(form.get("name") or "").strip()
+        apply_note = form.get("apply") == "1"
+        if not name:
+            return RedirectResponse(url="/discover", status_code=303)
+
+        def work(cmd_id: str) -> None:
+            from ..snowball.digest import write_watch_digest
+
+            digest = write_watch_digest(cfg, name)
+            note_key = _maybe_file_note(digest.html, apply_note, prefs.collection)
+            jobs._attach_result(
+                cfg,
+                cmd_id,
+                {
+                    "path": str(digest.path),
+                    "markdown": digest.markdown[:4000],
+                    "note_key": note_key,
+                },
+            )
+
+        commands.enqueue(cfg, "watch_digest", work)
         return RedirectResponse(url="/discover", status_code=303)
 
     @app.post("/discover/aw/save")
@@ -601,9 +941,16 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         name = str(form.get("list_name") or "followed").strip()
         orcid = str(form.get("orcid") or "").strip()
         display = str(form.get("display_name") or "").strip()
+        affiliation = str(form.get("affiliation") or "").strip()
         from ..authorwatch import add_person
 
-        add_person(cfg, name, orcid=orcid, display_name=display)
+        add_person(
+            cfg,
+            name,
+            orcid=orcid,
+            display_name=display,
+            affiliation_host=affiliation,
+        )
         return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
 
     @app.post("/discover/aw/remove")
@@ -635,11 +982,23 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         form = await request.form()
         name = str(form.get("list_name") or "").strip()
         backfill = str(form.get("backfill_from") or "").strip() or None
+        max_authors = form.get("max_authors")
+        per_author = form.get("per_author_limit")
+        max_authors_n = int(max_authors) if str(max_authors or "").strip() else None
+        per_author_n = int(per_author) if str(per_author or "").strip() else None
 
         def work(_cmd_id: str) -> None:
             from ..authorwatch import run_list
 
-            run_list(cfg, name, console=jobs._quiet_console(), backfill_from=backfill)
+            kwargs: dict[str, Any] = {
+                "console": jobs._quiet_console(),
+                "backfill_from": backfill,
+            }
+            if max_authors_n is not None:
+                kwargs["max_authors"] = max_authors_n
+            if per_author_n is not None:
+                kwargs["per_author_limit"] = per_author_n
+            run_list(cfg, name, **kwargs)
 
         commands.enqueue(cfg, "authorwatch_run", work)
         return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
@@ -793,6 +1152,38 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         set_cookie(resp, COOKIE_COLLECTION, coll)
         return resp
 
+    def _review_tokens_for(prefix: str) -> dict[str, str]:
+        out: dict[str, str] = {}
+        for c in commands.list_commands(cfg, limit=40):
+            verb = str(c.get("verb") or "")
+            token = str(c.get("review_token") or "")
+            if not token or not verb.startswith(prefix):
+                continue
+            short = verb[len(prefix) :]
+            if short and short not in out:
+                out[short] = token
+        return out
+
+    def _repair_flags(form: Any) -> dict[str, Any]:
+        return {
+            "overwrite": form.get("overwrite") == "1",
+            "apply_medium": form.get("apply_medium") == "1",
+            "phase": str(form.get("phase") or "all"),
+            "fix_broken": form.get("fix_broken") == "1",
+            "merge_files": form.get("merge_files") == "1",
+            "rename": form.get("rename") == "1",
+            "link": form.get("link") == "1",
+            "attach": form.get("attach") == "1",
+        }
+
+    def _mirror_flags(form: Any) -> dict[str, Any]:
+        pdfs = str(form.get("pdfs") or "").strip()
+        return {
+            "full": form.get("full") == "1",
+            "pdfs": pdfs,
+            "accept_gone": form.get("accept_gone") == "1",
+        }
+
     @app.get("/repair", response_class=HTMLResponse)
     def page_repair(request: Request, run: str = "", error: str = "") -> HTMLResponse:
         run_rec = command_by_id(cfg, run) if run else None
@@ -803,6 +1194,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 request,
                 "repair",
                 queues=repair_queues(cfg),
+                tokens=_review_tokens_for("repair_"),
                 message="",
                 run_rec=run_rec,
                 poll_run=run,
@@ -918,6 +1310,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     async def mirror_apply_route(request: Request) -> JSONResponse | RedirectResponse:
         prefs = prefs_from_request(request)
         form = await request.form()
+        verb = str(form.get("verb") or "")
         token = str(form.get("review_token") or "")
         if not token:
             return JSONResponse({"ok": False, "error": "missing review token"}, status_code=409)

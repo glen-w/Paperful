@@ -9,6 +9,18 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ### Added
 
+- **Docker light/heavy packs:** `PAPERFUL_IMAGE_MODE=light` (default; `[serve]`
+  only, CI) or `heavy` (`[serve]` `[llm]` `[rag]` `[browser-agent]`). Set in
+  `.env` for a full local image; `make docker-build-heavy`. See [docker](docs/docker.md).
+- **GUI CLI parity (Wanted / Repair / Mirror / Discover):** Repair and Mirror
+  Preview run dry-run then Apply invokes the same domain entrypoints as the CLI
+  (`lint`, `fix-metadata`, `dedupe`, `versions`, `attachments`, `ocr`, `sync`,
+  `snapshot`, `restore`, `cache clean`). Wanted Advanced: attach, recover,
+  handoff, inbox drain, reachout, Grab year/type/retry/browser-agent flags.
+  Discover Advanced: crawl knobs (including Twenty writeback), profile save,
+  refs gap, ingest-dois, authors, packs promote; queue/watch briefing and
+  digest can file a collection note (`paperful:frontier-briefing`). Route
+  table: [gui.md](docs/gui.md).
 - **GUI thickening:** Index runs `rag ingest`, `rag search`, batch Ask, and collection
   `synthesize`; Advanced **Briefs** runs collection `summarize` / `synthesize`.
   Per-item summarize in Wanted/Library drawers (`/item/{key}/summary`, `/wanted/summarize`).
@@ -23,6 +35,9 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ### Changed
 
+- **Docs:** workbench pages ([gui.md](docs/gui.md), roadmap, releases, commands,
+  architecture) now list Repair/Mirror Apply, watch briefing/digest, ingest-dois,
+  Twenty writeback, and what stays CLI.
 - **Roadmap / 1.0 scope:** 1.0 now includes the workbench GUI (illuminate and
   run CLI workflows) and interactive Ask (chat-over-collection RAG in the GUI).
   Post-1.0: local OpenAlex snapshot phases 2B/2C, Firefox extension,

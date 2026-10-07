@@ -209,7 +209,9 @@ def _build_agent_llm(cfg: Config, model: str) -> Any:
         from browser_use.llm.litellm.chat import ChatLiteLLM
 
         return ChatLiteLLM(model=model)
-    host = cfg.llm_base_url.rstrip("/")
+    from .llm.validate import resolve_ollama_base_url
+
+    host = resolve_ollama_base_url(cfg.llm_base_url).rstrip("/")
     host = host.removesuffix("/v1")
     return ChatOllama(model=model, host=host)
 

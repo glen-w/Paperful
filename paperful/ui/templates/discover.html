@@ -24,8 +24,42 @@
     <label>Max candidates <input name="max_candidates" placeholder="all"></label>
     <label>Per-hop limit <input name="per_hop_limit" placeholder="all"></label>
     <label>Hybrid seeds <input name="hybrid_seeds" type="number"></label>
+    <label>Per-hop rank
+      <select name="per_hop_rank">
+        <option value="">default</option>
+        <option value="most-cited">most-cited</option>
+        <option value="least-cited">least-cited</option>
+        <option value="random">random</option>
+      </select>
+    </label>
+    <label>Fetch PDFs
+      <select name="fetch_pdfs">
+        <option value="">off</option>
+        <option value="fast">fast</option>
+        <option value="full">full</option>
+      </select>
+    </label>
+    <label>Keyword limit <input name="keyword_limit"></label>
+    <label>Keyword hop limit <input name="keyword_hop_limit"></label>
+    <label>Keyword min score <input name="keyword_min_score"></label>
+    <label>Cites query <input name="cites_query"></label>
+    <label>Languages <input name="languages" placeholder="en,fr"></label>
+    <label>Min seed citations <input name="min_seed_citations" type="number"></label>
+    <label>Backends <input name="backends" placeholder="openalex,crossref"></label>
+    <label>Tags <input name="tags" placeholder="paperful:frontier"></label>
+    <label>Dedupe scope <input name="dedupe_scope"></label>
+    <label>Dedupe after <input name="dedupe_after"></label>
     <label><input type="checkbox" name="or_mode" value="1"> OR keywords</label>
+    <label><input type="checkbox" name="note_provenance" value="1"> Note provenance</label>
+    <label><input type="checkbox" name="refine" value="1"> Refine</label>
+    <label><input type="checkbox" name="author_site_preflight" value="1"> Author-site preflight</label>
+    <label><input type="checkbox" name="twenty_writeback" value="1"> Twenty writeback</label>
     <label>Seeds <textarea name="seeds" rows="3" placeholder="DOIs / ORCIDs, one per line"></textarea></label>
+    {% endif %}
+    {% if prefs.advanced %}
+    <label>Save as profile <input name="profile_name" placeholder="my-topic"></label>
+    <label><input type="checkbox" name="force" value="1"> Overwrite</label>
+    <button type="submit" formaction="/discover/profile-save" class="secondary">Save profile</button>
     {% endif %}
     <button type="submit">Search</button>
   </form>
@@ -44,14 +78,43 @@
   {% if run_id %}
   <form method="post" action="/discover/briefing" class="toolbar">
     <input type="hidden" name="run_id" value="{{ run_id }}">
+    {% if prefs.advanced %}<label><input type="checkbox" name="apply" value="1"> File collection note</label>{% endif %}
     <button type="submit" class="secondary">Briefing</button>
   </form>
   <form method="post" action="/discover/digest" class="toolbar">
     <input type="hidden" name="run_id" value="{{ run_id }}">
+    {% if prefs.advanced %}<label><input type="checkbox" name="apply" value="1"> File collection note</label>{% endif %}
     <button type="submit" class="secondary">Digest</button>
   </form>
   {% endif %}
 </section>
+{% if prefs.advanced %}
+<section class="toolbar">
+  <h2>Grow (citations / DOIs / authors)</h2>
+  <form method="post" action="/discover/refs-gap" class="toolbar">
+    <button type="submit" class="secondary">Refs gap (dry-run pack)</button>
+  </form>
+  <form method="post" action="/discover/ingest-preview" class="toolbar" enctype="multipart/form-data">
+    <label>DOI file <input type="file" name="file"></label>
+    <label>Or pack path <input name="pack_path" placeholder="state/refs-gaps/.../pack.json"></label>
+    <button type="submit" class="secondary">Preview ingest-dois</button>
+  </form>
+  <form method="post" action="/discover/ingest-apply" class="toolbar">
+    <input type="hidden" name="review_token" value="{{ ingest_token }}">
+    <button type="submit">Apply ingest-dois</button>
+  </form>
+  <form method="post" action="/discover/authors" class="toolbar">
+    <label>Min count <input name="min_count" type="number" value="2" min="1"></label>
+    <label>Max authors <input name="max_authors" type="number" value="15" min="1"></label>
+    <label><input type="checkbox" name="apply" value="1"> Write report + proposed pack</label>
+    <button type="submit" class="secondary">Authors frequency</button>
+  </form>
+  <form method="post" action="/discover/packs-promote" class="toolbar">
+    <label>Promote pack slug <input name="slug" placeholder="ocean-bbnj"></label>
+    <button type="submit" class="secondary">Packs promote</button>
+  </form>
+</section>
+{% endif %}
 <section class="toolbar">
   <h2>People</h2>
   <form method="post" action="/discover/aw/save">
@@ -68,6 +131,7 @@
     <input type="hidden" name="list_name" value="{{ aw_list }}">
     <label>Add ORCID <input name="orcid"></label>
     <label>Name <input name="display_name"></label>
+    {% if prefs.advanced %}<label>Affiliation <input name="affiliation"></label>{% endif %}
     <button type="submit" class="secondary">Add person</button>
   </form>
   <form method="post" action="/discover/aw/resolve">
@@ -77,6 +141,10 @@
   <form method="post" action="/discover/aw/run">
     <input type="hidden" name="list_name" value="{{ aw_list }}">
     <label>Backfill from <input name="backfill_from" type="date"></label>
+    {% if prefs.advanced %}
+    <label>Max authors <input name="max_authors" type="number" min="1"></label>
+    <label>Per-author limit <input name="per_author_limit" type="number" min="1"></label>
+    {% endif %}
     <button type="submit" class="secondary">Run list</button>
   </form>
   <form method="post" action="/discover/aw/import" enctype="multipart/form-data">
@@ -203,6 +271,18 @@
       <input type="hidden" name="name" value="{{ f.name }}">
       <button type="submit" class="secondary">Check again</button>
     </form>
+    {% if prefs.advanced and f.kind == 'topic' %}
+    <form method="post" action="/discover/watch-briefing" style="display:inline">
+      <input type="hidden" name="name" value="{{ f.name }}">
+      <label><input type="checkbox" name="apply" value="1"> Note</label>
+      <button type="submit" class="secondary">Watch briefing</button>
+    </form>
+    <form method="post" action="/discover/watch-digest" style="display:inline">
+      <input type="hidden" name="name" value="{{ f.name }}">
+      <label><input type="checkbox" name="apply" value="1"> Note</label>
+      <button type="submit" class="secondary">Watch digest</button>
+    </form>
+    {% endif %}
   </li>
   {% endfor %}
 </ul>

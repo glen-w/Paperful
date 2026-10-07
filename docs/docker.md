@@ -7,9 +7,10 @@ login live on the host. Docker does not replace them.
 
 The Compose image is a **one-shot pack** — Python 3.12, Paperful, Poppler
 (`pdftotext`), OCRmyPDF and Tesseract (`eng`), Playwright Chromium — for unattended commands (`run`, `lint`,
-`ocr`, `report`, `attach` once a write key exists). It is not a daemon and not a
-complete environment. Contributors use [`uv`](https://docs.astral.sh/uv/)
-(see the [README](https://github.com/glen-w/Paperful#readme) Develop section).
+`ocr`, `report`, `attach` once a write key exists). It is not a daemon.
+Build mode is selected with `PAPERFUL_IMAGE_MODE` (see below). Contributors can
+still use [`uv`](https://docs.astral.sh/uv/) on the host (see the
+[README](https://github.com/glen-w/Paperful#readme) Develop section).
 
 Durable data — config, custom playbook packs, `out/`, and `state/` — still
 lives **outside** the container (and, by default, outside the git root).
@@ -20,14 +21,15 @@ not extra volumes. Compose does not mount Zotero Storage writable. See
 [Terms](TERMS.md).
 
 **What CI proves:** job `docker` in `.github/workflows/ci.yml` builds the
-image and runs `doctor --no-guide` with **no live Zotero**. Exit **2** is
-required (Zotero row amber/red). That is a first-run stranger machine, not a
-failed Compose install. Pytest job `test` is not the Compose-first proof.
+**light** image (`PAPERFUL_IMAGE_MODE` unset) and runs `doctor --no-guide`
+with **no live Zotero**. Exit **2** is required (Zotero row amber/red). That
+is a first-run stranger machine, not a failed Compose install. Pytest job
+`test` is not the Compose-first proof.
 
 ## What still runs on the host
 
 - Zotero (GUI, local API, “Always allow”)
-- `paperful session login scholar|ezproxy` (headed Chrome/Edge on the host: campus SSO, Scholar CAPTCHA)
+- `paperful session login scholar|ezproxy` (headed Chrome/Edge on the host: campus SSO, Scholar CAPTCHA). An everyday-browser login does not transfer — see [Sessions](sessions.md)
 - `paperful session login mendeley` (Elsevier OAuth; the localhost redirect will not
   reach a container — see [Mendeley](mendeley.md))
 - EndNote `.enl` / `.Data` (desktop library on the host; Paperful never writes SQLite —
@@ -93,7 +95,7 @@ will not land on the volume.
 
 | File | Role |
 | --- | --- |
-| [`.env.example`](https://github.com/glen-w/Paperful/blob/main/.env.example) | Copy to `.env` — `PAPERFUL_DATA`, `PAPERFUL_ZOTERO_HOST` |
+| [`.env.example`](https://github.com/glen-w/Paperful/blob/main/.env.example) | Copy to `.env` — `PAPERFUL_DATA`, `PAPERFUL_ZOTERO_HOST`, `PAPERFUL_IMAGE_MODE` |
 | [`compose.yaml`](https://github.com/glen-w/Paperful/blob/main/compose.yaml) | Base service (build, Zotero host, data volume) |
 | [`compose.override.example.yaml`](https://github.com/glen-w/Paperful/blob/main/compose.override.example.yaml) | Optional local Compose tweaks |
 
@@ -102,19 +104,47 @@ never land in the repo. Set `PAPERFUL_DATA=.` to keep config/`out`/`state` in th
 repo; use `../paperful-data` (default) to keep packs and outputs outside the
 git root.
 
-`PAPERFUL_ZOTERO_HOST` defaults to `host.docker.internal` so Docker Desktop
-(macOS/Windows) can reach host Zotero. Compose also adds
+### Image mode: light vs heavy
+
+| Mode | `PAPERFUL_IMAGE_MODE` | Python extras | Typical use |
+| --- | --- | --- | --- |
+| **light** | `light` (Compose default when unset) | `[serve]` | CI, small stranger image |
+| **heavy** | `heavy` (set in `.env.example`) | `[serve]` `[llm]` `[rag]` `[browser-agent]` | Full local env |
+
+`rag-docling` (Torch) is not in either image; use host `uv sync --extra rag-docling` if you need Docling parsing.
+
+```sh
+# Local full pack (recommended after cp .env.example .env):
+PAPERFUL_IMAGE_MODE=heavy docker compose build
+# or: make docker-build-heavy
+
+# Slim pack (CI / default when the variable is unset):
+PAPERFUL_IMAGE_MODE=light docker compose build
+```
+
+Rebuild after changing the mode (`docker compose build`). The image label
+`paperful.image.mode` records which pack was built.
+
+`PAPERFUL_ZOTERO_HOST` and `PAPERFUL_OLLAMA_HOST` default to
+`host.docker.internal` so Docker Desktop (macOS/Windows) can reach Zotero and
+Ollama on the host. Compose also adds
 `extra_hosts: host.docker.internal:host-gateway` for Linux Docker Engine.
 Paperful always sends `Host: localhost:23119` — Zotero’s local API requires
-that header even when the TCP peer is `host.docker.internal`.
+that header even when the TCP peer is `host.docker.internal`. Outside Docker,
+`host.docker.internal` in those env vars falls back to localhost / `127.0.0.1`
+so a shared `.env` does not break host `uv run`.
 
-## Optional LLM inside the image
+## Optional LLM, RAG, and browser-agent
 
-The image ships neither `litellm` nor `browser-use`, so the `browser_agent` lane
-(`run` auto-recover and `paperful recover`) is host-only (it also needs the
-headed-login vault). The image **does** include `paperful[serve]` (FastAPI/Jinja)
-for the Compose `gui` profile. It binds in the container on `0.0.0.0:8765` and
-**publishes only** `127.0.0.1:8765:8765` (no LAN):
+**light** ships `[serve]` only (FastAPI/Jinja for the Compose `gui` profile).
+**heavy** also installs `[llm]`, `[rag]` (LanceDB), and `[browser-agent]`
+(`browser-use`), so `rag` / `ask`, LiteLLM, and the `browser_agent` lane work
+inside the container. Headed `session login` still stays on the host (shared
+`state/` vault).
+
+The GUI binds in the container on `0.0.0.0:8765` and **publishes only**
+`127.0.0.1:8765:8765` (no LAN). Same workbench as host `paperful serve`
+([gui.md](gui.md) — Discover / Wanted; Advanced Repair / Mirror / Index / Briefs):
 
 ```sh
 docker compose -f compose.yaml -f compose.gui.yaml --profile gui up paperful-gui
@@ -122,21 +152,15 @@ docker compose -f compose.yaml -f compose.gui.yaml --profile gui up paperful-gui
 
 Host-only `uv run paperful serve` remains the contributor path. `fix-metadata` title
 proposals, the `lint` identity check, `summarize`, and `synthesize` work from the container
-against an Ollama running on the host:
+against an Ollama running on the host. Keep loopback in `config.toml`
+(`base_url = "http://127.0.0.1:11434"`); Paperful rewrites it to
+`host.docker.internal` inside the container via `PAPERFUL_OLLAMA_HOST`.
 
-```toml
-[llm]
-enabled = true
-base_url = "http://host.docker.internal:11434"
-allow_remote = true    # host.docker.internal is not loopback
-```
-
-Start Ollama listening on all interfaces (`OLLAMA_HOST=0.0.0.0 ollama serve`).
+On **Docker Desktop**, the default Ollama loopback bind is enough (same as
+Zotero). On **Linux Docker Engine**, bind with
+`OLLAMA_HOST=0.0.0.0 ollama serve` so `host-gateway` can connect.
 `docker compose run --rm paperful doctor` shows the `LLM` row. Details:
-[LLM](llm.md#docker).
-
-The image does not ship the `rag` extra (LanceDB), so `paperful rag` and
-`paperful ask` are host-only for now. See [rag.md](rag.md).
+[LLM](llm.md#docker). See [rag.md](rag.md) for the index.
 
 ## Custom playbook packs
 
@@ -206,7 +230,8 @@ docker compose run --rm paperful dedupe -C BBNJ --dry-run
 docker compose run --rm paperful run --collection interesting --dry-run
 docker compose run --rm paperful run --collection interesting
 docker compose run --rm paperful report
-make docker-build
+make docker-build          # uses PAPERFUL_IMAGE_MODE from .env
+make docker-build-heavy    # force heavy pack
 make docker-doctor
 ```
 
@@ -217,7 +242,8 @@ instead of `uv run paperful`. Headed `session login` is still host-only.
 ## Image contents
 
 - Python 3.12, Paperful + Playwright Chromium (htmlpdf / session vault reuse)
-- Poppler (`pdftotext`)
+- Poppler (`pdftotext`), OCRmyPDF, Tesseract (`eng`)
+- `[serve]` always; **heavy** also `[llm]` `[rag]` `[browser-agent]`
 - Non-root user `paperful` (uid 1000)
 
 If bind-mounted `out/` / `state/` are not writable, fix ownership on the host

@@ -1,8 +1,14 @@
 # Browser sessions (Scholar, EZProxy, publishers)
 
-Log in once in your normal browser; Paperful reuses that login on this
+Log in once via `paperful session login`; Paperful reuses that vault on this
 machine. The walkthrough is [How it works](how-it-works.md#using-your-scholar-or-library-login).
 This page is the vault, engines, and CAPTCHA troubleshooting.
+
+**Known limitation — everyday browser cookies.** Being logged into EZProxy or
+Scholar in your usual Chrome/Safari/Firefox does **not** count. Paperful cannot
+read the system browser cookie store (Keychain-encrypted; no CDP attach to a
+normal window). Use `session login` (preferred), or export a Netscape
+`cookies.txt` into `state/` — see [Campus EZProxy](ezproxy.md#advanced-netscape-cookiestxt).
 
 One local vault: `state/sessions/`. Playwright is a core dependency; Chromium
 for the headless fallback installs automatically on first need.

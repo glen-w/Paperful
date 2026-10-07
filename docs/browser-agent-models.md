@@ -23,7 +23,7 @@ See [ROADMAP § browser-use](ROADMAP.md#browser-use-integration-models-docs-conf
 | Batch recover | `paperful recover --from-last-run` replays keys from `state/last-run.json` (`--from-last-run-mode`, `--limit`). Same runner as `--item`. |
 | Learned playbooks | Agent PDFs append `state/fetch-wins.jsonl` with promotable `click:` / `rewrite` wins and optional `steps` trace → `playbooks propose` / `promote`. |
 
-Operator setup: [LLM § recover](llm.md#a-recover--browser-agent-pdf-recovery), [sessions](sessions.md), [config § browser_agent](config.md#llm-optional-local-first).
+Operator setup: [LLM § recover](llm.md#a-recover--browser-agent-pdf-recovery), [sessions](sessions.md), [config § browser_agent](config.md#llm-optional-local-first). Install via `uv sync --extra browser-agent` or a **heavy** Compose image ([Docker](docker.md#image-mode-light-vs-heavy)); headed vault login stays on the host.
 
 ## Recommended Ollama tags (by VRAM band)
 

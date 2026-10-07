@@ -2,8 +2,10 @@
 
 Snippets below use `uv run` so they stay short. The operator install is
 clone plus `docker compose build`, then
-`docker compose run --rm paperful …` ([Docker](docker.md)). CI builds that
-image and expects `doctor` to exit 2 without Zotero. There is no published
+`docker compose run --rm paperful …` ([Docker](docker.md)). CI builds the
+**light** image and expects `doctor` to exit 2 without Zotero. **heavy**
+adds `[llm]` `[rag]` `[browser-agent]` (see
+[image mode](docker.md#image-mode-light-vs-heavy)). There is no published
 image and no PyPI package. Headed `session login` is host-only
 (`uv run paperful session login …`). No campus access: `--preset oa`.
 Campus EZProxy: `--preset eoi`. `paperful jobs` lists verbs by job.
@@ -214,7 +216,7 @@ uv run paperful pack show
 | `ingest-dois` | DOI list → metadata parents in `-C`. Dry-run unless `--apply`. Reports created / exists / unresolved / **held**. `--format json`. `--tag` plus `[ingest].default_tags` and `from-<file-stem>`. Does not fetch PDFs (`run` after). |
 | `collections` | `list` (or bare `collections`) — collection tree with “No PDF” counts. `add --keys-file` — file **existing** item keys into `-C` (membership only; dry-run unless `--apply`; added / already-in / not-found). `--format json`. Complements `ingest-dois` (create parents). Zotero / Mendeley; EndNote refuses `--apply`. Not an MCP tool. |
 | `mcp` | Optional stdio MCP over the same JSON channel. Tools: `refs_gap` (never writes parents) and `ask` (index read-only). Prefer `paperful … --format json` from a shell. `collections add` is CLI-only and is not exposed. |
-| `serve` | Localhost HTTP (`127.0.0.1:8765`). Needs `paperful[serve]` (`uv sync --extra serve`). JSON capability API (health, doctor, collections, last-run, dry-run `refs-gap` / `ask`) plus Jinja workbench (Discover, Wanted, …; Advanced Index / Briefs / Repair / Mirror / Settings). Library writes only from explicit Preview/Grab (and Advanced apply). Image includes the `serve` extra so the Compose `gui` profile can run `paperful serve`. See [gui.md](gui.md). |
+| `serve` | Localhost HTTP (`127.0.0.1:8765`). Needs `paperful[serve]` (`uv sync --extra serve`). JSON capability API (health, doctor, collections, last-run, dry-run `refs-gap` / `ask`) plus Jinja workbench (Discover, Wanted, …; Advanced Index / Briefs / Repair / Mirror / Settings). Library writes only from Preview then Apply / Grab (review tokens). TTY, Sci-Hub, and `collections add` stay CLI. Every Compose image includes `serve` so the `gui` profile can run; **heavy** also has RAG/Ask extras for Index. See [gui.md](gui.md). |
 | `all` | `gaps` → `run --try-all --retry-failed --upgrade-linked` → `lint` → `fix-metadata --apply` → `summarize --apply`. Stops on the first failure. `--dry-run` skips `summarize` and does not apply metadata. `--browser-agent` / `--no-browser-agent` pass through to the `run` step. `--profile` / `-f` load a saved run config. Opens a pack when none is open. `--format json` prints one envelope for the whole sequence (nested substeps stay quiet on stdout). See [Workflows](workflows.md). |
 | `profile` | `list` / `show` / `save` — named run configs beside `config.toml` (`profiles/<name>.toml` or `[profiles.*]`). `show` prints the merge `all` would use. `save` does not edit `config.toml`. |
 | `snowball` | Grow a library from one or more keywords, one or more DOIs, one or more ORCIDs, or a collection (`search`, `hybrid`, `doi`, `orcid`, `collection`, `apply`, `run --profile`, `resume`, `profile save`, `watch save` / `run` / `show` / `briefing` / `digest`, `briefing --run-id`, `digest --run-id`). `search` / `hybrid` take several keyword terms (AND by default; `--or`

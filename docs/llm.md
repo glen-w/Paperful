@@ -65,12 +65,14 @@ title/abstract/PDF excerpts (and, for `recover`, page text) leave your machine.
 ```sh
 uv sync --extra browser-agent  # browser-use + ollama client; needs Python >= 3.11
 uv run paperful session login scholar   # the agent reuses this Chromium profile
+# or: PAPERFUL_IMAGE_MODE=heavy docker compose build
 ```
 
 Paperful core supports Python 3.10; the extra is marked
 `python_version >= "3.11"` so `uv sync` on 3.10 simply skips it and `recover`
 exits 1 with a hint. If your `.python-version` is 3.10, run
-`uv python pin 3.12 && uv sync --extra browser-agent`.
+`uv python pin 3.12 && uv sync --extra browser-agent`. The **heavy** Compose
+image already includes this extra (headed login still on the host).
 
 ## 2. Configure
 
@@ -298,33 +300,58 @@ produced which note.
 
 ## 5. Docker
 
-The build-local image does **not** include `litellm` or `browser-use`; the
-`browser_agent` lane (`run` auto-recover and `paperful recover`) is host-only
-(it needs the headed-login vault anyway). B/C/D work inside the
-container against a host Ollama:
+**light** images omit `litellm` and `browser-use`. **heavy**
+(`PAPERFUL_IMAGE_MODE=heavy`) installs both, so the `browser_agent` lane can
+run in the container (headed `session login` still needs the host vault).
+B/C/D work inside the container against a host Ollama.
+
+**Keep loopback in config** so the same `config.toml` works for host
+`uv run` and Compose:
 
 ```toml
 [llm]
 enabled = true
-base_url = "http://host.docker.internal:11434"
-allow_remote = true      # required: host.docker.internal is not loopback
+base_url = "http://127.0.0.1:11434"   # rewritten inside the container
 ```
 
-and start Ollama bound to all interfaces on the host
-(`OLLAMA_HOST=0.0.0.0 ollama serve`). See [Docker](docker.md).
+Inside Docker, Paperful rewrites loopback to `host.docker.internal` (Compose
+sets `PAPERFUL_OLLAMA_HOST` and `extra_hosts`, same pattern as Zotero). That
+bridge is treated as local — you do **not** need `allow_remote = true` for it.
+
+**Docker Desktop (macOS/Windows):** leave Ollama on its default loopback bind
+(`127.0.0.1:11434`). Compose reaches it via `host.docker.internal` the same way
+it reaches Zotero. Do **not** force `OLLAMA_HOST=0.0.0.0` on Desktop — that can
+break the gateway path.
+
+**Linux Docker Engine:** bind the host daemon so `host-gateway` can connect:
+
+```sh
+OLLAMA_HOST=0.0.0.0 ollama serve
+```
+
+Optional overrides: set `PAPERFUL_OLLAMA_HOST` in `.env`, or pin an explicit
+URL with `allow_remote = true`:
+
+```toml
+base_url = "http://host.docker.internal:11434"
+allow_remote = true
+```
+
+`docker compose run --rm paperful doctor` shows the `LLM` row. See
+[Docker](docker.md).
 
 ## 6. Troubleshooting
 
 | Symptom | Cause / fix |
 | --- | --- |
 | `llm.enabled is false in config.toml` | Set `[llm].enabled = true` |
-| `Ollama unreachable` | `ollama serve` not running, wrong `base_url`, or firewall |
+| `Ollama unreachable` / `Connection refused` in Compose | Config still pointing at container loopback without this Paperful rewrite, or Ollama not running on the host. Keep `[llm].base_url = "http://127.0.0.1:11434"`; rebuild/restart Compose. On **Linux Engine** only: `OLLAMA_HOST=0.0.0.0 ollama serve` |
 | `model 'x' not in Ollama tags` | `ollama pull x`; tags must match (e.g. `qwen2.5:7b`, not `qwen2.5`) |
 | `Ollama URL host … is not local` | Set `allow_remote = true` knowingly (egress notice will print) |
-| `LiteLLM not installed` | `uv sync --extra llm` |
+| `LiteLLM not installed` | `uv sync --extra llm`, or rebuild with `PAPERFUL_IMAGE_MODE=heavy` |
 | `model 'ollama/…' must use llm.provider = "ollama"` | Switch provider or model id |
 | `recover requires Python 3.11+` | `uv python pin 3.12 && uv sync --extra browser-agent` |
-| `browser-use is not installed` | `uv sync --extra browser-agent` |
+| `browser-use is not installed` | `uv sync --extra browser-agent`, or rebuild with `PAPERFUL_IMAGE_MODE=heavy` |
 | `session vault not ready` | `paperful session login scholar` (headed, on the host) |
 | `recover` ends `not_found` quickly | Model too small or wrong class for UI tools; try 14B+ via `[browser_agent].model`, or a one-shot `[browser_agent].fallback_model` — [browser-agent-models.md](browser-agent-models.md) |
 | `recover` never starts during `run` | Extra missing, `[llm].enabled` false, `[browser_agent].during_run = false`, or `--no-browser-agent` |

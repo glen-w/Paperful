@@ -116,7 +116,7 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `twenty.py` | Twenty People lookup (local cache) and `sync` (CRM create/enrich). User guide: [Twenty and SearXNG](snowball.md#twenty-and-searxng) | httpx |
 | `mcp_server.py` | Optional stdio MCP: dry-run `refs_gap`, read-only `ask` (same envelopes as CLI) | `agent_ops` |
 | `serve.py` | Localhost FastAPI: JSON capability API + mounts `ui` when the `serve` extra is installed | `agent_ops`, `ui` |
-| `ui/` | Server-rendered workbench (Jinja): Discover / Wanted / …; review tokens; command ids under `state/gui/` | same builders as CLI / MCP |
+| `ui/` | Server-rendered workbench (Jinja). `app.py` mounts HTML + form POSTs; `jobs.py`, `wanted_jobs.py`, `repair_jobs.py`, `discover_jobs.py` call the same domain entrypoints as the CLI; review tokens under `state/gui/reviews/`; command ids under `state/gui/commands/` | CLI / MCP builders |
 | `authorwatch.py` | People lists → OpenAlex new works; `apply` creates parents | OpenAlex client, `identity`, `snowball.ingest` |
 | `snowball/` | Crawl, hops, watch, thin briefing, frontier digest. Watch and digest do not create library items | OpenAlex; library protocol only on apply |
 

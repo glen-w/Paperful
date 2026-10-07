@@ -11,10 +11,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # light = serve only (CI default). heavy = llm + rag + browser-agent.
+        PAPERFUL_IMAGE_MODE: ${PAPERFUL_IMAGE_MODE:-light}
     image: paperful:local
     working_dir: /data
     environment:
       PAPERFUL_ZOTERO_HOST: ${PAPERFUL_ZOTERO_HOST:-host.docker.internal}
+      # Reach host Ollama; loopback [llm].base_url is rewritten the same way.
+      PAPERFUL_OLLAMA_HOST: ${PAPERFUL_OLLAMA_HOST:-host.docker.internal}
+      PAPERFUL_IMAGE_MODE: ${PAPERFUL_IMAGE_MODE:-light}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

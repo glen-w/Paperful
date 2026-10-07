@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 from pathlib import Path
 
@@ -88,6 +89,11 @@ def run_fetch(
     source_list = filter_sources_for_year_scope(source_list, year_from)
     source_list = with_recover_lane(cfg, source_list, during_run=browser_agent)
     source_list = with_serpapi_lane(cfg, source_list)
+    e2e = os.environ.get("PAPERFUL_E2E") == "1"
+    # Live E2E streams human progress on stderr so --format json stays parseable.
+    talk = console if not json_out else (
+        Console(stderr=True, highlight=False) if e2e else None
+    )
     if not json_out:
         cli_mod._warn_if_scihub(source_list)
         cli_mod._warn_if_recover(source_list)
@@ -131,8 +137,8 @@ def run_fetch(
     linked_note = (
         f", {linked_skipped} linked URL only (skipped)" if linked_skipped else ""
     )
-    if not json_out:
-        console.print(
+    if talk is not None:
+        talk.print(
             f"Scope: [bold]{scope}[/] - {len(items)} items without PDF, {skipped_manifest} already handled, "
             f"{len(todo)} to process{linked_note}. Sources: {', '.join(source_list)}"
         )
@@ -199,19 +205,20 @@ def run_fetch(
             cli_mod._mirror_deferred(cfg)
         return
 
+    live = talk if talk is not None else console
     pipe = Pipeline(
         cfg,
         manifest,
-        console,
+        live,
         sources=source_list,
         attacher=attacher,
         try_all=True if try_all else None,
         strict_pdf_doi=bool(strict_pdf_doi),
     )
-    pipe.on_ezproxy_down = mid_run_ezproxy_hook(console, cfg, pipe, enabled=relogin)
-    preflight_ezproxy_session(console, cfg, pipe, source_list, enabled=relogin)
+    pipe.on_ezproxy_down = mid_run_ezproxy_hook(live, cfg, pipe, enabled=relogin)
+    preflight_ezproxy_session(live, cfg, pipe, source_list, enabled=relogin)
     interrupted = False
-    with cli_mod._item_progress() as progress:
+    with cli_mod._item_progress(json_out=json_out and e2e) as progress:
         task_id = progress.add_task("Fetching PDFs", total=len(todo))
         pipe.progress = lambda: progress.advance(task_id)
         pipe.live_progress = progress
@@ -219,7 +226,7 @@ def run_fetch(
             stats = pipe.run(todo)
         except KeyboardInterrupt:
             interrupted = True
-            console.print(
+            live.print(
                 "\n[yellow]Interrupted - progress is in the manifest; rerun to resume.[/]"
             )
             stats = pipe.stats
@@ -231,9 +238,9 @@ def run_fetch(
     # happens here, still before the report and before --handoff opens tabs.
     if not interrupted:
         try:
-            maybe_ezproxy_relogin(console, cfg, pipe, todo, enabled=relogin)
+            maybe_ezproxy_relogin(live, cfg, pipe, todo, enabled=relogin)
         except KeyboardInterrupt:
-            console.print(
+            live.print(
                 "\n[yellow]Interrupted during EZProxy re-login - "
                 "progress is in the manifest.[/]"
             )

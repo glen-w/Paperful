@@ -62,11 +62,22 @@ def preview_run(
     collection: str,
     preset: str,
     keys: list[str] | None,
+    flags: dict[str, Any] | None = None,
 ) -> None:
+    flags = dict(flags or {})
     items, manifest = _load_scope_items(cfg, collection)
     if keys:
         keyset = set(keys)
         items = [it for it in items if it.key in keyset]
+    year_from = flags.get("year_from")
+    year_to = flags.get("year_to")
+    item_type = list(flags.get("item_type") or [])
+    if year_from is not None or year_to is not None or item_type:
+        items = [
+            it
+            for it in items
+            if _item_in_filters(it, year_from=year_from, year_to=year_to, item_type=item_type)
+        ]
     fp = scope_fingerprint(items, manifest)
     if run_fetch_fn is not None:
         run_fetch_fn(
@@ -76,6 +87,7 @@ def preview_run(
             dry_run=True,
             preset=preset,
             keys=keys,
+            flags=flags,
         )
     token = commands.create_review_token(
         cfg,
@@ -85,10 +97,30 @@ def preview_run(
         keys=[it.key for it in items],
         fingerprint=fp,
         command_id=cmd_id,
+        flags=flags,
     )
     rec = commands.read_command(cfg, cmd_id) or {}
     rec["review_token"] = token
     commands.write_command(cfg, rec)
+
+
+def _item_in_filters(
+    item: Any,
+    *,
+    year_from: int | None,
+    year_to: int | None,
+    item_type: list[str],
+) -> bool:
+    year = getattr(item, "year", None)
+    if year_from is not None and year is not None and int(year) < int(year_from):
+        return False
+    if year_to is not None and year is not None and int(year) > int(year_to):
+        return False
+    if item_type:
+        itype = str(getattr(item, "item_type", None) or getattr(item, "type", "") or "")
+        if itype and itype not in item_type:
+            return False
+    return True
 
 
 def grab_run(
@@ -102,6 +134,7 @@ def grab_run(
         return False, "unknown token"
     collection = str(review.get("collection") or "")
     preset = str(review.get("preset") or "oa")
+    flags = dict(review.get("flags") or {})
     items, manifest = _load_scope_items(cfg, collection)
     keyset = set(review.get("keys") or [])
     items = [it for it in items if it.key in keyset]
@@ -110,6 +143,16 @@ def grab_run(
     if not ok:
         return False, msg
     item_keys = list(keyset)
+    year_from = flags.get("year_from")
+    year_to = flags.get("year_to")
+    item_type = list(flags.get("item_type") or [])
+    limit = flags.get("limit")
+    retry_failed = flags.get("retry_failed")
+    try_all = flags.get("try_all")
+    browser_agent = flags.get("browser_agent")
+    upgrade_linked = flags.get("upgrade_linked")
+    want_snapshot = bool(flags.get("upgrade_snapshot"))
+    htmlpdf = flags.get("htmlpdf")
     if run_fetch_fn is not None:
         run_fetch_fn(
             cfg,
@@ -119,30 +162,34 @@ def grab_run(
             preset=preset,
             no_attach=True,
             item_keys=item_keys,
+            flags=flags,
         )
     else:
         from ..run_cmd import run_fetch
 
+        sources = None
+        if htmlpdf:
+            sources = None  # preset + config; htmlpdf lane follows config/sources
         run_fetch(
             _quiet_console(),
             cfg,
             collection=[collection] if collection else [],
             library=not collection,
             dry_run=False,
-            year_from=None,
-            year_to=None,
-            item_type=[],
-            limit=None,
+            year_from=year_from,
+            year_to=year_to,
+            item_type=item_type,
+            limit=limit,
             no_attach=True,
-            retry_failed=None,
-            try_all=None,
-            sources=None,
+            retry_failed=True if retry_failed else None,
+            try_all=True if try_all else None,
+            sources=sources,
             preset=preset,
             scihub=None,
             relogin=False,
-            browser_agent=None,
-            upgrade_linked=None,
-            want_snapshot_upgrade=False,
+            browser_agent=True if browser_agent else None,
+            upgrade_linked=True if upgrade_linked else None,
+            want_snapshot_upgrade=want_snapshot,
             strict_pdf_doi=None,
             handoff=None,
             include_doi_tabs=False,
@@ -247,6 +294,8 @@ def snowball_run(
     from .snowball_form import build_request, compose_query, doi_list, orcid_list
 
     req = build_request(cfg, payload, collection)
+    if getattr(payload, "twenty_writeback", None):
+        cfg.twenty_writeback_listings = True
     console = _quiet_console()
     kind = payload.kind
     try:

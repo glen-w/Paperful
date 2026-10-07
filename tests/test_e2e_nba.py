@@ -37,6 +37,20 @@ def test_e2e_plan_effort_caps():
     assert low.fetch_pdfs == DEFAULT_FETCH_PDFS
 
 
+def test_e2e_plan_query_override():
+    plan = build_e2e_plan(
+        "eco-surveys",
+        "low",
+        query='survey AND ("climate policy" OR degrowth)',
+        year_from=2020,
+        year_to=2026,
+    )
+    assert plan.topic == "eco-surveys"
+    assert plan.collection == "e2e/eco-surveys"
+    assert plan.query == 'survey AND ("climate policy" OR degrowth)'
+    assert plan.max_orcids == 2
+
+
 def test_collection_for_topic_nba():
     assert collection_for_topic("NBA") == "e2e/NBA"
     assert pack_slug_for_topic("NBA") == "e2e-nba"

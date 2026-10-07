@@ -46,9 +46,15 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     assert "/repair" in res.text
     assert "/v1/ask" not in res.text
     assert client.get("/repair").status_code == 200
+    assert client.get("/mirror").status_code == 200
     assert client.get("/index").status_code == 200
     assert client.get("/briefs").status_code == 200
     assert "/briefs" in res.text
+    wanted_adv = client.get("/wanted")
+    assert "Recover" in wanted_adv.text
+    assert "Handoff" in wanted_adv.text
+    discover_adv = client.get("/discover")
+    assert "Refs gap" in discover_adv.text
 
 
 def test_dockerfile_includes_serve_extra():
