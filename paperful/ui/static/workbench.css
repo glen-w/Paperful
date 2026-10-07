@@ -9,7 +9,7 @@
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
   --font-brand: "Nunito", "Segoe UI", sans-serif;
   --font-body: "Source Sans 3", "Segoe UI", sans-serif;
-  --header-height: 4.35rem;
+  --header-height: 5.3rem;
 }
 
 *,
@@ -58,15 +58,15 @@ header.wb-chrome a.brand {
 
 .brand-mark {
   display: block;
-  width: 3.5rem;
-  height: 3.5rem;
+  width: 4.375rem;
+  height: 4.375rem;
   flex: 0 0 auto;
 }
 
 .brand-logo {
   display: block;
-  width: 3.5rem;
-  height: 3.5rem;
+  width: 4.375rem;
+  height: 4.375rem;
 }
 
 .brand-word {
