@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icon_btn.html" import icon_button %}
 {% block title %}Library — Paperful{% endblock %}
 {% block content %}
 {% macro collection_line(node) %}
@@ -7,7 +8,7 @@
   <span class="coll-missing">{{ node.missing_pdf }}</span>
   <form method="post" action="/prefs/collection">
     <input type="hidden" name="collection" value="{{ node.path }}">
-    <button type="submit" class="secondary">Set scope</button>
+    {{ icon_button('Set scope', 'scope', type='submit') }}
   </form>
 {% endmacro %}
 {% macro collection_nodes(nodes) %}
@@ -49,7 +50,7 @@
     <td>{% if row.has_pdf %}yes{% else %}no{% endif %}</td>
     <td>{% if row.has_summary %}yes{% else %}—{% endif %}</td>
     <td>
-      <button type="button" class="secondary" onclick="document.getElementById('lib-{{ row.key }}').showModal()">Detail</button>
+      {{ icon_button('Detail', 'detail', onclick="document.getElementById('lib-" ~ row.key ~ "').showModal()") }}
       <dialog class="wb-drawer" id="lib-{{ row.key }}">
         <p><strong>{{ row.title }}</strong> · {{ row.key }}</p>
         {% if row.has_summary %}

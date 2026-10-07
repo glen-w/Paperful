@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_miss_surface.html" import status_icon %}
+{% from "_icon_btn.html" import icon_button %}
 {% block title %}Wanted — Paperful{% endblock %}
 {% block body_attrs %}{% if request.query_params.get('run') or request.query_params.get('poll') %} data-poll-run="{{ request.query_params.get('run') or request.query_params.get('poll') }}"{% endif %}{% endblock %}
 {% block content %}
@@ -93,7 +94,7 @@
     <td><input type="checkbox" name="keys" value="{{ row.key }}" form="wanted-form" class="row-select"
       {% if row.ticked %}checked{% endif %}></td>
     <td>{{ row.title }}
-      <button type="button" class="secondary" onclick="document.getElementById('d-{{ row.key }}').showModal()">Detail</button>
+      {{ icon_button('Detail', 'detail', onclick="document.getElementById('d-" ~ row.key ~ "').showModal()") }}
       <dialog class="wb-drawer" id="d-{{ row.key }}">
         <p><strong>{{ row.title }}</strong></p>
         <p>Key {{ row.key }}{% if row.year %} · {{ row.year }}{% endif %}</p>

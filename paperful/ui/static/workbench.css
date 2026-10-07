@@ -214,6 +214,81 @@ button.spinning {
   pointer-events: none;
 }
 
+button.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border-radius: 0.35rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.45);
+  color: var(--ink-soft);
+  transform: none;
+  vertical-align: middle;
+}
+button.icon-btn:hover,
+button.icon-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--accent-deep);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  transform: none;
+}
+.icon-btn-glyph {
+  display: block;
+}
+
+.coll-tree {
+  margin-bottom: 1.25rem;
+}
+.coll-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3.5rem 4.5rem 2rem;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
+}
+.coll-head.coll-labels {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft);
+  margin-bottom: 0.25rem;
+}
+.coll-head form {
+  margin: 0;
+  justify-self: end;
+}
+.coll-children {
+  margin-left: 1rem;
+}
+.coll-name {
+  font-weight: 600;
+  min-width: 0;
+}
+.coll-count,
+.coll-missing {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+.coll-node > summary {
+  list-style: none;
+}
+.coll-node > summary::-webkit-details-marker {
+  display: none;
+}
+.coll-node > summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 1rem;
+  margin-right: 0.15rem;
+  color: var(--ink-soft);
+}
+.coll-node[open] > summary::before {
+  content: "▾";
+}
+
 table.wb-table {
   width: 100%;
   border-collapse: collapse;

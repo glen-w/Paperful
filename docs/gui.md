@@ -75,7 +75,7 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
    **Preview** → **Grab** (fetch to `out/` only; selected vs all) → **Attach**
    (explicit Zotero write for `doi_match` plus hand-ticks). Grab never writes
    the library.
-3. **Library** — Nested collection collapsibles with item / missing-PDF counts; pick scope.
+3. **Library** — Nested collection collapsibles with item / missing-PDF counts; target icon sets scope (collection chip).
 4. **Activity** — Command history + trust line from `last-run.json`.
 5. **System** — `doctor` rows with one next step each.
 

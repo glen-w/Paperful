@@ -234,6 +234,9 @@ def test_library_nests_collections(tmp_path, monkeypatch):
     assert "Coffee" in res.text
     assert "built-in method items" not in res.text
     assert ">267<" in res.text
+    assert 'class="icon-btn"' in res.text
+    assert 'aria-label="Set scope"' in res.text
+    assert ">Set scope</button>" not in res.text
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")

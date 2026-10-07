@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icon_btn.html" import icon_button %}
 {% block title %}Discover — Paperful{% endblock %}
 {% block content %}
 <h1>Discover</h1>
@@ -230,7 +231,7 @@
         <input type="hidden" name="person_id" value="{{ p.id }}">
         <input name="display_name" value="{{ p.display_name }}">
         <input name="affiliation" value="{{ p.affiliation }}" placeholder="affiliation host">
-        <button type="submit" class="secondary">Save</button>
+        {{ icon_button('Save', 'save', type='submit') }}
       </form>
     </td>
     <td>{{ p.orcid }}</td>
@@ -239,7 +240,7 @@
       <form method="post" action="/discover/aw/remove">
         <input type="hidden" name="list_name" value="{{ aw_list }}">
         <input type="hidden" name="person_id" value="{{ p.id }}">
-        <button type="submit" class="secondary">Remove</button>
+        {{ icon_button('Remove', 'remove', type='submit') }}
       </form>
     </td>
   </tr>

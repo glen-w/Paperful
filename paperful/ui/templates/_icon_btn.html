@@ -1,0 +1,28 @@
+{% macro icon_svg(name) %}
+<svg class="icon-btn-glyph" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+  {% if name == 'scope' %}
+  <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.35"/>
+  <circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.35"/>
+  <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2"/>
+  {% elif name == 'detail' %}
+  <rect x="2.5" y="3" width="11" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.35"/>
+  <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M5.5 6h5M5.5 8.5h5M5.5 11h3"/>
+  {% elif name == 'remove' %}
+  <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M3.5 4.5h9"/>
+  <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round" d="M5.5 4.5V3.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1"/>
+  <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round" d="M4.5 4.5l.5 8a1 1 0 0 0 1 .9h4a1 1 0 0 0 1-.9l.5-8"/>
+  {% elif name == 'save' %}
+  <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round" d="M3 3.5h7l3 2.5v7a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-8.5a1 1 0 0 1 1-1z"/>
+  <path fill="none" stroke="currentColor" stroke-width="1.35" d="M5.5 3.5V7h5V3.5"/>
+  <rect x="5.5" y="9" width="5" height="2.5" rx="0.35" fill="none" stroke="currentColor" stroke-width="1.35"/>
+  {% else %}
+  <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.35"/>
+  {% endif %}
+</svg>
+{% endmacro %}
+
+{% macro icon_button(label, icon, type='button', class='', onclick='') %}
+<button type="{{ type }}" class="icon-btn{% if class %} {{ class }}{% endif %}" title="{{ label }}" aria-label="{{ label }}"{% if onclick %} onclick="{{ onclick }}"{% endif %}>
+  {{ icon_svg(icon) }}
+</button>
+{% endmacro %}
