@@ -65,11 +65,17 @@
 <section>
   <h2>Ask</h2>
   <p class="counts">Scope: {% if prefs.collection %}{{ prefs.collection }}{% else %}entire mirror{% endif %}</p>
-  <p><a href="/index">New thread</a>
-  {% for t in threads %}
-  · <a href="/index?thread={{ t.id }}" {% if t.id == active_thread_id %}class="active"{% endif %}>{{ t.id }} ({{ t.turns }})</a>
-  {% endfor %}
-  </p>
+  <p><a href="/index">New thread</a></p>
+  {% if threads %}
+  <details>
+    <summary>Threads ({{ threads|length }})</summary>
+    <ul>
+    {% for t in threads %}
+      <li><a href="/index?thread={{ t.id }}" {% if t.id == active_thread_id %}class="active"{% endif %}>{{ t.id }} ({{ t.turns }})</a></li>
+    {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
   <div class="ask-thread">
   {% for turn in turns %}
     <div class="ask-turn ask-{{ turn.role }}">
@@ -119,7 +125,10 @@
   </form>
   {% if batch_result.stamp %}<p>Last batch: {{ batch_result.answered }}/{{ batch_result.questions }} <a href="/index/batch/{{ batch_result.stamp }}">answers</a></p>{% endif %}
   {% if packs %}
-  <ul class="counts">{% for p in packs %}<li><a href="/index/batch/{{ p.stamp }}">{{ p.stamp }}</a> — {{ p.answered }}/{{ p.questions }}{% if p.failed %} ({{ p.failed }} failed){% endif %}</li>{% endfor %}</ul>
+  <details>
+    <summary>Recent batches ({{ packs|length }})</summary>
+    <ul class="counts">{% for p in packs %}<li><a href="/index/batch/{{ p.stamp }}">{{ p.stamp }}</a> — {{ p.answered }}/{{ p.questions }}{% if p.failed %} ({{ p.failed }} failed){% endif %}</li>{% endfor %}</ul>
+  </details>
   {% endif %}
 </section>
 
@@ -151,7 +160,10 @@
     <button type="submit">Run answered check</button>
   </form>
   {% if answered_packs %}
-  <ul class="counts">{% for p in answered_packs %}<li><a href="/index/answered/{{ p.stamp }}">{{ p.stamp }}</a> — {{ p.answered }}/{{ p.partial }}/{{ p.not_found }}{% if p.failed %} ({{ p.failed }} failed){% endif %}</li>{% endfor %}</ul>
+  <details>
+    <summary>Recent answered reports ({{ answered_packs|length }})</summary>
+    <ul class="counts">{% for p in answered_packs %}<li><a href="/index/answered/{{ p.stamp }}">{{ p.stamp }}</a> — {{ p.answered }}/{{ p.partial }}/{{ p.not_found }}{% if p.failed %} ({{ p.failed }} failed){% endif %}</li>{% endfor %}</ul>
+  </details>
   {% endif %}
 </section>
 
@@ -168,7 +180,10 @@
     <button type="submit" name="dry_run" value="0">Write report</button>
   </form>
   {% if reports %}
-  <ul>{% for r in reports %}<li><a href="/index/report/{{ r.name }}" target="_blank">{{ r.name }}</a></li>{% endfor %}</ul>
+  <details>
+    <summary>Recent reports ({{ reports|length }})</summary>
+    <ul>{% for r in reports %}<li><a href="/index/report/{{ r.name }}" target="_blank">{{ r.name }}</a></li>{% endfor %}</ul>
+  </details>
   {% endif %}
 </section>
 {% endif %}

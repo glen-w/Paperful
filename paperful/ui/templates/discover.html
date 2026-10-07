@@ -186,12 +186,14 @@
   </form>
 </section>
 {% if aw_lists %}
-<h3>Lists</h3>
-<ul>
-{% for L in aw_lists %}
-  <li><a href="/discover?list_name={{ L.name }}">{{ L.name }}</a> — {{ L.people }} people · inbox {{ L.inbox }}{% if L.baseline %} · baseline{% endif %}</li>
-{% endfor %}
-</ul>
+<details>
+  <summary>Lists ({{ aw_lists|length }})</summary>
+  <ul>
+  {% for L in aw_lists %}
+    <li><a href="/discover?list_name={{ L.name }}">{{ L.name }}</a> — {{ L.people }} people · inbox {{ L.inbox }}{% if L.baseline %} · baseline{% endif %}</li>
+  {% endfor %}
+  </ul>
+</details>
 {% endif %}
 {% if aw_suggestions %}
 <h3>Suggestions</h3>
@@ -314,7 +316,9 @@
   {% endfor %}
   </tbody>
 </table>
-<h2>Following</h2>
+{% if following %}
+<details>
+  <summary>Following ({{ following|length }})</summary>
 <ul>
   {% for f in following %}
   <li>{{ f.kind }}: {{ f.name }}
@@ -338,4 +342,6 @@
   </li>
   {% endfor %}
 </ul>
+</details>
+{% endif %}
 {% endblock %}

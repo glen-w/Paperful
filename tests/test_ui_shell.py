@@ -149,6 +149,54 @@ def test_wanted_miss_surface_icon(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_wanted_verification_icon_on_held(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from paperful.store import Manifest, Record, STATUS_OK
+    from paperful.ui import jobs
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _cfg, probe=False: [])
+    monkeypatch.setattr(
+        "paperful.ui.app.collections_tree",
+        lambda _cfg: {"ok": True, "collections": []},
+    )
+
+    class _Item:
+        key = "H1"
+        title = "Mismatch"
+        doi = "10.1/a"
+        has_pdf = True
+        year = 2024
+        arxiv_id = None
+        url = ""
+
+    manifest = Manifest(cfg.manifest_path)
+    manifest.write(
+        Record(
+            itemKey="H1",
+            status=STATUS_OK,
+            doi="10.1/a",
+            pdf_doi="10.9/b",
+            source="unpaywall",
+            path="h.pdf",
+        )
+    )
+    monkeypatch.setattr(
+        jobs,
+        "_load_scope_items",
+        lambda _c, _col: ([_Item()], manifest),
+    )
+    client = TestClient(create_app(cfg))
+    client.cookies.set("pf_collection", "ocean")
+    page = client.get("/wanted?tab=held")
+    assert page.status_code == 200
+    assert 'class="miss-status miss-status--doi_mismatch"' in page.text
+    assert "DOI does not match" in page.text
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
 def test_library_nests_collections(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
@@ -186,6 +234,43 @@ def test_library_nests_collections(tmp_path, monkeypatch):
     assert "Coffee" in res.text
     assert "built-in method items" not in res.text
     assert ">267<" in res.text
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_archive_lists_use_details(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.llm_enabled = True
+    cfg.rag_enabled = True
+    cfg.reports_dir.mkdir(parents=True)
+    (cfg.reports_dir / "ocean-bbnj.html").write_text("<p>r</p>", encoding="utf-8")
+    runs = cfg.state_dir / "runs"
+    runs.mkdir(parents=True)
+    (runs / "20260101T000000Z-lint.json").write_text("{}", encoding="utf-8")
+    watch = cfg.state_dir / "snowball" / "watches" / "topic-watch"
+    watch.mkdir(parents=True)
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _cfg, probe=False: [])
+    monkeypatch.setattr(
+        "paperful.ui.app.collections_tree",
+        lambda _cfg: {"ok": True, "collections": []},
+    )
+    client = TestClient(create_app(cfg))
+    client.cookies.set("pf_advanced", "1")
+    briefs = client.get("/briefs")
+    assert briefs.status_code == 200
+    assert "<summary>Recent reports (1)</summary>" in briefs.text
+    repair = client.get("/repair")
+    assert repair.status_code == 200
+    assert "<summary>Queued files (1)</summary>" in repair.text
+    assert "20260101T000000Z-lint.json" in repair.text
+    discover = client.get("/discover")
+    assert discover.status_code == 200
+    assert "<summary>Following (1)</summary>" in discover.text
+    index = client.get("/index")
+    assert index.status_code == 200
+    assert "<summary>Recent reports (1)</summary>" in index.text
 
 
 def test_dockerfile_includes_serve_extra():
