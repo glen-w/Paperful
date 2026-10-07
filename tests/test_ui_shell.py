@@ -33,6 +33,13 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
         res = client.get(path)
         assert res.status_code == 200
         assert "Paperful" in res.text
+        assert 'class="brand-logo"' in res.text
+        assert 'class="brand-mark"' in res.text
+        assert 'src="/static/icon.png"' in res.text
+        assert "Source+Sans+3" in res.text
+    logo = client.get("/static/icon.png")
+    assert logo.status_code == 200
+    assert logo.headers["content-type"].startswith("image/")
     wanted = client.get("/wanted")
     assert wanted.status_code == 200
     nav = wanted.text
@@ -101,6 +108,46 @@ def test_html_pages_do_not_block_on_doctor(tmp_path, monkeypatch):
     assert wanted2.status_code == 200
     assert "health-red" in wanted2.text
     assert calls["n"] == 1
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_library_nests_collections(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _cfg, probe=False: [])
+    monkeypatch.setattr(
+        "paperful.ui.app.collections_tree",
+        lambda _cfg: {
+            "ok": True,
+            "collections": [
+                {"path": "AO", "name": "AO", "key": "1", "items": 267, "missing_pdf": 10},
+                {
+                    "path": "AO/Mini meta studies",
+                    "name": "Mini meta studies",
+                    "key": "2",
+                    "items": 0,
+                    "missing_pdf": 0,
+                },
+                {
+                    "path": "AO/Mini meta studies/Coffee",
+                    "name": "Coffee",
+                    "key": "3",
+                    "items": 0,
+                    "missing_pdf": 0,
+                },
+            ],
+        },
+    )
+    client = TestClient(create_app(cfg))
+    res = client.get("/library")
+    assert res.status_code == 200
+    assert "<details" in res.text
+    assert "Mini meta studies" in res.text
+    assert "Coffee" in res.text
+    assert "built-in method items" not in res.text
+    assert ">267<" in res.text
 
 
 def test_dockerfile_includes_serve_extra():

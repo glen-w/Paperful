@@ -41,12 +41,17 @@
   <p><button type="submit">Summarize</button></p>
 </form>
 {% if summaries %}
-<p>Recent summaries</p>
-<ul>
-  {% for s in summaries %}
-  <li><a href="/briefs/summary/{{ s.name }}">{{ s.name }}</a></li>
-  {% endfor %}
-</ul>
+<details>
+  <summary>Recent summaries ({{ summaries|length }})</summary>
+  <ul>
+    {% for s in summaries %}
+    <li>
+      <a href="/briefs/summary/{{ s.name }}">{{ s.cite }}</a>
+      {% if s.model %}<span class="counts"> · {{ s.model }}</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</details>
 {% endif %}
 
 <h2>Synthesize</h2>

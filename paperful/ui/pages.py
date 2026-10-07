@@ -159,6 +159,67 @@ def authorwatch_inbox_rows(cfg: Config) -> list[dict[str, Any]]:
     return out
 
 
+def nest_collection_rows(
+    rows: list[dict[str, Any]], *, active: str = ""
+) -> list[dict[str, Any]]:
+    """Nest flat ``path`` rows so Library can render ``<details>`` groups.
+
+    ``item_count`` is used instead of ``items`` so Jinja does not shadow the
+    dict ``.items`` method.
+    """
+    by_path: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        path = str(row.get("path") or "").strip()
+        if not path:
+            continue
+        name = str(row.get("name") or "").strip() or path.rsplit("/", 1)[-1]
+        by_path[path] = {
+            "path": path,
+            "name": name,
+            "key": str(row.get("key") or ""),
+            "item_count": int(row.get("items") or 0),
+            "missing_pdf": int(row.get("missing_pdf") or 0),
+            "children": [],
+            "open": False,
+        }
+    for path in list(by_path):
+        parts = path.split("/")
+        for i in range(1, len(parts)):
+            parent = "/".join(parts[:i])
+            if parent in by_path:
+                continue
+            by_path[parent] = {
+                "path": parent,
+                "name": parts[i - 1],
+                "key": "",
+                "item_count": 0,
+                "missing_pdf": 0,
+                "children": [],
+                "open": False,
+            }
+    roots: list[dict[str, Any]] = []
+    for path, node in sorted(by_path.items(), key=lambda kv: kv[0].lower()):
+        parent = path.rsplit("/", 1)[0] if "/" in path else ""
+        if parent in by_path:
+            by_path[parent]["children"].append(node)
+        else:
+            roots.append(node)
+
+    active = (active or "").strip()
+
+    def _finish(nodes: list[dict[str, Any]]) -> None:
+        nodes.sort(key=lambda n: str(n["name"]).lower())
+        for node in nodes:
+            path = str(node["path"])
+            node["open"] = bool(
+                active and (active == path or active.startswith(path + "/"))
+            )
+            _finish(node["children"])
+
+    _finish(roots)
+    return roots
+
+
 def library_item_rows(cfg: Config, items: list[Any], manifest: Manifest) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for item in sorted(items, key=lambda i: (i.year or 9999, (i.title or "").lower())):
@@ -529,6 +590,53 @@ def list_html_stems(folder: Any, limit: int = 20) -> list[dict[str, Any]]:
         reverse=True,
     )
     return [{"name": p.stem, "mtime": p.stat().st_mtime} for p in files[:limit]]
+
+
+def _summary_model(html: str) -> str:
+    from ..notehtml import parse
+    from ..summarize import parse_summary_provenance
+
+    meta = parse(html) or {}
+    model = str(meta.get("model") or "").strip()
+    if model:
+        return model
+    prov = parse_summary_provenance(html) or {}
+    return str(prov.get("model") or "").strip()
+
+
+def _summary_cite(cfg: Config, key: str) -> str:
+    try:
+        from ..catalogue import MirrorCatalogue
+
+        item = MirrorCatalogue(cfg.out_dir).get_item(key)
+    except OSError:
+        item = None
+    if item is None:
+        return key
+    return item.label
+
+
+def summary_meta(cfg: Config, key: str) -> dict[str, Any] | None:
+    """Cite, model, and mtime for ``state/summaries/<key>.html``."""
+    path = cfg.summaries_dir / f"{key}.html"
+    if not path.is_file():
+        return None
+    html = path.read_text(encoding="utf-8", errors="replace")
+    return {
+        "name": key,
+        "cite": _summary_cite(cfg, key),
+        "model": _summary_model(html),
+        "mtime": path.stat().st_mtime,
+    }
+
+
+def list_recent_summaries(cfg: Config, limit: int = 20) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for stem in list_html_stems(cfg.summaries_dir, limit):
+        meta = summary_meta(cfg, stem["name"])
+        if meta is not None:
+            rows.append(meta)
+    return rows
 
 
 def safe_child(root: Any, *parts: str) -> Any:

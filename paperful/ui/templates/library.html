@@ -1,26 +1,42 @@
 {% extends "base.html" %}
 {% block title %}Library — Paperful{% endblock %}
 {% block content %}
+{% macro collection_line(node) %}
+  <span class="coll-name">{{ node.name }}</span>
+  <span class="coll-count">{{ node.item_count }}</span>
+  <span class="coll-missing">{{ node.missing_pdf }}</span>
+  <form method="post" action="/prefs/collection">
+    <input type="hidden" name="collection" value="{{ node.path }}">
+    <button type="submit" class="secondary">Set scope</button>
+  </form>
+{% endmacro %}
+{% macro collection_nodes(nodes) %}
+  {% for node in nodes %}
+    {% if node.children %}
+    <details class="coll-node"{% if node.open %} open{% endif %}>
+      <summary class="coll-head">{{ collection_line(node) }}</summary>
+      <div class="coll-children">{{ collection_nodes(node.children) }}</div>
+    </details>
+    {% else %}
+    <div class="coll-leaf coll-head">{{ collection_line(node) }}</div>
+    {% endif %}
+  {% endfor %}
+{% endmacro %}
 <h1>Library</h1>
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
-<table class="wb-table">
-  <thead><tr><th>Collection</th><th>Items</th><th>Missing PDF</th><th></th></tr></thead>
-  <tbody>
-  {% for row in collections %}
-  <tr>
-    <td>{{ row.path }}</td>
-    <td>{{ row.items }}</td>
-    <td>{{ row.missing_pdf }}</td>
-    <td>
-      <form method="post" action="/prefs/collection">
-        <input type="hidden" name="collection" value="{{ row.path }}">
-        <button type="submit" class="secondary">Set scope</button>
-      </form>
-    </td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
+{% if collection_tree %}
+<div class="coll-tree">
+  <div class="coll-head coll-labels" aria-hidden="true">
+    <span>Collection</span>
+    <span>Items</span>
+    <span>Missing PDF</span>
+    <span></span>
+  </div>
+  {{ collection_nodes(collection_tree) }}
+</div>
+{% else %}
+<p class="counts">No collections loaded.</p>
+{% endif %}
 {% if prefs.collection and items %}
 <h2>Items in {{ prefs.collection }}</h2>
 <table class="wb-table">

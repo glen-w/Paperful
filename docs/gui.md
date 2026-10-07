@@ -40,6 +40,7 @@ browser-agent. No built-in scheduler — **Check again** on Discover, not cron.
 
 | Control | Role |
 | --- | --- |
+| **Logo** | Product lockup (box + Nunito wordmark) links to Wanted; fonts match the public site (Fraunces / Nunito / Source Sans 3) |
 | **Collection** chip | Scoped collection (remembered in a cookie) |
 | **Preset** chip | Open access (`oa`) or Campus (`eoi`) — the simple source choice |
 | **Health** dot | Worst cached `doctor` status (amber until **System** runs doctor; pages never block on a full doctor) |
@@ -68,12 +69,13 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
    (`authorwatch apply`). **Check again** re-runs a saved topic watch or
    person list. Advanced topic watches also offer **Watch briefing** /
    **Watch digest** (same optional collection note).
-2. **Wanted** — Miss rows use `MISS_SURFACE_PLAIN` only. **Held** tab: on-disk
+2. **Wanted** — Miss rows show a compact status icon (hover for `MISS_SURFACE_PLAIN`).
+   **Held** tab: on-disk
    PDFs with `doi_match` / `doi_mismatch` / `unverified` / `snapshot` (not
    “% complete”). **Preview** → **Grab** (fetch to `out/` only; selected vs all)
    → **Attach** (explicit Zotero write for `doi_match` plus hand-ticks). Grab
    never writes the library.
-3. **Library** — Collection list with have / held / missing counts; pick scope.
+3. **Library** — Nested collection collapsibles with item / missing-PDF counts; pick scope.
 4. **Activity** — Command history + trust line from `last-run.json`.
 5. **System** — `doctor` rows with one next step each.
 

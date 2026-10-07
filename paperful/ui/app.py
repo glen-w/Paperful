@@ -32,10 +32,13 @@ from .pages import (
     last_ask_result,
     last_job_result,
     library_item_rows,
+    nest_collection_rows,
     list_ask_packs,
     list_answered_packs,
     list_html_stems,
+    list_recent_summaries,
     list_snowball_profiles,
+    summary_meta,
     list_threads,
     newest_snowball_queue,
     command_by_id,
@@ -1163,8 +1166,10 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         tree = collections_tree(cfg)
         error = ""
         rows = []
+        nested: list[dict[str, Any]] = []
         if tree.get("ok"):
             rows = tree.get("collections") or []
+            nested = nest_collection_rows(rows, active=prefs.collection)
         else:
             error = str(tree.get("error") or "Library unavailable")
         items: list[dict[str, Any]] = []
@@ -1182,6 +1187,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 request,
                 "library",
                 collections=rows,
+                collection_tree=nested,
                 items=items,
                 error=error,
                 briefs=briefs,
@@ -1950,7 +1956,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 flags=flags,
                 dest_options=dest_options(),
                 orders=SUMMARIZE_ORDERS,
-                summaries=list_html_stems(cfg.summaries_dir),
+                summaries=list_recent_summaries(cfg),
                 reports=list_html_stems(cfg.reports_dir),
                 summarize_result=last_job_result(cfg, "summarize"),
                 synthesize_result=last_job_result(cfg, "synthesize"),
@@ -2043,12 +2049,22 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         cmd_id = commands.enqueue(cfg, "synthesize", work)
         return RedirectResponse(url=_page_url("/briefs", run=cmd_id), status_code=303)
 
-    @app.get("/briefs/summary/{key}", response_model=None)
-    def briefs_summary(key: str):
-        path = safe_child(cfg.summaries_dir, f"{key}.html")
-        if path is None:
+    @app.get("/briefs/summary/{key}", response_class=HTMLResponse)
+    def briefs_summary(request: Request, key: str):
+        meta = summary_meta(cfg, key)
+        if meta is None or safe_child(cfg.summaries_dir, f"{key}.html") is None:
             return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
-        return FileResponse(path, media_type="text/html; charset=utf-8")
+        return templates.TemplateResponse(
+            request,
+            "brief_summary.html",
+            ctx(
+                request,
+                "briefs",
+                key=meta["name"],
+                cite=meta["cite"],
+                model=meta["model"],
+            ),
+        )
 
     @app.get("/briefs/report/{slug}", response_model=None)
     def briefs_report(slug: str):

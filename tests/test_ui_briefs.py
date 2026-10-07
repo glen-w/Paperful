@@ -131,9 +131,66 @@ def test_briefs_summarize_enqueues(tmp_path, monkeypatch):
         assert "1 summarized" in done.text
         html = client.get("/briefs/summary/ITEMKEY1")
         assert html.status_code == 200
-        assert b"summary" in html.content
+        assert 'src="/item/ITEMKEY1/summary"' in html.text
+        assert 'target="_blank"' not in html.text
+        assert "wb-nav" in html.text
     finally:
         jobs.summarize_fn = None
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_briefs_lists_cite_and_opens_in_gui(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    import paperful.ui.app as ui_app
+    from paperful.mirror import forget_index
+    from paperful.notehtml import wrap
+    from paperful.store import record_path, write_json
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.summaries_dir.mkdir(parents=True)
+    cfg.llm_enabled = True
+    (cfg.summaries_dir / "KEY1.html").write_text(
+        wrap("<p>body</p>", note_type="summary", verb="summarize", model="qwen2.5"),
+        encoding="utf-8",
+    )
+    folder = cfg.out_dir / "BBNJ" / "Smith - 2021 - Area-based -- KEY1"
+    folder.mkdir(parents=True)
+    write_json(
+        record_path(folder),
+        {
+            "item_key": "KEY1",
+            "title": "Area-based management",
+            "year": 2021,
+            "creators": [{"creatorType": "author", "lastName": "Smith"}],
+        },
+    )
+    forget_index(cfg.out_dir)
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(ui_app, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(ui_app, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    client = TestClient(create_app(cfg))
+    client.cookies.set("pf_advanced", "1")
+    page = client.get("/briefs")
+    assert page.status_code == 200
+    assert "Smith (2021)" in page.text
+    assert "qwen2.5" in page.text
+    assert 'href="/briefs/summary/KEY1"' in page.text
+    assert 'target="_blank"' not in page.text
+    assert "<details>" in page.text
+    assert "Recent summaries (1)" in page.text
+    assert "<summary>" in page.text
+    view = client.get("/briefs/summary/KEY1")
+    assert view.status_code == 200
+    assert "wb-nav" in view.text
+    assert 'src="/item/KEY1/summary"' in view.text
+    assert "qwen2.5" in view.text
+    raw = client.get("/item/KEY1/summary")
+    assert raw.status_code == 200
+    assert "body" in raw.text
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
