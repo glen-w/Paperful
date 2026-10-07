@@ -144,24 +144,59 @@ Every step can be repeated. A crash leaves valid records and an old version.
 
 ## Disk schemas
 
-| Schema | File | State |
-| --- | --- | --- |
-| `paperful.item.v1` | `record.json` | Required keys frozen. Extra keys may be added |
-| `paperful.sync.v1` | `out/_sync.json` | New. Internal to the refresh |
-| `paperful.annotations.v1` | `annotations.json` | New |
-| `paperful.collections.v1` | `out/_collections.json` | Read by the catalogue |
-| `paperful.run_report.v1` | `state/runs/*.json` | Required keys frozen |
-| `paperful.agent.json.v1` | stdout of `--format json` | Additive 0.x envelope around existing reports |
-| `paperful.note.v1` | HTML comment in child notes | Prefix + type/verb/model/run/prompt sha |
-| `paperful.rag.thread.v1` | `state/rag/threads/*.json` | Ask follow-up turns; under `state/` (backup-excluded) |
-| `paperful.authorwatch.v1` | `state/authorwatch/<name>/watch.json` | People-list cursor; under `state/` (backup-excluded) |
-| `paperful.authorwatch.person.v1` | `state/authorwatch/<name>/people.jsonl` | List members; backup-excluded |
-| `paperful.authors_report.v1` | `state/reports/<slug>-authors.json` | Creator frequency from `authors --apply` |
-| `paperful.author_pack.v1` | `state/author-packs/<slug>[.proposed].toml` | Field author pack; promote before `author_site` |
+Tier policy (1.0-ready contract; package tag may still wait on workbench polish):
+
+| Tier | Policy |
+| --- | --- |
+| **T0 Trust** | Required keys frozen in code (`*_KEYS`); rename/remove is a break; extras additive. Golden fixtures under `tests/fixtures/` |
+| **T1 Agent packs** | Same for top-level keys used by scripts |
+| **T2 Additive** | Schema string stable; keys may grow; no frozenset required |
+| **T3 Cache** | Layout may change any release; rebuild with `rag ingest` |
+
+| Schema | Location | Writer | Tier | Frozenset / golden |
+| --- | --- | --- | --- | --- |
+| `paperful.item.v1` | `out/.../record.json` | `store` / `snapshot` | T0 | `ITEM_RECORD_KEYS`; `tests/fixtures/item_v1/` |
+| `paperful.run_report.v1` | `state/runs/*.json`, `state/last-run.json` | `runreport` | T0 | `RUN_REPORT_*_KEYS`; `tests/fixtures/run_report_v1/` |
+| `paperful.agent.json.v1` | stdout `--format json` | `agent_json` | T0 | `REQUIRED_KEYS`; `tests/fixtures/agent_json*` |
+| `paperful.note.v1` | HTML comment in child notes | `notehtml` | T0 | `NOTE_BLOCK_KEYS`; `tests/fixtures/note_v1/` |
+| `paperful.refs_gap.pack.v1` | `state/refs-gaps/<stamp>/pack.json` | `refs_gap` | T1 | `REFS_GAP_PACK_KEYS`; `tests/fixtures/refs_gap_pack_v1/` |
+| `paperful.inbox.proposal.v1` | `state/inbox/proposals/*.json` | `inbox_match` | T1 | `INBOX_PROPOSAL_KEYS`; `tests/fixtures/inbox_proposal_v1/` |
+| `paperful.sync.v1` | `out/_sync.json` | `sync` | T2 | — |
+| `paperful.annotations.v1` | `annotations.json` | `snapshot` | T2 | — |
+| `paperful.collections.v1` | `out/_collections.json` | `store` | T2 | — |
+| `paperful.history.v1` | item history sidecar | `store` | T2 | — |
+| `paperful.standalone.v1` | standalone catalogue | `sync` | T2 | — |
+| `paperful.pack.v1` | `state/packs/<id>.json` | `pack` | T2 | — |
+| `paperful.dedupe_pack.v1` | `state/dedupe-packs/` | `dedupe` | T2 | — |
+| `paperful.version_pack.v1` | `state/version-packs/` | `versions` | T2 | — |
+| `paperful.ingest_dois.v1` | `state/ingest/<stamp>/` | `ingest_dois` | T2 | — |
+| `paperful.collections_add.v1` | `state/collections-add/<stamp>/` | `collections_add` | T2 | — |
+| `paperful.acronyms.v1` | `state/acronyms/<scope>.json` | `acronyms` | T2 | — |
+| `paperful.authors_report.v1` | `state/reports/<slug>-authors.json` | `authors_report` | T2 | — |
+| `paperful.author_pack.v1` | `state/author-packs/` | `snowball.authors` | T2 | — |
+| `paperful.author_contact.v1` | `state/author-contacts/` | `twenty` | T2 | — |
+| `paperful.author_request.v1` | reachout / request ledger | `author_request` | T2 | — |
+| `paperful.authorwatch.v1` | `state/authorwatch/<name>/watch.json` | `authorwatch` | T2 | — |
+| `paperful.authorwatch.person.v1` | `state/authorwatch/<name>/people.jsonl` | `authorwatch` | T2 | — |
+| `paperful.snowball.candidate.v1` | `state/snowball/<run-id>/` | `snowball.candidate` | T2 | Additive through 1.x |
+| `paperful.snowball.watch.v1` | snowball watch cursor | `snowball.watch` | T2 | — |
+| `paperful.snowball.coauthors.v1` | co-author graph | `snowball.authors` | T2 | — |
+| `paperful.htmlpdf.proposal.v1` | `state/htmlpdf/proposals/` | `sources.htmlpdf` | T2 | — |
+| `paperful.synthesis.v1` | synthesize sidecar | `synthesize` | T2 | — |
+| `paperful.ask_batch.v1` | `state/ask-batch/<stamp>/` | `rag.batch` | T2 | — |
+| `paperful.rag.thread.v1` | `state/rag/threads/*.json` | `rag.thread` | T2 | — |
+| `paperful.rag.questions.v1` | `state/rag/questions/` | `rag.questions` | T2 | — |
+| `paperful.rq_answered.v1` | `state/rq-answered/` | `rag.answered` | T2 | — |
+| `paperful.rag.text.v1` | extracted text cache | `rag.extract` | T3 | Rebuildable |
+| `paperful.rag.index.v1` | LanceDB meta | `rag.index` | T3 | Not a promise |
+| `paperful.e2e_stack.report.v1` | e2e stack reports | `e2e_nba` | T2 | Internal / CI |
+
+**Consumers:** `recover --from-last-run`, GUI Activity, and `agent_ops` read `paperful.run_report.v1` (`state/last-run.json`). `restore` requires `paperful.item.v1`. Batch verbs and optional `paperful mcp` emit `paperful.agent.json.v1`.
 
 The catalogue rebuilds an `Item` from a record. The test
 `test_item_from_record_matches_the_live_listing` holds the two equal field
 for field. A new `Item` field needs a home in the record and a case there.
+Contract tests: `tests/test_schema_freeze.py`.
 
 ## Adding things
 

@@ -18,7 +18,9 @@ plus `snapshot` / `restore`), proven on **Zotero**, and the **workbench**
 with review tokens, full CLI surface behind **Advanced**. **Interactive Ask** is
 opt-in under Index (`[rag]` + `[llm]`), not the home page
 ([Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer)).
-Mendeley and EndNote adapters are not 1.0 until testers have exercised them.
+**Mendeley and EndNote do not gate 1.0** — they stay in the tree with honest
+docs (“seeking testers”; Zotero well-tested). Do not market them as supported
+until real-library reports say so.
 Still not a full-text reading index, not a WebDAV client, and not “AI fetch
 everything.” `paperful ocr` is the optional text layer for scans.
 
@@ -34,7 +36,7 @@ integrations.
 | Trust checklist, locked `paperful.run_report.v1` / `paperful.item.v1`, snapshot contract | **Local OpenAlex parquet store** — phases 2B/2C (`works_citing`, full search parity, `local_duckdb` / `http`). Live OpenAlex API is enough for most installs; v1 `ssh_duckdb` remains opt-in for institutions |
 | **GUI workbench** — Discover + Wanted simple loop (topic + people); command ids; review tokens; Advanced Repair / Mirror / Index / Briefs and the non-TTY CLI verbs | **Firefox extension** — native messaging → CLI ([section below](#optional-thin-bridge--firefox-extension-post-10)) |
 | **Ask in GUI (Index)** — scoped chat with citations when `[rag]` + `[llm]` on | **Newsletter / alert ingest** — rollup bridge, Scholar alerts first ([Frontier digest](#frontier-digest-later-watch--external-ingest)) |
-| Zotero-proven path; Mendeley / EndNote when real-library testers confirm | SaaS tenancy polish, remote-manager parity beyond what 1.0 open/Docker needs |
+| Zotero-proven fetch/mirror path; honest adapter docs (Mendeley / EndNote seeking testers) | SaaS tenancy polish; promoting other managers to “supported” after field reports; remote-manager parity beyond what 1.0 open/Docker needs |
 
 (trust-10)=
 ## 0.1 → 1.0 (trust + mirror contract)
@@ -50,10 +52,10 @@ Sci-Hub, no “AI fetch everything”).
 | `--dry-run` **Would-hit** column (sources in order) | Trust before network | Shipped |
 | Exit **2** + next-steps when Zotero is down (`collections` / `run` / `attach`) | Fresh clone never dead-ends | Shipped |
 | Slim README + [CHANGELOG](../CHANGELOG.md) known limits | Trust before install | Shipped |
-| Lock `paperful.run_report.v1` | Trust for agents | Required keys frozen; extra keys may be added. Not tagged 1.0 |
+| Lock `paperful.run_report.v1` | Trust for agents | **Shipped** — required keys frozen (`RUN_REPORT_*_KEYS` incl. miss rollups); golden fixtures; extra keys may be added. Package tag may still wait on workbench polish |
 | Lock `paperful.item.v1` and `snapshot` / `restore` (additive keys only after 1.0) | Trust for the disk ledger | **Shipped** — required keys frozen; restore is create-missing (not lossless round-trip) |
 | Strip legacy flat-PDF migrate + mixed-layout doctor amber | Day-0 mirror never steers people into a whole-library layout cleanup | **Shipped (0.1 → 1.0)** |
-| **Mendeley and EndNote adapters** | The ledger survives a manager change | In the tree. **Seeking testers.** Zotero stays the well-tested path. See below |
+| **Mendeley and EndNote adapters** (not a 1.0 blocker) | The ledger survives a manager change | In the tree. **Seeking testers.** Zotero stays the well-tested path. See below |
 | **Workbench GUI** | Discover, Wanted, Preview/Grab; Advanced Repair / Mirror / Discover grow / Wanted recover | Landed — [GUI](#gui); `paperful serve` + `paperful/ui/`; Compose `gui` profile. TTY and Sci-Hub stay CLI. Not tagged 1.0 |
 | **Interactive Ask (GUI)** | Index page when `[rag]` + `[llm]` enabled | **Shipped** — Index form, CLI threads, citations; ingest/search/batch on Index; Briefs for summarize/synthesize |
 
@@ -63,7 +65,9 @@ collection picker hint on fuzzy `--collection` miss.
 ### Mendeley and EndNote (seeking testers)
 
 The code is in the tree. It has not been proven on real libraries the way
-Zotero has. Do not document either adapter as supported until testers say so.
+Zotero has. **1.0 does not wait on tester sign-off** — ship with clear limits
+in README, [why.md](why.md), [mendeley.md](mendeley.md), and [endnote.md](endnote.md).
+Do not call either adapter **supported** until field reports justify it.
 
 1. **Mendeley** — `MendeleyBackend` talks to `api.mendeley.com` (no official
    SDK). OAuth via `paperful session login mendeley`. `supports_write` is true
@@ -366,7 +370,7 @@ inbox drain dry-run on a fixture pack where DOI-less PDFs attach via title
 fingerprint (deterministic) and one `when_thin` LLM case logs confidence without
 auto-attach when below bar.
 Golden CI fixtures for `paperful.run_report.v1`, `paperful.refs_gap.pack.v1`, and
-`paperful.inbox.proposal.v1` when those land.
+`paperful.inbox.proposal.v1` — **shipped** (`tests/fixtures/` + `tests/test_schema_freeze.py`).
 
 ## Optional LLM assist (local / LiteLLM)
 

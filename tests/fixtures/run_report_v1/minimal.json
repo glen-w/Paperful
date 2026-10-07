@@ -1,0 +1,41 @@
+{
+  "schema": "paperful.run_report.v1",
+  "command": "run",
+  "started_at": "2026-01-01T00:00:00+00:00",
+  "finished_at": "2026-01-01T00:00:01+00:00",
+  "duration_s": 1.0,
+  "scope": "library",
+  "sources_configured": [],
+  "flags": {},
+  "paths": {
+    "out_dir": "/tmp/out",
+    "manifest": "/tmp/state/manifest.jsonl",
+    "state_dir": "/tmp/state"
+  },
+  "summary": {
+    "processed": 0,
+    "pdfs_downloaded": 0,
+    "attached": 0,
+    "attach_failed": 0,
+    "not_found": 0,
+    "no_identifier": 0,
+    "captcha": 0,
+    "error": 0,
+    "retryable": 0,
+    "skipped_manifest": 0,
+    "linked_url_skipped": 0,
+    "fields_corrected": 0,
+    "fields_corrected_by_kind": {},
+    "identifiers_verified": 0,
+    "by_source": {},
+    "sources_checked": {},
+    "errors_by_type": {},
+    "attach_failed_by_code": {},
+    "browser_misses": {},
+    "not_downloaded": {},
+    "paywall_prices": {},
+    "agent_after_playwright": 0,
+    "write_api": true
+  },
+  "items": []
+}

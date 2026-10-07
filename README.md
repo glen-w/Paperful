@@ -130,7 +130,8 @@ Maybe, if Zotero’s own “find available PDF” already covers you.
 Wanted; Advanced Repair, Mirror, Index Ask, and Briefs) is landed but not
 tagged — see [gui.md](docs/gui.md). Paperful is not Zotero-in-the-browser, not a
 sync/mobile/WebDAV client, and not every paywalled PDF. `paperful ocr` exists
-for scans on disk. Mendeley and EndNote are not proven. Post-1.0: Firefox
+for scans on disk. Mendeley and EndNote adapters exist but are seeking testers
+(not 1.0 blockers). Post-1.0: Firefox
 extension, local OpenAlex snapshot beyond opt-in v1, newsletter ingest.
 [Why](docs/why.md) · [Comparison](docs/comparison.md) · [GUI](docs/gui.md) · [Roadmap](docs/ROADMAP.md).
 

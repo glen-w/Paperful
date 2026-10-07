@@ -273,8 +273,10 @@ from it. `sync`, `snapshot`, `restore`, `attachments`, `attach`, and any
 attach_failed_by_code, last_run? }`. `last_run` (when present) is the same object
 as `state/last-run.json`. The required key set below is frozen: a removed or
 renamed required key is a break. Extra keys may still be added. Required
-`paperful.item.v1` keys are frozen the same way. The package is not tagged 1.0
-yet (workbench landed; polish remains).
+`paperful.item.v1` keys are frozen the same way. Summary miss rollups
+(`retryable`, `browser_misses`, `not_downloaded`, `paywall_prices`,
+`agent_after_playwright`) are part of the required summary key set. The package
+is not tagged 1.0 yet (workbench landed; polish remains).
 
 | Field | Meaning |
 | --- | --- |
@@ -288,9 +290,11 @@ yet (workbench landed; polish remains).
 | `paths.out_dir` / `manifest` / `state_dir` | Absolute paths |
 | `summary.pdfs_downloaded` | Successful downloads (`ok` bumps) |
 | `summary.attached` / `attach_failed` | Write-back counts |
-| `summary.not_found` / `no_identifier` / `captcha` / `error` | Item outcomes |
+| `summary.not_found` / `no_identifier` / `captcha` / `error` / `retryable` | Item outcomes (required on every `build_report()` summary) |
+| `summary.browser_misses` | Browser-lane miss labels rolled up (`captcha`, `paywall`, …) |
 | `summary.not_downloaded` | Items with no PDF, one reason each. A page block (captcha, cloudflare, blocked, paywall, login) wins over a plain miss. Other reasons: session expired, paused, download failed, step budget, no identifier, error, not found |
 | `summary.paywall_prices` | Publisher prices the browser agent noted on items that were not saved, summed per currency (`articles`, `total`) |
+| `summary.agent_after_playwright` | Count of items where `browser_agent` saved after a Playwright miss |
 | `summary.skipped_manifest` / `linked_url_skipped` | Not attempted this run |
 | `summary.fields_corrected` / `fields_corrected_by_kind` | In-memory DOI enrichments (not library writes) |
 | `summary.identifiers_verified` | `verify:ok` count |
@@ -298,7 +302,7 @@ yet (workbench landed; polish remains).
 | `summary.sources_checked` | Per-source outcome tallies |
 | `summary.errors_by_type` / `attach_failed_by_code` | Typed errors |
 | `summary.write_api` | `true` / `false` / `null` (null when the run did not probe write support) |
-| `items[]` | Per-item: `itemKey`, `title`, `status`, `source`, `reason`, `doi`, `doi_verified`, `attempts`, `fields_corrected`, `path`, `error_type` |
+| `items[]` | Per-item required keys: `itemKey`, `title`, `status`, `source`, `reason`, `doi`, `doi_verified`, `attempts`, `fields_corrected`, `path`, `error_type`, `miss_surface`, `miss_plain`, `miss_detail`, `oa_status`, `license`, `version` |
 
 `--format json` on `run`, `refs gap`, `ingest-dois`, `collections add`, `inbox drain`, `gaps`, `lint`,
 `fix-metadata`, `dedupe`, snowball crawl (`search` / `hybrid` / `doi` / `orcid` /

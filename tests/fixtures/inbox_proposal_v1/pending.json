@@ -1,0 +1,13 @@
+{
+  "id": "goldenpropos1",
+  "action": "create_parent",
+  "pdf": "/tmp/sample.pdf",
+  "doi": "10.1000/new",
+  "title": "New paper",
+  "year": 2024,
+  "how": "doi",
+  "collection": "ocean/bbnj",
+  "created_at": "2026-01-01T00:00:00+00:00",
+  "schema": "paperful.inbox.proposal.v1",
+  "status": "pending"
+}

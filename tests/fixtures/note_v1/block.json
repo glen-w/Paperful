@@ -1,0 +1,8 @@
+{
+  "schema": "paperful.note.v1",
+  "type": "summary",
+  "verb": "summarize",
+  "model": "qwen",
+  "run_id": "r1",
+  "prompt_sha": "abc"
+}

@@ -1,0 +1,31 @@
+{
+  "schema": "paperful.refs_gap.pack.v1",
+  "scope": "library",
+  "created_at": "2026-01-01T00:00:00+00:00",
+  "counts": {
+    "cited": 1,
+    "already_exists": 0,
+    "missing": 1,
+    "ingest_dois": 1,
+    "needs_ocr": 0,
+    "no_pdf": 0
+  },
+  "findings": [],
+  "rows": [
+    {
+      "doi": "10.1000/a",
+      "title": "A",
+      "year": 2019,
+      "citing_keys": [
+        "SEED"
+      ],
+      "already_exists": false,
+      "exists_key": "",
+      "exists_kind": "",
+      "oa_hint": "",
+      "suggested_action": "ingest-dois",
+      "finding": "",
+      "cited_by_count_in_scope": 1
+    }
+  ]
+}

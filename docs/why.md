@@ -91,5 +91,5 @@ Python, the Zotero local API, Ollama or LiteLLM, Docker.
 - [How it works](how-it-works.md) — fill pipeline
 - [Quiet mirror](quiet-mirror.md) — folder contract
 - [How Paperful compares](comparison.md)
-- [Roadmap](ROADMAP.md) — Zotero is the tested path; Mendeley and EndNote are seeking testers
+- [Roadmap](ROADMAP.md) — Zotero is the tested path; Mendeley and EndNote are seeking testers (not 1.0 blockers)
 - [Workbench](gui.md) — localhost HTML over the same CLI verbs

@@ -131,6 +131,6 @@ notes are not mirrored.
 - [architecture.md](architecture.md) — disk-first adapters and data flow
 - [zotero.md](zotero.md) — attachment modes (`imported_file` vs linked)
 - [mendeley.md](mendeley.md) / [endnote.md](endnote.md) — other adapters (seeking testers)
-- [ROADMAP.md](ROADMAP.md) — the disk mirror is core; Zotero is the tested 1.0 path
+- [ROADMAP.md](ROADMAP.md) — the disk mirror is core; Zotero is the well-tested path (1.0 does not wait on other adapters)
 - [why.md](why.md) — storage, grey literature, and what is true today
 - [commands.md](commands.md) — `out/` path layout

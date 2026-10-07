@@ -17,6 +17,10 @@ from .snowball.expand import publication_year
 from .zot import Item
 
 SCHEMA = "paperful.refs_gap.pack.v1"
+# Required on every pack.json from write_pack(). Extra keys may be added.
+REFS_GAP_PACK_KEYS = frozenset(
+    {"schema", "scope", "created_at", "counts", "findings", "rows"}
+)
 BIBLIO_PAGES = None  # whole PDF; bibliography is often at the end
 
 

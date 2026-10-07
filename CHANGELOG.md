@@ -35,6 +35,12 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ### Changed
 
+- **Schema freeze prep for 1.0:** `RUN_REPORT_SUMMARY_KEYS` now includes always-emitted
+  rollups (`retryable`, `browser_misses`, `not_downloaded`, `paywall_prices`,
+  `agent_after_playwright`). Frozen top-level keys for `refs_gap.pack.v1`,
+  `inbox.proposal.v1`, and `note.v1`. Golden fixtures under `tests/fixtures/` and
+  `tests/test_schema_freeze.py`. Registry + tiers in [developer.md](docs/developer.md);
+  releases revisit rows resolved. Package not tagged 1.0 yet.
 - **Docs:** workbench pages ([gui.md](docs/gui.md), roadmap, releases, commands,
   architecture) now list Repair/Mirror Apply, watch briefing/digest, ingest-dois,
   Twenty writeback, and what stays CLI.
@@ -42,6 +48,8 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
   run CLI workflows) and interactive Ask (chat-over-collection RAG in the GUI).
   Post-1.0: local OpenAlex snapshot phases 2B/2C, Firefox extension,
   newsletter/alert ingest (rollup bridge). See [ROADMAP](docs/ROADMAP.md#product-split-10-vs-post-10).
+- **Roadmap / adapters:** Mendeley and EndNote no longer gate 1.0; docs stay
+  honest (seeking testers; Zotero well-tested).
 - BBNJ author-site / authorwatch dogfood plan: [bbnj-author-lanes](docs/bbnj-author-lanes.md)
   (`-C ocean/BBNJ`, test sibling `ocean/BBNJ-test`). Workflows pack slug is
   `ocean-bbnj`, not `bbnj`.
