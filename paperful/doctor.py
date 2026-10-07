@@ -203,6 +203,16 @@ def remediation_text(
             "(or: uv run playwright install chromium), then continue."
         )
     if check.name == "LLM":
+        if docker and "unreachable" in (check.detail or "").lower():
+            return (
+                "Ollama must be running on the host (not inside this container).\n"
+                "1. On the host: ollama serve  (Docker Desktop: default loopback "
+                "is fine; Linux Engine: OLLAMA_HOST=0.0.0.0 ollama serve).\n"
+                "2. Keep [llm].base_url = \"http://127.0.0.1:11434\" — Paperful "
+                "rewrites loopback to host.docker.internal inside Compose "
+                "(or set PAPERFUL_OLLAMA_HOST). See docs/llm.md#docker.\n"
+                "3. ollama pull <model>, then continue."
+            )
         return (
             f"Edit {cfg_hint} [llm]: start Ollama (ollama serve) and pull the model "
             '(ollama pull <model>), or set provider = "litellm" after '

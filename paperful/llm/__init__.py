@@ -34,6 +34,7 @@ from .validate import (
     embed_egress_is_remote,
     llm_egress_is_remote,
     reject_litellm_ollama_model,
+    resolve_ollama_base_url,
 )
 
 __all__ = [
@@ -61,6 +62,7 @@ __all__ = [
     "agent_model_uses_litellm",
     "llm_model_for_agent",
     "reject_litellm_ollama_model",
+    "resolve_ollama_base_url",
     "validate_llm_for_recover",
     "validate_llm_for_verb",
 ]

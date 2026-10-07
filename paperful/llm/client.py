@@ -270,7 +270,12 @@ def get_client_impl(cfg) -> LLMClient:
         return NullLLMClient()
     if cfg.llm_provider == "litellm":
         return LiteLLMClient(api_base=cfg.llm_api_base or None)
-    return OllamaClient(base_url=cfg.llm_base_url, allow_remote=cfg.llm_allow_remote)
+    from .validate import resolve_ollama_base_url
+
+    return OllamaClient(
+        base_url=resolve_ollama_base_url(cfg.llm_base_url),
+        allow_remote=cfg.llm_allow_remote,
+    )
 
 
 def _ollama_response_piece(line: str) -> str:

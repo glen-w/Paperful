@@ -27,6 +27,7 @@ from paperful.llm.preflight import validate_llm_for_recover, validate_llm_for_ve
 from paperful.llm.validate import (
     LlmConfigError,
     reject_litellm_ollama_model,
+    resolve_ollama_base_url,
     validate_llm_api_base,
     validate_ollama_url,
 )
@@ -35,13 +36,77 @@ from paperful.llm.validate import (
 # ---- validation --------------------------------------------------------------
 
 
-def test_validate_ollama_rejects_remote_by_default():
+def test_validate_ollama_rejects_remote_by_default(monkeypatch):
+    monkeypatch.delenv("PAPERFUL_OLLAMA_HOST", raising=False)
     with pytest.raises(LlmConfigError):
         validate_ollama_url("http://192.168.1.1:11434", False)
 
 
-def test_validate_ollama_allows_remote_when_opted_in():
+def test_validate_ollama_allows_remote_when_opted_in(monkeypatch):
+    monkeypatch.delenv("PAPERFUL_OLLAMA_HOST", raising=False)
     validate_ollama_url("http://192.168.1.1:11434", True)
+
+
+def test_resolve_ollama_env_does_not_rewrite_remote(monkeypatch):
+    """``.env`` PAPERFUL_OLLAMA_HOST must not turn remote URLs into loopback."""
+    monkeypatch.setattr("paperful.llm.validate._in_docker", lambda: False)
+    monkeypatch.setenv("PAPERFUL_OLLAMA_HOST", "host.docker.internal")
+    assert resolve_ollama_base_url("http://192.168.1.1:11434") == (
+        "http://192.168.1.1:11434"
+    )
+    with pytest.raises(LlmConfigError):
+        validate_ollama_url("http://192.168.1.1:11434", False)
+
+
+def test_resolve_ollama_loopback_unchanged_on_host(monkeypatch):
+    monkeypatch.setattr("paperful.llm.validate._in_docker", lambda: False)
+    monkeypatch.delenv("PAPERFUL_OLLAMA_HOST", raising=False)
+    assert resolve_ollama_base_url("http://127.0.0.1:11434") == (
+        "http://127.0.0.1:11434"
+    )
+
+
+def test_resolve_ollama_rewrites_loopback_in_docker(monkeypatch):
+    monkeypatch.setattr("paperful.llm.validate._in_docker", lambda: True)
+    monkeypatch.delenv("PAPERFUL_OLLAMA_HOST", raising=False)
+    monkeypatch.setattr("paperful.llm.validate._ipv4_literal", lambda _h: None)
+    assert resolve_ollama_base_url("http://127.0.0.1:11434") == (
+        "http://host.docker.internal:11434"
+    )
+    assert resolve_ollama_base_url("http://localhost:11434/v1") == (
+        "http://host.docker.internal:11434/v1"
+    )
+
+
+def test_resolve_ollama_prefers_ipv4_literal_in_docker(monkeypatch):
+    monkeypatch.setattr("paperful.llm.validate._in_docker", lambda: True)
+    monkeypatch.delenv("PAPERFUL_OLLAMA_HOST", raising=False)
+    monkeypatch.setattr(
+        "paperful.llm.validate._ipv4_literal", lambda _h: "192.168.65.254"
+    )
+    assert resolve_ollama_base_url("http://127.0.0.1:11434") == (
+        "http://192.168.65.254:11434"
+    )
+
+
+def test_resolve_ollama_env_host(monkeypatch):
+    monkeypatch.setattr("paperful.llm.validate._in_docker", lambda: True)
+    monkeypatch.setenv("PAPERFUL_OLLAMA_HOST", "host.docker.internal")
+    monkeypatch.setattr("paperful.llm.validate._ipv4_literal", lambda _h: None)
+    assert resolve_ollama_base_url("http://127.0.0.1:11434") == (
+        "http://host.docker.internal:11434"
+    )
+    monkeypatch.setattr("paperful.llm.validate._in_docker", lambda: False)
+    assert resolve_ollama_base_url("http://127.0.0.1:11434") == (
+        "http://127.0.0.1:11434"
+    )
+
+
+def test_validate_ollama_allows_docker_bridge_without_allow_remote(monkeypatch):
+    monkeypatch.setattr("paperful.llm.validate._in_docker", lambda: True)
+    monkeypatch.delenv("PAPERFUL_OLLAMA_HOST", raising=False)
+    monkeypatch.setattr("paperful.llm.validate._ipv4_literal", lambda _h: None)
+    validate_ollama_url("http://127.0.0.1:11434", False)
 
 
 @pytest.mark.parametrize("url", ["ftp://localhost", "localhost:11434", "http://"])
@@ -217,9 +282,10 @@ def test_ollama_error_payload(mock_ollama):
         )
 
 
-def test_ollama_complete_refuses_remote_without_flag():
+def test_ollama_complete_refuses_remote_without_flag(monkeypatch):
     from paperful.llm import CompletionRequest
 
+    monkeypatch.delenv("PAPERFUL_OLLAMA_HOST", raising=False)
     with pytest.raises(LlmConfigError):
         OllamaClient("http://10.0.0.5:11434", False).complete(
             CompletionRequest(model="m", prompt="p")
