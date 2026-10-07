@@ -57,7 +57,6 @@ def test_settings_saves_preset_cookie(tmp_path, monkeypatch):
         data={
             "email": "a@b.c",
             "preset": "eoi",
-            "attach_verified": "1",
             "out_dir": str(tmp_path / "out"),
         },
         follow_redirects=False,

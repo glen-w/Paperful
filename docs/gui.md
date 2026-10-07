@@ -15,8 +15,8 @@ Two jobs sit on the default nav:
 
 | Nav | CLI verbs | Job |
 | --- | --- | --- |
+| **Wanted** | `gaps`, `run`, `attach` | See missing PDFs, preview fetch, grab to `out/`, attach chosen copies |
 | **Discover** | `snowball`, `authorwatch`, watches | Find new works (topic or person), review, add metadata parents |
-| **Wanted** | `gaps`, `run`, `attach` | See missing PDFs, preview fetch, grab to `out/`, attach verified copies |
 
 **Library**, **Activity**, and **System** support the loop. **Repair**, **Mirror**,
 **Index**, **Briefs**, and **Settings** appear only when **Advanced** is on
@@ -64,8 +64,9 @@ Bind `127.0.0.1`. Compose `gui` profile publishes `127.0.0.1:8765:8765` only.
    **Check again** re-runs a saved topic watch or person list.
 2. **Wanted** — Miss rows use `MISS_SURFACE_PLAIN` only. **Held** tab: on-disk
    PDFs with `doi_match` / `doi_mismatch` / `unverified` / `snapshot` (not
-   “% complete”). **Preview** / **Grab** (selected vs all). Grab attaches only
-   `doi_match` when attach-verified is on.
+   “% complete”). **Preview** → **Grab** (fetch to `out/` only; selected vs all)
+   → **Attach** (explicit Zotero write for `doi_match` plus hand-ticks). Grab
+   never writes the library.
 3. **Library** — Collection list with have / held / missing counts; pick scope.
 4. **Activity** — Command history + trust line from `last-run.json`.
 5. **System** — `doctor` rows with one next step each.
@@ -104,7 +105,8 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/v1/ask` | Same as MCP `ask` (not linked from simple HTML) |
 | POST | `/v1/gui/noop` | Smoke / readiness for the GUI process |
 | POST | `/wanted/preview` | Review token for Grab |
-| POST | `/wanted/grab` | Consume token; fetch + attach per policy |
+| POST | `/wanted/grab` | Consume token; fetch to `out/` only (`item_keys` from preview) |
+| POST | `/wanted/attach` | Attach selected pending PDFs to Zotero (`doi_match` + hand-ticks) |
 | POST | `/wanted/summarize` | Enqueue single-item `summarize`; redirect `?run=` |
 | GET | `/item/{key}/summary` | Per-item HTML under `state/summaries/` |
 | POST | `/discover/topic` | Enqueue snowball kind (Advanced) or keyword search |
@@ -152,7 +154,8 @@ posts `review_token` from that command record (stale previews return HTTP 409).
 
 Writes over HTTP use review tokens under `state/gui/reviews/`; stale library
 fingerprints return **409**. Discover **Add selected** / inbox apply and Wanted
-**Grab** require **Preview** first. **Keep an eye on this** needs an existing
+**Grab** require **Preview** first. Wanted **Attach** is a separate labelled
+library write (checked rows only). **Keep an eye on this** needs an existing
 snowball profile (`save_watch`); it does not write an empty `watch.json`.
 Long jobs land under `state/gui/commands/`; Activity polls `GET /v1/runs/{id}`.
 

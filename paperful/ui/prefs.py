@@ -8,6 +8,7 @@ from typing import Any
 COOKIE_COLLECTION = "pf_collection"
 COOKIE_PRESET = "pf_preset"
 COOKIE_ADVANCED = "pf_advanced"
+# Legacy cookie name; no longer read (Grab is always fetch-only).
 COOKIE_ATTACH_VERIFIED = "pf_attach_verified"
 
 PRESETS = frozenset({"oa", "eoi"})
@@ -18,7 +19,6 @@ class WorkbenchPrefs:
     collection: str = ""
     preset: str = "oa"
     advanced: bool = False
-    attach_verified: bool = True
 
 
 def prefs_from_request(request: Any) -> WorkbenchPrefs:
@@ -27,12 +27,10 @@ def prefs_from_request(request: Any) -> WorkbenchPrefs:
     if preset not in PRESETS:
         preset = "oa"
     advanced = (cookies.get(COOKIE_ADVANCED) or "0") == "1"
-    attach = (cookies.get(COOKIE_ATTACH_VERIFIED) or "1") == "1"
     return WorkbenchPrefs(
         collection=(cookies.get(COOKIE_COLLECTION) or "").strip(),
         preset=preset,
         advanced=advanced,
-        attach_verified=attach,
     )
 
 

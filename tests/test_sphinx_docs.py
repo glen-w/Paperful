@@ -79,6 +79,7 @@ def test_gui_md_documents_discover_and_wanted_routes():
         "/discover/aw/briefing",
         "/wanted/preview",
         "/wanted/grab",
+        "/wanted/attach",
         "/briefs/summarize",
         "/index/ask",
         "Briefs",
