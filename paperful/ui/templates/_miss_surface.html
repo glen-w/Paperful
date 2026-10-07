@@ -1,0 +1,35 @@
+{% macro miss_surface_icon(code, plain, tip_extra='') %}
+{% if plain %}
+<span class="miss-status{% if code %} miss-status--{{ code }}{% endif %}" role="img" aria-label="{{ plain }}" tabindex="0">
+  <svg class="miss-status-glyph" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+    {% if code == 'no_doi' %}
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M4.5 6.5h7M4.5 9.5h4M3 2.5h10a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z"/>
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M10.5 8.5l3 3M13.5 8.5l-3 3"/>
+    {% elif code == 'paywalled' %}
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M5 7V5.5a3 3 0 0 1 6 0V7"/>
+    <rect x="3.5" y="7" width="9" height="6.5" rx="1" fill="none" stroke="currentColor" stroke-width="1.35"/>
+    {% elif code == 'no_oa' %}
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M3 3.5h7l3 2.5v7a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-8.5a1 1 0 0 1 1-1z"/>
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M10 3.5V6h3"/>
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M5.5 9.5l5 3M10.5 9.5l-5 3"/>
+    {% elif code == 'fetch_failed' %}
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round" d="M8 2.5l5.5 9.5H2.5L8 2.5z"/>
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M8 6.5v3M8 11h.01"/>
+    {% elif code == 'license_blocked' %}
+    <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.35"/>
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M4.8 4.8l6.4 6.4"/>
+    {% elif code == 'snapshot' %}
+    <rect x="2.5" y="3" width="11" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.35"/>
+    <circle cx="5.5" cy="6" r="1.2" fill="currentColor"/>
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M3.5 11l3-2.5 2 1.5 2.5-2 3.5 3"/>
+    {% elif code == 'import_ok' %}
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" d="M3 8.5l3 3 7-7"/>
+    {% else %}
+    <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.35"/>
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M8 5v3.5M8 11h.01"/>
+    {% endif %}
+  </svg>
+  <span class="miss-status-tip">{{ plain }}{% if tip_extra %} — {{ tip_extra }}{% endif %}</span>
+</span>
+{% endif %}
+{% endmacro %}
