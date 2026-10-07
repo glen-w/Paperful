@@ -137,7 +137,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/wanted/preview` | Review token for Grab (Advanced: year/type/retry/… flags) |
 | POST | `/wanted/grab` | Consume token; fetch to `out/` only (`item_keys` from preview) |
 | POST | `/wanted/attach/preview` | Review token for held PDF attach |
-| POST | `/wanted/attach` | Consume token; attach pending `out/` PDFs |
+| POST | `/wanted/attach` | Selected keys: attach pending `out/` PDFs. `review_token`: consume Advanced preview |
 | POST | `/wanted/recover/preview` | Review token for browser-agent recover |
 | POST | `/wanted/recover` | Consume token; `recover` |
 | POST | `/wanted/handoff` | `list` / `tabs` / `walk` / `watch` (never fetches) |
@@ -205,9 +205,10 @@ posts `review_token` from that command record (stale previews return HTTP 409).
 
 Writes over HTTP use review tokens under `state/gui/reviews/`; stale library
 fingerprints return **409**. Discover **Add selected** / inbox apply, ingest-dois
-Apply, and Wanted **Grab** / attach / recover require **Preview** first (tokens
+Apply, and Wanted **Grab** / recover require **Preview** first (tokens
 may bake Grab flags). **Grab** fetches to `out/` only; **Attach** is a separate
-labelled library write. Repair / Mirror **Apply** require **Preview** first.
+labelled library write (ticked keys from Wanted, or Advanced preview then apply).
+Repair / Mirror **Apply** require **Preview** first.
 **Keep an eye on this** needs an existing snowball profile (`save_watch`); it
 does not write an empty `watch.json`. Long jobs land under `state/gui/commands/`;
 Activity polls `GET /v1/runs/{id}`.

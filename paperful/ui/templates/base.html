@@ -22,7 +22,12 @@
     </a>
     <span class="chip" title="Collection">{% if prefs.collection %}{{ prefs.collection }}{% else %}no collection{% endif %}</span>
     <span class="chip" title="Preset">{% if prefs.preset == 'eoi' %}Campus{% else %}Open access{% endif %}</span>
-    <a class="health-chip health-{{ health }}" href="/system" title="System health">{% if health_label %}{{ health_label }}{% else %}System health{% endif %}</a>
+    <span
+      class="health-dot health-{{ health }}"
+      role="status"
+      title="{{ health_tooltip }}"
+      aria-label="System health: {{ health_tooltip }}"
+    ></span>
     <form method="post" action="/prefs/advanced" class="advanced-toggle">
       <label>
         <input type="checkbox" name="advanced" value="1" {% if prefs.advanced %}checked{% endif %}

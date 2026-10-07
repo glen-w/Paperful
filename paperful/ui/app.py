@@ -81,23 +81,40 @@ def _health_status(checks: list[dict[str, Any]]) -> str:
     return "green"
 
 
+def _row_health_label(row: dict[str, Any]) -> str:
+    code = str(row.get("code") or "")
+    if code == "zotero_down":
+        return "Zotero offline"
+    if code == "zotero_api_off":
+        return "Zotero API off"
+    name = str(row.get("name") or "").strip()
+    if name:
+        return name
+    if code:
+        return code.replace("_", " ")
+    return "Issue"
+
+
 def _health_label(checks: list[dict[str, Any]]) -> str:
     """Short label for the worst doctor row (red, then amber)."""
     for status in ("red", "amber"):
         for row in checks:
-            if row.get("status") != status:
-                continue
-            code = str(row.get("code") or "")
-            if code == "zotero_down":
-                return "Zotero offline"
-            if code == "zotero_api_off":
-                return "Zotero API off"
-            name = str(row.get("name") or "").strip()
-            if name:
-                return name
-            if code:
-                return code.replace("_", " ")
+            if row.get("status") == status:
+                return _row_health_label(row)
     return ""
+
+
+def _health_tooltip(checks: list[dict[str, Any]]) -> str:
+    if not checks:
+        return "Health not loaded — open System to refresh"
+    labels: list[str] = []
+    for status in ("red", "amber"):
+        for row in checks:
+            if row.get("status") == status:
+                labels.append(_row_health_label(row))
+    if labels:
+        return "; ".join(labels)
+    return "All checks OK"
 
 
 def _trust_line(cfg: Config) -> str:
@@ -150,8 +167,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     templates = Jinja2Templates(directory=str(_ui_dir() / "templates"))
     static_dir = _ui_dir() / "static"
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-    # Health chip: never run full doctor on HTML requests (15–30s with LLM/RAG).
-    # /system still calls doctor_payload and refreshes this cache for the chip.
+    # Health dot: never run full doctor on HTML requests (15–30s with LLM/RAG).
+    # /system still calls doctor_payload and refreshes this cache for the dot.
     _health_cache: dict[str, Any] = {"at": 0.0, "checks": []}
 
     def _remember_doctor(checks: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -171,6 +188,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             "active": active,
             "health": _health_status(checks),
             "health_label": _health_label(checks),
+            "health_tooltip": _health_tooltip(checks),
             **extra,
         }
 
@@ -403,8 +421,13 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         form = await request.form()
         from . import wanted_jobs
 
-        token = str(form.get("review_token") or "") or _wanted_token("attach")
-        ok, msg = wanted_jobs.attach_apply(cfg, token=token)
+        token = str(form.get("review_token") or "")
+        if token:
+            ok, msg = wanted_jobs.attach_apply(cfg, token=token)
+        else:
+            prefs = prefs_from_request(request)
+            keys = [str(k) for k in form.getlist("keys")]
+            ok, msg = jobs.attach_run(cfg, keys=keys, collection=prefs.collection)
         if not ok:
             return JSONResponse({"ok": False, "error": msg}, status_code=409)
         return RedirectResponse(url="/wanted", status_code=303)

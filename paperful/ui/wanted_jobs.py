@@ -61,13 +61,16 @@ def attach_preview(
     if keys:
         keyset = set(keys)
         pending = [r for r in pending if r.itemKey in keyset]
-    fp = scope_fingerprint(items, manifest)
+    stored_keys = [r.itemKey for r in pending] or [it.key for it in items]
+    fp_keyset = set(stored_keys)
+    fp_items = [it for it in items if it.key in fp_keyset] if fp_keyset else items
+    fp = scope_fingerprint(fp_items, manifest)
     return commands.create_review_token(
         cfg,
         verb="attach",
         collection=collection,
         preset="oa",
-        keys=[r.itemKey for r in pending] or [it.key for it in items],
+        keys=stored_keys,
         fingerprint=fp,
         command_id=cmd_id,
         flags={
