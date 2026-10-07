@@ -44,6 +44,11 @@ Default pytest stays offline. The opt-in all-in E2E (`make e2e-nba`, marker
 `e2e_live`, env `PAPERFUL_E2E=1`) talks to a real Zotero collection `e2e/NBA`
 and is documented in [docs/e2e-nba.md](docs/e2e-nba.md). Do not enable it in CI.
 
+**Issues to watch:** CI colours CLI help (use `plain_text()` for flag assertions),
+the dev group needs a LanceDB-compatible platform, and the Compose **docker** job
+is not a substitute for the full pytest job. Details:
+[developer guide — CI and local pitfalls](docs/developer.md#ci-and-local-pitfalls).
+
 ## Pull requests
 
 - Keep changes focused; match existing style in `paperful/`.

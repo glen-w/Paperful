@@ -235,3 +235,35 @@ by a test.
 | `tests/test_write_through.py::FakeLibrary` | A manager with write calls. For `MirroredBackend` |
 
 Count requests when the point of a change is fewer of them: `FakeZotero.calls`.
+
+### CI and local pitfalls
+
+GitHub Actions (`.github/workflows/ci.yml`) runs `uv sync --group dev --extra
+serve` and `uv run pytest` on Ubuntu. A second job builds the Compose image and
+smokes `paperful doctor`; it can pass while pytest fails, so check the **test**
+job when CI is red.
+
+**CLI help assertions.** On CI, `CI` / `GITHUB_ACTIONS` is set and Typer/Rich
+style option names with ANSI codes. A flag like `--apply` is often split across
+escape sequences, so `assert "--apply" in result.stdout` fails even though help
+is correct. Strip SGR codes with `tests.textutil.plain_text` before matching
+tokens (see the comment in that module). For table layout, several CLI test
+modules widen the shared `cli.console` (`width=250`) so Rich does not ellipsize
+cells — follow `tests/test_cli.py` when adding help or table assertions.
+
+**Dev sync and LanceDB.** `uv sync --group dev` pulls `lancedb` for index/RAG
+tests. PyPI wheels cover Linux x86_64/arm64, Windows, and **macOS arm64**; there
+is no wheel for every macOS x86_64 / OS combo. If sync fails with “no wheel for
+the current platform”, use native **arm64** Python on Apple Silicon, run pytest
+inside the Linux dev container / CI image, or temporarily sync without the dev
+group only when you are not touching RAG tests.
+
+**Pytest inside Compose.** The runtime image is for operators (`paperful …`), not
+the full dev test suite. Reproduce CI with host `uv run pytest` or a
+`python:3.12-slim` container plus `uv sync --group dev --extra serve`. Do not
+expect host-only tests (for example default Zotero endpoint URLs) to pass when
+`PAPERFUL_ZOTERO_HOST` is set for container → host networking.
+
+**Docs CI.** Pushes that change `docs/` or `website/` also run strict Sphinx
+(`DOCS_STRICT=1`) and may deploy Pages; new guide pages must be linked from
+`docs/index.md` (`tests/test_sphinx_docs.py`).
