@@ -314,7 +314,8 @@ prints the same fix steps once (no Enter wait — Compose owns Ctrl-C / stdin on
 `compose up`). Opt in to the interactive walk with
 `docker compose run --rm paperful doctor --guide`. Session logins still need a
 headed browser on the host. Force or skip with `--guide` / `--no-guide`.
-Bare `docker compose run --rm paperful` is `doctor`.
+`docker compose up` starts the GUI; CLI checks use
+`docker compose run --rm paperful doctor`.
 
 ## Dry-run
 

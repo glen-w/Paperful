@@ -47,9 +47,12 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ### Changed
 
+- **Compose `up` → GUI:** `docker compose up` serves the workbench at
+  http://127.0.0.1:8765 (assumes setup done). CLI one-shots stay
+  `docker compose run --rm paperful <cmd>`. `compose.gui.yaml` is a no-op shim.
 - **Docker doctor guide:** default `doctor` inside Compose no longer waits for
-  Enter (Compose owns Ctrl-C / stdin on `compose up`). It prints fix steps once;
-  opt in with `docker compose run --rm paperful doctor --guide`.
+  Enter. It prints fix steps once; opt in with
+  `docker compose run --rm paperful doctor --guide`.
 - **Schema freeze prep for 1.0:** `RUN_REPORT_SUMMARY_KEYS` now includes always-emitted
   rollups (`retryable`, `browser_misses`, `not_downloaded`, `paywall_prices`,
   `agent_after_playwright`). Frozen top-level keys for `refs_gap.pack.v1`,
@@ -70,6 +73,9 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
   `ocean-bbnj`, not `bbnj`.
 - `authorwatch run` maps a spent OpenAlex daily budget to exit 2 with a retry
   line (no traceback).
+- **Workbench health chip:** ordinary HTML pages no longer run full `doctor`
+  (was 15–30s and felt like an endless load). The chip stays amber until
+  **System** refreshes it; `/system` still runs doctor. See [gui.md](docs/gui.md).
 
 ### Added
 

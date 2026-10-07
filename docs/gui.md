@@ -42,12 +42,12 @@ browser-agent. No built-in scheduler — **Check again** on Discover, not cron.
 | --- | --- |
 | **Collection** chip | Scoped collection (remembered in a cookie) |
 | **Preset** chip | Open access (`oa`) or Campus (`eoi`) — the simple source choice |
-| **Health** dot | Worst `doctor` status |
+| **Health** dot | Worst cached `doctor` status (amber until **System** runs doctor; pages never block on a full doctor) |
 | **Advanced** toggle | Cookie only; reveals extra nav and form fields |
 
 Layout: table-first rows, native `<dialog>` drawer (no embedded PDF viewer).
 Long jobs return a **command id**; Activity polls `GET /v1/runs/{id}` (SSE later).
-Bind `127.0.0.1`. Compose `gui` profile publishes `127.0.0.1:8765:8765` only.
+Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
 
 ---
 

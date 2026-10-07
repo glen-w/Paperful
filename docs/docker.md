@@ -50,7 +50,7 @@ mounts (`PAPERFUL_DATA`).
 - For Scholar / EZProxy sessions: a host `uv` install so you can run
   `paperful session login …`, then reuse the mounted `state/sessions/`
   from the container. `doctor` prints fix steps; use `doctor --guide` via
-  `docker compose run` for step-by-step re-check (not `compose up`).
+  `docker compose run --rm paperful doctor --guide` for step-by-step re-check.
 
 ## Quick start
 
@@ -96,7 +96,7 @@ will not land on the volume.
 | File | Role |
 | --- | --- |
 | [`.env.example`](https://github.com/glen-w/Paperful/blob/main/.env.example) | Copy to `.env` — `PAPERFUL_DATA`, `PAPERFUL_ZOTERO_HOST`, `PAPERFUL_IMAGE_MODE` |
-| [`compose.yaml`](https://github.com/glen-w/Paperful/blob/main/compose.yaml) | Base service (build, Zotero host, data volume) |
+| [`compose.yaml`](https://github.com/glen-w/Paperful/blob/main/compose.yaml) | Default service: `compose up` → GUI; `compose run` → CLI |
 | [`compose.override.example.yaml`](https://github.com/glen-w/Paperful/blob/main/compose.override.example.yaml) | Optional local Compose tweaks |
 
 `.env` and `compose.override.yaml` are gitignored so your machine-local paths
@@ -136,18 +136,20 @@ so a shared `.env` does not break host `uv run`.
 
 ## Optional LLM, RAG, and browser-agent
 
-**light** ships `[serve]` only (FastAPI/Jinja for the Compose `gui` profile).
+**light** ships `[serve]` only (FastAPI/Jinja for `compose up`).
 **heavy** also installs `[llm]`, `[rag]` (LanceDB), and `[browser-agent]`
 (`browser-use`), so `rag` / `ask`, LiteLLM, and the `browser_agent` lane work
 inside the container. Headed `session login` still stays on the host (shared
 `state/` vault).
 
-The GUI binds in the container on `0.0.0.0:8765` and **publishes only**
-`127.0.0.1:8765:8765` (no LAN). Same workbench as host `paperful serve`
-([gui.md](gui.md) — Discover / Wanted; Advanced Repair / Mirror / Index / Briefs):
+After doctor is green, `docker compose up` starts the GUI. It binds in the
+container on `0.0.0.0:8765` and **publishes only** `127.0.0.1:8765:8765` (no
+LAN). Same workbench as host `paperful serve` ([gui.md](gui.md) — Discover /
+Wanted; Advanced Repair / Mirror / Index / Briefs):
 
 ```sh
-docker compose -f compose.yaml -f compose.gui.yaml --profile gui up paperful-gui
+docker compose up
+# → http://127.0.0.1:8765
 ```
 
 Host-only `uv run paperful serve` remains the contributor path. `fix-metadata` title
@@ -202,10 +204,13 @@ See [Workflows](workflows.md).
 
 ## After doctor is green
 
-Keep Zotero running. Bare `docker compose run --rm paperful` is `doctor`
-(image `CMD`). To fetch:
+Keep Zotero running. `docker compose up` starts the GUI at
+http://127.0.0.1:8765. CLI one-shots use `compose run` (pass the subcommand —
+bare `run` would also start serve):
 
 ```sh
+docker compose up                                    # GUI
+docker compose run --rm paperful doctor
 docker compose run --rm paperful collections
 docker compose run --rm paperful run --collection interesting --dry-run
 docker compose run --rm paperful run --collection interesting
@@ -223,7 +228,8 @@ docker compose run --rm paperful run -C BBNJ --year-from 2023 -T journalArticle 
 ## Common commands
 
 ```sh
-docker compose run --rm paperful            # doctor (default)
+docker compose up                           # GUI at http://127.0.0.1:8765
+docker compose run --rm paperful doctor
 docker compose run --rm paperful doctor --no-guide
 docker compose run --rm paperful collections
 docker compose run --rm paperful dedupe -C BBNJ --dry-run

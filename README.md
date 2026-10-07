@@ -169,7 +169,8 @@ cp .env.example .env          # PAPERFUL_DATA=. keeps data in this checkout
                               # .env.example sets PAPERFUL_IMAGE_MODE=heavy
 cp config.minimal.toml config.toml   # set email; full file is config.example.toml
 docker compose build                 # heavy when set in .env; CI uses light
-docker compose run --rm paperful doctor          # fix steps; --guide for Enter walk
+docker compose run --rm paperful doctor          # once; --guide for Enter walk
+docker compose up                                # GUI at http://127.0.0.1:8765
 docker compose run --rm paperful collections
 docker compose run --rm paperful run --collection interesting --preset oa --dry-run
 

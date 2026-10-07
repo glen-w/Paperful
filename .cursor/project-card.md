@@ -10,7 +10,7 @@ package: paperful
 src_package: paperful
 ui_kind: jinja
 ui_port: 8765
-ui_entry: paperful serve (paperful/ui; Compose gui profile)
+ui_entry: paperful serve (paperful/ui; docker compose up)
 sibling_ports: none
 small_fixture: tests/fixtures/scihub_found.html
 large_fixture_hint: a small Zotero collection the user names for --dry-run, or the full HTML fixture set under tests/fixtures/

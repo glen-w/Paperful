@@ -57,6 +57,52 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     assert "Refs gap" in discover_adv.text
 
 
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_html_pages_do_not_block_on_doctor(tmp_path, monkeypatch):
+    """Health chip must not run full doctor on ordinary HTML routes (GUI hang)."""
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    calls = {"n": 0}
+
+    def counting_doctor(_cfg, probe=False):
+        calls["n"] += 1
+        return [
+            {"name": "Zotero", "status": "red", "code": "zotero_down", "detail": "down"}
+        ]
+
+    # mount_ui binds doctor_payload at import time — patch the UI module name.
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", counting_doctor)
+    monkeypatch.setattr(
+        ops,
+        "collections_tree",
+        lambda _cfg: {"ok": True, "collections": []},
+    )
+    client = TestClient(create_app(cfg))
+
+    wanted = client.get("/wanted")
+    assert wanted.status_code == 200
+    assert "health-amber" in wanted.text
+    assert calls["n"] == 0
+
+    settings = client.get("/settings")
+    assert settings.status_code == 200
+    assert calls["n"] == 0
+
+    system = client.get("/system")
+    assert system.status_code == 200
+    assert calls["n"] == 1
+    assert "health-red" in system.text
+
+    wanted2 = client.get("/wanted")
+    assert wanted2.status_code == 200
+    assert "health-red" in wanted2.text
+    assert calls["n"] == 1
+
+
 def test_dockerfile_includes_serve_extra():
     from pathlib import Path
 

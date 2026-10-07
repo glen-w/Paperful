@@ -1,26 +1,9 @@
-# Optional GUI profile: paperful serve on localhost only.
+# Deprecated: GUI is the default `docker compose up` service in compose.yaml.
+# Kept so older docs/scripts that pass `-f compose.gui.yaml --profile gui` still
+# resolve. Prefer:
 #
-#   docker compose -f compose.yaml -f compose.gui.yaml --profile gui up paperful-gui
+#   docker compose up
 #
-# Requires paperful[serve] in the image (Dockerfile uv sync --extra serve).
+# → http://127.0.0.1:8765
 
-services:
-  paperful-gui:
-    profiles: [gui]
-    image: paperful:local
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        PAPERFUL_IMAGE_MODE: ${PAPERFUL_IMAGE_MODE:-light}
-    working_dir: /data
-    environment:
-      PAPERFUL_ZOTERO_HOST: ${PAPERFUL_ZOTERO_HOST:-host.docker.internal}
-      PAPERFUL_IMAGE_MODE: ${PAPERFUL_IMAGE_MODE:-light}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - ${PAPERFUL_DATA:-../paperful-data}:/data
-    ports:
-      - "127.0.0.1:8765:8765"
-    command: ["serve", "--host", "0.0.0.0", "--port", "8765"]
+services: {}

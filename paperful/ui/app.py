@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import time
 from pathlib import Path
 from typing import Any
 
@@ -68,6 +69,8 @@ def _ui_dir() -> Path:
 
 
 def _health_status(checks: list[dict[str, Any]]) -> str:
+    if not checks:
+        return "amber"
     if any(c.get("status") == "red" for c in checks):
         return "red"
     if any(c.get("status") == "amber" for c in checks):
@@ -144,19 +147,17 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     templates = Jinja2Templates(directory=str(_ui_dir() / "templates"))
     static_dir = _ui_dir() / "static"
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-    # Health chip only — avoid re-running the full doctor on every HTML request.
+    # Health chip: never run full doctor on HTML requests (15–30s with LLM/RAG).
+    # /system still calls doctor_payload and refreshes this cache for the chip.
     _health_cache: dict[str, Any] = {"at": 0.0, "checks": []}
 
-    def _cached_doctor() -> list[dict[str, Any]]:
-        import time
+    def _remember_doctor(checks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        _health_cache["at"] = time.time()
+        _health_cache["checks"] = list(checks)
+        return list(checks)
 
-        now = time.time()
-        if now - float(_health_cache["at"]) < 30.0 and _health_cache["checks"]:
-            return list(_health_cache["checks"])
-        checks = doctor_payload(cfg)
-        _health_cache["at"] = now
-        _health_cache["checks"] = checks
-        return checks
+    def _cached_doctor() -> list[dict[str, Any]]:
+        return list(_health_cache["checks"])
 
     def ctx(request: Request, active: str, **extra: Any) -> dict[str, Any]:
         prefs = prefs_from_request(request)
@@ -1203,8 +1204,9 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
 
     @app.get("/system", response_class=HTMLResponse)
     def page_system(request: Request) -> HTMLResponse:
+        raw = _remember_doctor(doctor_payload(cfg))
         checks = []
-        for row in doctor_payload(cfg):
+        for row in raw:
             checks.append(
                 {
                     "name": row["name"],
