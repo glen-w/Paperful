@@ -98,6 +98,14 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `run_cmd.py` | `run` body after the CLI parses flags | `pipeline`, `run_hooks` |
 | `ask_cmd.py` | `ask` body after the CLI parses flags | `agent_ops`, rag |
 | `completeness_cmd.py` | `dedupe`, `attachments`, `summarize`, `synthesize` after flags | `run_hooks` helpers via cli |
+| `lint_cmd.py` | `lint` after flags | `lint` |
+| `fix_metadata_cmd.py` | `fix-metadata` after flags | `metadata` |
+| `ocr_cmd.py` | `ocr` after flags | `ocr` |
+| `recover_cmd.py` | `recover` after flags | `pipeline`, `browser_agent` |
+| `reachout_cmd.py` | `reachout` after flags | `reachout`, `handoff` |
+| `notes_delete_cmd.py` | `notes delete` after flags | `notes` |
+| `authors_cmd.py` | `authors` after flags | `authors_report` |
+| `all_cmd.py` | `all` chain + step dispatch after flags | Typer wrappers via `cli` |
 | `cli.py` | Flags, progress, exits. No logic of its own | everything |
 | `agent_json.py` | `--format json` envelope (`paperful.agent.json.v1`) and exit 3 | none |
 | `agent_ops.py` | Shared refs-gap / ask builders for CLI JSON and MCP | `agent_json`, catalogue, rag |
