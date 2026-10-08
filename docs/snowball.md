@@ -374,6 +374,7 @@ The picture is [How a hop is cut](#how-a-hop-is-cut).
 | `per_hop_rank` | `most-cited` | How a numeric `per_hop_limit` picks neighbours: `most-cited`, `least-cited`, or `random` |
 | `cites_query` | unset | OpenAlex search on every reference batch and every cited-by request (title, abstract, or full text). Needs refs or cites in the direction, and depth of at least 1 |
 | `year_from` / `year_to` | unset | Drop candidates outside the window |
+| `study_designs` | unset | OpenAlex study design filter (`filter=study_designs.id:…`). OR several with `|` / repeated `--study-design`. Ids: `randomized-controlled-trial`, `clinical-trial`, `observational-study`, `case-report`, `systematic-review`, `meta-analysis`, `study-protocol`. Aliases: `rct`, `meta`, `sr`, `observational`, `protocol`, `case`, `trial`. Parents are included (every RCT is also a clinical trial). Untagged works (no abstract) never match. Also applied client-side after id hops. See [OpenAlex study designs](https://blog.openalex.org/filter-openalex-for-rcts-meta-analyses-and-systematic-reviews/) |
 | `types` | journal-article-shaped | OpenAlex / Zotero types |
 | `oa_only` | false | Metadata filter only. It does not change the PDF chain |
 | `min_seed_citations` | 0 | Skip cited-by expansion when the seed is below this count |
@@ -414,7 +415,7 @@ Schema `paperful.snowball.candidate.v1`:
 | `hop` | Integer. Search hits are 0. References of a seed are 1 |
 | `direction` | `search`, `refs`, `cites`, `keywords`, or `orcid` (the person’s own works) |
 | `ids` | Normalized doi, openalex, s2, pmid, orcid, when known |
-| `biblio` | Title, year, authors, venue, type, optional OA url |
+| `biblio` | Title, year, authors, venue, type, optional OA url, optional `study_designs` (OpenAlex slugs) |
 | `why` | Short reason, for example `ref of 10.xxxx/yyyy` |
 | `status` | `new`, `exists`, `filtered`, or `error` |
 | `exists_match` | When `exists`: `item_key` and `doi` or `title_year` |

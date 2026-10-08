@@ -313,6 +313,7 @@ gone = "mark"
 # tag_prefix = "paperful-snowball"
 # default_tags = []
 # types = ["article", "review"]  # empty = journal-article-shaped
+# study_designs = []  # OpenAlex: rct, meta-analysis, systematic-review, …
 # oa_only = false
 # venue_include = []
 # venue_exclude = []

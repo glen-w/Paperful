@@ -197,6 +197,77 @@ def publication_year(value: object) -> int | None:
         return None
 
 
+# OpenAlex study_designs.id values (PubMed publication-type vocabulary).
+STUDY_DESIGNS = frozenset(
+    {
+        "randomized-controlled-trial",
+        "clinical-trial",
+        "observational-study",
+        "case-report",
+        "systematic-review",
+        "meta-analysis",
+        "study-protocol",
+    }
+)
+STUDY_DESIGN_ALIASES = {
+    "rct": "randomized-controlled-trial",
+    "randomized": "randomized-controlled-trial",
+    "randomised-controlled-trial": "randomized-controlled-trial",
+    "trial": "clinical-trial",
+    "clinical": "clinical-trial",
+    "observational": "observational-study",
+    "case": "case-report",
+    "sr": "systematic-review",
+    "systematic": "systematic-review",
+    "meta": "meta-analysis",
+    "protocol": "study-protocol",
+}
+
+
+def normalize_study_design(raw: str) -> str:
+    """Canonical OpenAlex ``study_designs.id`` slug, or raise ValueError."""
+    text = str(raw or "").strip().lower().replace("_", "-").replace(" ", "-")
+    if "/study-designs/" in text:
+        text = text.rsplit("/study-designs/", 1)[-1]
+    text = text.strip().strip("/")
+    text = STUDY_DESIGN_ALIASES.get(text, text)
+    if text not in STUDY_DESIGNS:
+        known = ", ".join(sorted(STUDY_DESIGNS))
+        raise ValueError(f"unknown study design {raw!r}; use one of: {known}")
+    return text
+
+
+def parse_study_designs(value: Any) -> tuple[str, ...]:
+    """Parse CLI/config study designs. Repeatable values and commas are OR'd."""
+    if value is None:
+        return ()
+    parts: list[str] = []
+    if isinstance(value, str):
+        parts = [part for part in value.split(",") if part.strip()]
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            if item is None:
+                continue
+            if isinstance(item, str) and "," in item:
+                parts.extend(part for part in item.split(",") if part.strip())
+            else:
+                text = str(item).strip()
+                if text:
+                    parts.append(text)
+    else:
+        text = str(value).strip()
+        if text:
+            parts.append(text)
+    out: list[str] = []
+    seen: set[str] = set()
+    for part in parts:
+        slug = normalize_study_design(part)
+        if slug not in seen:
+            seen.add(slug)
+            out.append(slug)
+    return tuple(out)
+
+
 def apply_filters(
     rows: list[Candidate],
     *,
@@ -207,12 +278,14 @@ def apply_filters(
     venue_include: tuple[str, ...],
     venue_exclude: tuple[str, ...],
     languages: tuple[str, ...] = (),
+    study_designs: tuple[str, ...] = (),
 ) -> list[Candidate]:
     """Mark rejects ``filtered``. Drop rows with no DOI and no OpenAlex id."""
     allowed = {item.lower() for item in types} if types else set(JOURNAL_SHAPED)
     include = {item.lower() for item in venue_include}
     exclude = {item.lower() for item in venue_exclude}
     langs = {item.lower() for item in languages}
+    wanted_designs = {item.lower() for item in study_designs if item}
     out: list[Candidate] = []
     for row in rows:
         if row.status == "error":
@@ -243,6 +316,14 @@ def apply_filters(
         lang = str(row.biblio.get("language") or "").lower()
         if langs and lang and lang not in langs:
             reasons.append("language")
+        if wanted_designs:
+            carried = {
+                str(item).strip().lower()
+                for item in (row.biblio.get("study_designs") or [])
+                if str(item).strip()
+            }
+            if not (carried & wanted_designs):
+                reasons.append("study_design")
         if reasons:
             row.status = "filtered"
             note = ",".join(reasons)

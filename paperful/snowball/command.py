@@ -121,6 +121,7 @@ class SnowballRequest:
     link_versions: bool = False
     from_created_date: str | None = None
     cites_query: str = ""
+    study_designs: tuple[str, ...] | None = None
     dedupe_after: str | None = None
     author_site_preflight: bool | None = None
 
@@ -977,6 +978,9 @@ def _snowball_prepare_queue(
         cfg.snowball_venue_exclude if request.venue_exclude is None else request.venue_exclude
     )
     languages = cfg.snowball_languages if request.languages is None else request.languages
+    study_designs = (
+        cfg.snowball_study_designs if request.study_designs is None else request.study_designs
+    )
     try:
         direction = normalize_direction(request.direction)
     except ValueError:
@@ -1023,6 +1027,7 @@ def _snowball_prepare_queue(
         venue_include=venue_include,
         venue_exclude=venue_exclude,
         languages=languages,
+        study_designs=tuple(study_designs or ()),
     )
     rows = truncate(rows, caps[0])
     if gate == "approve-batch":
@@ -1111,6 +1116,10 @@ def _execute(
     oa.tally = tally
     if request.from_created_date:
         oa.from_created_date = request.from_created_date.strip() or None
+    designs = (
+        cfg.snowball_study_designs if request.study_designs is None else request.study_designs
+    )
+    oa.study_designs = tuple(designs or ())
     if oa.progress is None:
         oa.progress = lambda message: console.print(paint(message))
     backends_early = _backends(cfg, request)
@@ -1681,6 +1690,11 @@ def _summary_meta(
     cites_query = (request.cites_query or "").strip()
     if cites_query:
         meta["cites_query"] = cites_query
+    designs = (
+        cfg.snowball_study_designs if request.study_designs is None else request.study_designs
+    )
+    if designs:
+        meta["study_designs"] = list(designs)
     refine = cfg.snowball_refine if request.refine is None else request.refine
     if not refine:
         return meta

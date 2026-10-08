@@ -9,6 +9,12 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ### Added
 
+- **OpenAlex study design filters:** snowball `--study-design` / `[snowball].study_designs`
+  (`rct`, `meta-analysis`, `systematic-review`, …) pushes
+  `filter=study_designs.id:…` into OpenAlex search, citing, keyword, and author
+  queries, and keeps a client-side guard on candidates. See
+  [OpenAlex blog](https://blog.openalex.org/filter-openalex-for-rcts-meta-analyses-and-systematic-reviews/)
+  and [snowball stop rules](docs/snowball.md#stop-rules).
 - **`paperful authorwatch suggest` / `accept` / `delete`:** corpus-grounded people
   suggestions (`--method corpus|most_cited|coauthor|mix`, `-C`, `--limit`);
   `accept --id` (+ optional `--seed-from` backfill run). Social

@@ -21,7 +21,8 @@ API = "https://api.openalex.org"
 KEY_URL = "https://openalex.org/settings/api"
 SELECT = (
     "id,doi,display_name,publication_year,type,cited_by_count,language,"
-    "referenced_works,authorships,primary_location,open_access,keywords"
+    "referenced_works,authorships,primary_location,open_access,keywords,"
+    "study_designs"
 )
 Getter = Callable[[str, dict[str, Any]], dict[str, Any]]
 
@@ -77,6 +78,7 @@ class OpenAlexClient:
         self.deferred: dict[str, Any] | None = None
         self.emit: Callable[[list[Any]], None] | None = None
         self.from_created_date: str | None = None
+        self.study_designs: tuple[str, ...] = ()
         self._getter = getter
         self.store = store
         self.requests = 0
@@ -91,6 +93,16 @@ class OpenAlexClient:
         """OpenAlex ``from_created_date`` (YYYY-MM-DD). Watch cursor, or an override."""
         value = (from_created_date or self.from_created_date or "").strip()
         return value or None
+
+    def _study_design_filter(
+        self, study_designs: list[str] | tuple[str, ...] | None = None
+    ) -> str | None:
+        """OpenAlex ``study_designs.id:a|b``. Client default, or an override."""
+        ids = study_designs if study_designs is not None else self.study_designs
+        cleaned = [str(item).strip() for item in (ids or ()) if str(item).strip()]
+        if not cleaned:
+            return None
+        return "study_designs.id:" + "|".join(cleaned)
 
     def get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         if self._budget is not None:
@@ -283,6 +295,7 @@ class OpenAlexClient:
         year_from: int | None,
         year_to: int | None,
         from_created_date: str | None = None,
+        study_designs: list[str] | tuple[str, ...] | None = None,
     ) -> list[dict[str, Any]]:
         filters: list[str] = []
         if year_from is not None:
@@ -292,6 +305,9 @@ class OpenAlexClient:
         created = self._created_filter(from_created_date)
         if created:
             filters.append(f"from_created_date:{created}")
+        design = self._study_design_filter(study_designs)
+        if design:
+            filters.append(design)
         params: dict[str, Any] = {"search": query, "select": SELECT}
         if filters:
             params["filter"] = ",".join(filters)
@@ -468,6 +484,7 @@ class OpenAlexClient:
         sort: str | None = None,
         from_created_date: str | None = None,
         search: str | None = None,
+        study_designs: list[str] | tuple[str, ...] | None = None,
     ) -> list[dict[str, Any]]:
         """Works that cite ``openalex_id`` (OpenAlex ``filter=cites:``).
 
@@ -485,6 +502,9 @@ class OpenAlexClient:
         created = self._created_filter(from_created_date)
         if created:
             filters.append(f"from_created_date:{created}")
+        design = self._study_design_filter(study_designs)
+        if design:
+            filters.append(design)
         params: dict[str, Any] = {"filter": ",".join(filters), "select": SELECT}
         text = (search or "").strip()
         if text:
@@ -502,6 +522,7 @@ class OpenAlexClient:
         year_to: int | None = None,
         sort: str | None = None,
         from_created_date: str | None = None,
+        study_designs: list[str] | tuple[str, ...] | None = None,
     ) -> list[dict[str, Any]]:
         """Works carrying any of ``slugs``. ``limit`` must be a positive integer."""
         if limit <= 0:
@@ -520,6 +541,9 @@ class OpenAlexClient:
         created = self._created_filter(from_created_date)
         if created:
             filters.append(f"from_created_date:{created}")
+        design = self._study_design_filter(study_designs)
+        if design:
+            filters.append(design)
         params: dict[str, Any] = {"filter": ",".join(filters), "select": SELECT}
         if sort:
             params["sort"] = sort
@@ -571,6 +595,7 @@ class OpenAlexClient:
         year_to: int | None = None,
         from_created_date: str | None = None,
         from_publication_date: str | None = None,
+        study_designs: list[str] | tuple[str, ...] | None = None,
     ) -> list[dict[str, Any]]:
         """Works for an ORCID or OpenAlex author id. Name-only is refused by callers."""
         cleaned = normalize_orcid(orcid)
@@ -593,6 +618,9 @@ class OpenAlexClient:
         created = self._created_filter(from_created_date)
         if created:
             filters.append(f"from_created_date:{created}")
+        design = self._study_design_filter(study_designs)
+        if design:
+            filters.append(design)
         self.stage = self.stage or f"OpenAlex author {label}"
         return self._collect(
             "/works",
@@ -756,6 +784,7 @@ def work_to_candidate(
             "is_oa": bool((work.get("open_access") or {}).get("is_oa")),
             "language": str(work.get("language") or ""),
             "cited_by_count": int(work.get("cited_by_count") or 0),
+            "study_designs": study_design_slugs(work),
         },
         why=why,
         status="new",
@@ -771,6 +800,30 @@ def keyword_slug(raw: str) -> str:
     if "/keywords/" in text:
         text = text.rsplit("/keywords/", 1)[-1]
     return text.strip().strip("/").lower().replace(" ", "-")
+
+
+def study_design_slug(raw: str) -> str:
+    """OpenAlex study design id as a slug (``randomized-controlled-trial``)."""
+    text = str(raw or "").strip()
+    if "/study-designs/" in text:
+        text = text.rsplit("/study-designs/", 1)[-1]
+    return text.strip().strip("/").lower().replace(" ", "-").replace("_", "-")
+
+
+def study_design_slugs(work: dict[str, Any]) -> list[str]:
+    """Study design slugs on a work (OpenAlex includes parent designs)."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in work.get("study_designs") or []:
+        if isinstance(item, dict):
+            raw = str(item.get("id") or item.get("display_name") or "")
+        else:
+            raw = str(item or "")
+        slug = study_design_slug(raw)
+        if slug and slug not in seen:
+            seen.add(slug)
+            out.append(slug)
+    return out
 
 
 def keyword_slugs(work: dict[str, Any]) -> list[str]:

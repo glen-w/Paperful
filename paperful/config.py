@@ -223,6 +223,7 @@ class Config:
     snowball_tag_prefix: str = "paperful-snowball"
     snowball_default_tags: tuple[str, ...] = ()
     snowball_types: tuple[str, ...] = ()
+    snowball_study_designs: tuple[str, ...] = ()
     snowball_oa_only: bool = False
     # Opt-in OpenAlex snapshot store (SSH+DuckDB v1). Empty backend = API only.
     openalex_store_backend: str = ""  # ssh_duckdb | (later local_duckdb | http)
@@ -615,6 +616,10 @@ def _apply_snowball(raw: Any, cfg: Config) -> None:
         cfg.snowball_default_tags = _snowball_strs(raw["default_tags"])
     if "types" in raw:
         cfg.snowball_types = _snowball_strs(raw["types"])
+    if "study_designs" in raw:
+        from .snowball.expand import parse_study_designs
+
+        cfg.snowball_study_designs = parse_study_designs(raw["study_designs"])
     if "oa_only" in raw:
         cfg.snowball_oa_only = bool(raw["oa_only"])
     if "venue_include" in raw:

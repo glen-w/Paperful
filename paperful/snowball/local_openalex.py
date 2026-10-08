@@ -33,6 +33,7 @@ STORE_COLUMNS = (
     "primary_location",
     "open_access",
     "keywords",
+    "study_designs",
 )
 
 _ALLOWED_COLUMNS = frozenset(STORE_COLUMNS)

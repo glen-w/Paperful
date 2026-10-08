@@ -342,6 +342,16 @@ CitesQueryOpt = typer.Option(
         "(title, abstract, or full text). Needs refs or cites in the direction, and depth of at least 1."
     ),
 )
+StudyDesignOpt = typer.Option(
+    [],
+    "--study-design",
+    help=(
+        "OpenAlex study design filter (repeatable or comma-separated). "
+        "Ids: randomized-controlled-trial, clinical-trial, observational-study, "
+        "case-report, systematic-review, meta-analysis, study-protocol. "
+        "Aliases: rct, meta, sr, observational, protocol, case, trial."
+    ),
+)
 CreateTagOpt = typer.Option(
     [],
     "--tag",
@@ -6297,6 +6307,7 @@ def _snowball_request(
     keyword_min_score: float | None = None,
     cites_query: str | None = None,
     languages: str | None = None,
+    study_designs: list[str] | str | None = None,
     min_seed_citations: int | None = None,
     note_provenance: bool | None = None,
     backends: str | None = None,
@@ -6309,9 +6320,17 @@ def _snowball_request(
     twenty_writeback: bool | None = None,
 ) -> Any:
     from .snowball.command import SnowballRequest
+    from .snowball.expand import parse_study_designs
 
     if twenty_writeback is not None:
         cfg.twenty_writeback_listings = twenty_writeback
+    designs = None
+    if study_designs:
+        try:
+            designs = parse_study_designs(study_designs)
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(2) from exc
     return SnowballRequest(
         gate=gate or cfg.snowball_gate,
         collection=(collection or cfg.snowball_target_collection or ""),
@@ -6328,6 +6347,7 @@ def _snowball_request(
         keyword_min_score=keyword_min_score,
         cites_query=(cites_query or "").strip(),
         languages=_csv(languages) if languages else None,
+        study_designs=designs,
         min_seed_citations=min_seed_citations,
         note_provenance=note_provenance,
         backends=_csv(backends) if backends else None,
@@ -6445,6 +6465,7 @@ def snowball_search(
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
     cites_query: str | None = CitesQueryOpt,
+    study_design: list[str] = StudyDesignOpt,
     or_mode: bool = typer.Option(
         False, "--or", help="Match any keyword (default: all)."
     ),
@@ -6499,6 +6520,7 @@ def snowball_search(
         keyword_min_score=keyword_min_score,
         cites_query=(cites_query or "").strip(),
         languages=languages,
+        study_designs=study_design,
         min_seed_citations=min_seed_citations,
         note_provenance=note_provenance,
         backends=backends,
@@ -6541,6 +6563,7 @@ def snowball_hybrid(
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
     cites_query: str | None = CitesQueryOpt,
+    study_design: list[str] = StudyDesignOpt,
     or_mode: bool = typer.Option(
         False, "--or", help="Match any keyword (default: all)."
     ),
@@ -6583,6 +6606,7 @@ def snowball_hybrid(
         keyword_min_score=keyword_min_score,
         cites_query=(cites_query or "").strip(),
         languages=languages,
+        study_designs=study_design,
         min_seed_citations=min_seed_citations,
         hybrid_seeds=hybrid_seeds,
         refine=refine,
@@ -6624,6 +6648,7 @@ def snowball_doi(
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
     cites_query: str | None = CitesQueryOpt,
+    study_design: list[str] = StudyDesignOpt,
     gate: str | None = typer.Option(
         None,
         "--gate",
@@ -6662,6 +6687,7 @@ def snowball_doi(
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
         cites_query=(cites_query or "").strip(),
+        study_designs=study_design,
         tags=tag,
         dedupe_scope=dedupe_scope,
         dedupe_after=dedupe_after,
@@ -6700,6 +6726,7 @@ def snowball_orcid(
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
     cites_query: str | None = CitesQueryOpt,
+    study_design: list[str] = StudyDesignOpt,
     gate: str | None = typer.Option(
         None,
         "--gate",
@@ -6738,6 +6765,7 @@ def snowball_orcid(
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
         cites_query=(cites_query or "").strip(),
+        study_designs=study_design,
         tags=tag,
         dedupe_scope=dedupe_scope,
         dedupe_after=dedupe_after,
@@ -6773,6 +6801,7 @@ def snowball_collection(
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
     cites_query: str | None = CitesQueryOpt,
+    study_design: list[str] = StudyDesignOpt,
     gate: str | None = typer.Option(
         None,
         "--gate",
@@ -6814,6 +6843,7 @@ def snowball_collection(
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
         cites_query=(cites_query or "").strip(),
+        study_designs=study_design,
         tags=tag,
         dedupe_scope=dedupe_scope,
         dedupe_after=dedupe_after,
@@ -7128,6 +7158,7 @@ def snowball_profile_save(
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
     cites_query: str | None = CitesQueryOpt,
+    study_design: list[str] = StudyDesignOpt,
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     dedupe_scope: str = typer.Option("", "--dedupe-scope"),
@@ -7258,6 +7289,13 @@ def snowball_profile_save(
         body["keyword_min_score"] = keyword_min_score
     if cites_query and cites_query.strip():
         body["cites_query"] = cites_query.strip()
+    if study_design:
+        from .snowball.expand import parse_study_designs
+
+        try:
+            body["study_designs"] = list(parse_study_designs(study_design))
+        except ValueError as exc:
+            raise SnowballError(str(exc)) from exc
     if year_from is not None:
         body["year_from"] = year_from
     if year_to is not None:

@@ -24,7 +24,15 @@ from paperful.snowball.command import (
     run_resume,
     run_search,
 )
-from paperful.snowball.expand import MAX_DEPTH, apply_filters, cap_ids, clamp_depth, keyword_depth, truncate
+from paperful.snowball.expand import (
+    MAX_DEPTH,
+    apply_filters,
+    cap_ids,
+    clamp_depth,
+    keyword_depth,
+    parse_study_designs,
+    truncate,
+)
 from paperful.snowball.candidate import Candidate
 from paperful.snowball.openalex import OpenAlexBudgetExceeded, OpenAlexClient, _is_budget, keyless_limit_message
 from paperful.zot import Item
@@ -167,6 +175,39 @@ def test_apply_filters_still_filters_numeric_year():
     )
     assert out[0].status == "filtered"
     assert "year" in out[0].why
+
+
+def test_parse_study_designs_aliases_and_reject_unknown():
+    assert parse_study_designs(["rct", "meta"]) == (
+        "randomized-controlled-trial",
+        "meta-analysis",
+    )
+    assert parse_study_designs("sr,observational") == (
+        "systematic-review",
+        "observational-study",
+    )
+    with pytest.raises(ValueError, match="unknown study design"):
+        parse_study_designs(["not-a-design"])
+
+
+def test_apply_filters_study_designs():
+    keep = _apply_filter_row(study_designs=["randomized-controlled-trial", "clinical-trial"])
+    drop = _apply_filter_row(study_designs=["observational-study"])
+    bare = _apply_filter_row()
+    out = apply_filters(
+        [keep, drop, bare],
+        year_from=None,
+        year_to=None,
+        types=(),
+        oa_only=False,
+        venue_include=(),
+        venue_exclude=(),
+        study_designs=("randomized-controlled-trial",),
+    )
+    assert out[0].status == "new"
+    assert out[1].status == "filtered"
+    assert "study_design" in out[1].why
+    assert out[2].status == "filtered"
 
 
 def test_stop_rules_clamp_and_cap():
@@ -3747,6 +3788,107 @@ def test_openalex_search_uses_cursor_past_the_page_cap():
     pages.clear()
     client.search("basketball", limit=10, year_from=None, year_to=None)
     assert pages == ["1"]
+
+
+def test_openalex_search_emits_study_designs_filter():
+    seen: dict[str, dict] = {}
+
+    def getter(path: str, params: dict) -> dict:
+        seen["path"] = path
+        seen["params"] = dict(params)
+        return {"results": []}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    client.study_designs = ("randomized-controlled-trial", "meta-analysis")
+    client.search("semaglutide", limit=10, year_from=2020, year_to=None)
+    filt = str(seen["params"].get("filter") or "")
+    assert "from_publication_date:2020-01-01" in filt
+    assert "study_designs.id:randomized-controlled-trial|meta-analysis" in filt
+    assert "study_designs" in str(seen["params"].get("select") or "")
+
+
+def test_openalex_works_by_keywords_and_citing_honor_study_designs():
+    seen: list[str] = []
+
+    def getter(path: str, params: dict) -> dict:
+        seen.append(str(params.get("filter") or ""))
+        return {"results": []}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    client.study_designs = ("systematic-review",)
+    client.works_by_keywords(["machine-learning"], limit=5)
+    client.works_citing("W1", limit=5)
+    client.works_by_author(orcid="0000-0002-1825-0097", limit=5)
+    assert all("study_designs.id:systematic-review" in filt for filt in seen)
+    assert any("author.orcid:" in filt for filt in seen)
+
+
+def test_config_and_profile_load_study_designs(tmp_path: Path):
+    from paperful.config import load_config
+    from paperful.snowball.profile import request_from_profile
+
+    path = tmp_path / "config.toml"
+    path.write_text(
+        'email = "t@example.org"\n'
+        f'out_dir = "{tmp_path / "out"}"\n'
+        f'state_dir = "{tmp_path / "state"}"\n'
+        "[snowball]\n"
+        "enabled = true\n"
+        'study_designs = ["rct", "meta-analysis"]\n',
+        encoding="utf-8",
+    )
+    cfg = load_config(path)
+    assert cfg.snowball_study_designs == (
+        "randomized-controlled-trial",
+        "meta-analysis",
+    )
+    req = request_from_profile(
+        {
+            "mode": "search",
+            "query": "semaglutide",
+            "study_designs": ["sr"],
+        },
+        cfg,
+    )
+    assert req.study_designs == ("systematic-review",)
+
+
+def test_work_to_candidate_maps_study_designs():
+    from paperful.snowball.openalex import work_to_candidate
+
+    row = work_to_candidate(
+        {
+            "id": "https://openalex.org/W9",
+            "doi": "https://doi.org/10.1000/rct",
+            "display_name": "An RCT",
+            "publication_year": 2024,
+            "type": "article",
+            "cited_by_count": 3,
+            "study_designs": [
+                {
+                    "id": "https://openalex.org/study-designs/randomized-controlled-trial",
+                    "display_name": "Randomized Controlled Trial",
+                },
+                {
+                    "id": "https://openalex.org/study-designs/clinical-trial",
+                    "display_name": "Clinical Trial",
+                },
+            ],
+            "authorships": [],
+            "primary_location": {},
+            "open_access": {},
+        },
+        run_id="r",
+        seed={"type": "keyword", "value": "x"},
+        hop=0,
+        direction="search",
+        why="hit",
+        gate="dry-run",
+    )
+    assert row.biblio["study_designs"] == [
+        "randomized-controlled-trial",
+        "clinical-trial",
+    ]
 
 
 def test_resume_without_deferred_fetches_pdfs_without_search(tmp_path: Path, monkeypatch):

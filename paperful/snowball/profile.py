@@ -85,6 +85,9 @@ def request_from_profile(raw: dict[str, Any], cfg: Config) -> SnowballRequest:
         if ("default_tags" in raw or "tags" in raw)
         else (),
         types=_strs(raw.get("types")) if "types" in raw else None,
+        study_designs=_profile_study_designs(raw.get("study_designs"))
+        if "study_designs" in raw
+        else None,
         oa_only=bool(raw["oa_only"]) if "oa_only" in raw else None,
         venue_include=_strs(raw.get("venue_include")) if "venue_include" in raw else None,
         venue_exclude=_strs(raw.get("venue_exclude")) if "venue_exclude" in raw else None,
@@ -117,6 +120,12 @@ def _strs(raw: Any) -> tuple[str, ...]:
     if isinstance(raw, list):
         return tuple(str(part).strip() for part in raw if str(part).strip())
     return ()
+
+
+def _profile_study_designs(raw: Any) -> tuple[str, ...]:
+    from .expand import parse_study_designs
+
+    return parse_study_designs(raw)
 
 
 def orcids_from_profile(raw: dict[str, Any]) -> list[str]:
