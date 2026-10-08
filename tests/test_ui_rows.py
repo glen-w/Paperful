@@ -6,8 +6,13 @@ import json
 
 from paperful.config import Config
 from paperful.miss_surface import project_miss_surface
-from paperful.store import Record, STATUS_OK
-from paperful.ui.pages import nest_collection_rows, newest_snowball_queue, wanted_rows
+from paperful.store import Manifest, Record, STATUS_OK
+from paperful.ui.pages import (
+    library_items_page,
+    nest_collection_rows,
+    newest_snowball_queue,
+    wanted_rows,
+)
 from paperful.ui.verify import file_verification
 
 
@@ -115,6 +120,23 @@ def test_nest_collection_rows_groups_paths():
     assert mini["children"][0]["open"] is True
     assert tree[1]["open"] is False
     assert tree[1]["children"] == []
+
+
+def test_library_items_page_slices(tmp_path):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    manifest = Manifest(cfg.manifest_path)
+    items = [
+        _Item(f"K{i}", f"Title {i:02d}", None, False)
+        for i in range(5)
+    ]
+    rows, total, page, page_count = library_items_page(
+        cfg, items, manifest, page=2, per_page=2
+    )
+    assert total == 5
+    assert page == 2
+    assert page_count == 3
+    assert len(rows) == 2
+    assert rows[0]["title"] == "Title 02"
 
 
 def test_discover_queue_fixture(tmp_path):

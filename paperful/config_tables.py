@@ -43,6 +43,7 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_endnote(raw, cfg, source)
     apply_openalex_store(raw, cfg)
     apply_searxng(raw, cfg)
+    apply_ui(raw, cfg)
     apply_prompt_paths(cfg, source)
 
 
@@ -524,6 +525,35 @@ def apply_searxng(raw: dict[str, Any], cfg: "Config") -> None:
     searx = raw.get("searxng")
     if isinstance(searx, dict) and searx.get("base_url"):
         cfg.searxng_base_url = str(searx["base_url"]).strip().rstrip("/")
+
+
+def _positive_int_tuple(raw: Any) -> tuple[int, ...]:
+    if isinstance(raw, int):
+        return (max(1, raw),)
+    if isinstance(raw, str):
+        parts = [part.strip() for part in raw.split(",") if part.strip()]
+        return tuple(max(1, int(part)) for part in parts)
+    if isinstance(raw, list):
+        return tuple(max(1, int(part)) for part in raw)
+    return ()
+
+
+def apply_ui(raw: dict[str, Any], cfg: "Config") -> None:
+    ui = raw.get("ui")
+    if not isinstance(ui, dict):
+        return
+    C = _mod()
+    default = cfg.ui_library_page_size
+    sizes = cfg.ui_library_page_sizes
+    if "library_page_size" in ui:
+        default = max(1, int(ui["library_page_size"]))
+    if "library_page_sizes" in ui:
+        parsed = _positive_int_tuple(ui["library_page_sizes"])
+        if parsed:
+            sizes = parsed
+    cfg.ui_library_page_size, cfg.ui_library_page_sizes = C.normalize_ui_library_page_sizes(
+        default, sizes
+    )
 
 
 def apply_prompt_paths(cfg: "Config", source: Path) -> None:

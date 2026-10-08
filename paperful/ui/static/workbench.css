@@ -461,15 +461,45 @@ button.icon-btn:focus-visible {
 .coll-node > summary::-webkit-details-marker {
   display: none;
 }
-.coll-node > summary::before {
+.coll-node > summary .coll-name::before {
   content: "▸";
   display: inline-block;
   width: 1rem;
   margin-right: 0.15rem;
   color: var(--ink-soft);
 }
-.coll-node[open] > summary::before {
+.coll-node[open] > summary .coll-name::before {
   content: "▾";
+}
+
+.lib-items-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+}
+.lib-items-head h2 {
+  margin: 0;
+}
+.lib-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0;
+}
+.lib-pager label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+.lib-pager-nav {
+  text-decoration: none;
+  font-size: 0.9rem;
+  padding: 0.2rem 0.45rem;
 }
 
 table.wb-table {

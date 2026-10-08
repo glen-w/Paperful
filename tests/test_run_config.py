@@ -35,6 +35,20 @@ def _write_config(tmp_path: Path, extra: str = "") -> Path:
     return path
 
 
+def test_ui_library_page_sizes_from_config(tmp_path):
+    cfg_path = _write_config(
+        tmp_path,
+        """
+[ui]
+library_page_size = 100
+library_page_sizes = [25, 100, 250]
+""",
+    )
+    cfg = load_config(cfg_path)
+    assert cfg.ui_library_page_size == 100
+    assert cfg.ui_library_page_sizes == (25, 100, 250)
+
+
 def test_table_then_file_then_cli(tmp_path):
     cfg_path = _write_config(
         tmp_path,

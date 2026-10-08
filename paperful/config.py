@@ -283,6 +283,9 @@ class Config:
     rag_prompt: str = ""  # custom system prompt file for ask; empty → focus preset
     rag_dest: str = "disk"  # disk | zotero | both — batch note writes (needs --apply)
     rag_extract_questions_llm: bool = False  # LLM lane for `rag questions`
+    # Workbench Library item table (server-rendered pagination).
+    ui_library_page_size: int = 50
+    ui_library_page_sizes: tuple[int, ...] = (25, 50, 100, 200)
     # Attachment hygiene. Off until `paperful attachments --apply`.
     attachments_fix_broken: bool = False
     attachments_merge_files: bool = False
@@ -810,6 +813,20 @@ def _resolve_prompt_path(value: str, source: Path) -> str:
 
 def _clamp01(value: Any) -> float:
     return min(1.0, max(0.0, float(value)))
+
+
+def normalize_ui_library_page_sizes(
+    default: int, sizes: tuple[int, ...]
+) -> tuple[int, tuple[int, ...]]:
+    """Ensure a positive default and sorted unique page-size options."""
+    default_n = max(1, int(default))
+    opts = sorted({max(1, int(s)) for s in sizes})
+    if not opts:
+        opts = [default_n]
+    if default_n not in opts:
+        opts.append(default_n)
+        opts.sort()
+    return default_n, tuple(opts)
 
 
 def _apply_config_table(

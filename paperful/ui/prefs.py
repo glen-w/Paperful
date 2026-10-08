@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 COOKIE_COLLECTION = "pf_collection"
+COOKIE_LIBRARY_PER_PAGE = "pf_library_per_page"
 COOKIE_PRESET = "pf_preset"
 COOKIE_ADVANCED = "pf_advanced"
 # Legacy cookie name; no longer read (Grab is always fetch-only).

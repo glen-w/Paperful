@@ -81,7 +81,7 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
    (explicit Zotero write for `doi_match` plus hand-ticks). Grab never writes
    the library. The Attach control stays visible; there is no “attach verified
    automatically” setting.
-3. **Library** — Nested collection collapsibles with item / missing-PDF counts; target icon sets scope (collection chip).
+3. **Library** — Nested collection collapsibles with item / missing-PDF counts; target icon sets scope (collection chip). Scoped items paginate (default 50 per page; sizes in `[ui]` — see `config.example.toml`).
 4. **Activity** — Command history + trust line from `last-run.json`.
 5. **System** — `doctor` rows with one next step each.
 

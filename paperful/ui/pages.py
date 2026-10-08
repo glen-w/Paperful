@@ -226,9 +226,53 @@ def nest_collection_rows(
     return roots
 
 
+def _library_item_sort_key(item: Any) -> tuple[int, str]:
+    return (item.year or 9999, (item.title or "").lower())
+
+
+def library_page_size_options(cfg: Config) -> tuple[int, ...]:
+    from ..config import normalize_ui_library_page_sizes
+
+    _, sizes = normalize_ui_library_page_sizes(
+        cfg.ui_library_page_size, cfg.ui_library_page_sizes
+    )
+    return sizes
+
+
+def coerce_library_per_page(
+    value: int, cfg: Config, *, allowed: tuple[int, ...] | None = None
+) -> int:
+    options = allowed or library_page_size_options(cfg)
+    n = max(1, int(value))
+    if n in options:
+        return n
+    return cfg.ui_library_page_size if cfg.ui_library_page_size in options else options[0]
+
+
+def library_per_page_from_request(request: Any, cfg: Config) -> int:
+    raw = request.query_params.get("per_page")
+    if raw is not None:
+        text = str(raw).strip()
+        if text.isdigit():
+            return coerce_library_per_page(int(text), cfg)
+    from .prefs import COOKIE_LIBRARY_PER_PAGE
+
+    cookie = (request.cookies.get(COOKIE_LIBRARY_PER_PAGE) or "").strip()
+    if cookie.isdigit():
+        return coerce_library_per_page(int(cookie), cfg)
+    return coerce_library_per_page(cfg.ui_library_page_size, cfg)
+
+
+def library_page_from_request(request: Any) -> int:
+    raw = request.query_params.get("page")
+    if raw is not None and str(raw).strip().isdigit():
+        return max(1, int(str(raw).strip()))
+    return 1
+
+
 def library_item_rows(cfg: Config, items: list[Any], manifest: Manifest) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for item in sorted(items, key=lambda i: (i.year or 9999, (i.title or "").lower())):
+    for item in sorted(items, key=_library_item_sort_key):
         rec = manifest.records.get(item.key)
         base = _item_row_base(cfg, item)
         has_pdf = bool(
@@ -237,6 +281,26 @@ def library_item_rows(cfg: Config, items: list[Any], manifest: Manifest) -> list
         )
         rows.append({**base, "has_pdf": has_pdf})
     return rows
+
+
+def library_items_page(
+    cfg: Config,
+    items: list[Any],
+    manifest: Manifest,
+    *,
+    page: int,
+    per_page: int,
+) -> tuple[list[dict[str, Any]], int, int, int]:
+    """Return rows for one page plus total count and clamped page index."""
+    sorted_items = sorted(items, key=_library_item_sort_key)
+    total = len(sorted_items)
+    per_page = max(1, int(per_page))
+    page_count = max(1, (total + per_page - 1) // per_page) if total else 1
+    page = min(max(1, int(page)), page_count)
+    start = (page - 1) * per_page
+    chunk = sorted_items[start : start + per_page]
+    rows = library_item_rows(cfg, chunk, manifest)
+    return rows, total, page, page_count
 
 
 def snowball_deferred_run_id(cfg: Config) -> str:

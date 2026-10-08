@@ -41,9 +41,33 @@
 <p class="counts">No collections loaded.</p>
 {% endif %}
 </section>
-{% if prefs.collection and items %}
+{% if prefs.collection and library_pagination.total %}
 <section class="panel">
-  <h2>Items in {{ prefs.collection }}</h2>
+  <div class="lib-items-head">
+    <h2>Items in {{ prefs.collection }}</h2>
+    <form class="lib-pager" method="get" action="/library">
+      <span class="counts">
+        {{ library_pagination.range_start }}–{{ library_pagination.range_end }}
+        of {{ library_pagination.total }}
+      </span>
+      <label>
+        Per page
+        <select name="per_page" onchange="this.form.submit()">
+          {% for n in library_pagination.page_sizes %}
+          <option value="{{ n }}"{% if n == library_pagination.per_page %} selected{% endif %}>{{ n }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <input type="hidden" name="page" value="1">
+      {% if library_pagination.prev_url %}
+      <a class="secondary lib-pager-nav" href="{{ library_pagination.prev_url }}">Previous</a>
+      {% endif %}
+      <span class="counts">Page {{ library_pagination.page }} / {{ library_pagination.page_count }}</span>
+      {% if library_pagination.next_url %}
+      <a class="secondary lib-pager-nav" href="{{ library_pagination.next_url }}">Next</a>
+      {% endif %}
+    </form>
+  </div>
 <table class="wb-table">
   <thead><tr><th>Title</th><th>Year</th><th>PDF</th><th>Summary</th><th></th></tr></thead>
   <tbody>

@@ -31,7 +31,10 @@ from .pages import (
     following_lists,
     last_ask_result,
     last_job_result,
-    library_item_rows,
+    library_items_page,
+    library_page_from_request,
+    library_page_size_options,
+    library_per_page_from_request,
     nest_collection_rows,
     list_ask_packs,
     list_answered_packs,
@@ -61,6 +64,7 @@ from .snowball_form import parse_discover_topic
 from .prefs import (
     COOKIE_ADVANCED,
     COOKIE_COLLECTION,
+    COOKIE_LIBRARY_PER_PAGE,
     COOKIE_PRESET,
     prefs_from_request,
     set_cookie,
@@ -1196,14 +1200,63 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         else:
             error = str(tree.get("error") or "Library unavailable")
         items: list[dict[str, Any]] = []
+        library_total = 0
+        library_page = 1
+        library_page_count = 1
+        per_page = library_per_page_from_request(request, cfg)
+        library_pagination: dict[str, Any] = {
+            "page": 1,
+            "per_page": per_page,
+            "page_count": 1,
+            "total": 0,
+            "range_start": 0,
+            "range_end": 0,
+            "page_sizes": library_page_size_options(cfg),
+            "prev_url": "",
+            "next_url": "",
+        }
+        page_sizes = library_page_size_options(cfg)
+        persist_per_page = request.query_params.get("per_page") is not None
         if prefs.collection:
             try:
                 scope_items, manifest = jobs._load_scope_items(cfg, prefs.collection)
-                items = library_item_rows(cfg, scope_items, manifest)
+                page = library_page_from_request(request)
+                items, library_total, library_page, library_page_count = library_items_page(
+                    cfg,
+                    scope_items,
+                    manifest,
+                    page=page,
+                    per_page=per_page,
+                )
             except Exception as exc:
                 error = error or str(exc)
         briefs = briefs_page_flags(cfg)
-        return templates.TemplateResponse(
+        range_start = (
+            (library_page - 1) * per_page + 1 if library_total else 0
+        )
+        range_end = min(library_page * per_page, library_total)
+        library_pagination.update(
+            {
+                "page": library_page,
+                "per_page": per_page,
+                "page_count": library_page_count,
+                "total": library_total,
+                "range_start": range_start,
+                "range_end": range_end,
+                "page_sizes": page_sizes,
+                "prev_url": (
+                    _page_url("/library", page=library_page - 1, per_page=per_page)
+                    if library_page > 1
+                    else ""
+                ),
+                "next_url": (
+                    _page_url("/library", page=library_page + 1, per_page=per_page)
+                    if library_page < library_page_count
+                    else ""
+                ),
+            }
+        )
+        response = templates.TemplateResponse(
             request,
             "library.html",
             ctx(
@@ -1212,11 +1265,15 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 collections=rows,
                 collection_tree=nested,
                 items=items,
+                library_pagination=library_pagination,
                 error=error,
                 briefs=briefs,
                 dest_options=dest_options(),
             ),
         )
+        if persist_per_page:
+            set_cookie(response, COOKIE_LIBRARY_PER_PAGE, str(per_page))
+        return response
 
     @app.get("/activity", response_class=HTMLResponse)
     def page_activity(request: Request) -> HTMLResponse:
