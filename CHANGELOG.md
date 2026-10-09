@@ -9,6 +9,14 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ### Added
 
+- **GUI run SSE:** `GET /v1/runs/{id}/events` pushes command status until
+  `done`/`failed`; workbench Activity uses `EventSource` with JSON poll fallback.
+  See [gui.md](docs/gui.md#run-status-sse).
+- **`paperful coverage`:** briefing / note / file DOI lists vs `-C` membership
+  (`paperful.coverage.pack.v1` under `state/coverage/`). Always dry-run; sibling
+  of `refs gap`. `ingest-dois --from-pack` accepts coverage packs.
+- **Run witness:** optional `witness` (`paperful.witness.v1`) on
+  `write_run_report` / command reports; open packs record `witness_id` on steps.
 - **Literature-discovery Wave 1 (roadmap row 22):** `paperful mcp` adds read-only
   `gaps`, `snowball_search`, `export`, and `proposal_export` (same
   `paperful.agent.json.v1` builders as CLI). `paperful export-proposals` writes

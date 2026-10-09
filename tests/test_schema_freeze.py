@@ -7,6 +7,12 @@ from pathlib import Path
 
 from paperful.inbox_match import INBOX_PROPOSAL_KEYS, SCHEMA as INBOX_SCHEMA, write_proposal
 from paperful.notehtml import NOTE_BLOCK_KEYS, SCHEMA as NOTE_SCHEMA, block, wrap, parse
+from paperful.coverage import (
+    COVERAGE_PACK_KEYS,
+    SCHEMA as COVERAGE_SCHEMA,
+    CoverageRow,
+    write_pack as write_coverage_pack,
+)
 from paperful.refs_gap import (
     REFS_GAP_PACK_KEYS,
     SCHEMA as REFS_SCHEMA,
@@ -79,6 +85,30 @@ def test_refs_gap_pack_keys_match_golden(tmp_path: Path):
     )
     pack = json.loads((folder / "pack.json").read_text(encoding="utf-8"))
     assert REFS_GAP_PACK_KEYS <= pack.keys()
+
+
+def test_coverage_pack_keys_match_golden(tmp_path: Path):
+    keys = json.loads((FIX / "coverage_pack_v1" / "keys.json").read_text(encoding="utf-8"))
+    assert keys == sorted(COVERAGE_PACK_KEYS)
+    golden = json.loads((FIX / "coverage_pack_v1" / "pack.json").read_text(encoding="utf-8"))
+    assert golden["schema"] == COVERAGE_SCHEMA
+    assert COVERAGE_PACK_KEYS <= golden.keys()
+    folder = write_coverage_pack(
+        tmp_path,
+        "BBNJ",
+        [
+            CoverageRow(
+                doi="10.1000/a",
+                title="A",
+                year=2019,
+                status="missing",
+                suggested_action="ingest-dois",
+            )
+        ],
+        {"kind": "file", "ref": "briefing.md"},
+    )
+    pack = json.loads((folder / "pack.json").read_text(encoding="utf-8"))
+    assert COVERAGE_PACK_KEYS <= pack.keys()
 
 
 def test_inbox_proposal_keys_match_golden(cfg, tmp_path: Path):

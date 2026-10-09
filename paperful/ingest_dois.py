@@ -76,8 +76,13 @@ def dois_from_file(path: Path) -> list[str]:
 
 
 def dois_from_refs_pack(path: Path) -> list[str]:
-    """DOIs from a ``paperful.refs_gap.pack.v1`` JSON whose action is ingest-dois."""
+    """DOIs from a refs-gap or coverage pack JSON whose action is ingest-dois."""
     payload = json.loads(path.read_text(encoding="utf-8"))
+    schema = str(payload.get("schema") or "")
+    if schema == "paperful.coverage.pack.v1":
+        from .coverage import dois_from_coverage_pack
+
+        return dois_from_coverage_pack(path)
     rows = payload.get("rows") or []
     seen: set[str] = set()
     out: list[str] = []

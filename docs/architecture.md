@@ -126,6 +126,7 @@ flowchart LR
 | `state/version-packs/` | Preprint/published review packs (`paperful.version_pack.v1`) |
 | `state/versions-applied.jsonl` | One line per work updated by `versions --apply` |
 | `state/refs-gaps/<stamp>/` | `refs gap` review pack (`paperful.refs_gap.pack.v1`, `pack.md`, `dois.txt`). Always dry-run |
+| `state/coverage/<stamp>/` | `coverage` review pack (`paperful.coverage.pack.v1`, `pack.md`, `dois.txt`). Always dry-run — briefing/note/file vs `-C` |
 | `state/ingest/<stamp>/` | `ingest-dois` summary (`paperful.ingest_dois.v1`). Dry-run unless `--apply` |
 | `state/collections-add/<stamp>/` | `collections add` summary (`paperful.collections_add.v1`). Dry-run unless `--apply` |
 | `state/inbox/proposals/` | Gated inbox create/attach proposals (`paperful.inbox.proposal.v1`) |
@@ -251,7 +252,7 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
 - `paperful run --dry-run` — no downloads. Per item: **Would-hit** is the
   routed source list in order (full `sources` when `--try-all`).
 - `paperful lint` / `paperful fix-metadata` — identifier hygiene; apply is explicit.
-- `paperful dedupe` / `paperful gaps` / `paperful reachout` / `paperful refs gap` — duplicate packs, PDF/DOI counts, contact-only missing-PDF CSV (never fetches, never sends mail), and cited-in-PDF missing-from-library packs. `refs gap` is always dry-run (`state/refs-gaps/`). `ingest-dois` creates parents from that pack or a DOI file only with `--apply`.
+- `paperful dedupe` / `paperful gaps` / `paperful reachout` / `paperful refs gap` / `paperful coverage` — duplicate packs, PDF/DOI counts, contact-only missing-PDF CSV (never fetches, never sends mail), cited-in-PDF missing-from-library packs, and briefing/note/file vs `-C` coverage. `refs gap` and `coverage` are always dry-run (`state/refs-gaps/`, `state/coverage/`). `ingest-dois` creates parents from those packs or a DOI file only with `--apply`.
   `dedupe` writes `state/dedupe-packs/` and merges only with `--apply`
   (the spare-copy line is written then; title+year also needs `--apply-medium`).
   `versions` writes `state/version-packs/` and updates a preprint only with
@@ -305,8 +306,9 @@ is not tagged 1.0 yet (workbench landed; polish remains).
 | `summary.errors_by_type` / `attach_failed_by_code` | Typed errors |
 | `summary.write_api` | `true` / `false` / `null` (null when the run did not probe write support) |
 | `items[]` | Per-item required keys: `itemKey`, `title`, `status`, `source`, `reason`, `doi`, `doi_verified`, `attempts`, `fields_corrected`, `path`, `error_type`, `miss_surface`, `miss_plain`, `miss_detail`, `oa_status`, `license`, `version` |
+| `witness` (optional) | `paperful.witness.v1` — config SHA-256, Paperful version, profile, scope, fetch sources, LLM/RAG tip. Not in the required key frozenset. Built by [`witness.py`](../paperful/witness.py) on every `write_run_report` |
 
-`--format json` on `run`, `refs gap`, `ingest-dois`, `collections add`, `inbox drain`, `gaps`, `lint`,
+`--format json` on `run`, `refs gap`, `coverage`, `ingest-dois`, `collections add`, `inbox drain`, `gaps`, `lint`,
 `fix-metadata`, `dedupe`, snowball crawl (`search` / `hybrid` / `doi` / `orcid` /
 `collection`) plus `run` / `resume` / `apply`, `summarize`, `synthesize`, `restore`,
 `import`, `recover`, `ocr`, `all`, `ask`, `inbox proposals list|apply|reject`, and `notes delete`
@@ -325,9 +327,11 @@ from a shell. `paperful serve` (`paperful[serve]`) binds localhost HTTP: JSON
 capability routes (health, doctor, collections, last-run, dry-run `refs-gap` /
 `ask`) plus the server-rendered workbench (`paperful.ui` — Wanted, Discover,
 Library, Activity, System; Advanced Repair / Mirror / Index / Briefs / Settings).
-GUI writes use review tokens (`state/gui/reviews/`) then the same domain
-entrypoints as the CLI. Grab fetches to `out/` only; Attach and Apply write the
-catalogue. See [gui.md](gui.md).
+GUI long jobs enqueue under `state/gui/commands/`; Activity and post-submit pages
+subscribe to `GET /v1/runs/{id}/events` (SSE) with `GET /v1/runs/{id}` as JSON
+poll fallback. GUI writes use review tokens (`state/gui/reviews/`) then the same
+domain entrypoints as the CLI. Grab fetches to `out/` only; Attach and Apply
+write the catalogue. See [gui.md](gui.md).
 `collections add` is CLI-only (`--apply` writes) and is not an MCP tool.
 
 TTY-only paths (a GUI must not claim them): `session login`, `doctor --guide`,
@@ -348,7 +352,7 @@ Manifest `counts` keys match ledger statuses (`ok`, `attached`, `not_found`, …
 (pack-v1)=
 ## Run packs (`paperful.pack.v1`)
 
-`paperful pack open` writes `state/packs/<id>.json` and `state/packs/current`. Each later command that writes a run report appends a step `{command, started_at, finished_at, report}` — `report` is the child filename under `state/runs/`. The first step that has a scope copies it onto the parent. `paperful pack close` sets `status` to `closed` and deletes `current`. A second `open` while one is open exits 1.
+`paperful pack open` writes `state/packs/<id>.json` and `state/packs/current`. Each later command that writes a run report appends a step `{command, started_at, finished_at, report}` — `report` is the child filename under `state/runs/`. When the report has a `witness.config_sha256`, the step also gets `witness_id` (first 12 hex chars). The first step that has a scope copies it onto the parent. `paperful pack close` sets `status` to `closed` and deletes `current`. A second `open` while one is open exits 1.
 
 `PAPERFUL_PACK=off` writes the child report and does not append. Commands that exit before a report (bad flags, Zotero down, `run --dry-run`) are absent. `paperful pack show` reads disk only: the open pack, or the latest closed one. `--json` inlines each step's `summary`, not the child `items` array.
 

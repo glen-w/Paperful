@@ -292,7 +292,9 @@ Do not call either adapter **supported** until field reports justify it.
   when deletion ships. Complements `dedupe` (merge parents, not note purge)
   and quiet-mirror `notes/` (audit on disk before `--apply`). Mendeley / EndNote
   parity after the Zotero path is boring.
-- CORE as an OA PDF source when `core_api_key` is set
+- **CORE as an OA PDF source (shipped).** In `DEFAULT_SOURCES`; skipped until
+  `core_api_key` is set. Stamp `oa:core`. `doctor` reports whether the key is set
+  (green either way — optional lane).
 - Library adapter seam (`LibraryBackend`). **Zotero is well tested.** Mendeley
   and EndNote are seeking testers (above).
 
@@ -700,17 +702,13 @@ text-layer required for scan-only PDFs (`ocr` first); clear finding, not crash.
 Not a silent snowball auto-run. Treat as a **near-term research-ops epic** ([stack
 above](#near-term-research-ops)).
 
-### Briefing ↔ collection coverage (later; sibling of `refs gap`)
+### Briefing ↔ collection coverage (shipped; sibling of `refs gap`)
 
-**Status:** roadmap — `refs gap` is “cited inside collection PDFs but not owned.”
-This answers “named in my briefing / starred note / DOI list but not in `-C`.”
-
-**Direction:** `paperful coverage --from-note <key|path> -C … --dry-run` (or
-`--from-file` markdown / export). Same fingerprint family as `refs gap`; pack
-under `state/coverage/<stamp>/` with `in_collection` / `missing` / `ambiguous`;
-findings only → `ingest-dois` / snowball. Optional grey-vs-peer hint from
-provenance tags. Share pack columns with `paperful.refs_gap.pack.v1` where
-possible.
+**Status:** shipped — `paperful coverage --from-note <key|path> -C …` or
+`--from-file`. Always dry-run. Pack under `state/coverage/<stamp>/`
+(`paperful.coverage.pack.v1`) with `in_collection` / `missing` / `ambiguous`;
+`dois.txt` → `ingest-dois --from-file` / `--from-pack`. Same fingerprint family
+as `refs gap`. Optional `provenance_hint` when tags are available.
 
 ### Frontier digest (later; watch + external ingest)
 
@@ -805,20 +803,15 @@ sync into Paperful — never replace Zotero’s annotation UI. Consumers: cited
 answers prefer operator highlights; future evidence-pack export. Group libraries
 and adapter parity (Mendeley/EndNote) are explicit non-goals until tested.
 
-### Run witness (later; trust thicken)
+### Run witness (shipped; trust thicken)
 
-**Status:** roadmap — extend existing run artifacts, not a new product surface.
-
-**Shipped slices:** `state/runs/<stamp>-*.json`, `state/last-run.json`, pack
-open/close under `state/packs/`, frozen `paperful.run_report.v1` (0.1 → 1.0
-checklist). **Direction:** every material batch (`run`, `summarize`, `synthesize`,
-snowball execute, `ingest-dois`, `refs gap`, `inbox drain`, future RAG) appends a
-**witness** block: config file
-hash (or normalised effective config), active `profiles/*.toml` name, scope
-(`-C`, year/type), source list and presets, `[llm]` model ids per verb, PDF /
-index versions when relevant, Paperful version. Packs reference witness ids so
-“what produced this literature review?” is answerable without git. Additive keys
-only on `run_report` until 1.0 tag; document in [architecture](architecture.md).
+**Status:** shipped — optional `witness` (`paperful.witness.v1`) on every
+`paperful.run_report.v1` written via `write_run_report` / `write_command_report`.
+Includes config SHA-256, Paperful version, profile name when bound, scope,
+fetch sources/preset, `[llm]` / RAG index tip, mirror `_sync.json` refresh.
+Not part of `RUN_REPORT_KEYS` (additive). Open packs record `witness_id`
+(first 12 of `config_sha256`) on each step. `refs gap` and `coverage` write
+command reports so they join the pack trail.
 
 ### Auto-tagging library items (later; not 1.0)
 
@@ -1220,8 +1213,8 @@ Larger product bets. Park until the ledger and core loop justify them.
    witness](#run-witness-later-trust-thicken)** ties batches to config/model/index
    for reproducibility.
 6. **Writing & export** — CSL / BibLaTeX / Quarto sync; living review / gap lists;
-   git-friendly CSL-JSON dumps; [briefing ↔ collection coverage](#briefing--collection-coverage-later-sibling-of-refs-gap)
-   (thin slice of parked “gap lists,” collection-scoped only)
+   git-friendly CSL-JSON dumps; [briefing ↔ collection coverage](#briefing--collection-coverage-shipped-sibling-of-refs-gap)
+   (shipped thin slice of parked “gap lists,” collection-scoped only)
 7. **Agent surface** — MCP + CLI sharing one capability API; dry-run defaults;
    typed source/policy permissions; playbooks. **Shipped (CLI convenience,
    not a GUI):** named run configs and `paperful all` repeat a collection /
@@ -1265,11 +1258,11 @@ Larger product bets. Park until the ledger and core loop justify them.
    `record.json` plus `out/_history.json` are the chain-of-custody note for
    the library and the append-only ledgers. OA `license` / `oa_status` /
    `version` stamps (Core above) feed this lane; which fields are written stays
-   config-driven. **[Run witness](#run-witness-later-trust-thicken)** (Optional
-   LLM section) extends run reports and packs with config/model scope. Still
-   later: optional redistribution / license gate using those stamps, more
-   jurisdictional presets, and PDF annotation export (annotation **mirror** is
-   read-sync into `out/`, not export-only).
+   config-driven. **[Run witness](#run-witness-shipped-trust-thicken)** extends
+   run reports and packs with config/model scope. Still later: optional
+   redistribution / license gate using those stamps, more jurisdictional
+   presets, and PDF annotation export (annotation **mirror** is read-sync into
+   `out/`, not export-only).
 
 ## Explicitly out of near-term scope
 
@@ -1395,7 +1388,8 @@ second doc tree that drifts from the CLI.
 **Landed:** `paperful.item.v1` lock, `paperful serve` HTTP + server-rendered UI
 under `paperful/ui/` — default nav **Wanted** (also `GET /`) then **Discover**,
 Preview → Grab (fetch to `out/` only) → Attach (explicit library write), with
-review tokens and command ids under `state/gui/commands/`. Empty Wanted shows a
+review tokens and command ids under `state/gui/commands/`; Activity run-status
+SSE on `GET /v1/runs/{id}/events`. Empty Wanted shows a
 coach line when there is no collection or the library is down. Discover covers topic
 queues (keep/skip, briefing, digest, profile run, resume, watches), people
 lists (create/add/resolve/run/import/suggest/accept, inbox apply), and Advanced grow tools
@@ -1405,7 +1399,7 @@ digest can file a collection note (`paperful:frontier-briefing`). **Advanced**
 without enabling opt-in sources. Repair/Mirror Preview is dry-run; Apply uses
 the same entrypoints as the CLI. TTY (`session login`, `doctor --guide`,
 mid-run EZProxy), `collections add`, `approve-each`, and Sci-Hub stay CLI.
-**Not tagged 1.0.** Polish left is tagging, screenshots, and SSE.
+**Not tagged 1.0.** Polish left is tagging and screenshots.
 
 The CLI stays the source of truth; the GUI marshals the same verbs with dry-run
 default and explicit Apply. Not a second fetch stack or Zotero’s reader.

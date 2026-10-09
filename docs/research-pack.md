@@ -48,12 +48,20 @@ docker compose run --rm paperful snowball digest --run-id <run-id>
 
 Contributors: the same verbs with `uv run paperful …`.
 
+**Sibling — briefing ↔ collection coverage:** when the gap is “named in a
+frontier briefing or note but not under `-C`”, use `paperful coverage`
+(`--from-file` or `--from-note`) instead of `refs gap`. Pack under
+`state/coverage/<stamp>/`; then `ingest-dois` as above. See
+[ROADMAP — Briefing ↔ collection coverage](ROADMAP.md#briefing--collection-coverage-shipped-sibling-of-refs-gap).
+
 ## What to read on disk
 
 | Path | Schema / role |
 | --- | --- |
 | `state/refs-gaps/<stamp>/pack.json` | `paperful.refs_gap.pack.v1` — cited, missing, `ingest-dois` vs skip |
 | `state/refs-gaps/<stamp>/dois.txt` | Missing DOIs for ingest |
+| `state/coverage/<stamp>/pack.json` | `paperful.coverage.pack.v1` — briefing/note/file vs `-C` (`coverage`) |
+| `state/coverage/<stamp>/dois.txt` | Missing DOIs from coverage rows |
 | `state/runs/<stamp>-ingest-dois.json` | Created / exists / unresolved / held |
 | `state/last-run.json` | `paperful.run_report.v1` after `run` |
 | `state/snowball/<run-id>/digest.md` | Frontier digest for that queue |
@@ -86,4 +94,4 @@ lookup is [Twenty and SearXNG](snowball.md#twenty-and-searxng).
 - Silent parent create from inbox (default stays DOI attach)
 - Newsletter / Scholar-alert ingest
 - Firefox extension
-- `coverage` (briefing note vs collection) — later sibling of `refs gap`
+- Newsletter-scale ingest beyond a one-shot `coverage --from-file` check

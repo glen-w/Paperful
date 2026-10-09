@@ -547,6 +547,19 @@ def run_checks(
     else:
         checks.append(Check("Scholar", "green", "not in sources"))
 
+    if cfg.core_api_key:
+        checks.append(
+            Check("CORE", "green", "core_api_key set (OA PDF lane on by default)")
+        )
+    else:
+        checks.append(
+            Check(
+                "CORE",
+                "green",
+                "optional — set core_api_key in config.toml to enable the CORE OA lane",
+            )
+        )
+
     if cfg.serpapi_enabled:
         from .routing import serpapi_api_key
 

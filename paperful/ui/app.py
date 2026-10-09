@@ -8,7 +8,13 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -2158,6 +2164,20 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         if path is None:
             return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
         return FileResponse(path, media_type="text/html; charset=utf-8")
+
+    @app.get("/v1/runs/{cmd_id}/events", response_model=None)
+    def run_events(cmd_id: str):
+        if commands.read_command(cfg, cmd_id) is None:
+            return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+        return StreamingResponse(
+            commands.iter_command_status_events(cfg, cmd_id),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     @app.get("/v1/runs/{cmd_id}")
     def run_status(cmd_id: str) -> JSONResponse:

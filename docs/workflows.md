@@ -348,6 +348,12 @@ docker compose run --rm paperful inbox drain    # optional: PDFs dropped into [i
 docker compose run --rm paperful dedupe -C BBNJ --apply
 ```
 
+**Briefing / note mentions** (DOIs or titles named in markdown or HTML, not
+bibliographies inside PDFs): `coverage --from-file` or `--from-note` writes
+`state/coverage/<stamp>/` (`paperful.coverage.pack.v1`). Always dry-run. Feed
+missing rows through the same `ingest-dois --from-pack` path as `refs gap`. See
+[commands.md](commands.md) (`coverage`, `ingest-dois`).
+
 Contributors: the same verbs with `uv run paperful …`.
 
 ## 6. Field author packs (corpus frequency → author_site)

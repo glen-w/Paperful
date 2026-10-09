@@ -1,0 +1,29 @@
+{
+  "schema": "paperful.coverage.pack.v1",
+  "scope": "BBNJ",
+  "created_at": "2026-01-01T00:00:00+00:00",
+  "source": {
+    "kind": "file",
+    "ref": "briefing.md"
+  },
+  "counts": {
+    "mentioned": 1,
+    "in_collection": 0,
+    "missing": 1,
+    "ambiguous": 0,
+    "ingest_dois": 1
+  },
+  "rows": [
+    {
+      "doi": "10.1000/a",
+      "title": "A",
+      "year": 2019,
+      "status": "missing",
+      "item_key": "",
+      "exists_kind": "",
+      "suggested_action": "ingest-dois",
+      "provenance_hint": "",
+      "finding": ""
+    }
+  ]
+}

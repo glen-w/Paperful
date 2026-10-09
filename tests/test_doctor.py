@@ -96,3 +96,18 @@ def test_remediation_playwright(cfg):
     browsers = Check("Playwright", "amber", "package ok — Chromium installs")
     text2 = remediation_text(browsers, cfg, docker=False)
     assert text2 and "session login" in text2
+
+
+def test_core_check_green_optional_or_keyed(cfg):
+    from paperful.doctor import run_checks
+
+    cfg.core_api_key = ""
+    by_name = {c.name: c for c in run_checks(cfg, zl=None)}
+    assert by_name["CORE"].status == "green"
+    assert "optional" in by_name["CORE"].detail.lower()
+
+    cfg.core_api_key = "test-key"
+    by_name = {c.name: c for c in run_checks(cfg, zl=None)}
+    assert by_name["CORE"].status == "green"
+    assert "set" in by_name["CORE"].detail.lower()
+    assert remediation_text(by_name["CORE"], cfg) is None

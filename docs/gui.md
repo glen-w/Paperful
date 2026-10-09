@@ -49,7 +49,7 @@ browser-agent. No built-in scheduler — **Check again** on Discover, not cron.
 | **Long lists** | Discover lists, Index threads and batches, Briefs archives, and the Repair queue fold into collapsible sections |
 
 Layout: table-first rows, native `<dialog>` drawer (no embedded PDF viewer).
-Long jobs return a **command id**; Activity polls `GET /v1/runs/{id}` (SSE later).
+Long jobs return a **command id**; Activity subscribes to `GET /v1/runs/{id}/events` (SSE), with JSON poll fallback via `GET /v1/runs/{id}`.
 Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
 `compose.gui.yaml` is a no-op shim for older `-f compose.gui.yaml --profile gui` invocations.
 
@@ -135,6 +135,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | GET | `/v1/collections` | Collection tree |
 | GET | `/v1/runs/last` | `state/last-run.json` |
 | GET | `/v1/runs/{id}` | GUI command record under `state/gui/commands/` |
+| GET | `/v1/runs/{id}/events` | SSE `status` events until `done` or `failed` |
 | POST | `/v1/refs-gap` | Dry-run `refs gap` envelope |
 | POST | `/v1/ask` | Same as MCP `ask` (not linked from simple HTML) |
 | POST | `/v1/gui/noop` | Smoke / readiness for the GUI process |
@@ -215,7 +216,28 @@ labelled library write (ticked keys from Wanted, or Advanced preview then apply)
 Repair / Mirror **Apply** require **Preview** first.
 **Keep an eye on this** needs an existing snowball profile (`save_watch`); it
 does not write an empty `watch.json`. Long jobs land under `state/gui/commands/`;
-Activity polls `GET /v1/runs/{id}`.
+Activity streams `GET /v1/runs/{id}/events` (falls back to polling `GET /v1/runs/{id}`).
+
+### Run status (SSE)
+
+Long GUI jobs write a command record under `state/gui/commands/<id>.json`
+(`queued` → `running` → `done` | `failed`). The workbench opens
+`EventSource` on `GET /v1/runs/{id}/events` (`Content-Type: text/event-stream`).
+
+Each change emits:
+
+```text
+event: status
+data: {"ok":true,"id":"…","verb":"…","status":"running",…}
+```
+
+The payload matches `GET /v1/runs/{id}` (`ok` plus the on-disk record, including
+`review_token`, `error`, and `result` when present). The server sends the current
+record immediately, then pushes again when the ledger file changes; comment
+heartbeats (`: ping`) appear about every 15s while the job is still active. The
+stream closes after a terminal `status`. Missing ids return **404** JSON (not SSE).
+`workbench.js` reloads the page on `done` / `failed` and falls back to JSON polling
+if the stream errors.
 
 ---
 

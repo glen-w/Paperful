@@ -442,10 +442,18 @@ def build_report(
 
 
 def write_run_report(
-    cfg: Config, report: dict[str, Any], *, as_last_run: bool = True
+    cfg: Config,
+    report: dict[str, Any],
+    *,
+    as_last_run: bool = True,
+    bound: Any | None = None,
+    command_extra: dict[str, Any] | None = None,
 ) -> Path | None:
     """Write `state/runs/<stamp>.json` and optionally refresh `state/last-run.json`."""
     try:
+        from .witness import attach_witness
+
+        attach_witness(report, cfg, bound=bound, command_extra=command_extra)
         runs_dir = cfg.state_dir / "runs"
         runs_dir.mkdir(parents=True, exist_ok=True)
         stamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -475,6 +483,8 @@ def write_command_report(
     finished: float | None = None,
     errors: list[str] | None = None,
     extra_paths: dict[str, str] | None = None,
+    bound: Any | None = None,
+    command_extra: dict[str, Any] | None = None,
 ) -> Path | None:
     """Write a `paperful.run_report.v1` file without replacing `last-run.json`."""
     finished_ts = finished if finished is not None else time.time()
@@ -504,7 +514,9 @@ def write_command_report(
     if errors is not None:
         report["errors"] = errors
     summary.setdefault("write_api", None)
-    return write_run_report(cfg, report, as_last_run=False)
+    return write_run_report(
+        cfg, report, as_last_run=False, bound=bound, command_extra=command_extra
+    )
 
 
 _RECOVER_FROM_LAST_MODES = frozenset(

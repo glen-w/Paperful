@@ -126,6 +126,11 @@ def note_pack_step(cfg: Config, report: dict[str, Any], report_path: Path) -> No
         "finished_at": report.get("finished_at"),
         "report": report_path.name,
     }
+    witness = report.get("witness")
+    if isinstance(witness, dict):
+        digest = str(witness.get("config_sha256") or "")
+        if digest:
+            step["witness_id"] = digest[:12]
     pack.setdefault("steps", []).append(step)
     if not pack.get("scope") and report.get("scope"):
         pack["scope"] = report["scope"]

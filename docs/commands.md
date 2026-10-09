@@ -112,6 +112,8 @@ uv run paperful inbox drain                   # one-shot ingest
 uv run paperful inbox watch -C BBNJ           # optional: narrow DOI index
 uv run paperful refs gap -C BBNJ              # cited in PDFs, missing from library
 uv run paperful refs gap -C BBNJ --format json
+uv run paperful coverage --from-file briefing.md -C BBNJ   # named in briefing, not in -C
+uv run paperful coverage --from-note NOTEKEY -C BBNJ
 uv run paperful ingest-dois --from-file dois.txt -C BBNJ            # dry-run
 uv run paperful ingest-dois --from-file dois.txt -C BBNJ --format json
 uv run paperful collections add --keys-file keys.txt -C BBNJ        # dry-run
@@ -131,6 +133,7 @@ uv run paperful mcp                           # optional stdio: gaps, snowball_s
 uv run paperful export-proposals PACK out.bib # BibTeX/RIS from snowball or authorwatch inbox on disk
 uv run paperful serve                         # localhost HTTP (needs uv sync --extra serve)
 uv run paperful ingest-dois --from-pack state/refs-gaps/<stamp> -C BBNJ
+uv run paperful ingest-dois --from-pack state/coverage/<stamp> -C BBNJ
 uv run paperful ingest-dois --from-file dois.txt -C BBNJ --apply --tag bbnj
 uv run paperful acronyms -C BBNJ              # harvest ALL CAPS tokens (dry-run)
 uv run paperful acronyms -C BBNJ --apply      # write state/acronyms/<scope>.json
@@ -219,7 +222,8 @@ uv run paperful pack show
 | `inbox` | PDF drop-folder sidecar (`watch` / `drain` / `proposals`). Needs `[inbox].dir`. Default match is DOI-only against missing-PDF items (whole library unless `-C`). Optional `[inbox].match` ladder: hold before quarantine, OCR-for-match, title+year, `llm_when_thin`. `[inbox].create` is `attach_only` (default), `create_gated` (proposals), or high-bar `create_auto` (unique DOI only). Created parents are tagged `inbox-created`, `inbox:<dirname>`, `[ingest].default_tags`, and `--tag`. `--format json` on `drain` and `proposals list|apply|reject` is `paperful.agent.json.v1`. Handoff `watch` still uses FIFO. Writes `state/runs/<stamp>-inbox.json`. Not snowball’s `inbox.jsonl`. |
 | `notes delete` | Trash **Paperful-owned** notes only (`paperful.note.v1` or known tags). Dry-run unless `--apply`. `--type summary\|review\|attach\|duplicate\|linked\|snowball\|briefing` is the **note** kind (not Zotero `-T` / `--item-type` on parents). `--model` / `--except-model`, `--all` (every owned note in `-C` / `--library` / `--item`). `--apply --all` confirms on a TTY unless `--yes`. Never parents. `--format json`. |
 | `refs gap` | Works **cited inside** collection PDFs that are **not** in the library fingerprint. Always dry-run. Writes `state/refs-gaps/<stamp>/` (`paperful.refs_gap.pack.v1` plus `dois.txt`). `--format json` prints `paperful.agent.json.v1`. Then `ingest-dois --from-file` / `--from-pack`. Distinct from `gaps` (items already in scope missing a PDF). |
-| `ingest-dois` | DOI list → metadata parents in `-C`. Dry-run unless `--apply`. Reports created / exists / unresolved / **held**. `--format json`. `--tag` plus `[ingest].default_tags` and `from-<file-stem>`. Does not fetch PDFs (`run` after). |
+| `coverage` | DOIs (and optional titles) **named in a briefing note or file** that are **not** under `-C`. Always dry-run. `--from-note` (key or path) or `--from-file`. Writes `state/coverage/<stamp>/` (`paperful.coverage.pack.v1`). Rows: `in_collection` / `missing` / `ambiguous` (in library, outside `-C`). Then `ingest-dois`. Sibling of `refs gap`. |
+| `ingest-dois` | DOI list → metadata parents in `-C`. Dry-run unless `--apply`. Reports created / exists / unresolved / **held**. `--format json`. `--tag` plus `[ingest].default_tags` and `from-<file-stem>`. `--from-pack` accepts refs-gap or coverage packs. Does not fetch PDFs (`run` after). |
 | `collections` | `list` (or bare `collections`) — collection tree with “No PDF” counts. `add --keys-file` — file **existing** item keys into `-C` (membership only; dry-run unless `--apply`; added / already-in / not-found). `--format json`. Complements `ingest-dois` (create parents). Zotero / Mendeley; EndNote refuses `--apply`. Not an MCP tool. |
 | `mcp` | Optional stdio MCP over the same JSON channel. Read-only tools: `gaps`, `snowball_search` (dry-run), `snowball_trends` (publication-year counts), `export` (BibTeX/RIS text in envelope), `proposal_export` (pack under `state/snowball/` or `state/authorwatch/`), `refs_gap`, `ask`. Prefer `paperful … --format json` from a shell. `collections add` is CLI-only and is not exposed. |
 | `urls` | `urls check` probes metadata and linked-PDF URLs for a scope (HEAD/GET). Report only unless `--apply`, which rewrites a URL only when a grey playbook already knows the PDF target. `--limit`, `--format json`. |
@@ -427,6 +431,7 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
 - `state/versions-applied.jsonl` — one line per work updated by
   `versions --apply`.
 - `state/refs-gaps/<stamp>/` — `refs gap` pack (`pack.json`, `pack.md`, `dois.txt`). Always dry-run.
+- `state/coverage/<stamp>/` — `coverage` pack (`pack.json`, `pack.md`, `dois.txt`). Always dry-run.
 - `state/ingest/<stamp>/` — `ingest-dois` summary JSON. Created only classifies unless `--apply`.
 - `state/collections-add/<stamp>/` — `collections add` summary JSON (`paperful.collections_add.v1`). Dry-run unless `--apply`.
 - `state/authorwatch/<name>/` — people lists (`paperful.authorwatch.v1`), `people.jsonl`, `suggestions.jsonl`, inbox, seen, applied. Cursor baseline does not open the library; `suggest` does. See [authorwatch.md](authorwatch.md).

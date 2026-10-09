@@ -113,12 +113,15 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `pack_bib.py` | BibTeX/RIS from snowball / authorwatch proposal JSONL on disk | `interop`, snowball |
 | `notehtml.py` | First-line prefixes + `paperful.note.v1` comment | none |
 | `notes.py` | Classify and trash Paperful-owned notes | `notehtml`, library protocol |
+| `refs_gap.py` | Cited-in-PDF works missing from the library fingerprint | `identity`, bibliography parse |
+| `coverage.py` | Briefing/note/file DOI list vs `-C` membership | `identity`, `resolve` |
+| `witness.py` | Optional `paperful.witness.v1` on run reports | `config`, rag status tip |
 | `handoff_rank.py` | Missing-PDF sort: refs-gap cites × miss severity | `handoff` |
 | `reachout.py` | Contact-only missing-PDF rows (metadata / Twenty emails, CSV). No fetch | `handoff`, `twenty` |
 | `twenty.py` | Twenty People lookup (local cache) and `sync` (CRM create/enrich). User guide: [Twenty and SearXNG](snowball.md#twenty-and-searxng) | httpx |
 | `mcp_server.py` | Optional stdio MCP: read-only gaps, snowball preview / trends, export, proposal_export, refs_gap, ask | `agent_ops` |
 | `serve.py` | Localhost FastAPI: JSON capability API + mounts `ui` when the `serve` extra is installed | `agent_ops`, `ui` |
-| `ui/` | Server-rendered workbench (Jinja). `app.py` mounts HTML + form POSTs; ordinary pages do not run `doctor` (System does). `jobs.py`, `wanted_jobs.py`, `repair_jobs.py`, `discover_jobs.py` call the same domain entrypoints as the CLI; review tokens under `state/gui/reviews/`; command ids under `state/gui/commands/` | CLI / MCP builders |
+| `ui/` | Server-rendered workbench (Jinja). `app.py` mounts HTML + form POSTs + `GET /v1/runs/{id}` and SSE `GET /v1/runs/{id}/events` (`commands.iter_command_status_events`). Ordinary pages do not run `doctor` (System does). `jobs.py`, `wanted_jobs.py`, `repair_jobs.py`, `discover_jobs.py` call the same domain entrypoints as the CLI; review tokens under `state/gui/reviews/`; command ledger under `state/gui/commands/` (`write_command` notifies SSE waiters) | CLI / MCP builders |
 | `authorwatch.py` | People lists → OpenAlex new works; `gather_briefing` / `write_briefing` (inbox + recent works / co-authors); `apply` creates parents; `accept` / `delete` | OpenAlex client, `identity`, `snowball.ingest`, `authorwatch_suggest` |
 | `authorwatch_suggest.py` | Corpus / cited / coauthor / mix suggestions → `suggestions.jsonl`; shared co-author accumulation for briefing | `authors_report`, OpenAlex, promoted packs |
 | `authorwatch_social.py` | Parse operator-saved RG / LinkedIn / Academia HTML or CSV (no network) | stdlib HTML/CSV |
@@ -164,6 +167,8 @@ Tier policy (1.0-ready contract; package tag may still wait on workbench polish)
 | `paperful.agent.json.v1` | stdout `--format json` | `agent_json` | T0 | `REQUIRED_KEYS`; `tests/fixtures/agent_json*` |
 | `paperful.note.v1` | HTML comment in child notes | `notehtml` | T0 | `NOTE_BLOCK_KEYS`; `tests/fixtures/note_v1/` |
 | `paperful.refs_gap.pack.v1` | `state/refs-gaps/<stamp>/pack.json` | `refs_gap` | T1 | `REFS_GAP_PACK_KEYS`; `tests/fixtures/refs_gap_pack_v1/` |
+| `paperful.coverage.pack.v1` | `state/coverage/<stamp>/pack.json` | `coverage` | T1 | `COVERAGE_PACK_KEYS`; `tests/fixtures/coverage_pack_v1/` |
+| `paperful.witness.v1` | optional `witness` on run reports | `witness` | T2 | additive; not in `RUN_REPORT_KEYS` |
 | `paperful.inbox.proposal.v1` | `state/inbox/proposals/*.json` | `inbox_match` | T1 | `INBOX_PROPOSAL_KEYS`; `tests/fixtures/inbox_proposal_v1/` |
 | `paperful.sync.v1` | `out/_sync.json` | `sync` | T2 | — |
 | `paperful.annotations.v1` | `annotations.json` | `snapshot` | T2 | — |

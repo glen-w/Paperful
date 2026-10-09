@@ -12,6 +12,11 @@ from typing import Any, Callable
 
 from ..config import Config
 
+TERMINAL_STATUSES = frozenset({"done", "failed"})
+
+_watch_lock = threading.Lock()
+_watch_cond = threading.Condition(_watch_lock)
+
 _worker_lock = threading.Lock()
 _worker_started = False
 _queue: list[tuple[str, Callable[[], None]]] = []
@@ -39,6 +44,36 @@ def _atomic_write(path: Path, data: dict[str, Any]) -> None:
 def write_command(cfg: Config, record: dict[str, Any]) -> None:
     path = _commands_dir(cfg) / f"{record['id']}.json"
     _atomic_write(path, record)
+    with _watch_cond:
+        _watch_cond.notify_all()
+
+
+def wait_command_change(*, timeout: float) -> bool:
+    """Block until any command record is written, or timeout. Returns False on timeout."""
+    with _watch_cond:
+        return _watch_cond.wait(timeout=timeout)
+
+
+def iter_command_status_events(cfg: Config, cmd_id: str):
+    """Yield SSE frames for command status until terminal or missing record."""
+
+    def frame(rec: dict[str, Any]) -> str:
+        payload = json.dumps({"ok": True, **rec}, ensure_ascii=False)
+        return f"event: status\ndata: {payload}\n\n"
+
+    last_payload: str | None = None
+    while True:
+        rec = read_command(cfg, cmd_id)
+        if rec is None:
+            return
+        payload = json.dumps({"ok": True, **rec}, ensure_ascii=False)
+        if payload != last_payload:
+            last_payload = payload
+            yield frame(rec)
+            if rec.get("status") in TERMINAL_STATUSES:
+                return
+        if not wait_command_change(timeout=15.0):
+            yield ": ping\n\n"
 
 
 def read_command(cfg: Config, cmd_id: str) -> dict[str, Any] | None:

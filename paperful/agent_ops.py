@@ -42,6 +42,41 @@ def refs_gap_envelope(
     )
 
 
+def coverage_envelope(
+    *,
+    rows: list[Any],
+    folder: Any,
+    flags: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    interesting = [r for r in rows if getattr(r, "status", "") != "in_collection"]
+    items_out = [
+        {
+            "doi": getattr(r, "doi", "") or "",
+            "title": getattr(r, "title", "") or "",
+            "status": getattr(r, "status", "") or "",
+            "suggested_action": getattr(r, "suggested_action", "") or "",
+            "item_key": getattr(r, "item_key", "") or "",
+        }
+        for r in interesting
+    ]
+    return envelope(
+        command="coverage",
+        summary={
+            "mentioned": len(rows),
+            "in_collection": sum(
+                1 for r in rows if getattr(r, "status", "") == "in_collection"
+            ),
+            "missing": sum(1 for r in rows if getattr(r, "status", "") == "missing"),
+            "ambiguous": sum(
+                1 for r in rows if getattr(r, "status", "") == "ambiguous"
+            ),
+        },
+        items=items_out,
+        paths={"pack": str(folder)},
+        flags={"dry_run": True, **(flags or {})},
+    )
+
+
 def run_refs_gap(cfg: Config, collection: str) -> dict[str, Any]:
     """MCP / shared scan: always dry-run, never creates parents."""
     from .catalogue import open_library

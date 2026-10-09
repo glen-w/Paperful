@@ -17,7 +17,21 @@
   });
   updateToolbarLabels();
 
-  function pollRun(id, btn) {
+  function finishRun(id, btn) {
+    var key = "pf-poll-" + id;
+    sessionStorage.setItem(key, "1");
+    if (btn) btn.classList.remove("spinning");
+    location.reload();
+  }
+
+  function applyStatusToRow(id, status) {
+    var row = document.querySelector('[data-run-id="' + id + '"]');
+    if (!row) return;
+    var st = row.querySelector(".cmd-status");
+    if (st) st.textContent = status;
+  }
+
+  function pollRunJson(id, btn) {
     if (!id) return;
     var key = "pf-poll-" + id;
     if (sessionStorage.getItem(key)) return;
@@ -28,17 +42,50 @@
         .then(function (r) { return r.json(); })
         .then(function (body) {
           var st = body.status;
+          applyStatusToRow(id, st);
           if (st === "done" || st === "failed") {
             if (iv) clearInterval(iv);
-            sessionStorage.setItem(key, "1");
-            if (btn) btn.classList.remove("spinning");
-            location.reload();
+            finishRun(id, btn);
           }
         })
         .catch(function () {});
     }
     tick();
     iv = setInterval(tick, 2000);
+  }
+
+  function pollRun(id, btn) {
+    if (!id) return;
+    var key = "pf-poll-" + id;
+    if (sessionStorage.getItem(key)) return;
+    if (btn) btn.classList.add("spinning");
+    if (typeof EventSource === "undefined") {
+      pollRunJson(id, btn);
+      return;
+    }
+    var finished = false;
+    var es = new EventSource("/v1/runs/" + id + "/events");
+    es.addEventListener("status", function (ev) {
+      try {
+        var body = JSON.parse(ev.data);
+        var st = body.status;
+        applyStatusToRow(id, st);
+        if (st === "done" || st === "failed") {
+          finished = true;
+          es.close();
+          finishRun(id, btn);
+        }
+      } catch (e) {
+        finished = true;
+        es.close();
+        pollRunJson(id, btn);
+      }
+    });
+    es.onerror = function () {
+      if (finished) return;
+      es.close();
+      pollRunJson(id, btn);
+    };
   }
 
   document.querySelectorAll("[data-run-id]").forEach(function (row) {

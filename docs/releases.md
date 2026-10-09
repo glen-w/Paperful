@@ -13,9 +13,10 @@ Required keys on `paperful.item.v1` from `empty_item_record()` are frozen the
 same way. This tree is not tagged 1.0.
 
 **1.0** (not tagged) still owes polish on the **workbench** on
-`paperful serve` (screenshots, SSE, a 1.0 tag). Discover + Wanted, people lists,
+`paperful serve` (screenshots, a 1.0 tag). Discover + Wanted, people lists,
 briefing/digest (optional collection note), Repair/Mirror Preview→Apply,
-command ids, and review tokens are in tree. **Interactive Ask** is on **Index**,
+command ids, review tokens, and Activity run-status SSE (`GET /v1/runs/{id}/events`)
+are in tree. **Interactive Ask** is on **Index**,
 opt-in after `[rag]` + `[llm]`; Advanced **Briefs** runs summarize/synthesize.
 Item records and create-missing restore are locked; extra item keys may still
 be added. Required `paperful.run_report.v1` keys and imported-file attach
@@ -38,6 +39,8 @@ workbench polish.
 | `paperful.agent.json.v1` | Required envelope keys frozen (`REQUIRED_KEYS`); nested `report` additive | Frozen envelope |
 | `paperful.note.v1` | Required `block()` keys frozen (`NOTE_BLOCK_KEYS`) | Frozen |
 | `paperful.refs_gap.pack.v1` | Top-level keys frozen (`REFS_GAP_PACK_KEYS`) | Frozen |
+| `paperful.coverage.pack.v1` | Top-level keys frozen (`COVERAGE_PACK_KEYS`) | Frozen |
+| `paperful.witness.v1` | Optional on run reports; additive (not in `RUN_REPORT_KEYS`) | Additive |
 | `paperful.inbox.proposal.v1` | Top-level keys frozen (`INBOX_PROPOSAL_KEYS`) | Frozen |
 | `paperful.snowball.candidate.v1` | Shipped and tested; additive keys allowed | Additive through 1.x |
 | Snapshot / restore | Create-missing locked (DOI → key → title+year; no field overwrite; skip trashed/gone). Not a lossless round-trip | Same |
