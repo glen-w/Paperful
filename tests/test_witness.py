@@ -57,3 +57,23 @@ def test_attach_witness_idempotent(cfg):
     digest = report["witness"]["config_sha256"]
     attach_witness(report, cfg)
     assert report["witness"]["config_sha256"] == digest
+
+
+def test_pack_step_records_witness_id(cfg):
+    from paperful.pack import close_pack, current_id, open_pack, pack_path
+
+    open_pack(cfg, "deep-test")
+    path = write_command_report(
+        cfg,
+        command="coverage",
+        scope="BBNJ",
+        summary={"missing": 0, "write_api": None},
+        items=[],
+    )
+    assert path is not None
+    report = json.loads(path.read_text(encoding="utf-8"))
+    # note_pack_step already ran inside write_run_report; re-read pack.
+    pack = json.loads(pack_path(cfg, current_id(cfg)).read_text(encoding="utf-8"))
+    assert pack["steps"]
+    assert pack["steps"][-1]["witness_id"] == report["witness"]["config_sha256"][:12]
+    close_pack(cfg)

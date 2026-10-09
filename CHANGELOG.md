@@ -9,14 +9,20 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ### Added
 
+- **`paperful coverage`:** briefing / note / file DOI lists vs `-C` membership
+  (`in_collection` / `missing` / `ambiguous`). Always dry-run; pack under
+  `state/coverage/` (`paperful.coverage.pack.v1`). `ingest-dois --from-pack`
+  accepts coverage packs. Sibling of `refs gap`.
+- **Run witness:** optional `witness` (`paperful.witness.v1`) on every
+  `paperful.run_report.v1` — config SHA-256, Paperful version, profile, scope,
+  fetch sources, LLM/RAG tip. Pack steps record `witness_id`. Not part of the
+  required `RUN_REPORT_KEYS` freeze. `refs gap`, `coverage`, and `snowball apply`
+  write command reports so they join the pack trail.
+- **CORE doctor check:** green either way — reports whether `core_api_key` is
+  set (optional OA lane already in `DEFAULT_SOURCES`).
 - **GUI run SSE:** `GET /v1/runs/{id}/events` pushes command status until
   `done`/`failed`; workbench Activity uses `EventSource` with JSON poll fallback.
   See [gui.md](docs/gui.md#run-status-sse).
-- **`paperful coverage`:** briefing / note / file DOI lists vs `-C` membership
-  (`paperful.coverage.pack.v1` under `state/coverage/`). Always dry-run; sibling
-  of `refs gap`. `ingest-dois --from-pack` accepts coverage packs.
-- **Run witness:** optional `witness` (`paperful.witness.v1`) on
-  `write_run_report` / command reports; open packs record `witness_id` on steps.
 - **Literature-discovery Wave 1 (roadmap row 22):** `paperful mcp` adds read-only
   `gaps`, `snowball_search`, `export`, and `proposal_export` (same
   `paperful.agent.json.v1` builders as CLI). `paperful export-proposals` writes

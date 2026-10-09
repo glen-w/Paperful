@@ -16,7 +16,7 @@ lists that lane, not the full `sources` list.
 | `arxiv` | arXiv id, `10.48550/arxiv.…` DOI, or a scholarly item type with a long title |
 | `biorxiv` | `10.1101/…` DOI (including from a bioRxiv/medRxiv URL) |
 | `semanticscholar` | DOI or arXiv id |
-| `core` | DOI and `core_api_key` |
+| `core` | DOI and `core_api_key` (in default `sources`; skipped until the key is set. `doctor` reports whether it is set — green either way). Register at [core.ac.uk/services/api](https://core.ac.uk/services/api) |
 | `scholar` | DOI, or title at least 20 characters (**opt-in** — not in default `sources`). Policy order runs it late, paired with `browser_agent` when that lane is on |
 | `serpapi` | Same query as Scholar. **Opt-in:** `[serpapi].enabled` and env `SERPAPI_API_KEY`. Policy order after local Scholar / agent. Cap with `[serpapi].max_calls` / `--serpapi-max`. See [SerpApi](serpapi.md) |
 | `direct` | HTTP(S) URL that is not a resolver/aggregator/video host after playbook rewrite/synthesize, **or** Extra/title match from a `synthesize` playbook (e.g. UN symbol → undocs) |

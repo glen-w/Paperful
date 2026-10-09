@@ -674,7 +674,9 @@ the evidence-linked Q&A layer.
 (bibliography-gap-scan-later-not-gaps)=
 ### Bibliography gap scan (shipped; not `gaps`)
 
-**Status:** shipped — `paperful refs gap` writes `state/refs-gaps/` (`paperful.refs_gap.pack.v1`). Always dry-run.
+**Status:** shipped — `paperful refs gap` writes `state/refs-gaps/`
+(`paperful.refs_gap.pack.v1`) and a command report under `state/runs/`. Always
+dry-run. Sibling for briefing/note lists: [`coverage`](#briefing--collection-coverage-shipped-sibling-of-refs-gap).
 
 | Today | Bibliography gap scan |
 | --- | --- |
@@ -702,6 +704,7 @@ text-layer required for scan-only PDFs (`ocr` first); clear finding, not crash.
 Not a silent snowball auto-run. Treat as a **near-term research-ops epic** ([stack
 above](#near-term-research-ops)).
 
+(briefing--collection-coverage-shipped-sibling-of-refs-gap)=
 ### Briefing ↔ collection coverage (shipped; sibling of `refs gap`)
 
 **Status:** shipped — `paperful coverage --from-note <key|path> -C …` or
@@ -803,6 +806,7 @@ sync into Paperful — never replace Zotero’s annotation UI. Consumers: cited
 answers prefer operator highlights; future evidence-pack export. Group libraries
 and adapter parity (Mendeley/EndNote) are explicit non-goals until tested.
 
+(run-witness-shipped-trust-thicken)=
 ### Run witness (shipped; trust thicken)
 
 **Status:** shipped — optional `witness` (`paperful.witness.v1`) on every
@@ -810,8 +814,8 @@ and adapter parity (Mendeley/EndNote) are explicit non-goals until tested.
 Includes config SHA-256, Paperful version, profile name when bound, scope,
 fetch sources/preset, `[llm]` / RAG index tip, mirror `_sync.json` refresh.
 Not part of `RUN_REPORT_KEYS` (additive). Open packs record `witness_id`
-(first 12 of `config_sha256`) on each step. `refs gap` and `coverage` write
-command reports so they join the pack trail.
+(first 12 of `config_sha256`) on each step. `refs gap`, `coverage`, and
+`snowball apply` write command reports so they join the pack trail.
 
 ### Auto-tagging library items (later; not 1.0)
 
@@ -1210,8 +1214,8 @@ Larger product bets. Park until the ledger and core loop justify them.
    optional rollup newsletter bridge, Scholar alerts first, still later); [author watch
    lists](#author-watch-lists-later-people-you-follow--their-papers) (shipped;
    saved social HTML/CSV import; live scrape still out). **[Run
-   witness](#run-witness-later-trust-thicken)** ties batches to config/model/index
-   for reproducibility.
+   witness](#run-witness-shipped-trust-thicken)** (shipped) ties batches to
+   config/model/index for reproducibility.
 6. **Writing & export** — CSL / BibLaTeX / Quarto sync; living review / gap lists;
    git-friendly CSL-JSON dumps; [briefing ↔ collection coverage](#briefing--collection-coverage-shipped-sibling-of-refs-gap)
    (shipped thin slice of parked “gap lists,” collection-scoped only)
@@ -1237,11 +1241,11 @@ Larger product bets. Park until the ledger and core loop justify them.
    vault profile for agent ergonomics (see Optional LLM — extensions bullet);
    **user-agent switcher** spike (CAPTCHA open question #3 under Optional LLM)
    for between-item or mid-run rotation vs stable profile UA. **Shipped:** `--format json`
-   (`paperful.agent.json.v1`) on batch verbs (`run`, `refs gap`,
+   (`paperful.agent.json.v1`) on batch verbs (`run`, `refs gap`, `coverage`,
    `ingest-dois`, `inbox drain`, `ask`, snowball crawl/apply, …); documented exit-code
    table (`0` ok, `1` user, `2` manager down, `3` partial write batch). **MCP** is a thin
    optional stdio wrap of `refs_gap` + `ask` over the same envelope — not a second API
-   and not a prerequisite for research-ops. **Literature-discovery complement shipped**
+   and not a prerequisite for research-ops. (`coverage` is CLI `--format json` only.) **Literature-discovery complement shipped**
    (waves 1–3): read-only MCP for `gaps`, snowball preview, `snowball_trends`,
    `export`, `proposal_export`, plus `export-proposals`, `snowball trends`, and
    thickened `authorwatch briefing` — [Literature-discovery complement](#literature-discovery-complement-waves). Writes stay

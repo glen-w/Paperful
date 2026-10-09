@@ -108,7 +108,7 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `all_cmd.py` | `all` chain + step dispatch after flags | Typer wrappers via `cli` |
 | `cli.py` | Flags, progress, exits. No logic of its own | everything |
 | `agent_json.py` | `--format json` envelope (`paperful.agent.json.v1`) and exit 3 | none |
-| `agent_ops.py` | Shared builders for CLI JSON and MCP (`gaps`, snowball dry-run / trends, `export`, refs-gap, ask) | `agent_json`, catalogue, rag, `export_build`, `pack_bib`, `snowball.trends` |
+| `agent_ops.py` | Shared builders for CLI JSON and MCP (`gaps`, snowball dry-run / trends, `export`, refs-gap, ask) plus CLI `coverage_envelope` | `agent_json`, catalogue, rag, `export_build`, `pack_bib`, `snowball.trends`, `coverage` |
 | `export_build.py` | Mirror-first interchange records for a scoped library export. Agent/MCP `export` calls this with notes off and no PDF directory. CLI `export` still builds the same overlay in `cli.py` (EndNote XML bundle and `--pdfs` live there) | `interop`, `store`, `mirror`, library protocol |
 | `pack_bib.py` | BibTeX/RIS from snowball / authorwatch proposal JSONL on disk | `interop`, snowball |
 | `notehtml.py` | First-line prefixes + `paperful.note.v1` comment | none |

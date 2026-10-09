@@ -6633,6 +6633,21 @@ def _run_snowball(
             console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
     _rag_auto(cfg, snowball_started)
+    # Writing gates join the run-report / witness trail (dry-run crawls stay queue-only).
+    if command in {"snowball apply"}:
+        summary = dict(getattr(result, "summary", None) or {})
+        summary.setdefault("write_api", None)
+        run_dir = getattr(result, "run_dir", None)
+        write_command_report(
+            cfg,
+            command=command,
+            scope=str(run_dir or ""),
+            summary=summary,
+            items=[],
+            flags={"run_dir": str(run_dir or "")},
+            started=snowball_started,
+            extra_paths={"run": str(run_dir)} if run_dir else None,
+        )
     if json_out:
         payload = snowball_result_envelope(command, result)
         _emit_agent(payload, json_out=True, human=lambda: None)

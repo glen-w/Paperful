@@ -108,7 +108,9 @@ it open.
 `PAPERFUL_PACK=off` still keeps each child report out of a pack. `all` does
 not open one in that case.
 
-`paperful pack show` reads the witness. It does not re-run the steps.
+`paperful pack show` reads the pack (`paperful.pack.v1`). Each step can include
+`witness_id` when the child report under `state/runs/` carried a `witness`
+block. It does not re-run the steps.
 
 ### Narrow the chain
 

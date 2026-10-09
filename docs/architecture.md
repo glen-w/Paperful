@@ -306,7 +306,7 @@ is not tagged 1.0 yet (workbench landed; polish remains).
 | `summary.errors_by_type` / `attach_failed_by_code` | Typed errors |
 | `summary.write_api` | `true` / `false` / `null` (null when the run did not probe write support) |
 | `items[]` | Per-item required keys: `itemKey`, `title`, `status`, `source`, `reason`, `doi`, `doi_verified`, `attempts`, `fields_corrected`, `path`, `error_type`, `miss_surface`, `miss_plain`, `miss_detail`, `oa_status`, `license`, `version` |
-| `witness` (optional) | `paperful.witness.v1` — config SHA-256, Paperful version, profile, scope, fetch sources, LLM/RAG tip. Not in the required key frozenset. Built by [`witness.py`](../paperful/witness.py) on every `write_run_report` |
+| `witness` (optional) | `paperful.witness.v1` — config SHA-256, Paperful version, profile, scope, fetch sources, LLM/RAG tip. Not in the required key frozenset. Built by [`witness.py`](../paperful/witness.py) on every `write_run_report` (including `write_command_report` for `refs gap`, `coverage`, `snowball apply`, …) |
 
 `--format json` on `run`, `refs gap`, `coverage`, `ingest-dois`, `collections add`, `inbox drain`, `gaps`, `lint`,
 `fix-metadata`, `dedupe`, snowball crawl (`search` / `hybrid` / `doi` / `orcid` /

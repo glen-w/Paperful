@@ -95,7 +95,9 @@ or `off`. One-page stubs and DOI mismatches can hold the file on disk until you
 PDFs for author contact (CSV / ResearchGate tabs) and never fetches or
 sends mail. `refs gap` lists works
 **cited inside** collection PDFs that are not in the library (always
-dry-run; then `ingest-dois`). `lint` and `fix-metadata`
+dry-run; then `ingest-dois`). `coverage` checks DOIs named in a briefing
+note or file against `-C` (same dry-run pack → `ingest-dois` loop).
+`lint` and `fix-metadata`
 propose patches on disk; `--apply` writes them. `dedupe` reviews duplicates.
 `--apply` writes "Same paper as Smith 2019, which already has the PDF." on
 the spare copy, then merges that parent's PDF, notes, and better fields onto

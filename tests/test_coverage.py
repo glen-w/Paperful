@@ -91,3 +91,19 @@ def test_write_pack_and_dois(tmp_path: Path):
     assert (folder / "dois.txt").read_text(encoding="utf-8").strip() == "10.1000/missing"
     assert dois_from_coverage_pack(folder / "pack.json") == ["10.1000/missing"]
     assert dois_from_refs_pack(folder / "pack.json") == ["10.1000/missing"]
+
+
+def test_coverage_envelope_shape():
+    from paperful.agent_ops import coverage_envelope
+    from paperful.coverage import CoverageRow
+
+    rows = [
+        CoverageRow(doi="10.1000/a", status="in_collection", suggested_action="skip"),
+        CoverageRow(doi="10.1000/b", status="missing", suggested_action="ingest-dois"),
+    ]
+    env = coverage_envelope(rows=rows, folder="/tmp/cov", flags={"kind": "file"})
+    assert env["command"] == "coverage"
+    assert env["summary"]["mentioned"] == 2
+    assert env["summary"]["missing"] == 1
+    assert len(env["items"]) == 1
+    assert env["items"][0]["doi"] == "10.1000/b"

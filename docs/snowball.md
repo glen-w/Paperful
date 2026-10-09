@@ -319,7 +319,10 @@ title+year fingerprint. Only `status = new` rows can become parents.
 `resume` / `watch run` overrides the profile for that invocation.
 `snowball apply` fingerprints the **full library** unless you pass
 `--dedupe-scope` on apply itself (a saved `collection` scope does not leak
-into delayed apply).
+into delayed apply). After create it also writes a
+`state/runs/<stamp>-snowball apply.json` report (optional `witness` block) so
+an open `pack` can list the step — dry-run crawls stay queue-only under
+`state/snowball/`.
 
 `--seeds-file` (or `-` for stdin) loads DOI or ORCID lists for `doi` /
 `orcid`. Trailing `*` on a keyword (`polic*`) expands client-side into an
