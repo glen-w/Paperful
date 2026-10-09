@@ -95,6 +95,7 @@ def test_mcp_lists_refs_gap_and_ask():
         "refs_gap",
         "gaps",
         "snowball_search",
+        "snowball_trends",
         "export",
         "proposal_export",
         "ask",
@@ -200,6 +201,18 @@ def test_snowball_result_envelope_reads_summary_json(tmp_path: Path):
     )
     assert body["summary"]["by_status"]["new"] == 3
     assert body["paths"]["run"] == str(run_dir)
+
+
+def test_mcp_snowball_trends_delegates(monkeypatch):
+    from paperful.mcp_server import call_snowball_trends
+
+    def fake_trends(cfg, query=None, **kwargs):
+        assert query == "marine"
+        return envelope(command="snowball trends", summary={"total": 3})
+
+    monkeypatch.setattr("paperful.mcp_server.run_snowball_trends", fake_trends)
+    body = call_snowball_trends(type("C", (), {})(), {"query": "marine"})
+    assert body["summary"]["total"] == 3
 
 
 def test_mcp_gaps_delegates_to_run_gaps(monkeypatch):

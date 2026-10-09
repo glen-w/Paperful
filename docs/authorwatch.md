@@ -84,6 +84,25 @@ the rest dismissed). Optional `--seed-from` runs a backfill poll after accept.
 Repeat `suggest` to append more candidates (skips people already on the list or
 still pending). Spent OpenAlex budget exits **2** (same next steps as `run`).
 
+## Briefing and show
+
+`authorwatch briefing` writes `briefing.md` under the list directory. Besides
+**Proposed** rows from `inbox.jsonl`, it fetches OpenAlex **recent works** and
+ranked **co-authors** for each pollable (`ok`) person — same resolution paths
+as `run` / `suggest` (`works_by_author` and co-author parsing from authorships).
+Caps keep the call bounded; spent budget exits **2** like `run`.
+
+`authorwatch show` prints list stats and, when there are `ok` members, a compact
+per-person line (recent-work count and top co-author). It does not replace
+`briefing` for a full markdown export.
+
+```bash
+paperful authorwatch briefing ocean-people
+paperful authorwatch briefing ocean-people --format json   # agent envelope
+```
+
+Briefing does **not** create library items or replace `apply`.
+
 ## Import follows
 
 ```text
@@ -113,7 +132,7 @@ that tree):
 | `inbox.jsonl` | Proposed works |
 | `applied.json` | Identities already created in the library |
 | `suggestions.jsonl` | `paperful.authorwatch.suggestion.v1` — pending/accepted/dismissed |
-| `briefing.md` | `authorwatch briefing` (markdown only; not a substitute for `apply`) |
+| `briefing.md` | `authorwatch briefing` — inbox plus OpenAlex recent works / co-authors per pollable person (`--format json`; not a substitute for `apply`) |
 
 Export proposed works to BibTeX or RIS without applying:
 

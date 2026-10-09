@@ -19,7 +19,8 @@ research-pack (cited works → parents → PDFs) is [research-pack](research-pac
 | **`--preset eoi`** | Source *policy*: open access plus campus EZProxy, no Scholar, no Sci-Hub | CLI flag or `preset` in a profile |
 | **Playbook** | URL → PDF rule (`rewrite` / `scrape` / `synthesize`), hand-written or learned from fetch wins | `[[grey_playbooks]]`, `packs/*.toml`, `packs/learned.toml` |
 | **Pack** | Witness for one *executed* sequence. Lists child reports. Not a template you re-run | `state/packs/<id>.json` |
-| **`authorwatch`** | Named people list → their new papers (ORCID / OpenAlex). Optional `suggest` from `-C`. Not a crawl hop | `state/authorwatch/<name>/` |
+| **`authorwatch`** | Named people list → their new papers (ORCID / OpenAlex). Optional `suggest` from `-C`; `briefing` adds OpenAlex recent works / co-authors. Not a crawl hop | `state/authorwatch/<name>/` |
+| **`snowball trends`** | OpenAlex publication-year counts for a query or search/hybrid profile. Read-only (no library) | CLI + MCP `snowball_trends`; see [snowball.md](snowball.md#publication-trends-read-only) |
 | **`authors`** | Creator frequency in `-C`; `--apply` seeds a proposed field author pack | `state/reports/*-authors.json`, `state/author-packs/` |
 | **`reachout`** | Missing PDFs → CSV / RG tabs for author contact. Never fetches, never sends mail | `paperful reachout` |
 | **`snowball watch`** | Re-run a saved snowball *profile*; propose unseen works. The rollup is `digest.md` ([Watch](snowball.md#watch)) | `state/snowball/watches/<name>/` |

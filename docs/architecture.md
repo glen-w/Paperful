@@ -314,8 +314,13 @@ prints **one** `paperful.agent.json.v1` object on stdout (`schema`, `command`, `
 `summary`, `items`, `paths`, `flags`, optional nested `report`). Progress and logs go to **stderr**.
 Exit **3** is a mixed **write** batch (`run` uses attached vs attach_failed). Legacy `--json` on `lint` / `gaps` / `dedupe` keeps its old shape
 unless `--format json` is also passed. `paperful mcp` is optional stdio sugar for the same
-payloads on read-only tools: `gaps`, `snowball_search` (dry-run), `export`, `proposal_export`,
-`refs_gap` (never creates parents), and `ask` (index only). Prefer `… --format json`
+payloads on read-only tools: `gaps`, `snowball_search` (dry-run), `snowball_trends`
+(publication-year counts), `export`, `proposal_export`, `refs_gap` (never creates
+parents), and `ask` (index only). Agent and MCP `export`
+build records in [`export_build.py`](../paperful/export_build.py) (notes omitted, no PDF
+copy). Proposal packs go through [`pack_bib.py`](../paperful/pack_bib.py). The CLI
+`export` command still overlays fields in `cli.py`, including the EndNote XML bundle
+and `--pdfs`. Prefer `… --format json`
 from a shell. `paperful serve` (`paperful[serve]`) binds localhost HTTP: JSON
 capability routes (health, doctor, collections, last-run, dry-run `refs-gap` /
 `ask`) plus the server-rendered workbench (`paperful.ui` — Wanted, Discover,

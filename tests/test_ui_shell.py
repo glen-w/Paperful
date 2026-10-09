@@ -107,6 +107,7 @@ def test_html_pages_do_not_block_on_doctor(tmp_path, monkeypatch):
     wanted2 = client.get("/wanted")
     assert wanted2.status_code == 200
     assert "health-red" in wanted2.text
+    assert 'aria-label="System health: red · Zotero offline' in wanted2.text
     assert calls["n"] == 1
 
 
@@ -194,6 +195,44 @@ def test_wanted_verification_icon_on_held(tmp_path, monkeypatch):
     assert page.status_code == 200
     assert 'class="miss-status miss-status--doi_mismatch"' in page.text
     assert "DOI does not match" in page.text
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_wanted_ghost_pdf_on_missing_tab(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from paperful.store import Manifest
+    from paperful.ui import jobs
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _cfg, probe=False: [])
+    monkeypatch.setattr(
+        "paperful.ui.app.collections_tree",
+        lambda _cfg: {"ok": True, "collections": []},
+    )
+
+    class _Item:
+        key = "G1"
+        title = "Ghost"
+        doi = "10.1/g"
+        has_pdf = True
+        year = 2024
+        arxiv_id = None
+        url = ""
+
+    monkeypatch.setattr(
+        jobs,
+        "_load_scope_items",
+        lambda _c, _col: ([_Item()], Manifest(cfg.manifest_path)),
+    )
+    client = TestClient(create_app(cfg))
+    client.cookies.set("pf_collection", "ocean")
+    page = client.get("/wanted")
+    assert page.status_code == 200
+    assert 'href="/wanted?tab=missing"' in page.text
+    assert 'class="miss-status miss-status--missing"' in page.text
+    assert "No PDF file on disk" in page.text
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")

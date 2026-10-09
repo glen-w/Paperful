@@ -1,7 +1,7 @@
 """Thin MCP stdio server over the same JSON channel as ``--format json``.
 
-Read-only tools: ``refs_gap``, ``gaps``, ``snowball_search``, ``export``,
-``proposal_export``, and ``ask``. ``collections add`` is CLI-only. Prefer CLI
+Read-only tools: ``refs_gap``, ``gaps``, ``snowball_search``, ``snowball_trends``,
+``export``, ``proposal_export``, and ``ask``. ``collections add`` is CLI-only. Prefer CLI
 ``--format json``.
 """
 
@@ -19,6 +19,7 @@ from .agent_ops import (
     run_proposal_export,
     run_refs_gap,
     run_snowball_search,
+    run_snowball_trends,
 )
 from .config import Config
 from . import __version__
@@ -78,6 +79,22 @@ TOOLS = [
                 "year_to": {"type": "integer"},
             },
             "required": ["query"],
+        },
+    },
+    {
+        "name": "snowball_trends",
+        "description": (
+            "OpenAlex publication-year counts for a search query or snowball profile. "
+            "Read-only; no library writes."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "profile": {"type": "string"},
+                "year_from": {"type": "integer"},
+                "year_to": {"type": "integer"},
+            },
         },
     },
     {
@@ -237,6 +254,16 @@ def call_snowball_search(cfg: Config, args: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def call_snowball_trends(cfg: Config, args: dict[str, Any]) -> dict[str, Any]:
+    return run_snowball_trends(
+        cfg,
+        str(args.get("query") or "") or None,
+        profile=str(args.get("profile") or "") or None,
+        year_from=args.get("year_from"),
+        year_to=args.get("year_to"),
+    )
+
+
 def call_export(cfg: Config, args: dict[str, Any]) -> dict[str, Any]:
     return run_export(
         cfg,
@@ -265,6 +292,8 @@ def handle_tools_call(cfg: Config, req_id: Any, params: dict[str, Any]) -> dict[
         )
     elif name == "snowball_search":
         body = call_snowball_search(cfg, args)
+    elif name == "snowball_trends":
+        body = call_snowball_trends(cfg, args)
     elif name == "export":
         body = call_export(cfg, args)
     elif name == "proposal_export":

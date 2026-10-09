@@ -222,6 +222,35 @@ def _enrich_cited(
     return merged
 
 
+def accumulate_coauthors_from_works(
+    works: list[dict[str, Any]],
+    *,
+    seed_key: str,
+    skip_keys: set[str],
+) -> tuple[Counter[str], dict[str, tuple[str, str, str]]]:
+    counts: Counter[str] = Counter()
+    nodes: dict[str, tuple[str, str, str]] = {}
+    for work in works or []:
+        _, records = records_from_authorships(work.get("authorships"))
+        for rec in records:
+            ident = ""
+            if rec.get("orcid"):
+                ident = f"orcid:{rec['orcid']}"
+            elif rec.get("openalex"):
+                ident = f"openalex:{rec['openalex']}"
+            elif rec.get("fingerprint"):
+                ident = f"name:{rec['fingerprint']}"
+            if not ident or ident == seed_key or ident in skip_keys:
+                continue
+            counts[ident] += 1
+            nodes[ident] = (
+                str(rec.get("display_name") or ""),
+                normalize_orcid(str(rec.get("orcid") or "")),
+                short_id(str(rec.get("openalex") or "")),
+            )
+    return counts, nodes
+
+
 def _coauthor_candidates(
     cfg: Config,
     people: list[Person],
@@ -233,6 +262,7 @@ def _coauthor_candidates(
     seeds = [row for row in people if row.is_ok()]
     counts: Counter[str] = Counter()
     nodes: dict[str, tuple[str, str, str]] = {}
+    member_keys = _member_keys(people)
     if seeds:
         for person in seeds[:10]:
             try:
@@ -246,24 +276,13 @@ def _coauthor_candidates(
             except Exception:
                 continue
             seed_key = _dedupe_key(person)
-            for work in works or []:
-                _, records = records_from_authorships(work.get("authorships"))
-                for rec in records:
-                    ident = ""
-                    if rec.get("orcid"):
-                        ident = f"orcid:{rec['orcid']}"
-                    elif rec.get("openalex"):
-                        ident = f"openalex:{rec['openalex']}"
-                    elif rec.get("fingerprint"):
-                        ident = f"name:{rec['fingerprint']}"
-                    if not ident or ident == seed_key:
-                        continue
-                    counts[ident] += 1
-                    nodes[ident] = (
-                        str(rec.get("display_name") or ""),
-                        normalize_orcid(str(rec.get("orcid") or "")),
-                        short_id(str(rec.get("openalex") or "")),
-                    )
+            part_counts, part_nodes = accumulate_coauthors_from_works(
+                works,
+                seed_key=seed_key,
+                skip_keys=member_keys,
+            )
+            counts.update(part_counts)
+            nodes.update(part_nodes)
     if not counts and collection:
         slug = pack_slug(collection)
         for pack in load_promoted_packs(cfg):

@@ -333,7 +333,7 @@ daemon.
 (near-term-research-ops)=
 ### Near-term research-ops
 
-**Status:** rows 1–22 shipped; rows 23–24 are [literature-discovery complement](#literature-discovery-complement-waves) waves 2–3. Same bars:
+**Status:** rows 1–24 shipped (literature-discovery complement waves 1–3 in rows 22–24). Same bars:
 dry-run default, explicit `--apply`, fail closed, no silent library writes. See
 [Documentation (thicken) — research pack](#documentation-thicken)
 for the end-to-end operator story.
@@ -363,8 +363,8 @@ for the end-to-end operator story.
 | 20 | `paperful notes delete` (or equivalent) — scoped filters: type, model, `--except-model`, tags; dry-run / `--apply` | Shipped (`--type`, `--model` / `--except-model`, `--all` + confirm / `--yes`) |
 | 21 | [Author watch lists](#author-watch-lists-later-people-you-follow--their-papers) — ORCID / OpenAlex resolve + `run` / `apply`; file import of follows; corpus suggestions | **Shipped** — `paperful authorwatch` (+ suggest/accept/delete); saved social HTML/CSV import; Discover list management |
 | 22 | [Literature-discovery complement](#literature-discovery-complement-waves) — **Wave 1:** read-only MCP (`gaps`, snowball dry-run / keyword preview, collection `export`) + BibTeX/RIS for snowball / `authorwatch` proposal packs | **Shipped** — `paperful mcp` tools + `export-proposals`; CLI snowball `--format json` loads `summary.json` on dry-run |
-| 23 | Same — **Wave 2:** OpenAlex publication trend report for a query or saved snowball seed (`snowball trends`, name TBD) | Planned |
-| 24 | Same — **Wave 3:** thicker `authorwatch` briefing (co-authors + recent works via OpenAlex) | Planned |
+| 23 | Same — **Wave 2:** OpenAlex publication trend report for a query or saved snowball seed (`snowball trends`) | **Shipped** |
+| 24 | Same — **Wave 3:** thicker `authorwatch` briefing (co-authors + recent works via OpenAlex) | **Shipped** |
 
 (literature-discovery-complement-waves)=
 ### Literature-discovery complement (waves)
@@ -381,8 +381,8 @@ envelope for CLI and MCP.
 | Wave | Scope | Acceptance |
 | --- | --- | --- |
 | **1** | **Agent MCP + proposal export** — Extend optional `paperful mcp` with read-only tools that call the same builders as CLI `--format json`: `gaps`; snowball crawl dry-run / keyword preview (no gate that writes parents); collection `export` (BibTeX/RIS). Emit BibTeX or RIS from on-disk snowball / `authorwatch` proposal packs (DOIs already resolved in the pack). | **Shipped** — `export-proposals` + MCP tools; docs in [commands](commands.md#agent-channel-format-json-and-mcp), [snowball](snowball.md#bibtex--ris-from-the-queue), [authorwatch](authorwatch.md#ledger). |
-| **2** | **Publication trends** — Count works by publication year for an OpenAlex query or a saved snowball profile seed; reuse `OpenAlexClient` and budget posture as snowball. | Dry-run table + `--format json`; no library or manager writes. |
-| **3** | **Author briefing thicken** — `authorwatch show` / list briefing adds co-author network and recent works from OpenAlex (same resolution paths as `resolve` / `suggest`). | Human-readable briefing plus optional `--format json` for agents; no new polling scheduler. |
+| **2** | **Publication trends** — Count works by publication year for an OpenAlex query or a saved snowball profile seed; reuse `OpenAlexClient` and budget posture as snowball. | **Shipped** — `snowball trends`, MCP `snowball_trends`; dry-run table + `--format json`; no library writes. |
+| **3** | **Author briefing thicken** — `authorwatch show` / list briefing adds co-author network and recent works from OpenAlex (same resolution paths as `resolve` / `suggest`). | **Shipped** — `authorwatch briefing` + compact `show`; `--format json`; no new polling scheduler. |
 
 **Non-goals for these waves:** hosting a global full-text index; Valency Hub–style
 publishing; replacing Bond for “ask the whole literature” chat.
@@ -1248,9 +1248,10 @@ Larger product bets. Park until the ledger and core loop justify them.
    `ingest-dois`, `inbox drain`, `ask`, snowball crawl/apply, …); documented exit-code
    table (`0` ok, `1` user, `2` manager down, `3` partial write batch). **MCP** is a thin
    optional stdio wrap of `refs_gap` + `ask` over the same envelope — not a second API
-   and not a prerequisite for research-ops. **Wave 1 shipped:** read-only MCP for
-   `gaps`, snowball preview, `export`, `proposal_export`, and `export-proposals` —
-   [Literature-discovery complement](#literature-discovery-complement-waves). Writes stay
+   and not a prerequisite for research-ops. **Literature-discovery complement shipped**
+   (waves 1–3): read-only MCP for `gaps`, snowball preview, `snowball_trends`,
+   `export`, `proposal_export`, plus `export-proposals`, `snowball trends`, and
+   thickened `authorwatch briefing` — [Literature-discovery complement](#literature-discovery-complement-waves). Writes stay
    CLI `--apply`. `collections add` is CLI-only (not an MCP tool).
    **Shipped:** Twenty sync, lookup, and `--twenty-writeback` —
    [Twenty and SearXNG](snowball.md#twenty-and-searxng).

@@ -24,6 +24,7 @@ from rich.table import Table
 
 from .config import Config
 from .identity import from_seed_tag, library_lookup
+from .resolve import normalize_doi
 from .snowball.authors import name_fingerprint
 from .snowball.candidate import Candidate
 from .snowball.command import SnowballError, _mark_exists, get_backend
@@ -43,6 +44,10 @@ SUGGESTION_SCHEMA = "paperful.authorwatch.suggestion.v1"
 TAG = "paperful-authorwatch"
 DEFAULT_MAX_AUTHORS = 50
 DEFAULT_PER_AUTHOR_LIMIT = 200
+BRIEFING_MAX_PEOPLE = 10
+SHOW_ENRICH_PEOPLE = 5
+BRIEFING_RECENT_WORKS = 8
+BRIEFING_COAUTHORS = 8
 _NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 FILE_SOURCES = ("csv", "json", "orcid")
@@ -738,6 +743,29 @@ def show_list(cfg: Config, name: str, *, console: Console) -> None:
                 bits.append(f"{label} {oid}".strip())
             table.add_row(row.display_name or row.id, "; ".join(bits) or "(none)")
         console.print(table)
+    ok_people = [row for row in people if row.is_ok()]
+    if ok_people:
+        try:
+            data = gather_briefing(
+                cfg,
+                name,
+                max_people=SHOW_ENRICH_PEOPLE,
+            )
+        except AuthorwatchError:
+            pass
+        else:
+            for person in data.get("people") or []:
+                label = person.get("display_name") or person.get("orcid") or ""
+                recent = person.get("recent_works") or []
+                coauthors = person.get("coauthors") or []
+                bits = []
+                if recent:
+                    bits.append(f"{len(recent)} recent")
+                if coauthors:
+                    top = coauthors[0].get("display_name") or ""
+                    bits.append(f"co-authors incl. {top}" if top else "co-authors")
+                if bits:
+                    console.print(f"  {label}: {', '.join(bits)}")
     console.print(f"Next: {next_step(cfg, name)}")
 
 
@@ -1068,28 +1096,161 @@ def apply_list(
     )
 
 
-def write_briefing(cfg: Config, name: str) -> Path:
+def _openalex_budget_error(name: str, exc: OpenAlexBudgetExceeded) -> AuthorwatchError:
+    reset_at = getattr(exc, "reset_at", None)
+    wait = f" Wait until {reset_at}." if reset_at else ""
+    return AuthorwatchError(
+        "OpenAlex daily budget is spent. "
+        f"Set OPENALEX_API_KEY ({KEY_URL}) if this IP is sharing the "
+        f"no-key pool, then: paperful authorwatch briefing {name}."
+        + wait
+    )
+
+
+def gather_briefing(
+    cfg: Config,
+    name: str,
+    *,
+    client: Any = None,
+    max_people: int = BRIEFING_MAX_PEOPLE,
+) -> dict[str, Any]:
+    from .authorwatch_suggest import _COAUTHOR_WORKS, accumulate_coauthors_from_works
+
     body = load_watch(cfg, name)
     dest = list_dir(cfg, name)
     rows = load_inbox(cfg, name)
-    path = dest / "briefing.md"
+    people = load_people(cfg, name)
+    ok_people = [row for row in people if row.is_ok()]
+    member_keys = {_dedupe_key(row) for row in people}
+    proposed = []
+    for row in rows:
+        proposed.append(
+            {
+                "title": str(row.biblio.get("title") or "(untitled)"),
+                "year": row.biblio.get("year"),
+                "doi": row.ids.get("doi") or "",
+                "openalex": row.ids.get("openalex") or "",
+            }
+        )
+    enriched: list[dict[str, Any]] = []
+    oa = _openalex_client(cfg, client)
+    capped = ok_people[: max(0, max_people)]
+    try:
+        for person in capped:
+            works = oa.works_by_author(
+                orcid=person.orcid,
+                openalex=person.openalex,
+                limit=max(_COAUTHOR_WORKS, BRIEFING_RECENT_WORKS),
+            )
+            seed_key = _dedupe_key(person)
+            counts, nodes = accumulate_coauthors_from_works(
+                works,
+                seed_key=seed_key,
+                skip_keys=member_keys,
+            )
+            coauthors = []
+            for ident, count in counts.most_common(BRIEFING_COAUTHORS):
+                display, corcid, copenalex = nodes.get(ident, ("", "", ""))
+                coauthors.append(
+                    {
+                        "display_name": display or corcid or copenalex,
+                        "count": count,
+                        "orcid": corcid,
+                        "openalex": copenalex,
+                    }
+                )
+            recent = []
+            for work in (works or [])[:BRIEFING_RECENT_WORKS]:
+                recent.append(
+                    {
+                        "title": str(work.get("display_name") or "(untitled)"),
+                        "year": work.get("publication_year"),
+                        "doi": normalize_doi(str(work.get("doi") or "")) or "",
+                        "openalex": short_id(str(work.get("id") or "")),
+                    }
+                )
+            enriched.append(
+                {
+                    "display_name": person.display_name or person.orcid or person.openalex,
+                    "orcid": person.orcid,
+                    "openalex": person.openalex,
+                    "recent_works": recent,
+                    "coauthors": coauthors,
+                }
+            )
+    except OpenAlexBudgetExceeded as exc:
+        raise _openalex_budget_error(name, exc) from exc
+    return {
+        "name": name,
+        "inbox_path": str(dest / "inbox.jsonl"),
+        "baseline_at": body.get("baseline_at"),
+        "proposed": proposed,
+        "people": enriched,
+        "ok_people": len(ok_people),
+        "enriched_people": len(enriched),
+    }
+
+
+def _briefing_markdown(data: dict[str, Any]) -> str:
+    name = str(data.get("name") or "")
     lines = [f"# Authorwatch briefing {name}", ""]
-    lines.append(f"Inbox `{dest / 'inbox.jsonl'}`.")
-    if body.get("baseline_at") and not rows:
+    lines.append(f"Inbox `{data.get('inbox_path') or ''}`.")
+    proposed = list(data.get("proposed") or [])
+    baseline_at = data.get("baseline_at")
+    if baseline_at and not proposed:
         lines.append("Baseline is recorded and the inbox is empty.")
-    elif not body.get("baseline_at"):
+    elif not baseline_at:
         lines.append("No baseline yet. `paperful authorwatch run` records one.")
     lines.append("")
-    if rows:
+    if proposed:
         lines.append("## Proposed")
         lines.append("")
-        for row in rows:
-            title = str(row.biblio.get("title") or "(untitled)")
-            doi = row.ids.get("doi") or row.ids.get("openalex") or ""
-            year = row.biblio.get("year") or ""
-            lines.append(f"- {title} ({year}) {doi}".rstrip())
+        for row in proposed:
+            doi = row.get("doi") or row.get("openalex") or ""
+            lines.append(
+                f"- {row.get('title') or '(untitled)'} ({row.get('year') or ''}) {doi}".rstrip()
+            )
         lines.append("")
-    path.write_text("\n".join(lines), encoding="utf-8")
+    for person in data.get("people") or []:
+        label = person.get("display_name") or person.get("orcid") or person.get("openalex")
+        lines.append(f"## {label}")
+        lines.append("")
+        recent = person.get("recent_works") or []
+        if recent:
+            lines.append("### Recent works")
+            lines.append("")
+            for row in recent:
+                doi = row.get("doi") or row.get("openalex") or ""
+                lines.append(
+                    f"- {row.get('title') or '(untitled)'} ({row.get('year') or ''}) {doi}".rstrip()
+                )
+            lines.append("")
+        coauthors = person.get("coauthors") or []
+        if coauthors:
+            lines.append("### Co-authors")
+            lines.append("")
+            for row in coauthors:
+                bits = [str(row.get("display_name") or "")]
+                if row.get("orcid"):
+                    bits.append(str(row["orcid"]))
+                if row.get("openalex"):
+                    bits.append(str(row["openalex"]))
+                lines.append(f"- {' · '.join(b for b in bits if b)} ({row.get('count')})")
+            lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def write_briefing(
+    cfg: Config,
+    name: str,
+    *,
+    client: Any = None,
+    data: dict[str, Any] | None = None,
+) -> Path:
+    payload = data if data is not None else gather_briefing(cfg, name, client=client)
+    dest = list_dir(cfg, name)
+    path = dest / "briefing.md"
+    path.write_text(_briefing_markdown(payload), encoding="utf-8")
     return path
 
 

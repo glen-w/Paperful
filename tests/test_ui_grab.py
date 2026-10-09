@@ -178,7 +178,8 @@ def test_wanted_attach_route_and_button(tmp_path, monkeypatch):
     page = client.get("/wanted")
     assert page.status_code == 200
     assert 'formaction="/wanted/attach"' in page.text
-    assert "Attach N PDFs to this Zotero library" in page.text
+    assert "Attach PDFs to Zotero" in page.text
+    assert "Attach N PDFs" not in page.text
     assert "Pick a collection" in page.text
     res = client.post(
         "/wanted/attach",

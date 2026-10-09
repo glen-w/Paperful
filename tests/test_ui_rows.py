@@ -11,6 +11,7 @@ from paperful.ui.pages import (
     library_items_page,
     nest_collection_rows,
     newest_snowball_queue,
+    resolve_wanted_tab,
     wanted_rows,
 )
 from paperful.ui.verify import file_verification
@@ -86,6 +87,24 @@ def test_wanted_rows_counts(tmp_path):
     assert data["counts"]["have"] == 1
     assert data["counts"]["missing"] == 1
     assert "%" not in str(data["counts"])
+
+
+def test_wanted_rows_ghost_pdf_on_missing_not_held(tmp_path):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    manifest = Manifest(cfg.manifest_path)
+    ghost = _Item("G", "Ghost PDF", "10.3/g", True)
+    data = wanted_rows(cfg, [ghost], manifest)
+    assert data["counts"]["held"] == 0
+    assert data["counts"]["missing"] == 1
+    row = data["missing"][0]
+    assert row["miss_surface"] == "missing"
+    assert "No PDF file on disk" in row["miss_plain"]
+
+
+def test_resolve_wanted_tab_defaults_to_first_non_empty():
+    assert resolve_wanted_tab(None, {"missing": 0, "held": 4, "have": 0}) == "held"
+    assert resolve_wanted_tab(None, {"missing": 2, "held": 4, "have": 0}) == "missing"
+    assert resolve_wanted_tab("held", {"missing": 2, "held": 0, "have": 0}) == "held"
 
 
 def test_nest_collection_rows_groups_paths():

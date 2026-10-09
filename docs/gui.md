@@ -68,7 +68,8 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
    create/delete a list, Follow (ORCID + optional backfill), add/edit/remove,
    resolve, run, **Get suggestions** (method + limit + collection) → checkbox
    **Accept** (+ optional seed date), import CSV/JSON/ORCID or saved social
-   HTML, people briefing; inbox uses the same Preview → apply pattern
+   HTML, **people briefing** (inbox plus OpenAlex recent works / co-authors for
+   pollable members; same markdown as CLI `authorwatch briefing`); inbox uses the same Preview → apply pattern
    (`authorwatch apply`). **Check again** re-runs a saved topic watch or
    person list. Advanced topic watches also offer **Watch briefing** /
    **Watch digest** (same optional collection note).
@@ -77,6 +78,9 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
    **Missing** rows use miss-surface icons (hover for `MISS_SURFACE_PLAIN`).
    **Held** / **Have** use the same icon+tooltip pattern for PDF verification
    (`doi_match`, `doi_mismatch`, `unverified`, `snapshot`; not “% complete”).
+   A library PDF flag with no file on the mirror (`verification` `missing`,
+   “No PDF file on disk”) lands on **Missing** with the missing-file icon.
+   The default tab is the first non-empty bucket (Missing → Held → Have).
    **Preview** → **Grab** (fetch to `out/` only; selected vs all) → **Attach**
    (explicit Zotero write for `doi_match` plus hand-ticks). Grab never writes
    the library. The Attach control stays visible; there is no “attach verified
@@ -174,7 +178,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/discover/aw/edit` | Update member display name / affiliation |
 | POST | `/discover/aw/delete` | Delete list ledger (`--yes` on CLI) |
 | POST | `/discover/aw/import` | CSV/JSON/ORCID/saved social HTML upload → list (`resolve` off); files under `state/gui/uploads/` |
-| POST | `/discover/aw/briefing` | Write list `briefing.md` |
+| POST | `/discover/aw/briefing` | Write list `briefing.md` (inbox + OpenAlex people context) |
 | POST | `/prefs/advanced` | Toggle Advanced cookie |
 | POST | `/prefs/collection` | Remember collection chip cookie |
 | POST | `/settings` | Write allowed `config.toml` fields |

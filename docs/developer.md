@@ -108,20 +108,21 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `all_cmd.py` | `all` chain + step dispatch after flags | Typer wrappers via `cli` |
 | `cli.py` | Flags, progress, exits. No logic of its own | everything |
 | `agent_json.py` | `--format json` envelope (`paperful.agent.json.v1`) and exit 3 | none |
-| `agent_ops.py` | Shared builders for CLI JSON and MCP (`gaps`, snowball dry-run, `export`, refs-gap, ask) | `agent_json`, catalogue, rag, pack_bib |
+| `agent_ops.py` | Shared builders for CLI JSON and MCP (`gaps`, snowball dry-run / trends, `export`, refs-gap, ask) | `agent_json`, catalogue, rag, `export_build`, `pack_bib`, `snowball.trends` |
+| `export_build.py` | Mirror-first interchange records for a scoped library export. Agent/MCP `export` calls this with notes off and no PDF directory. CLI `export` still builds the same overlay in `cli.py` (EndNote XML bundle and `--pdfs` live there) | `interop`, `store`, `mirror`, library protocol |
 | `pack_bib.py` | BibTeX/RIS from snowball / authorwatch proposal JSONL on disk | `interop`, snowball |
 | `notehtml.py` | First-line prefixes + `paperful.note.v1` comment | none |
 | `notes.py` | Classify and trash Paperful-owned notes | `notehtml`, library protocol |
 | `handoff_rank.py` | Missing-PDF sort: refs-gap cites × miss severity | `handoff` |
 | `reachout.py` | Contact-only missing-PDF rows (metadata / Twenty emails, CSV). No fetch | `handoff`, `twenty` |
 | `twenty.py` | Twenty People lookup (local cache) and `sync` (CRM create/enrich). User guide: [Twenty and SearXNG](snowball.md#twenty-and-searxng) | httpx |
-| `mcp_server.py` | Optional stdio MCP: read-only gaps, snowball preview, export, proposal_export, refs_gap, ask | `agent_ops` |
+| `mcp_server.py` | Optional stdio MCP: read-only gaps, snowball preview / trends, export, proposal_export, refs_gap, ask | `agent_ops` |
 | `serve.py` | Localhost FastAPI: JSON capability API + mounts `ui` when the `serve` extra is installed | `agent_ops`, `ui` |
 | `ui/` | Server-rendered workbench (Jinja). `app.py` mounts HTML + form POSTs; ordinary pages do not run `doctor` (System does). `jobs.py`, `wanted_jobs.py`, `repair_jobs.py`, `discover_jobs.py` call the same domain entrypoints as the CLI; review tokens under `state/gui/reviews/`; command ids under `state/gui/commands/` | CLI / MCP builders |
-| `authorwatch.py` | People lists → OpenAlex new works; `apply` creates parents; `accept` / `delete` | OpenAlex client, `identity`, `snowball.ingest` |
-| `authorwatch_suggest.py` | Corpus / cited / coauthor / mix suggestions → `suggestions.jsonl` | `authors_report`, OpenAlex, promoted packs |
+| `authorwatch.py` | People lists → OpenAlex new works; `gather_briefing` / `write_briefing` (inbox + recent works / co-authors); `apply` creates parents; `accept` / `delete` | OpenAlex client, `identity`, `snowball.ingest`, `authorwatch_suggest` |
+| `authorwatch_suggest.py` | Corpus / cited / coauthor / mix suggestions → `suggestions.jsonl`; shared co-author accumulation for briefing | `authors_report`, OpenAlex, promoted packs |
 | `authorwatch_social.py` | Parse operator-saved RG / LinkedIn / Academia HTML or CSV (no network) | stdlib HTML/CSV |
-| `snowball/` | Crawl, hops, watch, thin briefing, frontier digest. Watch and digest do not create library items | OpenAlex; library protocol only on apply |
+| `snowball/` | Crawl, hops, watch, thin briefing, frontier digest, `trends` (OpenAlex `group_by` year counts). Watch, digest, and trends do not create library items | OpenAlex; library protocol only on apply |
 
 ## The refresh
 

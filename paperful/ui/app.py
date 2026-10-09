@@ -111,13 +111,15 @@ def _health_label(checks: list[dict[str, Any]]) -> str:
 def _health_tooltip(checks: list[dict[str, Any]]) -> str:
     if not checks:
         return "Health not loaded — open System to refresh"
-    labels: list[str] = []
     for status in ("red", "amber"):
         for row in checks:
-            if row.get("status") == status:
-                labels.append(_row_health_label(row))
-    if labels:
-        return "; ".join(labels)
+            if row.get("status") != status:
+                continue
+            label = _row_health_label(row)
+            step = next_step(str(row.get("code") or ""), str(row.get("detail") or ""))
+            if step and step != label:
+                return f"{status} · {label} — {step}"
+            return f"{status} · {label}"
     return "All checks OK"
 
 
@@ -280,7 +282,9 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         }
 
     @app.get("/wanted", response_class=HTMLResponse)
-    def page_wanted(request: Request, tab: str = "missing", error: str = "") -> HTMLResponse:
+    def page_wanted(request: Request, tab: str | None = None, error: str = "") -> HTMLResponse:
+        from .pages import resolve_wanted_tab
+
         prefs = prefs_from_request(request)
         load_error = ""
         data = {"have": [], "held": [], "missing": [], "counts": {"have": 0, "held": 0, "missing": 0}}
@@ -289,6 +293,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 data = _load_wanted(cfg, prefs.collection)
             except Exception as exc:
                 load_error = str(exc)
+        counts = data["counts"]
+        tab = resolve_wanted_tab(tab, counts)
         rows = data.get(tab, []) if tab in {"have", "held", "missing"} else data["missing"]
         briefs = briefs_page_flags(cfg)
         coach = ""

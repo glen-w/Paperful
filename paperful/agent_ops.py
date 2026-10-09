@@ -437,6 +437,53 @@ def run_export(
     )
 
 
+def run_snowball_trends(
+    cfg: Config,
+    query: str | None = None,
+    *,
+    profile: str | None = None,
+    year_from: int | None = None,
+    year_to: int | None = None,
+) -> dict[str, Any]:
+    """Publication-year histogram; read-only (no library access)."""
+    from .agent_json import envelope, EXIT_USER
+    from .snowball.command import SnowballError
+    from .snowball.trends import trends_for_scope
+
+    if not (query or "").strip() and not (profile or "").strip():
+        return envelope(
+            command="snowball trends",
+            exit_code=EXIT_USER,
+            summary={"error": "query or profile is required"},
+            flags={"read_only": True},
+        )
+    try:
+        report = trends_for_scope(
+            cfg,
+            query=query,
+            profile=profile,
+            year_from=year_from,
+            year_to=year_to,
+        )
+    except SnowballError as exc:
+        return envelope(
+            command="snowball trends",
+            exit_code=exc.code,
+            summary={"error": str(exc)},
+            flags={"read_only": True},
+        )
+    return envelope(
+        command="snowball trends",
+        summary={
+            "query": report.query,
+            "profile": report.profile or "",
+            "total": report.total,
+            "years": [{"year": row.year, "count": row.count} for row in report.years],
+        },
+        flags={"read_only": True, "dry_run": True},
+    )
+
+
 def run_proposal_export(cfg: Config, pack: str, *, kind: str = "bibtex") -> dict[str, Any]:
     """BibTeX or RIS from a snowball / authorwatch proposal pack on disk."""
     from .pack_bib import export_pack_text

@@ -314,6 +314,50 @@ class OpenAlexClient:
         use_cursor = limit <= 0 or limit > 5000
         return self._collect("/works", params, limit, use_cursor=use_cursor)
 
+    def counts_by_year(
+        self,
+        query: str,
+        *,
+        year_from: int | None = None,
+        year_to: int | None = None,
+        from_created_date: str | None = None,
+        study_designs: list[str] | tuple[str, ...] | None = None,
+    ) -> list[tuple[int, int]]:
+        """Publication-year histogram via OpenAlex ``group_by=publication_year``."""
+        filters: list[str] = []
+        if year_from is not None:
+            filters.append(f"from_publication_date:{year_from}-01-01")
+        if year_to is not None:
+            filters.append(f"to_publication_date:{year_to}-12-31")
+        created = self._created_filter(from_created_date)
+        if created:
+            filters.append(f"from_created_date:{created}")
+        design = self._study_design_filter(study_designs)
+        if design:
+            filters.append(design)
+        params: dict[str, Any] = {
+            "search": query,
+            "group_by": "publication_year",
+            "per_page": 200,
+        }
+        if filters:
+            params["filter"] = ",".join(filters)
+        payload = self.get("/works", params)
+        out: list[tuple[int, int]] = []
+        for row in payload.get("group_by") or []:
+            if not isinstance(row, dict):
+                continue
+            key = row.get("key")
+            if key is None:
+                key = row.get("key_display_name")
+            try:
+                year = int(str(key).strip()[:4])
+            except (TypeError, ValueError):
+                continue
+            out.append((year, int(row.get("count") or 0)))
+        out.sort(key=lambda item: item[0])
+        return out
+
     def work_by_doi(self, doi: str) -> dict[str, Any] | None:
         cleaned = normalize_doi(doi) or ""
         if cleaned and self.store is not None:

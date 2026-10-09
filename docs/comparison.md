@@ -24,12 +24,12 @@ Prefer this page for “is this the right tool?”
 | **Scriptable library surgery** (merge, enrich, disk GC, two-up scan split) via CLI/MCP | [zotero-agent](https://github.com/alex-roc/zotero-agent) |
 | **AI assistant** read/write over the library, including chat and (on some forks) OCR of scans | zotero-mcp forks ([richardjlyon](https://github.com/richardjlyon/zotero-mcp), [cookjohn](https://github.com/cookjohn/zotero-mcp), [mcp-zotero](https://github.com/Xevos117/mcp-zotero)) |
 | **Semantic search, citation graph, author/trend tools** over the public literature via MCP (hosted corpus; not your Zotero tree) | [Valency MCP Bond](https://www.valency.io/) — see [reference](comparison-reference.md#valency-mcp-bond-and-hub) |
-| **Grounded Q&A over PDFs you already have** (local index; same collection mirror as fetch) | **Paperful** `rag ingest` / `ask` — optional `paperful mcp` (`ask`, `refs_gap`, `gaps`, `snowball_search`, `export`, `proposal_export`) |
+| **Grounded Q&A over PDFs you already have** (local index; same collection mirror as fetch) | **Paperful** `rag ingest` / `ask` — optional `paperful mcp` (`ask`, `refs_gap`, `gaps`, `snowball_search`, `snowball_trends`, `export`, `proposal_export`) |
 | **`.bib` normalize / dedupe / upgrade preprints** (no Zotero required) | [bibcite](https://github.com/leo1oel/bibcite), [bibtex-tidy](https://github.com/FlamingTempura/bibtex-tidy), [bibmanager](https://bibmanager.readthedocs.io/) |
 | **Mendeley** dedup inside the app; clean **exported** BibTeX | Mendeley Duplicates smart collection; export cleaners such as [mendeley_bibtex_cleaner](https://gist.github.com/alexandrehuat/6d3263f73ccae87d0107977978316c02) |
 | **DOI-list PDF batch** without Zotero | [paperscraper](https://github.com/jannisborn/paperscraper) |
 | **Grow the library** from a keyword, one or more DOIs’ references, one or more ORCIDs, a similar-paper hop, or a hybrid hop, then optionally fill PDFs. Citation maps such as Research Rabbit link out; Paperful downloads. Re-check later with **watch** (baseline once, then propose new arrivals on disk; you schedule `watch run`) | **Paperful snowball** — dry-run, `approve-each`, `approve-batch`, `--gate auto`, `--fetch-pdfs`, and `watch` ([snowball](snowball.md)). In-app one-hop browsers stay separate ([zotero-snowball](https://github.com/socratic-irony/zotero-snowball), [Citegeist](https://github.com/phdemotions/zotero-citegeist)). General harvesters without the mirror: [findpapers](https://github.com/jonatasgrosman/findpapers), [opencite](https://github.com/neuromechanist/opencite) |
-| **People you follow** → their new papers (ORCID / OpenAlex; no hop; corpus `suggest`; saved social HTML/CSV, no live scrape) | **Paperful authorwatch** ([authorwatch](authorwatch.md)). Distinct from `snowball watch`. |
+| **People you follow** → their new papers (ORCID / OpenAlex; no hop; corpus `suggest`; briefing with recent works / co-authors; saved social HTML/CSV, no live scrape) | **Paperful authorwatch** ([authorwatch](authorwatch.md)). Distinct from `snowball watch`. |
 | **Local workbench** over the same CLI (Wanted / Discover; Advanced Repair, Mirror, Index Ask, Briefs) | **Paperful** `docker compose up` or `paperful serve` — [gui.md](gui.md). Grab fetches to disk; Attach is the library write. Not Zotero-in-the-browser. TTY login stays the CLI |
 | “Just use what ships in Zotero” | Built-in **Find Available PDF** plus [custom PDF resolvers](https://www.zotero.org/support/kb/custom_pdf_resolvers) |
 
@@ -172,7 +172,7 @@ Want a chat agent in the loop?
   → a zotero-mcp fork
 
 Need semantic search / citation graph / trends across all public papers, not just your library?
-  → Valency MCP Bond (or similar lit MCP). Paperful snowball + authorwatch grow *your* collection; `mcp` / CLI JSON for gaps, dry-run discovery, export, and ask over *your* mirror
+  → Valency MCP Bond (or similar lit MCP). Paperful snowball + authorwatch grow *your* collection; `snowball trends` for year histograms on a query; `mcp` / CLI JSON for gaps, dry-run discovery, trends, export, and ask over *your* mirror
 ```
 
 More branches: [comparison reference](comparison-reference.md#choosing-in-one-glance).

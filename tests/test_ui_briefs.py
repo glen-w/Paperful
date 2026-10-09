@@ -269,7 +269,7 @@ def test_drawer_shows_iframe_when_file(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
     import paperful.agent_ops as ops
-    from paperful.store import Manifest
+    from paperful.store import Manifest, Record, STATUS_OK
 
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     cfg.state_dir.mkdir(parents=True)
@@ -289,12 +289,23 @@ def test_drawer_shows_iframe_when_file(tmp_path, monkeypatch):
         arxiv_id = None
         url = ""
 
+    manifest = Manifest(cfg.manifest_path)
+    manifest.write(
+        Record(
+            itemKey="K1",
+            status=STATUS_OK,
+            doi="10.1/a",
+            pdf_doi="10.1/a",
+            source="unpaywall",
+            path="k1.pdf",
+        )
+    )
     monkeypatch.setattr(
-        jobs, "_load_scope_items", lambda _c, _col: ([_Item()], Manifest(cfg.manifest_path))
+        jobs, "_load_scope_items", lambda _c, _col: ([_Item()], manifest)
     )
     client = TestClient(create_app(cfg))
     client.cookies.set("pf_collection", "ocean")
-    page = client.get("/wanted?tab=held")
+    page = client.get("/wanted?tab=have")
     assert page.status_code == 200
     assert 'src="/item/K1/summary"' in page.text
     assert "summary-frame" in page.text

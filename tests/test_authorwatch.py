@@ -375,6 +375,40 @@ def test_briefing_and_doctor(cfg):
     assert check.status == "green"
 
 
+def test_briefing_includes_coauthors_and_recent(cfg):
+    add_person(cfg, "ocean", orcid=ORCID, display_name="Josiah")
+    co_work = {
+        "id": "https://openalex.org/W9",
+        "display_name": "Shared paper",
+        "publication_year": 2024,
+        "doi": "https://doi.org/10.1000/shared",
+        "authorships": [
+            {
+                "author": {
+                    "id": f"https://openalex.org/A1",
+                    "display_name": "Josiah Carberry",
+                    "orcid": f"https://orcid.org/{ORCID}",
+                }
+            },
+            {
+                "author": {
+                    "id": "https://openalex.org/A2",
+                    "display_name": "Co Author",
+                    "orcid": "https://orcid.org/0000-0001-2345-6789",
+                }
+            },
+        ],
+    }
+    client = FakeOA(works=[co_work])
+    path = write_briefing(cfg, "ocean", client=client)
+    text = path.read_text(encoding="utf-8")
+    assert "## Josiah" in text or "Josiah" in text
+    assert "### Recent works" in text
+    assert "Shared paper" in text
+    assert "### Co-authors" in text
+    assert "Co Author" in text
+
+
 def test_seen_records_backfill_identities(cfg):
     add_person(cfg, "ocean", orcid=ORCID, display_name="Josiah")
     client = FakeOA(works=[_work()])

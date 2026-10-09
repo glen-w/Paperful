@@ -4,7 +4,7 @@
     if (!form) return;
     var boxes = form.querySelectorAll(".row-select:checked:not(:disabled)");
     var any = boxes.length > 0;
-    ["preview-btn", "grab-btn"].forEach(function (id) {
+    ["preview-btn", "grab-btn", "attach-btn"].forEach(function (id) {
       var btn = document.getElementById(id);
       if (!btn) return;
       var all = btn.getAttribute("data-label-all");

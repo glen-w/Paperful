@@ -6922,6 +6922,30 @@ def _print_briefing(briefing: Any, *, apply: bool, collection: str, cfg: Config)
     _flush(backend)
     console.print(f"Note [bold]{key}[/] in {col.path or collection}")
 
+@snowball_app.command("trends")
+def snowball_trends(
+    query: str | None = typer.Argument(
+        None, help="OpenAlex search string (or use --profile)."
+    ),
+    profile: str | None = ProfileOpt,
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Publication-year counts for a query or saved search/hybrid profile. Read-only."""
+    from .snowball.trends_cmd import run_trends
+
+    run_trends(
+        console,
+        query=query,
+        profile=profile,
+        year_from=year_from,
+        year_to=year_to,
+        config=config,
+        fmt=fmt,
+    )
+
 @snowball_app.command("briefing")
 def snowball_briefing(
     run_id: str = typer.Option(
@@ -7737,13 +7761,41 @@ def authorwatch_run(
 def authorwatch_briefing(
     name: str = typer.Argument(..., help="List name."),
     config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
 ) -> None:
-    """Write markdown from the inbox. Does not create items."""
-    from .authorwatch import write_briefing
+    """Write markdown from the inbox plus OpenAlex people context. Does not create items."""
+    from .agent_json import envelope
+    from .authorwatch import gather_briefing, write_briefing
 
     cfg = _cfg(config)
-    path = _authorwatch_call(lambda: write_briefing(cfg, name))
-    console.print(f"Wrote [bold]{path}[/]")
+    json_out = _agent_json(fmt)
+
+    def _run() -> None:
+        data = gather_briefing(cfg, name)
+        path = write_briefing(cfg, name, data=data)
+
+        def _human() -> None:
+            console.print(f"Wrote [bold]{path}[/]")
+            console.print(
+                f"People enriched: {data.get('enriched_people', 0)} "
+                f"(of {data.get('ok_people', 0)} ok)"
+            )
+
+        payload = envelope(
+            command="authorwatch briefing",
+            summary={
+                "list": name,
+                "proposed": len(data.get("proposed") or []),
+                "ok_people": data.get("ok_people", 0),
+                "enriched_people": data.get("enriched_people", 0),
+                "people": data.get("people") or [],
+            },
+            paths={"briefing": str(path)},
+            flags={"read_only": True},
+        )
+        _emit_agent(payload, json_out=json_out, human=_human)
+
+    _authorwatch_call(_run)
 
 @authorwatch_app.command("apply")
 def authorwatch_apply_cmd(

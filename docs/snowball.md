@@ -467,6 +467,19 @@ or a path to either file. Rows need at least a resolved DOI or a title in
 `summary.json` when the in-memory crawl summary is empty (`paths.run` points
 at the queue folder).
 
+### Publication trends (read-only)
+
+Count OpenAlex works by publication year for a keyword query or a saved
+search/hybrid profile seed. Does not open the library or create parents:
+
+```bash
+paperful snowball trends "high seas biodiversity"
+paperful snowball trends --profile my-seed --format json
+```
+
+MCP `snowball_trends` uses the same envelope. Distinct from `watch` / `digest`
+(frontier arrivals since baseline).
+
 ## Config
 
 Precedence matches [run profiles](config.md#run-configs-profiles): built-in

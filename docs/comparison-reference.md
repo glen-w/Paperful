@@ -76,13 +76,13 @@ Legend: **Yes** · **Partial** · **No**. Valency rows reflect public positionin
 | Semantic search over **public** papers / preprints | Partial (`snowball` keyword / similar hops; OpenAlex-backed discovery — not a single “ask the whole web” MCP) | Yes | Partial (search library + sometimes Unpaywall) |
 | Semantic search over **your** PDFs | Yes (`rag ingest` + `ask`; GUI Index Ask) | No | Yes (chat reads attached PDFs) |
 | Citation graph (corpus-scale, both directions) | Partial (`snowball` `refs` / `cites` / `both`; not a browseable graph UI) | Yes | Partial |
-| Author profiles / co-author networks | Partial (`authorwatch`, `suggest -C`) | Yes | Partial |
-| Keyword / publication **trends** | Partial (OpenAlex filters in snowball; no dedicated trend MCP) | Yes | No |
+| Author profiles / co-author networks | Partial (`authorwatch briefing`, `suggest -C`) | Yes | Partial |
+| Keyword / publication **trends** | Partial (`snowball trends`, MCP `snowball_trends`; OpenAlex filters in snowball) | Yes | No |
 | BibTeX (or similar) **export** | Yes (`export`; `export-proposals` from snowball / authorwatch queues on disk) | Yes (positioning) | Partial |
 | Bulk **missing-PDF** fetch into a collection | Yes | No | Partial |
 | Disk mirror + **restore** ledger | Yes | No | No |
 | Campus EZProxy / grey-lit PDF playbooks | Yes | No | No |
-| MCP tools (indicative breadth) | Partial (read-only: `gaps`, `snowball_search`, `export`, `proposal_export`, `refs_gap`, `ask`; no `--apply`) | Yes (positioning: large tool surface) | Yes (varies by fork) |
+| MCP tools (indicative breadth) | Partial (read-only: `gaps`, `snowball_search`, `snowball_trends`, `export`, `proposal_export`, `refs_gap`, `ask`; no `--apply`) | Yes (positioning: large tool surface) | Yes (varies by fork) |
 | Corpus freshness (vendor SLA) | Partial (`snowball watch`, `authorwatch run` — you schedule polls) | Yes (positioning: index within hours) | N/A (local library) |
 
 Valency **Hub** (publish, fork, public review) is a separate product; Paperful does not host papers.
@@ -142,7 +142,7 @@ Valency **Hub** (publish, fork, public review) is a separate product; Paperful d
 
 - **Sites:** [valency.io](https://www.valency.io/)
 - **Fit:** **MCP Bond** — hosted semantic access to a very large public paper/preprint corpus (search, citation graph, authors, trends, export) for LLM clients. **Hub** — open publishing, versioning, and review; out of scope for Paperful’s library/mirror jobs.
-- **With Paperful:** Bond when the question is “what does the literature say?” across hundreds of millions of works. Paperful when the question is “fill, fix, mirror, and reason over **my** collection” — `run`, `snapshot`, `snowball` / `authorwatch` to grow it, `ask` / `refs_gap` / `gaps` / dry-run `snowball_search` / `export-proposals` (and optional `paperful mcp` with the same JSON envelopes) over the on-disk index. Typical stack: Bond (or similar) for discovery → snowball / `ingest-dois` / manual save → Paperful for PDFs and disk-first hygiene.
+- **With Paperful:** Bond when the question is “what does the literature say?” across hundreds of millions of works. Paperful when the question is “fill, fix, mirror, and reason over **my** collection” — `run`, `snapshot`, `snowball` / `authorwatch` to grow it, `ask` / `refs_gap` / `gaps` / dry-run `snowball_search` / `snowball trends` / `export-proposals` (and optional `paperful mcp` with the same JSON envelopes) over the on-disk index. Typical stack: Bond (or similar) for discovery → snowball / `ingest-dois` / manual save → Paperful for PDFs and disk-first hygiene.
 - **Not a substitute for:** EZProxy-backed fetch, grey-literature playbooks, collection-shaped `out/` restore, or unattended batch attach.
 
 ### ZotFile (legacy)

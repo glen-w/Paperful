@@ -51,6 +51,15 @@ def wanted_rows(
             state = ver["state"]
             if state == "doi_match":
                 have.append(row)
+            elif state == "missing":
+                missing.append(
+                    {
+                        **row,
+                        "miss_surface": "missing",
+                        "miss_plain": row["verify_plain"],
+                        "miss_detail": row["verify_tip"],
+                    }
+                )
             else:
                 held.append(row)
             continue
@@ -93,6 +102,19 @@ def wanted_rows(
             "missing": len(missing),
         },
     }
+
+
+_WANTED_TABS = ("missing", "held", "have")
+
+
+def resolve_wanted_tab(tab: str | None, counts: dict[str, int]) -> str:
+    """Pick a Wanted tab; default to the first non-empty bucket."""
+    if tab in _WANTED_TABS:
+        return tab
+    for name in _WANTED_TABS:
+        if counts.get(name, 0) > 0:
+            return name
+    return "missing"
 
 
 def scope_fingerprint(items: list[Any], manifest: Manifest) -> str:
