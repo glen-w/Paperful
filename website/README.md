@@ -1,7 +1,9 @@
 # Paperful website
 
 Modest public landing (plain HTML/CSS, minimal JS for mobile nav). Product
-front door: short hero → workbench screenshots → four-step fill → install.
+front door: hero → application screenshots → what you can do → on your
+machine → from a collection to PDFs you trust → install. Keep the marketing
+voice here; operator depth lives in `./guide/`.
 
 - Open `index.html` locally, or deploy via GitHub Pages (`.github/workflows/pages.yml`).
 - Logos live in [images/](images/) (copied from `docs/`): `logo.png` (ink wordmark for light backgrounds) and `logo-dark.png` (cream wordmark for dark backgrounds). The README picks via `prefers-color-scheme`.

@@ -6,7 +6,7 @@
     <title>Paperful — find missing PDFs, clean up your library, keep control of your papers</title>
     <meta
       name="description"
-      content="Local workbench for Zotero: fill missing PDFs, tidy records, and keep a folder mirror on your machine. Open access first, campus access when you have it."
+      content="Paperful fills missing PDFs in the Zotero library you already keep, tidies the records, and leaves a folder copy on your machine. Open access first, campus when you have it."
     />
     <link rel="icon" href="images/favicon.ico" sizes="any" />
     <link rel="icon" href="images/favicon-32.png" type="image/png" sizes="32x32" />
@@ -14,7 +14,7 @@
     <meta property="og:title" content="Paperful — find missing PDFs, clean up your library, keep control of your papers" />
     <meta
       property="og:description"
-      content="Local workbench for Zotero: fill missing PDFs, tidy records, and keep a folder mirror on your machine. Open access first, campus access when you have it."
+      content="Paperful fills missing PDFs in the Zotero library you already keep, tidies the records, and leaves a folder copy on your machine. Open access first, campus when you have it."
     />
     <meta property="og:image" content="https://paperful.app/images/logo.png" />
     <meta property="og:url" content="https://paperful.app/" />
@@ -24,7 +24,7 @@
     <meta name="twitter:title" content="Paperful — find missing PDFs, clean up your library, keep control of your papers" />
     <meta
       name="twitter:description"
-      content="Local workbench for Zotero: fill missing PDFs, tidy records, and keep a folder mirror on your machine. Open access first, campus access when you have it."
+      content="Paperful fills missing PDFs in the Zotero library you already keep, tidies the records, and leaves a folder copy on your machine. Open access first, campus when you have it."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -37,7 +37,7 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "Paperful",
-        "description": "Local workbench for Zotero: fill missing PDFs, tidy records, and keep a folder mirror on your machine. Open access first, campus access when you have it.",
+        "description": "Paperful fills missing PDFs in the Zotero library you already keep, tidies the records, and leaves a folder copy on your machine. Open access first, campus when you have it.",
         "url": "https://paperful.app/",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Linux, macOS, Windows",
@@ -68,7 +68,7 @@
           Menu
         </button>
         <nav id="site-nav" class="site-nav" data-nav>
-          <a href="#product">Workbench</a>
+          <a href="#product">See how it works</a>
           <a href="./guide/walkthroughs.html">Walkthroughs</a>
           <a href="./guide/">Docs</a>
           <a href="#install">Install</a>
@@ -95,33 +95,30 @@
             Keep control of your papers.
           </h1>
           <p class="lede">
-            A local workbench for the Zotero library you already keep. Open
-            access first; campus access when you have it.
+            Fill the gaps in the Zotero library you already keep. Open access
+            first, campus when you have it. A folder copy stays on this
+            machine — yours to back up or take elsewhere.
           </p>
-          <p class="stack">
-            Zotero is well tested. Mendeley and EndNote welcome testers.
-            Version 0.9.0.
-          </p>
+          <p class="stack">Built for Zotero. Runs on your computer. Version 0.9.0.</p>
           <div class="cta-row">
-            <a class="btn primary" href="#product">See the workbench</a>
+            <a class="btn primary" href="#product">See how it works</a>
             <a class="btn ghost" href="#install">Install</a>
           </div>
         </div>
       </section>
 
-      <section class="section muted" id="product">
+      <section class="section" id="product">
         <div class="wrap">
-          <h2>The workbench</h2>
+          <h2>The application</h2>
           <p class="section-lead">
-            <code>docker compose up</code> →
-            <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a>.
-            Preview, then Grab to disk, then Attach to Zotero.
+            See what’s missing, grow the collection, tidy the records, then
+            ask the PDFs you already have.
           </p>
           <div class="shot-grid">
             <figure class="shot">
               <img
                 src="images/workbench-wanted.png"
-                alt="Wanted: missing PDFs in a collection, with Preview, Grab, and Attach"
+                alt="Wanted: missing PDFs in a collection, ready to fetch"
                 width="1440"
                 height="900"
               />
@@ -132,13 +129,13 @@
                     <path d="M9 8h6M9 12h6M9 16h3.5" />
                   </svg>
                 </span>
-                Wanted — missing PDFs, Preview then Grab then Attach
+                Wanted — missing PDFs, ready to fetch
               </figcaption>
             </figure>
             <figure class="shot">
               <img
                 src="images/workbench-discover.png"
-                alt="Discover: topic search and people you follow"
+                alt="Discover: search a topic or follow people"
                 width="1440"
                 height="900"
               />
@@ -149,13 +146,13 @@
                     <path d="m16 16 4.5 4.5" />
                   </svg>
                 </span>
-                Discover — search a topic or follow people
+                Discover — grow the library from a topic or people
               </figcaption>
             </figure>
             <figure class="shot">
               <img
                 src="images/workbench-repair.png"
-                alt="Repair: lint, fix metadata, and review duplicates"
+                alt="Repair: tidy identifiers and review duplicates"
                 width="1440"
                 height="900"
               />
@@ -166,13 +163,13 @@
                     <path d="m12.5 6.5 5 5" />
                   </svg>
                 </span>
-                Repair — lint, fix identifiers, review duplicates
+                Repair — tidy identifiers and duplicates
               </figcaption>
             </figure>
             <figure class="shot">
               <img
                 src="images/workbench-index.png"
-                alt="Index: ingest, search, and ask PDFs already on disk"
+                alt="Index: ask the papers already on disk"
                 width="1440"
                 height="900"
               />
@@ -182,60 +179,74 @@
                     <path d="M4.5 6.5h15M4.5 12h15M4.5 17.5h10" />
                   </svg>
                 </span>
-                Index — search and ask PDFs already on disk
+                Index — ask the papers already on your disk
               </figcaption>
             </figure>
           </div>
-          <p class="around-fill">
-            <a href="./guide/walkthroughs.html">Walkthroughs</a>
+        </div>
+      </section>
+
+      <section class="section muted" id="what">
+        <div class="wrap narrow">
+          <h2>What can I do with it?</h2>
+          <ul class="outcomes">
+            <li>Fill missing PDFs — free copies first, campus access when you have it</li>
+            <li>Grow the library from a topic search or from people you follow</li>
+            <li>Tidy duplicates, identifiers, and broken attachments</li>
+            <li>Keep a folder copy you can back up or hand to another tool</li>
+            <li>Ask the papers you already have — optional local AI, off until you turn it on</li>
+          </ul>
+          <p>
+            <a href="./guide/walkthroughs.html">Walk through a real job</a>
             ·
-            <a href="./guide/gui.html">Workbench reference</a>
-            ·
-            <a href="./guide/first-fill.html">First fill</a>.
+            <a href="./guide/comparison.html">See how it compares</a>
           </p>
         </div>
       </section>
 
-      <section class="section" id="how-it-works">
+      <section class="section" id="privacy">
         <div class="wrap narrow">
-          <h2>How a fill works</h2>
-          <ol class="pipeline">
+          <h2>On your machine</h2>
+          <p>
+            Downloads, notes, and the folder copy stay on this computer.
+            Zotero remains the catalogue. Optional AI uses Ollama locally and
+            stays off until you turn it on. Paperful is not a sync service
+            and not Zotero in the browser.
+          </p>
+        </div>
+      </section>
+
+      <section class="section muted" id="how-it-works">
+        <div class="wrap narrow">
+          <h2>From a collection to PDFs you trust</h2>
+          <ol class="steps">
+            <li>Open the workbench and pick a collection.</li>
             <li>
-              <strong>Pick a collection</strong>
-              on Library, then open Wanted.
+              On <strong>Wanted</strong>, preview what’s missing, then fetch
+              copies onto this machine.
             </li>
+            <li>Open the files yourself. Attach the ones you trust into Zotero.</li>
             <li>
-              <strong>Preview</strong>
-              the fetch. Open-access indexes first; campus EZProxy if you have
-              it. Not every paywalled paper comes back.
-            </li>
-            <li>
-              <strong>Grab</strong>
-              writes PDFs under <code>out/</code> on this machine. Zotero is
-              unchanged until you Attach.
-            </li>
-            <li>
-              <strong>Attach</strong>
-              copies you trust into Zotero. Tidy duplicates and identifiers on
-              Repair when the collection is messy.
+              Grow the library on <strong>Discover</strong>, or tidy records
+              on <strong>Repair</strong>, when you need those jobs.
             </li>
           </ol>
-          <p class="around-fill">
-            <a href="./guide/first-fill.html">First fill</a>
+          <p>
+            <a href="./guide/first-fill.html">Full walkthrough with screenshots</a>
             ·
-            <a href="./guide/how-it-works.html">Search order</a>
-            ·
-            <a href="./guide/comparison.html">How it compares</a>
+            <a href="./guide/walkthroughs.html">All walkthroughs</a>
           </p>
         </div>
       </section>
 
-      <section class="section muted" id="install">
+      <section class="section" id="install">
         <div class="wrap narrow">
           <h2>Install</h2>
-          <p class="section-lead">
-            Clone and build. No app store, no published image. Zotero stays on
-            the host with the local API enabled.
+          <p>
+            Build on your machine — there is no app store package and no
+            published image. Keep Zotero on the host with the local API
+            enabled, then open the workbench at
+            <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a>.
           </p>
           <pre class="code"><code>git clone https://github.com/glen-w/Paperful.git
 cd Paperful
@@ -243,18 +254,17 @@ cp .env.example .env
 cp config.minimal.toml config.toml   # set email
 docker compose build
 docker compose run --rm paperful doctor
-docker compose up                    # http://127.0.0.1:8765</code></pre>
-          <ul class="outcomes">
-            <li>Edit <code>.env</code> and a real <code>email</code> in config — renaming the example files is not enough.</li>
-            <li>Minimal config is open access only. Campus EZProxy: <a href="./guide/ezproxy.html">EZProxy</a>.</li>
-            <li><code>.env.example</code> builds the <strong>heavy</strong> image. CI uses light. <a href="./guide/docker.html">Docker</a>.</li>
-          </ul>
+docker compose up</code></pre>
+          <p>
+            Set a real <code>email</code> in config (Unpaywall) and edit
+            <code>.env</code> — renaming the examples is not enough.
+          </p>
           <p class="fine">
-            <a href="./guide/first-fill.html">First fill</a>
+            <a href="./guide/docker.html">Docker</a>
             ·
             <a href="./guide/zotero.html">Zotero</a>
             ·
-            <a href="./guide/">Docs</a>
+            <a href="./guide/first-fill.html">First fill</a>
             ·
             <a href="https://github.com/glen-w/Paperful/blob/main/README.md">README</a>
           </p>
