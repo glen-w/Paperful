@@ -91,6 +91,9 @@ Ledger under `state/snowball/watches/<name>/`:
 | `briefing.md` | Thin markdown export (`watch briefing`) |
 | `digest.md` | Frontier digest (`watch digest` or `watch run --digest`) |
 
+`export-proposals` reads `inbox.jsonl` here (or `candidates.jsonl` on a crawl
+run dir). See [BibTeX / RIS from the queue](#bibtex--ris-from-the-queue).
+
 `paperful snowball briefing --run-id` writes thin markdown next to
 `candidates.jsonl`. `paperful snowball digest --run-id` writes `digest.md`
 there: new / exists / version / deferred, overlap detail on the top 25 new
@@ -442,6 +445,27 @@ A separate readable line follows `[remarks].surface` (a child note tagged
   the work: "In the bibliography of 2 of the papers you started from.",
   "Cites 2 of the papers you started from.", or "Linked to 2 of the papers
   you started from." Search hits (hop 0) get only the collection sentence.
+
+### BibTeX / RIS from the queue
+
+Turn a dry-run queue or watch inbox into bibliography text without creating
+parents in Zotero:
+
+```bash
+paperful export-proposals state/snowball/<run-id> proposals.bib
+paperful export-proposals state/snowball/watches/<name> watch-inbox.ris
+```
+
+Accepts a run directory (`candidates.jsonl`), a watch directory (`inbox.jsonl`),
+or a path to either file. Rows need at least a resolved DOI or a title in
+`biblio`. Agents can call MCP `proposal_export` with the same pack path and
+`format` `bibtex` or `ris` (bibliography text lives in the JSON envelope
+`summary.bibliography`). Library-scoped export of items you already own stays
+`paperful export` (or MCP `export`).
+
+`snowball search … --format json` on a dry-run includes `summary` from
+`summary.json` when the in-memory crawl summary is empty (`paths.run` points
+at the queue folder).
 
 ## Config
 

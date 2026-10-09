@@ -314,7 +314,8 @@ prints **one** `paperful.agent.json.v1` object on stdout (`schema`, `command`, `
 `summary`, `items`, `paths`, `flags`, optional nested `report`). Progress and logs go to **stderr**.
 Exit **3** is a mixed **write** batch (`run` uses attached vs attach_failed). Legacy `--json` on `lint` / `gaps` / `dedupe` keeps its old shape
 unless `--format json` is also passed. `paperful mcp` is optional stdio sugar for the same
-payloads on `refs_gap` (never creates parents) and `ask` (index only). Prefer `… --format json`
+payloads on read-only tools: `gaps`, `snowball_search` (dry-run), `export`, `proposal_export`,
+`refs_gap` (never creates parents), and `ask` (index only). Prefer `… --format json`
 from a shell. `paperful serve` (`paperful[serve]`) binds localhost HTTP: JSON
 capability routes (health, doctor, collections, last-run, dry-run `refs-gap` /
 `ask`) plus the server-rendered workbench (`paperful.ui` — Wanted, Discover,

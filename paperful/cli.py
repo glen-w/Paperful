@@ -246,6 +246,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "collections",
         "import",
         "export",
+        "export-proposals",
         "snowball",
         "ingest-dois",
         "twenty",
@@ -1045,7 +1046,7 @@ def jobs() -> None:
 
 @app.command()
 def mcp(config: Path | None = ConfigOpt) -> None:
-    """Optional stdio MCP: refs_gap (dry-run) and ask (index read-only). Prefer --format json."""
+    """Optional stdio MCP: read-only gaps, snowball preview, export, refs_gap, ask."""
     from .mcp_server import serve_stdio
 
     serve_stdio(_cfg(config))
@@ -4297,6 +4298,49 @@ def export_library(
     extra = f", {copied} PDFs" if copied else ""
     console.print(f"[green]Wrote[/] {dest} ({len(records)} records{extra}) for {scope}")
 
+
+@app.command("export-proposals")
+def export_proposals(
+    pack: Path = typer.Argument(
+        ...,
+        help=(
+            "Snowball run dir, watch dir, authorwatch dir, or a candidates/inbox "
+            ".jsonl file under state/."
+        ),
+    ),
+    dest: Path = typer.Argument(..., help="Output .bib or .ris file."),
+    fmt: str | None = typer.Option(
+        None,
+        "--format",
+        help="bibtex or ris. Default: from the file suffix.",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Export BibTeX or RIS from an on-disk snowball or authorwatch proposal pack."""
+    from .pack_bib import export_pack_text
+
+    cfg = _cfg(config)
+    kind = (fmt or dest.suffix.lstrip(".") or "").lower().replace("_", "-")
+    if kind in {"bib", "biblatex"}:
+        kind = "bibtex"
+    if kind not in {"ris", "bibtex"}:
+        console.print("[red]--format must be bibtex or ris.[/]")
+        raise typer.Exit(1)
+    path = pack
+    if not path.is_absolute():
+        path = cfg.state_dir / path
+    try:
+        text, jsonl, n = export_pack_text(path, kind)
+    except (FileNotFoundError, ValueError) as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(text, encoding="utf-8")
+    console.print(
+        f"[green]Wrote[/] {dest} ({n} records from {jsonl.name})"
+    )
+
+
 @app.command()
 def report(
     config: Path | None = ConfigOpt,
@@ -6422,7 +6466,7 @@ def _run_snowball(
     command: str = "snowball",
 ) -> None:
     from .snowball.command import SnowballError
-    from .agent_json import envelope
+    from .agent_ops import snowball_result_envelope
 
     snowball_started = time.time()
     try:
@@ -6434,14 +6478,8 @@ def _run_snowball(
             console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
     _rag_auto(cfg, snowball_started)
-    summary = getattr(result, "summary", None) or {}
     if json_out:
-        payload = envelope(
-            command=command,
-            summary=summary if isinstance(summary, dict) else {},
-            paths={"run": str(result.run_dir)},
-            exit_code=int(result.exit_code or 0),
-        )
+        payload = snowball_result_envelope(command, result)
         _emit_agent(payload, json_out=True, human=lambda: None)
         return
     if result.exit_code:

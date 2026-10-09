@@ -127,7 +127,8 @@ uv run paperful authorwatch accept ocean-people --id sug_abcd --seed-from 2025-0
 uv run paperful authorwatch run ocean-people --backfill-from 2025-01-01
 uv run paperful authorwatch apply ocean-people -C Watch/Ocean          # dry-run
 uv run paperful authorwatch delete ocean-people --yes
-uv run paperful mcp                           # optional stdio: refs_gap + ask; prefer --format json
+uv run paperful mcp                           # optional stdio: gaps, snowball_search, export, proposal_export, refs_gap, ask
+uv run paperful export-proposals PACK out.bib # BibTeX/RIS from snowball or authorwatch inbox on disk
 uv run paperful serve                         # localhost HTTP (needs uv sync --extra serve)
 uv run paperful ingest-dois --from-pack state/refs-gaps/<stamp> -C BBNJ
 uv run paperful ingest-dois --from-file dois.txt -C BBNJ --apply --tag bbnj
@@ -220,7 +221,7 @@ uv run paperful pack show
 | `refs gap` | Works **cited inside** collection PDFs that are **not** in the library fingerprint. Always dry-run. Writes `state/refs-gaps/<stamp>/` (`paperful.refs_gap.pack.v1` plus `dois.txt`). `--format json` prints `paperful.agent.json.v1`. Then `ingest-dois --from-file` / `--from-pack`. Distinct from `gaps` (items already in scope missing a PDF). |
 | `ingest-dois` | DOI list → metadata parents in `-C`. Dry-run unless `--apply`. Reports created / exists / unresolved / **held**. `--format json`. `--tag` plus `[ingest].default_tags` and `from-<file-stem>`. Does not fetch PDFs (`run` after). |
 | `collections` | `list` (or bare `collections`) — collection tree with “No PDF” counts. `add --keys-file` — file **existing** item keys into `-C` (membership only; dry-run unless `--apply`; added / already-in / not-found). `--format json`. Complements `ingest-dois` (create parents). Zotero / Mendeley; EndNote refuses `--apply`. Not an MCP tool. |
-| `mcp` | Optional stdio MCP over the same JSON channel. Tools: `refs_gap` (never writes parents) and `ask` (index read-only). Prefer `paperful … --format json` from a shell. `collections add` is CLI-only and is not exposed. |
+| `mcp` | Optional stdio MCP over the same JSON channel. Read-only tools: `gaps`, `snowball_search` (dry-run), `export` (BibTeX/RIS text in envelope), `proposal_export` (pack under `state/snowball/` or `state/authorwatch/`), `refs_gap`, `ask`. Prefer `paperful … --format json` from a shell. `collections add` is CLI-only and is not exposed. |
 | `urls` | `urls check` probes metadata and linked-PDF URLs for a scope (HEAD/GET). Report only unless `--apply`, which rewrites a URL only when a grey playbook already knows the PDF target. `--limit`, `--format json`. |
 | `htmlpdf` | Academic page-snapshot proposals: `proposals list` / `apply` / `reject`. `[htmlpdf].academic = gated` writes `state/htmlpdf/proposals/`; `apply` attaches a snapshot-tier PDF. Printing web and news pages during `run` is the `htmlpdf` *source*, not this verb. See [sources](sources.md#htmlpdf-web-news-blogs). |
 | `serve` | Localhost workbench and JSON API (`127.0.0.1:8765`). Needs `paperful[serve]` (`uv sync --extra serve`). JSON routes: health, doctor, collections, last-run, dry-run `refs-gap` / `ask` (those do not write the library). HTML: Wanted, Discover, Library, Activity, System; Advanced Index (Ask, batch, `rag questions`, `rag answered`), Briefs, Repair, Mirror, Settings. **Grab** fetches to `out/` only. Catalogue writes (Attach, Discover apply, Repair/Mirror Apply) need Preview, then a review token. TTY, Sci-Hub, and `collections add` stay CLI. `docker compose up` serves this UI. **heavy** also has RAG/Ask extras for Index. See [gui.md](gui.md). |
@@ -238,6 +239,7 @@ several positionals or `--seeds-file`; `profile save` repeats `--query` / `--doi
 | `cache` | `cache clean` lists throwaway files under `state/pdf-cache/` already absorbed into `out/` or stale versus the record MD5. Dry-run unless `--apply`. Does not delete `out/`. |
 | `import` | Load RIS, BibTeX, or EndNote XML into the configured manager. Dry-run unless `--apply`. |
 | `export` | Write the scoped library to RIS, BibTeX, or EndNote XML (`--pdfs` copies files for XML). |
+| `export-proposals` | BibTeX or RIS from a snowball run dir, watch inbox, authorwatch inbox, or a `.jsonl` path under `state/`. |
 | `session` | Local browser vault: `login scholar\|ezproxy\|mendeley` (`--engine` is for the browser slots), `status`, `export` |
 | `playbooks` | `propose` / `promote` — draft and install learned PDF recipes from `state/fetch-wins.jsonl` (vault clicks/rewrites and browser-agent `click:` / `rewrite` wins, including optional `steps` on agent rows) into `grey_playbooks_dir/learned.toml`. Default `[playbooks].promote` is `gated`. `auto` may promote flukes. `probe --corpus FILE` fetches each target and passes only when the first candidate is a PDF of at least `--min-bytes` (default 10KB). Exit 1 on any miss. `--save` writes a replayable JSON snapshot. The shipped public corpus is `tests/fixtures/grey/corpus.toml` |
 | `ezproxy` | Wrapper: headed login (or Netscape fallback) / `--no-open` probe |
@@ -331,6 +333,26 @@ late unless `[fetch].order = "list"`). `--try-all`
 `paperful dedupe` is classify-only unless you pass `--apply`: it writes
 `state/dedupe-packs/` and does not merge or write the spare-copy line. Do not
 pass `--dry-run` and `--apply` together.
+
+## Agent channel (`--format json` and `mcp`)
+
+Batch verbs that support `--format json` emit one `paperful.agent.json.v1`
+object on stdout (`schema`, `command`, `exit`, `summary`, `items`, `paths`,
+`flags`). `paperful mcp` is optional stdio JSON-RPC: each tool returns the same
+envelope in MCP text content. **Read-only** MCP tools today:
+
+| Tool | CLI equivalent | Notes |
+| --- | --- | --- |
+| `gaps` | `gaps --format json` | Counts only (no `--list-missing` handoff) |
+| `snowball_search` | `snowball search … --gate dry-run --format json` | Always dry-run; never creates parents |
+| `export` | `export` (scoped library) | BibTeX/RIS in `summary.bibliography`; no file path required |
+| `proposal_export` | `export-proposals` | Pack under `state/snowball/` or `state/authorwatch/` |
+| `refs_gap` | `refs gap --format json` | Always dry-run |
+| `ask` | `ask --format json` | Needs `[rag]` + ingest |
+
+`collections add`, snowball `apply`, and every other `--apply` path stay
+**CLI-only** (not MCP tools). Prefer `paperful … --format json` from a shell
+when you already have a subprocess wrapper.
 
 ## Exits
 

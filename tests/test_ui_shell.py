@@ -270,7 +270,8 @@ def test_archive_lists_use_details(tmp_path, monkeypatch):
     assert "20260101T000000Z-lint.json" in repair.text
     discover = client.get("/discover")
     assert discover.status_code == 200
-    assert "<summary>Following (1)</summary>" in discover.text
+    assert "<h2>Following</h2>" in discover.text
+    assert "topic-watch" in discover.text
     index = client.get("/index")
     assert index.status_code == 200
     assert "<summary>Recent reports (1)</summary>" in index.text

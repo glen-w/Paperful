@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 from .agent_json import EXIT_USER, batch_exit, envelope
@@ -219,3 +221,256 @@ def collections_add_exit(*, apply: bool, added: int, failed: int) -> int:
     if not apply:
         return 0
     return batch_exit(ok=added, failed=failed)
+
+
+def gaps_envelope(
+    items: list[Any],
+    *,
+    list_missing: bool = False,
+    handoff: str = "",
+    missing_rows: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    from .dedupe import summarize_gaps
+
+    counts = summarize_gaps(items)
+    rows: list[dict[str, Any]] = []
+    for it in items:
+        codes: list[str] = []
+        if not it.has_pdf:
+            codes.append("no_stored_pdf")
+        if it.has_linked_url and not it.has_pdf:
+            codes.append("linked_url_only")
+        if not it.doi:
+            codes.append("missing_doi")
+        if it.pdf_tier == "snapshot":
+            codes.append("snapshot_only")
+        if codes:
+            rows.append(
+                {"itemKey": it.key, "title": it.title, "status": ",".join(codes)}
+            )
+    summary: dict[str, Any] = {
+        "items": counts.items,
+        "no_stored_pdf": counts.no_stored_pdf,
+        "linked_url_only": counts.linked_url_only,
+        "missing_doi": counts.missing_doi,
+        "snapshot_only": counts.snapshot_only,
+    }
+    if missing_rows is not None:
+        summary["missing_pdfs"] = len(missing_rows)
+    body = envelope(
+        command="gaps",
+        summary=summary,
+        items=missing_rows if missing_rows is not None else rows,
+        flags={"list_missing": list_missing, "handoff": handoff if list_missing else ""},
+    )
+    return body
+
+
+def run_gaps(
+    cfg: Config,
+    *,
+    collection: str | list[str] | None = None,
+    library: bool = False,
+) -> dict[str, Any]:
+    """Counts and gap rows for scoped items. MCP: no handoff / list-missing."""
+    from .catalogue import open_library
+
+    cols = collection
+    if isinstance(cols, str):
+        cols = [cols] if cols.strip() else []
+    elif cols is None:
+        cols = []
+    if not cols and not library:
+        return envelope(
+            command="gaps",
+            exit_code=EXIT_USER,
+            summary={"error": "collection or library is required"},
+        )
+    try:
+        backend = open_library(cfg)
+        loaded = load_scope(
+            backend,
+            collections=list(cols) if cols else None,
+            library=library,
+        )
+    except (LibraryError, ScopeError) as exc:
+        return envelope(
+            command="gaps",
+            exit_code=2 if isinstance(exc, LibraryError) else EXIT_USER,
+            summary={"error": str(exc)},
+        )
+    return gaps_envelope(loaded.items)
+
+
+def snowball_result_envelope(
+    command: str,
+    result: Any,
+    *,
+    flags: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    summary = getattr(result, "summary", None) or {}
+    run_dir = Path(getattr(result, "run_dir", "") or "")
+    if not summary and run_dir.is_dir():
+        summary_path = run_dir / "summary.json"
+        if summary_path.is_file():
+            try:
+                summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            except ValueError:
+                summary = {}
+    return envelope(
+        command=command,
+        summary=summary if isinstance(summary, dict) else {},
+        paths={"run": str(run_dir)} if str(run_dir) else {},
+        flags=flags or {},
+        exit_code=int(getattr(result, "exit_code", 0) or 0),
+    )
+
+
+def run_snowball_search(
+    cfg: Config,
+    query: str,
+    *,
+    depth: int | None = None,
+    year_from: int | None = None,
+    year_to: int | None = None,
+) -> dict[str, Any]:
+    """Keyword preview; always dry-run (no parent creates)."""
+    import sys
+
+    from rich.console import Console
+
+    from .snowball.command import SnowballError, SnowballRequest, run_search
+
+    q = (query or "").strip()
+    if not q:
+        return envelope(
+            command="snowball search",
+            exit_code=EXIT_USER,
+            summary={"error": "query is required"},
+        )
+    request = SnowballRequest(
+        gate="dry-run",
+        collection=cfg.snowball_target_collection or "",
+        fetch_pdfs=False,
+        depth=depth,
+        year_from=year_from,
+        year_to=year_to,
+        direction=cfg.snowball_direction or "refs",
+    )
+    console = Console(file=sys.stderr, highlight=False, quiet=True)
+    try:
+        result = run_search(cfg, q, request, console=console)
+    except SnowballError as exc:
+        return envelope(
+            command="snowball search",
+            exit_code=exc.code,
+            summary={"error": str(exc)},
+        )
+    return snowball_result_envelope(
+        "snowball search",
+        result,
+        flags={"dry_run": True, "read_only": True},
+    )
+
+
+def run_export(
+    cfg: Config,
+    *,
+    collection: str | list[str] | None = None,
+    library: bool = False,
+    kind: str = "bibtex",
+) -> dict[str, Any]:
+    """Bibliography text from the scoped library (read-only)."""
+    from .catalogue import open_library
+    from .export_build import build_scope_records
+    from .interop.load import dump_records
+
+    cols = collection
+    if isinstance(cols, str):
+        cols = [cols] if cols.strip() else []
+    elif cols is None:
+        cols = []
+    fmt = kind.strip().lower().replace("_", "-")
+    if fmt in {"bib", "biblatex"}:
+        fmt = "bibtex"
+    if fmt not in {"ris", "bibtex"}:
+        return envelope(
+            command="export",
+            exit_code=EXIT_USER,
+            summary={"error": "format must be ris or bibtex"},
+        )
+    if not cols and not library:
+        return envelope(
+            command="export",
+            exit_code=EXIT_USER,
+            summary={"error": "collection or library is required"},
+        )
+    try:
+        backend = open_library(cfg)
+        loaded = load_scope(
+            backend,
+            collections=list(cols) if cols else None,
+            library=library,
+        )
+    except (LibraryError, ScopeError) as exc:
+        return envelope(
+            command="export",
+            exit_code=2 if isinstance(exc, LibraryError) else EXIT_USER,
+            summary={"error": str(exc)},
+        )
+    records, _ = build_scope_records(cfg, backend, loaded.items, include_notes=False)
+    if not records:
+        return envelope(
+            command="export",
+            summary={"records": 0, "scope": loaded.label},
+            flags={"format": fmt, "read_only": True},
+        )
+    text = dump_records(records, fmt)
+    return envelope(
+        command="export",
+        summary={
+            "records": len(records),
+            "scope": loaded.label,
+            "bibliography": text,
+        },
+        flags={"format": fmt, "read_only": True},
+    )
+
+
+def run_proposal_export(cfg: Config, pack: str, *, kind: str = "bibtex") -> dict[str, Any]:
+    """BibTeX or RIS from a snowball / authorwatch proposal pack on disk."""
+    from .pack_bib import export_pack_text
+
+    fmt = kind.strip().lower().replace("_", "-")
+    if fmt in {"bib", "biblatex"}:
+        fmt = "bibtex"
+    if fmt not in {"ris", "bibtex"}:
+        return envelope(
+            command="export-proposals",
+            exit_code=EXIT_USER,
+            summary={"error": "format must be ris or bibtex"},
+        )
+    spec = (pack or "").strip()
+    if not spec:
+        return envelope(
+            command="export-proposals",
+            exit_code=EXIT_USER,
+            summary={"error": "pack path is required"},
+        )
+    path = Path(spec)
+    if not path.is_absolute():
+        path = cfg.state_dir / spec
+    try:
+        text, jsonl, n = export_pack_text(path, fmt)
+    except (FileNotFoundError, ValueError) as exc:
+        return envelope(
+            command="export-proposals",
+            exit_code=EXIT_USER,
+            summary={"error": str(exc)},
+        )
+    return envelope(
+        command="export-proposals",
+        summary={"records": n, "bibliography": text},
+        paths={"pack": str(path), "jsonl": str(jsonl)},
+        flags={"format": fmt, "read_only": True},
+    )

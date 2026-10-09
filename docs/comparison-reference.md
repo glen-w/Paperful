@@ -3,7 +3,7 @@
 Vendor-by-vendor notes and longer capability tables. Most readers only need
 [How Paperful compares](comparison.md).
 
-**Last reviewed:** 2026-09-21. Feature lists for other products are based on public
+**Last reviewed:** 2026-10-09. Feature lists for other products are based on public
 docs and positioning — not paid pilots.
 
 ## Capability snapshot
@@ -66,6 +66,27 @@ Verify against each project’s latest release before upgrading Zotero.
 | Attach back to items | Yes | No | DIY |
 | EZProxy / Sci-Hub | Yes / opt-in | No / DIY | DIY |
 
+### Hosted literature MCP (global corpus)
+
+Legend: **Yes** · **Partial** · **No**. Valency rows reflect public positioning for
+[MCP Bond](https://www.valency.io/) (not a hands-on product audit).
+
+| Capability | Paperful | Valency MCP Bond | zotero-mcp (typical) |
+|------------|----------|------------------|----------------------|
+| Semantic search over **public** papers / preprints | Partial (`snowball` keyword / similar hops; OpenAlex-backed discovery — not a single “ask the whole web” MCP) | Yes | Partial (search library + sometimes Unpaywall) |
+| Semantic search over **your** PDFs | Yes (`rag ingest` + `ask`; GUI Index Ask) | No | Yes (chat reads attached PDFs) |
+| Citation graph (corpus-scale, both directions) | Partial (`snowball` `refs` / `cites` / `both`; not a browseable graph UI) | Yes | Partial |
+| Author profiles / co-author networks | Partial (`authorwatch`, `suggest -C`) | Yes | Partial |
+| Keyword / publication **trends** | Partial (OpenAlex filters in snowball; no dedicated trend MCP) | Yes | No |
+| BibTeX (or similar) **export** | Yes (`export`; `export-proposals` from snowball / authorwatch queues on disk) | Yes (positioning) | Partial |
+| Bulk **missing-PDF** fetch into a collection | Yes | No | Partial |
+| Disk mirror + **restore** ledger | Yes | No | No |
+| Campus EZProxy / grey-lit PDF playbooks | Yes | No | No |
+| MCP tools (indicative breadth) | Partial (read-only: `gaps`, `snowball_search`, `export`, `proposal_export`, `refs_gap`, `ask`; no `--apply`) | Yes (positioning: large tool surface) | Yes (varies by fork) |
+| Corpus freshness (vendor SLA) | Partial (`snowball watch`, `authorwatch run` — you schedule polls) | Yes (positioning: index within hours) | N/A (local library) |
+
+Valency **Hub** (publish, fork, public review) is a separate product; Paperful does not host papers.
+
 ## Complementary: Zotero plugins and built-ins
 
 ### Paperful
@@ -116,6 +137,13 @@ Verify against each project’s latest release before upgrading Zotero.
 - **Sites:** [richardjlyon/zotero-mcp](https://github.com/richardjlyon/zotero-mcp) · [cookjohn/zotero-mcp](https://github.com/cookjohn/zotero-mcp) · [mcp-zotero](https://github.com/Xevos117/mcp-zotero)
 - **Fit:** LLM-facing search, PDF text, create items, sometimes Unpaywall attach. Some forks OCR scans (Docling) or write reading notes from chat.
 - **With Paperful:** MCP when a person is in the loop; Paperful for unattended collection runs, the disk ledger, `ocr` on image PDFs, and batch `summarize` / `synthesize`.
+
+### Valency MCP Bond and Hub
+
+- **Sites:** [valency.io](https://www.valency.io/)
+- **Fit:** **MCP Bond** — hosted semantic access to a very large public paper/preprint corpus (search, citation graph, authors, trends, export) for LLM clients. **Hub** — open publishing, versioning, and review; out of scope for Paperful’s library/mirror jobs.
+- **With Paperful:** Bond when the question is “what does the literature say?” across hundreds of millions of works. Paperful when the question is “fill, fix, mirror, and reason over **my** collection” — `run`, `snapshot`, `snowball` / `authorwatch` to grow it, `ask` / `refs_gap` / `gaps` / dry-run `snowball_search` / `export-proposals` (and optional `paperful mcp` with the same JSON envelopes) over the on-disk index. Typical stack: Bond (or similar) for discovery → snowball / `ingest-dois` / manual save → Paperful for PDFs and disk-first hygiene.
+- **Not a substitute for:** EZProxy-backed fetch, grey-literature playbooks, collection-shaped `out/` restore, or unattended batch attach.
 
 ### ZotFile (legacy)
 
@@ -168,6 +196,12 @@ Need a grounded summary of many text-layer PDFs, then one collection review?
 
 Need reproducible .bib for a paper submission?
   → bibcite fix / bibtex-tidy
+
+Chat agent needs the whole public literature (graph, trends, author intel), not just Zotero?
+  → Valency MCP Bond (complement Paperful for *your* PDFs and mirror)
+
+Already have a reading list on disk and want gaps vs what your PDFs cite?
+  → paperful refs gap (CLI or MCP refs_gap)
 ```
 
 ## Related docs

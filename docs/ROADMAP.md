@@ -330,9 +330,10 @@ Closed in this pass:
 Not in scope: reading `zotero.sqlite` or `storage/` directly, and any sync
 daemon.
 
+(near-term-research-ops)=
 ### Near-term research-ops
 
-**Status:** rows 1–4 shipped; remaining rows thicken the same product. Same bars:
+**Status:** rows 1–22 shipped; rows 23–24 are [literature-discovery complement](#literature-discovery-complement-waves) waves 2–3. Same bars:
 dry-run default, explicit `--apply`, fail closed, no silent library writes. See
 [Documentation (thicken) — research pack](#documentation-thicken)
 for the end-to-end operator story.
@@ -354,13 +355,37 @@ for the end-to-end operator story.
 | 12 | Authors/orgs frequency report from `-C` (`state/reports/…`; seed **field author packs**) | Shipped (`paperful authors`; `--apply` writes report + proposed pack) |
 | 13 | Handoff list ranking (Core handoff) | Shipped (cite count × miss severity) |
 | 14 | Opt-in academic HTML→PDF snapshot (Core `htmlpdf`) | Shipped (`[htmlpdf].academic` off\|gated\|auto; snapshot tier; `--upgrade-snapshot`) |
-| 15 | Agent JSON + documented exit codes on batch verbs; MCP after those are stable | **Shipped** — `paperful.agent.json.v1` + exits 0/1/2/3 on batch verbs; thin optional `paperful mcp` (`refs_gap`, `ask`) |
+| 15 | Agent JSON + documented exit codes on batch verbs; MCP after those are stable | **Shipped** — `paperful.agent.json.v1` + exits 0/1/2/3 on batch verbs; optional `paperful mcp` (expanded in row 22) |
 | 16 | Author-site PDF (registry + packs + co-author crawl; **snowball co-author preflight** / `grey:author_site`) | Shipped (opt-in; promote packs; SearXNG local-only) |
 | 17 | ResearchGate request-from-author (**handoff-only**; config off by default; you click) | Shipped (`[request].channels`; `state/author-requests.jsonl`; `paperful reachout --handoff tabs`) |
 | 18 | Twenty CRM — lookup cache plus `twenty sync` (create/enrich, Paperful note, late `author_site` before Scholar, opt-in listing write-back) | Shipped (`paperful twenty lookup` / `twenty sync`; `[twenty].enabled`; `--twenty-writeback`) |
 | 19 | Typed note provenance (`paperful.note.v1`) + scannable **first-line** prefixes on all Paperful note writers | Shipped (summarize / synthesize / remarks / snowball / briefing) |
 | 20 | `paperful notes delete` (or equivalent) — scoped filters: type, model, `--except-model`, tags; dry-run / `--apply` | Shipped (`--type`, `--model` / `--except-model`, `--all` + confirm / `--yes`) |
 | 21 | [Author watch lists](#author-watch-lists-later-people-you-follow--their-papers) — ORCID / OpenAlex resolve + `run` / `apply`; file import of follows; corpus suggestions | **Shipped** — `paperful authorwatch` (+ suggest/accept/delete); saved social HTML/CSV import; Discover list management |
+| 22 | [Literature-discovery complement](#literature-discovery-complement-waves) — **Wave 1:** read-only MCP (`gaps`, snowball dry-run / keyword preview, collection `export`) + BibTeX/RIS for snowball / `authorwatch` proposal packs | **Shipped** — `paperful mcp` tools + `export-proposals`; CLI snowball `--format json` loads `summary.json` on dry-run |
+| 23 | Same — **Wave 2:** OpenAlex publication trend report for a query or saved snowball seed (`snowball trends`, name TBD) | Planned |
+| 24 | Same — **Wave 3:** thicker `authorwatch` briefing (co-authors + recent works via OpenAlex) | Planned |
+
+(literature-discovery-complement-waves)=
+### Literature-discovery complement (waves)
+
+**Context:** Hosted literature MCP (e.g. [Valency MCP Bond](comparison-reference.md#valency-mcp-bond-and-hub))
+covers corpus-scale semantic search, citation graph, and keyword trends. Paperful
+does not replicate that index; these waves tighten the **local** loop and agent
+surface so Bond-class tools pair cleanly with snowball, mirror, and `ask`.
+
+Same bars as [near-term research-ops](#near-term-research-ops): dry-run default,
+explicit `--apply` for anything that touches the manager, fail closed, one JSON
+envelope for CLI and MCP.
+
+| Wave | Scope | Acceptance |
+| --- | --- | --- |
+| **1** | **Agent MCP + proposal export** — Extend optional `paperful mcp` with read-only tools that call the same builders as CLI `--format json`: `gaps`; snowball crawl dry-run / keyword preview (no gate that writes parents); collection `export` (BibTeX/RIS). Emit BibTeX or RIS from on-disk snowball / `authorwatch` proposal packs (DOIs already resolved in the pack). | **Shipped** — `export-proposals` + MCP tools; docs in [commands](commands.md#agent-channel-format-json-and-mcp), [snowball](snowball.md#bibtex--ris-from-the-queue), [authorwatch](authorwatch.md#ledger). |
+| **2** | **Publication trends** — Count works by publication year for an OpenAlex query or a saved snowball profile seed; reuse `OpenAlexClient` and budget posture as snowball. | Dry-run table + `--format json`; no library or manager writes. |
+| **3** | **Author briefing thicken** — `authorwatch show` / list briefing adds co-author network and recent works from OpenAlex (same resolution paths as `resolve` / `suggest`). | Human-readable briefing plus optional `--format json` for agents; no new polling scheduler. |
+
+**Non-goals for these waves:** hosting a global full-text index; Valency Hub–style
+publishing; replacing Bond for “ask the whole literature” chat.
 
 **Spike acceptance (one week, eng):** `refs gap` dry-run pack with zero manager
 writes; `ingest-dois` idempotent apply + `held` on ambiguous resolve; `collections
@@ -1223,8 +1248,10 @@ Larger product bets. Park until the ledger and core loop justify them.
    `ingest-dois`, `inbox drain`, `ask`, snowball crawl/apply, …); documented exit-code
    table (`0` ok, `1` user, `2` manager down, `3` partial write batch). **MCP** is a thin
    optional stdio wrap of `refs_gap` + `ask` over the same envelope — not a second API
-   and not a prerequisite for research-ops. Writes stay CLI `--apply`. `collections add`
-   is CLI-only (not an MCP tool).
+   and not a prerequisite for research-ops. **Wave 1 shipped:** read-only MCP for
+   `gaps`, snowball preview, `export`, `proposal_export`, and `export-proposals` —
+   [Literature-discovery complement](#literature-discovery-complement-waves). Writes stay
+   CLI `--apply`. `collections add` is CLI-only (not an MCP tool).
    **Shipped:** Twenty sync, lookup, and `--twenty-writeback` —
    [Twenty and SearXNG](snowball.md#twenty-and-searxng).
    Request-channel policy stays config (`[request].channels`), not agent-default.

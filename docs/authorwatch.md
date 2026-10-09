@@ -115,6 +115,15 @@ that tree):
 | `suggestions.jsonl` | `paperful.authorwatch.suggestion.v1` — pending/accepted/dismissed |
 | `briefing.md` | `authorwatch briefing` (markdown only; not a substitute for `apply`) |
 
+Export proposed works to BibTeX or RIS without applying:
+
+```bash
+paperful export-proposals state/authorwatch/<name> voices.bib
+```
+
+Uses `inbox.jsonl` in that folder. Same command and MCP `proposal_export` accept
+snowball run or watch packs; see [snowball.md](snowball.md#bibtex--ris-from-the-queue).
+
 ## Local dogfood (operator)
 
 Validate on a test collection without committing `state/` or pack edits. Example:

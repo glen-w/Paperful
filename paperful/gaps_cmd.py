@@ -84,7 +84,7 @@ def run_gaps(
         items=rows,
         started=started,
     )
-    from .agent_json import envelope
+    from .agent_ops import gaps_envelope
 
     def _human_gaps_counts() -> None:
         console.print(f"Scope: [bold]{scope}[/]")
@@ -111,17 +111,10 @@ def run_gaps(
         )
         console.print(table)
 
-    agent_payload = envelope(
-        command="gaps",
-        summary={
-            "items": counts.items,
-            "no_stored_pdf": counts.no_stored_pdf,
-            "linked_url_only": counts.linked_url_only,
-            "missing_doi": counts.missing_doi,
-            "snapshot_only": counts.snapshot_only,
-        },
-        items=rows,
-        flags={"list_missing": list_missing, "handoff": mode if list_missing else ""},
+    agent_payload = gaps_envelope(
+        items,
+        list_missing=list_missing,
+        handoff=mode if list_missing else "",
     )
     if json_out and not list_missing:
         emit_agent(agent_payload, json_out=True, human=_human_gaps_counts)

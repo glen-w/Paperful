@@ -3,7 +3,7 @@
 A plain-language map of where Paperful sits next to Zotero plugins, bibliography
 fixers, Mendeley export cleaners, and DOI-centric download scripts.
 
-**Last reviewed:** 2026-10-07. Feature lists for other products are based on public
+**Last reviewed:** 2026-10-09. Feature lists for other products are based on public
 docs and positioning — not paid pilots or exhaustive release testing.
 
 Vendor-by-vendor notes live in the [comparison reference](comparison-reference.md).
@@ -23,6 +23,8 @@ Prefer this page for “is this the right tool?”
 | **Batch notes** from PDFs you already have: one grounded summary per item, then a collection review. Local model, off by default. Scans need `ocr` first | **Paperful** `summarize` / `synthesize` |
 | **Scriptable library surgery** (merge, enrich, disk GC, two-up scan split) via CLI/MCP | [zotero-agent](https://github.com/alex-roc/zotero-agent) |
 | **AI assistant** read/write over the library, including chat and (on some forks) OCR of scans | zotero-mcp forks ([richardjlyon](https://github.com/richardjlyon/zotero-mcp), [cookjohn](https://github.com/cookjohn/zotero-mcp), [mcp-zotero](https://github.com/Xevos117/mcp-zotero)) |
+| **Semantic search, citation graph, author/trend tools** over the public literature via MCP (hosted corpus; not your Zotero tree) | [Valency MCP Bond](https://www.valency.io/) — see [reference](comparison-reference.md#valency-mcp-bond-and-hub) |
+| **Grounded Q&A over PDFs you already have** (local index; same collection mirror as fetch) | **Paperful** `rag ingest` / `ask` — optional `paperful mcp` (`ask`, `refs_gap`, `gaps`, `snowball_search`, `export`, `proposal_export`) |
 | **`.bib` normalize / dedupe / upgrade preprints** (no Zotero required) | [bibcite](https://github.com/leo1oel/bibcite), [bibtex-tidy](https://github.com/FlamingTempura/bibtex-tidy), [bibmanager](https://bibmanager.readthedocs.io/) |
 | **Mendeley** dedup inside the app; clean **exported** BibTeX | Mendeley Duplicates smart collection; export cleaners such as [mendeley_bibtex_cleaner](https://gist.github.com/alexandrehuat/6d3263f73ccae87d0107977978316c02) |
 | **DOI-list PDF batch** without Zotero | [paperscraper](https://github.com/jannisborn/paperscraper) |
@@ -63,8 +65,10 @@ Zotero). **(3)** is `paperful attachments`: a report by default, and
 `--fix-broken`, `--merge-files`, `--rename`, or `--link` only with
 `--apply`. **(4)** is other tools. **(5)** here is CLI `--format json`
 (`paperful.agent.json.v1` + exits) on batch verbs, plus a thin optional
-`paperful mcp` for dry-run `refs_gap` and read-only `ask`. A chat agent over
-the live Zotero catalogue stays with zotero-mcp.
+`paperful mcp` for read-only agent tools (`gaps`, snowball keyword dry-run,
+scoped `export`, proposal-pack BibTeX/RIS, `refs_gap`, `ask`) — same JSON as
+`--format json`. A chat agent that mutates the live Zotero catalogue stays with
+zotero-mcp.
 Scanned PDFs get a text layer from `paperful ocr`; two-up split and shrink
 stay with zotero-agent `pdf-prep`. **Library** is the catalogue you already
 have, grown with `snowball` when you ask. **Control** is disk-first
@@ -113,7 +117,7 @@ Legend: **Yes** = first-class · **Partial** = adjacent or lighter · **No** = a
 | Grounded summary / collection review | Partial (opt-in, local, text layer) | No | No | No | No | Partial (public README: summarize PDFs into notes) |
 | OCR for scanned PDFs | Partial (`ocr`, OCRmyPDF text layer on disk) | No | No | No | No | Partial (`pdf-prep`, OCRmyPDF) |
 
-zotero-mcp and BibTeX-cluster columns: [comparison reference](comparison-reference.md#capability-snapshot).
+zotero-mcp, Valency MCP Bond, and BibTeX-cluster columns: [comparison reference](comparison-reference.md#capability-snapshot).
 
 ## What Paperful does not do today
 
@@ -166,6 +170,9 @@ Scanned PDFs with no text layer?
 
 Want a chat agent in the loop?
   → a zotero-mcp fork
+
+Need semantic search / citation graph / trends across all public papers, not just your library?
+  → Valency MCP Bond (or similar lit MCP). Paperful snowball + authorwatch grow *your* collection; `mcp` / CLI JSON for gaps, dry-run discovery, export, and ask over *your* mirror
 ```
 
 More branches: [comparison reference](comparison-reference.md#choosing-in-one-glance).

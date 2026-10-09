@@ -183,7 +183,8 @@ uv run paperful ask --thread <id> "and the EIA part?"
 
 `--format json` needs a question on the command line (or `--from-file`; no TTY
 multi-question loop). Agents that can shell out should prefer that over
-`paperful mcp` (`ask` tool returns the same envelope). Exit codes follow the
+`paperful mcp` (`ask` and other read-only tools return the same envelope; see
+[commands — Agent channel](commands.md#agent-channel-format-json-and-mcp)). Exit codes follow the
 [commands](commands.md#exits) table.
 
 `ask` prints the answer as it is written, then the sources it cited:

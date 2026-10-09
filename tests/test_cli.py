@@ -2737,6 +2737,41 @@ def test_snowball_apply_format_json_partial(cfg_file, stub_zotero, tmp_path, mon
     assert "items created" not in res.stdout.lower()
 
 
+def test_snowball_search_format_json_loads_summary_file(
+    cfg_file, stub_zotero, tmp_path, monkeypatch
+):
+    from paperful.snowball.command import PathResult
+
+    run_dir = tmp_path / "state" / "snowball" / "s1"
+    run_dir.mkdir(parents=True)
+    (run_dir / "summary.json").write_text(
+        json.dumps({"by_status": {"new": 5}}),
+        encoding="utf-8",
+    )
+
+    def fake_search(cfg, query, request, console=None, **k):
+        return PathResult(run_dir, 0, summary=None)
+
+    monkeypatch.setattr("paperful.snowball.command.run_search", fake_search)
+    res = runner.invoke(
+        cli.app,
+        [
+            "snowball",
+            "search",
+            "BBNJ",
+            "-c",
+            str(cfg_file),
+            "--gate",
+            "dry-run",
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    body = _one_json(res.stdout)
+    assert body["summary"]["by_status"]["new"] == 5
+
+
 def test_snowball_search_format_json(cfg_file, stub_zotero, tmp_path, monkeypatch):
     from paperful.snowball.command import PathResult
 

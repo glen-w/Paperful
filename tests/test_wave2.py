@@ -91,7 +91,14 @@ def test_mcp_lists_refs_gap_and_ask():
     cfg = type("C", (), {})()
     listed = dispatch(cfg, {"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
     names = {t["name"] for t in listed["result"]["tools"]}
-    assert names == {"refs_gap", "ask"}
+    assert names == {
+        "refs_gap",
+        "gaps",
+        "snowball_search",
+        "export",
+        "proposal_export",
+        "ask",
+    }
     init = dispatch(cfg, {"jsonrpc": "2.0", "id": 2, "method": "initialize"})
     assert init["result"]["serverInfo"]["name"] == "paperful"
 
@@ -175,6 +182,65 @@ def test_mcp_newline_json():
 
     line = b'{"jsonrpc":"2.0","id":1,"method":"initialize"}\n'
     assert _read_message(BytesIO(line))["method"] == "initialize"
+
+
+def test_snowball_result_envelope_reads_summary_json(tmp_path: Path):
+    from paperful.agent_ops import snowball_result_envelope
+    from paperful.snowball.command import PathResult
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "summary.json").write_text(
+        json.dumps({"run_id": "x", "by_status": {"new": 3}}),
+        encoding="utf-8",
+    )
+    body = snowball_result_envelope(
+        "snowball search",
+        PathResult(run_dir, 0, summary=None),
+    )
+    assert body["summary"]["by_status"]["new"] == 3
+    assert body["paths"]["run"] == str(run_dir)
+
+
+def test_mcp_gaps_delegates_to_run_gaps(monkeypatch):
+    from paperful.mcp_server import call_gaps
+
+    seen: list[str] = []
+
+    def fake_run_gaps(cfg, *, collection=None, library=False):
+        seen.append(f"{collection!r}:{library}")
+        return envelope(command="gaps", summary={"items": 1})
+
+    monkeypatch.setattr("paperful.mcp_server.run_gaps", fake_run_gaps)
+    body = call_gaps(type("C", (), {})(), "ocean/bbnj", library=False)
+    assert body["summary"]["items"] == 1
+    assert seen == ["'ocean/bbnj':False"]
+
+
+def test_mcp_proposal_export_roundtrip(tmp_path: Path):
+    from paperful.mcp_server import call_proposal_export
+
+    run_dir = tmp_path / "snowball" / "run-x"
+    run_dir.mkdir(parents=True)
+    row = {
+        "schema": "paperful.snowball.candidate.v1",
+        "run_id": "run-x",
+        "seed": {"kind": "keyword", "value": "x"},
+        "hop": 0,
+        "direction": "keywords",
+        "ids": {"doi": "10.5555/deep"},
+        "biblio": {"title": "Deep test paper", "year": 2025, "authors": ["A B"], "type": "article"},
+        "why": "hit",
+        "status": "new",
+        "provenance": {"backend": "openalex"},
+        "gate": "dry-run",
+        "score": 0.0,
+    }
+    (run_dir / "candidates.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+    cfg = type("C", (), {"state_dir": tmp_path})()
+    body = call_proposal_export(cfg, str(run_dir), kind="bibtex")
+    assert body["summary"]["records"] == 1
+    assert "10.5555/deep" in body["summary"]["bibliography"]
 
 
 def test_mcp_refs_gap_empty_collection_does_not_open_library(monkeypatch):

@@ -9,6 +9,12 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ### Added
 
+- **Literature-discovery Wave 1 (roadmap row 22):** `paperful mcp` adds read-only
+  `gaps`, `snowball_search`, `export`, and `proposal_export` (same
+  `paperful.agent.json.v1` builders as CLI). `paperful export-proposals` writes
+  BibTeX/RIS from `state/snowball/<run>/candidates.jsonl`, watch/authorwatch
+  `inbox.jsonl`, or a pack directory. Snowball `--format json` on dry-run loads
+  `summary.json` when the in-memory summary is empty.
 - **OpenAlex study design filters:** snowball `--study-design` / `[snowball].study_designs`
   (`rct`, `meta-analysis`, `systematic-review`, …) pushes
   `filter=study_designs.id:…` into OpenAlex search, citing, keyword, and author

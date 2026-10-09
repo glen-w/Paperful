@@ -1,7 +1,8 @@
 """Thin MCP stdio server over the same JSON channel as ``--format json``.
 
-Tools: ``refs_gap`` (never writes parents) and ``ask`` (index read + LLM).
-``collections add`` is CLI-only (``--apply`` writes). Prefer CLI ``--format json``.
+Read-only tools: ``refs_gap``, ``gaps``, ``snowball_search``, ``export``,
+``proposal_export``, and ``ask``. ``collections add`` is CLI-only. Prefer CLI
+``--format json``.
 """
 
 from __future__ import annotations
@@ -11,7 +12,14 @@ import sys
 from typing import Any, BinaryIO, TextIO
 
 from .agent_json import dumps
-from .agent_ops import run_ask, run_refs_gap
+from .agent_ops import (
+    run_ask,
+    run_export,
+    run_gaps,
+    run_proposal_export,
+    run_refs_gap,
+    run_snowball_search,
+)
 from .config import Config
 from . import __version__
 
@@ -33,6 +41,83 @@ TOOLS = [
                 }
             },
             "required": ["collection"],
+        },
+    },
+    {
+        "name": "gaps",
+        "description": (
+            "Gap counts for a collection or whole library (missing PDF, DOI, etc.). "
+            "Read-only."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "collection": {
+                    "type": "string",
+                    "description": "Collection path, name, or key.",
+                },
+                "library": {
+                    "type": "boolean",
+                    "description": "Use whole library instead of collection.",
+                },
+            },
+        },
+    },
+    {
+        "name": "snowball_search",
+        "description": (
+            "OpenAlex keyword search dry-run. Writes candidate queue on disk only; "
+            "never creates library parents."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "depth": {"type": "integer"},
+                "year_from": {"type": "integer"},
+                "year_to": {"type": "integer"},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "export",
+        "description": (
+            "Export scoped library metadata as BibTeX or RIS text in the JSON "
+            "envelope. Read-only."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "collection": {"type": "string"},
+                "library": {"type": "boolean"},
+                "format": {
+                    "type": "string",
+                    "enum": ["bibtex", "ris"],
+                    "description": "Default bibtex.",
+                },
+            },
+        },
+    },
+    {
+        "name": "proposal_export",
+        "description": (
+            "BibTeX or RIS from a snowball run, watch inbox, or authorwatch inbox "
+            "pack under state/."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pack": {
+                    "type": "string",
+                    "description": "Run dir, watch dir, authorwatch dir, or .jsonl path.",
+                },
+                "format": {
+                    "type": "string",
+                    "enum": ["bibtex", "ris"],
+                },
+            },
+            "required": ["pack"],
         },
     },
     {
@@ -138,6 +223,33 @@ def call_ask(cfg: Config, question: str, collection: str = "") -> dict[str, Any]
     return run_ask(cfg, question, collection)
 
 
+def call_gaps(cfg: Config, collection: str = "", library: bool = False) -> dict[str, Any]:
+    return run_gaps(cfg, collection=collection or None, library=library)
+
+
+def call_snowball_search(cfg: Config, args: dict[str, Any]) -> dict[str, Any]:
+    return run_snowball_search(
+        cfg,
+        str(args.get("query") or ""),
+        depth=args.get("depth"),
+        year_from=args.get("year_from"),
+        year_to=args.get("year_to"),
+    )
+
+
+def call_export(cfg: Config, args: dict[str, Any]) -> dict[str, Any]:
+    return run_export(
+        cfg,
+        collection=str(args.get("collection") or "") or None,
+        library=bool(args.get("library")),
+        kind=str(args.get("format") or "bibtex"),
+    )
+
+
+def call_proposal_export(cfg: Config, pack: str, kind: str = "bibtex") -> dict[str, Any]:
+    return run_proposal_export(cfg, pack, kind=kind)
+
+
 def handle_tools_call(cfg: Config, req_id: Any, params: dict[str, Any]) -> dict[str, Any]:
     name = str(params.get("name") or "")
     args = params.get("arguments") or {}
@@ -145,6 +257,22 @@ def handle_tools_call(cfg: Config, req_id: Any, params: dict[str, Any]) -> dict[
         args = {}
     if name == "refs_gap":
         body = call_refs_gap(cfg, str(args.get("collection") or ""))
+    elif name == "gaps":
+        body = call_gaps(
+            cfg,
+            str(args.get("collection") or ""),
+            library=bool(args.get("library")),
+        )
+    elif name == "snowball_search":
+        body = call_snowball_search(cfg, args)
+    elif name == "export":
+        body = call_export(cfg, args)
+    elif name == "proposal_export":
+        body = call_proposal_export(
+            cfg,
+            str(args.get("pack") or ""),
+            kind=str(args.get("format") or "bibtex"),
+        )
     elif name == "ask":
         body = call_ask(
             cfg,
