@@ -367,7 +367,19 @@ a {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
+  align-items: center;
   gap: 0.75rem;
+}
+
+.footer-inner p {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  margin: 0;
+}
+
+.site-footer img {
+  display: block;
 }
 
 /* Cleaning Service page (spoken offer under shared site chrome) */
