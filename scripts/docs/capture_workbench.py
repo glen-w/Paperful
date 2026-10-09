@@ -341,6 +341,9 @@ def main() -> None:
 
     for src_name, dest_name in HOMEPAGE.items():
         src = DOCS_OUT / src_name
+        if not src.is_file():
+            print(f"skip copy {src_name} (missing)")
+            continue
         dest = WEB_OUT / dest_name
         shutil.copy2(src, dest)
         print(f"copied {dest.relative_to(ROOT)}")
