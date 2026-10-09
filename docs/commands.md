@@ -1,7 +1,8 @@
 # Commands
 
 Snippets below use `uv run` so they stay short. The operator install is
-clone plus `docker compose build`, then
+clone plus `docker compose build`, then `docker compose up` for the
+workbench ([Walkthroughs](walkthroughs.md), [GUI](gui.md)). CLI one-shots:
 `docker compose run --rm paperful …` ([Docker](docker.md)). CI builds the
 **light** image and expects `doctor` to exit 2 without Zotero. **heavy**
 adds `[llm]` `[rag]` `[browser-agent]` (see

@@ -1,9 +1,7 @@
 # Paperful website
 
 Modest public landing (plain HTML/CSS, minimal JS for mobile nav). Product
-front door: hero (library, find, mirror) → how it works (fill pipeline) →
-what it does (downloads, notes, summaries, folder copy) → on your machine →
-install.
+front door: short hero → workbench screenshots → four-step fill → install.
 
 - Open `index.html` locally, or deploy via GitHub Pages (`.github/workflows/pages.yml`).
 - Logos live in [images/](images/) (copied from `docs/`): `logo.png` (ink wordmark for light backgrounds) and `logo-dark.png` (cream wordmark for dark backgrounds). The README picks via `prefers-color-scheme`.
@@ -15,7 +13,8 @@ install.
   The image is build-local only (no `docker pull`, no PyPI). `.env.example` sets
   `PAPERFUL_IMAGE_MODE=heavy`; CI builds **light**. `uv` is the contributor path.
   Guide: `./guide/docker.html` (light vs heavy packs).
-- Docs CTAs point at the **Sphinx HTML guide** published beside this landing (`./guide/`), rebuilt from `docs/` on every qualifying `main` push. The walkthrough is `./guide/how-it-works.html`.
+- Docs CTAs point at the **Sphinx HTML guide** published beside this landing (`./guide/`), rebuilt from `docs/` on every qualifying `main` push. Walkthroughs start at `./guide/walkthroughs.html`; the fill pipeline is `./guide/how-it-works.html`.
+- Workbench screenshots live in `images/workbench-*.png` (copied from `docs/_static/workflows/` by `scripts/docs/capture_workbench.py`).
 - The sticky header nav is shared with `/guide/` via `website/chrome/` (Sphinx injects the same chrome).
 - Cleaning Service offer: `cleaning-service.html` (nav item on landing + guide). `paperful.cloud` should redirect there once DNS/SSL is sorted.
 - Full local preview (landing + guide): `uv sync --extra docs && make pages-site` then open `_site/index.html`.

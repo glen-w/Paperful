@@ -7,7 +7,7 @@
 help:
 	@echo "paperful Makefile"
 	@echo ""
-	@echo "Usual path: uv run paperful <cmd>  (see README)"
+	@echo "Usual path: docker compose up  → http://127.0.0.1:8765  (see README)"
 	@echo ""
 	@echo "Docker (optional pack):"
 	@echo "  docker-build        Build image (PAPERFUL_IMAGE_MODE from .env, else light)"

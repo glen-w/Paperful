@@ -1257,7 +1257,7 @@ Larger product bets. Park until the ledger and core loop justify them.
 8. **Collaboration without SaaS** — shared `state/` over syncthing/git; attach
    locks; optional headless fetch node. Aligns with the house
    [quiet mirror](quiet-mirror.md) stance: Syncthing (or similar) is transport;
-   Paperful stays a local CLI, not a sync product.
+   Paperful stays a local workbench, not a sync product.
 9. **Compliance & provenance** — 1.0 attach stamp is listed above. On disk,
    `record.json` plus `out/_history.json` are the chain-of-custody note for
    the library and the append-only ledgers. OA `license` / `oa_status` /
@@ -1325,9 +1325,10 @@ DownThemAll / Pull Tabs for paced tab-download UX only.
 
 ## Documentation (thicken)
 
-**Status:** roadmap — reference docs exist; playbooks and media do not yet match
-the depth of the CLI. Raises trust before install; **GUI 1.0** should ship with
-worked examples and screenshots for the main workbench modes (see [GUI](#gui)).
+**Status:** walkthroughs and workbench screenshots shipped
+([Walkthroughs](walkthroughs.md), `docs/_static/workflows/`). Reference docs
+remain; keep them aligned with the GUI. **GUI 1.0** still wants a package tag
+(see [GUI](#gui)).
 
 Ship in layers:
 
@@ -1341,29 +1342,17 @@ Ship in layers:
    scoping, `--dry-run` → `--apply`, `paperful all`, snowball profiles and
    gates, `[inbox].dir` handoff, `session login` (Zotero / Mendeley / campus
    vault), and `[llm]` gates spelled as one-liners with expected exit codes.
-2. **Worked examples** (narrative walkthroughs: starting state → command
-   sequence → banners / `state/` paths → Zotero outcome):
-   - **Messy folder / uneven library** — weak metadata, broken or ghost PDF
-     attachments, same bytes on two parents, title+year stragglers: `doctor` →
-     `lint` / `fix-metadata` → `attachments` → `dedupe` → `run`, always
-     dry-run and read packs on disk before `--apply`.
-   - **Large corpus from scratch** — snowball from **keyword** plus seed
-     **DOI**s (profile save, `direction` / `hybrid`, `dedupe_scope`, gates,
-     optional `fetch_pdfs`, then `run` for stragglers; optional `watch` for
-     frontier inbox) with a realistic cap / approve story.
-   - **Research pack** — follow layer **0** above on a named `-C` (refs gap pack
-     on disk, ingest tags, handoff walk, watch inbox).
-   - **PDFs for an existing collection** — two passes documented side by side:
-     **quick** (default sources, `--dry-run` Would-hit, CORE / grey playbooks,
-     EZProxy session hygiene, `run` banner); **full** (`session login` / relogin for **EZProxy** (not Scholar-as-bot),
-     vault retry on soft-blocked OA, optional `[browser_agent]` on
-     `run` or `recover --item`, `--handoff list|tabs|walk|watch` including
-     Scholar in the **system browser**, PDF download into `[inbox].dir` and
-     `inbox drain` / `watch`).
-3. **Screenshots and video guides** — annotated screenshots for dry-run tables,
-   `doctor` colour lines, attachment provenance in Zotero, snowball queue rows,
-   and handoff inbox layout; short screen recordings aligned with the three
-   worked examples above (hygiene, snowball, fetch quick vs full).
+2. **Worked examples** — **Shipped (workbench):** [Walkthroughs](walkthroughs.md)
+   ([first fill](first-fill.md), [grow](grow-library.md),
+   [tidy](tidy-library.md)); [research-pack](research-pack.md). CLI depth for
+   hop gates and `paperful all` stays [workflows](workflows.md) /
+   [snowball](snowball.md). Remaining: a side-by-side **full** fetch (EZProxy
+   relogin, browser-agent, handoff walk / inbox) as its own page.
+3. **Screenshots and video guides** — **Shipped (stills):** workbench Wanted,
+   Discover, Repair, Index, System, Mirror (`docs/_static/workflows/`; homepage
+   copies under `website/images/`). Recapture:
+   `scripts/docs/capture_workbench.py`. Remaining: dry-run table callouts,
+   Zotero provenance, short screen recordings.
 4. **Developer guide** — [developer.md](developer.md). **Shipped:** the
    mirror-first rule, what a command's backend serves from disk, rules for
    new code, the module map, the refresh, disk schemas, and how to add a
@@ -1403,7 +1392,8 @@ digest can file a collection note (`paperful:frontier-briefing`). **Advanced**
 without enabling opt-in sources. Repair/Mirror Preview is dry-run; Apply uses
 the same entrypoints as the CLI. TTY (`session login`, `doctor --guide`,
 mid-run EZProxy), `collections add`, `approve-each`, and Sci-Hub stay CLI.
-**Not tagged 1.0.** Polish left is tagging and screenshots.
+**Not tagged 1.0.** Polish left is the package tag. Screenshots:
+[Walkthroughs](walkthroughs.md).
 
 The CLI stays the source of truth; the GUI marshals the same verbs with dry-run
 default and explicit Apply. Not a second fetch stack or Zotero’s reader.

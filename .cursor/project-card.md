@@ -19,7 +19,7 @@ coverage_cmd: uv run pytest --cov=paperful --cov-report=term-missing -q
 docker_build_cmd: docker compose build
 docker_smoke_cmd: docker compose run --rm paperful doctor
 docker_operator_cmd: docker compose run --rm paperful
-preferred_deploy: Docker Compose build-local (docs/docker.md); uv is the contributor path
+preferred_deploy: Docker Compose build-local (docs/docker.md); docker compose up serves the workbench at 127.0.0.1:8765; uv is the contributor path
 architecture_rules:
   - CLI orchestrates only (no download/resolve logic in cli.py)
   - source adapters under sources/ must not write the manifest or out_dir

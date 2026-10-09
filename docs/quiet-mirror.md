@@ -11,7 +11,7 @@ Zotero cloud storage is small, and WebDAV is more ops than most people want.
 Zotero stays the bibliographic catalogue and attach target that is well
 tested. Mendeley and EndNote adapters exist for a co-author on another
 manager — they are **seeking testers**. This is a product stance, not a new
-daemon. Paperful remains a **local CLI**. House sync of `out/` (and careful
+daemon. Paperful remains a **local workbench** (GUI + CLI). House sync of `out/` (and careful
 use of `state/`) lives outside this repo (e.g. Syncthing on a homeserver).
 See the Toast Heaven ops plan
 `docs/operations/syncthing-personal-and-research.md` in the `server` repo when

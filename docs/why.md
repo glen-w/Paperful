@@ -19,55 +19,33 @@ those you open tomorrow.
 
 ## Five jobs
 
-**Library.** The object is the reference library: collections, years, item
-types. `collections` shows what you have. `snowball` proposes new works from
-a keyword, one or more DOIs, one or more ORCIDs, or a seed collection, and
-creates items only when the gate says so. [How a hop is cut](snowball.md#how-a-hop-is-cut)
-shows depth, direction, and the two caps. `import` and `export` speak RIS,
-BibTeX, and EndNote XML. The write gate for a PDF is **attach**, not admit.
-The live catalogue is an adapter. Zotero’s local API is the one to use.
-Mendeley (REST) and EndNote (read the `.enl`; writes are an import bundle)
-are seeking testers.
+**Library.** Collections, years, and item types are the scope.
 
-**Find.** Missing PDFs are searched. Open-access indexes come first
-(Unpaywall, OpenAlex, arXiv, bioRxiv/medRxiv, Europe PMC, Semantic Scholar,
-CORE). Campus EZProxy is next, when you have a subscription. Sites that do
-not fit that pattern — grey literature, field-specific hosts, odd landing
-pages — use playbooks you write, and, if you turn it on, an AI browser after
-the scripted lanes fail. Google Scholar and Sci-Hub stay off until you opt
-in. Paperful does not fetch every paywalled or DOI-less item. Sci-Hub
-coverage after ~2021 is thin; recent paywalled papers are a campus-access
-problem when your library has the subscription. See
-[Sci-Hub](scihub.md).
+- `collections` shows what you have.
+- `snowball` proposes new works; parents are created only when the gate says so. [How a hop is cut](snowball.md#how-a-hop-is-cut).
+- `import` / `export` speak RIS, BibTeX, and EndNote XML.
+- The PDF write gate is **attach**, not admit.
+- Zotero’s local API is the adapter to use. Mendeley and EndNote are seeking testers.
 
-**Completeness.** A record is in good shape when the identifier is honest,
-the duplicate has been reviewed, a PDF is attached when one could be found,
-and — if you want it — a grounded summary sits on the item. `gaps` counts
-what is missing. `lint` and `fix-metadata` propose patches on disk;
-`--apply` writes them. `dedupe` writes a review pack and, with `--apply`, writes a spare-copy line,
-then merges the extra parent's PDF, notes, and better fields onto the keeper
-before trashing that parent. `summarize` writes one note from a text-layer PDF;
-`synthesize` reviews those notes for a collection. `paperful all` runs the
-usual chain: gaps, find, lint, fix, summarise. The model is off until
-`[llm].enabled`. `paperful ocr --apply` adds a text layer to scanned PDFs
-on disk so those commands can read them.
+**Find.** Search for a missing PDF. Open access first, campus EZProxy when you have it, playbooks (and an opt-in AI browser) for odd landings.
 
-**Mirror.** `out/` is a copy of the library that is not a citation manager:
-one folder per item (`record.json`, optional PDF, notes) plus a collection
-tree. Every command keeps it current and works from it, so a manager that
-is closed or misbehaving costs write-back, not the read work. `restore --apply` creates only what the live
-catalogue is missing and does not overwrite fields already there. That tree
-is the backup. RIS, BibTeX, and EndNote XML are the interchange. Copy `out/`
-with your own sync; Paperful is not a sync service and not a WebDAV client.
-Phone sync stays with the catalogue. See [Quiet mirror](quiet-mirror.md).
+- Not every paywalled or DOI-less item comes back.
+- Google Scholar stays off until you opt in.
+- [How it works](how-it-works.md) · [Sources](sources.md).
 
-**Control.** Downloads, patches, and summaries land on disk first.
-Write-back is a separate step you ask for. Dry-run before a big fetch.
-Scholar, Sci-Hub, and the local model are opt-in. Session passwords are not
-stored in the config. Attachments carry a provenance stamp. The parent item
-also gets a readable line ("Free copy from Unpaywall.") unless
-`[remarks].surface` is `off`. Docker runs the
-tool; the catalogue and a headed login stay on the host.
+**Completeness.** Honest identifier, reviewed duplicate, PDF when one could be found, optional grounded note.
+
+- `gaps` counts misses. `lint` / `fix-metadata` propose patches; `--apply` writes them.
+- `dedupe` reviews, then merges onto the keeper.
+- `summarize` / `synthesize` need `[llm].enabled`. `ocr --apply` adds a text layer on disk.
+- `paperful all` is gaps → find → lint → fix → summarise.
+
+**Mirror.** `out/` is a folder copy, not a citation manager. One folder per item (`record.json`, optional PDF, notes). A closed manager costs write-back, not the read work.
+
+- `restore --apply` creates only what the catalogue is missing.
+- Copy `out/` yourself. Not a sync or WebDAV client. [Quiet mirror](quiet-mirror.md).
+
+**Control.** Disk first; write-back is a separate step. Dry-run before a big fetch. Scholar and the local model are opt-in. Session passwords are not in config. PDFs keep a provenance stamp.
 
 Python, the Zotero local API, Ollama or LiteLLM, Docker.
 
@@ -84,10 +62,11 @@ Python, the Zotero local API, Ollama or LiteLLM, Docker.
 | EndNote (`manager = "endnote"`, local `.enl`) | Seeking testers. Reads `sdb.eni`. Writes stage `state/endnote-import/` for File → Import. Paperful does not edit the EndNote database, and it cannot trash items there |
 | Text layer for scanned PDFs | `paperful ocr` (OCRmyPDF on the disk file). Two-up page split stays with zotero-agent |
 | Linked-file cutover, hosted multi-user service, a second reading app | Cutover is `attachments --link --apply` (off by default; personal library only). Hosted service and a second reading app are not the product |
-| Local workbench (`paperful serve`) | Landed, not tagged 1.0. `docker compose up` opens Wanted first, then Discover; Advanced adds Repair, Mirror, Index, and Briefs. Grab fetches to disk; Attach is the library write. TTY and Sci-Hub stay the shell. [GUI](gui.md) |
+| Local workbench (`paperful serve`) | Landed, not tagged 1.0. `docker compose up` opens Wanted first, then Discover; Advanced adds Repair, Mirror, Index, and Briefs. Grab fetches to disk; Attach is the library write. TTY stays the shell. Screenshots and click-throughs: [Walkthroughs](walkthroughs.md). [GUI](gui.md) |
 
 ## Related
 
+- [Walkthroughs](walkthroughs.md) — first fill, grow, tidy
 - [How it works](how-it-works.md) — fill pipeline
 - [Quiet mirror](quiet-mirror.md) — folder contract
 - [How Paperful compares](comparison.md)

@@ -22,7 +22,11 @@ Hosted docs: `uv sync --extra docs && make docs` (Sphinx HTML) or
 only `docs/*.md`; every page must appear in `docs/index.md` toctrees
 (`tests/test_sphinx_docs.py`). CI and Pages deploy use `DOCS_STRICT=1` (Sphinx
 `-W`). Live site: [paperful.app](https://paperful.app/) with the guide at
-[paperful.app/guide/](https://paperful.app/guide/).
+[paperful.app/guide/](https://paperful.app/guide/). Workbench screenshots:
+run `docker compose up`, then
+`.venv/bin/python scripts/docs/capture_workbench.py` (writes
+`docs/_static/workflows/` and homepage copies under `website/images/`).
+Do not capture Settings (email) or Sci-Hub.
 
 Zotero must be running with the local API enabled for integration tests that touch the CLI; most tests use stubs and run offline.
 

@@ -1,11 +1,20 @@
 # Paperful workbench
 
-**Status: 1.0 target.** Paperful stays a **local CLI** with a quiet disk mirror.
-**1.0** adds a **server-rendered workbench** on `paperful serve` that grows the
-library and fills PDFs without a second fetch stack. Zotero remains the
-catalogue and reader. **Interactive Ask** is on **Index** (opt-in `[rag]` +
-`[llm]`), not the home page. A **Firefox extension** and
-hosted SaaS are **post-1.0** — see [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10).
+A **local GUI** over the same verbs as the CLI. `docker compose up` (or
+`paperful serve`) binds http://127.0.0.1:8765. Zotero remains the catalogue
+and reader. Grab fetches to `out/`; Attach writes the library.
+
+**Status:** landed, not tagged 1.0. **Interactive Ask** is on **Index**
+(opt-in `[rag]` + `[llm]`), not the home page. A Firefox extension and hosted
+SaaS are **post-1.0** — see [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10).
+
+Jobs, with screenshots: [Walkthroughs](walkthroughs.md)
+([first fill](first-fill.md), [grow](grow-library.md),
+[tidy](tidy-library.md)).
+
+![Wanted is the home page: missing PDFs, Preview, Grab, Attach](_static/workflows/wanted.png)
+
+![Discover: topic search and people you follow](_static/workflows/discover.png)
 
 ---
 
@@ -112,6 +121,9 @@ saved under `state/prompts/`), item keys, types, years, and top-k; batch adds
 `--force` and questions file upload. **Extract questions** (`rag questions`) and
 **Already answered?** (`rag answered`, `state/rq-answered/`) use the same scope.
 Collection chip is the scope. **Synthesize** on Index when `[llm]` is on.
+
+![Index: ingest, search, and Ask over PDFs already on disk](_static/workflows/index.png)
+
 **Briefs**: collection **summarize** / **synthesize** when `[llm]` is on.
 Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
 `config.toml`; it does not enable `[rag]` or `[llm]`.

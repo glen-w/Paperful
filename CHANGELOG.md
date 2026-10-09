@@ -9,6 +9,13 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ### Added
 
+- **Docs / site:** GUI-first landing and README (local workbench, not
+  “CLI sidecar”). Playwright screenshots of Wanted, Discover, Repair, and
+  Index on [paperful.app](https://paperful.app/) and in the guide.
+  Walkthroughs: [first fill](docs/first-fill.md),
+  [grow the library](docs/grow-library.md),
+  [tidy a collection](docs/tidy-library.md). Recapture:
+  `scripts/docs/capture_workbench.py`.
 - **`paperful coverage`:** briefing / note / file DOI lists vs `-C` membership
   (`in_collection` / `missing` / `ambiguous`). Always dry-run; pack under
   `state/coverage/` (`paperful.coverage.pack.v1`). `ingest-dois --from-pack`

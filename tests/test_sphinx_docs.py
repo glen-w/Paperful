@@ -101,3 +101,32 @@ def test_gui_md_documents_discover_and_wanted_routes():
     missing = [path for path in required if path not in text]
     assert not missing, f"docs/gui.md missing workbench routes/surfaces: {', '.join(missing)}"
     assert "gui profile" not in text
+
+
+def test_walkthrough_pages_and_screenshots():
+    """Keep GUI-first walkthroughs and captured workbench shots in tree."""
+    for stem in ("walkthroughs", "first-fill", "grow-library", "tidy-library"):
+        path = DOCS / f"{stem}.md"
+        assert path.is_file(), f"missing {path.name}"
+    index = (DOCS / "walkthroughs.md").read_text(encoding="utf-8")
+    for needle in ("first-fill", "grow-library", "tidy-library", "Wanted"):
+        assert needle in index, f"docs/walkthroughs.md missing {needle}"
+    shots = DOCS / "_static" / "workflows"
+    for name in (
+        "wanted.png",
+        "discover.png",
+        "repair.png",
+        "index.png",
+        "system.png",
+        "wanted-held.png",
+        "mirror.png",
+    ):
+        assert (shots / name).is_file(), f"missing screenshot {name}"
+    site = ROOT / "website" / "images"
+    for name in (
+        "workbench-wanted.png",
+        "workbench-discover.png",
+        "workbench-repair.png",
+        "workbench-index.png",
+    ):
+        assert (site / name).is_file(), f"missing homepage shot {name}"

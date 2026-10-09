@@ -1,9 +1,12 @@
 # How it works
 
-A fill is `run`. Paperful checks the record, searches for a PDF, and writes
-the file to disk. It does not merge duplicates and it does not rewrite
-titles or dates. Those jobs sit around a fill — see [Around a fill](#around-a-fill).
-The landing page is the short version of this story.
+A fill is **Grab** on the workbench, or `run` on the CLI. Paperful checks
+the record, searches for a PDF, and writes the file to disk. It does not
+merge duplicates and it does not rewrite titles or dates. Those jobs sit
+around a fill — see [Around a fill](#around-a-fill).
+
+Click-by-click: [First fill](first-fill.md). The landing page is the short
+version of this story.
 
 **Trust the disk** before notes or Ask: `gaps` → `attachments` (honesty) →
 `run` (bytes on disk under `out/`) → you read `out/` → then `summarize` /
@@ -36,36 +39,30 @@ The landing page is the short version of this story.
    says slow down, Paperful waits. If a site keeps blocking, that source is
    paused. See [Slowing down](#slowing-down).
 6. **Save on this machine first.** The PDF lands under `out/` with a
-   **provenance stamp** on the file (`paperful oa:unpaywall`, `campus:ezproxy`,
-   `grey:undocs`) and a readable source line on the parent (“Free copy from
-   Unpaywall.”). On Zotero 10+ it can **attach**; older Zotero still gets the
-   file on disk. A sparse one-page download (ethics stub, consent form) is
-   dropped so another source can try; a denser one-pager waits for
-   `paperful attach --allow-short-pdf`. Details:
-   [research-ops](research-ops.md#wrong-work-pdfs). Not every paywalled
-   or DOI-less item comes back.
+   provenance stamp (`paperful oa:unpaywall`, `campus:ezproxy`, …) and a
+   readable parent line (“Free copy from Unpaywall.”).
+7. **Attach** into Zotero 10+ when you ask. Older Zotero still gets the file
+   on disk. Sparse one-page stubs are dropped; denser one-pagers wait for
+   `attach --allow-short-pdf`. [Wrong-work PDFs](research-ops.md#wrong-work-pdfs).
+   Not every paywalled or DOI-less item comes back.
 
 ## Where it looks
 
-Default order: Unpaywall, OpenAlex, arXiv, bioRxiv/medRxiv, Europe PMC,
-Semantic Scholar, CORE, OpenAIRE, the item’s own URL, campus EZProxy, then
-print-to-PDF for web items. Google Scholar and Sci-Hub stay off until you
-put them in `sources`. When Scholar is on, it runs **late** (one try before
-browser recovery, or one late phase if recovery is off), not in the middle of
-campus/grey. `[fetch].order = "list"` keeps the `sources` array order instead.
-Sci-Hub coverage after about 2021 is thin; recent
-paywalled papers are a campus-access problem when your library has the
-subscription.
+Default order:
 
-Open-access sources can run in parallel. Scholar, Sci-Hub, EZProxy,
-print-to-PDF, and opt-in [SerpApi](serpapi.md) stay one-at-a-time — they share a browser
-profile or a paid quota. SerpApi is never a silent default; when you turn it
-on, `[serpapi].max_calls` (default 20, `0` unlimited) or `--serpapi-max`
-limits paid searches that run.
+- Unpaywall, OpenAlex, arXiv, bioRxiv/medRxiv, Europe PMC, Semantic Scholar,
+  CORE, OpenAIRE
+- the item’s own URL
+- campus EZProxy
+- print-to-PDF for web items
 
-Per-item routing is on by default: a journal article with a DOI is not sent
-to every site. The log line `trying: …` is that shorter lane, not the full
-list. Details: [Source routing](sources.md).
+Google Scholar stays off until you opt in; when on, it runs **late** (not
+in the middle of campus/grey). `[fetch].order = "list"` keeps the `sources`
+array order instead. Open-access sources can run in parallel. EZProxy,
+print-to-PDF, and opt-in [SerpApi](serpapi.md) stay one-at-a-time.
+
+Per-item routing is on: a DOI paper is not sent to every site. The log line
+`trying: …` is that shorter lane. [Source routing](sources.md).
 
 ## Around a fill
 
@@ -90,28 +87,16 @@ bibliographic fields.
 a collection. Scans need a text layer first. [LLM](llm.md).
 
 `paperful all` is gaps → **run** → lint → fix → summarise. Dedupe is not in
-that chain; run it before `gaps` / `run` when the collection is messy.
-[Workflows](workflows.md).
+that chain; run it before a messy collection. [Workflows](workflows.md).
 
-To follow **people** (not a keyword crawl), `paperful authorwatch` records a
-local list and polls OpenAlex for their papers. First `run` is a cursor only.
-`suggest -C` can propose people from a collection before you accept them onto
-the list. That is not `snowball watch` and not the PDF `inbox watch`.
-[Author watch](authorwatch.md).
+Related verbs (not inside a fill):
 
-To follow a saved keyword or seed profile, `snowball watch` proposes works
-that were not in the baseline. `snowball watch digest`, or `watch run
---digest`, writes the rollup under `state/snowball/watches/<name>/digest.md`.
-[Watch](snowball.md#watch).
-
-To rank creators already in a collection and seed a proposed field author pack
-for personal-site PDF fetch, use `paperful authors -C …` (then promote). See
-[Workflows § field author packs](workflows.md#6-field-author-packs-corpus-frequency--author_site).
-
-To **ask authors** instead of fetching, `paperful reachout` writes a CSV
-(emails from the item) and can open existing ResearchGate publication URLs
-so you click Request. It never downloads and never sends mail.
-[Workflows § reachout](workflows.md#7-reachout-ask-authors-do-not-fetch).
+| Job | Where |
+| --- | --- |
+| People you follow | [Author watch](authorwatch.md) |
+| Saved keyword / seed profile | [Snowball watch](snowball.md#watch) |
+| Rank creators in `-C` | [Field author packs](workflows.md#6-field-author-packs-corpus-frequency--author_site) |
+| Ask authors, do not fetch | [Reachout](workflows.md#7-reachout-ask-authors-do-not-fetch) |
 
 ## Slowing down
 
@@ -158,3 +143,5 @@ Why this shape: [Why Paperful](why.md). Commands: [Commands](commands.md).
 Architecture of the same flow: [Architecture](architecture.md). The same verbs
 on localhost HTTP: [Workbench](gui.md). `docker compose up` serves it at
 http://127.0.0.1:8765. Grab fetches to disk; Attach writes Zotero.
+Walkthroughs: [first fill](first-fill.md), [grow](grow-library.md),
+[tidy](tidy-library.md).

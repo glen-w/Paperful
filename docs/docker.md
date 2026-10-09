@@ -1,16 +1,19 @@
 # Docker
 
-Paperful is a **local CLI**. The operator install is `git clone` and
-`docker compose build`. The image is **build-local only** (`paperful:local`).
+Paperful is a **local workbench**. The operator install is `git clone` and
+`docker compose build`, then `docker compose up` at
+http://127.0.0.1:8765. The image is **build-local only** (`paperful:local`).
 There is no `docker pull` and no PyPI package. Zotero and headed browser
 login live on the host. Docker does not replace them.
 
-The Compose image is a **one-shot pack** — Python 3.12, Paperful, Poppler
-(`pdftotext`), OCRmyPDF and Tesseract (`eng`), Playwright Chromium — for unattended commands (`run`, `lint`,
-`ocr`, `report`, `attach` once a write key exists). It is not a daemon.
+`docker compose up` keeps the GUI running. CLI one-shots are
+`docker compose run --rm paperful …` (the image is also a pack for unattended
+`run`, `lint`, `ocr`, `report`, `attach` once a write key exists). Python 3.12,
+Poppler (`pdftotext`), OCRmyPDF and Tesseract (`eng`), Playwright Chromium.
 Build mode is selected with `PAPERFUL_IMAGE_MODE` (see below). Contributors can
 still use [`uv`](https://docs.astral.sh/uv/) on the host (see the
 [README](https://github.com/glen-w/Paperful#readme) Develop section).
+Jobs in the GUI: [Walkthroughs](walkthroughs.md).
 
 Durable data — config, custom playbook packs, `out/`, and `state/` — still
 lives **outside** the container (and, by default, outside the git root).
@@ -69,6 +72,8 @@ docker compose build
 docker compose run --rm paperful doctor
 # Without host Zotero this exits 2 (amber/red). That is expected; CI job docker
 # asserts the same. Start Zotero, then re-run doctor.
+docker compose up
+# → http://127.0.0.1:8765  (Wanted). CLI one-shots stay compose run.
 docker compose run --rm paperful run --collection interesting --dry-run
 ```
 

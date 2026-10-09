@@ -9,6 +9,10 @@ ledger is honest, optional `snowball watch` or `authorwatch` (including
 `suggest -C` → `accept`), then the frontier digest (thin `briefing` is still
 there), then `summarize` / `ask`.
 
+Workbench path (Advanced on Discover): **refs gap** → **ingest-dois**
+Preview → Apply, then [First fill](first-fill.md) on Wanted. Click-by-click
+siblings: [Walkthroughs](walkthroughs.md).
+
 ## Sequence
 
 ```sh
@@ -46,7 +50,9 @@ docker compose run --rm paperful snowball watch digest NAME
 docker compose run --rm paperful snowball digest --run-id <run-id>
 ```
 
-Contributors: the same verbs with `uv run paperful …`.
+Contributors: the same verbs with `uv run paperful …`. On the workbench,
+Advanced Discover runs refs gap and ingest-dois with the same Preview →
+Apply tokens as Wanted Grab.
 
 **Sibling — briefing ↔ collection coverage:** when the gap is “named in a
 frontier briefing or note but not under `-C`”, use `paperful coverage`

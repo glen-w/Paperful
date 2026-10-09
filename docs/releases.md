@@ -12,8 +12,8 @@ Required keys on `paperful.run_report.v1` from `build_report()` are frozen
 Required keys on `paperful.item.v1` from `empty_item_record()` are frozen the
 same way. This tree is not tagged 1.0.
 
-**1.0** (not tagged) still owes polish on the **workbench** on
-`paperful serve` (screenshots, a 1.0 tag). Discover + Wanted, people lists,
+**1.0** (not tagged) still owes a package tag. Workbench screenshots and
+walkthroughs are in the guide ([Walkthroughs](walkthroughs.md)). Discover + Wanted, people lists,
 briefing/digest (optional collection note), Repair/Mirror Preview→Apply,
 command ids, review tokens, and Activity run-status SSE (`GET /v1/runs/{id}/events`)
 are in tree. **Interactive Ask** is on **Index**,

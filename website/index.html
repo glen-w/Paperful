@@ -6,7 +6,7 @@
     <title>Paperful — find missing PDFs, clean up your library, keep control of your papers</title>
     <meta
       name="description"
-      content="Fill missing PDFs in your Zotero library, tidy records, and keep a folder mirror on your machine. Open access first, campus access when you have it."
+      content="Local workbench for Zotero: fill missing PDFs, tidy records, and keep a folder mirror on your machine. Open access first, campus access when you have it."
     />
     <link rel="icon" href="images/favicon.ico" sizes="any" />
     <link rel="icon" href="images/favicon-32.png" type="image/png" sizes="32x32" />
@@ -14,7 +14,7 @@
     <meta property="og:title" content="Paperful — find missing PDFs, clean up your library, keep control of your papers" />
     <meta
       property="og:description"
-      content="Fill missing PDFs in your Zotero library, tidy records, and keep a folder mirror on your machine. Open access first, campus access when you have it."
+      content="Local workbench for Zotero: fill missing PDFs, tidy records, and keep a folder mirror on your machine. Open access first, campus access when you have it."
     />
     <meta property="og:image" content="https://paperful.app/images/logo.png" />
     <meta property="og:url" content="https://paperful.app/" />
@@ -24,7 +24,7 @@
     <meta name="twitter:title" content="Paperful — find missing PDFs, clean up your library, keep control of your papers" />
     <meta
       name="twitter:description"
-      content="Fill missing PDFs in your Zotero library, tidy records, and keep a folder mirror on your machine. Open access first, campus access when you have it."
+      content="Local workbench for Zotero: fill missing PDFs, tidy records, and keep a folder mirror on your machine. Open access first, campus access when you have it."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -37,7 +37,7 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "Paperful",
-        "description": "Fill missing PDFs in your Zotero library, tidy records, and keep a folder mirror on your machine. Open access first, campus access when you have it.",
+        "description": "Local workbench for Zotero: fill missing PDFs, tidy records, and keep a folder mirror on your machine. Open access first, campus access when you have it.",
         "url": "https://paperful.app/",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Linux, macOS, Windows",
@@ -68,7 +68,8 @@
           Menu
         </button>
         <nav id="site-nav" class="site-nav" data-nav>
-          <a href="#product">How it works</a>
+          <a href="#product">Workbench</a>
+          <a href="./guide/walkthroughs.html">Walkthroughs</a>
           <a href="./guide/">Docs</a>
           <a href="#install">Install</a>
           <a href="./cleaning-service.html">Cleaning Service</a>
@@ -94,131 +95,137 @@
             Keep control of your papers.
           </h1>
           <p class="lede">
-            Paperful helps you fill missing PDFs in Zotero, tidy the records you
-            already have, and keep a folder copy you can back up or hand to
-            another tool. Open access first; campus access when you have it.
-            Everything runs on your machine.
+            A local workbench for the Zotero library you already keep. Open
+            access first; campus access when you have it.
           </p>
           <p class="stack">
-            Built for Zotero. Mendeley and EndNote welcome testers. Version
-            0.9.0.
+            Zotero is well tested. Mendeley and EndNote welcome testers.
+            Version 0.9.0.
           </p>
           <div class="cta-row">
-            <a class="btn primary" href="#product">How it works</a>
+            <a class="btn primary" href="#product">See the workbench</a>
             <a class="btn ghost" href="#install">Install</a>
           </div>
         </div>
       </section>
 
-      <section class="section" id="product">
-        <div class="wrap narrow" id="how-it-works">
-          <h2>How it works</h2>
+      <section class="section muted" id="product">
+        <div class="wrap">
+          <h2>The workbench</h2>
           <p class="section-lead">
-            When you fill a collection, Paperful does this. Preview first from
-            Install if you want to see the plan before anything is fetched.
+            <code>docker compose up</code> →
+            <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a>.
+            Preview, then Grab to disk, then Attach to Zotero.
           </p>
+          <div class="shot-grid">
+            <figure class="shot">
+              <img
+                src="images/workbench-wanted.png"
+                alt="Wanted: missing PDFs in a collection, with Preview, Grab, and Attach"
+                width="1440"
+                height="900"
+              />
+              <figcaption>
+                <span class="mark" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M7 3.5h10A1.5 1.5 0 0 1 18.5 5v14A1.5 1.5 0 0 1 17 20.5H7A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z" />
+                    <path d="M9 8h6M9 12h6M9 16h3.5" />
+                  </svg>
+                </span>
+                Wanted — missing PDFs, Preview then Grab then Attach
+              </figcaption>
+            </figure>
+            <figure class="shot">
+              <img
+                src="images/workbench-discover.png"
+                alt="Discover: topic search and people you follow"
+                width="1440"
+                height="900"
+              />
+              <figcaption>
+                <span class="mark" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="6.5" />
+                    <path d="m16 16 4.5 4.5" />
+                  </svg>
+                </span>
+                Discover — search a topic or follow people
+              </figcaption>
+            </figure>
+            <figure class="shot">
+              <img
+                src="images/workbench-repair.png"
+                alt="Repair: lint, fix metadata, and review duplicates"
+                width="1440"
+                height="900"
+              />
+              <figcaption>
+                <span class="mark" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14.5 4.5 19.5 9.5 9 20H4v-5Z" />
+                    <path d="m12.5 6.5 5 5" />
+                  </svg>
+                </span>
+                Repair — lint, fix identifiers, review duplicates
+              </figcaption>
+            </figure>
+            <figure class="shot">
+              <img
+                src="images/workbench-index.png"
+                alt="Index: ingest, search, and ask PDFs already on disk"
+                width="1440"
+                height="900"
+              />
+              <figcaption>
+                <span class="mark" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4.5 6.5h15M4.5 12h15M4.5 17.5h10" />
+                  </svg>
+                </span>
+                Index — search and ask PDFs already on disk
+              </figcaption>
+            </figure>
+          </div>
+          <p class="around-fill">
+            <a href="./guide/walkthroughs.html">Walkthroughs</a>
+            ·
+            <a href="./guide/gui.html">Workbench reference</a>
+            ·
+            <a href="./guide/first-fill.html">First fill</a>.
+          </p>
+        </div>
+      </section>
+
+      <section class="section" id="how-it-works">
+        <div class="wrap narrow">
+          <h2>How a fill works</h2>
           <ol class="pipeline">
             <li>
-              <strong>Pick the slice.</strong>
-              A collection, or the whole library. You can narrow by year or
-              item type.
+              <strong>Pick a collection</strong>
+              on Library, then open Wanted.
             </li>
             <li>
-              <strong>Look for a free copy first.</strong>
-              Unpaywall, OpenAlex, arXiv, bioRxiv/medRxiv, Europe PMC,
-              Semantic Scholar, CORE, then the item’s own URL. Web pages can
-              be printed to PDF. Odd hosts use playbooks you write. Google
-              Scholar and Sci-Hub stay off until you turn them on.
+              <strong>Preview</strong>
+              the fetch. Open-access indexes first; campus EZProxy if you have
+              it. Not every paywalled paper comes back.
             </li>
             <li>
-              <strong>Use your library login when you have it.</strong>
-              Log in once in Chrome or Edge. Paperful reuses that campus
-              session through EZProxy. Same pattern for Scholar if you opt in.
-              The institutional password is never stored in config. When the
-              campus session expires, that lane stops for the rest of the run.
+              <strong>Grab</strong>
+              writes PDFs under <code>out/</code> on this machine. Zotero is
+              unchanged until you Attach.
             </li>
             <li>
-              <strong>Only try what fits.</strong>
-              A paper with a DOI does not get sent to every site. If a site
-              says slow down, we wait. If it keeps blocking or showing a
-              CAPTCHA, we pause that source and come back later so one
-              publisher does not stall the run.
-            </li>
-            <li>
-              <strong>Save on this machine first.</strong>
-              The PDF lands on disk with a readable source line (“Free copy
-              from Unpaywall.”). On Zotero 10+ it can attach; older Zotero
-              still gets the file on disk. Not every paywalled paper comes
-              back.
+              <strong>Attach</strong>
+              copies you trust into Zotero. Tidy duplicates and identifiers on
+              Repair when the collection is messy.
             </li>
           </ol>
           <p class="around-fill">
-            <strong>Around a fill.</strong>
-            Before a messy ingest, review duplicates; nothing merges until you
-            say so. After a fill, you can tidy identifiers and, if you want,
-            write summary notes from the PDF text.
-            <a href="./guide/how-it-works.html">How it works</a>
+            <a href="./guide/first-fill.html">First fill</a>
             ·
-            <a href="./guide/sources.html">Sources</a>
+            <a href="./guide/how-it-works.html">Search order</a>
             ·
-            <a href="./guide/sessions.html">Sessions</a>
-            ·
-            <a href="./guide/ezproxy.html">EZProxy</a>
-            ·
-            <a href="./guide/dedupe.html">Dedupe</a>.
-          </p>
-        </div>
-      </section>
-
-      <section class="section muted" id="what">
-        <div class="wrap narrow">
-          <h2>What it does</h2>
-          <ul class="outcomes">
-            <li>
-              <strong>Downloads.</strong>
-              Missing PDFs, when a copy can be reached. Each attachment keeps
-              a source line.
-            </li>
-            <li>
-              <strong>Notes.</strong>
-              Optional grounded summary from the PDF’s text. Local model, off
-              until you enable it. Scans need a text layer first.
-            </li>
-            <li>
-              <strong>Summaries.</strong>
-              A collection-level review of those notes.
-            </li>
-            <li>
-              <strong>A folder copy.</strong>
-              Snapshot on disk; export RIS, BibTeX, or EndNote XML. Copy that
-              folder yourself — not a sync service.
-            </li>
-          </ul>
-          <p>
-            You can also grow the library from a search or seed papers; that is
-            a different step from filling PDFs you already keep.
-            <a href="./guide/snowball.html">Snowball</a>.
-          </p>
-          <p>
-            <a href="./guide/how-it-works.html">How it works</a>
-            ·
-            <a href="./guide/llm.html">Notes and summaries</a>
-            ·
-            <a href="./guide/quiet-mirror.html">Folder copy</a>
-            ·
-            <a href="./guide/comparison.html">How it compares</a>.
-          </p>
-        </div>
-      </section>
-
-      <section class="section" id="privacy">
-        <div class="wrap narrow">
-          <h2>Your machine, your files</h2>
-          <p>
-            Paperful is a local tool. It reads your catalogue through an
-            adapter — Zotero’s local API is the path that is well tested.
-            Logins you make in the browser stay on this machine; the folder
-            copy is yours to move.
+            <a href="./guide/comparison.html">How it compares</a>
           </p>
         </div>
       </section>
@@ -226,75 +233,30 @@
       <section class="section muted" id="install">
         <div class="wrap narrow">
           <h2>Install</h2>
-          <p>
-            Build on your machine — there is no app store package and no
-            published Docker image. Keep Zotero on the host with the local API
-            enabled.
-          </p>
-          <ol class="steps">
-            <li>
-              Copy <code>config.minimal.toml</code>, add your
-              <code>email</code>, and run <code>paperful doctor</code>.
-            </li>
-            <li>
-              List collections and see which ones still need PDFs:
-              <code>paperful collections</code>.
-            </li>
-            <li>Dry-run a collection, then fetch and attach.</li>
-            <li>
-              Optionally log in to EZProxy or Scholar on the host before a
-              larger run.
-            </li>
-          </ol>
-          <p>
-            After <code>doctor</code>, <code>docker compose up</code> opens the
-            local workbench at
-            <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a>
-            (Wanted, then Discover). CLI one-shots stay
-            <code>docker compose run</code>.
+          <p class="section-lead">
+            Clone and build. No app store, no published image. Zotero stays on
+            the host with the local API enabled.
           </p>
           <pre class="code"><code>git clone https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
-cp config.minimal.toml config.toml
+cp config.minimal.toml config.toml   # set email
 docker compose build
 docker compose run --rm paperful doctor
-docker compose up
-# stays in the foreground → http://127.0.0.1:8765
-# in another terminal:
-docker compose run --rm paperful run --collection interesting --preset oa --dry-run
-# campus: --preset eoi, after uv run paperful session login ezproxy on the host</code></pre>
-          <p>
-            Rename is not enough: edit <code>.env</code> (data directory,
-            Zotero host, and image pack) and set a real <code>email</code> in
-            <code>config.toml</code>. The minimal config is open-access sources
-            only — paths, Zotero as manager, no campus EZProxy.
-            <code>.env.example</code> sets <code>PAPERFUL_IMAGE_MODE=heavy</code>
-            (llm / rag / browser-agent); CI builds light.
-            <a href="./guide/docker.html#environment-and-override">.env / Docker</a>
-            ·
-            <a href="./guide/docker.html#image-mode-light-vs-heavy">light vs heavy</a>
-            ·
-            <a href="./guide/config.html">config.toml</a>.
-          </p>
+docker compose up                    # http://127.0.0.1:8765</code></pre>
+          <ul class="outcomes">
+            <li>Edit <code>.env</code> and a real <code>email</code> in config — renaming the example files is not enough.</li>
+            <li>Minimal config is open access only. Campus EZProxy: <a href="./guide/ezproxy.html">EZProxy</a>.</li>
+            <li><code>.env.example</code> builds the <strong>heavy</strong> image. CI uses light. <a href="./guide/docker.html">Docker</a>.</li>
+          </ul>
           <p class="fine">
-            Version 0.9 builds from a tagged clone. Full setup:
-            <a href="./guide/docker.html">Docker</a>
+            <a href="./guide/first-fill.html">First fill</a>
             ·
             <a href="./guide/zotero.html">Zotero</a>
             ·
-            <a href="./guide/">documentation</a>.
-            Headed login uses
-            <a href="https://docs.astral.sh/uv/">uv</a>
-            on the host.
-          </p>
-          <p class="fine">
-            Also:
-            <a href="./guide/releases.html">0.x roadmap</a>
+            <a href="./guide/">Docs</a>
             ·
-            <a href="https://github.com/glen-w/Paperful/blob/main/README.md"
-              >README</a
-            >
+            <a href="https://github.com/glen-w/Paperful/blob/main/README.md">README</a>
           </p>
         </div>
       </section>

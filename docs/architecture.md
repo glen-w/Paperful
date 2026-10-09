@@ -1,7 +1,8 @@
 # Paperful architecture
 
 Paperful does five jobs — **library**, **find**, **completeness**,
-**mirror**, **control** — as a **local CLI**. Fetch, identifier checks,
+**mirror**, **control** — as a **local workbench** (GUI on
+`docker compose up`, same verbs on the CLI). Fetch, identifier checks,
 proposed metadata patches, summaries, and the per-item mirror happen **on
 disk** (`out/`, `state/`). A **library adapter** reads the catalogue and,
 separately, writes PDFs or field patches back. **Zotero** (local API on
