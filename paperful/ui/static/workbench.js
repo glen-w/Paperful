@@ -2,7 +2,11 @@
   function updateToolbarLabels() {
     var form = document.getElementById("wanted-form");
     if (!form) return;
-    var boxes = form.querySelectorAll(".row-select:checked:not(:disabled)");
+    // Row checkboxes live in the items table and point at the form via
+    // the ``form`` attribute, so they are not descendants of #wanted-form.
+    var boxes = document.querySelectorAll(
+      "input.row-select:checked:not(:disabled)"
+    );
     var any = boxes.length > 0;
     ["preview-btn", "grab-btn", "attach-btn"].forEach(function (id) {
       var btn = document.getElementById(id);

@@ -41,11 +41,11 @@ The screenshots are `ocean/BBNJ`. The clicks are the same for any collection.
 
 ![Wanted: missing PDFs in ocean/BBNJ, rows selected for Preview / Grab](_static/workflows/wanted.png)
 
-3. Choose **Preview all** (or tick rows, then Preview selected). Activity
-   records the command. If the library changed since preview, Grab refuses
-   (HTTP 409) — preview again.
+3. Tick the rows you want, then **Preview selected** (or **Preview all**).
+   Activity records the command. If the library changed since preview, Grab
+   refuses (HTTP 409) — preview again.
 
-4. Choose **Grab all** (or Grab selected). Files land under `out/` with a
+4. Choose **Grab selected** (or Grab all). Files land under `out/` with a
    provenance stamp (`paperful oa:unpaywall`, …). Zotero is unchanged.
 
 5. Open `out/` in your file manager. Trust the disk before notes or Ask.
@@ -55,8 +55,8 @@ The screenshots are `ocean/BBNJ`. The clicks are the same for any collection.
 
 ![Wanted Held: downloads waiting for a human look, rows ticked before Attach](_static/workflows/wanted-held.png)
 
-7. Tick the copies you trust and choose **Attach PDFs to this Zotero
-   library**. On Zotero 7–9 the files stay on disk until you attach later
+7. Tick the copies you trust and choose **Attach selected PDFs**. On
+   Zotero 7–9 the files stay on disk until you attach later
    (`paperful attach` on the CLI).
 
 8. **System** is the doctor table if Wanted shows an amber coach line (no

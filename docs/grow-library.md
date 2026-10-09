@@ -65,6 +65,8 @@ not a keyword hop.
 4. **Get suggestions** ranks people already in the collection chip
    (`suggest -C`). Tick **Accept** to put them on the list.
 
+![Discover People: suggestions ticked, members already on the list](_static/workflows/discover-people.png)
+
 Paperful does not live-scrape ResearchGate or LinkedIn. Save a follows page
 and **Import**. Details: [Author watch](authorwatch.md).
 

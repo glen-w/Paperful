@@ -99,14 +99,41 @@ def _tick_first(page, n: int) -> None:
     for i in range(total):
         boxes.nth(i).check()
     if total:
+        # Docker-served workbench.js may still query only descendants of
+        # #wanted-form; set the selected labels from the ticked boxes.
+        page.evaluate(
+            """() => {
+              const any = document.querySelectorAll(
+                'input.row-select:checked:not(:disabled)'
+              ).length > 0;
+              ['preview-btn', 'grab-btn', 'attach-btn'].forEach((id) => {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                const next = any
+                  ? btn.getAttribute('data-label-sel')
+                  : btn.getAttribute('data-label-all');
+                if (next) btn.textContent = next;
+              });
+            }"""
+        )
         page.wait_for_timeout(150)
 
 
-def _scroll_h2(page, title: str) -> None:
-    loc = page.locator("h2", has_text=title)
-    if loc.count():
-        loc.first.scroll_into_view_if_needed()
-        page.wait_for_timeout(200)
+def _scroll_below_chrome(page, heading: str) -> None:
+    page.evaluate(
+        """(heading) => {
+          const h = [...document.querySelectorAll('h2')].find(
+            (el) => (el.textContent || '').trim() === heading
+          );
+          if (!h) return;
+          const nav = document.querySelector('.wb-nav');
+          const offset = (nav ? nav.getBoundingClientRect().bottom : 80) + 16;
+          const y = h.getBoundingClientRect().top + window.scrollY - offset;
+          window.scrollTo(0, Math.max(0, y));
+        }""",
+        heading,
+    )
+    page.wait_for_timeout(200)
 
 
 def _best_ask_thread(collection: str, question: str) -> str | None:
@@ -226,8 +253,7 @@ def main() -> None:
         for heading in ("Suggestions", "Members", "People"):
             loc = page.locator("h2", has_text=heading)
             if loc.count():
-                loc.first.scroll_into_view_if_needed()
-                page.wait_for_timeout(200)
+                _scroll_below_chrome(page, heading)
                 break
         _shot(page, "discover-people.png")
 
@@ -299,12 +325,8 @@ def main() -> None:
         _fill(page, "form[action='/index/ingest'] input[name='year_to']", "2026")
         _fill(page, "form[action='/index/ingest'] input[name='limit']", "40")
         _fill(page, "form[action='/index/ask'] textarea[name='question']", ASK_QUESTION)
-        _fill(
-            page,
-            "form[action='/index/ask-batch'] textarea[name='questions']",
-            "What is the BBNJ clearing-house mechanism?\n"
-            "How does the treaty treat marine genetic resources?",
-        )
+        page.locator("h1", has_text="Index").first.scroll_into_view_if_needed()
+        page.wait_for_timeout(150)
         _shot(page, "index.png")
 
         thread_id = _best_ask_thread(COLLECTION, ASK_QUESTION)
@@ -327,14 +349,6 @@ def main() -> None:
         _fill(page, "form[action='/briefs/synthesize'] input[name='limit']", "40")
         _fill(page, "form[action='/briefs/synthesize'] input[name='year_from']", "2020")
         _fill(page, "form[action='/briefs/synthesize'] input[name='year_to']", "2026")
-        page.evaluate(
-            """() => {
-              document.querySelectorAll('main details').forEach((el) => {
-                el.open = true;
-              });
-            }"""
-        )
-        page.wait_for_timeout(150)
         _shot(page, "briefs.png")
 
         browser.close()

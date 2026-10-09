@@ -26,7 +26,8 @@ only `docs/*.md`; every page must appear in `docs/index.md` toctrees
 run `docker compose up`, then
 `.venv/bin/python scripts/docs/capture_workbench.py` (writes
 `docs/_static/workflows/` and homepage copies under `website/images/`).
-Do not capture Settings (email) or Sci-Hub.
+The script fills demo values and ticks rows; it does not submit Grab or
+Apply. Do not capture Settings (email) or Sci-Hub.
 
 Zotero must be running with the local API enabled for integration tests that touch the CLI; most tests use stubs and run offline.
 

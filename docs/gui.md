@@ -122,7 +122,7 @@ saved under `state/prompts/`), item keys, types, years, and top-k; batch adds
 **Already answered?** (`rag answered`, `state/rq-answered/`) use the same scope.
 Collection chip is the scope. **Synthesize** on Index when `[llm]` is on.
 
-![Index: ingest scoped, passage search run, Ask question typed](_static/workflows/index.png)
+![Index: ingest scoped and a passage search run over ocean/BBNJ](_static/workflows/index.png)
 
 ![Index Ask: a cited answer from PDFs already on disk in ocean/BBNJ](_static/workflows/index-ask.png)
 

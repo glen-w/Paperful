@@ -84,6 +84,9 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 - **Docs screenshots:** workbench stills show forms in use (selected Wanted
   rows, Discover query, Index search + Ask), not empty landing pages.
   Recapture: `scripts/docs/capture_workbench.py`.
+- **Wanted row ticks:** Preview / Grab / Attach labels switch to “selected”
+  when table checkboxes are ticked (they sit outside `#wanted-form` and
+  point at it with the `form` attribute).
 - **Workbench chrome:** product box mark + Nunito wordmark top-left; cream paper,
   Fraunces / Nunito / Source Sans 3, and accent buttons match the public site.
 - **Library collections:** nested `<details>` groups by path (AO → Mini meta

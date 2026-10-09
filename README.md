@@ -38,9 +38,9 @@ Walkthroughs: [first fill](docs/first-fill.md), [grow the library](docs/grow-lib
 
 ## Screenshots
 
-![Wanted: missing PDFs, Preview then Grab then Attach](docs/_static/workflows/wanted.png)
+![Wanted: missing PDFs selected for Preview, then Grab, then Attach](docs/_static/workflows/wanted.png)
 
-![Discover: search a topic or follow people](docs/_static/workflows/discover.png)
+![Discover: topic filled, ready to search or follow people](docs/_static/workflows/discover.png)
 
 ![Repair: lint, fix metadata, review duplicates](docs/_static/workflows/repair.png)
 

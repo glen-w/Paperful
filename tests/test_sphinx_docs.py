@@ -115,6 +115,7 @@ def test_walkthrough_pages_and_screenshots():
     for name in (
         "wanted.png",
         "discover.png",
+        "discover-people.png",
         "repair.png",
         "index.png",
         "index-ask.png",
