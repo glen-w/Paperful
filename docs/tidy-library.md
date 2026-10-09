@@ -34,7 +34,7 @@ second copy of the same paper.
 2. Open **Repair**. Each verb is Preview (dry-run + review token) then
    Apply (consumes the token). Stale previews return HTTP 409.
 
-![Repair: lint, fix-metadata, and dedupe behind Preview / Apply](_static/workflows/repair.png)
+![Repair: lint, fix-metadata, and dedupe with Preview / Apply](_static/workflows/repair.png)
 
 3. **lint** — Preview writes the report. Lint is read-only; there is no
    Apply that “fixes lint”. Read the findings, then use **fix-metadata**.

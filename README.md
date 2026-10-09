@@ -44,7 +44,7 @@ Walkthroughs: [first fill](docs/first-fill.md), [grow the library](docs/grow-lib
 
 ![Repair: lint, fix metadata, review duplicates](docs/_static/workflows/repair.png)
 
-![Index: search and ask PDFs already on disk](docs/_static/workflows/index.png)
+![Index Ask: a cited answer from PDFs already on disk](docs/_static/workflows/index-ask.png)
 
 ## On your machine
 

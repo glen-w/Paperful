@@ -12,9 +12,9 @@ Jobs, with screenshots: [Walkthroughs](walkthroughs.md)
 ([first fill](first-fill.md), [grow](grow-library.md),
 [tidy](tidy-library.md)).
 
-![Wanted is the home page: missing PDFs, Preview, Grab, Attach](_static/workflows/wanted.png)
+![Wanted is the home page: missing PDFs selected for Preview, Grab, Attach](_static/workflows/wanted.png)
 
-![Discover: topic search and people you follow](_static/workflows/discover.png)
+![Discover: topic filled, ready to search or follow people](_static/workflows/discover.png)
 
 ---
 
@@ -122,7 +122,9 @@ saved under `state/prompts/`), item keys, types, years, and top-k; batch adds
 **Already answered?** (`rag answered`, `state/rq-answered/`) use the same scope.
 Collection chip is the scope. **Synthesize** on Index when `[llm]` is on.
 
-![Index: ingest, search, and Ask over PDFs already on disk](_static/workflows/index.png)
+![Index: ingest scoped, passage search run, Ask question typed](_static/workflows/index.png)
+
+![Index Ask: a cited answer from PDFs already on disk in ocean/BBNJ](_static/workflows/index-ask.png)
 
 **Briefs**: collection **summarize** / **synthesize** when `[llm]` is on.
 Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes

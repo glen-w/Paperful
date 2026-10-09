@@ -71,12 +71,14 @@ html_theme = "furo"
 html_title = "Paperful"
 html_favicon = "favicon.ico"
 html_theme_options = {
-    # Ink wordmark on light; cream wordmark on dark (see docs/logo*.png).
-    "light_logo": "logo.png",
-    "dark_logo": "logo-dark.png",
+    # Box mark only. The sticky site header already has the Nunito wordmark;
+    # logo.png / logo-dark.png are lockups (mark + word) for README / landing.
+    "light_logo": "icon.png",
+    "dark_logo": "icon.png",
+    "sidebar_hide_name": True,
 }
 # Shared public-site chrome (header nav) lives under website/chrome/ so the
 # marketing landing and /guide/ share one sticky header.
 html_static_path = ["_static", "../website/chrome"]
-html_css_files = ["site_chrome.css"]
+html_css_files = ["site_chrome.css", "docs.css"]
 html_js_files = ["site_nav.js"]

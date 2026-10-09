@@ -10,8 +10,9 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 ### Added
 
 - **Docs / site:** GUI-first landing and README (local workbench, not
-  “CLI sidecar”). Playwright screenshots of Wanted, Discover, Repair, and
-  Index on [paperful.app](https://paperful.app/) and in the guide.
+  “CLI sidecar”). Playwright screenshots of Wanted, Discover, Repair,
+  Index, and Index Ask (a live `ocean/BBNJ` thread with a cited answer) on
+  [paperful.app](https://paperful.app/) and in the guide.
   Walkthroughs: [first fill](docs/first-fill.md),
   [grow the library](docs/grow-library.md),
   [tidy a collection](docs/tidy-library.md). Recapture:
@@ -80,6 +81,9 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ### Changed
 
+- **Docs screenshots:** workbench stills show forms in use (selected Wanted
+  rows, Discover query, Index search + Ask), not empty landing pages.
+  Recapture: `scripts/docs/capture_workbench.py`.
 - **Workbench chrome:** product box mark + Nunito wordmark top-left; cream paper,
   Fraunces / Nunito / Source Sans 3, and accent buttons match the public site.
 - **Library collections:** nested `<details>` groups by path (AO → Mini meta

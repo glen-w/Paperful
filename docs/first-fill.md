@@ -39,7 +39,7 @@ The screenshots are `ocean/BBNJ`. The clicks are the same for any collection.
    Missing. The default tab is the first non-empty bucket. Missing rows use
    miss-surface icons (hover for the plain-language reason).
 
-![Wanted: missing PDFs in ocean/BBNJ, with Preview, Grab, and Attach](_static/workflows/wanted.png)
+![Wanted: missing PDFs in ocean/BBNJ, rows selected for Preview / Grab](_static/workflows/wanted.png)
 
 3. Choose **Preview all** (or tick rows, then Preview selected). Activity
    records the command. If the library changed since preview, Grab refuses
@@ -53,7 +53,7 @@ The screenshots are `ocean/BBNJ`. The clicks are the same for any collection.
 6. Back on Wanted, open **Held** for downloads that need a human look
    (short PDF, DOI mismatch). **Have** is already-imported copies.
 
-![Wanted Held: downloads waiting for a human look before Attach](_static/workflows/wanted-held.png)
+![Wanted Held: downloads waiting for a human look, rows ticked before Attach](_static/workflows/wanted-held.png)
 
 7. Tick the copies you trust and choose **Attach PDFs to this Zotero
    library**. On Zotero 7–9 the files stay on disk until you attach later

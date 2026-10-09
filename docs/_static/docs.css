@@ -1,0 +1,19 @@
+/* Furo sidebar + mobile header sit under the shared site chrome, which
+   already shows the Paperful wordmark. Keep one name, a small box mark. */
+
+.sidebar-logo {
+  display: block;
+  width: auto;
+  max-height: 4.5rem;
+  margin-inline: auto;
+}
+
+.sidebar-brand-text {
+  display: none;
+}
+
+/* Furo's mobile bar repeats html_title under the sticky header. Keep the
+   hamburger / theme-toggle layout; just don't print the name again. */
+.mobile-header .header-center {
+  visibility: hidden;
+}

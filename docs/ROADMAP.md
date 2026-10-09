@@ -1349,8 +1349,8 @@ Ship in layers:
    [snowball](snowball.md). Remaining: a side-by-side **full** fetch (EZProxy
    relogin, browser-agent, handoff walk / inbox) as its own page.
 3. **Screenshots and video guides** — **Shipped (stills):** workbench Wanted,
-   Discover, Repair, Index, System, Mirror (`docs/_static/workflows/`; homepage
-   copies under `website/images/`). Recapture:
+   Discover, Repair, Index, Index Ask, System, Mirror (`docs/_static/workflows/`;
+   homepage copies under `website/images/`). Recapture:
    `scripts/docs/capture_workbench.py`. Remaining: dry-run table callouts,
    Zotero provenance, short screen recordings.
 4. **Developer guide** — [developer.md](developer.md). **Shipped:** the

@@ -3,7 +3,9 @@
 `paperful rag ingest` builds a search index from the PDFs and abstracts in the
 on-disk mirror. `paperful ask` answers a question from that index and names the
 papers and pages it used. `paperful rag search` shows the matching passages
-without a chat model.
+without a chat model. On the workbench, that is **Index → Ask** (Advanced).
+
+![Index Ask: a cited answer from PDFs already on disk in ocean/BBNJ](_static/workflows/index-ask.png)
 
 Everything here is optional and off until `[rag].enabled = true`.
 

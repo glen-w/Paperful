@@ -117,6 +117,7 @@ def test_walkthrough_pages_and_screenshots():
         "discover.png",
         "repair.png",
         "index.png",
+        "index-ask.png",
         "system.png",
         "wanted-held.png",
         "mirror.png",
@@ -130,3 +131,16 @@ def test_walkthrough_pages_and_screenshots():
         "workbench-index.png",
     ):
         assert (site / name).is_file(), f"missing homepage shot {name}"
+
+
+def test_docs_sidebar_does_not_stack_wordmarks():
+    """Site chrome already names Paperful; Furo must not print the lockup twice more."""
+    conf = (DOCS / "conf.py").read_text(encoding="utf-8")
+    assert "sidebar_hide_name" in conf
+    assert '"light_logo": "icon.png"' in conf
+    assert '"dark_logo": "icon.png"' in conf
+    assert (DOCS / "_static" / "icon.png").is_file()
+    assert (DOCS / "_static" / "docs.css").is_file()
+    css = (DOCS / "_static" / "docs.css").read_text(encoding="utf-8")
+    assert ".sidebar-brand-text" in css
+    assert ".mobile-header .header-center" in css
