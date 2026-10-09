@@ -93,13 +93,22 @@ def main() -> None:
 
         page.goto(f"{BASE}/library", wait_until="domcontentloaded")
         _ready(page)
-        ocean = page.locator(".coll-name", has_text="ocean")
-        if ocean.count():
-            details = ocean.first.locator("xpath=ancestor::details")
-            if details.count():
-                details.first.evaluate("el => { el.open = true; }")
-            ocean.first.scroll_into_view_if_needed()
-            page.wait_for_timeout(250)
+        page.evaluate(
+            """() => {
+              document.querySelectorAll('.coll-tree > .coll-node').forEach((el) => {
+                const name = el.querySelector(':scope > summary .coll-name');
+                el.open = !!(name && /ocean/i.test(name.textContent || ''));
+              });
+              document.querySelectorAll('.coll-name').forEach((el) => {
+                if (/^bbnj$/i.test((el.textContent || '').trim())) {
+                  const details = el.closest('details');
+                  if (details) details.open = true;
+                }
+              });
+            }"""
+        )
+        page.locator("h1", has_text="Library").first.scroll_into_view_if_needed()
+        page.wait_for_timeout(250)
         _shot(page, "library.png")
 
         page.goto(f"{BASE}/activity", wait_until="domcontentloaded")

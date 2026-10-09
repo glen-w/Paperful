@@ -84,6 +84,8 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
   Fraunces / Nunito / Source Sans 3, and accent buttons match the public site.
 - **Library collections:** nested `<details>` groups by path (AO → Mini meta
   studies → Coffee); item counts no longer render as a dict `.items` method.
+  Parent rows no longer treat the disclosure marker as a grid cell, so names,
+  item counts, and missing-PDF counts line up with the column headers.
 - **Compose `up` → GUI:** `docker compose up` serves the workbench at
   http://127.0.0.1:8765 (assumes setup done). CLI one-shots stay
   `docker compose run --rm paperful <cmd>`. `compose.gui.yaml` is a no-op shim.

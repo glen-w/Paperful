@@ -269,6 +269,9 @@ def test_library_nests_collections(tmp_path, monkeypatch):
     res = client.get("/library")
     assert res.status_code == 200
     assert "<details" in res.text
+    assert 'class="coll-toggle"' in res.text
+    assert "<summary" in res.text
+    assert 'summary class="coll-head"' not in res.text
     assert "Mini meta studies" in res.text
     assert "Coffee" in res.text
     assert "built-in method items" not in res.text
