@@ -428,6 +428,8 @@ def _snowball_apply_fingerprint(cfg: Config, run_id: str, collection: str) -> st
     import hashlib
     import json
 
+    from .pages import candidate_title_doi
+
     keeps: list[str] = []
     path = cfg.state_dir / "snowball" / run_id / "candidates.jsonl"
     if path.is_file():
@@ -441,7 +443,7 @@ def _snowball_apply_fingerprint(cfg: Config, run_id: str, collection: str) -> st
                 continue
             if data.get("keep") is False:
                 continue
-            doi = str(data.get("doi") or "")
+            _title, doi = candidate_title_doi(data)
             if doi:
                 keeps.append(doi)
     keeps.sort()
@@ -1217,7 +1219,7 @@ def set_snowball_keep(cfg: Config, run_id: str, dois: list[str], keep: bool) -> 
     path = dest / "candidates.jsonl"
     out_lines: list[str] = []
     for row in rows:
-        if (row.doi or "").strip().lower() in doi_set:
+        if (row.ids.get("doi") or "").strip().lower() in doi_set:
             row.keep = keep
         out_lines.append(json.dumps(row.to_dict(), ensure_ascii=False))
     path.write_text("\n".join(out_lines) + "\n", encoding="utf-8")

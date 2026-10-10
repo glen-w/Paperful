@@ -175,6 +175,30 @@ def test_discover_queue_fixture(tmp_path):
     assert candidates[0]["title"] == "One"
 
 
+def test_discover_queue_reads_nested_biblio(tmp_path):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    run = cfg.state_dir / "snowball" / "run-nested"
+    run.mkdir(parents=True)
+    row = {
+        "schema": "paperful.snowball.candidate.v1",
+        "biblio": {"title": "Nested title"},
+        "ids": {"doi": "10.1000/nested"},
+        "keep": True,
+    }
+    (run / "candidates.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+    inbox = cfg.state_dir / "authorwatch" / "voices"
+    inbox.mkdir(parents=True)
+    (inbox / "inbox.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+    _run_id, candidates = newest_snowball_queue(cfg)
+    assert candidates[0]["title"] == "Nested title"
+    assert candidates[0]["doi"] == "10.1000/nested"
+    from paperful.ui.pages import authorwatch_inbox_rows
+
+    rows = authorwatch_inbox_rows(cfg)
+    assert rows[0]["title"] == "Nested title"
+    assert rows[0]["doi"] == "10.1000/nested"
+
+
 def test_list_recent_summaries_cite_and_model(tmp_path):
     from paperful.mirror import forget_index
     from paperful.notehtml import wrap

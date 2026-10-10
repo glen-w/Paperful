@@ -130,6 +130,19 @@ def scope_fingerprint(items: list[Any], manifest: Manifest) -> str:
     return digest
 
 
+def candidate_title_doi(data: dict[str, Any]) -> tuple[str, str]:
+    """Title and DOI from a snowball candidate row.
+
+    Live queues store them under ``biblio`` / ``ids``. Older fixtures used
+    top-level ``title`` and ``doi``.
+    """
+    biblio = data.get("biblio") if isinstance(data.get("biblio"), dict) else {}
+    ids = data.get("ids") if isinstance(data.get("ids"), dict) else {}
+    title = str(data.get("title") or biblio.get("title") or "").strip()
+    doi = str(data.get("doi") or ids.get("doi") or "").strip()
+    return title, doi
+
+
 def newest_snowball_queue(cfg: Config) -> tuple[str, list[dict[str, Any]]]:
     root = cfg.state_dir / "snowball"
     if not root.is_dir():
@@ -149,10 +162,11 @@ def newest_snowball_queue(cfg: Config) -> tuple[str, list[dict[str, Any]]]:
             if not line:
                 continue
             data = json.loads(line)
+            title, doi = candidate_title_doi(data)
             rows.append(
                 {
-                    "title": data.get("title") or "",
-                    "doi": data.get("doi") or "",
+                    "title": title,
+                    "doi": doi,
                     "keep": data.get("keep"),
                     "run_id": run_id,
                 }
@@ -177,11 +191,12 @@ def authorwatch_inbox_rows(cfg: Config) -> list[dict[str, Any]]:
                 if not line:
                     continue
                 data = json.loads(line)
+                title, doi = candidate_title_doi(data)
                 out.append(
                     {
                         "list": list_dir.name,
-                        "title": data.get("title") or "",
-                        "doi": data.get("doi") or "",
+                        "title": title,
+                        "doi": doi,
                     }
                 )
     return out
