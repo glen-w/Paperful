@@ -843,7 +843,7 @@ details > ul {
   text-transform: none;
   line-height: 1.4;
   text-align: left;
-  white-space: normal;
+  white-space: pre-line;
   box-shadow: 0 4px 14px rgba(16, 24, 32, 0.12);
   opacity: 0;
   visibility: hidden;
