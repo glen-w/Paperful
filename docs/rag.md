@@ -235,10 +235,12 @@ uv run paperful rag answered --from-file qs.txt --after-item AAAA1111
 `state/rq-answered/<stamp>/` (`paperful.rq_answered.v1`). `--after-item`
 keeps only newer years and drops the asking paper from retrieval.
 
-### Workbench (Advanced Index)
+(workbench-advanced-index)=
+### Workbench
 
-With `[rag]` and `[llm]` on, the workbench **Ask** page runs threaded Ask and
-batch Ask. Advanced **Index** covers ingest, search, extract questions,
+**Ask** is on the default nav. With `[rag]` and `[llm]` on, that page runs
+threaded Ask. Batch Ask is on the same page when Advanced is on. Advanced
+**Index** covers ingest, search, extract questions,
 already-answered checks, and synthesize. Scope follows the collection chip
 (plus optional item keys, years, types, top-k). Custom system prompts on
 Ask/batch, in order:

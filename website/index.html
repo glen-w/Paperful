@@ -226,8 +226,8 @@
             </li>
             <li>Open the files yourself. Attach the ones you trust into Zotero.</li>
             <li>
-              Grow the library on <strong>Discover</strong>, or tidy records
-              on <strong>Repair</strong>, when you need those jobs.
+              Grow the library on <strong>Discover</strong>. Tidy records on
+              <strong>Repair</strong> after you turn on Advanced.
             </li>
           </ol>
           <p>
@@ -250,13 +250,18 @@
           <pre class="code"><code>git clone https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
-cp config.minimal.toml config.toml   # set email
+mkdir -p ../paperful-data
+cp config.minimal.toml ../paperful-data/config.toml   # set email
 docker compose build
 docker compose run --rm paperful doctor
 docker compose up</code></pre>
           <p>
-            Set a real <code>email</code> in config (Unpaywall) and edit
-            <code>.env</code> — renaming the examples is not enough.
+            Compose reads <code>config.toml</code> from
+            <code>PAPERFUL_DATA</code> (the <code>.env</code> default is
+            <code>../paperful-data</code>), not from the git root. Set a real
+            <code>email</code> in that file (Unpaywall). To keep data in the
+            checkout, set <code>PAPERFUL_DATA=.</code> and copy
+            <code>config.toml</code> next to <code>compose.yaml</code>.
           </p>
           <p class="fine">
             <a href="./guide/docker.html">Docker</a>
