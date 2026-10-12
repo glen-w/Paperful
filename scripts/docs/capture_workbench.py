@@ -177,7 +177,7 @@ def _best_ask_thread(collection: str, question: str) -> str | None:
 
 
 def _prepare_ask_shot(page) -> None:
-    """Keep Index chrome; drop sibling Index panels so the thread fits."""
+    """Keep Ask chrome; drop sibling panels so the thread fits."""
     page.evaluate(
         """() => {
           const ask = [...document.querySelectorAll('section.panel')].find((el) => {
@@ -286,6 +286,21 @@ def main() -> None:
         _redact_emails(page)
         _shot(page, "system.png")
 
+        thread_id = _best_ask_thread(COLLECTION, ASK_QUESTION)
+        if thread_id:
+            page.goto(
+                f"{BASE}/ask?thread={thread_id}",
+                wait_until="domcontentloaded",
+            )
+            _ready(page)
+            _prepare_ask_shot(page)
+            _shot(page, "index-ask.png")
+        else:
+            page.goto(f"{BASE}/ask", wait_until="domcontentloaded")
+            _ready(page)
+            _fill(page, "form[action='/ask'] textarea[name='question']", ASK_QUESTION)
+            print("skip index-ask.png (no answered thread under state/rag/threads/)")
+
         context.add_cookies(_cookies(advanced=True))
 
         page.goto(f"{BASE}/repair", wait_until="domcontentloaded")
@@ -324,22 +339,9 @@ def main() -> None:
         _fill(page, "form[action='/index/ingest'] input[name='year_from']", "2018")
         _fill(page, "form[action='/index/ingest'] input[name='year_to']", "2026")
         _fill(page, "form[action='/index/ingest'] input[name='limit']", "40")
-        _fill(page, "form[action='/index/ask'] textarea[name='question']", ASK_QUESTION)
         page.locator("h1", has_text="Index").first.scroll_into_view_if_needed()
         page.wait_for_timeout(150)
         _shot(page, "index.png")
-
-        thread_id = _best_ask_thread(COLLECTION, ASK_QUESTION)
-        if thread_id:
-            page.goto(
-                f"{BASE}/index?thread={thread_id}",
-                wait_until="domcontentloaded",
-            )
-            _ready(page)
-            _prepare_ask_shot(page)
-            _shot(page, "index-ask.png")
-        else:
-            print("skip index-ask.png (no answered thread under state/rag/threads/)")
 
         page.goto(f"{BASE}/briefs", wait_until="domcontentloaded")
         _ready(page)

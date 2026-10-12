@@ -44,7 +44,7 @@ Walkthroughs: [first fill](docs/first-fill.md), [grow the library](docs/grow-lib
 
 ![Repair: lint, fix metadata, review duplicates](docs/_static/workflows/repair.png)
 
-![Index Ask: a cited answer from PDFs already on disk](docs/_static/workflows/index-ask.png)
+![Ask: a cited answer from PDFs already on disk](docs/_static/workflows/index-ask.png)
 
 ## On your machine
 
@@ -145,7 +145,7 @@ reviews, and Ask live on Advanced **Briefs** / **Index**.
 
 ```sh
 ollama pull qwen2.5:7b                       # then set [llm] enabled = true
-# Index Ask also needs: ollama pull nomic-embed-text and [rag] enabled = true
+# Ask also needs: ollama pull nomic-embed-text and [rag] enabled = true
 ```
 
 ## Develop

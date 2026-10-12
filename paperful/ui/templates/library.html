@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_help.html" import info %}
 {% from "_icon_btn.html" import icon_button %}
 {% block title %}Library — Paperful{% endblock %}
 {% block content %}
@@ -27,9 +28,11 @@
   {% endfor %}
 {% endmacro %}
 <h1>Library</h1>
+<p class="page-lede">Zotero collections in this library. The target icon sets the collection chip in the header — Wanted, Discover, Ask, Index, and Briefs all follow that chip. <strong>Missing PDF</strong> is how many items in that collection still have no stored file.</p>
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
 <section class="panel">
   <h2>Collections</h2>
+  <p class="section-lede">Click a name to expand nested collections. Item counts include subcollections. Set scope on the collection you actually want to work on, not only the parent folder.</p>
 {% if collection_tree %}
 <div class="coll-tree">
   <div class="coll-head coll-labels" aria-hidden="true">
@@ -55,7 +58,7 @@
         of {{ library_pagination.total }}
       </span>
       <label>
-        Per page
+        Per page {{ info("How many rows to show. Larger pages are heavier to render.") }}
         <select name="per_page" onchange="this.form.submit()">
           {% for n in library_pagination.page_sizes %}
           <option value="{{ n }}"{% if n == library_pagination.per_page %} selected{% endif %}>{{ n }}</option>
@@ -72,6 +75,7 @@
       {% endif %}
     </form>
   </div>
+  <p class="section-lede">Items currently in the collection chip. PDF yes means Zotero already has a stored file. Open Detail for the summary, if one exists.</p>
 <table class="wb-table">
   <thead><tr><th>Title</th><th>Year</th><th>PDF</th><th>Summary</th><th></th></tr></thead>
   <tbody>
@@ -82,16 +86,16 @@
     <td>{% if row.has_pdf %}yes{% else %}no{% endif %}</td>
     <td>{% if row.has_summary %}yes{% else %}—{% endif %}</td>
     <td>
-      {{ icon_button('Detail', 'detail', onclick="document.getElementById('lib-" ~ row.key ~ "').showModal()") }}
+      {{ icon_button('Detail', 'detail', onclick="openDrawer('lib-" ~ row.key ~ "')") }}
       <dialog class="wb-drawer" id="lib-{{ row.key }}">
         <p><strong>{{ row.title }}</strong> · {{ row.key }}</p>
         {% if row.has_summary %}
-        <iframe class="summary-frame" sandbox="" src="/item/{{ row.key }}/summary" title="Summary"></iframe>
+        <iframe class="summary-frame" sandbox="" data-src="/item/{{ row.key }}/summary" title="Summary"></iframe>
         {% endif %}
         {% if prefs.advanced and briefs.llm_on and row.has_pdf %}
         <form method="post" action="/wanted/summarize">
           <input type="hidden" name="key" value="{{ row.key }}">
-          <label>Dest <select name="dest">{% for d in dest_options %}<option value="{{ d }}">{{ d }}</option>{% endfor %}</select></label>
+          <label>Dest {{ info("disk: HTML under out/summaries only. zotero: a child note on this item. both: files and a note.") }} <select name="dest">{% for d in dest_options %}<option value="{{ d }}">{{ d }}</option>{% endfor %}</select></label>
           <button type="submit">Summarize</button>
         </form>
         {% endif %}

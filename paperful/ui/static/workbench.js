@@ -1,4 +1,20 @@
 (function () {
+  function loadDrawerSummary(dlg) {
+    if (!dlg) return;
+    dlg.querySelectorAll("iframe.summary-frame[data-src]").forEach(function (frame) {
+      if (!frame.getAttribute("src")) {
+        frame.setAttribute("src", frame.getAttribute("data-src"));
+      }
+    });
+  }
+
+  window.openDrawer = function (id) {
+    var dlg = document.getElementById(id);
+    if (!dlg) return;
+    loadDrawerSummary(dlg);
+    if (dlg.showModal) dlg.showModal();
+  };
+
   function updateToolbarLabels() {
     var form = document.getElementById("wanted-form");
     if (!form) return;
@@ -92,12 +108,30 @@
     };
   }
 
-  document.querySelectorAll("[data-run-id]").forEach(function (row) {
-    var id = row.getAttribute("data-run-id");
-    var st = row.querySelector(".cmd-status");
-    if (st && (st.textContent === "queued" || st.textContent === "running")) {
-      pollRun(id, null);
+  function placeHelpBubble(tip) {
+    var bubble = tip.querySelector(".help-tip-bubble");
+    if (!bubble) return;
+    bubble.classList.remove("help-tip-bubble--left", "help-tip-bubble--right", "help-tip-bubble--below");
+    var rect = bubble.getBoundingClientRect();
+    var hPad = 8;
+    var vPad = 8;
+    var chrome = document.querySelector("header.wb-chrome");
+    var nav = document.querySelector("nav.wb-nav");
+    if (chrome) vPad = Math.max(vPad, chrome.getBoundingClientRect().bottom + 8);
+    if (nav) vPad = Math.max(vPad, nav.getBoundingClientRect().bottom + 8);
+    if (rect.top < vPad && !tip.closest("header.wb-chrome")) {
+      bubble.classList.add("help-tip-bubble--below");
+      rect = bubble.getBoundingClientRect();
     }
+    if (rect.right > window.innerWidth - hPad) {
+      bubble.classList.add("help-tip-bubble--left");
+    } else if (rect.left < hPad) {
+      bubble.classList.add("help-tip-bubble--right");
+    }
+  }
+  document.querySelectorAll(".help-tip").forEach(function (tip) {
+    tip.addEventListener("mouseenter", function () { placeHelpBubble(tip); });
+    tip.addEventListener("focus", function () { placeHelpBubble(tip); });
   });
 
   var lastRun = document.body.getAttribute("data-poll-run");
@@ -105,7 +139,20 @@
     var params = new URLSearchParams(window.location.search);
     lastRun = params.get("run") || params.get("poll") || "";
   }
+  document.querySelectorAll("[data-run-id]").forEach(function (row) {
+    var id = row.getAttribute("data-run-id");
+    if (id && id === lastRun) return;
+    var st = row.querySelector(".cmd-status");
+    if (st && (st.textContent === "queued" || st.textContent === "running")) {
+      pollRun(id, null);
+    }
+  });
   if (lastRun) {
-    pollRun(lastRun, document.getElementById("preview-btn") || document.getElementById("grab-btn"));
+    pollRun(
+      lastRun,
+      document.querySelector("[data-poll-button]")
+        || document.getElementById("preview-btn")
+        || document.getElementById("grab-btn")
+    );
   }
 })();

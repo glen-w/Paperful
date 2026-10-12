@@ -29,7 +29,7 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     client = TestClient(create_app(cfg))
     assert client.get("/", follow_redirects=False).status_code == 302
     assert client.get("/", follow_redirects=False).headers["location"] == "/wanted"
-    for path in ("/wanted", "/discover", "/library", "/activity", "/system"):
+    for path in ("/wanted", "/discover", "/ask", "/library", "/activity", "/system"):
         res = client.get(path)
         assert res.status_code == 200
         assert "Paperful" in res.text
@@ -44,10 +44,13 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     assert wanted.status_code == 200
     nav = wanted.text
     assert nav.index('href="/wanted"') < nav.index('href="/discover"')
+    assert nav.index('href="/discover"') < nav.index('href="/ask"')
+    assert nav.index('href="/ask"') < nav.index('href="/library"')
     assert "Zotero offline" in wanted.text
     assert "Start Zotero" in wanted.text or "Pick a collection" in wanted.text
     assert 'formaction="/wanted/attach"' in wanted.text
     assert "/repair" not in wanted.text
+    assert 'href="/index"' not in wanted.text
     client.cookies.set("pf_advanced", "1")
     res = client.get("/wanted")
     assert "/repair" in res.text
@@ -236,6 +239,60 @@ def test_wanted_ghost_pdf_on_missing_tab(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_wanted_items_are_paginated(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from paperful.store import Manifest
+    from paperful.ui import jobs
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _cfg, probe=False: [])
+    monkeypatch.setattr(
+        "paperful.ui.app.collections_tree",
+        lambda _cfg: {"ok": True, "collections": []},
+    )
+
+    class _Item:
+        def __init__(self, n: int):
+            self.key = f"K{n:02d}"
+            self.title = f"Paper {n:02d}"
+            self.doi = None
+            self.has_pdf = False
+            self.year = 2000 + n
+            self.arxiv_id = None
+            self.url = ""
+
+    items = [_Item(n) for n in range(30)]
+    monkeypatch.setattr(
+        jobs,
+        "_load_scope_items",
+        lambda _c, _col: (items, Manifest(cfg.manifest_path)),
+    )
+    client = TestClient(create_app(cfg))
+    client.cookies.set("pf_collection", "ocean")
+    page = client.get("/wanted?tab=missing&per_page=25")
+    assert page.status_code == 200
+    assert "Order by" in page.text
+    assert "Per page" in page.text
+    assert "Filter" in page.text
+    assert "1–25" in page.text
+    assert "of 30" in page.text
+    assert "Paper 00" in page.text
+    assert "Paper 24" in page.text
+    assert "Paper 25" not in page.text
+    assert 'href="/wanted?tab=missing&amp;per_page=25&amp;page=2"' in page.text
+    next_page = client.get("/wanted?tab=missing&per_page=25&page=2")
+    assert next_page.status_code == 200
+    assert "Paper 25" in next_page.text
+    assert "Paper 00" not in next_page.text
+    newest = client.get("/wanted?tab=missing&per_page=25&order=year_new")
+    assert newest.status_code == 200
+    body = newest.text
+    assert body.index("Paper 29") < body.index("Paper 28")
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
 def test_library_nests_collections(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
@@ -317,6 +374,82 @@ def test_archive_lists_use_details(tmp_path, monkeypatch):
     index = client.get("/index")
     assert index.status_code == 200
     assert "<summary>Recent reports (1)</summary>" in index.text
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_pages_include_beginner_help(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.llm_enabled = True
+    cfg.rag_enabled = True
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _cfg, probe=False: [])
+    monkeypatch.setattr(
+        "paperful.ui.app.collections_tree",
+        lambda _cfg: {"ok": True, "collections": []},
+    )
+    client = TestClient(create_app(cfg))
+
+    wanted = client.get("/wanted")
+    assert wanted.status_code == 200
+    assert 'class="page-lede"' in wanted.text
+    assert "Missing</strong> means no file yet" in wanted.text
+    assert 'class="help-tip"' in wanted.text
+    assert "class=\"help-tip-bubble\"" in wanted.text
+    assert "Zotero collection currently in scope" in wanted.text
+    assert "Leave this off until you know what a control does" in wanted.text
+
+    library = client.get("/library")
+    assert library.status_code == 200
+    assert "target icon sets the collection chip" in library.text
+
+    discover = client.get("/discover")
+    assert discover.status_code == 200
+    assert "Nothing is added to Zotero until you Preview apply" in discover.text
+    assert "Treat query words as OR" not in discover.text
+
+    activity = client.get("/activity")
+    assert "Jobs this workbench has started" in activity.text
+
+    system = client.get("/system")
+    assert "Health checks for Zotero" in system.text
+
+    client.cookies.set("pf_advanced", "1")
+    wanted_adv = client.get("/wanted")
+    assert "Try again on items that already came back empty" in wanted_adv.text
+    assert "The file may be a different paper" in wanted_adv.text
+
+    discover_adv = client.get("/discover")
+    assert "Treat query words as OR instead of AND" in discover_adv.text
+
+    mirror = client.get("/mirror")
+    assert mirror.status_code == 200
+    assert "Accept gone (dangerous)" in mirror.text
+    assert "different library" in mirror.text
+    assert "help-tip--danger" in mirror.text
+    assert "lazy: copy a PDF into the mirror" in mirror.text
+
+    index = client.get("/index")
+    assert index.status_code == 200
+    assert "LLM extract lane" in index.text
+    assert "Costs tokens" in index.text
+    assert "Ignore cached answered-check rows" in index.text
+
+    ask = client.get("/ask")
+    assert ask.status_code == 200
+    assert 'class="page-lede"' in ask.text
+    assert "Ignore cached answers" in ask.text
+
+    briefs = client.get("/briefs")
+    assert "Regenerate even when a summary already exists" in briefs.text
+
+    repair = client.get("/repair")
+    assert "Always Preview first" in repair.text
+    assert "Title+year merges are off unless you opt in" in repair.text
+
+    settings = client.get("/settings")
+    assert "Unpaywall needs a real email" in settings.text
 
 
 def test_dockerfile_includes_serve_extra():

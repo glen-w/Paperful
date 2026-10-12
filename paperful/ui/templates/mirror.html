@@ -1,37 +1,62 @@
 {% extends "base.html" %}
+{% from "_help.html" import info %}
 {% block title %}Mirror — Paperful{% endblock %}
 {% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
 {% block content %}
 <h1>Mirror</h1>
+<p class="page-lede">The on-disk copy of the library under <code>out/</code>. Sync updates that folder from Zotero. Snapshot writes a full dump of the current collection. Restore creates missing Zotero items from disk — it never overwrites items that already exist. Always Preview before Apply.</p>
 {% if error == 'collection' %}<div class="error-banner">Pick a collection in the chip for snapshot and restore.</div>{% endif %}
 {% if error and error != 'collection' %}<div class="error-banner">{{ error }}</div>{% endif %}
 {% if run_rec %}
 <section class="panel">
   <h2>Last run</h2>
+  <p class="section-lede">The most recent Mirror job. Apply stays disabled until a Preview for that same action finishes successfully.</p>
   <p>Last run: {{ run_rec.verb }} — {{ run_rec.status }}{% if run_rec.error %} — {{ run_rec.error }}{% endif %}</p>
   {% if run_rec.summary %}<pre>{{ run_rec.summary }}</pre>{% endif %}
 </section>
 {% endif %}
-<p>Open <code>out/</code> on this machine. Restore creates missing items only.</p>
+<p class="page-lede">Open <code>out/</code> on this machine to browse the files. Restore creates missing items only.</p>
 <section class="panel">
   <h2>Actions</h2>
+  <p class="section-lede">Each action is Preview (count and plan) then Apply (write). PDFs lazy copies a file the first time Paperful needs it. all copies every PDF now. none stores metadata only.</p>
 {% for verb in verbs %}
   <div class="cluster">
-    <p class="field-legend">{{ verb }}</p>
+    <p class="field-legend">{{ verb }}
+      {% if verb == 'sync' %}
+      {{ info("Bring out/ up to date with Zotero. Reads what changed since the last refresh. Will refuse if most mirrored items are missing from this library, unless you tick Accept gone.") }}
+      {% elif verb == 'snapshot' %}
+      {{ info("Write a full dump of the current collection into out/. Heavier than Sync. Needs the collection chip.") }}
+      {% elif verb == 'restore' %}
+      {{ info("Create Zotero items that exist on disk but not in the library. Never overwrites an item that is already there. Needs the collection chip.") }}
+      {% elif verb == 'cache clean' %}
+      {{ info("Delete throwaway PDFs under state/pdf-cache/. Library files in out/ are not touched.") }}
+      {% endif %}
+    </p>
+    {% if verb == 'sync' %}
+    <p class="section-lede">Use this after Zotero has changed. Leave Accept gone off unless you are sure this is the same library — otherwise Paperful will refuse rather than mark hundreds of papers as gone.</p>
+    {% elif verb == 'snapshot' %}
+    <p class="section-lede">A full export of the collection chip into out/. Choose how PDFs are copied before you Preview.</p>
+    {% elif verb == 'restore' %}
+    <p class="section-lede">Puts missing items back into Zotero from out/. Existing items are left alone.</p>
+    {% elif verb == 'cache clean' %}
+    <p class="section-lede">Removes temporary download files. Safe for the library; you may have to re-fetch a PDF later.</p>
+    {% endif %}
     <form method="post" action="/mirror/preview" class="toolbar">
       <input type="hidden" name="verb" value="{{ verb }}">
       {% if verb in ['sync', 'snapshot'] %}
-      <label>PDFs <select name="pdfs"><option value="lazy">lazy</option><option value="all">all</option><option value="none">none</option></select></label>
+      <label>PDFs {{ info("lazy: copy a PDF into the mirror the first time Paperful uses it (default, smaller disk). all: copy every library PDF into the mirror now. none: metadata only, no PDF files on disk.") }} <select name="pdfs"><option value="lazy">lazy</option><option value="all">all</option><option value="none">none</option></select></label>
       {% endif %}
       {% if verb == 'sync' %}
-      <label><input type="checkbox" name="accept_gone" value="1"> Accept gone (dangerous)</label>
+      <label><input type="checkbox" name="accept_gone" value="1"> Accept gone (dangerous) {{ info("Proceed even when most mirrored items are not in this Zotero library. That usually means the library changed or you pointed Paperful at a different library. Off is the safe default — Paperful will refuse rather than mark hundreds of papers as gone.", danger=true) }}</label>
       {% endif %}
       <button type="submit">Preview {{ verb }}</button>
+      {{ info("Count what would change. Reads the library; writes nothing until Apply.") }}
     </form>
     {% if run_rec and run_rec.verb == verb and run_rec.review_token and run_rec.status == 'done' %}
     <form method="post" action="/mirror/apply" class="toolbar">
       <input type="hidden" name="review_token" value="{{ run_rec.review_token }}">
       <button type="submit">Apply {{ verb }}</button>
+      {{ info("Write the last successful preview for this action.") }}
     </form>
     {% endif %}
   </div>

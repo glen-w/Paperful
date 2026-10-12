@@ -158,6 +158,56 @@ def test_repair_apply_http_409(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_repair_preview_shows_running_status(tmp_path, monkeypatch):
+    import threading
+
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    monkeypatch.setattr(
+        ops,
+        "doctor_payload",
+        lambda _cfg, probe=False: [{"name": "x", "status": "green", "code": "", "detail": ""}],
+    )
+    gate = threading.Event()
+
+    def fake(cfg, cmd_id, **kw):
+        gate.wait(timeout=2)
+
+    monkeypatch.setattr(jobs, "repair_preview", fake)
+    try:
+        client = TestClient(create_app(cfg))
+        client.cookies.set("pf_collection", "ocean/BBNJ")
+        res = client.post(
+            "/repair/preview",
+            data={"verb": "lint"},
+            follow_redirects=False,
+        )
+        assert res.status_code == 303
+        loc = res.headers.get("location") or ""
+        assert "run=" in loc
+        page = client.get(loc)
+        assert "Last run" in page.text
+        assert "queued" in page.text or "running" in page.text
+        assert 'data-poll-run="' in page.text
+        gate.set()
+        cmd_id = loc.split("run=")[1].split("&")[0]
+        deadline = time.time() + 3
+        rec: dict = {}
+        while time.time() < deadline:
+            rec = client.get(f"/v1/runs/{cmd_id}").json()
+            if rec.get("status") in {"done", "failed"}:
+                break
+            time.sleep(0.02)
+        assert rec.get("status") == "done"
+    finally:
+        gate.set()
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
 def test_mirror_get_does_not_write(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 

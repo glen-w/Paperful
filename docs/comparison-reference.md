@@ -74,7 +74,7 @@ Legend: **Yes** · **Partial** · **No**. Valency rows reflect public positionin
 | Capability | Paperful | Valency MCP Bond | zotero-mcp (typical) |
 |------------|----------|------------------|----------------------|
 | Semantic search over **public** papers / preprints | Partial (`snowball` keyword / similar hops; OpenAlex-backed discovery — not a single “ask the whole web” MCP) | Yes | Partial (search library + sometimes Unpaywall) |
-| Semantic search over **your** PDFs | Yes (`rag ingest` + `ask`; GUI Index Ask) | No | Yes (chat reads attached PDFs) |
+| Semantic search over **your** PDFs | Yes (`rag ingest` + `ask`; GUI Ask) | No | Yes (chat reads attached PDFs) |
 | Citation graph (corpus-scale, both directions) | Partial (`snowball` `refs` / `cites` / `both`; not a browseable graph UI) | Yes | Partial |
 | Author profiles / co-author networks | Partial (`authorwatch briefing`, `suggest -C`) | Yes | Partial |
 | Keyword / publication **trends** | Partial (`snowball trends`, MCP `snowball_trends`; OpenAlex filters in snowball) | Yes | No |

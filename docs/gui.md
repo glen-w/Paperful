@@ -4,9 +4,9 @@ A **local GUI** over the same verbs as the CLI. `docker compose up` (or
 `paperful serve`) binds http://127.0.0.1:8765. Zotero remains the catalogue
 and reader. Grab fetches to `out/`; Attach writes the library.
 
-**Status:** landed, not tagged 1.0. **Interactive Ask** is on **Index**
-(opt-in `[rag]` + `[llm]`), not the home page. A Firefox extension and hosted
-SaaS are **post-1.0** — see [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10).
+**Status:** landed, not tagged 1.0. **Ask** is on the default nav (`/ask`;
+opt-in `[rag]` + `[llm]`). A Firefox extension and hosted SaaS are **post-1.0**
+— see [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10).
 
 Jobs, with screenshots: [Walkthroughs](walkthroughs.md)
 ([first fill](first-fill.md), [grow](grow-library.md),
@@ -20,16 +20,17 @@ Jobs, with screenshots: [Walkthroughs](walkthroughs.md)
 
 ## Product framing
 
-Two jobs sit on the default nav:
+Three jobs sit on the default nav:
 
 | Nav | CLI verbs | Job |
 | --- | --- | --- |
 | **Wanted** | `gaps`, `run`, `attach` | See missing PDFs, preview fetch, grab to `out/`, attach chosen copies |
 | **Discover** | `snowball`, `authorwatch`, watches | Find new works (topic or person), review, add metadata parents |
+| **Ask** | `ask`, `ask --from-file` | Cited answers from PDFs already copied to disk (needs `[rag]` + `[llm]` and an index) |
 
 **Library**, **Activity**, and **System** support the loop. **Repair**, **Mirror**,
-**Index**, **Briefs**, and **Settings** appear only when **Advanced** is on
-(reveal only; does not enable Scholar, Sci-Hub, or LLM).
+**Index** (ingest / search / extract), **Briefs**, and **Settings** appear only
+when **Advanced** is on (reveal only; does not enable Scholar, Sci-Hub, or LLM).
 
 ```text
   Browser  ──HTTP──►  paperful serve  ──►  paperful.* (same as CLI)
@@ -55,7 +56,7 @@ browser-agent. No built-in scheduler — **Check again** on Discover, not cron.
 | **Health** dot | Worst cached `doctor` status (amber until **System** runs doctor; pages never block on a full doctor) |
 | **Advanced** toggle | Cookie only; reveals extra nav and form fields |
 | **Row actions** | Icon buttons (detail drawer, set collection scope) with the action name as the tooltip |
-| **Long lists** | Discover lists, Index threads and batches, Briefs archives, and the Repair queue fold into collapsible sections |
+| **Long lists** | Discover lists, Ask threads and batches, Briefs archives, and the Repair queue fold into collapsible sections |
 
 Layout: table-first rows, native `<dialog>` drawer (no embedded PDF viewer).
 Long jobs return a **command id**; Activity subscribes to `GET /v1/runs/{id}/events` (SSE), with JSON poll fallback via `GET /v1/runs/{id}`.
@@ -114,17 +115,19 @@ plus Grab filters (`year` / type / retry / try-all / browser-agent / upgrade).
 **Repair** Preview runs dry-run then Apply writes: `lint` (read-only report),
 `fix-metadata`, `dedupe`, `versions`, `attachments`, `ocr`.
 **Mirror** Preview/Apply: `sync`, `snapshot`, `restore`, `cache clean`.
-**Index**: `rag ingest` / `search` when `[rag]` is on; cited Ask and batch Ask
-(`state/ask-batch/`) when `[rag]` and `[llm]` are on and the index has rows.
-Ask and batch support focus presets, custom prompts (inline, upload, path, or
-saved under `state/prompts/`), item keys, types, years, and top-k; batch adds
-`--force` and questions file upload. **Extract questions** (`rag questions`) and
-**Already answered?** (`rag answered`, `state/rq-answered/`) use the same scope.
-Collection chip is the scope. **Synthesize** on Index when `[llm]` is on.
+**Ask**: cited Ask when `[rag]` and `[llm]` are on and the index has rows.
+Batch Ask (`state/ask-batch/`) is on the same page when **Advanced** is on.
+Focus presets, custom prompts (inline, upload, path, or saved under
+`state/prompts/`), item keys, types, years, and top-k; batch adds `--force`
+and a questions file upload. If the index is empty, Ask offers a compact
+ingest. **Index** (Advanced): `rag ingest` / `search` when
+`[rag]` is on; **Extract questions** (`rag questions`) and **Already answered?**
+(`rag answered`, `state/rq-answered/`) use the same scope. Collection chip is
+the scope. **Synthesize** on Index when `[llm]` is on.
 
 ![Index: ingest scoped and a passage search run over ocean/BBNJ](_static/workflows/index.png)
 
-![Index Ask: a cited answer from PDFs already on disk in ocean/BBNJ](_static/workflows/index-ask.png)
+![Ask: a cited answer from PDFs already on disk in ocean/BBNJ](_static/workflows/index-ask.png)
 
 **Briefs**: collection **summarize** / **synthesize** when `[llm]` is on.
 Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
@@ -201,10 +204,13 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/repair/apply` | Consume token; apply repair verb |
 | POST | `/mirror/preview` | Dry-run mirror verb + review token |
 | POST | `/mirror/apply` | Consume token; apply mirror verb |
-| POST | `/index/ask` | Enqueue cited Ask turn; redirect to `/index?thread=&run=` |
-| POST | `/index/ingest` | Enqueue `rag ingest` (Preview dry-run or Build); redirect `?run=` |
+| GET | `/ask` | Ask page (threads, cited answer, batch). `?thread=` selects a thread |
+| POST | `/ask` | Enqueue cited Ask turn; redirect to `/ask?thread=&run=` |
+| POST | `/ask/batch` | Enqueue batch Ask; redirect `/ask?run=` |
+| POST | `/index/ask` | Alias of `POST /ask` |
+| POST | `/index/ask-batch` | Alias of `POST /ask/batch` |
+| POST | `/index/ingest` | Enqueue `rag ingest` (Preview dry-run or Build); redirect `?run=` (`next=ask` returns to `/ask`) |
 | POST | `/index/search` | Redirect to `/index?q=` (sync search on GET) |
-| POST | `/index/ask-batch` | Enqueue batch Ask; redirect `?run=` |
 | GET | `/index/batch/{stamp}` | `answers.md` under `state/ask-batch/<stamp>/` |
 | POST | `/index/rag-questions` | Enqueue `rag questions` (dry-run or write); redirect `?run=` |
 | POST | `/index/rag-answered` | Enqueue `rag answered`; redirect `?run=` |
@@ -216,11 +222,12 @@ are mounted by `paperful.ui` (`mount_ui`).
 | GET | `/briefs/summary/{key}` | HTML under `state/summaries/` |
 | GET | `/briefs/report/{slug}` | HTML under `state/reports/` |
 
-HTML routes: `/discover`, `/wanted`, `/library`, `/activity`, `/system`, plus
+HTML routes: `/discover`, `/wanted`, `/ask`, `/library`, `/activity`, `/system`, plus
 advanced `/repair`, `/mirror`, `/index`, `/briefs`, `/settings`. `GET /` → `/wanted`.
 `/repair/preview` and `/mirror/preview` enqueue work and redirect with `?run=`; Apply
 posts `review_token` from that command record (stale previews return HTTP 409).
-`POST /index/ask` enqueues a cited Ask turn (not linked from the simple shell).
+`GET /index?thread=` redirects to `/ask?thread=`. `POST /ask` enqueues a cited Ask
+turn; `POST /index/ask` is the same handler.
 
 Writes over HTTP use review tokens under `state/gui/reviews/`; stale library
 fingerprints return **409**. Discover **Add selected** / inbox apply, ingest-dois
@@ -251,7 +258,9 @@ record immediately, then pushes again when the ledger file changes; comment
 heartbeats (`: ping`) appear about every 15s while the job is still active. The
 stream closes after a terminal `status`. Missing ids return **404** JSON (not SSE).
 `workbench.js` reloads the page on `done` / `failed` and falls back to JSON polling
-if the stream errors.
+if the stream errors. After a form POST that enqueues work, the redirect includes
+`?run=` (or Wanted Preview uses `?poll=`); the target page shows **queued** / **running**
+beside that form until the job finishes.
 
 ---
 
@@ -268,8 +277,8 @@ if the stream errors.
 ## Related docs
 
 - [ROADMAP — GUI](ROADMAP.md#gui)
-- [rag.md](rag.md) — Index Ask / batch / questions / answered (CLI + workbench)
+- [rag.md](rag.md) — Ask / batch / questions / answered (CLI + workbench)
 - [architecture.md](architecture.md)
 - [why.md](why.md)
 - [commands.md](commands.md)
-- [docker.md](docker.md) — `docker compose up` serves the workbench; **heavy** image for Index Ask / RAG extras
+- [docker.md](docker.md) — `docker compose up` serves the workbench; **heavy** image for Ask / RAG extras

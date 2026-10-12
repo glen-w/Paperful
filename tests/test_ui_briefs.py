@@ -260,6 +260,209 @@ def test_briefs_synthesize_dry_run(tmp_path, monkeypatch):
             time.sleep(0.02)
         assert rec.get("status") == "done"
         assert seen == [True]
+        page = client.get("/briefs")
+        assert "ocean-bbnj" in page.text
+        assert "Dry-run" in page.text
+    finally:
+        jobs.synthesize_fn = None
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_briefs_write_report_defaults_to_disk_without_collection(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    import paperful.ui.app as ui_app
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.llm_enabled = True
+    cfg.synthesize_dest = "both"
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(ui_app, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(ui_app, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    seen: list[dict] = []
+
+    def fake(cfg, cmd_id, **kw):
+        seen.append(kw)
+        return {
+            "dry_run": False,
+            "slug": "library",
+            "sources_disk": 3,
+            "sources_note": 0,
+            "missing": 0,
+            "chunks": 2,
+        }
+
+    jobs.synthesize_fn = fake
+    try:
+        client = TestClient(create_app(cfg))
+        blank = client.get("/briefs")
+        assert blank.status_code == 200
+        assert 'option value="disk" selected' in blank.text or 'value="disk" selected' in blank.text
+        res = client.post(
+            "/briefs/synthesize",
+            data={"dry_run": "0", "limit": "40", "year_from": "2020", "year_to": "2026"},
+            follow_redirects=False,
+        )
+        assert res.status_code == 303
+        loc = res.headers.get("location") or ""
+        assert "run=" in loc
+        assert "error=" not in loc
+        cmd_id = loc.split("run=")[1].split("&")[0]
+        deadline = time.time() + 3
+        rec: dict = {}
+        while time.time() < deadline:
+            rec = client.get(f"/v1/runs/{cmd_id}").json()
+            if rec.get("status") in {"done", "failed"}:
+                break
+            time.sleep(0.02)
+        assert rec.get("status") == "done"
+        assert seen[0]["dry_run"] is False
+        assert seen[0]["dest"] == "disk"
+        assert seen[0]["limit"] == 40
+        done = client.get("/briefs")
+        assert 'href="/briefs/report/library"' in done.text
+        assert 'value="40"' in done.text
+        assert 'value="2020"' in done.text
+        assert 'value="2026"' in done.text
+    finally:
+        jobs.synthesize_fn = None
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_briefs_write_report_keeps_fields_when_collection_required(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    import paperful.ui.app as ui_app
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.llm_enabled = True
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(ui_app, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(ui_app, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    client = TestClient(create_app(cfg))
+    res = client.post(
+        "/briefs/synthesize",
+        data={
+            "dry_run": "0",
+            "dest": "both",
+            "limit": "40",
+            "year_from": "2020",
+            "year_to": "2026",
+        },
+        follow_redirects=False,
+    )
+    assert res.status_code == 303
+    loc = res.headers.get("location") or ""
+    assert "error=collection" in loc
+    page = client.get(loc)
+    assert page.status_code == 200
+    assert "Pick a collection in the chip, or set destination to disk." in page.text
+    assert page.text.count("Pick a collection in the chip, or set destination to disk.") >= 2
+    assert 'value="40"' in page.text
+    assert 'value="2020"' in page.text
+    assert 'value="2026"' in page.text
+    assert 'option value="both" selected' in page.text or 'value="both" selected' in page.text
+    assert commands.list_commands(cfg) == []
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_briefs_write_report_shows_running_status(tmp_path, monkeypatch):
+    import threading
+
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    import paperful.ui.app as ui_app
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.llm_enabled = True
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(ui_app, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(ui_app, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    gate = threading.Event()
+
+    def fake(cfg, cmd_id, **kw):
+        gate.wait(timeout=2)
+        return {"dry_run": False, "slug": "library", "sources_disk": 1, "sources_note": 0, "missing": 0, "chunks": 1}
+
+    jobs.synthesize_fn = fake
+    try:
+        client = TestClient(create_app(cfg))
+        res = client.post(
+            "/briefs/synthesize",
+            data={"dry_run": "0", "dest": "disk"},
+            follow_redirects=False,
+        )
+        loc = res.headers.get("location") or ""
+        page = client.get(loc)
+        assert page.status_code == 200
+        assert "Write report" in page.text
+        assert "queued" in page.text or "running" in page.text
+        assert "cmd-status" in page.text
+        gate.set()
+        cmd_id = loc.split("run=")[1].split("&")[0]
+        deadline = time.time() + 3
+        while time.time() < deadline:
+            rec = client.get(f"/v1/runs/{cmd_id}").json()
+            if rec.get("status") in {"done", "failed"}:
+                break
+            time.sleep(0.02)
+        assert rec.get("status") == "done"
+    finally:
+        gate.set()
+        jobs.synthesize_fn = None
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_briefs_write_report_explains_missing_summaries(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    import paperful.ui.app as ui_app
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.llm_enabled = True
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(ui_app, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(ui_app, "collections_tree", lambda _c: {"ok": True, "collections": []})
+
+    def fake(cfg, cmd_id, **kw):
+        return {
+            "dry_run": False,
+            "slug": "library",
+            "sources_disk": 0,
+            "sources_note": 0,
+            "missing": 4,
+            "skipped": "no_summaries",
+        }
+
+    jobs.synthesize_fn = fake
+    try:
+        client = TestClient(create_app(cfg))
+        res = client.post(
+            "/briefs/synthesize",
+            data={"dry_run": "0", "dest": "disk"},
+            follow_redirects=False,
+        )
+        cmd_id = (res.headers.get("location") or "").split("run=")[1].split("&")[0]
+        deadline = time.time() + 3
+        while time.time() < deadline:
+            rec = client.get(f"/v1/runs/{cmd_id}").json()
+            if rec.get("status") in {"done", "failed"}:
+                break
+            time.sleep(0.02)
+        page = client.get("/briefs")
+        assert "No summaries in this scope. Summarize first, then write the report." in page.text
     finally:
         jobs.synthesize_fn = None
 
@@ -307,12 +510,15 @@ def test_drawer_shows_iframe_when_file(tmp_path, monkeypatch):
     client.cookies.set("pf_collection", "ocean")
     page = client.get("/wanted?tab=have")
     assert page.status_code == 200
-    assert 'src="/item/K1/summary"' in page.text
+    assert 'data-src="/item/K1/summary"' in page.text
+    assert ' src="/item/K1/summary"' not in page.text
     assert "summary-frame" in page.text
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
 def test_wanted_summarize_enqueues_item(tmp_path, monkeypatch):
+    import threading
+
     from fastapi.testclient import TestClient
 
     import paperful.agent_ops as ops
@@ -325,8 +531,10 @@ def test_wanted_summarize_enqueues_item(tmp_path, monkeypatch):
         ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
     )
     seen: list[list[str] | None] = []
+    gate = threading.Event()
 
     def fake(cfg, cmd_id, **kw):
+        gate.wait(timeout=2)
         seen.append(kw.get("item_keys"))
         return {"summarized": 1}
 
@@ -339,11 +547,23 @@ def test_wanted_summarize_enqueues_item(tmp_path, monkeypatch):
             follow_redirects=False,
         )
         assert res.status_code == 303
-        deadline = time.time() + 2
+        loc = res.headers.get("location") or ""
+        assert "run=" in loc
+        page = client.get(loc)
+        assert "queued" in page.text or "running" in page.text
+        assert "cmd-status" in page.text
+        assert 'data-poll-run="' in page.text
+        gate.set()
+        cmd_id = loc.split("run=")[1].split("&")[0]
+        deadline = time.time() + 3
+        rec: dict = {}
         while time.time() < deadline:
-            if seen:
+            rec = client.get(f"/v1/runs/{cmd_id}").json()
+            if rec.get("status") in {"done", "failed"}:
                 break
             time.sleep(0.02)
+        assert rec.get("status") == "done"
         assert seen == [["K1"]]
     finally:
+        gate.set()
         jobs.summarize_fn = None

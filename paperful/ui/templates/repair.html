@@ -1,13 +1,16 @@
 {% extends "base.html" %}
+{% from "_help.html" import info %}
 {% block title %}Repair — Paperful{% endblock %}
 {% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
 {% block content %}
 <h1>Repair</h1>
+<p class="page-lede">Cleanup for the collection in the header chip. Always Preview first — that writes a plan and does not change Zotero. Apply runs the last successful preview for that tool. Several of these can merge or rewrite library items.</p>
 {% if error == 'collection' %}<div class="error-banner">Pick a collection in the chip first.</div>{% endif %}
 {% if error and error != 'collection' %}<div class="error-banner">{{ error }}</div>{% endif %}
 {% if run_rec %}
 <section class="panel">
   <h2>Last run</h2>
+  <p class="section-lede">The most recent Repair job. Apply stays disabled until a Preview for that same tool finishes successfully.</p>
   <p>Last run: {{ run_rec.verb }} — {{ run_rec.status }}{% if run_rec.error %} — {{ run_rec.error }}{% endif %}</p>
   {% if run_rec.summary %}<pre>{{ run_rec.summary }}</pre>{% endif %}
 </section>
@@ -15,6 +18,19 @@
 {% for q in queues %}
 <section class="panel">
   <h2>{{ q.verb }}</h2>
+  {% if q.verb == 'lint' %}
+  <p class="section-lede">Read-only check of identifiers, URLs, and attachment health. Preview writes a report; it never changes the library.</p>
+  {% elif q.verb == 'fix-metadata' %}
+  <p class="section-lede">Fill missing title, date, venue, and DOI from Crossref and OpenAlex. Paperful never rewrites metadata during a Grab — this is the write path. Preview proposes patches; Apply writes them.</p>
+  {% elif q.verb == 'dedupe' %}
+  <p class="section-lede">Find duplicate items (same DOI, or same title+year, or grey-literature matches) and propose merges. Title+year merges are off unless you opt in — they can join different papers with similar titles.</p>
+  {% elif q.verb == 'versions' %}
+  <p class="section-lede">Find preprint vs published pairs and propose moving the published PDF onto the keeper item. Preview first; Apply performs the moves.</p>
+  {% elif q.verb == 'attachments' %}
+  <p class="section-lede">Fix broken PDF links, merge duplicate files on one item, rename attachments, or convert linked URLs into stored files (personal libraries only).</p>
+  {% elif q.verb == 'ocr' %}
+  <p class="section-lede">Run OCR on scanned PDFs that have no selectable text. Optional Attach writes the searchable file back to Zotero.</p>
+  {% endif %}
   {% if q.files %}
   <details>
     <summary>Queued files ({{ q.files|length }})</summary>
@@ -26,14 +42,14 @@
   </details>
   {% endif %}
   <div class="cluster">
-    <p class="field-legend">Preview / apply</p>
+    <p class="field-legend">Preview / apply {{ info("Preview is the dry-run. Apply writes the last successful preview for this tool into Zotero or onto disk.") }}</p>
     <form method="post" action="/repair/preview" class="toolbar">
       <input type="hidden" name="verb" value="{{ q.verb }}">
       {% if q.verb == 'fix-metadata' %}
-      <label><input type="checkbox" name="overwrite" value="1"> Overwrite edited title/date/venue (preview)</label>
+      <label><input type="checkbox" name="overwrite" value="1"> Overwrite edited title/date/venue (preview) {{ info("Replace title, date, or venue even when those fields are already set. Use this only when the library value is wrong.") }}</label>
       {% endif %}
       {% if q.verb == 'dedupe' %}
-      <label>Phase
+      <label>Phase {{ info("all: every matcher. high_doi: same DOI. medium_title_year: similar title and year (riskier). grey_id / grey_host: grey literature with the same identifier or host.") }}
         <select name="phase">
           <option value="all">all</option>
           <option value="high_doi">high_doi</option>
@@ -42,23 +58,25 @@
           <option value="grey_host">grey_host</option>
         </select>
       </label>
-      <label><input type="checkbox" name="apply_medium" value="1"> Include title+year merges (preview)</label>
+      <label><input type="checkbox" name="apply_medium" value="1"> Include title+year merges (preview) {{ info("Also propose merges for items that share a title and year but not a DOI. These can be different papers. Review the preview carefully.", danger=true) }}</label>
       {% endif %}
       {% if q.verb == 'attachments' %}
-      <label><input type="checkbox" name="fix_broken" value="1"> Fix broken</label>
-      <label><input type="checkbox" name="merge_files" value="1"> Merge files</label>
-      <label><input type="checkbox" name="rename" value="1"> Rename</label>
-      <label><input type="checkbox" name="link" value="1"> Link (personal library)</label>
+      <label><input type="checkbox" name="fix_broken" value="1"> Fix broken {{ info("Clear or repair attachment links that no longer point at a file.") }}</label>
+      <label><input type="checkbox" name="merge_files" value="1"> Merge files {{ info("Collapse duplicate PDF attachments on the same item into one file.") }}</label>
+      <label><input type="checkbox" name="rename" value="1"> Rename {{ info("Rename attachment titles to match the parent item.") }}</label>
+      <label><input type="checkbox" name="link" value="1"> Link (personal library) {{ info("Turn a linked PDF URL into a stored file. Only works on a personal Zotero library, not a group.") }}</label>
       {% endif %}
       {% if q.verb == 'ocr' %}
-      <label><input type="checkbox" name="attach" value="1"> Attach after OCR</label>
+      <label><input type="checkbox" name="attach" value="1"> Attach after OCR {{ info("Write the searchable OCR PDF back to Zotero. Off keeps the OCR file on disk only.") }}</label>
       {% endif %}
       <button type="submit">Preview</button>
+      {{ info("Run a dry-run and write the plan. Nothing in Zotero changes until Apply.") }}
     </form>
     {% if q.verb != 'lint' and run_rec and run_rec.verb == q.verb and run_rec.review_token and run_rec.status == 'done' %}
     <form method="post" action="/repair/apply" class="toolbar">
       <input type="hidden" name="review_token" value="{{ run_rec.review_token }}">
       <button type="submit">Apply</button>
+      {{ info("Write the last successful preview for this tool. This can merge items or rewrite metadata.") }}
     </form>
     {% elif q.verb == 'lint' %}
     <p class="counts">Lint is read-only; Preview writes the report.</p>

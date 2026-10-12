@@ -1,81 +1,107 @@
 {% extends "base.html" %}
+{% from "_help.html" import info %}
 {% from "_miss_surface.html" import status_icon %}
 {% from "_icon_btn.html" import icon_button %}
+{% from "_job_status.html" import job_status %}
 {% block title %}Wanted — Paperful{% endblock %}
 {% block body_attrs %}{% if request.query_params.get('run') or request.query_params.get('poll') %} data-poll-run="{{ request.query_params.get('run') or request.query_params.get('poll') }}"{% endif %}{% endblock %}
 {% block content %}
 <h1>Wanted</h1>
+<p class="page-lede">Find PDFs for items in the collection shown in the header. <strong>Missing</strong> means no file yet. <strong>Held</strong> means Paperful found a file but has not attached it, or the DOI does not match. <strong>Have</strong> means a matching PDF is already in the library. Preview shows what would happen; Grab downloads; Attach writes held files into Zotero.</p>
 {% if coach %}<div class="coach-banner">{{ coach }} <a href="/system">System</a></div>{% endif %}
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
+{{ job_status(job) }}
 <p class="counts">Have {{ counts.have }} · Held {{ counts.held }} · Missing {{ counts.missing }}</p>
 <div class="tabs">
-  <a href="/wanted?tab=missing" {% if tab == 'missing' %}class="active"{% endif %}>Missing</a>
-  <a href="/wanted?tab=held" {% if tab == 'held' %}class="active"{% endif %}>Held</a>
-  <a href="/wanted?tab=have" {% if tab == 'have' %}class="active"{% endif %}>Have</a>
+  <span class="tab-with-help">
+    <a href="{{ wanted_pagination.tab_urls.missing }}" {% if tab == 'missing' %}class="active"{% endif %}>Missing</a>
+    {{ info("Items with no stored PDF. This is the usual list to Preview and Grab.") }}
+  </span>
+  <span class="tab-with-help">
+    <a href="{{ wanted_pagination.tab_urls.held }}" {% if tab == 'held' %}class="active"{% endif %}>Held</a>
+    {{ info("A PDF was downloaded or linked, but it is not attached yet, the DOI does not match, or the file still needs a check.") }}
+  </span>
+  <span class="tab-with-help">
+    <a href="{{ wanted_pagination.tab_urls.have }}" {% if tab == 'have' %}class="active"{% endif %}>Have</a>
+    {{ info("A PDF whose DOI matches the library item is already on the record.") }}
+  </span>
 </div>
 <section class="panel">
   <h2>Fetch</h2>
+  <p class="section-lede">Work on the current collection, or on rows you tick in the table below. With no rows ticked, Preview and Grab use the whole Missing list. Grab stores files in Paperful first; they land in Zotero only after Attach.</p>
 <form method="post" action="/wanted/preview" id="wanted-form" class="form-stack">
   {% if prefs.advanced %}
   <div class="field-group">
-    <p class="field-legend">Filters</p>
-    <label>Year from <input name="year_from" type="number"></label>
-    <label>Year to <input name="year_to" type="number"></label>
-    <label>Type <input name="item_type" placeholder="journalArticle"></label>
-    <label>Limit <input name="limit" type="number" min="1"></label>
-    <label><input type="checkbox" name="retry_failed" value="1"> Retry failed</label>
-    <label><input type="checkbox" name="try_all" value="1"> Try all sources</label>
-    <label><input type="checkbox" name="upgrade_linked" value="1"> Upgrade linked</label>
-    <label><input type="checkbox" name="upgrade_snapshot" value="1"> Upgrade snapshot</label>
-    <label><input type="checkbox" name="browser_agent" value="1"> Browser agent</label>
+    <p class="field-legend">Filters {{ info("Narrow which items this run considers. Leave blank to use the whole Missing list (or your ticked rows).") }}</p>
+    <p class="section-lede">Optional limits. Undated items are dropped when you set a year range.</p>
+    <label>Year from {{ info("Only items dated this year or later. Undated items are excluded.") }} <input name="year_from" type="number"></label>
+    <label>Year to {{ info("Only items dated this year or earlier. Undated items are excluded.") }} <input name="year_to" type="number"></label>
+    <label>Type {{ info("Limit to a Zotero item type such as journalArticle or report.") }} <input name="item_type" placeholder="journalArticle"></label>
+    <label>Limit {{ info("Stop after this many items. Leave blank to consider every matching row.") }} <input name="limit" type="number" min="1"></label>
+    <label><input type="checkbox" name="retry_failed" value="1"> Retry failed {{ info("Try again on items that already came back empty on a previous run.") }}</label>
+    <label><input type="checkbox" name="try_all" value="1"> Try all sources {{ info("Try every configured PDF source even when metadata looks like a source would not apply — for example a journal source on a report.") }}</label>
+    <label><input type="checkbox" name="upgrade_linked" value="1"> Upgrade linked {{ info("Also fetch items that only have a linked PDF URL in Zotero, not a stored file.") }}</label>
+    <label><input type="checkbox" name="upgrade_snapshot" value="1"> Upgrade snapshot {{ info("Re-fetch items whose only PDF is an HTML page print. A native publisher PDF replaces the snapshot.") }}</label>
+    <label><input type="checkbox" name="browser_agent" value="1"> Browser agent {{ info("After other sources miss, let a headed browser try the publisher page. Needs LLM config and the browser-agent extra. Slow, and can hit captchas.") }}</label>
   </div>
   {% endif %}
   <div class="field-group">
-    <p class="field-legend">Actions</p>
+    <p class="field-legend">Actions {{ info("Preview is safe. Grab downloads to Paperful. Attach writes held files into Zotero.") }}</p>
     <button type="submit" id="preview-btn" data-label-all="Preview all" data-label-sel="Preview selected">Preview all</button>
+    {{ info("Show which items would be fetched, without downloading.") }}
     <button type="submit" formaction="/wanted/grab" id="grab-btn" data-label-all="Grab all" data-label-sel="Grab selected">Grab all</button>
+    {{ info("Download PDFs into Paperful’s holding area. They are not attached to Zotero until you Attach.") }}
     <button type="submit" formaction="/wanted/attach" id="attach-btn" class="secondary"
       data-label-all="Attach PDFs to Zotero" data-label-sel="Attach selected PDFs">Attach PDFs to Zotero</button>
+    {{ info("Write already-downloaded held PDFs into Zotero. Skips files that fail the DOI or length checks unless you override those in Advanced.") }}
   </div>
 </form>
 </section>
 {% if prefs.advanced %}
 <section class="panel">
   <h2>Advanced</h2>
+  <p class="section-lede">Overrides and recovery. These can attach a PDF that is the wrong paper, or open many browser tabs. Preview first when a Preview button is offered.</p>
   <div class="cluster">
-    <p class="field-legend">Attach</p>
+    <p class="field-legend">Attach {{ info("Write held PDFs into Zotero, including files the usual Attach button would refuse.") }}</p>
+    <p class="section-lede">Use these only when you have looked at the held file and still want it on the item.</p>
     <form method="post" action="/wanted/attach/preview" class="toolbar keys-form">
-      <label><input type="checkbox" name="allow_mismatch" value="1"> Allow DOI mismatch</label>
-      <label><input type="checkbox" name="allow_short" value="1"> Allow short PDF</label>
+      <label><input type="checkbox" name="allow_mismatch" value="1"> Allow DOI mismatch {{ info("Attach a PDF whose DOI does not match the library item. The file may be a different paper.", danger=true) }}</label>
+      <label><input type="checkbox" name="allow_short" value="1"> Allow short PDF {{ info("Attach a dense one-page PDF that Paperful held back because it often looks like a landing page, not a full article.", danger=true) }}</label>
       <button type="submit" class="secondary">Preview attach</button>
+      {{ info("Show which held files would be attached with the overrides above, without writing to Zotero.") }}
     </form>
     <form method="post" action="/wanted/attach" class="toolbar">
       <input type="hidden" name="review_token" value="{{ attach_token }}">
       <button type="submit">Attach held PDFs</button>
+      {{ info("Apply the last successful attach preview to Zotero.") }}
     </form>
   </div>
   <div class="cluster">
-    <p class="field-legend">Recover</p>
+    <p class="field-legend">Recover {{ info("Re-run the browser agent on items a Grab already missed. Needs LLM config and the browser-agent extra.") }}</p>
+    <p class="section-lede">This opens a real browser and tries publisher pages one by one. It is slower than Grab and can hit captchas.</p>
     <form method="post" action="/wanted/recover/preview" class="toolbar keys-form">
-      <label><input type="checkbox" name="from_last_run" value="1"> From last run</label>
-      <label>Mode
+      <label><input type="checkbox" name="from_last_run" value="1"> From last run {{ info("Use items from the previous Grab instead of the rows ticked below.") }}</label>
+      <label>Mode {{ info("Which misses to retry. browser_agent_miss: the agent ran and failed. missing: still no PDF. browser_agent_not_found: the agent loaded a page but found no PDF.") }}
         <select name="from_last_run_mode">
           <option value="browser_agent_miss">browser_agent_miss</option>
           <option value="missing">missing</option>
           <option value="browser_agent_not_found">browser_agent_not_found</option>
         </select>
       </label>
-      <label>Limit <input name="recover_limit" type="number" min="1"></label>
+      <label>Limit {{ info("Cap how many items Recover tries this time.") }} <input name="recover_limit" type="number" min="1"></label>
       <button type="submit" class="secondary">Preview recover</button>
+      {{ info("Show which items would be sent to the browser agent, without opening a browser.") }}
     </form>
     <form method="post" action="/wanted/recover" class="toolbar">
       <input type="hidden" name="review_token" value="{{ recover_token }}">
       <button type="submit">Recover</button>
+      {{ info("Run the last successful recover preview in a headed browser.") }}
     </form>
   </div>
   <form method="post" action="/wanted/handoff" class="toolbar keys-form">
-    <p class="field-legend">Handoff</p>
-    <label>Mode
+    <p class="field-legend">Handoff {{ info("Open publisher pages in your own browser so you can download PDFs by hand. Paperful never clicks Request full-text for you.") }}</p>
+    <p class="section-lede">Use this when automated fetch cannot get a file — typically paywalled papers you can reach yourself.</p>
+    <label>Mode {{ info("list: a table of URLs. tabs: open them in the browser. walk: open one at a time and pick up the newest file in Downloads. watch: open tabs and watch the inbox folder for new PDFs.") }}
       <select name="mode">
         <option value="list">list</option>
         <option value="tabs">tabs</option>
@@ -83,18 +109,21 @@
         <option value="watch">watch</option>
       </select>
     </label>
-    <label><input type="checkbox" name="include_doi_tabs" value="1"> Include DOI tabs</label>
+    <label><input type="checkbox" name="include_doi_tabs" value="1"> Include DOI tabs {{ info("Also open doi.org for items that have no better URL.") }}</label>
     <button type="submit" class="secondary">Handoff</button>
   </form>
   <form method="post" action="/wanted/inbox/drain" class="toolbar">
-    <p class="field-legend">Inbox</p>
+    <p class="field-legend">Inbox {{ info("A drop folder for PDFs you downloaded yourself. Paperful matches files to library items by DOI or title.") }}</p>
+    <p class="section-lede">Put hand-downloaded PDFs in the configured inbox folder, then drain it here.</p>
     <button type="submit" class="secondary">Drain inbox</button>
+    {{ info("Match whatever is waiting in the drop folder and attach the hits. Unmatched files stay put.") }}
   </form>
   <form method="post" action="/wanted/reachout" class="toolbar keys-form">
-    <p class="field-legend">Reachout</p>
-    <label><input type="checkbox" name="non_oa_only" value="1"> Non-OA only</label>
-    <label><input type="checkbox" name="lookup" value="1"> Twenty lookup</label>
-    <label>Handoff
+    <p class="field-legend">Reachout {{ info("Export a list of authors to ask for a PDF (ResearchGate and similar). Paperful never sends mail.") }}</p>
+    <p class="section-lede">Builds a contact list for items that are still missing. Optional Twenty lookup fills emails when that integration is on.</p>
+    <label><input type="checkbox" name="non_oa_only" value="1"> Non-OA only {{ info("Only items that are paywalled, not open access, or blocked by license.") }}</label>
+    <label><input type="checkbox" name="lookup" value="1"> Twenty lookup {{ info("When Twenty CRM is enabled, search People for authors still missing an email. Does not send mail.") }}</label>
+    <label>Handoff {{ info("export only: write the list to disk. tabs: open ResearchGate publication URLs. walk: open them one at a time.") }}
       <select name="handoff_mode">
         <option value="">export only</option>
         <option value="tabs">tabs</option>
@@ -106,7 +135,58 @@
 </section>
 {% endif %}
 <section class="panel">
-  <h2>Items</h2>
+  <div class="lib-items-head">
+    <h2>Items</h2>
+    <form class="lib-pager" method="get" action="/wanted">
+      <span class="counts">
+        {% if wanted_pagination.total %}
+        {{ wanted_pagination.range_start }}–{{ wanted_pagination.range_end }}
+        of {{ wanted_pagination.total }}
+        {% else %}
+        0 of 0
+        {% endif %}
+      </span>
+      <input type="hidden" name="tab" value="{{ tab }}">
+      <input type="hidden" name="page" value="1">
+      <label>
+        Order by {{ info("Sort this tab. Year sorts put undated items last.") }}
+        <select name="order" onchange="this.form.submit()">
+          {% for value, label in wanted_pagination.orders %}
+          <option value="{{ value }}"{% if value == wanted_pagination.order %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Per page {{ info("How many rows to show. Larger pages are heavier to render.") }}
+        <select name="per_page" onchange="this.form.submit()">
+          {% for n in wanted_pagination.page_sizes %}
+          <option value="{{ n }}"{% if n == wanted_pagination.per_page %} selected{% endif %}>{{ n }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Filter {{ info("With summary: items that already have a Paperful summary. Without summary: the rest.") }}
+        <select name="filter" onchange="this.form.submit()">
+          {% for value, label in wanted_pagination.filter_options %}
+          <option value="{{ value }}"{% if value == wanted_pagination.filt %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Search {{ info("Match title, Zotero item key, or DOI. Applied with the other filters on this tab.") }}
+        <input type="search" name="q" value="{{ wanted_pagination.q }}" placeholder="Title, key, or DOI">
+      </label>
+      <button type="submit" class="secondary">Apply</button>
+      {% if wanted_pagination.prev_url %}
+      <a class="secondary lib-pager-nav" href="{{ wanted_pagination.prev_url }}">Previous</a>
+      {% endif %}
+      <span class="counts">Page {{ wanted_pagination.page }} / {{ wanted_pagination.page_count }}</span>
+      {% if wanted_pagination.next_url %}
+      <a class="secondary lib-pager-nav" href="{{ wanted_pagination.next_url }}">Next</a>
+      {% endif %}
+    </form>
+  </div>
+  <p class="section-lede">Tick rows to limit Fetch (and Advanced attach, recover, handoff, or reachout) to those items. With none ticked, Fetch uses the whole tab. The icon in Detail explains why an item is missing or held — hover it.</p>
 <table class="wb-table">
   <thead><tr><th></th><th>Title</th><th>Detail</th></tr></thead>
   <tbody>
@@ -115,7 +195,7 @@
     <td><input type="checkbox" name="keys" value="{{ row.key }}" form="wanted-form" class="row-select"
       {% if row.ticked %}checked{% endif %}></td>
     <td>{{ row.title }}
-      {{ icon_button('Detail', 'detail', onclick="document.getElementById('d-" ~ row.key ~ "').showModal()") }}
+      {{ icon_button('Detail', 'detail', onclick="openDrawer('d-" ~ row.key ~ "')") }}
       <dialog class="wb-drawer" id="d-{{ row.key }}">
         <p><strong>{{ row.title }}</strong></p>
         <p>Key {{ row.key }}{% if row.year %} · {{ row.year }}{% endif %}</p>
@@ -125,13 +205,13 @@
         {% if row.miss_plain %}<p>{{ row.miss_plain }}</p>{% endif %}
         {% if row.has_summary %}
         <p><a href="/briefs/summary/{{ row.key }}">Open summary</a></p>
-        <iframe class="summary-frame" sandbox="" src="/item/{{ row.key }}/summary" title="Summary"></iframe>
+        <iframe class="summary-frame" sandbox="" data-src="/item/{{ row.key }}/summary" title="Summary"></iframe>
         {% endif %}
         {% if prefs.advanced and briefs.llm_on and tab != 'missing' %}
         <form method="post" action="/wanted/summarize" class="toolbar">
           <input type="hidden" name="key" value="{{ row.key }}">
-          <label>Dest <select name="dest">{% for d in dest_options %}<option value="{{ d }}">{{ d }}</option>{% endfor %}</select></label>
-          <label><input type="checkbox" name="force" value="1"> Force</label>
+          <label>Dest {{ info("disk: HTML under out/summaries only. zotero: a child note on this item. both: files and a note.") }} <select name="dest">{% for d in dest_options %}<option value="{{ d }}">{{ d }}</option>{% endfor %}</select></label>
+          <label><input type="checkbox" name="force" value="1"> Force {{ info("Regenerate even when a summary already exists, and summarize when the PDF identity check would skip this item.") }}</label>
           <button type="submit">Summarize this</button>
         </form>
         {% endif %}

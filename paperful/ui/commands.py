@@ -120,7 +120,13 @@ def _worker_loop() -> None:
             pass
 
 
-def enqueue(cfg: Config, verb: str, fn: Callable[[str], None]) -> str:
+def enqueue(
+    cfg: Config,
+    verb: str,
+    fn: Callable[[str], None],
+    *,
+    args: dict[str, Any] | None = None,
+) -> str:
     """Enqueue work; fn receives command id and must update the command record."""
     _ensure_worker()
     cmd_id = uuid.uuid4().hex[:12]
@@ -133,6 +139,8 @@ def enqueue(cfg: Config, verb: str, fn: Callable[[str], None]) -> str:
         "report_path": "",
         "created": time.time(),
     }
+    if args:
+        record["args"] = args
     write_command(cfg, record)
 
     def _run() -> None:

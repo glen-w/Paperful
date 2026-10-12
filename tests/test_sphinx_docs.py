@@ -91,6 +91,7 @@ def test_gui_md_documents_discover_and_wanted_routes():
         "/repair/preview",
         "/mirror/apply",
         "/briefs/summarize",
+        "/ask",
         "/index/ask",
         "Briefs",
         "Stays CLI",

@@ -1,0 +1,8 @@
+{# Queued / running / failed line for a last_job_result or job_view dict. #}
+{% macro job_status(result, label='') -%}
+{% if result and (result.status == 'queued' or result.status == 'running') %}
+<p class="counts" role="status"{% if result.id %} data-run-id="{{ result.id }}"{% endif %}>{{ label or (result.verb.replace('_', ' ') if result.verb else 'Job') }} <span class="cmd-status">{{ result.status }}</span>…</p>
+{% elif result and result.error %}
+<p class="error-banner">{{ result.error }}</p>
+{% endif %}
+{%- endmacro %}

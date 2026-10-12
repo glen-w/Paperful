@@ -1,17 +1,23 @@
 {% extends "base.html" %}
+{% from "_help.html" import info %}
 {% from "_icon_btn.html" import icon_button %}
+{% from "_job_status.html" import job_status %}
 {% block title %}Discover — Paperful{% endblock %}
+{% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
 {% block content %}
 <h1>Discover</h1>
+<p class="page-lede">Find papers that are not in the library yet. Topic search grows a citation and keyword graph from a query, DOI, ORCID, or collection. People watches authors for new work. Nothing is added to Zotero until you Preview apply and then Add selected. Filling PDFs happens on Wanted after items exist.</p>
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
+{{ job_status(job) }}
 <section class="panel">
   <h2>Topic</h2>
+  <p class="section-lede">Start from a keyword (or, in Advanced, a DOI, ORCID, or collection). Search is a dry-run: candidates land in the Queue below. Save a profile if you will re-run the same graph later.</p>
   <form method="post" action="/discover/topic" class="form-stack">
     <div class="field-group">
-      <p class="field-legend">Search</p>
-      <label>Track a topic <input name="query"></label>
+      <p class="field-legend">Search {{ info("OpenAlex search. For DOI, ORCID, or collection kinds, put the identifier in Seeds as well.") }}</p>
+      <label>Track a topic {{ info("Keywords OpenAlex will search. Phrase it like a paper title or a few technical terms, not a whole paragraph.") }} <input name="query"></label>
       {% if prefs.advanced %}
-      <label>Kind
+      <label>Kind {{ info("search: keyword only. hybrid: keyword plus citation hops. doi / orcid / collection: start from those seeds instead of a keyword.") }}
         <select name="kind">
           <option value="search">search</option>
           <option value="hybrid">hybrid</option>
@@ -22,18 +28,20 @@
       </label>
       {% endif %}
       <button type="submit">Search</button>
+      {{ info("Run a dry-run graph and fill the Queue. Does not create Zotero items until you Apply below.") }}
     </div>
     {% if prefs.advanced %}
     <div class="field-group">
-      <p class="field-legend">Graph</p>
-      <label>Direction <input name="direction" placeholder="refs"></label>
-      <label>Depth <input name="depth" type="number" min="0"></label>
-      <label>Year from <input name="year_from" type="number"></label>
-      <label>Year to <input name="year_to" type="number"></label>
-      <label>Max candidates <input name="max_candidates" placeholder="all"></label>
-      <label>Per-hop limit <input name="per_hop_limit" placeholder="all"></label>
-      <label>Hybrid seeds <input name="hybrid_seeds" type="number"></label>
-      <label>Per-hop rank
+      <p class="field-legend">Graph {{ info("How far to walk references and citing papers from each seed. Leave defaults if you are unsure.") }}</p>
+      <p class="section-lede">Citation hops find papers that a seed cites, or papers that cite it. Depth 0 is the seed set only. Higher depth explodes quickly — cap it with Max candidates.</p>
+      <label>Direction {{ info("refs: papers the seeds cite. cites: papers that cite the seeds. both: those two. keywords / similar add OpenAlex keyword or related-work expansion. Combinations such as refs+keywords are allowed.") }} <input name="direction" placeholder="refs"></label>
+      <label>Depth {{ info("How many hops from each seed. 0 is seeds only. 1 is the usual first ring of references or citers.") }} <input name="depth" type="number" min="0"></label>
+      <label>Year from {{ info("Drop candidate works published before this year.") }} <input name="year_from" type="number"></label>
+      <label>Year to {{ info("Drop candidate works published after this year.") }} <input name="year_to" type="number"></label>
+      <label>Max candidates {{ info("Stop after this many new-plus-already-in-library rows. Use all for every row (can be huge).") }} <input name="max_candidates" placeholder="all"></label>
+      <label>Per-hop limit {{ info("Neighbours kept per seed at each hop. Use all for every neighbour.") }} <input name="per_hop_limit" placeholder="all"></label>
+      <label>Hybrid seeds {{ info("For hybrid kind: how many keyword hits become graph seeds. Leave blank for the default.") }} <input name="hybrid_seeds" type="number"></label>
+      <label>Per-hop rank {{ info("Which neighbours a numeric Per-hop limit keeps: most-cited, least-cited, or random. default uses the usual ranking.") }}
         <select name="per_hop_rank">
           <option value="">default</option>
           <option value="most-cited">most-cited</option>
@@ -41,7 +49,7 @@
           <option value="random">random</option>
         </select>
       </label>
-      <label>Fetch PDFs
+      <label>Fetch PDFs {{ info("After items are created: off leaves PDFs to Wanted. fast uses cheap public sources. full runs the usual fetch policy. Creating items still needs Apply below.") }}
         <select name="fetch_pdfs">
           <option value="">off</option>
           <option value="fast">fast</option>
@@ -50,41 +58,42 @@
       </label>
     </div>
     <div class="field-group">
-      <p class="field-legend">Keywords &amp; sources</p>
-      <label>Keyword limit <input name="keyword_limit"></label>
-      <label>Keyword hop limit <input name="keyword_hop_limit"></label>
-      <label>Keyword min score <input name="keyword_min_score"></label>
-      <label>Cites query <input name="cites_query"></label>
-      <label>Languages <input name="languages" placeholder="en,fr"></label>
-      <label>Min seed citations <input name="min_seed_citations" type="number"></label>
-      <label>Backends <input name="backends" placeholder="openalex,crossref"></label>
-      <label>Tags <input name="tags" placeholder="paperful:frontier"></label>
-      <label>Dedupe scope <input name="dedupe_scope"></label>
-      <label>Dedupe after <input name="dedupe_after"></label>
+      <p class="field-legend">Keywords &amp; sources {{ info("OpenAlex keyword expansion, language filters, and which bibliographic backends to query.") }}</p>
+      <p class="section-lede">Keyword expansion is a second graph beside citations. Leave these blank unless a previous run was too broad or too thin.</p>
+      <label>Keyword limit {{ info("How many of a work’s OpenAlex keywords to expand (1–5). 5 uses every stored keyword.") }} <input name="keyword_limit"></label>
+      <label>Keyword hop limit {{ info("Works kept per seed on the keyword side. A positive integer.") }} <input name="keyword_hop_limit"></label>
+      <label>Keyword min score {{ info("Drop seed keywords below this similarity. 0 keeps whatever OpenAlex assigned.") }} <input name="keyword_min_score"></label>
+      <label>Cites query {{ info("Only references and citing works that match this OpenAlex search. Needs refs or cites in Direction, and Depth of at least 1.") }} <input name="cites_query"></label>
+      <label>Languages {{ info("Comma-separated ISO language codes to keep, for example en,fr.") }} <input name="languages" placeholder="en,fr"></label>
+      <label>Min seed citations {{ info("Ignore seed works cited fewer times than this. Filters noisy or very new seeds.") }} <input name="min_seed_citations" type="number"></label>
+      <label>Backends {{ info("Bibliographic sources to query, comma-separated. Typical: openalex,crossref.") }} <input name="backends" placeholder="openalex,crossref"></label>
+      <label>Tags {{ info("Extra Zotero tags on items created from this run, comma-separated. Combined with config defaults.") }} <input name="tags" placeholder="paperful:frontier"></label>
+      <label>Dedupe scope {{ info("Where to look for duplicates after create: library, collection, or none.") }} <input name="dedupe_scope"></label>
+      <label>Dedupe after {{ info("After create: off (default), classify (write a pack), or apply (merge). classify is safer.") }} <input name="dedupe_after"></label>
     </div>
     <div class="field-group">
-      <p class="field-legend">Options</p>
-      <label><input type="checkbox" name="or_mode" value="1"> OR keywords</label>
-      <label><input type="checkbox" name="note_provenance" value="1"> Note provenance</label>
-      <label><input type="checkbox" name="refine" value="1"> Refine</label>
-      <label><input type="checkbox" name="author_site_preflight" value="1"> Author-site preflight</label>
-      <label><input type="checkbox" name="twenty_writeback" value="1"> Twenty writeback</label>
+      <p class="field-legend">Options {{ info("Toggles that change matching, notes, ranking, and optional CRM writeback.") }}</p>
+      <label><input type="checkbox" name="or_mode" value="1"> OR keywords {{ info("Treat query words as OR instead of AND. Returns more, noisier hits.") }}</label>
+      <label><input type="checkbox" name="note_provenance" value="1"> Note provenance {{ info("Write a Paperful note on created items explaining which seed and hop found them.") }}</label>
+      <label><input type="checkbox" name="refine" value="1"> Refine {{ info("Second-pass ranking of candidates so weaker keyword matches drop. Costs a bit more time.") }}</label>
+      <label><input type="checkbox" name="author_site_preflight" value="1"> Author-site preflight {{ info("Opt-in co-author graph and a proposed field pack from author pages. Off unless you need it.") }}</label>
+      <label><input type="checkbox" name="twenty_writeback" value="1"> Twenty writeback {{ info("Append personal-page URLs onto a unique Twenty Person. Does not create People or send mail.") }}</label>
     </div>
     <div class="field-group">
-      <p class="field-legend">Seeds</p>
-      <label>Seeds <textarea name="seeds" rows="3" placeholder="DOIs / ORCIDs, one per line"></textarea></label>
+      <p class="field-legend">Seeds {{ info("Starting works or people for DOI, ORCID, collection, or hybrid runs.") }}</p>
+      <label>Seeds {{ info("One DOI or ORCID per line. Used when Kind is doi, orcid, hybrid, or you want extra seeds beside a keyword.") }} <textarea name="seeds" rows="3" placeholder="DOIs / ORCIDs, one per line"></textarea></label>
     </div>
     <div class="field-group">
-      <p class="field-legend">Profile</p>
-      <label>Save as profile <input name="profile_name" placeholder="my-topic"></label>
-      <label><input type="checkbox" name="force" value="1"> Overwrite</label>
+      <p class="field-legend">Profile {{ info("Save these knobs under a name so you can re-run the same topic later.") }}</p>
+      <label>Save as profile {{ info("File name for this topic’s knobs. Letters, numbers, and hyphens. Does not include API keys.") }} <input name="profile_name" placeholder="my-topic"></label>
+      <label><input type="checkbox" name="force" value="1"> Overwrite {{ info("Replace an existing saved profile with the same name.") }}</label>
       <button type="submit" formaction="/discover/profile-save" class="secondary">Save profile</button>
     </div>
     {% endif %}
   </form>
   {% if prefs.advanced and profiles %}
   <form method="post" action="/discover/profile-run" class="toolbar">
-    <label>Run profile <select name="profile">{% for p in profiles %}<option value="{{ p }}">{{ p }}</option>{% endfor %}</select></label>
+    <label>Run profile {{ info("Re-run a saved topic search with the knobs you stored.") }} <select name="profile">{% for p in profiles %}<option value="{{ p }}">{{ p }}</option>{% endfor %}</select></label>
     <button type="submit" class="secondary">Run profile</button>
   </form>
   {% endif %}
@@ -92,90 +101,100 @@
   <form method="post" action="/discover/resume" class="toolbar">
     <input type="hidden" name="run_id" value="{{ deferred_run }}">
     <button type="submit" class="secondary">Resume {{ deferred_run }}</button>
+    {{ info("Continue a topic run that stopped after the dry-run, waiting for you to create items.") }}
   </form>
   {% endif %}
   {% if run_id %}
   <form method="post" action="/discover/briefing" class="toolbar">
     <input type="hidden" name="run_id" value="{{ run_id }}">
-    {% if prefs.advanced %}<label><input type="checkbox" name="apply" value="1"> File collection note</label>{% endif %}
+    {% if prefs.advanced %}<label><input type="checkbox" name="apply" value="1"> File collection note {{ info("Also write this briefing as a Zotero collection note. Needs a collection chip.") }}</label>{% endif %}
     <button type="submit" class="secondary">Briefing</button>
+    {{ info("A short write-up of this run’s candidates: what is new, what you already own, what is open access.") }}
   </form>
   <form method="post" action="/discover/digest" class="toolbar">
     <input type="hidden" name="run_id" value="{{ run_id }}">
-    {% if prefs.advanced %}<label><input type="checkbox" name="apply" value="1"> File collection note</label>{% endif %}
+    {% if prefs.advanced %}<label><input type="checkbox" name="apply" value="1"> File collection note {{ info("Also write this digest as a Zotero collection note. Needs a collection chip.") }}</label>{% endif %}
     <button type="submit" class="secondary">Digest</button>
+    {{ info("A longer digest of the frontier this run found, grouped for reading rather than for Apply.") }}
   </form>
   {% endif %}
 </section>
 {% if prefs.advanced %}
 <section class="panel">
   <h2>Grow (citations / DOIs / authors)</h2>
+  <p class="section-lede">Three more ways to add works: papers cited by PDFs you already have, a DOI list, or frequent authors in the current collection. Each path is Preview then Apply, like Topic.</p>
   <form method="post" action="/discover/refs-gap" class="toolbar">
-    <p class="field-legend">Citation gaps</p>
+    <p class="field-legend">Citation gaps {{ info("Works cited inside your PDFs that are not yet in the library.") }}</p>
+    <p class="section-lede">Reads bibliographies in stored PDFs and lists cited works you do not own. Writes a dry-run pack; ingest-dois below can create the items.</p>
     <button type="submit" class="secondary">Refs gap (dry-run pack)</button>
   </form>
   <div class="cluster">
-    <p class="field-legend">Ingest DOIs</p>
+    <p class="field-legend">Ingest DOIs {{ info("Create Zotero parents from a DOI file or from a refs-gap pack. Does not fetch PDFs.") }}</p>
+    <p class="section-lede">Creates metadata records only. After Apply, use Wanted to fill PDFs.</p>
     <form method="post" action="/discover/ingest-preview" class="toolbar" enctype="multipart/form-data">
-      <label>DOI file <input type="file" name="file"></label>
-      <label>Or pack path <input name="pack_path" placeholder="state/refs-gaps/.../pack.json"></label>
+      <label>DOI file {{ info("Text file, one DOI per line.") }} <input type="file" name="file"></label>
+      <label>Or pack path {{ info("A refs-gap pack.json from the button above, if you already have one on disk.") }} <input name="pack_path" placeholder="state/refs-gaps/.../pack.json"></label>
       <button type="submit" class="secondary">Preview ingest-dois</button>
+      {{ info("Count which DOIs would be created, already exist, or cannot be resolved. Writes nothing to Zotero.") }}
     </form>
     <form method="post" action="/discover/ingest-apply" class="toolbar">
       <input type="hidden" name="review_token" value="{{ ingest_token }}">
       <button type="submit">Apply ingest-dois</button>
+      {{ info("Create the items from the last successful ingest preview.") }}
     </form>
   </div>
   <form method="post" action="/discover/authors" class="toolbar">
-    <p class="field-legend">Authors</p>
-    <label>Min count <input name="min_count" type="number" value="2" min="1"></label>
-    <label>Max authors <input name="max_authors" type="number" value="15" min="1"></label>
-    <label><input type="checkbox" name="apply" value="1"> Write report + proposed pack</label>
+    <p class="field-legend">Authors {{ info("People who appear often in the current collection. Use this to decide who to follow in People.") }}</p>
+    <p class="section-lede">Counts author names in scope. Writing a report is optional and stays on disk until you follow someone.</p>
+    <label>Min count {{ info("Ignore authors who appear fewer times than this.") }} <input name="min_count" type="number" value="2" min="1"></label>
+    <label>Max authors {{ info("Cap the frequency table at this many names.") }} <input name="max_authors" type="number" value="15" min="1"></label>
+    <label><input type="checkbox" name="apply" value="1"> Write report + proposed pack {{ info("Save the frequency table and a proposed author-watch pack on disk. Off is a dry-run print only.") }}</label>
     <button type="submit" class="secondary">Authors frequency</button>
   </form>
   <form method="post" action="/discover/packs-promote" class="toolbar">
-    <p class="field-legend">Packs</p>
-    <label>Promote pack slug <input name="slug" placeholder="ocean-bbnj"></label>
+    <p class="field-legend">Packs {{ info("Turn a named on-disk pack into library items. Same idea as Apply on the Queue, for packs built elsewhere.") }}</p>
+    <label>Promote pack slug {{ info("Folder name under state/ for a pack you already generated, for example ocean-bbnj.") }} <input name="slug" placeholder="ocean-bbnj"></label>
     <button type="submit" class="secondary">Packs promote</button>
   </form>
 </section>
 {% endif %}
 <section class="panel">
   <h2>People</h2>
+  <p class="section-lede">Watch lists of researchers. Paperful polls OpenAlex for new papers by those ORCIDs. It does not scrape social sites. New hits land in Person inbox until you Apply them into Zotero.</p>
   <form method="post" action="/discover/aw/save" class="toolbar">
-    <p class="field-legend">Lists</p>
-    <label>New list <input name="name" placeholder="my-list"></label>
+    <p class="field-legend">Lists {{ info("A named group of people to poll together, for example a lab or a field.") }}</p>
+    <label>New list {{ info("Short name for a new people list. Letters, numbers, and hyphens.") }} <input name="name" placeholder="my-list"></label>
     <button type="submit" class="secondary">Create list</button>
   </form>
   <form method="post" action="/discover/follow" class="toolbar">
-    <p class="field-legend">Follow</p>
-    <label>Follow (ORCID) <input name="orcid" placeholder="0000-0002-1825-0097"></label>
-    <label>List <input name="list_name" value="{{ aw_list }}"></label>
-    <label>Since <input name="backfill_from" type="date"></label>
+    <p class="field-legend">Follow {{ info("Add one ORCID and immediately start watching them.") }}</p>
+    <label>Follow (ORCID) {{ info("The person’s 16-digit ORCID, with hyphens. Required to poll OpenAlex.") }} <input name="orcid" placeholder="0000-0002-1825-0097"></label>
+    <label>List {{ info("Which people list to add them to.") }} <input name="list_name" value="{{ aw_list }}"></label>
+    <label>Since {{ info("Backfill papers published on or after this date. Leave blank to start from today going forward.") }} <input name="backfill_from" type="date"></label>
     <button type="submit">Follow</button>
   </form>
   <form method="post" action="/discover/aw/add" class="toolbar">
-    <p class="field-legend">Add person</p>
+    <p class="field-legend">Add person {{ info("Add someone to the list without running a poll yet. Resolve later if the ORCID is blank.") }}</p>
     <input type="hidden" name="list_name" value="{{ aw_list }}">
-    <label>Add ORCID <input name="orcid"></label>
-    <label>Name <input name="display_name"></label>
-    {% if prefs.advanced %}<label>Affiliation <input name="affiliation"></label>{% endif %}
+    <label>Add ORCID {{ info("Optional if you only have a name. Resolve will try to find the ORCID later.") }} <input name="orcid"></label>
+    <label>Name {{ info("Display name on the list. You can edit it later.") }} <input name="display_name"></label>
+    {% if prefs.advanced %}<label>Affiliation {{ info("Institution or host, used as a hint when resolving an ORCID.") }} <input name="affiliation"></label>{% endif %}
     <button type="submit" class="secondary">Add person</button>
   </form>
   <form method="post" action="/discover/aw/run" class="toolbar">
-    <p class="field-legend">Run</p>
+    <p class="field-legend">Run {{ info("Poll OpenAlex for every person on this list and queue new papers in Person inbox.") }}</p>
     <input type="hidden" name="list_name" value="{{ aw_list }}">
-    <label>Backfill from <input name="backfill_from" type="date"></label>
+    <label>Backfill from {{ info("Include papers published on or after this date. Leave blank for new work since the last run.") }} <input name="backfill_from" type="date"></label>
     {% if prefs.advanced %}
-    <label>Max authors <input name="max_authors" type="number" min="1"></label>
-    <label>Per-author limit <input name="per_author_limit" type="number" min="1"></label>
+    <label>Max authors {{ info("Stop after this many people on the list. Leave blank for everyone.") }} <input name="max_authors" type="number" min="1"></label>
+    <label>Per-author limit {{ info("Max new papers to queue per person this run.") }} <input name="per_author_limit" type="number" min="1"></label>
     {% endif %}
     <button type="submit" class="secondary">Run list</button>
   </form>
   <form method="post" action="/discover/aw/suggest" class="toolbar">
-    <p class="field-legend">Suggestions</p>
+    <p class="field-legend">Suggestions {{ info("Propose people to follow from the current collection, citation counts, or coauthors.") }}</p>
     <input type="hidden" name="list_name" value="{{ aw_list }}">
-    <label>Method
+    <label>Method {{ info("corpus: names that appear often in the collection. most cited: OpenAlex citation count. coauthors: people who write with someone already on the list. mix: a blend.") }}
       <select name="method">
         <option value="corpus">corpus frequency</option>
         <option value="most_cited">most cited</option>
@@ -183,14 +202,14 @@
         <option value="mix">mix</option>
       </select>
     </label>
-    <label>Limit <input name="limit" type="number" value="15" min="1" max="100"></label>
-    <label>Collection <input name="collection" value="{{ prefs.collection }}" placeholder="-C path"></label>
+    <label>Limit {{ info("How many suggestions to show.") }} <input name="limit" type="number" value="15" min="1" max="100"></label>
+    <label>Collection {{ info("Collection to scan for corpus frequency. Defaults to the header chip.") }} <input name="collection" value="{{ prefs.collection }}" placeholder="-C path"></label>
     <button type="submit" class="secondary">Get suggestions</button>
   </form>
   <form method="post" action="/discover/aw/import" class="toolbar" enctype="multipart/form-data">
-    <p class="field-legend">Import</p>
+    <p class="field-legend">Import {{ info("Load people from a file you already have. Paperful does not log into ResearchGate, LinkedIn, or Academia.edu.") }}</p>
     <input type="hidden" name="list_name" value="{{ aw_list }}">
-    <label>Source
+    <label>Source {{ info("csv/json: a file you exported. orcid: a list of ORCIDs. rg / linkedin / academia: a page you saved yourself as HTML or CSV.") }}
       <select name="source">
         <option value="csv">csv</option>
         <option value="json">json</option>
@@ -200,28 +219,32 @@
         <option value="academia">academia (saved HTML)</option>
       </select>
     </label>
-    <label>File <input type="file" name="file"></label>
+    <label>File {{ info("The file to import into the current list.") }} <input type="file" name="file"></label>
     <button type="submit" class="secondary">Import</button>
   </form>
   <div class="cluster">
-    <p class="field-legend">List actions</p>
+    <p class="field-legend">List actions {{ info("Resolve fills missing ORCIDs. Briefing writes a reading note. Delete removes the list and its ledger files.") }}</p>
     <form method="post" action="/discover/aw/resolve" class="toolbar">
       <input type="hidden" name="list_name" value="{{ aw_list }}">
       <button type="submit" class="secondary">Resolve {{ aw_list }}</button>
+      {{ info("Look up missing ORCIDs from names and affiliations. People without an ORCID cannot be polled.") }}
     </form>
     <form method="post" action="/discover/aw/briefing" class="toolbar">
       <input type="hidden" name="list_name" value="{{ aw_list }}">
       <button type="submit" class="secondary">People briefing</button>
+      {{ info("A short note of who is on the list and what the last poll found.") }}
     </form>
     <form method="post" action="/discover/aw/delete" class="toolbar" onsubmit="return confirm('Delete list {{ aw_list }} and all ledger files?');">
       <input type="hidden" name="list_name" value="{{ aw_list }}">
       <button type="submit" class="secondary">Delete list</button>
+      {{ info("Permanently delete this people list and its on-disk ledger. Zotero items already created are not deleted.") }}
     </form>
   </div>
 </section>
 {% if aw_lists %}
 <section class="panel">
   <h2>Lists</h2>
+  <p class="section-lede">Saved people lists. Inbox is new papers waiting to be applied. Baseline means the first poll has already run.</p>
   <ul>
   {% for L in aw_lists %}
     <li><a href="/discover?list_name={{ L.name }}">{{ L.name }}</a> — {{ L.people }} people · inbox {{ L.inbox }}{% if L.baseline %} · baseline{% endif %}</li>
@@ -232,6 +255,7 @@
 {% if aw_suggestions %}
 <section class="panel">
   <h2>Suggestions</h2>
+  <p class="section-lede">Tick who to add to the current list. Names marked resolve still need an ORCID before they can be polled.</p>
 <form method="post" action="/discover/aw/accept" class="form-stack">
   <input type="hidden" name="list_name" value="{{ aw_list }}">
   <table class="wb-table">
@@ -249,7 +273,7 @@
     </tbody>
   </table>
   <div class="field-group">
-    <label>Initial seed from <input name="seed_from" type="date"></label>
+    <label>Initial seed from {{ info("After accept, backfill each new person’s papers from this date.") }} <input name="seed_from" type="date"></label>
     <button type="submit">Accept selected</button>
   </div>
 </form>
@@ -258,6 +282,7 @@
 {% if aw_people %}
 <section class="panel">
   <h2>Members</h2>
+  <p class="section-lede">People on the current list. Save edits in place. Remove drops them from the list; it does not delete Zotero items.</p>
 <table class="wb-table">
   <thead><tr><th>Name</th><th>ORCID</th><th>Status</th><th></th></tr></thead>
   <tbody>
@@ -290,6 +315,7 @@
 {% if inbox %}
 <section class="panel">
   <h2>Person inbox</h2>
+  <p class="section-lede">New papers from the last people poll. Preview apply shows what would be created; Apply inbox writes those items into Zotero. PDFs still need Wanted.</p>
 <table class="wb-table">
   <thead><tr><th>List</th><th>Title</th><th>DOI</th></tr></thead>
   <tbody>
@@ -299,17 +325,19 @@
   </tbody>
 </table>
   <div class="cluster">
-    <p class="field-legend">Apply</p>
+    <p class="field-legend">Apply {{ info("Create Zotero parents for inbox rows. Does not fetch PDFs.") }}</p>
     <form method="post" action="/discover/apply-preview" class="toolbar">
       <input type="hidden" name="kind" value="authorwatch">
       <input type="hidden" name="list_name" value="{{ aw_list }}">
       <button type="submit" class="secondary">Preview apply</button>
+      {{ info("Count which inbox rows would become new Zotero items. Writes nothing.") }}
     </form>
     <form method="post" action="/discover/apply" class="toolbar">
       <input type="hidden" name="kind" value="authorwatch">
       <input type="hidden" name="list_name" value="{{ aw_list }}">
       <input type="hidden" name="review_token" value="{{ aw_token }}">
       <button type="submit">Apply inbox ({{ aw_list }})</button>
+      {{ info("Create the items from the last successful inbox preview.") }}
     </form>
   </div>
 </section>
@@ -317,31 +345,36 @@
 {% if note and note.markdown %}
 <section class="panel">
   <h2>Note</h2>
+  <p class="section-lede">The briefing or digest just generated for this page.</p>
   <pre>{{ note.markdown }}</pre>
 </section>
 {% endif %}
 <section class="panel">
   <h2>Queue</h2>
+  <p class="section-lede">Candidates from the last topic search. Keep or Skip each row, then Preview apply and Add selected to create Zotero items. Fill PDFs on Wanted afterwards. Watch remembers this topic and checks it again later.</p>
   {% if run_id %}
   <div class="cluster">
-    <p class="field-legend">Apply this run</p>
+    <p class="field-legend">Apply this run {{ info("Create Zotero parents for rows you kept. Does not fetch PDFs unless Fetch PDFs was set on the search.") }}</p>
     <form method="post" action="/discover/apply-preview" class="toolbar">
       <input type="hidden" name="run_id" value="{{ run_id }}">
       <input type="hidden" name="kind" value="snowball">
       <button type="submit" class="secondary">Preview apply</button>
+      {{ info("Count which kept rows would become new Zotero items. Writes nothing.") }}
     </form>
     <form method="post" action="/discover/apply" class="toolbar">
       <input type="hidden" name="run_id" value="{{ run_id }}">
       <input type="hidden" name="kind" value="snowball">
       <input type="hidden" name="review_token" value="{{ snowball_token }}">
       <button type="submit">Add selected</button>
+      {{ info("Create the items from the last successful queue preview.") }}
       <a href="/wanted">Fill PDFs</a>
     </form>
     <form method="post" action="/discover/watch" class="toolbar">
       <input type="hidden" name="run_id" value="{{ run_id }}">
-      <label>Watch name <input name="watch_name" value="topic-watch"></label>
-      {% if profiles %}<label>Profile <select name="profile"><option value="">—</option>{% for p in profiles %}<option value="{{ p }}">{{ p }}</option>{% endfor %}</select></label>{% endif %}
+      <label>Watch name {{ info("Name for this saved topic watch. Check again later from Following.") }} <input name="watch_name" value="topic-watch"></label>
+      {% if profiles %}<label>Profile {{ info("Optional saved profile to re-use when this watch runs.") }} <select name="profile"><option value="">—</option>{% for p in profiles %}<option value="{{ p }}">{{ p }}</option>{% endfor %}</select></label>{% endif %}
       <button type="submit" class="secondary">Keep an eye on this</button>
+      {{ info("Save this topic and poll it later for new papers. Not the same as a People list.") }}
     </form>
   </div>
   {% endif %}
@@ -369,6 +402,7 @@
 {% if following %}
 <section class="panel">
   <h2>Following</h2>
+  <p class="section-lede">Saved topic watches and people lists. Check again re-runs the poll. Briefing and digest are reading notes, not Apply.</p>
 <ul>
   {% for f in following %}
   <li>{{ f.kind }}: {{ f.name }}
@@ -376,16 +410,17 @@
       <input type="hidden" name="kind" value="{{ f.kind }}">
       <input type="hidden" name="name" value="{{ f.name }}">
       <button type="submit" class="secondary">Check again</button>
+      {{ info("Poll this watch or list for new papers since the last run.") }}
     </form>
     {% if prefs.advanced and f.kind == 'topic' %}
     <form method="post" action="/discover/watch-briefing" class="toolbar" style="display:inline">
       <input type="hidden" name="name" value="{{ f.name }}">
-      <label><input type="checkbox" name="apply" value="1"> Note</label>
+      <label><input type="checkbox" name="apply" value="1"> Note {{ info("Also file this briefing as a Zotero collection note.") }}</label>
       <button type="submit" class="secondary">Watch briefing</button>
     </form>
     <form method="post" action="/discover/watch-digest" class="toolbar" style="display:inline">
       <input type="hidden" name="name" value="{{ f.name }}">
-      <label><input type="checkbox" name="apply" value="1"> Note</label>
+      <label><input type="checkbox" name="apply" value="1"> Note {{ info("Also file this digest as a Zotero collection note.") }}</label>
       <button type="submit" class="secondary">Watch digest</button>
     </form>
     {% endif %}

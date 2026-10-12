@@ -81,6 +81,9 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ### Changed
 
+- **Ask on the default nav:** `/ask` is a first-class page (Wanted, Discover,
+  Ask, Library, …). Index stays Advanced ingest/search. `POST /index/ask` and
+  `POST /index/ask-batch` remain aliases.
 - **Docs screenshots:** workbench stills show forms in use (selected Wanted
   rows, Discover query, Index search + Ask), not empty landing pages.
   Recapture: `scripts/docs/capture_workbench.py`.

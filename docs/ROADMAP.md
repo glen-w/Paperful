@@ -57,7 +57,7 @@ Sci-Hub, no “AI fetch everything”).
 | Strip legacy flat-PDF migrate + mixed-layout doctor amber | Day-0 mirror never steers people into a whole-library layout cleanup | **Shipped (0.1 → 1.0)** |
 | **Mendeley and EndNote adapters** (not a 1.0 blocker) | The ledger survives a manager change | In the tree. **Seeking testers.** Zotero stays the well-tested path. See below |
 | **Workbench GUI** | Discover, Wanted, Preview/Grab; Advanced Repair / Mirror / Discover grow / Wanted recover | Landed — [GUI](#gui); `paperful serve` + `paperful/ui/`; `docker compose up` publishes `127.0.0.1:8765`. TTY and Sci-Hub stay CLI. Not tagged 1.0 |
-| **Interactive Ask (GUI)** | Index page when `[rag]` + `[llm]` enabled | **Shipped** — Index Ask + batch (scope, custom prompts, force); `rag questions` / `rag answered`; ingest/search; Briefs for summarize/synthesize |
+| **Interactive Ask (GUI)** | `/ask` on the default nav when `[rag]` + `[llm]` enabled | **Shipped** — Ask + batch (scope, custom prompts, force); Index for ingest/search/`rag questions`/`rag answered`; Briefs for summarize/synthesize |
 
 Nice-to-have (not 1.0 blockers): colour glossary next to `doctor` (documented);
 collection picker hint on fuzzy `--collection` miss.

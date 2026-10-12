@@ -3,6 +3,7 @@
 {% block content %}
 <p><a href="/briefs">Briefs</a></p>
 <h1>{{ cite }}</h1>
+<p class="page-lede">Grounded summary of this paper from local PDF text. It is a reading aid, not a substitute for the PDF.</p>
 <p class="counts">{% if model %}{{ model }} · {% endif %}{{ key }}</p>
 <iframe class="summary-frame summary-frame-page" sandbox="" src="/item/{{ key }}/summary" title="Summary"></iframe>
 {% endblock %}

@@ -8,10 +8,15 @@ from paperful.config import Config
 from paperful.miss_surface import project_miss_surface
 from paperful.store import Manifest, Record, STATUS_OK
 from paperful.ui.pages import (
+    briefs_synth_form,
+    dest_for_form,
+    job_view,
+    last_job_result,
     library_items_page,
     nest_collection_rows,
     newest_snowball_queue,
     resolve_wanted_tab,
+    wanted_items_page,
     wanted_rows,
 )
 from paperful.ui.verify import file_verification
@@ -141,6 +146,38 @@ def test_nest_collection_rows_groups_paths():
     assert tree[1]["children"] == []
 
 
+def test_wanted_items_page_filters_sorts_and_slices():
+    rows = [
+        {"key": "C", "title": "Charlie", "year": 2020, "doi": "", "has_summary": False},
+        {"key": "A", "title": "Alpha", "year": 2024, "doi": "10.1/a", "has_summary": True},
+        {"key": "B", "title": "Bravo", "year": 2022, "doi": "", "has_summary": False},
+        {"key": "D", "title": "Delta", "year": 2018, "doi": "", "has_summary": True},
+        {"key": "E", "title": "Echo", "year": None, "doi": "", "has_summary": False},
+    ]
+    page, total, index, count = wanted_items_page(
+        rows, page=2, per_page=2, order="title"
+    )
+    assert total == 5
+    assert index == 2
+    assert count == 3
+    assert [row["title"] for row in page] == ["Charlie", "Delta"]
+
+    newest, *_rest = wanted_items_page(rows, page=1, per_page=10, order="year_new")
+    assert [row["title"] for row in newest] == ["Alpha", "Bravo", "Charlie", "Delta", "Echo"]
+
+    summaries, total_sum, _, _ = wanted_items_page(
+        rows, page=1, per_page=10, filt="summary"
+    )
+    assert total_sum == 2
+    assert [row["key"] for row in summaries] == ["A", "D"]
+
+    search, total_q, _, _ = wanted_items_page(
+        rows, page=1, per_page=10, query="10.1/a"
+    )
+    assert total_q == 1
+    assert search[0]["key"] == "A"
+
+
 def test_library_items_page_slices(tmp_path):
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     manifest = Manifest(cfg.manifest_path)
@@ -230,3 +267,87 @@ def test_list_recent_summaries_cite_and_model(tmp_path):
     assert "Smith" in rows[0]["cite"]
     assert "2021" in rows[0]["cite"]
     assert "Area-based" in rows[0]["cite"]
+
+
+def test_job_view_normalizes_command_record():
+    assert job_view(None) == {}
+    view = job_view(
+        {
+            "id": "abc",
+            "verb": "rag_ingest",
+            "status": "failed",
+            "error": "no index",
+            "args": {"limit": 3},
+            "result": {"summary": {"pdf": 0}},
+        }
+    )
+    assert view["id"] == "abc"
+    assert view["verb"] == "rag_ingest"
+    assert view["status"] == "failed"
+    assert view["error"] == "no index"
+    assert view["args"]["limit"] == 3
+    assert view["summary"]["pdf"] == 0
+
+
+def test_last_job_result_prefers_matching_run(tmp_path):
+    from paperful.ui import commands
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    commands.write_command(
+        cfg,
+        {"id": "old", "verb": "ask", "status": "done", "result": {"answer": "old"}},
+    )
+    commands.write_command(
+        cfg,
+        {"id": "new", "verb": "ask", "status": "queued", "result": {}},
+    )
+    commands.write_command(
+        cfg,
+        {"id": "ingest", "verb": "rag_ingest", "status": "queued", "result": {}},
+    )
+    by_run = last_job_result(cfg, "ask", run="old")
+    assert by_run["id"] == "old"
+    assert by_run["status"] == "done"
+    latest = last_job_result(cfg, "ask", run="ingest")
+    assert latest["id"] == "new"
+    assert latest["status"] == "queued"
+
+
+def test_dest_for_form_falls_back_to_disk_without_collection():
+    assert dest_for_form("both", "") == "disk"
+    assert dest_for_form("zotero", "") == "disk"
+    assert dest_for_form("disk", "") == "disk"
+    assert dest_for_form("both", "ocean") == "both"
+
+
+def test_briefs_synth_form_prefers_query_then_last_job():
+    class _Req:
+        def __init__(self, **qp):
+            self.query_params = qp
+
+    from_query = briefs_synth_form(
+        _Req(synth_dest="zotero", synth_limit="40", synth_year_from="2020"),
+        dest_default="both",
+        collection="",
+        last={"args": {"dest": "disk", "limit": 9}},
+    )
+    assert from_query["dest"] == "zotero"
+    assert from_query["limit"] == "40"
+    assert from_query["year_from"] == "2020"
+
+    from_last = briefs_synth_form(
+        _Req(),
+        dest_default="both",
+        collection="",
+        last={"args": {"dest": "both", "limit": 12, "force": True}},
+    )
+    assert from_last["dest"] == "disk"
+    assert from_last["limit"] == "12"
+    assert from_last["force"] is True
+
+    fresh = briefs_synth_form(
+        _Req(), dest_default="both", collection="ocean/BBNJ", last={}
+    )
+    assert fresh["dest"] == "both"
+    assert fresh["limit"] == ""

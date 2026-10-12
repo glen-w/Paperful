@@ -1,16 +1,19 @@
 {% extends "base.html" %}
+{% from "_help.html" import info %}
+{% from "_job_status.html" import job_status %}
 {% block title %}Index — Paperful{% endblock %}
 {% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
 {% block content %}
 <h1>Index</h1>
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
-<p>{{ message }}</p>
+<p class="page-lede">{{ message }} The index is built from PDFs already copied to disk under <code>out/</code>, not live from Zotero. Ingest first, then Search here or <a href="/ask">Ask</a>.</p>
 {% if flags.remote_llm %}<p class="warn-remote">Remote LLM — excerpts from your PDFs leave this machine.</p>{% endif %}
 {% if flags.remote_embed %}<p class="warn-remote">Remote embedding model — passage text leaves this machine.</p>{% endif %}
 {% if enabled %}
 <section class="panel">
   <details>
     <summary class="panel-summary">Status</summary>
+    <p class="section-lede">How many items and chunks are in the local index. If this is empty, run Ingest.</p>
     <table class="wb-table">
       <thead><tr><th>Field</th><th>Value</th></tr></thead>
       <tbody>
@@ -26,19 +29,23 @@
 {% if flags.can_ingest %}
 <section class="panel">
   <h2>Ingest</h2>
+  <p class="section-lede">Read PDFs (and abstracts) from the mirror into the search index. Dry-run counts what would change. Unchanged files are skipped unless you come back after they change on disk.</p>
+  {{ job_status(ingest_result, 'Ingest') }}
   {% if ingest_result.summary %}
   <p>{% if ingest_result.dry_run %}Would index{% else %}Indexed{% endif %}
     {{ ingest_result.summary.pdf + ingest_result.summary.ocr }} PDFs
     ({{ ingest_result.summary.ocr }} after OCR) and {{ ingest_result.summary.abstract }} abstracts.
     Unchanged {{ ingest_result.summary.unchanged }}, failed {{ ingest_result.summary.failed }}.
     pdf {{ ingest_result.summary.pdf }}, chunks {{ ingest_result.summary.chunks }}.</p>
-  {% elif ingest_result.status %}<p>Last ingest: {{ ingest_result.status }}</p>{% endif %}
+  {% endif %}
   <form method="post" action="/index/ingest" class="toolbar">
-    <label>Year from <input type="number" name="year_from"></label>
-    <label>Year to <input type="number" name="year_to"></label>
-    <label>Limit <input type="number" name="limit" min="1"></label>
+    <label>Year from {{ info("Only items dated this year or later. Undated items are excluded.") }} <input type="number" name="year_from"></label>
+    <label>Year to {{ info("Only items dated this year or earlier. Undated items are excluded.") }} <input type="number" name="year_to"></label>
+    <label>Limit {{ info("Stop after this many items. Leave blank to ingest the whole scope.") }} <input type="number" name="limit" min="1"></label>
     <button type="submit" name="dry_run" value="1">Dry-run ingest</button>
+    {{ info("Count what would be indexed. Writes nothing.") }}
     <button type="submit" name="dry_run" value="0">Ingest</button>
+    {{ info("Write new or changed PDFs and abstracts into the local index.") }}
   </form>
 </section>
 {% endif %}
@@ -46,12 +53,14 @@
 {% if flags.can_search %}
 <section class="panel">
   <h2>Search</h2>
+  <p class="section-lede">Find passages in the indexed PDFs. This is retrieval only — it does not call the chat model. <a href="/ask">Ask</a> uses the same index to answer in sentences.</p>
   <form method="post" action="/index/search" class="toolbar">
-    <label>Query <input name="q" value="{{ search_q }}"></label>
-    <label>Top-k <input name="k" value="{{ search_k or '' }}"></label>
-    <label>Year from <input name="year_from" value="{{ year_from }}"></label>
-    <label>Year to <input type="number" name="year_to" value="{{ year_to }}"></label>
+    <label>Query {{ info("Natural-language search over indexed passages, not a keyword-only library search.") }} <input name="q" value="{{ search_q }}"></label>
+    <label>Top-k {{ info("How many matching passages to return. Higher values show more context and more noise.") }} <input name="k" value="{{ search_k or '' }}"></label>
+    <label>Year from {{ info("Only items dated this year or later. Undated items are excluded.") }} <input name="year_from" value="{{ year_from }}"></label>
+    <label>Year to {{ info("Only items dated this year or earlier. Undated items are excluded.") }} <input type="number" name="year_to" value="{{ year_to }}"></label>
     <button type="submit">Search</button>
+    {{ info("Retrieve matching passages. Does not call the chat model.") }}
   </form>
   {% if hits %}
   <table class="wb-table">
@@ -66,120 +75,48 @@
 </section>
 {% endif %}
 
-{% if flags.can_ask %}
-<section class="panel">
-  <h2>Ask</h2>
-  <p class="counts">Scope: {% if prefs.collection %}{{ prefs.collection }}{% else %}entire mirror{% endif %}
-    · <a href="/index">New thread</a></p>
-  {% if threads %}
-  <details>
-    <summary>Threads ({{ threads|length }})</summary>
-    <ul>
-    {% for t in threads %}
-      <li><a href="/index?thread={{ t.id }}" {% if t.id == active_thread_id %}class="active"{% endif %}>{{ t.id }} ({{ t.turns }})</a></li>
-    {% endfor %}
-    </ul>
-  </details>
-  {% endif %}
-  <div class="ask-thread">
-  {% for turn in turns %}
-    <div class="ask-turn ask-{{ turn.role }}">
-      <p class="ask-role">{{ turn.role }}</p>
-      <pre>{{ turn.content }}</pre>
-    </div>
-  {% endfor %}
-  </div>
-  {% if last_result.sources %}
-  <div class="ask-sources">
-    <p><strong>{% if last_result.cited %}Sources{% else %}Retrieved, not cited{% endif %}</strong></p>
-    <ul>
-    {% for s in last_result.sources %}
-      <li>[{{ s.marker }}] {{ s.citation }} {{ s.title }}{% if s.pages %} {{ s.pages | join(", ") }}{% endif %} [{{ s.itemKey }}]</li>
-    {% endfor %}
-    </ul>
-  </div>
-  {% endif %}
-  <form method="post" action="/index/ask" enctype="multipart/form-data" class="form-stack">
-    <input type="hidden" name="thread_id" value="{{ active_thread_id or '' }}">
-    <div class="field-group">
-      <p class="field-legend">Question</p>
-      <label>Question <textarea name="question" rows="3" required></textarea></label>
-      <label>Focus <select name="focus">{% for f in focus_options %}<option value="{{ f }}">{{ f }}</option>{% endfor %}</select></label>
-      <button type="submit">Ask</button>
-    </div>
-    {% include "_rag_scope_fields.html" %}
-    {% include "_rag_prompt_fields.html" %}
-  </form>
-</section>
-{% elif flags.rag_on and not flags.llm_on %}
-<p>Turn on [llm] for Ask.</p>
-{% elif enabled and not flags.can_ask %}
-<p>Run ingest, then reload.</p>
-{% endif %}
-
 {% if flags.llm_on and flags.rag_on %}
 <section class="panel">
-  <h2>Batch Ask</h2>
-  {% if batch_result.stamp %}<p>Last batch: {{ batch_result.answered }}/{{ batch_result.questions }} <a href="/index/batch/{{ batch_result.stamp }}">answers</a></p>{% endif %}
-  <form method="post" action="/index/ask-batch" enctype="multipart/form-data" class="form-stack">
-    <div class="field-group">
-      <p class="field-legend">Questions</p>
-      <label>Questions <textarea name="questions" rows="4" placeholder="One question per line"></textarea></label>
-      <label>Or upload <input type="file" name="questions_upload" accept=".md,.txt,text/plain"></label>
-    </div>
-    {% include "_rag_scope_fields.html" %}
-    <div class="field-group">
-      <p class="field-legend">Output</p>
-      <label>Focus <select name="focus">{% for f in focus_options %}<option value="{{ f }}">{{ f }}</option>{% endfor %}</select></label>
-      <label>Dest <select name="dest">{% for d in dest_options %}<option value="{{ d }}" {% if d == rag_dest %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></label>
-      <label><input type="checkbox" name="apply" value="1"> Write Zotero note</label>
-      <label><input type="checkbox" name="force" value="1"> Force re-answer</label>
-      <button type="submit">Run batch</button>
-    </div>
-    {% include "_rag_prompt_fields.html" %}
-  </form>
-  {% if packs %}
-  <details>
-    <summary>Recent batches ({{ packs|length }})</summary>
-    <ul class="counts">{% for p in packs %}<li><a href="/index/batch/{{ p.stamp }}">{{ p.stamp }}</a> — {{ p.answered }}/{{ p.questions }}{% if p.failed %} ({{ p.failed }} failed){% endif %}</li>{% endfor %}</ul>
-  </details>
-  {% endif %}
-</section>
-
-<section class="panel">
   <h2>Extract questions</h2>
+  <p class="section-lede">Pull research questions out of indexed papers. The default is a rules pass over headings and abstracts. The LLM extract lane also asks the model, which costs tokens and may send excerpts off this machine if the model is remote.</p>
+  {{ job_status(questions_result, 'Extract questions') }}
   {% if questions_result.questions is defined %}<p>Last: {{ questions_result.questions }} question(s) from {{ questions_result.items }} item(s){% if questions_result.dry_run %} (dry-run){% endif %}</p>{% endif %}
   <form method="post" action="/index/rag-questions" enctype="multipart/form-data" class="form-stack">
     {% include "_rag_scope_fields.html" %}
     <div class="field-group">
-      <p class="field-legend">Extract</p>
-      <label><input type="checkbox" name="whole_library" value="1"> Whole library (when no collection chip)</label>
-      <label><input type="checkbox" name="use_llm" value="1" {% if extract_questions_llm %}checked{% endif %}> LLM extract lane</label>
-      <label>Limit <input type="number" name="limit" min="1"></label>
+      <p class="field-legend">Extract {{ info("Rules first; optionally a grounded LLM pass. Dry-run counts without writing.") }}</p>
+      <label><input type="checkbox" name="whole_library" value="1"> Whole library (when no collection chip) {{ info("Use every indexed item when the header has no collection. Ignored when a collection chip is set or you listed item keys.") }}</label>
+      <label><input type="checkbox" name="use_llm" value="1" {% if extract_questions_llm %}checked{% endif %}> LLM extract lane {{ info("Also ask the model to extract research questions from each paper, grounded in retrieved passages. Costs tokens. Remote models send excerpts off this machine. The rules pass still runs.") }}</label>
+      <label>Limit {{ info("Max papers this run. Leave blank to use the whole scope.") }} <input type="number" name="limit" min="1"></label>
       <button type="submit" name="dry_run" value="1">Dry-run</button>
+      {{ info("Count questions that would be written. Does not save them.") }}
       <button type="submit" name="dry_run" value="0">Extract</button>
+      {{ info("Write extracted questions under state/rag/questions/.") }}
     </div>
   </form>
 </section>
 
 <section class="panel">
   <h2>Already answered?</h2>
+  <p class="section-lede">Check whether the indexed corpus already answers a list of questions. Useful before a new study: you get answered / partial / not found rather than a full write-up.</p>
+  {{ job_status(answered_result, 'Answered check') }}
   {% if answered_result.stamp %}<p>Last: answered {{ answered_result.answered }} · partial {{ answered_result.partial }} · not found {{ answered_result.not_found }} <a href="/index/answered/{{ answered_result.stamp }}">report</a></p>{% endif %}
   <form method="post" action="/index/rag-answered" enctype="multipart/form-data" class="form-stack">
     <div class="field-group">
-      <p class="field-legend">Questions</p>
-      <label><input type="radio" name="question_mode" value="text" checked> Questions in form</label>
-      <label><input type="radio" name="question_mode" value="upload"> Upload file</label>
-      <label><input type="radio" name="question_mode" value="extract"> From extracted questions</label>
-      <label>Questions <textarea name="answered_questions" rows="3" placeholder="One question per line"></textarea></label>
-      <label>Questions file <input type="file" name="answered_upload" accept=".md,.txt,text/plain"></label>
+      <p class="field-legend">Questions {{ info("Pick one source of questions. The form, an upload, or questions already extracted above.") }}</p>
+      <label><input type="radio" name="question_mode" value="text" checked> Questions in form {{ info("Use the textarea below, one question per line.") }}</label>
+      <label><input type="radio" name="question_mode" value="upload"> Upload file {{ info("Use the uploaded .md or .txt file, one question per line.") }}</label>
+      <label><input type="radio" name="question_mode" value="extract"> From extracted questions {{ info("Use questions previously written by Extract questions, for items in this scope.") }}</label>
+      <label>Questions {{ info("One question per line. Used when Questions in form is selected.") }} <textarea name="answered_questions" rows="3" placeholder="One question per line"></textarea></label>
+      <label>Questions file {{ info("Used when Upload file is selected.") }} <input type="file" name="answered_upload" accept=".md,.txt,text/plain"></label>
     </div>
     {% include "_rag_scope_fields.html" %}
     <div class="field-group">
-      <p class="field-legend">Check</p>
-      <label>After item <input name="after_item" placeholder="item key"></label>
-      <label><input type="checkbox" name="force" value="1"> Force</label>
+      <p class="field-legend">Check {{ info("Walk the index and classify each question as answered, partial, or not found.") }}</p>
+      <label>After item {{ info("Resume after this Zotero item key. Leave blank to start at the beginning of the scope.") }} <input name="after_item" placeholder="item key"></label>
+      <label><input type="checkbox" name="force" value="1"> Force {{ info("Ignore cached answered-check rows and classify every question again.") }}</label>
       <button type="submit">Run answered check</button>
+      {{ info("Classify each question against the index. Spends tokens when the LLM lane is on.") }}
     </div>
   </form>
   {% if answered_packs %}
@@ -192,15 +129,26 @@
 
 <section class="panel">
   <h2>Synthesize report</h2>
-  {% if synthesize_result.slug %}<p>Last: {{ synthesize_result.slug }} {% if synthesize_result.skipped %}({{ synthesize_result.skipped }}){% endif %}</p>{% endif %}
+  <p class="section-lede">Fold existing summary notes into a literature-review report for the current collection. Preview (dry-run) shows source counts and the chunk plan without calling the model.</p>
+  {% if synthesize_result.status == 'queued' or synthesize_result.status == 'running' %}
+  <p class="counts" role="status" {% if synthesize_result.id %}data-run-id="{{ synthesize_result.id }}"{% endif %}>{% if synthesize_result.args.dry_run %}Preview{% else %}Write report{% endif %} <span class="cmd-status">{{ synthesize_result.status }}</span>…</p>
+  {% elif synthesize_result.skip_plain %}
+  <p class="warn-remote">{{ synthesize_result.skip_plain }}</p>
+  {% elif synthesize_result.slug %}
+  <p>Last: {% if synthesize_result.dry_run or synthesize_result.args.dest == 'zotero' %}{{ synthesize_result.slug }}{% else %}<a href="/index/report/{{ synthesize_result.slug }}">{{ synthesize_result.slug }}</a>{% endif %} {% if synthesize_result.skipped %}({{ synthesize_result.skipped }}){% endif %}</p>
+  {% elif synthesize_result.error %}
+  <p class="error-banner">{{ synthesize_result.error }}</p>
+  {% endif %}
   <form method="post" action="/index/synthesize" class="toolbar">
-    <label>Dest <select name="dest">{% for d in synth_dest_options %}<option value="{{ d }}" {% if d == synth_dest %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></label>
-    <label>Year from <input type="number" name="year_from"></label>
-    <label>Year to <input type="number" name="year_to"></label>
-    <label>Limit <input type="number" name="limit" min="1"></label>
-    <label><input type="checkbox" name="force" value="1"> Force</label>
-    <button type="submit" name="dry_run" value="1">Preview</button>
-    <button type="submit" name="dry_run" value="0">Write report</button>
+    <label>Dest {{ info("disk: HTML under out/reports/ only. zotero: a collection note. both: files and a note.") }} <select name="dest">{% for d in synth_dest_options %}<option value="{{ d }}" {% if d == synth_dest %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></label>
+    <label>Year from {{ info("Only summaries dated this year or later.") }} <input type="number" name="year_from"></label>
+    <label>Year to {{ info("Only summaries dated this year or earlier.") }} <input type="number" name="year_to"></label>
+    <label>Limit {{ info("Max summary notes to include. Leave blank for the whole scope.") }} <input type="number" name="limit" min="1"></label>
+    <label><input type="checkbox" name="force" value="1"> Force {{ info("Regenerate even when a saved report used the same summary notes.") }}</label>
+    <button type="submit" name="dry_run" value="1"{% if synthesize_result.status == 'queued' or synthesize_result.status == 'running' %}{% if synthesize_result.args.dry_run %} data-poll-button{% endif %}{% endif %}>Preview</button>
+    {{ info("Show source counts and the chunk plan. No model call.") }}
+    <button type="submit" name="dry_run" value="0"{% if synthesize_result.status == 'queued' or synthesize_result.status == 'running' %}{% if not synthesize_result.args.dry_run %} data-poll-button{% endif %}{% endif %}>Write report</button>
+    {{ info("Call the model and write the report to Dest.") }}
   </form>
   {% if reports %}
   <details>

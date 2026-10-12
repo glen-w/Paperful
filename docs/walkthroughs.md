@@ -21,7 +21,7 @@ Start here. First-time users should follow **1 → 3** in order.
 | 2 | [Grow the library](grow-library.md) | Search a topic or follow people, review, add metadata parents |
 | 3 | [Tidy a collection](tidy-library.md) | Lint, fix identifiers, review duplicates — before or after a fill |
 
-Walkthroughs 1–3 do **not** need a local model. Index Ask and Briefs do
+Walkthroughs 1–3 do **not** need a local model. Ask and Briefs do
 ([Ask your library](rag.md), [LLM](llm.md)).
 
 ## More playbooks

@@ -1,12 +1,14 @@
+{% from "_help.html" import info %}
 <fieldset class="rag-prompt">
-  <legend>Custom system prompt (optional)</legend>
+  <legend>Custom system prompt (optional) {{ info("Replace the built-in Ask/summarize instructions for this run. Leave empty to use Focus or the config default.") }}</legend>
+  <p class="section-lede">A custom prompt overrides Focus. Inline text wins over an upload, which wins over a path or a saved prompt.</p>
   {% if rag_config_prompt %}<p class="counts">Config default: {{ rag_config_prompt }}</p>{% endif %}
   <div class="field-group">
-    <label>Inline <textarea name="prompt_inline" rows="4" placeholder="Overrides focus when set"></textarea></label>
-    <label>Upload <input type="file" name="prompt_upload" accept=".md,.txt,text/plain,text/markdown"></label>
-    <label>Path <input name="prompt_path" placeholder="prompts/ask.md"></label>
+    <label>Inline {{ info("Paste a prompt here. When this is set, Focus is ignored.") }} <textarea name="prompt_inline" rows="4" placeholder="Overrides focus when set"></textarea></label>
+    <label>Upload {{ info("A .md or .txt file used as the system prompt for this run.") }} <input type="file" name="prompt_upload" accept=".md,.txt,text/plain,text/markdown"></label>
+    <label>Path {{ info("A prompt file already on this machine, relative to the Paperful working directory.") }} <input name="prompt_path" placeholder="prompts/ask.md"></label>
     {% if saved_prompts %}
-    <label>Saved
+    <label>Saved {{ info("A prompt you saved from an earlier run. Dash means do not use a saved prompt.") }}
       <select name="prompt_saved">
         <option value="default">—</option>
         {% for p in saved_prompts %}
@@ -15,7 +17,7 @@
       </select>
     </label>
     {% endif %}
-    <label><input type="checkbox" name="save_prompt" value="1"> Save inline/upload as</label>
-    <input name="prompt_save_name" placeholder="my-prompt.md">
+    <label><input type="checkbox" name="save_prompt" value="1"> Save inline/upload as {{ info("Keep the inline text or uploaded file under a name you can pick later.") }}</label>
+    <label>Save name {{ info("Filename for a saved prompt, such as my-prompt.md. Used only when Save inline/upload as is ticked.") }} <input name="prompt_save_name" placeholder="my-prompt.md"></label>
   </div>
 </fieldset>

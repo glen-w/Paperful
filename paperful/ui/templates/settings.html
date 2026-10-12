@@ -1,22 +1,26 @@
 {% extends "base.html" %}
+{% from "_help.html" import info %}
 {% block title %}Settings — Paperful{% endblock %}
 {% block content %}
 <h1>Settings</h1>
+<p class="page-lede">Local paths and the fetch preset. Turning LLM, RAG, or the browser agent on and off happens in config.toml — this page does not toggle them. Unpaywall needs a real email because that is their polite-pool rule.</p>
 {% if saved %}<p>Saved.</p>{% endif %}
 <section class="panel">
   <h2>Paths &amp; preset</h2>
+  <p class="section-lede">These values are written into config.toml. The Campus preset uses your university login; Open access does not.</p>
 <form method="post" action="/settings" class="form-stack">
   <div class="field-group">
-    <p class="field-legend">Local</p>
-    <label>Unpaywall email <input name="email" value="{{ email }}"></label>
-    <label>out/ path <input name="out_dir" value="{{ out_dir }}"></label>
-    <label>Preset
+    <p class="field-legend">Local {{ info("Stored in config.toml on this machine. Not sent anywhere except Unpaywall, which requires the email.") }}</p>
+    <label>Unpaywall email {{ info("Required by Unpaywall’s API. Use an address you control. Paperful sends it only to Unpaywall.") }} <input name="email" value="{{ email }}"></label>
+    <label>out/ path {{ info("Folder for the on-disk library mirror, summaries, and reports. Restore and Index read from here.") }} <input name="out_dir" value="{{ out_dir }}"></label>
+    <label>Preset {{ info("Open access: public PDF sources only. Campus: also use EZProxy / university login for paywalled papers. Change this to match how you are allowed to fetch.") }}
       <select name="preset">
         <option value="oa" {% if prefs.preset == 'oa' %}selected{% endif %}>Open access</option>
         <option value="eoi" {% if prefs.preset == 'eoi' %}selected{% endif %}>Campus</option>
       </select>
     </label>
     <button type="submit">Save</button>
+    {{ info("Write these values into config.toml on this machine.") }}
   </div>
 </form>
 </section>

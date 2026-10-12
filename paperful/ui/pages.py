@@ -105,6 +105,18 @@ def wanted_rows(
 
 
 _WANTED_TABS = ("missing", "held", "have")
+WANTED_ORDERS = ("title", "year_new", "year_old")
+WANTED_FILTERS = ("all", "summary", "no_summary")
+WANTED_ORDER_LABELS = (
+    ("title", "Title"),
+    ("year_new", "Year (newest)"),
+    ("year_old", "Year (oldest)"),
+)
+WANTED_FILTER_LABELS = (
+    ("all", "All"),
+    ("summary", "With summary"),
+    ("no_summary", "Without summary"),
+)
 
 
 def resolve_wanted_tab(tab: str | None, counts: dict[str, int]) -> str:
@@ -307,6 +319,118 @@ def library_page_from_request(request: Any) -> int:
     return 1
 
 
+def wanted_order_from_request(request: Any) -> str:
+    raw = str(request.query_params.get("order") or "").strip().lower()
+    return raw if raw in WANTED_ORDERS else "title"
+
+
+def wanted_filter_from_request(request: Any) -> str:
+    raw = str(request.query_params.get("filter") or "").strip().lower()
+    return raw if raw in WANTED_FILTERS else "all"
+
+
+def wanted_query_from_request(request: Any) -> str:
+    return str(request.query_params.get("q") or "").strip()
+
+
+def paginate_rows(
+    rows: list[Any], *, page: int, per_page: int
+) -> tuple[list[Any], int, int, int]:
+    """Return one page of ``rows`` plus total, clamped page, and page count."""
+    total = len(rows)
+    per_page = max(1, int(per_page))
+    page_count = max(1, (total + per_page - 1) // per_page) if total else 1
+    page = min(max(1, int(page)), page_count)
+    start = (page - 1) * per_page
+    return rows[start : start + per_page], total, page, page_count
+
+
+def pagination_meta(
+    *,
+    page: int,
+    per_page: int,
+    page_count: int,
+    total: int,
+    page_sizes: tuple[int, ...],
+) -> dict[str, Any]:
+    range_start = (page - 1) * per_page + 1 if total else 0
+    range_end = min(page * per_page, total)
+    return {
+        "page": page,
+        "per_page": per_page,
+        "page_count": page_count,
+        "total": total,
+        "range_start": range_start,
+        "range_end": range_end,
+        "page_sizes": page_sizes,
+        "prev_url": "",
+        "next_url": "",
+    }
+
+
+def filter_wanted_rows(
+    rows: list[dict[str, Any]], *, filt: str, query: str
+) -> list[dict[str, Any]]:
+    out = rows
+    needle = (query or "").strip().lower()
+    if needle:
+        out = [
+            row
+            for row in out
+            if needle in str(row.get("title") or "").lower()
+            or needle in str(row.get("key") or "").lower()
+            or needle in str(row.get("doi") or "").lower()
+        ]
+    if filt == "summary":
+        out = [row for row in out if row.get("has_summary")]
+    elif filt == "no_summary":
+        out = [row for row in out if not row.get("has_summary")]
+    return out
+
+
+def sort_wanted_rows(rows: list[dict[str, Any]], order: str) -> list[dict[str, Any]]:
+    if order == "year_new":
+        return sorted(
+            rows,
+            key=lambda row: (
+                -(int(row["year"]) if row.get("year") is not None else -1),
+                str(row.get("title") or "").lower(),
+                str(row.get("key") or ""),
+            ),
+        )
+    if order == "year_old":
+        return sorted(
+            rows,
+            key=lambda row: (
+                int(row["year"]) if row.get("year") is not None else 9999,
+                str(row.get("title") or "").lower(),
+                str(row.get("key") or ""),
+            ),
+        )
+    return sorted(
+        rows,
+        key=lambda row: (
+            str(row.get("title") or "").lower(),
+            str(row.get("key") or ""),
+        ),
+    )
+
+
+def wanted_items_page(
+    rows: list[dict[str, Any]],
+    *,
+    page: int,
+    per_page: int,
+    order: str = "title",
+    filt: str = "all",
+    query: str = "",
+) -> tuple[list[dict[str, Any]], int, int, int]:
+    """Filter, sort, and paginate one Wanted tab's rows."""
+    filtered = filter_wanted_rows(rows, filt=filt, query=query)
+    ordered = sort_wanted_rows(filtered, order)
+    return paginate_rows(ordered, page=page, per_page=per_page)
+
+
 def library_item_rows(cfg: Config, items: list[Any], manifest: Manifest) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for item in sorted(items, key=_library_item_sort_key):
@@ -330,12 +454,9 @@ def library_items_page(
 ) -> tuple[list[dict[str, Any]], int, int, int]:
     """Return rows for one page plus total count and clamped page index."""
     sorted_items = sorted(items, key=_library_item_sort_key)
-    total = len(sorted_items)
-    per_page = max(1, int(per_page))
-    page_count = max(1, (total + per_page - 1) // per_page) if total else 1
-    page = min(max(1, int(page)), page_count)
-    start = (page - 1) * per_page
-    chunk = sorted_items[start : start + per_page]
+    chunk, total, page, page_count = paginate_rows(
+        sorted_items, page=page, per_page=per_page
+    )
     rows = library_item_rows(cfg, chunk, manifest)
     return rows, total, page, page_count
 
@@ -504,6 +625,11 @@ ASK_ERROR_MESSAGES = {
     "type": "Item type filter is invalid.",
 }
 
+SYNTHESIZE_SKIP_MESSAGES = {
+    "no_summaries": "No summaries in this scope. Summarize first, then write the report.",
+    "current": "Report is already up to date. Tick Force to rewrite it.",
+}
+
 DEST_OPTIONS = ("disk", "zotero", "both")
 SUMMARIZE_ORDERS = ("library", "newest", "oldest")
 
@@ -592,18 +718,35 @@ def command_by_id(cfg: Config, cmd_id: str) -> dict[str, Any] | None:
     return commands.read_command(cfg, cmd_id)
 
 
-def last_job_result(cfg: Config, verb: str) -> dict[str, Any]:
+def job_view(rec: dict[str, Any] | None) -> dict[str, Any]:
+    """Normalize a GUI command record for templates (status, error, result)."""
+    if not rec:
+        return {}
+    result = rec.get("result") if isinstance(rec.get("result"), dict) else {}
+    extra_args = rec.get("args") if isinstance(rec.get("args"), dict) else {}
+    out = {
+        "id": rec.get("id") or "",
+        "verb": rec.get("verb") or "",
+        "status": rec.get("status") or "",
+        "error": rec.get("error") or "",
+        "args": extra_args,
+        **result,
+    }
+    skipped = str(out.get("skipped") or "")
+    out["skip_plain"] = SYNTHESIZE_SKIP_MESSAGES.get(skipped, "")
+    return out
+
+
+def last_job_result(cfg: Config, verb: str, run: str = "") -> dict[str, Any]:
     from . import commands
 
+    rec = command_by_id(cfg, (run or "").strip()) if run else None
+    if rec and rec.get("verb") == verb:
+        return job_view(rec)
     for rec in commands.list_commands(cfg, limit=50):
         if rec.get("verb") != verb:
             continue
-        result = rec.get("result") if isinstance(rec.get("result"), dict) else {}
-        return {
-            "status": rec.get("status") or "",
-            "error": rec.get("error") or "",
-            **result,
-        }
+        return job_view(rec)
     return {}
 
 
@@ -767,6 +910,58 @@ def safe_child(root: Any, *parts: str) -> Any:
 
 def dest_options() -> tuple[str, ...]:
     return DEST_OPTIONS
+
+
+def dest_for_form(cfg_dest: str, collection: str) -> str:
+    """Zotero dest needs a collection; fall back to disk so Write report can run."""
+    from ..config import wants_zotero
+
+    dest = (cfg_dest or "disk").strip()
+    if dest not in DEST_OPTIONS:
+        dest = "disk"
+    if wants_zotero(dest) and not (collection or "").strip():
+        return "disk"
+    return dest
+
+
+def briefs_synth_form(
+    request: Any,
+    *,
+    dest_default: str,
+    collection: str,
+    last: dict[str, Any],
+) -> dict[str, Any]:
+    """Filters for the Briefs synthesize form (query string, then last job, then dest default)."""
+    qp = getattr(request, "query_params", {}) or {}
+    args = last.get("args") if isinstance(last.get("args"), dict) else {}
+
+    def pick(name: str) -> str:
+        raw = qp.get(f"synth_{name}")
+        if raw is not None and str(raw).strip() != "":
+            return str(raw).strip()
+        val = args.get(name)
+        if val is None or val is False:
+            return ""
+        if val is True:
+            return "1"
+        return str(val)
+
+    q_dest = str(qp.get("synth_dest") or "").strip()
+    if q_dest in DEST_OPTIONS:
+        dest = q_dest
+    else:
+        arg_dest = str(args.get("dest") or "").strip()
+        dest = dest_for_form(
+            arg_dest if arg_dest in DEST_OPTIONS else dest_default,
+            collection,
+        )
+    return {
+        "dest": dest,
+        "limit": pick("limit"),
+        "year_from": pick("year_from"),
+        "year_to": pick("year_to"),
+        "force": pick("force") in {"1", "true", "True"},
+    }
 
 
 def briefs_page_flags(cfg: Config) -> dict[str, Any]:

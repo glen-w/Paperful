@@ -1,45 +1,48 @@
 {% extends "base.html" %}
+{% from "_help.html" import info %}
+{% from "_job_status.html" import job_status %}
 {% block title %}Briefs — Paperful{% endblock %}
 {% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
 {% block content %}
 <h1>Briefs</h1>
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
-<p>{{ message }}</p>
+<p class="page-lede">{{ message }} Summaries are grounded in local PDF text. Synthesize then folds those notes into a collection review. Both follow the collection chip.</p>
 {% if flags.remote_llm %}<p class="warn-remote">Remote LLM — PDF or summary text may leave this machine.</p>{% endif %}
 <p class="counts">Scope: {% if prefs.collection %}{{ prefs.collection }}{% else %}entire library{% endif %}</p>
 
 {% if flags.llm_on %}
 <section class="panel">
 <h2>Summarize</h2>
+<p class="section-lede">Write a grounded summary of each PDF in scope. Dest chooses disk, a Zotero child note, or both. Force regenerates papers that already have a summary.</p>
+{{ job_status(summarize_result, 'Summarize') }}
 {% if summarize_result.queued is defined %}
 <p class="counts">Last run: {{ summarize_result.summarized }} summarized · {{ summarize_result.skipped }} skipped · {{ summarize_result.failed }} failed
   · {{ summarize_result.not_reached }} not reached ({{ summarize_result.dest }})</p>
-{% elif summarize_result.error %}
-<p class="error-banner">{{ summarize_result.error }}</p>
 {% endif %}
 <form method="post" action="/briefs/summarize" class="form-stack">
   <div class="field-group">
-    <p class="field-legend">Filters</p>
-    <label>Order
+    <p class="field-legend">Filters {{ info("Which PDFs to summarize, in what order, and where to write them.") }}</p>
+    <label>Order {{ info("Queue order before Limit. library: Zotero order. newest / oldest: by year. Undated items sort last.") }}
       <select name="order">
         {% for o in orders %}
         <option value="{{ o }}" {% if o == flags.summarize_order %}selected{% endif %}>{{ o }}</option>
         {% endfor %}
       </select>
     </label>
-    <label>Dest
+    <label>Dest {{ info("disk: HTML under out/summaries only. zotero: a child note on the item. both: files and a note.") }}
       <select name="dest">
         {% for d in dest_options %}
         <option value="{{ d }}" {% if d == flags.summarize_dest %}selected{% endif %}>{{ d }}</option>
         {% endfor %}
       </select>
     </label>
-    <label>Limit <input type="number" name="limit" min="1"></label>
-    <label>Max new <input type="number" name="max_new" min="1"></label>
-    <label>Year from <input type="number" name="year_from"></label>
-    <label>Year to <input type="number" name="year_to"></label>
-    <label><input type="checkbox" name="force" value="1"> Force</label>
-    <button type="submit">Summarize</button>
+    <label>Limit {{ info("Max items to consider, including ones that will be skipped because a summary already exists.") }} <input type="number" name="limit" min="1"></label>
+    <label>Max new {{ info("Stop after this many new model summaries. Skips do not count, so this caps token spend.") }} <input type="number" name="max_new" min="1"></label>
+    <label>Year from {{ info("Only items dated this year or later. Undated items are excluded.") }} <input type="number" name="year_from"></label>
+    <label>Year to {{ info("Only items dated this year or earlier. Undated items are excluded.") }} <input type="number" name="year_to"></label>
+    <label><input type="checkbox" name="force" value="1"> Force {{ info("Regenerate even when a summary already exists, and summarize when the PDF identity check would skip the item.") }}</label>
+    <button type="submit" {% if summarize_result.status == 'queued' or summarize_result.status == 'running' %}data-poll-button{% endif %}>Summarize</button>
+    {{ info("Write grounded summaries for PDFs in scope. Spends tokens. Skips papers that already have a summary unless Force is on.") }}
   </div>
 </form>
 {% if summaries %}
@@ -59,30 +62,46 @@
 
 <section class="panel">
 <h2>Synthesize</h2>
-{% if synthesize_result.slug %}
-<p class="counts">{% if synthesize_result.dry_run %}Dry-run{% else %}Report{% endif %} {{ synthesize_result.slug }}:
+<p class="section-lede">Build a literature-review report from summaries already on disk. Dry-run shows source counts and the chunk plan without calling the model. Write report spends tokens.</p>
+{% if synth_via and error %}<p class="error-banner">{{ error }}</p>{% endif %}
+{% if synthesize_result.status == 'queued' or synthesize_result.status == 'running' %}
+<p class="counts" role="status" {% if synthesize_result.id %}data-run-id="{{ synthesize_result.id }}"{% endif %}>{% if synthesize_result.args.dry_run %}Dry-run{% else %}Write report{% endif %} <span class="cmd-status">{{ synthesize_result.status }}</span>…</p>
+{% elif synthesize_result.skip_plain %}
+<p class="warn-remote">{{ synthesize_result.skip_plain }}</p>
+{% elif synthesize_result.slug %}
+<p class="counts">{% if synthesize_result.dry_run %}Dry-run{% else %}Report{% endif %}
+  {% if synthesize_result.dry_run or synthesize_result.args.dest == 'zotero' %}
+  {{ synthesize_result.slug }}
+  {% else %}
+  <a href="/briefs/report/{{ synthesize_result.slug }}">{{ synthesize_result.slug }}</a>
+  {% endif %}:
   disk {{ synthesize_result.sources_disk }} · notes {{ synthesize_result.sources_note }}
-  · missing {{ synthesize_result.missing }} · chunks {{ synthesize_result.chunks }}
-  {% if synthesize_result.skipped %} · {{ synthesize_result.skipped }}{% endif %}</p>
+  · missing {{ synthesize_result.missing }}{% if synthesize_result.chunks %} · chunks {{ synthesize_result.chunks }}{% endif %}
+</p>
 {% elif synthesize_result.error %}
 <p class="error-banner">{{ synthesize_result.error }}</p>
 {% endif %}
 <form method="post" action="/briefs/synthesize" class="form-stack">
   <div class="field-group">
-    <p class="field-legend">Filters</p>
-    <label>Dest
+    <p class="field-legend">Filters {{ info("Which summaries to include and where to write the report.") }}</p>
+    <label>Dest {{ info("disk: HTML under out/reports/ only. zotero: a collection note. both: files and a note.") }}
       <select name="dest">
         {% for d in dest_options %}
-        <option value="{{ d }}" {% if d == flags.synthesize_dest %}selected{% endif %}>{{ d }}</option>
+        <option value="{{ d }}" {% if d == synth_form.dest %}selected{% endif %}>{{ d }}</option>
         {% endfor %}
       </select>
     </label>
-    <label>Limit <input type="number" name="limit" min="1"></label>
-    <label>Year from <input type="number" name="year_from"></label>
-    <label>Year to <input type="number" name="year_to"></label>
-    <label><input type="checkbox" name="force" value="1"> Force</label>
-    <button type="submit" name="dry_run" value="1">Dry-run</button>
-    <button type="submit" name="dry_run" value="0">Write report</button>
+    <label>Limit {{ info("Max summary notes to include. Leave blank for the whole scope.") }} <input type="number" name="limit" min="1" value="{{ synth_form.limit }}"></label>
+    <label>Year from {{ info("Only summaries dated this year or later.") }} <input type="number" name="year_from" value="{{ synth_form.year_from }}"></label>
+    <label>Year to {{ info("Only summaries dated this year or earlier.") }} <input type="number" name="year_to" value="{{ synth_form.year_to }}"></label>
+    <label><input type="checkbox" name="force" value="1" {% if synth_form.force %}checked{% endif %}> Force {{ info("Regenerate even when a saved report used the same summary notes.") }}</label>
+    {% if not prefs.collection %}
+    <p class="counts">No collection in the chip — destination defaults to disk. Zotero or both needs a collection.</p>
+    {% endif %}
+    <button type="submit" name="dry_run" value="1"{% if synthesize_result.status in ('queued', 'running') and synthesize_result.args.dry_run %} data-poll-button{% endif %}>Dry-run</button>
+    {{ info("Show source counts and the chunk plan. No model call.") }}
+    <button type="submit" name="dry_run" value="0"{% if synthesize_result.status in ('queued', 'running') and not synthesize_result.args.dry_run %} data-poll-button{% endif %}>Write report</button>
+    {{ info("Call the model and write the report to Dest.") }}
   </div>
 </form>
 {% if reports %}

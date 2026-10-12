@@ -260,3 +260,57 @@ def test_ingest_apply_http_409(tmp_path, monkeypatch):
     client = TestClient(create_app(cfg))
     res = client.post("/discover/ingest-apply", data={"review_token": "missing"})
     assert res.status_code == 409
+
+
+@pytest.mark.skipif(
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
+    reason="paperful[serve] extra missing",
+)
+def test_discover_topic_redirects_with_run_status(tmp_path, monkeypatch):
+    import threading
+    import time
+
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    from paperful.serve import create_app
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
+    gate = threading.Event()
+
+    def fake(*a, **k):
+        gate.wait(timeout=2)
+
+    jobs.snowball_run_fn = fake
+    try:
+        client = TestClient(create_app(cfg))
+        res = client.post(
+            "/discover/topic",
+            data={"query": "BBNJ"},
+            follow_redirects=False,
+        )
+        assert res.status_code == 303
+        loc = res.headers.get("location") or ""
+        assert "run=" in loc
+        page = client.get(loc)
+        assert page.status_code == 200
+        assert "queued" in page.text or "running" in page.text
+        assert "cmd-status" in page.text
+        assert 'data-poll-run="' in page.text
+        gate.set()
+        cmd_id = loc.split("run=")[1].split("&")[0]
+        deadline = time.time() + 3
+        while time.time() < deadline:
+            rec = client.get(f"/v1/runs/{cmd_id}").json()
+            if rec.get("status") in {"done", "failed"}:
+                break
+            time.sleep(0.02)
+        assert rec.get("status") == "done"
+    finally:
+        gate.set()
+        jobs.snowball_run_fn = None

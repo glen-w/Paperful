@@ -95,6 +95,46 @@ def test_index_ingest_preview_enqueues(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_index_ingest_shows_running_status(tmp_path, monkeypatch):
+    import threading
+
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.rag_enabled = True
+    _ops(monkeypatch)
+    _fresh_index(monkeypatch)
+    gate = threading.Event()
+
+    def fake(cfg, cmd_id, **kw):
+        gate.wait(timeout=2)
+        return {"dry_run": True, "summary": {"pdf": 0, "ocr": 0, "abstract": 0, "unchanged": 0, "failed": 0, "chunks": 0}}
+
+    jobs.rag_ingest_fn = fake
+    try:
+        client = TestClient(create_app(cfg))
+        res = client.post(
+            "/index/ingest",
+            data={"dry_run": "1"},
+            follow_redirects=False,
+        )
+        loc = res.headers.get("location") or ""
+        page = client.get(loc)
+        assert "Ingest" in page.text
+        assert "queued" in page.text or "running" in page.text
+        assert "cmd-status" in page.text
+        assert 'data-poll-run="' in page.text
+        gate.set()
+        cmd_id = loc.split("run=")[1].split("&")[0]
+        rec = _wait_done(client, cmd_id)
+        assert rec.get("status") == "done"
+    finally:
+        gate.set()
+        jobs.rag_ingest_fn = None
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
 def test_index_ingest_disabled_without_rag(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
@@ -184,13 +224,15 @@ def test_index_batch_ask_enqueues(tmp_path, monkeypatch):
     try:
         client = TestClient(create_app(cfg))
         client.cookies.set("pf_collection", "ocean/BBNJ")
-        page = client.get("/index")
-        assert 'action="/index/ask-batch"' in page.text
-        assert 'action="/index/rag-questions"' in page.text
-        assert 'action="/index/rag-answered"' in page.text
-        assert "prompt_inline" in page.text
+        client.cookies.set("pf_advanced", "1")
+        ask_page = client.get("/ask")
+        assert 'action="/ask/batch"' in ask_page.text
+        assert "prompt_inline" in ask_page.text
+        index_page = client.get("/index")
+        assert 'action="/index/rag-questions"' in index_page.text
+        assert 'action="/index/rag-answered"' in index_page.text
         res = client.post(
-            "/index/ask-batch",
+            "/ask/batch",
             data={"questions": "What is BBNJ?\nWhat is EIA?", "focus": "gaps"},
             follow_redirects=False,
         )
@@ -218,12 +260,12 @@ def test_index_batch_empty_and_disabled(tmp_path, monkeypatch):
     cfg.llm_enabled = True
     _ops(monkeypatch)
     client = TestClient(create_app(cfg))
-    empty = client.post("/index/ask-batch", data={"questions": "  \n# hi"}, follow_redirects=False)
+    empty = client.post("/ask/batch", data={"questions": "  \n# hi"}, follow_redirects=False)
     assert empty.status_code == 303
     assert "error=questions" in (empty.headers.get("location") or "")
     cfg.llm_enabled = False
     off = client.post(
-        "/index/ask-batch",
+        "/ask/batch",
         data={"questions": "What is BBNJ?"},
         follow_redirects=False,
     )
@@ -251,7 +293,7 @@ def test_index_batch_force_and_prompt(tmp_path, monkeypatch):
     try:
         client = TestClient(create_app(cfg))
         res = client.post(
-            "/index/ask-batch",
+            "/ask/batch",
             data={
                 "questions": "What is BBNJ?",
                 "force": "1",

@@ -327,7 +327,7 @@ and `--pdfs`. Prefer `… --format json`
 from a shell. `paperful serve` (`paperful[serve]`) binds localhost HTTP: JSON
 capability routes (health, doctor, collections, last-run, dry-run `refs-gap` /
 `ask`) plus the server-rendered workbench (`paperful.ui` — Wanted, Discover,
-Library, Activity, System; Advanced Repair / Mirror / Index / Briefs / Settings).
+Ask, Library, Activity, System; Advanced Repair / Mirror / Index / Briefs / Settings).
 GUI long jobs enqueue under `state/gui/commands/`; Activity and post-submit pages
 subscribe to `GET /v1/runs/{id}/events` (SSE) with `GET /v1/runs/{id}` as JSON
 poll fallback. GUI writes use review tokens (`state/gui/reviews/`) then the same

@@ -1,0 +1,11 @@
+{# Hover/focus (i) tip. Pass beginner-facing prose; Jinja auto-escapes. #}
+{% macro info(text, danger=false) -%}
+<span class="help-tip{% if danger %} help-tip--danger{% endif %}" tabindex="0" role="img" aria-label="{{ text }}">
+  <svg class="help-tip-glyph" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+    <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.35"/>
+    <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M8 7.35v3.9"/>
+    <circle cx="8" cy="5.2" r="0.75" fill="currentColor"/>
+  </svg>
+  <span class="help-tip-bubble">{{ text }}</span>
+</span>
+{%- endmacro %}

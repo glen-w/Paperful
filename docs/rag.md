@@ -3,9 +3,9 @@
 `paperful rag ingest` builds a search index from the PDFs and abstracts in the
 on-disk mirror. `paperful ask` answers a question from that index and names the
 papers and pages it used. `paperful rag search` shows the matching passages
-without a chat model. On the workbench, that is **Index → Ask** (Advanced).
+without a chat model. On the workbench, that is **Ask** on the default nav.
 
-![Index Ask: a cited answer from PDFs already on disk in ocean/BBNJ](_static/workflows/index-ask.png)
+![Ask: a cited answer from PDFs already on disk in ocean/BBNJ](_static/workflows/index-ask.png)
 
 Everything here is optional and off until `[rag].enabled = true`.
 
@@ -237,10 +237,11 @@ keeps only newer years and drops the asking paper from retrieval.
 
 ### Workbench (Advanced Index)
 
-With `[rag]` and `[llm]` on, Advanced **Index** runs the same verbs as the CLI:
-ingest, search, threaded Ask, batch Ask, extract questions, already-answered
-checks, and synthesize. Scope follows the collection chip (plus optional item
-keys, years, types, top-k). Custom system prompts on Ask/batch, in order:
+With `[rag]` and `[llm]` on, the workbench **Ask** page runs threaded Ask and
+batch Ask. Advanced **Index** covers ingest, search, extract questions,
+already-answered checks, and synthesize. Scope follows the collection chip
+(plus optional item keys, years, types, top-k). Custom system prompts on
+Ask/batch, in order:
 
 1. Inline textarea
 2. Uploaded `.md`/`.txt` (stored under `state/gui/uploads/`)

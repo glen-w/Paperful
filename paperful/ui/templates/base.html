@@ -1,3 +1,4 @@
+{% from "_help.html" import info %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,7 +11,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Nunito:wght@800&family=Source+Sans+3:wght@400;600;700&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="/static/workbench.css">
+  <link rel="stylesheet" href="/static/workbench.css?v=7">
 </head>
 <body{% block body_attrs %}{% endblock %}>
   <header class="wb-chrome">
@@ -20,39 +21,50 @@
       </span>
       <span class="brand-word">Paperful</span>
     </a>
-    <span class="chip" title="Collection">{% if prefs.collection %}{{ prefs.collection }}{% else %}no collection{% endif %}</span>
-    <span class="chip" title="Preset">{% if prefs.preset == 'eoi' %}Campus{% else %}Open access{% endif %}</span>
-    <span
-      class="health-dot health-{{ health }}"
-      role="status"
-      title="{{ health_tooltip }}"
-      aria-label="System health: {{ health_tooltip }}"
-    ></span>
+    <span class="chip-with-help">
+      <span class="chip">{% if prefs.collection %}{{ prefs.collection }}{% else %}no collection{% endif %}</span>
+      {{ info("The Zotero collection currently in scope. Set it with the target icon on Library. Many actions refuse to run until a collection is set.") }}
+    </span>
+    <span class="chip-with-help">
+      <span class="chip">{% if prefs.preset == 'eoi' %}Campus{% else %}Open access{% endif %}</span>
+      {{ info("How Paperful looks for PDFs. Campus uses your university login (EZProxy) for paywalled papers. Open access only uses public sources such as Unpaywall.") }}
+    </span>
+    <span class="chip-with-help">
+      <span
+        class="health-dot health-{{ health }}"
+        role="status"
+        title="{{ health_tooltip }}"
+        aria-label="System health: {{ health_tooltip }}"
+      ></span>
+      {{ info("System health from the last System page visit. Green is ready. Amber is a warning. Red usually means Zotero or a login needs a fix before fetching.") }}
+    </span>
     <form method="post" action="/prefs/advanced" class="advanced-toggle">
       <label>
         <input type="checkbox" name="advanced" value="1" {% if prefs.advanced %}checked{% endif %}
                onchange="this.form.submit()"> Advanced
+        {{ info("Show extra pages and options that can change the library, rewrite files, or spend model tokens. Leave this off until you know what a control does.") }}
       </label>
     </form>
   </header>
   <nav class="wb-nav">
-    <a href="/wanted" {% if active == 'wanted' %}class="active"{% endif %}>Wanted</a>
-    <a href="/discover" {% if active == 'discover' %}class="active"{% endif %}>Discover</a>
-    <a href="/library" {% if active == 'library' %}class="active"{% endif %}>Library</a>
-    <a href="/activity" {% if active == 'activity' %}class="active"{% endif %}>Activity</a>
-    <a href="/system" {% if active == 'system' %}class="active"{% endif %}>System</a>
+    <a href="/wanted" {% if active == 'wanted' %}class="active"{% endif %} title="Find and attach PDFs for items in the current collection">Wanted</a>
+    <a href="/discover" {% if active == 'discover' %}class="active"{% endif %} title="Find new papers by topic or author and add them to the library">Discover</a>
+    <a href="/ask" {% if active == 'ask' %}class="active"{% endif %} title="Ask questions over PDFs already copied to disk">Ask</a>
+    <a href="/library" {% if active == 'library' %}class="active"{% endif %} title="Browse collections and items; set the collection chip">Library</a>
+    <a href="/activity" {% if active == 'activity' %}class="active"{% endif %} title="Recent Paperful jobs and their status">Activity</a>
+    <a href="/system" {% if active == 'system' %}class="active"{% endif %} title="Health checks and next steps">System</a>
     {% if prefs.advanced %}
-    <a href="/repair" {% if active == 'repair' %}class="active"{% endif %}>Repair</a>
-    <a href="/mirror" {% if active == 'mirror' %}class="active"{% endif %}>Mirror</a>
-    <a href="/index" {% if active == 'index' %}class="active"{% endif %}>Index</a>
-    <a href="/briefs" {% if active == 'briefs' %}class="active"{% endif %}>Briefs</a>
-    <a href="/settings" {% if active == 'settings' %}class="active"{% endif %}>Settings</a>
+    <a href="/repair" {% if active == 'repair' %}class="active"{% endif %} title="Fix metadata, duplicates, attachments, and OCR">Repair</a>
+    <a href="/mirror" {% if active == 'mirror' %}class="active"{% endif %} title="Copy the library to disk and restore missing items">Mirror</a>
+    <a href="/index" {% if active == 'index' %}class="active"{% endif %} title="Build and search the local PDF index">Index</a>
+    <a href="/briefs" {% if active == 'briefs' %}class="active"{% endif %} title="Summarize papers and write a literature review">Briefs</a>
+    <a href="/settings" {% if active == 'settings' %}class="active"{% endif %} title="Unpaywall email, output folder, and campus vs open-access preset">Settings</a>
     {% endif %}
   </nav>
   <main>
     {% block content %}{% endblock %}
   </main>
-  <script src="/static/workbench.js"></script>
+  <script src="/static/workbench.js?v=6"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -112,8 +112,14 @@ header.wb-chrome a.brand {
 
 .advanced-toggle {
   margin-left: auto;
+  position: relative;
   font-weight: 600;
   color: var(--ink-soft);
+}
+.advanced-toggle:has(.help-tip:hover),
+.advanced-toggle:has(.help-tip:focus),
+.advanced-toggle:has(.help-tip:focus-within) {
+  z-index: 50;
 }
 
 nav.wb-nav {
@@ -267,7 +273,8 @@ h2 {
 .panel > .coll-tree,
 .panel > .ask-thread,
 .panel > .ask-sources,
-.panel > pre {
+.panel > pre,
+.panel > .lib-items-head {
   margin: 0;
 }
 
@@ -300,6 +307,9 @@ h2 {
 }
 
 .field-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
   flex: 1 0 100%;
   margin: 0;
   font-size: 0.72rem;
@@ -348,6 +358,9 @@ fieldset.rag-prompt .field-group {
   background: transparent;
 }
 fieldset.rag-prompt legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -441,12 +454,36 @@ button.icon-btn:focus-visible {
   gap: 0.35rem 0.5rem;
   align-items: center;
 }
+.coll-node > summary > .coll-head,
+.coll-leaf.coll-head {
+  padding: 0.42rem 0.55rem;
+  border-radius: 0;
+  margin: 0;
+  border-bottom: 1px solid var(--line);
+}
+.coll-tree > .coll-node:nth-child(even) > summary > .coll-head,
+.coll-tree > .coll-leaf:nth-child(even),
+.coll-children > .coll-node:nth-child(odd) > summary > .coll-head,
+.coll-children > .coll-leaf:nth-child(odd) {
+  background: color-mix(in srgb, var(--ink) 8%, var(--paper-deep));
+}
+.coll-tree > .coll-node:nth-child(odd) > summary > .coll-head,
+.coll-tree > .coll-leaf:nth-child(odd),
+.coll-children > .coll-node:nth-child(even) > summary > .coll-head,
+.coll-children > .coll-leaf:nth-child(even) {
+  background: color-mix(in srgb, #fff 72%, var(--paper));
+}
+.coll-node > summary:hover > .coll-head,
+.coll-leaf.coll-head:hover {
+  background: color-mix(in srgb, var(--accent) 14%, #fff);
+}
 .coll-head.coll-labels {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--ink-soft);
   margin-bottom: 0.25rem;
+  padding: 0.25rem 0.5rem;
 }
 .coll-head.coll-labels span:nth-child(3),
 .coll-head.coll-labels span:nth-child(4) {
@@ -531,6 +568,12 @@ table.wb-table th {
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--ink-soft);
+}
+table.wb-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--ink) 4.5%, transparent);
+}
+table.wb-table tbody tr:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .counts {
@@ -645,8 +688,15 @@ details > ul {
 
 .tabs {
   display: flex;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.85rem;
   margin-bottom: 1rem;
+}
+.tab-with-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
 }
 .tabs a {
   padding: 0.35rem 0.6rem;
@@ -711,4 +761,126 @@ details > ul {
 }
 .ask-sources {
   margin: 0.75rem 0 1rem;
+}
+
+.page-lede,
+.section-lede {
+  max-width: 46rem;
+  color: var(--ink-soft);
+  font-size: 0.98rem;
+  font-weight: 400;
+  line-height: 1.55;
+}
+.page-lede {
+  margin: 0 0 1rem;
+}
+.section-lede {
+  margin: 0;
+  font-size: 0.92rem;
+}
+.field-group > .section-lede,
+.cluster > .section-lede,
+.toolbar > .section-lede {
+  flex: 1 0 100%;
+}
+
+.chip-with-help {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.chip-with-help:has(.help-tip:hover),
+.chip-with-help:has(.help-tip:focus),
+.chip-with-help:has(.help-tip:focus-within) {
+  z-index: 50;
+}
+
+.help-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1.1rem;
+  height: 1.1rem;
+  vertical-align: middle;
+  color: var(--ink-soft);
+  cursor: help;
+  outline: none;
+}
+.help-tip:hover,
+.help-tip:focus,
+.help-tip:focus-within {
+  z-index: 50;
+}
+.help-tip:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 50%;
+}
+.help-tip--danger {
+  color: #9b2226;
+}
+.help-tip-glyph {
+  display: block;
+}
+.help-tip-bubble {
+  position: absolute;
+  z-index: 40;
+  left: 50%;
+  bottom: calc(100% + 0.4rem);
+  transform: translateX(-50%);
+  min-width: 14rem;
+  max-width: 22rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.35rem;
+  border: 1px solid var(--line);
+  background: #fffaf3;
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 4px 14px rgba(16, 24, 32, 0.12);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.12s ease, visibility 0.12s ease;
+}
+.help-tip:hover .help-tip-bubble,
+.help-tip:focus .help-tip-bubble,
+.help-tip:focus-within .help-tip-bubble {
+  opacity: 1;
+  visibility: visible;
+}
+.help-tip-bubble--left {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+.help-tip-bubble--right {
+  left: 0;
+  transform: none;
+}
+.help-tip-bubble--below {
+  bottom: auto;
+  top: calc(100% + 0.4rem);
+}
+header.wb-chrome .help-tip-bubble,
+header.wb-chrome .help-tip-bubble--below {
+  left: calc(100% + 0.45rem);
+  right: auto;
+  bottom: auto;
+  top: 0;
+  transform: none;
+}
+header.wb-chrome .help-tip-bubble.help-tip-bubble--left,
+header.wb-chrome .advanced-toggle .help-tip-bubble {
+  left: auto;
+  right: calc(100% + 0.45rem);
+  top: 0;
+  transform: none;
 }

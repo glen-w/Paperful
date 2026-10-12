@@ -2,9 +2,11 @@
 {% block title %}Activity — Paperful{% endblock %}
 {% block content %}
 <h1>Activity</h1>
+<p class="page-lede">Jobs this workbench has started — fetches, repairs, indexing, and the rest. Status updates while a run is in progress. If a job stays failed, open System and fix the red check first.</p>
 {% if trust_line %}<p class="counts">{{ trust_line }}</p>{% endif %}
 <section class="panel">
   <h2>Commands</h2>
+  <p class="section-lede">Newest first. Queued and running rows keep polling until they finish. The ID is the run you can also see in the URL after Preview or Grab.</p>
 <table class="wb-table">
   <thead><tr><th>ID</th><th>Verb</th><th>Status</th></tr></thead>
   <tbody>

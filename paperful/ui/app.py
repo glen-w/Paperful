@@ -32,16 +32,26 @@ from .pages import (
     authorwatch_people_rows,
     authorwatch_suggestion_rows,
     briefs_page_flags,
+    briefs_synth_form,
+    dest_for_form,
     dest_options,
     focus_options,
     following_lists,
     last_ask_result,
     last_job_result,
+    job_view,
+    WANTED_FILTER_LABELS,
+    WANTED_ORDER_LABELS,
     library_items_page,
     library_page_from_request,
     library_page_size_options,
     library_per_page_from_request,
     nest_collection_rows,
+    pagination_meta,
+    wanted_filter_from_request,
+    wanted_items_page,
+    wanted_order_from_request,
+    wanted_query_from_request,
     list_ask_packs,
     list_answered_packs,
     list_html_stems,
@@ -210,6 +220,9 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         pairs = [(k, str(v)) for k, v in kwargs.items() if v not in (None, "")]
         return path + (("?" + urlencode(pairs)) if pairs else "")
 
+    def _after_job(path: str, cmd_id: str, **extra: Any) -> RedirectResponse:
+        return RedirectResponse(url=_page_url(path, run=cmd_id, **extra), status_code=303)
+
     def _optional_int(raw: object, *, positive: bool = False) -> int | None:
         text = str(raw or "").strip()
         if not text:
@@ -301,7 +314,66 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 load_error = str(exc)
         counts = data["counts"]
         tab = resolve_wanted_tab(tab, counts)
-        rows = data.get(tab, []) if tab in {"have", "held", "missing"} else data["missing"]
+        bucket = data.get(tab, []) if tab in {"have", "held", "missing"} else data["missing"]
+        per_page = library_per_page_from_request(request, cfg)
+        persist_per_page = request.query_params.get("per_page") is not None
+        page = library_page_from_request(request)
+        order = wanted_order_from_request(request)
+        filt = wanted_filter_from_request(request)
+        query = wanted_query_from_request(request)
+        rows, wanted_total, page, wanted_page_count = wanted_items_page(
+            bucket,
+            page=page,
+            per_page=per_page,
+            order=order,
+            filt=filt,
+            query=query,
+        )
+        page_sizes = library_page_size_options(cfg)
+        wanted_pagination = pagination_meta(
+            page=page,
+            per_page=per_page,
+            page_count=wanted_page_count,
+            total=wanted_total,
+            page_sizes=page_sizes,
+        )
+
+        def _wanted_qs(*, page_no: int | None = None, with_per_page: bool = False) -> dict[str, Any]:
+            params: dict[str, Any] = {
+                "tab": tab,
+                "order": order if order != "title" else "",
+                "filter": filt if filt != "all" else "",
+                "q": query,
+            }
+            if with_per_page or persist_per_page:
+                params["per_page"] = per_page
+            if page_no is not None and int(page_no) > 1:
+                params["page"] = page_no
+            return params
+
+        wanted_pagination.update(
+            {
+                "order": order,
+                "filt": filt,
+                "q": query,
+                "orders": WANTED_ORDER_LABELS,
+                "filter_options": WANTED_FILTER_LABELS,
+                "prev_url": (
+                    _page_url("/wanted", **_wanted_qs(page_no=page - 1, with_per_page=True))
+                    if page > 1
+                    else ""
+                ),
+                "next_url": (
+                    _page_url("/wanted", **_wanted_qs(page_no=page + 1, with_per_page=True))
+                    if page < wanted_page_count
+                    else ""
+                ),
+                "tab_urls": {
+                    name: _page_url("/wanted", **{**_wanted_qs(page_no=1), "tab": name})
+                    for name in ("missing", "held", "have")
+                },
+            }
+        )
         briefs = briefs_page_flags(cfg)
         coach = ""
         if not prefs.collection:
@@ -316,7 +388,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                     coach = next_step(code, str(row.get("detail") or ""))
                     break
         banner = load_error or error
-        return templates.TemplateResponse(
+        response = templates.TemplateResponse(
             request,
             "wanted.html",
             ctx(
@@ -331,8 +403,22 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 dest_options=dest_options(),
                 attach_token=_wanted_token("attach"),
                 recover_token=_wanted_token("recover"),
+                wanted_pagination=wanted_pagination,
+                job=job_view(
+                    command_by_id(
+                        cfg,
+                        str(
+                            request.query_params.get("run")
+                            or request.query_params.get("poll")
+                            or ""
+                        ),
+                    )
+                ),
             ),
         )
+        if persist_per_page:
+            set_cookie(response, COOKIE_LIBRARY_PER_PAGE, str(per_page))
+        return response
 
     @app.post("/wanted/summarize")
     async def wanted_summarize(request: Request) -> RedirectResponse:
@@ -548,7 +634,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
 
     @app.get("/discover", response_class=HTMLResponse)
     def page_discover(
-        request: Request, list_name: str = "", error: str = ""
+        request: Request, list_name: str = "", error: str = "", run: str = ""
     ) -> HTMLResponse:
         run_id, candidates = newest_snowball_queue(cfg)
         active_list = (list_name or "followed").strip()
@@ -584,6 +670,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                     or last_job_result(cfg, "refs_gap")
                     or last_job_result(cfg, "authors")
                 ),
+                job=job_view(command_by_id(cfg, (run or "").strip())),
+                poll_run=(run or "").strip(),
                 error=error,
             ),
         )
@@ -597,8 +685,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         def work(cmd_id: str) -> None:
             jobs.snowball_run(cfg, cmd_id, payload=payload, collection=prefs.collection)
 
-        commands.enqueue(cfg, f"snowball_{payload.kind}", work)
-        return RedirectResponse(url="/discover", status_code=303)
+        cmd_id = commands.enqueue(cfg, f"snowball_{payload.kind}", work)
+        return _after_job("/discover", cmd_id)
 
     @app.post("/discover/profile-save")
     async def discover_profile_save(request: Request) -> RedirectResponse:
@@ -634,7 +722,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             commands.write_command(cfg, rec)
 
         cmd_id = commands.enqueue(cfg, "refs_gap", work)
-        return RedirectResponse(url=f"/discover?run={cmd_id}", status_code=303)
+        return _after_job("/discover", cmd_id)
 
     @app.post("/discover/ingest-preview")
     async def discover_ingest_preview(request: Request) -> RedirectResponse:
@@ -663,7 +751,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             )
 
         cmd_id = commands.enqueue(cfg, "ingest_dois", work)
-        return RedirectResponse(url=f"/discover?run={cmd_id}", status_code=303)
+        return _after_job("/discover", cmd_id)
 
     @app.post("/discover/ingest-apply", response_model=None)
     async def discover_ingest_apply(request: Request):
@@ -709,7 +797,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             commands.write_command(cfg, rec)
 
         cmd_id = commands.enqueue(cfg, "authors", work)
-        return RedirectResponse(url=f"/discover?run={cmd_id}", status_code=303)
+        return _after_job("/discover", cmd_id)
 
     @app.post("/discover/packs-promote")
     async def discover_packs_promote(request: Request) -> RedirectResponse:
@@ -727,7 +815,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             commands.write_command(cfg, rec)
 
         cmd_id = commands.enqueue(cfg, "packs_promote", work)
-        return RedirectResponse(url=f"/discover?run={cmd_id}", status_code=303)
+        return _after_job("/discover", cmd_id)
 
     @app.post("/discover/follow")
     async def discover_follow(request: Request) -> RedirectResponse:
@@ -747,8 +835,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 backfill_from=backfill,
             )
 
-        commands.enqueue(cfg, "authorwatch_run", work)
-        return RedirectResponse(url="/discover", status_code=303)
+        cmd_id = commands.enqueue(cfg, "authorwatch_run", work)
+        return _after_job("/discover", cmd_id)
 
     @app.post("/discover/apply-preview")
     async def discover_apply_preview(request: Request) -> RedirectResponse:
@@ -769,8 +857,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             )
 
         verb = "authorwatch_apply" if kind == "authorwatch" else "snowball_apply"
-        commands.enqueue(cfg, verb, work)
-        return RedirectResponse(url="/discover", status_code=303)
+        cmd_id = commands.enqueue(cfg, verb, work)
+        return _after_job("/discover", cmd_id)
 
     @app.post("/discover/apply", response_model=None)
     async def discover_apply(request: Request):
@@ -812,8 +900,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
 
                 run_watch(cfg, name, console=jobs._quiet_console())
 
-        commands.enqueue(cfg, "check_again", work)
-        return RedirectResponse(url="/discover", status_code=303)
+        cmd_id = commands.enqueue(cfg, "check_again", work)
+        return _after_job("/discover", cmd_id)
 
     @app.post("/discover/keep")
     async def discover_keep(request: Request) -> RedirectResponse:
@@ -854,8 +942,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             req = SnowballRequest(gate="dry-run", collection=prefs.collection or "")
             run_resume(cfg, run_id, req, console=jobs._quiet_console())
 
-        commands.enqueue(cfg, "snowball_resume", work)
-        return RedirectResponse(url="/discover", status_code=303)
+        cmd_id = commands.enqueue(cfg, "snowball_resume", work)
+        return _after_job("/discover", cmd_id)
 
     @app.post("/discover/profile-run")
     async def discover_profile_run(request: Request) -> RedirectResponse:
@@ -899,8 +987,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             else:
                 raise SnowballError(f"Profile {profile!r} has unknown mode.")
 
-        commands.enqueue(cfg, "snowball_profile", work)
-        return RedirectResponse(url="/discover", status_code=303)
+        cmd_id = commands.enqueue(cfg, "snowball_profile", work)
+        return _after_job("/discover", cmd_id)
 
     def _maybe_file_note(html: str, apply: bool, collection: str) -> str:
         if not apply:
@@ -933,8 +1021,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 },
             )
 
-        commands.enqueue(cfg, "snowball_briefing", work)
-        return RedirectResponse(url="/discover", status_code=303)
+        cmd_id = commands.enqueue(cfg, "snowball_briefing", work)
+        return _after_job("/discover", cmd_id)
 
     @app.post("/discover/digest")
     async def discover_digest(request: Request) -> RedirectResponse:
@@ -960,8 +1048,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 },
             )
 
-        commands.enqueue(cfg, "snowball_digest", work)
-        return RedirectResponse(url="/discover", status_code=303)
+        cmd_id = commands.enqueue(cfg, "snowball_digest", work)
+        return _after_job("/discover", cmd_id)
 
     @app.post("/discover/watch-briefing")
     async def discover_watch_briefing(request: Request) -> RedirectResponse:
@@ -987,8 +1075,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 },
             )
 
-        commands.enqueue(cfg, "watch_briefing", work)
-        return RedirectResponse(url="/discover", status_code=303)
+        cmd_id = commands.enqueue(cfg, "watch_briefing", work)
+        return _after_job("/discover", cmd_id)
 
     @app.post("/discover/watch-digest")
     async def discover_watch_digest(request: Request) -> RedirectResponse:
@@ -1014,8 +1102,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 },
             )
 
-        commands.enqueue(cfg, "watch_digest", work)
-        return RedirectResponse(url="/discover", status_code=303)
+        cmd_id = commands.enqueue(cfg, "watch_digest", work)
+        return _after_job("/discover", cmd_id)
 
     @app.post("/discover/aw/save")
     async def discover_aw_save(request: Request) -> RedirectResponse:
@@ -1067,8 +1155,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
 
             resolve_people(cfg, name)
 
-        commands.enqueue(cfg, "authorwatch_resolve", work)
-        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+        cmd_id = commands.enqueue(cfg, "authorwatch_resolve", work)
+        return _after_job("/discover", cmd_id, list_name=name)
 
     @app.post("/discover/aw/run")
     async def discover_aw_run(request: Request) -> RedirectResponse:
@@ -1093,8 +1181,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 kwargs["per_author_limit"] = per_author_n
             run_list(cfg, name, **kwargs)
 
-        commands.enqueue(cfg, "authorwatch_run", work)
-        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+        cmd_id = commands.enqueue(cfg, "authorwatch_run", work)
+        return _after_job("/discover", cmd_id, list_name=name)
 
     @app.post("/discover/aw/import", response_model=None)
     async def discover_aw_import(request: Request):
@@ -1131,8 +1219,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 limit=limit,
             )
 
-        commands.enqueue(cfg, "authorwatch_suggest", work)
-        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+        cmd_id = commands.enqueue(cfg, "authorwatch_suggest", work)
+        return _after_job("/discover", cmd_id, list_name=name)
 
     @app.post("/discover/aw/accept")
     async def discover_aw_accept(request: Request) -> RedirectResponse:
@@ -1149,8 +1237,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 seed_from=seed_from,
             )
 
-        commands.enqueue(cfg, "authorwatch_accept", work)
-        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+        cmd_id = commands.enqueue(cfg, "authorwatch_accept", work)
+        return _after_job("/discover", cmd_id, list_name=name)
 
     @app.post("/discover/aw/delete")
     async def discover_aw_delete(request: Request) -> RedirectResponse:
@@ -1196,8 +1284,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 {"path": str(path), "markdown": path.read_text(encoding="utf-8")[:4000]},
             )
 
-        commands.enqueue(cfg, "authorwatch_briefing", work)
-        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+        cmd_id = commands.enqueue(cfg, "authorwatch_briefing", work)
+        return _after_job("/discover", cmd_id, list_name=name)
 
     @app.get("/library", response_class=HTMLResponse)
     def page_library(request: Request) -> HTMLResponse:
@@ -1216,17 +1304,6 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         library_page = 1
         library_page_count = 1
         per_page = library_per_page_from_request(request, cfg)
-        library_pagination: dict[str, Any] = {
-            "page": 1,
-            "per_page": per_page,
-            "page_count": 1,
-            "total": 0,
-            "range_start": 0,
-            "range_end": 0,
-            "page_sizes": library_page_size_options(cfg),
-            "prev_url": "",
-            "next_url": "",
-        }
         page_sizes = library_page_size_options(cfg)
         persist_per_page = request.query_params.get("per_page") is not None
         if prefs.collection:
@@ -1243,19 +1320,15 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             except Exception as exc:
                 error = error or str(exc)
         briefs = briefs_page_flags(cfg)
-        range_start = (
-            (library_page - 1) * per_page + 1 if library_total else 0
+        library_pagination = pagination_meta(
+            page=library_page,
+            per_page=per_page,
+            page_count=library_page_count,
+            total=library_total,
+            page_sizes=page_sizes,
         )
-        range_end = min(library_page * per_page, library_total)
         library_pagination.update(
             {
-                "page": library_page,
-                "per_page": per_page,
-                "page_count": library_page_count,
-                "total": library_total,
-                "range_start": range_start,
-                "range_end": range_end,
-                "page_sizes": page_sizes,
                 "prev_url": (
                     _page_url("/library", page=library_page - 1, per_page=per_page)
                     if library_page > 1
@@ -1535,7 +1608,72 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             return JSONResponse({"ok": False, "error": msg}, status_code=409)
         return RedirectResponse(url="/mirror", status_code=303)
 
-    @app.get("/index", response_class=HTMLResponse)
+    @app.get("/ask", response_class=HTMLResponse)
+    def page_ask(
+        request: Request,
+        thread: str = "",
+        run: str = "",
+        error: str = "",
+    ) -> HTMLResponse:
+        flags = ask_page_flags(cfg)
+        if flags["can_ask"]:
+            msg = (
+                "Ask questions over PDFs already copied to disk. "
+                "Ingest on Index builds the search index from the mirror."
+            )
+            coach = ""
+        elif flags["rag_on"] and flags["llm_on"]:
+            msg = "The index is empty. Ingest first, then this page can answer."
+            coach = "Ingest the current collection (or the whole mirror), then return here."
+        elif flags["rag_on"]:
+            msg = (
+                "Ingest is on. Turn on [llm] in config.toml for Ask "
+                "(Settings does not toggle it)."
+            )
+            coach = "Ask needs [llm] in config.toml. Settings does not turn it on."
+        else:
+            msg = (
+                "Turn on [rag] and [llm] in config.toml to Ask. "
+                "Settings does not toggle them."
+            )
+            coach = "Ask needs [rag] and [llm] in config.toml. Settings does not turn them on."
+        active = (thread or "").strip()
+        turns: list[dict[str, str]] = []
+        result: dict[str, Any] = {}
+        if active:
+            turns = thread_for_display(cfg, active)
+            result = last_ask_result(cfg, active)
+        return templates.TemplateResponse(
+            request,
+            "ask.html",
+            ctx(
+                request,
+                "ask",
+                page_title="Ask",
+                message=msg,
+                coach=coach,
+                flags=flags,
+                threads=list_threads(cfg),
+                turns=turns,
+                active_thread_id=active,
+                last_result=result,
+                ingest_result=last_job_result(cfg, "rag_ingest", run),
+                ask_result=last_job_result(cfg, "ask", run),
+                batch_result=last_job_result(cfg, "ask_batch", run),
+                packs=list_ask_packs(cfg),
+                saved_prompts=list_saved_prompts(cfg),
+                rag_config_prompt=cfg.rag_prompt or "",
+                dest_options=dest_options(),
+                rag_dest=cfg.rag_dest or "disk",
+                focus_options=focus_options(),
+                year_from="",
+                year_to="",
+                poll_run=(run or "").strip(),
+                error=ASK_ERROR_MESSAGES.get(error, error),
+            ),
+        )
+
+    @app.get("/index", response_class=HTMLResponse, response_model=None)
     def page_index(
         request: Request,
         thread: str = "",
@@ -1546,28 +1684,28 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         year_from: str = "",
         year_to: str = "",
     ) -> HTMLResponse:
+        active = (thread or "").strip()
+        if active:
+            return RedirectResponse(
+                url=_page_url("/ask", thread=active, run=run, error=error),
+                status_code=303,
+            )
         flags = ask_page_flags(cfg)
         if flags["rag_on"] and flags["llm_on"]:
             msg = (
-                "Ingest the mirror, search passages, then ask. "
-                "Scope follows the collection chip."
+                "Build and search the local PDF index. Ingest from the mirror, "
+                "then Search here or Ask in the nav. Scope follows the collection chip."
             )
         elif flags["rag_on"]:
             msg = (
                 "Ingest and search are on. Turn on [llm] in config.toml "
-                "for Ask and batch Ask (Settings does not toggle it)."
+                "for Ask (Settings does not toggle it)."
             )
         else:
             msg = (
                 "Turn on [rag] in config.toml to ingest and search. "
                 "Ask also needs [llm]. Settings does not toggle them."
             )
-        active = (thread or "").strip()
-        turns: list[dict[str, str]] = []
-        result: dict[str, Any] = {}
-        if active:
-            turns = thread_for_display(cfg, active)
-            result = last_ask_result(cfg, active)
         hits: list[dict[str, Any]] = []
         search_q = (q or "").strip()
         search_error = ""
@@ -1629,15 +1767,9 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 enabled=flags["rag_on"],
                 flags=flags,
                 status=flags["status"],
-                threads=list_threads(cfg),
-                turns=turns,
-                active_thread_id=active,
-                last_result=result,
-                ingest_result=last_job_result(cfg, "rag_ingest"),
-                batch_result=last_job_result(cfg, "ask_batch"),
-                questions_result=last_job_result(cfg, "rag_questions"),
-                answered_result=last_job_result(cfg, "rag_answered"),
-                packs=list_ask_packs(cfg),
+                ingest_result=last_job_result(cfg, "rag_ingest", run),
+                questions_result=last_job_result(cfg, "rag_questions", run),
+                answered_result=last_job_result(cfg, "rag_answered", run),
                 answered_packs=list_answered_packs(cfg),
                 saved_prompts=list_saved_prompts(cfg),
                 rag_config_prompt=cfg.rag_prompt or "",
@@ -1647,15 +1779,14 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 search_k=k,
                 year_from=year_from,
                 year_to=year_to,
-                dest_options=dest_options(),
-                rag_dest=cfg.rag_dest or "disk",
-                focus_options=focus_options(),
                 poll_run=(run or "").strip(),
                 error=err,
-                synthesize_result=last_job_result(cfg, "synthesize"),
+                synthesize_result=last_job_result(cfg, "synthesize", run),
                 reports=list_html_stems(cfg.reports_dir),
                 synth_dest_options=dest_options(),
-                synth_dest=cfg.synthesize_dest,
+                synth_dest=dest_for_form(
+                    cfg.synthesize_dest, prefs_from_request(request).collection
+                ),
             ),
         )
 
@@ -1673,7 +1804,9 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         except ValueError:
             return RedirectResponse(url=_page_url("/index", error="limit"), status_code=303)
         try:
-            dest = _parse_dest(form.get("dest"), cfg.synthesize_dest)
+            dest = _parse_dest(
+                form.get("dest"), dest_for_form(cfg.synthesize_dest, prefs.collection)
+            )
         except ValueError:
             return RedirectResponse(url=_page_url("/index", error="dest"), status_code=303)
         from ..config import wants_zotero
@@ -1695,7 +1828,19 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 force=force,
             )
 
-        cmd_id = commands.enqueue(cfg, "synthesize", work)
+        cmd_id = commands.enqueue(
+            cfg,
+            "synthesize",
+            work,
+            args={
+                "dest": dest,
+                "limit": limit,
+                "year_from": year_from,
+                "year_to": year_to,
+                "force": force,
+                "dry_run": dry_run,
+            },
+        )
         return RedirectResponse(url=_page_url("/index", run=cmd_id), status_code=303)
 
     @app.get("/index/report/{slug}", response_model=None)
@@ -1709,18 +1854,19 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     async def index_ingest(request: Request) -> RedirectResponse:
         prefs = prefs_from_request(request)
         form = await request.form()
+        next_path = "/ask" if str(form.get("next") or "").strip() == "ask" else "/index"
         if not cfg.rag_enabled:
-            return RedirectResponse(url=_page_url("/index", error="rag"), status_code=303)
+            return RedirectResponse(url=_page_url(next_path, error="rag"), status_code=303)
         dry_run = str(form.get("dry_run") or "1") != "0"
         try:
             year_from = _optional_int(form.get("year_from"))
             year_to = _optional_int(form.get("year_to"))
         except ValueError:
-            return RedirectResponse(url=_page_url("/index", error="year"), status_code=303)
+            return RedirectResponse(url=_page_url(next_path, error="year"), status_code=303)
         try:
             limit = _optional_int(form.get("limit"), positive=True)
         except ValueError:
-            return RedirectResponse(url=_page_url("/index", error="limit"), status_code=303)
+            return RedirectResponse(url=_page_url(next_path, error="limit"), status_code=303)
 
         def work(cmd_id: str) -> None:
             jobs.rag_ingest(
@@ -1734,7 +1880,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             )
 
         cmd_id = commands.enqueue(cfg, "rag_ingest", work)
-        return RedirectResponse(url=_page_url("/index", run=cmd_id), status_code=303)
+        return RedirectResponse(url=_page_url(next_path, run=cmd_id), status_code=303)
 
     @app.post("/index/search")
     async def index_search(request: Request) -> RedirectResponse:
@@ -1753,6 +1899,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             status_code=303,
         )
 
+    @app.post("/ask")
     @app.post("/index/ask")
     async def index_ask(request: Request) -> RedirectResponse:
         prefs = prefs_from_request(request)
@@ -1763,7 +1910,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
 
         def _redir(*, err: str = "", tid: str = "", run: str = "") -> RedirectResponse:
             return RedirectResponse(
-                url=_page_url("/index", thread=tid, run=run, error=err),
+                url=_page_url("/ask", thread=tid, run=run, error=err),
                 status_code=303,
             )
 
@@ -1822,12 +1969,13 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         cmd_id = commands.enqueue(cfg, "ask", work)
         return _redir(tid=thread_id, run=cmd_id)
 
+    @app.post("/ask/batch")
     @app.post("/index/ask-batch")
     async def index_ask_batch(request: Request) -> RedirectResponse:
         prefs = prefs_from_request(request)
         form = await request.form()
         if not (cfg.rag_enabled and cfg.llm_enabled):
-            return RedirectResponse(url=_page_url("/index", error="disabled"), status_code=303)
+            return RedirectResponse(url=_page_url("/ask", error="disabled"), status_code=303)
         try:
             q_upload = await _upload_bytes(form, "questions_upload")
             questions = read_questions_upload(form, q_upload)
@@ -1844,30 +1992,30 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         except ValueError as exc:
             msg = str(exc).lower()
             if "upload" in msg or "too large" in msg:
-                return RedirectResponse(url=_page_url("/index", error="upload"), status_code=303)
+                return RedirectResponse(url=_page_url("/ask", error="upload"), status_code=303)
             if "top_k" in msg or "positive" in msg:
-                return RedirectResponse(url=_page_url("/index", error="limit"), status_code=303)
+                return RedirectResponse(url=_page_url("/ask", error="limit"), status_code=303)
             if "type" in msg:
-                return RedirectResponse(url=_page_url("/index", error="type"), status_code=303)
+                return RedirectResponse(url=_page_url("/ask", error="type"), status_code=303)
             if "year" in msg:
-                return RedirectResponse(url=_page_url("/index", error="year"), status_code=303)
-            return RedirectResponse(url=_page_url("/index", error="prompt"), status_code=303)
+                return RedirectResponse(url=_page_url("/ask", error="year"), status_code=303)
+            return RedirectResponse(url=_page_url("/ask", error="prompt"), status_code=303)
         if not questions:
-            return RedirectResponse(url=_page_url("/index", error="questions"), status_code=303)
+            return RedirectResponse(url=_page_url("/ask", error="questions"), status_code=303)
         try:
             dest = _parse_dest(form.get("dest"), cfg.rag_dest or "disk")
         except ValueError:
-            return RedirectResponse(url=_page_url("/index", error="dest"), status_code=303)
+            return RedirectResponse(url=_page_url("/ask", error="dest"), status_code=303)
         apply = form.get("apply") == "1"
         if apply and (dest == "disk" or not prefs.collection):
-            return RedirectResponse(url=_page_url("/index", error="apply"), status_code=303)
+            return RedirectResponse(url=_page_url("/ask", error="apply"), status_code=303)
         focus_raw = str(form.get("focus") or "").strip() or None
         try:
             from ..rag.prompt import parse_focus
 
             parse_focus(focus_raw if focus_raw is not None else cfg.rag_focus)
         except ValueError:
-            return RedirectResponse(url=_page_url("/index", error="focus"), status_code=303)
+            return RedirectResponse(url=_page_url("/ask", error="focus"), status_code=303)
         _save_prompt_if_asked(form, resolved)
 
         def work(cmd_id: str) -> None:
@@ -1890,7 +2038,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             )
 
         cmd_id = commands.enqueue(cfg, "ask_batch", work)
-        return RedirectResponse(url=_page_url("/index", run=cmd_id), status_code=303)
+        return RedirectResponse(url=_page_url("/ask", run=cmd_id), status_code=303)
 
     @app.post("/index/rag-questions")
     async def index_rag_questions(request: Request) -> RedirectResponse:
@@ -2029,7 +2177,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         flags = briefs_page_flags(cfg)
         if flags["llm_on"]:
             msg = (
-                "Summarize PDFs in scope, then synthesize a collection review. "
+                "Write grounded summaries of PDFs in the current collection, "
+                "then fold those notes into a literature-review report. "
                 "Scope follows the collection chip."
             )
         else:
@@ -2038,6 +2187,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 "Settings does not toggle it."
             )
         err = ASK_ERROR_MESSAGES.get(error, error)
+        prefs = prefs_from_request(request)
+        synthesize_result = last_job_result(cfg, "synthesize", run)
         return templates.TemplateResponse(
             request,
             "briefs.html",
@@ -2050,8 +2201,15 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 orders=SUMMARIZE_ORDERS,
                 summaries=list_recent_summaries(cfg),
                 reports=list_html_stems(cfg.reports_dir),
-                summarize_result=last_job_result(cfg, "summarize"),
-                synthesize_result=last_job_result(cfg, "synthesize"),
+                summarize_result=last_job_result(cfg, "summarize", run),
+                synthesize_result=synthesize_result,
+                synth_form=briefs_synth_form(
+                    request,
+                    dest_default=cfg.synthesize_dest,
+                    collection=prefs.collection,
+                    last=synthesize_result,
+                ),
+                synth_via=str(request.query_params.get("via") or "").strip() == "synthesize",
                 poll_run=(run or "").strip(),
                 error=err,
             ),
@@ -2103,27 +2261,47 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     async def briefs_synthesize(request: Request) -> RedirectResponse:
         prefs = prefs_from_request(request)
         form = await request.form()
+        raw_dest = str(form.get("dest") or "").strip()
+        raw_limit = str(form.get("limit") or "").strip()
+        raw_year_from = str(form.get("year_from") or "").strip()
+        raw_year_to = str(form.get("year_to") or "").strip()
+        force = form.get("force") == "1"
+
+        def bounce(error: str) -> RedirectResponse:
+            return RedirectResponse(
+                url=_page_url(
+                    "/briefs",
+                    error=error,
+                    via="synthesize",
+                    synth_dest=raw_dest,
+                    synth_limit=raw_limit,
+                    synth_year_from=raw_year_from,
+                    synth_year_to=raw_year_to,
+                    synth_force="1" if force else "",
+                ),
+                status_code=303,
+            )
+
         if not cfg.llm_enabled:
-            return RedirectResponse(url=_page_url("/briefs", error="llm"), status_code=303)
+            return bounce("llm")
         dry_run = str(form.get("dry_run") or "1") != "0"
         try:
             year_from = _optional_int(form.get("year_from"))
             year_to = _optional_int(form.get("year_to"))
         except ValueError:
-            return RedirectResponse(url=_page_url("/briefs", error="year"), status_code=303)
+            return bounce("year")
         try:
             limit = _optional_int(form.get("limit"), positive=True)
         except ValueError:
-            return RedirectResponse(url=_page_url("/briefs", error="limit"), status_code=303)
+            return bounce("limit")
         try:
-            dest = _parse_dest(form.get("dest"), cfg.synthesize_dest)
+            dest = _parse_dest(form.get("dest"), dest_for_form(cfg.synthesize_dest, prefs.collection))
         except ValueError:
-            return RedirectResponse(url=_page_url("/briefs", error="dest"), status_code=303)
+            return bounce("dest")
         from ..config import wants_zotero
 
         if wants_zotero(dest) and not prefs.collection and not dry_run:
-            return RedirectResponse(url=_page_url("/briefs", error="collection"), status_code=303)
-        force = form.get("force") == "1"
+            return bounce("collection")
 
         def work(cmd_id: str) -> None:
             jobs.synthesize(
@@ -2138,7 +2316,19 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 force=force,
             )
 
-        cmd_id = commands.enqueue(cfg, "synthesize", work)
+        cmd_id = commands.enqueue(
+            cfg,
+            "synthesize",
+            work,
+            args={
+                "dest": dest,
+                "limit": limit,
+                "year_from": year_from,
+                "year_to": year_to,
+                "force": force,
+                "dry_run": dry_run,
+            },
+        )
         return RedirectResponse(url=_page_url("/briefs", run=cmd_id), status_code=303)
 
     @app.get("/briefs/summary/{key}", response_class=HTMLResponse)
