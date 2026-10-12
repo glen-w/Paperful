@@ -255,6 +255,11 @@ Do not call either adapter **supported** until field reports justify it.
   creates missing items and does not overwrite fields already in Zotero. Dual
   `imported_file` store; house sync (Syncthing) stays outside Paperful. Not a
   second reading UI. Not a linked-file cutover. Not a WebDAV client.
+- **`paperful screen` (shipped, opt-in).** Retraction / expression-of-concern
+  lookup (Crossref + OpenAlex), optional PubPeer (`[screen].pubpeer` +
+  `PUBPEER_DEVKEY`), and local PDF screening against PPS fingerprint CSV dumps.
+  Report by default; `--apply` writes a `paperful pps:` tag and `paperful-pps`
+  note. Not in `paperful all`. See [screen.md](screen.md).
 - Deterministic `lint` / `fix-metadata` (Crossref / OpenAlex / Semantic Scholar /
   PubMed, PDF-text DOI via pdftotext then pypdf) with explicit `--apply`.
   **Shipped:** verified PDF-DOI → patch; date precision guard; HTML title cleanup;

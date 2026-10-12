@@ -29,6 +29,7 @@ PREFIX = {
     "linked": "Linked",
     "snowball": "Snowball",
     "briefing": "Briefing",
+    "screen": "Screen",
 }
 
 

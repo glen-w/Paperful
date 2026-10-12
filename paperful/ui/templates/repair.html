@@ -20,6 +20,8 @@
   <h2>{{ q.verb }}</h2>
   {% if q.verb == 'lint' %}
   <p class="section-lede">Read-only check of identifiers, URLs, and attachment health. Preview writes a report; it never changes the library.</p>
+  {% elif q.verb == 'screen' %}
+  <p class="section-lede">Screen for retractions, optional PubPeer comments, and PPS-style tortured-phrase fingerprints in PDF text. Preview writes a report. Apply adds a parent tag and child note — not a misconduct finding.</p>
   {% elif q.verb == 'fix-metadata' %}
   <p class="section-lede">Fill missing title, date, venue, and DOI from Crossref and OpenAlex. Paperful never rewrites metadata during a Grab — this is the write path. Preview proposes patches; Apply writes them.</p>
   {% elif q.verb == 'dedupe' %}

@@ -155,6 +155,13 @@ mirror_failures_before_skip = 3
 # [lint]
 # llm_pdf_match = false          # pdf_identity_mismatch finding
 # llm_pdf_match_min_confidence = 0.6
+# [screen]
+# # Retraction/PubPeer lookup + PPS fingerprint CSVs (see docs/screen.md).
+# detectors = ["retracted", "withdrawn", "expression_of_concern", "pubpeer", "tortured", "scigen", "mathgen", "suspect"]
+# tortured_min = 5               # PPS-style threshold; obvious phrases always flag
+# pubpeer = false                # needs env PUBPEER_DEVKEY
+# fingerprint_max_age_days = 14
+# tag = "paperful-pps"
 # [summarize]
 # prompt_template = "default"    # or "prompts/summary.md"
 # max_context_chars = 24000

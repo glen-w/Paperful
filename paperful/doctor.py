@@ -582,6 +582,32 @@ def run_checks(
                 )
             )
 
+    from .screen import fingerprint_cache_age_days, pubpeer_devkey
+
+    if cfg.screen_pubpeer:
+        if pubpeer_devkey():
+            checks.append(Check("PubPeer", "green", "PUBPEER_DEVKEY set for screen"))
+        else:
+            checks.append(
+                Check(
+                    "PubPeer",
+                    "amber",
+                    "[screen].pubpeer is on but PUBPEER_DEVKEY is unset",
+                    code="pubpeer_key",
+                )
+            )
+    age = fingerprint_cache_age_days(cfg)
+    if age is not None and age > cfg.screen_fingerprint_max_age_days:
+        checks.append(
+            Check(
+                "PPS fingerprints",
+                "amber",
+                f"cache is {age:.0f}d old (max {cfg.screen_fingerprint_max_age_days}d); "
+                "run paperful screen --refresh",
+                code="pps_fingerprints_stale",
+            )
+        )
+
     from .author_request import rg_handoff_enabled
 
     if rg_handoff_enabled(cfg):

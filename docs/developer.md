@@ -99,6 +99,7 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `ask_cmd.py` | `ask` body after the CLI parses flags | `agent_ops`, rag |
 | `completeness_cmd.py` | `dedupe`, `attachments`, `summarize`, `synthesize` after flags | `run_hooks` helpers via cli |
 | `lint_cmd.py` | `lint` after flags | `lint` |
+| `screen_cmd.py` | `screen` after flags | `screen` |
 | `fix_metadata_cmd.py` | `fix-metadata` after flags | `metadata` |
 | `ocr_cmd.py` | `ocr` after flags | `ocr` |
 | `recover_cmd.py` | `recover` after flags | `pipeline`, `browser_agent` |

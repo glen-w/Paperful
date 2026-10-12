@@ -179,6 +179,8 @@ def _repair_run(
 ) -> dict[str, Any]:
     if verb == "lint":
         return _lint(cfg, collection)
+    if verb == "screen":
+        return _screen(cfg, collection, apply=apply)
     if verb == "fix-metadata":
         return _fix_metadata(cfg, collection, apply=apply, overwrite=bool(flags.get("overwrite")))
     if verb == "dedupe":
@@ -261,6 +263,52 @@ def _lint(cfg: Config, collection: str) -> dict[str, Any]:
         started=started,
     )
     return {"verb": "lint", "scope": scope, "findings": len(findings), "items": len(items)}
+
+
+def _screen(cfg: Config, collection: str, *, apply: bool) -> dict[str, Any]:
+    from ..pipeline import make_client
+    from ..runreport import write_command_report
+    from ..screen import apply_screen, screen_items
+
+    backend, items, scope = _open_scope(cfg, collection)
+    started = time.time()
+    client = make_client(cfg)
+    try:
+        findings = screen_items(
+            client, cfg, items, backend=backend, manifest=Manifest(cfg.manifest_path)
+        )
+    finally:
+        client.close()
+    applied = 0
+    if apply and findings:
+        applied = apply_screen(backend, cfg, items, findings)
+    by_code: dict[str, int] = {}
+    for f in findings:
+        by_code[f.code] = by_code.get(f.code, 0) + 1
+    write_command_report(
+        cfg,
+        command="screen",
+        scope=scope,
+        summary={
+            "items": len(items),
+            "findings": len(findings),
+            "findings_by_code": by_code,
+            "applied": applied,
+        },
+        items=[
+            {"itemKey": f.itemKey, "code": f.code, "detail": f.detail, "title": f.title}
+            for f in findings[:200]
+        ],
+        flags={"apply": apply},
+        started=started,
+    )
+    return {
+        "verb": "screen",
+        "scope": scope,
+        "findings": len(findings),
+        "items": len(items),
+        "applied": applied,
+    }
 
 
 def _fix_metadata(
