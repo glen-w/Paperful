@@ -12,17 +12,18 @@ they do not rewrite the fetcher. A **Zotero plugin** is not the 1.0 bet.
 **Firefox extension**, **local OpenAlex snapshot** (beyond today’s opt-in v1),
 and **newsletter / alert ingest** are **post-1.0** — see [Product split](#product-split-10-vs-post-10).
 
-**1.0** is the trust checklist below, a locked item record (`paperful.item.v1`
-plus `snapshot` / `restore`), proven on **Zotero**, and the **workbench**
-([GUI](#gui)): Discover + Wanted on the default nav, Preview/Grab
+**1.0** is the trust checklist below (all rows shipped), a locked item record
+(`paperful.item.v1` plus `snapshot` / `restore`), proven on **Zotero**, and the
+**workbench** ([GUI](#gui)): Discover + Wanted on the default nav, Preview/Grab
 with review tokens, full CLI surface behind **Advanced**. **Interactive Ask** is
-opt-in under Index (`[rag]` + `[llm]`), not the home page
+opt-in on `/ask` (`[rag]` + `[llm]`), not the home page
 ([Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer)).
 **Mendeley and EndNote do not gate 1.0** — they stay in the tree with honest
 docs (“seeking testers”; Zotero well-tested). Do not market them as supported
 until real-library reports say so.
 Still not a full-text reading index, not a WebDAV client, and not “AI fetch
-everything.” `paperful ocr` is the optional text layer for scans.
+everything.” `paperful ocr` is the optional text layer for scans. The remaining
+1.0 step is a package tag (`pyproject.toml` is still `0.9.0` until then).
 
 (product-split-10-vs-post-10)=
 ## Product split: 1.0 vs post-1.0
@@ -35,15 +36,15 @@ integrations.
 | --- | --- |
 | Trust checklist, locked `paperful.run_report.v1` / `paperful.item.v1`, snapshot contract | **Local OpenAlex parquet store** — phases 2B/2C (`works_citing`, full search parity, `local_duckdb` / `http`). Live OpenAlex API is enough for most installs; v1 `ssh_duckdb` remains opt-in for institutions |
 | **GUI workbench** — Discover + Wanted simple loop (topic + people); command ids; review tokens; Advanced Repair / Mirror / Index / Briefs and the non-TTY CLI verbs | **Firefox extension** — native messaging → CLI ([section below](#optional-thin-bridge--firefox-extension-post-10)) |
-| **Ask in GUI (Index)** — scoped chat with citations when `[rag]` + `[llm]` on | **Newsletter / alert ingest** — rollup bridge, Scholar alerts first ([Frontier digest](#frontier-digest-later-watch--external-ingest)) |
+| **Ask in GUI** — scoped chat on `/ask` with citations when `[rag]` + `[llm]` on | **Newsletter / alert ingest** — rollup bridge, Scholar alerts first ([Frontier digest](#frontier-digest-later-watch--external-ingest)) |
 | Zotero-proven fetch/mirror path; honest adapter docs (Mendeley / EndNote seeking testers) | SaaS tenancy polish; promoting other managers to “supported” after field reports; remote-manager parity beyond what 1.0 open/Docker needs |
 
 (trust-10)=
 ## 0.1 → 1.0 (trust + mirror contract)
 
-`0.1` is a first usable helper for a reference library. Do not call it **1.0**
-until these land. Do **not** grow this list into a second product (no auto
-Sci-Hub, no “AI fetch everything”).
+`0.1` was a first usable helper. **1.0** is this checklist — every row shipped.
+Do **not** grow it into a second product (no auto Sci-Hub, no “AI fetch
+everything”). Tag when ready.
 
 | Step | UX outcome | Status |
 | --- | --- | --- |
@@ -52,11 +53,11 @@ Sci-Hub, no “AI fetch everything”).
 | `--dry-run` **Would-hit** column (sources in order) | Trust before network | Shipped |
 | Exit **2** + next-steps when Zotero is down (`collections` / `run` / `attach`) | Fresh clone never dead-ends | Shipped |
 | Slim README + [CHANGELOG](../CHANGELOG.md) known limits | Trust before install | Shipped |
-| Lock `paperful.run_report.v1` | Trust for agents | **Shipped** — required keys frozen (`RUN_REPORT_*_KEYS` incl. miss rollups); golden fixtures; extra keys may be added. Package tag may still wait on workbench polish |
+| Lock `paperful.run_report.v1` | Trust for agents | **Shipped** — required keys frozen (`RUN_REPORT_*_KEYS` incl. miss rollups); golden fixtures; extra keys may be added |
 | Lock `paperful.item.v1` and `snapshot` / `restore` (additive keys only after 1.0) | Trust for the disk ledger | **Shipped** — required keys frozen; restore is create-missing (not lossless round-trip) |
 | Strip legacy flat-PDF migrate + mixed-layout doctor amber | Day-0 mirror never steers people into a whole-library layout cleanup | **Shipped (0.1 → 1.0)** |
 | **Mendeley and EndNote adapters** (not a 1.0 blocker) | The ledger survives a manager change | In the tree. **Seeking testers.** Zotero stays the well-tested path. See below |
-| **Workbench GUI** | Discover, Wanted, Preview/Grab; Advanced Repair / Mirror / Discover grow / Wanted recover | Landed — [GUI](#gui); `paperful serve` + `paperful/ui/`; `docker compose up` publishes `127.0.0.1:8765`. TTY and Sci-Hub stay CLI. Not tagged 1.0 |
+| **Workbench GUI** | Discover, Wanted, Preview/Grab; Advanced Repair / Mirror / Discover grow / Wanted recover | **Shipped** — [GUI](#gui); `paperful serve` + `paperful/ui/`; `docker compose up` publishes `127.0.0.1:8765`. TTY and Sci-Hub stay CLI |
 | **Interactive Ask (GUI)** | `/ask` on the default nav when `[rag]` + `[llm]` enabled | **Shipped** — Ask + batch (scope, custom prompts, force); Index for ingest/search/`rag questions`/`rag answered`; Briefs for summarize/synthesize |
 
 Nice-to-have (not 1.0 blockers): colour glossary next to `doctor` (documented);
@@ -1332,8 +1333,7 @@ DownThemAll / Pull Tabs for paced tab-download UX only.
 
 **Status:** walkthroughs and workbench screenshots shipped
 ([Walkthroughs](walkthroughs.md), `docs/_static/workflows/`). Reference docs
-remain; keep them aligned with the GUI. **GUI 1.0** still wants a package tag
-(see [GUI](#gui)).
+remain; keep them aligned with the GUI.
 
 Ship in layers:
 
@@ -1372,7 +1372,7 @@ second doc tree that drifts from the CLI.
 - [architecture.md](architecture.md) — disk-first adapters, the mirror-first rule, and data flow
 - [why.md](why.md) — library, find, completeness, mirror, control; what is true today
 - [quiet-mirror.md](quiet-mirror.md) — `out/` as the copy you keep
-- [releases.md](releases.md) — 0.x vs 1.0; known limits
+- [releases.md](releases.md) — 1.0 contract; known limits
 - [comparison.md](comparison.md) — what Paperful does and does not replace today
 - [snowball.md](snowball.md) — library-building from a keyword, multi-DOI / multi-ORCID, or collection
 - [bbnj-author-lanes.md](bbnj-author-lanes.md) — dogfood `author_site` + `authorwatch` on `ocean/BBNJ` / `ocean/BBNJ-test`
@@ -1383,7 +1383,7 @@ second doc tree that drifts from the CLI.
 ## GUI
 
 **1.0 deliverable** — workbench (open / Docker first): [gui.md](gui.md).
-**Landed:** `paperful.item.v1` lock, `paperful serve` HTTP + server-rendered UI
+**Shipped:** `paperful.item.v1` lock, `paperful serve` HTTP + server-rendered UI
 under `paperful/ui/` — default nav **Wanted** (also `GET /`) then **Discover**,
 Preview → Grab (fetch to `out/` only) → Attach (explicit library write), with
 review tokens and command ids under `state/gui/commands/`; Activity run-status
@@ -1397,17 +1397,16 @@ digest can file a collection note (`paperful:frontier-briefing`). **Advanced**
 without enabling opt-in sources. Repair/Mirror Preview is dry-run; Apply uses
 the same entrypoints as the CLI. TTY (`session login`, `doctor --guide`,
 mid-run EZProxy), `collections add`, `approve-each`, and Sci-Hub stay CLI.
-**Not tagged 1.0.** Polish left is the package tag. Screenshots:
-[Walkthroughs](walkthroughs.md).
+Screenshots: [Walkthroughs](walkthroughs.md).
 
 The CLI stays the source of truth; the GUI marshals the same verbs with dry-run
 default and explicit Apply. Not a second fetch stack or Zotero’s reader.
 **Firefox extension** is post-1.0.
 
-**Ask (Index, opt-in):** **Shipped** — scoped chat with citations when `[llm]` and
+**Ask (opt-in, `/ask`):** **Shipped** — scoped chat with citations when `[llm]` and
 `[rag]` are on and the index has rows. Collection chip is the scope; threads live
-under `state/rag/threads/` (same as `ask --thread`). Index also runs `rag ingest`,
-`rag search`, batch Ask (item/year/type/top-k/force, custom prompts),
+under `state/rag/threads/` (same as `ask --thread`). Index (Advanced) runs
+`rag ingest`, `rag search`, batch Ask (item/year/type/top-k/force, custom prompts),
 `rag questions`, and `rag answered`. **Briefs** (Advanced) runs `summarize` and
 `synthesize`. CLI `ask` remains for scripts, TTY multi-turn, and run profiles.
 See [Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer).

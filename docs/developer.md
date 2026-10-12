@@ -152,7 +152,7 @@ Every step can be repeated. A crash leaves valid records and an old version.
 
 ## Disk schemas
 
-Tier policy (1.0-ready contract; package tag may still wait on workbench polish):
+Tier policy (1.0 contract):
 
 | Tier | Policy |
 | --- | --- |

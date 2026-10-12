@@ -11,7 +11,7 @@ paywalled PDF. [Terms](TERMS.md).
 `docker compose build`, then `docker compose up` →
 `http://127.0.0.1:8765` ([GUI](gui.md)). No `docker pull`, no PyPI.
 [Docker](docker.md) (light / heavy packs). CLI: `docker compose run --rm paperful …`.
-Contributors: [`uv`](https://docs.astral.sh/uv/). **0.x**: [releases](releases.md).
+Contributors: [`uv`](https://docs.astral.sh/uv/). Stability: [releases](releases.md).
 Why this shape: [Why Paperful](why.md).
 
 ```{toctree}
