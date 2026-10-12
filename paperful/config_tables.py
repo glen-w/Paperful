@@ -20,6 +20,7 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_browser_agent(raw, cfg)
     apply_fix_metadata(raw, cfg)
     apply_lint(raw, cfg)
+    apply_screen(raw, cfg)
     apply_summarize(raw, cfg)
     apply_synthesize(raw, cfg)
     apply_fetch(raw, cfg)
@@ -112,6 +113,29 @@ def apply_lint(raw: dict[str, Any], cfg: "Config") -> None:
             ),
         ],
     )
+
+
+def apply_screen(raw: dict[str, Any], cfg: "Config") -> None:
+    C = _mod()
+    section = raw.get("screen")
+    if not isinstance(section, dict):
+        return
+    C._apply_config_table(
+        section,
+        cfg,
+        [
+            ("tortured_min", "screen_tortured_min", lambda v: max(1, int(v))),
+            ("pubpeer", "screen_pubpeer", bool),
+            (
+                "fingerprint_max_age_days",
+                "screen_fingerprint_max_age_days",
+                lambda v: max(1, int(v)),
+            ),
+            ("tag", "screen_tag", lambda v: str(v).strip() or "paperful-pps"),
+        ],
+    )
+    if "detectors" in section:
+        cfg.screen_detectors = C._snowball_strs(section["detectors"])
 
 
 def apply_summarize(raw: dict[str, Any], cfg: "Config") -> None:

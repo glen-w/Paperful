@@ -172,6 +172,20 @@ class Config:
     fix_metadata_llm_title: bool = False
     lint_llm_pdf_match: bool = False
     lint_llm_pdf_match_min_confidence: float = 0.6
+    screen_detectors: tuple[str, ...] = (
+        "retracted",
+        "withdrawn",
+        "expression_of_concern",
+        "pubpeer",
+        "tortured",
+        "scigen",
+        "mathgen",
+        "suspect",
+    )
+    screen_tortured_min: int = 5
+    screen_pubpeer: bool = False
+    screen_fingerprint_max_age_days: int = 14
+    screen_tag: str = "paperful-pps"
     summarize_prompt_template: str = "default"
     summarize_max_context_chars: int = 24_000
     summarize_tag: str = "paperful-summary"

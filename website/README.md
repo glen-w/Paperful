@@ -7,8 +7,8 @@ voice here; operator depth lives in `./guide/`.
 
 - Open `index.html` locally, or deploy via GitHub Pages (`.github/workflows/pages.yml`).
 - Logos live in [images/](images/) (copied from `docs/`): `logo.png` (ink wordmark for light backgrounds) and `logo-dark.png` (cream wordmark for dark backgrounds). The README picks via `prefers-color-scheme`.
-- Footer version should match [pyproject.toml](../pyproject.toml) `version` (currently **0.9.0**).
-- **0.x** is called out in the footer; stability story is [docs/releases.md](../docs/releases.md).
+- Footer version should match [pyproject.toml](../pyproject.toml) `version` (currently **0.9.0** until the 1.0 tag).
+- Stability story is [docs/releases.md](../docs/releases.md).
 - Install snippet matches README: `docker compose build`, then `doctor`, then
   `docker compose up` (workbench at http://127.0.0.1:8765). CLI one-shots stay
   `docker compose run --rm paperful …`.

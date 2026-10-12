@@ -214,6 +214,11 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[llm].api_base` | `""` | OpenAI-compatible base when `provider = litellm` |
 | `[fix_metadata].llm_title` | `false` | Grounded title proposals in `fix-metadata` |
 | `[lint].llm_pdf_match` | `false` | `pdf_identity_mismatch` finding; `summarize` refuses flagged items unless `--force` |
+| `[screen].detectors` | retracted, withdrawal, EoC, pubpeer, tortured, scigen, mathgen, suspect | Which lanes run. PubPeer needs `[screen].pubpeer = true` and `PUBPEER_DEVKEY` |
+| `[screen].tortured_min` | `5` | Minimum tortured-phrase hits before flagging (obvious phrases always flag) |
+| `[screen].pubpeer` | `false` | PubPeer batch lookup |
+| `[screen].fingerprint_max_age_days` | `14` | Re-download PPS CSV dumps after this age (`doctor` ambers when stale) |
+| `[screen].tag` | `paperful-pps` | Child note tag for `--apply` |
 | `[summarize].dest` | `both` | `disk` (`state/summaries/`), `zotero` (child note), or `both`. `--to` overrides |
 | `[summarize].order` | `library` | Summarize queue order before `--limit`: `library` (manager order), `newest`, or `oldest`. `--order` overrides. Undated items stay last under `newest` / `oldest`. Type stays a filter (`-T`) |
 | `[synthesize].dest` | `both` | `disk` (`state/reports/`), `zotero` (standalone note in the collection), or `both` |

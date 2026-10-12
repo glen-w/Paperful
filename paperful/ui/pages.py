@@ -580,7 +580,7 @@ def following_lists(cfg: Config) -> list[dict[str, Any]]:
     return out
 
 
-REPAIR_VERBS = ("lint", "fix-metadata", "dedupe", "versions", "attachments", "ocr")
+REPAIR_VERBS = ("lint", "screen", "fix-metadata", "dedupe", "versions", "attachments", "ocr")
 MIRROR_VERBS = ("sync", "snapshot", "restore", "cache clean")
 
 
@@ -589,6 +589,7 @@ def repair_queues(cfg: Config) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     mapping = (
         ("lint", cfg.state_dir / "runs", "*-lint.json"),
+        ("screen", cfg.state_dir / "runs", "*-screen.json"),
         ("fix-metadata", cfg.state_dir, "metadata-patches.jsonl"),
         ("dedupe", cfg.state_dir / "dedupe-packs", "*.json"),
         ("versions", cfg.state_dir / "version-packs", "*.json"),

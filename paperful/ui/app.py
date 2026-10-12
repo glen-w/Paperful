@@ -1536,7 +1536,15 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         prefs = prefs_from_request(request)
         form = await request.form()
         verb = str(form.get("verb") or "dedupe")
-        if verb not in {"lint", "fix-metadata", "dedupe", "versions", "attachments", "ocr"}:
+        if verb not in {
+            "lint",
+            "screen",
+            "fix-metadata",
+            "dedupe",
+            "versions",
+            "attachments",
+            "ocr",
+        }:
             return RedirectResponse(url="/repair?error=verb", status_code=303)
         if not prefs.collection:
             return RedirectResponse(url="/repair?error=collection", status_code=303)

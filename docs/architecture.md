@@ -279,8 +279,8 @@ as `state/last-run.json`. The required key set below is frozen: a removed or
 renamed required key is a break. Extra keys may still be added. Required
 `paperful.item.v1` keys are frozen the same way. Summary miss rollups
 (`retryable`, `browser_misses`, `not_downloaded`, `paywall_prices`,
-`agent_after_playwright`) are part of the required summary key set. The package
-is not tagged 1.0 yet (workbench landed; polish remains).
+`agent_after_playwright`) are part of the required summary key set. Extra keys
+may still be added.
 
 | Field | Meaning |
 | --- | --- |
@@ -426,9 +426,9 @@ stop at `no_identifier`.
 
 ## Related docs
 
-- [ROADMAP.md](ROADMAP.md) — 0.1→1.0 trust; core vs maybe-later
+- [ROADMAP.md](ROADMAP.md) — 1.0 trust checklist; core vs maybe-later
 - [quiet-mirror.md](quiet-mirror.md) — `out/` as quiet browsable mirror (direction)
-- [releases.md](releases.md) — 0.x vs 1.0
+- [releases.md](releases.md) — 1.0 contract
 - [comparison.md](comparison.md) — where Paperful sits next to plugins and bib tools
 - [commands.md](commands.md) — CLI and disk artifacts
 - [dedupe.md](dedupe.md) — duplicate packs and the post-ingest hygiene loop

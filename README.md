@@ -79,9 +79,8 @@ and one-shots.
 
 ## Quick start
 
-Tagged **v0.9** means clone and **Compose build**. There is no GitHub Release
-binary, no published image, and no PyPI package: do not `docker pull` or
-`pip install paperful`.
+Clone and **Compose build**. There is no GitHub Release binary, no published
+image, and no PyPI package: do not `docker pull` or `pip install paperful`.
 
 **You need**
 

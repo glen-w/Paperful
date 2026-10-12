@@ -256,6 +256,7 @@ JOBS: dict[str, tuple[str, ...]] = {
     "find": ("run", "attach", "recover", "gaps", "inbox", "urls", "htmlpdf"),
     "completeness": (
         "lint",
+        "screen",
         "fix-metadata",
         "dedupe",
         "attachments",
@@ -1390,6 +1391,50 @@ def lint(
         config=config,
         fmt=fmt,
     )
+
+
+@app.command()
+def screen(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
+    as_json: bool = typer.Option(False, "--json", help="Legacy findings array. Prefer --format json."),
+    strict: bool = typer.Option(False, "--strict", help="Exit 1 if any finding."),
+    apply: bool = typer.Option(False, "--apply", help="Write parent tag and child note for flagged items."),
+    refresh: bool = typer.Option(
+        False, "--refresh", help="Bypass status cache and re-download fingerprint CSVs."
+    ),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Flag items using retraction APIs, optional PubPeer, and PPS fingerprint CSVs."""
+    from .screen_cmd import run_screen
+
+    run_screen(
+        console,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=limit,
+        as_json=as_json,
+        strict=strict,
+        apply=apply,
+        refresh=refresh,
+        profile=profile,
+        run_config=run_config,
+        config=config,
+        fmt=fmt,
+    )
+
 
 @app.command()
 def acronyms(

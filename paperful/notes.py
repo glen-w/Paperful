@@ -17,6 +17,7 @@ FIXED_TAGS = {
     "paperful-duplicate": "duplicate",
     "paperful-linked": "linked",
     "paperful:frontier-briefing": "briefing",
+    "paperful-pps": "screen",
 }
 
 

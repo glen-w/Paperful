@@ -43,7 +43,7 @@ workflow (`.github/workflows/docs.yml`) runs the guide corpus tests and a strict
 Sphinx build; pushes to `main` that touch `docs/` or `website/` also redeploy
 Pages (`.github/workflows/pages.yml`).
 User-facing changes: note them in [CHANGELOG.md](CHANGELOG.md) and
-[docs/releases.md](docs/releases.md) when they affect 0.x vs 1.0 promises.
+[docs/releases.md](docs/releases.md) when they affect 1.0 vs post-1.0 promises.
 
 Default pytest stays offline. The opt-in all-in E2E (`make e2e-nba`, marker
 `e2e_live`, env `PAPERFUL_E2E=1`) talks to a real Zotero collection `e2e/NBA`

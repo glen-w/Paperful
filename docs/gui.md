@@ -4,7 +4,7 @@ A **local GUI** over the same verbs as the CLI. `docker compose up` (or
 `paperful serve`) binds http://127.0.0.1:8765. Zotero remains the catalogue
 and reader. Grab fetches to `out/`; Attach writes the library.
 
-**Status:** landed, not tagged 1.0. **Ask** is on the default nav (`/ask`;
+**Status:** shipped. **Ask** is on the default nav (`/ask`;
 opt-in `[rag]` + `[llm]`). A Firefox extension and hosted SaaS are **post-1.0**
 — see [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10).
 

@@ -1,9 +1,10 @@
 # Changelog
 
-All notable user-facing changes. Paperful is **0.x** and is not tagged 1.0.
-Required `paperful.run_report.v1` keys are frozen; extra report keys may still
-be added. Required `paperful.item.v1` keys are frozen the same way (additive
-extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
+All notable user-facing changes. The **1.0 contract** is locked; the package
+is still **0.9.0** until tagged. Required `paperful.run_report.v1` keys are
+frozen; extra report keys may still be added. Required `paperful.item.v1` keys
+are frozen the same way (additive extras allowed). See
+[releases](docs/releases.md).
 
 ## Unreleased
 
@@ -101,6 +102,9 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ### Changed
 
+- **Docs / 1.0:** ROADMAP trust checklist, releases contract, and workbench
+  status treat 1.0 as complete in this tree (package still `0.9.0` until the
+  tag). Ask lives on `/ask`; Index stays Advanced ingest/search.
 - **Ask on the default nav:** `/ask` is a first-class page (Wanted, Discover,
   Ask, Library, …). Index stays Advanced ingest/search. `POST /index/ask` and
   `POST /index/ask-batch` remain aliases.
@@ -122,12 +126,11 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 - **Docker doctor guide:** default `doctor` inside Compose no longer waits for
   Enter. It prints fix steps once; opt in with
   `docker compose run --rm paperful doctor --guide`.
-- **Schema freeze prep for 1.0:** `RUN_REPORT_SUMMARY_KEYS` now includes always-emitted
+- **Schema freeze for 1.0:** `RUN_REPORT_SUMMARY_KEYS` now includes always-emitted
   rollups (`retryable`, `browser_misses`, `not_downloaded`, `paywall_prices`,
   `agent_after_playwright`). Frozen top-level keys for `refs_gap.pack.v1`,
   `inbox.proposal.v1`, and `note.v1`. Golden fixtures under `tests/fixtures/` and
-  `tests/test_schema_freeze.py`. Registry + tiers in [developer.md](docs/developer.md);
-  releases revisit rows resolved. Package not tagged 1.0 yet.
+  `tests/test_schema_freeze.py`. Registry + tiers in [developer.md](docs/developer.md).
 - **Docs:** command reference covers `urls`, `htmlpdf`, `cache`, and `jobs`.
   Workbench pages, the public install snippet, and `paperful serve --help`
   match Grab (disk only) → Attach (library write), `docker compose up` (no
