@@ -43,13 +43,23 @@ class Candidate:
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> Candidate:
+        # Live rows nest title/DOI. Older queue files used top-level keys;
+        # fold those in so Keep, apply, and the Discover table agree.
+        ids = dict(raw.get("ids") or {})
+        legacy_doi = str(raw.get("doi") or "").strip()
+        if legacy_doi and not str(ids.get("doi") or "").strip():
+            ids["doi"] = legacy_doi
+        biblio = dict(raw.get("biblio") or {})
+        legacy_title = str(raw.get("title") or "").strip()
+        if legacy_title and not str(biblio.get("title") or "").strip():
+            biblio["title"] = legacy_title
         return cls(
             run_id=str(raw.get("run_id") or ""),
             seed=dict(raw.get("seed") or {}),
             hop=int(raw.get("hop") or 0),
             direction=str(raw.get("direction") or ""),
-            ids=dict(raw.get("ids") or {}),
-            biblio=dict(raw.get("biblio") or {}),
+            ids=ids,
+            biblio=biblio,
             why=str(raw.get("why") or ""),
             status=str(raw.get("status") or "new"),
             provenance=dict(raw.get("provenance") or {}),

@@ -465,7 +465,13 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         prefs = prefs_from_request(request)
         form = await request.form()
         keys = [str(k) for k in form.getlist("keys")]
-        flags = _wanted_run_flags(form) if prefs.advanced else {}
+        try:
+            flags = _wanted_run_flags(form) if prefs.advanced else {}
+        except ValueError:
+            return RedirectResponse(
+                url="/wanted?error=Year and limit must be whole numbers.",
+                status_code=303,
+            )
 
         def work(cmd_id: str) -> None:
             jobs.preview_run(
@@ -483,19 +489,29 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
 
     @app.post("/wanted/grab", response_model=None)
     async def wanted_grab(request: Request):
+        prefs = prefs_from_request(request)
         form = await request.form()
-        token = str(form.get("review_token") or "")
-        if not token:
-            review_cmds = commands.list_commands(cfg, limit=5)
-            for c in review_cmds:
-                if c.get("review_token"):
-                    token = c["review_token"]
-                    break
-        if not token:
-            token = _wanted_token("preview_run")
-        ok, msg = jobs.grab_run(cfg, token=token)
+        try:
+            flags = _wanted_run_flags(form) if prefs.advanced else {}
+        except ValueError:
+            return RedirectResponse(
+                url="/wanted?error=Year and limit must be whole numbers.",
+                status_code=303,
+            )
+        posted = [str(k).strip() for k in form.getlist("keys") if str(k).strip()]
+        review, why = jobs.matching_preview(
+            cfg,
+            collection=prefs.collection,
+            preset=prefs.preset,
+            posted_keys=posted,
+            flags=flags,
+            explicit_token=str(form.get("review_token") or ""),
+        )
+        if review is None:
+            return RedirectResponse(url=_page_url("/wanted", error=why), status_code=303)
+        ok, msg = jobs.grab_run(cfg, token=str(review.get("token") or ""))
         if not ok:
-            return JSONResponse({"ok": False, "error": msg}, status_code=409)
+            return RedirectResponse(url=_page_url("/wanted", error=msg), status_code=303)
         return RedirectResponse(url="/wanted", status_code=303)
 
     @app.post("/wanted/attach/preview")
@@ -541,6 +557,14 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         keys = [str(k) for k in form.getlist("keys")]
         from . import wanted_jobs
 
+        try:
+            recover_limit = _parse_int(form.get("limit"))
+        except ValueError:
+            return RedirectResponse(
+                url="/wanted?error=Year and limit must be whole numbers.",
+                status_code=303,
+            )
+
         def work(cmd_id: str) -> None:
             wanted_jobs.recover_preview(
                 cfg,
@@ -549,7 +573,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 keys=keys,
                 from_last_run=form.get("from_last_run") == "1",
                 from_last_run_mode=str(form.get("from_last_run_mode") or "browser_agent_miss"),
-                limit=_parse_int(form.get("limit")),
+                limit=recover_limit,
             )
 
         cmd_id = commands.enqueue(cfg, "recover", work)
@@ -771,6 +795,14 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     async def discover_authors(request: Request) -> RedirectResponse:
         prefs = prefs_from_request(request)
         form = await request.form()
+        try:
+            min_count = int(form.get("min_count") or 2)
+            max_authors = int(form.get("max_authors") or 15)
+        except ValueError:
+            return RedirectResponse(
+                url="/discover?error=Counts must be whole numbers.",
+                status_code=303,
+            )
 
         def work(cmd_id: str) -> None:
             from rich.console import Console
@@ -784,8 +816,8 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 year_from=None,
                 year_to=None,
                 item_type=[],
-                min_count=int(form.get("min_count") or 2),
-                max_authors=int(form.get("max_authors") or 15),
+                min_count=min_count,
+                max_authors=max_authors,
                 apply=form.get("apply") == "1",
                 profile=None,
                 run_config=None,
@@ -1165,8 +1197,14 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         backfill = str(form.get("backfill_from") or "").strip() or None
         max_authors = form.get("max_authors")
         per_author = form.get("per_author_limit")
-        max_authors_n = int(max_authors) if str(max_authors or "").strip() else None
-        per_author_n = int(per_author) if str(per_author or "").strip() else None
+        try:
+            max_authors_n = int(max_authors) if str(max_authors or "").strip() else None
+            per_author_n = int(per_author) if str(per_author or "").strip() else None
+        except ValueError:
+            return RedirectResponse(
+                url=_page_url("/discover", error="Counts must be whole numbers.", list_name=name),
+                status_code=303,
+            )
 
         def work(_cmd_id: str) -> None:
             from ..authorwatch import run_list
@@ -1711,50 +1749,56 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         search_error = ""
         if search_q and flags["can_search"]:
             try:
-                from ..llm.preflight import validate_embedder
-                from ..rag.index import Index, ledger_path
-                from ..rag.ledger import Ledger
-                from ..rag.retrieve import scope_keys, search
-
-                prefs = prefs_from_request(request)
                 y_from = _optional_int(year_from)
                 y_to = _optional_int(year_to)
-                top_k = _optional_int(k, positive=True)
-                index = Index.open(cfg)
-                ledger = Ledger(ledger_path(cfg))
-                keys = scope_keys(
-                    ledger,
-                    collections=[prefs.collection] if prefs.collection else None,
-                    year_from=y_from,
-                    year_to=y_to,
-                )
-                found = search(
-                    cfg,
-                    search_q,
-                    k=top_k,
-                    keys=keys,
-                    embedder=validate_embedder(cfg),
-                    index=index,
-                    ledger=ledger,
-                )
-                for hit in found:
-                    text = hit.text or ""
-                    if len(text) > 280:
-                        text = text[:277] + "…"
-                    hits.append(
-                        {
-                            "score": f"{hit.score:.3f}",
-                            "item_key": hit.item_key,
-                            "title": hit.title,
-                            "pages": hit.pages,
-                            "year": hit.year,
-                            "text": text,
-                        }
-                    )
             except ValueError:
-                search_error = ASK_ERROR_MESSAGES["year"] if error != "limit" else ASK_ERROR_MESSAGES["limit"]
-            except Exception as exc:
-                search_error = str(exc) or ASK_ERROR_MESSAGES["search"]
+                search_error = ASK_ERROR_MESSAGES["year"]
+            else:
+                try:
+                    top_k = _optional_int(k, positive=True)
+                except ValueError:
+                    search_error = ASK_ERROR_MESSAGES["limit"]
+            if not search_error:
+                try:
+                    from ..llm.preflight import validate_embedder
+                    from ..rag.index import Index, ledger_path
+                    from ..rag.ledger import Ledger
+                    from ..rag.retrieve import scope_keys, search
+
+                    prefs = prefs_from_request(request)
+                    index = Index.open(cfg)
+                    ledger = Ledger(ledger_path(cfg))
+                    keys = scope_keys(
+                        ledger,
+                        collections=[prefs.collection] if prefs.collection else None,
+                        year_from=y_from,
+                        year_to=y_to,
+                    )
+                    found = search(
+                        cfg,
+                        search_q,
+                        k=top_k,
+                        keys=keys,
+                        embedder=validate_embedder(cfg),
+                        index=index,
+                        ledger=ledger,
+                    )
+                    for hit in found:
+                        text = hit.text or ""
+                        if len(text) > 280:
+                            text = text[:277] + "…"
+                        hits.append(
+                            {
+                                "score": f"{hit.score:.3f}",
+                                "item_key": hit.item_key,
+                                "title": hit.title,
+                                "pages": hit.pages,
+                                "year": hit.year,
+                                "text": text,
+                            }
+                        )
+                except Exception as exc:
+                    search_error = str(exc) or ASK_ERROR_MESSAGES["search"]
         err = ASK_ERROR_MESSAGES.get(error, error) or search_error
         return templates.TemplateResponse(
             request,

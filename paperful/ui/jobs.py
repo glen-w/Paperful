@@ -57,6 +57,44 @@ def _load_scope_items(cfg: Config, collection: str) -> tuple[list[Any], Manifest
         return [], manifest
 
 
+def missing_items(cfg: Config, items: list[Any], manifest: Manifest) -> list[Any]:
+    """Items on the Wanted Missing tab (the list Preview/Grab mean by "all")."""
+    from .pages import wanted_rows
+
+    missing_keys = {row["key"] for row in wanted_rows(cfg, items, manifest)["missing"]}
+    return [it for it in items if it.key in missing_keys]
+
+
+def scope_for_fetch(
+    cfg: Config,
+    collection: str,
+    keys: list[str] | None,
+    flags: dict[str, Any] | None,
+) -> tuple[list[Any], Manifest]:
+    """Rows a Preview or Grab should consider.
+
+    Ticked keys win. With no ticks, the scope is the Missing list, then any
+    year/type flags. Have and Held rows are not fetched unless ticked.
+    """
+    flags = dict(flags or {})
+    items, manifest = _load_scope_items(cfg, collection)
+    if keys:
+        keyset = {k for k in keys if k}
+        items = [it for it in items if it.key in keyset]
+    else:
+        items = missing_items(cfg, items, manifest)
+    year_from = flags.get("year_from")
+    year_to = flags.get("year_to")
+    item_type = list(flags.get("item_type") or [])
+    if year_from is not None or year_to is not None or item_type:
+        items = [
+            it
+            for it in items
+            if _item_in_filters(it, year_from=year_from, year_to=year_to, item_type=item_type)
+        ]
+    return items, manifest
+
+
 def preview_run(
     cfg: Config,
     cmd_id: str,
@@ -67,19 +105,7 @@ def preview_run(
     flags: dict[str, Any] | None = None,
 ) -> None:
     flags = dict(flags or {})
-    items, manifest = _load_scope_items(cfg, collection)
-    if keys:
-        keyset = set(keys)
-        items = [it for it in items if it.key in keyset]
-    year_from = flags.get("year_from")
-    year_to = flags.get("year_to")
-    item_type = list(flags.get("item_type") or [])
-    if year_from is not None or year_to is not None or item_type:
-        items = [
-            it
-            for it in items
-            if _item_in_filters(it, year_from=year_from, year_to=year_to, item_type=item_type)
-        ]
+    items, manifest = scope_for_fetch(cfg, collection, keys, flags)
     fp = scope_fingerprint(items, manifest)
     if run_fetch_fn is not None:
         run_fetch_fn(
@@ -125,6 +151,64 @@ def _item_in_filters(
     return True
 
 
+def _flags_match(stored: dict[str, Any], current: dict[str, Any]) -> bool:
+    return dict(stored or {}) == dict(current or {})
+
+
+def matching_preview(
+    cfg: Config,
+    *,
+    collection: str,
+    preset: str,
+    posted_keys: list[str],
+    flags: dict[str, Any] | None,
+    explicit_token: str = "",
+) -> tuple[dict[str, Any] | None, str]:
+    """Find an unconsumed Preview token for this Grab.
+
+    Grab never borrows an Attach, Recover, or other review token. The token's
+    keys must be the ticked rows, or the current Missing list when nothing
+    is ticked.
+    """
+    flags = dict(flags or {})
+    posted = [k for k in posted_keys if str(k).strip()]
+
+    def _usable(token: str) -> dict[str, Any] | None:
+        review = commands.load_review(cfg, token)
+        if review is None or review.get("consumed"):
+            return None
+        if str(review.get("verb") or "") != "preview_run":
+            return None
+        if str(review.get("collection") or "") != collection:
+            return None
+        if str(review.get("preset") or "oa") != (preset or "oa"):
+            return None
+        if not _flags_match(dict(review.get("flags") or {}), flags):
+            return None
+        return review
+
+    review: dict[str, Any] | None = None
+    if explicit_token:
+        review = _usable(explicit_token)
+    if review is None:
+        for rec in commands.list_commands(cfg, limit=30):
+            token = str(rec.get("review_token") or "")
+            if not token:
+                continue
+            review = _usable(token)
+            if review is not None:
+                break
+    if review is None:
+        return None, "Preview the missing list, or the rows you ticked, before Grab."
+    items, _manifest = scope_for_fetch(cfg, collection, posted or None, flags)
+    intended = sorted(it.key for it in items)
+    if intended != sorted(review.get("keys") or []):
+        if posted:
+            return None, "Preview the ticked rows before Grab."
+        return None, "Preview the missing list before Grab."
+    return review, ""
+
+
 def grab_run(
     cfg: Config,
     *,
@@ -134,6 +218,8 @@ def grab_run(
     review = commands.load_review(cfg, token)
     if review is None:
         return False, "unknown token"
+    if str(review.get("verb") or "") != "preview_run":
+        return False, "preview first"
     collection = str(review.get("collection") or "")
     preset = str(review.get("preset") or "oa")
     flags = dict(review.get("flags") or {})

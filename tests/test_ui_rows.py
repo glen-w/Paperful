@@ -289,22 +289,38 @@ def test_job_view_normalizes_command_record():
     assert view["summary"]["pdf"] == 0
 
 
+def test_keep_matches_legacy_top_level_doi(tmp_path):
+    from paperful.ui.jobs import set_snowball_keep
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    run = cfg.state_dir / "snowball" / "run1"
+    run.mkdir(parents=True)
+    row = {"schema": "paperful.snowball.candidate.v1", "title": "One", "doi": "10.1/legacy"}
+    (run / "candidates.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+    set_snowball_keep(cfg, "run1", ["10.1/legacy"], False)
+    saved = json.loads((run / "candidates.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    assert saved["keep"] is False
+    assert saved["ids"]["doi"] == "10.1/legacy"
+    assert saved["biblio"]["title"] == "One"
+
+
 def test_last_job_result_prefers_matching_run(tmp_path):
     from paperful.ui import commands
 
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     cfg.state_dir.mkdir(parents=True)
+    # "old" is written last so its file mtime is newest; created time must win.
     commands.write_command(
         cfg,
-        {"id": "old", "verb": "ask", "status": "done", "result": {"answer": "old"}},
+        {"id": "new", "verb": "ask", "status": "queued", "created": 30, "result": {}},
     )
     commands.write_command(
         cfg,
-        {"id": "new", "verb": "ask", "status": "queued", "result": {}},
+        {"id": "ingest", "verb": "rag_ingest", "status": "queued", "created": 20, "result": {}},
     )
     commands.write_command(
         cfg,
-        {"id": "ingest", "verb": "rag_ingest", "status": "queued", "result": {}},
+        {"id": "old", "verb": "ask", "status": "done", "created": 10, "result": {"answer": "old"}},
     )
     by_run = last_job_result(cfg, "ask", run="old")
     assert by_run["id"] == "old"

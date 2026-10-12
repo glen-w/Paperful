@@ -7,6 +7,24 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ## Unreleased
 
+### Fixed
+
+- **Wanted Grab:** with nothing ticked, Preview and Grab use the Missing list
+  (Have and Held stay put unless ticked). Grab only consumes a Preview token
+  for those same rows. An Attach or Recover token is not reused. A Grab with
+  no matching preview returns to Wanted with a message instead of a JSON error.
+- **Discover Keep:** queue rows that store the DOI at the top level (older
+  files) still match Keep / Skip, and the DOI is kept for apply.
+- **Job order:** the newest workbench command is the one with the latest
+  `created` time, so two jobs written in the same second no longer swap.
+- **Index search:** a bad top-k shows the limit message; a bad year shows the
+  year message.
+- **Contributor setup:** `uv sync --group dev` installs Jinja2 and
+  `python-multipart`, so `uv run pytest` can render the workbench.
+- **Docs:** install snippets put `config.toml` on the Compose data directory.
+  Ask is described on the default nav. `doctor` exit 2 is red fatal rows only
+  (Zotero 7–9 Write API stays amber).
+
 ### Added
 
 - **Docs / site:** GUI-first landing and README (local workbench, not
@@ -61,8 +79,10 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
   refs gap, ingest-dois, authors, packs promote; queue/watch briefing and
   digest can file a collection note (`paperful:frontier-briefing`). Route
   table: [gui.md](docs/gui.md).
-- **GUI thickening:** Index runs `rag ingest`, `rag search`, batch Ask, and collection
-  `synthesize`; Advanced **Briefs** runs collection `summarize` / `synthesize`.
+- **GUI thickening:** **Ask** (default nav) runs cited Ask and, when Advanced is
+  on, batch Ask. **Index** runs `rag ingest`, `rag search`, `rag questions`,
+  `rag answered`, and collection `synthesize`. Advanced **Briefs** runs
+  collection `summarize` / `synthesize`.
   Per-item summarize in Wanted/Library drawers (`/item/{key}/summary`, `/wanted/summarize`).
   Discover: snowball kinds (search/hybrid/doi/orcid/collection), keep/skip, profile run,
   resume, queue briefing/digest, watch via `save_watch` (profile required);
@@ -130,11 +150,12 @@ extras allowed). This tree is not tagged 1.0. See [releases](docs/releases.md).
 
 ### Added
 
-- **Index Ask:** Advanced Index page runs cited, threaded `ask` when `[rag]` and
-  `[llm]` are on and the index has rows. Collection chip is the scope; turns
-  persist under `state/rag/threads/` (`paperful.rag.thread.v1`). `rag ingest`,
-  `rag search`, and batch Ask (`state/ask-batch/`) are on Index; synthesize on
-  Index; per-item summarize in drawers. Advanced **Briefs** runs collection
+- **Ask:** cited, threaded `ask` when `[rag]` and `[llm]` are on and the index
+  has rows. The page is `/ask` on the default nav (see Changed). Collection
+  chip is the scope; turns persist under `state/rag/threads/`
+  (`paperful.rag.thread.v1`). Batch Ask (`state/ask-batch/`) is on that page
+  when Advanced is on. Index runs `rag ingest`, `rag search`, and synthesize;
+  per-item summarize stays in drawers. Advanced **Briefs** runs collection
   `summarize` / `synthesize`. See [gui.md](docs/gui.md).
 - **GUI P0:** required `paperful.item.v1` keys frozen (additive extras survive
   snapshot); restore is create-missing (DOI → key → title+year; skip gone /

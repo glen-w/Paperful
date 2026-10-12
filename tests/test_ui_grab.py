@@ -116,6 +116,113 @@ def test_grab_production_passes_item_keys(tmp_path, monkeypatch):
     assert captured.get("no_attach") is True
 
 
+def test_preview_all_uses_missing_list_only(tmp_path, monkeypatch):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    have = _Item("HAVE", "10.1/have")
+    have.has_pdf = True
+    miss = _Item("MISS", "10.1/miss")
+    manifest = Manifest(cfg.manifest_path)
+    manifest.write(
+        Record(
+            itemKey="HAVE",
+            status=STATUS_OK,
+            doi="10.1/have",
+            pdf_doi="10.1/have",
+            source="unpaywall",
+            path="have.pdf",
+        )
+    )
+    monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: ([have, miss], manifest))
+    commands.write_command(
+        cfg,
+        {"id": "prev", "verb": "preview_run", "status": "running", "created": 1},
+    )
+    jobs.preview_run(cfg, "prev", collection="BBNJ", preset="oa", keys=None, flags={})
+    rec = commands.read_command(cfg, "prev") or {}
+    review = commands.load_review(cfg, rec["review_token"])
+    assert review is not None
+    assert review["keys"] == ["MISS"]
+
+
+def test_grab_rejects_non_preview_token(tmp_path, monkeypatch):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    items = [_Item("K1", "10.1/a")]
+    manifest = Manifest(cfg.manifest_path)
+    monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: (items, manifest))
+    called: list[str] = []
+    jobs.run_fetch_fn = lambda *args, **kwargs: called.append("fetch")
+    token = commands.create_review_token(
+        cfg,
+        verb="attach",
+        collection="BBNJ",
+        preset="oa",
+        keys=["K1"],
+        fingerprint="x",
+        command_id="att",
+    )
+    ok, msg = jobs.grab_run(cfg, token=token)
+    assert not ok
+    assert "preview" in msg.lower()
+    assert called == []
+    jobs.run_fetch_fn = None
+
+
+def test_matching_preview_ignores_newer_attach_token(tmp_path, monkeypatch):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    miss = _Item("MISS", "10.1/miss")
+    manifest = Manifest(cfg.manifest_path)
+    monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: ([miss], manifest))
+    commands.write_command(
+        cfg,
+        {"id": "prev", "verb": "preview_run", "status": "done", "created": 1},
+    )
+    jobs.preview_run(cfg, "prev", collection="BBNJ", preset="oa", keys=None, flags={})
+    preview = commands.load_review(cfg, (commands.read_command(cfg, "prev") or {})["review_token"])
+    assert preview is not None
+    attach = commands.create_review_token(
+        cfg,
+        verb="attach",
+        collection="BBNJ",
+        preset="oa",
+        keys=["MISS"],
+        fingerprint="other",
+        command_id="att",
+    )
+    commands.write_command(
+        cfg,
+        {
+            "id": "att",
+            "verb": "attach",
+            "status": "done",
+            "created": 50,
+            "review_token": attach,
+        },
+    )
+    review, err = jobs.matching_preview(
+        cfg,
+        collection="BBNJ",
+        preset="oa",
+        posted_keys=[],
+        flags={},
+    )
+    assert err == ""
+    assert review is not None
+    assert review["verb"] == "preview_run"
+    assert review["token"] == preview["token"]
+    mismatched, why = jobs.matching_preview(
+        cfg,
+        collection="BBNJ",
+        preset="oa",
+        posted_keys=["OTHER"],
+        flags={},
+    )
+    assert mismatched is None
+    assert "ticked" in why.lower()
+
+
 def test_attach_run_selected_keys(tmp_path, monkeypatch):
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     cfg.state_dir.mkdir(parents=True)
@@ -189,3 +296,22 @@ def test_wanted_attach_route_and_button(tmp_path, monkeypatch):
     )
     assert res.status_code == 303
     assert attached == ["K1", "K2"]
+
+
+@pytest.mark.skipif(
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
+    reason="paperful[serve] extra missing",
+)
+def test_grab_without_preview_stays_on_wanted(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from paperful.serve import create_app
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: ([], Manifest(cfg.manifest_path)))
+    client = TestClient(create_app(cfg))
+    res = client.post("/wanted/grab", data={}, follow_redirects=False)
+    assert res.status_code == 303
+    assert res.headers["location"].startswith("/wanted?")
+    assert "Preview" in res.headers["location"]
