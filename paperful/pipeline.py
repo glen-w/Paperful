@@ -97,6 +97,7 @@ _SERIAL_SOURCES = frozenset(
         "ezproxy",
         "htmlpdf",
         "scholar",
+        "camofox",
         "browser_agent",
         "author_site",
         "serpapi",
@@ -1197,12 +1198,18 @@ class Pipeline:
                 reason = "source paused"
             self._record(item, STATUS_RETRYABLE, attempts, reason=reason)
         elif soft_block_miss(attempts):
-            agent_done = any(
-                a.startswith("browser_agent:")
-                and not a.startswith("browser_agent:skipped")
+            recover_done = any(
+                (
+                    a.startswith("browser_agent:")
+                    and not a.startswith("browser_agent:skipped")
+                )
+                or (
+                    a.startswith("camofox:")
+                    and not a.startswith("camofox:skipped")
+                )
                 for a in attempts
             )
-            if not agent_done:
+            if not recover_done:
                 self._record(item, STATUS_RETRYABLE, attempts, reason="soft block")
             elif any(":captcha" in a for a in attempts):
                 self._record(item, STATUS_CAPTCHA, attempts, reason="bot wall")

@@ -26,6 +26,7 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_fetch(raw, cfg)
     apply_scholar(raw, cfg)
     apply_serpapi(raw, cfg)
+    apply_camofox(raw, cfg)
     apply_handoff(raw, cfg)
     apply_request(raw, cfg)
     apply_twenty(raw, cfg)
@@ -222,6 +223,19 @@ def apply_serpapi(raw: dict[str, Any], cfg: "Config") -> None:
         [
             ("enabled", "serpapi_enabled", bool),
             ("max_calls", "serpapi_max_calls", lambda v: max(0, int(v))),
+        ],
+    )
+
+
+def apply_camofox(raw: dict[str, Any], cfg: "Config") -> None:
+    _mod()._apply_config_table(
+        raw.get("camofox"),
+        cfg,
+        [
+            ("enabled", "camofox_enabled", bool),
+            ("during_run", "camofox_during_run", bool),
+            ("base_url", "camofox_base_url", lambda v: str(v).strip()),
+            ("max_wall_s", "camofox_max_wall_s", float),
         ],
     )
 

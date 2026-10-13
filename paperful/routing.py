@@ -39,10 +39,29 @@ _HTMLPDF_ITEM_TYPES = frozenset(
 # Playwright vault lanes. `run` auto-appends `browser_agent` after the last of
 # these, and only invokes the agent when one of them was tried and failed.
 BROWSER_LANES = frozenset({"scholar", "ezproxy", "htmlpdf"})
-_POLICY_TAIL = ("author_site", "scholar", "browser_agent", "htmlpdf", "serpapi", "scihub")
-_POLICY_ALWAYS_TAIL = frozenset({"author_site", "scholar", "browser_agent", "serpapi", "scihub"})
+_POLICY_TAIL = (
+    "author_site",
+    "scholar",
+    "camofox",
+    "browser_agent",
+    "htmlpdf",
+    "serpapi",
+    "scihub",
+)
+_POLICY_ALWAYS_TAIL = frozenset(
+    {"author_site", "scholar", "camofox", "browser_agent", "serpapi", "scihub"}
+)
 _SERIAL_FOR_ORDER = frozenset(
-    {"scihub", "ezproxy", "htmlpdf", "scholar", "browser_agent", "author_site", "serpapi"}
+    {
+        "scihub",
+        "ezproxy",
+        "htmlpdf",
+        "scholar",
+        "camofox",
+        "browser_agent",
+        "author_site",
+        "serpapi",
+    }
 )
 
 
@@ -196,6 +215,42 @@ def with_serpapi_lane(cfg: Config, sources: list[str]) -> list[str]:
     return listed
 
 
+def camofox_ready(cfg: Config) -> bool:
+    return bool(cfg.camofox_enabled and (cfg.camofox_base_url or "").strip())
+
+
+def with_camofox_lane(
+    cfg: Config,
+    sources: list[str],
+    *,
+    during_run: bool | None = None,
+) -> list[str]:
+    """Insert ``camofox`` after vault browser lanes when the opt-in lane can fire.
+
+    Stays out of ``DEFAULT_SOURCES``. Needs ``[camofox].enabled`` and a
+    non-empty ``base_url``. Inserted before ``browser_agent`` when that lane
+    is present, otherwise after the last of scholar / ezproxy / htmlpdf.
+    ``during_run`` overrides ``[camofox].during_run`` for one call
+    (CLI ``--camofox`` / ``--no-camofox``).
+    """
+    listed = list(sources)
+    if "camofox" in listed:
+        if not camofox_ready(cfg):
+            return [name for name in listed if name != "camofox"]
+        return listed
+    enabled = cfg.camofox_during_run if during_run is None else during_run
+    if not camofox_ready(cfg) or not enabled:
+        return listed
+    if not any(name in BROWSER_LANES for name in listed):
+        return listed
+    if "browser_agent" in listed:
+        listed.insert(listed.index("browser_agent"), "camofox")
+        return listed
+    last = max(i for i, name in enumerate(listed) if name in BROWSER_LANES)
+    listed.insert(last + 1, "camofox")
+    return listed
+
+
 def with_author_site_lane(cfg: Config, sources: list[str]) -> list[str]:
     """Append ``author_site`` when a pack, contact cache, or Twenty workspace can supply a page.
 
@@ -259,14 +314,19 @@ def order_run(cfg: Config, sources: list[str]) -> list[SerialStep]:
         else:
             steps.append(SerialStep(name))
     has_scholar = "scholar" in serial
+    has_camofox = "camofox" in serial
     has_agent = "browser_agent" in serial
     if "author_site" in serial:
         steps.append(SerialStep("author_site"))
-    if scholar_pairs_with_agent(cfg, serial):
+    # When camofox is on, use separate phases so order stays
+    # scholar → camofox → browser_agent (Scholar hits still leave the queue).
+    if scholar_pairs_with_agent(cfg, serial) and not has_camofox:
         steps.append(SerialStep("scholar", partner="browser_agent"))
     else:
         if has_scholar:
             steps.append(SerialStep("scholar"))
+        if has_camofox:
+            steps.append(SerialStep("camofox"))
         if has_agent:
             steps.append(SerialStep("browser_agent"))
     if split_htmlpdf:

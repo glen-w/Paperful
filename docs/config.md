@@ -36,10 +36,14 @@ and [architecture](architecture.md).
 | `[oa_honesty].license_block` | `[]` | Substrings; when a stamped `license` matches, the run records `license_blocked` and does not save the PDF |
 | `[remarks].surface` | `note` | Where the readable lines go: where a PDF came from, which duplicate to keep, and why a snowball hit belongs. `note` (child note), `tag` (parent tag), or `off`. The PDF attachment stamp stays the machine token |
 | `sources` | `unpaywall` → `openalex` → `arxiv` → `biorxiv` → `europepmc` → `semanticscholar` → `core` → `openaire` → `direct` → `ezproxy` → `htmlpdf` | Default **head** of a run. `[fetch].order = "policy"` (default) still runs these first; `scholar` and `scihub` are **not** included unless you opt in. When `scholar` is in `sources`, policy places it in the **late tail** (one try before `browser_agent` when that lane is on). `order = "list"` honors this array. `core` is skipped until `core_api_key` is set. `openaire` looks up repository copies by DOI |
-| `[fetch].order` | `policy` | `policy` late-tails Scholar / SerpApi / Sci-Hub (and academic `htmlpdf`). `list` is the configured `sources` order |
+| `[fetch].order` | `policy` | `policy` late-tails Scholar / Camofox / `browser_agent` / SerpApi / Sci-Hub (and academic `htmlpdf`). `list` is the configured `sources` order |
 | `[scholar].when` | `auto` | `auto`: interleave with `browser_agent` when that lane is on, else one late Scholar phase. `phase`: Scholar burst then agent. `interleave`: always pair |
 | `[serpapi].enabled` | `false` | Paid Google Scholar **link discovery** after local routes. Needs env `SERPAPI_API_KEY`. Never a silent default. See [SerpApi](serpapi.md) |
 | `[serpapi].max_calls` | `20` | Paid Scholar searches this run. `0` = no cap. `--serpapi-max` overrides one run |
+| `[camofox].enabled` | `false` | Opt-in Camoufox recover lane after vault browsers, before `browser_agent`. Needs an external camofox-browser server. Never a silent default. See [Camofox](camofox.md) |
+| `[camofox].during_run` | `true` | Inject on `run` when enabled. `--camofox` / `--no-camofox` override one run |
+| `[camofox].base_url` | `http://127.0.0.1:9377` | REST base for the camofox-browser server |
+| `[camofox].max_wall_s` | `90` | Wall-clock budget per item for the scripted grab |
 | `[handoff].scholar` | `true` | Put a Scholar results URL on miss rows and open it in the system browser when there is no direct PDF URL |
 | `[request].channels` | `off` | Author-request policy: `off` \| `rg` \| `email` \| `both` \| `rg_then_email_after_days`. **`rg` is handoff-only:** opens an existing ResearchGate publication URL in your system browser so **you** click Request full-text (RG ToS). Paperful never clicks and does not search RG. `email` / delay are recorded for later mail-merge; Paperful does not send mail. Override one `gaps` / `run --handoff` / `reachout` with `--request-rg` / `--no-request-rg`. `--re-request` ignores the `state/author-requests.jsonl` ledger |
 | `[request].email_after_days` | `14` | Used when `channels = rg_then_email_after_days` (policy only until a draft verb exists) |
@@ -63,7 +67,9 @@ use a library proxy. Google Scholar is off until you add `scholar` to
 `sources` (and usually run `session login scholar`). Policy mode then runs it
 **late**, not in the middle of campus/grey. Paid [SerpApi](serpapi.md) Scholar
 search is off until `[serpapi].enabled` and `SERPAPI_API_KEY`; cap with
-`[serpapi].max_calls` / `--serpapi-max`. Sci-Hub is off until
+`[serpapi].max_calls` / `--serpapi-max`. Opt-in [Camofox](camofox.md) is off
+until `[camofox].enabled` and a reachable server at `[camofox].base_url`.
+Sci-Hub is off until
 you add `"scihub"` to `sources` or pass `--scihub` — see [Sci-Hub](scihub.md).
 Items dated after 2021 are not sent to Sci-Hub; a `--year-from` past that
 year drops it from the run list.

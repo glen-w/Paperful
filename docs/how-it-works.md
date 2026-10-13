@@ -59,7 +59,8 @@ Default order:
 Google Scholar stays off until you opt in; when on, it runs **late** (not
 in the middle of campus/grey). `[fetch].order = "list"` keeps the `sources`
 array order instead. Open-access sources can run in parallel. EZProxy,
-print-to-PDF, and opt-in [SerpApi](serpapi.md) stay one-at-a-time.
+print-to-PDF, opt-in [Camofox](camofox.md), the LLM [browser agent](llm.md),
+and opt-in [SerpApi](serpapi.md) stay one-at-a-time.
 
 Per-item routing is on: a DOI paper is not sent to every site. The log line
 `trying: …` is that shorter lane. [Source routing](sources.md).

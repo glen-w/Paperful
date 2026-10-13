@@ -17,7 +17,8 @@ lists that lane, not the full `sources` list.
 | `biorxiv` | `10.1101/…` DOI (including from a bioRxiv/medRxiv URL) |
 | `semanticscholar` | DOI or arXiv id |
 | `core` | DOI and `core_api_key` (in default `sources`; skipped until the key is set. `doctor` reports whether it is set — green either way). Register at [core.ac.uk/services/api](https://core.ac.uk/services/api) |
-| `scholar` | DOI, or title at least 20 characters (**opt-in** — not in default `sources`). Policy order runs it late, paired with `browser_agent` when that lane is on |
+| `scholar` | DOI, or title at least 20 characters (**opt-in** — not in default `sources`). Policy order runs it late, paired with `browser_agent` when that lane is on (separate phases when `camofox` is also on) |
+| `camofox` | DOI or URL. **Opt-in:** `[camofox].enabled` and a reachable camofox-browser server at `[camofox].base_url`. Policy order after vault lanes, before `browser_agent`. Scripted PDF grab; no vault SSO. See [Camofox](camofox.md) |
 | `serpapi` | Same query as Scholar. **Opt-in:** `[serpapi].enabled` and env `SERPAPI_API_KEY`. Policy order after local Scholar / agent. Cap with `[serpapi].max_calls` / `--serpapi-max`. See [SerpApi](serpapi.md) |
 | `direct` | HTTP(S) URL that is not a resolver/aggregator/video host after playbook rewrite/synthesize, **or** Extra/title match from a `synthesize` playbook (e.g. UN symbol → undocs) |
 | `ezproxy` | `ezproxy_base` plus a session (vault or cookie file), **and** a DOI or a URL on a [known publisher host](ezproxy.md#what-ezproxy-will-try) |

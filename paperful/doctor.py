@@ -218,6 +218,12 @@ def remediation_text(
             '(ollama pull <model>), or set provider = "litellm" after '
             "`uv sync --extra llm` with keys in the environment. Then continue."
         )
+    if check.name == "Camofox":
+        return (
+            "Start the external camofox-browser server "
+            "(npx @askjo/camofox-browser), set [camofox].base_url if needed, "
+            "or set enabled = false. See docs/camofox.md."
+        )
     if check.name == "browser-agent extra":
         if "not installed" in check.detail:
             return (
@@ -559,6 +565,28 @@ def run_checks(
                 "optional — set core_api_key in config.toml to enable the CORE OA lane",
             )
         )
+
+    if cfg.camofox_enabled:
+        from .camofox_recover import camofox_server_ready
+
+        base = (cfg.camofox_base_url or "").strip() or "(empty)"
+        if camofox_server_ready(cfg):
+            checks.append(
+                Check(
+                    "Camofox",
+                    "green",
+                    f"server ok at {base} · max_wall_s={cfg.camofox_max_wall_s}",
+                )
+            )
+        else:
+            checks.append(
+                Check(
+                    "Camofox",
+                    "amber",
+                    f"enabled but unreachable at {base} — "
+                    "start camofox-browser (npx @askjo/camofox-browser) or see docs/camofox.md",
+                )
+            )
 
     if cfg.serpapi_enabled:
         from .routing import serpapi_api_key

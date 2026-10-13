@@ -20,6 +20,7 @@ from rich.table import Table
 
 from . import __version__
 from .config import (
+    CAMOFOX_DISCLAIMER,
     KNOWN_MANAGERS,
     RECOVER_DISCLAIMER,
     SCIHUB_DISCLAIMER,
@@ -510,6 +511,16 @@ BrowserAgentOpt = typer.Option(
         "--no-browser-agent skips it for this run so other PDF lanes can be tested alone."
     ),
 )
+CamofoxOpt = typer.Option(
+    None,
+    "--camofox/--no-camofox",
+    help=(
+        "Auto-append the camofox recover lane when [camofox].enabled "
+        "(default: [camofox].during_run). "
+        "Needs an external camofox-browser server at [camofox].base_url. "
+        "See docs/camofox.md."
+    ),
+)
 ApplyOpt = typer.Option(
     None,
     "--apply/--no-apply",
@@ -803,6 +814,12 @@ def _warn_if_scihub(source_list: list[str]) -> None:
 def _warn_if_recover(source_list: list[str]) -> None:
     if "browser_agent" in source_list:
         console.print(f"[orange3]{RECOVER_DISCLAIMER}[/]")
+
+
+def _warn_if_camofox(source_list: list[str]) -> None:
+    if "camofox" in source_list:
+        console.print(f"[orange3]{CAMOFOX_DISCLAIMER}[/]")
+
 
 def _require_manager(cfg: Config) -> None:
     manager = (cfg.manager or "zotero").strip().lower()
@@ -2394,6 +2411,7 @@ def run(
     scihub: bool | None = SciHubOpt,
     ezproxy_relogin: bool | None = EzproxyReloginOpt,
     browser_agent: bool | None = BrowserAgentOpt,
+    camofox: bool | None = CamofoxOpt,
     upgrade_linked: bool | None = UpgradeLinkedOpt,
     upgrade_snapshot: bool | None = UpgradeSnapshotOpt,
     keep_snapshot: bool = typer.Option(
@@ -2550,6 +2568,7 @@ def run(
         downloads_dir=downloads_dir,
         re_request=re_request,
         json_out=json_out,
+        camofox=camofox,
     )
 
 def _ezproxy_headed_login_and_probe(cfg: Config, pipe: Pipeline) -> bool:
@@ -6143,6 +6162,7 @@ def all_cmd(
     strict_pdf_doi: bool | None = StrictPdfDoiOpt,
     scihub: bool | None = SciHubOpt,
     browser_agent: bool | None = BrowserAgentOpt,
+    camofox: bool | None = CamofoxOpt,
     sources: str | None = typer.Option(
         None,
         "--sources",
@@ -6195,6 +6215,7 @@ def all_cmd(
         strict_pdf_doi=strict_pdf_doi,
         scihub=scihub,
         browser_agent=browser_agent,
+        camofox=camofox,
         sources=sources,
         preset=preset,
         apply=apply,

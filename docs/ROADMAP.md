@@ -94,23 +94,26 @@ Do not call either adapter **supported** until field reports justify it.
   (below): stop treating vault Scholar replay as core; human browser at handoff
   instead. **Shipped (find
   recovery):** soft-blocked OA URLs (empty httpx body) retry in the vault
-  browser (SSO / PDF link / download control), then optional `browser_agent`;
-  items stay `retryable` / `soft block` rather than hard `not_found`. Dead vault
-  landings (`login` / `captcha` / `no download control`) silence that final host
-  for the rest of the run; transport timeouts use a short connect budget and do
-  not permanently block a publisher on a single blip. Manual
-  handoff: `run` / `gaps --handoff list|tabs|walk|watch` and `paperful inbox
-  watch` / `drain` against `[inbox].dir` (default: PDF **DOI-only** attach to
-  missing-PDF parents, whole-library scope; `[inbox].match` / `[inbox].create`
-  opt in to the [match ladder](#inbox-match-ladder) and gated create). Distinct from snowball
-  watch `inbox.jsonl`. **Later (handoff):**
-  rank `--handoff list` by in-corpus cite count (from [refs gap](#bibliography-gap-scan-later-not-gaps))
-  × miss severity so limited browser time hits high-value PDFs first. CLI
-  `--browser-agent` / `--no-browser-agent` overrides `[browser_agent].during_run`
-  for one `run` / `all`. **Later (author-site + RG):** personal-site PDF discovery
-  via opt-in web search ([Acquire §2](#maybe-later-not-core)); ResearchGate
-  request-from-author is **handoff-only** (existing RG URL → system browser;
-  you click Request full-text; ToS) behind `[request].channels` ([same section](#maybe-later-not-core)).
+  browser (SSO / PDF link / download control), then optional opt-in `camofox`
+  (external camofox-browser REST; scripted grab; [camofox.md](camofox.md)) and
+  optional `browser_agent`; items stay `retryable` / `soft block` rather than
+  hard `not_found`. Dead vault landings (`login` / `captcha` / `no download
+  control`) silence that final host for the rest of the run; transport timeouts
+  use a short connect budget and do not permanently block a publisher on a
+  single blip. Manual handoff: `run` / `gaps --handoff list|tabs|walk|watch` and
+  `paperful inbox watch` / `drain` against `[inbox].dir` (default: PDF
+  **DOI-only** attach to missing-PDF parents, whole-library scope;
+  `[inbox].match` / `[inbox].create` opt in to the [match ladder](#inbox-match-ladder)
+  and gated create). Distinct from snowball watch `inbox.jsonl`. **Later
+  (handoff):** rank `--handoff list` by in-corpus cite count (from [refs
+  gap](#bibliography-gap-scan-later-not-gaps)) × miss severity so limited
+  browser time hits high-value PDFs first. CLI `--browser-agent` /
+  `--no-browser-agent` and `--camofox` / `--no-camofox` override
+  `[browser_agent].during_run` / `[camofox].during_run` for one `run` / `all`.
+  **Later (author-site + RG):** personal-site PDF discovery via opt-in web
+  search ([Acquire §2](#maybe-later-not-core)); ResearchGate request-from-author
+  is **handoff-only** (existing RG URL → system browser; you click Request
+  full-text; ToS) behind `[request].channels` ([same section](#maybe-later-not-core)).
 - **Academic HTML→PDF snapshot (shipped, opt-in).** Web/news (and DOI-less
   `document` / `report`) still print when the page is the article. Journal and
   other DOI items stay off unless `[htmlpdf].academic` is `gated` or `auto`
@@ -519,6 +522,7 @@ no invented URL — not parameter count or model marketing copy.
 | **Batch recover** | **Shipped:** `recover --from-last-run` + `--from-last-run-mode`. |
 | **Playbooks from wins** | **Shipped:** agent successes write promotable `click:` / `rewrite` wins + optional `steps` in `fetch-wins.jsonl`. |
 | **Browser Use Cloud / BU2** | Stealth / CAPTCHA — explicit non-default; no bypass product. |
+| **Opt-in camofox lane** | **Shipped:** external camofox-browser REST before `browser_agent`; scripted PDF grab; not a CF-bypass product; no vault SSO. See [camofox.md](camofox.md). |
 | **Controlled bakeoff** | No Paperful CI fixture for “Springer cookie → PDF” per model; optional **`assessments/`** protocol later. |
 
 #### When *not* to run the agent (product rule)

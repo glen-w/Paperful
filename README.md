@@ -132,7 +132,7 @@ Reference:
 - [Docker](docs/docker.md) — operator install; light/heavy packs
 - [Workbench](docs/gui.md) — pages, Preview tokens, what stays CLI
 - [Commands](docs/commands.md) · [Workflows](docs/workflows.md) · [Configuration](docs/config.md)
-- [Source routing](docs/sources.md) · [Quiet mirror](docs/quiet-mirror.md)
+- [Source routing](docs/sources.md) · [Camofox](docs/camofox.md) · [Quiet mirror](docs/quiet-mirror.md)
 - [Why Paperful](docs/why.md) · [Roadmap](docs/ROADMAP.md)
 
 ## Optional local LLM and Ask

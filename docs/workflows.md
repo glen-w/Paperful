@@ -253,7 +253,9 @@ label. Subcollections are included automatically when you pass a parent path.
 `[llm].enabled` for `summarize` and the auto `browser_agent` lane on `run`,
 `uv sync --extra llm --extra browser-agent` on the host (Python 3.11+) or a
 **heavy** Compose image, and headed `paperful session login ezproxy` /
-`scholar` when you use those sources.
+`scholar` when you use those sources. Optional: `[camofox].enabled` plus a
+running camofox-browser server for a scripted try before the LLM agent
+([camofox.md](camofox.md)).
 Optional: `[inbox].dir` so `--handoff tabs` can continue into inbox watch.
 Campus-only policy: add `--preset eoi` on `run` / `all`.
 

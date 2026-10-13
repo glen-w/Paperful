@@ -145,7 +145,9 @@ Model choice (Ollama tags, VRAM bands, acceptance test):
 On `run`, when `[llm].enabled` and `paperful[browser-agent]` are available,
 Paperful appends `browser_agent` as a late serial lane. Policy order tries
 Scholar once immediately before the agent (the agent wall clock spaces Scholar
-requests). The agent
+requests). When opt-in [Camofox](camofox.md) is also on, order is Scholar →
+`camofox` → `browser_agent` (separate phases; a Scholar or Camofox hit skips
+later lanes). The agent
 fires only if one of those vault lanes was tried and failed (not merely
 skipped as inapplicable). Playwright releases the session profile first.
 `[browser_agent].during_run = false` turns that auto-lane off for every run.
@@ -375,5 +377,6 @@ allow_remote = true
 - [config.md](config.md#llm-optional-local-first) — key reference
 - [commands.md](commands.md) — `recover` / `summarize` / `synthesize` flags and exit codes
 - [architecture.md](architecture.md#llm-layer-optional-local-first) — layer, gates, note write path
+- [camofox.md](camofox.md) — opt-in scripted Camoufox lane before `browser_agent`
 - [sessions.md](sessions.md) — vault profile ownership during `recover`
 - [ROADMAP.md](ROADMAP.md#optional-llm-assist-local-litellm) — what is later (Cloud/BU2, `num_ctx` pass-through)

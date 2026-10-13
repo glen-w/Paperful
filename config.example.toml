@@ -190,6 +190,13 @@ mirror_failures_before_skip = 3
 # [serpapi]
 # enabled = false                # paid Scholar link discovery; needs SERPAPI_API_KEY
 # max_calls = 20                 # paid searches this run; 0 = unlimited. --serpapi-max overrides
+# [camofox]
+# enabled = false                # opt-in Camoufox recover lane before browser_agent
+# during_run = true              # inject on run when enabled; --camofox / --no-camofox
+# base_url = "http://127.0.0.1:9377"  # external camofox-browser server (npx/Docker)
+# max_wall_s = 90
+# # Optional bearer: env CAMOFOX_ACCESS_KEY when the server sets CAMOFOX_ACCESS_KEY
+# # See docs/camofox.md — not a Cloudflare-bypass product; no vault SSO cookies
 # [handoff]
 # scholar = true                 # open Scholar in the system browser when there is no PDF URL
 

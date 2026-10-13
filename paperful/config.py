@@ -75,6 +75,11 @@ RECOVER_DISCLAIMER = (
     "and applicable law. Page content may be sent to a remote LLM; using a local "
     "LLM does not send page content off this machine."
 )
+CAMOFOX_DISCLAIMER = (
+    "Camofox recovery is experimental and opt-in. It uses a separate Camoufox "
+    "browser (not the vault Chromium SSO profile). You are responsible for "
+    "publisher terms and applicable law. This is not a Cloudflare-bypass product."
+)
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
@@ -113,6 +118,10 @@ class Config:
     scholar_when: str = "auto"  # auto | phase | interleave
     serpapi_enabled: bool = False
     serpapi_max_calls: int = 20  # 0 = no cap; counts paid Scholar searches this run
+    camofox_enabled: bool = False
+    camofox_during_run: bool = True
+    camofox_base_url: str = "http://127.0.0.1:9377"
+    camofox_max_wall_s: float = 90.0
     handoff_scholar: bool = True
     request_channels: str = "off"  # off | rg | email | both | rg_then_email_after_days
     request_email_after_days: int = 14

@@ -41,6 +41,7 @@ def run_all(
     run_config: Path | None,
     config: Path | None,
     fmt: str,
+    camofox: bool | None = None,
 ) -> None:
     from . import cli as cli_mod
 
@@ -133,6 +134,7 @@ def run_all(
                             scope,
                             dry_run=dry_run,
                             browser_agent=browser_agent,
+                            camofox=camofox,
                             serpapi_max=serpapi_max
                             if isinstance(serpapi_max, int)
                             else None,
@@ -145,6 +147,7 @@ def run_all(
                         scope,
                         dry_run=dry_run,
                         browser_agent=browser_agent,
+                        camofox=camofox,
                         serpapi_max=serpapi_max if isinstance(serpapi_max, int) else None,
                     )
                 steps_done.append({"step": step, "status": "ok"})
@@ -204,6 +207,7 @@ def _dispatch_all_step(
     *,
     dry_run: bool,
     browser_agent: bool | None = None,
+    camofox: bool | None = None,
     serpapi_max: int | None = None,
     json_out: bool = False,
 ) -> None:
@@ -237,6 +241,7 @@ def _dispatch_all_step(
             preset=bound.preset,
             scihub=bound.scihub,
             browser_agent=browser_agent,
+            camofox=camofox,
             upgrade_linked=bound.upgrade_linked,
             upgrade_snapshot=None,
             keep_snapshot=False,

@@ -90,6 +90,7 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `resolve/` (`ids.py`, `enrich.py`), `lint.py`, `acronyms.py`, `authors_report.py`, `metadata.py`, `dedupe.py`, `pdfid.py` | Identifier, hygiene, and corpus-frequency logic. Take a backend; never name a manager | the protocol |
 | `config_tables.py` | Nested TOML sections applied onto `Config` | `config` parsers |
 | `sources/` | One fetch lane each. Return bytes or a miss | `sources.base` |
+| `camofox_client.py` / `camofox_recover.py` | Opt-in Camoufox REST recover (before `browser_agent`) | `sources.camofox`, [camofox.md](camofox.md) |
 | `pipeline.py` | Order the lanes, save, attach, write the manifest | most things |
 | `pipeline_save.py` | Save a fetched PDF, write the manifest, attach when allowed | `store`, `pdfid` |
 | `pipeline_phases.py` | OA parallel and serial fetch phases | `pipeline` helpers |

@@ -40,6 +40,7 @@ def test_registry_has_every_planned_source_and_scihub_is_opt_in():
 
     assert set(REGISTRY) == {
         "browser_agent",
+        "camofox",
         "unpaywall",
         "openalex",
         "arxiv",
@@ -59,6 +60,7 @@ def test_registry_has_every_planned_source_and_scihub_is_opt_in():
     assert "scihub" not in DEFAULT_SOURCES
     assert "scholar" not in DEFAULT_SOURCES
     assert "author_site" not in DEFAULT_SOURCES
+    assert "camofox" not in DEFAULT_SOURCES
     assert DEFAULT_SOURCES[-1] == "htmlpdf"
     assert DEFAULT_SOURCES.index("core") == DEFAULT_SOURCES.index("semanticscholar") + 1
     assert DEFAULT_SOURCES.index("openaire") == DEFAULT_SOURCES.index("core") + 1

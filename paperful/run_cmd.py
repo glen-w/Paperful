@@ -14,6 +14,7 @@ from .pipeline import Pipeline, RunStats
 from .routing import (
     filter_sources_for_item_types,
     filter_sources_for_year_scope,
+    with_camofox_lane,
     with_recover_lane,
     with_serpapi_lane,
 )
@@ -56,6 +57,7 @@ def run_fetch(
     re_request: bool,
     json_out: bool,
     item_keys: list[str] | None = None,
+    camofox: bool | None = None,
 ) -> None:
     from . import cli as cli_mod
 
@@ -88,6 +90,7 @@ def run_fetch(
     )
     source_list = filter_sources_for_year_scope(source_list, year_from)
     source_list = with_recover_lane(cfg, source_list, during_run=browser_agent)
+    source_list = with_camofox_lane(cfg, source_list, during_run=camofox)
     source_list = with_serpapi_lane(cfg, source_list)
     e2e = os.environ.get("PAPERFUL_E2E") == "1"
     # Live E2E streams human progress on stderr so --format json stays parseable.
@@ -96,6 +99,7 @@ def run_fetch(
     )
     if not json_out:
         cli_mod._warn_if_scihub(source_list)
+        cli_mod._warn_if_camofox(source_list)
         cli_mod._warn_if_recover(source_list)
 
     manifest = Manifest(cfg.manifest_path)

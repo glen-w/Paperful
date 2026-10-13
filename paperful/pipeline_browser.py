@@ -1,7 +1,7 @@
 """Browser-agent handoff for :class:`paperful.pipeline.Pipeline`.
 
 The batch order stays in the pipeline. These helpers only release Playwright
-and decide whether ``browser_agent`` may run.
+and decide whether recover lanes (``camofox`` / ``browser_agent``) may run.
 """
 
 from __future__ import annotations
@@ -10,6 +10,8 @@ from typing import Any
 
 from .routing import BROWSER_LANES, browser_lane_failed
 from .zot import Item
+
+_RECOVER_LANES = frozenset({"camofox", "browser_agent"})
 
 
 def release_browser_for_agent(pipe: Any) -> None:
@@ -24,19 +26,19 @@ def release_browser_for_agent(pipe: Any) -> None:
 def skip_recover_without_lane_failure(
     pipe: Any, name: str, item: Item, attempts: list[str]
 ) -> bool:
-    """Hold ``browser_agent`` on mixed runs until a vault lane has failed.
+    """Hold recover lanes on mixed runs until a vault lane has failed.
 
     Manual ``paperful recover`` uses ``sources=["browser_agent"]`` only, so
-    the gate does not apply.
+    the gate does not apply. ``camofox`` uses the same vault-miss gate.
     """
-    if name != "browser_agent":
+    if name not in _RECOVER_LANES:
         return False
     if not any(s in BROWSER_LANES for s in pipe.sources):
         return False
     if browser_lane_failed(attempts):
         return False
-    attempts.append("browser_agent:skipped(no browser-lane failure)")
+    attempts.append(f"{name}:skipped(no browser-lane failure)")
     with pipe._stats_lock:
         pipe.stats.note_source(name, "skipped")
-    pipe._log_item(item, "browser_agent: [dim]skipped[/] (no browser-lane failure)")
+    pipe._log_item(item, f"{name}: [dim]skipped[/] (no browser-lane failure)")
     return True

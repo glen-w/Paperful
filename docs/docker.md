@@ -147,6 +147,16 @@ so a shared `.env` does not break host `uv run`.
 inside the container. Headed `session login` still stays on the host (shared
 `state/` vault).
 
+### Optional Camofox sidecar
+
+The opt-in [`camofox`](camofox.md) lane talks to an **external**
+[camofox-browser](https://github.com/jo-inc/camofox-browser) REST server. Paperful
+does not install Node or Camoufox in the light/heavy images. Run the server on
+the host (or a second Compose service) and point `[camofox].base_url` at it
+(for example `http://host.docker.internal:9377` from a container). Set
+`CAMOFOX_ACCESS_KEY` in both places when the server requires a bearer. This is
+not a Cloudflare-bypass product and does not reuse the vault Chromium profile.
+
 After doctor is green, `docker compose up` starts the GUI. It binds in the
 container on `0.0.0.0:8765` and **publishes only** `127.0.0.1:8765:8765` (no
 LAN). Same workbench as host `paperful serve` ([gui.md](gui.md) — Wanted, then

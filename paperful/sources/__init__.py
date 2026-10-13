@@ -7,6 +7,7 @@ from . import (
     author_site,
     biorxiv,
     browser_agent,
+    camofox,
     core,
     direct,
     europepmc,
@@ -37,6 +38,7 @@ REGISTRY: dict[str, Source] = {
     "ezproxy": ezproxy,
     "htmlpdf": htmlpdf,
     "scihub": scihub,
+    "camofox": camofox,
     "browser_agent": browser_agent,
     "author_site": author_site,
 }

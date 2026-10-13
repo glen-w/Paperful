@@ -52,6 +52,7 @@ research-ops
 sessions
 scihub
 serpapi
+camofox
 llm
 rag
 browser-agent-models

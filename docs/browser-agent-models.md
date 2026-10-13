@@ -92,7 +92,8 @@ models that only succeed by hallucinating PDF URLs should be demoted regardless 
 
 ## Deterministic paths beat the agent
 
-Use HTTP / vault Playwright lanes first. Reserve `browser_agent` for **soft UI**
+Use HTTP / vault Playwright lanes first, then opt-in [Camofox](camofox.md) when
+enabled. Reserve `browser_agent` for **soft UI**
 (cookie banner → “Download PDF”) when metadata lanes and vault retry already failed.
 See [architecture § sources](architecture.md) and [workflows](workflows.md).
 

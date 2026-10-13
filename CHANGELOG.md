@@ -6,6 +6,14 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+### Added
+
+- Opt-in **`camofox`** recover lane: scripted DOI→PDF via an external
+  [camofox-browser](https://github.com/jo-inc/camofox-browser) server, after
+  vault Playwright lanes and before `browser_agent`. Config `[camofox]`,
+  CLI `--camofox` / `--no-camofox`, `doctor` health check. See
+  [docs/camofox.md](docs/camofox.md).
+
 ## 1.0.0 — 2026-10-13
 
 Tagged release of the 1.0 contract: CLI honesty, the operator workbench

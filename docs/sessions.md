@@ -67,9 +67,11 @@ writes `{grey_playbooks_dir}/learned.toml`. Default `[playbooks].promote` is
 overrides the config for one process.
 
 `paperful recover` (`--item` or `--from-last-run`) and the auto `browser_agent`
-lane on `run` launch Chromium on this same profile. `run` closes the Playwright `BrowserSession` before that lane so the
-agent can take the profile; do not run a second `run` or `recover` against the
-same vault at the same time. Headed EZProxy re-login during `run` does the same
+lane on `run` launch Chromium on this same profile. `run` closes the Playwright
+`BrowserSession` before that lane so the agent can take the profile; do not run
+a second `run` or `recover` against the same vault at the same time. The opt-in
+[Camofox](camofox.md) lane uses a separate Camoufox server and does **not** share
+this Chromium profile. Headed EZProxy re-login during `run` does the same
 release first — otherwise Chrome exits with no window while the probe still holds
 `state/sessions/chromium`.
 
