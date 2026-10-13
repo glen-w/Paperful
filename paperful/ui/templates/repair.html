@@ -70,6 +70,8 @@
       {% endif %}
       {% if q.verb == 'ocr' %}
       <label><input type="checkbox" name="attach" value="1"> Attach after OCR {{ info("Write the searchable OCR PDF back to Zotero. Off keeps the OCR file on disk only.") }}</label>
+      <label><input type="checkbox" name="auto_ignore_failures" value="1" checked> Auto-ignore failures {{ info("After Apply, add failed or missing PDFs to state/ocr-ignore.jsonl so the next run skips them.") }}</label>
+      <label><input type="checkbox" name="force_retry" value="1"> Force retry ignored {{ info("Run OCR on items on the ignore list (for one-off retries).") }}</label>
       {% endif %}
       <button type="submit">Preview</button>
       {{ info("Run a dry-run and write the plan. Nothing in Zotero changes until Apply.") }}

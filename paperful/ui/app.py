@@ -1517,6 +1517,9 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             "merge_files": form.get("merge_files") == "1",
             "rename": form.get("rename") == "1",
             "link": form.get("link") == "1",
+            "attach": form.get("attach") == "1",
+            "force_retry": form.get("force_retry") == "1",
+            "auto_ignore_failures": form.get("auto_ignore_failures") == "1",
         }
 
         def work(cmd_id: str) -> None:

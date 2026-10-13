@@ -21,6 +21,7 @@ from .library import LibraryBackend, LibraryError
 from .lint import resolve_pdf_path
 from .pdfid import text_from_pdf
 from .snapshot import item_dirs
+from .ocr_ignore import OcrIgnoreList
 from .store import STATUS_ATTACHED, STATUS_OK, Manifest, Record, item_filename
 from .zot import Item
 
@@ -48,6 +49,7 @@ class OcrBatch:
     rows: list[OcrRow] = field(default_factory=list)
     ocr: int = 0
     skipped: int = 0
+    ignored: int = 0
     failed: int = 0
     would: int = 0
     not_reached: int = 0
@@ -211,6 +213,9 @@ def ocr_items(
     track: Track | None = None,
     classify: Callable[[Path], str | None] | None = None,
     deadline: float | None = None,
+    ignore_list: OcrIgnoreList | None = None,
+    force_retry: bool = False,
+    auto_ignore_failures: bool = True,
 ) -> OcrBatch:
     """Classify each PDF. With ``apply``, rewrite image files under ``out/``.
 
@@ -224,17 +229,33 @@ def ocr_items(
             "or apt install ocrmypdf tesseract-ocr-eng."
         )
     batch = OcrBatch()
+    ignores = ignore_list or OcrIgnoreList(cfg.ocr_ignore_path)
     queue = track(items) if track else items
     for idx, item in enumerate(queue):
         if deadline is not None and time.time() >= deadline:
             batch.not_reached = len(items) - idx
             break
+        if ignores.is_ignored(item.key) and not force_retry:
+            entry = ignores.get(item.key)
+            note = entry.reason if entry else ""
+            row = OcrRow(
+                item.key,
+                item.title,
+                "",
+                "ignore",
+                f"ignored{': ' + note if note else ''}",
+            )
+            batch.rows.append(row)
+            batch.ignored += 1
+            continue
         durable, probe = _probe_pdf(cfg, item, manifest, backend)
         sample = probe or durable
         if sample is None:
             row = OcrRow(item.key, item.title, "", "missing", "no PDF on disk")
             batch.rows.append(row)
             batch.failed += 1
+            if apply and auto_ignore_failures:
+                ignores.add(item.key, row.reason, source="auto")
             continue
         if classify is not None:
             why = classify(sample)
@@ -264,6 +285,12 @@ def ocr_items(
         batch.rows.append(row)
         if row.status == "ocr":
             batch.ocr += 1
+            if ignores.is_ignored(item.key):
+                ignores.remove(item.key)
+        elif row.status in {"failed", "missing"}:
+            batch.failed += 1
+            if apply and auto_ignore_failures:
+                ignores.add(item.key, row.reason or row.status, source="auto")
         else:
             batch.failed += 1
     return batch

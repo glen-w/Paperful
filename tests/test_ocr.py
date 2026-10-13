@@ -13,6 +13,7 @@ from paperful.ocr import (
     ocr_items,
     tesseract_langs,
 )
+from paperful.ocr_ignore import OcrIgnoreList
 from paperful.store import Manifest
 from paperful.zot import Item
 
@@ -422,6 +423,54 @@ def test_manager_only_pdf_is_exported_into_out(tmp_path, monkeypatch):
     cached = cfg.pdf_cache_dir / "FAO2019A.pdf"
     assert cached.is_file()
     assert cached.read_bytes() == b"%PDF-1.4 from-library"
+
+
+def test_ignored_items_skip_unless_force_retry(tmp_path, monkeypatch):
+    pdf = _blank_pdf(tmp_path / "scan.pdf")
+    monkeypatch.setattr("paperful.ocr.text_from_pdf", lambda *a, **k: "  ")
+    cfg = _cfg(tmp_path)
+    ignores = OcrIgnoreList(cfg.ocr_ignore_path)
+    ignores.add("FAO2019A", "no PDF on disk", source="auto")
+    manifest = Manifest(cfg.manifest_path)
+    batch = ocr_items(
+        cfg,
+        [_item(pdf)],
+        manifest,
+        None,
+        apply=False,
+        ignore_list=ignores,
+    )
+    assert batch.ignored == 1
+    assert batch.would == 0
+    batch2 = ocr_items(
+        cfg,
+        [_item(pdf)],
+        manifest,
+        None,
+        apply=False,
+        ignore_list=ignores,
+        force_retry=True,
+    )
+    assert batch2.ignored == 0
+    assert batch2.would == 1
+
+
+def test_apply_auto_ignore_records_failures(tmp_path, monkeypatch):
+    item = _item(None)
+    monkeypatch.setattr("paperful.ocr.text_from_pdf", lambda *a, **k: "")
+    cfg = _cfg(tmp_path)
+    manifest = Manifest(cfg.manifest_path)
+    batch = ocr_items(
+        cfg,
+        [item],
+        manifest,
+        None,
+        apply=True,
+        auto_ignore_failures=True,
+    )
+    assert batch.failed == 1
+    ignores = OcrIgnoreList(cfg.ocr_ignore_path)
+    assert ignores.is_ignored("FAO2019A")
 
 
 def test_ocr_is_optional_on_all():

@@ -204,7 +204,14 @@ def _repair_run(
             link=bool(flags.get("link")),
         )
     if verb == "ocr":
-        return _ocr(cfg, collection, apply=apply, attach=bool(flags.get("attach")))
+        return _ocr(
+            cfg,
+            collection,
+            apply=apply,
+            attach=bool(flags.get("attach")),
+            force_retry=bool(flags.get("force_retry")),
+            auto_ignore_failures=flags.get("auto_ignore_failures"),
+        )
     raise ValueError(f"unknown repair verb {verb!r}")
 
 
@@ -592,10 +599,23 @@ def _attachments(
     }
 
 
-def _ocr(cfg: Config, collection: str, *, apply: bool, attach: bool) -> dict[str, Any]:
+def _ocr(
+    cfg: Config,
+    collection: str,
+    *,
+    apply: bool,
+    attach: bool,
+    force_retry: bool = False,
+    auto_ignore_failures: bool | None = None,
+) -> dict[str, Any]:
     from ..ocr import OcrUnavailable, ocr_items
+    from ..ocr_ignore import OcrIgnoreList
     from ..runreport import write_command_report
 
+    if auto_ignore_failures is None:
+        auto_ignore = cfg.ocr_auto_ignore_failures
+    else:
+        auto_ignore = bool(auto_ignore_failures)
     backend, items, scope = _open_scope(cfg, collection)
     started = time.time()
     try:
@@ -606,6 +626,9 @@ def _ocr(cfg: Config, collection: str, *, apply: bool, attach: bool) -> dict[str
             backend,
             apply=apply,
             attach=attach and apply,
+            ignore_list=OcrIgnoreList(cfg.ocr_ignore_path),
+            force_retry=force_retry,
+            auto_ignore_failures=auto_ignore,
         )
     except OcrUnavailable as exc:
         raise ValueError(str(exc)) from exc
@@ -619,6 +642,7 @@ def _ocr(cfg: Config, collection: str, *, apply: bool, attach: bool) -> dict[str
             "would": batch.would,
             "failed": batch.failed,
             "skipped": batch.skipped,
+            "ignored": batch.ignored,
             "not_reached": batch.not_reached,
         },
         items=[
@@ -630,7 +654,12 @@ def _ocr(cfg: Config, collection: str, *, apply: bool, attach: bool) -> dict[str
             }
             for r in batch.rows[:200]
         ],
-        flags={"apply": apply, "attach": attach},
+        flags={
+            "apply": apply,
+            "attach": attach,
+            "force_retry": force_retry,
+            "auto_ignore_failures": auto_ignore,
+        },
         started=started,
     )
     return {
@@ -640,6 +669,7 @@ def _ocr(cfg: Config, collection: str, *, apply: bool, attach: bool) -> dict[str
         "would": batch.would,
         "failed": batch.failed,
         "skipped": batch.skipped,
+        "ignored": batch.ignored,
     }
 
 

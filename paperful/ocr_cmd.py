@@ -28,10 +28,13 @@ def run_ocr(
     run_config: Path | None,
     config: Path | None,
     fmt: str,
+    force_retry: bool = False,
+    no_auto_ignore_failures: bool = False,
 ) -> None:
     from . import cli as cli_mod
 
     from .ocr import OcrUnavailable, ocr_items
+    from .ocr_ignore import OcrIgnoreList
     from .store import Manifest
     from .runreport import write_command_report
 
@@ -43,6 +46,7 @@ def run_ocr(
         raise typer.Exit(1)
     cfg = cli_mod._cfg(config)
     json_out = cli_mod._agent_json(fmt)
+    auto_ignore = cfg.ocr_auto_ignore_failures and not no_auto_ignore_failures
     bound = cli_mod._bind_run(
         cfg,
         profile=profile,
@@ -64,6 +68,7 @@ def run_ocr(
     if attach and not backend.supports_write():
         cli_mod._exit_env("Write support required to attach.", cfg)
     manifest = Manifest(cfg.manifest_path)
+    ignores = OcrIgnoreList(cfg.ocr_ignore_path)
     loaded = cli_mod._load_scope(
         backend,
         json_out=json_out,
@@ -116,6 +121,9 @@ def run_ocr(
                 attach=attach,
                 track=cli_mod._track(progress, "Running OCR" if apply else "Checking PDFs"),
                 deadline=deadline,
+                ignore_list=ignores,
+                force_retry=force_retry,
+                auto_ignore_failures=auto_ignore,
             )
     except OcrUnavailable as exc:
         console.print(f"[red]{exc}[/]")
@@ -126,7 +134,7 @@ def run_ocr(
     table.add_column("Path")
     table.add_column("Why")
     for row in batch.rows:
-        if row.status == "skip":
+        if row.status in {"skip", "ignore"}:
             continue
         title = row.title if len(row.title) <= 60 else row.title[:57] + "…"
         table.add_row(row.key, title, row.path, row.reason or row.status)
@@ -147,12 +155,19 @@ def run_ocr(
         summary={
             "ocr": batch.ocr,
             "skipped": batch.skipped,
+            "ignored": batch.ignored,
             "failed": batch.failed,
             "would": batch.would,
             "not_reached": batch.not_reached,
         },
         items=outcomes,
-        flags={"apply": apply, "attach": attach, "max_minutes": max_minutes},
+        flags={
+            "apply": apply,
+            "attach": attach,
+            "max_minutes": max_minutes,
+            "force_retry": force_retry,
+            "auto_ignore_failures": auto_ignore,
+        },
         started=started,
     )
     from .agent_json import batch_exit, envelope
@@ -163,12 +178,13 @@ def run_ocr(
         summary={
             "ocr": batch.ocr,
             "skipped": batch.skipped,
+            "ignored": batch.ignored,
             "failed": batch.failed,
             "would": batch.would,
             "not_reached": batch.not_reached,
         },
         items=outcomes,
-        flags={"apply": apply, "attach": attach},
+        flags={"apply": apply, "attach": attach, "force_retry": force_retry},
         exit_code=code,
     )
 
@@ -177,7 +193,8 @@ def run_ocr(
             console.print(table)
         if apply:
             console.print(
-                f"OCR {batch.ocr}, skipped {batch.skipped}, failed {batch.failed}."
+                f"OCR {batch.ocr}, skipped {batch.skipped}, ignored {batch.ignored}, "
+                f"failed {batch.failed}."
                 + (
                     f" Not checked: {batch.not_reached}."
                     if batch.not_reached
@@ -186,8 +203,8 @@ def run_ocr(
             )
         else:
             console.print(
-                f"Would OCR {batch.would}, skip {batch.skipped} "
-                f"(already have text). Pass --apply to write the text layer."
+                f"Would OCR {batch.would}, skip {batch.skipped}, ignored {batch.ignored} "
+                f"(already have text / on ignore list). Pass --apply to write the text layer."
             )
 
     cli_mod._emit_agent(payload, json_out=json_out, human=_human_ocr)

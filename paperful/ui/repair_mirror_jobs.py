@@ -314,8 +314,25 @@ def run_repair_preview(
 
     if verb == "ocr":
         from ..ocr import ocr_items
+        from ..ocr_ignore import OcrIgnoreList
 
-        batch = ocr_items(cfg, items, manifest, backend, apply=False)
+        surg = dict(options.get("surgery") or {})
+        auto_ignore = surg.get("auto_ignore_failures")
+        if auto_ignore is None:
+            auto_ignore = cfg.ocr_auto_ignore_failures
+        else:
+            auto_ignore = bool(auto_ignore)
+        batch = ocr_items(
+            cfg,
+            items,
+            manifest,
+            backend,
+            apply=False,
+            attach=bool(surg.get("attach")),
+            ignore_list=OcrIgnoreList(cfg.ocr_ignore_path),
+            force_retry=bool(surg.get("force_retry")),
+            auto_ignore_failures=bool(auto_ignore),
+        )
         from ..runreport import write_command_report
 
         path = write_command_report(
@@ -325,10 +342,15 @@ def run_repair_preview(
             summary={
                 "would_ocr": batch.would,
                 "skipped": batch.skipped,
+                "ignored": batch.ignored,
                 "failed": batch.failed,
             },
             items=[asdict(r) for r in batch.rows],
-            flags={"gui": True, "apply": False},
+            flags={
+                "gui": True,
+                "apply": False,
+                "force_retry": bool(surg.get("force_retry")),
+            },
             started=started,
         )
         if path is None:
@@ -342,9 +364,11 @@ def run_repair_preview(
             summary={
                 "would_ocr": batch.would,
                 "skipped": batch.skipped,
+                "ignored": batch.ignored,
                 "failed": batch.failed,
             },
             keys=keys,
+            options=options,
         )
         return
 
@@ -508,12 +532,29 @@ def run_repair_apply(
 
     if verb == "ocr":
         from ..ocr import ocr_items
+        from ..ocr_ignore import OcrIgnoreList
 
-        batch = ocr_items(cfg, items, manifest, backend, apply=True, attach=False)
+        auto_ignore = surg.get("auto_ignore_failures")
+        if auto_ignore is None:
+            auto_ignore = cfg.ocr_auto_ignore_failures
+        else:
+            auto_ignore = bool(auto_ignore)
+        batch = ocr_items(
+            cfg,
+            items,
+            manifest,
+            backend,
+            apply=True,
+            attach=bool(surg.get("attach")),
+            ignore_list=OcrIgnoreList(cfg.ocr_ignore_path),
+            force_retry=bool(surg.get("force_retry")),
+            auto_ignore_failures=bool(auto_ignore),
+        )
         summary = {
             "ocr_applied": batch.ocr,
             "failed": batch.failed,
             "skipped": batch.skipped,
+            "ignored": batch.ignored,
         }
         return True, "", summary
 

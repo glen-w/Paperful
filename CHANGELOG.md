@@ -10,6 +10,12 @@ are frozen the same way (additive extras allowed). See
 
 ### Added
 
+- **OCR ignore list:** `state/ocr-ignore.jsonl` skips failed or missing items on
+  later `paperful ocr --library` runs. After `--apply`, failures are appended
+  automatically unless `--no-auto-ignore-failures` or `[ocr] auto_ignore_failures
+  = false`. `--force-retry` overrides the list. Manage with
+  `paperful ocr-ignore list|add|remove|import-failures`. Repair → OCR checkboxes:
+  **Auto-ignore failures** and **Force retry ignored**.
 - **Docs / site:** GUI-first landing and README (local workbench, not
   “CLI sidecar”). Playwright screenshots of Wanted, Discover, Repair,
   Index, and Index Ask (a live `ocean/BBNJ` thread with a cited answer) on

@@ -443,6 +443,7 @@ def apply_ocr(raw: dict[str, Any], cfg: "Config") -> None:
         [
             ("languages", "ocr_languages", lambda v: str(v).strip() or "eng"),
             ("timeout_s", "ocr_timeout_s", lambda v: max(1.0, float(v))),
+            ("auto_ignore_failures", "ocr_auto_ignore_failures", bool),
         ],
     )
 

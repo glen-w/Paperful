@@ -274,6 +274,7 @@ class Config:
     # OCRmyPDF text layer for scanned PDFs. languages is a Tesseract -l list.
     ocr_languages: str = "eng"
     ocr_timeout_s: float = 600.0
+    ocr_auto_ignore_failures: bool = True
     # Library index for `paperful rag` / `paperful ask`. Reads the mirror only.
     rag_enabled: bool = False
     rag_auto_ingest: bool = (
@@ -326,6 +327,10 @@ class Config:
     @property
     def versions_applied_path(self) -> Path:
         return self.state_dir / "versions-applied.jsonl"
+
+    @property
+    def ocr_ignore_path(self) -> Path:
+        return self.state_dir / "ocr-ignore.jsonl"
 
     @property
     def pdf_cache_dir(self) -> Path:

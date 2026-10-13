@@ -593,6 +593,11 @@ def write_history(out_dir: Path, cfg: Config) -> None:
                 "path": str(cfg.dedupe_applied_path),
                 "kind": "jsonl",
             },
+            {
+                "name": "ocr-ignore",
+                "path": str(cfg.ocr_ignore_path),
+                "kind": "jsonl",
+            },
             {"name": "runs", "path": str(runs), "kind": "dir"},
             {
                 "name": "last-run",

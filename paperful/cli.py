@@ -5071,6 +5071,16 @@ def ocr(
         "--attach",
         help="After --apply, upload the text-layer PDF as a new attachment. The scan stays.",
     ),
+    force_retry: bool = typer.Option(
+        False,
+        "--force-retry",
+        help="Run OCR on items in state/ocr-ignore.jsonl (normally skipped).",
+    ),
+    no_auto_ignore_failures: bool = typer.Option(
+        False,
+        "--no-auto-ignore-failures",
+        help="Do not append failed or missing items to the OCR ignore list after --apply.",
+    ),
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
@@ -5105,7 +5115,66 @@ def ocr(
         run_config=run_config,
         config=config,
         fmt=fmt,
+        force_retry=force_retry,
+        no_auto_ignore_failures=no_auto_ignore_failures,
     )
+
+
+ocr_ignore_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Skip list for ``paperful ocr`` (failed or missing PDFs). Ledger: state/ocr-ignore.jsonl.",
+)
+app.add_typer(ocr_ignore_app, name="ocr-ignore")
+
+
+@ocr_ignore_app.command("list")
+def ocr_ignore_list(
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Show ignored item keys."""
+    from .ocr_ignore_cmd import run_ocr_ignore_list
+
+    run_ocr_ignore_list(console, config=config)
+
+
+@ocr_ignore_app.command("add")
+def ocr_ignore_add(
+    item: list[str] = typer.Option([], "--item", help="Item key (repeatable)."),
+    reason: str = typer.Option("", "--reason", help="Why this item is ignored."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Add item keys to the OCR ignore list."""
+    from .ocr_ignore_cmd import run_ocr_ignore_add
+
+    run_ocr_ignore_add(console, item=item, reason=reason, config=config)
+
+
+@ocr_ignore_app.command("remove")
+def ocr_ignore_remove(
+    item: list[str] = typer.Option([], "--item", help="Item key (repeatable)."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Remove item keys from the OCR ignore list."""
+    from .ocr_ignore_cmd import run_ocr_ignore_remove
+
+    run_ocr_ignore_remove(console, item=item, config=config)
+
+
+@ocr_ignore_app.command("import-failures")
+def ocr_ignore_import_failures(
+    report: Path | None = typer.Option(
+        None,
+        "--report",
+        help="OCR run report JSON (default: newest state/runs/*-ocr.json).",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Add every failed or missing row from an OCR run report to the ignore list."""
+    from .ocr_ignore_cmd import run_ocr_ignore_import_failures
+
+    run_ocr_ignore_import_failures(console, report=report, config=config)
+
 
 # ---- library index: `paperful rag` and `paperful ask` -------------------------
 # These read out_dir and state_dir only. None of them opens the reference manager.
