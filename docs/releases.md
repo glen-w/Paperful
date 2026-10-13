@@ -1,7 +1,7 @@
 # Releases and stability
 
-The **1.0 contract** is locked in this tree. `pyproject.toml` is still `0.9.0`
-until the tag. The operator install is clone plus `docker compose build`.
+**1.0.0** is tagged. Required schemas are frozen in this tree. The operator
+install is clone plus `docker compose build`.
 The image is build-local only. There is no `docker pull` and no
 `pip install paperful`. Image packs: **light** (`[serve]` only; CI default
 when unset) or **heavy** (`[serve]` `[llm]` `[rag]` `[browser-agent]`; set in
@@ -96,3 +96,20 @@ are part of the 1.0 surface (additive extras allowed). See [LLM](llm.md).
 | Workbench GUI (Discover, Wanted, Preview/Grab) | Shipped on `paperful serve` (Jinja workbench; Wanted first; Grab fetches to disk, Attach writes the library; Advanced Repair / Mirror / Index / Briefs; review tokens; `docker compose up` at `127.0.0.1:8765`) — [gui.md](gui.md) |
 | Interactive Ask in GUI (cited chat-over-collection) | **Shipped** on `/ask` (opt-in `[rag]` + `[llm]`; threads, batch, custom prompts); Index for ingest/search/`rag questions` / `rag answered`; Briefs for summarize/synthesize |
 | Fresh-clone doctor stays quiet without Scholar | Shipped: `scholar` opt-in like `scihub` |
+
+## Known limits (1.0)
+
+These stay true after the tag. They are not unfinished 1.0 work.
+
+- Restore is create-missing, not a lossless round-trip.
+- Mendeley and EndNote stay seeking testers; Zotero is the well-tested path.
+- Provenance notes are Zotero-only.
+- Open-access fill is DOI-scoped; Unpaywall often returns a landing page.
+  Grey literature is configured playbooks only. Sci-Hub is opt-in and thin
+  after ~2021.
+- `attachments` still reads live children from the manager.
+- The RAG index (`state/rag/`) is a rebuildable cache, not a layout promise.
+- TTY stays the shell for `session login`, `doctor --guide`, mid-run EZProxy,
+  and Sci-Hub.
+
+Full list: [CHANGELOG](../CHANGELOG.md) (1.0.0).

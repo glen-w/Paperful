@@ -1,12 +1,44 @@
 # Changelog
 
-All notable user-facing changes. The **1.0 contract** is locked; the package
-is still **0.9.0** until tagged. Required `paperful.run_report.v1` keys are
-frozen; extra report keys may still be added. Required `paperful.item.v1` keys
-are frozen the same way (additive extras allowed). See
-[releases](docs/releases.md).
+All notable user-facing changes. **1.0.0** locks the trust contract: required
+`paperful.run_report.v1` and `paperful.item.v1` keys are frozen (extra keys
+may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
+
+## 1.0.0 — 2026-10-13
+
+Tagged release of the 1.0 contract: CLI honesty, the operator workbench
+(`docker compose up` → Wanted / Discover / Ask), locked item records and
+create-missing restore, proven on Zotero. Install remains clone plus
+`docker compose build` (no PyPI, no `docker pull`).
+
+### Known limits
+
+- Restore is create-missing (DOI → key → title+year), not a lossless identity
+  round-trip.
+- Mendeley and EndNote adapters are in the tree and seeking testers. Zotero
+  is the well-tested path.
+- Open-access fill is DOI-scoped. Unpaywall often returns a landing page with
+  no PDF. Grey literature is the configured playbooks only, not a universal
+  harvester. Sci-Hub is opt-in and thin after ~2021. A full Zotero file quota
+  can leave the PDF only in `out/`.
+- A mismatched PDF DOI still attaches unless `--strict-pdf-doi` is set. The
+  note then includes `warn:pdf_doi_mismatch`.
+- Collection resolve failures print the spec; they do not suggest closest
+  paths.
+- Provenance notes are Zotero-only.
+- `attachments` still reads live children from the manager.
+- The RAG index under `state/rag/` is a rebuildable cache, not a layout
+  promise.
+- `recover` needs Python 3.11+ and a 14B-class local model to be useful.
+  Light images omit LLM extras.
+
+### Honest defaults
+
+- Sci-Hub is opt-in and off by default.
+- Zotero 7–9: download to disk only; attach needs Zotero 10+.
+- `--preset eoi`: open access + campus EZProxy (no Scholar, no Sci-Hub).
 
 ### Added
 
@@ -89,8 +121,8 @@ are frozen the same way (additive extras allowed). See
 ### Changed
 
 - **Docs / 1.0:** ROADMAP trust checklist, releases contract, and workbench
-  status treat 1.0 as complete in this tree (package still `0.9.0` until the
-  tag). Ask lives on `/ask`; Index stays Advanced ingest/search.
+  status treat 1.0 as complete. Ask lives on `/ask`; Index stays Advanced
+  ingest/search.
 - **Ask on the default nav:** `/ask` is a first-class page (Wanted, Discover,
   Ask, Library, …). Index stays Advanced ingest/search. `POST /index/ask` and
   `POST /index/ask-batch` remain aliases.

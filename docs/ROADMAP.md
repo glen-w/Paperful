@@ -22,8 +22,8 @@ opt-in on `/ask` (`[rag]` + `[llm]`), not the home page
 docs (“seeking testers”; Zotero well-tested). Do not market them as supported
 until real-library reports say so.
 Still not a full-text reading index, not a WebDAV client, and not “AI fetch
-everything.” `paperful ocr` is the optional text layer for scans. The remaining
-1.0 step is a package tag (`pyproject.toml` is still `0.9.0` until then).
+everything.” `paperful ocr` is the optional text layer for scans. **1.0.0 is
+tagged.** Post-1.0 items stay in the split below.
 
 (product-split-10-vs-post-10)=
 ## Product split: 1.0 vs post-1.0

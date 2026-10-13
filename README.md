@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/glen-w/Paperful/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/glen-w/Paperful/actions/workflows/ci.yml/badge.svg"></a>
-  <img alt="version 0.9.0" src="https://img.shields.io/badge/version-0.9.0-blue">
+  <img alt="version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-blue">
   <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
 </p>

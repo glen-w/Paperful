@@ -262,6 +262,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "attachments",
         "versions",
         "ocr",
+        "ocr-ignore",
         "summarize",
         "synthesize",
         "rag",
