@@ -211,9 +211,16 @@ def attach_run(
 ) -> tuple[bool, str]:
     """Attach selected pending PDFs to Zotero (doi_match defaults + hand-ticks)."""
     selected = [k.strip() for k in keys if k and str(k).strip()]
+    items, manifest = _load_scope_items(cfg, collection)
+    if not selected:
+        item_keys = {it.key for it in items}
+        selected = [
+            r.itemKey
+            for r in manifest.pending_attach()
+            if r.itemKey in item_keys
+        ]
     if not selected:
         return False, "no keys selected"
-    items, _manifest = _load_scope_items(cfg, collection)
     keyset = set(selected)
     scoped_keys = [it.key for it in items if it.key in keyset]
     if not scoped_keys:

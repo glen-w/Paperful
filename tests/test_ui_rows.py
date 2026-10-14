@@ -91,6 +91,7 @@ def test_wanted_rows_counts(tmp_path):
     data = wanted_rows(cfg, items, manifest)
     assert data["counts"]["have"] == 1
     assert data["counts"]["missing"] == 1
+    assert data["counts"]["attach"] == 1
     assert "%" not in str(data["counts"])
 
 

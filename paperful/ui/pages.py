@@ -92,6 +92,11 @@ def wanted_rows(
             }
         )
 
+    item_keys = {it.key for it in items}
+    attach_pending = len(
+        [r for r in manifest.pending_attach() if r.itemKey in item_keys]
+    )
+
     return {
         "have": have,
         "held": held,
@@ -100,6 +105,7 @@ def wanted_rows(
             "have": len(have),
             "held": len(held),
             "missing": len(missing),
+            "attach": attach_pending,
         },
     }
 

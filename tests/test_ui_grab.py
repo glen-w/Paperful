@@ -147,6 +147,58 @@ def test_attach_run_selected_keys(tmp_path, monkeypatch):
     __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
     reason="paperful[serve] extra missing",
 )
+def test_wanted_grab_uses_grab_review_token(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    from paperful.serve import create_app
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    monkeypatch.setattr(
+        ops,
+        "doctor_payload",
+        lambda _cfg, probe=False: [{"name": "x", "status": "green", "code": "", "detail": ""}],
+    )
+    grabbed: list[str] = []
+
+    def fake_grab(cfg, *, token):
+        grabbed.append(token)
+        return True, ""
+
+    monkeypatch.setattr(jobs, "grab_run", fake_grab)
+    good = commands.create_review_token(
+        cfg,
+        verb="preview_run",
+        collection="",
+        preset="oa",
+        keys=["K1"],
+        fingerprint="fp",
+        command_id="prev",
+    )
+    commands.create_review_token(
+        cfg,
+        verb="attach",
+        collection="",
+        preset="oa",
+        keys=["K1"],
+        fingerprint="fp2",
+        command_id="att",
+    )
+    client = TestClient(create_app(cfg))
+    res = client.post(
+        "/wanted/grab",
+        data={"grab_review_token": good, "review_token": "wrong-attach-token"},
+        follow_redirects=False,
+    )
+    assert res.status_code == 303
+    assert grabbed == [good]
+
+
+@pytest.mark.skipif(
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
+    reason="paperful[serve] extra missing",
+)
 def test_wanted_attach_route_and_button(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
@@ -179,7 +231,6 @@ def test_wanted_attach_route_and_button(tmp_path, monkeypatch):
     assert page.status_code == 200
     assert 'formaction="/wanted/attach"' in page.text
     assert "Attach PDFs to Zotero" in page.text
-    assert "Attach N PDFs" not in page.text
     assert "Pick a collection" in page.text
     res = client.post(
         "/wanted/attach",

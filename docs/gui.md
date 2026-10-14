@@ -67,7 +67,19 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
 
 ## Simple loop
 
-1. **Discover** — **Topic:** keyword search (`snowball search` dry-run queue),
+1. **Wanted** — first nav item, and `GET /` lands here. With no collection, or
+   when the library is down, an amber coach line points at **System**.
+   **Missing** rows use miss-surface icons (hover for `MISS_SURFACE_PLAIN`).
+   **Held** / **Have** use the same icon+tooltip pattern for PDF verification
+   (`doi_match`, `doi_mismatch`, `unverified`, `snapshot`; not “% complete”).
+   A library PDF flag with no file on the mirror (`verification` `missing`,
+   “No PDF file on disk”) lands on **Missing** with the missing-file icon.
+   The default tab is the first non-empty bucket (Missing → Held → Have).
+   **Preview** → **Grab** (fetch to `out/` only; selected vs all) → **Attach**
+   (explicit Zotero write for `doi_match` plus hand-ticks). Grab never writes
+   the library. The Attach control stays visible; there is no “attach verified
+   automatically” setting.
+2. **Discover** — **Topic:** keyword search (`snowball search` dry-run queue),
    per-row Keep/Skip, then **Preview apply** → **Add selected**
    (`snowball apply`, metadata only). **Fill PDFs** opens Wanted.
    **Briefing** / **Digest** write `briefing.md` / `digest.md` on the queue
@@ -83,18 +95,6 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
    (`authorwatch apply`). **Check again** re-runs a saved topic watch or
    person list. Advanced topic watches also offer **Watch briefing** /
    **Watch digest** (same optional collection note).
-2. **Wanted** — first nav item, and `GET /` lands here. With no collection, or
-   when the library is down, an amber coach line points at **System**.
-   **Missing** rows use miss-surface icons (hover for `MISS_SURFACE_PLAIN`).
-   **Held** / **Have** use the same icon+tooltip pattern for PDF verification
-   (`doi_match`, `doi_mismatch`, `unverified`, `snapshot`; not “% complete”).
-   A library PDF flag with no file on the mirror (`verification` `missing`,
-   “No PDF file on disk”) lands on **Missing** with the missing-file icon.
-   The default tab is the first non-empty bucket (Missing → Held → Have).
-   **Preview** → **Grab** (fetch to `out/` only; selected vs all) → **Attach**
-   (explicit Zotero write for `doi_match` plus hand-ticks). Grab never writes
-   the library. The Attach control stays visible; there is no “attach verified
-   automatically” setting.
 3. **Library** — Nested collection collapsibles with item / missing-PDF counts; target icon sets scope (collection chip). Scoped items paginate (default 50 per page; sizes in `[ui]` — see `config.example.toml`).
 4. **Activity** — Command history + trust line from `last-run.json`.
 5. **System** — `doctor` rows with one next step each.

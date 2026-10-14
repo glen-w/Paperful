@@ -306,7 +306,12 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
 
         prefs = prefs_from_request(request)
         load_error = ""
-        data = {"have": [], "held": [], "missing": [], "counts": {"have": 0, "held": 0, "missing": 0}}
+        data = {
+            "have": [],
+            "held": [],
+            "missing": [],
+            "counts": {"have": 0, "held": 0, "missing": 0, "attach": 0},
+        }
         if prefs.collection:
             try:
                 data = _load_wanted(cfg, prefs.collection)
@@ -401,6 +406,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 coach=coach,
                 briefs=briefs,
                 dest_options=dest_options(),
+                grab_token=_wanted_token("preview_run"),
                 attach_token=_wanted_token("attach"),
                 recover_token=_wanted_token("recover"),
                 wanted_pagination=wanted_pagination,
@@ -484,13 +490,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     @app.post("/wanted/grab", response_model=None)
     async def wanted_grab(request: Request):
         form = await request.form()
-        token = str(form.get("review_token") or "")
-        if not token:
-            review_cmds = commands.list_commands(cfg, limit=5)
-            for c in review_cmds:
-                if c.get("review_token"):
-                    token = c["review_token"]
-                    break
+        token = str(form.get("grab_review_token") or form.get("review_token") or "")
         if not token:
             token = _wanted_token("preview_run")
         ok, msg = jobs.grab_run(cfg, token=token)
@@ -524,6 +524,10 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
         from . import wanted_jobs
 
         token = str(form.get("review_token") or "")
+        if token:
+            review = commands.load_review(cfg, token)
+            if review is None or review.get("verb") != "attach":
+                token = ""
         if token:
             ok, msg = wanted_jobs.attach_apply(cfg, token=token)
         else:
