@@ -109,7 +109,9 @@ is the overlap with the prior frontier. If OpenAlex stopped early,
 new-only and keeps older proposals. Neither command creates library items. `--apply` with
 `-C` files a collection note tagged `paperful:frontier-briefing`. OA / grey
 stamps already on the row (`oa:…`, `grey:…`, `is_oa`, `oa_status`) are
-printed; there is no extra API call. Newsletter ingest stays later.
+printed; there is no extra API call. Post-1.0 **alert loop** (poll watch /
+authorwatch → ingest parents → briefing) is separate from digest export — see
+[ROADMAP](ROADMAP.md#frontier-digest-later-watch--external-ingest).
 
 ### Schedule it yourself
 

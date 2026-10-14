@@ -104,7 +104,9 @@ and the commands say so.
 ### Parser
 
 `light` uses `pdftotext` (Poppler), with `pypdf` as fallback. It is fast and
-keeps page numbers; section headings are detected by rule.
+keeps page numbers; section headings are detected by rule (synonym list shared
+with [`extract-sections`](rag.md#structured-sections-mirror-only) via
+`paperful/sections/headings.py`).
 
 `docling` reads layout and gives cleaner headings and tables, at a large cost in
 install size (it pulls in PyTorch) and time:

@@ -185,7 +185,7 @@ create-missing restore, proven on Zotero. Install remains clone plus
 - **Roadmap / 1.0 scope:** 1.0 now includes the workbench GUI (illuminate and
   run CLI workflows) and interactive Ask (chat-over-collection RAG in the GUI).
   Post-1.0: local OpenAlex snapshot phases 2B/2C, Firefox extension,
-  newsletter/alert ingest (rollup bridge). See [ROADMAP](docs/ROADMAP.md#product-split-10-vs-post-10).
+  alert loop (watch / authorwatch poll → ingest → briefing). See [ROADMAP](docs/ROADMAP.md#product-split-10-vs-post-10).
 - **Roadmap / adapters:** Mendeley and EndNote no longer gate 1.0; docs stay
   honest (seeking testers; Zotero well-tested).
 - BBNJ author-site / authorwatch dogfood plan: [bbnj-author-lanes](docs/bbnj-author-lanes.md)

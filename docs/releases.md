@@ -22,7 +22,7 @@ Item records and create-missing restore are locked; extra item keys may still
 be added. Required `paperful.run_report.v1` keys and imported-file attach
 (typed `attach_failed`, provenance note) are the contract. **Post-1.0:**
 local OpenAlex snapshot phases beyond opt-in v1, Firefox extension,
-newsletter/alert ingest — see
+alert loop (watch / authorwatch ingest + briefing) — see
 [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10).
 
 ## Schema compatibility (1.0 contract)

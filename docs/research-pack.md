@@ -98,6 +98,6 @@ lookup is [Twenty and SearXNG](snowball.md#twenty-and-searxng).
 ## Out of this playbook
 
 - Silent parent create from inbox (default stays DOI attach)
-- Newsletter / Scholar-alert ingest
+- Post-1.0 alert loop (watch / authorwatch poll → ingest → briefing; no email)
 - Firefox extension
-- Newsletter-scale ingest beyond a one-shot `coverage --from-file` check
+- Large-scale alert ingest beyond one-shot `coverage --from-file`

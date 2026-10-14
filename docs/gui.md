@@ -123,7 +123,9 @@ and a questions file upload. If the index is empty, Ask offers a compact
 ingest. **Index** (Advanced): `rag ingest` / `search` when
 `[rag]` is on; **Extract questions** (`rag questions`) and **Already answered?**
 (`rag answered`, `state/rq-answered/`) use the same scope. Collection chip is
-the scope. **Synthesize** on Index when `[llm]` is on.
+the scope. **Synthesize** on Index when `[llm]` is on. Structured IMRaD fields
+(`extract-sections` → `state/sections/`) are **CLI-only** today — mirror PDFs,
+no `[rag].enabled` required; see [rag.md](rag.md#structured-sections-mirror-only).
 
 ![Index: ingest scoped and a passage search run over ocean/BBNJ](_static/workflows/index.png)
 

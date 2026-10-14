@@ -129,6 +129,7 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `authorwatch_suggest.py` | Corpus / cited / coauthor / mix suggestions → `suggestions.jsonl`; shared co-author accumulation for briefing | `authors_report`, OpenAlex, promoted packs |
 | `authorwatch_social.py` | Parse operator-saved RG / LinkedIn / Academia HTML or CSV (no network) | stdlib HTML/CSV |
 | `snowball/` | Crawl, hops, watch, thin briefing, frontier digest, `trends` (OpenAlex `group_by` year counts). Watch, digest, and trends do not create library items | OpenAlex; library protocol only on apply |
+| `sections/` | IMRaD field extract (`extract-sections`): deterministic split + optional LLM fill | `rag.extract` text cache, `rag.chunk` / `sections.headings`, gated `llm` |
 
 ## The refresh
 
@@ -199,7 +200,7 @@ Tier policy (1.0 contract):
 | `paperful.ask_batch.v1` | `state/ask-batch/<stamp>/` | `rag.batch` | T2 | — |
 | `paperful.rag.thread.v1` | `state/rag/threads/*.json` | `rag.thread` | T2 | — |
 | `paperful.rag.questions.v1` | `state/rag/questions/` | `rag.questions` | T2 | — |
-| `paperful.sections.v1` | `state/sections/` | `extract-sections` | T2 | — |
+| `paperful.sections.v1` | `state/sections/<key>.json` | `extract-sections` | T2 | Required: `schema`, `item_key`, `title`, `year`, `source`, `fields`, `missing`. Optional: `sections` (raw heading map when `[extract_sections].raw_map`). Each `fields.<name>`: `text`, `provenance` (`rule`\|`llm`), optional `heading`, `pages` |
 | `paperful.rq_answered.v1` | `state/rq-answered/` | `rag.answered` | T2 | — |
 | `paperful.rag.text.v1` | extracted text cache | `rag.extract` | T3 | Rebuildable |
 | `paperful.rag.index.v1` | LanceDB meta | `rag.index` | T3 | Not a promise |

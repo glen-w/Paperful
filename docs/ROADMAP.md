@@ -10,7 +10,7 @@ adapter.** Mendeley and EndNote are in the tree and seeking testers. See
 Optional thin bridges (`paperful session login`) capture a local browser profile;
 they do not rewrite the fetcher. A **Zotero plugin** is not the 1.0 bet.
 **Firefox extension**, **local OpenAlex snapshot** (beyond today’s opt-in v1),
-and **newsletter / alert ingest** are **post-1.0** — see [Product split](#product-split-10-vs-post-10).
+and **alert loop** (watch / authorwatch poll → ingest → briefing) are **post-1.0** — see [Product split](#product-split-10-vs-post-10).
 
 **1.0** is the trust checklist below (all rows shipped), a locked item record
 (`paperful.item.v1` plus `snapshot` / `restore`), proven on **Zotero**, and the
@@ -36,7 +36,7 @@ integrations.
 | --- | --- |
 | Trust checklist, locked `paperful.run_report.v1` / `paperful.item.v1`, snapshot contract | **Local OpenAlex parquet store** — phases 2B/2C (`works_citing`, full search parity, `local_duckdb` / `http`). Live OpenAlex API is enough for most installs; v1 `ssh_duckdb` remains opt-in for institutions |
 | **GUI workbench** — Discover + Wanted simple loop (topic + people); command ids; review tokens; Advanced Repair / Mirror / Index / Briefs and the non-TTY CLI verbs | **Firefox extension** — native messaging → CLI ([section below](#optional-thin-bridge--firefox-extension-post-10)) |
-| **Ask in GUI** — scoped chat on `/ask` with citations when `[rag]` + `[llm]` on | **Newsletter / alert ingest** — rollup bridge, Scholar alerts first ([Frontier digest](#frontier-digest-later-watch--external-ingest)) |
+| **Ask in GUI** — scoped chat on `/ask` with citations when `[rag]` + `[llm]` on | **Alert loop** — poll `snowball watch` / `authorwatch`, ingest parents into `-C`, post-ingest briefing ([Frontier digest](#frontier-digest-later-watch--external-ingest)) |
 | Zotero-proven fetch/mirror path; honest adapter docs (Mendeley / EndNote seeking testers) | SaaS tenancy polish; promoting other managers to “supported” after field reports; remote-manager parity beyond what 1.0 open/Docker needs |
 
 (trust-10)=
@@ -352,7 +352,7 @@ for the end-to-end operator story.
 | 7 | Non-DOI grey fingerprint (`norm(title)|year|registrant_host`; ISBN/report # when present) in snowball / dedupe / inbox ladder + inbox-create | Shipped (ISBN/report like DOI; title\|year\|host is review-tier; host mismatch is not `exists`) |
 | 8 | `paperful collections add --keys-file` — membership batch, dry-run / apply | Shipped |
 | 9 | Acronym allowlist harvest (Core `fix-metadata`) | Shipped (`paperful acronyms`; Title Case consumes `state/acronyms/`) |
-| 10 | [Frontier digest](#frontier-digest-later-watch--external-ingest); thin [snowball briefing](#frontier-digest-later-watch--external-ingest) export before full digest | Shipped (`snowball digest`, `watch digest`, `watch run --digest`); newsletter ingest later |
+| 10 | [Frontier digest](#frontier-digest-later-watch--external-ingest); thin [snowball briefing](#frontier-digest-later-watch--external-ingest) export before full digest | Shipped (`snowball digest`, `watch digest`, `watch run --digest`); alert loop (watch inbox apply + post-ingest briefing) later |
 | 11 | Scholar late tail + latch + opt-in SerpApi | Shipped (`[fetch].order` policy; interleave with `browser_agent`; `[handoff].scholar`; `[serpapi].enabled` / `max_calls`) |
 | 12 | Authors/orgs frequency report from `-C` (`state/reports/…`; seed **field author packs**) | Shipped (`paperful authors`; `--apply` writes report + proposed pack) |
 | 13 | Handoff list ranking (Core handoff) | Shipped (cite count × miss severity) |
@@ -716,7 +716,7 @@ as `refs gap`. Optional `provenance_hint` when tags are available.
 
 ### Frontier digest (later; watch + external ingest)
 
-**Status:** digest shipped. Newsletter / alert ingest stays later. Snowball
+**Status:** digest shipped. Alert loop (poll → ingest → briefing) stays later — Paperful-local only (no email / rollup). Snowball
 **watch** stays dry-run and does not download PDFs. There is still **no**
 built-in scheduler.
 
@@ -738,14 +738,14 @@ launchd / systemd / cron examples are in [snowball.md](snowball.md#watch).
 grey-vs-peer / OA stamp hints in briefing tables where provenance
 exists (`grey:…`, `oa:…`).
 
-**Newsletter / alert ingest (rollup bridge; post-1.0):** optional plug-in or HTTP client
-to sibling **[rollup](Documents/rollup)**-style ingest architecture — pull
-candidate papers from the operator’s **newsletters and alerts**, first source
-**Google Scholar** email/alert feeds (opt-in; same honesty bar as Scholar in
-handoff, not a silent `run` source). Normalise to DOI/title rows → Paperful
-snowball queue or bibliography-gap / ingest path. Rollup owns fetch/parse of
-mail sources; Paperful owns library fingerprint, gates, and ledger. Spike
-shared message shapes before hard-wiring repos.
+**Alert loop (post-1.0; Paperful-only):** close the loop after frontier /
+people polls — `snowball watch run` / `authorwatch run` (operator cron;
+no built-in scheduler) → review `digest.md` / `authorwatch digest` →
+`snowball watch apply` / `authorwatch apply` into `-C` (dry-run default) →
+optional post-ingest briefing of what landed → `paperful run` for PDFs.
+Ingest reads watch / authorwatch **inbox jsonl**, not `digest.md`. Distinct
+from digest `--apply`, which only files a `paperful:frontier-briefing` note.
+No email, IMAP, or sibling rollup coupling.
 
 (author-watch-lists-later-people-you-follow--their-papers)=
 ### Author watch lists (in tree; people you follow → their papers)
@@ -1208,10 +1208,11 @@ Larger product bets. Park until the ledger and core loop justify them.
    integration](#zotero-rag-integration-later-question-centric-layer);
    [bibliography gap scan](#bibliography-gap-scan-later-not-gaps) (cited-but-not-owned,
    distinct from shipped `gaps`); [structured section
-   extract](#structured-section-extract-mvp-later); [annotation
+   extract](#structured-section-extract-mvp-shipped) (shipped —
+   `extract-sections`); [annotation
    mirror](#annotation-mirror-later); [frontier
    digest](#frontier-digest-later-watch--external-ingest) (watch rollup shipped;
-   optional rollup newsletter bridge, Scholar alerts first, still later); [author watch
+   alert loop ingest + briefing still later); [author watch
    lists](#author-watch-lists-later-people-you-follow--their-papers) (shipped;
    saved social HTML/CSV import; live scrape still out). **[Run
    witness](#run-witness-shipped-trust-thicken)** (shipped) ties batches to
