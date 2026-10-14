@@ -118,6 +118,7 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `refs_gap.py` | Cited-in-PDF works missing from the library fingerprint | `identity`, bibliography parse |
 | `coverage.py` | Briefing/note/file DOI list vs `-C` membership | `identity`, `resolve` |
 | `witness.py` | Optional `paperful.witness.v1` on run reports | `config`, rag status tip |
+| `inbox.py` / `inbox_match.py` / `inbox_route.py` | Drop-folder watch/drain, match ladder, gated create, collection routing | `handoff`, `library`, optional `llm` |
 | `handoff_rank.py` | Missing-PDF sort: refs-gap cites × miss severity | `handoff` |
 | `reachout.py` | Contact-only missing-PDF rows (metadata / Twenty emails, CSV). No fetch | `handoff`, `twenty` |
 | `twenty.py` | Twenty People lookup (local cache) and `sync` (CRM create/enrich). User guide: [Twenty and SearXNG](snowball.md#twenty-and-searxng) | httpx |
@@ -171,7 +172,7 @@ Tier policy (1.0 contract):
 | `paperful.refs_gap.pack.v1` | `state/refs-gaps/<stamp>/pack.json` | `refs_gap` | T1 | `REFS_GAP_PACK_KEYS`; `tests/fixtures/refs_gap_pack_v1/` |
 | `paperful.coverage.pack.v1` | `state/coverage/<stamp>/pack.json` | `coverage` | T1 | `COVERAGE_PACK_KEYS`; `tests/fixtures/coverage_pack_v1/` |
 | `paperful.witness.v1` | optional `witness` on run reports | `witness` | T2 | additive; not in `RUN_REPORT_KEYS` |
-| `paperful.inbox.proposal.v1` | `state/inbox/proposals/*.json` | `inbox_match` | T1 | `INBOX_PROPOSAL_KEYS`; `tests/fixtures/inbox_proposal_v1/` |
+| `paperful.inbox.proposal.v1` | `state/inbox/proposals/*.json` | `inbox_match` | T1 | `INBOX_PROPOSAL_KEYS`; extra `route_*` keys allowed; `tests/fixtures/inbox_proposal_v1/` |
 | `paperful.sync.v1` | `out/_sync.json` | `sync` | T2 | — |
 | `paperful.annotations.v1` | `annotations.json` | `snapshot` | T2 | — |
 | `paperful.collections.v1` | `out/_collections.json` | `store` | T2 | — |

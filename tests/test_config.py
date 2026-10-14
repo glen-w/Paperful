@@ -279,3 +279,25 @@ def test_nested_tables_apply_through_config_tables(tmp_path, monkeypatch):
     cfg = _from_dict({"llm": {"enabled": True}}, tmp_path / "config.toml")
     assert seen == [True]
     assert cfg.llm_enabled is True
+
+
+def test_inbox_route_keys_parse(tmp_path):
+    from paperful.config import _from_dict
+
+    cfg = _from_dict(
+        {
+            "inbox": {
+                "route": "gated",
+                "llm_route": "when_thin",
+                "route_min_confidence": 0.8,
+                "route_auto_min": 0.99,
+            }
+        },
+        tmp_path / "config.toml",
+    )
+    assert cfg.inbox_route == "gated"
+    assert cfg.inbox_llm_route == "when_thin"
+    assert cfg.inbox_route_min_confidence == 0.8
+    assert cfg.inbox_route_auto_min == 0.99
+    with pytest.raises(ValueError):
+        _from_dict({"inbox": {"route": "maybe"}}, tmp_path / "config.toml")

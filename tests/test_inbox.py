@@ -653,3 +653,403 @@ def test_llm_when_thin_logs_without_auto_attach(cfg, tmp_path: Path, monkeypatch
     assert hit.how == "llm"
     assert hit.confidence == 0.6
     assert hit.confidence < cfg.inbox_llm_auto_attach_min
+
+
+def test_explicit_collection_overrides_snowball_route(cfg, tmp_path: Path, monkeypatch):
+    from paperful.resolve import WorkMeta
+    from paperful.zot import Collection
+
+    root = tmp_path / "inbox"
+    cfg.inbox_dir = str(root)
+    cfg.state_dir = tmp_path / "state"
+    cfg.out_dir = tmp_path / "out"
+    cfg.state_dir.mkdir()
+    cfg.min_pdf_bytes = 1000
+    cfg.inbox_create = "create_auto"
+    cfg.inbox_route = "auto"
+    ensure_inbox_dirs(cfg)
+    snow = cfg.state_dir / "snowball" / "r1"
+    snow.mkdir(parents=True)
+    (snow / "summary.json").write_text(
+        '{"target_collection": "ocean/bbnj"}\n', encoding="utf-8"
+    )
+    (snow / "candidates.jsonl").write_text(
+        '{"ids": {"doi": "10.1000/auto"}}\n', encoding="utf-8"
+    )
+    pdf = root / "auto.pdf"
+    pdf.write_bytes(b"%PDF-1.4 " + b"z" * 2000)
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: "10.1000/auto")
+    created_in: list[str] = []
+
+    class Backend:
+        def supports_write(self):
+            return True
+
+        def items_in_scope(self, keys):
+            return []
+
+        def collections(self):
+            return {
+                "A": Collection(key="A", name="bbnj", parent=None, path="ocean/bbnj"),
+                "B": Collection(key="B", name="other", parent=None, path="other"),
+            }
+
+        def ensure_collection_path(self, path):
+            created_in.append(path)
+            return "CK"
+
+        def create_parent(self, payload):
+            return "AUTO1"
+
+        def attach(self, key, path, title=None, note=None):
+            class R:
+                ok = True
+                reason = "ok"
+
+            return R()
+
+    work = WorkMeta(
+        doi="10.1000/auto",
+        title="A sufficiently long auto created title",
+        year=2021,
+        source="crossref",
+        work_type="journal-article",
+    )
+    stats = process_candidates(
+        cfg,
+        Backend(),
+        Manifest(cfg.manifest_path),
+        [],
+        once=True,
+        settle_seconds=0.0,
+        collection="other",
+        resolve_work=lambda doi: work,
+    )
+    assert stats.created_auto == 1
+    assert created_in == ["other"]
+
+
+def test_route_auto_creates_into_snowball_collection(cfg, tmp_path: Path, monkeypatch):
+    from paperful.resolve import WorkMeta
+    from paperful.zot import Collection
+
+    root = tmp_path / "inbox"
+    cfg.inbox_dir = str(root)
+    cfg.state_dir = tmp_path / "state"
+    cfg.out_dir = tmp_path / "out"
+    cfg.state_dir.mkdir()
+    cfg.min_pdf_bytes = 1000
+    cfg.inbox_create = "create_auto"
+    cfg.inbox_route = "auto"
+    ensure_inbox_dirs(cfg)
+    snow = cfg.state_dir / "snowball" / "r1"
+    snow.mkdir(parents=True)
+    (snow / "summary.json").write_text(
+        '{"target_collection": "ocean/bbnj"}\n', encoding="utf-8"
+    )
+    (snow / "candidates.jsonl").write_text(
+        '{"ids": {"doi": "10.1000/auto"}}\n', encoding="utf-8"
+    )
+    pdf = root / "auto.pdf"
+    pdf.write_bytes(b"%PDF-1.4 " + b"z" * 2000)
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: "10.1000/auto")
+    created_in: list[str] = []
+
+    class Backend:
+        def supports_write(self):
+            return True
+
+        def items_in_scope(self, keys):
+            return []
+
+        def collections(self):
+            return {
+                "A": Collection(key="A", name="bbnj", parent=None, path="ocean/bbnj"),
+            }
+
+        def ensure_collection_path(self, path):
+            created_in.append(path)
+            return "CK"
+
+        def create_parent(self, payload):
+            return "AUTO1"
+
+        def attach(self, key, path, title=None, note=None):
+            class R:
+                ok = True
+                reason = "ok"
+
+            return R()
+
+    work = WorkMeta(
+        doi="10.1000/auto",
+        title="A sufficiently long auto created title",
+        year=2021,
+        source="crossref",
+        work_type="journal-article",
+    )
+    stats = process_candidates(
+        cfg,
+        Backend(),
+        Manifest(cfg.manifest_path),
+        [],
+        once=True,
+        settle_seconds=0.0,
+        resolve_work=lambda doi: work,
+    )
+    assert stats.created_auto == 1
+    assert created_in == ["ocean/bbnj"]
+    assert "route:ocean/bbnj:snowball" in stats.events[0].detail
+
+
+def test_route_off_unscoped_create_still_needs_collection(cfg, tmp_path: Path, monkeypatch):
+    from paperful.resolve import WorkMeta
+
+    root = tmp_path / "inbox"
+    cfg.inbox_dir = str(root)
+    cfg.state_dir = tmp_path / "state"
+    cfg.out_dir = tmp_path / "out"
+    cfg.state_dir.mkdir()
+    cfg.min_pdf_bytes = 1000
+    cfg.inbox_create = "create_auto"
+    assert cfg.inbox_route == "off"
+    ensure_inbox_dirs(cfg)
+    pdf = root / "auto.pdf"
+    pdf.write_bytes(b"%PDF-1.4 " + b"z" * 2000)
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: "10.1000/auto")
+
+    class Backend:
+        def supports_write(self):
+            return True
+
+        def items_in_scope(self, keys):
+            return []
+
+        def create_parent(self, payload):
+            raise AssertionError("no create without collection")
+
+        def attach(self, *a, **k):
+            raise AssertionError("no attach")
+
+    work = WorkMeta(
+        doi="10.1000/auto",
+        title="A sufficiently long auto created title",
+        year=2021,
+        source="crossref",
+        work_type="journal-article",
+    )
+    with pytest.raises(ValueError, match="inbox create needs"):
+        process_candidates(
+            cfg,
+            Backend(),
+            Manifest(cfg.manifest_path),
+            [],
+            once=True,
+            settle_seconds=0.0,
+            resolve_work=lambda doi: work,
+        )
+
+
+def _route_backend(paths: tuple[str, ...] = ("ocean/bbnj",)):
+    from paperful.zot import Collection
+
+    class Backend:
+        def supports_write(self):
+            return True
+
+        def items_in_scope(self, keys):
+            return []
+
+        def collections(self):
+            return {
+                f"K{i}": Collection(key=f"K{i}", name=p.split("/")[-1], parent=None, path=p)
+                for i, p in enumerate(paths)
+            }
+
+        def ensure_collection_path(self, path):
+            raise AssertionError(f"no create {path}")
+
+        def create_parent(self, payload):
+            raise AssertionError("no create")
+
+        def attach(self, *a, **k):
+            raise AssertionError("no attach")
+
+    return Backend()
+
+
+def test_route_gated_proposes_instead_of_create_auto(cfg, tmp_path: Path, monkeypatch):
+    from paperful.inbox_match import list_proposals
+    from paperful.resolve import WorkMeta
+
+    root = tmp_path / "inbox"
+    cfg.inbox_dir = str(root)
+    cfg.state_dir = tmp_path / "state"
+    cfg.out_dir = tmp_path / "out"
+    cfg.state_dir.mkdir()
+    cfg.min_pdf_bytes = 1000
+    cfg.inbox_create = "create_auto"
+    cfg.inbox_route = "gated"
+    ensure_inbox_dirs(cfg)
+    snow = cfg.state_dir / "snowball" / "r1"
+    snow.mkdir(parents=True)
+    (snow / "summary.json").write_text(
+        '{"target_collection": "ocean/bbnj"}\n', encoding="utf-8"
+    )
+    (snow / "candidates.jsonl").write_text(
+        '{"ids": {"doi": "10.1000/auto"}}\n', encoding="utf-8"
+    )
+    pdf = root / "auto.pdf"
+    pdf.write_bytes(b"%PDF-1.4 " + b"z" * 2000)
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: "10.1000/auto")
+    work = WorkMeta(
+        doi="10.1000/auto",
+        title="A sufficiently long auto created title",
+        year=2021,
+        source="crossref",
+        work_type="journal-article",
+    )
+    stats = process_candidates(
+        cfg,
+        _route_backend(),
+        Manifest(cfg.manifest_path),
+        [],
+        once=True,
+        settle_seconds=0.0,
+        resolve_work=lambda doi: work,
+    )
+    assert stats.created_gated == 1
+    assert stats.created_auto == 0
+    rows = list_proposals(cfg)
+    assert rows[0]["collection"] == "ocean/bbnj"
+    assert rows[0]["route_how"] == "snowball"
+    assert "route:ocean/bbnj:snowball" in stats.events[0].detail
+
+
+def test_route_auto_below_bar_does_not_create(cfg, tmp_path: Path, monkeypatch):
+    from paperful.inbox_match import list_proposals
+    from paperful.resolve import WorkMeta
+
+    root = tmp_path / "inbox"
+    cfg.inbox_dir = str(root)
+    cfg.state_dir = tmp_path / "state"
+    cfg.out_dir = tmp_path / "out"
+    cfg.state_dir.mkdir()
+    cfg.min_pdf_bytes = 1000
+    cfg.inbox_create = "create_auto"
+    cfg.inbox_route = "auto"
+    ensure_inbox_dirs(cfg)
+    (cfg.state_dir / "last-run.json").write_text(
+        '{"scope": "ocean/bbnj"}\n', encoding="utf-8"
+    )
+    pdf = root / "auto.pdf"
+    pdf.write_bytes(b"%PDF-1.4 " + b"z" * 2000)
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: "10.1000/auto")
+    work = WorkMeta(
+        doi="10.1000/auto",
+        title="A sufficiently long auto created title",
+        year=2021,
+        source="crossref",
+        work_type="journal-article",
+    )
+    stats = process_candidates(
+        cfg,
+        _route_backend(),
+        Manifest(cfg.manifest_path),
+        [],
+        once=True,
+        settle_seconds=0.0,
+        resolve_work=lambda doi: work,
+    )
+    assert stats.created_auto == 0
+    assert stats.created_gated == 1
+    rows = list_proposals(cfg)
+    assert rows[0]["collection"] == "ocean/bbnj"
+    assert rows[0]["route_how"] == "last_scope"
+    assert rows[0]["route_confidence"] < cfg.inbox_route_auto_min
+
+
+def test_llm_when_thin_writes_gated_route_proposal(cfg, tmp_path: Path, monkeypatch):
+    from paperful.inbox_match import list_proposals
+    from paperful.resolve import WorkMeta
+    from tests.test_llm_verbs import StubLLM
+
+    root = tmp_path / "inbox"
+    cfg.inbox_dir = str(root)
+    cfg.state_dir = tmp_path / "state"
+    cfg.out_dir = tmp_path / "out"
+    cfg.state_dir.mkdir()
+    cfg.min_pdf_bytes = 1000
+    cfg.llm_enabled = True
+    cfg.inbox_create = "create_gated"
+    cfg.inbox_route = "gated"
+    cfg.inbox_llm_route = "when_thin"
+    ensure_inbox_dirs(cfg)
+    pdf = root / "auto.pdf"
+    pdf.write_bytes(b"%PDF-1.4 " + b"z" * 2000)
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: "10.1000/new")
+    stub = StubLLM(
+        data={
+            "match": True,
+            "confidence": 0.88,
+            "collection": "ocean/bbnj",
+            "reason": "topic",
+        }
+    )
+    monkeypatch.setattr("paperful.llm.get_client", lambda _cfg: stub)
+    work = WorkMeta(
+        doi="10.1000/new",
+        title="A sufficiently long new work title",
+        year=2022,
+        source="crossref",
+        work_type="journal-article",
+    )
+    stats = process_candidates(
+        cfg,
+        _route_backend(),
+        Manifest(cfg.manifest_path),
+        [],
+        once=True,
+        settle_seconds=0.0,
+        resolve_work=lambda doi: work,
+    )
+    assert stats.created_gated == 1
+    rows = list_proposals(cfg)
+    assert rows[0]["collection"] == "ocean/bbnj"
+    assert rows[0]["route_how"] == "llm"
+    assert stub.calls
+
+
+def test_attach_only_ignores_route_and_stays_unmatched(cfg, tmp_path: Path, monkeypatch):
+    root = tmp_path / "inbox"
+    cfg.inbox_dir = str(root)
+    cfg.state_dir = tmp_path / "state"
+    cfg.out_dir = tmp_path / "out"
+    cfg.state_dir.mkdir()
+    cfg.min_pdf_bytes = 1000
+    cfg.inbox_create = "attach_only"
+    cfg.inbox_route = "auto"
+    ensure_inbox_dirs(cfg)
+    snow = cfg.state_dir / "snowball" / "r1"
+    snow.mkdir(parents=True)
+    (snow / "summary.json").write_text(
+        '{"target_collection": "ocean/bbnj"}\n', encoding="utf-8"
+    )
+    (snow / "candidates.jsonl").write_text(
+        '{"ids": {"doi": "10.1000/new"}}\n', encoding="utf-8"
+    )
+    pdf = root / "drop.pdf"
+    pdf.write_bytes(b"%PDF-1.4 " + b"z" * 2000)
+    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: "10.1000/new")
+    stats = process_candidates(
+        cfg,
+        _route_backend(),
+        Manifest(cfg.manifest_path),
+        [],
+        once=True,
+        settle_seconds=0.0,
+    )
+    assert stats.unmatched == 1
+    assert stats.created_auto == 0
+    assert stats.created_gated == 0
+    assert (root / "unmatched" / "drop.pdf").is_file()

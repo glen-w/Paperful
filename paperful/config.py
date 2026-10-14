@@ -225,6 +225,10 @@ class Config:
     inbox_model: str = ""
     inbox_provider: str = ""
     inbox_create: str = "attach_only"  # attach_only | create_gated | create_auto
+    inbox_route: str = "off"  # off | gated | auto
+    inbox_llm_route: str = "off"  # off | when_thin | always
+    inbox_route_min_confidence: float = 0.75
+    inbox_route_auto_min: float = 0.92
     inbox_title_resolve: bool = False
     inbox_manager_metadata_s: float = 0.0
     # Academic HTML→PDF. off leaves journals alone. gated writes a proposal.

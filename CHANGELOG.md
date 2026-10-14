@@ -8,6 +8,13 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- **Smart inbox routing:** `[inbox].route` (`off` / `gated` / `auto`) picks an
+  existing collection for create-on-unmatched when `-C` is omitted. Deterministic
+  signals first (recent snowball/watch `target_collection`, last-run scope, DOI
+  already in the library, filename/title vs collection paths), then optional
+  `[inbox].llm_route`. Fail closed — never invents a collection. DOI attach is
+  unchanged.
+
 - **`[summarize].style = ste`**: ASD-STE100 Simplified Technical English
   constraints in the summarize prompt (sentence/paragraph limits, active voice,
   optional approved-word list). Post-generation heuristic check with

@@ -28,6 +28,7 @@ from .inbox_match import (
     save_proposal,
     write_proposal,
 )
+from .inbox_route import RouteResult, route_collection, route_proposal_fields
 from .interop.load import parent_payload
 from .library import LibraryBackend, LibraryError
 from .resolve import WorkMeta, normalize_doi, work_by_doi
@@ -223,6 +224,7 @@ def ingest_one(
     resolve_work: Callable[[str], WorkMeta | None] | None = None,
     extra_tags: list[str] | None = None,
     on_status: Callable[[str], None] | None = None,
+    items: list[Item] | None = None,
 ) -> IngestEvent:
     """Match one stable PDF, attach, propose, create, hold, or quarantine."""
     say = on_status or (lambda _msg: None)
@@ -261,6 +263,7 @@ def ingest_one(
         say=say,
         root=root,
         extra_tags=extra_tags,
+        items=items,
     )
 
 
@@ -334,6 +337,7 @@ def process_candidates(
             resolve_work=resolve_work,
             extra_tags=extra_tags,
             on_status=say,
+            items=items,
         )
         stats.events.append(event)
         if event.status == "attached":
@@ -569,6 +573,7 @@ def _unmatched_path(
     say: Callable[[str], None],
     root: Path,
     extra_tags: list[str] | None = None,
+    items: list[Item] | None = None,
 ) -> IngestEvent:
     wait_s = cfg.inbox_quarantine_after_s
     if wait_s > 0 and holds is not None:
@@ -583,28 +588,21 @@ def _unmatched_path(
                 doi=matched.doi or "",
                 detail="quarantine_after_s",
             )
-    if cfg.inbox_create == "create_gated":
-        parked = move_unmatched(root, pdf, REVIEW_DIRNAME)
-        dest = write_proposal(
+    routed: RouteResult | None = None
+    if not collection.strip() and cfg.inbox_route != "off" and cfg.inbox_create != "attach_only":
+        routed = route_collection(
             cfg,
-            {
-                "action": "create_parent",
-                "pdf": str(parked),
-                "doi": matched.doi or "",
-                "title": matched.title,
-                "year": matched.year,
-                "how": matched.how,
-                "collection": collection,
-                "extra_tags": list(extra_tags or []),
-            },
+            backend,
+            matched,
+            text=matched.text,
+            filename=pdf.name,
+            items=items,
         )
-        say(f"proposal {dest.name} for {parked.name}")
-        return IngestEvent(
-            path=str(pdf),
-            status="created_gated",
-            how=matched.how,
-            doi=matched.doi or "",
-            detail=str(dest),
+        if routed.collection:
+            collection = routed.collection
+    if cfg.inbox_create == "create_gated" or _route_as_gated(cfg, collection, routed):
+        return _propose_create(
+            cfg, pdf, matched, collection, extra_tags, say, root, routed
         )
     if cfg.inbox_create == "create_auto" and matched.doi:
         work = (resolve_work or _default_resolve(cfg))(matched.doi)
@@ -629,7 +627,7 @@ def _unmatched_path(
                     doi_index, title_index, say,
                 )
                 attached.status = "created_auto"
-                attached.detail = TAG_CREATED
+                attached.detail = _created_detail(routed)
                 say(f"created {item.key} ← {pdf.name}")
                 return attached
         dest = move_unmatched(root, pdf, REVIEW_DIRNAME)
@@ -678,7 +676,7 @@ def _unmatched_path(
                 say,
             )
             attached.status = "created_auto"
-            attached.detail = TAG_CREATED
+            attached.detail = _created_detail(routed)
             say(f"created {item.key} ← {pdf.name}")
             return attached
         dest = move_unmatched(root, pdf, REVIEW_DIRNAME)
@@ -700,6 +698,64 @@ def _unmatched_path(
         doi=matched.doi or "",
         detail=detail,
     )
+
+
+def _route_as_gated(
+    cfg: Config, collection: str, routed: RouteResult | None
+) -> bool:
+    """True when a routed create_auto should write a proposal instead of minting."""
+    if routed is None or cfg.inbox_create != "create_auto":
+        return False
+    if cfg.inbox_route == "gated":
+        return True
+    if not collection.strip():
+        return True
+    return routed.confidence < cfg.inbox_route_auto_min
+
+
+def _propose_create(
+    cfg: Config,
+    pdf: Path,
+    matched: MatchResult,
+    collection: str,
+    extra_tags: list[str] | None,
+    say: Callable[[str], None],
+    root: Path,
+    routed: RouteResult | None,
+) -> IngestEvent:
+    parked = move_unmatched(root, pdf, REVIEW_DIRNAME)
+    payload = {
+        "action": "create_parent",
+        "pdf": str(parked),
+        "doi": matched.doi or "",
+        "title": matched.title,
+        "year": matched.year,
+        "how": matched.how,
+        "collection": collection,
+        "extra_tags": list(extra_tags or []),
+    }
+    if routed is not None:
+        payload.update(route_proposal_fields(routed))
+    dest = write_proposal(cfg, payload)
+    target = collection or "no collection"
+    how = routed.how if routed is not None else "given"
+    say(f"proposal {dest.name} for {parked.name} → {target} ({how})")
+    detail = str(dest)
+    if routed is not None:
+        detail = f"{dest} route:{routed.collection or 'none'}:{routed.how}"
+    return IngestEvent(
+        path=str(pdf),
+        status="created_gated",
+        how=matched.how,
+        doi=matched.doi or "",
+        detail=detail,
+    )
+
+
+def _created_detail(routed: RouteResult | None) -> str:
+    if routed is None or not routed.collection:
+        return TAG_CREATED
+    return f"{TAG_CREATED} route:{routed.collection}:{routed.how}"
 
 
 def _grey_create_key(matched: MatchResult) -> bool:

@@ -1665,6 +1665,7 @@ def test_filters_dedupe_scope_and_partial_create(tmp_path: Path):
     assert summary["score"] == "overlap * 1000 + cited_by_count"
     assert summary["filtered"] >= 1
     assert summary["dedupe_scope"] == "collection"
+    assert summary["target_collection"] == "Inbox/Snowball"
 
 
 def test_profile_save_refuses_secrets(tmp_path: Path):

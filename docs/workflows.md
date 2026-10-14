@@ -27,7 +27,7 @@ Repair) live in [Walkthroughs](walkthroughs.md). The same verbs are on
 | **`authors`** | Creator frequency in `-C`; `--apply` seeds a proposed field author pack | `state/reports/*-authors.json`, `state/author-packs/` |
 | **`reachout`** | Missing PDFs → CSV / RG tabs for author contact. Never fetches, never sends mail | `paperful reachout` |
 | **`snowball watch`** | Re-run a saved snowball *profile*; propose unseen works. The rollup is `digest.md` ([Watch](snowball.md#watch)) | `state/snowball/watches/<name>/` |
-| **`inbox watch`** | PDF drop folder → attach to matching items | `[inbox].dir` |
+| **`inbox watch`** | PDF drop folder → attach to matching items; `[inbox].route` can pick a collection for create-on-unmatched when `-C` is omitted | `[inbox].dir` |
 
 Grey-lit `packs/` and run-config `profiles/` are different directories.
 `state/packs/` is the witness, and it is excluded from backups of the

@@ -150,7 +150,7 @@ Do not call either adapter **supported** until field reports justify it.
   uses its own latch and does not trip Scholar.
 - **Inbox create-on-unmatched (config, shipped).** Optional `[inbox]` mode so
   `watch` / `drain` still ingests when no missing-PDF parent matches: create a
-  parent in a configured collection (or a routed target once smart inbox exists),
+  parent in a configured collection (or a routed target from `[inbox].route`),
   attach the PDF, and fill bibliographic fields from Paperful’s identifier
   pipelines (DOI from PDF → Crossref / OpenAlex / Semantic Scholar; title /
   first-page fallbacks when DOI is missing). **Reference-manager metadata
@@ -209,26 +209,17 @@ Do not call either adapter **supported** until field reports justify it.
   `manager_metadata` | `none`. **Not in scope:** guessing parents outside the
   missing-PDF index without create-on-unmatched; bulk OCR of the whole library
   inside `watch`.
-- **Smart inbox (optional, later).** Create-on-unmatched and the match ladder
-  can attach or propose a parent; they still do not choose a collection.
-  A smarter drop-folder lane would
-  **route** (and optionally ingest) each PDF toward the right collection using
-  **deterministic** signals first — ongoing / recent snowball runs and watches
-  (`state/snowball/…`, open packs, last `-C` / profile), DOI already in the
-  library, filename / PDF metadata / first-page text (and ladder OCR/title
-  fingerprints) against collection titles and recent candidates — then an
-  optional LLM ranker.
-  **LLM use** is configurable per this lane: `off` | `when_thin` (only when
-  deterministic signals conflict or score below a bar) | `always`. **Model**
-  follows the house pattern: global `[llm].provider` + `[llm].model` (and the
-  LiteLLM `provider/model` id form), overridable **per function** (e.g.
-  `[inbox].model` / `[inbox].provider`, same idea as `[browser_agent].model`
-  today; other verbs keep their own overrides). Apply modes: **gated** (propose
-  collection ± create-parent → human confirm / edit) or **auto** (apply when
-  confidence clears a config bar). Fail closed to today’s `unmatched/` (or a
-  review queue) — never silent misfile. Builds on the Firefox-bridge
-  create-parent ingest gap; keep DOI attach as the fast path when a miss already
-  exists.
+- **Smart inbox (config, shipped).** Create-on-unmatched and the match ladder
+  attach or propose a parent; this lane chooses a **collection** when `-C` is
+  omitted. Deterministic signals first — recent snowball runs and watches
+  (`state/snowball/…`, `target_collection` on `summary.json`, last `-C` /
+  profile), DOI already in the library, filename / PDF metadata / first-page
+  text against **existing** collection titles — then an optional LLM ranker.
+  **LLM use:** `[inbox].llm_route` `off` | `when_thin` | `always`. Model follows
+  the house pattern: global `[llm]` plus `[inbox].model` / `[inbox].provider`.
+  Apply modes: `[inbox].route` `off` (default) | `gated` | `auto`. Fail closed
+  to `review/` / a proposal — never silent misfile, never invent a collection.
+  DOI attach stays the fast path when a missing-PDF parent already matches.
 - **OA honesty / miss taxonomy (shipped).** Project internal miss status to a frozen
   surface enum for dry-run, `gaps`, and the run report:
   `no_doi | paywalled | no_oa | fetch_failed | license_blocked | import_ok`
@@ -352,7 +343,7 @@ for the end-to-end operator story.
 | Priority | Item | Status |
 | --- | --- | --- |
 | 1 | [`paperful refs gap`](#bibliography-gap-scan-later-not-gaps) — cited-in-PDF, not-in-library pack | Shipped |
-| 2 | [Inbox match ladder](#inbox-match-ladder) (defer quarantine, title/OCR, optional `llm_when_thin`) + [create-on-unmatched](#core-keep-sharpening) (gated proposals) | Shipped (`create_auto`: unique DOI, or unique ISBN / report / title+year+host) |
+| 2 | [Inbox match ladder](#inbox-match-ladder) (defer quarantine, title/OCR, optional `llm_when_thin`) + [create-on-unmatched](#core-keep-sharpening) (gated proposals) + smart inbox routing | Shipped (`create_auto`: unique DOI, or unique ISBN / report / title+year+host; `[inbox].route` picks `-C` when omitted) |
 | 3 | `paperful ingest-dois` — DOI list → `-C`, `--dry-run` / `--apply`, `--tag` | Shipped |
 | 4 | Provenance tags on create (`--tag`, `[snowball]` / `[ingest]` default_tags, `from-<seed-slug>`) | Shipped |
 | 4b | OA honesty miss enum + license/OA stamps on `run --dry-run`, `gaps`, handoff list, run report | Shipped |
@@ -1072,11 +1063,9 @@ prerequisites for the fetch / lint / attach loop.
    plus FAO, RFMO, IUCN/DOSI, IDDRI/Pew). IEA/IRENA and OECD/WHO/UNEP/UNDP
    are optional files in `paperful/data/grey_playbooks_examples/` — extend
    via `grey_playbooks_dir` or `[[grey_playbooks]]`. **Shipped:**
-   **inbox match ladder** and **inbox create-on-unmatched** (config; unique-DOI
-   `create_auto`; gated proposals). Still parked: **smart inbox** routing (Core
-   above — snowball/recent-run context + ladder
-   signals; LLM `off` | `when_thin` | `always`; model global + per-function;
-   gated or auto);
+   **inbox match ladder**, **inbox create-on-unmatched**, and **smart inbox**
+   routing (config; snowball/recent-run context + ladder signals; LLM
+   `off` | `when_thin` | `always`; gated or auto). Still parked:
    SI/dataset/code siblings;
    **opt-in LibGen** for `book` / `bookSection` gap-fill (title or ISBN routing;
    unofficial scrapers only — spike

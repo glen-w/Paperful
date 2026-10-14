@@ -122,7 +122,7 @@ flowchart LR
 | `state/dedupe-packs/` | Duplicate review packs from `dedupe` (JSON + Markdown) |
 | `state/dedupe-applied.jsonl` | Merge audit; appended only on `dedupe --apply` |
 | `state/cites/<hash>.json` | OpenAlex reference lists for one DOI set, inverted so snowball can say how many items in the target collection cite a new work. Reused until that DOI set changes |
-| `state/snowball/<run-id>/` | One crawl queue: `candidates.jsonl`, `summary.json`, thin `briefing.md`, frontier `digest.md`. How the digest is cut is [Watch](snowball.md#watch) |
+| `state/snowball/<run-id>/` | One crawl queue: `candidates.jsonl`, `summary.json` (includes `target_collection` when `-C` was set), thin `briefing.md`, frontier `digest.md`. How the digest is cut is [Watch](snowball.md#watch) |
 | `state/snowball/watches/<name>/` | Watch ledger: `watch.json`, `seen.json`, `inbox.jsonl`, `briefing.md`, `digest.md`. No scheduler in Paperful |
 | `state/version-packs/` | Preprint/published review packs (`paperful.version_pack.v1`) |
 | `state/versions-applied.jsonl` | One line per work updated by `versions --apply` |
@@ -130,7 +130,7 @@ flowchart LR
 | `state/coverage/<stamp>/` | `coverage` review pack (`paperful.coverage.pack.v1`, `pack.md`, `dois.txt`). Always dry-run — briefing/note/file vs `-C` |
 | `state/ingest/<stamp>/` | `ingest-dois` summary (`paperful.ingest_dois.v1`). Dry-run unless `--apply` |
 | `state/collections-add/<stamp>/` | `collections add` summary (`paperful.collections_add.v1`). Dry-run unless `--apply` |
-| `state/inbox/proposals/` | Gated inbox create/attach proposals (`paperful.inbox.proposal.v1`) |
+| `state/inbox/proposals/` | Gated inbox create/attach proposals (`paperful.inbox.proposal.v1`). Optional `route_*` keys when `[inbox].route` chose a collection |
 | `state/pdf-cache/` | Throwaway copies of manager PDFs, only when `[mirror].pdfs = "none"`. Otherwise an exported PDF goes into its item folder, and `sync` moves older cache files there. `paperful cache clean` removes absorbed or stale leftovers |
 | `state/summaries/<key>.html` | `summarize` output when dest includes disk; the Zotero child note is the other copy |
 | `state/ask-batch/<stamp>/` | `ask --from-file` / Index batch Ask pack (`paperful.ask_batch.v1`, `answers.md`); resume cache under `by-hash/` |

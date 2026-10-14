@@ -250,6 +250,10 @@ mirror_failures_before_skip = 3
 # llm_match_min_confidence = 0.75
 # llm_auto_attach_min = 0.92
 # create = "attach_only"           # attach_only | create_gated | create_auto
+# route = "off"                    # off | gated | auto — pick -C when omitted
+# llm_route = "off"                # off | when_thin | always
+# route_min_confidence = 0.75
+# route_auto_min = 0.92
 # title_resolve = false            # Crossref/OpenAlex title search when local match is thin
 # manager_metadata_s = 0           # wait after attach for a manager recognizer
 # [ingest]

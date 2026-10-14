@@ -339,6 +339,8 @@ def apply_inbox(raw: dict[str, Any], cfg: "Config") -> None:
             ("ocr_for_match", "inbox_ocr_for_match", bool),
             ("llm_match_min_confidence", "inbox_llm_match_min_confidence", C._clamp01),
             ("llm_auto_attach_min", "inbox_llm_auto_attach_min", C._clamp01),
+            ("route_min_confidence", "inbox_route_min_confidence", C._clamp01),
+            ("route_auto_min", "inbox_route_auto_min", C._clamp01),
             ("model", "inbox_model", lambda v: str(v).strip()),
             ("provider", "inbox_provider", lambda v: str(v).strip()),
             ("title_resolve", "inbox_title_resolve", bool),
@@ -366,6 +368,18 @@ def apply_inbox(raw: dict[str, Any], cfg: "Config") -> None:
             "[inbox].create",
             inbox["create"],
             ("attach_only", "create_gated", "create_auto"),
+        )
+    if "route" in inbox:
+        cfg.inbox_route = C._one_of(
+            "[inbox].route",
+            inbox["route"],
+            ("off", "gated", "auto"),
+        )
+    if "llm_route" in inbox:
+        cfg.inbox_llm_route = C._one_of(
+            "[inbox].llm_route",
+            inbox["llm_route"],
+            ("off", "when_thin", "always"),
         )
 
 

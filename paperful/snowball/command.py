@@ -1687,6 +1687,8 @@ def _summary_meta(
         "filtered": filtered,
         "dedupe_scope": scope,
     }
+    if request.collection.strip():
+        meta["target_collection"] = request.collection.strip()
     cites_query = (request.cites_query or "").strip()
     if cites_query:
         meta["cites_query"] = cites_query

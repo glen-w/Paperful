@@ -246,6 +246,10 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[inbox].llm_match_min_confidence` | `0.75` | LLM `match: true` below this does not auto-attach |
 | `[inbox].llm_auto_attach_min` | `0.92` | High bar for auto-attach; otherwise a gated proposal |
 | `[inbox].create` | `attach_only` | `attach_only` \| `create_gated` (proposals) \| `create_auto` (unique DOI, or a unique ISBN / report number / title+year+host) |
+| `[inbox].route` | `off` | `off` \| `gated` \| `auto`. When `-C` is omitted, pick an **existing** collection for create. Default off (create still needs `-C`). Never invents a path |
+| `[inbox].llm_route` | `off` | `off` \| `when_thin` \| `always`. Needs `[llm].enabled`. Ranks existing collections after deterministic signals |
+| `[inbox].route_min_confidence` | `0.75` | Below this, routing is thin (proposal / `review/`, no auto create) |
+| `[inbox].route_auto_min` | `0.92` | High bar for `route = auto` + `create_auto` |
 | `[htmlpdf].academic` | `off` | `off` \| `gated` \| `auto`. DOI journal items. `gated` proposes; `auto` attaches a page snapshot after landing checks. `--htmlpdf` overrides one `run` |
 | `[htmlpdf].upgrade` | `false` | When true, `run` retries items whose only PDF is an HTML snapshot. `--upgrade-snapshot` / `--no-upgrade-snapshot` override |
 | `[htmlpdf].keep_snapshot` | `false` | Leave the HTML print in place when a native PDF attaches. `--keep-snapshot` on `run` |
