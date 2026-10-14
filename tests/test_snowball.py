@@ -1660,7 +1660,9 @@ def test_filters_dedupe_scope_and_partial_create(tmp_path: Path):
     assert by["10.1000/book"]["status"] == "filtered"
     assert by["10.1000/same"]["status"] == "exists"
     assert by["10.1000/same"]["exists_match"]["title_year"].startswith("same title|")
-    assert result.exit_code == 1
+    from paperful.agent_json import EXIT_PARTIAL
+
+    assert result.exit_code == EXIT_PARTIAL
     summary = json.loads((result.run_dir / "summary.json").read_text())
     assert summary["score"] == "overlap * 1000 + cited_by_count"
     assert summary["filtered"] >= 1
@@ -2213,7 +2215,9 @@ def test_api_error_keeps_a_restorable_queue(tmp_path: Path):
         client=OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter),
         lookup=lambda doi, title: None,
     )
-    assert result.exit_code == 1
+    from paperful.agent_json import EXIT_PARTIAL
+
+    assert result.exit_code == EXIT_PARTIAL
     assert (result.run_dir / "candidates.jsonl").is_file()
     deferred = json.loads((result.run_dir / "deferred.json").read_text())
     assert deferred["kind"] == "cites"
@@ -2292,7 +2296,9 @@ def test_budget_stop_keeps_partial_rows_and_resume(tmp_path: Path):
         client=client,
         lookup=lambda doi, title: None,
     )
-    assert result.exit_code == 1
+    from paperful.agent_json import EXIT_PARTIAL
+
+    assert result.exit_code == EXIT_PARTIAL
     deferred_path = result.run_dir / "deferred.json"
     deferred = json.loads(deferred_path.read_text())
     assert deferred["kind"] == "cites"
@@ -2439,7 +2445,9 @@ def test_cites_query_survives_budget_resume(tmp_path: Path):
         client=client,
         lookup=lambda doi, title: None,
     )
-    assert result.exit_code == 1
+    from paperful.agent_json import EXIT_PARTIAL
+
+    assert result.exit_code == EXIT_PARTIAL
     deferred = json.loads((result.run_dir / "deferred.json").read_text())
     assert deferred["cites_query"] == "degrowth"
 

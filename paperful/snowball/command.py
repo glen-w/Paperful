@@ -11,6 +11,7 @@ from typing import Any, Callable
 from rich.console import Console
 from rich.table import Table
 
+from ..agent_json import EXIT_PARTIAL, batch_exit
 from ..config import Config, parse_cap, parse_fetch_pdfs, parse_per_hop_rank
 from ..dedupe import normalize_dedupe_title
 from ..catalogue import open_library
@@ -1223,9 +1224,12 @@ def _execute(
                     "(need TWENTY_API_KEY and [twenty].base_url)"
                 )
     _print_table(console, rows)
-    exit_code = 1 if failed or oa.deferred else 0
+    crawl_fail_n = len(failed) if failed else 0
     if oa.deferred:
+        exit_code = EXIT_PARTIAL
         console.print(f"[yellow]Partial queue kept[/] · paperful snowball resume {run_id}")
+    else:
+        exit_code = 0
     if gate in {"dry-run", "approve-batch"}:
         if gate == "approve-batch":
             console.print(
@@ -1234,6 +1238,9 @@ def _execute(
             )
         else:
             console.print("candidates ready")
+        if not oa.deferred and crawl_fail_n:
+            ok_n = max(0, len(rows) - crawl_fail_n)
+            exit_code = batch_exit(ok=ok_n, failed=crawl_fail_n)
         tally.stop()
         return PathResult(dest, exit_code)
     if library_unread or lib is None:
@@ -1258,7 +1265,14 @@ def _execute(
     except LibraryError as exc:
         tally.stop()
         raise SnowballError(str(exc)) from exc
-    exit_code = 1 if failed or counts.get("failed") else exit_code
+    create_fail_n = int(counts.get("failed") or 0)
+    created_n = int(counts.get("created") or 0)
+    if oa.deferred:
+        exit_code = EXIT_PARTIAL
+    else:
+        exit_code = batch_exit(
+            ok=created_n, failed=crawl_fail_n + create_fail_n
+        )
     report = {
         "created": counts["created"],
         "skipped_exists": counts["skipped_exists"],
