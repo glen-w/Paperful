@@ -99,7 +99,7 @@ No campus access: **Open access** preset (`--preset oa`, or
 `ezproxy_base` is set. [Configuration](docs/config.md).
 
 ```sh
-git clone https://github.com/glen-w/Paperful.git
+git clone --branch v1.0 https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env          # PAPERFUL_DATA=. keeps data in this checkout
                               # .env.example sets PAPERFUL_IMAGE_MODE=heavy

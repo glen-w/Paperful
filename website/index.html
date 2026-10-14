@@ -11,16 +11,23 @@
     <link rel="icon" href="images/favicon.ico" sizes="any" />
     <link rel="icon" href="images/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="canonical" href="https://paperful.app/" />
+    <link rel="sitemap" type="application/xml" title="Sitemap" href="sitemap.xml" />
     <meta property="og:title" content="Paperful — find missing PDFs, clean up your library, keep control of your papers" />
     <meta
       property="og:description"
       content="Paperful fills missing PDFs in the Zotero library you already keep, tidies the records, and leaves a folder copy on your machine. Open access first, campus when you have it."
     />
-    <meta property="og:image" content="https://paperful.app/images/logo.png" />
+    <meta property="og:image" content="https://paperful.app/images/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Paperful Wanted: missing PDFs selected for Preview, Grab, and Attach"
+    />
     <meta property="og:url" content="https://paperful.app/" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="https://paperful.app/images/logo.png" />
+    <meta name="twitter:image" content="https://paperful.app/images/og.png" />
     <meta name="twitter:title" content="Paperful — find missing PDFs, clean up your library, keep control of your papers" />
     <meta
       name="twitter:description"
@@ -189,7 +196,7 @@
         <div class="wrap narrow">
           <h2>What can I do with it?</h2>
           <ul class="outcomes">
-            <li>Fill missing PDFs — free copies first, campus access when you have it</li>
+            <li>Fill missing PDFs — free copies first, campus access when you have it (not every paywalled paper; Preview shows what fetch can reach)</li>
             <li>Grow the library from a topic search or from people you follow</li>
             <li>Tidy duplicates, identifiers, and broken attachments</li>
             <li>Keep a folder copy you can back up or hand to another tool</li>
@@ -247,7 +254,7 @@
             enabled, then open the workbench at
             <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a>.
           </p>
-          <pre class="code"><code>git clone https://github.com/glen-w/Paperful.git
+          <pre class="code"><code>git clone --branch v1.0 https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
 cp config.minimal.toml config.toml   # set email
@@ -259,6 +266,7 @@ docker compose up</code></pre>
             <code>.env</code> — renaming the examples is not enough.
           </p>
           <p class="fine">
+            Omit <code>--branch v1.0</code> to track latest <code>main</code>.
             <a href="./guide/docker.html">Docker</a>
             ·
             <a href="./guide/zotero.html">Zotero</a>
