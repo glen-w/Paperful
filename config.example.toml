@@ -393,6 +393,14 @@ gone = "mark"
 # dest = "disk"                  # batch ask note writes: disk | zotero | both (needs --apply)
 # extract_questions_llm = false  # LLM lane for `rag questions` (rules always run)
 
+# IMRaD-style section extract (`paperful extract-sections`). Reads mirror PDFs / text cache only.
+# [extract_sections]
+# llm = false                    # fill missing MVP fields; still needs [llm].enabled
+# headings = ""                  # extra synonym TOML; also loads state/section-headings.toml when present
+# fields = ["abstract", "conclusion", "methodology", "research_questions"]
+# raw_map = true                 # include detected section headings in JSON
+# max_field_chars = 20000
+
 # Workbench UI (paperful serve). Library and Wanted item tables share these sizes.
 # [ui]
 # library_page_size = 50

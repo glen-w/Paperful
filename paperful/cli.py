@@ -265,6 +265,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "ocr",
         "ocr-ignore",
         "summarize",
+        "extract-sections",
         "synthesize",
         "rag",
         "ask",
@@ -6074,6 +6075,121 @@ def summarize(
         config=config,
         fmt=fmt,
     )
+
+
+@app.command("extract-sections")
+def extract_sections(
+    item: list[str] = typer.Option([], "--item", help="Item key (repeatable)."),
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path under the mirror (repeatable)."
+    ),
+    library: bool = typer.Option(False, "--library", help="Every item in the mirror."),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    llm: bool | None = typer.Option(
+        None,
+        "--llm/--no-llm",
+        help="Fill missing MVP fields with a grounded LLM pass. Default is [extract_sections].llm.",
+    ),
+    limit: int | None = typer.Option(None, "--limit", help="Max items this run."),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Print counts; do not write state/sections/.",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Re-extract even when state/sections/<key>.json already exists.",
+    ),
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Extract IMRaD-style sections to disk (rules; optional LLM)."""
+    from .agent_json import batch_exit, envelope
+    from .llm import get_client
+    from .llm.preflight import validate_llm_for_verb
+    from .llm.validate import LlmConfigError
+    from .sections.command import extract_scope, item_to_dict, write_item
+
+    cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    if not (item or collection or library):
+        console.print("[red]Pass --item, -C, or --library.[/]")
+        raise typer.Exit(1)
+    use_llm = cfg.extract_sections_llm if llm is None else llm
+    client = None
+    if use_llm:
+        try:
+            validate_llm_for_verb(cfg)
+        except LlmConfigError as exc:
+            console.print(str(exc), markup=False, style="red")
+            raise typer.Exit(1) from exc
+        client = get_client(cfg)
+    types = _resolve_types(item_type)
+    started = time.time()
+    items = extract_scope(
+        cfg,
+        collections=collection or None,
+        item_keys=item,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_types=types,
+        use_llm=use_llm,
+        client=client,
+        limit=limit,
+        force=force,
+        skip_existing=not force,
+    )
+    filled = sum(
+        1
+        for it in items
+        for name in cfg.extract_sections_fields
+        if it.fields.get(name) is not None
+    )
+    if not dry_run:
+        for it in items:
+            write_item(cfg, it)
+    scope = ", ".join(collection) or ("library" if library else "items")
+    if not json_out:
+        action = "Would extract" if dry_run else "Extracted"
+        console.print(
+            f"{action} sections for {len(items)} item(s)"
+            + (f" ({filled} field(s) present)" if items else "")
+            + (" (LLM on)" if use_llm else "")
+            + "."
+        )
+    write_command_report(
+        cfg,
+        command="extract-sections",
+        scope=scope,
+        summary={
+            "items": len(items),
+            "fields_present": filled,
+            "dry_run": dry_run,
+            "llm": use_llm,
+        },
+        items=[item_to_dict(it) for it in items],
+        flags={"limit": limit, "llm": use_llm, "force": force},
+        started=started,
+    )
+    code = batch_exit(ok=len(items), failed=0)
+    if json_out:
+        payload = envelope(
+            command="extract-sections",
+            summary={
+                "items": len(items),
+                "fields_present": filled,
+                "dry_run": dry_run,
+            },
+            items=[item_to_dict(it) for it in items],
+            flags={"read_only": dry_run, "llm": use_llm, "force": force},
+            exit_code=code,
+        )
+        _emit_agent(payload, json_out=True, human=lambda: None)
+
 
 @app.command()
 def synthesize(

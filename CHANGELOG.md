@@ -8,6 +8,12 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- **`paperful extract-sections`:** deterministic IMRaD-style fields
+  (`abstract`, `conclusion`, `methodology`, `research_questions`) to
+  `state/sections/<key>.json`, with optional grounded LLM fill
+  (`[extract_sections].llm`). Shared heading synonyms with the RAG chunker;
+  optional `state/section-headings.toml` overlay.
+
 - **Smart inbox routing:** `[inbox].route` (`off` / `gated` / `auto`) picks an
   existing collection for create-on-unmatched when `-C` is omitted. Deterministic
   signals first (recent snowball/watch `target_collection`, last-run scope, DOI

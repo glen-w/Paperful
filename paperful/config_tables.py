@@ -41,6 +41,7 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_attachments(raw, cfg)
     apply_ocr(raw, cfg)
     apply_rag(raw, cfg, source)
+    apply_extract_sections(raw, cfg, source)
     apply_mendeley(raw, cfg)
     apply_endnote(raw, cfg, source)
     apply_openalex_store(raw, cfg)
@@ -537,6 +538,34 @@ def apply_rag(raw: dict[str, Any], cfg: "Config", source: Path) -> None:
         if cfg.rag_prompt == "default":
             cfg.rag_prompt = ""
     cfg.rag_chunk_overlap = min(cfg.rag_chunk_overlap, cfg.rag_chunk_chars // 2)
+
+
+def apply_extract_sections(raw: dict[str, Any], cfg: "Config", source: Path) -> None:
+    C = _mod()
+    table = raw.get("extract_sections")
+    if not isinstance(table, dict):
+        return
+    C._apply_config_table(
+        table,
+        cfg,
+        [
+            ("llm", "extract_sections_llm", bool),
+            ("raw_map", "extract_sections_raw_map", bool),
+            (
+                "max_field_chars",
+                "extract_sections_max_field_chars",
+                lambda v: max(500, int(v)),
+            ),
+        ],
+    )
+    if "headings" in table:
+        cfg.extract_sections_headings = C._resolve_prompt_path(
+            str(table["headings"]), source
+        )
+        if cfg.extract_sections_headings == "default":
+            cfg.extract_sections_headings = ""
+    if "fields" in table:
+        cfg.extract_sections_fields = C._snowball_strs(table["fields"])
 
 
 def apply_mendeley(raw: dict[str, Any], cfg: "Config") -> None:

@@ -199,6 +199,7 @@ Tier policy (1.0 contract):
 | `paperful.ask_batch.v1` | `state/ask-batch/<stamp>/` | `rag.batch` | T2 | — |
 | `paperful.rag.thread.v1` | `state/rag/threads/*.json` | `rag.thread` | T2 | — |
 | `paperful.rag.questions.v1` | `state/rag/questions/` | `rag.questions` | T2 | — |
+| `paperful.sections.v1` | `state/sections/` | `extract-sections` | T2 | — |
 | `paperful.rq_answered.v1` | `state/rq-answered/` | `rag.answered` | T2 | — |
 | `paperful.rag.text.v1` | extracted text cache | `rag.extract` | T3 | Rebuildable |
 | `paperful.rag.index.v1` | LanceDB meta | `rag.index` | T3 | Not a promise |
@@ -215,7 +216,8 @@ Contract tests: `tests/test_schema_freeze.py`.
 
 **A read verb.** `backend = _connect(cfg)`, `_load_scope(backend, …)`, do
 the work, write a run report. Add it to `READ_VERBS`. Disk-only verbs such as
-`authorwatch save` still belong there so a closed manager is not an accident.
+`authorwatch save` and `extract-sections` still belong there so a closed
+manager is not an accident.
 
 **A write verb.** Same, dry-run by default. Before applying:
 `if not backend.supports_write(): _exit_env(_no_write(backend), cfg)`.

@@ -2,8 +2,9 @@
 
 Everything here is **off by default**. Paperful’s PDF loop (`run` / `attach` /
 `lint` / `fix-metadata` / `dedupe`) never needs a model. Turn the LLM on only
-for the five verbs below, and only after `paperful doctor` shows the `LLM` row
-green.
+for the LLM-backed verbs below, and only after `paperful doctor` shows the
+`LLM` row green. `extract-sections` and `rag questions` run deterministic
+rules without a model; their `--llm` lanes need `[llm].enabled`.
 
 Design rules (see [architecture § LLM layer](architecture.md#llm-layer-optional-local-first)):
 
@@ -38,7 +39,7 @@ No Python extra is needed for Ollama: Paperful talks HTTP to the daemon.
 
 | Verb | Works well with | Notes |
 | --- | --- | --- |
-| `fix-metadata` titles, `lint` identity, `summarize`, `synthesize` | 7B–12B instruct models (`qwen2.5:7b`, `gemma3:12b`, `llama3.1:8b`) | JSON-capable instruct tags; thinking models are fine but slower. `summarize` and `synthesize` set Ollama `num_ctx` from the prompt, capped by `[llm].max_num_ctx` |
+| `fix-metadata` titles, `lint` identity, `summarize`, `synthesize`, `extract-sections --llm`, `rag questions --llm` | 7B–12B instruct models (`qwen2.5:7b`, `gemma3:12b`, `llama3.1:8b`) | JSON-capable instruct tags; thinking models are fine but slower. `summarize` and `synthesize` set Ollama `num_ctx` from the prompt, capped by `[llm].max_num_ctx` |
 | `recover` | 14B+ (`qwen2.5:14b`, `qwen3:14b`, larger); 32B / VL on 24 GB+ | Small models loop on cookie banners and publisher menus; `doctor` warns under ~10B by tag name. Full guidance: [browser-agent-models.md](browser-agent-models.md) |
 
 ### LiteLLM (paid / OpenAI-compatible APIs)
@@ -310,6 +311,24 @@ Use only the metadata and document text provided.
 The file’s SHA-256 is stamped in the footer so you can tell which prompt
 produced which note.
 
+### F. `extract-sections` — structured IMRaD JSON (optional LLM)
+
+```sh
+uv run paperful extract-sections -C BBNJ
+uv run paperful extract-sections -C BBNJ --llm    # fill missing MVP fields only
+uv run paperful extract-sections --library --dry-run
+```
+
+- **Rules always run** without `[llm].enabled`. Heading split uses the shared
+  synonym list (see `[extract_sections]` and `state/section-headings.toml`).
+- **`--llm`** (or `[extract_sections].llm`) asks the model for missing
+  `abstract`, `methodology`, `conclusion`, or `research_questions` only.
+  Outputs must ground in the excerpt or they are dropped.
+- Writes `state/sections/<key>.json` (`paperful.sections.v1`). Reuses
+  `state/rag/text/` when present; otherwise parses the mirror PDF. No Zotero
+  writes. Distinct from `summarize` (HTML prose) and `rag questions` (RQ queue
+  for `rag answered`). See [rag.md](rag.md#structured-sections-mirror-only).
+
 ## 5. Docker
 
 **light** images omit `litellm` and `browser-use`. **heavy**
@@ -385,7 +404,7 @@ allow_remote = true
   `[rag]`.
 
 - [config.md](config.md#llm-optional-local-first) — key reference
-- [commands.md](commands.md) — `recover` / `summarize` / `synthesize` flags and exit codes
+- [commands.md](commands.md) — `recover` / `summarize` / `synthesize` / `extract-sections` flags and exit codes
 - [architecture.md](architecture.md#llm-layer-optional-local-first) — layer, gates, note write path
 - [camofox.md](camofox.md) — opt-in scripted Camoufox lane before `browser_agent`
 - [sessions.md](sessions.md) — vault profile ownership during `recover`

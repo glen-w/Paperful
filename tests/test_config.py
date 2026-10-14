@@ -253,6 +253,26 @@ def test_rag_table_is_parsed_and_clamped(tmp_path):
     assert cfg.rag_model == "qwen3:8b"
 
 
+def test_extract_sections_table_is_parsed(tmp_path):
+    from paperful.config import _from_dict
+
+    cfg = _from_dict(
+        {
+            "extract_sections": {
+                "llm": True,
+                "raw_map": False,
+                "max_field_chars": 9000,
+                "fields": ["abstract", "methodology"],
+            }
+        },
+        tmp_path / "config.toml",
+    )
+    assert cfg.extract_sections_llm is True
+    assert cfg.extract_sections_raw_map is False
+    assert cfg.extract_sections_max_field_chars == 9000
+    assert cfg.extract_sections_fields == ("abstract", "methodology")
+
+
 @pytest.mark.parametrize(
     "table",
     [{"ocr": "always"}, {"parser": "pymupdf"}, {"embed_provider": "openai"}, {"embed_model": " "}],

@@ -277,6 +277,7 @@ def _close_manager(monkeypatch):
 
 READ_VERBS = [
     ["collections"],
+    ["extract-sections", "-C", "BBNJ", "--dry-run"],
     ["gaps", "-C", "BBNJ", "--json"],
     ["lint", "-C", "BBNJ", "--json"],
     ["fix-metadata", "-C", "BBNJ"],

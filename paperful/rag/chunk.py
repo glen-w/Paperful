@@ -7,6 +7,8 @@ from bisect import bisect_right
 from collections import Counter
 from dataclasses import dataclass
 
+from ..sections.headings import _build_maps
+
 CHUNKER_VERSION = 1
 MIN_CHUNK_CHARS = 100
 _PAGE_BREAK = "\n\n"
@@ -17,27 +19,7 @@ _NUMBERED_HEADING = re.compile(
     r"^\d{1,2}(?:\.\d{1,2}){0,3}\.?\s+[A-Z][A-Za-z]{2,}[^\n]{0,90}$"
 )
 _CAPS_HEADING = re.compile(r"^[A-Z][A-Z0-9 ,&:\-]{3,70}$")
-_NAMED_HEADINGS = frozenset(
-    {
-        "abstract",
-        "summary",
-        "introduction",
-        "background",
-        "methods",
-        "methodology",
-        "materials and methods",
-        "results",
-        "discussion",
-        "results and discussion",
-        "conclusion",
-        "conclusions",
-        "acknowledgements",
-        "acknowledgments",
-        "references",
-        "bibliography",
-        "appendix",
-    }
-)
+_NAMED_HEADINGS = _build_maps()[0]
 _HYPHEN_BREAK = re.compile(r"(?<=[a-z])-\n(?=[a-z])")
 _BLANK_RUN = re.compile(r"\n{3,}")
 # A heading-like line seen this often is a running page header, not a section.
@@ -61,7 +43,9 @@ def _clean_page(page: str) -> str:
     return _BLANK_RUN.sub("\n\n", text)
 
 
-def _heading(line: str, prev_blank: bool) -> str | None:
+def _heading(
+    line: str, prev_blank: bool, named: frozenset[str] = _NAMED_HEADINGS
+) -> str | None:
     """The heading text if ``line`` reads as a section heading."""
     stripped = line.strip()
     markdown = _MARKDOWN_HEADING.match(stripped)
@@ -69,7 +53,7 @@ def _heading(line: str, prev_blank: bool) -> str | None:
         return markdown.group(1).strip().strip("#").strip()
     if not prev_blank or not stripped or len(stripped) > 100:
         return None
-    if stripped.lower().rstrip(":") in _NAMED_HEADINGS:
+    if stripped.lower().rstrip(":") in named:
         return stripped.rstrip(":")
     if stripped.endswith((".", ",", ";")) or len(stripped.split()) > 12:
         return None
@@ -82,13 +66,22 @@ def _heading(line: str, prev_blank: bool) -> str | None:
     return None
 
 
-def _sections(text: str) -> list[tuple[str | None, int, int]]:
+def section_spans(
+    text: str, named: frozenset[str] | None = None
+) -> list[tuple[str | None, int, int]]:
+    """``(heading, body_start, body_end)`` spans covering the text in order."""
+    return _sections(text, named or _NAMED_HEADINGS)
+
+
+def _sections(
+    text: str, named: frozenset[str] = _NAMED_HEADINGS
+) -> list[tuple[str | None, int, int]]:
     """``(heading, body_start, body_end)`` spans covering the text in order."""
     lines = text.split("\n")
     titles: list[str | None] = []
     prev_blank = True
     for line in lines:
-        titles.append(_heading(line, prev_blank))
+        titles.append(_heading(line, prev_blank, named))
         prev_blank = not line.strip()
     seen = Counter(title for title in titles if title is not None)
     spans: list[tuple[str | None, int, int]] = []
@@ -189,7 +182,7 @@ def chunk_pages(
         return max(1, bisect_right(starts, position))
 
     chunks: list[Chunk] = []
-    for heading, body_start, body_end in _sections(text):
+    for heading, body_start, body_end in _sections(text, _NAMED_HEADINGS):
         spans = _split(text, body_start, body_end, limit)
         for i, (span_start, span_end) in enumerate(spans):
             begin = span_start

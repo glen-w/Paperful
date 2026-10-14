@@ -69,6 +69,11 @@ uv run paperful rag questions -C ocean/BBNJ
 uv run paperful rag answered --from-extract -C ocean/BBNJ
 uv run paperful ask                                  # prompt for several questions
 
+# structured IMRaD fields — mirror only; rules always run; no [rag].enabled
+uv run paperful extract-sections -C ocean/BBNJ --dry-run
+uv run paperful extract-sections -C ocean/BBNJ       # state/sections/<key>.json
+uv run paperful extract-sections --library --llm     # optional LLM fill; needs [llm].enabled
+
 # optional LLM verbs — off until [llm].enabled; setup in docs/llm.md
 # recover also auto-fires at the end of `run` when Scholar / EZProxy / htmlpdf fail
 uv run paperful recover --item ITEMKEY --dry-run     # browser agent: show start URL only
@@ -210,6 +215,7 @@ uv run paperful pack show
 | `rag status` | What the index holds and how far it is behind the mirror (items indexed, scans waiting for OCR, failures, PDFs held only by the reference manager). `--json`. Works with `[rag].enabled = false`. |
 | `rag search` | Indexed passages closest to a query, with paper and pages. No chat model. `-k`, `--item` / `-C`, `--year-from` / `--year-to`, `--type`, `--json`. |
 | `rag questions` | Extract research questions from indexed papers (rules; optional `--llm` / `[rag].extract_questions_llm`). `--item` / `-C` / `--library`, year/type/`--limit`, `--dry-run`. Writes `state/rag/questions/<key>.json`. Also on Advanced Index. See [rag.md](rag.md). |
+| `extract-sections` | IMRaD-style fields from mirror PDF text (rules; optional `--llm` / `[extract_sections].llm`). `--item` / `-C` / `--library`, year/type/`--limit`, `--dry-run`, `--force`. Writes `state/sections/<key>.json` (`paperful.sections.v1`). Does not need `[rag].enabled`; reuses `state/rag/text/` when present. No Zotero writes. Writes `state/runs/<stamp>-extract-sections.json`. Config: [config.md](config.md#section-extract-extract-sections). |
 | `rag answered` | Ask whether the corpus already answers operator or extracted questions (`--from-file` / `--from-extract`, `--after-item`, scope, `--force`). Writes `state/rq-answered/<stamp>/` (`pack.md`). Also on Advanced Index. See [rag.md](rag.md). |
 | `ask` | Answer a question from the index, streamed, with cited sources and pages (`-k`, `--item` / `-C`, `--year-from` / `--year-to`, `--type`, `--focus`, `--prompt FILE`, `--from-file` batch → `state/ask-batch/`, `--force`, `--apply`/`--to`, `--no-stream`, `--show-context`, `--thread`, `--format json`). JSON implies `--no-stream` and needs a question (no TTY loop). Prompted `ask` (no question) keeps a thread under `state/rag/threads/`; follow-ups rewrite a standalone retrieval query. One-shot CLI still answers independently unless `--thread`. Writes `state/runs/<stamp>-ask.json`. Needs `[rag].enabled`, `[llm].enabled` and a built index. Workbench **Ask** covers the same verbs except TTY / `--show-context` / run profiles — [gui.md](gui.md), [rag.md](rag.md#workbench-advanced-index). |
 | `summarize` | Grounded LLM summary from the PDF already on disk (`--item` / `-C` / `--library`, `--year-from` / `--year-to`, `--type` / `-T`, `--order newest\|oldest\|library`, `--limit`, `--prompt FILE`, `--force`, `--to disk, zotero, or both`). Default writes `state/summaries/<key>.html` and one child note tagged `[summarize].tag`. Without `--force`, existing summaries for the chosen dest are skipped when the footer matches the current model and prompt sha (resume-safe; a model or `[summarize].style` change rewrites). `[summarize].style = ste` enables ASD-STE100 constraints and post-check (`ste_violation_policy`, optional `ste_word_list_path`). `--order` (default `[summarize].order`, or `library`) sorts before `--limit` so a slow model can finish recent or old work first; undated items stay last under `newest` / `oldest`. `--to disk` skips Zotero. `--apply` requires the note and conflicts with `--to disk`. Writes `state/runs/<stamp>-summarize.json`. See [LLM](llm.md#d-summarize-grounded-summary-note). |
@@ -446,7 +452,8 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
 - `state/last-run.json` — latest auditable `run` or `recover` report (summary + per-item
   outcomes). Other commands do not replace it. Historical copies land in
   `state/runs/<timestamp>-<command>.json` (`run`, `recover`, `gaps`, `reachout`, `lint`,
-  `fix-metadata` for dry-run and `--apply`, `summarize`, `synthesize`, `refs gap`,
+  `fix-metadata` for dry-run and `--apply`, `summarize`, `synthesize`,
+  `extract-sections`, `refs gap`,
   `coverage`, `snowball apply`, …). Reports may include optional `witness`
   (`paperful.witness.v1`).
 - `state/packs/<id>.json` — parent witness for one `pack open` … `pack close`
@@ -454,6 +461,7 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
   may include `witness_id` (first 12 of `witness.config_sha256`).
   `state/packs/current` is the open id; `PAPERFUL_PACK=off` skips appending.
 - `state/summaries/` — HTML summaries from `summarize` when dest includes disk.
+- `state/sections/` — structured IMRaD JSON from `extract-sections` (`paperful.sections.v1`; optional `state/section-headings.toml` synonyms).
 - `state/reports/` — `synthesize` HTML report plus a JSON sidecar of source hashes; `authors --apply` writes `<scope>-authors.json` (`paperful.authors_report.v1`).
 - `state/author-packs/` — field author packs (`*.proposed.toml` until `snowball packs promote`). Seeded by `authors --apply`, snowball `--author-site-preflight`, or `twenty lookup --apply`.
 - `state/author-contacts/` — Twenty People cache from `twenty lookup --apply`, `twenty sync --apply`, or `reachout --lookup` (websites / emails; no mail).

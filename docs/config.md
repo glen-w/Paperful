@@ -283,6 +283,25 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[rag].dest` | `disk` | Batch ask note destination: `disk`, `zotero`, or `both` (Zotero needs `--apply` + one `-C`) |
 | `[rag].extract_questions_llm` | `false` | Default for `rag questions --llm` grounded extract lane |
 
+### Section extract (`extract-sections`)
+
+Reads mirror PDFs and optional `state/rag/text/` cache only. No Zotero writes.
+Short bodies and table-of-contents noise are left in `missing` rather than
+written as garbage. Re-run with `--force` to replace an existing
+`state/sections/<key>.json`.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `[extract_sections].llm` | `false` | Default for `extract-sections --llm` (fill missing MVP fields; needs `[llm].enabled`) |
+| `[extract_sections].headings` | `""` | Extra heading-synonym TOML (`canonical = ["synonym", …]` rows). Also loads `state/section-headings.toml` when present |
+| `[extract_sections].fields` | `abstract`, `conclusion`, `methodology`, `research_questions` | MVP keys written under `fields` in `state/sections/<key>.json` |
+| `[extract_sections].raw_map` | `true` | Include detected section headings (`sections` array) in the JSON |
+| `[extract_sections].max_field_chars` | `20000` | Truncate each text field at this length |
+
+Each populated MVP field is an object: `text`, `provenance` (`rule` or `llm`),
+optional `heading`, optional `pages`. Top-level `source` is `pdf`, `abstract`,
+or `none`. Schema: `paperful.sections.v1` ([developer.md](developer.md)).
+
 Timeouts, context budgets, prompt templates, tags, attachment hygiene, and
 browser-agent step caps: [Advanced](#advanced).
 

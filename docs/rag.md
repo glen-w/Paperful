@@ -235,6 +235,30 @@ uv run paperful rag answered --from-file qs.txt --after-item AAAA1111
 `state/rq-answered/<stamp>/` (`paperful.rq_answered.v1`). `--after-item`
 keeps only newer years and drops the asking paper from retrieval.
 
+### Structured sections (mirror-only)
+
+`paperful extract-sections` is **not** part of the LanceDB index. It reads the
+same mirror PDFs (or `state/rag/text/<key>.json` when ingest already cached
+pages) and writes IMRaD-shaped fields to `state/sections/<key>.json`
+(`paperful.sections.v1`). The deterministic lane always runs; `--llm` fills
+only missing MVP fields when `[llm].enabled` and `[extract_sections].llm` (or
+`--llm` on the CLI). It does not write Zotero notes and does not require
+`[rag].enabled`.
+
+Use `rag questions` when you need a corpus-wide RQ queue for `rag answered`.
+Use `extract-sections` when you want structured `abstract`, `methodology`,
+`conclusion`, and `research_questions` beside each item for scripts, gap
+context, or downstream synthesis — without HTML summaries.
+
+```bash
+uv run paperful extract-sections -C ocean/BBNJ
+uv run paperful extract-sections --library --llm --dry-run
+```
+
+Heading synonyms ship in the tree; merge publisher-specific titles from
+`state/section-headings.toml` or `[extract_sections].headings`. See
+[config.md](config.md#section-extract-extract-sections).
+
 ### Workbench (Advanced Index)
 
 With `[rag]` and `[llm]` on, the workbench **Ask** page runs threaded Ask and

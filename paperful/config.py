@@ -314,6 +314,17 @@ class Config:
     rag_prompt: str = ""  # custom system prompt file for ask; empty → focus preset
     rag_dest: str = "disk"  # disk | zotero | both — batch note writes (needs --apply)
     rag_extract_questions_llm: bool = False  # LLM lane for `rag questions`
+    # Structured IMRaD section extract (`extract-sections`).
+    extract_sections_llm: bool = False
+    extract_sections_headings: str = ""  # extra synonym TOML; also state/section-headings.toml
+    extract_sections_fields: tuple[str, ...] = (
+        "abstract",
+        "conclusion",
+        "methodology",
+        "research_questions",
+    )
+    extract_sections_raw_map: bool = True
+    extract_sections_max_field_chars: int = 20_000
     # Workbench Library item table (server-rendered pagination).
     ui_library_page_size: int = 50
     ui_library_page_sizes: tuple[int, ...] = (25, 50, 100, 200)
@@ -375,6 +386,10 @@ class Config:
     @property
     def rag_dir(self) -> Path:
         return self.state_dir / "rag"
+
+    @property
+    def sections_dir(self) -> Path:
+        return self.state_dir / "sections"
 
     @property
     def inbox_path(self) -> Path | None:
