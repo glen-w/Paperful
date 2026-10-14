@@ -27,12 +27,13 @@ class STEValidator:
     def __init__(self, word_list_path: Path | None = None):
         """Initialize validator with optional approved word list."""
         self.approved_words: set[str] = set()
-        if word_list_path and word_list_path.exists():
-            try:
-                text = word_list_path.read_text(encoding="utf-8")
-                self.approved_words = {w.strip().lower() for w in text.splitlines() if w.strip()}
-            except Exception:
-                pass
+        if word_list_path is not None:
+            if not word_list_path.is_file():
+                raise FileNotFoundError(f"STE word list not found: {word_list_path}")
+            text = word_list_path.read_text(encoding="utf-8")
+            self.approved_words = {
+                w.strip().lower() for w in text.splitlines() if w.strip()
+            }
 
     def check_summary(
         self, html: str, domain_words: set[str] | None = None
@@ -168,11 +169,13 @@ class STEValidator:
         approved_combined = self.approved_words | domain_words_lower
 
         unapproved = words - approved_combined
-        if unapproved and len(unapproved) <= 5:  # Only flag small counts to avoid noise
+        if unapproved:
+            sample = sorted(unapproved)[:5]
+            extra = f" (+{len(unapproved) - 5} more)" if len(unapproved) > 5 else ""
             violations.append(
                 STEViolation(
                     rule="vocabulary",
-                    message=f"Unapproved words found: {', '.join(sorted(list(unapproved)[:5]))}",
+                    message=f"Unapproved words found: {', '.join(sample)}{extra}",
                 )
             )
 

@@ -813,6 +813,8 @@ def parse_rag_embed_provider(value: str) -> str:
 
 
 _SUMMARIZE_ORDERS = frozenset({"library", "newest", "oldest"})
+_SUMMARIZE_STYLES = frozenset({"plain", "ste"})
+_STE_VIOLATION_POLICIES = frozenset({"warn", "fail"})
 
 
 def parse_summarize_order(value: str, *, key: str = "order") -> str:
@@ -823,6 +825,26 @@ def parse_summarize_order(value: str, *, key: str = "order") -> str:
     if order not in _SUMMARIZE_ORDERS:
         raise ValueError(f"config {key} {value!r} must be newest, oldest, or library")
     return order
+
+
+def parse_summarize_style(value: str, *, key: str = "style") -> str:
+    """Normalise summarize style. Blank means plain."""
+    style = str(value).strip().lower()
+    if not style:
+        return "plain"
+    if style not in _SUMMARIZE_STYLES:
+        raise ValueError(f"config {key} {value!r} must be plain or ste")
+    return style
+
+
+def parse_ste_violation_policy(value: str, *, key: str = "ste_violation_policy") -> str:
+    """Normalise STE violation policy. Blank means warn."""
+    policy = str(value).strip().lower()
+    if not policy:
+        return "warn"
+    if policy not in _STE_VIOLATION_POLICIES:
+        raise ValueError(f"config {key} {value!r} must be warn or fail")
+    return policy
 
 
 def wants_disk(dest: str) -> bool:

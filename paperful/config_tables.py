@@ -159,9 +159,11 @@ def apply_summarize(raw: dict[str, Any], cfg: "Config") -> None:
                 "summarize_tag",
                 lambda v: str(v).strip() or "paperful-summary",
             ),
-            ("style", "summarize_style", lambda v: str(v).strip()),
-            ("ste_violation_policy", "ste_violation_policy", lambda v: str(v).strip()),
-            ("ste_word_list_path", "ste_word_list_path", lambda v: Path(v).expanduser() if v else None),
+            (
+                "ste_word_list_path",
+                "ste_word_list_path",
+                lambda v: Path(v).expanduser() if v else None,
+            ),
         ],
     )
     if "dest" in summ:
@@ -169,6 +171,15 @@ def apply_summarize(raw: dict[str, Any], cfg: "Config") -> None:
     if "order" in summ:
         cfg.summarize_order = C.parse_summarize_order(
             str(summ["order"]), key="[summarize].order"
+        )
+    if "style" in summ:
+        cfg.summarize_style = C.parse_summarize_style(
+            str(summ["style"]), key="[summarize].style"
+        )
+    if "ste_violation_policy" in summ:
+        cfg.ste_violation_policy = C.parse_ste_violation_policy(
+            str(summ["ste_violation_policy"]),
+            key="[summarize].ste_violation_policy",
         )
 
 
@@ -606,3 +617,5 @@ def apply_prompt_paths(cfg: "Config", source: Path) -> None:
     cfg.synthesize_prompt_template = C._resolve_prompt_path(
         cfg.synthesize_prompt_template, source
     )
+    if cfg.ste_word_list_path is not None and not cfg.ste_word_list_path.is_absolute():
+        cfg.ste_word_list_path = (source.parent / cfg.ste_word_list_path).resolve()

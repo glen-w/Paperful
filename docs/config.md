@@ -227,6 +227,9 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[screen].tag` | `paperful-pps` | Child note tag for `--apply` |
 | `[summarize].dest` | `both` | `disk` (`state/summaries/`), `zotero` (child note), or `both`. `--to` overrides |
 | `[summarize].order` | `library` | Summarize queue order before `--limit`: `library` (manager order), `newest`, or `oldest`. `--order` overrides. Undated items stay last under `newest` / `oldest`. Type stays a filter (`-T`) |
+| `[summarize].style` | `plain` | Summary writing style: `plain` (default) or `ste` (ASD-STE100 Simplified Technical English constraints in the prompt + post-check) |
+| `[summarize].ste_violation_policy` | `warn` | When `style = ste`: `warn` (keep the summary, emit a warning) or `fail` (mark the item failed) |
+| `[summarize].ste_word_list_path` | unset | Optional path to an approved-word list (one word per line). Relative paths resolve from the config file. Domain words from the PDF/metadata stay allowed |
 | `[synthesize].dest` | `both` | `disk` (`state/reports/`), `zotero` (standalone note in the collection), or `both` |
 | `[browser_agent].during_run` | `true` | When `[llm].enabled` and the extra is installed, `run` appends `browser_agent`. Policy order tries Scholar once immediately before it. Override per run with `--browser-agent` / `--no-browser-agent` |
 | `[gaps].handoff` | `list` | Default for `gaps --handoff` when the flag is omitted: `list`, `tabs`, `walk`, or `watch`. `run` only handoffs when you pass `--handoff` |

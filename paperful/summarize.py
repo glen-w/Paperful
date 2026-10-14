@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import re
 import time
+import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -190,9 +191,10 @@ def render_summary(
     if not raw.strip():
         raise ValueError("could not extract PDF text")
     text = budget_slice(raw, cfg.summarize_max_context_chars)
+    meta = metadata_block(item)
     template, _template_id = load_prompt_template(cfg)
     client = get_client(cfg)
-    prompt = f"{template}\n\n---\n{metadata_block(item)}\n\n---\nDocument text:\n{text}"
+    prompt = f"{template}\n\n---\n{meta}\n\n---\nDocument text:\n{text}"
     html_body = to_note_html(
         client.complete(
             CompletionRequest(
@@ -203,6 +205,7 @@ def render_summary(
             )
         )
     )
+    _enforce_ste(cfg, html_body, item_key=item.key, metadata=meta, text=text)
     sha = hashlib.sha256(template.encode()).hexdigest()[:8]
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     footer = f"<p><em>paperful · {cfg.llm_model} · {stamp} · prompt {sha}</em></p>"
@@ -272,9 +275,7 @@ def _validate_ste(
     html: str,
     domain_words: set[str] | None = None,
 ) -> list[str]:
-    """
-    Validate STE compliance. Returns list of violation messages.
-    """
+    """Validate STE compliance. Returns list of violation messages."""
     if cfg.summarize_style != "ste":
         return []
 
@@ -282,6 +283,32 @@ def _validate_ste(
     violations = validator.check_summary(html, domain_words or set())
 
     return [f"{v.rule}: {v.message}" for v in violations]
+
+
+def _enforce_ste(
+    cfg: Config,
+    html: str,
+    *,
+    item_key: str,
+    metadata: str | None = None,
+    text: str | None = None,
+) -> None:
+    """Apply STE checks per ``ste_violation_policy`` (warn or fail)."""
+    if cfg.summarize_style != "ste":
+        return
+    domain_words = extract_domain_words(metadata, text)
+    violations = _validate_ste(cfg, html, domain_words)
+    if not violations:
+        return
+    detail = "; ".join(violations)
+    policy = (cfg.ste_violation_policy or "warn").strip().lower()
+    if policy == "fail":
+        raise ValueError(f"STE violations ({item_key}): {detail}")
+    warnings.warn(
+        f"STE violations ({item_key}): {detail}",
+        UserWarning,
+        stacklevel=2,
+    )
 
 
 _FOOTER = re.compile(

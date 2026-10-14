@@ -168,6 +168,9 @@ mirror_failures_before_skip = 3
 # tag = "paperful-summary"       # child-note tag; re-runs update, never duplicate
 # dest = "both"                  # disk | zotero | both. disk keeps the Zotero tree clean
 # order = "library"              # library | newest | oldest (before --limit; undated last)
+# style = "plain"                # plain | ste (ASD-STE100 Simplified Technical English)
+# ste_violation_policy = "warn"  # warn | fail when style = ste
+# ste_word_list_path = ""        # optional approved-word list (one word per line)
 # [synthesize]
 # prompt_template = "default"
 # max_context_chars = 24000

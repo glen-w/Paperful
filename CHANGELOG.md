@@ -8,6 +8,13 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- **`[summarize].style = ste`**: ASD-STE100 Simplified Technical English
+  constraints in the summarize prompt (sentence/paragraph limits, active voice,
+  optional approved-word list). Post-generation heuristic check with
+  `ste_violation_policy` (`warn` or `fail`). Toggles the prompt SHA so plain
+  summaries are not reused. See [LLM](docs/llm.md#d-summarize-grounded-summary-note)
+  and [Configuration](docs/config.md#llm-optional-local-first).
+
 - Opt-in **`camofox`** recover lane: scripted DOI→PDF via an external
   [camofox-browser](https://github.com/jo-inc/camofox-browser) server, after
   vault Playwright lanes and before `browser_agent`. Config `[camofox]`,

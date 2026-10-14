@@ -1,13 +1,22 @@
 """Tests for ASD-STE100 STE flag and validator."""
 
-import hashlib
 from pathlib import Path
 
 import pytest
 
-from paperful.config import Config
+from paperful.config import (
+    Config,
+    load_config,
+    parse_ste_violation_policy,
+    parse_summarize_style,
+)
 from paperful.ste import STEValidator, extract_domain_words
-from paperful.summarize import load_prompt_template, current_prompt_sha, _validate_ste
+from paperful.summarize import (
+    _enforce_ste,
+    _validate_ste,
+    current_prompt_sha,
+    load_prompt_template,
+)
 
 
 class TestSTEValidator:
@@ -16,7 +25,11 @@ class TestSTEValidator:
     def test_sentence_too_long(self):
         """Sentence exceeding 25 words should be flagged."""
         validator = STEValidator()
-        html = "<p>This is a very long sentence that contains significantly more than twenty five words in total and should definitely be flagged as a violation of the rule.</p>"
+        html = (
+            "<p>This is a very long sentence that contains significantly more "
+            "than twenty five words in total and should definitely be flagged "
+            "as a violation of the rule.</p>"
+        )
         violations = validator.check_summary(html)
         assert any(v.rule == "sentence_length" for v in violations)
 
@@ -30,7 +43,10 @@ class TestSTEValidator:
     def test_paragraph_too_long(self):
         """Paragraph with more than 6 sentences should be flagged."""
         validator = STEValidator()
-        html = "<p>Sentence one. Sentence two. Sentence three. Sentence four. Sentence five. Sentence six. Sentence seven.</p>"
+        html = (
+            "<p>Sentence one. Sentence two. Sentence three. Sentence four. "
+            "Sentence five. Sentence six. Sentence seven.</p>"
+        )
         violations = validator.check_summary(html)
         assert any(v.rule == "paragraph_length" for v in violations)
 
@@ -41,18 +57,30 @@ class TestSTEValidator:
         violations = validator.check_summary(html)
         assert not any(v.rule == "paragraph_length" for v in violations)
 
-    def test_domain_words_excluded(self):
+    def test_domain_words_excluded(self, tmp_path: Path):
         """Words in domain_words set should not be flagged."""
-        word_list = Path("/tmp/test_ste_words.txt")
-        word_list.write_text("test\napproved\n")
-        try:
-            validator = STEValidator(word_list)
-            html = "<p>Test approved system.</p>"
-            violations = validator.check_summary(html, domain_words={"system"})
-            # Should not have vocabulary violations
-            assert not any(v.rule == "vocabulary" for v in violations)
-        finally:
-            word_list.unlink()
+        word_list = tmp_path / "ste_words.txt"
+        word_list.write_text("test\napproved\n", encoding="utf-8")
+        validator = STEValidator(word_list)
+        html = "<p>Test approved system.</p>"
+        violations = validator.check_summary(html, domain_words={"system"})
+        assert not any(v.rule == "vocabulary" for v in violations)
+
+    def test_vocabulary_flags_many_unapproved(self, tmp_path: Path):
+        """Many unapproved words still produce a vocabulary violation."""
+        word_list = tmp_path / "ste_words.txt"
+        word_list.write_text("the\na\n", encoding="utf-8")
+        validator = STEValidator(word_list)
+        html = "<p>Alpha bravo charlie delta echo foxtrot golf.</p>"
+        violations = validator.check_summary(html)
+        vocab = [v for v in violations if v.rule == "vocabulary"]
+        assert vocab
+        assert "more" in vocab[0].message
+
+    def test_missing_word_list_raises(self, tmp_path: Path):
+        missing = tmp_path / "missing.txt"
+        with pytest.raises(FileNotFoundError, match="STE word list"):
+            STEValidator(missing)
 
 
 class TestSTEPromptIntegration:
@@ -62,6 +90,7 @@ class TestSTEPromptIntegration:
         """summarize_style should default to 'plain'."""
         cfg = Config()
         assert cfg.summarize_style == "plain"
+        assert cfg.ste_violation_policy == "warn"
 
     def test_ste_rules_block_appended_when_enabled(self):
         """STE rules block should be appended when summarize_style='ste'."""
@@ -99,21 +128,57 @@ class TestSTEPromptIntegration:
 
 
 class TestSTEValidation:
-    """Test validation function."""
+    """Test validation function and policy enforcement."""
 
     def test_validate_ste_disabled_in_plain_mode(self):
         """_validate_ste should return empty list when summarize_style='plain'."""
         cfg = Config(summarize_style="plain")
-        html = "<p>Some problematic text with very long sentences that exceed the limit significantly.</p>"
+        html = (
+            "<p>Some problematic text with very long sentences that exceed "
+            "the limit significantly.</p>"
+        )
         violations = _validate_ste(cfg, html)
         assert violations == []
 
     def test_validate_ste_enabled_in_ste_mode(self):
         """_validate_ste should check violations when summarize_style='ste'."""
         cfg = Config(summarize_style="ste")
-        html = "<p>This is a very long sentence that contains more than twenty five words in total and should definitely be flagged as a violation.</p>"
+        html = (
+            "<p>This is a very long sentence that contains more than twenty "
+            "five words in total and should definitely be flagged as a "
+            "violation.</p>"
+        )
         violations = _validate_ste(cfg, html)
         assert len(violations) > 0
+
+    def test_enforce_ste_warn_emits_warning(self):
+        cfg = Config(summarize_style="ste", ste_violation_policy="warn")
+        html = (
+            "<p>This is a very long sentence that contains more than twenty "
+            "five words in total and should definitely be flagged as a "
+            "violation.</p>"
+        )
+        with pytest.warns(UserWarning, match="STE violations"):
+            _enforce_ste(cfg, html, item_key="ABCD1234")
+
+    def test_enforce_ste_fail_raises(self):
+        cfg = Config(summarize_style="ste", ste_violation_policy="fail")
+        html = (
+            "<p>This is a very long sentence that contains more than twenty "
+            "five words in total and should definitely be flagged as a "
+            "violation.</p>"
+        )
+        with pytest.raises(ValueError, match="STE violations \\(ABCD1234\\)"):
+            _enforce_ste(cfg, html, item_key="ABCD1234")
+
+    def test_enforce_ste_noop_in_plain_mode(self):
+        cfg = Config(summarize_style="plain", ste_violation_policy="fail")
+        html = (
+            "<p>This is a very long sentence that contains more than twenty "
+            "five words in total and should definitely be flagged as a "
+            "violation.</p>"
+        )
+        _enforce_ste(cfg, html, item_key="ABCD1234")
 
 
 class TestExtractDomainWords:
@@ -140,3 +205,37 @@ class TestExtractDomainWords:
         assert "very" in words
         assert "important" in words
         assert "concept" in words
+
+
+class TestSTEConfigParse:
+    """Config parsers and TOML wiring for STE knobs."""
+
+    def test_parse_summarize_style(self):
+        assert parse_summarize_style("STE") == "ste"
+        assert parse_summarize_style("") == "plain"
+        with pytest.raises(ValueError, match="plain or ste"):
+            parse_summarize_style("fancy")
+
+    def test_parse_ste_violation_policy(self):
+        assert parse_ste_violation_policy("FAIL") == "fail"
+        assert parse_ste_violation_policy("") == "warn"
+        with pytest.raises(ValueError, match="warn or fail"):
+            parse_ste_violation_policy("ignore")
+
+    def test_toml_loads_ste_keys(self, tmp_path: Path):
+        words = tmp_path / "words.txt"
+        words.write_text("the\na\n", encoding="utf-8")
+        cfg_path = tmp_path / "config.toml"
+        cfg_path.write_text(
+            f"""
+[summarize]
+style = "ste"
+ste_violation_policy = "fail"
+ste_word_list_path = "{words.name}"
+""",
+            encoding="utf-8",
+        )
+        cfg = load_config(cfg_path)
+        assert cfg.summarize_style == "ste"
+        assert cfg.ste_violation_policy == "fail"
+        assert cfg.ste_word_list_path == words.resolve()

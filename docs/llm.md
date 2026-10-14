@@ -99,6 +99,9 @@ max_context_chars = 24000
 tag = "paperful-summary"
 # dest = "both"                    # disk | zotero | both
 # order = "library"                # library | newest | oldest
+# style = "plain"                  # plain | ste (ASD-STE100 constraints)
+# ste_violation_policy = "warn"    # warn | fail (when style = ste)
+# ste_word_list_path = ""          # optional approved-word list (one word/line)
 
 [synthesize]                        # verb E
 prompt_template = "default"
@@ -252,6 +255,13 @@ uv run paperful summarize --item ABCD1234 --prompt prompts/one-liner.md
   truncation warning, lower `max_context_chars` or raise `max_num_ctx`.
 - If `[lint].llm_pdf_match` is on and the item is flagged, `summarize` refuses
   it; pass `--force` to override.
+- `[summarize].style = ste` appends ASD-STE100 Simplified Technical English
+  constraints to the prompt (≤25 words/sentence, ≤6 sentences/paragraph,
+  prefer active voice, approved vocabulary with domain terms allowed). The
+  prompt SHA changes, so existing plain summaries are regenerated. After the
+  model replies, a heuristic check runs: `ste_violation_policy = warn` (default)
+  keeps the summary and warns; `fail` marks the item failed. Optional
+  `ste_word_list_path` enables vocabulary checks against an approved list.
 
 ### E. `synthesize` — summary of summaries
 
