@@ -21,6 +21,7 @@ from .llm import (
     get_client,
     llm_egress_is_remote,
 )
+from .ste import STEValidator, extract_domain_words
 from .store import Manifest
 from .zot import Item
 
@@ -57,6 +58,17 @@ Structure the summary in simple HTML (no outer html/body tags, no Markdown, no c
 <h2>Key findings</h2>
 <h2>Limitations</h2>
 Use <p> and <ul><li> for bullets. Keep under 600 words."""
+
+_STE_RULES_BLOCK = """
+
+---
+Write the summary following Simplified Technical English (STE) constraints:
+- Use approved vocabulary only. Domain terms and proper nouns from the source text are allowed.
+- Maximum 25 words per sentence.
+- Maximum 6 sentences per paragraph; each paragraph has one topic.
+- Prefer active voice. Minimize -ing forms.
+- Use simple punctuation and American English spelling.
+- If you cannot meet these constraints while conveying the summary, prioritize accuracy."""
 
 
 _FENCE = re.compile(r"^```[a-zA-Z]*\s*$")
@@ -138,9 +150,17 @@ def _inline(text: str) -> str:
 
 def load_prompt_template(cfg: Config) -> tuple[str, str]:
     if cfg.summarize_prompt_template == "default":
-        return _DEFAULT_PROMPT, "default"
-    path = Path(cfg.summarize_prompt_template)
-    return path.read_text(encoding="utf-8"), str(path)
+        template = _DEFAULT_PROMPT
+        name = "default"
+    else:
+        path = Path(cfg.summarize_prompt_template)
+        template = path.read_text(encoding="utf-8")
+        name = str(path)
+
+    if cfg.summarize_style == "ste":
+        template += _STE_RULES_BLOCK
+
+    return template, name
 
 
 class IdentityMismatch(ValueError):
@@ -245,6 +265,23 @@ class SummaryBatch:
             if row.fatal:
                 return row.reason
         return None
+
+
+def _validate_ste(
+    cfg: Config,
+    html: str,
+    domain_words: set[str] | None = None,
+) -> list[str]:
+    """
+    Validate STE compliance. Returns list of violation messages.
+    """
+    if cfg.summarize_style != "ste":
+        return []
+
+    validator = STEValidator(cfg.ste_word_list_path)
+    violations = validator.check_summary(html, domain_words or set())
+
+    return [f"{v.rule}: {v.message}" for v in violations]
 
 
 _FOOTER = re.compile(

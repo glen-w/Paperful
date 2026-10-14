@@ -159,6 +159,9 @@ def apply_summarize(raw: dict[str, Any], cfg: "Config") -> None:
                 "summarize_tag",
                 lambda v: str(v).strip() or "paperful-summary",
             ),
+            ("style", "summarize_style", lambda v: str(v).strip()),
+            ("ste_violation_policy", "ste_violation_policy", lambda v: str(v).strip()),
+            ("ste_word_list_path", "ste_word_list_path", lambda v: Path(v).expanduser() if v else None),
         ],
     )
     if "dest" in summ:

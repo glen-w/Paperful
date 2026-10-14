@@ -200,6 +200,9 @@ class Config:
     summarize_tag: str = "paperful-summary"
     summarize_dest: str = "both"  # disk | zotero | both
     summarize_order: str = "library"  # library | newest | oldest
+    summarize_style: str = "plain"  # plain | ste
+    ste_violation_policy: str = "warn"  # warn | fail
+    ste_word_list_path: Path | None = None
     synthesize_prompt_template: str = "default"
     synthesize_max_context_chars: int = 24_000
     synthesize_tag: str = "paperful-report"
