@@ -1,9 +1,11 @@
 # Optional local Compose overrides (gitignored as compose.override.yaml).
 #
-# Prefer editing .env for data location and image pack:
-#   PAPERFUL_DATA=../paperful-data   # sibling dir (recommended)
-#   PAPERFUL_DATA=.                 # keep config/out/state in the repo
-#   PAPERFUL_IMAGE_MODE=heavy       # full local: llm + rag + browser-agent
+# Prefer editing .env for mount locations and image pack:
+#   PAPERFUL_DATA=../paperful-data   # config/state/packs (recommended)
+#   PAPERFUL_OUT=../paperful-out     # PDF mirror (recommended)
+#   PAPERFUL_DATA=.                  # keep config/state in the repo
+#   PAPERFUL_OUT=./out               # keep out/ in the repo
+#   PAPERFUL_IMAGE_MODE=heavy        # full local: llm + rag + browser-agent
 #
 # Example: pin Zotero host explicitly
 #

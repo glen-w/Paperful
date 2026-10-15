@@ -30,10 +30,12 @@ jobs:
         # Must not fail the workflow solely because the API is missing.
         run: |
           data="$(mktemp -d)"
-          # Image runs as uid 1000; mktemp is 0700 for the runner uid — open the mount.
-          chmod 0777 "$data"
+          out="$(mktemp -d)"
+          # Image runs as uid 1000; mktemp is 0700 for the runner uid — open the mounts.
+          chmod 0777 "$data" "$out"
           cp config.example.toml "$data/config.toml"
           export PAPERFUL_DATA="$data"
+          export PAPERFUL_OUT="$out"
           docker compose run --rm -T paperful --help
           set +e
           docker compose run --rm -T paperful doctor --no-guide

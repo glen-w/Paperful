@@ -6,6 +6,12 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+### Changed
+
+- **Compose mounts:** `PAPERFUL_OUT` is a separate volume at `/data/out`
+  (default `../paperful-out`). `PAPERFUL_DATA` holds config/`state`/packs only.
+  Repo-local setups set `PAPERFUL_OUT=./out` with `PAPERFUL_DATA=.`.
+
 ### Added
 
 - **`paperful extract-sections`:** deterministic IMRaD-style fields

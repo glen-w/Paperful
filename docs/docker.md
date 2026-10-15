@@ -18,10 +18,10 @@ Jobs in the GUI: [Walkthroughs](walkthroughs.md).
 Durable data — config, custom playbook packs, `out/`, and `state/` — still
 lives **outside** the container (and, by default, outside the git root).
 
-**Mounts (stranger path):** host `PAPERFUL_DATA` → container `/data`. `out/`
-and `state/` are folders **inside** that tree (`/data/out`, `/data/state`),
-not extra volumes. Compose does not mount Zotero Storage writable. See
-[Terms](TERMS.md).
+**Mounts (stranger path):** host `PAPERFUL_DATA` → container `/data`
+(config.toml, `state/`, packs). Host `PAPERFUL_OUT` → `/data/out` (PDF
+mirror). Separate mounts by default. Compose does not mount Zotero Storage
+writable. See [Terms](TERMS.md).
 
 **What CI proves:** job `docker` in `.github/workflows/ci.yml` builds the
 **light** image (`PAPERFUL_IMAGE_MODE` unset) and runs `doctor --no-guide`
@@ -67,7 +67,7 @@ cp .env.example .env
 
 ```sh
 cp .env.example .env
-# edit .env: PAPERFUL_DATA=.
+# edit .env: PAPERFUL_DATA=. and PAPERFUL_OUT=./out
 docker compose build
 docker compose run --rm paperful doctor
 # Without host Zotero this exits 2 (amber/red). That is expected; CI job docker
@@ -77,37 +77,37 @@ docker compose up
 docker compose run --rm paperful run --collection interesting --dry-run
 ```
 
-**Or migrate into a sibling data directory** (recommended if you use Compose
-long-term):
+**Or migrate into sibling mounts** (recommended if you use Compose long-term):
 
 ```sh
-cp .env.example .env   # PAPERFUL_DATA=../paperful-data
-mkdir -p ../paperful-data/packs ../paperful-data/profiles ../paperful-data/out ../paperful-data/state
+cp .env.example .env   # PAPERFUL_DATA=../paperful-data PAPERFUL_OUT=../paperful-out
+mkdir -p ../paperful-data/packs ../paperful-data/profiles ../paperful-data/state
+mkdir -p ../paperful-out
 cp config.example.toml ../paperful-data/config.toml
 # edit email / ezproxy_base / grey_playbooks_dir = "packs" as needed
-# optional: move existing out/ and state/ into ../paperful-data/
+# optional: move existing state/ into ../paperful-data/ and out/ into ../paperful-out/
 docker compose build
 docker compose run --rm paperful doctor
 ```
 
-`PAPERFUL_DATA` in `.env` defaults to `../paperful-data`. Compose mounts that
-tree at `/data` inside the container. Use **relative** `out_dir` / `state_dir` /
-`grey_playbooks_dir` in config (e.g. `"out"`, `"state"`, `"packs"`) so they
-resolve under the mounted data dir. Absolute host paths (e.g. `/Users/...`)
-will not land on the volume.
+`PAPERFUL_DATA` / `PAPERFUL_OUT` in `.env` default to `../paperful-data` and
+`../paperful-out`. Compose mounts them at `/data` and `/data/out`. Use
+**relative** `out_dir` / `state_dir` / `grey_playbooks_dir` in config
+(e.g. `"out"`, `"state"`, `"packs"`) so they resolve under the mounted data
+dir. Absolute host paths (e.g. `/Users/...`) will not land on the volumes.
 
 ## Environment and override
 
 | File | Role |
 | --- | --- |
-| [`.env.example`](https://github.com/glen-w/Paperful/blob/main/.env.example) | Copy to `.env` — `PAPERFUL_DATA`, `PAPERFUL_ZOTERO_HOST`, `PAPERFUL_IMAGE_MODE` |
+| [`.env.example`](https://github.com/glen-w/Paperful/blob/main/.env.example) | Copy to `.env` — `PAPERFUL_DATA`, `PAPERFUL_OUT`, `PAPERFUL_ZOTERO_HOST`, `PAPERFUL_IMAGE_MODE` |
 | [`compose.yaml`](https://github.com/glen-w/Paperful/blob/main/compose.yaml) | Default service: `compose up` → GUI; `compose run` → CLI |
 | [`compose.override.example.yaml`](https://github.com/glen-w/Paperful/blob/main/compose.override.example.yaml) | Optional local Compose tweaks |
 
 `.env` and `compose.override.yaml` are gitignored so your machine-local paths
-never land in the repo. Set `PAPERFUL_DATA=.` to keep config/`out`/`state` in the
-repo; use `../paperful-data` (default) to keep packs and outputs outside the
-git root.
+never land in the repo. Set `PAPERFUL_DATA=.` and `PAPERFUL_OUT=./out` to keep
+config/`out`/`state` in the repo; defaults keep data and the PDF mirror
+outside the git root as sibling dirs.
 
 ### Image mode: light vs heavy
 

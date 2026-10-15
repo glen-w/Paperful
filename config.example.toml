@@ -21,7 +21,7 @@ manager = "zotero"
 # library = "/path/to/Library.enl"
 
 # Where PDFs land. Sub-folders mirror the Zotero collection path.
-# Prefer relative paths (resolved against this config's folder; Compose mounts that folder at /data).
+# Prefer relative paths (resolved against this config's folder; Compose: /data, with PAPERFUL_OUT at /data/out).
 out_dir = "out"
 
 # Where manifest.jsonl, metadata-patches.jsonl, pdf-cache/, last-run.json,

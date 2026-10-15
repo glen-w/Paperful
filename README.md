@@ -101,7 +101,7 @@ No campus access: **Open access** preset (`--preset oa`, or
 ```sh
 git clone --branch v1.0 https://github.com/glen-w/Paperful.git
 cd Paperful
-cp .env.example .env          # PAPERFUL_DATA=. keeps data in this checkout
+cp .env.example .env          # PAPERFUL_DATA=. PAPERFUL_OUT=./out keeps data here
                               # .env.example sets PAPERFUL_IMAGE_MODE=heavy
 cp config.minimal.toml config.toml   # set email; full file is config.example.toml
 docker compose build                 # heavy when set in .env; CI uses light
