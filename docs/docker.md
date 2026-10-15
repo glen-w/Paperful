@@ -25,7 +25,7 @@ writable. See [Terms](TERMS.md).
 
 **What CI proves:** job `docker` in `.github/workflows/ci.yml` builds the
 **light** image (`PAPERFUL_IMAGE_MODE` unset) and runs `doctor --no-guide`
-with **no live Zotero**. Exit **2** is required (Zotero row amber/red). That
+with **no live Zotero**. Exit **2** is required (Zotero row red). That
 is a first-run stranger machine, not a failed Compose install. Pytest job
 `test` is not the Compose-first proof.
 
@@ -70,7 +70,7 @@ cp .env.example .env
 # edit .env: PAPERFUL_DATA=. and PAPERFUL_OUT=./out
 docker compose build
 docker compose run --rm paperful doctor
-# Without host Zotero this exits 2 (amber/red). That is expected; CI job docker
+# Without host Zotero this exits 2 (red Zotero row). That is expected; CI job docker
 # asserts the same. Start Zotero, then re-run doctor.
 docker compose up
 # → http://127.0.0.1:8765  (Wanted). CLI one-shots stay compose run.

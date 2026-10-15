@@ -3739,8 +3739,10 @@ serve = [
 dev = [
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "jinja2" },
     { name = "lancedb" },
     { name = "pytest" },
+    { name = "python-multipart" },
     { name = "uvicorn" },
 ]
 
@@ -3778,8 +3780,10 @@ provides-extras = ["htmlpdf", "llm", "rag", "rag-docling", "browser-agent", "ser
 dev = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.27" },
+    { name = "jinja2", specifier = ">=3.1" },
     { name = "lancedb", specifier = ">=0.39,<1" },
     { name = "pytest", specifier = ">=8" },
+    { name = "python-multipart", specifier = ">=0.0.9" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]
 

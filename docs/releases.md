@@ -16,8 +16,10 @@ same way.
 walkthroughs are in the guide ([Walkthroughs](walkthroughs.md)). Discover + Wanted, people lists,
 briefing/digest (optional collection note), Repair/Mirror Preview→Apply,
 command ids, review tokens, and Activity run-status SSE (`GET /v1/runs/{id}/events`)
-are in tree. **Interactive Ask** is on `/ask`,
-opt-in after `[rag]` + `[llm]`; Advanced **Briefs** runs summarize/synthesize.
+are in tree. **Interactive Ask** is on the default nav (`/ask`),
+opt-in after `[rag]` + `[llm]`. Batch Ask is on that page when Advanced is on.
+Advanced **Index** is ingest, search, and question extracts. **Briefs** runs
+summarize/synthesize.
 Item records and create-missing restore are locked; extra item keys may still
 be added. Required `paperful.run_report.v1` keys and imported-file attach
 (typed `attach_failed`, provenance note) are the contract. **Post-1.0:**
@@ -94,7 +96,7 @@ are part of the 1.0 surface (additive extras allowed). See [LLM](llm.md).
 | Locked item record + snapshot/restore | Required `paperful.item.v1` keys frozen; restore is create-missing (not identity round-trip) |
 | Mendeley and EndNote adapters | Not a 1.0 blocker. In the tree; seeking testers; Zotero is the well-tested path |
 | Workbench GUI (Discover, Wanted, Preview/Grab) | Shipped on `paperful serve` (Jinja workbench; Wanted first; Grab fetches to disk, Attach writes the library; Advanced Repair / Mirror / Index / Briefs; review tokens; `docker compose up` at `127.0.0.1:8765`) — [gui.md](gui.md) |
-| Interactive Ask in GUI (cited chat-over-collection) | **Shipped** on `/ask` (opt-in `[rag]` + `[llm]`; threads, batch, custom prompts); Index for ingest/search/`rag questions` / `rag answered`; Briefs for summarize/synthesize |
+| Interactive Ask in GUI (cited chat-over-collection) | **Shipped** on the default nav (`/ask`; opt-in `[rag]` + `[llm]`; threads, batch when Advanced, custom prompts). Index is ingest/search/`rag questions`/`rag answered`. Briefs for summarize/synthesize |
 | Fresh-clone doctor stays quiet without Scholar | Shipped: `scholar` opt-in like `scihub` |
 
 ## Known limits (1.0)

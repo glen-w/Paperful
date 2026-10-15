@@ -43,7 +43,16 @@ paperful = "paperful.cli:app"
 
 [dependency-groups]
 # lancedb here so CI runs the index tests.
-dev = ["pytest>=8", "lancedb>=0.39,<1", "fastapi>=0.115", "uvicorn>=0.32", "httpx>=0.27"]
+dev = [
+    "pytest>=8",
+    "lancedb>=0.39,<1",
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+    "httpx>=0.27",
+    # Workbench tests render Jinja and post forms. CI also passes --extra serve.
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+]
 
 [build-system]
 requires = ["hatchling"]

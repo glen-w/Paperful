@@ -14,9 +14,9 @@ and **alert loop** (watch / authorwatch poll → ingest → briefing) are **post
 
 **1.0** is the trust checklist below (all rows shipped), a locked item record
 (`paperful.item.v1` plus `snapshot` / `restore`), proven on **Zotero**, and the
-**workbench** ([GUI](#gui)): Discover + Wanted on the default nav, Preview/Grab
-with review tokens, full CLI surface behind **Advanced**. **Interactive Ask** is
-opt-in on `/ask` (`[rag]` + `[llm]`), not the home page
+**workbench** ([GUI](#gui)): Discover + Wanted + Ask on the default nav, Preview/Grab
+with review tokens, full CLI surface behind **Advanced**. **Interactive Ask**
+is `/ask` when `[rag]` + `[llm]` are on, not the home page
 ([Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer)).
 **Mendeley and EndNote do not gate 1.0** — they stay in the tree with honest
 docs (“seeking testers”; Zotero well-tested). Do not market them as supported
@@ -36,7 +36,7 @@ integrations.
 | --- | --- |
 | Trust checklist, locked `paperful.run_report.v1` / `paperful.item.v1`, snapshot contract | **Local OpenAlex parquet store** — phases 2B/2C (`works_citing`, full search parity, `local_duckdb` / `http`). Live OpenAlex API is enough for most installs; v1 `ssh_duckdb` remains opt-in for institutions |
 | **GUI workbench** — Discover + Wanted simple loop (topic + people); command ids; review tokens; Advanced Repair / Mirror / Index / Briefs and the non-TTY CLI verbs | **Firefox extension** — native messaging → CLI ([section below](#optional-thin-bridge--firefox-extension-post-10)) |
-| **Ask in GUI** — scoped chat on `/ask` with citations when `[rag]` + `[llm]` on | **Alert loop** — poll `snowball watch` / `authorwatch`, ingest parents into `-C`, post-ingest briefing ([Frontier digest](#frontier-digest-later-watch--external-ingest)) |
+| **Ask in GUI** — `/ask` on the default nav, scoped chat with citations when `[rag]` + `[llm]` on | **Alert loop** — poll `snowball watch` / `authorwatch`, ingest parents into `-C`, post-ingest briefing ([Frontier digest](#frontier-digest-later-watch--external-ingest)) |
 | Zotero-proven fetch/mirror path; honest adapter docs (Mendeley / EndNote seeking testers) | SaaS tenancy polish; promoting other managers to “supported” after field reports; remote-manager parity beyond what 1.0 open/Docker needs |
 
 (trust-10)=
@@ -1379,7 +1379,7 @@ second doc tree that drifts from the CLI.
 
 **1.0 deliverable** — workbench (open / Docker first): [gui.md](gui.md).
 **Shipped:** `paperful.item.v1` lock, `paperful serve` HTTP + server-rendered UI
-under `paperful/ui/` — default nav **Wanted** (also `GET /`) then **Discover**,
+under `paperful/ui/` — default nav **Wanted** (also `GET /`), **Discover**, **Ask**,
 Preview → Grab (fetch to `out/` only) → Attach (explicit library write), with
 review tokens and command ids under `state/gui/commands/`; Activity run-status
 SSE on `GET /v1/runs/{id}/events`. Empty Wanted shows a
@@ -1398,10 +1398,11 @@ The CLI stays the source of truth; the GUI marshals the same verbs with dry-run
 default and explicit Apply. Not a second fetch stack or Zotero’s reader.
 **Firefox extension** is post-1.0.
 
-**Ask (opt-in, `/ask`):** **Shipped** — scoped chat with citations when `[llm]` and
-`[rag]` are on and the index has rows. Collection chip is the scope; threads live
-under `state/rag/threads/` (same as `ask --thread`). Index (Advanced) runs
-`rag ingest`, `rag search`, batch Ask (item/year/type/top-k/force, custom prompts),
-`rag questions`, and `rag answered`. **Briefs** (Advanced) runs `summarize` and
-`synthesize`. CLI `ask` remains for scripts, TTY multi-turn, and run profiles.
+**Ask (default nav, opt-in):** **Shipped** — `/ask` runs scoped chat with citations
+when `[llm]` and `[rag]` are on and the index has rows. Collection chip is the
+scope; threads live under `state/rag/threads/` (same as `ask --thread`). Batch
+Ask (item/year/type/top-k/force, custom prompts) is on that page when Advanced
+is on. **Index** (Advanced) runs `rag ingest`, `rag search`, `rag questions`,
+and `rag answered`. **Briefs** (Advanced) runs `summarize` and `synthesize`.
+CLI `ask` remains for scripts, TTY multi-turn, and run profiles.
 See [Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer).

@@ -109,8 +109,13 @@ docker compose run --rm paperful doctor          # once; --guide for Enter walk
 docker compose up                                # stays up; workbench at http://127.0.0.1:8765
 ```
 
-First-run `doctor` without Zotero is **exit 2** (amber/red Zotero row) —
-same as CI job `docker` (light). Layout: [Docker](docs/docker.md).
+Compose reads `config.toml` from `PAPERFUL_DATA` (mounted at `/data`), not from
+the git root. To keep config, `out/`, and `state/` in this checkout, set
+`PAPERFUL_DATA=.` in `.env` and copy `config.minimal.toml` to `./config.toml`
+instead. Layout: [Docker](docs/docker.md).
+
+First-run `doctor` without Zotero is **exit 2** (red Zotero row) — same as CI
+job `docker` (light). An amber Write API row (Zotero 7–9) does not exit 2.
 
 CLI one-shots (other terminal):
 
@@ -138,8 +143,9 @@ Reference:
 ## Optional local LLM and Ask
 
 Off until `[llm].enabled` / `[rag].enabled`. Needs a **heavy** Compose image
-(or host `uv sync --extra llm --extra rag`). Grounded notes, collection
-reviews, and Ask live on Advanced **Briefs** / **Index**.
+(or host `uv sync --extra llm --extra rag`). **Ask** is on the default nav.
+Grounded notes and collection reviews are on Advanced **Briefs**. Ingest and
+search are on Advanced **Index**.
 [LLM](docs/llm.md) · [Ask your library](docs/rag.md).
 
 ```sh

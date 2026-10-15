@@ -264,8 +264,11 @@ tokens (see the comment in that module). For table layout, several CLI test
 modules widen the shared `cli.console` (`width=250`) so Rich does not ellipsize
 cells — follow `tests/test_cli.py` when adding help or table assertions.
 
-**Dev sync and LanceDB.** `uv sync --group dev` pulls `lancedb` for index/RAG
-tests. PyPI wheels cover Linux x86_64/arm64, Windows, and **macOS arm64**; there
+**Dev sync and the workbench.** `uv sync --group dev` installs Jinja2 and
+`python-multipart` as well as FastAPI, so `uv run pytest` can render the
+workbench. CI still passes `--extra serve` (the operator extra). The same
+sync pulls `lancedb` for index/RAG tests. PyPI wheels cover Linux
+x86_64/arm64, Windows, and **macOS arm64**; there
 is no wheel for every macOS x86_64 / OS combo. If sync fails with “no wheel for
 the current platform”, use native **arm64** Python on Apple Silicon, run pytest
 inside the Linux dev container / CI image, or temporarily sync without the dev

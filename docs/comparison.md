@@ -14,7 +14,7 @@ Prefer this page for “is this the right tool?”
 | If you need… | Look at… |
 |--------------|----------|
 | A platform-agnostic **mirror** of the library (backup, and a way out if the citation manager changes). **Zotero is well tested.** Mendeley and EndNote adapters are seeking testers | **Paperful** `snapshot` / `restore` — [quiet mirror](quiet-mirror.md). Do not treat the other adapters as proven |
-| Bulk **missing-PDF** fetch for a Zotero library (OA → campus proxy → optional Sci-Hub), collection-shaped folders, resumable CLI | **Paperful** (this repo) |
+| Bulk **missing-PDF** fetch for a Zotero library (open access first, campus proxy when you have it), collection-shaped folders, resumable CLI | **Paperful** (this repo) |
 | **In-Zotero** “find OA PDF” plus optional grey-zone sources in one plugin UI | [zotero-zotadata](https://github.com/ydeng11/zotero-zotadata) |
 | **Attachment hygiene** (broken links, rename, stored-to-linked, duplicate files on one parent) | **Paperful** `attachments` (report by default; surgery with a flag and `--apply`). In-app: [StorScan](https://github.com/brian-j-griffith/StorScan), [Attanger](https://github.com/MuiseDestiny/zotero-attanger), [ZotMoov](https://github.com/wileyyugioh/zotmoov) |
 | **Metadata repair** (DOI/ISBN/arXiv bulk update, parent-from-PDF) | Paperful `lint` / `fix-metadata`, or [ZotMeta](https://github.com/RoadToDream/ZotMeta) |

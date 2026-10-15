@@ -61,6 +61,12 @@
       fetch("/v1/runs/" + id)
         .then(function (r) { return r.json(); })
         .then(function (body) {
+          if (!body || body.ok === false || !body.status) {
+            if (iv) clearInterval(iv);
+            sessionStorage.setItem(key, "1");
+            if (btn) btn.classList.remove("spinning");
+            return;
+          }
           var st = body.status;
           applyStatusToRow(id, st);
           if (st === "done" || st === "failed") {
