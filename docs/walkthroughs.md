@@ -9,7 +9,8 @@ on any collection chip.
 
 CLI recipes for the same verbs live in [Workflows](workflows.md)
 (`paperful all`, named run configs). How a fill searches:
-[How it works](how-it-works.md).
+[How it works](how-it-works.md). Which pieces to turn on together:
+[Example setups](example-setups.md).
 
 ## Common workflows
 

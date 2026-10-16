@@ -107,6 +107,7 @@ Site: [paperful.app](https://paperful.app/).
 Reference:
 
 - [Walkthroughs](docs/walkthroughs.md) — Wanted, Discover, Repair
+- [Example setups](docs/example-setups.md) — one collection, campus, a growing desk, all-in
 - [Docker](docs/docker.md) — operator install; light/heavy packs
 - [Workbench](docs/gui.md) — pages, Preview tokens, what stays CLI
 - [Commands](docs/commands.md) · [Workflows](docs/workflows.md) · [Configuration](docs/config.md)

@@ -17,6 +17,7 @@ from paperful import (
     ocr_cmd,
     reachout_cmd,
     recover_cmd,
+    screen_cmd,
 )
 from paperful import cli
 
@@ -31,6 +32,7 @@ ENTRIES = [
     ("notes_delete", notes_delete_cmd, "run_notes_delete", "notes_delete_cmd"),
     ("authors", authors_cmd, "run_authors", "authors_cmd"),
     ("all_cmd", all_cmd, "run_all", "all_cmd"),
+    ("screen", screen_cmd, "run_screen", "screen_cmd"),
 ]
 
 

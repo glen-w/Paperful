@@ -1,7 +1,9 @@
 # Paperful documentation
 
 New here? [paperful.app](https://paperful.app/), then
-[Walkthroughs](walkthroughs.md). Search order: [How it works](how-it-works.md).
+[Walkthroughs](walkthroughs.md). Four ways to wire it up:
+[Example setups](example-setups.md). Search order:
+[How it works](how-it-works.md).
 
 Paperful is a **local workbench** for a Zotero library you already keep.
 Open access first; campus EZProxy when you have it. **Zotero is well tested.**
@@ -20,6 +22,7 @@ Why this shape: [Why Paperful](why.md).
 
 how-it-works
 walkthroughs
+example-setups
 first-fill
 grow-library
 tidy-library
