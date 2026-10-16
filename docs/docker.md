@@ -2,7 +2,7 @@
 
 Paperful is a **local workbench**. The operator install is `git clone` and
 `docker compose build`, then `docker compose up` at
-http://127.0.0.1:8765. Build the image on this machine (`paperful:local`)
+http://127.0.0.1:8765. Build the image on your computer (`paperful:local`)
 with `docker compose build`. Zotero and headed browser login stay on the
 host; the container talks to them over the local API.
 

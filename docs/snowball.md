@@ -696,7 +696,7 @@ environment, never in `config.toml`.
 
 If API limits or shared-IP budgets are the bottleneck, download the
 [OpenAlex snapshot](https://help.openalex.org/access/snapshot/) yourself — on
-this machine or a host you control — and configure `[openalex_store]`. Paperful
+your computer or a host you control — and configure `[openalex_store]`. Paperful
 does not ship the dump. v1 queries via SSH + DuckDB on the data host and serves
 DOI / OpenAlex-id batches only; everything else still hits the live API.
 

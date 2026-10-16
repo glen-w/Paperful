@@ -1,6 +1,6 @@
 [project]
 name = "paperful"
-version = "1.0.0"
+version = "1.1.0"
 description = "Research helper for a reference library: clean records, find missing PDFs, summarise papers, keep a platform-agnostic mirror. Zotero is the well-tested adapter; Mendeley and EndNote are seeking testers."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -76,7 +76,22 @@ markers = [
 
 [tool.coverage.run]
 source = ["paperful"]
+# Opt-in E2E and alternate managers are not part of the default offline unit gate.
+omit = [
+    "paperful/e2e_nba.py",
+    "paperful/mendeley.py",
+    "paperful/endnote.py",
+    # Workbench job bodies: exercised via ``paperful[serve]`` route tests.
+    "paperful/ui/repair_jobs.py",
+    "paperful/ui/discover_jobs.py",
+    "paperful/ui/discover_routes.py",
+    "paperful/ui/wanted_jobs.py",
+    "paperful/sources/author_site.py",
+    "paperful/browser_agent.py",
+]
 
 [tool.coverage.report]
 show_missing = true
 skip_empty = true
+# Stretch goal 85%; gate tracks offline suite + scoped omits below.
+fail_under = 80

@@ -235,9 +235,9 @@ folder sync is out of scope for this CLI.
 
 ## Ghost attachments
 
-Zotero can show **The attached file could not be found** for a path under the data directory’s `storage/<key>/`. The attachment record is there (MD5 and storage folder) but the bytes never landed on this machine. That is a ghost, not a file moved or deleted outside Zotero. `paperful attachments` reports it. `--fix-broken --apply` refills the row only when `out/` already has a PDF with the same MD5.
+Zotero can show **The attached file could not be found** for a path under the data directory’s `storage/<key>/`. The attachment record is there (MD5 and storage folder) but the bytes never landed on your computer. That is a ghost, not a file moved or deleted outside Zotero. `paperful attachments` reports it. `--fix-broken --apply` refills the row only when `out/` already has a PDF with the same MD5.
 
-Attachments created through the API as `imported_url` open that storage slot without always finishing a local download. `linked_url` attachments (including a quota-full open-access pass) do not use that path: they open in the browser and do not raise this dialog. Paperful’s attach path is `imported_file`: the PDF is already on disk, then uploaded through the local write API. The Zotero attachment note is a provenance stamp (`paperful oa:unpaywall`, `campus:ezproxy`, `grey:<playbook>`, `pirate:scihub`, …). Title stays `Full Text PDF`. The parent also gets a readable line ("Free copy from Unpaywall.") unless `[remarks].surface` is `off`. Prefer `paperful run` / `paperful attach` for gap-fills so the file is written on this machine.
+Attachments created through the API as `imported_url` open that storage slot without always finishing a local download. `linked_url` attachments (including a quota-full open-access pass) do not use that path: they open in the browser and do not raise this dialog. Paperful’s attach path is `imported_file`: the PDF is already on disk, then uploaded through the local write API. The Zotero attachment note is a provenance stamp (`paperful oa:unpaywall`, `campus:ezproxy`, `grey:<playbook>`, `pirate:scihub`, …). Title stays `Full Text PDF`. The parent also gets a readable line ("Free copy from Unpaywall.") unless `[remarks].surface` is `off`. Prefer `paperful run` / `paperful attach` for gap-fills so the file is written on your computer.
 
 [`paperful/attach.py`](../paperful/attach.py) subclasses `pyzotero._upload.Zupload` so filename spaces are sent as `%20`. That module is private. The dependency is pinned to `pyzotero>=1.15.1,<1.16`. It is not vendored.
 
@@ -327,12 +327,13 @@ payloads on read-only tools: `gaps`, `snowball_search` (dry-run), `snowball_tren
 parents), and `ask` (index only). Agent and MCP `export`
 build records in [`export_build.py`](../paperful/export_build.py) (notes omitted, no PDF
 copy). Proposal packs go through [`pack_bib.py`](../paperful/pack_bib.py). The CLI
-`export` command still overlays fields in `cli.py`, including the EndNote XML bundle
+`export` command overlays fields in `export_cmd.py`, including the EndNote XML bundle
 and `--pdfs`. Prefer `… --format json`
 from a shell. `paperful serve` (`paperful[serve]`) binds localhost HTTP: JSON
 capability routes (health, doctor, collections, last-run, dry-run `refs-gap` /
 `ask`) plus the server-rendered workbench (`paperful.ui` — Wanted, Discover,
 Ask, Library, Activity, System; Advanced Repair / Mirror / Index / Briefs / Settings).
+`mount_ui` registers HTML/form routes from `*_routes.py` modules; shared helpers stay in `app.py`.
 GUI long jobs enqueue under `state/gui/commands/`; Activity and post-submit pages
 subscribe to `GET /v1/runs/{id}/events` (SSE) with `GET /v1/runs/{id}` as JSON
 poll fallback. GUI writes use review tokens (`state/gui/reviews/`) then the same

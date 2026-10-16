@@ -19,7 +19,7 @@ def run_trends(
     config,
     fmt: str,
 ) -> None:
-    from .. import cli as cli_mod
+    from .. import cli_runtime as cli_mod
     from ..agent_json import envelope
 
     cfg = cli_mod._cfg(config)

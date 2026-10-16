@@ -10,7 +10,7 @@ import typer
 from typer.testing import CliRunner
 
 from tests.conftest import FakeListing
-from paperful import cli
+from paperful import cli, cli_runtime
 from paperful.config import Config, load_config
 from paperful.run_config import (
     RunConfigError,
@@ -249,6 +249,7 @@ class StubZL(FakeListing):
 @pytest.fixture
 def stubbed(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "ZoteroLocal", lambda *a, **k: StubZL())
+    monkeypatch.setattr(cli_runtime, "ZoteroLocal", lambda *a, **k: StubZL())
     monkeypatch.setattr("paperful.lint.lint_items", lambda *a, **k: [])
     monkeypatch.setattr("paperful.metadata.lint_item", lambda *a, **k: [])
     monkeypatch.setattr("paperful.metadata.propose_patch", lambda *a, **k: None)

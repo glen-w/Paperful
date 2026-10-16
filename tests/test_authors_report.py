@@ -201,9 +201,11 @@ def test_authors_cli_dry_run_and_apply(tmp_path, monkeypatch):
         ),
     ]
     loaded = types.SimpleNamespace(items=items, label="BBNJ")
+    from paperful import cli_runtime
+
     monkeypatch.setenv("PAPERFUL_PACK", "off")
-    monkeypatch.setattr(cli, "_connect", lambda cfg, quiet=False: object())
-    monkeypatch.setattr(cli, "_load_scope", lambda backend, **scope: loaded)
+    monkeypatch.setattr(cli_runtime, "_connect", lambda cfg, quiet=False: object())
+    monkeypatch.setattr(cli_runtime, "_load_scope", lambda backend, **scope: loaded)
 
     dry = runner.invoke(
         cli.app, ["authors", "-C", "BBNJ", "--config", str(config)]

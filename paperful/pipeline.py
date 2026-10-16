@@ -44,6 +44,7 @@ from .resolve import (
     version_link,
 )
 from .routing import (
+    SERIAL_SOURCES,
     academic_htmlpdf_item,
     is_publisher_url,
     order_run,
@@ -90,19 +91,6 @@ from .store import (
 )
 from .zot import Item
 
-# Sources that share a browser/session or are heavy — keep serial & polite.
-_SERIAL_SOURCES = frozenset(
-    {
-        "scihub",
-        "ezproxy",
-        "htmlpdf",
-        "scholar",
-        "camofox",
-        "browser_agent",
-        "author_site",
-        "serpapi",
-    }
-)
 _DIRECT_PDF_CAP = 12
 _LANDING_CAP = 6
 # Soft-block vault retries that land on campus CAS; trip EZProxy after this many.
@@ -479,9 +467,9 @@ class Pipeline:
 
     def _run_batch(self, items: list[Item]) -> None:
         oa_sources = [
-            s for s in self.sources if s not in _SERIAL_SOURCES and s in REGISTRY
+            s for s in self.sources if s not in SERIAL_SOURCES and s in REGISTRY
         ]
-        serial = [s for s in self.sources if s in _SERIAL_SOURCES and s in REGISTRY]
+        serial = [s for s in self.sources if s in SERIAL_SOURCES and s in REGISTRY]
         steps = order_run(self.cfg, serial)
         serial_names: list[str] = []
         for step in steps:

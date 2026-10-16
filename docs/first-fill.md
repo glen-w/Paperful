@@ -1,7 +1,7 @@
 # First fill: missing PDFs onto disk
 
 The shortest realistic path from “this collection still has holes” to PDFs
-you can open on this machine.
+you can open on your computer.
 
 ## Outcome
 

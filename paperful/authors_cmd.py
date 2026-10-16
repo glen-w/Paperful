@@ -26,7 +26,7 @@ def run_authors(
     config: Path | None,
     fmt: str,
 ) -> None:
-    from . import cli as cli_mod
+    from . import cli_runtime as cli_mod
 
     from .agent_json import envelope
     from .authors_report import (

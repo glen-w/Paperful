@@ -107,7 +107,7 @@ Desktop dialog (files-not-syncing KB):
 > computer, it may not yet have been synced to or from zotero.org.
 
 A **ghost** is the storage-slot case: the attachment row (and often an MD5)
-exists under `storage/<key>/`, but the bytes never landed on this machine.
+exists under `storage/<key>/`, but the bytes never landed on your computer.
 Creating an `imported_url` or `imported_file` row and stopping before the
 upload finishes does that. `linked_url` does not.
 
@@ -221,6 +221,6 @@ GET is a **302** to `file://`. Saved searches execute locally
 dialogs are. Anything unimplemented is typically **501**.
 
 Web upload docs mention **413** when a file would exceed online storage quota.
-A local upload writes to this machine’s data directory first; a later sync can
+A local upload writes to your computer’s data directory first; a later sync can
 still fail on quota. What the local server returns when the disk is full is
 not documented.

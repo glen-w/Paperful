@@ -168,8 +168,8 @@ paid Scholar search. Turn those on in setup 4 when the desk feels small.
 
 **Room to grow.** Save a snowball profile and a watch so the next
 **Check again** only shows unseen works. Point `grey_playbooks_dir` at a
-pack when the collection is full of reports and UN documents. Enable a
-local model when you want notes (setup 4, or [LLM](llm.md) on its own).
+pack when the collection is full of reports and UN documents. Enable a model when you want notes — Ollama locally or LiteLLM for a hosted
+API (setup 4, or [LLM](llm.md) on its own).
 
 ## 4. All-in workbench
 
@@ -254,10 +254,16 @@ do not download. [Workflows](workflows.md).
 
 ### Notes, a collection review, and Ask
 
-A model is optional and local by default (Ollama on this machine). A remote
-OpenAI-compatible endpoint is an explicit opt-in; commands print a notice
-when text leaves the machine. The model only sees metadata and text from
-PDFs already on disk.
+A model is optional. **Local AI (default path):** [Ollama](https://ollama.com)
+on your computer when you have enough RAM/VRAM for the job — 7B-class for
+summaries and collection reviews, 14B+ for the browser agent. **Hosted APIs
+(optional):** install `paperful[llm]` and set `provider = "litellm"` to call
+an external service (OpenAI, Anthropic, or any LiteLLM-supported provider;
+keys via environment variables). That path is an explicit opt-in; commands
+print a notice when text leaves the machine. In every case the model only
+sees metadata and text from PDFs already on disk. Feasibility (try-it vs a
+~1.5k library, overnight local runs, hosted cost order of magnitude):
+[AI for notes and Ask](ai.md). Command setup: [LLM](llm.md).
 
 Three reading jobs, in order:
 
@@ -274,6 +280,7 @@ is already inside `all`. `recover` is the browser agent for one stubborn
 landing.
 
 ```toml
+# Local (Ollama) — pull tags with `ollama pull` on the host
 [llm]
 enabled = true
 provider = "ollama"
@@ -281,8 +288,15 @@ model = "qwen2.5:7b"
 
 [rag]
 enabled = true
+embed_provider = "ollama"
 embed_model = "nomic-embed-text"
 ```
+
+For a hosted chat and embeddings API instead of Ollama, use
+`provider = "litellm"` and LiteLLM model ids (for example
+`openai/gpt-4.1-mini` and `openai/text-embedding-3-small`), after
+`uv sync --extra llm` on the host or a **heavy** Docker image. See
+[LiteLLM in llm.md](llm.md#litellm-paid--openai-compatible-apis).
 
 ```sh
 docker compose run --rm paperful all -C "Inbox/Snowball" --preset eoi
@@ -297,9 +311,12 @@ update that note when the source summaries are unchanged unless you pass
 `--force`. [LLM](llm.md#e-synthesize-summary-of-summaries).
 
 Summaries and the collection review want a 7B-class instruct model. Ask
-uses that chat model plus an embedding model (`ollama pull nomic-embed-text`).
-The browser agent wants 14B or larger. The heavy Docker image includes the
-RAG extra; the light image does not. [LLM](llm.md) · [Ask your library](rag.md).
+uses that chat model plus embeddings (`ollama pull nomic-embed-text` locally,
+or `embed_provider = "litellm"` with a hosted embedding model). The browser
+agent wants 14B or larger on Ollama, or a capable hosted tag on LiteLLM.
+The heavy Docker image includes the RAG and LiteLLM extras; the light image
+does not. A full collection summarize is a multi-night or hosted-budget job —
+not a laptop afternoon. [AI](ai.md) · [LLM](llm.md) · [Ask your library](rag.md).
 
 ### What you run on a schedule you own
 

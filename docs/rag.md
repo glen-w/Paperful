@@ -51,7 +51,8 @@ ollama pull nomic-embed-text        # default embedding model
 ```
 
 `ask` also needs a chat model: follow [llm.md](llm.md) and set
-`[llm].enabled = true`.
+`[llm].enabled = true`. For local vs hosted scale (including embeddings cost
+order of magnitude), see [AI for notes and Ask](ai.md).
 
 LanceDB ships wheels for Apple Silicon, Linux (x86_64, aarch64) and Windows.
 On an Apple Silicon Mac, use an arm64 Python

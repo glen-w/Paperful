@@ -35,7 +35,7 @@ Zotero is well tested. Mendeley and EndNote are seeking testers.
 - Add papers from a topic search or from people you follow (the record first; the PDF after)
 - Check identifiers, review duplicates, and repair broken attachments
 - Keep a folder of your papers that you can back up or give to another tool
-- Optionally ask questions of the PDFs you already have (a model on this computer, off until you turn it on)
+- Optionally ask questions of the PDFs you already have (local models via [Ollama](https://ollama.com) when your machine can run them, or hosted APIs via [LiteLLM](docs/llm.md#litellm-paid--openai-compatible-apis) — off until you turn it on)
 
 Walkthroughs: [first fill](docs/first-fill.md), [grow the library](docs/grow-library.md),
 [tidy a collection](docs/tidy-library.md). All of them: [Walkthroughs](docs/walkthroughs.md).
@@ -118,8 +118,9 @@ Reference:
 
 Paperful runs on this computer. It does not upload your library to a
 Paperful server. Downloads, notes, and the folder of copies stay here.
-Zotero stays your catalogue. A local model for notes and questions stays
-off until you turn it on. [Terms](docs/TERMS.md).
+Zotero stays your catalogue. Notes and questions use a model only when you
+enable one — usually **Ollama** on your computer, or an external provider
+through **LiteLLM** if you prefer hosted APIs. [Terms](docs/TERMS.md).
 
 Read the file before you trust a note or an answer:
 
@@ -134,15 +135,22 @@ before it runs, and how each file records where it came from:
 
 ## Optional: ask your papers
 
-Asking questions of PDFs you already have is off until you turn it on. It
-uses a model on this computer, not a cloud chat. **Ask** is in the workbench.
-Notes and collection reviews are under Advanced.
+Asking questions of PDFs you already have is off until you turn it on.
+**Local first:** run models on this computer with Ollama when your hardware
+can support the tags you need (summaries from ~7B; the browser agent from
+~14B). **Optional hosted APIs:** install `paperful[llm]` and set
+`provider = "litellm"` to call OpenAI, Anthropic, or another LiteLLM-backed
+service (API keys in the environment, not in `config.toml`). Commands print
+a notice when text leaves the machine. **Ask** is in the workbench; notes and
+collection reviews are under Advanced.
 
-[Set up the local model](docs/llm.md) · [Ask your library](docs/rag.md).
+[What is feasible (local vs hosted, library scale)](docs/ai.md) ·
+[LLM setup](docs/llm.md) · [Ask your library](docs/rag.md).
 
 ```sh
-ollama pull qwen2.5:7b                       # then turn the model on in config
+ollama pull qwen2.5:7b                       # local default; then enable [llm] in config
 # Ask also needs: ollama pull nomic-embed-text
+# Hosted instead: uv sync --extra llm  — see docs/llm.md
 ```
 
 ## Develop

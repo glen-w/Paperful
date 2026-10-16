@@ -12,7 +12,7 @@ voice here; operator depth lives in `./guide/`.
 - Install snippet matches README: `docker compose build`, then `doctor`, then
   `docker compose up` (workbench at http://127.0.0.1:8765). CLI one-shots stay
   `docker compose run --rm paperful …`.
-  Build the image on this machine with `docker compose build`. `.env.example` sets
+  Build the image on your computer with `docker compose build`. `.env.example` sets
   `PAPERFUL_IMAGE_MODE=heavy`; CI builds **light**. `uv` is the contributor path.
   Guide: `./guide/docker.html` (light vs heavy packs).
 - Docs CTAs point at the **Sphinx HTML guide** published beside this landing (`./guide/`), rebuilt from `docs/` on every qualifying `main` push. Walkthroughs start at `./guide/walkthroughs.html`; the fill pipeline is `./guide/how-it-works.html`.

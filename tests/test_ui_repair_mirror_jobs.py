@@ -323,6 +323,95 @@ def test_mirror_preview_snapshot(cfg, scoped_backend, monkeypatch):
     assert rec["summary"]["records"] == 3
 
 
+def test_repair_preview_versions(cfg, scoped_backend, monkeypatch):
+    monkeypatch.setattr("paperful.versions.classify_versions", lambda items, r: [])
+    cmd_id = "ver-prev"
+    commands.write_command(cfg, _cmd_record(cmd_id, verb="repair_versions"))
+    rmj.run_repair_preview(cfg, cmd_id, verb="versions", collection="BBNJ")
+    rec = commands.read_command(cfg, cmd_id)
+    assert rec["review_token"]
+    assert Path(rec["report_path"]).is_file()
+
+
+def test_repair_apply_ocr(cfg, scoped_backend, monkeypatch):
+    from paperful.ocr import OcrBatch
+
+    monkeypatch.setattr(
+        "paperful.ocr.ocr_items",
+        lambda *a, **k: OcrBatch(ocr=1, would=0, skipped=0, ignored=0, failed=0),
+    )
+    cmd_id = "ocr-apply"
+    commands.write_command(cfg, _cmd_record(cmd_id, verb="repair_ocr"))
+    rmj.run_repair_preview(
+        cfg,
+        cmd_id,
+        verb="ocr",
+        collection="BBNJ",
+        surgery={"attach": False},
+    )
+    rec = commands.read_command(cfg, cmd_id)
+    ok, msg, summary = rmj.run_repair_apply(cfg, token=rec["review_token"])
+    assert ok, msg
+    assert summary.get("ocr_applied") == 1
+
+
+def test_repair_apply_attachments_with_surgery(cfg, scoped_backend, monkeypatch):
+    from paperful.attachments import Scan
+
+    monkeypatch.setattr(
+        "paperful.attachments.plan_actions",
+        lambda *a, **k: Scan(findings=[], actions=[], refusals=[]),
+    )
+    monkeypatch.setattr(
+        "paperful.attachments.apply_actions",
+        lambda backend, actions, **k: (1, []),
+    )
+    cmd_id = "att-ok"
+    commands.write_command(cfg, _cmd_record(cmd_id, verb="repair_attach"))
+    rmj.run_repair_preview(
+        cfg,
+        cmd_id,
+        verb="attachments",
+        collection="BBNJ",
+        surgery={"fix_broken": True},
+    )
+    rec = commands.read_command(cfg, cmd_id)
+    ok, msg, summary = rmj.run_repair_apply(cfg, token=rec["review_token"])
+    assert ok, msg
+    assert summary.get("applied") == 1
+
+
+def test_mirror_preview_restore_empty(cfg, scoped_backend, monkeypatch):
+    monkeypatch.setattr("paperful.restore.iter_records", lambda *a, **k: [])
+    cmd_id = "restore-prev"
+    commands.write_command(cfg, _cmd_record(cmd_id, verb="mirror_restore"))
+    rmj.run_mirror_preview(cfg, cmd_id, verb="restore", collection="BBNJ")
+    rec = commands.read_command(cfg, cmd_id)
+    assert rec["summary"]["would_create"] == 0
+
+
+def test_mirror_apply_snapshot(cfg, scoped_backend, monkeypatch):
+    from paperful.snapshot import SnapshotStats
+
+    calls: list[bool] = []
+
+    def fake_snapshot(*a, dry_run, **k):
+        calls.append(dry_run)
+        return SnapshotStats(records=1, pdf_exports=0)
+
+    monkeypatch.setattr("paperful.snapshot.run_snapshot", fake_snapshot)
+    cmd_id = "snap-apply"
+    commands.write_command(cfg, _cmd_record(cmd_id, verb="mirror_snapshot"))
+    rmj.run_mirror_preview(cfg, cmd_id, verb="snapshot", collection="BBNJ")
+    rec = commands.read_command(cfg, cmd_id)
+    ok, msg, summary = rmj.run_mirror_apply(
+        cfg, token=rec["review_token"], collection="BBNJ"
+    )
+    assert ok, msg
+    assert summary["records"] == 1
+    assert calls == [True, False]
+
+
 def test_mirror_apply_cache_clean(cfg, monkeypatch):
     preview_report = {"removable": 1, "kept": 0, "paths": ["/x.pdf"]}
 

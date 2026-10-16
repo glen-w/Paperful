@@ -51,7 +51,7 @@ _POLICY_TAIL = (
 _POLICY_ALWAYS_TAIL = frozenset(
     {"author_site", "scholar", "camofox", "browser_agent", "serpapi", "scihub"}
 )
-_SERIAL_FOR_ORDER = frozenset(
+SERIAL_SOURCES = frozenset(
     {
         "scihub",
         "ezproxy",
@@ -301,7 +301,7 @@ def apply_fetch_order(
 
 def order_run(cfg: Config, sources: list[str]) -> list[SerialStep]:
     """Serial phases for one batch, after parallel OA."""
-    serial = [name for name in sources if name in _SERIAL_FOR_ORDER]
+    serial = [name for name in sources if name in SERIAL_SOURCES]
     if cfg.fetch_order == "list":
         return [SerialStep(name) for name in serial]
     split_htmlpdf = cfg.htmlpdf_academic in {"gated", "auto"} and "htmlpdf" in serial

@@ -10,14 +10,26 @@ import pytest
 
 from paperful import (
     all_cmd,
+    attach_cmd,
     authors_cmd,
+    cache_cmd,
+    collections_cmd,
+    coverage_cmd,
+    doctor_cmd,
+    export_cmd,
     fix_metadata_cmd,
+    inbox_cmd,
     lint_cmd,
+    mirrors_cmd,
     notes_delete_cmd,
     ocr_cmd,
+    pack_cmd,
     reachout_cmd,
     recover_cmd,
+    refs_gap_cmd,
     screen_cmd,
+    session_cmd,
+    versions_cmd,
 )
 from paperful import cli
 
@@ -33,6 +45,29 @@ ENTRIES = [
     ("authors", authors_cmd, "run_authors", "authors_cmd"),
     ("all_cmd", all_cmd, "run_all", "all_cmd"),
     ("screen", screen_cmd, "run_screen", "screen_cmd"),
+    ("attach", attach_cmd, "run_attach", "attach_cmd"),
+    ("versions", versions_cmd, "run_versions", "versions_cmd"),
+    ("refs_gap", refs_gap_cmd, "run_refs_gap", "refs_gap_cmd"),
+    ("coverage_cmd", coverage_cmd, "run_coverage", "coverage_cmd"),
+    ("export_library", export_cmd, "run_export_library", "export_cmd"),
+    ("inbox_watch", inbox_cmd, "run_inbox_watch", "inbox_cmd"),
+    ("inbox_drain", inbox_cmd, "run_inbox_drain", "inbox_cmd"),
+    ("inbox_proposals_list", inbox_cmd, "run_inbox_proposals_list", "inbox_cmd"),
+    ("inbox_proposals_apply", inbox_cmd, "run_inbox_proposals_apply", "inbox_cmd"),
+    ("inbox_proposals_reject", inbox_cmd, "run_inbox_proposals_reject", "inbox_cmd"),
+    ("doctor", doctor_cmd, "run_doctor", "doctor_cmd"),
+    ("collections_list", collections_cmd, "run_collections_show", "collections_cmd"),
+    ("collections_add_cmd", collections_cmd, "run_collections_add", "collections_cmd"),
+    ("session_login", session_cmd, "run_session_login", "session_cmd"),
+    ("session_status", session_cmd, "run_session_status", "session_cmd"),
+    ("session_export", session_cmd, "run_session_export", "session_cmd"),
+    ("ezproxy_cmd", session_cmd, "run_ezproxy", "session_cmd"),
+    ("scholar_cmd", session_cmd, "run_scholar", "session_cmd"),
+    ("mirrors", mirrors_cmd, "run_mirrors", "mirrors_cmd"),
+    ("pack_open", pack_cmd, "run_pack_open", "pack_cmd"),
+    ("pack_close", pack_cmd, "run_pack_close", "pack_cmd"),
+    ("pack_show", pack_cmd, "run_pack_show", "pack_cmd"),
+    ("cache_clean", cache_cmd, "run_cache_clean", "cache_cmd"),
 ]
 
 
@@ -73,3 +108,32 @@ def test_cmd_modules_exist_on_disk():
         tree = ast.parse(path.read_text(encoding="utf-8"))
         names = {n.name for n in tree.body if isinstance(n, ast.FunctionDef)}
         assert any(n.startswith("run_") for n in names)
+
+
+def test_completeness_shim_reexports_split_modules():
+    from paperful import (
+        attachments_cmd,
+        completeness_cmd,
+        dedupe_cmd,
+        summarize_cmd,
+        synthesize_cmd,
+    )
+
+    assert completeness_cmd.run_attachments is attachments_cmd.run_attachments
+    assert completeness_cmd.run_dedupe is dedupe_cmd.run_dedupe
+    assert completeness_cmd.run_summarize is summarize_cmd.run_summarize
+    assert completeness_cmd.run_synthesize is synthesize_cmd.run_synthesize
+
+
+@pytest.mark.parametrize(
+    "cli_name,entry",
+    [
+        ("dedupe", "run_dedupe"),
+        ("attachments", "run_attachments"),
+        ("summarize", "run_summarize"),
+        ("synthesize", "run_synthesize"),
+    ],
+)
+def test_completeness_cli_uses_shim(cli_name, entry):
+    src = inspect.getsource(getattr(cli, cli_name))
+    assert f"from .completeness_cmd import {entry}" in src

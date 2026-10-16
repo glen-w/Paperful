@@ -825,8 +825,45 @@ def test_map_reduce_raises_after_three_passes(llm_cfg, tmp_path):
             self.calls.append(request.prompt)
             return "Z" * 2000
 
-    with pytest.raises(ReduceCapError, match="3 reduce passes"):
-        map_reduce(llm_cfg, Big(), ["A" * 500, "B" * 500], "T")
+    stub = Big()
+    with pytest.raises(ReduceCapError, match="forecast"):
+        map_reduce(llm_cfg, stub, ["A" * 500, "B" * 500], "T")
+    assert len(stub.calls) == 2
+
+
+def test_map_reduce_finishes_when_third_pass_packs_to_one(
+    llm_cfg, tmp_path, monkeypatch
+):
+    from paperful import synthesize as syn_mod
+    from paperful.synthesize import map_reduce
+
+    monkeypatch.setattr(syn_mod, "_probe_reduce_fit", lambda *a, **k: None)
+
+    prompt = tmp_path / "p.md"
+    prompt.write_text("T")
+    llm_cfg.synthesize_prompt_template = str(prompt)
+    llm_cfg.synthesize_max_context_chars = 1000
+
+    class Staged(StubLLM):
+        def complete(self, request):
+            self.calls.append(request.prompt)
+            if request.prompt.startswith("T\n"):
+                return "<p>done</p>"
+            n = sum(1 for c in self.calls if c.startswith("You are synthesising"))
+            return "Z" * (2000 if n <= 4 else 80)
+
+    stub = Staged()
+    body, first = map_reduce(llm_cfg, stub, ["A" * 500, "B" * 500], "T")
+    assert first == 2 and "<p>done</p>" in body
+    assert len(stub.calls) == 7
+
+
+def test_forecast_reduce_and_pack_length_groups():
+    from paperful.synthesize import forecast_reduce, pack_length_groups
+
+    assert pack_length_groups([500, 500], 1000) == [500, 500]
+    assert forecast_reduce(2, 2000, 935) > 1
+    assert forecast_reduce(8, 80, 935) == 1
 
 
 def _two_sources(cfg):

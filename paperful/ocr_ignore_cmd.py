@@ -12,7 +12,7 @@ from .ocr_ignore import OcrIgnoreList, import_failures_from_report, latest_ocr_r
 
 
 def run_ocr_ignore_list(console: Console, *, config: Path | None) -> None:
-    from . import cli as cli_mod
+    from . import cli_runtime as cli_mod
 
     cfg = cli_mod._cfg(config)
     ignores = OcrIgnoreList(cfg.ocr_ignore_path)
@@ -38,7 +38,7 @@ def run_ocr_ignore_add(
     reason: str,
     config: Path | None,
 ) -> None:
-    from . import cli as cli_mod
+    from . import cli_runtime as cli_mod
 
     if not item:
         console.print("[red]Give at least one --item KEY.[/]")
@@ -56,7 +56,7 @@ def run_ocr_ignore_remove(
     item: list[str],
     config: Path | None,
 ) -> None:
-    from . import cli as cli_mod
+    from . import cli_runtime as cli_mod
 
     if not item:
         console.print("[red]Give at least one --item KEY.[/]")
@@ -73,7 +73,7 @@ def run_ocr_ignore_import_failures(
     report: Path | None,
     config: Path | None,
 ) -> None:
-    from . import cli as cli_mod
+    from . import cli_runtime as cli_mod
 
     cfg = cli_mod._cfg(config)
     path = report

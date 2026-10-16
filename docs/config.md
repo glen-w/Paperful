@@ -208,7 +208,8 @@ Off by default. Install extras: `uv sync --extra llm` (LiteLLM for paid APIs),
 lane and `recover`), or build the **heavy** Compose image
 (`PAPERFUL_IMAGE_MODE=heavy`; see [Docker](docker.md#image-mode-light-vs-heavy)).
 Batch recover: `recover --from-last-run` reads `state/last-run.json`
-(`--from-last-run-mode`, `--limit`). Setup walkthrough, model advice, Docker
+(`--from-last-run-mode`, `--limit`). Feasibility (try-it vs library scale,
+OpenRouter / cost sketch): [AI](ai.md). Setup walkthrough, verbs, Docker
 networking, and troubleshooting: [LLM](llm.md).
 
 | Table / key | Default | Role |

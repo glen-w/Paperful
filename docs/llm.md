@@ -6,6 +6,17 @@ for the LLM-backed verbs below, and only after `paperful doctor` shows the
 `LLM` row green. `extract-sections` and `rag questions` run deterministic
 rules without a model; their `--llm` lanes need `[llm].enabled`.
 
+**Feasibility first.** Trying one summary is not the same job as summarizing
+or synthesizing ~1.5k PDFs. Hardware bands, overnight local runs, OpenRouter /
+LiteLLM setup, free-tier caveats, and order-of-magnitude hosted cost:
+[AI for notes and Ask](ai.md).
+
+**Two ways to run a model:** use **Ollama** on your computer when your RAM/VRAM
+can support the tags you need (default `provider = "ollama"`). Or install
+`paperful[llm]` and set **`provider = "litellm"`** to call a hosted API
+(OpenAI, Anthropic, or another LiteLLM provider) without running weights
+locally. RAG embeddings follow the same split (`[rag].embed_provider`).
+
 Design rules (see [architecture § LLM layer](architecture.md#llm-layer-optional-local-first)):
 
 - **Local first.** Default provider is [Ollama](https://ollama.com) on
@@ -46,7 +57,7 @@ No Python extra is needed for Ollama: Paperful talks HTTP to the daemon.
 
 ```sh
 uv sync --extra llm            # installs litellm
-export OPENAI_API_KEY=...      # or ANTHROPIC_API_KEY, etc. — provider-specific env var
+export OPENAI_API_KEY=...      # or ANTHROPIC_API_KEY, OPENROUTER_API_KEY, etc.
 ```
 
 ```toml
@@ -54,12 +65,14 @@ export OPENAI_API_KEY=...      # or ANTHROPIC_API_KEY, etc. — provider-specifi
 enabled = true
 provider = "litellm"
 model = "openai/gpt-4.1-mini"          # LiteLLM model id (provider/model)
-# api_base = "https://my-proxy.example/v1"   # optional OpenAI-compatible base
+# api_base = "https://openrouter.ai/api/v1"   # e.g. OpenRouter; optional otherwise
 ```
 
 Rules: `ollama/…` model ids are rejected on the LiteLLM path (use
 `provider = "ollama"` instead); `api_base` must be `http(s)`. With LiteLLM,
 title/abstract/PDF excerpts (and, for `recover`, page text) leave your machine.
+OpenRouter walkthrough, free-tier limits, and cost sketch:
+[AI for notes and Ask](ai.md#openrouter-setup).
 
 ### Browser agent (`recover` / last `run` lane)
 
@@ -193,7 +206,7 @@ uv run paperful recover --from-last-run --from-last-run-mode missing -n 5
   is counted in that run’s report (`command = "run"`).
 - Prints an orange disclaimer: you are responsible for publisher terms; remote
   LLMs may receive page content; a local LLM does not send page content off
-  this machine.
+  your computer.
 
 Do not run two commands concurrently against the same vault: both would open
 the same Chromium profile.
@@ -282,6 +295,10 @@ uv run paperful synthesize -C BBNJ --force            # ignore the up-to-date si
   completion. Several chunks are synthesised in batches, then combined.
   If that still overflows, Paperful reduces again, at most three times, then
   exits 1 and asks you to narrow the scope or raise the budget.
+- When there is more than one first-level chunk, Paperful completes the first
+  three (or fewer), forecasts whether three reduce passes can fit the budget,
+  and may run one extra reduce on that sample. If the forecast still leaves
+  more than one chunk, it exits 1 before the rest of the chunks run.
 - The builtin prompt asks for Corpus / Themes / Points of agreement /
   Disagreements and tensions / Gaps and open questions / Suggested reading
   order, citing only `[Surname Year]`. `--prompt FILE` overrides it; its SHA
@@ -399,10 +416,11 @@ allow_remote = true
 
 ## Related docs
 
+- [ai.md](ai.md) — feasibility: try-it vs ~1.5k library, LiteLLM / OpenRouter,
+  cost order of magnitude
 - [rag.md](rag.md): `paperful ask` and the library index. `ask` uses the chat
   model configured here (`[rag].model` overrides it); embeddings are set under
   `[rag]`.
-
 - [config.md](config.md#llm-optional-local-first) — key reference
 - [commands.md](commands.md) — `recover` / `summarize` / `synthesize` / `extract-sections` flags and exit codes
 - [architecture.md](architecture.md#llm-layer-optional-local-first) — layer, gates, note write path

@@ -185,17 +185,19 @@ def test_force_attach_overrides_config_and_stops_without_write(tmp_path, monkeyp
     monkeypatch.setattr("paperful.run_cmd.Pipeline", FakePipe)
     monkeypatch.setattr("paperful.run_cmd.preflight_ezproxy_session", lambda *a, **k: None)
     monkeypatch.setattr("paperful.run_cmd.rag_auto_after_command", lambda *a, **k: None)
-    monkeypatch.setattr("paperful.cli._require_manager", lambda _cfg: None)
-    monkeypatch.setattr("paperful.cli._scope_keys", lambda *_a, **_k: (["K1"], "C"))
-    monkeypatch.setattr("paperful.cli._library_write_api", lambda _b: "local")
-    monkeypatch.setattr("paperful.cli._flush", lambda _b: None)
-    monkeypatch.setattr("paperful.cli._finish_run", lambda *a, **k: None)
+    monkeypatch.setattr("paperful.cli_runtime._require_manager", lambda _cfg: None)
+    monkeypatch.setattr("paperful.cli_runtime._scope_keys", lambda *_a, **_k: (["K1"], "C"))
+    monkeypatch.setattr("paperful.cli_runtime._library_write_api", lambda _b: "local")
+    monkeypatch.setattr("paperful.cli_runtime._flush", lambda _b: None)
+    monkeypatch.setattr("paperful.cli_runtime._finish_run", lambda *a, **k: None)
 
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     cfg.state_dir.mkdir(parents=True)
     cfg.attach = False
     backend = Backend(True)
-    monkeypatch.setattr("paperful.cli._open_library", lambda *_a, **_k: (backend, None))
+    monkeypatch.setattr(
+        "paperful.cli_runtime._open_library", lambda *_a, **_k: (backend, None)
+    )
     run_fetch(
         __import__("rich.console", fromlist=["Console"]).Console(quiet=True),
         cfg,
@@ -229,7 +231,9 @@ def test_force_attach_overrides_config_and_stops_without_write(tmp_path, monkeyp
 
     seen.clear()
     quiet = Backend(False)
-    monkeypatch.setattr("paperful.cli._open_library", lambda *_a, **_k: (quiet, None))
+    monkeypatch.setattr(
+        "paperful.cli_runtime._open_library", lambda *_a, **_k: (quiet, None)
+    )
     run_fetch(
         __import__("rich.console", fromlist=["Console"]).Console(quiet=True),
         cfg,

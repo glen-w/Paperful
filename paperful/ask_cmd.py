@@ -38,7 +38,7 @@ def run_ask(
     run_config: Path | None,
     json_out: bool,
 ) -> None:
-    from . import cli as cli_mod
+    from . import cli_runtime as cli_mod
     from .agent_json import batch_exit
     from .agent_ops import ask_envelope
     from .llm import LLMClientError, get_client, llm_egress_is_remote

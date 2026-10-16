@@ -60,7 +60,7 @@ def run_fetch(
     camofox: bool | None = None,
     force_attach: bool = False,
 ) -> None:
-    from . import cli as cli_mod
+    from . import cli_runtime as cli_mod
 
     if not collection and not library:
         cli_mod._refuse_missing_scope()

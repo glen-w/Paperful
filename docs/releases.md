@@ -1,7 +1,7 @@
 # Releases and stability
 
 **1.0.0** is tagged. Required schemas are frozen in this tree. The operator
-install is clone plus `docker compose build` on this machine.
+install is clone plus `docker compose build` on your computer.
 Image packs: **light** (`[serve]` only; CI default
 when unset) or **heavy** (`[serve]` `[llm]` `[rag]` `[browser-agent]`; set in
 `.env.example`). See [Docker](docker.md#image-mode-light-vs-heavy).

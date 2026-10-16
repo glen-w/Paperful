@@ -20,7 +20,7 @@ def run_recover(
     config: Path | None,
     fmt: str,
 ) -> None:
-    from . import cli as cli_mod
+    from . import cli_runtime as cli_mod
 
     from .browser_agent import recover_start_url
     from .config import RECOVER_DISCLAIMER

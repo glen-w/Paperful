@@ -58,10 +58,12 @@ def test_ensure_ezproxy_session_pauses_live_progress(monkeypatch):
         events.append("input" if progress.live.is_started else "input-paused")
         return "n"
 
-    monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
-    monkeypatch.setattr(cli.console, "input", fake_input)
+    from paperful import cli_runtime
+
+    monkeypatch.setattr(cli_runtime, "_stdin_is_tty", lambda: True)
+    monkeypatch.setattr(cli_runtime.console, "input", fake_input)
     # Avoid headed login; decline path only needs the prompt.
-    ok = cli._ensure_ezproxy_session(
+    ok = cli_runtime._ensure_ezproxy_session(
         pipe.cfg,
         pipe,
         enabled=True,

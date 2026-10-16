@@ -7,7 +7,7 @@ import json
 import pytest
 from typer.testing import CliRunner
 
-from paperful import cli
+from paperful import cli, cli_runtime
 from paperful.store import (
     STATUS_ATTACH_FAILED,
     STATUS_ATTACHED,
@@ -29,6 +29,7 @@ def wide_console(monkeypatch):
     from rich.console import Console
 
     monkeypatch.setattr(cli, "console", Console(highlight=False, width=250, height=100))
+    monkeypatch.setattr(cli_runtime, "console", cli.console)
 
 
 @pytest.fixture
@@ -113,6 +114,7 @@ class StubZL(FakeListing):
 def stub_zotero(monkeypatch):
     zl = StubZL()
     monkeypatch.setattr(cli, "ZoteroLocal", lambda *a, **k: zl)
+    monkeypatch.setattr(cli_runtime, "ZoteroLocal", lambda *a, **k: zl)
     return zl
 
 
@@ -130,6 +132,7 @@ def test_run_uses_mirror_when_manager_is_down(cfg_file, tmp_path, monkeypatch):
             raise ConnectionError("connection refused")
 
     monkeypatch.setattr(cli, "ZoteroLocal", Down)
+    monkeypatch.setattr(cli_runtime, "ZoteroLocal", Down)
     folder = tmp_path / "out" / "BBNJ" / "Smith - 2019 - Title -- ITEM0001"
     folder.mkdir(parents=True)
     (folder / "record.json").write_text(
@@ -551,6 +554,7 @@ def test_run_ezproxy_relogin_retries_on_tty(cfg_file, stub_zotero, monkeypatch):
     logins: list[str] = []
     monkeypatch.setattr(cli.Pipeline, "run", _fake_ezproxy_run(runs))
     monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
+    monkeypatch.setattr(cli_runtime, "_stdin_is_tty", lambda: True)
     monkeypatch.setattr(
         "paperful.session.login_headed",
         lambda cfg, slot, **kwargs: logins.append(slot) or [],
@@ -577,6 +581,7 @@ def test_run_ezproxy_relogin_skips_when_declined_or_not_a_tty(
     logins: list[str] = []
     monkeypatch.setattr(cli.Pipeline, "run", _fake_ezproxy_run(runs))
     monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
+    monkeypatch.setattr(cli_runtime, "_stdin_is_tty", lambda: True)
     monkeypatch.setattr(
         "paperful.session.login_headed",
         lambda cfg, slot, **kwargs: logins.append(slot) or [],
@@ -592,6 +597,7 @@ def test_run_ezproxy_relogin_skips_when_declined_or_not_a_tty(
 
     runs.clear()
     monkeypatch.setattr(cli, "_stdin_is_tty", lambda: False)
+    monkeypatch.setattr(cli_runtime, "_stdin_is_tty", lambda: False)
     res = runner.invoke(
         cli.app,
         ["run", "-c", str(cfg_file), "-C", "BBNJ", "--no-browser-agent"],
@@ -602,6 +608,7 @@ def test_run_ezproxy_relogin_skips_when_declined_or_not_a_tty(
 
     runs.clear()
     monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
+    monkeypatch.setattr(cli_runtime, "_stdin_is_tty", lambda: True)
     res = runner.invoke(
         cli.app,
         [
@@ -629,6 +636,7 @@ def test_run_handoff_tabs_open_after_ezproxy_browser_closes(
     events: list[str] = []
     monkeypatch.setattr(cli.Pipeline, "run", _fake_ezproxy_run([]))
     monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
+    monkeypatch.setattr(cli_runtime, "_stdin_is_tty", lambda: True)
     monkeypatch.setattr(
         "paperful.session.login_headed",
         lambda cfg, slot, **kwargs: events.append("login") or [],
@@ -641,9 +649,11 @@ def test_run_handoff_tabs_open_after_ezproxy_browser_closes(
         return orig_close(self)
 
     monkeypatch.setattr(BrowserSession, "close", tracking_close)
-    monkeypatch.setattr(
-        cli, "_run_session_handoff", lambda *args, **kwargs: events.append("handoff")
-    )
+    def _track_handoff(*args, **kwargs):
+        events.append("handoff")
+
+    monkeypatch.setattr(cli, "_run_session_handoff", _track_handoff)
+    monkeypatch.setattr(cli_runtime, "_run_session_handoff", _track_handoff)
     res = runner.invoke(
         cli.app,
         [
@@ -671,6 +681,7 @@ def test_run_ezproxy_relogin_follows_config_off(cfg_file, stub_zotero, monkeypat
     logins: list[str] = []
     monkeypatch.setattr(cli.Pipeline, "run", _fake_ezproxy_run(runs))
     monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
+    monkeypatch.setattr(cli_runtime, "_stdin_is_tty", lambda: True)
     monkeypatch.setattr(
         "paperful.session.login_headed",
         lambda cfg, slot, **kwargs: logins.append(slot) or [],
@@ -692,6 +703,7 @@ def test_run_ezproxy_relogin_skips_second_pass_when_probe_fails(
     runs: list[list[str]] = []
     monkeypatch.setattr(cli.Pipeline, "run", _fake_ezproxy_run(runs))
     monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
+    monkeypatch.setattr(cli_runtime, "_stdin_is_tty", lambda: True)
     monkeypatch.setattr("paperful.session.login_headed", lambda cfg, slot, **kwargs: [])
     monkeypatch.setattr(
         "paperful.sources.ezproxy.session_ok",
@@ -726,6 +738,7 @@ def test_run_ezproxy_preflight_marks_down_when_probe_fails(
 
     monkeypatch.setattr(cli.Pipeline, "run", fake_run)
     monkeypatch.setattr(cli, "_stdin_is_tty", lambda: False)
+    monkeypatch.setattr(cli_runtime, "_stdin_is_tty", lambda: False)
     monkeypatch.setattr(
         "paperful.sources.ezproxy.session_ok",
         lambda ctx: (False, "session expired or not logged in"),
@@ -762,6 +775,7 @@ def test_run_ezproxy_preflight_login_on_tty(cfg_file, stub_zotero, monkeypatch):
     monkeypatch.setattr(cli.Pipeline, "run", fake_run)
     monkeypatch.setattr(cli.Pipeline, "release_browser", fake_release)
     monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
+    monkeypatch.setattr(cli_runtime, "_stdin_is_tty", lambda: True)
     monkeypatch.setattr(
         "paperful.session.login_headed",
         lambda cfg, slot, **kwargs: logins.append(slot) or [],
@@ -812,6 +826,7 @@ def test_zotero_unreachable_exits_2(cfg_file, monkeypatch):
             raise ConnectionError("Zotero local API is disabled.")
 
     monkeypatch.setattr(cli, "ZoteroLocal", lambda *a, **k: Down())
+    monkeypatch.setattr(cli_runtime, "ZoteroLocal", lambda *a, **k: Down())
     res = runner.invoke(cli.app, ["collections", "-c", str(cfg_file)])
     assert (
         res.exit_code == 2
@@ -1169,6 +1184,7 @@ def test_doctor_docker_prints_fixes_without_enter_wait(
     monkeypatch.setattr("paperful.doctor.shutil.which", lambda name: "/bin/pdftotext")
     monkeypatch.setattr("paperful.cli.in_docker", lambda: True)
     monkeypatch.setattr("paperful.cli._stdin_is_tty", lambda: True)
+    monkeypatch.setattr("paperful.cli_runtime._stdin_is_tty", lambda: True)
     res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file)])
     assert res.exit_code == 0
     assert "Press Enter when done" not in res.stdout
@@ -1208,6 +1224,7 @@ def test_doctor_zotero_red(cfg_file, monkeypatch):
             raise ConnectionError("Zotero local API is disabled.")
 
     monkeypatch.setattr(cli, "ZoteroLocal", lambda *a, **k: Down())
+    monkeypatch.setattr(cli_runtime, "ZoteroLocal", lambda *a, **k: Down())
     res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--no-guide"])
     assert res.exit_code == 2 and "red" in res.stdout
     assert "Allow other applications" in res.stdout
@@ -1220,6 +1237,7 @@ def test_doctor_json_api_off_code(cfg_file, monkeypatch):
             raise ConnectionError("Zotero local API is disabled.")
 
     monkeypatch.setattr(cli, "ZoteroLocal", lambda *a, **k: Off())
+    monkeypatch.setattr(cli_runtime, "ZoteroLocal", lambda *a, **k: Off())
     res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--json"])
     assert res.exit_code == 2
     payload = json.loads(res.stdout)
@@ -1233,6 +1251,7 @@ def test_doctor_json_codes_when_zotero_down(cfg_file, monkeypatch):
             raise ConnectionError("connection refused")
 
     monkeypatch.setattr(cli, "ZoteroLocal", lambda *a, **k: Down())
+    monkeypatch.setattr(cli_runtime, "ZoteroLocal", lambda *a, **k: Down())
     monkeypatch.setenv("PAPERFUL_ZOTERO_HOST", "host.docker.internal")
     res = runner.invoke(cli.app, ["doctor", "-c", str(cfg_file), "--json"])
     assert res.exit_code == 2
@@ -1331,6 +1350,7 @@ def test_attach_command_uses_pending_records(
             return None
 
     monkeypatch.setattr(cli, "_connect", lambda cfg, quiet=False: FakeBackend())
+    monkeypatch.setattr(cli_runtime, "_connect", lambda cfg, quiet=False: FakeBackend())
     res = runner.invoke(cli.app, ["attach", "-c", str(cfg_file)])
     assert (
         res.exit_code == 0
@@ -1561,6 +1581,7 @@ def test_recover_python_gate(cfg_file, monkeypatch):
         "S", (), {"version_info": VI(3, 10, 0, "final", 0), "modules": real_sys.modules}
     )()
     monkeypatch.setattr(cli, "sys", fake)
+    monkeypatch.setattr(cli_runtime, "sys", fake)
     res = runner.invoke(cli.app, ["recover", "-c", str(cfg_file), "--item", "I1"])
     assert res.exit_code == 1 and "3.11" in res.stdout
 
@@ -1772,6 +1793,7 @@ def test_summarize_default_writes_note_and_disk_only_skips_it(
             return key
 
     monkeypatch.setattr(cli, "get_backend", lambda cfg, zl: B())
+    monkeypatch.setattr(cli_runtime, "get_backend", lambda cfg, zl: B())
     monkeypatch.setattr(
         "paperful.summarize.pdf_text_for", lambda *a, **k: "Marine governance text."
     )
@@ -1842,13 +1864,13 @@ def test_summarize_remote_egress_notice(tmp_path, stub_zotero, monkeypatch):
     monkeypatch.setattr(
         "paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model
     )
-    monkeypatch.setattr(
-        cli,
-        "get_backend",
-        lambda cfg, zl: type(
+    def _backend(cfg, zl):
+        return type(
             "B", (), {"get_item": lambda self, k: make_item(key=k, has_pdf=False)}
-        )(),
-    )
+        )()
+
+    monkeypatch.setattr(cli, "get_backend", _backend)
+    monkeypatch.setattr(cli_runtime, "get_backend", _backend)
     res = runner.invoke(cli.app, ["summarize", "-c", str(cfg_file), "--item", "I1"])
     assert "Remote LLM" in res.stdout
     assert "No items with PDFs" in res.stdout
@@ -1908,6 +1930,7 @@ def test_synthesize_library_needs_a_collection_for_zotero(
             return None
 
     monkeypatch.setattr(cli, "get_backend", lambda cfg, zl: B())
+    monkeypatch.setattr(cli_runtime, "get_backend", lambda cfg, zl: B())
     res = runner.invoke(cli.app, ["synthesize", "-c", str(cfg_file), "--library"])
     assert res.exit_code == 1, res.stdout
     assert "--report-collection" in res.stdout
@@ -1946,6 +1969,7 @@ def test_synthesize_dry_run_and_disk_report(tmp_path, stub_zotero, monkeypatch):
             return "<h2>Themes</h2><p>See [Smith 2019].</p>"
 
     monkeypatch.setattr(cli, "get_backend", lambda cfg, zl: B())
+    monkeypatch.setattr(cli_runtime, "get_backend", lambda cfg, zl: B())
     monkeypatch.setattr("paperful.llm.get_client", lambda cfg: Stub())
     res = runner.invoke(
         cli.app,
@@ -2807,21 +2831,24 @@ def test_snowball_search_format_json(cfg_file, stub_zotero, tmp_path, monkeypatc
 
 def test_ask_format_json(cfg_file, monkeypatch):
     monkeypatch.setattr(cli, "_rag_require", lambda cfg: None)
+    monkeypatch.setattr(cli_runtime, "_rag_require", lambda cfg: None)
     monkeypatch.setattr(cli, "_rag_embedder", lambda cfg: None)
+    monkeypatch.setattr(cli_runtime, "_rag_embedder", lambda cfg: None)
     monkeypatch.setattr(cli, "_rag_open", lambda cfg: (None, None))
+    monkeypatch.setattr(cli_runtime, "_rag_open", lambda cfg: (None, None))
     monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_ask", lambda cfg: None)
     monkeypatch.setattr("paperful.llm.get_client", lambda cfg: object())
     monkeypatch.setattr("paperful.rag.retrieve.scope_keys", lambda *a, **k: None)
-    monkeypatch.setattr(
-        cli,
-        "_ask_once",
-        lambda *a, **k: {
+    def _fake_ask(*a, **k):
+        return {
             "question": "What is BBNJ?",
             "answer": "A treaty.",
             "cited": [],
             "sources": [],
-        },
-    )
+        }
+
+    monkeypatch.setattr(cli, "_ask_once", _fake_ask)
+    monkeypatch.setattr(cli_runtime, "_ask_once", _fake_ask)
     res = runner.invoke(
         cli.app,
         ["ask", "What is BBNJ?", "-c", str(cfg_file), "--format", "json"],

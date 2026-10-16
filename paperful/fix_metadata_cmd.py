@@ -31,7 +31,7 @@ def run_fix_metadata(
     config: Path | None,
     fmt: str,
 ) -> None:
-    from . import cli as cli_mod
+    from . import cli_runtime as cli_mod
     from .metadata import apply_patches, collect_patches, write_patches
     from .pipeline import make_client
 

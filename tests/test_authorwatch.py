@@ -500,7 +500,7 @@ def test_openalex_client_author_filters():
 
 def test_load_collection_items_passes_scope_kwargs(cfg, monkeypatch):
     from paperful import authorwatch_suggest as sug
-    from paperful import cli as cli_mod
+    from paperful import cli_runtime as cli_mod
 
     class FakeLoaded:
         items = [make_item(key="X1")]

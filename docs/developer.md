@@ -98,7 +98,8 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `gaps_cmd.py` | `gaps` body after the CLI parses flags | `handoff`, `run_hooks` |
 | `run_cmd.py` | `run` body after the CLI parses flags | `pipeline`, `run_hooks` |
 | `ask_cmd.py` | `ask` body after the CLI parses flags | `agent_ops`, rag |
-| `completeness_cmd.py` | `dedupe`, `attachments`, `summarize`, `synthesize` after flags | `run_hooks` helpers via cli |
+| `dedupe_cmd.py` / `attachments_cmd.py` / `summarize_cmd.py` / `synthesize_cmd.py` | Completeness verbs after flags | domain modules via `cli_runtime` |
+| `completeness_cmd.py` | Re-export shim for the four verbs (keep `cli` imports and monkeypatches stable) | the four `*_cmd` modules |
 | `lint_cmd.py` | `lint` after flags | `lint` |
 | `screen_cmd.py` | `screen` after flags | `screen` |
 | `fix_metadata_cmd.py` | `fix-metadata` after flags | `metadata` |
@@ -107,11 +108,20 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `reachout_cmd.py` | `reachout` after flags | `reachout`, `handoff` |
 | `notes_delete_cmd.py` | `notes delete` after flags | `notes` |
 | `authors_cmd.py` | `authors` after flags | `authors_report` |
-| `all_cmd.py` | `all` chain + step dispatch after flags | Typer wrappers via `cli` |
-| `cli.py` | Flags, progress, exits. No logic of its own | everything |
+| `all_cmd.py` | `all` chain + step dispatch after flags | Typer wrappers via `cli`; helpers via `cli_runtime` |
+| `cli_runtime.py` | Connect, scope, progress, agent emit, source-list helpers | `catalogue`, `library`, `scope`, `run_hooks` (not `cli`) |
+| `attach_cmd.py` | `attach` after flags | `attach`, `handoff`, `pipeline` |
+| `versions_cmd.py` | `versions` after flags | `versions` |
+| `refs_gap_cmd.py` | `refs gap` after flags | `refs_gap`, `agent_ops` |
+| `coverage_cmd.py` | `coverage` after flags | `coverage`, `agent_ops` |
+| `export_cmd.py` | CLI `export` (RIS/BibTeX/EndNote XML + `--pdfs`) after flags | `interop`, `store`, `mirror` |
+| `inbox_cmd.py` | `inbox` watch/drain/proposals after flags | `inbox`, `inbox_match`, `inbox_route` |
+| `doctor_cmd.py` / `collections_cmd.py` / `session_cmd.py` / `mirrors_cmd.py` / `pack_cmd.py` / `cache_cmd.py` | Operator verbs (doctor, collections, session/ezproxy/scholar, mirrors, pack, cache clean) | `cli_runtime`, domain modules |
+| `cli.py` | Flags, Typer apps, exits. Re-exports `cli_runtime` names | everything |
+| `routing.py` | Per-item lanes; owns `SERIAL_SOURCES` (Sci-Hub and other serial phases) | `config`, `zot` |
 | `agent_json.py` | `--format json` envelope (`paperful.agent.json.v1`) and exit 3 | none |
 | `agent_ops.py` | Shared builders for CLI JSON and MCP (`gaps`, snowball dry-run / trends, `export`, refs-gap, ask) plus CLI `coverage_envelope` | `agent_json`, catalogue, rag, `export_build`, `pack_bib`, `snowball.trends`, `coverage` |
-| `export_build.py` | Mirror-first interchange records for a scoped library export. Agent/MCP `export` calls this with notes off and no PDF directory. CLI `export` still builds the same overlay in `cli.py` (EndNote XML bundle and `--pdfs` live there) | `interop`, `store`, `mirror`, library protocol |
+| `export_build.py` | Mirror-first interchange records for a scoped library export. Agent/MCP `export` calls this with notes off and no PDF directory. CLI `export` overlays the same records in `export_cmd.py` (EndNote XML bundle and `--pdfs` live there) | `interop`, `store`, `mirror`, library protocol |
 | `pack_bib.py` | BibTeX/RIS from snowball / authorwatch proposal JSONL on disk | `interop`, snowball |
 | `notehtml.py` | First-line prefixes + `paperful.note.v1` comment | none |
 | `notes.py` | Classify and trash Paperful-owned notes | `notehtml`, library protocol |
@@ -124,7 +134,7 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `twenty.py` | Twenty People lookup (local cache) and `sync` (CRM create/enrich). User guide: [Twenty and SearXNG](snowball.md#twenty-and-searxng) | httpx |
 | `mcp_server.py` | Optional stdio MCP: read-only gaps, snowball preview / trends, export, proposal_export, refs_gap, ask | `agent_ops` |
 | `serve.py` | Localhost FastAPI: JSON capability API + mounts `ui` when the `serve` extra is installed | `agent_ops`, `ui` |
-| `ui/` | Server-rendered workbench (Jinja). `app.py` mounts HTML + form POSTs + `GET /v1/runs/{id}` and SSE `GET /v1/runs/{id}/events` (`commands.iter_command_status_events`). Ordinary pages do not run `doctor` (System does). `jobs.py`, `wanted_jobs.py`, `repair_jobs.py`, `discover_jobs.py` call the same domain entrypoints as the CLI; review tokens under `state/gui/reviews/`; command ledger under `state/gui/commands/` (`write_command` notifies SSE waiters) | CLI / MCP builders |
+| `ui/` | Server-rendered workbench (Jinja). `app.py` owns shared helpers + `mount_ui`; routes live in `wanted_routes` / `discover_routes` / `shell_routes` / `repair_routes` / `index_routes` (each `register_*`). Long jobs: `jobs.py` re-exports `wanted_jobs` / `discover_jobs` / `repair_jobs` / `index_jobs` (RAG, ask, summarize, synthesize). Ordinary pages do not run `doctor` (System does). Handlers resolve `doctor_payload` / `collections_tree` via `paperful.ui.app` so tests can monkeypatch there | CLI / MCP builders |
 | `authorwatch.py` | People lists → OpenAlex new works; `gather_briefing` / `write_briefing` (inbox + recent works / co-authors); `apply` creates parents; `accept` / `delete` | OpenAlex client, `identity`, `snowball.ingest`, `authorwatch_suggest` |
 | `authorwatch_suggest.py` | Corpus / cited / coauthor / mix suggestions → `suggestions.jsonl`; shared co-author accumulation for briefing | `authors_report`, OpenAlex, promoted packs |
 | `authorwatch_social.py` | Parse operator-saved RG / LinkedIn / Academia HTML or CSV (no network) | stdlib HTML/CSV |

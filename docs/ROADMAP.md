@@ -438,6 +438,7 @@ vault login still stays on the host (shared `state/`).
 
 | Doc | Role |
 | --- | --- |
+| [ai.md](ai.md) | Feasibility: try-it vs ~1.5k library, overnight local reality, LiteLLM/OpenRouter setup, cost order of magnitude |
 | [llm.md](llm.md) | Install extras, `[llm]` / `[browser_agent]` keys, `recover` behaviour, troubleshooting table |
 | [browser-agent-models.md](browser-agent-models.md) | **Local Ollama tag guidance** for PDF UI loops (VRAM bands, avoid list, acceptance test) |
 | [config.md](config.md#llm-optional-local-first) | Key table: `model`, `fallback_model`, `use_vision`, `during_run`, caps |

@@ -56,6 +56,7 @@ sessions
 scihub
 serpapi
 camofox
+ai
 llm
 rag
 browser-agent-models

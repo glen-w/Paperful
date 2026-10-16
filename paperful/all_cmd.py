@@ -43,7 +43,7 @@ def run_all(
     fmt: str,
     camofox: bool | None = None,
 ) -> None:
-    from . import cli as cli_mod
+    from . import cli_runtime as cli_mod
 
     if cli_mod._scope_unset(collection, library, profile, run_config):
         cli_mod._refuse_missing_scope()

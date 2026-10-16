@@ -7,7 +7,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from paperful import cli
+from paperful import cli, cli_runtime
 from paperful.dedupe import (
     DedupeGroup,
     actionable_groups,
@@ -318,6 +318,7 @@ def test_cli_dedupe_dry_run_writes_pack(tmp_path, monkeypatch):
             ]
 
     monkeypatch.setattr(cli, "ZoteroLocal", lambda *a, **k: Stub())
+    monkeypatch.setattr(cli_runtime, "ZoteroLocal", lambda *a, **k: Stub())
     res = runner.invoke(
         cli.app,
         ["dedupe", "-c", str(cfg_file), "-C", "2DBKZRPC", "--dry-run", "--json"],
@@ -380,6 +381,7 @@ def test_cli_apply_trashes_only_high_doi(tmp_path, monkeypatch):
             ]
 
     monkeypatch.setattr(cli, "ZoteroLocal", lambda *a, **k: Stub())
+    monkeypatch.setattr(cli_runtime, "ZoteroLocal", lambda *a, **k: Stub())
     monkeypatch.setattr(
         ZoteroBackend,
         "merge_into",
@@ -558,6 +560,7 @@ def _cfg_and_stub(tmp_path, monkeypatch, items, *, write=True):
             return list(items)
 
     monkeypatch.setattr(cli, "ZoteroLocal", lambda *a, **k: Stub())
+    monkeypatch.setattr(cli_runtime, "ZoteroLocal", lambda *a, **k: Stub())
     return cfg_file
 
 

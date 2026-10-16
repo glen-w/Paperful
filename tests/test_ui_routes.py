@@ -1,0 +1,110 @@
+"""Workbench route modules: mount_ui registers families; POST smokes stay offline."""
+
+from __future__ import annotations
+
+import inspect
+
+import pytest
+
+from paperful.config import Config
+from paperful.serve import create_app, fastapi_available
+from paperful.ui import app as ui_app
+
+
+def test_index_jobs_reexported_from_jobs_module():
+    from paperful.ui import index_jobs, jobs
+
+    assert jobs.rag_ingest is index_jobs.rag_ingest
+    assert jobs.summarize is index_jobs.summarize
+    assert jobs.rag_ingest_fn is None
+
+
+def test_shell_routes_resolve_doctor_and_collections_via_app():
+    from paperful.ui import shell_routes
+
+    src = inspect.getsource(shell_routes)
+    assert "_ui_app.doctor_payload(" in src
+    assert "_ui_app.collections_tree(" in src
+    assert "from . import app as _ui_app" in src
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_mount_ui_has_no_inline_wanted_or_discover_routes():
+    src = inspect.getsource(ui_app.mount_ui)
+    assert '@app.get("/wanted"' not in src
+    assert '@app.post("/discover' not in src
+    assert "register_wanted" in src
+    assert "register_discover" in src
+    assert "register_index" in src
+    assert "register_repair" in src
+    assert "register_shell" in src
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_post_smokes_per_family(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    import paperful.ui.jobs as jobs
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    doctor = lambda _cfg, probe=False: [
+        {"name": "Zotero", "status": "green", "code": "", "detail": "ok"}
+    ]
+    monkeypatch.setattr(ops, "doctor_payload", doctor)
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", doctor)
+    monkeypatch.setattr(
+        ops,
+        "collections_tree",
+        lambda _cfg: {"ok": True, "error": "", "collections": []},
+    )
+    monkeypatch.setattr(
+        "paperful.catalogue.open_library",
+        lambda _cfg: (_ for _ in ()).throw(RuntimeError("no live manager")),
+    )
+
+    # Job hooks: avoid real work
+    monkeypatch.setattr(
+        jobs,
+        "summarize",
+        lambda *a, **k: None,
+    )
+
+    client = TestClient(create_app(cfg))
+
+    # shell: prefs collection
+    res = client.post(
+        "/prefs/collection",
+        data={"collection": "BBNJ"},
+        follow_redirects=False,
+    )
+    assert res.status_code in {302, 303, 200}
+
+    # wanted: preview without token should not 500
+    res = client.post("/wanted/preview", data={}, follow_redirects=False)
+    assert res.status_code in {303, 302, 400, 422, 200}
+
+    # discover: refs-gap
+    res = client.post(
+        "/discover/refs-gap",
+        data={"collection": "BBNJ"},
+        follow_redirects=False,
+    )
+    assert res.status_code in {303, 302, 400, 422, 200}
+
+    # index: ingest (may redirect or error without collection; must not 500)
+    res = client.post(
+        "/index/ingest",
+        data={"collection": ""},
+        follow_redirects=False,
+    )
+    assert res.status_code < 500
+
+    # repair: preview
+    res = client.post(
+        "/repair/preview",
+        data={"collection": "BBNJ"},
+        follow_redirects=False,
+    )
+    assert res.status_code < 500

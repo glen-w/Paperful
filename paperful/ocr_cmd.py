@@ -31,7 +31,7 @@ def run_ocr(
     force_retry: bool = False,
     no_auto_ignore_failures: bool = False,
 ) -> None:
-    from . import cli as cli_mod
+    from . import cli_runtime as cli_mod
 
     from .ocr import OcrUnavailable, ocr_items
     from .ocr_ignore import OcrIgnoreList
