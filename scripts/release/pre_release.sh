@@ -104,6 +104,12 @@ if [[ -f website/index.html ]]; then
   fi
 fi
 
+if [[ -f website/cleaning-service.html ]]; then
+  if ! grep -q "· ${VERSION} ·" website/cleaning-service.html; then
+    fail "website/cleaning-service.html footer version does not match ${VERSION}"
+  fi
+fi
+
 # Stale local builds should not ride along on uv publish.
 shopt -s nullglob
 stale=(dist/paperful-*.whl dist/paperful-*.tar.gz)
