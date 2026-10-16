@@ -5,7 +5,12 @@ from __future__ import annotations
 import pytest
 
 from paperful.config import Config
-from paperful.store import Manifest, Record, STATUS_OK
+from paperful.store import (
+    Manifest,
+    REASON_STRICT_PDF_DOI,
+    Record,
+    STATUS_OK,
+)
 from paperful.ui import commands, jobs
 from paperful.ui.pages import scope_fingerprint
 
@@ -378,6 +383,24 @@ def test_attach_run_selected_keys(tmp_path, monkeypatch):
     cfg.state_dir.mkdir(parents=True)
     items = [_Item("K1", "10.1/a"), _Item("K2", "10.2/b")]
     manifest = Manifest(cfg.manifest_path)
+    manifest.write(
+        Record(
+            itemKey="K1",
+            status=STATUS_OK,
+            doi="10.1/a",
+            pdf_doi="10.1/a",
+            path="a.pdf",
+        )
+    )
+    manifest.write(
+        Record(
+            itemKey="K2",
+            status=STATUS_OK,
+            doi="10.2/b",
+            pdf_doi="10.2/b",
+            path="b.pdf",
+        )
+    )
     monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: (items, manifest))
 
     attached: list[str] = []
@@ -386,18 +409,131 @@ def test_attach_run_selected_keys(tmp_path, monkeypatch):
         attached.extend(keys or [])
 
     jobs.attach_fn = fake_attach
-    ok, msg = jobs.attach_run(cfg, keys=["K2", "K1"], collection="BBNJ")
+    ok, msg, n = jobs.attach_run(cfg, keys=["K2", "K1"], collection="BBNJ")
     assert ok
     assert msg == ""
-    assert attached == ["K2", "K1"] or set(attached) == {"K1", "K2"}
+    assert n == 2
+    assert set(attached) == {"K1", "K2"}
 
-    ok2, msg2 = jobs.attach_run(cfg, keys=[], collection="BBNJ")
-    assert not ok2
-    assert "keys" in msg2.lower()
+    ok2, msg2, n2 = jobs.attach_run(cfg, keys=[], collection="BBNJ")
+    assert ok2
+    assert n2 == 2
 
-    ok3, msg3 = jobs.attach_run(cfg, keys=["MISSING"], collection="BBNJ")
+    ok3, msg3, n3 = jobs.attach_run(cfg, keys=["MISSING"], collection="BBNJ")
     assert not ok3
+    assert n3 == 0
     jobs.attach_fn = None
+
+
+def test_preview_selected_keys_stored_on_token(tmp_path, monkeypatch):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    m1 = _Item("M1", "10.1/m1")
+    m2 = _Item("M2", "10.1/m2")
+    have = _Item("HAVE", "10.1/have")
+    have.has_pdf = True
+    manifest = Manifest(cfg.manifest_path)
+    manifest.write(
+        Record(
+            itemKey="HAVE",
+            status=STATUS_OK,
+            doi="10.1/have",
+            pdf_doi="10.1/have",
+            path="have.pdf",
+        )
+    )
+    monkeypatch.setattr(
+        jobs, "_load_scope_items", lambda _c, _col: ([have, m1, m2], manifest)
+    )
+    fetch_calls: list[dict] = []
+
+    def fake_run(*_args, **kwargs):
+        fetch_calls.append(kwargs)
+
+    jobs.run_fetch_fn = fake_run
+    commands.write_command(
+        cfg,
+        {"id": "prev", "verb": "preview_run", "status": "running", "created": 1},
+    )
+    jobs.preview_run(cfg, "prev", collection="BBNJ", preset="oa", keys=["M1"], flags={})
+    rec = commands.read_command(cfg, "prev") or {}
+    review = commands.load_review(cfg, rec["review_token"])
+    assert review is not None
+    assert review["keys"] == ["M1"]
+    token = rec["review_token"]
+    ok, msg = jobs.grab_run(cfg, token=token)
+    assert ok, msg
+    grab = next(c for c in fetch_calls if c.get("dry_run") is False)
+    assert grab.get("item_keys") == ["M1"]
+    jobs.run_fetch_fn = None
+
+
+def test_preview_fingerprint_matches_ticked_subset_only(tmp_path, monkeypatch):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    m1 = _Item("M1", "10.1/m1")
+    m2 = _Item("M2", "10.1/m2")
+    manifest = Manifest(cfg.manifest_path)
+    monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: ([m1, m2], manifest))
+    commands.write_command(
+        cfg,
+        {"id": "prev2", "verb": "preview_run", "status": "running", "created": 1},
+    )
+    jobs.preview_run(cfg, "prev2", collection="BBNJ", preset="oa", keys=["M1"], flags={})
+    rec = commands.read_command(cfg, "prev2") or {}
+    review = commands.load_review(cfg, rec["review_token"])
+    assert review is not None
+    assert review["fingerprint"] == scope_fingerprint([m1], manifest)
+
+
+def test_attach_selected_held_unverified(tmp_path, monkeypatch):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    u1 = _Item("U1", "10.1/u1")
+    manifest = Manifest(cfg.manifest_path)
+    manifest.write(
+        Record(
+            itemKey="U1",
+            status=STATUS_OK,
+            doi="10.1/u1",
+            path="u.pdf",
+            source="grey:test",
+        )
+    )
+    monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: ([u1], manifest))
+    attached: list[str] = []
+
+    def fake_attach(cfg, keys=None):
+        attached.extend(keys or [])
+
+    jobs.attach_fn = fake_attach
+    ok, msg, n = jobs.attach_run(cfg, keys=["U1"], collection="BBNJ")
+    assert ok, msg
+    assert n == 1
+    assert attached == ["U1"]
+    jobs.attach_fn = None
+
+
+def test_attach_selected_held_mismatch_skipped_on_main_button(tmp_path, monkeypatch):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    m1 = _Item("M1", "10.1/a")
+    manifest = Manifest(cfg.manifest_path)
+    manifest.write(
+        Record(
+            itemKey="M1",
+            status=STATUS_OK,
+            doi="10.1/a",
+            pdf_doi="10.9/wrong",
+            path="wrong.pdf",
+            reason=REASON_STRICT_PDF_DOI,
+        )
+    )
+    monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: ([m1], manifest))
+    ok, msg, n = jobs.attach_run(cfg, keys=["M1"], collection="BBNJ")
+    assert not ok
+    assert n == 0
+    assert "attachable" in msg.lower()
 
 
 @pytest.mark.skipif(
@@ -483,7 +619,7 @@ def test_wanted_attach_route_and_button(tmp_path, monkeypatch):
 
     def fake_attach_run(cfg, *, keys, collection):
         attached.extend(keys)
-        return True, ""
+        return True, "", len(keys)
 
     monkeypatch.setattr(jobs, "attach_run", fake_attach_run)
     client = TestClient(create_app(cfg))
@@ -491,7 +627,10 @@ def test_wanted_attach_route_and_button(tmp_path, monkeypatch):
     assert page.status_code == 200
     assert 'formaction="/wanted/attach"' in page.text
     assert "Attach PDFs to Zotero" in page.text
-    assert "Grab saves files under out/ only" in page.text
+    assert 'id="attach-btn"' in page.text
+    assert "disabled" in page.text
+    assert "out/ folder on this computer" in page.text
+    assert "--strict-pdf-doi" in page.text
     assert "Pick a collection" in page.text
     cfg.ui_attach_mode = "auto"
     auto_page = TestClient(create_app(cfg)).get("/wanted")

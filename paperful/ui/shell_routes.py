@@ -39,6 +39,7 @@ from .pages import (
     last_ask_result,
     last_job_result,
     job_view,
+    library_has_attached_pdf,
     WANTED_FILTER_LABELS,
     WANTED_ORDER_LABELS,
     library_items_page,
@@ -229,6 +230,7 @@ def register_shell(ui: UiContext) -> None:
                 saved=bool(saved),
                 out_dir=str(cfg.out_dir),
                 attach_mode=cfg.ui_attach_mode,
+                show_auto_attach_setting=library_has_attached_pdf(cfg),
             ),
         )
 

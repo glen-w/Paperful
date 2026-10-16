@@ -1,10 +1,10 @@
 # Releases and stability
 
-**1.1.0** is on [PyPI](https://pypi.org/project/paperful/) (`pip install paperful`;
-optional extras `[llm]`, `[rag]`, `[serve]`, `[browser-agent]`). After install,
-run `playwright install chromium` once for campus login and HTML PDF paths.
-The **operator** install tested in CI is still clone plus `docker compose build`
-on your computer (see [Docker](docker.md)).
+**1.1.1** is the current PyPI release (`pip install paperful`; optional extras
+`[llm]`, `[rag]`, `[serve]`, `[browser-agent]`). **1.1.0** introduced PyPI and
+trusted publishing. After install, run `playwright install chromium` once for
+campus login and HTML PDF paths. The **operator** install tested in CI is still
+clone plus `docker compose build` on your computer (see [Docker](docker.md)).
 
 **1.0.0** is tagged. Required schemas are frozen in this tree.
 Image packs: **light** (`[serve]` only; CI default
@@ -26,10 +26,13 @@ Advanced **Index** is ingest, search, and question extracts. **Briefs** runs
 summarize/synthesize.
 Item records and create-missing restore are locked; extra item keys may still
 be added. Required `paperful.run_report.v1` keys and imported-file attach
-(typed `attach_failed`, provenance note) are the contract. **Post-1.0:**
-local OpenAlex snapshot phases beyond opt-in v1, Firefox extension,
-alert loop (watch / authorwatch ingest + briefing) — see
-[ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10).
+(typed `attach_failed`, provenance note) are the contract. **1.1.1** shipped
+Wanted stop-ship hygiene (Grab scope, Attach at zero, copy). Everything after
+that is a buffet by area (Wanted excellence first, testers before new features).
+Local OpenAlex
+snapshot phases beyond opt-in v1, Firefox extension, and the alert loop stay
+later — see [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10)
+and [After 1.1.0](ROADMAP.md#after-110-buffet-by-area).
 
 ## Schema compatibility (1.0 contract)
 

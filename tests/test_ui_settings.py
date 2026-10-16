@@ -71,9 +71,13 @@ def test_settings_saves_attach_mode(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
     import paperful.agent_ops as ops
+    from paperful.store import Manifest, Record, STATUS_ATTACHED
 
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     cfg.state_dir.mkdir(parents=True)
+    Manifest(cfg.manifest_path).write(
+        Record(itemKey="K1", status=STATUS_ATTACHED, path="a.pdf")
+    )
     cfg.config_path = tmp_path / "config.toml"
     cfg.config_path.write_text(
         'email = "a@b.c"\n\n[ui]\nlibrary_page_size = 50\n',

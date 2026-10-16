@@ -1,6 +1,6 @@
 [project]
 name = "paperful"
-version = "1.1.0"
+version = "1.1.1"
 description = "Research helper for a reference library: clean records, find missing PDFs, summarise papers, keep a platform-agnostic mirror. Zotero is the well-tested adapter; Mendeley and EndNote are seeking testers."
 readme = "README.md"
 requires-python = ">=3.10"

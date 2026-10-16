@@ -6,6 +6,25 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.1.1 — 2026-10-16
+
+Stop-ship hygiene before outside testers and launch gates.
+
+### Fixed
+
+- **Wanted Attach:** button disabled when there are no attachable PDFs; server
+  rejects empty attach with a clear message; attach count matches pending writes.
+- **Wanted:** Held row selection for attach (unverified pending OK; DOI mismatch
+  still requires Advanced). Preview token keys locked to ticked rows (tests).
+- **Packaging:** `paperful.__version__` reads from package metadata (single
+  source with `pyproject.toml`).
+
+### Changed
+
+- **Wanted / Settings copy:** `out/` folder naming, Zotero 10+ under Attach, GUI
+  vs CLI `--strict-pdf-doi`; Settings “Automatic after Grab” hidden until the
+  library has at least one attached PDF.
+
 ## 1.1.0 — 2026-10-16
 
 **1.1.0** ships on [PyPI](https://pypi.org/project/paperful/) (`pip install paperful`).

@@ -31,6 +31,11 @@
       var sel = btn.getAttribute("data-label-sel");
       btn.textContent = any ? sel : all;
     });
+    var attachBtn = document.getElementById("attach-btn");
+    if (attachBtn) {
+      var attachCount = parseInt(attachBtn.getAttribute("data-attach-count") || "0", 10);
+      attachBtn.disabled = attachCount === 0 && !any;
+    }
   }
   document.querySelectorAll(".row-select").forEach(function (el) {
     el.addEventListener("change", updateToolbarLabels);

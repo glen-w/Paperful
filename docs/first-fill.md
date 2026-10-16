@@ -48,10 +48,11 @@ The screenshots are `ocean/BBNJ`. The clicks are the same for any collection.
    Activity records the command. If the library changed since preview, Grab
    refuses (HTTP 409) — preview again.
 
-4. Choose **Grab selected** (or Grab all). Files land under `out/` with a
-   provenance stamp (`paperful oa:unpaywall`, …). On manual, Zotero is
-   unchanged. On automatic, matching PDFs are attached when Zotero is 10
-   or newer.
+4. Choose **Grab selected** (or Grab all). Files land in the `out/` folder on
+   this computer with a provenance stamp (`paperful oa:unpaywall`, …). On
+   manual (default), Zotero is unchanged until you Attach. On automatic
+   (Settings → **After Grab**, after your first Attach), matching PDFs are
+   attached when Zotero is 10 or newer.
 
 5. Open `out/` in your file manager. Trust the disk before notes or Ask.
 
@@ -60,11 +61,12 @@ The screenshots are `ocean/BBNJ`. The clicks are the same for any collection.
 
 ![Wanted Held: downloads waiting for a human look, rows ticked before Attach](_static/workflows/wanted-held.png)
 
-7. On manual, tick the copies you trust and choose **Attach selected PDFs**.
-   On Zotero 7–9 the files stay on disk until you attach them in Zotero
-   (`paperful attach` on the CLI once you are on Zotero 10 or newer).
-   Settings → **After Grab** switches manual and automatic. Automatic still
-   leaves DOI mismatches and short PDFs on Held for this button.
+7. Tick the copies you trust and choose **Attach selected PDFs** (or **Attach N
+   PDFs to Zotero** when nothing is ticked). The main button does not attach
+   DOI mismatches or short PDFs — use Advanced on Wanted for those. On Zotero
+   7–9 the files stay on disk until you attach them in Zotero (`paperful attach`
+   on the CLI once you are on Zotero 10 or newer). After your first Attach,
+   Settings → **After Grab** can switch manual and automatic.
 
 8. **System** is the doctor table if Wanted shows an amber coach line (no
    collection, or the library is down). **Activity** is the command history.

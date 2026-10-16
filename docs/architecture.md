@@ -338,8 +338,9 @@ GUI long jobs enqueue under `state/gui/commands/`; Activity and post-submit page
 subscribe to `GET /v1/runs/{id}/events` (SSE) with `GET /v1/runs/{id}` as JSON
 poll fallback. GUI writes use review tokens (`state/gui/reviews/`) then the same
 domain entrypoints as the CLI. Grab fetches to `out/`. Attach writes the catalogue
-when you press it, or during Grab when `[ui].attach_mode` is `auto` and the
-library can write. Apply writes the catalogue too. See [gui.md](gui.md).
+when you press it (attachable pending only on the main Wanted button; mismatch
+and short PDF need Advanced), or during Grab when `[ui].attach_mode` is `auto`
+and the library can write. Apply writes the catalogue too. See [gui.md](gui.md).
 `collections add` is CLI-only (`--apply` writes) and is not an MCP tool.
 
 TTY-only paths (a GUI must not claim them): `session login`, `doctor --guide`,
@@ -433,7 +434,7 @@ stop at `no_identifier`.
 
 ## Related docs
 
-- [ROADMAP.md](ROADMAP.md) — 1.0 trust checklist; core vs maybe-later
+- [ROADMAP.md](ROADMAP.md) — 1.0 trust checklist; post-1.1 buffet by area; core vs maybe-later
 - [quiet-mirror.md](quiet-mirror.md) — `out/` as quiet browsable mirror (direction)
 - [releases.md](releases.md) — 1.0 contract
 - [comparison.md](comparison.md) — where Paperful sits next to plugins and bib tools

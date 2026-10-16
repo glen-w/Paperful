@@ -110,6 +110,14 @@ def wanted_rows(
     }
 
 
+def library_has_attached_pdf(cfg: Config) -> bool:
+    """True after at least one PDF has been written back to the library."""
+    from ..store import STATUS_ATTACHED, Manifest
+
+    manifest = Manifest(cfg.manifest_path)
+    return any(r.status == STATUS_ATTACHED for r in manifest.records.values())
+
+
 _WANTED_TABS = ("missing", "held", "have")
 WANTED_ORDERS = ("title", "year_new", "year_old")
 WANTED_FILTERS = ("all", "summary", "no_summary")

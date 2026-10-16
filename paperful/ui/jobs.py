@@ -313,44 +313,51 @@ def attach_run(
     *,
     keys: list[str],
     collection: str,
-) -> tuple[bool, str]:
+) -> tuple[bool, str, int]:
     """Attach selected pending PDFs to Zotero (doi_match defaults + hand-ticks)."""
-    selected = [k.strip() for k in keys if k and str(k).strip()]
+    posted = [k.strip() for k in keys if k and str(k).strip()]
     items, manifest = _load_scope_items(cfg, collection)
-    if not selected:
-        item_keys = {it.key for it in items}
-        selected = [
-            r.itemKey
+    if posted:
+        pending = [
+            r
             for r in manifest.pending_attach()
-            if r.itemKey in item_keys
+            if r.itemKey in set(posted)
         ]
-    if not selected:
-        return False, "no keys selected"
-    keyset = set(selected)
-    scoped_keys = [it.key for it in items if it.key in keyset]
-    if not scoped_keys:
-        return False, "no matching items"
-    _attach_keys(cfg, scoped_keys)
-    return True, ""
+        if not pending:
+            return False, "no attachable PDFs for that selection", 0
+        scoped_keys = [r.itemKey for r in pending]
+    else:
+        item_keys = {it.key for it in items}
+        pending = [
+            r for r in manifest.pending_attach() if r.itemKey in item_keys
+        ]
+        if not pending:
+            return False, "no attachable PDFs", 0
+        scoped_keys = [r.itemKey for r in pending]
+    n = _attach_keys(cfg, scoped_keys)
+    if n == 0:
+        return False, "no attachable PDFs", 0
+    return True, "", n
 
 
-def _attach_keys(cfg: Config, keys: list[str]) -> None:
+def _attach_keys(cfg: Config, keys: list[str]) -> int:
     if not keys:
-        return
-    if attach_fn is not None:
-        attach_fn(cfg, keys=keys)
-        return
-    from ..catalogue import open_library
-    from ..pipeline import Pipeline
-
+        return 0
     m = Manifest(cfg.manifest_path)
     pending = [r for r in m.pending_attach() if r.itemKey in keys]
     if not pending:
-        return
+        return 0
+    if attach_fn is not None:
+        attach_fn(cfg, keys=[r.itemKey for r in pending])
+        return len(pending)
+    from ..catalogue import open_library
+    from ..pipeline import Pipeline
+
     backend = open_library(cfg)
     pipe = Pipeline(cfg, m, _quiet_console(), attacher=backend)
     for rec in pending:
         pipe.attach_record(rec)
+    return len(pending)
 
 
 def track_topic(

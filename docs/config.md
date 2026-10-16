@@ -59,7 +59,7 @@ and [architecture](architecture.md).
 | `[playbooks].promote` | `gated` | `gated` only logs fetch wins. `auto` writes `learned.toml` after `auto_min_hits` matching wins. **Auto may promote flukes** (one-off article URLs, cookie-banner clicks). `run --promote` overrides one run |
 | `[playbooks].auto_min_hits` | `2` | How many matching wins `auto` needs before writing a recipe. Manual `playbooks promote` can install a single cluster |
 | `[[grey_playbooks]]` | (none) | User rewrite/scrape/synthesize rules; same `name` overrides the pack |
-| `attach` | `true` | CLI: attach into Zotero after `run` (`--no-attach` overrides). Needs Zotero 10 or newer. The workbench uses `[ui].attach_mode` instead |
+| `attach` | `true` | CLI: attach into Zotero after `run` (`--no-attach` overrides). Needs Zotero 10 or newer. The workbench uses `[ui].attach_mode` instead (`manual` or `auto`; Settings shows **After Grab** only after at least one PDF has been attached via the workbench) |
 | `app_name` | `paperful` | Name shown in Zotero's authorisation dialog |
 
 Leave `ezproxy_base` empty (or remove `ezproxy` from `sources`) if you do not

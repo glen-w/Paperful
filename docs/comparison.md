@@ -180,7 +180,7 @@ How far a snowball hop reaches: [How a hop is cut](snowball.md#how-a-hop-is-cut)
 ## Related docs
 
 - [architecture.md](architecture.md) — disk-first adapters, circuit breaker, Sci-Hub
-- [ROADMAP.md](ROADMAP.md) — 1.0 trust + post-1.0; optional LLM; snowball phases
+- [ROADMAP.md](ROADMAP.md) — 1.0 trust + post-1.1 buffet by area; optional LLM; snowball phases
 - [snowball.md](snowball.md) — keyword, multi-DOI / multi-ORCID, collection, and hybrid library building
 - [authorwatch.md](authorwatch.md) — people lists → new papers (suggest / accept / import; no hop)
 - [comparison-reference.md](comparison-reference.md) — vendor notes and extra tables

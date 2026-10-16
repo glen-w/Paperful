@@ -28,7 +28,7 @@
 </div>
 <section class="panel">
   <h2>Fetch</h2>
-  <p class="section-lede">Work on the current collection, or on rows you tick in the table below. With no rows ticked, Preview and Grab use the whole Missing list. {% if attach_mode == 'auto' %}Grab saves files under out/ and attaches them when the library can be written (Zotero 10 or newer). On Zotero 7–9 the files stay on disk. Change this under Settings.{% else %}Grab saves files under out/ only. Press Attach for the copies you trust. Attach needs Zotero 10 or newer; on 7–9, attach the files in Zotero. Settings can make Grab attach automatically.{% endif %}</p>
+  <p class="section-lede">Work on the current collection, or on rows you tick in the table below. With no rows ticked, Preview and Grab use the whole Missing list. {% if attach_mode == 'auto' %}Grab saves PDFs to the <code>out/</code> folder on this computer and attaches them when the library can be written (Zotero 10 or newer). On Zotero 7–9 the files stay on disk. Change this under Settings.{% else %}Grab saves PDFs to the <code>out/</code> folder on this computer only. Press Attach for the copies you trust.{% if show_auto_attach_setting %} Settings can make Grab attach automatically.{% endif %}{% endif %}</p>
 <form method="post" action="/wanted/preview" id="wanted-form" class="form-stack">
   <input type="hidden" name="grab_review_token" value="{{ grab_token }}">
   {% if prefs.advanced %}
@@ -52,14 +52,16 @@
     {{ info("Show which items would be fetched, without downloading.") }}
     <button type="submit" formaction="/wanted/grab" id="grab-btn" data-label-all="Grab all" data-label-sel="Grab selected">Grab all</button>
     {% if attach_mode == 'auto' %}
-    {{ info("Download PDFs into out/ and attach them into the library when write access is available (Zotero 10 or newer).") }}
+    {{ info("Download PDFs into the out/ folder on this computer and attach them into the library when write access is available (Zotero 10 or newer).") }}
     {% else %}
-    {{ info("Download PDFs into Paperful’s holding area. They are not attached to Zotero until you Attach.") }}
+    {{ info("Download PDFs into the out/ folder on this computer. They are not attached to Zotero until you Attach.") }}
     {% endif %}
     <button type="submit" formaction="/wanted/attach" id="attach-btn" class="secondary"
+      data-attach-count="{{ counts.attach }}"
+      {% if counts.attach == 0 %}disabled{% endif %}
       data-label-all="{% if counts.attach %}Attach {{ counts.attach }} PDF{% if counts.attach != 1 %}s{% endif %} to Zotero{% else %}Attach PDFs to Zotero{% endif %}"
       data-label-sel="Attach selected PDFs">{% if counts.attach %}Attach {{ counts.attach }} PDF{% if counts.attach != 1 %}s{% endif %} to Zotero{% else %}Attach PDFs to Zotero{% endif %}</button>
-    {{ info("Write already-downloaded held PDFs into Zotero. Skips files that fail the DOI or length checks unless you override those in Advanced.") }}
+    {{ info("Write PDFs from the out/ folder into Zotero. Needs Zotero 10 or newer; on 7–9, attach those files in Zotero. Skips PDFs whose DOI does not match the item (use Advanced to override). CLI paperful run attaches mismatches unless you pass --strict-pdf-doi.") }}
   </div>
 </form>
 </section>

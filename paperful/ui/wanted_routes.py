@@ -39,6 +39,7 @@ from .pages import (
     last_ask_result,
     last_job_result,
     job_view,
+    library_has_attached_pdf,
     WANTED_FILTER_LABELS,
     WANTED_ORDER_LABELS,
     library_items_page,
@@ -252,6 +253,7 @@ def register_wanted(ui: UiContext) -> None:
                 dest_options=dest_options(),
                 grab_token=_wanted_token("preview_run"),
                 attach_mode=cfg.ui_attach_mode,
+                show_auto_attach_setting=library_has_attached_pdf(cfg),
                 attach_token=_wanted_token("attach"),
                 recover_token=_wanted_token("recover"),
                 wanted_pagination=wanted_pagination,
@@ -408,7 +410,7 @@ def register_wanted(ui: UiContext) -> None:
         else:
             prefs = prefs_from_request(request)
             keys = [str(k) for k in form.getlist("keys")]
-            ok, msg = jobs.attach_run(cfg, keys=keys, collection=prefs.collection)
+            ok, msg, _n = jobs.attach_run(cfg, keys=keys, collection=prefs.collection)
         if not ok:
             return JSONResponse({"ok": False, "error": msg}, status_code=409)
         return RedirectResponse(url="/wanted", status_code=303)

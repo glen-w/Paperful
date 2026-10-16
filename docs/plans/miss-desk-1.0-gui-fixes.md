@@ -19,7 +19,7 @@ Sources folded in: claim↔code, usability/door walk, packaging slice, options l
 
 Wanted is the right door. Localhost bind, verify stamps, Ask-off-nav, and Have/Held/Missing counts already pass.
 
-**Stop-ship:** default-on `attach_verified` makes Grab silently write Zotero for first-hour users while hiding the Attach control. The visible “Attach” button is not a real attach path. “Grab selected” overclaims because production fetch ignores token keys.
+**Historical (pre-1.1.1):** default-on `attach_verified` made Grab silently write Zotero while hiding Attach; “Grab selected” ignored token keys. **1.1.1** closed the P0s below (see [1.1.1 stop-ship](1.1.1-stop-ship.md)).
 
 Ship write-surface honesty before chrome.
 
