@@ -102,6 +102,12 @@ def request_from_profile(raw: dict[str, Any], cfg: Config) -> SnowballRequest:
         author_site_preflight=bool(raw["author_site_preflight"])
         if "author_site_preflight" in raw
         else None,
+        stop_rule=str(raw["stop_rule"]).strip() if raw.get("stop_rule") else None,
+        stop_eps=float(raw["stop_eps"]) if raw.get("stop_eps") is not None else None,
+        stop_k=int(raw["stop_k"]) if raw.get("stop_k") is not None else None,
+        stop_tau=float(raw["stop_tau"]) if raw.get("stop_tau") is not None else None,
+        stop_min_points=int(raw["stop_min_points"]) if raw.get("stop_min_points") is not None else None,
+        stop_max_screened=int(raw["stop_max_screened"]) if raw.get("stop_max_screened") is not None else None,
     )
 
 

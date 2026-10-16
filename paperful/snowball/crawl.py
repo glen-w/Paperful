@@ -193,6 +193,7 @@ def search_candidates(
     keyword_hop_limit: int = 50,
     keyword_min_score: float = 0.0,
     cites_query: str = "",
+    hop_end: int | None = None,
 ) -> list[Candidate]:
     _remember_keywords(
         client,
@@ -256,6 +257,7 @@ def search_candidates(
                 why_prefix="search hit",
                 min_seed_citations=min_seed_citations,
                 per_hop_rank=per_hop_rank,
+                hop_end=hop_end,
             )
         )
     return truncate(_dedupe(rows), max_candidates)
@@ -280,6 +282,7 @@ def doi_candidates(
     keyword_min_score: float = 0.0,
     cites_query: str = "",
     include_seeds: bool = True,
+    hop_end: int | None = None,
 ) -> tuple[list[Candidate], list[str]]:
     """Return each seed DOI (hop 0 when include_seeds), its neighbours, and failures."""
     _remember_keywords(
@@ -378,6 +381,7 @@ def doi_candidates(
                     why_prefix=doi,
                     min_seed_citations=min_seed_citations,
                     per_hop_rank=per_hop_rank,
+                    hop_end=hop_end,
                 )
             )
         _emit(client, rows)
@@ -408,6 +412,7 @@ def orcid_candidates(
     keyword_hop_limit: int = 50,
     keyword_min_score: float = 0.0,
     cites_query: str = "",
+    hop_end: int | None = None,
 ) -> tuple[list[Candidate], list[str]]:
     """One or more people's works (hop 0), then one expander over the combined seeds."""
     _remember_keywords(
@@ -472,6 +477,7 @@ def orcid_candidates(
                 why_prefix=why,
                 min_seed_citations=min_seed_citations,
                 per_hop_rank=per_hop_rank,
+                hop_end=hop_end,
             )
         )
     return truncate(_dedupe(rows), max_candidates), failed
@@ -873,9 +879,16 @@ def _expand_hops(
     why_prefix: str,
     min_seed_citations: int = 0,
     per_hop_rank: str = "most-cited",
+    hop_start: int = 1,
+    hop_end: int | None = None,
+    seen_oa: set[str] | None = None,
 ) -> list[Candidate]:
-    """BFS from seed works through refs, cites, and/or keywords up to ``depth`` hops."""
-    if depth < 1:
+    """BFS from seed works through refs, cites, and/or keywords up to ``depth`` hops.
+
+    ``hop_end`` stops after that hop (inclusive). ``seen_oa`` skips works already queued.
+    """
+    end = depth if hop_end is None else min(hop_end, depth)
+    if end < 1 or hop_start > end:
         return []
     want_refs = _wants_refs(direction)
     want_cites = _wants_cites(direction)
@@ -889,10 +902,11 @@ def _expand_hops(
 
     rows: list[Candidate] = []
     frontier = list(seeds)
-    seen_oa: set[str] = {short_id(str(w.get("id") or "")) for w in seeds if w.get("id")}
-    seen_oa.discard("")
+    seen: set[str] = set(seen_oa or ())
+    seen.update(short_id(str(w.get("id") or "")) for w in seeds if w.get("id"))
+    seen.discard("")
 
-    for hop in range(1, depth + 1):
+    for hop in range(hop_start, end + 1):
         client.stage = f"hop {hop}/{depth}"
         client.note(f"hop {hop}/{depth} · {len(frontier)} seeds · {direction}")
         next_works: list[dict[str, Any]] = []
@@ -913,22 +927,22 @@ def _expand_hops(
         if want_refs:
             from .hops import hop_refs
 
-            if hop_refs(client, frontier, rows, next_works, seen_oa, **hop_kw):
+            if hop_refs(client, frontier, rows, next_works, seen, **hop_kw):
                 return rows
         if want_cites:
             from .hops import hop_cites
 
-            if hop_cites(client, frontier, rows, next_works, seen_oa, **hop_kw):
+            if hop_cites(client, frontier, rows, next_works, seen, **hop_kw):
                 return rows
         if want_keywords:
             from .hops import hop_keywords
 
-            if hop_keywords(client, frontier, rows, next_works, seen_oa, **hop_kw):
+            if hop_keywords(client, frontier, rows, next_works, seen, **hop_kw):
                 return rows
         if want_similar and hop == 1:
             from .hops import hop_similar
 
-            if hop_similar(client, frontier, rows, seen_oa, **hop_kw):
+            if hop_similar(client, frontier, rows, seen, **hop_kw):
                 return rows
         frontier = next_works
         if not frontier:

@@ -40,6 +40,19 @@
       <label>Year to {{ info("Drop candidate works published after this year.") }} <input name="year_to" type="number"></label>
       <label>Max candidates {{ info("Stop after this many new-plus-already-in-library rows. Use all for every row (can be huge).") }} <input name="max_candidates" placeholder="all"></label>
       <label>Per-hop limit {{ info("Neighbours kept per seed at each hop. Use all for every neighbour.") }} <input name="per_hop_limit" placeholder="all"></label>
+      <label>Stop rule {{ info("Off walks the whole depth in one search. marginal_yield pauses after each hop so you can Keep or Skip before the next hop. any also stops on a fitted coverage curve, a screening cap, or an empty frontier. Depth and max candidates still cap the walk.") }}
+        <select name="stop_rule">
+          <option value="">default</option>
+          <option value="off">off</option>
+          <option value="marginal_yield">marginal_yield</option>
+          <option value="asymptotic_coverage">asymptotic_coverage</option>
+          <option value="budget">budget</option>
+          <option value="any">any</option>
+        </select>
+      </label>
+      <label>Stop eps {{ info("marginal_yield: fraction of screened works you Keep. Below this for stop-k hops in a row, and not before hop k+1. Default 0.01.") }} <input name="stop_eps" placeholder="0.01"></label>
+      <label>Stop k {{ info("How many low-yield hops in a row. Default 2, so the rule cannot fire before the third labeled hop.") }} <input name="stop_k" type="number" min="1"></label>
+      <label>Stop max screened {{ info("budget: stop after this many new rows have been screened. Leave blank for no cap.") }} <input name="stop_max_screened" type="number" min="0"></label>
       <label>Hybrid seeds {{ info("For hybrid kind: how many keyword hits become graph seeds. Leave blank for the default.") }} <input name="hybrid_seeds" type="number"></label>
       <label>Per-hop rank {{ info("Which neighbours a numeric Per-hop limit keeps: most-cited, least-cited, or random. default uses the usual ranking.") }}
         <select name="per_hop_rank">
@@ -369,6 +382,14 @@
       {{ info("Create the items from the last successful queue preview.") }}
       <a href="/wanted">Fill PDFs</a>
     </form>
+    {% if stop_pending %}
+    <form method="post" action="/discover/continue" class="toolbar">
+      <input type="hidden" name="run_id" value="{{ run_id }}">
+      <button type="submit" class="secondary">Next hop</button>
+      {{ info("Score the Keep and Skip marks on this hop. If the stopping rule has not fired, fetch one more hop from the rows you kept.") }}
+    </form>
+    {% endif %}
+    {% if stop_note %}<p class="section-lede">{{ stop_note }}</p>{% endif %}
     <form method="post" action="/discover/watch" class="toolbar">
       <input type="hidden" name="run_id" value="{{ run_id }}">
       <label>Watch name {{ info("Name for this saved topic watch. Check again later from Following.") }} <input name="watch_name" value="topic-watch"></label>

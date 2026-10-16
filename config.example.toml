@@ -349,6 +349,12 @@ gone = "mark"
 # author_site_preflight = false
 # author_site_max_authors = 15
 # author_site_max_queries = 20
+# stop_rule = "off"          # off | marginal_yield | asymptotic_coverage | budget | any
+# stop_eps = 0.01            # Keep rate below this for stop_k hops
+# stop_k = 2                 # cannot fire before hop k+1
+# stop_tau = 0.95
+# stop_min_points = 4
+# stop_max_screened = 0      # budget cap; 0 means unset
 
 # People lists: `paperful authorwatch`. Caps are CLI flags on `authorwatch run`
 # (`--max-authors` 50, `--per-author-limit` 200). No [authorwatch] table is

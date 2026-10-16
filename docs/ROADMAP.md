@@ -26,7 +26,7 @@ until real-library reports say so.
 Still not a full-text reading index, not a WebDAV client, and not “AI fetch
 everything.” `paperful ocr` is the optional text layer for scans. **1.0.0 and
 1.1.0 are tagged** (1.1.0 on PyPI). **1.1.1** is stop-ship hygiene (shipped in
-tree). Everything
+tree). **1.2.0** adds snowball stopping rules, off by default. Everything
 after that is a **buffet by area** — keep it on the map, pick later, prefer
 evidence from outside testers. See [After 1.1.0](#after-110-buffet-by-area).
 
@@ -77,7 +77,7 @@ Paperful every week, not just once to fill gaps?
 ### Facts settled against 1.1.0
 
 - 1.1.0 is tagged and on PyPI; trusted publishing (`publish.yml`) exists.
-- Version: single source via `importlib.metadata` / `pyproject.toml` (1.1.1).
+- Version: single source via `importlib.metadata` / `pyproject.toml` (1.2.0).
 - Attach is **manual by default** (`[ui].attach_mode`); Grab does not write to
   Zotero unless Settings is automatic.
 - **1.1.1 closed P0s:** Grab-selected `item_keys`, Held hand-ticks, Attach at
@@ -85,7 +85,7 @@ Paperful every week, not just once to fill gaps?
 - **Ask** is on the default nav (third after Wanted and Discover); it does
   not need Advanced. Whether it *stays* there is an [open
   question](#after-110-open-questions).
-- Install docs are pinned to `v1.1.1` (README, `docs/docker.md`,
+- Install docs are pinned to `v1.2.0` (README, `docs/docker.md`,
   `website/index.html`). Recheck every paperful.app claim before launch.
 
 (after-110-1-1-1)=
@@ -272,7 +272,10 @@ chasing and complement each other everywhere else.
 **Borrow (do not vendor):**
 
 - A **stopping rule** (`marginal_yield` over Keep/Skip) instead of fixed
-  hop caps.
+  hop caps. **Shipped, off by default** (`[snowball].stop_rule`, per-run
+  flags / profile / Discover). One hop, then Keep/Skip, then
+  `snowball continue`. `asymptotic_coverage`, `budget`, and `any` are
+  included. Hop caps stay as ceilings. No recall percentage.
 - A **response-hash cache with drift classification** for watches — tells a
   genuinely new paper apart from a reassigned or merged ID (matters for
   [OpenAlex topics](#after-110-openalex-topics)).
@@ -323,7 +326,7 @@ a review UI, a citation-graph canvas — [Parked](#snowball).
   the main route, now. **(2)** A Docker image for labs and NAS boxes, only
   if testers ask. **(3)** A signed desktop bundle, only if marketing
   targets non-technical researchers. Which of these is *the* main route is
-  still open (PyPI 1.1.1 is current; Docker remains the CI-tested operator
+  still open (PyPI stays on 1.1.1 until `v1.2.0` is published; Docker remains the CI-tested operator
   path in [releases.md](releases.md)).
 - Possibly an opt-in update notice that checks PyPI and sends no telemetry.
 

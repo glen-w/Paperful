@@ -122,7 +122,7 @@ flowchart LR
 | `state/dedupe-packs/` | Duplicate review packs from `dedupe` (JSON + Markdown) |
 | `state/dedupe-applied.jsonl` | Merge audit; appended only on `dedupe --apply` |
 | `state/cites/<hash>.json` | OpenAlex reference lists for one DOI set, inverted so snowball can say how many items in the target collection cite a new work. Reused until that DOI set changes |
-| `state/snowball/<run-id>/` | One crawl queue: `candidates.jsonl`, `summary.json` (includes `target_collection` when `-C` was set), thin `briefing.md`, frontier `digest.md`. How the digest is cut is [Watch](snowball.md#watch) |
+| `state/snowball/<run-id>/` | One crawl queue: `candidates.jsonl`, `summary.json` (includes `target_collection` when `-C` was set), thin `briefing.md`, frontier `digest.md`. When a stopping rule is on, also `stop.json` and append-only `stops.jsonl` (`paperful.snowball.stop.v1`). How the digest is cut is [Watch](snowball.md#watch) |
 | `state/snowball/watches/<name>/` | Watch ledger: `watch.json`, `seen.json`, `inbox.jsonl`, `briefing.md`, `digest.md`. No scheduler in Paperful |
 | `state/version-packs/` | Preprint/published review packs (`paperful.version_pack.v1`) |
 | `state/versions-applied.jsonl` | One line per work updated by `versions --apply` |

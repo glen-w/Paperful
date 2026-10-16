@@ -59,6 +59,7 @@ from .pages import (
     summary_meta,
     list_threads,
     newest_snowball_queue,
+    snowball_stop_view,
     command_by_id,
     repair_queues,
     safe_child,
@@ -128,6 +129,7 @@ def register_discover(ui: UiContext) -> None:
         request: Request, list_name: str = "", error: str = "", run: str = ""
     ) -> HTMLResponse:
         run_id, candidates = newest_snowball_queue(cfg)
+        stop_pending, stop_note = snowball_stop_view(cfg, run_id)
         active_list = (list_name or "followed").strip()
         people: list[dict[str, Any]] = []
         if active_list:
@@ -143,6 +145,8 @@ def register_discover(ui: UiContext) -> None:
                 "discover",
                 run_id=run_id,
                 candidates=candidates,
+                stop_pending=stop_pending,
+                stop_note=stop_note,
                 following=following_lists(cfg),
                 inbox=authorwatch_inbox_rows(cfg),
                 aw_lists=authorwatch_lists(cfg),
@@ -439,6 +443,29 @@ def register_discover(ui: UiContext) -> None:
         except Exception:
             return RedirectResponse(url="/discover?error=watch", status_code=303)
         return RedirectResponse(url="/discover", status_code=303)
+
+
+    @app.post("/discover/continue")
+    async def discover_continue(request: Request) -> RedirectResponse:
+        form = await request.form()
+        run_id = str(form.get("run_id") or "").strip()
+        if not run_id:
+            return RedirectResponse(url="/discover", status_code=303)
+
+        def work(cmd_id: str) -> None:
+            from ..snowball.command import SnowballError, run_continue
+
+            try:
+                run_continue(cfg, run_id, console=jobs._quiet_console())
+            except SnowballError as exc:
+                rec = commands.read_command(cfg, cmd_id) or {}
+                rec["status"] = "failed"
+                rec["error"] = str(exc)
+                commands.write_command(cfg, rec)
+                raise
+
+        cmd_id = commands.enqueue(cfg, "snowball_continue", work)
+        return _after_job("/discover", cmd_id)
 
 
     @app.post("/discover/resume")

@@ -43,6 +43,10 @@ class DiscoverTopicPayload:
     dedupe_after: str | None = None
     author_site_preflight: bool | None = None
     twenty_writeback: bool | None = None
+    stop_rule: str | None = None
+    stop_eps: float | None = None
+    stop_k: int | None = None
+    stop_max_screened: int | None = None
 
 
 def _opt_int(raw: object) -> int | None:
@@ -129,6 +133,10 @@ def parse_discover_topic(form: Mapping[str, Any], *, advanced: bool) -> Discover
         dedupe_after=_opt_str(form.get("dedupe_after")),
         author_site_preflight=True if form.get("author_site_preflight") == "1" else None,
         twenty_writeback=True if form.get("twenty_writeback") == "1" else None,
+        stop_rule=_opt_str(form.get("stop_rule")),
+        stop_eps=_opt_float(form.get("stop_eps")),
+        stop_k=_opt_int(form.get("stop_k")),
+        stop_max_screened=_opt_int(form.get("stop_max_screened")),
     )
 
 
@@ -158,6 +166,10 @@ def build_request(cfg: Config, payload: DiscoverTopicPayload, collection: str) -
         dedupe_scope=payload.dedupe_scope,
         dedupe_after=payload.dedupe_after,
         author_site_preflight=payload.author_site_preflight,
+        stop_rule=payload.stop_rule,
+        stop_eps=payload.stop_eps,
+        stop_k=payload.stop_k,
+        stop_max_screened=payload.stop_max_screened,
     )
 
 
@@ -241,4 +253,12 @@ def profile_body_from_payload(
         body["refine"] = True
     if payload.author_site_preflight:
         body["author_site_preflight"] = True
+    if payload.stop_rule:
+        body["stop_rule"] = payload.stop_rule
+    if payload.stop_eps is not None:
+        body["stop_eps"] = payload.stop_eps
+    if payload.stop_k is not None:
+        body["stop_k"] = payload.stop_k
+    if payload.stop_max_screened is not None:
+        body["stop_max_screened"] = payload.stop_max_screened
     return {k: v for k, v in body.items() if v is not None and v != "" and v != []}

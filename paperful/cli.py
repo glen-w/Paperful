@@ -443,6 +443,30 @@ AuthorSitePreflightOpt = typer.Option(
     "--author-site-preflight/--no-author-site-preflight",
     help="Opt-in co-author graph and proposed field pack. Default: config.",
 )
+StopRuleOpt = typer.Option(
+    None,
+    "--stop-rule",
+    help=(
+        "off, marginal_yield, asymptotic_coverage, budget, or any. "
+        "Off walks every hop in one shot. A rule pauses after each hop for Keep/Skip. "
+        "Default: config, else off."
+    ),
+)
+StopEpsOpt = typer.Option(
+    None,
+    "--stop-eps",
+    help="marginal_yield: Keep rate below this. Default 0.01.",
+)
+StopKOpt = typer.Option(
+    None,
+    "--stop-k",
+    help="Consecutive low-yield iterations. The rule cannot fire before iteration k+1. Default 2.",
+)
+StopMaxScreenedOpt = typer.Option(
+    None,
+    "--stop-max-screened",
+    help="budget: stop after this many screened new rows. 0 means no cap.",
+)
 TwentyWritebackOpt = typer.Option(
     None,
     "--twenty-writeback/--no-twenty-writeback",
@@ -4741,6 +4765,10 @@ def _snowball_request(
     dedupe_after: str | None = None,
     author_site_preflight: bool | None = None,
     twenty_writeback: bool | None = None,
+    stop_rule: str | None = None,
+    stop_eps: float | None = None,
+    stop_k: int | None = None,
+    stop_max_screened: int | None = None,
 ) -> Any:
     from .snowball.command import SnowballRequest
     from .snowball.expand import parse_study_designs
@@ -4781,6 +4809,10 @@ def _snowball_request(
         dedupe_scope=(dedupe_scope or "").strip() or None,
         dedupe_after=(dedupe_after or "").strip() or None,
         author_site_preflight=author_site_preflight,
+        stop_rule=(stop_rule or "").strip() or None,
+        stop_eps=stop_eps,
+        stop_k=stop_k,
+        stop_max_screened=stop_max_screened,
     )
 
 def _csv(raw: str | None) -> tuple[str, ...]:
@@ -4928,6 +4960,10 @@ def snowball_search(
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
     twenty_writeback: bool | None = TwentyWritebackOpt,
+    stop_rule: str | None = StopRuleOpt,
+    stop_eps: float | None = StopEpsOpt,
+    stop_k: int | None = StopKOpt,
+    stop_max_screened: int | None = StopMaxScreenedOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
@@ -4962,6 +4998,10 @@ def snowball_search(
         dedupe_after=dedupe_after,
         author_site_preflight=author_site_preflight,
         twenty_writeback=twenty_writeback,
+        stop_rule=stop_rule,
+        stop_eps=stop_eps,
+        stop_k=stop_k,
+        stop_max_screened=stop_max_screened,
     )
     from .snowball.command import run_search
 
@@ -5014,6 +5054,10 @@ def snowball_hybrid(
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
     twenty_writeback: bool | None = TwentyWritebackOpt,
+    stop_rule: str | None = StopRuleOpt,
+    stop_eps: float | None = StopEpsOpt,
+    stop_k: int | None = StopKOpt,
+    stop_max_screened: int | None = StopMaxScreenedOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
@@ -5047,6 +5091,10 @@ def snowball_hybrid(
         dedupe_after=dedupe_after,
         author_site_preflight=author_site_preflight,
         twenty_writeback=twenty_writeback,
+        stop_rule=stop_rule,
+        stop_eps=stop_eps,
+        stop_k=stop_k,
+        stop_max_screened=stop_max_screened,
     )
     from .snowball.command import run_hybrid
 
@@ -5095,6 +5143,10 @@ def snowball_doi(
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
     twenty_writeback: bool | None = TwentyWritebackOpt,
+    stop_rule: str | None = StopRuleOpt,
+    stop_eps: float | None = StopEpsOpt,
+    stop_k: int | None = StopKOpt,
+    stop_max_screened: int | None = StopMaxScreenedOpt,
     seeds_file: str | None = SeedsFileOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
@@ -5125,6 +5177,10 @@ def snowball_doi(
         dedupe_after=dedupe_after,
         author_site_preflight=author_site_preflight,
         twenty_writeback=twenty_writeback,
+        stop_rule=stop_rule,
+        stop_eps=stop_eps,
+        stop_k=stop_k,
+        stop_max_screened=stop_max_screened,
     )
     from .snowball.command import SnowballError, run_doi
 
@@ -5173,6 +5229,10 @@ def snowball_orcid(
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
     twenty_writeback: bool | None = TwentyWritebackOpt,
+    stop_rule: str | None = StopRuleOpt,
+    stop_eps: float | None = StopEpsOpt,
+    stop_k: int | None = StopKOpt,
+    stop_max_screened: int | None = StopMaxScreenedOpt,
     seeds_file: str | None = SeedsFileOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
@@ -5203,6 +5263,10 @@ def snowball_orcid(
         dedupe_after=dedupe_after,
         author_site_preflight=author_site_preflight,
         twenty_writeback=twenty_writeback,
+        stop_rule=stop_rule,
+        stop_eps=stop_eps,
+        stop_k=stop_k,
+        stop_max_screened=stop_max_screened,
     )
     from .snowball.command import SnowballError, run_orcid
 
@@ -5251,6 +5315,10 @@ def snowball_collection(
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
     twenty_writeback: bool | None = TwentyWritebackOpt,
+    stop_rule: str | None = StopRuleOpt,
+    stop_eps: float | None = StopEpsOpt,
+    stop_k: int | None = StopKOpt,
+    stop_max_screened: int | None = StopMaxScreenedOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
@@ -5281,6 +5349,10 @@ def snowball_collection(
         dedupe_after=dedupe_after,
         author_site_preflight=author_site_preflight,
         twenty_writeback=twenty_writeback,
+        stop_rule=stop_rule,
+        stop_eps=stop_eps,
+        stop_k=stop_k,
+        stop_max_screened=stop_max_screened,
     )
     from .snowball.command import run_collection
 
@@ -5437,6 +5509,30 @@ def snowball_resume(
         command="snowball resume",
     )
 
+@snowball_app.command("continue")
+def snowball_continue_cmd(
+    run_id: str = typer.Argument(..., help="Run id under state/snowball/<run-id>/ with stop.json."),
+    gate: str | None = typer.Option(
+        None,
+        "--gate",
+        help="auto marks unlabeled new rows as Keep. Default: the gate saved with the run.",
+    ),
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Score Keep/Skip on the latest hop, then walk one more hop unless a stopping rule fires."""
+    cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    out = _snowball_console(json_out=json_out)
+    from .snowball.command import run_continue
+
+    _run_snowball(
+        cfg,
+        lambda c: run_continue(c, run_id, console=out, gate=gate),
+        json_out=json_out,
+        command="snowball continue",
+    )
+
 @snowball_app.command("apply")
 def snowball_apply(
     run_id: str = typer.Argument(..., help="Run id under state/snowball/<run-id>/."),
@@ -5489,6 +5585,10 @@ def snowball_run(
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
     twenty_writeback: bool | None = TwentyWritebackOpt,
+    stop_rule: str | None = StopRuleOpt,
+    stop_eps: float | None = StopEpsOpt,
+    stop_k: int | None = StopKOpt,
+    stop_max_screened: int | None = StopMaxScreenedOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
@@ -5531,6 +5631,14 @@ def snowball_run(
             request.dedupe_after = dedupe_after.strip()
         if author_site_preflight is not None:
             request.author_site_preflight = author_site_preflight
+        if stop_rule:
+            request.stop_rule = stop_rule.strip()
+        if stop_eps is not None:
+            request.stop_eps = stop_eps
+        if stop_k is not None:
+            request.stop_k = stop_k
+        if stop_max_screened is not None:
+            request.stop_max_screened = stop_max_screened
         description = str(raw.get("description") or "").strip()
         if description and not json_out:
             console.print(description)
@@ -5635,6 +5743,10 @@ def snowball_profile_save(
     hybrid_seeds: int | None = typer.Option(None, "--hybrid-seeds"),
     refine: bool = typer.Option(False, "--refine"),
     author_site_preflight: bool = typer.Option(False, "--author-site-preflight"),
+    stop_rule: str = typer.Option("", "--stop-rule", help="off, marginal_yield, asymptotic_coverage, budget, or any."),
+    stop_eps: float | None = StopEpsOpt,
+    stop_k: int | None = StopKOpt,
+    stop_max_screened: int | None = StopMaxScreenedOpt,
     seeds_file: str | None = SeedsFileOpt,
     force: bool = typer.Option(
         False, "--force", help="Overwrite, or save a writing gate."
@@ -5772,6 +5884,14 @@ def snowball_profile_save(
         body["hybrid_seeds"] = hybrid_seeds
     if refine:
         body["refine"] = True
+    if stop_rule.strip():
+        body["stop_rule"] = stop_rule.strip()
+    if stop_eps is not None:
+        body["stop_eps"] = stop_eps
+    if stop_k is not None:
+        body["stop_k"] = stop_k
+    if stop_max_screened is not None:
+        body["stop_max_screened"] = stop_max_screened
     try:
         path = save_snowball_profile(cfg, name, body, force=force)
     except SnowballError as exc:

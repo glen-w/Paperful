@@ -1,6 +1,6 @@
 # Releases and stability
 
-**1.1.1** is the current PyPI release (`pip install paperful`; optional extras
+**1.2.0** is the current release (`pip install paperful` after this tag is published; optional extras
 `[llm]`, `[rag]`, `[serve]`, `[browser-agent]`). **1.1.0** introduced PyPI and
 trusted publishing. After install, run `playwright install chromium` once for
 campus login and HTML PDF paths. The **operator** install tested in CI is still

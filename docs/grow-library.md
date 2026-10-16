@@ -48,7 +48,8 @@ The screenshots are the Discover page on a live `ocean/BBNJ` chip.
 5. **Fill PDFs** opens Wanted. Continue with [First fill](first-fill.md).
 
 Advanced (toggle, cookie only) adds crawl kinds (hybrid / DOI / ORCID /
-collection), hop knobs, profile save/run, **refs gap**, and **ingest-dois**.
+collection), hop knobs, a stopping rule (off unless you set it; **Next hop**
+between hops), profile save/run, **refs gap**, and **ingest-dois**.
 Those are the [research pack](research-pack.md) and [snowball](snowball.md)
 surfaces, not the first click.
 

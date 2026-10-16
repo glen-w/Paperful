@@ -259,6 +259,10 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[ingest].default_tags` | `()` | Tags on `ingest-dois --apply` and inbox-created parents |
 | `[snowball].default_tags` | `()` | Extra tags on snowball `--gate auto` / `apply` creates, with `--tag` and `from-<seed-slug>` |
 | `[snowball].study_designs` | `()` | OpenAlex study design filter (`rct`, `meta-analysis`, …). CLI `--study-design`. See [snowball stop rules](snowball.md#stop-rules) |
+| `[snowball].stop_rule` | `off` | `off`, `marginal_yield`, `asymptotic_coverage`, `budget`, or `any`. Off is one shot. A rule pauses for Keep/Skip between hops. CLI `--stop-rule`. See [snowball stopping rules](snowball.md#stopping-rules) |
+| `[snowball].stop_eps` / `stop_k` | `0.01` / `2` | Marginal yield: Keep rate below `eps` for `k` hops, not before hop `k + 1`. CLI `--stop-eps` / `--stop-k` |
+| `[snowball].stop_tau` / `stop_min_points` | `0.95` / `4` | Fitted Keep ceiling. Needs that many labeled hops. Config and profile only |
+| `[snowball].stop_max_screened` | `0` | `budget` cap. `0` means unset. CLI `--stop-max-screened` |
 | `[snowball].dedupe_after` | `off` | After create: `off`, `classify` (`state/dedupe-packs/`), or `apply` (merge high-DOI extras) |
 | `[snowball].author_site_preflight` | `false` | Co-author graph + proposed `state/author-packs/`. Promote before `author_site` fetch. Corpus frequency without a snowball run is `paperful authors -C … --apply` |
 | `[authorwatch]` | — | Not parsed. Caps are `authorwatch run --max-authors` / `--per-author-limit`. `doctor` ambers lists with people and no ORCID/OpenAlex id. No social scrape |

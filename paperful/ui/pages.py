@@ -200,6 +200,24 @@ def newest_snowball_queue(cfg: Config) -> tuple[str, list[dict[str, Any]]]:
     return run_id, rows
 
 
+def snowball_stop_view(cfg: Config, run_id: str) -> tuple[bool, str]:
+    """Whether the newest queue is waiting for Next hop, and any stop sentence."""
+    if not run_id:
+        return False, ""
+    path = cfg.state_dir / "snowball" / run_id / "stop.json"
+    if not path.is_file():
+        return False, ""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False, ""
+    if not isinstance(data, dict):
+        return False, ""
+    note = str(data.get("rationale") or "").strip()
+    pending = bool(data.get("awaiting_labels")) and not data.get("stopped_by")
+    return pending, note
+
+
 def authorwatch_inbox_rows(cfg: Config) -> list[dict[str, Any]]:
     root = cfg.state_dir / "authorwatch"
     if not root.is_dir():

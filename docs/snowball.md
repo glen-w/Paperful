@@ -8,6 +8,8 @@ OpenAlex keywords, depth up to 5 under caps, gates
 `--fetch-pdfs`, `--dedupe-scope` per invocation, optional `--dedupe-after`,
 opt-in author-site preflight / `snowball packs promote`, and pull-only `watch`
 are implemented, plus a frontier `digest` on a saved queue or watch.
+Optional [stopping rules](#stopping-rules) are off until you set them: one hop,
+then Keep/Skip, then `snowball continue`.
 Config honors `dedupe_scope`, `tag_prefix`, `default_tags`,
 `types`, `oa_only`, venues, `languages`, `min_seed_citations`,
 `note_provenance`, and `backends`. `--refine` writes query suggestions when
@@ -41,10 +43,12 @@ paperful snowball watch run bbnj --digest
 paperful snowball watch digest bbnj
 paperful snowball digest --run-id <run-id>
 paperful snowball watch briefing bbnj
+paperful snowball doi 10.1038/s41586-021-03819-2 --depth 3 --stop-rule marginal_yield
+paperful snowball continue <run-id>
 ```
 
 `--format json` on crawl (`search` / `hybrid` / `doi` / `orcid` / `collection`),
-`run`, `resume`, and `apply` prints one
+`run`, `resume`, `continue`, and `apply` prints one
 [`paperful.agent.json.v1`](commands.md#exits) object on stdout (run path +
 summary; progress on stderr). Mixed `apply` writes exit **3**. Prefer that
 over MCP for shell agents.
@@ -278,7 +282,9 @@ flowchart TB
 DOI and collection seeds use the same hop. For DOI, the seed work itself is
 included as hop 0, then neighbours. Collection expands DOIs already in the
 seed path. Keyword search stays on the hit list unless you set depth. The
-usual numbers are in [Stop rules](#stop-rules).
+usual numbers are in [Stop rules](#stop-rules). With a stopping rule on and
+depth greater than 1, that first command stops after hop 1 and waits. See
+[Stopping rules](#stopping-rules).
 
 `direction` including `keywords` adds another side. OpenAlex stores at most
 five scored keywords on a work. The hop takes the top `keyword_limit` (default
@@ -389,11 +395,47 @@ The picture is [How a hop is cut](#how-a-hop-is-cut).
 | `languages`, `venue_include`, `venue_exclude` | unset | Applied when the source has the field. A missing language does not drop the row |
 | `hybrid_seeds` | 5 | How many top DOI hits `hybrid` expands |
 | `approve_each_max` | 20 | Largest `approve-each` list. Above this, use `approve-batch` |
+| `stop_rule` | `off` | `off` walks the whole depth in one shot. `marginal_yield` pauses after each hop until Keep/Skip, then `snowball continue` (Discover: **Next hop**) expands only from kept rows. Also `asymptotic_coverage`, `budget`, and `any`. Depth, `per_hop_limit`, and `max_candidates` stay as ceilings. See [Stopping rules](#stopping-rules) |
+| `stop_eps` | `0.01` | `marginal_yield`: new Keeps divided by screened rows. Fires when that stays below this value |
+| `stop_k` | `2` | How many low-yield hops in a row. The rule does not fire before iteration `k + 1` |
+| `stop_tau` | `0.95` | `asymptotic_coverage`: fraction of a fitted Keep ceiling |
+| `stop_min_points` | `4` | Labeled hops required before that fit |
+| `stop_max_screened` | `0` | `budget`: screened new rows. `0` means no cap |
 | `refine` | false | With `[llm].enabled`, write up to five query suggestions. They do not start a second crawl |
 
 A seed that fails to resolve is `status = error`. Other seeds continue. The
 process exits non-zero if any seed failed, using the existing exit ladder
 (`2` for config / doctor).
+
+## Stopping rules
+
+`stop_rule` is off until you set it. The hop caps above still bound every crawl. Precedence is the usual one: built-in default, then `[snowball]` in `config.toml`, then a snowball profile, then flags.
+
+With a rule on and depth greater than 1, the first command fetches hop 1 and waits. Keyword depth 0 fetches the hit list only. `hybrid` is already one hop, so the rule scores that hop and does not walk further. Mark each new row Keep or Skip, then:
+
+```text
+paperful snowball continue <run-id>
+```
+
+The next hop expands only from kept `new` rows that have an OpenAlex id or a DOI. Screened rows are `status = new` on the open hop. `exists`, `filtered`, and `error` are not that batch. `approve-batch` does not pre-mark those rows as Skip while a rule is on, so they stay unlabeled until you set Keep or Skip.
+
+`--gate auto` on `continue` counts every unlabeled new row as Keep. Discover stays a dry-run search. Advanced Graph has Stop rule, Stop eps, Stop k, and Stop max screened. **Next hop** appears on the queue while the run is waiting.
+
+CLI flags on `search`, `hybrid`, `doi`, `orcid`, `collection`, `run`, and `profile save`: `--stop-rule`, `--stop-eps`, `--stop-k`, `--stop-max-screened`. `stop_tau` and `stop_min_points` are config and profile keys only.
+
+`continue` is not `resume`. `resume` finishes a crawl that OpenAlex paused (`deferred.json`). `continue` refuses while that file is present. If the pause happens on a later hop, resume first, then continue.
+
+| Rule | Fires when |
+| --- | --- |
+| `marginal_yield` | New Keeps / screened rows stay below `stop_eps` for `stop_k` hops, and not before hop `k + 1` |
+| `asymptotic_coverage` | Cumulative Keeps reach `stop_tau` of a fitted ceiling, after `stop_min_points` hops |
+| `budget` | Screened new rows reach `stop_max_screened` (`0` means no cap) |
+| `any` | The first of those three, or an empty kept frontier |
+| `exhaustion` | No kept work left to expand. Recorded on every hop. Stops the crawl even when another rule is selected |
+
+Each hop appends one line per rule to `state/snowball/<run-id>/stops.jsonl` (`paperful.snowball.stop.v1`), including rules that did not fire. The stopping sentence is in `stop.json` (`rationale`) and is meant for a methods section. `summary.json` records `stop_rule`, `stop_awaiting_labels`, and `stopped_by`. A depth ceiling or a full `max_candidates` budget stops the walk as well and says so (`stopped_by` `depth` or `max_candidates`).
+
+This is the saturation idea from SnowBallSLR, reimplemented here. It does not estimate how much of the literature you have found.
 
 ## Progress
 
@@ -516,6 +558,12 @@ dedupe_after = "off"     # off | classify | apply
 author_site_preflight = false
 author_site_max_authors = 15
 author_site_max_queries = 20
+stop_rule = "off"        # off | marginal_yield | asymptotic_coverage | budget | any
+stop_eps = 0.01
+stop_k = 2
+stop_tau = 0.95          # config and profile only; no CLI flag
+stop_min_points = 4
+stop_max_screened = 0    # budget; 0 means no cap
 ```
 
 `[searxng].base_url` (or `SEARXNG_BASE_URL`) is an optional metasearch for
@@ -750,7 +798,7 @@ BibTeX citekeys still make sense. Snowball does not depend on that plugin.
 
 - A hosted discovery service, a force-directed graph, or a second OpenAlex browser
 - A built-in scheduler or cron helper (call `watch run` yourself), or a snowball step inside `paperful all`
-- A TUI or local web reviewer
+- A dedicated screening TUI. Discover Keep/Skip and **Next hop** are the reviewer when a stopping rule is on
 - Sci-Hub or Scholar as ways to discover works
 - Pulling every publication of every cited author, until an explicit capped switch exists
 

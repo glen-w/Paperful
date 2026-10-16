@@ -187,7 +187,7 @@ Snowball proposes works from a keyword, a DOI, an ORCID, or a collection,
 then stops at a gate. `approve-batch` (or **Preview apply** on Discover)
 is the safe default on a large crawl. `gate = auto` creates parents without
 that pause — use it on a slice you already trust. `--fetch-pdfs` fills only
-the keys just created.
+the keys just created. A stopping rule is separate from that gate and stays off unless you set `[snowball].stop_rule` or `--stop-rule`. Then the crawl pauses after one hop for Keep/Skip and `snowball continue`. See [Stopping rules](snowball.md#stopping-rules).
 
 ```sh
 docker compose run --rm paperful snowball search "marine spatial planning" \

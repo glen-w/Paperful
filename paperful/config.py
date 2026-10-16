@@ -282,6 +282,13 @@ class Config:
     snowball_author_site_preflight: bool = False
     snowball_author_site_max_authors: int = 15
     snowball_author_site_max_queries: int = 20
+    # Saturation stop. off keeps the one-shot hop caps.
+    snowball_stop_rule: str = "off"  # off | marginal_yield | asymptotic_coverage | budget | any
+    snowball_stop_eps: float = 0.01
+    snowball_stop_k: int = 2
+    snowball_stop_tau: float = 0.95
+    snowball_stop_min_points: int = 4
+    snowball_stop_max_screened: int = 0
     searxng_base_url: str = ""
     # Where plain-language lines are written. note | tag | off.
     remarks_surface: str = "note"
@@ -704,6 +711,33 @@ def _apply_snowball(raw: Any, cfg: Config) -> None:
         cfg.snowball_author_site_max_authors = int(raw["author_site_max_authors"])
     if "author_site_max_queries" in raw:
         cfg.snowball_author_site_max_queries = int(raw["author_site_max_queries"])
+    if any(
+        key in raw
+        for key in (
+            "stop_rule",
+            "stop_eps",
+            "stop_k",
+            "stop_tau",
+            "stop_min_points",
+            "stop_max_screened",
+        )
+    ):
+        from .snowball.stop import parse_stop_params
+
+        params = parse_stop_params(
+            rule=raw.get("stop_rule", cfg.snowball_stop_rule),
+            eps=raw.get("stop_eps", cfg.snowball_stop_eps),
+            k=raw.get("stop_k", cfg.snowball_stop_k),
+            tau=raw.get("stop_tau", cfg.snowball_stop_tau),
+            min_points=raw.get("stop_min_points", cfg.snowball_stop_min_points),
+            max_screened=raw.get("stop_max_screened", cfg.snowball_stop_max_screened),
+        )
+        cfg.snowball_stop_rule = params.rule
+        cfg.snowball_stop_eps = params.eps
+        cfg.snowball_stop_k = params.k
+        cfg.snowball_stop_tau = params.tau
+        cfg.snowball_stop_min_points = params.min_points
+        cfg.snowball_stop_max_screened = params.max_screened
 
 
 def _snowball_strs(raw: Any) -> tuple[str, ...]:

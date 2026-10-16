@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from dataclasses import dataclass
@@ -125,6 +126,14 @@ class SnowballRequest:
     study_designs: tuple[str, ...] | None = None
     dedupe_after: str | None = None
     author_site_preflight: bool | None = None
+    stop_rule: str | None = None
+    stop_eps: float | None = None
+    stop_k: int | None = None
+    stop_tau: float | None = None
+    stop_min_points: int | None = None
+    stop_max_screened: int | None = None
+    iterative: bool = False
+    depth_ceiling: int | None = None
 
 
 @dataclass
@@ -159,6 +168,7 @@ def run_search(
         raise SnowballError(str(exc)) from exc
     keywords = _keyword_caps(cfg, request)
     cites_query = _checked_cites_query(request, direction, expands=depth >= 1)
+    hop_end = _arm_stop(cfg, request, depth)
     return _execute(
         cfg,
         request,
@@ -190,6 +200,7 @@ def run_search(
             keyword_hop_limit=keywords[1],
             keyword_min_score=keywords[2],
             cites_query=cites_query,
+            hop_end=hop_end,
         ),
     )
 
@@ -219,6 +230,7 @@ def run_hybrid(
         raise SnowballError(str(exc)) from exc
     keywords = _keyword_caps(cfg, request)
     cites_query = _checked_cites_query(request, direction, expands=True)
+    _arm_stop(cfg, request, 1)
     seeds = request.hybrid_seeds if request.hybrid_seeds is not None else cfg.snowball_hybrid_seeds
 
     def crawl(oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int, str]) -> tuple[list[Candidate], list[str]]:
@@ -282,6 +294,7 @@ def run_doi(
     keywords = _keyword_caps(cfg, request)
     depth, warning = clamp_depth(_graph_depth(cfg, request))
     cites_query = _checked_cites_query(request, direction, expands=depth >= 1)
+    hop_end = _arm_stop(cfg, request, depth)
     cleaned = [d.strip() for d in dois if d.strip()]
     if not cleaned:
         raise SnowballError("Pass at least one DOI.")
@@ -304,6 +317,7 @@ def run_doi(
             keyword_hop_limit=keywords[1],
             keyword_min_score=keywords[2],
             cites_query=cites_query,
+            hop_end=hop_end,
         )
 
     return _execute(
@@ -356,6 +370,7 @@ def run_orcid(
     keywords = _keyword_caps(cfg, request)
     depth, warning = clamp_depth(_graph_depth(cfg, request))
     cites_query = _checked_cites_query(request, direction, expands=depth >= 1)
+    hop_end = _arm_stop(cfg, request, depth)
     backends = _backends(cfg, request)
     dois_by_orcid: dict[str, list[str]] = {item: [] for item in cleaned}
     if "orcid" in backends:
@@ -386,6 +401,7 @@ def run_orcid(
             keyword_hop_limit=keywords[1],
             keyword_min_score=keywords[2],
             cites_query=cites_query,
+            hop_end=hop_end,
         )
 
     return _execute(
@@ -421,6 +437,7 @@ def run_collection(
     keywords = _keyword_caps(cfg, request)
     depth, warning = clamp_depth(_graph_depth(cfg, request))
     cites_query = _checked_cites_query(request, direction, expands=depth >= 1)
+    hop_end = _arm_stop(cfg, request, depth)
     lib = backend
     try:
         lib = lib or get_backend(cfg)
@@ -452,6 +469,7 @@ def run_collection(
             keyword_min_score=keywords[2],
             cites_query=cites_query,
             include_seeds=False,
+            hop_end=hop_end,
         )
 
     return _execute(
@@ -466,6 +484,293 @@ def run_collection(
         expect_failures=True,
         expand_neighbors=depth >= 1,
     )
+
+
+def _open_stop(
+    cfg: Config,
+    request: SnowballRequest,
+    dest: Any,
+    rows: list[Candidate],
+    caps: tuple[int, int, str],
+    console: Console,
+    run_id: str,
+) -> None:
+    from .stop import SCHEMA, write_state
+
+    params = _stop_params(cfg, request)
+    keywords = _keyword_caps(cfg, request)
+    seed: dict[str, str] = {}
+    for row in rows:
+        if row.seed:
+            seed = dict(row.seed)
+            break
+    types = cfg.snowball_types if request.types is None else request.types
+    study = cfg.snowball_study_designs if request.study_designs is None else request.study_designs
+    state = {
+        "schema": SCHEMA,
+        "rule": params.rule,
+        "eps": params.eps,
+        "k": params.k,
+        "tau": params.tau,
+        "min_points": params.min_points,
+        "max_screened": params.max_screened,
+        "depth_ceiling": request.depth_ceiling if request.depth_ceiling is not None else 0,
+        "iteration": 1,
+        "awaiting_labels": True,
+        "history": [],
+        "stopped_by": None,
+        "rationale": None,
+        "paused": None,
+        "crawl": {
+            "direction": request.direction,
+            "per_hop_limit": caps[1],
+            "per_hop_rank": caps[2],
+            "max_candidates": caps[0],
+            "year_from": request.year_from,
+            "year_to": request.year_to,
+            "min_seed_citations": _min_cites(cfg, request),
+            "keyword_limit": keywords[0],
+            "keyword_hop_limit": keywords[1],
+            "keyword_min_score": keywords[2],
+            "cites_query": request.cites_query or "",
+            "gate": request.gate,
+            "seed": seed,
+            "types": list(types or ()),
+            "study_designs": list(study or ()),
+            "oa_only": cfg.snowball_oa_only if request.oa_only is None else request.oa_only,
+            "venue_include": list(
+                cfg.snowball_venue_include if request.venue_include is None else request.venue_include
+            ),
+            "venue_exclude": list(
+                cfg.snowball_venue_exclude if request.venue_exclude is None else request.venue_exclude
+            ),
+            "languages": list(cfg.snowball_languages if request.languages is None else request.languages),
+        },
+    }
+    write_state(dest / "stop.json", state)
+    _touch_stop_summary(dest, state)
+    console.print(
+        f"[dim]stop rule {params.rule} · depth ceiling "
+        f"{state['depth_ceiling']} · hop caps still apply[/]"
+    )
+
+
+def _touch_stop_summary(dest: Any, state: dict[str, Any]) -> None:
+    path = dest / "summary.json"
+    if not path.is_file():
+        return
+    summary = json.loads(path.read_text(encoding="utf-8"))
+    summary["stop_rule"] = state.get("rule")
+    summary["stop_awaiting_labels"] = bool(state.get("awaiting_labels"))
+    summary["stopped_by"] = state.get("stopped_by")
+    path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+
+
+def run_continue(
+    cfg: Config,
+    run_id: str,
+    *,
+    console: Console,
+    client: OpenAlexClient | None = None,
+    lookup: Lookup | None = None,
+    backend: Any = None,
+    gate: str | None = None,
+) -> PathResult:
+    """Score Keep/Skip on the open hop, then expand one more hop unless a rule fires."""
+    if not cfg.snowball_enabled:
+        raise SnowballError("Snowball is off. Set [snowball] enabled = true in config.toml.")
+    from .crawl import _dedupe, _expand_hops, _remember_cites_query, _remember_keywords
+    from .openalex import short_id
+    from .stop import (
+        IterationStat,
+        append_decisions,
+        evaluate,
+        load_state,
+        parse_stop_params,
+        terminating,
+        write_state,
+    )
+
+    dest = cfg.state_dir / "snowball" / run_id
+    state = load_state(dest / "stop.json")
+    if state is None:
+        raise SnowballError(f"Run {run_id} has no stopping rule. It was a one-shot crawl.")
+    if state.get("stopped_by"):
+        console.print(str(state.get("rationale") or state["stopped_by"]))
+        return PathResult(dest, 0, summary=state)
+    if (dest / "deferred.json").is_file():
+        raise SnowballError(
+            f"OpenAlex paused this hop. paperful snowball resume {run_id} first, then continue."
+        )
+    try:
+        _, rows = load_queue(cfg.state_dir, run_id)
+    except FileNotFoundError as exc:
+        raise SnowballError(f"No snowball queue for run {run_id!r}.") from exc
+    hop = max((row.hop for row in rows), default=0)
+    batch = [row for row in rows if row.hop == hop and row.status == "new"]
+    crawl = dict(state.get("crawl") or {})
+    effective_gate = (gate or str(crawl.get("gate") or "dry-run")).strip()
+    pending = [row for row in batch if row.keep is None]
+    if pending and effective_gate != "auto":
+        count = len(pending)
+        if count == 1:
+            message = f"1 new row at hop {hop} still needs Keep or Skip."
+        else:
+            message = f"{count} new rows at hop {hop} still need Keep or Skip."
+        raise SnowballError(message)
+    if effective_gate == "auto":
+        for row in pending:
+            row.keep = True
+    iteration = int(state.get("iteration") or 1)
+    history = [
+        IterationStat(
+            iteration=int(item["iteration"]),
+            screened=int(item["screened"]),
+            included=int(item["included"]),
+        )
+        for item in (state.get("history") or [])
+        if isinstance(item, dict)
+    ]
+    included = sum(1 for row in batch if row.keep is True)
+    history.append(IterationStat(iteration=iteration, screened=len(batch), included=included))
+    kept = [
+        row
+        for row in batch
+        if row.keep is True and (row.ids.get("openalex") or row.ids.get("doi"))
+    ]
+    ceiling = int(state.get("depth_ceiling") or 0)
+    next_hop = hop + 1
+    max_candidates = int(crawl.get("max_candidates") or 0)
+    if max_candidates <= 0:
+        room = -1
+    else:
+        used = sum(1 for row in rows if row.status in {"new", "exists"})
+        room = max_candidates - used
+    try:
+        params = parse_stop_params(
+            rule=state.get("rule") or "off",
+            eps=state.get("eps", 0.01),
+            k=state.get("k", 2),
+            tau=state.get("tau", 0.95),
+            min_points=state.get("min_points", 4),
+            max_screened=state.get("max_screened", 0),
+        )
+    except ValueError as exc:
+        raise SnowballError(str(exc)) from exc
+    decisions = evaluate(
+        history,
+        params,
+        frontier_empty=not kept,
+        next_hop=next_hop,
+        depth_ceiling=ceiling,
+        candidate_room=room,
+    )
+    append_decisions(dest / "stops.jsonl", iteration, decisions)
+    state["history"] = [
+        {"iteration": item.iteration, "screened": item.screened, "included": item.included}
+        for item in history
+    ]
+    chosen = terminating(decisions, params.rule)
+    if chosen is not None:
+        state["stopped_by"] = chosen.rule
+        state["rationale"] = chosen.rationale
+        state["awaiting_labels"] = False
+        write_state(dest / "stop.json", state)
+        write_queue(cfg.state_dir, run_id, rows, client or _openalex_client(cfg), library_unread=False)
+        _touch_stop_summary(dest, state)
+        console.print(chosen.rationale)
+        return PathResult(dest, 0, summary={"stopped_by": chosen.rule, "rationale": chosen.rationale})
+
+    oa = client or _openalex_client(cfg, sleep_s=0.0 if client else 0.15)
+    _remember_keywords(
+        oa,
+        keyword_limit=int(crawl.get("keyword_limit") or 3),
+        keyword_hop_limit=int(crawl.get("keyword_hop_limit") or 50),
+        keyword_min_score=float(crawl.get("keyword_min_score") or 0.0),
+    )
+    _remember_cites_query(oa, str(crawl.get("cites_query") or ""))
+    ids = [short_id(str(row.ids.get("openalex") or "")) for row in kept]
+    ids = [item for item in ids if item]
+    works = oa.works_by_ids(ids) if ids else []
+    if not works:
+        for row in kept:
+            doi = (row.ids.get("doi") or "").strip()
+            if not doi:
+                continue
+            try:
+                work = oa.work_by_doi(doi)
+            except Exception:
+                work = None
+            if work:
+                works.append(work)
+    seen = {short_id(str(row.ids.get("openalex") or "")) for row in rows}
+    seen.discard("")
+    seed = dict(crawl.get("seed") or {"type": "stop", "value": run_id})
+    direction = str(crawl.get("direction") or "refs")
+    new_rows = _expand_hops(
+        oa,
+        works,
+        run_id=run_id,
+        seed=seed,
+        gate=effective_gate,
+        depth=ceiling,
+        direction=direction,
+        per_hop_limit=int(crawl.get("per_hop_limit") or 50),
+        year_from=crawl.get("year_from"),
+        year_to=crawl.get("year_to"),
+        why_prefix="kept",
+        min_seed_citations=int(crawl.get("min_seed_citations") or 0),
+        per_hop_rank=str(crawl.get("per_hop_rank") or "most-cited"),
+        hop_start=next_hop,
+        hop_end=next_hop,
+        seen_oa=seen,
+    )
+    new_rows = apply_filters(
+        new_rows,
+        year_from=crawl.get("year_from"),
+        year_to=crawl.get("year_to"),
+        types=tuple(crawl.get("types") or ()),
+        oa_only=bool(crawl.get("oa_only")),
+        venue_include=tuple(crawl.get("venue_include") or ()),
+        venue_exclude=tuple(crawl.get("venue_exclude") or ()),
+        languages=tuple(crawl.get("languages") or ()),
+        study_designs=tuple(crawl.get("study_designs") or ()),
+    )
+    if lookup is not None:
+        _mark_exists(new_rows, lookup)
+    elif backend is not None:
+        try:
+            finder = _library_lookup(backend, scope="library", collection="")
+            _mark_exists(new_rows, finder)
+        except Exception:
+            pass
+    if max_candidates > 0:
+        new_rows = truncate(new_rows, max(0, room))
+    merged = _dedupe(rows + new_rows)
+    state["iteration"] = iteration + 1
+    state["paused"] = "budget" if oa.deferred else None
+    state["awaiting_labels"] = oa.deferred is None and bool(new_rows)
+    if oa.deferred is None and not new_rows:
+        state["stopped_by"] = "exhaustion"
+        state["rationale"] = (
+            f"Citation searching stopped after iteration {iteration}: "
+            "the next hop returned no new works."
+        )
+        state["awaiting_labels"] = False
+    write_state(dest / "stop.json", state)
+    write_queue(cfg.state_dir, run_id, merged, oa, library_unread=False)
+    _touch_stop_summary(dest, state)
+    if oa.deferred:
+        console.print(f"[yellow]Partial hop kept[/] · paperful snowball resume {run_id}")
+        return PathResult(dest, EXIT_PARTIAL, summary=state)
+    if state.get("stopped_by"):
+        console.print(str(state["rationale"]))
+        return PathResult(dest, 0, summary=state)
+    console.print(
+        f"hop {next_hop} · {len(new_rows)} new rows · "
+        f"Keep or Skip, then: paperful snowball continue {run_id}"
+    )
+    return PathResult(dest, 0, summary=state)
 
 
 def run_resume(
@@ -843,6 +1148,43 @@ def _rank(value: str | None, default: str) -> str:
         raise SnowballError(str(exc)) from exc
 
 
+def _arm_stop(cfg: Config, request: SnowballRequest, depth: int) -> int | None:
+    """Turn on one-hop iteration. Returns ``hop_end`` when the ceiling is deeper than 1."""
+    params = _stop_params(cfg, request)
+    request.iterative = params.rule != "off"
+    if not request.iterative:
+        request.depth_ceiling = None
+        return None
+    request.depth_ceiling = depth
+    if depth > 1:
+        return 1
+    return None
+
+
+def _stop_params(cfg: Config, request: SnowballRequest):
+    from .stop import parse_stop_params
+
+    try:
+        return parse_stop_params(
+            rule=cfg.snowball_stop_rule if request.stop_rule is None else request.stop_rule,
+            eps=cfg.snowball_stop_eps if request.stop_eps is None else request.stop_eps,
+            k=cfg.snowball_stop_k if request.stop_k is None else request.stop_k,
+            tau=cfg.snowball_stop_tau if request.stop_tau is None else request.stop_tau,
+            min_points=(
+                cfg.snowball_stop_min_points
+                if request.stop_min_points is None
+                else request.stop_min_points
+            ),
+            max_screened=(
+                cfg.snowball_stop_max_screened
+                if request.stop_max_screened is None
+                else request.stop_max_screened
+            ),
+        )
+    except ValueError as exc:
+        raise SnowballError(str(exc)) from exc
+
+
 def _guard(cfg: Config, request: SnowballRequest) -> None:
     if not cfg.snowball_enabled:
         raise SnowballError("Snowball is off. Set [snowball] enabled = true in config.toml.")
@@ -868,6 +1210,8 @@ def _guard(cfg: Config, request: SnowballRequest) -> None:
         except ValueError as exc:
             raise SnowballError(str(exc)) from exc
     _backends(cfg, request)
+    if request.stop_rule is not None or request.stop_eps is not None or request.stop_k is not None:
+        _stop_params(cfg, request)
     if request.gate in {"auto", "approve-batch", "approve-each"} and not request.collection.strip():
         raise SnowballError(
             f"gate {request.gate} needs a target collection (-C / target_collection)."
@@ -1031,7 +1375,7 @@ def _snowball_prepare_queue(
         study_designs=tuple(study_designs or ()),
     )
     rows = truncate(rows, caps[0])
-    if gate == "approve-batch":
+    if gate == "approve-batch" and not request.iterative:
         for row in rows:
             if row.keep is None and row.status == "new":
                 row.keep = False
@@ -1230,8 +1574,15 @@ def _execute(
         console.print(f"[yellow]Partial queue kept[/] · paperful snowball resume {run_id}")
     else:
         exit_code = 0
+    if request.iterative and not oa.deferred:
+        _open_stop(cfg, request, dest, rows, caps, console, run_id)
     if gate in {"dry-run", "approve-batch"}:
-        if gate == "approve-batch":
+        if request.iterative and not oa.deferred:
+            console.print(
+                f"one hop saved · Keep or Skip each new row · "
+                f"paperful snowball continue {run_id}"
+            )
+        elif gate == "approve-batch":
             console.print(
                 f"candidates ready · mark keep=true in {dest / 'candidates.jsonl'} · "
                 f"then: paperful snowball apply {run_id}"

@@ -71,6 +71,7 @@ frontier briefing or note but not under `-C`”, use `paperful coverage`
 | `state/runs/<stamp>-ingest-dois.json` | Created / exists / unresolved / held |
 | `state/last-run.json` | `paperful.run_report.v1` after `run` |
 | `state/snowball/<run-id>/digest.md` | Frontier digest for that queue |
+| `state/snowball/<run-id>/stop.json` | `paperful.snowball.stop.v1` when a stopping rule is on; `stops.jsonl` is the per-hop log |
 | `state/snowball/watches/<name>/digest.md` | Frontier digest for that watch |
 | `state/snowball/<run-id>/briefing.md` | Thin queue export |
 | `state/snowball/watches/<name>/briefing.md` | Thin watch inbox export |

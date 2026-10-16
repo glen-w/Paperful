@@ -4,7 +4,11 @@ All notable user-facing changes. **1.0.0** locks the trust contract: required
 `paperful.run_report.v1` and `paperful.item.v1` keys are frozen (extra keys
 may still be added). See [releases](docs/releases.md).
 
-## Unreleased
+## 1.2.0 — 2026-10-16
+
+### Added
+
+- **Snowball stopping rules** (off by default): `marginal_yield`, `asymptotic_coverage`, `budget`, or `any`. One hop, then Keep/Skip, then `snowball continue` / Discover **Next hop**. Depth and candidate caps still apply. No recall estimate.
 
 ## 1.1.1 — 2026-10-16
 

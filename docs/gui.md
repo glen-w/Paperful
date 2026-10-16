@@ -91,7 +91,9 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
    the file from Paperful. DOI mismatch and short PDF still wait for Attach.
 2. **Discover** — **Topic:** keyword search (`snowball search` dry-run queue),
    per-row Keep/Skip, then **Preview apply** → **Add selected**
-   (`snowball apply`, metadata only). **Fill PDFs** opens Wanted.
+   (`snowball apply`, metadata only). When a [stopping rule](snowball.md#stopping-rules)
+   is on, **Next hop** scores those marks and fetches one more hop
+   (`snowball continue`). **Fill PDFs** opens Wanted.
    **Briefing** / **Digest** write `briefing.md` / `digest.md` on the queue
    (shown on the page; digests are not auto-created). Advanced can tick
    **File collection note** (`--apply` + collection chip) to file a Zotero
@@ -115,6 +117,7 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
 
 Same shell; extra verbs call the same domain entrypoints as the CLI. Discover
 adds snowball kinds (hybrid/doi/orcid/collection), crawl knobs (including
+stop rule, stop eps, stop k, stop max screened, and
 **Twenty writeback** → `cfg.twenty_writeback_listings`), profile save/run,
 resume, briefing, frontier digest, **refs gap**, **ingest-dois**
 (Preview → Apply token), **authors**, and **packs promote**.
