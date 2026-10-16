@@ -22,7 +22,7 @@
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="Paperful Wanted: missing PDFs selected for Preview, Grab, and Attach"
+      content="Paperful — find missing PDFs, clean up your library, keep control of your papers"
     />
     <meta property="og:url" content="https://paperful.app/" />
     <meta property="og:type" content="website" />
@@ -231,7 +231,11 @@
               On <strong>Wanted</strong>, preview what’s missing, then fetch
               copies onto your computer.
             </li>
-            <li>Open the files yourself and attach the ones you trust, or set Grab to attach them on Zotero 10 or newer.</li>
+            <li>
+              Open the files yourself and attach the ones you trust. On Zotero
+              10 or newer you can attach from the workbench; Grab leaves
+              copies in a folder until you do.
+            </li>
             <li>
               Grow the library on <strong>Discover</strong>. Tidy records on
               <strong>Repair</strong> after you turn on Advanced.
@@ -250,11 +254,14 @@
           <h2>Install</h2>
           <p>
             Build on your machine — there is no app store package and no
-            published image. Keep Zotero on the host with the local API
+            published Docker image. Keep Zotero on the host with the local API
             enabled, then open the workbench at
             <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a>.
+            Host CLI without Docker:
+            <code>pip install paperful</code>
+            (<a href="https://pypi.org/project/paperful/">PyPI</a>).
           </p>
-          <pre class="code"><code>git clone --branch v1.0 https://github.com/glen-w/Paperful.git
+          <pre class="code"><code>git clone --branch v1.1.0 https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
 mkdir -p ../paperful-data
@@ -271,7 +278,7 @@ docker compose up</code></pre>
             <code>config.toml</code> next to <code>compose.yaml</code>.
           </p>
           <p class="fine">
-            Omit <code>--branch v1.0</code> to track latest <code>main</code>.
+            Omit <code>--branch v1.1.0</code> to track latest <code>main</code>.
             <a href="./guide/docker.html">Docker</a>
             ·
             <a href="./guide/zotero.html">Zotero</a>
