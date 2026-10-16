@@ -673,6 +673,97 @@ scheduling nightly “ask everything” jobs without an explicit operator comman
 `summarize` / `synthesize` — summaries stay the human-readable layer; RAG stays
 the evidence-linked Q&A layer.
 
+(embeddinggemma-2-local-embeddings)=
+### EmbeddingGemma 2 (later; stronger offline embeddings)
+
+**Status:** roadmap only — evaluate as an optional `[rag].embed_model`, not a
+default swap and not a new product. Today’s path stays
+`nomic-embed-text` (small, English-leaning) or `bge-m3` (multilingual) via
+Ollama / LiteLLM; each model already keeps its own index under `state/rag/`.
+Announced 2026-10 ([Google Open Source roundup](https://opensource.googleblog.com/2026/10/this-week-in-open-source-for-october-15.html);
+[developer guide](https://developers.googleblog.com/embeddinggemma-2-the-developer-guide/);
+weights on [Hugging Face](https://huggingface.co/google/embeddinggemma-2)).
+
+**Why it matters for Paperful:** Ask / `rag search` already run fully from the
+on-disk mirror with local embeddings. EmbeddingGemma 2 is **Apache 2.0**,
+sub-1B, and tuned for on-device RAG — so it strengthens the “passages never
+leave the machine” story without inventing a second index stack. Quantized
+footprint Google cites: ~**191 MB** active RAM for **text-only**, ~**567 MB**
+for the full multimodal load (Pixel-class numbers; laptop CPU/GPU will differ).
+Ollama already ships tags (`embeddinggemma-2`, plus size slices such as
+`270m` text-only / `440m` text+vision / `740m` full), so the first spike can
+stay on the existing `embed_provider = "ollama"` path.
+
+| Property | EmbeddingGemma 2 | Paperful fit |
+| --- | --- | --- |
+| License | Apache 2.0 | Matches local-first / redistributable tooling posture |
+| Text backbone | 270M (modular; vision +170M, audio +300M → 740M full) | Default Paperful path is **text from PDFs/abstracts** — load text-only |
+| Output | 768-d native; MRL truncates to 512 / 256 / 128 | Large libraries: shorter vectors cut LanceDB storage (re-normalize after truncate) |
+| Context | 8,192 tokens | Longer chunks than many small embed models; still respect `[rag]` chunk settings |
+| Languages | 100+ (MTEB multilingual ~par with EmbeddingGemma 1) | Candidate alternative to documenting `bge-m3` as the only multilingual pick |
+| Task prompts | Asymmetric `SearchQuery` / `Document` / `QuestionAnswering` (and titled `title: … \| text: …`) | Quality depends on prefixes — Ollama/LiteLLM passthrough may need an explicit Paperful wrapper |
+| Multimodal | Shared space for text, images, video, audio | **Later:** figure / page-image retrieval; not required for the text spike |
+| Precision note | Prefer **bfloat16** or float32; float16 can NaN or silently degrade | Document in `rag.md` / doctor; prefer bf16 Ollama tags when available |
+
+**Direction (ship in order; each stage can stop):**
+
+1. **Spike (config-only, no new provider)** — On a dogfood collection (e.g.
+   `ocean/BBNJ` or a fixture pack), set
+   `embed_model = "embeddinggemma-2:270m-…"` (pin a text-only / bf16 tag once
+   the Ollama library naming is stable), run `rag ingest`, then compare
+   `rag search` / `ask` recall against `nomic-embed-text` and `bge-m3` on the
+   same questions. Record wall-clock, peak RSS, and citation hit rate in
+   `assessments/` (local; not a published benchmark). Confirm `doctor` green
+   and that switching models leaves the old index folder intact (existing
+   contract).
+2. **Task-prompt honesty** — EmbeddingGemma 2 expects different prefixes for
+   queries vs documents. Spike whether Ollama’s embed API applies them, or
+   whether Paperful must format passages (`title: {item title} | text: {chunk}`)
+   and queries (`prompt_name` / instruction string) in `rag.ingest` /
+   `rag.retrieve`. Fail closed: never claim “drop-in” if bare strings regress
+   vs nomic. Document the required `[rag]` knobs (or a model-family hint) in
+   [rag.md](rag.md).
+3. **Docs + recommended tags** — If the spike is clearly better for multilingual
+   or long-passage corpora, add a short “optional stronger local embedder”
+   subsection beside the existing `nomic` / `bge-m3` guidance: pull command,
+   RAM band, “rebuild index” reminder, float16 warning. **Do not** change the
+   default until dogfood + CI fakes stay green; defaults stay small and boring.
+4. **MRL / storage (optional)** — For libraries with tens of thousands of
+   chunks, expose an opt-in truncate dim (256 default candidate for text) on
+   ingest + query, with `normalize_embeddings` behaviour documented. Index
+   folder name must include dim so 768-d and 256-d indexes do not collide.
+5. **Vision path (parked until text is boring)** — With the 440M text+vision
+   slice, embed page renders or extracted figures for “find the chart that
+   shows …” queries. Only after OCR / `light`|`docling` text RAG is solid;
+   keep citations grounded to item key + page. Audio/video are out of scope
+   for a PDF library workbench.
+
+**Config sketch (names TBD; additive only):**
+
+```toml
+[rag]
+enabled = true
+embed_provider = "ollama"
+# Optional stronger local model (after spike); default remains nomic-embed-text
+# embed_model = "embeddinggemma-2:270m-bf16-text"
+# embed_dim = 768          # or 256 / 128 when MRL ships; part of index id
+# embed_task = "qa"        # maps to QuestionAnswering vs SearchQuery prefixes
+```
+
+**Acceptance (spike):**
+
+- Text-only tag embeds offline with `[llm].allow_remote = false`.
+- `rag ingest` + `rag search` + `ask` work with zero manager calls (same as today).
+- Side-by-side note vs `nomic-embed-text` on ≥10 fixed questions; no silent
+  quality cliff from missing task prefixes.
+- Peak embedding RSS in the same ballpark as Google’s text-only claim on a
+  laptop-class machine (order-of-magnitude, not a hard CI gate).
+
+**Non-goals:** replacing LanceDB; making EmbeddingGemma 2 the CI default;
+shipping torch / sentence-transformers as a required extra when Ollama
+suffices; cloud embedding endpoints; multimodal as a 1.0 or near-term
+research-ops blocker; fine-tuning the model in-tree.
+
 (bibliography-gap-scan-later-not-gaps)=
 ### Bibliography gap scan (shipped; not `gaps`)
 
@@ -1207,6 +1298,8 @@ Larger product bets. Park until the ledger and core loop justify them.
    evidence packs; briefs grounded only in local PDFs. **Planned (see Optional
    LLM + subsections above):** [Zotero-RAG
    integration](#zotero-rag-integration-later-question-centric-layer);
+   [EmbeddingGemma 2](#embeddinggemma-2-local-embeddings) (optional stronger
+   offline embedder; text spike before any vision path);
    [bibliography gap scan](#bibliography-gap-scan-later-not-gaps) (cited-but-not-owned,
    distinct from shipped `gaps`); [structured section
    extract](#structured-section-extract-mvp-shipped) (shipped —

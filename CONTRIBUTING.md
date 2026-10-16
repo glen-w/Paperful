@@ -5,10 +5,10 @@
 Operators clone and `docker compose build`. Contributors use `uv`.
 [Docker](docs/docker.md) packs Python, Poppler, and Chromium
 (`PAPERFUL_IMAGE_MODE=light` or `heavy`); Zotero and headed session login
-still run on the host. A release checklist: version in `pyproject.toml`
-matches the README badge and the website footer, CHANGELOG has a section,
-and `docs/releases.md` still says install is clone plus Compose (no pull,
-no pip) unless a real artifact exists.
+still run on the host. A release checklist: run `make pre-release` (version in `pyproject.toml`,
+`CHANGELOG.md` section, website footer, and a clean `dist/` for that version),
+then tag or publish. PyPI is live — document pip when you change install paths
+in `docs/releases.md`.
 
 ```sh
 git clone https://github.com/glen-w/Paperful.git

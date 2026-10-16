@@ -1,0 +1,33 @@
+# Upload release wheels to PyPI (trusted publishing).
+# One-time setup: https://docs.pypi.org/trusted-publishers/
+#   Owner: glen-w  Repo: Paperful  Workflow: publish.yml  Environment: pypi
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Pre-release checks
+        run: bash scripts/release/pre_release.sh
+      - name: Build packages
+        run: uv build
+      - name: Verify dist artifacts
+        run: bash scripts/release/pre_release.sh --dist-only
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true

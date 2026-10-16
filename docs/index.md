@@ -13,6 +13,7 @@ machine and attach the PDFs you trust. [Terms](TERMS.md).
 Clone the repo, then `docker compose build` and `docker compose up` →
 `http://127.0.0.1:8765` ([GUI](gui.md)).
 [Docker](docker.md) (light / heavy packs). CLI: `docker compose run --rm paperful …`.
+Host CLI without Docker: `pip install paperful` ([releases](releases.md#releases-and-stability)).
 Contributors: [`uv`](https://docs.astral.sh/uv/). Stability: [releases](releases.md).
 Why this shape: [Why Paperful](why.md).
 

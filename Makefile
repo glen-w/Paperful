@@ -2,7 +2,7 @@
 
 .DEFAULT_GOAL := help
 
-.PHONY: help docs docs-clean pages-site docker-build docker-build-heavy docker-doctor e2e-nba e2e-stack
+.PHONY: help docs docs-clean pages-site pre-release docker-build docker-build-heavy docker-doctor e2e-nba e2e-stack
 
 help:
 	@echo "paperful Makefile"
@@ -13,6 +13,9 @@ help:
 	@echo "  docker-build        Build image (PAPERFUL_IMAGE_MODE from .env, else light)"
 	@echo "  docker-build-heavy  Build heavy image (llm + rag + browser-agent)"
 	@echo "  docker-doctor       Run paperful doctor in the container"
+	@echo ""
+	@echo "Release:"
+	@echo "  pre-release       Version/changelog/dist checks before tag or PyPI upload"
 	@echo ""
 	@echo "Docs:"
 	@echo "  docs              Build Sphinx HTML into docs/_build/html (requires .[docs]; DOCS_STRICT=1 for CI parity)"
@@ -35,6 +38,9 @@ docker-build-heavy:
 
 docker-doctor:
 	docker compose run --rm paperful doctor --guide
+
+pre-release:
+	@bash scripts/release/pre_release.sh
 
 docs:
 	@bash scripts/release/build_docs.sh

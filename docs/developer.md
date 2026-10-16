@@ -293,3 +293,39 @@ expect host-only tests (for example default Zotero endpoint URLs) to pass when
 **Docs CI.** Pushes that change `docs/` or `website/` also run strict Sphinx
 (`DOCS_STRICT=1`) and may deploy Pages; new guide pages must be linked from
 `docs/index.md` (`tests/test_sphinx_docs.py`).
+
+## PyPI releases
+
+Wheels are built with Hatchling (`uv build` → `dist/`). Publishing uses
+[trusted publishing](https://docs.pypi.org/trusted-publishers/) from
+`.github/workflows/publish.yml` when a GitHub **Release** is published or a
+`v*` tag is pushed. Configure the pending publisher on [pypi.org](https://pypi.org)
+once:
+
+| Field | Value |
+| --- | --- |
+| PyPI project | `paperful` (created on first successful upload) |
+| Owner | `glen-w` |
+| Repository | `Paperful` |
+| Workflow | `publish.yml` |
+| Environment | `pypi` |
+
+Add a GitHub **environment** named `pypi` on the repo (Settings → Environments)
+if you want approval gates; the workflow references `environment: pypi`.
+
+**First upload before trusted publishing is wired:** build locally, then upload
+with an API token for the `glenwwright` account (PyPI → Account settings →
+API tokens). Do not commit the token.
+
+```sh
+make pre-release
+uv build
+bash scripts/release/pre_release.sh --dist-only
+UV_PUBLISH_TOKEN=pypi-… uv publish dist/paperful-$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")*
+```
+
+`uv publish` uploads **every** file in `dist/` unless you pass explicit paths.
+`pre_release.sh` fails if `dist/` contains wheels or sdists for an older
+version than `pyproject.toml`.
+
+Confirm: `pip install paperful==<version>` and `paperful --help`.

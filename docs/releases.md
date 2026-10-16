@@ -1,7 +1,12 @@
 # Releases and stability
 
-**1.0.0** is tagged. Required schemas are frozen in this tree. The operator
-install is clone plus `docker compose build` on your computer.
+**1.1.0** is on [PyPI](https://pypi.org/project/paperful/) (`pip install paperful`;
+optional extras `[llm]`, `[rag]`, `[serve]`, `[browser-agent]`). After install,
+run `playwright install chromium` once for campus login and HTML PDF paths.
+The **operator** install tested in CI is still clone plus `docker compose build`
+on your computer (see [Docker](docker.md)).
+
+**1.0.0** is tagged. Required schemas are frozen in this tree.
 Image packs: **light** (`[serve]` only; CI default
 when unset) or **heavy** (`[serve]` `[llm]` `[rag]` `[browser-agent]`; set in
 `.env.example`). See [Docker](docker.md#image-mode-light-vs-heavy).

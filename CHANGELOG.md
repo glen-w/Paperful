@@ -6,8 +6,22 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.1.0 — 2026-10-16
+
+**1.1.0** ships on [PyPI](https://pypi.org/project/paperful/) (`pip install paperful`).
+The operator path tested in CI remains **clone + Docker Compose**; pip is for a
+host CLI with Zotero’s local API on the same machine.
+
 ### Changed
 
+- **CLI / workbench structure:** command bodies and UI routes split into focused
+  modules (`*_cmd.py`, `ui/*_routes.py`, `cli_runtime.py`) without changing the
+  default operator workflows.
+- **Docs:** [AI feasibility](docs/ai.md) (local Ollama vs hosted LiteLLM), pip
+  install in the README, and PyPI release notes in [developer.md](docs/developer.md).
+- **Packaging:** Hatchling metadata, trusted publishing workflow, and
+  `make pre-release` / `scripts/release/pre_release.sh` to block stale `dist/`
+  artifacts before `uv publish`.
 - **Compose mounts:** `PAPERFUL_OUT` is a separate volume at `/data/out`
   (default `../paperful-out`). `PAPERFUL_DATA` holds config/`state`/packs only.
   Repo-local setups set `PAPERFUL_OUT=./out` with `PAPERFUL_DATA=.`.

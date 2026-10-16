@@ -9,7 +9,7 @@
   <a href="https://github.com/glen-w/Paperful/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/glen-w/Paperful/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/glen-w/Paperful/actions/workflows/ci.yml"><img alt="Test coverage" src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/glen-w/Paperful/main/badges/coverage.json"></a>
   <a href="https://paperful.app/guide/"><img alt="Docs" src="https://img.shields.io/badge/docs-paperful.app-blue"></a>
-  <img alt="version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-blue">
+  <a href="https://pypi.org/project/paperful/"><img alt="PyPI" src="https://img.shields.io/pypi/v/paperful?label=PyPI"></a>
   <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
 </p>
@@ -152,6 +152,21 @@ ollama pull qwen2.5:7b                       # local default; then enable [llm] 
 # Ask also needs: ollama pull nomic-embed-text
 # Hosted instead: uv sync --extra llm  — see docs/llm.md
 ```
+
+## Install with pip
+
+For a **CLI on the host** (Zotero local API on this machine; no Docker
+workbench image):
+
+```sh
+pip install paperful
+playwright install chromium    # once; needed for campus login / HTML PDF
+cp config.minimal.toml config.toml   # set email — see docs/config.md
+paperful doctor
+```
+
+Optional extras: `[llm]`, `[rag]`, `[serve]` (workbench), `[browser-agent]`.
+The operator path tested in CI is still **clone + Compose** ([Docker](docs/docker.md)).
 
 ## Develop
 
