@@ -161,6 +161,27 @@ def _load_wanted(cfg: Config, collection: str) -> dict[str, Any]:
     return wanted_rows(cfg, items, manifest)
 
 
+def _patch_section_assignment(text: str, section: str, key: str, literal: str) -> str:
+    """Insert or replace ``key = literal`` inside one TOML table."""
+    line = f"{key} = {literal}"
+    header = re.compile(rf"^\[{re.escape(section)}\]\s*$", re.MULTILINE)
+    found = header.search(text)
+    if not found:
+        return text.rstrip() + f"\n\n[{section}]\n{line}\n"
+    start = found.end()
+    nxt = re.search(r"^\[", text[start:], re.MULTILINE)
+    end = start + nxt.start() if nxt else len(text)
+    block = text[start:end]
+    key_re = re.compile(rf"^[ \t]*{re.escape(key)}\s*=.*$", re.MULTILINE)
+    if key_re.search(block):
+        block = key_re.sub(line, block, count=1)
+    else:
+        if block and not block.endswith("\n"):
+            block += "\n"
+        block += line + "\n"
+    return text[:start] + block + text[end:]
+
+
 def _patch_config_field(cfg: Config, section: str, key: str, value: str) -> None:
     path = cfg.config_path
     if path is None or not path.is_file():
@@ -407,6 +428,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 briefs=briefs,
                 dest_options=dest_options(),
                 grab_token=_wanted_token("preview_run"),
+                attach_mode=cfg.ui_attach_mode,
                 attach_token=_wanted_token("attach"),
                 recover_token=_wanted_token("recover"),
                 wanted_pagination=wanted_pagination,
@@ -1453,6 +1475,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
                 zotero_host=__import__("paperful.zot", fromlist=["zotero_local_host"]).zotero_local_host(),
                 saved=bool(saved),
                 out_dir=str(cfg.out_dir),
+                attach_mode=cfg.ui_attach_mode,
             ),
         )
 
@@ -1469,6 +1492,18 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
             _patch_config_field(cfg, "zotero", "host", host)
         if out_dir:
             _patch_config_field(cfg, "", "out_dir", out_dir)
+        attach_mode = str(form.get("attach_mode") or "").strip().lower()
+        if attach_mode in {"manual", "auto"}:
+            cfg.ui_attach_mode = attach_mode
+            path = cfg.config_path
+            if path is not None and path.is_file():
+                text = path.read_text(encoding="utf-8")
+                path.write_text(
+                    _patch_section_assignment(
+                        text, "ui", "attach_mode", f'"{attach_mode}"'
+                    ),
+                    encoding="utf-8",
+                )
         resp = RedirectResponse(url="/settings?saved=1", status_code=303)
         if preset in {"oa", "eoi"}:
             set_cookie(resp, COOKIE_PRESET, preset)

@@ -30,18 +30,17 @@ Prefer this page for “is this the right tool?”
 | **DOI-list PDF batch** without Zotero | [paperscraper](https://github.com/jannisborn/paperscraper) |
 | **Grow the library** from a keyword, one or more DOIs’ references, one or more ORCIDs, a similar-paper hop, or a hybrid hop, then optionally fill PDFs. Citation maps such as Research Rabbit link out; Paperful downloads. Re-check later with **watch** (baseline once, then propose new arrivals on disk; you schedule `watch run`) | **Paperful snowball** — dry-run, `approve-each`, `approve-batch`, `--gate auto`, `--fetch-pdfs`, and `watch` ([snowball](snowball.md)). In-app one-hop browsers stay separate ([zotero-snowball](https://github.com/socratic-irony/zotero-snowball), [Citegeist](https://github.com/phdemotions/zotero-citegeist)). General harvesters without the mirror: [findpapers](https://github.com/jonatasgrosman/findpapers), [opencite](https://github.com/neuromechanist/opencite) |
 | **People you follow** → their new papers (ORCID / OpenAlex; no hop; corpus `suggest`; briefing with recent works / co-authors; saved social HTML/CSV, no live scrape) | **Paperful authorwatch** ([authorwatch](authorwatch.md)). Distinct from `snowball watch`. |
-| **Local workbench** over the same CLI (Wanted / Discover / Ask; Advanced Repair, Mirror, Index, Briefs) | **Paperful** `docker compose up` or `paperful serve` — [gui.md](gui.md). Grab fetches to disk; Attach is the library write. Not Zotero-in-the-browser. TTY login stays the CLI |
+| **Local workbench** over the same CLI (Wanted / Discover / Ask; Advanced Repair, Mirror, Index, Briefs) | **Paperful** `docker compose up` or `paperful serve` — [gui.md](gui.md). Grab fetches to disk; Attach writes the library. Zotero stays the catalogue. Browser login stays the CLI |
 | “Just use what ships in Zotero” | Built-in **Find Available PDF** plus [custom PDF resolvers](https://www.zotero.org/support/kb/custom_pdf_resolvers) |
 
-Paperful does **not** replace a full metadata editor, an in-app attachment
-reorganiser, or a `.bib` linter. It does **not** promise phone sync, mobile
-apps, or WebDAV — those stay with the citation manager. `attachments`
+Paperful’s jobs are library, find, completeness, mirror, and control. Fetch
+and lint run on disk; the manager is a write-back adapter (`manager = "zotero"`
+is well tested; Mendeley and EndNote are seeking testers). `attachments`
 reports layout problems and, with a flag plus `--apply`, repairs them from
-`out/`. `--link` is that surgery, not a Storage client. Incoming downloads,
-author folders, and tablet send/get stay with Attanger and ZotMoov. The jobs
-are library, find, completeness, mirror, and control. Fetch and lint run on
-disk; the manager is a write-back adapter (`manager = "zotero"` is well
-tested; Mendeley and EndNote are seeking testers).
+`out/`. `--link` is that repair. For a full metadata editor, phone sync,
+mobile apps, WebDAV, incoming downloads, author folders, or tablet send/get,
+use the citation manager or the tools named in the table (Attanger, ZotMoov,
+and the `.bib` linters).
 
 Architecture: [architecture.md](architecture.md).
 

@@ -11,7 +11,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --group dev --extra serve
-      - run: uv run pytest -m "not docs"
+      - run: uv run pytest -m "not docs" --cov=paperful --cov-report=term-missing --cov-report=json:coverage.json
+      - name: Upload coverage report
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-json
+          path: coverage.json
+          if-no-files-found: error
       - name: Workbench API smoke (preview token path)
         run: |
           uv run pytest tests/test_ui_grab.py tests/test_ui_commands.py -q

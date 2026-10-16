@@ -41,8 +41,9 @@ version of this story.
 6. **Save on this machine first.** The PDF lands under `out/` with a
    provenance stamp (`paperful oa:unpaywall`, `campus:ezproxy`, …) and a
    readable parent line (“Free copy from Unpaywall.”).
-7. **Attach** into Zotero 10+ when you ask. Older Zotero still gets the file
-   on disk. Sparse one-page stubs are dropped; denser one-pagers wait for
+7. **Attach** into Zotero 10 or newer when you ask, or automatically on Grab
+   when Settings is automatic. Zotero 7–9 still gets the file on disk only.
+   Sparse one-page stubs are dropped; denser one-pagers wait for
    `attach --allow-short-pdf`. [Wrong-work PDFs](research-ops.md#wrong-work-pdfs).
    Not every paywalled or DOI-less item comes back.
 
@@ -138,7 +139,7 @@ chat. [Sessions](sessions.md) · [Campus EZProxy](ezproxy.md).
 A PDF on disk, when a copy could be reached, with a readable source line on
 the item. Optional: a grounded summary note, then a collection-level review
 of those notes. A folder copy you can back up or export as RIS, BibTeX, or
-EndNote XML — not a sync service.
+EndNote XML.
 
 Why this shape: [Why Paperful](why.md). Commands: [Commands](commands.md).
 Architecture of the same flow: [Architecture](architecture.md). The same verbs

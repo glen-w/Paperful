@@ -19,6 +19,12 @@
         <option value="eoi" {% if prefs.preset == 'eoi' %}selected{% endif %}>Campus</option>
       </select>
     </label>
+    <label>After Grab {{ info("Manual: Grab only saves PDFs under out/. You press Attach for the copies you trust. Automatic: Grab also writes those PDFs into the library when Paperful can (Zotero 10 or newer, or Mendeley / EndNote). Zotero 7–9 always stays on disk — attach those files in Zotero. Held files (DOI mismatch, short PDF) still wait for Attach.") }}
+      <select name="attach_mode">
+        <option value="manual" {% if attach_mode != 'auto' %}selected{% endif %}>Manual — I attach</option>
+        <option value="auto" {% if attach_mode == 'auto' %}selected{% endif %}>Automatic — Grab attaches</option>
+      </select>
+    </label>
     <button type="submit">Save</button>
     {{ info("Write these values into config.toml on this machine.") }}
   </div>

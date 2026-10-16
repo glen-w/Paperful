@@ -45,6 +45,7 @@ paperful = "paperful.cli:app"
 # lancedb here so CI runs the index tests.
 dev = [
     "pytest>=8",
+    "pytest-cov>=6",
     "lancedb>=0.39,<1",
     "fastapi>=0.115",
     "uvicorn>=0.32",
@@ -72,3 +73,10 @@ markers = [
     "e2e_live: opt-in all-in E2E (NBA 2025–2026); set PAPERFUL_E2E=1 — see docs/e2e-nba.md",
     "docs: guide corpus / Sphinx toctree hygiene (advisory in CI; see .github/workflows/docs.yml)",
 ]
+
+[tool.coverage.run]
+source = ["paperful"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true

@@ -227,3 +227,35 @@ def test_paperful_zotero_host_overrides_endpoint(monkeypatch):
     hooks[-1](req)
     assert req.headers["Host"] == _ZOTERO_LOCAL_HOST_HEADER
     assert req.headers["Host"] == "localhost:23119"
+
+
+def test_dockerenv_keeps_host_docker_internal_and_localhost_host_header(monkeypatch):
+    from pathlib import Path
+
+    from paperful.zot import ZoteroLocal, zotero_local_endpoint, zotero_local_host
+
+    monkeypatch.setenv("PAPERFUL_ZOTERO_HOST", "host.docker.internal")
+    monkeypatch.setattr(
+        "paperful.zot.Path.exists",
+        lambda self: self == Path("/.dockerenv"),
+    )
+    assert zotero_local_host() == "host.docker.internal"
+    assert zotero_local_endpoint() == "http://host.docker.internal:23119/api"
+    zl = ZoteroLocal()
+    assert zl.zot.endpoint == "http://host.docker.internal:23119/api"
+
+    class _Req:
+        def __init__(self):
+            self.headers = {}
+
+    req = _Req()
+    hooks = zl.zot.client.event_hooks["request"]
+    hooks[-1](req)
+    assert req.headers["Host"] == "localhost:23119"
+
+
+def test_blank_paperful_zotero_host_is_localhost(monkeypatch):
+    from paperful.zot import zotero_local_host
+
+    monkeypatch.setenv("PAPERFUL_ZOTERO_HOST", "   ")
+    assert zotero_local_host() == "localhost"

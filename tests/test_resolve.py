@@ -111,6 +111,9 @@ def test_title_similarity_ignores_case_punctuation_and_accents():
     assert title_similarity(a, b) > 0.9
     assert title_similarity("Élan vital", "Elan vital") == 1.0
     assert title_similarity("Completely different", a) < 0.5
+    assert title_similarity(None, a) == 0.0
+    assert title_similarity("", a) == 0.0
+    assert title_similarity("<i>Elan</i> vital", "Elan vital") == 1.0
 
 
 def test_short_title_splits_on_sentence_or_colon():

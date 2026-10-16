@@ -29,7 +29,7 @@ those you open tomorrow.
 
 **Find.** Search for a missing PDF. Open access first, campus EZProxy when you have it, playbooks (and an opt-in AI browser) for odd landings.
 
-- Not every paywalled or DOI-less item comes back.
+- Open-access and campus copies come back when a source has them. Preview lists what a fetch would try.
 - Google Scholar stays off until you opt in.
 - [How it works](how-it-works.md) · [Sources](sources.md).
 
@@ -43,7 +43,7 @@ those you open tomorrow.
 **Mirror.** `out/` is a folder copy, not a citation manager. One folder per item (`record.json`, optional PDF, notes). A closed manager costs write-back, not the read work.
 
 - `restore --apply` creates only what the catalogue is missing.
-- Copy `out/` yourself. Not a sync or WebDAV client. [Quiet mirror](quiet-mirror.md).
+- Copy `out/` yourself when you want a backup or a handoff. [Quiet mirror](quiet-mirror.md).
 
 **Control.** Disk first; write-back is a separate step. Dry-run before a big fetch. Scholar and the local model are opt-in. Session passwords are not in config. PDFs keep a provenance stamp.
 

@@ -2,7 +2,9 @@
 
 A **local GUI** over the same verbs as the CLI. `docker compose up` (or
 `paperful serve`) binds http://127.0.0.1:8765. Zotero remains the catalogue
-and reader. Grab fetches to `out/`; Attach writes the library.
+and reader. Grab fetches to `out/`. Attach writes the library — you press
+it (manual, the default) or Grab does it (automatic, Settings) when the
+library can be written.
 
 **Status:** shipped. **Ask** is on the default nav (`/ask`;
 opt-in `[rag]` + `[llm]`). A Firefox extension and hosted SaaS are **post-1.0**
@@ -75,10 +77,13 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
    A library PDF flag with no file on the mirror (`verification` `missing`,
    “No PDF file on disk”) lands on **Missing** with the missing-file icon.
    The default tab is the first non-empty bucket (Missing → Held → Have).
-   **Preview** → **Grab** (fetch to `out/` only; selected vs all) → **Attach**
-   (explicit Zotero write for `doi_match` plus hand-ticks). Grab never writes
-   the library. The Attach control stays visible; there is no “attach verified
-   automatically” setting.
+   **Preview** → **Grab** (fetch to `out/`; selected vs all). **Manual**
+   (default, Settings → After Grab): **Attach** is the Zotero write for
+   `doi_match` plus hand-ticks. **Automatic**: Grab also attaches when the
+   library supports write (Zotero 10 or newer; Mendeley and EndNote when
+   they can write). Zotero 7–9 never receives the file from Paperful. Held
+   rows (DOI mismatch, short PDF) still need Attach. The Attach control
+   stays visible in both modes.
 2. **Discover** — **Topic:** keyword search (`snowball search` dry-run queue),
    per-row Keep/Skip, then **Preview apply** → **Add selected**
    (`snowball apply`, metadata only). **Fill PDFs** opens Wanted.
@@ -159,7 +164,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/v1/ask` | Same as MCP `ask` (not linked from simple HTML) |
 | POST | `/v1/gui/noop` | Smoke / readiness for the GUI process |
 | POST | `/wanted/preview` | Review token for Grab (Advanced: year/type/retry/… flags) |
-| POST | `/wanted/grab` | Consume token; fetch to `out/` only (`item_keys` from preview) |
+| POST | `/wanted/grab` | Consume token; fetch to `out/` (`item_keys` from preview). Attaches only when `[ui].attach_mode` is `auto` and the library can write |
 | POST | `/wanted/attach/preview` | Review token for held PDF attach |
 | POST | `/wanted/attach` | Selected keys: attach pending `out/` PDFs. `review_token`: consume Advanced preview |
 | POST | `/wanted/recover/preview` | Review token for browser-agent recover |

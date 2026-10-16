@@ -58,6 +58,7 @@ def run_fetch(
     json_out: bool,
     item_keys: list[str] | None = None,
     camofox: bool | None = None,
+    force_attach: bool = False,
 ) -> None:
     from . import cli as cli_mod
 
@@ -163,7 +164,8 @@ def run_fetch(
         raise typer.Exit(0)
 
     attacher = None
-    if backend is not None and cfg.attach and not no_attach:
+    want_attach = not no_attach and (force_attach or cfg.attach)
+    if backend is not None and want_attach:
         attacher = backend
         if not backend.supports_write():
             console.print(

@@ -650,6 +650,9 @@ def apply_ui(raw: dict[str, Any], cfg: "Config") -> None:
     cfg.ui_library_page_size, cfg.ui_library_page_sizes = C.normalize_ui_library_page_sizes(
         default, sizes
     )
+    mode = str(ui.get("attach_mode") or "").strip().lower()
+    if mode in {"manual", "auto"}:
+        cfg.ui_attach_mode = mode
 
 
 def apply_prompt_paths(cfg: "Config", source: Path) -> None:

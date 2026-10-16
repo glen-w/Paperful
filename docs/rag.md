@@ -54,11 +54,11 @@ ollama pull nomic-embed-text        # default embedding model
 `[llm].enabled = true`.
 
 LanceDB ships wheels for Apple Silicon, Linux (x86_64, aarch64) and Windows.
-There is no wheel for Intel macOS; on an Apple Silicon Mac make sure the
-environment uses an arm64 Python (`uv venv --python /opt/homebrew/bin/python3`)
-and not an x86_64 build under Rosetta. The **heavy** Compose image
-(`PAPERFUL_IMAGE_MODE=heavy`) includes `[rag]`; **light** (CI default) does
-not. See [Docker](docker.md#image-mode-light-vs-heavy).
+On an Apple Silicon Mac, use an arm64 Python
+(`uv venv --python /opt/homebrew/bin/python3`). On Intel macOS, run Ask from
+the **heavy** Compose image (`PAPERFUL_IMAGE_MODE=heavy`), which includes
+`[rag]`. **light** (CI default) is the `[serve]` pack. See
+[Docker](docker.md#image-mode-light-vs-heavy).
 
 ## Configure
 

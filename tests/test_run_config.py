@@ -49,6 +49,31 @@ library_page_sizes = [25, 100, 250]
     assert cfg.ui_library_page_sizes == (25, 100, 250)
 
 
+def test_ui_attach_mode_from_config(tmp_path):
+    cfg = load_config(
+        _write_config(
+            tmp_path,
+            """
+[ui]
+attach_mode = "auto"
+""",
+        )
+    )
+    assert cfg.ui_attach_mode == "auto"
+    other = tmp_path / "other"
+    other.mkdir()
+    kept = load_config(
+        _write_config(
+            other,
+            """
+[ui]
+attach_mode = "sometimes"
+""",
+        )
+    )
+    assert kept.ui_attach_mode == "manual"
+
+
 def test_table_then_file_then_cli(tmp_path):
     cfg_path = _write_config(
         tmp_path,

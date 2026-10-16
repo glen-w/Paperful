@@ -114,6 +114,152 @@ def test_grab_production_passes_item_keys(tmp_path, monkeypatch):
     assert ok, msg
     assert captured.get("item_keys") == ["K1"]
     assert captured.get("no_attach") is True
+    assert captured.get("force_attach") is False
+
+
+def test_grab_auto_mode_asks_fetch_to_attach(tmp_path, monkeypatch):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.ui_attach_mode = "auto"
+    cfg.attach = False
+    items = [_Item("K1", "10.1/a")]
+    manifest = Manifest(cfg.manifest_path)
+    fp = scope_fingerprint(items, manifest)
+    monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: (items, manifest))
+    captured: dict = {}
+
+    def fake_run(*_args, **kwargs):
+        captured.update(kwargs)
+
+    jobs.run_fetch_fn = fake_run
+    token = commands.create_review_token(
+        cfg,
+        verb="preview_run",
+        collection="BBNJ",
+        preset="oa",
+        keys=["K1"],
+        fingerprint=fp,
+        command_id="auto",
+    )
+    ok, msg = jobs.grab_run(cfg, token=token)
+    assert ok, msg
+    assert captured.get("no_attach") is False
+    assert captured.get("force_attach") is True
+    jobs.run_fetch_fn = None
+
+
+def test_force_attach_overrides_config_and_stops_without_write(tmp_path, monkeypatch):
+    """Automatic Grab attaches even when CLI attach is off, unless the library cannot write."""
+    from types import SimpleNamespace
+
+    from paperful.pipeline import RunStats
+    from paperful.run_cmd import run_fetch
+
+    item = SimpleNamespace(
+        key="K1", has_pdf=False, has_linked_url=False, pdf_tier=""
+    )
+    seen: dict = {}
+
+    class Backend:
+        def __init__(self, write: bool):
+            self._write = write
+
+        def supports_write(self) -> bool:
+            return self._write
+
+        def items_in_scope(self, _keys):
+            return [item]
+
+    class FakePipe:
+        def __init__(self, cfg, manifest, live, **kwargs):
+            seen["attacher"] = kwargs.get("attacher")
+            self.stats = RunStats()
+            self.browser = None
+            self.progress = None
+            self.live_progress = None
+
+        def run(self, _todo):
+            self.stats.finished_at = 1.0
+            return self.stats
+
+    monkeypatch.setattr("paperful.run_cmd.Pipeline", FakePipe)
+    monkeypatch.setattr("paperful.run_cmd.preflight_ezproxy_session", lambda *a, **k: None)
+    monkeypatch.setattr("paperful.run_cmd.rag_auto_after_command", lambda *a, **k: None)
+    monkeypatch.setattr("paperful.cli._require_manager", lambda _cfg: None)
+    monkeypatch.setattr("paperful.cli._scope_keys", lambda *_a, **_k: (["K1"], "C"))
+    monkeypatch.setattr("paperful.cli._library_write_api", lambda _b: "local")
+    monkeypatch.setattr("paperful.cli._flush", lambda _b: None)
+    monkeypatch.setattr("paperful.cli._finish_run", lambda *a, **k: None)
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.attach = False
+    backend = Backend(True)
+    monkeypatch.setattr("paperful.cli._open_library", lambda *_a, **_k: (backend, None))
+    run_fetch(
+        __import__("rich.console", fromlist=["Console"]).Console(quiet=True),
+        cfg,
+        collection=["C"],
+        library=False,
+        dry_run=False,
+        year_from=None,
+        year_to=None,
+        item_type=[],
+        limit=None,
+        no_attach=False,
+        retry_failed=None,
+        try_all=None,
+        sources=None,
+        preset="oa",
+        scihub=False,
+        relogin=False,
+        browser_agent=None,
+        upgrade_linked=None,
+        want_snapshot_upgrade=False,
+        strict_pdf_doi=None,
+        handoff=None,
+        include_doi_tabs=False,
+        downloads_dir=None,
+        re_request=False,
+        json_out=True,
+        item_keys=["K1"],
+        force_attach=True,
+    )
+    assert seen["attacher"] is backend
+
+    seen.clear()
+    quiet = Backend(False)
+    monkeypatch.setattr("paperful.cli._open_library", lambda *_a, **_k: (quiet, None))
+    run_fetch(
+        __import__("rich.console", fromlist=["Console"]).Console(quiet=True),
+        cfg,
+        collection=["C"],
+        library=False,
+        dry_run=False,
+        year_from=None,
+        year_to=None,
+        item_type=[],
+        limit=None,
+        no_attach=False,
+        retry_failed=None,
+        try_all=None,
+        sources=None,
+        preset="oa",
+        scihub=False,
+        relogin=False,
+        browser_agent=None,
+        upgrade_linked=None,
+        want_snapshot_upgrade=False,
+        strict_pdf_doi=None,
+        handoff=None,
+        include_doi_tabs=False,
+        downloads_dir=None,
+        re_request=False,
+        json_out=True,
+        item_keys=["K1"],
+        force_attach=True,
+    )
+    assert seen["attacher"] is None
 
 
 def test_preview_all_uses_missing_list_only(tmp_path, monkeypatch):
@@ -341,7 +487,12 @@ def test_wanted_attach_route_and_button(tmp_path, monkeypatch):
     assert page.status_code == 200
     assert 'formaction="/wanted/attach"' in page.text
     assert "Attach PDFs to Zotero" in page.text
+    assert "Grab saves files under out/ only" in page.text
     assert "Pick a collection" in page.text
+    cfg.ui_attach_mode = "auto"
+    auto_page = TestClient(create_app(cfg)).get("/wanted")
+    assert "attaches them when the library can be written" in auto_page.text
+    assert 'formaction="/wanted/attach"' in auto_page.text
     res = client.post(
         "/wanted/attach",
         content=b"keys=K1&keys=K2",

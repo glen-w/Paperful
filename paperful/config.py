@@ -328,6 +328,9 @@ class Config:
     # Workbench Library item table (server-rendered pagination).
     ui_library_page_size: int = 50
     ui_library_page_sizes: tuple[int, ...] = (25, 50, 100, 200)
+    # Workbench Grab: "manual" leaves PDFs in out/ until Attach; "auto" writes
+    # them when the library supports it (Zotero 10+). CLI `attach` is separate.
+    ui_attach_mode: str = "manual"
     # Attachment hygiene. Off until `paperful attachments --apply`.
     attachments_fix_broken: bool = False
     attachments_merge_files: bool = False

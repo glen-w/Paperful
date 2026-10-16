@@ -221,13 +221,10 @@ def ocr_items(
 
     ``classify`` replaces the first-pages probe for callers that have already
     read the whole file. It returns the reason to OCR, or None to skip.
+
+    Missing PDFs are recorded (and auto-ignored) even when ``ocrmypdf`` is
+    absent. The binary is required only when a file actually needs a rewrite.
     """
-    if apply and not ocrmypdf_available():
-        raise OcrUnavailable(
-            "ocrmypdf is not on PATH. "
-            "brew install ocrmypdf tesseract-lang, "
-            "or apt install ocrmypdf tesseract-ocr-eng."
-        )
     batch = OcrBatch()
     ignores = ignore_list or OcrIgnoreList(cfg.ocr_ignore_path)
     queue = track(items) if track else items
@@ -272,6 +269,12 @@ def ocr_items(
             batch.rows.append(row)
             batch.would += 1
             continue
+        if not ocrmypdf_available():
+            raise OcrUnavailable(
+                "ocrmypdf is not on PATH. "
+                "brew install ocrmypdf tesseract-lang, "
+                "or apt install ocrmypdf tesseract-ocr-eng."
+            )
         row = _apply_one(
             cfg,
             item,

@@ -1380,7 +1380,7 @@ second doc tree that drifts from the CLI.
 **1.0 deliverable** — workbench (open / Docker first): [gui.md](gui.md).
 **Shipped:** `paperful.item.v1` lock, `paperful serve` HTTP + server-rendered UI
 under `paperful/ui/` — default nav **Wanted** (also `GET /`), **Discover**, **Ask**,
-Preview → Grab (fetch to `out/` only) → Attach (explicit library write), with
+Preview → Grab (fetch to `out/`; Attach is manual by default, or automatic via `[ui].attach_mode`), with
 review tokens and command ids under `state/gui/commands/`; Activity run-status
 SSE on `GET /v1/runs/{id}/events`. Empty Wanted shows a
 coach line when there is no collection or the library is down. Discover covers topic

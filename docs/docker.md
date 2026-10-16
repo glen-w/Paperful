@@ -2,9 +2,9 @@
 
 Paperful is a **local workbench**. The operator install is `git clone` and
 `docker compose build`, then `docker compose up` at
-http://127.0.0.1:8765. The image is **build-local only** (`paperful:local`).
-There is no `docker pull` and no PyPI package. Zotero and headed browser
-login live on the host. Docker does not replace them.
+http://127.0.0.1:8765. Build the image on this machine (`paperful:local`)
+with `docker compose build`. Zotero and headed browser login stay on the
+host; the container talks to them over the local API.
 
 `docker compose up` keeps the GUI running. CLI one-shots are
 `docker compose run --rm paperful …` (the image is also a pack for unattended

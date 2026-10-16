@@ -67,14 +67,14 @@ not a keyword hop.
 
 ![Discover People: suggestions ticked, members already on the list](_static/workflows/discover-people.png)
 
-Paperful does not live-scrape ResearchGate or LinkedIn. Save a follows page
-and **Import**. Details: [Author watch](authorwatch.md).
+Save a follows page from ResearchGate or LinkedIn and **Import**.
+Details: [Author watch](authorwatch.md).
 
 ## What to notice
 
 - Discover creates **parents**. Wanted fills **PDFs**. Do not conflate them
   with `run`.
-- There is no scheduler. **Check again** is the re-run.
+- **Check again** re-runs the same search.
 - `snowball watch` (saved keyword profile) is not `authorwatch` and not the
   PDF `inbox watch`.
 

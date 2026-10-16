@@ -1,9 +1,8 @@
 # Releases and stability
 
 **1.0.0** is tagged. Required schemas are frozen in this tree. The operator
-install is clone plus `docker compose build`.
-The image is build-local only. There is no `docker pull` and no
-`pip install paperful`. Image packs: **light** (`[serve]` only; CI default
+install is clone plus `docker compose build` on this machine.
+Image packs: **light** (`[serve]` only; CI default
 when unset) or **heavy** (`[serve]` `[llm]` `[rag]` `[browser-agent]`; set in
 `.env.example`). See [Docker](docker.md#image-mode-light-vs-heavy).
 
@@ -48,8 +47,8 @@ Extra keys may still be added on frozen schemas.
 | Library index (`state/rag/`) | A rebuildable cache. Folder layout, ledger and table columns may change in any release; `rag ingest` rebuilds it | Not a promise |
 
 Install claim tested in CI (`.github/workflows/ci.yml`, job `docker`): clone,
-`docker compose build`, `doctor` exits 2 when Zotero is absent. That is the
-release. There is no wheel and no GHCR image.
+`docker compose build`, `doctor` exits 2 when Zotero is absent. That
+clone-and-build path is the release.
 
 A second manager is not owed as a finished feature and **does not gate 1.0**.
 Mendeley and EndNote adapters are in the tree and **seeking testers**;

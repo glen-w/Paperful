@@ -38,7 +38,9 @@ uv run pytest
 DOCS_STRICT=1 make docs   # after: uv sync --extra docs
 ```
 
-CI runs pytest on every push and PR (`.github/workflows/ci.yml`). The Docs
+CI runs pytest with coverage on every push and PR (`.github/workflows/ci.yml`).
+A green push to `main` refreshes `badges/coverage.json`, which the README
+coverage badge reads. The Docs
 workflow (`.github/workflows/docs.yml`) runs the guide corpus tests and a strict
 Sphinx build; pushes to `main` that touch `docs/` or `website/` also redeploy
 Pages (`.github/workflows/pages.yml`).

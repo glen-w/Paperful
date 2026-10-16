@@ -209,12 +209,17 @@ def matching_preview(
     return review, ""
 
 
+def grab_attaches(cfg: Config) -> bool:
+    """True when Settings says Grab should write the library after download."""
+    return cfg.ui_attach_mode == "auto"
+
+
 def grab_run(
     cfg: Config,
     *,
     token: str,
 ) -> tuple[bool, str]:
-    """Fetch to out/ only (never attaches to Zotero)."""
+    """Fetch into out/. Attach during Grab only when Settings is automatic."""
     review = commands.load_review(cfg, token)
     if review is None:
         return False, "unknown token"
@@ -231,6 +236,7 @@ def grab_run(
     if not ok:
         return False, msg
     item_keys = list(keyset)
+    auto_attach = grab_attaches(cfg)
     year_from = flags.get("year_from")
     year_to = flags.get("year_to")
     item_type = list(flags.get("item_type") or [])
@@ -248,7 +254,8 @@ def grab_run(
             library=not collection,
             dry_run=False,
             preset=preset,
-            no_attach=True,
+            no_attach=not auto_attach,
+            force_attach=auto_attach,
             item_keys=item_keys,
             flags=flags,
         )
@@ -268,7 +275,8 @@ def grab_run(
             year_to=year_to,
             item_type=item_type,
             limit=limit,
-            no_attach=True,
+            no_attach=not auto_attach,
+            force_attach=auto_attach,
             retry_failed=True if retry_failed else None,
             try_all=True if try_all else None,
             sources=sources,

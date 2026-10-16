@@ -5,11 +5,11 @@ New here? [paperful.app](https://paperful.app/), then
 
 Paperful is a **local workbench** for a Zotero library you already keep.
 Open access first; campus EZProxy when you have it. **Zotero is well tested.**
-Mendeley and EndNote are seeking testers. Not a sync client. Not every
-paywalled PDF. [Terms](TERMS.md).
+Mendeley and EndNote are seeking testers. You keep a folder copy on this
+machine and attach the PDFs you trust. [Terms](TERMS.md).
 
-`docker compose build`, then `docker compose up` →
-`http://127.0.0.1:8765` ([GUI](gui.md)). No `docker pull`, no PyPI.
+Clone the repo, then `docker compose build` and `docker compose up` →
+`http://127.0.0.1:8765` ([GUI](gui.md)).
 [Docker](docker.md) (light / heavy packs). CLI: `docker compose run --rm paperful …`.
 Contributors: [`uv`](https://docs.astral.sh/uv/). Stability: [releases](releases.md).
 Why this shape: [Why Paperful](why.md).

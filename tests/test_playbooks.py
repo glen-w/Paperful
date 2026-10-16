@@ -469,6 +469,49 @@ pdf_template = "https://inline.test/{id}.pdf"
     )
 
 
+def test_pack_dir_later_filename_overrides_same_name(tmp_path):
+    packs = tmp_path / "packs"
+    packs.mkdir()
+    (packs / "a.toml").write_text(
+        """
+[[grey_playbooks]]
+name = "shared"
+kind = "rewrite"
+hosts = ["shared.test"]
+url_re = '(?i)shared\\.test/(?P<id>\\d+)'
+pdf_template = "https://early.test/{id}.pdf"
+""",
+        encoding="utf-8",
+    )
+    (packs / "b.toml").write_text(
+        """
+[[grey_playbooks]]
+name = "shared"
+kind = "rewrite"
+hosts = ["shared.test"]
+url_re = '(?i)shared\\.test/(?P<id>\\d+)'
+pdf_template = "https://late.test/{id}.pdf"
+""",
+        encoding="utf-8",
+    )
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        """
+email = "t@example.org"
+out_dir = "out"
+state_dir = "state"
+grey_playbooks_builtin = false
+grey_playbooks_dir = "packs"
+""",
+        encoding="utf-8",
+    )
+    cfg = load_config(cfg_path)
+    assert (
+        apply_rewrite("https://shared.test/9", cfg.grey_playbooks)
+        == "https://late.test/9.pdf"
+    )
+
+
 def test_invalid_playbook_rows_warn(tmp_path):
     import warnings
 

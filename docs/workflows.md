@@ -5,7 +5,7 @@ Operator sequences for one collection slice. A **run config** (also called a
 process. Individual commands stay available and can still be chained with
 `&&`.
 
-This is not a scheduler. There is no cron helper. Recipes below are copy-paste
+Run a recipe again when you want another pass. Recipes below are copy-paste
 CLI commands (`paperful all` and named run configs).
 
 **Workbench first?** Click-by-click jobs (Preview → Grab → Attach, Discover,

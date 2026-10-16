@@ -12,6 +12,7 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+/coverage.json
 dist/
 .DS_Store
 .cursor/commands/
