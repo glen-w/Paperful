@@ -289,6 +289,15 @@ pdfs = "all"
 refresh = "auto"
 gone = "mark"
 
+# Firefox add-on capture. Independent of [mirror].refresh.
+# snapshot = auto refreshes out/ once before a capture, even when mirror
+# refresh is manual. off skips that refresh; a live Zotero read still runs.
+[extension]
+snapshot = "auto"
+collection = "Capture"
+# drop = ""         # empty: inbox dir, else state/capture/drop
+concurrency = 2
+
 # Snowball grows a library from a keyword, DOI, ORCID, or collection.
 # Off until you set enabled. Dry-run / approve-batch write state/snowball/.
 # gate = "auto" plus target_collection creates parents. fetch_pdfs is

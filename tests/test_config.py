@@ -196,6 +196,23 @@ def test_example_config_toml_parses_and_omits_scihub_by_default():
     assert isinstance(cfg, Config)
 
 
+def test_extension_table_parses_and_rejects(tmp_path):
+    p = tmp_path / "c.toml"
+    p.write_text(
+        '[extension]\nsnapshot = "off"\ncollection = "Inbox"\nconcurrency = 4\n'
+    )
+    cfg = load_config(p)
+    assert cfg.extension_snapshot == "off"
+    assert cfg.extension_collection == "Inbox"
+    assert cfg.extension_concurrency == 4
+    p.write_text("[extension]\nconcurrency = 9\n")
+    with pytest.raises(ValueError):
+        load_config(p)
+    p.write_text('[extension]\nsnapshot = "always"\n')
+    with pytest.raises(ValueError):
+        load_config(p)
+
+
 def test_mirror_modes_parse_and_reject(tmp_path):
     p = tmp_path / "c.toml"
     p.write_text('[mirror]\npdfs = "additional"\ngone = "trash"\nrefresh = "manual"\n')

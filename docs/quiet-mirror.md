@@ -27,7 +27,7 @@ refresh and to explicit write-back. The rule and how the code follows it:
 | Layer | Role |
 | --- | --- |
 | **Zotero** | Catalogue, collections, citations, annotations; `storage/` holds `imported_file` attachments after attach; phone/WebDAV sync is Zotero’s job |
-| **`out/<collection>/<stem -- KEY>/`** | Quiet mirror. One folder per item: `record.json` (`paperful.item.v1`), optional PDF, `notes/`. A refresh keeps one for every item, including items with no PDF |
+| **`out/<collection>/<stem -- KEY>/`** | Quiet mirror. One folder per item: `record.json` (`paperful.item.v1`), optional PDF, optional `snapshot.html` from the [Firefox add-on](firefox.md), `notes/`. A refresh keeps one for every item, including items with no PDF |
 | **`state/`** | Append-only history (manifest, patches, dedupe, runs, authorwatch lists including `suggestions.jsonl`) plus secrets. `out/_history.json` points at the ledgers and does not copy sessions, cookies, or the API key |
 
 **Dual store for now.** Attach stays **`imported_file`**: bytes land under `out/`,
@@ -43,6 +43,7 @@ Zotero library  →  paperful sync       →  out/<collection>/<stem -- KEY>/
                     (and the refresh every command starts with)
                  →  paperful run       →  same folder (PDF + record.json)
                                       →  attach (imported_file)
+Firefox add-on  →  same folder (PDF or snapshot.html; does not attach)
 out/  →  paperful restore --apply  →  missing Zotero items only
 ```
 
@@ -52,6 +53,7 @@ out/  →  paperful restore --apply  →  missing Zotero items only
 out/<collection>/<Author - Year - Title -- KEY>/
   record.json
   <human name>.pdf          # optional
+  snapshot.html             # optional; the Firefox add-on, when the page had no PDF
   notes/<tag-or-key>.html
   annotations.json          # highlights, when there are any
 out/_index.jsonl

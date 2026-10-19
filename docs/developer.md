@@ -116,6 +116,8 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `coverage_cmd.py` | `coverage` after flags | `coverage`, `agent_ops` |
 | `export_cmd.py` | CLI `export` (RIS/BibTeX/EndNote XML + `--pdfs`) after flags | `interop`, `store`, `mirror` |
 | `inbox_cmd.py` | `inbox` watch/drain/proposals after flags | `inbox`, `inbox_match`, `inbox_route` |
+| `capture.py` | Firefox page → mirror identity, blank-field merge, drop-dir PDF, HTML snapshot | `store`, `mirror`, `snapshot`, `run_cmd` |
+| `capture_host.py` | Native-messaging stdio host and `install-host` | `capture` |
 | `doctor_cmd.py` / `collections_cmd.py` / `session_cmd.py` / `mirrors_cmd.py` / `pack_cmd.py` / `cache_cmd.py` | Operator verbs (doctor, collections, session/ezproxy/scholar, mirrors, pack, cache clean) | `cli_runtime`, domain modules |
 | `cli.py` | Flags, Typer apps, exits. Re-exports `cli_runtime` names | everything |
 | `routing.py` | Per-item lanes; owns `SERIAL_SOURCES` (Sci-Hub and other serial phases) | `config`, `zot` |

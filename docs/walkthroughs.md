@@ -32,6 +32,7 @@ Walkthroughs 1–3 do **not** need a local model. Ask and Briefs do
 | [Research pack](research-pack.md) | Cited-in-PDF works → parents → PDFs |
 | [Author watch](authorwatch.md) | Named people → their new papers |
 | [Snowball](snowball.md) | Keyword / DOI / ORCID crawl (CLI depth) |
+| [Firefox add-on](firefox.md) | Optional. Save the open page, or selected tabs, into `out/`. The Zotero Connector stays for saving into Zotero |
 | [Ask your library](rag.md) | Cited answers from PDFs already on disk |
 
 ## Prerequisites

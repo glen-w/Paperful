@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Paperful</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <strong>Paperful</strong>
+    <button type="button" id="show-page">This page</button>
+    <button type="button" id="show-tabs">Selected tabs</button>
+  </header>
+  <p id="status"></p>
+  <section id="page-view">
+    <p id="page-title"></p>
+    <p id="page-doi"></p>
+    <p id="page-action"></p>
+    <p id="page-maybe"></p>
+    <div id="candidates"></div>
+    <label id="unread-label" hidden>
+      <input type="checkbox" id="allow-unread">
+      Zotero didn't answer. Create a mirror item anyway?
+    </label>
+    <label id="pdf-label">
+      <input type="checkbox" id="save-pdf">
+      Save the PDF from this page
+    </label>
+    <label id="lanes-label">
+      <input type="checkbox" id="search-lanes">
+      Search my sources
+    </label>
+    <button type="button" id="save-page">Save</button>
+  </section>
+  <section id="tabs-view" hidden>
+    <div id="tab-list"></div>
+    <p class="row">
+      <button type="button" id="select-walk">From this walk</button>
+      <button type="button" id="select-all">Select all</button>
+      <button type="button" id="select-none">Select none</button>
+    </p>
+    <label>
+      <input type="checkbox" id="tabs-pdf" checked>
+      Save PDFs the tabs already show
+    </label>
+    <label>
+      <input type="checkbox" id="tabs-lanes">
+      Search my sources
+    </label>
+    <button type="button" id="save-tabs">Save selected</button>
+    <p id="tabs-summary"></p>
+  </section>
+  <script src="popup.js"></script>
+</body>
+</html>

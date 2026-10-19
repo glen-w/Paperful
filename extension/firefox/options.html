@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Paperful options</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <h1>Paperful</h1>
+  <p id="status">Checking the capture host…</p>
+  <p id="detail"></p>
+  <button type="button" id="retry">Test connection</button>
+  <p>
+    Load this add-on from about:debugging, This Firefox, Load Temporary Add-on,
+    and choose manifest.json in extension/firefox. It unloads when Firefox restarts.
+    Set Firefox's download folder to the drop directory shown here so saved PDFs
+    land where Paperful can read them.
+  </p>
+  <script src="options.js"></script>
+</body>
+</html>

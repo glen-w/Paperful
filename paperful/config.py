@@ -171,6 +171,11 @@ class Config:
     mirror_pdfs: str = "all"  # all | lazy | none
     mirror_gone: str = "mark"  # mark | trash: an item that left the library
     mirror_refresh: str = "auto"  # auto | manual: refresh before a command reads
+    # Firefox capture. Independent of [mirror].refresh.
+    extension_snapshot: str = "auto"  # auto | off: refresh out/ once before a capture
+    extension_collection: str = "Capture"
+    extension_drop: str = ""  # empty → inbox dir, else state/capture/drop
+    extension_concurrency: int = 2
     browser_agent_max_steps: int = 20
     browser_agent_max_wall_s: float = 300.0
     browser_agent_model: str = ""

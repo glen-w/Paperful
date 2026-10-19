@@ -177,6 +177,16 @@ inbox_app = typer.Typer(
     ),
 )
 app.add_typer(inbox_app, name="inbox")
+capture_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    invoke_without_command=True,
+    help=(
+        "Save a browser page into the quiet mirror. Reads Zotero so a stale "
+        "snapshot cannot create a second item. Does not attach or create in the library."
+    ),
+)
+app.add_typer(capture_app, name="capture")
 htmlpdf_app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
@@ -254,7 +264,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "reachout",
         "authorwatch",
     ),
-    "find": ("run", "attach", "recover", "gaps", "inbox", "urls", "htmlpdf"),
+    "find": ("run", "attach", "recover", "gaps", "inbox", "capture", "urls", "htmlpdf"),
     "completeness": (
         "lint",
         "screen",
@@ -6424,6 +6434,85 @@ def authorwatch_apply_cmd(
     result = _authorwatch_call(_go)
     if result.failed and result.created:
         raise typer.Exit(3)
+
+
+@capture_app.callback(invoke_without_command=True)
+def capture_main(
+    ctx: typer.Context,
+    stdio: bool = typer.Option(
+        False, "--stdio", help="Native messaging loop for the Firefox add-on."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Mirror capture. ``--stdio`` speaks Firefox native messaging."""
+    if ctx.invoked_subcommand is not None:
+        return
+    if not stdio:
+        console.print(ctx.get_help())
+        raise typer.Exit(0)
+    from .capture_host import serve_stdio
+
+    serve_stdio(_cfg(config))
+
+
+@capture_app.command("plan")
+def capture_plan(
+    doi: str = typer.Option("", "--doi"),
+    url: str = typer.Option("", "--url"),
+    title: str = typer.Option("", "--title"),
+    year: int | None = typer.Option(None, "--year"),
+    pdf_url: str = typer.Option("", "--pdf-url"),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Dry-run identity: create, update, blocked, or ambiguous. Writes nothing."""
+    from .capture import as_year, plan_page
+
+    result = plan_page(
+        _cfg(config),
+        doi=doi,
+        url=url,
+        title=title,
+        year=year if year is not None else as_year(year),
+        pdf_url=pdf_url,
+    )
+    console.print_json(json.dumps(result))
+
+
+@capture_app.command("apply")
+def capture_apply(config: Path | None = ConfigOpt) -> None:
+    """Read one JSON object on stdin and write the mirror."""
+    from .capture import apply_page
+
+    try:
+        body = json.loads(sys.stdin.read() or "{}")
+    except ValueError:
+        console.print_json(json.dumps({"ok": False, "reason": "invalid"}))
+        raise typer.Exit(2)
+    if not isinstance(body, dict):
+        console.print_json(json.dumps({"ok": False, "reason": "invalid"}))
+        raise typer.Exit(2)
+    result = apply_page(_cfg(config), body)
+    code = int(result.pop("code", 0 if result.get("ok") else 2))
+    console.print_json(json.dumps(result))
+    if code:
+        raise typer.Exit(code)
+
+
+@capture_app.command("session")
+def capture_session(config: Path | None = ConfigOpt) -> None:
+    """Print the open handoff tab list, or an empty list."""
+    from .capture import read_session
+
+    console.print_json(json.dumps(read_session(_cfg(config))))
+
+
+@capture_app.command("install-host")
+def capture_install_host(config: Path | None = ConfigOpt) -> None:
+    """Install the user-level Firefox native messaging host."""
+    from .capture_host import install_host
+
+    line = install_host(_cfg(config), config)
+    console.print(line)
 
 
 def _reconcile_jobs() -> None:

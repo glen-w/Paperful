@@ -59,6 +59,7 @@ def run_fetch(
     item_keys: list[str] | None = None,
     camofox: bool | None = None,
     force_attach: bool = False,
+    force_mirror_only: bool = False,
 ) -> None:
     from . import cli_runtime as cli_mod
 
@@ -66,9 +67,19 @@ def run_fetch(
         cli_mod._refuse_missing_scope()
     cli_mod._require_manager(cfg)
     source_list = cli_mod._source_list(cfg, sources, scihub, preset)
-    backend, offline_reason = cli_mod._open_library(cfg, quiet=json_out)
-    mirror_only = backend is None
-    if mirror_only:
+    if force_mirror_only:
+        # Capture lanes must not open the live library or attach, even when
+        # Zotero is up. ``mirror_only`` is otherwise only the offline branch.
+        backend = None
+        offline_reason = "mirror only"
+        mirror_only = True
+        catalog = items_from_mirror(cfg.out_dir, None if library else collection)
+        scope = "library" if library else ", ".join(collection)
+        keys = None
+    else:
+        backend, offline_reason = cli_mod._open_library(cfg, quiet=json_out)
+        mirror_only = backend is None
+    if mirror_only and not force_mirror_only:
         manager = cli_mod._manager_name(cfg)
         if not json_out:
             console.print(
@@ -78,7 +89,7 @@ def run_fetch(
         catalog = items_from_mirror(cfg.out_dir, None if library else collection)
         scope = "library" if library else ", ".join(collection)
         keys = None
-    else:
+    elif not mirror_only:
         keys, scope = cli_mod._scope_keys(backend, collection, library)
     types = cli_mod._resolve_types(item_type)
     # Drop sources that can never hit this -T / year scope (e.g. htmlpdf on

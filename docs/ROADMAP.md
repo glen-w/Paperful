@@ -9,9 +9,10 @@ adapter.** Mendeley and EndNote are in the tree and seeking testers. See
 
 Optional thin bridges (`paperful session login`) capture a local browser profile;
 they do not rewrite the fetcher. A **Zotero plugin** is not the 1.0 bet.
-**Firefox extension**, **local OpenAlex snapshot** (beyond today’s opt-in v1),
-and **alert loop** (watch / authorwatch poll → ingest → briefing) stay later —
-see [Product split](#product-split-10-vs-post-10) and the
+The **Firefox extension** is an optional mirror bridge ([firefox.md](firefox.md)).
+**Local OpenAlex snapshot** (beyond today’s opt-in v1) and the **alert loop**
+(watch / authorwatch poll → ingest → briefing) stay later — see
+[Product split](#product-split-10-vs-post-10) and the
 [post-1.1 buffet](#after-110-buffet-by-area).
 
 **1.0** is the trust checklist below (all rows shipped), a locked item record
@@ -40,7 +41,7 @@ integrations.
 | **1.0** | **Post-1.0** |
 | --- | --- |
 | Trust checklist, locked `paperful.run_report.v1` / `paperful.item.v1`, snapshot contract | **Local OpenAlex parquet store** — phases 2B/2C (`works_citing`, full search parity, `local_duckdb` / `http`). Live OpenAlex API is enough for most installs; v1 `ssh_duckdb` remains opt-in for institutions |
-| **GUI workbench** — Discover + Wanted simple loop (topic + people); command ids; review tokens; Advanced Repair / Mirror / Index / Briefs and the non-TTY CLI verbs | **Firefox extension** — native messaging → CLI ([section below](#optional-thin-bridge--firefox-extension-post-10)) |
+| **GUI workbench** — Discover + Wanted simple loop (topic + people); command ids; review tokens; Advanced Repair / Mirror / Index / Briefs and the non-TTY CLI verbs | **Firefox extension** — optional native messaging into the mirror ([firefox.md](firefox.md)) |
 | **Ask in GUI** — `/ask` on the default nav, scoped chat with citations when `[rag]` + `[llm]` on | **Alert loop** — poll `snowball watch` / `authorwatch`, ingest parents into `-C`, post-ingest briefing ([Frontier digest](#frontier-digest-later-watch--external-ingest)) |
 | Zotero-proven fetch/mirror path; honest adapter docs (Mendeley / EndNote seeking testers) | SaaS tenancy polish; promoting other managers to “supported” after field reports; remote-manager parity beyond what 1.0 open/Docker needs |
 
@@ -77,7 +78,7 @@ Paperful every week, not just once to fill gaps?
 ### Facts settled against 1.1.0
 
 - 1.1.0 is tagged and on PyPI; trusted publishing (`publish.yml`) exists.
-- Version: single source via `importlib.metadata` / `pyproject.toml` (1.2.0).
+- Version: single source via `importlib.metadata` / `pyproject.toml` (1.3.0).
 - Attach is **manual by default** (`[ui].attach_mode`); Grab does not write to
   Zotero unless Settings is automatic.
 - **1.1.1 closed P0s:** Grab-selected `item_keys`, Held hand-ticks, Attach at
@@ -85,7 +86,7 @@ Paperful every week, not just once to fill gaps?
 - **Ask** is on the default nav (third after Wanted and Discover); it does
   not need Advanced. Whether it *stays* there is an [open
   question](#after-110-open-questions).
-- Install docs are pinned to `v1.2.0` (README, `docs/docker.md`,
+- Install docs are pinned to `v1.3.0` (README, `docs/docker.md`,
   `website/index.html`). Recheck every paperful.app claim before launch.
 
 (after-110-1-1-1)=
@@ -398,9 +399,8 @@ Gaps that had no owner in the 1.0 push:
 
 Do not start these until testers ask, or until the main lane is boring.
 
-- **Firefox extension** — hold until outside users exist, then test
-  interest with a demo GIF first. Design remains
-  [below](#optional-thin-bridge--firefox-extension-post-10).
+- **Firefox extension** — unsigned temporary add-on, mirror writes only.
+  [firefox.md](firefox.md). Not a 1.0 gate.
 - **Local OpenAlex 2B/2C** — institutions only; live API is enough.
 - **SaaS / tenancy.**
 - **Catalogue unification** (managers as equals).
@@ -1808,53 +1808,17 @@ Larger product bets. Park until the ledger and core loop justify them.
 
 ## Optional thin bridge — Firefox extension (post-1.0)
 
-**Status:** design-only; **hold** until outside users exist, then test
-interest with a demo GIF first ([Parked](#after-110-parked)). **Not** a
-replacement for the Zotero Connector. Same Control posture as the CLI
-(dry-run default, explicit Apply, fail closed if Paperful is unreachable).
-Feasibility + contracts researched 2026-09-29 (local notes; substance locked
-below).
+**Status:** implemented, unsigned, temporary add-on. Not a 1.0 gate and not a
+replacement for the Zotero Connector. Operator notes: [firefox.md](firefox.md).
 
-Three explicit toolbar actions (no single “grab everything”):
-
-| Action | Maps to | Priority |
-| --- | --- | --- |
-| **Snowball this DOI** — detect DOI on the current page → `paperful snowball doi` | CLI already writes `paperful.snowball.candidate.v1`; dry-run → optional Apply + `-C` | **P0** |
-| **Ingest to quiet mirror** — current page → `out/` (`paperful.item.v1`) → Zotero upsert via LibraryBackend | `ingest-dois` / inbox create exist on the CLI; extension still needs a thin ingest action | **P1** |
-| **PDFs from open tabs** — enumerate tabs, confirm checklist, download with tab cookies into `[inbox].dir`, then `inbox drain` | Campus entitlement strength; refuse pirate hosts; park unattended mass download | **P1** spike |
-
-**v0 transport (room lock):** Extension → **`nativeMessaging`** host → shells
-`paperful` CLI (dry-run JSON → confirm → write). No new daemon and no invented
-localhost Capability API for these three actions. Thin `paperful serve` /
-Capability API for the 1.0 workbench targets HTTP — [gui.md](gui.md). The
-extension may reuse the same API later via native messaging. **Wrong:** extension → Zotero `:23119`
-directly (skips quiet mirror + provenance; do not replace Connector for
-cite-save).
-
-**Contracts (names):** NM message shapes `snowball.doi`, `ingest`,
-`tabs.pdfs.plan` / confirm with the same dry-run + miss-enum honesty as the
-CLI. DOI detect: Unpaywall-style meta list first (`citation_doi`,
-`dc.identifier.doi`, …), then doi.org links, then bounded regex — not a full
-Zotero translator VM. Provenance: `paperful web:extension` (or `campus:…`
-when the URL matches a configured proxy host). Hard-refuse Sci-Hub / LibGen /
-known pirate hosts on the tab-PDF job.
-
-**P0 spike:** content-script DOI → native host → `paperful snowball doi …`
-`--dry-run` → popup shows `run_id` + new/exists counts.
-
-**Blockers / gaps:** `[snowball].enabled` opt-in; ingest create-parent verb
-missing; mass-download ToS / campus AUP (confirm count, concurrency cap);
-AMO friction (sideload fine for personal spike); do not collide with Zotero
-23119.
-
-**Inspo (steal patterns, not product identity):**
-[zotero-connectors](https://github.com/zotero/zotero-connectors) (inject /
-background / localhost maturity),
-[unpaywall-extension](https://github.com/ourresearch/unpaywall-extension)
-(DOI meta + legal OA posture),
-[JabRef browser extension](https://docs.jabref.org/collect/jabref-browser-extension)
-(local-manager pairing; JabRef’s HTTP direction informs later Capability API),
-DownThemAll / Pull Tabs for paced tab-download UX only.
+The add-on saves the current page or selected tabs into the quiet mirror.
+Identity is the mirror plus a live Zotero read, so a stale snapshot does not
+create a second item. `[extension].snapshot = auto` (default) refreshes `out/`
+once first. Writes stay on disk: no `create_items`, no attach. Transport is
+native messaging to `paperful capture --stdio`. PDF bytes go to a drop
+directory; the host receives a path. Pirate hosts are refused. Snowball and
+gaps `--handoff tabs` / `walk` write `state/handoff/session.json`, which the
+tab checklist pre-checks. Starting a snowball from the toolbar is not this cut.
 
 ## Documentation (thicken)
 
@@ -1909,7 +1873,7 @@ second doc tree that drifts from the CLI.
 - [bbnj-author-lanes.md](bbnj-author-lanes.md) — dogfood `author_site` + `authorwatch` on `ocean/BBNJ` / `ocean/BBNJ-test`
 - Site career / domain timeline plan (consumer of durable tags):
   `/Users/89298/Documents/website/glen-w.github.io/docs/dev/career-timeline-plan.md`
-- Firefox extension (held; design above) — not a separate doc yet
+- [firefox.md](firefox.md) — optional Firefox add-on; mirror writes, Zotero read
 - [After 1.1.0 (buffet by area)](#after-110-buffet-by-area) — Wanted, testers,
   digest, embeddings, review methods, launch, parked bets
 
@@ -1934,8 +1898,8 @@ Screenshots: [Walkthroughs](walkthroughs.md).
 
 The CLI stays the source of truth; the GUI marshals the same verbs with dry-run
 default and explicit Apply. Not a second fetch stack or Zotero’s reader.
-**Firefox extension** is held until outside users exist
-([Parked](#after-110-parked)).
+The optional [Firefox add-on](firefox.md) saves pages into the mirror and
+does not attach.
 
 Post-1.1: **Wanted is the recommended main lane** (stamps, hand-ticks, miss
 reasons) before Repair/Mirror polish or Ask depth —

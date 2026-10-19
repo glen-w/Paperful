@@ -4,6 +4,12 @@ All notable user-facing changes. **1.0.0** locks the trust contract: required
 `paperful.run_report.v1` and `paperful.item.v1` keys are frozen (extra keys
 may still be added). See [releases](docs/releases.md).
 
+## 1.3.0 — 2026-10-19
+
+### Added
+
+- **Firefox add-on** (optional, unsigned, temporary load): save the current page or selected tabs into the quiet mirror. Reads Zotero so a stale snapshot does not create a second item. Writes `out/` only. A page with no PDF keeps `snapshot.html`, and can search the configured lanes. See [Firefox](docs/firefox.md).
+
 ## 1.2.0 — 2026-10-16
 
 ### Added

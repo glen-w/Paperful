@@ -436,6 +436,7 @@ stop at `no_identifier`.
 
 - [ROADMAP.md](ROADMAP.md) — 1.0 trust checklist; post-1.1 buffet by area; core vs maybe-later
 - [quiet-mirror.md](quiet-mirror.md) — `out/` as quiet browsable mirror (direction)
+- [firefox.md](firefox.md) — optional add-on; reads Zotero, writes the mirror only
 - [releases.md](releases.md) — 1.0 contract
 - [comparison.md](comparison.md) — where Paperful sits next to plugins and bib tools
 - [commands.md](commands.md) — CLI and disk artifacts

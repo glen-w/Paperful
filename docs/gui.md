@@ -7,8 +7,10 @@ it (manual, the default) or Grab does it (automatic, Settings) when the
 library can be written.
 
 **Status:** shipped. **Ask** is on the default nav (`/ask`;
-opt-in `[rag]` + `[llm]`). A Firefox extension and hosted SaaS are **post-1.0**
-— see [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10).
+opt-in `[rag]` + `[llm]`). An optional unsigned
+[Firefox add-on](firefox.md) saves the page you are reading into `out/`.
+The Zotero Connector stays the way to save into Zotero. Hosted SaaS stays
+later — see [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10).
 
 Jobs, with screenshots: [Walkthroughs](walkthroughs.md)
 ([first fill](first-fill.md), [grow](grow-library.md),

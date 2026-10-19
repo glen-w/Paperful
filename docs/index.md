@@ -32,6 +32,7 @@ why
 docker
 zotero
 commands
+firefox
 workflows
 research-pack
 dedupe

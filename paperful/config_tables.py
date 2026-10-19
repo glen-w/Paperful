@@ -36,6 +36,7 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_ingest(raw, cfg)
     apply_playbooks(raw, cfg)
     apply_mirror(raw, cfg)
+    apply_extension(raw, cfg)
     apply_remarks(raw, cfg)
     apply_oa_honesty(raw, cfg)
     apply_attachments(raw, cfg)
@@ -447,6 +448,32 @@ def apply_mirror(raw: dict[str, Any], cfg: "Config") -> None:
         cfg.mirror_refresh = C._one_of(
             "[mirror].refresh", mirror["refresh"], ("auto", "manual")
         )
+
+
+def apply_extension(raw: dict[str, Any], cfg: "Config") -> None:
+    """``[extension]`` — Firefox capture. Does not change ``[mirror].refresh``."""
+    block = raw.get("extension")
+    if not isinstance(block, dict):
+        return
+    C = _mod()
+    if "snapshot" in block:
+        cfg.extension_snapshot = C._one_of(
+            "[extension].snapshot", block["snapshot"], ("auto", "off")
+        )
+    if "collection" in block and str(block["collection"]).strip():
+        cfg.extension_collection = str(block["collection"]).strip()
+    if "drop" in block:
+        cfg.extension_drop = str(block["drop"] or "").strip()
+    if "concurrency" in block:
+        try:
+            n = int(block["concurrency"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "[extension].concurrency must be 1–4"
+            ) from exc
+        if n < 1 or n > 4:
+            raise ValueError("[extension].concurrency must be 1–4")
+        cfg.extension_concurrency = n
 
 
 def apply_remarks(raw: dict[str, Any], cfg: "Config") -> None:
