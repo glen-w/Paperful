@@ -370,6 +370,16 @@ class Config:
         return self.state_dir / "ocr-ignore.jsonl"
 
     @property
+    def summarize_skip_path(self) -> Path:
+        """JSONL of items summarize should not retry (no PDF text, etc.)."""
+        return self.state_dir / "summarize-skip.jsonl"
+
+    @property
+    def summarize_miss_path(self) -> Path:
+        """Human miss digest for overnight / morning triage."""
+        return self.state_dir / "summarize-miss.md"
+
+    @property
     def pdf_cache_dir(self) -> Path:
         return self.state_dir / "pdf-cache"
 

@@ -128,3 +128,27 @@ def run_collections_add(
         console.print(f"Summary: {folder}")
 
     cli_mod._emit_agent(payload, json_out=json_out, human=_human_add)
+
+
+def run_collections_children_paths(
+    *,
+    parent: str,
+    exclude_name: str | None,
+    config: Path | None,
+) -> list[str]:
+    """Direct children of a collection path, one path per line (sorted)."""
+    from . import cli_runtime as cli_mod
+
+    cfg = cli_mod._cfg(config)
+    cli_mod._require_manager(cfg)
+    backend = cli_mod._connect(cfg, quiet=True)
+    cols = backend.collections()
+    ocean = backend.resolve_collection(parent)
+    out: list[str] = []
+    for c in sorted(cols.values(), key=lambda x: x.path):
+        if c.parent != ocean.key:
+            continue
+        if exclude_name and c.name == exclude_name:
+            continue
+        out.append(c.path)
+    return out

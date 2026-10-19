@@ -340,6 +340,31 @@ def test_summarize_no_text_raises(llm_cfg, monkeypatch):
         summarize.summarize_item(llm_cfg, make_item(has_pdf=True), None, None)
 
 
+def test_summarize_items_skips_no_text_and_writes_miss(llm_cfg, monkeypatch):
+    """Empty PDFs are skipped (not failed) and land on the miss/skip ledger."""
+    _ground(monkeypatch, summarize, text="")
+    stub = StubLLM(text="<p>should not run</p>")
+    monkeypatch.setattr(summarize, "get_client", lambda cfg: stub)
+    empty = make_item(key="EMPTY001", has_pdf=True, title="Scan only")
+    batch = summarize.summarize_items(
+        llm_cfg, [empty], None, None, dest="disk"
+    )
+    assert batch.summarized == 0 and batch.failed == 0
+    assert batch.skipped == 1 and batch.skipped_no_text == 1
+    assert batch.rows[0].status == "skipped"
+    assert "no PDF text" in batch.rows[0].reason
+    assert not stub.calls
+    assert llm_cfg.summarize_skip_path.is_file()
+    miss = summarize.write_summarize_miss_digest(llm_cfg, batch.rows)
+    assert miss is not None and miss.is_file()
+    assert "EMPTY001" in miss.read_text()
+
+    again = summarize.summarize_items(
+        llm_cfg, [empty], None, None, dest="disk"
+    )
+    assert again.skipped_no_text == 1 and not stub.calls
+
+
 def test_summarize_custom_prompt_changes_sha(llm_cfg, monkeypatch, tmp_path):
     _ground(monkeypatch, summarize)
     monkeypatch.setattr(summarize, "get_client", lambda cfg: StubLLM(text="<p>s</p>"))

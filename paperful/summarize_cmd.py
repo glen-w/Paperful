@@ -33,6 +33,7 @@ def run_summarize(
     limit: int | None,
     max_new: int | None,
     max_minutes: float | None,
+    collections_file: Path | None,
     profile: str | None,
     run_config: Path | None,
     config: Path | None,
@@ -66,6 +67,13 @@ def run_summarize(
     collection, library, year_from, year_to, item_type = cli_mod._take_scope(bound)
     limit = bound.limit
     apply = bound.apply
+    if collections_file is not None:
+        extra = [
+            ln.strip()
+            for ln in collections_file.expanduser().read_text(encoding="utf-8").splitlines()
+            if ln.strip()
+        ]
+        collection = list(collection) + extra
     if not item and not collection and not library:
         console.print("[red]Give --item KEY and/or --collection / --library.[/]")
         raise typer.Exit(1)
@@ -117,6 +125,7 @@ def run_summarize(
         failed: int,
         skipped: int,
         not_reached: int = 0,
+        skipped_no_text: int = 0,
     ) -> None:
         write_command_report(
             cfg,
@@ -126,6 +135,7 @@ def run_summarize(
                 "summarized": summarized,
                 "failed": failed,
                 "skipped": skipped,
+                "skipped_no_text": skipped_no_text,
                 "not_reached": not_reached,
                 "dest": dest,
                 "order": queue_order,
@@ -148,6 +158,7 @@ def run_summarize(
                 "summarized": summarized,
                 "failed": failed,
                 "skipped": skipped,
+                "skipped_no_text": skipped_no_text,
                 "not_reached": not_reached,
             },
             items=outcomes,
@@ -201,12 +212,16 @@ def run_summarize(
         }
         for row in batch.rows
     ]
+    from .summarize import write_summarize_miss_digest
+
+    miss_path = write_summarize_miss_digest(cfg, batch.rows)
     _finish(
         outcomes,
         batch.summarized,
         batch.failed,
         batch.skipped,
         batch.not_reached,
+        batch.skipped_no_text,
     )
     if batch.fatal and not json_out:
         console.print(f"[red]{batch.fatal}[/]")
@@ -220,10 +235,16 @@ def run_summarize(
         console.print(f"Summarized {batch.summarized}/{len(items)} items under {where}")
         if batch.not_reached:
             console.print(f"Not reached: {batch.not_reached} (time or --max-new limit).")
-        if batch.skipped:
+        already = batch.skipped - batch.skipped_no_text
+        if already:
             console.print(
-                f"Skipped {batch.skipped} already summarized for this model "
+                f"Skipped {already} already summarized for this model "
                 "(pass --force to redo)."
+            )
+        if batch.skipped_no_text:
+            console.print(
+                f"Skipped {batch.skipped_no_text} with no PDF text "
+                f"(needs ocr; miss list {miss_path or cfg.summarize_miss_path})."
             )
         if dest == "disk":
             console.print("Zotero not written (dest=disk).")

@@ -745,6 +745,32 @@ def collections_list(config: Path | None = ConfigOpt) -> None:
     run_collections_show(console, config=config)
 
 
+@collections_app.command("children")
+def collections_children_cmd(
+    parent: str = typer.Option(
+        "ocean",
+        "--parent",
+        "-p",
+        help="Parent collection path (default: ocean).",
+    ),
+    exclude: str = typer.Option(
+        "BBNJ",
+        "--exclude",
+        help="Child collection name to omit (default: BBNJ).",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Print child collection paths under --parent (for night batch scripts)."""
+    from .collections_cmd import run_collections_children_paths
+
+    for path in run_collections_children_paths(
+        parent=parent,
+        exclude_name=exclude or None,
+        config=config,
+    ):
+        print(path)
+
+
 @collections_app.command("add")
 def collections_add_cmd(
     collection: list[str] = typer.Option(
@@ -3037,6 +3063,42 @@ def export_proposals(
     )
 
 
+@app.command("run-report-counts")
+def run_report_counts_cmd(
+    report_file: Path = typer.Argument(
+        ...,
+        exists=True,
+        dir_okay=False,
+        help="paperful run report JSON from state/runs/",
+    ),
+) -> None:
+    """One-line counts summary for Nightshift index lines."""
+    import json
+
+    from .runreport import nightshift_counts_line
+
+    payload = json.loads(report_file.read_text(encoding="utf-8"))
+    print(nightshift_counts_line(payload))
+
+
+@app.command("run-report-new-count")
+def run_report_new_count_cmd(
+    report_file: Path = typer.Argument(
+        ...,
+        exists=True,
+        dir_okay=False,
+        help="paperful summarize run report JSON",
+    ),
+) -> None:
+    """Count new model summaries in a run report (skips do not count)."""
+    import json
+
+    from .runreport import nightshift_report_new_count
+
+    payload = json.loads(report_file.read_text(encoding="utf-8"))
+    print(nightshift_report_new_count(payload))
+
+
 @app.command()
 def report(
     config: Path | None = ConfigOpt,
@@ -4042,6 +4104,13 @@ def summarize(
         min=0,
         help="Stop after this many minutes (finishes the paper in hand).",
     ),
+    collections_file: Path | None = typer.Option(
+        None,
+        "--collections-file",
+        exists=True,
+        dir_okay=False,
+        help="Text file: one collection path per line (appended to --collection).",
+    ),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
@@ -4066,6 +4135,7 @@ def summarize(
         limit=limit,
         max_new=_typer_opt(max_new),
         max_minutes=_typer_opt(max_minutes),
+        collections_file=collections_file,
         profile=profile,
         run_config=run_config,
         config=config,
