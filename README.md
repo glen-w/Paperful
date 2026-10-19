@@ -1,7 +1,7 @@
 <h1 align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="website/images/logo-dark.png" />
-    <img src="website/images/logo.png" alt="Paperful" width="280" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/glen-w/Paperful/main/website/images/logo-dark.png" />
+    <img src="https://raw.githubusercontent.com/glen-w/Paperful/main/website/images/logo.png" alt="Paperful" width="280" />
   </picture>
 </h1>
 
@@ -42,13 +42,13 @@ Walkthroughs: [first fill](docs/first-fill.md), [grow the library](docs/grow-lib
 
 ## Screenshots
 
-![Wanted: missing PDFs selected for Preview, then Grab, then Attach](docs/_static/workflows/wanted.png)
+![Wanted: missing PDFs selected for Preview, then Grab, then Attach](https://raw.githubusercontent.com/glen-w/Paperful/main/docs/_static/workflows/wanted.png)
 
-![Discover: topic filled, ready to search or follow people](docs/_static/workflows/discover.png)
+![Discover: topic filled, ready to search or follow people](https://raw.githubusercontent.com/glen-w/Paperful/main/docs/_static/workflows/discover.png)
 
-![Repair: lint, fix metadata, review duplicates](docs/_static/workflows/repair.png)
+![Repair: lint, fix metadata, review duplicates](https://raw.githubusercontent.com/glen-w/Paperful/main/docs/_static/workflows/repair.png)
 
-![Ask: a cited answer from PDFs already on disk](docs/_static/workflows/index-ask.png)
+![Ask: a cited answer from PDFs already on disk](https://raw.githubusercontent.com/glen-w/Paperful/main/docs/_static/workflows/index-ask.png)
 
 ## From a collection to PDFs on your computer
 
@@ -165,8 +165,9 @@ cp config.minimal.toml config.toml   # set email — see docs/config.md
 paperful doctor
 ```
 
-Optional extras: `[llm]`, `[rag]`, `[serve]` (workbench), `[browser-agent]`.
-The operator path tested in CI is still **clone + Compose** ([Docker](docs/docker.md)).
+Optional extras: `[llm]`, `[rag]`, `[browser-agent]`. The `[serve]` extra
+(workbench) is untested without Docker; the operator path tested in CI is
+**clone + Compose** ([Docker](docs/docker.md)).
 
 ## Develop
 
