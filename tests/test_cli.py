@@ -400,8 +400,44 @@ def test_jobs_matches_registered_commands():
     from paperful.cli import JOBS
 
     names = set(get_command(cli.app).commands)
-    listed = {verb for verbs in JOBS.values() for verb in verbs}
-    assert listed == names
+    flat = [verb for verbs in JOBS.values() for verb in verbs]
+    listed = set(flat)
+    assert len(flat) == len(listed), (
+        f"JOBS has duplicate verbs: {sorted(v for v in listed if flat.count(v) > 1)}"
+    )
+    missing = sorted(names - listed)
+    extra = sorted(listed - names)
+    assert listed == names, (
+        f"JOBS drift — add to JOBS: {missing}; remove from JOBS: {extra}. "
+        "New @app.command names must be categorized in JOBS (cli._reconcile_jobs "
+        "auto-parks orphans under utility)."
+    )
+    assert "run-report-counts" in JOBS["utility"]
+    assert "run-report-new-count" in JOBS["utility"]
+
+
+def test_reconcile_jobs_parks_orphans_and_rejects_stale():
+    from paperful import cli as cli_mod
+
+    utility = cli_mod.JOBS["utility"]
+    cli_mod.JOBS["utility"] = tuple(
+        v for v in utility if v != "run-report-counts"
+    )
+    try:
+        cli_mod._reconcile_jobs()
+        assert "run-report-counts" in cli_mod.JOBS["utility"]
+    finally:
+        cli_mod._reconcile_jobs()
+
+    cli_mod.JOBS["utility"] = (*cli_mod.JOBS["utility"], "not-a-real-command")
+    try:
+        with pytest.raises(RuntimeError, match="not registered"):
+            cli_mod._reconcile_jobs()
+    finally:
+        cli_mod.JOBS["utility"] = tuple(
+            v for v in cli_mod.JOBS["utility"] if v != "not-a-real-command"
+        )
+        cli_mod._reconcile_jobs()
 
 
 def test_jobs_command_names_snowball_and_run():
