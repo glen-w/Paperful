@@ -174,6 +174,27 @@ def test_snowball_default_tags(tmp_path):
     assert load_config(p).snowball_default_tags == ("bbnj", "grey")
 
 
+def test_keepup_and_map_categories_from_toml(tmp_path):
+    bare = Config()
+    assert bare.keepup_interval_days == 7
+    assert "evidence-synthesis" in bare.snowball_map_categories
+    p = tmp_path / "config.toml"
+    p.write_text(
+        'email = "me@example.org"\n\n'
+        "[keepup]\ninterval_days = 3\n\n"
+        "[snowball]\n"
+        'map_categories = ["trials", "protocols"]\n'
+        "map_category_defs = [\n"
+        '  { id = "grey", label = "Grey", any_types = ["report"] },\n'
+        "]\n",
+        encoding="utf-8",
+    )
+    cfg = load_config(p)
+    assert cfg.keepup_interval_days == 3
+    assert cfg.snowball_map_categories == ("trials", "protocols")
+    assert any(item.get("id") == "grey" for item in cfg.snowball_map_category_defs)
+
+
 def test_ui_citation_map_defaults_and_toml(tmp_path):
     bare = Config()
     assert bare.ui_citation_map_edit == "both"

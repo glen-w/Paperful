@@ -141,7 +141,7 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `authorwatch_suggest.py` | Corpus / cited / coauthor / mix suggestions → `suggestions.jsonl`; shared co-author accumulation for briefing | `authors_report`, OpenAlex, promoted packs |
 | `authorwatch_social.py` | Parse operator-saved RG / LinkedIn / Academia HTML or CSV (no network) | stdlib HTML/CSV |
 | `keepup.py` / `keepup_cites.py` | Alert loop job ledger (`paperful.keepup.v1`); poll watch / authorwatch / collection citers; interval gate; apply + dismiss | `snowball.watch`, `authorwatch`, OpenAlex `works_citing` |
-| `snowball/` | Crawl, hops, watch (`watch apply` from inbox), thin briefing, frontier digest, `trends` (OpenAlex `group_by` year counts). `watch run` does not create library items | OpenAlex; library protocol only on apply |
+| `snowball/` | Crawl, hops, watch (`watch apply` from inbox), thin briefing, frontier digest, `trends` (OpenAlex `group_by` year counts). `watch run` does not create library items. Citation-map categories live in `map_categories.py`; library annotate/add/remove in `graph_library.py` | OpenAlex; library protocol only on apply |
 | `sections/` | IMRaD field extract (`extract-sections`): deterministic split + optional LLM fill | `rag.extract` text cache, `rag.chunk` / `sections.headings`, gated `llm` |
 
 ## The refresh

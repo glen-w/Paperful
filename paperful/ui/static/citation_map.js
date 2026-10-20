@@ -927,6 +927,13 @@
         }
       }
       libActions += "</div>";
+    }
+    var seedSearchBtn =
+      '<div class="citation-actions">' +
+      '<button type="button" class="secondary" data-action="seed-search">Seed search</button>' +
+      "</div>";
+    editForm = "";
+    if (canEdit) {
       editForm =
         '<div class="citation-edit">' +
         '<label>Tags <input type="text" id="citationTags" value="' +
@@ -971,6 +978,7 @@
       why +
       keep +
       libActions +
+      seedSearchBtn +
       editForm +
       '<div class="citation-actions">' +
       '<button type="button" class="secondary" data-expand="refs"' +
@@ -1000,6 +1008,25 @@
         else if (action === "save-meta") saveMeta(paper, btn);
       });
     });
+    els.panel.querySelectorAll("[data-action='seed-search']").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        seedSnowballForm(paper);
+      });
+    });
+  }
+
+  function seedSnowballForm(paper) {
+    var title = paper.title || "";
+    var doi = paper.doi || "";
+    if (!doi && paper.id && paper.id.indexOf("doi:") === 0) {
+      doi = paper.id.slice(4);
+    }
+    document.cookie = "pf_advanced=1; path=/; max-age=31536000; SameSite=Lax";
+    sessionStorage.setItem(
+      "paperfulDiscoverPrefill",
+      JSON.stringify({ title: title, doi: doi })
+    );
+    window.location.href = "/discover?tab=topic";
   }
 
   function fillCollectionList() {

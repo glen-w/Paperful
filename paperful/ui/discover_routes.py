@@ -46,7 +46,9 @@ from .pages import (
     library_page_size_options,
     library_per_page_from_request,
     nest_collection_rows,
+    paginate_rows,
     pagination_meta,
+    resolve_discover_tab,
     wanted_filter_from_request,
     wanted_items_page,
     wanted_order_from_request,
@@ -124,6 +126,153 @@ def register_discover(ui: UiContext) -> None:
         except Exception:
             return []
 
+    def _discover_page(
+        request: Request,
+        *,
+        list_name: str = "",
+        error: str = "",
+        run: str = "",
+        watch_name: str = "",
+        compare_run: str = "",
+        tab: str | None = None,
+        explore_picks: list[dict[str, Any]] | None = None,
+        explore_query: str = "",
+        note: Any = ...,
+        status_code: int = 200,
+    ) -> HTMLResponse:
+        prefs = prefs_from_request(request)
+        run_id, all_candidates = newest_snowball_queue(cfg)
+        stop_pending, stop_note = snowball_stop_view(cfg, run_id)
+        list_requested = bool((list_name or "").strip())
+        active_list = (list_name or "followed").strip()
+        following = following_lists(cfg)
+        picks = explore_picks or []
+        tab_name = resolve_discover_tab(
+            tab if tab is not None else request.query_params.get("tab"),
+            advanced=prefs.advanced,
+            has_candidates=bool(all_candidates),
+            has_following=bool(following),
+            explore_picks=bool(picks),
+            list_requested=list_requested,
+        )
+        per_page = library_per_page_from_request(request, cfg)
+        persist_per_page = request.query_params.get("per_page") is not None
+        page = library_page_from_request(request)
+        candidates, queue_total, page, queue_page_count = paginate_rows(
+            all_candidates, page=page, per_page=per_page
+        )
+        page_sizes = library_page_size_options(cfg)
+        queue_pagination = pagination_meta(
+            page=page,
+            per_page=per_page,
+            page_count=queue_page_count,
+            total=queue_total,
+            page_sizes=page_sizes,
+        )
+
+        def _discover_qs(
+            *,
+            page_no: int | None = None,
+            with_per_page: bool = False,
+            tab_override: str | None = None,
+        ) -> dict[str, Any]:
+            params: dict[str, Any] = {
+                "tab": tab_override or tab_name,
+                "list_name": list_name if list_requested else "",
+                "watch_name": (watch_name or "").strip(),
+                "compare_run": (compare_run or "").strip(),
+                "run": (run or "").strip(),
+                "error": error,
+            }
+            if with_per_page or persist_per_page:
+                params["per_page"] = per_page
+            if page_no is not None and int(page_no) > 1:
+                params["page"] = page_no
+            return params
+
+        queue_pagination.update(
+            {
+                "prev_url": (
+                    _page_url(
+                        "/discover",
+                        **_discover_qs(page_no=page - 1, with_per_page=True),
+                    )
+                    if page > 1
+                    else ""
+                ),
+                "next_url": (
+                    _page_url(
+                        "/discover",
+                        **_discover_qs(page_no=page + 1, with_per_page=True),
+                    )
+                    if page < queue_page_count
+                    else ""
+                ),
+                "tab_urls": {
+                    name: _page_url(
+                        "/discover",
+                        **_discover_qs(page_no=1, tab_override=name),
+                    )
+                    for name in (
+                        ("explore", "topic", "grow", "people", "queue", "following")
+                        if prefs.advanced
+                        else ("explore", "topic", "people", "queue", "following")
+                    )
+                },
+            }
+        )
+        people: list[dict[str, Any]] = []
+        if active_list and tab_name == "people":
+            try:
+                people = authorwatch_people_rows(cfg, active_list)
+            except Exception:
+                people = []
+        if note is ...:
+            note = (
+                last_job_result(cfg, "snowball_briefing")
+                or last_job_result(cfg, "snowball_digest")
+                or last_job_result(cfg, "authorwatch_briefing")
+                or last_job_result(cfg, "refs_gap")
+                or last_job_result(cfg, "authors")
+            )
+        return templates.TemplateResponse(
+            request,
+            "discover.html",
+            ctx(
+                request,
+                "discover",
+                tab=tab_name,
+                run_id=run_id,
+                candidates=candidates,
+                stop_pending=stop_pending,
+                stop_note=stop_note,
+                following=following,
+                inbox=authorwatch_inbox_rows(cfg) if tab_name == "people" else [],
+                aw_lists=authorwatch_lists(cfg) if tab_name == "people" else [],
+                aw_list=active_list,
+                aw_people=people,
+                aw_suggestions=(
+                    _safe_aw_suggestions(active_list) if tab_name == "people" else []
+                ),
+                profiles=list_snowball_profiles(cfg),
+                deferred_run=snowball_deferred_run_id(cfg),
+                snowball_token=_last_review_token("snowball_apply"),
+                aw_token=_last_review_token("authorwatch_apply"),
+                watch_token=_last_review_token("watch_apply"),
+                ingest_token=_last_review_token("ingest_dois"),
+                note=note,
+                job=job_view(command_by_id(cfg, (run or "").strip())),
+                poll_run=(run or "").strip(),
+                error=error,
+                map_watch_name=(watch_name or "").strip(),
+                map_compare_run=(compare_run or "").strip(),
+                explore_picks=picks,
+                explore_query=explore_query,
+                queue_pagination=queue_pagination,
+            ),
+            status_code=status_code,
+        )
+
     @app.get("/discover", response_class=HTMLResponse)
     def page_discover(
         request: Request,
@@ -132,51 +281,68 @@ def register_discover(ui: UiContext) -> None:
         run: str = "",
         watch_name: str = "",
         compare_run: str = "",
+        tab: str = "",
     ) -> HTMLResponse:
-        run_id, candidates = newest_snowball_queue(cfg)
-        stop_pending, stop_note = snowball_stop_view(cfg, run_id)
-        active_list = (list_name or "followed").strip()
-        people: list[dict[str, Any]] = []
-        if active_list:
-            try:
-                people = authorwatch_people_rows(cfg, active_list)
-            except Exception:
-                people = []
-        return templates.TemplateResponse(
+        return _discover_page(
             request,
-            "discover.html",
-            ctx(
+            list_name=list_name,
+            error=error,
+            run=run,
+            watch_name=watch_name,
+            compare_run=compare_run,
+            tab=tab or None,
+        )
+
+
+    @app.post("/discover/explore")
+    async def discover_explore(request: Request):
+        from ..snowball.citation_graph import CitationGraphError
+        from ..snowball.command import _openalex_client
+        from ..snowball.explore import ExploreAmbiguous, start_explore
+        from ..snowball.openalex import OpenAlexBudgetExceeded
+
+        form = await request.form()
+        query = str(form.get("query") or "").strip()
+        node_id = str(form.get("node_id") or "").strip()
+        try:
+            start_explore(
+                cfg,
+                _openalex_client(cfg),
+                query=query,
+                node_id=node_id,
+                map_categories=cfg.snowball_map_categories,
+                map_category_defs=cfg.snowball_map_category_defs,
+            )
+        except ExploreAmbiguous as exc:
+            picks = [
+                {
+                    "id": p.id,
+                    "title": p.title,
+                    "year": p.year,
+                    "cited_by_count": p.cited_by_count,
+                    "doi": p.doi,
+                }
+                for p in exc.picks
+            ]
+            return _discover_page(
                 request,
-                "discover",
-                run_id=run_id,
-                candidates=candidates,
-                stop_pending=stop_pending,
-                stop_note=stop_note,
-                following=following_lists(cfg),
-                inbox=authorwatch_inbox_rows(cfg),
-                aw_lists=authorwatch_lists(cfg),
-                aw_list=active_list,
-                aw_people=people,
-                aw_suggestions=_safe_aw_suggestions(active_list),
-                profiles=list_snowball_profiles(cfg),
-                deferred_run=snowball_deferred_run_id(cfg),
-                snowball_token=_last_review_token("snowball_apply"),
-                aw_token=_last_review_token("authorwatch_apply"),
-                watch_token=_last_review_token("watch_apply"),
-                ingest_token=_last_review_token("ingest_dois"),
-                note=(
-                    last_job_result(cfg, "snowball_briefing")
-                    or last_job_result(cfg, "snowball_digest")
-                    or last_job_result(cfg, "authorwatch_briefing")
-                    or last_job_result(cfg, "refs_gap")
-                    or last_job_result(cfg, "authors")
-                ),
-                job=job_view(command_by_id(cfg, (run or "").strip())),
-                poll_run=(run or "").strip(),
-                error=error,
-                map_watch_name=(watch_name or "").strip(),
-                map_compare_run=(compare_run or "").strip(),
-            ),
+                tab="explore",
+                explore_picks=picks,
+                explore_query=query,
+                note=None,
+            )
+        except CitationGraphError as exc:
+            return RedirectResponse(
+                url=_page_url("/discover", tab="explore", error=str(exc)[:120]),
+                status_code=303,
+            )
+        except OpenAlexBudgetExceeded as exc:
+            return RedirectResponse(
+                url=_page_url("/discover", tab="explore", error=str(exc)[:120]),
+                status_code=303,
+            )
+        return RedirectResponse(
+            url=_page_url("/discover", tab="queue"), status_code=303
         )
 
 
@@ -190,7 +356,7 @@ def register_discover(ui: UiContext) -> None:
             jobs.snowball_run(cfg, cmd_id, payload=payload, collection=prefs.collection)
 
         cmd_id = commands.enqueue(cfg, f"snowball_{payload.kind}", work)
-        return _after_job("/discover", cmd_id)
+        return _after_job("/discover", cmd_id, tab="queue")
 
 
     @app.post("/discover/profile-save")
@@ -199,7 +365,10 @@ def register_discover(ui: UiContext) -> None:
         form = await request.form()
         name = str(form.get("profile_name") or "").strip()
         if not name:
-            return RedirectResponse(url="/discover?error=profile", status_code=303)
+            return RedirectResponse(
+                url=_page_url("/discover", tab="topic", error="profile"),
+                status_code=303,
+            )
         from .snowball_form import profile_body_from_payload
         from ..snowball.profile import save_profile
         from ..snowball.command import SnowballError
@@ -210,9 +379,12 @@ def register_discover(ui: UiContext) -> None:
             save_profile(cfg, name, body, force=form.get("force") == "1")
         except (SnowballError, ValueError) as exc:
             return RedirectResponse(
-                url=f"/discover?error={str(exc)[:80]}", status_code=303
+                url=_page_url("/discover", tab="topic", error=str(exc)[:80]),
+                status_code=303,
             )
-        return RedirectResponse(url="/discover", status_code=303)
+        return RedirectResponse(
+            url=_page_url("/discover", tab="topic"), status_code=303
+        )
 
 
     @app.post("/discover/refs-gap")
@@ -228,7 +400,7 @@ def register_discover(ui: UiContext) -> None:
             commands.write_command(cfg, rec)
 
         cmd_id = commands.enqueue(cfg, "refs_gap", work)
-        return _after_job("/discover", cmd_id)
+        return _after_job("/discover", cmd_id, tab="grow")
 
 
     @app.post("/discover/ingest-preview")
@@ -258,7 +430,7 @@ def register_discover(ui: UiContext) -> None:
             )
 
         cmd_id = commands.enqueue(cfg, "ingest_dois", work)
-        return _after_job("/discover", cmd_id)
+        return _after_job("/discover", cmd_id, tab="grow")
 
 
     @app.post("/discover/ingest-apply", response_model=None)
@@ -273,7 +445,9 @@ def register_discover(ui: UiContext) -> None:
         )
         if not ok:
             return JSONResponse({"ok": False, "error": msg}, status_code=409)
-        return RedirectResponse(url="/discover", status_code=303)
+        return RedirectResponse(
+            url=_page_url("/discover", tab="grow"), status_code=303
+        )
 
 
     @app.post("/discover/authors")
@@ -285,7 +459,11 @@ def register_discover(ui: UiContext) -> None:
             max_authors = int(form.get("max_authors") or 15)
         except ValueError:
             return RedirectResponse(
-                url="/discover?error=Counts must be whole numbers.",
+                url=_page_url(
+                    "/discover",
+                    tab="grow",
+                    error="Counts must be whole numbers.",
+                ),
                 status_code=303,
             )
 
@@ -314,7 +492,7 @@ def register_discover(ui: UiContext) -> None:
             commands.write_command(cfg, rec)
 
         cmd_id = commands.enqueue(cfg, "authors", work)
-        return _after_job("/discover", cmd_id)
+        return _after_job("/discover", cmd_id, tab="grow")
 
 
     @app.post("/discover/packs-promote")
@@ -322,7 +500,10 @@ def register_discover(ui: UiContext) -> None:
         form = await request.form()
         slug = str(form.get("slug") or "").strip()
         if not slug:
-            return RedirectResponse(url="/discover?error=slug", status_code=303)
+            return RedirectResponse(
+                url=_page_url("/discover", tab="grow", error="slug"),
+                status_code=303,
+            )
 
         def work(cmd_id: str) -> None:
             from ..snowball.preflight import promote_pack
@@ -333,7 +514,7 @@ def register_discover(ui: UiContext) -> None:
             commands.write_command(cfg, rec)
 
         cmd_id = commands.enqueue(cfg, "packs_promote", work)
-        return _after_job("/discover", cmd_id)
+        return _after_job("/discover", cmd_id, tab="grow")
 
 
     @app.post("/discover/follow")
@@ -343,7 +524,10 @@ def register_discover(ui: UiContext) -> None:
         list_name = str(form.get("list_name") or "followed").strip()
         backfill = str(form.get("backfill_from") or "").strip() or None
         if not orcid:
-            return RedirectResponse(url="/discover?error=orcid", status_code=303)
+            return RedirectResponse(
+                url=_page_url("/discover", tab="people", error="orcid"),
+                status_code=303,
+            )
 
         def work(cmd_id: str) -> None:
             jobs.follow_person(
@@ -355,7 +539,7 @@ def register_discover(ui: UiContext) -> None:
             )
 
         cmd_id = commands.enqueue(cfg, "authorwatch_run", work)
-        return _after_job("/discover", cmd_id)
+        return _after_job("/discover", cmd_id, tab="people", list_name=list_name)
 
 
     @app.post("/discover/apply-preview")
@@ -378,12 +562,20 @@ def register_discover(ui: UiContext) -> None:
 
         if kind == "authorwatch":
             verb = "authorwatch_apply"
+            tab = "people"
         elif kind in {"watch", "topic"}:
             verb = "watch_apply"
+            tab = "following"
         else:
             verb = "snowball_apply"
+            tab = "queue"
         cmd_id = commands.enqueue(cfg, verb, work)
-        return _after_job("/discover", cmd_id)
+        return _after_job(
+            "/discover",
+            cmd_id,
+            tab=tab,
+            list_name=list_name if tab == "people" else "",
+        )
 
 
     @app.post("/discover/apply", response_model=None)
@@ -431,7 +623,7 @@ def register_discover(ui: UiContext) -> None:
                 run_watch(cfg, name, console=jobs._quiet_console())
 
         cmd_id = commands.enqueue(cfg, "check_again", work)
-        return _after_job("/discover", cmd_id)
+        return _after_job("/discover", cmd_id, tab="following")
 
 
     @app.post("/discover/keep")
@@ -442,6 +634,8 @@ def register_discover(ui: UiContext) -> None:
         run_id = str(form.get("run_id") or "")
         doi = str(form.get("doi") or "")
         keep = str(form.get("keep") or "1") == "1"
+        page_raw = str(form.get("page") or "").strip()
+        page = int(page_raw) if page_raw.isdigit() else 1
         wants_json = str(form.get("format") or "") == "json"
         accept = (request.headers.get("accept") or "").lower()
         if "application/json" in accept:
@@ -463,7 +657,10 @@ def register_discover(ui: UiContext) -> None:
                 status = 404 if "queue" in str(exc).lower() else 400
                 return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
             return JSONResponse({"ok": True, "graph": graph, "doi": doi, "keep": keep})
-        return RedirectResponse(url="/discover", status_code=303)
+        return RedirectResponse(
+            url=_page_url("/discover", tab="queue", page=page if page > 1 else ""),
+            status_code=303,
+        )
 
     def _graph_overlay_context(watch_name: str, compare_run_id: str) -> tuple[set[str] | None, set[str] | None]:
         from ..snowball.citation_graph import valid_run_id
@@ -755,14 +952,22 @@ def register_discover(ui: UiContext) -> None:
         name = str(form.get("watch_name") or "topic-watch").strip()
         profile = str(form.get("profile") or "").strip()
         if not profile:
-            return RedirectResponse(url="/discover?error=watch", status_code=303)
+            return RedirectResponse(
+                url=_page_url("/discover", tab="queue", error="watch"),
+                status_code=303,
+            )
         from ..snowball.watch import save_watch
 
         try:
             save_watch(cfg, name, profile)
         except Exception:
-            return RedirectResponse(url="/discover?error=watch", status_code=303)
-        return RedirectResponse(url="/discover", status_code=303)
+            return RedirectResponse(
+                url=_page_url("/discover", tab="queue", error="watch"),
+                status_code=303,
+            )
+        return RedirectResponse(
+            url=_page_url("/discover", tab="following"), status_code=303
+        )
 
 
     @app.post("/discover/continue")
@@ -770,7 +975,9 @@ def register_discover(ui: UiContext) -> None:
         form = await request.form()
         run_id = str(form.get("run_id") or "").strip()
         if not run_id:
-            return RedirectResponse(url="/discover", status_code=303)
+            return RedirectResponse(
+                url=_page_url("/discover", tab="queue"), status_code=303
+            )
 
         def work(cmd_id: str) -> None:
             from ..snowball.command import SnowballError, run_continue
@@ -785,7 +992,7 @@ def register_discover(ui: UiContext) -> None:
                 raise
 
         cmd_id = commands.enqueue(cfg, "snowball_continue", work)
-        return _after_job("/discover", cmd_id)
+        return _after_job("/discover", cmd_id, tab="queue")
 
 
     @app.post("/discover/resume")
@@ -794,7 +1001,9 @@ def register_discover(ui: UiContext) -> None:
         form = await request.form()
         run_id = str(form.get("run_id") or snowball_deferred_run_id(cfg)).strip()
         if not run_id:
-            return RedirectResponse(url="/discover", status_code=303)
+            return RedirectResponse(
+                url=_page_url("/discover", tab="topic"), status_code=303
+            )
 
         def work(cmd_id: str) -> None:
             from ..snowball.command import SnowballRequest, run_resume
@@ -803,7 +1012,7 @@ def register_discover(ui: UiContext) -> None:
             run_resume(cfg, run_id, req, console=jobs._quiet_console())
 
         cmd_id = commands.enqueue(cfg, "snowball_resume", work)
-        return _after_job("/discover", cmd_id)
+        return _after_job("/discover", cmd_id, tab="queue")
 
 
     @app.post("/discover/profile-run")
@@ -811,7 +1020,9 @@ def register_discover(ui: UiContext) -> None:
         form = await request.form()
         profile = str(form.get("profile") or "").strip()
         if not profile:
-            return RedirectResponse(url="/discover", status_code=303)
+            return RedirectResponse(
+                url=_page_url("/discover", tab="topic"), status_code=303
+            )
 
         def work(cmd_id: str) -> None:
             from ..snowball.command import (
@@ -849,7 +1060,7 @@ def register_discover(ui: UiContext) -> None:
                 raise SnowballError(f"Profile {profile!r} has unknown mode.")
 
         cmd_id = commands.enqueue(cfg, "snowball_profile", work)
-        return _after_job("/discover", cmd_id)
+        return _after_job("/discover", cmd_id, tab="queue")
 
 
     def _maybe_file_note(html: str, apply: bool, collection: str) -> str:
@@ -867,7 +1078,9 @@ def register_discover(ui: UiContext) -> None:
         run_id = str(form.get("run_id") or "").strip()
         apply_note = form.get("apply") == "1"
         if not run_id:
-            return RedirectResponse(url="/discover", status_code=303)
+            return RedirectResponse(
+                url=_page_url("/discover", tab="topic"), status_code=303
+            )
 
         def work(cmd_id: str) -> None:
             from ..snowball.briefing import write_run_briefing
@@ -885,7 +1098,7 @@ def register_discover(ui: UiContext) -> None:
             )
 
         cmd_id = commands.enqueue(cfg, "snowball_briefing", work)
-        return _after_job("/discover", cmd_id)
+        return _after_job("/discover", cmd_id, tab="queue")
 
 
     @app.post("/discover/digest")
@@ -895,7 +1108,9 @@ def register_discover(ui: UiContext) -> None:
         run_id = str(form.get("run_id") or "").strip()
         apply_note = form.get("apply") == "1"
         if not run_id:
-            return RedirectResponse(url="/discover", status_code=303)
+            return RedirectResponse(
+                url=_page_url("/discover", tab="topic"), status_code=303
+            )
 
         def work(cmd_id: str) -> None:
             from ..snowball.digest import write_run_digest
@@ -913,7 +1128,7 @@ def register_discover(ui: UiContext) -> None:
             )
 
         cmd_id = commands.enqueue(cfg, "snowball_digest", work)
-        return _after_job("/discover", cmd_id)
+        return _after_job("/discover", cmd_id, tab="queue")
 
 
     @app.post("/discover/watch-briefing")
@@ -923,7 +1138,9 @@ def register_discover(ui: UiContext) -> None:
         name = str(form.get("name") or "").strip()
         apply_note = form.get("apply") == "1"
         if not name:
-            return RedirectResponse(url="/discover", status_code=303)
+            return RedirectResponse(
+                url=_page_url("/discover", tab="following"), status_code=303
+            )
 
         def work(cmd_id: str) -> None:
             from ..snowball.briefing import write_watch_briefing
@@ -941,7 +1158,7 @@ def register_discover(ui: UiContext) -> None:
             )
 
         cmd_id = commands.enqueue(cfg, "watch_briefing", work)
-        return _after_job("/discover", cmd_id)
+        return _after_job("/discover", cmd_id, tab="following")
 
 
     @app.post("/discover/watch-digest")
@@ -951,7 +1168,9 @@ def register_discover(ui: UiContext) -> None:
         name = str(form.get("name") or "").strip()
         apply_note = form.get("apply") == "1"
         if not name:
-            return RedirectResponse(url="/discover", status_code=303)
+            return RedirectResponse(
+                url=_page_url("/discover", tab="following"), status_code=303
+            )
 
         def work(cmd_id: str) -> None:
             from ..snowball.digest import write_watch_digest
@@ -969,7 +1188,7 @@ def register_discover(ui: UiContext) -> None:
             )
 
         cmd_id = commands.enqueue(cfg, "watch_digest", work)
-        return _after_job("/discover", cmd_id)
+        return _after_job("/discover", cmd_id, tab="following")
 
 
     @app.post("/discover/aw/save")
@@ -977,11 +1196,13 @@ def register_discover(ui: UiContext) -> None:
         form = await request.form()
         name = str(form.get("name") or "").strip()
         if not name:
-            return RedirectResponse(url="/discover", status_code=303)
+            return RedirectResponse(
+                url=_page_url("/discover", tab="people"), status_code=303
+            )
         from ..authorwatch import save_list
 
         save_list(cfg, name)
-        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+        return RedirectResponse(url=_page_url("/discover", tab="people", list_name=name), status_code=303)
 
 
     @app.post("/discover/aw/add")
@@ -1000,7 +1221,7 @@ def register_discover(ui: UiContext) -> None:
             display_name=display,
             affiliation_host=affiliation,
         )
-        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+        return RedirectResponse(url=_page_url("/discover", tab="people", list_name=name), status_code=303)
 
 
     @app.post("/discover/aw/remove")
@@ -1012,7 +1233,7 @@ def register_discover(ui: UiContext) -> None:
         from ..authorwatch import remove_person
 
         remove_person(cfg, name, orcid=orcid, person_id=person_id)
-        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+        return RedirectResponse(url=_page_url("/discover", tab="people", list_name=name), status_code=303)
 
 
     @app.post("/discover/aw/resolve")
@@ -1026,7 +1247,7 @@ def register_discover(ui: UiContext) -> None:
             resolve_people(cfg, name)
 
         cmd_id = commands.enqueue(cfg, "authorwatch_resolve", work)
-        return _after_job("/discover", cmd_id, list_name=name)
+        return _after_job("/discover", cmd_id, tab="people", list_name=name)
 
 
     @app.post("/discover/aw/run")
@@ -1059,7 +1280,7 @@ def register_discover(ui: UiContext) -> None:
             run_list(cfg, name, **kwargs)
 
         cmd_id = commands.enqueue(cfg, "authorwatch_run", work)
-        return _after_job("/discover", cmd_id, list_name=name)
+        return _after_job("/discover", cmd_id, tab="people", list_name=name)
 
 
     @app.post("/discover/aw/import", response_model=None)
@@ -1077,7 +1298,7 @@ def register_discover(ui: UiContext) -> None:
         dest = dest_dir / Path(filename).name
         dest.write_bytes(data)
         jobs.authorwatch_import(cfg, list_name=name, path=dest, source=source)
-        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+        return RedirectResponse(url=_page_url("/discover", tab="people", list_name=name), status_code=303)
 
 
     @app.post("/discover/aw/suggest")
@@ -1099,7 +1320,7 @@ def register_discover(ui: UiContext) -> None:
             )
 
         cmd_id = commands.enqueue(cfg, "authorwatch_suggest", work)
-        return _after_job("/discover", cmd_id, list_name=name)
+        return _after_job("/discover", cmd_id, tab="people", list_name=name)
 
 
     @app.post("/discover/aw/accept")
@@ -1118,7 +1339,7 @@ def register_discover(ui: UiContext) -> None:
             )
 
         cmd_id = commands.enqueue(cfg, "authorwatch_accept", work)
-        return _after_job("/discover", cmd_id, list_name=name)
+        return _after_job("/discover", cmd_id, tab="people", list_name=name)
 
 
     @app.post("/discover/aw/delete")
@@ -1128,7 +1349,9 @@ def register_discover(ui: UiContext) -> None:
         from ..authorwatch import delete_list
 
         delete_list(cfg, name, yes=True)
-        return RedirectResponse(url="/discover", status_code=303)
+        return RedirectResponse(
+            url=_page_url("/discover", tab="people"), status_code=303
+        )
 
 
     @app.post("/discover/aw/edit")
@@ -1147,7 +1370,7 @@ def register_discover(ui: UiContext) -> None:
             display_name=display,
             affiliation_host=affiliation,
         )
-        return RedirectResponse(url=_page_url("/discover", list_name=name), status_code=303)
+        return RedirectResponse(url=_page_url("/discover", tab="people", list_name=name), status_code=303)
 
 
     @app.post("/discover/aw/briefing")
@@ -1155,7 +1378,9 @@ def register_discover(ui: UiContext) -> None:
         form = await request.form()
         name = str(form.get("list_name") or "").strip()
         if not name:
-            return RedirectResponse(url="/discover", status_code=303)
+            return RedirectResponse(
+                url=_page_url("/discover", tab="people"), status_code=303
+            )
 
         def work(cmd_id: str) -> None:
             from ..authorwatch import write_briefing
@@ -1168,5 +1393,5 @@ def register_discover(ui: UiContext) -> None:
             )
 
         cmd_id = commands.enqueue(cfg, "authorwatch_briefing", work)
-        return _after_job("/discover", cmd_id, list_name=name)
+        return _after_job("/discover", cmd_id, tab="people", list_name=name)
 

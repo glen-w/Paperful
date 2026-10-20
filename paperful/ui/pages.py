@@ -132,6 +132,9 @@ WANTED_FILTER_LABELS = (
     ("no_summary", "Without summary"),
 )
 
+_DISCOVER_TABS = ("explore", "topic", "grow", "people", "queue", "following")
+DISCOVER_TABS = _DISCOVER_TABS
+
 
 def resolve_wanted_tab(tab: str | None, counts: dict[str, int]) -> str:
     """Pick a Wanted tab; default to the first non-empty bucket."""
@@ -141,6 +144,32 @@ def resolve_wanted_tab(tab: str | None, counts: dict[str, int]) -> str:
         if counts.get(name, 0) > 0:
             return name
     return "missing"
+
+
+def resolve_discover_tab(
+    tab: str | None,
+    *,
+    advanced: bool,
+    has_candidates: bool,
+    has_following: bool,
+    explore_picks: bool,
+    list_requested: bool,
+) -> str:
+    """Pick a Discover tab; honour an explicit ``tab`` when allowed."""
+    allowed = {"explore", "topic", "people", "queue", "following"}
+    if advanced:
+        allowed.add("grow")
+    if tab in allowed:
+        return str(tab)
+    if explore_picks:
+        return "explore"
+    if list_requested:
+        return "people"
+    if has_candidates:
+        return "queue"
+    if has_following:
+        return "following"
+    return "topic"
 
 
 def scope_fingerprint(items: list[Any], manifest: Manifest) -> str:

@@ -42,6 +42,18 @@ def run_all(
     config: Path | None,
     fmt: str,
     camofox: bool | None = None,
+    handoff: str | None = None,
+    gaps_handoff: str | None = None,
+    include_doi_tabs: bool = False,
+    downloads_dir: Path | None = None,
+    promote: str | None = None,
+    htmlpdf: str | None = None,
+    keep_snapshot: bool = False,
+    ezproxy_relogin: bool | None = None,
+    twenty_writeback: bool | None = None,
+    request_rg: bool | None = None,
+    re_request: bool = False,
+    after_handoff_gaps: bool = False,
 ) -> None:
     from . import cli_runtime as cli_mod
 
@@ -75,7 +87,22 @@ def run_all(
         steps=steps,
         skip=skip,
         require_summarize=require_summarize,
+        handoff=handoff,
+        gaps_handoff=gaps_handoff,
+        include_doi_tabs=include_doi_tabs if include_doi_tabs else None,
+        downloads_dir=str(downloads_dir) if downloads_dir is not None else None,
+        promote=promote,
+        htmlpdf=htmlpdf,
+        keep_snapshot=keep_snapshot if keep_snapshot else None,
+        ezproxy_relogin=ezproxy_relogin,
+        twenty_writeback=twenty_writeback,
+        request_rg=request_rg,
+        re_request=re_request if re_request else None,
     )
+    if after_handoff_gaps and bound.effective_gaps_handoff():
+        steps = list(bound.steps)
+        if "gaps_handoff" not in steps:
+            bound.steps = steps + ["gaps_handoff"]
     if not bound.collections and not bound.library:
         cli_mod._refuse_missing_scope()
     opened = False
@@ -200,6 +227,12 @@ def _all_scope(bound: ResolvedRunConfig, config: Path | None) -> dict[str, Any]:
         "config": config,
     }
 
+def _run_downloads_dir(bound: ResolvedRunConfig) -> Path | None:
+    if not bound.downloads_dir:
+        return None
+    return Path(bound.downloads_dir)
+
+
 def _dispatch_all_step(
     step: str,
     bound: ResolvedRunConfig,
@@ -228,6 +261,21 @@ def _dispatch_all_step(
             fmt=fmt,
         )
         return
+    if step == "gaps_handoff":
+        _call_step(
+            cli_mod.gaps,
+            **scope,
+            as_json=False,
+            list_missing=True,
+            handoff=bound.effective_gaps_handoff(),
+            include_doi_tabs=bound.include_doi_tabs,
+            downloads_dir=_run_downloads_dir(bound),
+            request_rg=bound.request_rg,
+            re_request=bound.re_request,
+            to=None,
+            fmt=fmt,
+        )
+        return
     if step == "run":
         _call_step(
             cli_mod.run,
@@ -243,19 +291,19 @@ def _dispatch_all_step(
             browser_agent=browser_agent,
             camofox=camofox,
             upgrade_linked=bound.upgrade_linked,
-            upgrade_snapshot=None,
-            keep_snapshot=False,
-            htmlpdf_mode=None,
+            upgrade_snapshot=bound.upgrade_snapshot,
+            keep_snapshot=bound.keep_snapshot,
+            htmlpdf_mode=bound.htmlpdf,
             strict_pdf_doi=bound.strict_pdf_doi,
-            handoff=None,
-            include_doi_tabs=False,
-            downloads_dir=None,
-            request_rg=None,
-            re_request=False,
-            ezproxy_relogin=None,
+            handoff=bound.handoff,
+            include_doi_tabs=bound.include_doi_tabs,
+            downloads_dir=_run_downloads_dir(bound),
+            request_rg=bound.request_rg,
+            re_request=bound.re_request,
+            ezproxy_relogin=bound.ezproxy_relogin,
             serpapi_max=serpapi_max,
-            twenty_writeback=None,
-            promote=None,
+            twenty_writeback=bound.twenty_writeback,
+            promote=bound.promote,
             fmt=fmt,
         )
         return

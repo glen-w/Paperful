@@ -496,3 +496,94 @@ def test_summarize_tolerates_optioninfo_defaults(monkeypatch):
     assert captured.get("to_dest") is None
     assert captured.get("max_new") is None
     assert captured.get("max_minutes") is None
+
+
+def test_resolve_run_config_run_extras(tmp_path):
+    cfg = load_config(_write_config(tmp_path))
+    resolved = resolve_run_config(
+        cfg,
+        for_all=True,
+        collection=["BBNJ"],
+        handoff="tabs",
+        gaps_handoff="watch",
+        promote="auto",
+        htmlpdf="auto",
+        include_doi_tabs=True,
+    )
+    assert resolved.handoff == "tabs"
+    assert resolved.gaps_handoff == "watch"
+    assert resolved.effective_gaps_handoff() == "watch"
+    assert resolved.promote == "auto"
+    assert resolved.htmlpdf == "auto"
+    assert resolved.include_doi_tabs is True
+
+
+def test_all_forwards_run_flags(stubbed, monkeypatch):
+    captured: dict = {}
+
+    def run_spy(**kwargs):
+        captured.update(kwargs)
+        raise typer.Exit(0)
+
+    def gaps_spy(**kwargs):
+        raise typer.Exit(0)
+
+    monkeypatch.setattr(cli, "run", run_spy)
+    monkeypatch.setattr(cli, "gaps", gaps_spy)
+    res = runner.invoke(
+        cli.app,
+        [
+            "all",
+            "-c",
+            str(stubbed),
+            "-C",
+            "BBNJ",
+            "--steps",
+            "run",
+            "--handoff",
+            "watch",
+            "--include-doi-tabs",
+            "--promote",
+            "auto",
+            "--htmlpdf",
+            "auto",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    assert captured.get("handoff") == "watch"
+    assert captured.get("include_doi_tabs") is True
+    assert captured.get("promote") == "auto"
+    assert captured.get("htmlpdf_mode") == "auto"
+
+
+def test_all_after_handoff_gaps_step(stubbed, monkeypatch):
+    order: list[str] = []
+
+    def gaps_spy(**kwargs):
+        order.append(f"gaps:{kwargs.get('list_missing')}:{kwargs.get('handoff')}")
+        raise typer.Exit(0)
+
+    def run_spy(**kwargs):
+        order.append("run")
+        raise typer.Exit(0)
+
+    monkeypatch.setattr(cli, "gaps", gaps_spy)
+    monkeypatch.setattr(cli, "run", run_spy)
+    monkeypatch.setattr(cli, "lint", lambda **k: (_ for _ in ()).throw(typer.Exit(0)))
+    res = runner.invoke(
+        cli.app,
+        [
+            "all",
+            "-c",
+            str(stubbed),
+            "-C",
+            "BBNJ",
+            "--steps",
+            "run",
+            "--handoff",
+            "tabs",
+            "--after-handoff-gaps",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    assert order == ["run", "gaps:True:tabs"]

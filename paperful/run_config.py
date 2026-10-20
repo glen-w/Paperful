@@ -28,7 +28,13 @@ DEFAULT_ALL_STEPS: tuple[str, ...] = (
     "fix-metadata",
     "summarize",
 )
-OPTIONAL_STEPS: tuple[str, ...] = ("snapshot", "synthesize", "dedupe", "ocr")
+OPTIONAL_STEPS: tuple[str, ...] = (
+    "snapshot",
+    "synthesize",
+    "dedupe",
+    "ocr",
+    "gaps_handoff",
+)
 KNOWN_STEPS: tuple[str, ...] = DEFAULT_ALL_STEPS + OPTIONAL_STEPS
 
 # Filled in only for `paperful all` / `profile show`, and only when the profile omits them.
@@ -65,6 +71,17 @@ PROFILE_KEYS = frozenset(
         "overwrite",
         "require_summarize",
         "focus",
+        "handoff",
+        "gaps_handoff",
+        "include_doi_tabs",
+        "downloads_dir",
+        "promote",
+        "htmlpdf",
+        "keep_snapshot",
+        "ezproxy_relogin",
+        "twenty_writeback",
+        "request_rg",
+        "re_request",
     }
 )
 SCOPE_KEYS = frozenset(
@@ -90,6 +107,17 @@ RUN_KEYS = frozenset(
         "scihub",
         "preset",
         "sources",
+        "handoff",
+        "gaps_handoff",
+        "include_doi_tabs",
+        "downloads_dir",
+        "promote",
+        "htmlpdf",
+        "keep_snapshot",
+        "ezproxy_relogin",
+        "twenty_writeback",
+        "request_rg",
+        "re_request",
     }
 )
 APPLY_KEYS = frozenset({"apply", "overwrite"})
@@ -116,6 +144,17 @@ _DUMP_ORDER = (
     "apply",
     "overwrite",
     "require_summarize",
+    "handoff",
+    "gaps_handoff",
+    "include_doi_tabs",
+    "downloads_dir",
+    "promote",
+    "htmlpdf",
+    "keep_snapshot",
+    "ezproxy_relogin",
+    "twenty_writeback",
+    "request_rg",
+    "re_request",
 )
 
 
@@ -157,7 +196,21 @@ class ResolvedRunConfig:
     apply: bool = False
     overwrite: bool = False
     require_summarize: bool = False
+    handoff: str | None = None
+    gaps_handoff: str | None = None
+    include_doi_tabs: bool = False
+    downloads_dir: str | None = None
+    promote: str | None = None
+    htmlpdf: str | None = None
+    keep_snapshot: bool = False
+    ezproxy_relogin: bool | None = None
+    twenty_writeback: bool | None = None
+    request_rg: bool | None = None
+    re_request: bool = False
     origins: tuple[str, ...] = ()
+
+    def effective_gaps_handoff(self) -> str | None:
+        return self.gaps_handoff or self.handoff
 
     @property
     def sources_csv(self) -> str | None:
@@ -238,6 +291,17 @@ def resolve_run_config(
     skip: list[str] | None = None,
     require_summarize: bool | None = None,
     focus: str | None = None,
+    handoff: str | None = None,
+    gaps_handoff: str | None = None,
+    include_doi_tabs: bool | None = None,
+    downloads_dir: str | None = None,
+    promote: str | None = None,
+    htmlpdf: str | None = None,
+    keep_snapshot: bool | None = None,
+    ezproxy_relogin: bool | None = None,
+    twenty_writeback: bool | None = None,
+    request_rg: bool | None = None,
+    re_request: bool | None = None,
 ) -> ResolvedRunConfig:
     """Merge builtin ``all`` policy, named profile, file, then explicit CLI flags.
 
@@ -300,6 +364,17 @@ def resolve_run_config(
         skip=skip,
         require_summarize=require_summarize,
         focus=focus,
+        handoff=handoff,
+        gaps_handoff=gaps_handoff,
+        include_doi_tabs=include_doi_tabs,
+        downloads_dir=downloads_dir,
+        promote=promote,
+        htmlpdf=htmlpdf,
+        keep_snapshot=keep_snapshot,
+        ezproxy_relogin=ezproxy_relogin,
+        twenty_writeback=twenty_writeback,
+        request_rg=request_rg,
+        re_request=re_request,
     )
     if collection or library is not None or (item_type or []) or year_from is not None or year_to is not None or any(
         flag is not None
@@ -319,6 +394,17 @@ def resolve_run_config(
             steps,
             require_summarize,
             focus,
+            handoff,
+            gaps_handoff,
+            include_doi_tabs,
+            downloads_dir,
+            promote,
+            htmlpdf,
+            keep_snapshot,
+            ezproxy_relogin,
+            twenty_writeback,
+            request_rg,
+            re_request,
         )
     ) or (skip or []):
         origins.append("cli")
@@ -474,6 +560,28 @@ def format_effective(resolved: ResolvedRunConfig) -> str:
         body["limit"] = resolved.limit
     if resolved.overwrite:
         body["overwrite"] = True
+    if resolved.handoff:
+        body["handoff"] = resolved.handoff
+    if resolved.gaps_handoff:
+        body["gaps_handoff"] = resolved.gaps_handoff
+    if resolved.include_doi_tabs:
+        body["include_doi_tabs"] = True
+    if resolved.downloads_dir:
+        body["downloads_dir"] = resolved.downloads_dir
+    if resolved.promote:
+        body["promote"] = resolved.promote
+    if resolved.htmlpdf:
+        body["htmlpdf"] = resolved.htmlpdf
+    if resolved.keep_snapshot:
+        body["keep_snapshot"] = True
+    if resolved.ezproxy_relogin is not None:
+        body["ezproxy_relogin"] = resolved.ezproxy_relogin
+    if resolved.twenty_writeback is not None:
+        body["twenty_writeback"] = resolved.twenty_writeback
+    if resolved.request_rg is not None:
+        body["request_rg"] = resolved.request_rg
+    if resolved.re_request:
+        body["re_request"] = True
     title = resolved.name or "all"
     return render_profile_toml(title, body)
 
@@ -592,6 +700,28 @@ def _apply_cli(body: dict[str, Any], **flags: Any) -> None:
         body["overwrite"] = flags["overwrite"]
     if flags["require_summarize"] is not None:
         body["require_summarize"] = flags["require_summarize"]
+    if flags.get("handoff") is not None and str(flags["handoff"]).strip():
+        body["handoff"] = str(flags["handoff"]).strip()
+    if flags.get("gaps_handoff") is not None and str(flags["gaps_handoff"]).strip():
+        body["gaps_handoff"] = str(flags["gaps_handoff"]).strip()
+    if flags.get("include_doi_tabs") is not None:
+        body["include_doi_tabs"] = flags["include_doi_tabs"]
+    if flags.get("downloads_dir") is not None and str(flags["downloads_dir"]).strip():
+        body["downloads_dir"] = str(flags["downloads_dir"]).strip()
+    if flags.get("promote") is not None and str(flags["promote"]).strip():
+        body["promote"] = str(flags["promote"]).strip()
+    if flags.get("htmlpdf") is not None and str(flags["htmlpdf"]).strip():
+        body["htmlpdf"] = str(flags["htmlpdf"]).strip()
+    if flags.get("keep_snapshot") is not None:
+        body["keep_snapshot"] = flags["keep_snapshot"]
+    if flags.get("ezproxy_relogin") is not None:
+        body["ezproxy_relogin"] = flags["ezproxy_relogin"]
+    if flags.get("twenty_writeback") is not None:
+        body["twenty_writeback"] = flags["twenty_writeback"]
+    if flags.get("request_rg") is not None:
+        body["request_rg"] = flags["request_rg"]
+    if flags.get("re_request") is not None:
+        body["re_request"] = flags["re_request"]
     parsed_steps = _coerce_steps(flags["steps"])
     if parsed_steps is not None:
         body["steps"] = parsed_steps
@@ -642,6 +772,46 @@ def _finalize(body: dict[str, Any], *, for_all: bool) -> ResolvedRunConfig:
         if focus not in FOCI:
             known = ", ".join(sorted(FOCI))
             raise RunConfigError(f"Unknown focus {focus!r}. Known: {known}")
+    handoff_raw = body.get("handoff")
+    handoff = str(handoff_raw).strip() if handoff_raw not in (None, "") else None
+    gaps_handoff_raw = body.get("gaps_handoff")
+    gaps_handoff = (
+        str(gaps_handoff_raw).strip() if gaps_handoff_raw not in (None, "") else None
+    )
+    if handoff is not None:
+        from .handoff import parse_handoff
+
+        try:
+            handoff = parse_handoff(handoff, default="list")
+        except ValueError as exc:
+            raise RunConfigError(str(exc)) from exc
+    if gaps_handoff is not None:
+        from .handoff import parse_handoff
+
+        try:
+            gaps_handoff = parse_handoff(gaps_handoff, default="list")
+        except ValueError as exc:
+            raise RunConfigError(str(exc)) from exc
+    promote_raw = body.get("promote")
+    promote = str(promote_raw).strip() if promote_raw not in (None, "") else None
+    if promote is not None:
+        from .config import parse_playbooks_promote
+
+        try:
+            promote = parse_playbooks_promote(promote)
+        except ValueError as exc:
+            raise RunConfigError(str(exc)) from exc
+    htmlpdf_raw = body.get("htmlpdf")
+    htmlpdf = str(htmlpdf_raw).strip() if htmlpdf_raw not in (None, "") else None
+    if htmlpdf is not None:
+        from .config import _one_of
+
+        try:
+            htmlpdf = _one_of("htmlpdf", htmlpdf, ("off", "gated", "auto"))
+        except ValueError as exc:
+            raise RunConfigError(str(exc)) from exc
+    downloads = body.get("downloads_dir")
+    downloads_dir = str(downloads).strip() if downloads not in (None, "") else None
     return ResolvedRunConfig(
         description=str(body.get("description") or ""),
         collections=[str(item) for item in body.get("collections") or []],
@@ -666,6 +836,21 @@ def _finalize(body: dict[str, Any], *, for_all: bool) -> ResolvedRunConfig:
         apply=bool(body.get("apply")),
         overwrite=bool(body.get("overwrite")),
         require_summarize=bool(body.get("require_summarize")),
+        handoff=handoff,
+        gaps_handoff=gaps_handoff,
+        include_doi_tabs=bool(body.get("include_doi_tabs")),
+        downloads_dir=downloads_dir,
+        promote=promote,
+        htmlpdf=htmlpdf,
+        keep_snapshot=bool(body.get("keep_snapshot")),
+        ezproxy_relogin=(
+            bool(body["ezproxy_relogin"]) if "ezproxy_relogin" in body else None
+        ),
+        twenty_writeback=(
+            bool(body["twenty_writeback"]) if "twenty_writeback" in body else None
+        ),
+        request_rg=(bool(body["request_rg"]) if "request_rg" in body else None),
+        re_request=bool(body.get("re_request")),
     )
 
 
@@ -720,9 +905,18 @@ def _normalize(raw: dict[str, Any], *, expect_name: str | None) -> dict[str, Any
         "apply",
         "overwrite",
         "require_summarize",
+        "include_doi_tabs",
+        "keep_snapshot",
+        "ezproxy_relogin",
+        "twenty_writeback",
+        "request_rg",
+        "re_request",
     ):
         if key in raw:
             out[key] = _as_bool(key, raw[key])
+    for key in ("handoff", "gaps_handoff", "downloads_dir", "promote", "htmlpdf"):
+        if key in raw and raw[key] is not None:
+            out[key] = _as_str(key, raw[key])
     for key in ("year_from", "year_to", "limit"):
         if key in raw and raw[key] is not None:
             out[key] = _as_int(key, raw[key])

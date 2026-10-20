@@ -135,8 +135,20 @@ Omitted `try_all` stays off unless the profile sets it.
 | `sources` | `--sources` (comma-separated; TOML is an array of strings) |
 | `apply` | `--apply` / `--no-apply` on `all`, `fix-metadata`, and `summarize` |
 | `overwrite` | `--overwrite` / `--no-overwrite` on `fix-metadata` |
-| `steps` | `--steps` (comma-separated). Optional extras: `snapshot`, `dedupe`, `synthesize`, `ocr` |
+| `steps` | `--steps` (comma-separated). Optional extras: `snapshot`, `dedupe`, `synthesize`, `ocr`, `gaps_handoff` |
 | `require_summarize` | `--require-summarize` — exit 1 if `summarize` cannot run because the LLM is off |
+| `handoff` | `--handoff` on `all` / `run` (`list` \| `tabs` \| `walk` \| `watch`) |
+| `gaps_handoff` | `--gaps-handoff` on `all` (defaults to `handoff` for the `gaps_handoff` step) |
+| `include_doi_tabs` | `--include-doi-tabs` |
+| `downloads_dir` | `--downloads-dir` |
+| `promote` | `--promote` (`gated` \| `auto`) |
+| `htmlpdf` | `--htmlpdf` (`off` \| `gated` \| `auto`) |
+| `upgrade_snapshot` | `--upgrade-snapshot` / `--no-upgrade-snapshot` |
+| `keep_snapshot` | `--keep-snapshot` |
+| `ezproxy_relogin` | `--ezproxy-relogin` / `--no-ezproxy-relogin` |
+| `twenty_writeback` | `--twenty-writeback` / `--no-twenty-writeback` |
+| `request_rg` | `--request-rg` / `--no-request-rg` |
+| `re_request` | `--re-request` |
 | `description` | `profile save --description` |
 
 `profile save NAME` writes `profiles/NAME.toml` from the flags on that

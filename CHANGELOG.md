@@ -8,6 +8,9 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- **Discover Explore map:** Paste a DOI or paper name to seed a citation map
+  immediately (one auto-expand hop). Map **Seed search** fills the Topic
+  snowball form from the selected node. See [Citation map](docs/snowball.md#citation-map).
 - **Keepup (alert loop / what cites):** `paperful keepup` polls topic watches,
   authorwatch lists, and OpenAlex citers of `-C` on a configurable
   `interval_days` (default 7). Baseline proposes nothing; later runs write
@@ -25,6 +28,11 @@ may still be added). See [releases](docs/releases.md).
 
 ### Changed
 
+- **Discover tabs + queue pagination:** Explore, Topic, Grow (Advanced), People,
+  Queue, and Following are separate tabs so the page is shorter. The Queue table
+  paginates like Library / Wanted (`page` / `per_page`). Map lives on Queue.
+  Map **Seed search** opens the Topic tab with the form prefilled.
+- **`paperful all` run-step parity:** `--handoff`, `--include-doi-tabs`, `--downloads-dir`, `--promote`, `--htmlpdf`, `--upgrade-snapshot`, `--keep-snapshot`, `--ezproxy-relogin`, `--twenty-writeback`, `--request-rg`, and `--re-request` reach the internal `run`. Optional `gaps_handoff` step (or `--after-handoff-gaps`) runs leftover `gaps --list-missing` with `--gaps-handoff` or the same `--handoff`. Profiles may store the same keys. See [Workflows](docs/workflows.md).
 - **Firefox add-on 0.2:** richer page detection (Highwire / Dublin Core / JSON-LD), type-to-filter collection picker, capture tags with library and OpenAlex keyword suggestions, optional capture note, Review-then-Save for selected tabs, context menu and Alt+Shift+P, walk badge, open folder / Wanted after save. Native messages are correlated by id. Downloads are staged from the user Downloads folder into the drop directory. `install-host` writes a Windows launcher. Popup and options use the workbench paper, copper, and box-mark chrome. See [Firefox](docs/firefox.md).
 
 ## 1.3.0 — 2026-10-19

@@ -9,16 +9,71 @@
 <p class="page-lede">Find papers that are not in the library yet. Topic search grows a citation and keyword graph from a query, DOI, ORCID, or collection. People watches authors for new work. Nothing is added to Zotero until you Preview apply and then Add selected. Filling PDFs happens on Wanted after items exist.</p>
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
 {{ job_status(job) }}
-<section class="panel">
+<div class="tabs">
+  <span class="tab-with-help">
+    <a href="{{ queue_pagination.tab_urls.explore }}" {% if tab == 'explore' %}class="active"{% endif %}>Explore</a>
+    {{ info("Paste a DOI or title to open a citation map right away.") }}
+  </span>
+  <span class="tab-with-help">
+    <a href="{{ queue_pagination.tab_urls.topic }}" {% if tab == 'topic' %}class="active"{% endif %}>Topic</a>
+    {{ info("Keyword (or Advanced seed) search. Candidates land in Queue.") }}
+  </span>
+  {% if prefs.advanced %}
+  <span class="tab-with-help">
+    <a href="{{ queue_pagination.tab_urls.grow }}" {% if tab == 'grow' %}class="active"{% endif %}>Grow</a>
+    {{ info("Citation gaps, DOI ingest, author frequency, and pack promote.") }}
+  </span>
+  {% endif %}
+  <span class="tab-with-help">
+    <a href="{{ queue_pagination.tab_urls.people }}" {% if tab == 'people' %}class="active"{% endif %}>People</a>
+    {{ info("Watch lists of researchers. New papers land in Person inbox.") }}
+  </span>
+  <span class="tab-with-help">
+    <a href="{{ queue_pagination.tab_urls.queue }}" {% if tab == 'queue' %}class="active"{% endif %}>Queue{% if queue_pagination.total %} ({{ queue_pagination.total }}){% endif %}</a>
+    {{ info("Map and candidates from the last topic or explore run. Keep or Skip, then Apply.") }}
+  </span>
+  <span class="tab-with-help">
+    <a href="{{ queue_pagination.tab_urls.following }}" {% if tab == 'following' %}class="active"{% endif %}>Following</a>
+    {{ info("Saved topic watches and people lists. Check again to re-poll.") }}
+  </span>
+</div>
+
+{% if tab == 'explore' %}
+<section class="panel" id="discoverExploreSection">
+  <h2>Explore</h2>
+  <p class="section-lede">Paste a DOI or paper name to open a citation map immediately. Hop on the map, add papers to the library, or use <strong>Seed search</strong> on a node to start a full snowball from that work.</p>
+  <form method="post" action="/discover/explore" class="form-stack">
+    <label>Paper {{ info("DOI or title. Titles with several OpenAlex matches show a picker.") }}
+      <input name="query" value="{{ explore_query }}" placeholder="10.1038/… or paper title" {% if explore_picks %}autofocus{% endif %}>
+    </label>
+    <button type="submit">Open map</button>
+  </form>
+  {% if explore_picks %}
+  <form method="post" action="/discover/explore" class="form-stack explore-picks">
+    <p class="field-legend">Several matches — choose one</p>
+    {% for pick in explore_picks %}
+    <label class="explore-pick-row">
+      <input type="radio" name="node_id" value="{{ pick.id }}" {% if loop.first %}checked{% endif %}>
+      {{ pick.title }}{% if pick.year %} ({{ pick.year }}){% endif %} · {{ pick.cited_by_count }} citations{% if pick.doi %} · {{ pick.doi }}{% endif %}
+    </label>
+    {% endfor %}
+    <button type="submit">Open map for selected</button>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if tab == 'topic' %}
+<section class="panel" id="discoverTopicSection">
   <h2>Topic</h2>
-  <p class="section-lede">Start from a keyword (or, in Advanced, a DOI, ORCID, or collection). Search is a dry-run: candidates land in the Queue below. Save a profile if you will re-run the same graph later.</p>
-  <form method="post" action="/discover/topic" class="form-stack">
+  <p class="section-lede">Start from a keyword (or, in Advanced, a DOI, ORCID, or collection). Search is a dry-run: candidates land in the Queue. Save a profile if you will re-run the same graph later.</p>
+  <form method="post" action="/discover/topic" class="form-stack" id="discoverTopicForm">
     <div class="field-group">
       <p class="field-legend">Search {{ info("OpenAlex search. For DOI, ORCID, or collection kinds, put the identifier in Seeds as well.") }}</p>
-      <label>Track a topic {{ info("Keywords OpenAlex will search. Phrase it like a paper title or a few technical terms, not a whole paragraph.") }} <input name="query"></label>
+      <label>Track a topic {{ info("Keywords OpenAlex will search. Phrase it like a paper title or a few technical terms, not a whole paragraph.") }} <input name="query" id="discoverQuery"></label>
       {% if prefs.advanced %}
       <label>Kind {{ info("search: keyword only. hybrid: keyword plus citation hops. doi / orcid / collection: start from those seeds instead of a keyword.") }}
-        <select name="kind">
+        <select name="kind" id="discoverKind">
           <option value="search">search</option>
           <option value="hybrid">hybrid</option>
           <option value="doi">doi</option>
@@ -96,7 +151,7 @@
     </div>
     <div class="field-group">
       <p class="field-legend">Seeds {{ info("Starting works or people for DOI, ORCID, collection, or hybrid runs.") }}</p>
-      <label>Seeds {{ info("One DOI or ORCID per line. Used when Kind is doi, orcid, hybrid, or you want extra seeds beside a keyword.") }} <textarea name="seeds" rows="3" placeholder="DOIs / ORCIDs, one per line"></textarea></label>
+      <label>Seeds {{ info("One DOI or ORCID per line. Used when Kind is doi, orcid, hybrid, or you want extra seeds beside a keyword.") }} <textarea name="seeds" id="discoverSeeds" rows="3" placeholder="DOIs / ORCIDs, one per line"></textarea></label>
     </div>
     <div class="field-group">
       <p class="field-legend">Profile {{ info("Save these knobs under a name so you can re-run the same topic later.") }}</p>
@@ -134,7 +189,9 @@
   </form>
   {% endif %}
 </section>
-{% if prefs.advanced %}
+{% endif %}
+
+{% if tab == 'grow' and prefs.advanced %}
 <section class="panel">
   <h2>Grow (citations / DOIs / authors)</h2>
   <p class="section-lede">Three more ways to add works: papers cited by PDFs you already have, a DOI list, or frequent authors in the current collection. Each path is Preview then Apply, like Topic.</p>
@@ -172,7 +229,16 @@
     <button type="submit" class="secondary">Packs promote</button>
   </form>
 </section>
+{% if note and note.markdown %}
+<section class="panel">
+  <h2>Note</h2>
+  <p class="section-lede">The briefing or digest just generated for this page.</p>
+  <pre>{{ note.markdown }}</pre>
+</section>
 {% endif %}
+{% endif %}
+
+{% if tab == 'people' %}
 <section class="panel">
   <h2>People</h2>
   <p class="section-lede">Watch lists of researchers. Paperful polls OpenAlex for new papers by those ORCIDs. It does not scrape social sites. New hits land in Person inbox until you Apply them into Zotero.</p>
@@ -262,7 +328,7 @@
   <p class="section-lede">Saved people lists. Inbox is new papers waiting to be applied. Baseline means the first poll has already run.</p>
   <ul>
   {% for L in aw_lists %}
-    <li><a href="/discover?list_name={{ L.name }}">{{ L.name }}</a> — {{ L.people }} people · inbox {{ L.inbox }}{% if L.baseline %} · baseline{% endif %}</li>
+    <li><a href="/discover?tab=people&amp;list_name={{ L.name }}">{{ L.name }}</a> — {{ L.people }} people · inbox {{ L.inbox }}{% if L.baseline %} · baseline{% endif %}</li>
   {% endfor %}
   </ul>
 </section>
@@ -364,6 +430,16 @@
   <pre>{{ note.markdown }}</pre>
 </section>
 {% endif %}
+{% endif %}
+
+{% if tab == 'queue' %}
+{% if note and note.markdown %}
+<section class="panel">
+  <h2>Note</h2>
+  <p class="section-lede">The briefing or digest just generated for this page.</p>
+  <pre>{{ note.markdown }}</pre>
+</section>
+{% endif %}
 {% if run_id %}
 <section class="panel" id="citationMapApp" data-run-id="{{ run_id }}" data-graph="/discover/graph?run_id={{ run_id }}" data-watch-name="{{ map_watch_name }}" data-compare-run="{{ map_compare_run }}">
   <h2>Map</h2>
@@ -408,7 +484,34 @@
 </section>
 {% endif %}
 <section class="panel">
-  <h2>Queue</h2>
+  <div class="lib-items-head">
+    <h2>Queue</h2>
+    {% if queue_pagination.total %}
+    <form class="lib-pager" method="get" action="/discover">
+      <input type="hidden" name="tab" value="queue">
+      <span class="counts">
+        {{ queue_pagination.range_start }}–{{ queue_pagination.range_end }}
+        of {{ queue_pagination.total }}
+      </span>
+      <label>
+        Per page {{ info("How many queue rows to show. Larger pages are heavier to render.") }}
+        <select name="per_page" onchange="this.form.submit()">
+          {% for n in queue_pagination.page_sizes %}
+          <option value="{{ n }}"{% if n == queue_pagination.per_page %} selected{% endif %}>{{ n }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <input type="hidden" name="page" value="1">
+      {% if queue_pagination.prev_url %}
+      <a class="secondary lib-pager-nav" href="{{ queue_pagination.prev_url }}">Previous</a>
+      {% endif %}
+      <span class="counts">Page {{ queue_pagination.page }} / {{ queue_pagination.page_count }}</span>
+      {% if queue_pagination.next_url %}
+      <a class="secondary lib-pager-nav" href="{{ queue_pagination.next_url }}">Next</a>
+      {% endif %}
+    </form>
+    {% endif %}
+  </div>
   <p class="section-lede">Candidates from the last topic search. Keep or Skip each row, then Preview apply and Add selected to create Zotero items. Fill PDFs on Wanted afterwards. Watch remembers this topic and checks it again later.</p>
   {% if run_id %}
   <div class="cluster">
@@ -456,6 +559,7 @@
       <form method="post" action="/discover/keep" style="display:inline">
         <input type="hidden" name="run_id" value="{{ row.run_id }}">
         <input type="hidden" name="doi" value="{{ row.doi }}">
+        <input type="hidden" name="page" value="{{ queue_pagination.page }}">
         <button type="submit" name="keep" value="1" class="secondary">Keep</button>
         <button type="submit" name="keep" value="0" class="secondary">Skip</button>
       </form>
@@ -465,6 +569,9 @@
   </tbody>
 </table>
 </section>
+{% endif %}
+
+{% if tab == 'following' %}
 {% if following %}
 <section class="panel">
   <h2>Following</h2>
@@ -509,11 +616,44 @@
   {% endfor %}
 </ul>
 </section>
+{% else %}
+<section class="panel">
+  <h2>Following</h2>
+  <p class="section-lede">No saved topic watches or people lists yet. Create a watch from Queue after a topic search, or a list under People.</p>
+</section>
+{% endif %}
+{% if note and note.markdown %}
+<section class="panel">
+  <h2>Note</h2>
+  <p class="section-lede">The briefing or digest just generated for this page.</p>
+  <pre>{{ note.markdown }}</pre>
+</section>
+{% endif %}
 {% endif %}
 {% endblock %}
 {% block scripts %}
-{% if run_id %}
+<script>
+(function () {
+  var raw = sessionStorage.getItem("paperfulDiscoverPrefill");
+  if (!raw) return;
+  sessionStorage.removeItem("paperfulDiscoverPrefill");
+  try {
+    var data = JSON.parse(raw);
+    var query = document.getElementById("discoverQuery");
+    var kind = document.getElementById("discoverKind");
+    var seeds = document.getElementById("discoverSeeds");
+    if (query && data.title) query.value = data.title;
+    if (data.doi && seeds && kind) {
+      kind.value = "doi";
+      seeds.value = data.doi;
+    } else if (query && data.doi) {
+      query.value = data.doi;
+    }
+  } catch (e) {}
+})();
+</script>
+{% if tab == 'queue' and run_id %}
 <script src="/static/vendor/d3.v7.min.js"></script>
-<script src="/static/citation_map.js?v=5"></script>
+<script src="/static/citation_map.js?v=7"></script>
 {% endif %}
 {% endblock %}

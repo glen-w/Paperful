@@ -259,9 +259,12 @@ running camofox-browser server for a scripted try before the LLM agent
 Optional: `[inbox].dir` so `--handoff tabs` can continue into inbox watch.
 Campus-only policy: add `--preset eoi` on `run` / `all`.
 
-`paperful all` does **not** pass `--handoff` to its internal `run` step.
-Use the shell chain below (or a second `run` / `gaps` with `--handoff`) for
-tab or walk handoff.
+`paperful all` forwards `--handoff`, `--include-doi-tabs`, `--promote`,
+`--htmlpdf`, and the other run-step flags to its internal `run`. Add
+`--after-handoff-gaps` (or a `gaps_handoff` step) to run
+`gaps --list-missing` with the same handoff after the chain. The shell
+sequence below stays useful when you want dedupe first, or a different
+handoff mode after `run` than after the leftover-gaps pass.
 
 Review duplicates before merging:
 
@@ -297,15 +300,14 @@ uv run paperful gaps "${SCOPE[@]}" --list-missing --handoff walk
 uv run paperful pack close
 ```
 
-Same policy as `all`, but with dedupe first and explicit handoff on a
-standalone `run`:
+Same policy as `all`, with dedupe first and handoff on the `run` step plus
+a leftover-gaps pass:
 
 ```sh
 uv run paperful all -C COLLECTION \
   --steps dedupe,gaps,run,lint,fix-metadata,summarize \
-  --apply --browser-agent
-# then, for remaining misses:
-uv run paperful gaps -C COLLECTION --list-missing --handoff walk
+  --apply --browser-agent \
+  --handoff tabs --after-handoff-gaps --gaps-handoff walk
 ```
 
 Handoff modes: `tabs` (batch open, optional inbox watch after tabs),
@@ -313,7 +315,8 @@ Handoff modes: `tabs` (batch open, optional inbox watch after tabs),
 `[gaps].downloads_dir`). See [Sources](sources.md) (manual handoff after
 soft blocks).
 
-Save the slice for reruns (`handoff` is still a separate step):
+Save the slice for reruns. Profile TOML can store `handoff` /
+`gaps_handoff`; CLI `--handoff` still overrides one invocation:
 
 ```sh
 uv run paperful profile save PROFILE_NAME \
@@ -323,8 +326,8 @@ uv run paperful profile save PROFILE_NAME \
   --steps dedupe,gaps,run,lint,fix-metadata,summarize \
   --description "DESCRIPTION"
 
-uv run paperful all --profile PROFILE_NAME --browser-agent
-uv run paperful gaps -C COLLECTION --list-missing --handoff walk
+uv run paperful all --profile PROFILE_NAME --browser-agent \
+  --handoff tabs --after-handoff-gaps --gaps-handoff walk
 ```
 
 Dry-run the automated half first:

@@ -810,6 +810,10 @@ BibTeX citekeys still make sense. Snowball does not depend on that plugin.
 
 ## Citation map
 
+**Explore** (Discover panel) seeds a tiny queue from one DOI or title, auto-expands
+one hop, and opens **Map** for ad-hoc hops and **Add to library**. **Seed search**
+on a map node fills the Topic form (DOI kind + seeds) for a full snowball run.
+
 Discover **Map** draws the current queue before you open PDFs. Node colour is
 year × `cited_by_count`:
 
@@ -876,7 +880,7 @@ and watch/compare badges when you open Discover with `?watch_name=` or
 
 ## Out of this lane
 
-- A hosted discovery service or a second OpenAlex browser. The map is one queue, not the public corpus
+- A hosted discovery service or corpus-scale OpenAlex browser (Explore is one seed + hops, not the whole public graph)
 - A built-in scheduler or cron helper (call `watch run` yourself), or a snowball step inside `paperful all`
 - A dedicated screening TUI. Discover Keep/Skip and **Next hop** are the reviewer when a stopping rule is on
 - Sci-Hub or Scholar as ways to discover works

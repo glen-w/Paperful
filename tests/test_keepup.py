@@ -290,6 +290,196 @@ def test_keepup_config_interval(tmp_path: Path):
     assert cfg.keepup_interval_days == 3
 
 
+def _cand(doi: str, *, title: str = "Work") -> Candidate:
+    return Candidate(
+        run_id="keepup:field",
+        seed={"type": "collection", "value": "Ocean/BBNJ"},
+        hop=1,
+        direction="cites",
+        ids={"doi": doi, "openalex": "W" + doi[-1]},
+        biblio={"title": title, "year": 2025},
+        why="test",
+        status="new",
+        provenance={"backend": "openalex"},
+        gate="dry-run",
+        keep=True,
+        score=1,
+    )
+
+
+def _past_baseline(cfg: Config, name: str) -> None:
+    body = load_job(cfg, name)
+    body["baseline_at"] = "2020-01-01T00:00:00Z"
+    body["last_run_at"] = "2020-01-02T00:00:00Z"
+    (cfg.state_dir / "keepup" / name / "job.json").write_text(
+        __import__("json").dumps(body, indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def test_poll_watch_and_authorwatch_notes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from paperful import keepup
+
+    cfg = _cfg(tmp_path)
+    watch_row = _cand("10.1000/w", title="Watch hit")
+    aw_row = _cand("10.1000/a", title="Author hit")
+    already = _cand("10.1000/skip")
+
+    class _WatchRes:
+        proposed = 1
+        baseline = True
+
+    monkeypatch.setattr(
+        "paperful.snowball.watch.run_watch", lambda *_a, **_k: _WatchRes()
+    )
+    monkeypatch.setattr("paperful.snowball.watch.load_applied", lambda *_a, **_k: set())
+    monkeypatch.setattr(
+        "paperful.snowball.watch.load_inbox", lambda *_a, **_k: [watch_row]
+    )
+    rows, note = keepup._poll_watch(
+        cfg,
+        Source(type="watch", name="bbnj"),
+        console=_console(),
+        client=None,
+        backend=None,
+        lookup=None,
+    )
+    assert [row.ids["doi"] for row in rows] == ["10.1000/w"]
+    assert "watch bbnj: proposed 1" in note
+    assert "(baseline)" in note
+
+    class _AwRes:
+        proposed = 2
+        baseline = False
+
+    monkeypatch.setattr("paperful.authorwatch.run_list", lambda *_a, **_k: _AwRes())
+    monkeypatch.setattr(
+        "paperful.authorwatch.load_applied", lambda *_a, **_k: {"doi:10.1000/skip"}
+    )
+    monkeypatch.setattr(
+        "paperful.authorwatch.load_inbox",
+        lambda *_a, **_k: [aw_row, already],
+    )
+    rows, note = keepup._poll_authorwatch(
+        cfg,
+        Source(type="authorwatch", name="people"),
+        console=_console(),
+        client=None,
+        backend=None,
+        lookup=None,
+    )
+    assert [row.ids["doi"] for row in rows] == ["10.1000/a"]
+    assert "authorwatch people: proposed 2" in note
+    assert "(baseline)" not in note
+
+
+def test_run_job_merges_watch_and_cites(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    cfg = _cfg(tmp_path)
+    save_job(
+        cfg,
+        "field",
+        collection="Ocean/BBNJ",
+        sources=[Source(type="watch", name="bbnj"), Source(type="cites")],
+        interval_days=0,
+    )
+    _past_baseline(cfg, "field")
+    watch_row = _cand("10.1000/w")
+    cite_row = _cand("10.1000/c")
+    dup = _cand("10.1000/w")
+
+    monkeypatch.setattr(
+        "paperful.keepup._poll_watch",
+        lambda *_a, **_k: ([watch_row], "watch bbnj: proposed 1"),
+    )
+    monkeypatch.setattr(
+        "paperful.keepup._poll_cites",
+        lambda *_a, **_k: ([cite_row, dup], "cites: proposed 2 · seeds 1", set()),
+    )
+    result = run_job(cfg, "field", console=_console(), force=True)
+    assert result.skipped is False
+    assert result.baseline is False
+    assert result.proposed == 2
+    dois = {row.ids.get("doi") for row in load_inbox(cfg, "field")}
+    assert dois == {"10.1000/w", "10.1000/c"}
+    assert any("watch bbnj" in note for note in result.source_notes)
+    assert any(note.startswith("cites:") for note in result.source_notes)
+
+
+def test_keepup_apply_marks_nested_watch_ledger(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from paperful.keepup import append_inbox
+    from paperful.snowball import watch as sw
+
+    cfg = _cfg(tmp_path)
+    save_job(
+        cfg,
+        "field",
+        collection="Ocean/BBNJ",
+        sources=[Source(type="watch", name="bbnj")],
+    )
+    append_inbox(cfg, "field", [_cand("10.1000/new")])
+
+    def fake_create(backend, rows, collection, **kwargs):
+        assert collection == "Ocean/BBNJ"
+        return [], {"created": len(rows), "skipped_exists": 0, "failed": 0}
+
+    monkeypatch.setattr("paperful.snowball.ingest.create_new", fake_create)
+    written = apply_job(
+        cfg,
+        "field",
+        console=_console(),
+        apply=True,
+        lookup=lambda *a, **k: None,
+        backend=object(),
+    )
+    assert written.created == 1
+    assert "doi:10.1000/new" in load_applied(cfg, "field")
+    assert "doi:10.1000/new" in sw.load_applied(cfg, "bbnj")
+
+
+def test_cli_keepup_save(tmp_path: Path):
+    from typer.testing import CliRunner
+
+    from paperful.cli import app
+
+    cfg_file = tmp_path / "config.toml"
+    cfg_file.write_text(
+        f'email = "t@example.org"\nout_dir = "{tmp_path / "out"}"\n'
+        f'state_dir = "{tmp_path / "state"}"\n',
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        [
+            "keepup",
+            "save",
+            "field",
+            "-C",
+            "Ocean/BBNJ",
+            "--watch",
+            "bbnj",
+            "--source",
+            "cites",
+            "-c",
+            str(cfg_file),
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    body = __import__("json").loads(
+        (tmp_path / "state" / "keepup" / "field" / "job.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert body["collection"] == "Ocean/BBNJ"
+    kinds = {src["type"] for src in body["sources"]}
+    assert kinds == {"watch", "cites"}
+
+
 def test_discover_watch_apply_fingerprint(tmp_path: Path):
     from paperful.ui import jobs
     from paperful.snowball.watch import append_inbox, watch_dir

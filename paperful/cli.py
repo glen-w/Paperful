@@ -4402,6 +4402,60 @@ def all_cmd(
         "--serpapi-max",
         help="Cap paid SerpApi Scholar searches on the run step (0 = unlimited).",
     ),
+    upgrade_snapshot: bool | None = UpgradeSnapshotOpt,
+    keep_snapshot: bool = typer.Option(
+        False,
+        "--keep-snapshot",
+        help="With --upgrade-snapshot on the run step, leave the HTML print beside the new PDF.",
+    ),
+    htmlpdf: str | None = typer.Option(
+        None,
+        "--htmlpdf",
+        help="Academic HTML snapshot on the run step: off, gated, or auto.",
+    ),
+    handoff: str | None = typer.Option(
+        None,
+        "--handoff",
+        help=(
+            "After the run step: list|tabs|walk|watch for soft-blocked openable PDF URLs. "
+            "watch = tabs then poll the inbox.dir folder."
+        ),
+    ),
+    gaps_handoff: str | None = typer.Option(
+        None,
+        "--gaps-handoff",
+        help=(
+            "Handoff mode for the optional gaps_handoff step (defaults to --handoff). "
+            "list|tabs|walk|watch."
+        ),
+    ),
+    include_doi_tabs: bool = typer.Option(
+        False,
+        "--include-doi-tabs",
+        help="With run or gaps_handoff handoff tabs|watch, also open doi.org for doi_only rows.",
+    ),
+    downloads_dir: Path | None = typer.Option(
+        None,
+        "--downloads-dir",
+        help="Downloads dir for run/gaps_handoff --handoff walk (default ~/Downloads).",
+    ),
+    ezproxy_relogin: bool | None = EzproxyReloginOpt,
+    twenty_writeback: bool | None = TwentyWritebackOpt,
+    request_rg: bool | None = RequestRgOpt,
+    re_request: bool = ReRequestOpt,
+    promote: str | None = typer.Option(
+        None,
+        "--promote",
+        help="Override [playbooks].promote on the run step: gated or auto.",
+    ),
+    after_handoff_gaps: bool = typer.Option(
+        False,
+        "--after-handoff-gaps",
+        help=(
+            "Append a gaps_handoff step after the chain when --handoff or --gaps-handoff is set: "
+            "gaps --list-missing with the same handoff options."
+        ),
+    ),
     label: str | None = typer.Option(
         None, "--label", help="Pack label when this command opens a pack."
     ),
@@ -4446,6 +4500,18 @@ def all_cmd(
         run_config=run_config,
         config=config,
         fmt=fmt,
+        handoff=_typer_opt(handoff),
+        gaps_handoff=_typer_opt(gaps_handoff),
+        include_doi_tabs=include_doi_tabs,
+        downloads_dir=_typer_opt(downloads_dir),
+        promote=_typer_opt(promote),
+        htmlpdf=_typer_opt(htmlpdf),
+        keep_snapshot=keep_snapshot,
+        ezproxy_relogin=_typer_opt(ezproxy_relogin),
+        twenty_writeback=_typer_opt(twenty_writeback),
+        request_rg=_typer_opt(request_rg),
+        re_request=re_request,
+        after_handoff_gaps=after_handoff_gaps,
     )
 
 def _dispatch_all_step(*args, **kwargs):

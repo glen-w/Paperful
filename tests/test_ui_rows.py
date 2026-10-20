@@ -113,6 +113,55 @@ def test_resolve_wanted_tab_defaults_to_first_non_empty():
     assert resolve_wanted_tab("held", {"missing": 2, "held": 0, "have": 0}) == "held"
 
 
+def test_resolve_discover_tab_defaults_and_guards_grow():
+    from paperful.ui.pages import resolve_discover_tab
+
+    assert (
+        resolve_discover_tab(
+            None,
+            advanced=False,
+            has_candidates=True,
+            has_following=True,
+            explore_picks=False,
+            list_requested=False,
+        )
+        == "queue"
+    )
+    assert (
+        resolve_discover_tab(
+            "grow",
+            advanced=False,
+            has_candidates=False,
+            has_following=False,
+            explore_picks=False,
+            list_requested=False,
+        )
+        == "topic"
+    )
+    assert (
+        resolve_discover_tab(
+            "grow",
+            advanced=True,
+            has_candidates=False,
+            has_following=False,
+            explore_picks=False,
+            list_requested=False,
+        )
+        == "grow"
+    )
+    assert (
+        resolve_discover_tab(
+            None,
+            advanced=False,
+            has_candidates=False,
+            has_following=False,
+            explore_picks=False,
+            list_requested=True,
+        )
+        == "people"
+    )
+
+
 def test_nest_collection_rows_groups_paths():
     tree = nest_collection_rows(
         [

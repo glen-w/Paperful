@@ -60,7 +60,7 @@ browser-agent. No built-in scheduler — **Check again** on Discover, not cron.
 | **Health** dot | Worst cached `doctor` status (amber until **System** runs doctor; pages never block on a full doctor) |
 | **Advanced** toggle | Cookie only; reveals extra nav and form fields |
 | **Row actions** | Icon buttons (detail drawer, set collection scope) with the action name as the tooltip |
-| **Long lists** | Discover lists, Ask threads and batches, Briefs archives, and the Repair queue fold into collapsible sections |
+| **Long lists** | Discover uses tabs (Explore / Topic / Grow / People / Queue / Following); Queue paginates. Ask threads and batches, Briefs archives, and the Repair queue fold into collapsible sections |
 
 Layout: table-first rows, native `<dialog>` drawer (no embedded PDF viewer).
 Long jobs return a **command id**; Activity subscribes to `GET /v1/runs/{id}/events` (SSE), with JSON poll fallback via `GET /v1/runs/{id}`.
@@ -91,19 +91,21 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
    → **After Grab**, shown only after at least one successful Attach): Grab
    also attaches when the library supports write. Zotero 7–9 never receives
    the file from Paperful. DOI mismatch and short PDF still wait for Attach.
-2. **Discover** — **Topic:** keyword search (`snowball search` dry-run queue),
-   per-row Keep/Skip, then **Preview apply** → **Add selected**
-   (`snowball apply`, metadata only). **Map** draws that queue before you
-   open a PDF: older + highly cited is foundational, recent + highly cited
-   is influential, recent + fewer citations may be emerging. OpenAlex study
-   designs (RCT, meta-analysis, …) appear as category badges and filter chips
-   on top of those roles. Click a paper to Keep/Skip or expand one hop
-   (references, or papers that cite it).
+2. **Discover** — Tabs: **Explore**, **Topic**, **Grow** (Advanced),
+   **People**, **Queue** (map + paginated candidates), **Following**.
+   **Topic:** keyword search (`snowball search` dry-run queue), then open
+   **Queue** for per-row Keep/Skip and **Preview apply** → **Add selected**
+   (`snowball apply`, metadata only). **Map** (on Queue) draws that queue
+   before you open a PDF: older + highly cited is foundational, recent +
+   highly cited is influential, recent + fewer citations may be emerging.
+   OpenAlex study designs (RCT, meta-analysis, …) appear as category badges
+   and filter chips on top of those roles. Click a paper to Keep/Skip or
+   expand one hop (references, or papers that cite it).
    When a [stopping rule](snowball.md#stopping-rules)
    is on, **Next hop** scores those marks and fetches one more hop
    (`snowball continue`). **Fill PDFs** opens Wanted.
    **Briefing** / **Digest** write `briefing.md` / `digest.md` on the queue
-   (shown on the page; digests are not auto-created). Advanced can tick
+   (shown on Queue; digests are not auto-created). Advanced can tick
    **File collection note** (`--apply` + collection chip) to file a Zotero
    collection note tagged `paperful:frontier-briefing`. **Keep an eye on this**
    saves a topic watch only when a snowball **profile** is chosen. **People:**
@@ -192,6 +194,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/wanted/reachout` | Export contact rows; optional RG tabs |
 | POST | `/wanted/summarize` | Enqueue single-item `summarize`; redirect `?run=` |
 | GET | `/item/{key}/summary` | Per-item HTML under `state/summaries/` |
+| POST | `/discover/explore` | Resolve a DOI or title into an explore queue; open Map (picker when title is ambiguous) |
 | POST | `/discover/topic` | Enqueue snowball kind (Advanced) or keyword search |
 | POST | `/discover/profile-save` | Save snowball profile from the topic form |
 | POST | `/discover/refs-gap` | Dry-run refs gap pack for the collection chip |
