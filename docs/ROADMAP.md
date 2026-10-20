@@ -227,7 +227,7 @@ Ask stays optional; whether it stays third on the default nav is open.
   cell tied to a passage and marked “check this” when unsure; local claim
   tracking that sorts citing papers into supporting, contrasting, or just
   mentioning. Study-type seed for that table: Discover citation-map
-  literature categories from OpenAlex `study_designs` (see
+  literature categories from OpenAlex `study_designs` and work `type` (see
   [Citation map](snowball.md#citation-map)).
 - Existing RAG / Ask / Briefs surface: [Zotero-RAG
   integration](#zotero-rag-integration-later-question-centric-layer),

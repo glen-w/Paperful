@@ -52,27 +52,39 @@ def test_map_categories_from_study_designs():
     assert [item.id for item in catalog] == [
         "evidence-synthesis",
         "trials",
+        "clinical-trials",
         "observational",
         "case-reports",
         "protocols",
+        "narrative-reviews",
+        "preprints",
+        "books",
+        "commentary",
     ]
     assert categories_for(
         {"study_designs": ["meta-analysis", "systematic-review"]}, catalog
     ) == ["evidence-synthesis"]
     assert categories_for(
         {"study_designs": ["randomized-controlled-trial", "clinical-trial"]}, catalog
-    ) == ["trials"]
+    ) == ["trials", "clinical-trials"]
+    assert categories_for({"study_designs": ["clinical-trial"]}, catalog) == [
+        "clinical-trials"
+    ]
+    assert categories_for({"type": "preprint"}, catalog) == ["preprints"]
+    assert categories_for({"type": "review"}, catalog) == ["narrative-reviews"]
+    assert categories_for({"type": "book-chapter"}, catalog) == ["books"]
+    assert categories_for({"type": "letter"}, catalog) == ["commentary"]
     custom = resolve_catalog(
-        enabled=["preprints"],
+        enabled=["grey-reports"],
         custom_defs=[
             {
-                "id": "preprints",
-                "label": "Preprints",
-                "any_types": ["preprint", "posted-content"],
+                "id": "grey-reports",
+                "label": "Reports",
+                "any_types": ["report"],
             }
         ],
     )
-    assert categories_for({"type": "preprint"}, custom) == ["preprints"]
+    assert categories_for({"type": "report"}, custom) == ["grey-reports"]
     parsed = parse_category_def(
         {"id": "rcts", "label": "RCTs", "any_study_designs": ["rct"]}
     )
@@ -115,6 +127,74 @@ def test_graph_nodes_carry_categories_and_legend():
     assert by_id[meta.identity]["role"] == "foundational"
     assert by_id[trial.identity]["categories"] == ["trials"]
     assert by_id[trial.identity]["role"] == "emerging"
+
+
+def test_graph_nodes_carry_type_based_categories():
+    seed = _candidate("10.1000/seed", "W1", "Seed", 2020, 9, hop=0, direction="search")
+    preprint = _candidate(
+        "10.1000/pre",
+        "W2",
+        "Early draft",
+        2024,
+        2,
+        hop=1,
+        direction="refs",
+        links=[{"parent": seed.identity, "direction": "refs"}],
+        work_type="preprint",
+    )
+    chapter = _candidate(
+        "10.1000/ch",
+        "W3",
+        "A book chapter",
+        2019,
+        10,
+        hop=1,
+        direction="refs",
+        links=[{"parent": seed.identity, "direction": "refs"}],
+        work_type="book-chapter",
+    )
+    letter = _candidate(
+        "10.1000/let",
+        "W4",
+        "A letter",
+        2023,
+        1,
+        hop=1,
+        direction="refs",
+        links=[{"parent": seed.identity, "direction": "refs"}],
+        work_type="letter",
+    )
+    clinical = _candidate(
+        "10.1000/ct",
+        "W5",
+        "A non-RCT trial",
+        2022,
+        8,
+        hop=1,
+        direction="refs",
+        links=[{"parent": seed.identity, "direction": "refs"}],
+        study_designs=["clinical-trial"],
+    )
+    graph = build_graph(
+        [seed, preprint, chapter, letter, clinical], run_id="Rtypes", now_year=2026
+    )
+    legend_ids = {row["id"] for row in graph["category_legend"]}
+    assert legend_ids >= {"preprints", "books", "commentary", "clinical-trials"}
+    by_id = {node["id"]: node for node in graph["nodes"]}
+    assert by_id[preprint.identity]["categories"] == ["preprints"]
+    assert by_id[chapter.identity]["categories"] == ["books"]
+    assert by_id[letter.identity]["categories"] == ["commentary"]
+    assert by_id[clinical.identity]["categories"] == ["clinical-trials"]
+
+
+def test_config_defaults_include_ten_map_categories():
+    cfg = Config()
+    assert "preprints" in cfg.snowball_map_categories
+    assert "clinical-trials" in cfg.snowball_map_categories
+    assert "books" in cfg.snowball_map_categories
+    assert "commentary" in cfg.snowball_map_categories
+    assert "narrative-reviews" in cfg.snowball_map_categories
+    assert len(cfg.snowball_map_categories) == 10
 
 
 def test_build_graph_respects_enabled_map_categories():
@@ -691,6 +771,7 @@ def _candidate(
     direction: str,
     links: list[dict[str, str]] | None = None,
     study_designs: list[str] | None = None,
+    work_type: str | None = None,
 ) -> Candidate:
     biblio: dict[str, object] = {
         "title": title,
@@ -702,6 +783,8 @@ def _candidate(
         biblio["graph_links"] = links
     if study_designs:
         biblio["study_designs"] = list(study_designs)
+    if work_type:
+        biblio["type"] = work_type
     return Candidate(
         run_id="R1",
         seed={"type": "doi", "value": "10.1000/seed"},
