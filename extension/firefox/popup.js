@@ -5,6 +5,13 @@ var pageState = {
   hello: null,
   lastSave: null,
   reviews: [],
+  tags: [],
+  knownTags: [],
+  pageTagHints: [],
+  remoteTagHints: [],
+  suggestIndex: -1,
+  suggestTimer: null,
+  suggestSeq: 0,
 };
 
 function byId(id) {
@@ -49,19 +56,169 @@ function actionLine(plan) {
 }
 
 function fillCollections(hello, selected) {
-  var select = byId("collection");
-  clearNode(select);
-  var paths = (hello && hello.collections) || [];
-  var current = selected || (hello && hello.collection) || "Capture";
+  var input = byId("collection");
+  var list = byId("collection-list");
+  clearNode(list);
+  var paths = ((hello && hello.collections) || []).slice();
+  var current = selected || input.value || (hello && hello.collection) || "Capture";
   if (paths.indexOf(current) === -1) paths = [current].concat(paths);
   var i;
   for (i = 0; i < paths.length; i++) {
     var opt = document.createElement("option");
     opt.value = paths[i];
-    opt.textContent = paths[i];
-    if (paths[i] === current) opt.selected = true;
-    select.appendChild(opt);
+    list.appendChild(opt);
   }
+  if (!input.value) input.value = current;
+  pageState.knownTags = ((hello && hello.tags) || []).slice();
+}
+
+function tagKey(name) {
+  return String(name || "").trim().toLowerCase();
+}
+
+function renderTagChips() {
+  var box = byId("tag-chips");
+  clearNode(box);
+  var i;
+  for (i = 0; i < pageState.tags.length; i++) {
+    (function (name) {
+      var chip = document.createElement("span");
+      chip.className = "tag-chip";
+      var label = document.createElement("span");
+      label.textContent = name;
+      var remove = document.createElement("button");
+      remove.type = "button";
+      remove.setAttribute("aria-label", "Remove " + name);
+      remove.textContent = "×";
+      remove.addEventListener("click", function () {
+        pageState.tags = pageState.tags.filter(function (row) {
+          return tagKey(row) !== tagKey(name);
+        });
+        renderTagChips();
+        hideTagSuggest();
+      });
+      chip.appendChild(label);
+      chip.appendChild(remove);
+      box.appendChild(chip);
+    })(pageState.tags[i]);
+  }
+}
+
+function addTag(raw) {
+  var name = String(raw || "").trim();
+  if (!name) return false;
+  if (name.length > 100) name = name.slice(0, 100);
+  if (pageState.tags.length >= 20) return false;
+  var key = tagKey(name);
+  var i;
+  for (i = 0; i < pageState.tags.length; i++) {
+    if (tagKey(pageState.tags[i]) === key) return false;
+  }
+  pageState.tags.push(name);
+  renderTagChips();
+  byId("tag-input").value = "";
+  hideTagSuggest();
+  return true;
+}
+
+function hideTagSuggest() {
+  var list = byId("tag-suggest");
+  list.hidden = true;
+  clearNode(list);
+  pageState.suggestIndex = -1;
+}
+
+function tagIsChosen(name) {
+  var key = tagKey(name);
+  var i;
+  for (i = 0; i < pageState.tags.length; i++) {
+    if (tagKey(pageState.tags[i]) === key) return true;
+  }
+  return false;
+}
+
+function matchingTags(query) {
+  var needle = tagKey(query);
+  var out = [];
+  var seen = {};
+  var pools = [];
+  if (needle) pools.push(pageState.remoteTagHints, pageState.knownTags, pageState.pageTagHints);
+  else pools.push(pageState.pageTagHints, pageState.knownTags);
+  var p;
+  var i;
+  for (p = 0; p < pools.length; p++) {
+    var pool = pools[p] || [];
+    for (i = 0; i < pool.length; i++) {
+      var name = pool[i];
+      var key = tagKey(name);
+      if (!name || seen[key] || tagIsChosen(name)) continue;
+      if (needle && key.indexOf(needle) === -1) continue;
+      seen[key] = true;
+      out.push(name);
+      if (out.length >= 8) break;
+    }
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
+function queueTagSuggest(query) {
+  var text = String(query || "");
+  var doi = (pageState.detected && pageState.detected.doi) || "";
+  if (pageState.suggestTimer) clearTimeout(pageState.suggestTimer);
+  var seq = pageState.suggestSeq + 1;
+  pageState.suggestSeq = seq;
+  pageState.suggestTimer = setTimeout(function () {
+    pageState.suggestTimer = null;
+    send({ type: "tag-suggest", query: text, doi: doi }).then(function (payload) {
+      if (seq !== pageState.suggestSeq) return;
+      if (!payload || payload.ok === false) return;
+      var rows = (payload && payload.tags) || [];
+      if (text) pageState.remoteTagHints = rows;
+      else pageState.pageTagHints = rows;
+      renderTagSuggest();
+    }, function () {});
+  }, text ? 280 : 0);
+}
+
+function renderTagSuggest() {
+  var input = byId("tag-input");
+  var list = byId("tag-suggest");
+  var rows = matchingTags(input.value);
+  clearNode(list);
+  if (!rows.length) {
+    hideTagSuggest();
+    return;
+  }
+  var i;
+  for (i = 0; i < rows.length; i++) {
+    (function (name, index) {
+      var item = document.createElement("li");
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = name;
+      if (index === pageState.suggestIndex) btn.className = "active";
+      btn.addEventListener("mousedown", function (ev) {
+        ev.preventDefault();
+        addTag(name);
+        input.focus();
+      });
+      item.appendChild(btn);
+      list.appendChild(item);
+    })(rows[i], i);
+  }
+  list.hidden = false;
+  if (pageState.suggestIndex >= rows.length) pageState.suggestIndex = rows.length - 1;
+}
+
+function commitTagInput() {
+  var value = byId("tag-input").value;
+  var rows = matchingTags(value);
+  if (pageState.suggestIndex >= 0 && rows[pageState.suggestIndex]) {
+    addTag(rows[pageState.suggestIndex]);
+    return;
+  }
+  addTag(value);
 }
 
 function renderPage(payload) {
@@ -118,6 +275,9 @@ function renderPage(payload) {
   byId("search-lanes").checked = false;
   byId("save-page").disabled = plan.action === "blocked" && plan.reason === "refused_host";
   fillCollections(pageState.hello, pageState.hello && pageState.hello.collection);
+  pageState.pageTagHints = [];
+  pageState.remoteTagHints = [];
+  queueTagSuggest("");
 }
 
 function selectedConfirm() {
@@ -253,6 +413,53 @@ byId("show-tabs").addEventListener("click", function () {
     say(String(err && err.message ? err.message : err));
   });
 });
+byId("tag-input").addEventListener("input", function () {
+  pageState.suggestIndex = -1;
+  queueTagSuggest(byId("tag-input").value);
+  renderTagSuggest();
+});
+byId("tag-input").addEventListener("focus", function () {
+  if (!pageState.pageTagHints.length && (pageState.detected && pageState.detected.doi)) {
+    queueTagSuggest("");
+  }
+  renderTagSuggest();
+});
+byId("tag-input").addEventListener("keydown", function (ev) {
+  var rows = matchingTags(byId("tag-input").value);
+  if (ev.key === "ArrowDown" && rows.length) {
+    ev.preventDefault();
+    pageState.suggestIndex = Math.min(pageState.suggestIndex + 1, rows.length - 1);
+    renderTagSuggest();
+    return;
+  }
+  if (ev.key === "ArrowUp" && rows.length) {
+    ev.preventDefault();
+    pageState.suggestIndex = Math.max(pageState.suggestIndex - 1, 0);
+    renderTagSuggest();
+    return;
+  }
+  if (ev.key === "Enter" || ev.key === ",") {
+    ev.preventDefault();
+    commitTagInput();
+    return;
+  }
+  if (ev.key === "Tab" && byId("tag-input").value.trim()) {
+    ev.preventDefault();
+    commitTagInput();
+    return;
+  }
+  if (ev.key === "Escape") {
+    hideTagSuggest();
+    return;
+  }
+  if (ev.key === "Backspace" && !byId("tag-input").value && pageState.tags.length) {
+    pageState.tags.pop();
+    renderTagChips();
+  }
+});
+byId("tag-input").addEventListener("blur", function () {
+  window.setTimeout(hideTagSuggest, 120);
+});
 byId("select-walk").addEventListener("click", function () { setChecks("walk"); });
 byId("select-all").addEventListener("click", function () { setChecks("all"); });
 byId("select-none").addEventListener("click", function () { setChecks("none"); });
@@ -266,6 +473,7 @@ byId("save-page").addEventListener("click", function () {
     allowUnread: byId("allow-unread").checked,
     confirmKey: selectedConfirm(),
     collection: byId("collection").value,
+    tags: pageState.tags.slice(),
     note: byId("note").value,
   }).then(function (result) {
     if (!result) {
@@ -277,6 +485,7 @@ byId("save-page").addEventListener("click", function () {
     if (result.pdf) line += " · " + result.pdf;
     if (result.snapshot && result.snapshot !== "none") line += " · snapshot " + result.snapshot;
     if (result.note === "saved") line += " · note";
+    if (result.tags && result.tags.length) line += " · tags " + result.tags.length;
     if (result.reason) line += " (" + result.reason + ")";
     say(line);
     showSaved(result);
@@ -340,6 +549,7 @@ byId("save-tabs").addEventListener("click", function () {
     lanes: byId("tabs-lanes").checked,
     allowUnread: byId("tabs-unread").checked,
     collection: byId("collection").value,
+    tags: pageState.tags.slice(),
     note: byId("note").value,
   }).then(function (payload) {
     var summary = (payload && payload.summary) || {};

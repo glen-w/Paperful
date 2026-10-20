@@ -197,8 +197,11 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/discover/packs-promote` | Promote a proposed field author pack |
 | POST | `/discover/follow` | Follow ORCID into a list (`authorwatch` run) |
 | POST | `/discover/keep` | Mark queue DOI keep/skip |
-| GET | `/discover/graph` | Citation map JSON for `run_id` (`paperful.citation_graph.v1`) |
+| GET | `/discover/graph` | Citation map JSON for `run_id` (`paperful.citation_graph.v1`); optional `watch_name`, `compare_run` |
 | POST | `/discover/graph/expand` | One OpenAlex hop (`refs`, `cites`, or `both`) merged into that queue |
+| POST | `/discover/graph/repair` | Re-link rows to hop-0 seeds via OpenAlex (Keep unchanged) |
+| POST | `/discover/graph/halo` | Library neighbours as ghost overlay (mirror DOIs; not queued) |
+| POST | `/discover/keep` | `format=json` or `Accept: application/json` returns `{ graph, keep, doi }` for the map panel |
 | POST | `/discover/check-again` | Re-run topic watch or person list |
 | POST | `/discover/resume` | Enqueue `snowball resume` |
 | POST | `/discover/profile-run` | Enqueue snowball from a named profile |

@@ -519,11 +519,13 @@ def test_html_outside_drop_dir_refused(tmp_path):
 def test_host_hello_unknown_and_install(tmp_path, monkeypatch):
     from paperful.capture_host import handle_message, install_host
 
+    monkeypatch.setattr("paperful.capture_host._open_live", lambda _cfg: None)
     cfg = _cfg(tmp_path)
     hello = handle_message(cfg, {"type": "hello"}, [])
     assert hello["ok"] is True
     assert hello["snapshot"] == "off"
     assert hello["collection"] == "Capture"
+    assert hello["tags"] == []
     assert handle_message(cfg, {"type": "nope"}, []) == {"ok": False, "reason": "unknown"}
     session = handle_message(cfg, {"type": "handoff.session"}, [])
     assert session["ok"] is True and session["items"] == []
@@ -697,11 +699,13 @@ def test_stage_rejects_outside_allowed(tmp_path):
 def test_host_echoes_id_and_stages(tmp_path, monkeypatch):
     from paperful.capture_host import handle_message
 
+    monkeypatch.setattr("paperful.capture_host._open_live", lambda _cfg: None)
     cfg = _cfg(tmp_path)
     hello = handle_message(cfg, {"type": "hello", "id": 7}, [])
     assert hello["id"] == 7
     assert hello["workbench"]
     assert "Capture" in hello["collections"]
+    assert hello["tags"] == []
     reply = handle_message(cfg, {"type": "handoff.mark", "id": 8, "keys": ["ABCD"]}, [])
     assert reply["ok"] is True and reply["id"] == 8 and reply["marked"] == 0
 
@@ -765,6 +769,8 @@ def test_extension_uses_workbench_tokens():
     assert 'class="brand-word"' in popup and 'class="brand-word"' in options
     assert 'id="review-tabs"' in popup
     assert 'id="open-wanted"' in popup
+    assert 'id="tag-input"' in popup
+    assert 'list="collection-list"' in popup
     assert "Test connection" in options
 
 
@@ -779,6 +785,16 @@ def test_list_collection_paths_from_mirror(tmp_path):
     assert paths[0] == "Capture"
     assert "Inbox" in paths
     assert all(not name.startswith("_") for name in paths)
+
+    class Coll:
+        path = "BBNJ/EIA"
+
+    class Live:
+        def collections(self):
+            return {"K": Coll()}
+
+    live_paths = list_collection_paths(cfg, live=Live())
+    assert "BBNJ/EIA" in live_paths
 
 
 def test_open_target_item_out_and_invalid(tmp_path):
@@ -867,13 +883,117 @@ def test_stage_already_in_drop_and_html(tmp_path, monkeypatch):
     assert refused["ok"] is False and refused["reason"] == "refused"
 
 
-def test_id_echo_rejects_bool_and_out_of_range(tmp_path):
+def test_id_echo_rejects_bool_and_out_of_range(tmp_path, monkeypatch):
     from paperful.capture_host import handle_message
 
+    monkeypatch.setattr("paperful.capture_host._open_live", lambda _cfg: None)
     cfg = _cfg(tmp_path)
     for req_id in (True, 0, 1_000_000_000, "7"):
         reply = handle_message(cfg, {"type": "hello", "id": req_id}, [])
         assert "id" not in reply
+
+
+def test_clip_tags_and_hello_suggestions(tmp_path, monkeypatch):
+    from paperful.capture import clip_tags, list_tag_names
+    from paperful.capture_host import handle_message
+
+    assert clip_tags("BBNJ, bbnj; ocean\nlaw") == ["BBNJ", "ocean", "law"]
+    assert clip_tags([{"tag": "keep"}, "keep", ""]) == ["keep"]
+    assert len(clip_tags([f"t{i}" for i in range(30)])) == 20
+
+    cfg = _cfg(tmp_path)
+    rec_path = _mirror(cfg, "ABCD1234") / "record.json"
+    body = json.loads(rec_path.read_text())
+    body["tags"] = [{"tag": "mirror-tag"}]
+    rec_path.write_text(json.dumps(body))
+    assert "mirror-tag" in list_tag_names(cfg)
+
+    class Live:
+        def get(self, path, **params):
+            assert path == "/tags"
+            return _Resp([{"tag": "live-tag"}, {"tag": "mirror-tag"}])
+
+        def collections(self):
+            return {}
+
+    names = list_tag_names(cfg, live=Live())
+    assert names == ["live-tag", "mirror-tag"]
+    monkeypatch.setattr("paperful.capture_host._open_live", lambda _cfg: Live())
+    hello = handle_message(cfg, {"type": "hello"}, [])
+    assert "live-tag" in hello["tags"]
+    assert "mirror-tag" in hello["tags"]
+
+
+def test_suggest_tags_uses_openalex(tmp_path, monkeypatch):
+    from paperful.capture import suggest_tag_names
+
+    cfg = _cfg(tmp_path)
+    cfg.email = "test@example.org"
+
+    class Client:
+        def work_by_doi(self, doi):
+            assert doi == "10.1000/example"
+            return {
+                "keywords": [
+                    {"display_name": "Marine Policy", "score": 0.9, "id": "https://openalex.org/keywords/marine-policy"},
+                    {"display_name": "Law of the Sea", "score": 0.5, "id": "https://openalex.org/keywords/law-of-the-sea"},
+                ],
+                "study_designs": [
+                    {"id": "https://openalex.org/study-designs/literature-review", "display_name": "Literature review"},
+                ],
+            }
+
+        def search_keywords(self, query, limit=5):
+            assert query == "ocean"
+            return [{"display_name": "Ocean governance", "id": "https://openalex.org/keywords/ocean-governance"}]
+
+    monkeypatch.setattr("paperful.capture._openalex_client_for_capture", lambda _cfg: Client())
+    hints = suggest_tag_names(cfg, doi="10.1000/example")
+    assert "Marine Policy" in hints
+    assert any("literature" in row.lower() for row in hints)
+    typed = suggest_tag_names(cfg, query="ocean", doi="10.1000/example")
+    assert "Ocean governance" in typed
+
+    from paperful.capture_host import handle_message
+
+    monkeypatch.setattr("paperful.capture_host._open_live", lambda _cfg: None)
+    reply = handle_message(
+        cfg,
+        {"type": "capture.tag_suggest", "id": 3, "query": "ocean", "doi": "10.1000/example"},
+        [],
+    )
+    assert reply["id"] == 3
+    assert "Ocean governance" in reply["tags"]
+
+
+def test_apply_merges_tags(tmp_path):
+    cfg = _cfg(tmp_path)
+    created = apply_page(
+        cfg,
+        {
+            "apply": True,
+            "allow_unread": True,
+            "doi": "10.1000/tagged",
+            "title": "Tagged",
+            "tags": ["BBNJ", "bbnj", "ocean"],
+        },
+        opener=_down,
+        run_sync_fn=_quiet,
+    )
+    assert created["ok"] is True
+    assert created["tags"] == ["BBNJ", "ocean"]
+    rec_path = next(cfg.out_dir.rglob("record.json"))
+    rec = json.loads(rec_path.read_text())
+    assert rec["tags"] == [{"tag": "BBNJ"}, {"tag": "ocean"}]
+    updated = apply_page(
+        cfg,
+        {"apply": True, "doi": "10.1000/tagged", "tags": ["law", "BBNJ"]},
+        opener=_down,
+        run_sync_fn=_quiet,
+    )
+    assert updated["ok"] is True
+    saved = json.loads(rec_path.read_text())
+    assert saved["tags"] == [{"tag": "BBNJ"}, {"tag": "ocean"}, {"tag": "law"}]
 
 
 def test_mark_session_saved_skips_empty_write(tmp_path):

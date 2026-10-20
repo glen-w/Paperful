@@ -126,7 +126,12 @@ def register_discover(ui: UiContext) -> None:
 
     @app.get("/discover", response_class=HTMLResponse)
     def page_discover(
-        request: Request, list_name: str = "", error: str = "", run: str = ""
+        request: Request,
+        list_name: str = "",
+        error: str = "",
+        run: str = "",
+        watch_name: str = "",
+        compare_run: str = "",
     ) -> HTMLResponse:
         run_id, candidates = newest_snowball_queue(cfg)
         stop_pending, stop_note = snowball_stop_view(cfg, run_id)
@@ -168,6 +173,8 @@ def register_discover(ui: UiContext) -> None:
                 job=job_view(command_by_id(cfg, (run or "").strip())),
                 poll_run=(run or "").strip(),
                 error=error,
+                map_watch_name=(watch_name or "").strip(),
+                map_compare_run=(compare_run or "").strip(),
             ),
         )
 
@@ -419,25 +426,127 @@ def register_discover(ui: UiContext) -> None:
 
 
     @app.post("/discover/keep")
-    async def discover_keep(request: Request) -> RedirectResponse:
+    async def discover_keep(request: Request):
+        from ..snowball.citation_graph import CitationGraphError, graph_for_run
+
         form = await request.form()
         run_id = str(form.get("run_id") or "")
         doi = str(form.get("doi") or "")
         keep = str(form.get("keep") or "1") == "1"
+        wants_json = str(form.get("format") or "") == "json"
+        accept = (request.headers.get("accept") or "").lower()
+        if "application/json" in accept:
+            wants_json = True
         if run_id and doi:
             jobs.set_snowball_keep(cfg, run_id, [doi], keep)
+        if wants_json:
+            if not run_id:
+                return JSONResponse({"ok": False, "error": "Missing run."}, status_code=400)
+            try:
+                graph = graph_for_run(cfg.state_dir, run_id)
+            except CitationGraphError as exc:
+                status = 404 if "queue" in str(exc).lower() else 400
+                return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
+            return JSONResponse({"ok": True, "graph": graph, "doi": doi, "keep": keep})
         return RedirectResponse(url="/discover", status_code=303)
 
+    def _graph_overlay_context(watch_name: str, compare_run_id: str) -> tuple[set[str] | None, set[str] | None]:
+        from ..snowball.citation_graph import valid_run_id
+        from ..snowball.queue import load_queue
+        from ..snowball.watch import load_seen
+
+        watch_seen: set[str] | None = None
+        compare_ids: set[str] | None = None
+        if watch_name.strip():
+            try:
+                watch_seen = load_seen(cfg, watch_name.strip())
+            except Exception:
+                watch_seen = set()
+        if compare_run_id.strip() and valid_run_id(compare_run_id.strip()):
+            try:
+                _, rows = load_queue(cfg.state_dir, compare_run_id.strip())
+                compare_ids = {row.identity for row in rows}
+            except FileNotFoundError:
+                compare_ids = set()
+        return watch_seen, compare_ids
+
     @app.get("/discover/graph")
-    def discover_graph(run_id: str = "") -> JSONResponse:
+    def discover_graph(
+        run_id: str = "",
+        watch_name: str = "",
+        compare_run: str = "",
+    ) -> JSONResponse:
         from ..snowball.citation_graph import CitationGraphError, graph_for_run
 
+        watch_seen, compare_ids = _graph_overlay_context(watch_name, compare_run)
         try:
-            graph = graph_for_run(cfg.state_dir, run_id)
+            graph = graph_for_run(
+                cfg.state_dir,
+                run_id,
+                watch_seen=watch_seen,
+                compare_ids=compare_ids,
+            )
         except CitationGraphError as exc:
             status = 404 if "queue" in str(exc).lower() else 400
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
         return JSONResponse(graph)
+
+    @app.post("/discover/graph/repair")
+    async def discover_graph_repair(request: Request) -> JSONResponse:
+        from ..snowball.citation_graph import CitationGraphError, repair_queue_links
+        from ..snowball.command import _openalex_client
+        from ..snowball.openalex import OpenAlexBudgetExceeded
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        run_id = str(body.get("run_id") or "")
+        try:
+            graph = repair_queue_links(cfg.state_dir, run_id, _openalex_client(cfg))
+        except CitationGraphError as exc:
+            status = 404 if "queue" in str(exc).lower() else 400
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
+        except OpenAlexBudgetExceeded as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=429)
+        return JSONResponse(graph)
+
+    @app.post("/discover/graph/halo")
+    async def discover_graph_halo(request: Request) -> JSONResponse:
+        from ..identity import LibraryFingerprint
+        from ..mirror import items_in_mirror
+        from ..snowball.citation_graph import CitationGraphError, library_halo
+        from ..snowball.command import _openalex_client
+        from ..snowball.openalex import OpenAlexBudgetExceeded
+        from ..snowball.queue import load_queue
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        run_id = str(body.get("run_id") or "")
+        node_id = str(body.get("node_id") or "")
+        try:
+            dest, rows = load_queue(cfg.state_dir, run_id)
+        except FileNotFoundError:
+            return JSONResponse({"ok": False, "error": "No queue for that run."}, status_code=404)
+        target = next((row for row in rows if row.identity == node_id), None)
+        if target is None:
+            return JSONResponse({"ok": False, "error": "That paper is not in this queue."}, status_code=400)
+        items = items_in_mirror(cfg.out_dir)
+        fp = LibraryFingerprint.from_items(items)
+        library_dois = set(fp.by_doi.keys())
+        try:
+            overlay = library_halo(_openalex_client(cfg), target, library_dois)
+        except CitationGraphError as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+        except OpenAlexBudgetExceeded as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=429)
+        return JSONResponse({"ok": True, **overlay})
 
     @app.post("/discover/graph/expand")
     async def discover_graph_expand(request: Request) -> JSONResponse:

@@ -363,9 +363,9 @@
 </section>
 {% endif %}
 {% if run_id %}
-<section class="panel" id="citationMapApp" data-run-id="{{ run_id }}" data-graph="/discover/graph?run_id={{ run_id }}">
+<section class="panel" id="citationMapApp" data-run-id="{{ run_id }}" data-graph="/discover/graph?run_id={{ run_id }}" data-watch-name="{{ map_watch_name }}" data-compare-run="{{ map_compare_run }}">
   <h2>Map</h2>
-  <p class="section-lede">Not every paper deserves the same time. Older and highly cited work is likely foundational. Recent and highly cited work is influential now. Recent work with fewer citations may be emerging. Expand a node to see who it cites and who cites it, then Keep what you will read.</p>
+  <p class="section-lede">Not every paper deserves the same time. Older and highly cited work is likely foundational. Recent and highly cited work is influential now. Recent work with fewer citations may be emerging. Keyword and similar neighbours appear without citation links. Expand a node to see who it cites and who cites it, then Keep what you will read.</p>
   <div class="citation-toolbar">
     <div class="citation-filters" role="group" aria-label="Citation direction">
       <button type="button" class="citation-filter is-active" data-direction="both" aria-pressed="true">Both</button>
@@ -373,9 +373,20 @@
       <button type="button" class="citation-filter" data-direction="cites" aria-pressed="false">Cited by</button>
     </div>
     <label class="citation-occasional"><input type="checkbox" id="citationShowOccasional"> Show other papers</label>
+    <label class="citation-occasional"><input type="checkbox" id="citationLibraryHalo"> Library neighbours</label>
+    <button type="button" class="secondary" id="citationRepairLinks">Repair links</button>
+    <button type="button" class="secondary" id="citationPathMode">Path between two papers</button>
+    <p id="citationThresholds" class="citation-meta"></p>
     <p id="citationStatus" class="citation-status" role="status"></p>
   </div>
+  <label class="citation-year">
+    Year focus
+    <span id="citationYearLabel">all years</span>
+    <input type="range" id="citationYearMin" min="1900" max="2100" value="1900">
+    <input type="range" id="citationYearMax" min="1900" max="2100" value="2100">
+  </label>
   <div class="citation-layout">
+    <aside id="citationTriage" class="citation-triage" aria-label="Read first"></aside>
     <div class="citation-canvas-wrap">
       <svg id="citationCanvas" class="citation-canvas" role="img" aria-label="Citation map of this Discover queue"></svg>
     </div>
@@ -483,7 +494,7 @@
 {% endblock %}
 {% block scripts %}
 {% if run_id %}
-<script src="https://cdn.jsdelivr.net/npm/d3@7.8.5/dist/d3.min.js"></script>
-<script src="/static/citation_map.js?v=3"></script>
+<script src="/static/vendor/d3.v7.min.js"></script>
+<script src="/static/citation_map.js?v=4"></script>
 {% endif %}
 {% endblock %}

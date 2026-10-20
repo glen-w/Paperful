@@ -11,15 +11,25 @@ from paperful.config import Config
 from paperful.snowball.candidate import Candidate
 from paperful.snowball.citation_graph import (
     MAX_NODES,
+    NEIGHBOR_CAP,
+    REF_FETCH_CAP,
     SCHEMA,
     CitationGraphError,
     build_graph,
+    build_triage,
     expand_queue,
     graph_for_run,
+    path_between,
+    repair_queue_links,
     role_for,
+    select_nodes,
 )
 from paperful.snowball.crawl import doi_candidates
-from paperful.snowball.openalex import OpenAlexClient, OpenAlexError
+from paperful.snowball.openalex import (
+    OpenAlexBudgetExceeded,
+    OpenAlexClient,
+    OpenAlexError,
+)
 from paperful.snowball.queue import write_queue
 
 
@@ -77,6 +87,8 @@ def test_edges_and_threshold_from_queue():
     assert graph["schema"] == SCHEMA
     assert graph["threshold"]["highly_cited"] == 50
     assert graph["threshold"]["recent_from_year"] == 2021
+    assert graph["thresholds"]["citation_floor"] == 50
+    assert graph["triage"]
     by_id = {node["id"]: node for node in graph["nodes"]}
     assert by_id[old.identity]["role"] == "foundational"
     assert by_id[hot.identity]["role"] == "influential"
@@ -177,6 +189,19 @@ def test_expand_reports_an_openalex_failure(tmp_path: Path):
         expand_queue(state, "Rfail", seed.identity, "refs", client)
 
 
+def test_expand_propagates_openalex_budget(tmp_path: Path):
+    seed = _candidate("10.1000/seed", "W1", "Seed", 2019, 30, hop=0, direction="doi")
+    state = tmp_path / "state"
+    write_queue(state, "Rbudget", [seed], _client({}), library_unread=False)
+
+    def getter(path: str, params: dict) -> dict:
+        raise OpenAlexBudgetExceeded("daily cap", reset_at="soon")
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    with pytest.raises(OpenAlexBudgetExceeded, match="daily cap"):
+        expand_queue(state, "Rbudget", seed.identity, "refs", client)
+
+
 def test_expand_rejects_a_bad_direction(tmp_path: Path):
     seed = _candidate("10.1000/seed", "W1", "Seed", 2019, 30, hop=0, direction="doi")
     state = tmp_path / "state"
@@ -203,6 +228,78 @@ def test_graph_for_run_rewrites_the_file(tmp_path: Path):
     __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
     reason="paperful[serve] extra missing",
 )
+
+def test_triage_orders_influential_before_library():
+    nodes = [
+        {"id": "a", "role": "influential", "in_library": False, "seed": False, "cited_by_count": 10},
+        {"id": "b", "role": "foundational", "in_library": False, "seed": False, "cited_by_count": 100},
+        {"id": "c", "role": "emerging", "in_library": True, "seed": False, "cited_by_count": 2},
+    ]
+    triage = build_triage(nodes)
+    assert triage[0]["id"] == "a"
+    assert triage[-1]["id"] == "c"
+
+
+def test_path_between_finds_a_short_chain():
+    edges = [
+        {"source": "a", "target": "b", "direction": "refs"},
+        {"source": "b", "target": "c", "direction": "refs"},
+    ]
+    path = path_between(edges, "a", "c")
+    assert path is not None and len(path) == 2
+
+
+def test_select_nodes_prefers_focus_neighbours():
+    seed = _candidate("10.1000/seed", "W1", "Seed", 2020, 1, hop=0, direction="doi")
+    near = _candidate(
+        "10.1000/near",
+        "W2",
+        "Near",
+        2020,
+        50,
+        hop=1,
+        direction="refs",
+        links=[{"parent": seed.identity, "direction": "refs"}],
+    )
+    far = _candidate("10.1000/far", "W99", "Far", 2020, 1, hop=1, direction="refs")
+    rows = [seed, near, far]
+    chosen = select_nodes(rows, focus=near.identity, max_nodes=2)
+    ids = {row.identity for row in chosen}
+    assert seed.identity in ids
+    assert near.identity in ids
+
+
+def test_neighbor_cap_limits_expand(tmp_path: Path):
+    seed = _candidate("10.1000/seed", "W1", "Seed", 2019, 30, hop=0, direction="doi")
+    state = tmp_path / "state"
+    write_queue(state, "Rcap", [seed], _client({}), library_unread=False)
+    refs = [f"W{i}" for i in range(2, 2 + REF_FETCH_CAP)]
+    children = {
+        f"W{i}": _work(f"W{i}", f"10.1000/{i}", f"P{i}", 2000, i)
+        for i in range(2, 2 + NEIGHBOR_CAP + 10)
+    }
+    seed_work = _work("W1", "10.1000/seed", "Seed", 2019, 30, refs=refs[:REF_FETCH_CAP])
+    client = _client({"W1": seed_work, **children})
+    graph = expand_queue(state, "Rcap", seed.identity, "refs", client, now_year=2026)
+    added = [n for n in graph["nodes"] if not n.get("seed")]
+    assert len(added) <= NEIGHBOR_CAP
+
+
+def test_repair_queue_links_writes_graph_links(tmp_path: Path):
+    seed = _candidate("10.1000/seed", "W1", "Seed", 2019, 30, hop=0, direction="doi")
+    child = _candidate("10.1000/child", "W2", "Child", 2010, 5, hop=1, direction="refs")
+    state = tmp_path / "state"
+    write_queue(state, "Rrepair", [seed, child], _client({}), library_unread=False)
+    cited = _work("W2", "10.1000/child", "Child", 2010, 5)
+    seed_work = _work("W1", "10.1000/seed", "Seed", 2019, 30, refs=["W2"])
+    client = _client({"W1": seed_work, "W2": cited})
+    graph = repair_queue_links(state, "Rrepair", client)
+    assert any(
+        edge["source"] == seed.identity and edge["target"] == child.identity
+        for edge in graph["edges"]
+    )
+
+
 def test_discover_page_includes_the_map(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
@@ -227,6 +324,25 @@ def test_discover_page_includes_the_map(tmp_path, monkeypatch):
     assert missing.status_code == 404
     bad = client.get("/discover/graph", params={"run_id": "../etc"})
     assert bad.status_code == 400
+
+    monkeypatch.setattr(
+        "paperful.snowball.citation_graph.expand_queue",
+        lambda state_dir, run_id, node_id, direction, client, **kw: graph_for_run(state_dir, run_id),
+    )
+    expand = client.post(
+        "/discover/graph/expand",
+        json={"run_id": "Rpage", "node_id": seed.identity, "direction": "refs"},
+    )
+    assert expand.status_code == 200
+    assert expand.json()["schema"] == SCHEMA
+    keep = client.post(
+        "/discover/keep",
+        data={"run_id": "Rpage", "doi": "10.1000/seed", "keep": "1", "format": "json"},
+        headers={"Accept": "application/json"},
+    )
+    assert keep.status_code == 200
+    body = keep.json()
+    assert body["ok"] is True and body["graph"]["schema"] == SCHEMA
 
 
 def _candidate(

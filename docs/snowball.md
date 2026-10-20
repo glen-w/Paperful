@@ -825,7 +825,13 @@ not people.
 
 `state/snowball/<run-id>/citation_graph.json` is `paperful.citation_graph.v1`,
 rebuilt from `candidates.jsonl`. Hops store `biblio.graph_links` so an edge
-knows which paper it came from. The map caps at 150 nodes.
+knows which paper it came from. The map caps at 150 nodes. Keyword and similar neighbours appear on the map
+without citation edges — only refs/cites hops draw links. Use **Repair links**
+on Discover when an older queue is missing `graph_links`. Optional overlays:
+read-first triage, a year scrubber, path-between-two-papers inside the current
+graph, library neighbours (ghost nodes from your mirror, not added to the queue),
+and watch/compare badges when you open Discover with `?watch_name=` or
+`?compare_run=`.
 
 ## Out of this lane
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,7 @@ from ..resolve import normalize_doi
 from .candidate import Candidate
 from .expand import select_works_by_citations
 from .openalex import (
+    OpenAlexBudgetExceeded,
     OpenAlexClient,
     OpenAlexError,
     referenced_ids,
@@ -107,14 +109,25 @@ def build_graph(
     now_year: int | None = None,
     max_nodes: int = MAX_NODES,
     focus: str | None = None,
+    watch_seen: set[str] | None = None,
+    compare_ids: set[str] | None = None,
 ) -> dict[str, Any]:
     """JSON map for the Discover canvas. Caps nodes; edges stay inside that set."""
     year_now = now_year if now_year is not None else datetime.now(timezone.utc).year
-    chosen = _select_nodes(rows, focus=focus, max_nodes=max_nodes)
+    chosen = select_nodes(rows, focus=focus, max_nodes=max_nodes)
     counts = [_cited(row) for row in chosen if row.hop != 0]
     threshold = CITATION_FLOOR if not counts else max(CITATION_FLOOR, _median(counts))
     recent_from = year_now - RECENT_YEARS
-    nodes = [_node(row, now_year=year_now, threshold=threshold) for row in chosen]
+    nodes = [
+        _node(
+            row,
+            now_year=year_now,
+            threshold=threshold,
+            watch_seen=watch_seen,
+            compare_ids=compare_ids,
+        )
+        for row in chosen
+    ]
     edges = _edges(chosen)
     return {
         "v": 1,
@@ -124,6 +137,13 @@ def build_graph(
             "highly_cited": threshold,
             "recent_from_year": recent_from,
         },
+        "thresholds": {
+            "recent_years": RECENT_YEARS,
+            "citation_floor": CITATION_FLOOR,
+            "highly_cited": threshold,
+            "recent_from_year": recent_from,
+        },
+        "triage": build_triage(nodes),
         "nodes": nodes,
         "edges": edges,
     }
@@ -141,7 +161,13 @@ def write_graph_file(dest: Path, graph: dict[str, Any]) -> Path:
     return path
 
 
-def graph_for_run(state_dir: Path, run_id: str) -> dict[str, Any]:
+def graph_for_run(
+    state_dir: Path,
+    run_id: str,
+    *,
+    watch_seen: set[str] | None = None,
+    compare_ids: set[str] | None = None,
+) -> dict[str, Any]:
     """Rebuild the map from the queue on disk."""
     from .queue import load_queue
 
@@ -151,9 +177,220 @@ def graph_for_run(state_dir: Path, run_id: str) -> dict[str, Any]:
         dest, rows = load_queue(state_dir, run_id)
     except FileNotFoundError as exc:
         raise CitationGraphError("No queue for that run.") from exc
+    graph = build_graph(
+        rows,
+        run_id=run_id,
+        watch_seen=watch_seen,
+        compare_ids=compare_ids,
+    )
+    write_graph_file(dest, graph)
+    return graph
+
+
+def repair_queue_links(
+    state_dir: Path,
+    run_id: str,
+    client: OpenAlexClient,
+) -> dict[str, Any]:
+    """Re-link queue rows to hop-0 seeds from OpenAlex refs/cites (Keep unchanged)."""
+    from .queue import load_queue
+
+    if not valid_run_id(run_id):
+        raise CitationGraphError("Unknown run.")
+    try:
+        dest, rows = load_queue(state_dir, run_id)
+    except FileNotFoundError as exc:
+        raise CitationGraphError("No queue for that run.") from exc
+    by_id = {row.identity: row for row in rows}
+    seeds = [row for row in rows if row.hop == 0]
+    if not seeds:
+        raise CitationGraphError("This queue has no seeds to repair from.")
+    for seed_row in seeds:
+        try:
+            work = _load_work(client, seed_row)
+        except OpenAlexBudgetExceeded:
+            raise
+        except (OpenAlexError, httpx.HTTPError) as exc:
+            raise CitationGraphError("OpenAlex could not look up a seed.") from exc
+        if work is None:
+            continue
+        parent = seed_row.identity
+        ref_ids = referenced_ids(work, REF_FETCH_CAP)
+        if ref_ids:
+            for child in client.works_by_ids(ref_ids):
+                cid = work_node_id(child)
+                if cid in by_id:
+                    remember_link(by_id[cid], parent, "refs")
+        oa = short_id(str(work.get("id") or "")) or (seed_row.ids.get("openalex") or "")
+        if oa:
+            try:
+                citing = client.works_citing(oa, limit=NEIGHBOR_CAP, sort="cited_by_count:desc")
+            except OpenAlexBudgetExceeded:
+                raise
+            except (OpenAlexError, httpx.HTTPError) as exc:
+                raise CitationGraphError("OpenAlex could not repair cited-by links.") from exc
+            for child in citing:
+                cid = work_node_id(child)
+                if cid in by_id:
+                    remember_link(by_id[cid], parent, "cites")
+    path = dest / "candidates.jsonl"
+    path.write_text(
+        "".join(json.dumps(row.to_dict(), ensure_ascii=False) + "\n" for row in rows),
+        encoding="utf-8",
+    )
     graph = build_graph(rows, run_id=run_id)
     write_graph_file(dest, graph)
     return graph
+
+
+def library_halo(
+    client: OpenAlexClient,
+    target: Candidate,
+    library_dois: set[str],
+    *,
+    cap: int = 15,
+) -> dict[str, Any]:
+    """OpenAlex neighbours that are already in the library (session overlay, not queue)."""
+    if not library_dois:
+        return {"nodes": [], "edges": []}
+    try:
+        work = _load_work(client, target)
+    except OpenAlexBudgetExceeded:
+        raise
+    except (OpenAlexError, httpx.HTTPError) as exc:
+        raise CitationGraphError("OpenAlex could not look up this paper.") from exc
+    if work is None:
+        raise CitationGraphError("OpenAlex has no record for this paper.")
+    focus_id = target.identity
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    def add_ghost(child: dict[str, Any], direction: str) -> None:
+        doi = (normalize_doi(str(child.get("doi") or "")) or "").lower()
+        if not doi or doi not in library_dois:
+            return
+        gid = f"doi:{doi}"
+        if gid in seen or gid == focus_id:
+            return
+        seen.add(gid)
+        year = child.get("publication_year")
+        cited = int(child.get("cited_by_count") or 0)
+        nodes.append(
+            {
+                "id": gid,
+                "title": str(child.get("display_name") or ""),
+                "year": year,
+                "cited_by_count": cited,
+                "role": "other",
+                "seed": False,
+                "in_library": True,
+                "ghost": True,
+                "keep": None,
+                "hop": None,
+                "occasional": False,
+                "doi": doi,
+                "openalex": short_id(str(child.get("id") or "")),
+                "why": "Already in your library",
+                "first_author": "",
+            }
+        )
+        if direction == "refs":
+            edges.append({"source": focus_id, "target": gid, "direction": "refs"})
+        else:
+            edges.append({"source": gid, "target": focus_id, "direction": "cites"})
+        if len(nodes) >= cap:
+            return
+
+    ref_ids = referenced_ids(work, REF_FETCH_CAP)
+    for child in client.works_by_ids(ref_ids) if ref_ids else []:
+        add_ghost(child, "refs")
+        if len(nodes) >= cap:
+            break
+    if len(nodes) < cap:
+        oa = short_id(str(work.get("id") or "")) or (target.ids.get("openalex") or "")
+        if oa:
+            citing = client.works_citing(oa, limit=NEIGHBOR_CAP, sort="cited_by_count:desc")
+            for child in citing:
+                add_ghost(child, "cites")
+                if len(nodes) >= cap:
+                    break
+    return {"nodes": nodes, "edges": edges}
+
+
+def build_triage(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Read-first ordering for the map sidebar (deterministic, no model)."""
+
+    def bucket(node: dict[str, Any]) -> tuple[int, int]:
+        if node.get("keep") is False:
+            return (4, 0)
+        if node.get("in_library"):
+            return (4, 0)
+        role = str(node.get("role") or "other")
+        if role == "influential":
+            return (0, -(node.get("cited_by_count") or 0))
+        if role == "emerging":
+            return (1, -(node.get("cited_by_count") or 0))
+        if role == "foundational":
+            return (2, -(node.get("cited_by_count") or 0))
+        return (3, -(node.get("cited_by_count") or 0))
+
+    def reason(node: dict[str, Any]) -> str:
+        if node.get("keep") is False:
+            return "Skipped on this queue"
+        if node.get("in_library"):
+            return "Already in your library"
+        role = str(node.get("role") or "other")
+        if role == "influential":
+            return "Recent and highly cited — read while it is influential"
+        if role == "emerging":
+            return "Recent with fewer citations — may be emerging"
+        if role == "foundational":
+            return "Older and highly cited — likely foundational"
+        return "Lower priority on this map"
+
+    candidates = [n for n in nodes if not n.get("seed")]
+    ordered = sorted(candidates, key=bucket)
+    out: list[dict[str, Any]] = []
+    for rank, node in enumerate(ordered, start=1):
+        out.append({"id": node["id"], "rank": rank, "reason": reason(node)})
+    return out
+
+
+def path_between(
+    edges: list[dict[str, str]],
+    start: str,
+    end: str,
+    *,
+    max_len: int = 4,
+) -> list[dict[str, str]] | None:
+    """Shortest citation path inside the current graph (undirected BFS)."""
+    if start == end:
+        return []
+    if not start or not end:
+        return None
+    adj: dict[str, list[tuple[str, dict[str, str]]]] = {}
+    for edge in edges:
+        a, b = edge.get("source"), edge.get("target")
+        if not a or not b:
+            continue
+        adj.setdefault(a, []).append((b, edge))
+        adj.setdefault(b, []).append((a, edge))
+    queue: deque[tuple[str, list[dict[str, str]]]] = deque([(start, [])])
+    visited = {start}
+    while queue:
+        node, path_edges = queue.popleft()
+        if len(path_edges) > max_len:
+            continue
+        for nxt, edge in adj.get(node, []):
+            if nxt in visited:
+                continue
+            step = list(path_edges) + [edge]
+            if nxt == end:
+                return step
+            visited.add(nxt)
+            queue.append((nxt, step))
+    return None
 
 
 def expand_queue(
@@ -186,12 +423,16 @@ def expand_queue(
         raise CitationGraphError("That paper is not in this queue.")
     try:
         work = _load_work(client, target)
+    except OpenAlexBudgetExceeded:
+        raise
     except (OpenAlexError, httpx.HTTPError) as exc:
         raise CitationGraphError("OpenAlex could not look up this paper.") from exc
     if work is None:
         raise CitationGraphError("OpenAlex has no record for this paper.")
     try:
         added = _neighbours(client, work, target, side)
+    except OpenAlexBudgetExceeded:
+        raise
     except (OpenAlexError, httpx.HTTPError) as exc:
         raise CitationGraphError("OpenAlex could not expand this paper.") from exc
     merged = _dedupe(list(rows) + added)
@@ -264,7 +505,7 @@ def _load_work(client: OpenAlexClient, target: Candidate) -> dict[str, Any] | No
     return None
 
 
-def _select_nodes(
+def select_nodes(
     rows: list[Candidate],
     *,
     focus: str | None,
@@ -308,7 +549,14 @@ def _select_nodes(
     return chosen
 
 
-def _node(row: Candidate, *, now_year: int, threshold: int) -> dict[str, Any]:
+def _node(
+    row: Candidate,
+    *,
+    now_year: int,
+    threshold: int,
+    watch_seen: set[str] | None = None,
+    compare_ids: set[str] | None = None,
+) -> dict[str, Any]:
     year = _year(row)
     cited = _cited(row)
     kind = role_for(year, cited, now_year=now_year, threshold=threshold)
@@ -316,7 +564,7 @@ def _node(row: Candidate, *, now_year: int, threshold: int) -> dict[str, Any]:
     first = ""
     if isinstance(authors, list) and authors:
         first = str(authors[0] or "")
-    return {
+    payload: dict[str, Any] = {
         "id": row.identity,
         "title": str(row.biblio.get("title") or ""),
         "year": year,
@@ -332,6 +580,12 @@ def _node(row: Candidate, *, now_year: int, threshold: int) -> dict[str, Any]:
         "why": str(row.why or ""),
         "first_author": first,
     }
+    if watch_seen is not None:
+        payload["watch_new"] = row.identity not in watch_seen
+        payload["watch_seen"] = row.identity in watch_seen
+    if compare_ids is not None:
+        payload["compare_new"] = row.identity not in compare_ids
+    return payload
 
 
 def _edges(rows: list[Candidate]) -> list[dict[str, str]]:

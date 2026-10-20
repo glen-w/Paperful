@@ -57,6 +57,11 @@ ABSTRACT_MAX = 8000
 AUTHOR_MAX = 200
 NOTE_MAX = 4000
 COLLECTION_MAX = 200
+TAG_MAX = 100
+TAGS_MAX = 20
+TAGS_LIST_MAX = 200
+TAG_SCAN_MAX = 400
+SUGGEST_MAX = 8
 PDF_MAX_BYTES = 150_000_000
 HTML_MAX_BYTES = 8_000_000
 SNAPSHOT_NAME = "snapshot.html"
@@ -180,7 +185,7 @@ def safe_collection(raw: Any, fallback: str) -> str:
     return fallback
 
 
-def list_collection_paths(cfg: Config) -> list[str]:
+def list_collection_paths(cfg: Config, live: Any | None = None) -> list[str]:
     """Known collection paths for the add-on picker. Caps the native payload."""
     paths: set[str] = set()
     default = safe_collection(cfg.extension_collection, "Capture")
@@ -201,7 +206,262 @@ def list_collection_paths(cfg: Config) -> list[str]:
                     paths.add(child.name)
     except OSError:
         pass
+    if live is not None and hasattr(live, "collections"):
+        try:
+            loaded = live.collections() or {}
+        except Exception:
+            loaded = {}
+        if isinstance(loaded, dict):
+            for coll in loaded.values():
+                path = str(getattr(coll, "path", "") or "").strip()
+                if path and not path.startswith("_"):
+                    paths.add(path)
     return sorted(paths, key=str.casefold)[:200]
+
+
+def clip_tags(raw: Any) -> list[str]:
+    """Sanitize a capture tag list. Order is kept; names are unique by case."""
+    parts: list[str] = []
+    if isinstance(raw, str):
+        parts.extend(re.split(r"[\n,;]+", raw))
+    elif isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict) and item.get("tag") not in (None, ""):
+                parts.append(str(item.get("tag")))
+    seen: set[str] = set()
+    out: list[str] = []
+    for part in parts:
+        name = clip(part, TAG_MAX).strip()
+        if not name or "\n" in name or "\r" in name:
+            continue
+        key = name.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(name)
+        if len(out) >= TAGS_MAX:
+            break
+    return out
+
+
+def list_tag_names(cfg: Config, live: Any | None = None) -> list[str]:
+    """Tag names the add-on can suggest. Live Zotero first, then the mirror."""
+    names: dict[str, str] = {}
+
+    def add(raw: Any) -> None:
+        name = clip(raw, TAG_MAX).strip()
+        if not name:
+            return
+        key = name.casefold()
+        if key not in names:
+            names[key] = name
+
+    if live is not None:
+        getter = getattr(live, "get", None)
+        if getter is None:
+            zl = getattr(live, "zl", None)
+            getter = getattr(zl, "get", None) if zl is not None else None
+        if getter is not None:
+            try:
+                resp = getter("/tags", limit=TAGS_LIST_MAX)
+                rows = resp.json() if hasattr(resp, "json") else resp
+            except Exception:
+                rows = []
+            if isinstance(rows, list):
+                for row in rows:
+                    if isinstance(row, dict):
+                        add(row.get("tag") or (row.get("data") or {}).get("tag"))
+                    elif isinstance(row, str):
+                        add(row)
+    if cfg.out_dir.is_dir() and len(names) < TAGS_LIST_MAX:
+        scanned = 0
+        try:
+            records = cfg.out_dir.rglob("record.json")
+        except OSError:
+            records = []
+        for path in records:
+            scanned += 1
+            if scanned > TAG_SCAN_MAX or len(names) >= TAGS_LIST_MAX:
+                break
+            rec = load_json(path) or {}
+            tags = rec.get("tags")
+            if not isinstance(tags, list):
+                continue
+            for row in tags:
+                if isinstance(row, dict):
+                    add(row.get("tag"))
+                elif isinstance(row, str):
+                    add(row)
+    return sorted(names.values(), key=str.casefold)[:TAGS_LIST_MAX]
+
+
+def _openalex_client_for_capture(cfg: Config) -> Any | None:
+    if not (cfg.email or "").strip():
+        return None
+    try:
+        from .snowball.command import _openalex_client
+
+        return _openalex_client(cfg, sleep_s=0)
+    except Exception:
+        return None
+
+
+def _keyword_labels_from_work(work: dict[str, Any]) -> list[str]:
+    from .snowball.openalex import keyword_slug, study_design_slugs
+
+    ranked: list[tuple[float, str]] = []
+    for item in work.get("keywords") or []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            score = float(item.get("score") or 0)
+        except (TypeError, ValueError):
+            score = 0.0
+        name = clip(item.get("display_name"), TAG_MAX).strip()
+        if not name:
+            slug = keyword_slug(str(item.get("id") or ""))
+            name = slug.replace("-", " ") if slug else ""
+        if name:
+            ranked.append((score, name))
+    ranked.sort(key=lambda pair: (-pair[0], pair[1].casefold()))
+    out: list[str] = []
+    seen: set[str] = set()
+    for _score, name in ranked:
+        key = name.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(name)
+        if len(out) >= 10:
+            break
+    for slug in study_design_slugs(work):
+        label = clip(slug.replace("-", " "), TAG_MAX).strip()
+        key = label.casefold()
+        if label and key not in seen:
+            seen.add(key)
+            out.append(label)
+    return out
+
+
+def openalex_work_tag_hints(cfg: Config, doi: str) -> list[str]:
+    """OpenAlex keywords and study-design labels for one DOI."""
+    cleaned = normalize_doi(clip(doi, DOI_MAX))
+    if not cleaned:
+        return []
+    client = _openalex_client_for_capture(cfg)
+    if client is None:
+        return []
+    try:
+        work = client.work_by_doi(cleaned)
+    except Exception:
+        return []
+    if not isinstance(work, dict):
+        return []
+    return _keyword_labels_from_work(work)
+
+
+def openalex_query_tag_hints(cfg: Config, query: str) -> list[str]:
+    """OpenAlex keyword entities matching free text."""
+    text = clip(query, TAG_MAX).strip()
+    if not text:
+        return []
+    client = _openalex_client_for_capture(cfg)
+    if client is None:
+        return []
+    from .snowball.openalex import keyword_slug
+
+    out: list[str] = []
+    seen: set[str] = set()
+    try:
+        rows = client.search_keywords(text, limit=SUGGEST_MAX)
+    except Exception:
+        rows = []
+    if not isinstance(rows, list):
+        return []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        name = clip(row.get("display_name"), TAG_MAX).strip()
+        if not name:
+            slug = keyword_slug(str(row.get("id") or row.get("display_name") or ""))
+            name = slug.replace("-", " ") if slug else ""
+        key = name.casefold()
+        if not name or key in seen:
+            continue
+        seen.add(key)
+        out.append(name)
+    return out
+
+
+def suggest_tag_names(
+    cfg: Config,
+    *,
+    query: str = "",
+    doi: str = "",
+    live: Any | None = None,
+) -> list[str]:
+    """Tag suggestions for the add-on: library, mirror, then OpenAlex."""
+    needle = clip(query, TAG_MAX).strip().casefold()
+    chosen: dict[str, str] = {}
+
+    def add(name: str) -> None:
+        text = clip(name, TAG_MAX).strip()
+        if not text:
+            return
+        key = text.casefold()
+        if needle and key.find(needle) == -1:
+            return
+        if key not in chosen:
+            chosen[key] = text
+
+    if not needle and doi:
+        for label in openalex_work_tag_hints(cfg, doi):
+            add(label)
+            if len(chosen) >= SUGGEST_MAX:
+                return list(chosen.values())[:SUGGEST_MAX]
+
+    for label in list_tag_names(cfg, live=live):
+        add(label)
+        if len(chosen) >= SUGGEST_MAX:
+            return list(chosen.values())[:SUGGEST_MAX]
+
+    if doi:
+        for label in openalex_work_tag_hints(cfg, doi):
+            add(label)
+            if len(chosen) >= SUGGEST_MAX:
+                return list(chosen.values())[:SUGGEST_MAX]
+
+    if needle:
+        for label in openalex_query_tag_hints(cfg, query):
+            add(label)
+            if len(chosen) >= SUGGEST_MAX:
+                break
+
+    return list(chosen.values())[:SUGGEST_MAX]
+
+
+def merge_record_tags(rec: dict[str, Any], names: list[str]) -> None:
+    """Add capture tags to a mirror record. Existing tags stay."""
+    if not names:
+        return
+    existing = rec.get("tags")
+    rows: list[Any] = list(existing) if isinstance(existing, list) else []
+    have: set[str] = set()
+    for row in rows:
+        if isinstance(row, dict):
+            have.add(clip(row.get("tag"), TAG_MAX).strip().casefold())
+        elif isinstance(row, str):
+            have.add(clip(row, TAG_MAX).strip().casefold())
+    have.discard("")
+    for name in names:
+        key = name.casefold()
+        if not key or key in have:
+            continue
+        have.add(key)
+        rows.append({"tag": name})
+    rec["tags"] = rows
 
 
 def _is_under(path: Path, parent: Path) -> bool:
@@ -1030,6 +1290,7 @@ def apply_page(
     collection = safe_collection(
         body.get("collection"), cfg.extension_collection or "Capture"
     )
+    tags = clip_tags(body.get("tags"))
     if match.action == "create":
         if not index.zotero_up and body.get("allow_unread") is not True:
             return _fail("zotero_unread")
@@ -1056,6 +1317,7 @@ def apply_page(
                 {"creatorType": "author", "lastName": name} for name in authors
             ]
         rec["fetch"] = {"origin": "web:extension", "source": "web:extension"}
+        merge_record_tags(rec, tags)
         from .mirror import place_item_dirs
 
         folders = place_item_dirs(cfg.out_dir, item)
@@ -1077,6 +1339,7 @@ def apply_page(
         for path in files:
             rec = load_json(path) or {}
             _fill_blanks(rec, page)
+            merge_record_tags(rec, tags)
             write_json(path, rec)
         folder = files[0].parent
         # A snapshot may have copied a PDF the library already holds.
@@ -1107,6 +1370,7 @@ def apply_page(
         "collection": collection if match.action == "create" else (
             (item.collection_paths or [""])[0]
         ),
+        "tags": tags,
         "reason": ""
         if placed in {"saved", "kept"} or snapshot in {"saved", "kept"}
         else "no_pdf",

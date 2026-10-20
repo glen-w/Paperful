@@ -308,6 +308,7 @@ function applyDetected(detected, flags, pdfPath, htmlPath) {
     allow_unread: Boolean(flags.allowUnread),
     confirm_key: flags.confirmKey || "",
     collection: flags.collection || "",
+    tags: flags.tags || [],
     note: flags.note || "",
     page: page,
   });
@@ -569,6 +570,7 @@ function saveTabs(message) {
     lanes: Boolean(message.lanes),
     allowUnread: Boolean(message.allowUnread),
     collection: message.collection || "",
+    tags: message.tags || [],
     note: message.note || "",
   };
   return hello()
@@ -585,6 +587,7 @@ function saveTabs(message) {
           allowUnread: flags.allowUnread,
           confirmKey: job.confirmKey || "",
           collection: flags.collection,
+          tags: flags.tags,
           note: flags.note,
         };
         return detectTab(tabId).then(function (detected) {
@@ -673,6 +676,15 @@ browser.runtime.onMessage.addListener(function (message, sender) {
     });
   }
   if (message.type === "open-workbench") return openWorkbench(message);
+  if (message.type === "tag-suggest") {
+    return request({
+      type: "capture.tag_suggest",
+      query: message.query || "",
+      doi: message.doi || "",
+    }).then(function (payload) {
+      return payload || { ok: false };
+    });
+  }
   return undefined;
 });
 

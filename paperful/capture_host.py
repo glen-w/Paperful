@@ -20,15 +20,19 @@ from .capture import (
     COLLECTION_MAX,
     NOTE_MAX,
     apply_page,
+    clip_tags,
     drop_dir,
     list_collection_paths,
+    list_tag_names,
     mark_session_saved,
+    suggest_tag_names,
     open_target,
     plan_page,
     prepare,
     read_session,
     stage_incoming,
     workbench_url,
+    _open_live,
 )
 from .config import Config
 
@@ -73,11 +77,13 @@ def host_launcher_path(cfg: Config) -> Path:
 def hello_payload(cfg: Config) -> dict[str, Any]:
     path = drop_dir(cfg)
     path.mkdir(parents=True, exist_ok=True)
+    live = _open_live(cfg)
     return {
         "ok": True,
         "snapshot": cfg.extension_snapshot,
         "collection": cfg.extension_collection,
         "collections": list_collection_paths(cfg),
+        "tags": list_tag_names(cfg, live=live),
         "drop": str(path.resolve()),
         "out": str(Path(cfg.out_dir).resolve()),
         "concurrency": cfg.extension_concurrency,
@@ -192,6 +198,8 @@ def _clip_message(msg: dict[str, Any]) -> dict[str, Any]:
             out[key] = clip(out[key], limit)
     if "authors" in out:
         out["authors"] = _clip_authors(out["authors"])
+    if "tags" in out:
+        out["tags"] = clip_tags(out["tags"])
     keys = out.get("keys")
     if isinstance(keys, list):
         out["keys"] = [clip(key, 64) for key in keys[:200]]
@@ -243,6 +251,15 @@ def handle_message(
         if not isinstance(keys, list):
             keys = []
         return _echo_id(msg, mark_session_saved(cfg, keys))
+    if kind == "capture.tag_suggest":
+        live = _open_live(cfg)
+        tags = suggest_tag_names(
+            cfg,
+            query=str(msg.get("query") or ""),
+            doi=str(msg.get("doi") or ""),
+            live=live,
+        )
+        return _echo_id(msg, {"ok": True, "tags": tags})
     if kind == "capture.stage":
         return _echo_id(msg, stage_incoming(cfg, str(msg.get("path") or "")))
     if kind == "capture.open":

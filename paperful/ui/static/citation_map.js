@@ -15,13 +15,28 @@
   var state = {
     graphUrl: "",
     runId: "",
+    watchName: "",
+    compareRun: "",
     nodes: [],
     edges: [],
+    triage: [],
+    ghostNodes: [],
+    ghostEdges: [],
     direction: "both",
     showOccasional: false,
+    showHalo: false,
+    yearMin: 1900,
+    yearMax: 2100,
+    yearLo: 1900,
+    yearHi: 2100,
     simulation: null,
     reduceMotion: false,
     selectedId: "",
+    pathMode: false,
+    pathFirst: "",
+    pathEdges: [],
+    expandBlocked: false,
+    triageById: {},
   };
   var els = {};
 
@@ -30,7 +45,7 @@
     if (!root || typeof d3 === "undefined") {
       var status = document.getElementById("citationStatus");
       if (status && typeof d3 === "undefined") {
-        status.textContent = "The map needs a network connection to load its drawing library.";
+        status.textContent = "The map could not load its drawing library.";
       }
       return;
     }
@@ -38,9 +53,19 @@
     els.svg = d3.select("#citationCanvas");
     els.panel = document.getElementById("citationPanel");
     els.status = document.getElementById("citationStatus");
+    els.triage = document.getElementById("citationTriage");
+    els.thresholds = document.getElementById("citationThresholds");
     els.toggle = document.getElementById("citationShowOccasional");
+    els.halo = document.getElementById("citationLibraryHalo");
+    els.repair = document.getElementById("citationRepairLinks");
+    els.pathMode = document.getElementById("citationPathMode");
+    els.yearMin = document.getElementById("citationYearMin");
+    els.yearMax = document.getElementById("citationYearMax");
+    els.yearLabel = document.getElementById("citationYearLabel");
     state.graphUrl = root.getAttribute("data-graph") || "";
     state.runId = root.getAttribute("data-run-id") || "";
+    state.watchName = root.getAttribute("data-watch-name") || "";
+    state.compareRun = root.getAttribute("data-compare-run") || "";
     state.reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     root.querySelectorAll(".citation-filter").forEach(function (btn) {
@@ -60,12 +85,45 @@
         renderGraph();
       });
     }
+    if (els.halo) {
+      els.halo.addEventListener("change", function () {
+        state.showHalo = Boolean(els.halo.checked);
+        if (state.showHalo && state.selectedId) {
+          loadHalo(state.selectedId);
+        } else {
+          state.ghostNodes = [];
+          state.ghostEdges = [];
+          renderGraph();
+        }
+      });
+    }
+    if (els.repair) {
+      els.repair.addEventListener("click", repairLinks);
+    }
+    if (els.pathMode) {
+      els.pathMode.addEventListener("click", function () {
+        state.pathMode = !state.pathMode;
+        state.pathFirst = "";
+        state.pathEdges = [];
+        els.pathMode.classList.toggle("is-active", state.pathMode);
+        setStatus(
+          state.pathMode
+            ? "Path mode: click two papers on the map."
+            : "Path mode off."
+        );
+        renderGraph();
+      });
+    }
+    if (els.yearMin && els.yearMax) {
+      els.yearMin.addEventListener("input", onYearScrub);
+      els.yearMax.addEventListener("input", onYearScrub);
+    }
     window.addEventListener("resize", function () {
       if (state.nodes.length) renderGraph();
     });
 
     setStatus("Loading citation map…");
-    fetch(state.graphUrl, { credentials: "same-origin" })
+    fetch(graphFetchUrl(), { credentials: "same-origin" })
       .then(readJson)
       .then(function (graph) {
         adopt(graph);
@@ -76,15 +134,135 @@
       });
   }
 
+  function graphFetchUrl() {
+    var url = state.graphUrl;
+    var extra = [];
+    if (state.watchName) extra.push("watch_name=" + encodeURIComponent(state.watchName));
+    if (state.compareRun) extra.push("compare_run=" + encodeURIComponent(state.compareRun));
+    if (!extra.length) return url;
+    return url + (url.indexOf("?") >= 0 ? "&" : "?") + extra.join("&");
+  }
+
   function adopt(graph) {
     state.nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
     state.edges = Array.isArray(graph.edges) ? graph.edges : [];
+    state.triage = Array.isArray(graph.triage) ? graph.triage : [];
+    state.triageById = {};
+    state.triage.forEach(function (row) {
+      state.triageById[row.id] = row;
+    });
+    setupYearScrubber();
+    renderThresholds(graph);
+    renderTriage();
     renderGraph();
     if (state.selectedId) {
       var still = state.nodes.filter(function (node) {
         return node.id === state.selectedId;
       })[0];
       if (still) showNode(still);
+    }
+  }
+
+  function renderThresholds(graph) {
+    if (!els.thresholds) return;
+    var t = graph.thresholds || graph.threshold || {};
+    var recent = t.recent_from_year || t.recent_from_year;
+    var cited = t.highly_cited;
+    if (recent && cited) {
+      els.thresholds.textContent =
+        "Highly cited: ≥ " +
+        cited +
+        " · Recent: " +
+        recent +
+        " and later";
+    } else {
+      els.thresholds.textContent = "";
+    }
+  }
+
+  function renderTriage() {
+    if (!els.triage) return;
+    if (!state.triage.length) {
+      els.triage.innerHTML = "";
+      return;
+    }
+    var html =
+      '<h3>Read first</h3><ol class="citation-triage-list">';
+    state.triage.slice(0, 12).forEach(function (row) {
+      var node = state.nodes.filter(function (n) {
+        return n.id === row.id;
+      })[0];
+      var title = node ? shortTitle(node.title) : row.id;
+      html +=
+        '<li><button type="button" class="citation-triage-btn" data-id="' +
+        escapeAttr(row.id) +
+        '">' +
+        escapeHtml(title) +
+        '</button><span class="citation-meta">' +
+        escapeHtml(row.reason || "") +
+        "</span></li>";
+    });
+    html += "</ol>";
+    els.triage.innerHTML = html;
+    els.triage.querySelectorAll(".citation-triage-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-id") || "";
+        var node = state.nodes.filter(function (n) {
+          return n.id === id;
+        })[0];
+        if (node) {
+          state.selectedId = id;
+          showNode(node);
+        }
+      });
+    });
+  }
+
+  function setupYearScrubber() {
+    var years = state.nodes
+      .map(function (n) {
+        return n.year;
+      })
+      .filter(function (y) {
+        return typeof y === "number" && y > 0;
+      });
+    if (!years.length || !els.yearMin || !els.yearMax) return;
+    var lo = Math.min.apply(null, years);
+    var hi = Math.max.apply(null, years);
+    state.yearMin = lo;
+    state.yearMax = hi;
+    state.yearLo = lo;
+    state.yearHi = hi;
+    els.yearMin.min = String(lo);
+    els.yearMin.max = String(hi);
+    els.yearMin.value = String(lo);
+    els.yearMax.min = String(lo);
+    els.yearMax.max = String(hi);
+    els.yearMax.value = String(hi);
+    updateYearLabel();
+  }
+
+  function onYearScrub() {
+    if (!els.yearMin || !els.yearMax) return;
+    state.yearLo = parseInt(els.yearMin.value, 10);
+    state.yearHi = parseInt(els.yearMax.value, 10);
+    if (state.yearLo > state.yearHi) {
+      var tmp = state.yearLo;
+      state.yearLo = state.yearHi;
+      state.yearHi = tmp;
+      els.yearMin.value = String(state.yearLo);
+      els.yearMax.value = String(state.yearHi);
+    }
+    updateYearLabel();
+    renderGraph();
+  }
+
+  function updateYearLabel() {
+    if (!els.yearLabel) return;
+    if (state.yearLo <= state.yearMin && state.yearHi >= state.yearMax) {
+      els.yearLabel.textContent = "all years";
+    } else {
+      els.yearLabel.textContent = state.yearLo + " – " + state.yearHi;
     }
   }
 
@@ -95,6 +273,9 @@
   function visibleNodes() {
     return state.nodes.filter(function (node) {
       if (!state.showOccasional && node.occasional && !node.seed) return false;
+      if (!node.seed && node.year) {
+        if (node.year < state.yearLo || node.year > state.yearHi) return false;
+      }
       if (state.direction === "both" || node.seed) return true;
       return state.edges.some(function (edge) {
         return (
@@ -115,17 +296,20 @@
 
   function renderGraph() {
     var papers = visibleNodes();
+    var ghostPapers = state.showHalo ? state.ghostNodes : [];
     var ids = new Set(
-      papers.map(function (paper) {
-        return paper.id;
-      })
+      papers
+        .concat(ghostPapers)
+        .map(function (paper) {
+          return paper.id;
+        })
     );
-    var edges = visibleEdges(ids);
+    var edges = visibleEdges(ids).concat(state.showHalo ? state.ghostEdges : []);
     var hidden = state.nodes.filter(function (paper) {
       return paper.occasional && !paper.seed;
     }).length;
 
-    if (!papers.length) {
+    if (!papers.length && !ghostPapers.length) {
       els.svg.selectAll("*").remove();
       setStatus("No papers to map yet. Search a topic, then come back.");
       return;
@@ -162,7 +346,7 @@
       .attr("fill", "#5c6b73");
 
     var maxCited =
-      d3.max(papers, function (paper) {
+      d3.max(papers.concat(ghostPapers), function (paper) {
         return paper.cited_by_count || 1;
       }) || 1;
     var radiusScale = d3.scaleSqrt().domain([0, maxCited]).range([7, 26]);
@@ -171,7 +355,7 @@
     }
 
     var crowded = papers.length > 35;
-    var nodes = papers.map(function (paper) {
+    var nodes = papers.concat(ghostPapers).map(function (paper) {
       return Object.assign({}, paper);
     });
     var nodeById = new Map(
@@ -189,6 +373,12 @@
       .filter(function (edge) {
         return edge.source && edge.target;
       });
+
+    var pathKeys = new Set();
+    state.pathEdges.forEach(function (edge) {
+      pathKeys.add(edge.source + "|" + edge.target + "|" + edge.direction);
+      pathKeys.add(edge.target + "|" + edge.source + "|" + edge.direction);
+    });
 
     var seeds = nodes.filter(function (node) {
       return node.seed;
@@ -227,8 +417,18 @@
       .attr("stroke", function (d) {
         return d.direction === "cites" ? "#3d5a80" : "#c46a2a";
       })
-      .attr("stroke-opacity", crowded ? 0.35 : 0.55)
-      .attr("stroke-width", 1.4)
+      .attr("stroke-opacity", function (d) {
+        var key = d.source.id + "|" + d.target.id + "|" + d.direction;
+        if (pathKeys.size && pathKeys.has(key)) return 0.95;
+        return crowded ? 0.35 : 0.55;
+      })
+      .attr("stroke-width", function (d) {
+        var key = d.source.id + "|" + d.target.id + "|" + d.direction;
+        return pathKeys.size && pathKeys.has(key) ? 2.4 : 1.4;
+      })
+      .attr("stroke-dasharray", function (d) {
+        return d.source.ghost || d.target.ghost ? "4 3" : null;
+      })
       .attr("marker-end", "url(#citation-arrow)")
       .style("cursor", "pointer")
       .on("click", function (event, d) {
@@ -263,8 +463,13 @@
       )
       .on("click", function (event, d) {
         event.stopPropagation();
+        if (state.pathMode) {
+          pickPathNode(d);
+          return;
+        }
         state.selectedId = d.id;
         showNode(d);
+        if (state.showHalo) loadHalo(d.id);
       })
       .on("mouseenter", function (event, d) {
         setFocus(d.id);
@@ -280,21 +485,30 @@
         return ROLE_FILL[d.role] || ROLE_FILL.other;
       })
       .attr("stroke", function (d) {
+        if (d.ghost) return "#101820";
         return d.in_library ? "#101820" : "#f7f1e8";
       })
       .attr("stroke-width", function (d) {
-        return d.in_library ? 2.5 : 1;
+        return d.in_library || d.ghost ? 2.5 : 1;
+      })
+      .attr("stroke-dasharray", function (d) {
+        return d.ghost ? "3 2" : null;
+      })
+      .style("opacity", function (d) {
+        if (d.keep === false) return 0.35;
+        if (d.watch_seen) return 0.45;
+        return 1;
       });
 
     node.append("title").text(function (d) {
-      return (
-        (d.title || "Untitled") +
-        " · " +
-        (d.year || "n.d.") +
-        " · " +
-        (d.cited_by_count || 0) +
-        " citations"
-      );
+      var bits = [
+        d.title || "Untitled",
+        d.year || "n.d.",
+        (d.cited_by_count || 0) + " citations",
+      ];
+      if (d.watch_new) bits.push("new since watch baseline");
+      if (d.compare_new) bits.push("not in compare run");
+      return bits.join(" · ");
     });
 
     var labels = g
@@ -304,7 +518,9 @@
       .data(nodes)
       .join("text")
       .text(function (d) {
-        return shortTitle(d.title);
+        var label = shortTitle(d.title);
+        if (d.watch_new) label += " *";
+        return label;
       })
       .attr("y", function (d) {
         return radius(d) + 14;
@@ -322,8 +538,16 @@
 
     function setFocus(focusId) {
       if (!focusId) {
-        node.style("opacity", 1);
-        link.attr("stroke-opacity", crowded ? 0.35 : 0.55);
+        node.style("opacity", function (d) {
+          if (d.keep === false) return 0.35;
+          if (d.watch_seen) return 0.45;
+          return 1;
+        });
+        link.attr("stroke-opacity", function (d) {
+          var key = d.source.id + "|" + d.target.id + "|" + d.direction;
+          if (pathKeys.size && pathKeys.has(key)) return 0.95;
+          return crowded ? 0.35 : 0.55;
+        });
         labels.style("opacity", function (d) {
           return labeledIds.has(d.id) ? 1 : 0;
         });
@@ -340,6 +564,8 @@
         return connected.has(d.id) ? 1 : 0.12;
       });
       link.attr("stroke-opacity", function (d) {
+        var key = d.source.id + "|" + d.target.id + "|" + d.direction;
+        if (pathKeys.size && pathKeys.has(key)) return 0.95;
         return d.source.id === focusId || d.target.id === focusId ? 0.9 : 0.04;
       });
       labels.style("opacity", function (d) {
@@ -408,6 +634,76 @@
     }
   }
 
+  function pickPathNode(paper) {
+    if (!state.pathFirst) {
+      state.pathFirst = paper.id;
+      setStatus("Path: choose the second paper.");
+      return;
+    }
+    if (state.pathFirst === paper.id) {
+      setStatus("Path: choose a different second paper.");
+      return;
+    }
+    var path = bfsPath(state.pathFirst, paper.id);
+    state.pathEdges = path || [];
+    state.pathMode = false;
+    if (els.pathMode) els.pathMode.classList.remove("is-active");
+    if (!path) {
+      setStatus("No citation path between those papers on this map. Try Expand on each end.");
+    } else {
+      setStatus("Path: " + path.length + " link(s) on this map.");
+      showPathPanel(path, paper);
+    }
+    state.pathFirst = "";
+    renderGraph();
+  }
+
+  function bfsPath(start, end) {
+    var adj = {};
+    state.edges.forEach(function (edge) {
+      adj[edge.source] = adj[edge.source] || [];
+      adj[edge.source].push({ next: edge.target, edge: edge });
+      adj[edge.target] = adj[edge.target] || [];
+      adj[edge.target].push({ next: edge.source, edge: edge });
+    });
+    var queue = [{ id: start, path: [] }];
+    var seen = {};
+    seen[start] = true;
+    while (queue.length) {
+      var item = queue.shift();
+      if (item.path.length > 4) continue;
+      var steps = adj[item.id] || [];
+      for (var i = 0; i < steps.length; i += 1) {
+        var step = steps[i];
+        if (seen[step.next]) continue;
+        var nextPath = item.path.concat([step.edge]);
+        if (step.next === end) return nextPath;
+        seen[step.next] = true;
+        queue.push({ id: step.next, path: nextPath });
+      }
+    }
+    return null;
+  }
+
+  function showPathPanel(path, endPaper) {
+    var start = state.nodes.filter(function (n) {
+      return n.id === path[0].source || n.id === path[0].target;
+    })[0];
+    var labels = path
+      .map(function (edge) {
+        return edge.direction === "cites" ? "cites" : "references";
+      })
+      .join(" → ");
+    els.panel.innerHTML =
+      '<h3>Path on this map</h3><p class="citation-meta">' +
+      escapeHtml((start && start.title) || "") +
+      " … " +
+      escapeHtml(endPaper.title || "") +
+      "</p><p>" +
+      escapeHtml(labels) +
+      "</p>";
+  }
+
   function showNode(paper) {
     var year = paper.year || "year unknown";
     var library = paper.in_library ? "In your library" : "Not in the library yet";
@@ -420,20 +716,19 @@
         "</a></p>"
       : "";
     var why = paper.why ? "<p>" + escapeHtml(paper.why) + "</p>" : "";
+    var triage = state.triageById[paper.id];
+    var triageLine = triage
+      ? '<p class="citation-meta">' + escapeHtml(triage.reason || "") + "</p>"
+      : "";
     var keep = "";
     if (paper.doi) {
       keep =
-        '<form method="post" action="/discover/keep" class="citation-actions">' +
-        '<input type="hidden" name="run_id" value="' +
-        escapeAttr(state.runId) +
-        '">' +
-        '<input type="hidden" name="doi" value="' +
-        escapeAttr(paper.doi) +
-        '">' +
-        '<button type="submit" name="keep" value="1" class="secondary">Keep</button>' +
-        '<button type="submit" name="keep" value="0" class="secondary">Skip</button>' +
-        "</form>";
+        '<div class="citation-actions">' +
+        '<button type="button" class="secondary" data-keep="1">Keep</button>' +
+        '<button type="button" class="secondary" data-keep="0">Skip</button>' +
+        "</div>";
     }
+    var expandDisabled = state.expandBlocked ? " disabled" : "";
     els.panel.innerHTML =
       "<h3>" +
       escapeHtml(paper.title || "Untitled") +
@@ -450,17 +745,68 @@
       "<p>" +
       library +
       "</p>" +
+      triageLine +
       doi +
       why +
       keep +
       '<div class="citation-actions">' +
-      '<button type="button" class="secondary" data-expand="refs">Papers it cites</button>' +
-      '<button type="button" class="secondary" data-expand="cites">Papers that cite it</button>' +
+      '<button type="button" class="secondary" data-expand="refs"' +
+      expandDisabled +
+      ">Papers it cites</button>" +
+      '<button type="button" class="secondary" data-expand="cites"' +
+      expandDisabled +
+      ">Papers that cite it</button>" +
       "</div>";
+    els.panel.querySelectorAll("[data-keep]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        submitKeep(paper, btn.getAttribute("data-keep") === "1");
+      });
+    });
     els.panel.querySelectorAll("[data-expand]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         expand(paper.id, btn.getAttribute("data-expand") || "both", btn);
       });
+    });
+  }
+
+  function submitKeep(paper, keep) {
+    if (!paper.doi) return;
+    var body = new URLSearchParams();
+    body.set("run_id", state.runId);
+    body.set("doi", paper.doi);
+    body.set("keep", keep ? "1" : "0");
+    body.set("format", "json");
+    fetch("/discover/keep", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+      body: body,
+    })
+      .then(readJson)
+      .then(function (payload) {
+        if (payload.graph) adopt(payload.graph);
+        syncQueueRow(paper.doi, keep);
+        var updated = state.nodes.filter(function (n) {
+          return n.id === paper.id;
+        })[0];
+        if (updated) showNode(updated);
+        setStatus(keep ? "Kept on this queue." : "Skipped on this queue.");
+      })
+      .catch(function (error) {
+        setStatus(error.message || "Could not update Keep.");
+      });
+  }
+
+  function syncQueueRow(doi, keep) {
+    document.querySelectorAll('form[action="/discover/keep"]').forEach(function (form) {
+      var input = form.querySelector('input[name="doi"]');
+      if (input && input.value === doi) {
+        var cell = form.closest("td");
+        if (cell && cell.previousElementSibling) {
+          var keepCell = cell.parentElement.querySelector("td:nth-child(3)");
+          if (keepCell) keepCell.childNodes[0].textContent = keep ? "True" : "False";
+        }
+      }
     });
   }
 
@@ -482,6 +828,7 @@
   }
 
   function expand(nodeId, direction, btn) {
+    if (state.expandBlocked) return;
     if (btn) btn.disabled = true;
     setStatus("Loading neighbours…");
     fetch("/discover/graph/expand", {
@@ -500,8 +847,50 @@
         adopt(graph);
       })
       .catch(function (error) {
-        setStatus(error.message || "Could not expand that paper.");
-        if (btn) btn.disabled = false;
+        var msg = error.message || "Could not expand that paper.";
+        if (msg.toLowerCase().indexOf("budget") >= 0 || msg.toLowerCase().indexOf("429") >= 0) {
+          state.expandBlocked = true;
+          msg += " Expand is paused until you reload or OpenAlex resets.";
+        }
+        setStatus(msg);
+        if (btn) btn.disabled = state.expandBlocked;
+      });
+  }
+
+  function repairLinks() {
+    setStatus("Repairing citation links from seeds…");
+    fetch("/discover/graph/repair", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ run_id: state.runId }),
+    })
+      .then(readJson)
+      .then(function (graph) {
+        adopt(graph);
+        setStatus("Links repaired from OpenAlex for seeds on this queue.");
+      })
+      .catch(function (error) {
+        setStatus(error.message || "Could not repair links.");
+      });
+  }
+
+  function loadHalo(nodeId) {
+    fetch("/discover/graph/halo", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ run_id: state.runId, node_id: nodeId }),
+    })
+      .then(readJson)
+      .then(function (payload) {
+        state.ghostNodes = payload.nodes || [];
+        state.ghostEdges = payload.edges || [];
+        renderGraph();
+      })
+      .catch(function () {
+        state.ghostNodes = [];
+        state.ghostEdges = [];
       });
   }
 
@@ -514,8 +903,11 @@
         throw new Error("Could not read the map response.");
       }
       if (!response.ok || (body && body.ok === false)) {
-        throw new Error((body && body.error) || "Could not update the map.");
+        var err = (body && body.error) || "Could not update the map.";
+        if (response.status === 429) state.expandBlocked = true;
+        throw new Error(err);
       }
+      if (body && body.graph) return body.graph;
       return body || {};
     });
   }

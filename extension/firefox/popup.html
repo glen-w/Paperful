@@ -69,8 +69,17 @@
   <section id="shared" class="panel">
     <label class="stack">
       <span class="field-legend">Collection</span>
-      <select id="collection"></select>
+      <input id="collection" list="collection-list" maxlength="200" autocomplete="off" placeholder="Capture">
+      <datalist id="collection-list"></datalist>
     </label>
+    <div class="stack">
+      <span class="field-legend">Tags</span>
+      <div class="tag-box">
+        <div id="tag-chips" class="tag-chips"></div>
+        <input id="tag-input" type="text" maxlength="100" autocomplete="off" placeholder="Type to add, then Enter" aria-label="Tags">
+        <ul id="tag-suggest" class="suggest" hidden></ul>
+      </div>
+    </div>
     <label class="stack">
       <span class="field-legend">Note</span>
       <textarea id="note" rows="2" maxlength="4000" placeholder="Why you saved this"></textarea>

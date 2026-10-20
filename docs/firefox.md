@@ -58,8 +58,13 @@ are looking at the paper.
 
 **This page.** Detect a DOI, PDF, title, authors, year, journal, and abstract
 from Highwire / Dublin Core meta tags and JSON-LD. Pick the collection for a
-new item. An optional note lands in `notes/paperful-capture.html`. After a
-save, open the item folder or the Wanted page when the workbench is running.
+new item (type to filter, or enter a new path). Add tags; suggestions come
+from your library and mirror, and from OpenAlex (keywords on the page's DOI,
+keyword search as you type, and study-design labels when OpenAlex lists them).
+Tags land on the mirror `record.json` only — the
+add-on still does not write Zotero. An optional note lands in
+`notes/paperful-capture.html`. After a save, open the item folder or the Wanted
+page when the workbench is running.
 
 - If the DOI or URL is already in the mirror or in Zotero, fill only empty
   fields on that item. A Zotero hit keeps the Zotero key. The mirror folder
@@ -97,6 +102,7 @@ refresh. Either way, a live read runs when Zotero is open.
 | What | Where |
 | --- | --- |
 | New item that is in neither place | `out/<collection>/` — the picker, or `[extension].collection` (default `Capture`) |
+| Tags | `record.json` `tags` on create or update (existing tags stay) |
 | PDF the tab could already open | Browser download, copied into the drop directory, then the item folder |
 | Page with no PDF | `snapshot.html` in the item folder |
 | Optional capture note | `notes/paperful-capture.html` |

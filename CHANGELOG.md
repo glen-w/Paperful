@@ -8,7 +8,7 @@ may still be added). See [releases](docs/releases.md).
 
 ### Changed
 
-- **Firefox add-on 0.2:** richer page detection (Highwire / Dublin Core / JSON-LD), collection picker, optional capture note, Review-then-Save for selected tabs, context menu and Alt+Shift+P, walk badge, open folder / Wanted after save. Native messages are correlated by id. Downloads are staged from the user Downloads folder into the drop directory. `install-host` writes a Windows launcher. Popup and options use the workbench paper, copper, and box-mark chrome. See [Firefox](docs/firefox.md).
+- **Firefox add-on 0.2:** richer page detection (Highwire / Dublin Core / JSON-LD), type-to-filter collection picker, capture tags with library and OpenAlex keyword suggestions, optional capture note, Review-then-Save for selected tabs, context menu and Alt+Shift+P, walk badge, open folder / Wanted after save. Native messages are correlated by id. Downloads are staged from the user Downloads folder into the drop directory. `install-host` writes a Windows launcher. Popup and options use the workbench paper, copper, and box-mark chrome. See [Firefox](docs/firefox.md).
 
 ## 1.3.0 — 2026-10-19
 

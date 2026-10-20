@@ -227,23 +227,20 @@ label {
   color: var(--ink);
 }
 
-label.stack {
+label.stack,
+.stack {
+  display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 0.3rem;
 }
 
-label.stack .field-legend {
+.stack .field-legend {
   margin: 0;
 }
 
-input[type="checkbox"],
-input[type="radio"] {
-  accent-color: var(--accent);
-  flex: 0 0 auto;
-}
-
 input, select, textarea {
+  width: 100%;
   font: inherit;
   color: var(--ink);
   border: 1px solid var(--line);
@@ -252,8 +249,104 @@ input, select, textarea {
   padding: 0.3rem 0.5rem;
 }
 
-select, textarea {
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  accent-color: var(--accent);
+  flex: 0 0 auto;
+}
+
+.tag-box {
+  position: relative;
+}
+
+.tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0 0 0.3rem;
+}
+
+.tag-chips:empty {
+  display: none;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  max-width: 100%;
+  padding: 0.1rem 0.25rem 0.1rem 0.45rem;
+  border-radius: 0.35rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: color-mix(in srgb, var(--accent) 12%, #fff);
+  color: var(--accent-deep);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.tag-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-chip button {
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 0.25rem;
+  border: none;
+  background: transparent;
+  color: var(--accent-deep);
+  cursor: pointer;
+}
+
+.tag-chip button:hover,
+.tag-chip button:focus-visible {
+  background: transparent;
+  transform: none;
+  color: var(--bad);
+}
+
+.suggest {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  margin: 0.15rem 0 0;
+  padding: 0.2rem 0;
+  list-style: none;
+  max-height: 8.5rem;
+  overflow: auto;
+  border-radius: 0.35rem;
+  border: 1px solid var(--line);
+  background: #fff;
+  box-shadow: 0 0.4rem 0.8rem rgba(16, 24, 32, 0.08);
+}
+
+.suggest[hidden] {
+  display: none;
+}
+
+.suggest button {
+  display: block;
   width: 100%;
+  text-align: left;
+  font-weight: 500;
+  padding: 0.3rem 0.55rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.suggest button:hover,
+.suggest button:focus-visible,
+.suggest button.active {
+  background: color-mix(in srgb, var(--accent) 12%, #fff);
+  color: var(--accent-deep);
+  transform: none;
 }
 
 textarea {
