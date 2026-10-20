@@ -16,8 +16,10 @@ from paperful.keepup import (
     days_until_due,
     dismiss,
     load_applied,
+    load_inbox,
     load_job,
     load_muted,
+    load_seen,
     run_job,
     save_job,
     write_digest,
@@ -290,15 +292,16 @@ def test_keepup_config_interval(tmp_path: Path):
 
 def test_discover_watch_apply_fingerprint(tmp_path: Path):
     from paperful.ui import jobs
-    from paperful.snowball.profile import save_profile
-    from paperful.snowball.watch import append_inbox, save_watch
+    from paperful.snowball.watch import append_inbox, watch_dir
 
     cfg = _cfg(tmp_path)
-    (tmp_path / "profiles").mkdir()
-    save_profile(
-        cfg, "scout", {"mode": "search", "query": "bbnj", "gate": "dry-run"}, force=False
+    dest = watch_dir(cfg, "topic-a")
+    dest.mkdir(parents=True, exist_ok=True)
+    (dest / "watch.json").write_text(
+        '{"schema":"paperful.snowball.watch.v1","profile":"scout"}\n',
+        encoding="utf-8",
     )
-    save_watch(cfg, "topic-a", "scout")
+    (dest / "inbox.jsonl").write_text("", encoding="utf-8")
     row = Candidate(
         run_id="watch:topic-a",
         seed={"type": "query", "value": "bbnj"},
@@ -316,7 +319,4 @@ def test_discover_watch_apply_fingerprint(tmp_path: Path):
     fp1 = jobs._watch_apply_fingerprint(cfg, "topic-a", "Ocean/BBNJ")
     fp2 = jobs._watch_apply_fingerprint(cfg, "topic-a", "Ocean/BBNJ")
     assert fp1 == fp2
-    assert "watch|" in __import__("hashlib").sha256(
-        b"x"
-    ).hexdigest() or True  # fingerprint stable
     assert len(fp1) == 64

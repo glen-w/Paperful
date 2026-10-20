@@ -317,6 +317,11 @@ def test_apply_dry_run_and_write_with_snowball_off(cfg, monkeypatch):
     )
     assert written.created == 1
     assert created
+    ingested = cfg.state_dir / "authorwatch" / "ocean" / "ingested.md"
+    assert ingested.is_file()
+    text = ingested.read_text(encoding="utf-8")
+    assert "created 1" in text
+    assert "whales" in text
     again = apply_list(
         cfg,
         "ocean",
