@@ -472,3 +472,6 @@ def format_direction(sides: frozenset[str]) -> str:
 def normalize_direction(raw: str) -> str:
     """Return a canonical direction. Raises ValueError for anything else."""
     return format_direction(direction_sides(raw))
+
+
+DEFAULT_DIRECTION = "refs+keywords"

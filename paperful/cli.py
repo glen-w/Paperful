@@ -421,6 +421,14 @@ KeywordMinScoreOpt = typer.Option(
     "--keyword-min-score",
     help="Drop seed keywords below this similarity. 0 keeps whatever OpenAlex assigned.",
 )
+SearchKeywordsOpt = typer.Option(
+    None,
+    "--search-keywords/--no-search-keywords",
+    help=(
+        "On keyword search/hybrid, also pull works tagged with matching OpenAlex keywords "
+        "(union with full-text hits). Default: config, else on."
+    ),
+)
 CitesQueryOpt = typer.Option(
     None,
     "--cites-query",
@@ -4838,6 +4846,7 @@ def _snowball_request(
     keyword_limit: str | int | None = None,
     keyword_hop_limit: str | int | None = None,
     keyword_min_score: float | None = None,
+    search_keywords: bool | None = None,
     cites_query: str | None = None,
     languages: str | None = None,
     study_designs: list[str] | str | None = None,
@@ -4878,10 +4887,11 @@ def _snowball_request(
         per_hop_rank=per_hop_rank,
         year_from=year_from,
         year_to=year_to,
-        direction=direction or cfg.snowball_direction or "refs",
+        direction=direction or cfg.snowball_direction or "refs+keywords",
         keyword_limit=keyword_limit,
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
+        search_keywords=search_keywords,
         cites_query=(cites_query or "").strip(),
         languages=_csv(languages) if languages else None,
         study_designs=designs,
@@ -5014,6 +5024,7 @@ def snowball_search(
     keyword_limit: str | None = KeywordLimitOpt,
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
+    search_keywords: bool | None = SearchKeywordsOpt,
     cites_query: str | None = CitesQueryOpt,
     study_design: list[str] = StudyDesignOpt,
     or_mode: bool = typer.Option(
@@ -5072,6 +5083,7 @@ def snowball_search(
         keyword_limit=keyword_limit,
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
+        search_keywords=search_keywords,
         cites_query=(cites_query or "").strip(),
         languages=languages,
         study_designs=study_design,
@@ -5120,6 +5132,7 @@ def snowball_hybrid(
     keyword_limit: str | None = KeywordLimitOpt,
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
+    search_keywords: bool | None = SearchKeywordsOpt,
     cites_query: str | None = CitesQueryOpt,
     study_design: list[str] = StudyDesignOpt,
     or_mode: bool = typer.Option(
@@ -5166,6 +5179,7 @@ def snowball_hybrid(
         keyword_limit=keyword_limit,
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
+        search_keywords=search_keywords,
         cites_query=(cites_query or "").strip(),
         languages=languages,
         study_designs=study_design,
@@ -5807,6 +5821,7 @@ def snowball_profile_save(
     keyword_limit: str | None = KeywordLimitOpt,
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
+    search_keywords: bool | None = SearchKeywordsOpt,
     cites_query: str | None = CitesQueryOpt,
     study_design: list[str] = StudyDesignOpt,
     year_from: int | None = YearFromOpt,
@@ -5941,6 +5956,8 @@ def snowball_profile_save(
             raise SnowballError(str(exc)) from exc
     if keyword_min_score is not None:
         body["keyword_min_score"] = keyword_min_score
+    if search_keywords is not None:
+        body["search_keywords"] = search_keywords
     if cites_query and cites_query.strip():
         body["cites_query"] = cites_query.strip()
     if study_design:
@@ -6508,7 +6525,7 @@ def capture_session(config: Path | None = ConfigOpt) -> None:
 
 @capture_app.command("install-host")
 def capture_install_host(config: Path | None = ConfigOpt) -> None:
-    """Install the user-level Firefox native messaging host."""
+    """Install the user-level Firefox native messaging host (macOS, Linux, Windows)."""
     from .capture_host import install_host
 
     line = install_host(_cfg(config), config)

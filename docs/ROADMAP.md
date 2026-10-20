@@ -292,8 +292,9 @@ own validation reports estimator undercoverage of 0–17% and calls the
 estimate advisory. Do not headline “we estimate you’ve found ~85%” or put
 any percentage in copy until it has been validated on real reviews.
 
-Parked in the snowball lane today, still true: systematic-review screening,
-a review UI, a citation-graph canvas — [Parked](#snowball).
+Parked in the snowball lane today, still true: systematic-review screening
+and a review UI — [Parked](#snowball). The Discover citation map is the
+queue canvas (year × citations), not a corpus browser.
 
 (after-110-bigger-bets)=
 ### Bigger bets (pick at most one a year)
@@ -1371,8 +1372,9 @@ LLM tags as source of truth without stage 1–2 anchors.
 **Status:** keyword, multi-DOI / multi-ORCID, and collection seeds, hybrid keyword-then-hop,
 `direction` sides `refs` / `cites` / `both` / `keywords` / `similar` (and
 combos), gates including `approve-each`, overlap ranking, and optional `[llm]`
-query suggestions are in the tree. Contract: [snowball.md](snowball.md). Still
-outside: `expand = cited_authors`.
+query suggestions are in the tree. Discover **Map** draws the queue
+(`paperful.citation_graph.v1`) and can expand one hop. Contract:
+[snowball.md](snowball.md). Still outside: `expand = cited_authors`.
 
 Snowball grows a library outward from a keyword, one or more DOIs, one or more
 ORCIDs, or DOIs already in a collection. It writes a candidate queue on disk, then
@@ -1542,8 +1544,9 @@ as the **Large corpus from scratch** worked example under [Documentation
   resolver graph**, Maybe later §3); snowball keeps skip-only semantics.
 
 Still outside this lane: every paper by every cited author; a snowball step
-inside `paperful all`; a built-in scheduler; a review UI; systematic-review screening; a
-citation-graph canvas; Sci-Hub or Google Scholar as snowball sources.
+inside `paperful all`; a built-in scheduler; a review UI; systematic-review screening;
+Sci-Hub or Google Scholar as snowball sources. The Discover map
+(`paperful.citation_graph.v1`) is a view of one queue, with one-hop expand.
 Post-1.1 buffet for stopping rules, drift cache, PRISMA counts, SnowBallSLR
 interop, and a possible systematic-review mode —
 [Snowballing and review methods](#after-110-snowball-review),
@@ -1816,9 +1819,13 @@ Identity is the mirror plus a live Zotero read, so a stale snapshot does not
 create a second item. `[extension].snapshot = auto` (default) refreshes `out/`
 once first. Writes stay on disk: no `create_items`, no attach. Transport is
 native messaging to `paperful capture --stdio`. PDF bytes go to a drop
-directory; the host receives a path. Pirate hosts are refused. Snowball and
+directory; the host receives a path (and will copy a just-downloaded file from
+Downloads into that drop dir). Pirate hosts are refused. Snowball and
 gaps `--handoff tabs` / `walk` write `state/handoff/session.json`, which the
-tab checklist pre-checks. Starting a snowball from the toolbar is not this cut.
+tab checklist pre-checks (URL or DOI). Review selected plans each tab before
+apply. Context menu, Alt+Shift+P, collection picker, capture notes, and
+open-folder / Wanted links shipped in add-on 0.2. Starting a snowball from the
+toolbar is not this cut. AMO signing is not this cut.
 
 ## Documentation (thicken)
 

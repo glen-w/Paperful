@@ -34,7 +34,7 @@ and [architecture](architecture.md).
 | `[mirror].gone` | `mark` | An item trashed, merged, or deleted in the manager: `mark` keeps its folder in place and marks the record; `trash` also moves the folder under `out/_trash/`. Nothing is deleted either way |
 | `[extension].snapshot` | `auto` | Firefox capture only. `auto` refreshes `out/` once before a plan or apply, even when `[mirror].refresh` is `manual`. `off` skips that refresh. A live Zotero read still runs when Zotero is open. See [Firefox](firefox.md) |
 | `[extension].collection` | `Capture` | Collection path for a page that is in neither the mirror nor Zotero |
-| `[extension].drop` | (empty) | Where the add-on saves PDFs and HTML snapshots. Empty uses `[inbox].dir`, or `state/capture/drop`. Point Firefox's download folder here. See [Firefox](firefox.md) |
+| `[extension].drop` | (empty) | Where the add-on stages PDFs and HTML snapshots. Empty uses `[inbox].dir`, or `state/capture/drop`. The host also copies a just-downloaded file from your user Downloads folder into this directory. See [Firefox](firefox.md) |
 | `[extension].concurrency` | `2` | How many selected tabs the add-on saves at once (1–4) |
 | `[oa_honesty].stamp_fields` | `license`, `oa_status`, `version` | Which Unpaywall / OpenAlex fields are written to `record.json` (`fetch.oa`) and the manifest on successful fetch |
 | `[oa_honesty].license_block` | `[]` | Substrings; when a stamped `license` matches, the run records `license_blocked` and does not save the PDF |

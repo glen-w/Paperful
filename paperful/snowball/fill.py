@@ -10,6 +10,7 @@ from typing import Any, Callable, NoReturn
 
 from ..lint import usable_work_title
 from .candidate import Candidate
+from .citation_graph import remember_link
 
 CrossrefGet = Callable[[str], dict[str, Any] | None]
 S2Get = Callable[[str], dict[str, Any] | None]
@@ -231,6 +232,7 @@ def _neighbor_rows(
                 gate=row.gate,
             )
         )
+        remember_link(added[-1], row.identity, "refs")
         kept += 1
     return added
 

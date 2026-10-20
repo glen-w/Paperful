@@ -884,3 +884,113 @@ header.wb-chrome .advanced-toggle .help-tip-bubble {
   top: 0;
   transform: none;
 }
+
+.citation-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.citation-filters {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.citation-filter.is-active {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.citation-status,
+.citation-meta,
+.citation-panel-empty {
+  color: var(--ink-soft);
+  margin: 0.35rem 0;
+}
+
+.citation-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18rem;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.citation-canvas-wrap {
+  min-height: 28rem;
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  overflow: hidden;
+}
+
+.citation-canvas {
+  display: block;
+  width: 100%;
+  height: 28rem;
+}
+
+.citation-panel {
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  padding: 0.85rem 0.9rem;
+  background: rgba(255, 255, 255, 0.55);
+  overflow: auto;
+  max-height: 28rem;
+}
+
+.citation-panel h3 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1.25;
+  margin: 0 0 0.4rem;
+}
+
+.citation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.citation-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 1rem;
+  list-style: none;
+  padding: 0.75rem 0 0;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
+.citation-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.citation-swatch {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.citation-swatch.foundational { background: #3d5a80; }
+.citation-swatch.influential { background: #c46a2a; }
+.citation-swatch.emerging { background: #2f6f4e; }
+.citation-swatch.other { background: #8d99a6; }
+.citation-swatch.library {
+  background: transparent;
+  border: 2px solid var(--ink);
+  box-sizing: border-box;
+}
+
+@media (max-width: 800px) {
+  .citation-layout {
+    grid-template-columns: 1fr;
+  }
+}

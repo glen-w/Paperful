@@ -531,12 +531,16 @@ def test_host_hello_unknown_and_install(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "paperful.capture_host.host_manifest_dir", lambda: tmp_path / "hosts"
     )
+    monkeypatch.setattr(
+        "paperful.capture_host.host_launcher_path",
+        lambda _cfg: tmp_path / "capture" / "paperful-host",
+    )
     dest = install_host(cfg, tmp_path / "config.toml")
     manifest = json.loads(Path(dest).read_text(encoding="utf-8"))
     assert manifest["name"] == "paperful"
     assert manifest["type"] == "stdio"
     assert manifest["allowed_extensions"] == ["addon@paperful.local"]
-    script = (cfg.state_dir / "capture" / "paperful-host").read_text(encoding="utf-8")
+    script = (tmp_path / "capture" / "paperful-host").read_text(encoding="utf-8")
     assert script.startswith("#!/bin/sh\nexec ")
     assert "--stdio" in script
     assert "shell" not in script
@@ -581,3 +585,302 @@ def test_capture_does_not_call_zotero_writes():
     source = (Path(__file__).resolve().parents[1] / "paperful" / "capture.py").read_text()
     assert "create_items" not in source
     assert "attach_pdf_file" not in source
+
+
+def test_create_fills_authors_year_journal(tmp_path):
+    cfg = _cfg(tmp_path)
+    result = apply_page(
+        cfg,
+        {
+            "apply": True,
+            "allow_unread": True,
+            "doi": "10.1000/new",
+            "title": "New paper",
+            "year": 2021,
+            "collection": "Inbox/Capture",
+            "page": {
+                "authors": ["Ada Lovelace", "Alan Turing"],
+                "abstract": "A note.",
+                "publication_title": "Example Journal",
+                "year": 2021,
+            },
+        },
+        opener=_down,
+        run_sync_fn=_quiet,
+    )
+    assert result["ok"] is True
+    assert result["action"] == "create"
+    assert result["collection"] == "Inbox/Capture"
+    rec = json.loads(next(cfg.out_dir.rglob("record.json")).read_text())
+    assert rec["year"] == 2021
+    assert rec["publication_title"] == "Example Journal"
+    assert rec["abstract"] == "A note."
+    assert rec["creators"][0]["lastName"] == "Ada Lovelace"
+
+
+def test_blank_year_and_note(tmp_path):
+    cfg = _cfg(tmp_path)
+    folder = _mirror(cfg, "ABCD1234", doi="10.1000/example")
+    rec_path = folder / "record.json"
+    body = json.loads(rec_path.read_text())
+    body["year"] = None
+    rec_path.write_text(json.dumps(body))
+    result = apply_page(
+        cfg,
+        {
+            "doi": "10.1000/example",
+            "apply": True,
+            "year": 2019,
+            "note": "Keep this copy.",
+        },
+        opener=_down,
+        run_sync_fn=_quiet,
+    )
+    assert result["note"] == "saved"
+    saved = json.loads(rec_path.read_text())
+    assert saved["year"] == 2019
+    note = (folder / "notes" / "paperful-capture.html").read_text()
+    assert "Keep this copy." in note
+    assert "paperful.note.v1" in note
+    assert "capture" in note
+
+
+def test_collection_path_rejects_escape(tmp_path):
+    cfg = _cfg(tmp_path)
+    result = apply_page(
+        cfg,
+        {
+            "apply": True,
+            "allow_unread": True,
+            "url": "https://example.org/page",
+            "title": "Page",
+            "collection": "../etc",
+        },
+        opener=_down,
+        run_sync_fn=_quiet,
+    )
+    assert result["ok"] is True
+    assert result["collection"] == "Capture"
+    assert (cfg.out_dir / "Capture").is_dir()
+
+
+def test_stage_copies_from_allowed_parent(tmp_path, monkeypatch):
+    from paperful.capture import stage_incoming
+
+    cfg = _cfg(tmp_path)
+    incoming_dir = tmp_path / "Downloads"
+    incoming_dir.mkdir()
+    src = incoming_dir / "paper.pdf"
+    src.write_bytes(b"%PDF-1.4\nstaged\n")
+    monkeypatch.setattr(
+        "paperful.capture.stage_parents", lambda _cfg: [incoming_dir]
+    )
+    staged = stage_incoming(cfg, str(src))
+    assert staged["ok"] is True
+    assert staged["staged"] is True
+    dest = Path(staged["path"])
+    assert dest.parent == Path(cfg.extension_drop).resolve()
+    assert dest.read_bytes().startswith(b"%PDF-1.4")
+
+
+def test_stage_rejects_outside_allowed(tmp_path):
+    from paperful.capture import stage_incoming
+
+    cfg = _cfg(tmp_path)
+    evil = tmp_path / "secret.pdf"
+    evil.write_bytes(b"%PDF-1.4\nevil\n")
+    staged = stage_incoming(cfg, str(evil))
+    assert staged["ok"] is False
+    assert staged["reason"] == "outside_drop"
+
+
+def test_host_echoes_id_and_stages(tmp_path, monkeypatch):
+    from paperful.capture_host import handle_message
+
+    cfg = _cfg(tmp_path)
+    hello = handle_message(cfg, {"type": "hello", "id": 7}, [])
+    assert hello["id"] == 7
+    assert hello["workbench"]
+    assert "Capture" in hello["collections"]
+    reply = handle_message(cfg, {"type": "handoff.mark", "id": 8, "keys": ["ABCD"]}, [])
+    assert reply["ok"] is True and reply["id"] == 8 and reply["marked"] == 0
+
+    opened = []
+    monkeypatch.setattr("paperful.capture._reveal", lambda path: opened.append(path))
+    opened_reply = handle_message(
+        cfg, {"type": "capture.open", "target": "drop", "id": 9}, []
+    )
+    assert opened_reply["ok"] is True
+    assert opened
+
+
+def test_mark_session_saved(tmp_path):
+    from paperful.capture import mark_session_saved
+    from paperful.store import write_json
+
+    cfg = _cfg(tmp_path)
+    session = cfg.state_dir / "handoff" / "session.json"
+    session.parent.mkdir(parents=True)
+    write_json(
+        session,
+        {
+            "schema": "paperful.handoff.session.v1",
+            "items": [
+                {"key": "ABCD1234", "doi": "10.1000/example", "url": "https://x.example/a"},
+                {"key": "KEEPME01", "doi": "10.1000/other", "url": "https://x.example/b"},
+            ],
+        },
+    )
+    result = mark_session_saved(cfg, ["ABCD1234"])
+    assert result["marked"] == 1
+    rows = json.loads(session.read_text())["items"]
+    assert rows[0]["saved_at"]
+    assert "saved_at" not in rows[1]
+
+
+def test_windows_install_writes_bat(tmp_path, monkeypatch):
+    from paperful import capture_host
+
+    monkeypatch.setattr(capture_host.sys, "platform", "win32")
+    monkeypatch.setitem(capture_host.os.environ, "APPDATA", str(tmp_path / "app"))
+    monkeypatch.setitem(capture_host.os.environ, "LOCALAPPDATA", str(tmp_path / "local"))
+    cfg = _cfg(tmp_path)
+    dest = capture_host.install_host(cfg, tmp_path / "config.toml")
+    assert dest.endswith("paperful.json")
+    script = (tmp_path / "local" / "Paperful" / "capture" / "paperful-host.bat").read_text()
+    assert script.startswith("@echo off")
+    assert "--stdio" in script
+    assert "-u" in script
+
+
+def test_extension_uses_workbench_tokens():
+    root = Path(__file__).resolve().parents[1] / "extension" / "firefox"
+    css = (root / "popup.css").read_text(encoding="utf-8")
+    assert "--paper: #f7f1e8;" in css
+    assert "--accent: #c46a2a;" in css
+    assert "[hidden]" in css
+    assert "display: none !important" in css
+    popup = (root / "popup.html").read_text(encoding="utf-8")
+    options = (root / "options.html").read_text(encoding="utf-8")
+    assert 'class="brand-word"' in popup and 'class="brand-word"' in options
+    assert 'id="review-tabs"' in popup
+    assert 'id="open-wanted"' in popup
+    assert "Test connection" in options
+
+
+def test_list_collection_paths_from_mirror(tmp_path):
+    from paperful.capture import list_collection_paths
+
+    cfg = _cfg(tmp_path)
+    _mirror(cfg, "ABCD1234")
+    (cfg.out_dir / "Inbox").mkdir()
+    (cfg.out_dir / "_hidden").mkdir()
+    paths = list_collection_paths(cfg)
+    assert paths[0] == "Capture"
+    assert "Inbox" in paths
+    assert all(not name.startswith("_") for name in paths)
+
+
+def test_open_target_item_out_and_invalid(tmp_path):
+    from paperful.capture import open_target
+
+    cfg = _cfg(tmp_path)
+    folder = _mirror(cfg, "ABCD1234")
+    opened: list[Path] = []
+    item = open_target(cfg, "item", "ABCD1234", opener=opened.append)
+    assert item["ok"] is True
+    assert Path(item["path"]) == folder.resolve()
+    assert opened[-1] == folder.resolve()
+    out = open_target(cfg, "out", opener=opened.append)
+    assert Path(out["path"]) == cfg.out_dir.resolve()
+    assert open_target(cfg, "item", "NOPEKEY1", opener=opened.append)["reason"] == "missing_item"
+    assert open_target(cfg, "wanted", opener=opened.append)["reason"] == "invalid"
+
+
+def test_host_plan_reads_page_year_and_clips_authors(tmp_path):
+    from paperful.capture import prepare
+    from paperful.capture_host import handle_message
+
+    cfg = _cfg(tmp_path)
+    _mirror(cfg, "ABCD1234", doi="10.1000/example", year=None)
+    rec_path = next(cfg.out_dir.rglob("record.json"))
+    body = json.loads(rec_path.read_text())
+    body["year"] = None
+    body["creators"] = []
+    rec_path.write_text(json.dumps(body))
+    index = [prepare(cfg, opener=_down, run_sync_fn=_quiet)]
+    planned = handle_message(
+        cfg,
+        {
+            "type": "capture.plan",
+            "id": 11,
+            "page": {
+                "doi": "10.1000/example",
+                "title": "A paper",
+                "year": "2018",
+            },
+        },
+        index,
+    )
+    assert planned["id"] == 11
+    assert planned["action"] == "update"
+    long = "A" * 500
+    extra = [f"Author {i}" for i in range(24)]
+    applied = handle_message(
+        cfg,
+        {
+            "type": "capture.apply",
+            "id": 12,
+            "apply": True,
+            "doi": "10.1000/example",
+            "year": "2018",
+            "page": {"authors": [long, *extra], "year": "2018"},
+        },
+        index,
+    )
+    assert applied["ok"] is True and applied["id"] == 12
+    saved = json.loads(rec_path.read_text())
+    assert saved["year"] == 2018
+    assert len(saved["creators"]) == 20
+    assert saved["creators"][0]["lastName"] == "A" * 200
+
+
+def test_stage_already_in_drop_and_html(tmp_path, monkeypatch):
+    from paperful.capture import stage_incoming
+
+    cfg = _cfg(tmp_path)
+    drop_pdf = Path(cfg.extension_drop) / "kept.pdf"
+    drop_pdf.write_bytes(b"%PDF-1.4\nkept\n")
+    same = stage_incoming(cfg, str(drop_pdf))
+    assert same["ok"] is True and same["staged"] is False
+    incoming = tmp_path / "Downloads"
+    incoming.mkdir()
+    html = incoming / "page.html"
+    html.write_text("<html><body>ok</body></html>", encoding="utf-8")
+    monkeypatch.setattr("paperful.capture.stage_parents", lambda _cfg: [incoming])
+    staged = stage_incoming(cfg, str(html))
+    assert staged["ok"] is True and staged["staged"] is True
+    assert Path(staged["path"]).parent == Path(cfg.extension_drop).resolve()
+    junk = incoming / "notes.txt"
+    junk.write_text("nope", encoding="utf-8")
+    refused = stage_incoming(cfg, str(junk))
+    assert refused["ok"] is False and refused["reason"] == "refused"
+
+
+def test_id_echo_rejects_bool_and_out_of_range(tmp_path):
+    from paperful.capture_host import handle_message
+
+    cfg = _cfg(tmp_path)
+    for req_id in (True, 0, 1_000_000_000, "7"):
+        reply = handle_message(cfg, {"type": "hello", "id": req_id}, [])
+        assert "id" not in reply
+
+
+def test_mark_session_saved_skips_empty_write(tmp_path):
+    from paperful.capture import mark_session_saved
+
+    cfg = _cfg(tmp_path)
+    session = cfg.state_dir / "handoff" / "session.json"
+    result = mark_session_saved(cfg, [])
+    assert result["marked"] == 0
+    assert not session.exists()

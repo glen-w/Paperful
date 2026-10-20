@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Paperful",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Save the current page or selected tabs into your local Paperful mirror.",
   "browser_specific_settings": {
     "gecko": {
@@ -29,12 +29,25 @@
   "background": {
     "scripts": ["background.js"]
   },
+  "commands": {
+    "save-page": {
+      "suggested_key": {
+        "default": "Alt+Shift+P"
+      },
+      "description": "Save this page to Paperful"
+    }
+  },
+  "host_permissions": [
+    "*://*/*"
+  ],
   "permissions": [
     "activeTab",
     "tabs",
     "downloads",
     "storage",
     "nativeMessaging",
-    "scripting"
+    "scripting",
+    "contextMenus",
+    "clipboardWrite"
   ]
 }

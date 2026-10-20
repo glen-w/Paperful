@@ -65,6 +65,8 @@ def _client(
     by_orcid = by_orcid or {}
 
     def getter(path: str, params: dict) -> dict:
+        if path.startswith("/keywords"):
+            return {"results": []}
         if path.startswith("/works/https://doi.org/"):
             doi = path.split("/works/https://doi.org/", 1)[1]
             for work in works.values():
@@ -75,6 +77,8 @@ def _client(
         if filt.startswith("openalex:"):
             ids = filt.split(":", 1)[1].split("|")
             return {"results": [works[i] for i in ids if i in works]}
+        if filt.startswith("keywords.id:"):
+            return {"results": []}
         if "cites:" in filt:
             seed = ""
             for part in filt.split(","):
@@ -821,7 +825,9 @@ def test_multi_keyword_search_composes_openalex_query(tmp_path: Path):
     seen: list[str] = []
 
     def getter(path: str, params: dict) -> dict:
-        if "search" in params:
+        if path.startswith("/keywords"):
+            return {"results": []}
+        if path.startswith("/works") and "search" in params:
             seen.append(str(params["search"]))
             return {"results": list(works.values())}
         return {"results": []}
@@ -833,7 +839,7 @@ def test_multi_keyword_search_composes_openalex_query(tmp_path: Path):
     result = run_search(
         _cfg(tmp_path),
         query,
-        SnowballRequest(gate="dry-run", max_candidates=10),
+        SnowballRequest(gate="dry-run", max_candidates=10, search_keywords=False),
         console=Console(highlight=False, width=160),
         client=client,
     )
@@ -2665,6 +2671,120 @@ def _keyword_client(works: dict[str, dict]) -> tuple[OpenAlexClient, dict]:
     return OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter), seen
 
 
+def test_default_direction_and_search_keywords_config(tmp_path: Path):
+    cfg = _cfg(tmp_path)
+    assert cfg.snowball_direction == "refs+keywords"
+    assert cfg.snowball_search_keywords is True
+    assert SnowballRequest().direction == "refs+keywords"
+    assert SnowballRequest().search_keywords is None
+    path = tmp_path / "config-off.toml"
+    path.write_text(
+        f'email = "t@example.org"\nout_dir = "{tmp_path / "out"}"\n'
+        f'state_dir = "{tmp_path / "state"}"\n'
+        '[snowball]\nenabled = true\ndirection = "refs"\nsearch_keywords = false\n'
+    )
+    off = load_config(path)
+    assert off.snowball_direction == "refs"
+    assert off.snowball_search_keywords is False
+
+
+def test_search_unions_openalex_keyword_tags(tmp_path: Path):
+    text_hit = _work("W1", "10.1000/text", "Text hit", 2020, 2)
+    tag_only = _work("W2", "10.1000/tag", "Tag only", 2021, 9)
+    tag_only["keywords"] = [_keyword("degrowth", 0.9)]
+    text_hit["keywords"] = [_keyword("degrowth", 0.5)]
+    seen: dict[str, list[str]] = {"paths": [], "filters": []}
+
+    def getter(path: str, params: dict) -> dict:
+        seen["paths"].append(path)
+        if path.startswith("/keywords"):
+            return {
+                "results": [
+                    {
+                        "id": "https://openalex.org/keywords/degrowth",
+                        "display_name": "degrowth",
+                        "works_count": 10,
+                    }
+                ]
+            }
+        filt = str(params.get("filter") or "")
+        if filt.startswith("keywords.id:"):
+            seen["filters"].append(filt.split(",", 1)[0])
+            return {"results": [tag_only, text_hit]}
+        if path.startswith("/works") and "search" in params:
+            return {"results": [text_hit]}
+        return {"results": []}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    result = run_search(
+        _cfg(tmp_path),
+        "degrowth",
+        SnowballRequest(gate="dry-run", max_candidates=10, search_keywords=True),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=client,
+        lookup=lambda doi, title: None,
+    )
+    assert result.exit_code == 0
+    assert any(p.startswith("/keywords") for p in seen["paths"])
+    assert seen["filters"] == ["keywords.id:degrowth"]
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    by_doi = {row["ids"]["doi"]: row for row in rows}
+    assert set(by_doi) == {"10.1000/text", "10.1000/tag"}
+    assert by_doi["10.1000/tag"]["why"].startswith("OpenAlex keywords")
+    assert by_doi["10.1000/text"]["biblio"]["keyword_overlap"] == 1
+    assert rows[0]["ids"]["doi"] in {"10.1000/tag", "10.1000/text"}
+
+
+def test_search_keywords_off_skips_tag_fetch(tmp_path: Path):
+    text_hit = _work("W1", "10.1000/text", "Text hit", 2020, 2)
+    seen_paths: list[str] = []
+
+    def getter(path: str, params: dict) -> dict:
+        seen_paths.append(path)
+        if path.startswith("/works") and "search" in params:
+            return {"results": [text_hit]}
+        return {"results": []}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    result = run_search(
+        _cfg(tmp_path),
+        "degrowth",
+        SnowballRequest(gate="dry-run", max_candidates=10, search_keywords=False),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=client,
+        lookup=lambda doi, title: None,
+    )
+    assert result.exit_code == 0
+    assert not any(p.startswith("/keywords") for p in seen_paths)
+    assert not any("keywords.id:" in p for p in seen_paths)
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    assert [row["ids"]["doi"] for row in rows] == ["10.1000/text"]
+    assert rows[0]["why"] == "OpenAlex search"
+
+
+def test_default_doi_direction_expands_keywords(tmp_path: Path):
+    seed = _work("W1", "10.1000/seed", "Seed", 2020, 4, ["W2"])
+    seed["keywords"] = [_keyword("alpha", 0.9)]
+    ref = _work("W2", "10.1000/ref", "Ref", 2019, 2)
+    hit = _work("H1", "10.1000/hit", "Hit", 2021, 3)
+    hit["keywords"] = [_keyword("alpha", 0.5)]
+    works = {"W1": seed, "W2": ref, "H1": hit}
+    client, seen = _keyword_client(works)
+    result = run_doi(
+        _cfg(tmp_path),
+        ["10.1000/seed"],
+        SnowballRequest(depth=1, per_hop_limit="all"),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=client,
+        lookup=lambda doi, title: None,
+    )
+    assert result.exit_code == 0
+    assert seen.get("filter") == "keywords.id:alpha"
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    assert {row["direction"] for row in rows} >= {"doi", "refs", "keywords"}
+    assert {row["ids"]["doi"] for row in rows} >= {"10.1000/seed", "10.1000/ref", "10.1000/hit"}
+
+
 def test_keyword_hop_uses_top_slugs_and_finite_cap(tmp_path: Path):
     from paperful.snowball.expand import normalize_direction, parse_keyword_hop_limit, parse_keyword_limit
 
@@ -3615,6 +3735,8 @@ def test_reference_stub_takes_the_openalex_title_inside_the_year_window(tmp_path
     catalogue = {"10.1000/hit": hit, "10.1000/old": old, "10.1000/new": kept}
 
     def getter(path: str, params: dict) -> dict:
+        if path.startswith("/keywords"):
+            return {"results": []}
         if path.startswith("/works/https://doi.org/"):
             doi = path.split("/works/https://doi.org/", 1)[1]
             return catalogue.get(doi, {})
@@ -3622,7 +3744,7 @@ def test_reference_stub_takes_the_openalex_title_inside_the_year_window(tmp_path
         if filt.startswith("doi:"):
             wanted = set(filt.split(":", 1)[1].split("|"))
             return {"results": [work for doi, work in catalogue.items() if doi in wanted]}
-        if "search" in params:
+        if path.startswith("/works") and "search" in params:
             return {"results": [hit]}
         return {"results": []}
 
@@ -3640,7 +3762,13 @@ def test_reference_stub_takes_the_openalex_title_inside_the_year_window(tmp_path
     result = run_search(
         _cfg(tmp_path),
         "basketball",
-        SnowballRequest(depth=1, year_from=2023, year_to=2026),
+        SnowballRequest(
+            depth=1,
+            year_from=2023,
+            year_to=2026,
+            direction="refs",
+            search_keywords=False,
+        ),
         console=Console(file=StringIO(), highlight=False, width=160),
         client=OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter),
         lookup=lambda doi, title: None,

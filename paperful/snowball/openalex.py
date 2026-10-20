@@ -593,6 +593,34 @@ class OpenAlexClient:
             params["sort"] = sort
         return self._collect("/works", params, limit)
 
+    def search_keywords(self, query: str, *, limit: int = 5) -> list[dict[str, Any]]:
+        """Resolve free text to OpenAlex keyword entities (``/keywords?search=``)."""
+        text = (query or "").strip()
+        if not text or limit <= 0:
+            return []
+        self.stage = self.stage or f"OpenAlex keywords {text}"
+        return self._collect(
+            "/keywords",
+            {
+                "search": text,
+                "select": "id,display_name,works_count,cited_by_count",
+            },
+            max(1, limit),
+        )
+
+    def resolve_keyword_slugs(self, query: str, *, limit: int = 5) -> list[str]:
+        """Top keyword slugs for ``query``. Empty when nothing resolves."""
+        out: list[str] = []
+        seen: set[str] = set()
+        for row in self.search_keywords(query, limit=max(1, limit)):
+            slug = keyword_slug(str(row.get("id") or row.get("display_name") or ""))
+            if slug and slug not in seen:
+                seen.add(slug)
+                out.append(slug)
+            if len(out) >= limit:
+                break
+        return out
+
     def search_authors(self, name: str, *, limit: int = 8) -> list[dict[str, Any]]:
         """OpenAlex author search. Callers fail closed when more than one hit remains."""
         text = (name or "").strip()

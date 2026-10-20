@@ -5,16 +5,32 @@
   <title>Paperful options</title>
   <link rel="stylesheet" href="popup.css">
 </head>
-<body>
-  <h1>Paperful</h1>
-  <p id="status">Checking the capture host…</p>
-  <p id="detail"></p>
-  <button type="button" id="retry">Test connection</button>
-  <p>
+<body class="options">
+  <header class="wb-chrome">
+    <span class="brand">
+      <img class="brand-logo" src="icons/icon-48.png" alt="" width="48" height="48">
+      <span class="brand-word">Paperful</span>
+    </span>
+    <span id="status" class="chip health-amber">Checking the capture host…</span>
+  </header>
+  <p id="flash" class="status" role="status"></p>
+  <section class="panel">
+    <p class="field-legend">Host</p>
+    <p id="detail" class="lede"></p>
+    <p class="field-legend">Drop directory</p>
+    <p id="drop" class="path"></p>
+    <p class="toolbar">
+      <button type="button" id="retry">Test connection</button>
+      <button type="button" class="secondary" id="copy-drop">Copy drop path</button>
+      <button type="button" class="secondary" id="open-drop">Open drop folder</button>
+    </p>
+  </section>
+  <p class="help">
     Load this add-on from about:debugging, This Firefox, Load Temporary Add-on,
     and choose manifest.json in extension/firefox. It unloads when Firefox restarts.
-    Set Firefox's download folder to the drop directory shown here so saved PDFs
-    land where Paperful can read them.
+    PDFs the browser downloads are copied from your Downloads folder into the drop
+    directory shown here. You can still point Firefox's download folder at that
+    drop directory if you prefer.
   </p>
   <script src="options.js"></script>
 </body>

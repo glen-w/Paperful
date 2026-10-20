@@ -11,7 +11,9 @@ toolbar button.
 The toolbar button uses the Paperful box mark. It reads Zotero so a paper
 already in the library is not created again. It writes only the mirror. It
 does not create items in Zotero, it does not attach, and it does not talk
-to Zotero's connector port.
+to Zotero's connector port. **Alt+Shift+P** saves the current page. Right-click
+a page, tab, or link for the same save. A badge counts tabs from the current
+gaps or snowball walk that are still waiting.
 
 ## Why a browser extension
 
@@ -40,11 +42,12 @@ What you get that the Connector does not:
   first, campus login when you have configured it). The PDF lands in the
   item folder. Nothing is attached until you attach it yourself.
 - **Many tabs at once.** Select the tabs you want, or start from the ones a
-  snowball or gaps handoff just opened. Each row is saved, updated, or
-  skipped the same way as a single page. You confirm the list before
-  anything is written.
+  snowball or gaps handoff just opened. Review the plan (create, update,
+  ambiguous, blocked) before anything is written. Ambiguous rows ask which
+  key to keep. A walk tab matches by URL or DOI, not URL alone.
 - **The same item, not a second one.** A DOI or URL that is already in
-  Zotero or in the mirror updates that record. Empty fields get filled.
+  Zotero or in the mirror updates that record. Empty fields get filled,
+  including authors, year, journal, and abstract when the page names them.
   Fields you already have stay as they are.
 
 You do not need the add-on to fill missing PDFs. **Wanted** and
@@ -53,7 +56,10 @@ are looking at the paper.
 
 ## What the button does
 
-**This page.** Detect a DOI and a PDF the tab can already see.
+**This page.** Detect a DOI, PDF, title, authors, year, journal, and abstract
+from Highwire / Dublin Core meta tags and JSON-LD. Pick the collection for a
+new item. An optional note lands in `notes/paperful-capture.html`. After a
+save, open the item folder or the Wanted page when the workbench is running.
 
 - If the DOI or URL is already in the mirror or in Zotero, fill only empty
   fields on that item. A Zotero hit keeps the Zotero key. The mirror folder
@@ -65,7 +71,8 @@ are looking at the paper.
 
 **Selected tabs.** A checklist of the current window, in the style of a
 download queue. Tabs opened by `gaps --handoff tabs` or `--handoff walk` are
-pre-checked (**From this walk**). Snowball and gaps still open those tabs.
+pre-checked (**From this walk**). **Review selected** plans each tab first.
+Save writes only after that review. Snowball and gaps still open those tabs.
 The add-on does not open them and does not start a snowball.
 
 **PDF, or a snapshot.** A PDF the tab can already see is saved with the
@@ -89,28 +96,35 @@ refresh. Either way, a live read runs when Zotero is open.
 
 | What | Where |
 | --- | --- |
-| New item that is in neither place | `out/<collection>/` with `[extension].collection` (default `Capture`) |
-| PDF the tab could already open | Drop directory, then the item folder |
+| New item that is in neither place | `out/<collection>/` — the picker, or `[extension].collection` (default `Capture`) |
+| PDF the tab could already open | Browser download, copied into the drop directory, then the item folder |
 | Page with no PDF | `snapshot.html` in the item folder |
-| Tabs opened by a handoff | `state/handoff/session.json` |
+| Optional capture note | `notes/paperful-capture.html` |
+| Tabs opened by a handoff | `state/handoff/session.json` (rows get `saved_at` after a matching update) |
 
 The drop directory is `[extension].drop` when set, otherwise `[inbox].dir`,
-otherwise `state/capture/drop`. Set Firefox's download folder to that
-directory. Paperful copies a file only when the path is inside it.
+otherwise `state/capture/drop`. The host will copy a just-downloaded PDF or
+HTML snapshot from your user Downloads folder into that drop directory. You
+can still point Firefox's download folder at the drop directory if you prefer.
+Paperful still refuses a path that is not in the drop directory, Downloads, or
+the inbox dir.
 
 ## Install
 
 The add-on is unsigned. Load it as a temporary add-on. It is not on
 addons.mozilla.org.
 
-1. `paperful capture install-host` (macOS or Linux). This writes a user-level
-   Firefox native-messaging manifest. Windows prints `not installed`.
+1. `paperful capture install-host`. This writes a user-level Firefox
+   native-messaging manifest (macOS, Linux, or Windows). On macOS the launcher
+   lives under Application Support so Firefox can execute it.
 2. Firefox → `about:debugging` → This Firefox → Load Temporary Add-on →
    `extension/firefox/manifest.json`.
 
 A temporary add-on is gone after Firefox restarts. Load it again. Options →
-Test connection should say Connected. A manifest change needs Remove, then
-Load Temporary Add-on again.
+Test connection should say Connected, and shows the drop path (copy or open
+that folder). A manifest change needs Remove, then Load Temporary Add-on
+again. **Alt+Shift+P** is the save shortcut (Firefox → Add-ons → Paperful →
+Manage Extension Shortcuts if it collides).
 
 The same identity check without the browser:
 

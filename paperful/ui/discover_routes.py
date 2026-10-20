@@ -428,6 +428,47 @@ def register_discover(ui: UiContext) -> None:
             jobs.set_snowball_keep(cfg, run_id, [doi], keep)
         return RedirectResponse(url="/discover", status_code=303)
 
+    @app.get("/discover/graph")
+    def discover_graph(run_id: str = "") -> JSONResponse:
+        from ..snowball.citation_graph import CitationGraphError, graph_for_run
+
+        try:
+            graph = graph_for_run(cfg.state_dir, run_id)
+        except CitationGraphError as exc:
+            status = 404 if "queue" in str(exc).lower() else 400
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
+        return JSONResponse(graph)
+
+    @app.post("/discover/graph/expand")
+    async def discover_graph_expand(request: Request) -> JSONResponse:
+        from ..snowball.citation_graph import CitationGraphError, expand_queue
+        from ..snowball.command import _openalex_client
+        from ..snowball.openalex import OpenAlexBudgetExceeded
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        run_id = str(body.get("run_id") or "")
+        node_id = str(body.get("node_id") or "")
+        direction = str(body.get("direction") or "both")
+        try:
+            graph = expand_queue(
+                cfg.state_dir,
+                run_id,
+                node_id,
+                direction,
+                _openalex_client(cfg),
+            )
+        except CitationGraphError as exc:
+            status = 404 if "queue" in str(exc).lower() else 400
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
+        except OpenAlexBudgetExceeded as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=429)
+        return JSONResponse(graph)
+
 
     @app.post("/discover/watch")
     async def discover_watch(request: Request) -> RedirectResponse:

@@ -222,9 +222,9 @@ A snowball profile is a named job in `profiles/`. `paperful run` and
 
 | Seed | What it collects | Default depth |
 | --- | --- | --- |
-| Keyword | OpenAlex title/abstract search. Pass several terms for one boolean query (AND by default; `--or` for any). One term is passed through unchanged | **0** — the hit list. Depth 1+ expands those hits and must be set explicitly. A global `depth = 1` does not expand every keyword hit |
+| Keyword | OpenAlex title/abstract search, plus (by default) works carrying matching OpenAlex keyword tags. Pass several terms for one boolean query (AND by default; `--or` for any). One term is passed through unchanged. Turn tags off with `search_keywords = false` or `--no-search-keywords` | **0** — the hit list. Depth 1+ expands those hits and must be set explicitly. A global `depth = 1` does not expand every keyword hit |
 | Hybrid | That hit list, then one hop from the top `hybrid_seeds` DOIs (default 5). Same multi-term rules as Keyword | The hop is always 1. `--depth` does not add further hops |
-| DOI | Each seed work (hop 0), then its neighbours (`referenced_works` and/or works that cite it). Pass several DOIs for one shared crawl | **1**, direction `refs` by default. Use `--direction cites` or `both` for cited-by |
+| DOI | Each seed work (hop 0), then its neighbours (`referenced_works` and/or works that cite it). Pass several DOIs for one shared crawl | **1**, direction `refs+keywords` by default. Use `--direction refs` to drop tags, or `cites` / `both` for cited-by |
 | ORCID | Those people’s works (ORCID public API, filled by OpenAlex author filter), then the same expander. Pass several ORCID iDs for one shared crawl | **1**. [One hop out](#how-a-hop-is-cut) from the combined works |
 | Collection | DOIs already in the seed collection path, then neighbours only | **1**. `-C` is the write target (defaults to the seed path) |
 
@@ -286,11 +286,19 @@ usual numbers are in [Stop rules](#stop-rules). With a stopping rule on and
 depth greater than 1, that first command stops after hop 1 and waits. See
 [Stopping rules](#stopping-rules).
 
-`direction` including `keywords` adds another side. OpenAlex stores at most
-five scored keywords on a work. The hop takes the top `keyword_limit` (default
-3) at or above `keyword_min_score` and requests works with any of those slugs
-(`keywords.id:a|b|c`), then keeps `keyword_hop_limit` of them. `all` is refused
-on both keyword caps: the matching literature is not a closed neighbour list.
+`direction` including `keywords` adds another side (the built-in default is
+`refs+keywords`). OpenAlex stores at most five scored keywords on a work. The
+hop takes the top `keyword_limit` (default 3) at or above `keyword_min_score`
+and requests works with any of those slugs (`keywords.id:a|b|c`), then keeps
+`keyword_hop_limit` of them. `all` is refused on both keyword caps: the matching
+literature is not a closed neighbour list. Set `direction = "refs"` in config
+to restore reference-only hops.
+
+Keyword **search** (and hybrid hop 0) also uses those tags when
+`search_keywords` is on (default): the query is resolved via OpenAlex
+`/keywords`, then tagged works are unioned with full-text `search=` hits and
+ranked by tag overlap. `--no-search-keywords` or `search_keywords = false`
+keeps full-text retrieval only.
 
 Works with no topic have no keywords. That is about 12% of OpenAlex. When
 keywords are in the direction, the run says how many seeds have none and will
@@ -379,8 +387,9 @@ The picture is [How a hop is cut](#how-a-hop-is-cut).
 | Knob | Default | Meaning |
 | --- | --- | --- |
 | `depth` | 0 for keyword, 1 for DOI / ORCID / collection | Hops from the seed. Soft ceiling 5 |
-| `direction` | `refs` | `refs`, `cites`, `both`, `keywords`, `similar`, or combinations such as `refs+similar` and `refs+cites+keywords`. `both` stays references plus cited-by. `similar` is one ranked hop (shared references, plus Semantic Scholar recommendations), not a deeper crawl |
-| `keyword_limit` | 3 | How many of a work's OpenAlex keywords to expand. Integer 1–5. `all` and `0` are errors. 5 uses every keyword OpenAlex stored (at most five) |
+| `direction` | `refs+keywords` | `refs`, `cites`, `both`, `keywords`, `similar`, or combinations such as `refs+similar` and `refs+cites+keywords`. `both` stays references plus cited-by. `similar` is one ranked hop (shared references, plus Semantic Scholar recommendations), not a deeper crawl. Set `refs` to drop the keyword hop |
+| `search_keywords` | `true` | On `search` / `hybrid`, also pull works tagged with matching OpenAlex keywords (union with full-text hits). `--no-search-keywords` or `false` keeps full-text only |
+| `keyword_limit` | 3 | How many of a work's OpenAlex keywords to expand (and how many tag slugs search resolves). Integer 1–5. `all` and `0` are errors. 5 uses every keyword OpenAlex stored (at most five) |
 | `keyword_hop_limit` | 50 | Works kept per seed on the keyword side. A positive integer. `all` and `0` are errors. A keyword filter is an open query, so it never pages without a cap. Citation `per_hop_limit = all` still applies on a mixed run |
 | `keyword_min_score` | 0 | Drop seed keywords below this similarity. 0 keeps whatever OpenAlex already assigned |
 | `max_candidates` | 200 | Stops after this many `new` + `exists` rows. `all` (or `0`) keeps every row |
@@ -537,7 +546,8 @@ then flags on the command.
 [snowball]
 enabled = false          # doctor and the CLI refuse snowball until true
 depth = 1                # keyword runs still default to depth 0
-direction = "refs"
+direction = "refs+keywords"
+search_keywords = true   # search/hybrid also unions OpenAlex keyword tags
 max_candidates = 200
 per_hop_limit = 50         # all keeps every neighbour of a seed
 per_hop_rank = "most-cited"  # most-cited | least-cited | random
@@ -794,9 +804,32 @@ existing PDF lane. It is not a snowball source. Screening a RIS file stays
 with ASReview. Created items keep clean creators, DOI, and date so Better
 BibTeX citekeys still make sense. Snowball does not depend on that plugin.
 
+## Citation map
+
+Discover **Map** draws the current queue before you open PDFs. Node colour is
+year × `cited_by_count`:
+
+| Pattern | Role |
+| --- | --- |
+| Older + highly cited | foundational |
+| Recent + highly cited | influential |
+| Recent + fewer citations | emerging |
+
+Highly cited means at least 50 citations, or the median of the non-seed papers
+on this map when that median is higher. Recent means the last five years.
+Click a paper to Keep or Skip it, or to expand one hop (papers it cites, or
+papers that cite it). Expand merges neighbours into the same dry-run queue.
+It does not create Zotero items. The drawing code follows the personal-site
+force layout (zoom, drag, hover focus, side panel); nodes here are works,
+not people.
+
+`state/snowball/<run-id>/citation_graph.json` is `paperful.citation_graph.v1`,
+rebuilt from `candidates.jsonl`. Hops store `biblio.graph_links` so an edge
+knows which paper it came from. The map caps at 150 nodes.
+
 ## Out of this lane
 
-- A hosted discovery service, a force-directed graph, or a second OpenAlex browser
+- A hosted discovery service or a second OpenAlex browser. The map is one queue, not the public corpus
 - A built-in scheduler or cron helper (call `watch run` yourself), or a snowball step inside `paperful all`
 - A dedicated screening TUI. Discover Keep/Skip and **Next hop** are the reviewer when a stopping rule is on
 - Sci-Hub or Scholar as ways to discover works

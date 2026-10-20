@@ -7,9 +7,15 @@ Reads the mirror and, when the manager answers, the live library. Writes
 from __future__ import annotations
 
 import hashlib
+import html as html_lib
+import os
 import re
 import secrets
+import shutil
+import subprocess
+import sys
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
@@ -49,7 +55,14 @@ URL_MAX = 2048
 TITLE_MAX = 500
 ABSTRACT_MAX = 8000
 AUTHOR_MAX = 200
+NOTE_MAX = 4000
+COLLECTION_MAX = 200
+PDF_MAX_BYTES = 150_000_000
+HTML_MAX_BYTES = 8_000_000
+SNAPSHOT_NAME = "snapshot.html"
 SESSION_SCHEMA = "paperful.handoff.session.v1"
+_COLL_OK = re.compile(r"^[\w .,'&()+\-]+(?:/[\w .,'&()+\-]+)*$", re.UNICODE)
+WORKBENCH_DEFAULT = "http://127.0.0.1:8765"
 
 
 @dataclass
@@ -151,6 +164,188 @@ def read_session(cfg: Config) -> dict[str, Any]:
     if not isinstance(items, list):
         data = {**data, "items": []}
     return data
+
+
+def workbench_url() -> str:
+    return (os.environ.get("PAPERFUL_UI") or WORKBENCH_DEFAULT).rstrip("/")
+
+
+def safe_collection(raw: Any, fallback: str) -> str:
+    text = clip(raw, COLLECTION_MAX).strip().replace("\\", "/").strip("/")
+    fallback = clip(fallback, COLLECTION_MAX).strip() or "Capture"
+    if not text or ".." in text.split("/"):
+        return fallback
+    if _COLL_OK.match(text):
+        return text
+    return fallback
+
+
+def list_collection_paths(cfg: Config) -> list[str]:
+    """Known collection paths for the add-on picker. Caps the native payload."""
+    paths: set[str] = set()
+    default = safe_collection(cfg.extension_collection, "Capture")
+    paths.add(default)
+    try:
+        from .catalogue import MirrorCatalogue
+
+        for coll in MirrorCatalogue(cfg.out_dir).collections().values():
+            path = str(getattr(coll, "path", "") or "").strip()
+            if path and not path.startswith("_"):
+                paths.add(path)
+    except Exception:
+        pass
+    try:
+        if cfg.out_dir.is_dir():
+            for child in cfg.out_dir.iterdir():
+                if child.is_dir() and not child.name.startswith("_"):
+                    paths.add(child.name)
+    except OSError:
+        pass
+    return sorted(paths, key=str.casefold)[:200]
+
+
+def _is_under(path: Path, parent: Path) -> bool:
+    try:
+        path.resolve().relative_to(parent.resolve())
+    except (OSError, ValueError):
+        return False
+    return True
+
+
+def stage_parents(cfg: Config) -> list[Path]:
+    """Directories a just-downloaded file may be copied from into the drop dir."""
+    parents = [drop_dir(cfg)]
+    inbox = (cfg.inbox_dir or "").strip()
+    if inbox:
+        parents.append(Path(inbox).expanduser())
+    home = Path.home()
+    for name in ("Downloads", "downloads"):
+        candidate = home / name
+        if candidate.is_dir():
+            parents.append(candidate)
+    return parents
+
+
+def stage_incoming(cfg: Config, src: str) -> dict[str, Any]:
+    """Copy a browser download into the drop directory when the parent is allowed."""
+    raw = clip(src, URL_MAX)
+    if not raw:
+        return {"ok": False, "reason": "invalid"}
+    try:
+        path = Path(raw).expanduser().resolve()
+    except (OSError, ValueError):
+        return {"ok": False, "reason": "invalid"}
+    if not path.is_file():
+        return {"ok": False, "reason": "invalid"}
+    drop = drop_dir(cfg).resolve()
+    drop.mkdir(parents=True, exist_ok=True)
+    if _is_under(path, drop):
+        return {"ok": True, "path": str(path), "staged": False}
+    allowed = False
+    for parent in stage_parents(cfg):
+        try:
+            resolved = parent.resolve()
+        except OSError:
+            continue
+        if _is_under(path, resolved):
+            allowed = True
+            break
+    if not allowed:
+        return {"ok": False, "reason": "outside_drop", "drop": str(drop)}
+    suffix = path.suffix.lower()
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return {"ok": False, "reason": "refused"}
+    if suffix == ".pdf":
+        if size < cfg.min_pdf_bytes or size > PDF_MAX_BYTES:
+            return {"ok": False, "reason": "refused"}
+        try:
+            head = path.read_bytes()[:16]
+        except OSError:
+            return {"ok": False, "reason": "refused"}
+        if not looks_like_pdf(head):
+            return {"ok": False, "reason": "refused"}
+    elif suffix in {".html", ".htm"}:
+        if size <= 0 or size > HTML_MAX_BYTES:
+            return {"ok": False, "reason": "refused"}
+    else:
+        return {"ok": False, "reason": "refused"}
+    dest = drop / path.name
+    if dest.exists() and dest.resolve() != path:
+        dest = drop / f"{path.stem}-{secrets.token_hex(3)}{path.suffix}"
+    if dest.resolve() != path:
+        try:
+            shutil.copyfile(path, dest)
+        except OSError:
+            return {"ok": False, "reason": "refused"}
+        return {"ok": True, "path": str(dest.resolve()), "staged": True}
+    return {"ok": True, "path": str(path), "staged": False}
+
+
+def reveal_path(path: Path, opener: Any = None) -> None:
+    """Open a folder the host already resolved (drop dir or an item folder)."""
+    fn = opener or _reveal
+    fn(path)
+
+
+def _reveal(path: Path) -> None:
+    target = str(path)
+    if sys.platform == "darwin":
+        subprocess.Popen(["open", target], start_new_session=True)
+    elif sys.platform == "win32":
+        os.startfile(target)  # type: ignore[attr-defined]
+    else:
+        subprocess.Popen(["xdg-open", target], start_new_session=True)
+
+
+def open_target(
+    cfg: Config,
+    kind: str,
+    key: str = "",
+    *,
+    opener: Any = None,
+) -> dict[str, Any]:
+    """Reveal the drop directory, the mirror root, or one item folder."""
+    want = str(kind or "").strip().lower()
+    if want == "drop":
+        path = drop_dir(cfg)
+        path.mkdir(parents=True, exist_ok=True)
+    elif want == "out":
+        path = Path(cfg.out_dir)
+    elif want == "item":
+        files = _record_files(cfg.out_dir, clip(key, 64))
+        if not files:
+            return {"ok": False, "reason": "missing_item"}
+        path = files[0].parent
+    else:
+        return {"ok": False, "reason": "invalid"}
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return {"ok": False, "reason": "invalid"}
+    reveal_path(resolved, opener=opener)
+    return {"ok": True, "path": str(resolved)}
+
+
+def mark_session_saved(cfg: Config, keys: list[Any]) -> dict[str, Any]:
+    """Stamp matching handoff rows so the tab checklist can drop them."""
+    want = {clip(key, 64) for key in keys if clip(key, 64)}
+    data = read_session(cfg)
+    items = data.get("items")
+    if not want or not isinstance(items, list):
+        return {"ok": True, "marked": 0, **data}
+    now = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    marked = 0
+    for row in items:
+        if not isinstance(row, dict):
+            continue
+        if clip(row.get("key"), 64) in want and not row.get("saved_at"):
+            row["saved_at"] = now
+            marked += 1
+    if marked:
+        write_json(session_path(cfg), data)
+    return {"ok": True, "marked": marked, **data}
 
 
 def _open_live(cfg: Config) -> Any | None:
@@ -428,6 +623,9 @@ def _fill_blanks(rec: dict[str, Any], page: dict[str, Any]) -> None:
     title = clip(page.get("title"), TITLE_MAX).strip()
     if not str(rec.get("title") or "").strip() and title:
         rec["title"] = title
+    year = as_year(page.get("year"))
+    if rec.get("year") in (None, "", 0) and year is not None:
+        rec["year"] = year
     creators = rec.get("creators")
     authors = _authors(page.get("authors"))
     if (not isinstance(creators, list) or not creators) and authors:
@@ -464,7 +662,16 @@ def _page_from(body: dict[str, Any]) -> dict[str, Any]:
     merged: dict[str, Any] = {}
     if isinstance(page, dict):
         merged.update(page)
-    for key in ("doi", "url", "title", "year", "pdf_url"):
+    for key in (
+        "doi",
+        "url",
+        "title",
+        "year",
+        "pdf_url",
+        "abstract",
+        "publication_title",
+        "authors",
+    ):
         if key not in merged and body.get(key) not in (None, ""):
             merged[key] = body.get(key)
     return merged
@@ -567,8 +774,6 @@ _FRAME_BLOCK = re.compile(r"(?is)<(iframe|object|embed)\b[^>]*>.*?</\1>")
 _FRAME_TAG = re.compile(r"(?is)<(iframe|object|embed)\b[^>]*/?>")
 _ON_ATTR = re.compile(r"""(?i)\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)""")
 _JS_URL = re.compile(r"(?i)javascript\s*:")
-SNAPSHOT_NAME = "snapshot.html"
-HTML_MAX_BYTES = 8_000_000
 
 
 def _strip_active_html(text: str) -> str:
@@ -612,6 +817,36 @@ def _note_snapshot(cfg: Config, key: str, page_url: str) -> None:
         fetch["snapshot"] = "extension"
         rec["fetch"] = fetch
         write_json(path, rec)
+
+
+def _place_note(folder: Path, item: Item, note_text: str) -> str:
+    """Write a capture remark under notes/. Mirror only; no library child note."""
+    text = clip(note_text, NOTE_MAX).strip()
+    if not text:
+        return "none"
+    from .notehtml import wrap
+
+    notes_dir = folder / "notes"
+    notes_dir.mkdir(parents=True, exist_ok=True)
+    dest = notes_dir / "paperful-capture.html"
+    body = "<p>" + html_lib.escape(text).replace("\n", "<br>\n") + "</p>"
+    dest.write_text(
+        wrap(body, note_type="capture", verb="capture", extra=item.key),
+        encoding="utf-8",
+    )
+    rec_path = folder / "record.json"
+    rec = load_json(rec_path) or {}
+    rows = rec.get("notes")
+    if not isinstance(rows, list):
+        rows = []
+    if not any(
+        isinstance(row, dict) and row.get("file") == "paperful-capture.html"
+        for row in rows
+    ):
+        rows.append({"file": "paperful-capture.html", "tag": "paperful-capture"})
+    rec["notes"] = rows
+    write_json(rec_path, rec)
+    return "saved"
 
 
 def _place_html(
@@ -792,6 +1027,9 @@ def apply_page(
     }
     pdf_path = str(body.get("pdf_path") or "")
     html_path = str(body.get("html_path") or "")
+    collection = safe_collection(
+        body.get("collection"), cfg.extension_collection or "Capture"
+    )
     if match.action == "create":
         if not index.zotero_up and body.get("allow_unread") is not True:
             return _fail("zotero_unread")
@@ -806,7 +1044,7 @@ def apply_page(
             url=url or None,
             year=year,
             first_author=authors[0] if authors else None,
-            collection_paths=[cfg.extension_collection or "Capture"],
+            collection_paths=[collection],
             doi_source="url" if doi else "none",
             abstract=clip(page.get("abstract"), ABSTRACT_MAX).strip() or None,
             publication_title=clip(page.get("publication_title"), TITLE_MAX).strip()
@@ -850,17 +1088,25 @@ def apply_page(
     snapshot = "none"
     if placed not in {"saved", "kept"} and not _folder_has_pdf(folder):
         snapshot = _place_html(cfg, folder, item, html_path, url)
+    note = _place_note(folder, item, str(body.get("note") or ""))
     lanes = "skipped"
     if body.get("lanes") is True and placed != "saved" and placed != "kept":
         if not _folder_has_pdf(folder):
             lanes = _run_lanes(cfg, item.key, run_fetch_fn)
+    if match.action != "create" and item.key:
+        mark_session_saved(cfg, [item.key])
     result = {
         "ok": True,
         "action": "create" if match.action == "create" else "update",
         "key": item.key,
         "pdf": placed,
         "snapshot": snapshot,
+        "note": note,
         "lanes": lanes,
+        "folder": str(folder),
+        "collection": collection if match.action == "create" else (
+            (item.collection_paths or [""])[0]
+        ),
         "reason": ""
         if placed in {"saved", "kept"} or snapshot in {"saved", "kept"}
         else "no_pdf",

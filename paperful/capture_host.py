@@ -7,6 +7,7 @@ fixed argument list; page text never becomes a shell command.
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import struct
 import sys
@@ -14,7 +15,21 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Any
 
-from .capture import apply_page, drop_dir, plan_page, prepare, read_session
+from .capture import (
+    AUTHOR_MAX,
+    COLLECTION_MAX,
+    NOTE_MAX,
+    apply_page,
+    drop_dir,
+    list_collection_paths,
+    mark_session_saved,
+    open_target,
+    plan_page,
+    prepare,
+    read_session,
+    stage_incoming,
+    workbench_url,
+)
 from .config import Config
 
 MAX_MSG = 1024 * 1024
@@ -27,7 +42,32 @@ def host_manifest_dir() -> Path | None:
         return Path.home() / "Library/Application Support/Mozilla/NativeMessagingHosts"
     if sys.platform.startswith("linux"):
         return Path.home() / ".mozilla/native-messaging-hosts"
+    if sys.platform == "win32":
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            return Path(appdata) / "Mozilla" / "NativeMessagingHosts"
     return None
+
+
+def host_launcher_path(cfg: Config) -> Path:
+    """Path to the native-messaging launcher Firefox executes.
+
+    macOS blocks Firefox from running helpers under Documents, Desktop, or
+    Downloads (TCC). Keep the launcher under Application Support / .local.
+    """
+    if sys.platform == "darwin":
+        return (
+            Path.home()
+            / "Library/Application Support/Paperful/capture/paperful-host"
+        )
+    if sys.platform.startswith("linux"):
+        return Path.home() / ".local/share/paperful/capture/paperful-host"
+    if sys.platform == "win32":
+        local = os.environ.get("LOCALAPPDATA") or str(
+            Path.home() / "AppData" / "Local"
+        )
+        return Path(local) / "Paperful" / "capture" / "paperful-host.bat"
+    return cfg.state_dir / "capture" / "paperful-host"
 
 
 def hello_payload(cfg: Config) -> dict[str, Any]:
@@ -37,9 +77,25 @@ def hello_payload(cfg: Config) -> dict[str, Any]:
         "ok": True,
         "snapshot": cfg.extension_snapshot,
         "collection": cfg.extension_collection,
+        "collections": list_collection_paths(cfg),
         "drop": str(path.resolve()),
+        "out": str(Path(cfg.out_dir).resolve()),
         "concurrency": cfg.extension_concurrency,
+        "workbench": workbench_url(),
+        "platform": sys.platform,
     }
+
+
+def _win_quote(part: str) -> str:
+    if not part or any(ch in part for ch in ' \t"&|^<>'):
+        return '"' + part.replace('"', '\\"') + '"'
+    return part
+
+
+def _launcher_script(argv: list[str]) -> str:
+    if sys.platform == "win32":
+        return "@echo off\r\n" + " ".join(_win_quote(part) for part in argv) + "\r\n"
+    return "#!/bin/sh\nexec " + " ".join(shlex.quote(part) for part in argv) + "\n"
 
 
 def install_host(cfg: Config, config_path: Path | None = None) -> str:
@@ -47,15 +103,18 @@ def install_host(cfg: Config, config_path: Path | None = None) -> str:
     dest_dir = host_manifest_dir()
     if dest_dir is None:
         return "not installed"
-    launcher = cfg.state_dir / "capture" / "paperful-host"
+    launcher = host_launcher_path(cfg)
     launcher.parent.mkdir(parents=True, exist_ok=True)
     argv = [sys.executable, "-m", "paperful.cli", "capture"]
-    if config_path is not None:
-        argv.extend(["--config", str(config_path.resolve())])
+    if sys.platform == "win32":
+        argv.insert(1, "-u")
+    cfg_file = config_path or cfg.config_path
+    if cfg_file is not None:
+        argv.extend(["--config", str(cfg_file.resolve())])
     argv.append("--stdio")
-    script = "#!/bin/sh\nexec " + " ".join(shlex.quote(part) for part in argv) + "\n"
-    launcher.write_text(script, encoding="utf-8")
-    launcher.chmod(0o755)
+    launcher.write_text(_launcher_script(argv), encoding="utf-8")
+    if sys.platform != "win32":
+        launcher.chmod(0o755)
     manifest = {
         "name": HOST_NAME,
         "description": "Paperful capture",
@@ -99,6 +158,16 @@ def _write_frame(payload: dict[str, Any]) -> None:
     sys.stdout.buffer.flush()
 
 
+def _clip_authors(raw: Any) -> Any:
+    from .capture import clip
+
+    if isinstance(raw, list):
+        return [clip(part, AUTHOR_MAX) for part in raw[:20]]
+    if raw is None:
+        return raw
+    return clip(raw, AUTHOR_MAX * 5)
+
+
 def _clip_message(msg: dict[str, Any]) -> dict[str, Any]:
     from .capture import ABSTRACT_MAX, DOI_MAX, TITLE_MAX, URL_MAX, clip
 
@@ -111,9 +180,21 @@ def _clip_message(msg: dict[str, Any]) -> dict[str, Any]:
         ("pdf_path", URL_MAX),
         ("html_path", URL_MAX),
         ("confirm_key", 64),
+        ("path", URL_MAX),
+        ("key", 64),
+        ("collection", COLLECTION_MAX),
+        ("note", NOTE_MAX),
+        ("abstract", ABSTRACT_MAX),
+        ("publication_title", TITLE_MAX),
+        ("target", 16),
     ):
         if key in out and out[key] is not None:
             out[key] = clip(out[key], limit)
+    if "authors" in out:
+        out["authors"] = _clip_authors(out["authors"])
+    keys = out.get("keys")
+    if isinstance(keys, list):
+        out["keys"] = [clip(key, 64) for key in keys[:200]]
     page = out.get("page")
     if isinstance(page, dict):
         page = dict(page)
@@ -127,8 +208,21 @@ def _clip_message(msg: dict[str, Any]) -> dict[str, Any]:
         ):
             if key in page and page[key] is not None:
                 page[key] = clip(page[key], limit)
+        if "authors" in page:
+            page["authors"] = _clip_authors(page["authors"])
         out["page"] = page
     return out
+
+
+def _echo_id(msg: dict[str, Any], reply: dict[str, Any]) -> dict[str, Any]:
+    req_id = msg.get("id")
+    if isinstance(req_id, bool) or not isinstance(req_id, int):
+        return reply
+    if 0 < req_id < 1_000_000_000:
+        out = dict(reply)
+        out["id"] = req_id
+        return out
+    return reply
 
 
 def handle_message(
@@ -139,11 +233,27 @@ def handle_message(
     """``index`` is a one-slot cache so a tab batch refreshes once."""
     kind = str(msg.get("type") or "")
     if kind == "oversize" or kind == "invalid":
-        return {"ok": False, "reason": "invalid"}
+        return _echo_id(msg, {"ok": False, "reason": "invalid"})
     if kind == "hello":
-        return hello_payload(cfg)
+        return _echo_id(msg, hello_payload(cfg))
     if kind == "handoff.session":
-        return {"ok": True, **read_session(cfg)}
+        return _echo_id(msg, {"ok": True, **read_session(cfg)})
+    if kind == "handoff.mark":
+        keys = msg.get("keys")
+        if not isinstance(keys, list):
+            keys = []
+        return _echo_id(msg, mark_session_saved(cfg, keys))
+    if kind == "capture.stage":
+        return _echo_id(msg, stage_incoming(cfg, str(msg.get("path") or "")))
+    if kind == "capture.open":
+        return _echo_id(
+            msg,
+            open_target(
+                cfg,
+                str(msg.get("target") or ""),
+                key=str(msg.get("key") or ""),
+            ),
+        )
     if kind in {"capture.plan", "capture.apply"}:
         if not index:
             index.append(prepare(cfg))
@@ -152,19 +262,26 @@ def handle_message(
         if kind == "capture.plan":
             from .capture import as_year
 
-            return plan_page(
-                cfg,
-                doi=str(msg.get("doi") or ""),
-                url=str(msg.get("url") or ""),
-                title=str(msg.get("title") or ""),
-                year=as_year(msg.get("year")),
-                pdf_url=str(msg.get("pdf_url") or ""),
-                index=cached,
+            page = msg.get("page") if isinstance(msg.get("page"), dict) else {}
+            year = msg.get("year")
+            if year in (None, "") and isinstance(page, dict):
+                year = page.get("year")
+            return _echo_id(
+                msg,
+                plan_page(
+                    cfg,
+                    doi=str(msg.get("doi") or page.get("doi") or ""),
+                    url=str(msg.get("url") or page.get("url") or ""),
+                    title=str(msg.get("title") or page.get("title") or ""),
+                    year=as_year(year),
+                    pdf_url=str(msg.get("pdf_url") or page.get("pdf_url") or ""),
+                    index=cached,
+                ),
             )
         result = apply_page(cfg, msg, index=cached)
         result.pop("code", None)
-        return result
-    return {"ok": False, "reason": "unknown"}
+        return _echo_id(msg, result)
+    return _echo_id(msg, {"ok": False, "reason": "unknown"})
 
 
 def serve_stdio(cfg: Config) -> None:
@@ -174,7 +291,7 @@ def serve_stdio(cfg: Config) -> None:
         if msg is None:
             return
         if msg.get("type") == "oversize":
-            _write_frame({"ok": False, "reason": "invalid"})
+            _write_frame(_echo_id(msg, {"ok": False, "reason": "invalid"}))
             return
         with redirect_stdout(sys.stderr):
             reply = handle_message(cfg, msg, index)

@@ -247,10 +247,11 @@ class Config:
     snowball_per_hop_limit: int = 50
     snowball_per_hop_rank: str = "most-cited"  # most-cited | least-cited | random
     snowball_depth: int = 1
-    snowball_direction: str = "refs"
+    snowball_direction: str = "refs+keywords"
     snowball_keyword_limit: int = 3
     snowball_keyword_hop_limit: int = 50
     snowball_keyword_min_score: float = 0.0
+    snowball_search_keywords: bool = True
     snowball_gate: str = "dry-run"
     snowball_target_collection: str = ""
     snowball_fetch_pdfs: str = "off"  # off | fast | full
@@ -664,6 +665,8 @@ def _apply_snowball(raw: Any, cfg: Config) -> None:
         cfg.snowball_depth = int(raw["depth"])
     if "direction" in raw and raw["direction"]:
         cfg.snowball_direction = str(raw["direction"]).strip()
+    if "search_keywords" in raw:
+        cfg.snowball_search_keywords = bool(raw["search_keywords"])
     if "keyword_limit" in raw:
         from .snowball.expand import parse_keyword_limit
 

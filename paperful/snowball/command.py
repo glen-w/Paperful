@@ -22,10 +22,11 @@ from ..resolve import normalize_doi
 from .candidate import Candidate
 from .crawl import NoKeywordSeeds, doi_candidates, hybrid_candidates, orcid_candidates, search_candidates
 from .expand import (
+    DEFAULT_DIRECTION,
     apply_filters,
     clamp_depth,
-    keyword_depth,
     direction_sides,
+    keyword_depth,
     normalize_direction,
     parse_keyword_hop_limit,
     parse_keyword_limit,
@@ -102,10 +103,11 @@ class SnowballRequest:
     per_hop_rank: str | None = None
     year_from: int | None = None
     year_to: int | None = None
-    direction: str = "refs"
+    direction: str = "refs+keywords"
     keyword_limit: int | str | None = None
     keyword_hop_limit: int | str | None = None
     keyword_min_score: float | None = None
+    search_keywords: bool | None = None
     dedupe_scope: str | None = None
     tag_prefix: str | None = None
     tags: tuple[str, ...] = ()
@@ -199,6 +201,7 @@ def run_search(
             keyword_limit=keywords[0],
             keyword_hop_limit=keywords[1],
             keyword_min_score=keywords[2],
+            search_keywords=_search_keywords_on(cfg, request),
             cites_query=cites_query,
             hop_end=hop_end,
         ),
@@ -250,6 +253,7 @@ def run_hybrid(
             keyword_limit=keywords[0],
             keyword_hop_limit=keywords[1],
             keyword_min_score=keywords[2],
+            search_keywords=_search_keywords_on(cfg, request),
             cites_query=cites_query,
         )
 
@@ -706,7 +710,7 @@ def run_continue(
     seen = {short_id(str(row.ids.get("openalex") or "")) for row in rows}
     seen.discard("")
     seed = dict(crawl.get("seed") or {"type": "stop", "value": run_id})
-    direction = str(crawl.get("direction") or "refs")
+    direction = str(crawl.get("direction") or DEFAULT_DIRECTION)
     new_rows = _expand_hops(
         oa,
         works,
@@ -831,7 +835,7 @@ def run_resume(
             crossref_getter=None,
             s2_getter=None,
             per_hop_limit=int(deferred.get("per_hop_limit") or cfg.snowball_per_hop_limit),
-            direction=str(deferred.get("direction") or request.direction or "refs"),
+            direction=str(deferred.get("direction") or request.direction or DEFAULT_DIRECTION),
             tally=tally,
             expand_neighbors=bool(deferred.get("expand_neighbors", True)),
         )
@@ -1119,6 +1123,12 @@ def _keyword_caps(cfg: Config, request: SnowballRequest) -> tuple[int, int, floa
     except ValueError as exc:
         raise SnowballError(str(exc)) from exc
     return limit, hop, score
+
+
+def _search_keywords_on(cfg: Config, request: SnowballRequest) -> bool:
+    if request.search_keywords is None:
+        return bool(cfg.snowball_search_keywords)
+    return bool(request.search_keywords)
 
 
 def _checked_cites_query(request: SnowballRequest, direction: str, *, expands: bool) -> str:

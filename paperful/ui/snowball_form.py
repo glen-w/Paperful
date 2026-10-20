@@ -151,7 +151,7 @@ def build_request(cfg: Config, payload: DiscoverTopicPayload, collection: str) -
         per_hop_rank=payload.per_hop_rank,
         year_from=payload.year_from,
         year_to=payload.year_to,
-        direction=payload.direction or cfg.snowball_direction or "refs",
+        direction=payload.direction or cfg.snowball_direction or "refs+keywords",
         hybrid_seeds=payload.hybrid_seeds,
         keyword_limit=payload.keyword_limit,
         keyword_hop_limit=payload.keyword_hop_limit,

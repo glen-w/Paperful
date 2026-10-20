@@ -362,6 +362,36 @@
   <pre>{{ note.markdown }}</pre>
 </section>
 {% endif %}
+{% if run_id %}
+<section class="panel" id="citationMapApp" data-run-id="{{ run_id }}" data-graph="/discover/graph?run_id={{ run_id }}">
+  <h2>Map</h2>
+  <p class="section-lede">Not every paper deserves the same time. Older and highly cited work is likely foundational. Recent and highly cited work is influential now. Recent work with fewer citations may be emerging. Expand a node to see who it cites and who cites it, then Keep what you will read.</p>
+  <div class="citation-toolbar">
+    <div class="citation-filters" role="group" aria-label="Citation direction">
+      <button type="button" class="citation-filter is-active" data-direction="both" aria-pressed="true">Both</button>
+      <button type="button" class="citation-filter" data-direction="refs" aria-pressed="false">References</button>
+      <button type="button" class="citation-filter" data-direction="cites" aria-pressed="false">Cited by</button>
+    </div>
+    <label class="citation-occasional"><input type="checkbox" id="citationShowOccasional"> Show other papers</label>
+    <p id="citationStatus" class="citation-status" role="status"></p>
+  </div>
+  <div class="citation-layout">
+    <div class="citation-canvas-wrap">
+      <svg id="citationCanvas" class="citation-canvas" role="img" aria-label="Citation map of this Discover queue"></svg>
+    </div>
+    <aside id="citationPanel" class="citation-panel" aria-live="polite">
+      <p class="citation-panel-empty">Click a paper to see why it is on the map.</p>
+    </aside>
+  </div>
+  <ul class="citation-legend">
+    <li><span class="citation-swatch foundational" aria-hidden="true"></span> Foundational</li>
+    <li><span class="citation-swatch influential" aria-hidden="true"></span> Influential</li>
+    <li><span class="citation-swatch emerging" aria-hidden="true"></span> Emerging</li>
+    <li><span class="citation-swatch other" aria-hidden="true"></span> Other</li>
+    <li><span class="citation-swatch library" aria-hidden="true"></span> In your library</li>
+  </ul>
+</section>
+{% endif %}
 <section class="panel">
   <h2>Queue</h2>
   <p class="section-lede">Candidates from the last topic search. Keep or Skip each row, then Preview apply and Add selected to create Zotero items. Fill PDFs on Wanted afterwards. Watch remembers this topic and checks it again later.</p>
@@ -449,5 +479,11 @@
   {% endfor %}
 </ul>
 </section>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if run_id %}
+<script src="https://cdn.jsdelivr.net/npm/d3@7.8.5/dist/d3.min.js"></script>
+<script src="/static/citation_map.js?v=3"></script>
 {% endif %}
 {% endblock %}

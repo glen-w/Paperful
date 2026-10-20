@@ -116,7 +116,7 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `coverage_cmd.py` | `coverage` after flags | `coverage`, `agent_ops` |
 | `export_cmd.py` | CLI `export` (RIS/BibTeX/EndNote XML + `--pdfs`) after flags | `interop`, `store`, `mirror` |
 | `inbox_cmd.py` | `inbox` watch/drain/proposals after flags | `inbox`, `inbox_match`, `inbox_route` |
-| `capture.py` | Firefox page → mirror identity, blank-field merge, drop-dir PDF, HTML snapshot | `store`, `mirror`, `snapshot`, `run_cmd` |
+| `capture.py` | Firefox page → mirror identity, blank-field merge, staged PDF/HTML, snapshot, capture note | `store`, `mirror`, `snapshot`, `run_cmd`, `notehtml` |
 | `capture_host.py` | Native-messaging stdio host and `install-host` | `capture` |
 | `doctor_cmd.py` / `collections_cmd.py` / `session_cmd.py` / `mirrors_cmd.py` / `pack_cmd.py` / `cache_cmd.py` | Operator verbs (doctor, collections, session/ezproxy/scholar, mirrors, pack, cache clean) | `cli_runtime`, domain modules |
 | `cli.py` | Flags, Typer apps, exits. Re-exports `cli_runtime` names | everything |
@@ -207,6 +207,7 @@ Tier policy (1.0 contract):
 | `paperful.snowball.candidate.v1` | `state/snowball/<run-id>/` | `snowball.candidate` | T2 | Additive through 1.x |
 | `paperful.snowball.watch.v1` | snowball watch cursor | `snowball.watch` | T2 | — |
 | `paperful.snowball.coauthors.v1` | co-author graph | `snowball.authors` | T2 | — |
+| `paperful.citation_graph.v1` | `state/snowball/<run-id>/citation_graph.json` | `snowball.citation_graph` | T2 | Discover map. Rebuilt from the queue. Nodes carry `role` (`foundational` / `influential` / `emerging` / `other`). |
 | `paperful.htmlpdf.proposal.v1` | `state/htmlpdf/proposals/` | `sources.htmlpdf` | T2 | — |
 | `paperful.synthesis.v1` | synthesize sidecar | `synthesize` | T2 | — |
 | `paperful.ask_batch.v1` | `state/ask-batch/<stamp>/` | `rag.batch` | T2 | — |

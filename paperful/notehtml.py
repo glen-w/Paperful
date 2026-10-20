@@ -30,6 +30,7 @@ PREFIX = {
     "snowball": "Snowball",
     "briefing": "Briefing",
     "screen": "Screen",
+    "capture": "Capture",
 }
 
 

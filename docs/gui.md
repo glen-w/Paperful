@@ -93,7 +93,11 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
    the file from Paperful. DOI mismatch and short PDF still wait for Attach.
 2. **Discover** — **Topic:** keyword search (`snowball search` dry-run queue),
    per-row Keep/Skip, then **Preview apply** → **Add selected**
-   (`snowball apply`, metadata only). When a [stopping rule](snowball.md#stopping-rules)
+   (`snowball apply`, metadata only). **Map** draws that queue before you
+   open a PDF: older + highly cited is foundational, recent + highly cited
+   is influential, recent + fewer citations may be emerging. Click a paper
+   to Keep/Skip or expand one hop (references, or papers that cite it).
+   When a [stopping rule](snowball.md#stopping-rules)
    is on, **Next hop** scores those marks and fetches one more hop
    (`snowball continue`). **Fill PDFs** opens Wanted.
    **Briefing** / **Digest** write `briefing.md` / `digest.md` on the queue
@@ -193,6 +197,8 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/discover/packs-promote` | Promote a proposed field author pack |
 | POST | `/discover/follow` | Follow ORCID into a list (`authorwatch` run) |
 | POST | `/discover/keep` | Mark queue DOI keep/skip |
+| GET | `/discover/graph` | Citation map JSON for `run_id` (`paperful.citation_graph.v1`) |
+| POST | `/discover/graph/expand` | One OpenAlex hop (`refs`, `cites`, or `both`) merged into that queue |
 | POST | `/discover/check-again` | Re-run topic watch or person list |
 | POST | `/discover/resume` | Enqueue `snowball resume` |
 | POST | `/discover/profile-run` | Enqueue snowball from a named profile |
