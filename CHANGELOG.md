@@ -15,12 +15,13 @@ may still be added). See [releases](docs/releases.md).
   `snowball watch apply` (inbox → parents) and `authorwatch digest`. No
   built-in scheduler or email — cron `keepup run`. Discover Following can
   Preview/Apply a topic watch inbox. See [Keepup](docs/keepup.md).
-- **Citation map literature categories:** OpenAlex `study_designs` surface as
-  badges and filter chips beside foundational / influential / emerging roles
-  (evidence synthesis, trials, observational, case reports, protocols).
-  Config `[snowball].map_categories` / `map_category_defs`; Discover advanced
-  form also takes study-design crawl filters and map category ids. See
-  [Citation map](docs/snowball.md#citation-map).
+- **Citation map literature categories:** OpenAlex `study_designs` and work
+  `type` surface as badges and filter chips beside foundational /
+  influential / emerging roles (evidence synthesis, trials, clinical trials,
+  observational, case reports, protocols, narrative reviews, preprints,
+  books & chapters, commentary / letters). Config `[snowball].map_categories`
+  / `map_category_defs`; Discover advanced form also takes study-design crawl
+  filters and map category ids. See [Citation map](docs/snowball.md#citation-map).
 
 ### Changed
 
