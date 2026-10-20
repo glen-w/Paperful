@@ -264,9 +264,14 @@ class Config:
     snowball_map_categories: tuple[str, ...] = (
         "evidence-synthesis",
         "trials",
+        "clinical-trials",
         "observational",
         "case-reports",
         "protocols",
+        "narrative-reviews",
+        "preprints",
+        "books",
+        "commentary",
     )
     snowball_map_category_defs: tuple[dict[str, Any], ...] = ()
     snowball_oa_only: bool = False

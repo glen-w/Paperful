@@ -23,6 +23,7 @@ class CategoryDef:
 
 
 # Default fill accents for badges (role colors stay on the node circle).
+# Study-design rules use OpenAlex study_designs; type rules use biblio.type.
 BUILT_IN_CATEGORIES: tuple[CategoryDef, ...] = (
     CategoryDef(
         id="evidence-synthesis",
@@ -35,6 +36,12 @@ BUILT_IN_CATEGORIES: tuple[CategoryDef, ...] = (
         label="Trials",
         any_study_designs=("randomized-controlled-trial",),
         color="#b23a48",
+    ),
+    CategoryDef(
+        id="clinical-trials",
+        label="Clinical trials",
+        any_study_designs=("clinical-trial",),
+        color="#c45c26",
     ),
     CategoryDef(
         id="observational",
@@ -53,6 +60,30 @@ BUILT_IN_CATEGORIES: tuple[CategoryDef, ...] = (
         label="Protocols",
         any_study_designs=("study-protocol",),
         color="#4a7c59",
+    ),
+    CategoryDef(
+        id="narrative-reviews",
+        label="Narrative reviews",
+        any_types=("review",),
+        color="#5c4d7a",
+    ),
+    CategoryDef(
+        id="preprints",
+        label="Preprints",
+        any_types=("preprint", "posted-content"),
+        color="#3d6b8a",
+    ),
+    CategoryDef(
+        id="books",
+        label="Books & chapters",
+        any_types=("book", "book-chapter", "edited-book"),
+        color="#6b5a3e",
+    ),
+    CategoryDef(
+        id="commentary",
+        label="Commentary / letters",
+        any_types=("editorial", "letter", "paratext"),
+        color="#7a7a7a",
     ),
 )
 

@@ -823,15 +823,20 @@ Highly cited means at least 50 citations, or the median of the non-seed papers
 on this map when that median is higher. Recent means the last five years.
 
 **Literature categories** are a second layer (badges and filter chips), orthogonal
-to roles. Defaults map OpenAlex `study_designs` onto:
+to roles. Defaults map OpenAlex `study_designs` and work `type` onto:
 
 | Category id | Matches |
 | --- | --- |
-| `evidence-synthesis` | systematic-review, meta-analysis |
-| `trials` | randomized-controlled-trial |
-| `observational` | observational-study |
-| `case-reports` | case-report |
-| `protocols` | study-protocol |
+| `evidence-synthesis` | study designs: systematic-review, meta-analysis |
+| `trials` | study design: randomized-controlled-trial |
+| `clinical-trials` | study design: clinical-trial (non-RCT interventional; RCTs may also carry this when OpenAlex dual-tags) |
+| `observational` | study design: observational-study |
+| `case-reports` | study design: case-report |
+| `protocols` | study design: study-protocol |
+| `narrative-reviews` | type: review |
+| `preprints` | type: preprint, posted-content |
+| `books` | type: book, book-chapter, edited-book |
+| `commentary` | type: editorial, letter, paratext |
 
 Config `[snowball].map_categories` chooses which ids appear.
 `[snowball].map_category_defs` adds custom rules (`any_study_designs` and/or
