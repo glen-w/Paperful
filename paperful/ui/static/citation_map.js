@@ -37,6 +37,12 @@
     pathEdges: [],
     expandBlocked: false,
     triageById: {},
+    categoryLegend: [],
+    categoryFilter: "",
+    categoryById: {},
+    metaCollections: [],
+    metaTags: [],
+    editMode: "both",
   };
   var els = {};
 
@@ -62,15 +68,17 @@
     els.yearMin = document.getElementById("citationYearMin");
     els.yearMax = document.getElementById("citationYearMax");
     els.yearLabel = document.getElementById("citationYearLabel");
+    els.categoryFilters = document.getElementById("citationCategoryFilters");
+    els.categoryLegend = document.getElementById("citationCategoryLegend");
     state.graphUrl = root.getAttribute("data-graph") || "";
     state.runId = root.getAttribute("data-run-id") || "";
     state.watchName = root.getAttribute("data-watch-name") || "";
     state.compareRun = root.getAttribute("data-compare-run") || "";
     state.reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    root.querySelectorAll(".citation-filter").forEach(function (btn) {
+    root.querySelectorAll(".citation-filters .citation-filter").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        root.querySelectorAll(".citation-filter").forEach(function (other) {
+        root.querySelectorAll(".citation-filters .citation-filter").forEach(function (other) {
           var on = other === btn;
           other.classList.toggle("is-active", on);
           other.setAttribute("aria-pressed", on ? "true" : "false");
@@ -123,6 +131,14 @@
     });
 
     setStatus("Loading citation map…");
+    fetch("/discover/graph/meta", { credentials: "same-origin" })
+      .then(readJson)
+      .then(function (meta) {
+        state.metaCollections = meta.collections || [];
+        state.metaTags = meta.tags || [];
+        state.editMode = meta.edit || "both";
+      })
+      .catch(function () {});
     fetch(graphFetchUrl(), { credentials: "same-origin" })
       .then(readJson)
       .then(function (graph) {
@@ -151,8 +167,22 @@
     state.triage.forEach(function (row) {
       state.triageById[row.id] = row;
     });
+    state.categoryLegend = Array.isArray(graph.category_legend)
+      ? graph.category_legend
+      : [];
+    state.categoryById = {};
+    state.categoryLegend.forEach(function (row) {
+      state.categoryById[row.id] = row;
+    });
+    if (
+      state.categoryFilter &&
+      !state.categoryById[state.categoryFilter]
+    ) {
+      state.categoryFilter = "";
+    }
     setupYearScrubber();
     renderThresholds(graph);
+    renderCategoryControls();
     renderTriage();
     renderGraph();
     if (state.selectedId) {
@@ -161,6 +191,60 @@
       })[0];
       if (still) showNode(still);
     }
+  }
+
+  function renderCategoryControls() {
+    if (!els.categoryFilters || !els.categoryLegend) return;
+    var legend = state.categoryLegend;
+    if (!legend.length) {
+      els.categoryFilters.hidden = true;
+      els.categoryFilters.innerHTML = "";
+      els.categoryLegend.hidden = true;
+      els.categoryLegend.innerHTML = "";
+      return;
+    }
+    els.categoryFilters.hidden = false;
+    var html =
+      '<button type="button" class="citation-filter citation-category-chip' +
+      (state.categoryFilter ? "" : " is-active") +
+      '" data-category="" aria-pressed="' +
+      (state.categoryFilter ? "false" : "true") +
+      '">All study types</button>';
+    legend.forEach(function (row) {
+      var on = state.categoryFilter === row.id;
+      html +=
+        '<button type="button" class="citation-filter citation-category-chip' +
+        (on ? " is-active" : "") +
+        '" data-category="' +
+        escapeAttr(row.id) +
+        '" aria-pressed="' +
+        (on ? "true" : "false") +
+        '"><span class="citation-swatch citation-category-swatch" style="background:' +
+        escapeAttr(row.color || "#5c6b7a") +
+        '" aria-hidden="true"></span>' +
+        escapeHtml(row.label || row.id) +
+        "</button>";
+    });
+    els.categoryFilters.innerHTML = html;
+    els.categoryFilters.querySelectorAll("[data-category]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        state.categoryFilter = btn.getAttribute("data-category") || "";
+        renderCategoryControls();
+        renderGraph();
+      });
+    });
+    els.categoryLegend.hidden = false;
+    els.categoryLegend.innerHTML = legend
+      .map(function (row) {
+        return (
+          "<li><span class=\"citation-swatch citation-category-swatch\" style=\"background:" +
+          escapeAttr(row.color || "#5c6b7a") +
+          '" aria-hidden="true"></span> ' +
+          escapeHtml(row.label || row.id) +
+          "</li>"
+        );
+      })
+      .join("");
   }
 
   function renderThresholds(graph) {
@@ -275,6 +359,10 @@
       if (!state.showOccasional && node.occasional && !node.seed) return false;
       if (!node.seed && node.year) {
         if (node.year < state.yearLo || node.year > state.yearHi) return false;
+      }
+      if (state.categoryFilter) {
+        var cats = Array.isArray(node.categories) ? node.categories : [];
+        if (cats.indexOf(state.categoryFilter) < 0) return false;
       }
       if (state.direction === "both" || node.seed) return true;
       return state.edges.some(function (edge) {
@@ -500,12 +588,72 @@
         return 1;
       });
 
+    node
+      .append("text")
+      .attr("class", "citation-lib-badge")
+      .attr("text-anchor", "middle")
+      .attr("dy", "0.35em")
+      .attr("font-size", "8px")
+      .attr("font-weight", "700")
+      .attr("fill", "#f7f1e8")
+      .attr("pointer-events", "none")
+      .text(function (d) {
+        if (d.ghost) return "LIB";
+        if (d.in_library) return "LIB";
+        if (d.staged) return "…";
+        return "";
+      });
+
+    node.each(function (d) {
+      var cats = Array.isArray(d.categories) ? d.categories.slice(0, 3) : [];
+      if (!cats.length || d.ghost) return;
+      var g = d3.select(this);
+      var r = radius(d) + 3;
+      cats.forEach(function (cid, index) {
+        var meta = state.categoryById[cid] || {};
+        var color = meta.color || "#5c6b7a";
+        var start = -Math.PI / 2 + index * ((2 * Math.PI) / Math.max(cats.length, 1));
+        var end = start + (2 * Math.PI) / Math.max(cats.length, 1) - 0.12;
+        var arc =
+          "M " +
+          Math.cos(start) * r +
+          " " +
+          Math.sin(start) * r +
+          " A " +
+          r +
+          " " +
+          r +
+          " 0 0 1 " +
+          Math.cos(end) * r +
+          " " +
+          Math.sin(end) * r;
+        g.append("path")
+          .attr("d", arc)
+          .attr("fill", "none")
+          .attr("stroke", color)
+          .attr("stroke-width", 2.5)
+          .attr("pointer-events", "none");
+      });
+    });
+
     node.append("title").text(function (d) {
       var bits = [
         d.title || "Untitled",
         d.year || "n.d.",
         (d.cited_by_count || 0) + " citations",
       ];
+      var cats = Array.isArray(d.categories) ? d.categories : [];
+      if (cats.length) {
+        bits.push(
+          cats
+            .map(function (cid) {
+              return (state.categoryById[cid] && state.categoryById[cid].label) || cid;
+            })
+            .join(", ")
+        );
+      }
+      if (d.in_library) bits.push("in your library");
+      if (d.staged) bits.push("staged edits");
       if (d.watch_new) bits.push("new since watch baseline");
       if (d.compare_new) bits.push("not in compare run");
       return bits.join(" · ");
@@ -706,7 +854,15 @@
 
   function showNode(paper) {
     var year = paper.year || "year unknown";
-    var library = paper.in_library ? "In your library" : "Not in the library yet";
+    var library = paper.in_library
+      ? "In your library" + (paper.item_key ? " · " + paper.item_key : "")
+      : "Not in the library yet";
+    var pdfLine =
+      paper.in_library && paper.has_pdf === true
+        ? "PDF on disk"
+        : paper.in_library && paper.has_pdf === false
+          ? "No PDF on disk yet"
+          : "";
     var author = paper.first_author ? escapeHtml(paper.first_author) + " · " : "";
     var doi = paper.doi
       ? '<p class="citation-meta"><a href="https://doi.org/' +
@@ -720,12 +876,73 @@
     var triageLine = triage
       ? '<p class="citation-meta">' + escapeHtml(triage.reason || "") + "</p>"
       : "";
+    var cats = Array.isArray(paper.categories) ? paper.categories : [];
+    var catLine = "";
+    if (cats.length) {
+      catLine =
+        '<p class="citation-meta">Categories: ' +
+        escapeHtml(
+          cats
+            .map(function (cid) {
+              return (state.categoryById[cid] && state.categoryById[cid].label) || cid;
+            })
+            .join(", ")
+        ) +
+        "</p>";
+    }
+    var designs = Array.isArray(paper.study_designs) ? paper.study_designs : [];
+    var designLine = designs.length
+      ? '<p class="citation-meta">Study designs: ' +
+        escapeHtml(designs.join(", ")) +
+        "</p>"
+      : "";
     var keep = "";
     if (paper.doi) {
       keep =
         '<div class="citation-actions">' +
         '<button type="button" class="secondary" data-keep="1">Keep</button>' +
         '<button type="button" class="secondary" data-keep="0">Skip</button>' +
+        "</div>";
+    }
+    var canEdit = state.editMode !== "off";
+    var libActions = "";
+    var editForm = "";
+    if (canEdit) {
+      libActions = '<div class="citation-actions">';
+      if (!paper.in_library && !paper.ghost) {
+        libActions += '<button type="button" data-lib="add">Add to library</button>';
+      }
+      if (paper.in_library && paper.item_key) {
+        libActions +=
+          '<button type="button" class="secondary" data-lib="find-pdf">Find PDF</button>' +
+          '<button type="button" class="secondary" data-lib="remove">Remove from library</button>' +
+          '<a class="secondary" href="zotero://select/library/items/' +
+          encodeURIComponent(paper.item_key) +
+          '">Open in Zotero</a>';
+        if (paper.has_pdf) {
+          libActions +=
+            '<a class="secondary" href="/item/' +
+            encodeURIComponent(paper.item_key) +
+            '/summary">Summary</a>';
+        }
+      }
+      libActions += "</div>";
+      editForm =
+        '<div class="citation-edit">' +
+        '<label>Tags <input type="text" id="citationTags" value="' +
+        escapeAttr((paper.tags || []).join(", ")) +
+        '" placeholder="to-read, paperful:map"></label>' +
+        '<label>Note <textarea id="citationNote" rows="2" placeholder="Why keep this?">' +
+        escapeHtml(paper.note || "") +
+        "</textarea></label>" +
+        '<label>Collection <input type="text" id="citationCollection" value="' +
+        escapeAttr(paper.target_collection || "") +
+        '" placeholder="Inbox/Snowball" list="citationCollectionList"></label>' +
+        '<datalist id="citationCollectionList"></datalist>' +
+        '<button type="button" class="secondary" data-lib="save-meta">Save tags / note / collection</button>' +
+        (paper.staged
+          ? '<p class="citation-meta">Staged for Apply (or saved if already in library).</p>'
+          : "") +
         "</div>";
     }
     var expandDisabled = state.expandBlocked ? " disabled" : "";
@@ -739,16 +956,22 @@
       " · " +
       (paper.cited_by_count || 0) +
       " citations</p>" +
+      "<p><strong>" +
+      escapeHtml(library) +
+      "</strong>" +
+      (pdfLine ? " · " + escapeHtml(pdfLine) : "") +
+      "</p>" +
       "<p>" +
       escapeHtml(ROLE_LABEL[paper.role] || paper.role) +
       "</p>" +
-      "<p>" +
-      library +
-      "</p>" +
+      catLine +
+      designLine +
       triageLine +
       doi +
       why +
       keep +
+      libActions +
+      editForm +
       '<div class="citation-actions">' +
       '<button type="button" class="secondary" data-expand="refs"' +
       expandDisabled +
@@ -757,6 +980,7 @@
       expandDisabled +
       ">Papers that cite it</button>" +
       "</div>";
+    fillCollectionList();
     els.panel.querySelectorAll("[data-keep]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         submitKeep(paper, btn.getAttribute("data-keep") === "1");
@@ -767,6 +991,117 @@
         expand(paper.id, btn.getAttribute("data-expand") || "both", btn);
       });
     });
+    els.panel.querySelectorAll("[data-lib]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var action = btn.getAttribute("data-lib");
+        if (action === "add") addToLibrary(paper, btn);
+        else if (action === "find-pdf") findPdf(paper, btn);
+        else if (action === "remove") removeFromLibrary(paper, btn);
+        else if (action === "save-meta") saveMeta(paper, btn);
+      });
+    });
+  }
+
+  function fillCollectionList() {
+    var list = document.getElementById("citationCollectionList");
+    if (!list || !state.metaCollections) return;
+    list.innerHTML = state.metaCollections
+      .map(function (p) {
+        return '<option value="' + escapeAttr(p) + '"></option>';
+      })
+      .join("");
+  }
+
+  function postGraph(path, body) {
+    return fetch(path, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(body),
+    }).then(readJson);
+  }
+
+  function addToLibrary(paper, btn) {
+    if (btn) btn.disabled = true;
+    setStatus("Adding to library…");
+    postGraph("/discover/graph/add", { run_id: state.runId, node_id: paper.id })
+      .then(function (payload) {
+        if (payload.graph) adopt(payload.graph);
+        var msg = "Added to library.";
+        if (payload.searched) msg += " Searching for PDF…";
+        if (payload.search_error) msg += " PDF search failed: " + payload.search_error;
+        setStatus(msg);
+        var updated = state.nodes.filter(function (n) { return n.id === paper.id; })[0];
+        if (updated) showNode(updated);
+      })
+      .catch(function (error) {
+        setStatus(error.message || "Could not add to library.");
+        if (btn) btn.disabled = false;
+      });
+  }
+
+  function findPdf(paper, btn) {
+    if (btn) btn.disabled = true;
+    setStatus("Finding PDF…");
+    postGraph("/discover/graph/find-pdf", {
+      run_id: state.runId,
+      node_id: paper.id,
+      item_key: paper.item_key || "",
+    })
+      .then(function (payload) {
+        if (payload.graph) adopt(payload.graph);
+        setStatus("PDF search finished for that item.");
+        var updated = state.nodes.filter(function (n) { return n.id === paper.id; })[0];
+        if (updated) showNode(updated);
+      })
+      .catch(function (error) {
+        setStatus(error.message || "Could not find PDF.");
+        if (btn) btn.disabled = false;
+      });
+  }
+
+  function removeFromLibrary(paper, btn) {
+    if (!window.confirm("Trash this item in Zotero? It will leave the library.")) return;
+    if (btn) btn.disabled = true;
+    setStatus("Removing from library…");
+    postGraph("/discover/graph/remove", { run_id: state.runId, node_id: paper.id })
+      .then(function (payload) {
+        if (payload.graph) adopt(payload.graph);
+        setStatus("Removed from library.");
+        var updated = state.nodes.filter(function (n) { return n.id === paper.id; })[0];
+        if (updated) showNode(updated);
+      })
+      .catch(function (error) {
+        setStatus(error.message || "Could not remove from library.");
+        if (btn) btn.disabled = false;
+      });
+  }
+
+  function saveMeta(paper, btn) {
+    var tagsInput = document.getElementById("citationTags");
+    var noteInput = document.getElementById("citationNote");
+    var collInput = document.getElementById("citationCollection");
+    var tags = tagsInput
+      ? tagsInput.value.split(/[,;]+/).map(function (t) { return t.trim(); }).filter(Boolean)
+      : [];
+    if (btn) btn.disabled = true;
+    postGraph("/discover/graph/annotate", {
+      run_id: state.runId,
+      node_id: paper.id,
+      tags: tags,
+      note: noteInput ? noteInput.value : "",
+      collection: collInput ? collInput.value : "",
+    })
+      .then(function (payload) {
+        if (payload.graph) adopt(payload.graph);
+        setStatus("Saved tags / note / collection.");
+        var updated = state.nodes.filter(function (n) { return n.id === paper.id; })[0];
+        if (updated) showNode(updated);
+      })
+      .catch(function (error) {
+        setStatus(error.message || "Could not save.");
+        if (btn) btn.disabled = false;
+      });
   }
 
   function submitKeep(paper, keep) {

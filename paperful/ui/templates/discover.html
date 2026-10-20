@@ -78,6 +78,8 @@
       <label>Keyword min score {{ info("Drop seed keywords below this similarity. 0 keeps whatever OpenAlex assigned.") }} <input name="keyword_min_score"></label>
       <label>Cites query {{ info("Only references and citing works that match this OpenAlex search. Needs refs or cites in Direction, and Depth of at least 1.") }} <input name="cites_query"></label>
       <label>Languages {{ info("Comma-separated ISO language codes to keep, for example en,fr.") }} <input name="languages" placeholder="en,fr"></label>
+      <label>Study designs {{ info("OpenAlex study-design filter for the crawl. Comma-separated: rct, meta-analysis, systematic-review, observational, case-report, protocol, clinical-trial. Untagged works never match.") }} <input name="study_designs" placeholder="rct, meta-analysis"></label>
+      <label>Map categories {{ info("Which literature categories appear on the citation map (badges and filters). Comma-separated ids: evidence-synthesis, trials, observational, case-reports, protocols. Custom ids need [snowball].map_category_defs in config.") }} <input name="map_categories" placeholder="evidence-synthesis, trials, observational, case-reports, protocols"></label>
       <label>Min seed citations {{ info("Ignore seed works cited fewer times than this. Filters noisy or very new seeds.") }} <input name="min_seed_citations" type="number"></label>
       <label>Backends {{ info("Bibliographic sources to query, comma-separated. Typical: openalex,crossref.") }} <input name="backends" placeholder="openalex,crossref"></label>
       <label>Tags {{ info("Extra Zotero tags on items created from this run, comma-separated. Combined with config defaults.") }} <input name="tags" placeholder="paperful:frontier"></label>
@@ -379,6 +381,7 @@
     <p id="citationThresholds" class="citation-meta"></p>
     <p id="citationStatus" class="citation-status" role="status"></p>
   </div>
+  <div id="citationCategoryFilters" class="citation-category-filters" role="group" aria-label="Literature categories" hidden></div>
   <label class="citation-year">
     Year focus
     <span id="citationYearLabel">all years</span>
@@ -399,8 +402,9 @@
     <li><span class="citation-swatch influential" aria-hidden="true"></span> Influential</li>
     <li><span class="citation-swatch emerging" aria-hidden="true"></span> Emerging</li>
     <li><span class="citation-swatch other" aria-hidden="true"></span> Other</li>
-    <li><span class="citation-swatch library" aria-hidden="true"></span> In your library</li>
+    <li><span class="citation-swatch library" aria-hidden="true"></span> In your library (LIB badge / dark ring)</li>
   </ul>
+  <ul id="citationCategoryLegend" class="citation-legend citation-category-legend" hidden></ul>
 </section>
 {% endif %}
 <section class="panel">
@@ -474,6 +478,21 @@
       <button type="submit" class="secondary">Check again</button>
       {{ info("Poll this watch or list for new papers since the last run.") }}
     </form>
+    {% if f.kind == 'topic' %}
+    <form method="post" action="/discover/apply-preview" class="toolbar" style="display:inline">
+      <input type="hidden" name="kind" value="watch">
+      <input type="hidden" name="list_name" value="{{ f.name }}">
+      <button type="submit" class="secondary">Preview apply</button>
+      {{ info("Count watch-inbox rows that would become new Zotero items. Writes nothing.") }}
+    </form>
+    <form method="post" action="/discover/apply" class="toolbar" style="display:inline">
+      <input type="hidden" name="kind" value="watch">
+      <input type="hidden" name="list_name" value="{{ f.name }}">
+      <input type="hidden" name="review_token" value="{{ watch_token }}">
+      <button type="submit">Apply inbox</button>
+      {{ info("Create parents from this topic watch inbox (same as snowball watch apply --apply).") }}
+    </form>
+    {% endif %}
     {% if prefs.advanced and f.kind == 'topic' %}
     <form method="post" action="/discover/watch-briefing" class="toolbar" style="display:inline">
       <input type="hidden" name="name" value="{{ f.name }}">
@@ -495,6 +514,6 @@
 {% block scripts %}
 {% if run_id %}
 <script src="/static/vendor/d3.v7.min.js"></script>
-<script src="/static/citation_map.js?v=4"></script>
+<script src="/static/citation_map.js?v=5"></script>
 {% endif %}
 {% endblock %}

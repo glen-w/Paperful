@@ -995,6 +995,28 @@ header.wb-chrome .advanced-toggle .help-tip-bubble {
   margin-top: 0.6rem;
 }
 
+.citation-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--line);
+}
+
+.citation-edit label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.88rem;
+}
+
+.citation-edit input,
+.citation-edit textarea {
+  font: inherit;
+  width: 100%;
+}
+
 .citation-legend {
   display: flex;
   flex-wrap: wrap;
@@ -1027,6 +1049,28 @@ header.wb-chrome .advanced-toggle .help-tip-bubble {
   background: transparent;
   border: 2px solid var(--ink);
   box-sizing: border-box;
+}
+
+.citation-category-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.citation-category-filters[hidden],
+.citation-category-legend[hidden] {
+  display: none;
+}
+
+.citation-category-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.citation-swatch.citation-category-swatch {
+  border-radius: 2px;
 }
 
 @media (max-width: 800px) {

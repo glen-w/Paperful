@@ -23,6 +23,13 @@ import httpx
 from ..resolve import normalize_doi
 from .candidate import Candidate
 from .expand import select_works_by_citations
+from .map_categories import (
+    CategoryDef,
+    categories_for,
+    legend_for,
+    resolve_catalog,
+    study_designs_of,
+)
 from .openalex import (
     OpenAlexBudgetExceeded,
     OpenAlexClient,
@@ -111,9 +118,13 @@ def build_graph(
     focus: str | None = None,
     watch_seen: set[str] | None = None,
     compare_ids: set[str] | None = None,
+    map_categories: list[str] | tuple[str, ...] | None = None,
+    map_category_defs: list[dict[str, Any]] | tuple[dict[str, Any], ...] | None = None,
+    out_dir: Path | None = None,
 ) -> dict[str, Any]:
     """JSON map for the Discover canvas. Caps nodes; edges stay inside that set."""
     year_now = now_year if now_year is not None else datetime.now(timezone.utc).year
+    catalog = resolve_catalog(enabled=map_categories, custom_defs=map_category_defs)
     chosen = select_nodes(rows, focus=focus, max_nodes=max_nodes)
     counts = [_cited(row) for row in chosen if row.hop != 0]
     threshold = CITATION_FLOOR if not counts else max(CITATION_FLOOR, _median(counts))
@@ -125,6 +136,8 @@ def build_graph(
             threshold=threshold,
             watch_seen=watch_seen,
             compare_ids=compare_ids,
+            catalog=catalog,
+            out_dir=out_dir,
         )
         for row in chosen
     ]
@@ -143,14 +156,29 @@ def build_graph(
             "highly_cited": threshold,
             "recent_from_year": recent_from,
         },
+        "category_legend": legend_for(catalog),
         "triage": build_triage(nodes),
         "nodes": nodes,
         "edges": edges,
     }
 
 
-def write_graph(dest: Path, rows: list[Candidate], *, run_id: str) -> Path:
-    graph = build_graph(rows, run_id=run_id)
+def write_graph(
+    dest: Path,
+    rows: list[Candidate],
+    *,
+    run_id: str,
+    map_categories: list[str] | tuple[str, ...] | None = None,
+    map_category_defs: list[dict[str, Any]] | tuple[dict[str, Any], ...] | None = None,
+    out_dir: Path | None = None,
+) -> Path:
+    graph = build_graph(
+        rows,
+        run_id=run_id,
+        map_categories=map_categories,
+        map_category_defs=map_category_defs,
+        out_dir=out_dir,
+    )
     return write_graph_file(dest, graph)
 
 
@@ -161,12 +189,35 @@ def write_graph_file(dest: Path, graph: dict[str, Any]) -> Path:
     return path
 
 
+def _summary_map_settings(
+    dest: Path,
+) -> tuple[list[str] | None, list[dict[str, Any]] | None]:
+    """Read map category knobs persisted on the run summary, if any."""
+    path = dest / "summary.json"
+    if not path.is_file():
+        return None, None
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, None
+    if not isinstance(raw, dict):
+        return None, None
+    cats = raw.get("map_categories")
+    defs = raw.get("map_category_defs")
+    cat_out = [str(item) for item in cats] if isinstance(cats, list) else None
+    def_out = [dict(item) for item in defs if isinstance(item, dict)] if isinstance(defs, list) else None
+    return cat_out, def_out
+
+
 def graph_for_run(
     state_dir: Path,
     run_id: str,
     *,
     watch_seen: set[str] | None = None,
     compare_ids: set[str] | None = None,
+    map_categories: list[str] | tuple[str, ...] | None = None,
+    map_category_defs: list[dict[str, Any]] | tuple[dict[str, Any], ...] | None = None,
+    out_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Rebuild the map from the queue on disk."""
     from .queue import load_queue
@@ -177,11 +228,16 @@ def graph_for_run(
         dest, rows = load_queue(state_dir, run_id)
     except FileNotFoundError as exc:
         raise CitationGraphError("No queue for that run.") from exc
+    # Run summary wins so a profile-saved map_categories set sticks on that queue.
+    summary_cats, summary_defs = _summary_map_settings(dest)
     graph = build_graph(
         rows,
         run_id=run_id,
         watch_seen=watch_seen,
         compare_ids=compare_ids,
+        map_categories=summary_cats if summary_cats is not None else map_categories,
+        map_category_defs=summary_defs if summary_defs is not None else map_category_defs,
+        out_dir=out_dir,
     )
     write_graph_file(dest, graph)
     return graph
@@ -191,6 +247,10 @@ def repair_queue_links(
     state_dir: Path,
     run_id: str,
     client: OpenAlexClient,
+    *,
+    map_categories: list[str] | tuple[str, ...] | None = None,
+    map_category_defs: list[dict[str, Any]] | tuple[dict[str, Any], ...] | None = None,
+    out_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Re-link queue rows to hop-0 seeds from OpenAlex refs/cites (Keep unchanged)."""
     from .queue import load_queue
@@ -238,7 +298,13 @@ def repair_queue_links(
         "".join(json.dumps(row.to_dict(), ensure_ascii=False) + "\n" for row in rows),
         encoding="utf-8",
     )
-    graph = build_graph(rows, run_id=run_id)
+    graph = build_graph(
+        rows,
+        run_id=run_id,
+        map_categories=map_categories,
+        map_category_defs=map_category_defs,
+        out_dir=out_dir,
+    )
     write_graph_file(dest, graph)
     return graph
 
@@ -401,6 +467,8 @@ def expand_queue(
     client: OpenAlexClient,
     *,
     now_year: int | None = None,
+    map_categories: list[str] | tuple[str, ...] | None = None,
+    map_category_defs: list[dict[str, Any]] | tuple[dict[str, Any], ...] | None = None,
 ) -> dict[str, Any]:
     """One OpenAlex hop from ``node_id``. Merges neighbours into the queue."""
     from .crawl import _dedupe
@@ -441,7 +509,14 @@ def expand_queue(
         "".join(json.dumps(row.to_dict(), ensure_ascii=False) + "\n" for row in merged),
         encoding="utf-8",
     )
-    graph = build_graph(merged, run_id=run_id, now_year=now_year, focus=target_id)
+    graph = build_graph(
+        merged,
+        run_id=run_id,
+        now_year=now_year,
+        focus=target_id,
+        map_categories=map_categories,
+        map_category_defs=map_category_defs,
+    )
     write_graph_file(dest, graph)
     return graph
 
@@ -556,6 +631,8 @@ def _node(
     threshold: int,
     watch_seen: set[str] | None = None,
     compare_ids: set[str] | None = None,
+    catalog: list[CategoryDef] | None = None,
+    out_dir: Path | None = None,
 ) -> dict[str, Any]:
     year = _year(row)
     cited = _cited(row)
@@ -564,6 +641,23 @@ def _node(
     first = ""
     if isinstance(authors, list) and authors:
         first = str(authors[0] or "")
+    designs = study_designs_of(row.biblio)
+    active = catalog if catalog is not None else resolve_catalog()
+    in_library = row.status == "exists" or bool(row.exists_match)
+    match = row.exists_match if isinstance(row.exists_match, dict) else {}
+    item_key = str(match.get("item_key") or "").strip()
+    op = row.operator if isinstance(row.operator, dict) else {}
+    staged_tags = [str(t) for t in (op.get("tags") or []) if str(t).strip()]
+    staged_note = str(op.get("note") or "").strip()
+    staged_collection = str(op.get("collection") or "").strip()
+    has_pdf: bool | None = None
+    if out_dir is not None and item_key:
+        try:
+            from ..mirror import pdf_for_key
+
+            has_pdf = pdf_for_key(out_dir, item_key) is not None
+        except Exception:
+            has_pdf = None
     payload: dict[str, Any] = {
         "id": row.identity,
         "title": str(row.biblio.get("title") or ""),
@@ -571,7 +665,9 @@ def _node(
         "cited_by_count": cited,
         "role": kind,
         "seed": row.hop == 0,
-        "in_library": row.status == "exists" or bool(row.exists_match),
+        "in_library": in_library,
+        "item_key": item_key,
+        "has_pdf": has_pdf,
         "keep": row.keep,
         "hop": row.hop,
         "occasional": kind == "other" and row.hop != 0,
@@ -579,6 +675,12 @@ def _node(
         "openalex": str(row.ids.get("openalex") or ""),
         "why": str(row.why or ""),
         "first_author": first,
+        "study_designs": designs,
+        "categories": categories_for(row.biblio, active),
+        "tags": staged_tags,
+        "note": staged_note,
+        "target_collection": staged_collection,
+        "staged": bool(staged_tags or staged_note or staged_collection),
     }
     if watch_seen is not None:
         payload["watch_new"] = row.identity not in watch_seen

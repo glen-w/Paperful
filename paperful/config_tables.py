@@ -47,6 +47,7 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_endnote(raw, cfg, source)
     apply_openalex_store(raw, cfg)
     apply_searxng(raw, cfg)
+    apply_keepup(raw, cfg)
     apply_ui(raw, cfg)
     apply_prompt_paths(cfg, source)
 
@@ -650,6 +651,14 @@ def apply_searxng(raw: dict[str, Any], cfg: "Config") -> None:
         cfg.searxng_base_url = str(searx["base_url"]).strip().rstrip("/")
 
 
+def apply_keepup(raw: dict[str, Any], cfg: "Config") -> None:
+    keepup = raw.get("keepup")
+    if not isinstance(keepup, dict):
+        return
+    if "interval_days" in keepup:
+        cfg.keepup_interval_days = max(0, int(keepup["interval_days"]))
+
+
 def _positive_int_tuple(raw: Any) -> tuple[int, ...]:
     if isinstance(raw, int):
         return (max(1, raw),)
@@ -680,6 +689,14 @@ def apply_ui(raw: dict[str, Any], cfg: "Config") -> None:
     mode = str(ui.get("attach_mode") or "").strip().lower()
     if mode in {"manual", "auto"}:
         cfg.ui_attach_mode = mode
+    edit = str(ui.get("citation_map_edit") or "").strip().lower()
+    if edit in {"sidebar", "popup", "both", "off"}:
+        cfg.ui_citation_map_edit = edit
+    if "citation_map_auto_search" in ui:
+        cfg.ui_citation_map_auto_search = bool(ui["citation_map_auto_search"])
+    remove = str(ui.get("citation_map_remove") or "").strip().lower()
+    if remove in {"trash", "remove_from_collection"}:
+        cfg.ui_citation_map_remove = remove
 
 
 def apply_prompt_paths(cfg: "Config", source: Path) -> None:

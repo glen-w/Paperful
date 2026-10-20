@@ -6,6 +6,22 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+### Added
+
+- **Keepup (alert loop / what cites):** `paperful keepup` polls topic watches,
+  authorwatch lists, and OpenAlex citers of `-C` on a configurable
+  `interval_days` (default 7). Baseline proposes nothing; later runs write
+  `digest.md`, and `--apply` creates parents plus `ingested.md`. Also
+  `snowball watch apply` (inbox → parents) and `authorwatch digest`. No
+  built-in scheduler or email — cron `keepup run`. Discover Following can
+  Preview/Apply a topic watch inbox. See [Keepup](docs/keepup.md).
+- **Citation map literature categories:** OpenAlex `study_designs` surface as
+  badges and filter chips beside foundational / influential / emerging roles
+  (evidence synthesis, trials, observational, case reports, protocols).
+  Config `[snowball].map_categories` / `map_category_defs`; Discover advanced
+  form also takes study-design crawl filters and map category ids. See
+  [Citation map](docs/snowball.md#citation-map).
+
 ### Changed
 
 - **Firefox add-on 0.2:** richer page detection (Highwire / Dublin Core / JSON-LD), type-to-filter collection picker, capture tags with library and OpenAlex keyword suggestions, optional capture note, Review-then-Save for selected tabs, context menu and Alt+Shift+P, walk badge, open folder / Wanted after save. Native messages are correlated by id. Downloads are staged from the user Downloads folder into the drop directory. `install-host` writes a Windows launcher. Popup and options use the workbench paper, copper, and box-mark chrome. See [Firefox](docs/firefox.md).

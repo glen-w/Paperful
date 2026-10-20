@@ -137,10 +137,11 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `mcp_server.py` | Optional stdio MCP: read-only gaps, snowball preview / trends, export, proposal_export, refs_gap, ask | `agent_ops` |
 | `serve.py` | Localhost FastAPI: JSON capability API + mounts `ui` when the `serve` extra is installed | `agent_ops`, `ui` |
 | `ui/` | Server-rendered workbench (Jinja). `app.py` owns shared helpers + `mount_ui`; routes live in `wanted_routes` / `discover_routes` / `shell_routes` / `repair_routes` / `index_routes` (each `register_*`). Long jobs: `jobs.py` re-exports `wanted_jobs` / `discover_jobs` / `repair_jobs` / `index_jobs` (RAG, ask, summarize, synthesize). Ordinary pages do not run `doctor` (System does). Handlers resolve `doctor_payload` / `collections_tree` via `paperful.ui.app` so tests can monkeypatch there | CLI / MCP builders |
-| `authorwatch.py` | People lists → OpenAlex new works; `gather_briefing` / `write_briefing` (inbox + recent works / co-authors); `apply` creates parents; `accept` / `delete` | OpenAlex client, `identity`, `snowball.ingest`, `authorwatch_suggest` |
+| `authorwatch.py` | People lists → OpenAlex new works; `gather_briefing` / `write_briefing` / `write_digest`; `apply` creates parents + `ingested.md`; `accept` / `delete` | OpenAlex client, `identity`, `snowball.ingest`, `authorwatch_suggest` |
 | `authorwatch_suggest.py` | Corpus / cited / coauthor / mix suggestions → `suggestions.jsonl`; shared co-author accumulation for briefing | `authors_report`, OpenAlex, promoted packs |
 | `authorwatch_social.py` | Parse operator-saved RG / LinkedIn / Academia HTML or CSV (no network) | stdlib HTML/CSV |
-| `snowball/` | Crawl, hops, watch, thin briefing, frontier digest, `trends` (OpenAlex `group_by` year counts). Watch, digest, and trends do not create library items | OpenAlex; library protocol only on apply |
+| `keepup.py` / `keepup_cites.py` | Alert loop job ledger (`paperful.keepup.v1`); poll watch / authorwatch / collection citers; interval gate; apply + dismiss | `snowball.watch`, `authorwatch`, OpenAlex `works_citing` |
+| `snowball/` | Crawl, hops, watch (`watch apply` from inbox), thin briefing, frontier digest, `trends` (OpenAlex `group_by` year counts). `watch run` does not create library items | OpenAlex; library protocol only on apply |
 | `sections/` | IMRaD field extract (`extract-sections`): deterministic split + optional LLM fill | `rag.extract` text cache, `rag.chunk` / `sections.headings`, gated `llm` |
 
 ## The refresh
@@ -206,8 +207,9 @@ Tier policy (1.0 contract):
 | `paperful.authorwatch.suggestion.v1` | `state/authorwatch/<name>/suggestions.jsonl` | `authorwatch_suggest` | T2 | — |
 | `paperful.snowball.candidate.v1` | `state/snowball/<run-id>/` | `snowball.candidate` | T2 | Additive through 1.x |
 | `paperful.snowball.watch.v1` | snowball watch cursor | `snowball.watch` | T2 | — |
+| `paperful.keepup.v1` | `state/keepup/<name>/job.json` | `keepup` | T2 | Alert loop / what-cites; see [keepup.md](keepup.md) |
 | `paperful.snowball.coauthors.v1` | co-author graph | `snowball.authors` | T2 | — |
-| `paperful.citation_graph.v1` | `state/snowball/<run-id>/citation_graph.json` | `snowball.citation_graph` | T2 | Discover map. Rebuilt from the queue. Nodes carry `role`, optional `watch_new` / `compare_new`, `thresholds`, and `triage` (read-first list). |
+| `paperful.citation_graph.v1` | `state/snowball/<run-id>/citation_graph.json` | `snowball.citation_graph` | T2 | Discover map. Rebuilt from the queue. Nodes carry `role`, `in_library`, `item_key`, `has_pdf`, optional operator staging (`tags` / `note` / `target_collection` / `staged`), optional `watch_new` / `compare_new`, `thresholds`, and `triage` (read-first list). Library actions: `paperful.snowball.graph_library`. |
 | `paperful.htmlpdf.proposal.v1` | `state/htmlpdf/proposals/` | `sources.htmlpdf` | T2 | — |
 | `paperful.synthesis.v1` | synthesize sidecar | `synthesize` | T2 | — |
 | `paperful.ask_batch.v1` | `state/ask-batch/<stamp>/` | `rag.batch` | T2 | — |

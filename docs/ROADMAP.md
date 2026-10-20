@@ -10,10 +10,10 @@ adapter.** Mendeley and EndNote are in the tree and seeking testers. See
 Optional thin bridges (`paperful session login`) capture a local browser profile;
 they do not rewrite the fetcher. A **Zotero plugin** is not the 1.0 bet.
 The **Firefox extension** is an optional mirror bridge ([firefox.md](firefox.md)).
-**Local OpenAlex snapshot** (beyond today’s opt-in v1) and the **alert loop**
-(watch / authorwatch poll → ingest → briefing) stay later — see
+**Local OpenAlex snapshot** (beyond today’s opt-in v1) stays later — see
 [Product split](#product-split-10-vs-post-10) and the
-[post-1.1 buffet](#after-110-buffet-by-area).
+[post-1.1 buffet](#after-110-buffet-by-area). Alert loop / what-cites:
+[`keepup`](keepup.md).
 
 **1.0** is the trust checklist below (all rows shipped), a locked item record
 (`paperful.item.v1` plus `snapshot` / `restore`), proven on **Zotero**, and the
@@ -42,7 +42,7 @@ integrations.
 | --- | --- |
 | Trust checklist, locked `paperful.run_report.v1` / `paperful.item.v1`, snapshot contract | **Local OpenAlex parquet store** — phases 2B/2C (`works_citing`, full search parity, `local_duckdb` / `http`). Live OpenAlex API is enough for most installs; v1 `ssh_duckdb` remains opt-in for institutions |
 | **GUI workbench** — Discover + Wanted simple loop (topic + people); command ids; review tokens; Advanced Repair / Mirror / Index / Briefs and the non-TTY CLI verbs | **Firefox extension** — optional native messaging into the mirror ([firefox.md](firefox.md)) |
-| **Ask in GUI** — `/ask` on the default nav, scoped chat with citations when `[rag]` + `[llm]` on | **Alert loop** — poll `snowball watch` / `authorwatch`, ingest parents into `-C`, post-ingest briefing ([Frontier digest](#frontier-digest-later-watch--external-ingest)) |
+| **Ask in GUI** — `/ask` on the default nav, scoped chat with citations when `[rag]` + `[llm]` on | Discover keepup UX polish; `refs` on collection digest; retractions / living-review ([Keeping up](#after-110-keeping-up)) |
 | Zotero-proven fetch/mirror path; honest adapter docs (Mendeley / EndNote seeking testers) | SaaS tenancy polish; promoting other managers to “supported” after field reports; remote-manager parity beyond what 1.0 open/Docker needs |
 
 **1.1.x vs later (still not a calendar).** 1.1.0 is the PyPI cut. **1.1.1**
@@ -150,22 +150,21 @@ headline.
 (after-110-keeping-up)=
 ### Keeping up (digest, watches, alert loop)
 
-Pieces exist: `watch.py`, `digest.py`, `briefing.py` under
-`paperful/snowball/`; [Frontier digest](#frontier-digest-later-watch--external-ingest)
-and [author watch](#author-watch-lists-later-people-you-follow--their-papers)
-are in tree. There is still **no** built-in scheduler.
+**Shipped (CLI):** [`keepup`](keepup.md) — alert loop
+(`watch` / `authorwatch` / `cites` → digest → apply → `ingested.md`) with
+configurable `interval_days` (default 7). Also `snowball watch apply` and
+`authorwatch digest`. Still **no** built-in scheduler and **no** email;
+operators cron `keepup run`.
 
-- **Alert loop** (watch / authorwatch → ingest into `-C` → post-ingest
-  briefing). Cheapest visible feature. Test demand with a documented cron
-  recipe before automating.
-- **Weekly digest per Zotero collection.** New works that cite or are cited
-  by the collection, new works by saved authors, and topic or snowball
-  feeds. Each item carries a short “why suggested” line (for example “cites
-  3 of your papers”). One click adds it, dismisses it, or mutes the source.
-  Kept items go to Wanted; the digest files in Zotero as a note. Hand-build
-  one on a BBNJ collection and ask testers whether they would want it
-  before productizing. If yes, this is the retention feature (the reason to
-  come back every week).
+Pieces underneath: `watch.py`, `digest.py`, `briefing.py`;
+[Frontier digest](#frontier-digest-later-watch--external-ingest) and
+[author watch](#author-watch-lists-later-people-you-follow--their-papers).
+
+- **Alert loop** — shipped as `paperful keepup` (+ standalone watch/authorwatch apply).
+- **Weekly digest per Zotero collection.** Shipped as keepup `--source cites`
+  (why line `cites N of your papers`); combine with `--watch` / `--authorwatch`
+  on one job. Dismiss/mute via `keepup dismiss`. Discover one-click UX and
+  “cited by your collection” (`refs`) remain buffet polish.
 - **Infra variant:** a scheduled nightly or weekly job uses the library’s
   own embeddings to query OpenAlex and preprint servers, optional local-model
   summaries, lands as a Zotero note or email.
@@ -227,7 +226,9 @@ Ask stays optional; whether it stays third on the default nav is open.
 - Stretch: evidence-table export (study type, n, method, finding), each
   cell tied to a passage and marked “check this” when unsure; local claim
   tracking that sorts citing papers into supporting, contrasting, or just
-  mentioning.
+  mentioning. Study-type seed for that table: Discover citation-map
+  literature categories from OpenAlex `study_designs` (see
+  [Citation map](snowball.md#citation-map)).
 - Existing RAG / Ask / Briefs surface: [Zotero-RAG
   integration](#zotero-rag-integration-later-question-centric-layer),
   [GUI](#gui). Question generation from summaries is still deferred there.
@@ -294,7 +295,11 @@ any percentage in copy until it has been validated on real reviews.
 
 Parked in the snowball lane today, still true: systematic-review screening
 and a review UI — [Parked](#snowball). The Discover citation map is the
-queue canvas (year × citations), not a corpus browser.
+queue canvas (year × citations), not a corpus browser: Wave 1 hardened
+edges / Keep / offline D3; Wave 2 added triage, year scrubber, path,
+library halo, and watch delta. Literature categories (OpenAlex
+`study_designs`) and in-map library actions (add / Find PDF / trash /
+tags) sit on that canvas — [Citation map](snowball.md#citation-map).
 
 (after-110-bigger-bets)=
 ### Bigger bets (pick at most one a year)
@@ -769,7 +774,7 @@ for the end-to-end operator story.
 | 7 | Non-DOI grey fingerprint (`norm(title)|year|registrant_host`; ISBN/report # when present) in snowball / dedupe / inbox ladder + inbox-create | Shipped (ISBN/report like DOI; title\|year\|host is review-tier; host mismatch is not `exists`) |
 | 8 | `paperful collections add --keys-file` — membership batch, dry-run / apply | Shipped |
 | 9 | Acronym allowlist harvest (Core `fix-metadata`) | Shipped (`paperful acronyms`; Title Case consumes `state/acronyms/`) |
-| 10 | [Frontier digest](#frontier-digest-later-watch--external-ingest); thin [snowball briefing](#frontier-digest-later-watch--external-ingest) export before full digest | Shipped (`snowball digest`, `watch digest`, `watch run --digest`); alert loop (watch inbox apply + post-ingest briefing) later — [Keeping up](#after-110-keeping-up) |
+| 10 | [Frontier digest](#frontier-digest-later-watch--external-ingest); thin [snowball briefing](#frontier-digest-later-watch--external-ingest) export before full digest | Shipped (`snowball digest`, `watch digest`, `watch run --digest`); alert loop + what-cites as [`keepup`](keepup.md) — [Keeping up](#after-110-keeping-up) |
 | 11 | Scholar late tail + latch + opt-in SerpApi | Shipped (`[fetch].order` policy; interleave with `browser_agent`; `[handoff].scholar`; `[serpapi].enabled` / `max_calls`) |
 | 12 | Authors/orgs frequency report from `-C` (`state/reports/…`; seed **field author packs**) | Shipped (`paperful authors`; `--apply` writes report + proposed pack) |
 | 13 | Handoff list ranking (Core handoff) | Shipped (cite count × miss severity) |
@@ -1229,10 +1234,11 @@ as `refs gap`. Optional `provenance_hint` when tags are available.
 
 ### Frontier digest (later; watch + external ingest)
 
-**Status:** digest shipped. Alert loop (poll → ingest → briefing) stays later — Paperful-local only (no email / rollup). Snowball
+**Status:** digest shipped. Alert loop shipped as [`keepup`](keepup.md)
+(poll → ingest → briefing; Paperful-local only — no email / rollup). Snowball
 **watch** stays dry-run and does not download PDFs. There is still **no**
-built-in scheduler. Post-1.1 buffet: a weekly collection digest, the alert
-loop as a cron recipe first, and retractions / living-review add-ons —
+built-in scheduler. Post-1.1 buffet: Discover keepup UX, `refs` direction on
+collection digest, retractions / living-review add-ons —
 [Keeping up](#after-110-keeping-up).
 
 **Digest (Paperful):** `paperful snowball digest --run-id`,
@@ -1253,13 +1259,12 @@ launchd / systemd / cron examples are in [snowball.md](snowball.md#watch).
 grey-vs-peer / OA stamp hints in briefing tables where provenance
 exists (`grey:…`, `oa:…`).
 
-**Alert loop (post-1.0; Paperful-only):** close the loop after frontier /
-people polls — `snowball watch run` / `authorwatch run` (operator cron;
-no built-in scheduler) → review `digest.md` / `authorwatch digest` →
-`snowball watch apply` / `authorwatch apply` into `-C` (dry-run default) →
-optional post-ingest briefing of what landed → `paperful run` for PDFs.
-Ingest reads watch / authorwatch **inbox jsonl**, not `digest.md`. Distinct
-from digest `--apply`, which only files a `paperful:frontier-briefing` note.
+**Alert loop (shipped; Paperful-only):** `paperful keepup run` (operator cron;
+no built-in scheduler) polls configured sources → `digest.md` →
+`keepup apply --apply` (or `run --apply`) into the job `-C` → `ingested.md` →
+`paperful run` for PDFs. Standalone: `snowball watch apply` /
+`authorwatch apply` read **inbox jsonl**, not `digest.md`. Distinct from
+digest `--apply`, which only files a `paperful:frontier-briefing` note.
 No email, IMAP, or sibling rollup coupling.
 
 (author-watch-lists-later-people-you-follow--their-papers)=
@@ -1741,7 +1746,7 @@ Larger product bets. Park until the ledger and core loop justify them.
    `extract-sections`); [annotation
    mirror](#annotation-mirror-later); [frontier
    digest](#frontier-digest-later-watch--external-ingest) (watch rollup shipped;
-   alert loop ingest + briefing still later); [author watch
+   alert loop + what-cites as [`keepup`](keepup.md)); [author watch
    lists](#author-watch-lists-later-people-you-follow--their-papers) (shipped;
    saved social HTML/CSV import; live scrape still out). **[Run
    witness](#run-witness-shipped-trust-thicken)** (shipped) ties batches to

@@ -7,19 +7,33 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from rich.console import Console
+from rich.table import Table
 
 from ..config import Config
+from ..identity import from_seed_tag
 from ..run_config import RunConfigError, check_profile_name
 from .candidate import Candidate
-from .command import PathResult, SnowballError, SnowballRequest, run_collection, run_doi, run_orcid, run_search
+from .command import (
+    PathResult,
+    SnowballError,
+    SnowballRequest,
+    _mark_exists,
+    get_backend,
+    run_collection,
+    run_doi,
+    run_orcid,
+    run_search,
+)
 from .profile import load_profile, request_from_profile
 from .queue import load_queue
 
 SCHEMA = "paperful.snowball.watch.v1"
+TAG = "paperful-snowball"
 _NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+Lookup = Callable[..., Any]
 
 
 @dataclass
@@ -30,6 +44,16 @@ class WatchResult:
     proposed: int
     already_seen: int
     baseline_count: int = 0
+
+
+@dataclass
+class ApplyResult:
+    created: int
+    skipped_exists: int
+    already_applied: int
+    failed: int
+    dry_run: bool
+    ingested_path: Path | None = None
 
 
 def watches_root(cfg: Config) -> Path:
@@ -74,12 +98,14 @@ def save_watch(cfg: Config, name: str, profile: str) -> Path:
             "last_run_id": None,
         }
     path.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
-    if not (dest / "seen.json").is_file():
-        (dest / "seen.json").write_text(
-            json.dumps({"identities": []}, indent=2) + "\n", encoding="utf-8"
-        )
-    if not (dest / "inbox.jsonl").is_file():
-        (dest / "inbox.jsonl").write_text("", encoding="utf-8")
+    for leaf, body in (
+        ("seen.json", json.dumps({"identities": []}, indent=2) + "\n"),
+        ("applied.json", json.dumps({"identities": []}, indent=2) + "\n"),
+        ("inbox.jsonl", ""),
+    ):
+        target = dest / leaf
+        if not target.is_file():
+            target.write_text(body, encoding="utf-8")
     return path
 
 
@@ -119,16 +145,226 @@ def append_inbox(cfg: Config, name: str, rows: list[Candidate]) -> None:
             handle.write(json.dumps(row.to_dict(), ensure_ascii=False) + "\n")
 
 
-def inbox_count(cfg: Config, name: str) -> int:
+def load_inbox(cfg: Config, name: str) -> list[Candidate]:
     path = watch_dir(cfg, name) / "inbox.jsonl"
     if not path.is_file():
-        return 0
-    count = 0
-    with path.open(encoding="utf-8") as handle:
-        for line in handle:
-            if line.strip():
-                count += 1
-    return count
+        return []
+    rows: list[Candidate] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            raw = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(raw, dict):
+            rows.append(Candidate.from_dict(raw))
+    return rows
+
+
+def inbox_count(cfg: Config, name: str) -> int:
+    return len(load_inbox(cfg, name))
+
+
+def _identities_file(cfg: Config, name: str, leaf: str) -> set[str]:
+    path = watch_dir(cfg, name) / leaf
+    if not path.is_file():
+        return set()
+    body = json.loads(path.read_text(encoding="utf-8"))
+    return {str(item) for item in (body.get("identities") or []) if item}
+
+
+def _save_identities(cfg: Config, name: str, leaf: str, identities: set[str]) -> None:
+    dest = watch_dir(cfg, name)
+    dest.mkdir(parents=True, exist_ok=True)
+    (dest / leaf).write_text(
+        json.dumps({"identities": sorted(identities)}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def load_applied(cfg: Config, name: str) -> set[str]:
+    return _identities_file(cfg, name, "applied.json")
+
+
+def save_applied(cfg: Config, name: str, identities: set[str]) -> None:
+    _save_identities(cfg, name, "applied.json", identities)
+
+
+def write_ingest_briefing(
+    cfg: Config,
+    name: str,
+    *,
+    collection: str,
+    created_rows: list[Candidate],
+    created: int,
+    skipped_exists: int,
+    failed: int,
+) -> Path:
+    """Post-apply rollup of what landed. Does not create library items."""
+    dest = watch_dir(cfg, name)
+    dest.mkdir(parents=True, exist_ok=True)
+    path = dest / "ingested.md"
+    lines = [
+        f"# Watch ingest {name}",
+        "",
+        f"Collection `{collection}`.",
+        f"created {created} · exists {skipped_exists} · failed {failed}",
+        "",
+        "## Created",
+        "",
+    ]
+    if not created_rows:
+        lines.append("None.")
+    else:
+        for row in created_rows:
+            title = str(row.biblio.get("title") or "").strip() or "(untitled)"
+            doi = row.ids.get("doi") or ""
+            why = (row.why or "").replace("\n", " ").strip()
+            bit = f"- {title}"
+            if doi:
+                bit += f" · `{doi}`"
+            if why:
+                bit += f" — {why}"
+            lines.append(bit)
+    lines.extend(
+        [
+            "",
+            "## Next",
+            "",
+            f"- `paperful run -C {_quote_collection(collection)}`",
+            "- Open Wanted in the workbench for PDFs",
+            "",
+        ]
+    )
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
+def _quote_collection(collection: str) -> str:
+    if any(ch.isspace() for ch in collection):
+        return f'"{collection}"'
+    return collection
+
+
+def apply_watch(
+    cfg: Config,
+    name: str,
+    collection: str,
+    *,
+    console: Console,
+    apply: bool = False,
+    lookup: Lookup | None = None,
+    backend: Any = None,
+) -> ApplyResult:
+    """Create parents from the watch inbox. Dry-run by default."""
+    from .ingest import create_new
+
+    if not cfg.snowball_enabled:
+        raise SnowballError("Snowball is off. Set [snowball] enabled = true in config.toml.")
+    dest = collection.strip()
+    if not dest:
+        raise SnowballError("snowball watch apply needs a target collection (-C).")
+    _check_watch_name(name)
+    load_watch(cfg, name)
+    rows = load_inbox(cfg, name)
+    applied = load_applied(cfg, name)
+    pending: list[Candidate] = []
+    already = 0
+    for row in rows:
+        key = row.identity
+        if not key:
+            continue
+        if key in applied:
+            already += 1
+            continue
+        if row.status not in {"new", "exists"}:
+            continue
+        row.keep = True
+        pending.append(row)
+    finder = lookup
+    lib = backend
+    if finder is None:
+        try:
+            lib = lib or get_backend(cfg)
+            from .command import _library_lookup
+
+            finder = _library_lookup(lib, scope="library", collection=dest)
+        except Exception as exc:
+            raise SnowballError(f"Library was not read. Refusing to create items. {exc}") from exc
+    _mark_exists(pending, finder)
+    creatable = [row for row in pending if row.status == "new"]
+    skipped_exists = sum(1 for row in pending if row.status in {"exists", "version"})
+    if not apply:
+        table = Table(title=f"snowball watch apply {name} (dry-run)")
+        table.add_column("Title")
+        table.add_column("DOI")
+        table.add_column("Status")
+        for row in pending[:25]:
+            table.add_row(
+                str(row.biblio.get("title") or "")[:80],
+                row.ids.get("doi") or "",
+                row.status,
+            )
+        console.print(table)
+        console.print(
+            f"would create {len(creatable)} · exists {skipped_exists} · "
+            f"already applied {already}"
+        )
+        return ApplyResult(
+            created=0,
+            skipped_exists=skipped_exists,
+            already_applied=already,
+            failed=0,
+            dry_run=True,
+        )
+    assert lib is not None
+    extra = [from_seed_tag({"type": "watch", "value": name}) or f"from-watch-{name}"]
+    items, counts = create_new(
+        lib,
+        creatable,
+        dest,
+        tag_prefix=cfg.snowball_tag_prefix or TAG,
+        extra_tags=extra,
+        note_provenance=cfg.snowball_note_provenance,
+        console=console,
+        remarks_surface=cfg.remarks_surface,
+    )
+    created = int(counts.get("created") or len(items))
+    failed = int(counts.get("failed") or 0)
+    skipped_exists += int(counts.get("skipped_exists") or 0)
+    landed: list[Candidate] = []
+    for row in creatable:
+        key = row.identity
+        if key and row.status != "error":
+            applied.add(key)
+            landed.append(row)
+    save_applied(cfg, name, applied)
+    ingested = write_ingest_briefing(
+        cfg,
+        name,
+        collection=dest,
+        created_rows=landed,
+        created=created,
+        skipped_exists=skipped_exists,
+        failed=failed,
+    )
+    console.print(
+        f"created {created} · exists {skipped_exists} · "
+        f"already applied {already} · failed {failed}"
+    )
+    console.print(f"Wrote [bold]{ingested}[/]")
+    if created:
+        console.print(f"Next: paperful run -C {dest}")
+    return ApplyResult(
+        created=created,
+        skipped_exists=skipped_exists,
+        already_applied=already,
+        failed=failed,
+        dry_run=False,
+        ingested_path=ingested,
+    )
 
 
 def show_watch(cfg: Config, name: str, *, console: Console) -> None:

@@ -126,6 +126,8 @@ class SnowballRequest:
     from_created_date: str | None = None
     cites_query: str = ""
     study_designs: tuple[str, ...] | None = None
+    map_categories: tuple[str, ...] | None = None
+    map_category_defs: tuple[dict[str, Any], ...] | None = None
     dedupe_after: str | None = None
     author_site_preflight: bool | None = None
     stop_rule: str | None = None
@@ -2072,6 +2074,19 @@ def _summary_meta(
     )
     if designs:
         meta["study_designs"] = list(designs)
+    map_cats = (
+        cfg.snowball_map_categories
+        if request.map_categories is None
+        else request.map_categories
+    )
+    meta["map_categories"] = list(map_cats or ())
+    map_defs = (
+        cfg.snowball_map_category_defs
+        if request.map_category_defs is None
+        else request.map_category_defs
+    )
+    if map_defs:
+        meta["map_category_defs"] = [dict(item) for item in map_defs]
     refine = cfg.snowball_refine if request.refine is None else request.refine
     if not refine:
         return meta

@@ -67,6 +67,7 @@ def create_new(
     remarks_surface: str = "note",
     local_cites: Any = None,
     allowlist: frozenset[str] | None = None,
+    operator_note: str = "",
 ) -> tuple[list[Item], dict[str, int]]:
     """Create status=new rows. One LibraryError does not abort the rest."""
     collection_key = backend.ensure_collection_path(collection)
@@ -107,8 +108,16 @@ def create_new(
             {"tag": prefix},
             {"tag": f"{prefix}:{row.provenance.get('backend') or 'openalex'}"},
         ]
-        for extra in merge_tags(extra_tags, [from_seed_tag(row.seed)]):
+        staged = list((row.operator or {}).get("tags") or [])
+        for extra in merge_tags(extra_tags, staged, [from_seed_tag(row.seed)]):
             tags.append({"tag": extra})
+        row_collection = str((row.operator or {}).get("collection") or "").strip()
+        use_collection_key = collection_key
+        if row_collection:
+            try:
+                use_collection_key = backend.ensure_collection_path(row_collection)
+            except LibraryError:
+                use_collection_key = collection_key
         record = {
             "item_type": _item_type(str(biblio.get("type") or "")),
             "title": title,
@@ -137,7 +146,7 @@ def create_new(
                 record["book_title"] = series
         else:
             record["publication_title"] = biblio.get("venue") or ""
-        payload = parent_payload(record, [collection_key])
+        payload = parent_payload(record, [use_collection_key])
         try:
             key = backend.create_parent(payload)
         except LibraryError as exc:
@@ -169,6 +178,17 @@ def create_new(
                 run_id=str(row.run_id or ""),
             )
             backend.create_or_update_note(key, note, prefix)
+        staged_note = str((row.operator or {}).get("note") or operator_note or "").strip()
+        if staged_note:
+            from ..notehtml import wrap as wrap_note
+
+            body = wrap_note(
+                f"<p>{staged_note}</p>",
+                note_type="map",
+                verb="discover-map",
+                run_id=str(row.run_id or ""),
+            )
+            backend.create_or_update_note(key, body, f"{prefix}:map")
         cite_count = 0
         if local_cites is not None:
             cite_count = local_cites.count(

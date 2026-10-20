@@ -64,6 +64,9 @@ and [architecture](architecture.md).
 | `[playbooks].auto_min_hits` | `2` | How many matching wins `auto` needs before writing a recipe. Manual `playbooks promote` can install a single cluster |
 | `[[grey_playbooks]]` | (none) | User rewrite/scrape/synthesize rules; same `name` overrides the pack |
 | `attach` | `true` | CLI: attach into Zotero after `run` (`--no-attach` overrides). Needs Zotero 10 or newer. The workbench uses `[ui].attach_mode` instead (`manual` or `auto`; Settings shows **After Grab** only after at least one PDF has been attached via the workbench) |
+| `[ui].citation_map_edit` | `both` | Discover map library panel: `sidebar` / `popup` / `both` / `off` |
+| `[ui].citation_map_auto_search` | `false` | After **Add to library** on the map, also run Find PDF for that item |
+| `[ui].citation_map_remove` | `trash` | Map **Remove from library** behaviour (trash only for now) |
 | `app_name` | `paperful` | Name shown in Zotero's authorisation dialog |
 
 Leave `ezproxy_base` empty (or remove `ezproxy` from `sources`) if you do not
@@ -261,8 +264,11 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[inbox].title_resolve` | `false` | Opt-in Crossref/OpenAlex title search when local title+year is thin (not silent create) |
 | `[inbox].manager_metadata_s` | `0` | Wait after attach so a manager recognizer can run (`0` when the backend has none) |
 | `[ingest].default_tags` | `()` | Tags on `ingest-dois --apply` and inbox-created parents |
+| `[keepup].interval_days` | `7` | Default days between `keepup run` polls (`0` = every run). Per-job `--interval-days` overrides. No built-in scheduler — cron `keepup run`. See [Keepup](keepup.md) |
 | `[snowball].default_tags` | `()` | Extra tags on snowball `--gate auto` / `apply` creates, with `--tag` and `from-<seed-slug>` |
 | `[snowball].study_designs` | `()` | OpenAlex study design filter (`rct`, `meta-analysis`, …). CLI `--study-design`. See [snowball stop rules](snowball.md#stop-rules) |
+| `[snowball].map_categories` | five built-ins | Which literature-category ids appear on the citation map (badges/filters). Defaults: `evidence-synthesis`, `trials`, `observational`, `case-reports`, `protocols`. See [Citation map](snowball.md#citation-map) |
+| `[snowball].map_category_defs` | `()` | Extra category tables: `{ id, label, any_study_designs?, any_types?, color? }`. Ids listed here are appended to `map_categories` when that key is unset |
 | `[snowball].stop_rule` | `off` | `off`, `marginal_yield`, `asymptotic_coverage`, `budget`, or `any`. Off is one shot. A rule pauses for Keep/Skip between hops. CLI `--stop-rule`. See [snowball stopping rules](snowball.md#stopping-rules) |
 | `[snowball].stop_eps` / `stop_k` | `0.01` / `2` | Marginal yield: Keep rate below `eps` for `k` hops, not before hop `k + 1`. CLI `--stop-eps` / `--stop-k` |
 | `[snowball].stop_tau` / `stop_min_points` | `0.95` / `4` | Fitted Keep ceiling. Needs that many labeled hops. Config and profile only |

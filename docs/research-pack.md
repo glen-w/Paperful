@@ -99,6 +99,6 @@ lookup is [Twenty and SearXNG](snowball.md#twenty-and-searxng).
 ## Out of this playbook
 
 - Silent parent create from inbox (default stays DOI attach)
-- Post-1.0 alert loop (watch / authorwatch poll → ingest → briefing; no email)
+- Alert loop / what-cites: [`keepup`](keepup.md) (poll → ingest → briefing; no email; you cron it)
 - Saving the page you are reading ([Firefox add-on](firefox.md); not this playbook)
 - Large-scale alert ingest beyond one-shot `coverage --from-file`

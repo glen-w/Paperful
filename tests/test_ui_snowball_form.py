@@ -37,3 +37,17 @@ def test_advanced_parses_crawl_knobs():
     assert payload.fetch_pdfs == "fast"
     assert payload.twenty_writeback is True
     assert payload.languages == ("en", "fr")
+
+
+def test_advanced_parses_map_categories_and_study_designs():
+    payload = parse_discover_topic(
+        {
+            "kind": "search",
+            "query": "GLP-1",
+            "study_designs": "rct, meta-analysis",
+            "map_categories": "trials, evidence-synthesis",
+        },
+        advanced=True,
+    )
+    assert payload.study_designs == ("randomized-controlled-trial", "meta-analysis")
+    assert payload.map_categories == ("trials", "evidence-synthesis")

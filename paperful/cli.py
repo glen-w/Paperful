@@ -238,6 +238,16 @@ authorwatch_app = typer.Typer(
     ),
 )
 app.add_typer(authorwatch_app, name="authorwatch")
+keepup_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help=(
+        "Alert loop and collection digests: poll watches / authorwatch / "
+        "what-cites, then apply into -C. Paperful does not schedule; "
+        "call keepup run from cron."
+    ),
+)
+app.add_typer(keepup_app, name="keepup")
 collections_app = typer.Typer(
     add_completion=False,
     invoke_without_command=True,
@@ -263,6 +273,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "twenty",
         "reachout",
         "authorwatch",
+        "keepup",
     ),
     "find": ("run", "attach", "recover", "gaps", "inbox", "capture", "urls", "htmlpdf"),
     "completeness": (
@@ -6150,6 +6161,51 @@ def snowball_watch_digest(
         raise typer.Exit(exc.code) from exc
     _print_briefing(digest, apply=apply, collection=collection, cfg=cfg)
 
+
+@snowball_watch_app.command("apply")
+def snowball_watch_apply(
+    name: str = typer.Argument(..., help="Watch name."),
+    collection: str = typer.Option(
+        ..., "--collection", "-C", help="Target collection path."
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Create metadata parents from the watch inbox. Default is dry-run.",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Create parents from watches/<name>/inbox.jsonl. PDFs stay paperful run."""
+    from .snowball.command import SnowballError
+    from .snowball.watch import apply_watch
+
+    cfg = _cfg(config)
+    backend = None
+    if apply:
+        _require_manager(cfg)
+        backend = _connect(cfg)
+        if not backend.supports_write():
+            _exit_env(_no_write(backend), cfg)
+
+    def _go():
+        return apply_watch(
+            cfg,
+            name,
+            collection,
+            console=console,
+            apply=apply,
+            backend=backend,
+        )
+
+    try:
+        result = _go()
+    except SnowballError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(exc.code) from exc
+    if result.failed and result.created:
+        raise typer.Exit(3)
+
+
 def _authorwatch_call(action: Callable[[], Any]) -> Any:
     from .authorwatch import AuthorwatchError
 
@@ -6414,6 +6470,20 @@ def authorwatch_briefing(
 
     _authorwatch_call(_run)
 
+
+@authorwatch_app.command("digest")
+def authorwatch_digest_cmd(
+    name: str = typer.Argument(..., help="List name."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Write digest.md from the inbox. Does not create items."""
+    from .authorwatch import write_digest
+
+    cfg = _cfg(config)
+    path = _authorwatch_call(lambda: write_digest(cfg, name))
+    console.print(f"Wrote [bold]{path}[/]")
+
+
 @authorwatch_app.command("apply")
 def authorwatch_apply_cmd(
     name: str = typer.Argument(..., help="List name."),
@@ -6451,6 +6521,221 @@ def authorwatch_apply_cmd(
     result = _authorwatch_call(_go)
     if result.failed and result.created:
         raise typer.Exit(3)
+
+
+def _keepup_call(action: Callable[[], Any]) -> Any:
+    from .keepup import KeepupError
+    from .snowball.command import SnowballError
+
+    try:
+        return action()
+    except (KeepupError, SnowballError) as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(getattr(exc, "code", 2) or 2) from exc
+
+
+@keepup_app.command("save")
+def keepup_save(
+    name: str = typer.Argument(..., help="Job name under state/keepup/<name>/."),
+    collection: str = typer.Option(
+        ..., "--collection", "-C", help="Target Zotero collection path."
+    ),
+    watch: list[str] = typer.Option(
+        [], "--watch", help="Snowball watch name (repeatable)."
+    ),
+    authorwatch: list[str] = typer.Option(
+        [], "--authorwatch", help="Authorwatch list name (repeatable)."
+    ),
+    source: list[str] = typer.Option(
+        [],
+        "--source",
+        help="Built-in source type. Use cites for what-cites-my-collection.",
+    ),
+    interval_days: int | None = typer.Option(
+        None,
+        "--interval-days",
+        help="Days between polls (default [keepup].interval_days or 7).",
+    ),
+    per_seed_limit: int = typer.Option(
+        20, "--per-seed-limit", help="OpenAlex citing works per seed paper."
+    ),
+    max_candidates: int = typer.Option(
+        100, "--max-candidates", help="Cap proposed rows per cites poll (0 = no cap)."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Create or update a keepup job. No API keys."""
+    from .keepup import Source, save_job
+
+    cfg = _cfg(config)
+    sources = [Source(type="watch", name=item) for item in watch]
+    sources.extend(Source(type="authorwatch", name=item) for item in authorwatch)
+    for raw in source:
+        kind = raw.strip().lower()
+        sources.append(Source(type=kind, name=""))
+    path = _keepup_call(
+        lambda: save_job(
+            cfg,
+            name,
+            collection=collection,
+            sources=sources,
+            interval_days=interval_days,
+            per_seed_limit=per_seed_limit,
+            max_candidates=max_candidates,
+        )
+    )
+    console.print(f"Wrote [bold]{path}[/]")
+
+
+@keepup_app.command("list")
+def keepup_list_cmd(config: Path | None = ConfigOpt) -> None:
+    """List keepup jobs."""
+    from .keepup import list_jobs
+
+    cfg = _cfg(config)
+    names = list_jobs(cfg)
+    if not names:
+        console.print("No keepup jobs.")
+        return
+    for name in names:
+        console.print(name)
+
+
+@keepup_app.command("show")
+def keepup_show(
+    name: str = typer.Argument(..., help="Job name."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Show job ledger. Does not open the library."""
+    from .keepup import show_job
+
+    cfg = _cfg(config)
+    _keepup_call(lambda: show_job(cfg, name, console=console))
+
+
+@keepup_app.command("delete")
+def keepup_delete(
+    name: str = typer.Argument(..., help="Job name."),
+    yes: bool = typer.Option(False, "--yes", help="Remove state/keepup/<name>/."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Delete a keepup job ledger."""
+    from .keepup import delete_job
+
+    cfg = _cfg(config)
+    if not yes:
+        console.print("Pass --yes to delete the keepup job directory.")
+        raise typer.Exit(1)
+    path = _keepup_call(lambda: delete_job(cfg, name))
+    console.print(f"Deleted {path}")
+
+
+@keepup_app.command("run")
+def keepup_run(
+    name: str = typer.Argument(..., help="Job name."),
+    force: bool = typer.Option(
+        False, "--force", help="Ignore interval_days and poll now."
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="After polling, create parents in the job collection.",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Poll sources (respecting interval). Baseline proposes nothing."""
+    from .keepup import run_job
+
+    cfg = _cfg(config)
+    backend = None
+    if apply:
+        _require_manager(cfg)
+        backend = _connect(cfg)
+        if not backend.supports_write():
+            _exit_env(_no_write(backend), cfg)
+
+    def _go():
+        return run_job(
+            cfg,
+            name,
+            console=console,
+            force=force,
+            apply=apply,
+            backend=backend,
+        )
+
+    result = _keepup_call(_go)
+    if result.created and getattr(result, "created", 0):
+        pass
+
+
+@keepup_app.command("digest")
+def keepup_digest(
+    name: str = typer.Argument(..., help="Job name."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Rebuild digest.md from the keepup inbox. Does not create items."""
+    from .keepup import write_digest
+
+    cfg = _cfg(config)
+    path = _keepup_call(lambda: write_digest(cfg, name))
+    console.print(f"Wrote [bold]{path}[/]")
+
+
+@keepup_app.command("apply")
+def keepup_apply_cmd(
+    name: str = typer.Argument(..., help="Job name."),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Create metadata parents. Default is dry-run.",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Create parents from the keepup inbox into the job collection."""
+    from .keepup import apply_job, load_job
+
+    cfg = _cfg(config)
+    body = _keepup_call(lambda: load_job(cfg, name))
+    backend = None
+    if apply:
+        _require_manager(cfg)
+        backend = _connect(cfg)
+        if not backend.supports_write():
+            _exit_env(_no_write(backend), cfg)
+
+    def _go():
+        return apply_job(
+            cfg,
+            name,
+            console=console,
+            apply=apply,
+            backend=backend,
+        )
+
+    result = _keepup_call(_go)
+    _ = body
+    if result.failed and result.created:
+        raise typer.Exit(3)
+
+
+@keepup_app.command("dismiss")
+def keepup_dismiss(
+    name: str = typer.Argument(..., help="Job name."),
+    doi: str = typer.Option("", "--doi", help="DOI to mute."),
+    identity: str = typer.Option(
+        "", "--identity", help="Identity key (doi:… or openalex:…)."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Mute a work so keepup never re-proposes it."""
+    from .keepup import dismiss
+
+    cfg = _cfg(config)
+    key = _keepup_call(
+        lambda: dismiss(cfg, name, identity=identity, doi=doi)
+    )
+    console.print(f"Muted {key}")
 
 
 @capture_app.callback(invoke_without_command=True)

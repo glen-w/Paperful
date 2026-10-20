@@ -327,6 +327,11 @@ concurrency = 2
 # parquet_glob = "/mnt/files/openalex/data/parquet/**/*.parquet"
 # # duckdb_bin = "duckdb"
 # # timeout_s = 120
+# Alert loop / weekly collection digest. Paperful does not schedule;
+# point cron at `paperful keepup run <name>`. Interval is also stored per job.
+# [keepup]
+# interval_days = 7
+
 # [snowball]
 # enabled = false
 # max_candidates = 200     # all keeps every new+exists row
@@ -346,6 +351,10 @@ concurrency = 2
 # default_tags = []
 # types = ["article", "review"]  # empty = journal-article-shaped
 # study_designs = []  # OpenAlex: rct, meta-analysis, systematic-review, …
+# map_categories = ["evidence-synthesis", "trials", "observational", "case-reports", "protocols"]
+# map_category_defs = [
+#   { id = "preprints", label = "Preprints", any_types = ["preprint", "posted-content"] },
+# ]
 # oa_only = false
 # venue_include = []
 # venue_exclude = []
@@ -426,6 +435,9 @@ concurrency = 2
 # library_page_size = 50
 # library_page_sizes = [25, 50, 100, 200]
 # attach_mode = "manual"
+# citation_map_edit = "both"           # sidebar | popup | both | off
+# citation_map_auto_search = false     # Find PDF right after Add to library
+# citation_map_remove = "trash"        # trash (default)
 
 # Attachment layout. Off until `paperful attachments --apply`.
 # [attachments]

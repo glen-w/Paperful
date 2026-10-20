@@ -330,6 +330,32 @@ def test_apply_dry_run_and_write_with_snowball_off(cfg, monkeypatch):
     assert again.created == 0
 
 
+def test_write_digest(cfg, tmp_path: Path):
+    from paperful.authorwatch import append_inbox, write_digest
+
+    save_list(cfg, "ocean")
+    row = Candidate(
+        run_id="authorwatch:ocean",
+        seed={"type": "authorwatch", "value": ORCID},
+        hop=0,
+        direction="author",
+        ids={"doi": "10.1000/digest", "openalex": "W2"},
+        biblio={"title": "Digest row", "year": 2025, "authors": ["Josiah"]},
+        why="authorwatch:ocean",
+        status="new",
+        provenance={"backend": "openalex"},
+        gate="dry-run",
+        keep=True,
+        score=5,
+    )
+    append_inbox(cfg, "ocean", [row])
+    path = write_digest(cfg, "ocean")
+    text = path.read_text(encoding="utf-8")
+    assert "Authorwatch digest ocean" in text
+    assert "Digest row" in text
+    assert "authorwatch apply" in text
+
+
 def test_cli_help_and_import_rg_without_file(cfg, tmp_path: Path):
     help_res = runner.invoke(app, ["authorwatch", "--help"])
     assert help_res.exit_code == 0, help_res.stdout

@@ -23,6 +23,7 @@ those you open tomorrow.
 
 - `collections` shows what you have.
 - `snowball` proposes new works; parents are created only when the gate says so. [How a hop is cut](snowball.md#how-a-hop-is-cut).
+- `keepup` polls watches / author lists / what-cites on a cadence you cron; apply creates parents. [Keepup](keepup.md).
 - `import` / `export` speak RIS, BibTeX, and EndNote XML.
 - The PDF write gate is **attach**, not admit.
 - Zotero’s local API is the adapter to use. Mendeley and EndNote are seeking testers.

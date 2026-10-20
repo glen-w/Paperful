@@ -231,6 +231,8 @@ def register_shell(ui: UiContext) -> None:
                 out_dir=str(cfg.out_dir),
                 attach_mode=cfg.ui_attach_mode,
                 show_auto_attach_setting=library_has_attached_pdf(cfg),
+                citation_map_edit=cfg.ui_citation_map_edit,
+                citation_map_auto_search=cfg.ui_citation_map_auto_search,
             ),
         )
 
@@ -248,10 +250,10 @@ def register_shell(ui: UiContext) -> None:
             _patch_config_field(cfg, "zotero", "host", host)
         if out_dir:
             _patch_config_field(cfg, "", "out_dir", out_dir)
+        path = cfg.config_path
         attach_mode = str(form.get("attach_mode") or "").strip().lower()
         if attach_mode in {"manual", "auto"}:
             cfg.ui_attach_mode = attach_mode
-            path = cfg.config_path
             if path is not None and path.is_file():
                 text = path.read_text(encoding="utf-8")
                 path.write_text(
@@ -260,6 +262,30 @@ def register_shell(ui: UiContext) -> None:
                     ),
                     encoding="utf-8",
                 )
+        edit = str(form.get("citation_map_edit") or "").strip().lower()
+        if edit in {"sidebar", "popup", "both", "off"}:
+            cfg.ui_citation_map_edit = edit
+            if path is not None and path.is_file():
+                text = path.read_text(encoding="utf-8")
+                path.write_text(
+                    _patch_section_assignment(
+                        text, "ui", "citation_map_edit", f'"{edit}"'
+                    ),
+                    encoding="utf-8",
+                )
+        auto_search = form.get("citation_map_auto_search") == "1"
+        cfg.ui_citation_map_auto_search = auto_search
+        if path is not None and path.is_file():
+            text = path.read_text(encoding="utf-8")
+            path.write_text(
+                _patch_section_assignment(
+                    text,
+                    "ui",
+                    "citation_map_auto_search",
+                    "true" if auto_search else "false",
+                ),
+                encoding="utf-8",
+            )
         resp = RedirectResponse(url="/settings?saved=1", status_code=303)
         if preset in {"oa", "eoi"}:
             set_cookie(resp, COOKIE_PRESET, preset)

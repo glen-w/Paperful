@@ -3456,6 +3456,71 @@ def test_watch_apply_creates_from_proposed_queue(tmp_path: Path):
     assert lib.created[0]["DOI"] == "10.1000/b"
 
 
+def test_watch_apply_from_inbox(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from paperful.snowball.profile import save_profile
+    from paperful.snowball.watch import (
+        append_inbox,
+        apply_watch,
+        load_applied,
+        save_watch,
+    )
+
+    cfg = _cfg(tmp_path)
+    (tmp_path / "profiles").mkdir()
+    save_profile(
+        cfg,
+        "scout",
+        {"mode": "search", "query": "bbnj", "gate": "dry-run"},
+        force=False,
+    )
+    save_watch(cfg, "inbox-ap", "scout")
+    row = Candidate(
+        run_id="watch:inbox-ap",
+        seed={"type": "query", "value": "bbnj"},
+        hop=1,
+        direction="refs",
+        ids={"doi": "10.1000/inbox", "openalex": "W3"},
+        biblio={"title": "From inbox", "year": 2024, "cited_by_count": 2},
+        why="watch",
+        status="new",
+        provenance={"backend": "openalex"},
+        gate="dry-run",
+        keep=True,
+    )
+    append_inbox(cfg, "inbox-ap", [row])
+    console = Console(file=StringIO(), highlight=False, width=120)
+    dry = apply_watch(
+        cfg,
+        "inbox-ap",
+        "Inbox/Snowball",
+        console=console,
+        apply=False,
+        lookup=lambda *a, **k: None,
+        backend=object(),
+    )
+    assert dry.dry_run is True
+
+    created = []
+
+    def fake_create(backend, rows, collection, **kwargs):
+        created.extend(rows)
+        return [], {"created": len(rows), "skipped_exists": 0, "failed": 0}
+
+    monkeypatch.setattr("paperful.snowball.ingest.create_new", fake_create)
+    written = apply_watch(
+        cfg,
+        "inbox-ap",
+        "Inbox/Snowball",
+        console=console,
+        apply=True,
+        lookup=lambda *a, **k: None,
+        backend=object(),
+    )
+    assert written.created == 1
+    assert written.ingested_path and written.ingested_path.is_file()
+    assert "doi:10.1000/inbox" in load_applied(cfg, "inbox-ap")
+
+
 def test_fill_pause_continues_and_retries_then_writes_settled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from paperful.snowball.fill import FillPaused, run_fill_pass
     from paperful.snowball.candidate import Candidate
@@ -3859,6 +3924,50 @@ def test_create_new_adds_provenance_tags():
     }
 
 
+def test_create_new_merges_operator_tags_note_and_collection():
+    from paperful.snowball.ingest import create_new
+
+    class Lib(_CreateLib):
+        def __init__(self):
+            super().__init__()
+            self.payloads: list[dict] = []
+            self.paths: list[str] = []
+
+        def ensure_collection_path(self, path: str) -> str:
+            self.paths.append(path)
+            return f"COL:{path}"
+
+        def create_parent(self, payload):
+            self.payloads.append(payload)
+            return super().create_parent(payload)
+
+    lib = Lib()
+    row = Candidate(
+        "r",
+        {"type": "doi", "value": "10.1000/seed"},
+        1,
+        "refs",
+        {"doi": "10.1000/op"},
+        {
+            "title": "A sufficiently long paper title about oceans",
+            "year": 2021,
+            "authors": ["Ada"],
+            "type": "article",
+        },
+        "ref of 10.1000/seed",
+        "new",
+        {"backend": "openalex"},
+        "auto",
+        operator={"tags": ["to-read"], "note": "check methods", "collection": "Inbox/Map"},
+    )
+    items, counts = create_new(lib, [row], "Inbox", note_provenance=False)
+    assert counts["created"] == 1 and items
+    tags = {t["tag"] for t in lib.payloads[0]["tags"]}
+    assert "to-read" in tags
+    assert "Inbox/Map" in lib.paths
+    assert any("check methods" in note for note in lib.notes)
+
+
 def test_similar_ranks_coupled_work_above_a_one_off(tmp_path: Path):
     works = {
         "S1": _work("S1", "10.1000/seed", "Seed", 2020, 10, ["A", "B"]),
@@ -3971,7 +4080,8 @@ def test_config_and_profile_load_study_designs(tmp_path: Path):
         f'state_dir = "{tmp_path / "state"}"\n'
         "[snowball]\n"
         "enabled = true\n"
-        'study_designs = ["rct", "meta-analysis"]\n',
+        'study_designs = ["rct", "meta-analysis"]\n'
+        'map_categories = ["trials", "evidence-synthesis"]\n',
         encoding="utf-8",
     )
     cfg = load_config(path)
@@ -3979,15 +4089,18 @@ def test_config_and_profile_load_study_designs(tmp_path: Path):
         "randomized-controlled-trial",
         "meta-analysis",
     )
+    assert cfg.snowball_map_categories == ("trials", "evidence-synthesis")
     req = request_from_profile(
         {
             "mode": "search",
             "query": "semaglutide",
             "study_designs": ["sr"],
+            "map_categories": ["protocols"],
         },
         cfg,
     )
     assert req.study_designs == ("systematic-review",)
+    assert req.map_categories == ("protocols",)
 
 
 def test_work_to_candidate_maps_study_designs():

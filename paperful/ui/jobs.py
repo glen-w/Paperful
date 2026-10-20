@@ -582,6 +582,17 @@ def _authorwatch_apply_fingerprint(cfg: Config, list_name: str, collection: str)
     ).hexdigest()
 
 
+def _watch_apply_fingerprint(cfg: Config, watch_name: str, collection: str) -> str:
+    import hashlib
+
+    from ..snowball.watch import inbox_count
+
+    n = inbox_count(cfg, watch_name)
+    return hashlib.sha256(
+        f"watch|{watch_name}|{collection}|{n}".encode()
+    ).hexdigest()
+
+
 def discover_apply_preview(
     cfg: Config,
     cmd_id: str,
@@ -595,6 +606,11 @@ def discover_apply_preview(
         fp = _authorwatch_apply_fingerprint(cfg, list_name, collection)
         keys = [list_name]
         verb = "authorwatch_apply"
+    elif kind in {"watch", "topic"}:
+        name = list_name or run_id
+        fp = _watch_apply_fingerprint(cfg, name, collection)
+        keys = [name]
+        verb = "watch_apply"
     else:
         fp = _snowball_apply_fingerprint(cfg, run_id, collection)
         keys = [run_id]
@@ -624,6 +640,10 @@ def discover_apply_consume(
     if kind == "authorwatch":
         fp = _authorwatch_apply_fingerprint(cfg, list_name, collection)
         keys = [list_name]
+    elif kind in {"watch", "topic"}:
+        name = list_name or run_id
+        fp = _watch_apply_fingerprint(cfg, name, collection)
+        keys = [name]
     else:
         fp = _snowball_apply_fingerprint(cfg, run_id, collection)
         keys = [run_id]
@@ -632,6 +652,8 @@ def discover_apply_consume(
         return False, msg
     if kind == "authorwatch":
         discover_apply_authorwatch(cfg, list_name, collection)
+    elif kind in {"watch", "topic"}:
+        discover_apply_watch(cfg, list_name or run_id, collection)
     else:
         discover_apply_snowball(cfg, run_id, collection)
     return True, ""
@@ -654,6 +676,19 @@ def discover_apply_authorwatch(cfg: Config, list_name: str, collection: str) -> 
     from ..authorwatch import apply_list
 
     apply_list(cfg, list_name, collection, console=_quiet_console(), apply=True)
+
+
+def discover_apply_watch(cfg: Config, watch_name: str, collection: str) -> None:
+    """Create parents from a topic watch inbox (``snowball watch apply``)."""
+    from ..snowball.watch import apply_watch
+
+    apply_watch(
+        cfg,
+        watch_name,
+        collection,
+        console=_quiet_console(),
+        apply=True,
+    )
 
 
 def authorwatch_suggest(

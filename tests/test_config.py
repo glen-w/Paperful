@@ -174,6 +174,26 @@ def test_snowball_default_tags(tmp_path):
     assert load_config(p).snowball_default_tags == ("bbnj", "grey")
 
 
+def test_ui_citation_map_defaults_and_toml(tmp_path):
+    bare = Config()
+    assert bare.ui_citation_map_edit == "both"
+    assert bare.ui_citation_map_auto_search is False
+    assert bare.ui_citation_map_remove == "trash"
+    p = tmp_path / "config.toml"
+    p.write_text(
+        'email = "me@example.org"\n\n'
+        "[ui]\n"
+        'citation_map_edit = "off"\n'
+        "citation_map_auto_search = true\n"
+        'citation_map_remove = "trash"\n',
+        encoding="utf-8",
+    )
+    cfg = load_config(p)
+    assert cfg.ui_citation_map_edit == "off"
+    assert cfg.ui_citation_map_auto_search is True
+    assert cfg.ui_citation_map_remove == "trash"
+
+
 def test_remarks_surface(tmp_path):
     p = tmp_path / "config.toml"
     p.write_text('email = "me@example.org"\n\n[remarks]\nsurface = "tag"\n')

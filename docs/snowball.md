@@ -113,31 +113,36 @@ is the overlap with the prior frontier. If OpenAlex stopped early,
 new-only and keeps older proposals. Neither command creates library items. `--apply` with
 `-C` files a collection note tagged `paperful:frontier-briefing`. OA / grey
 stamps already on the row (`oa:…`, `grey:…`, `is_oa`, `oa_status`) are
-printed; there is no extra API call. Post-1.0 **alert loop** (poll watch /
-authorwatch → ingest parents → briefing) is separate from digest export — see
-[ROADMAP](ROADMAP.md#frontier-digest-later-watch--external-ingest).
+printed; there is no extra API call. The **alert loop** (poll → ingest parents
+→ briefing) and weekly what-cites digest are [`keepup`](keepup.md). Standalone
+inbox apply:
+
+```text
+paperful snowball watch apply bbnj -C Inbox/Snowball          # dry-run
+paperful snowball watch apply bbnj -C Inbox/Snowball --apply  # parents + ingested.md
+```
 
 ### Schedule it yourself
 
-Paperful does not run a timer. Point cron, launchd, or a systemd user timer
-at `watch run --digest`. Replace the paths and the watch name.
+Paperful does not run a timer. Prefer [`keepup run`](keepup.md) for the full
+loop. For watch-only digest:
 
 Operators (Compose), from the repo:
 
 ```text
-15 7 * * 1 cd /path/to/paperful && docker compose run --rm paperful snowball watch run bbnj --digest
+15 7 * * 1 cd /path/to/paperful && docker compose run --rm paperful keepup run field --apply
 ```
 
 Contributors, on a host checkout:
 
 ```text
-15 7 * * 1 cd /path/to/library && uv run paperful snowball watch run bbnj --digest
+15 7 * * 1 cd /path/to/library && uv run paperful keepup run field --apply
 ```
 
 launchd and systemd below are the host-checkout form (`uv`). A Compose
 operator uses the cron line above (`docker compose run`).
 
-launchd (`~/Library/LaunchAgents/paperful.watch.bbnj.plist`):
+launchd (`~/Library/LaunchAgents/paperful.keepup.field.plist`):
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -145,7 +150,7 @@ launchd (`~/Library/LaunchAgents/paperful.watch.bbnj.plist`):
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>paperful.watch.bbnj</string>
+  <string>paperful.keepup.field</string>
   <key>WorkingDirectory</key>
   <string>/path/to/library</string>
   <key>ProgramArguments</key>
@@ -153,11 +158,10 @@ launchd (`~/Library/LaunchAgents/paperful.watch.bbnj.plist`):
     <string>/path/to/uv</string>
     <string>run</string>
     <string>paperful</string>
-    <string>snowball</string>
-    <string>watch</string>
+    <string>keepup</string>
     <string>run</string>
-    <string>bbnj</string>
-    <string>--digest</string>
+    <string>field</string>
+    <string>--apply</string>
   </array>
   <key>StartCalendarInterval</key>
   <dict>
@@ -817,11 +821,43 @@ year × `cited_by_count`:
 
 Highly cited means at least 50 citations, or the median of the non-seed papers
 on this map when that median is higher. Recent means the last five years.
+
+**Literature categories** are a second layer (badges and filter chips), orthogonal
+to roles. Defaults map OpenAlex `study_designs` onto:
+
+| Category id | Matches |
+| --- | --- |
+| `evidence-synthesis` | systematic-review, meta-analysis |
+| `trials` | randomized-controlled-trial |
+| `observational` | observational-study |
+| `case-reports` | case-report |
+| `protocols` | study-protocol |
+
+Config `[snowball].map_categories` chooses which ids appear.
+`[snowball].map_category_defs` adds custom rules (`any_study_designs` and/or
+`any_types`). Graph JSON carries `category_legend`, and each node has
+`study_designs` plus `categories`. Untagged OpenAlex works stay uncategorised.
+
 Click a paper to Keep or Skip it, or to expand one hop (papers it cites, or
 papers that cite it). Expand merges neighbours into the same dry-run queue.
 It does not create Zotero items. The drawing code follows the personal-site
 force layout (zoom, drag, hover focus, side panel); nodes here are works,
 not people.
+
+**Library on the map.** Nodes already in the library show a **LIB** badge and
+a dark ring. The side panel lists `item_key`, whether a PDF is on disk, and
+(when `[ui].citation_map_edit` is not `off`) library actions:
+
+| Action | Behaviour |
+| --- | --- |
+| Add to library | Creates one parent (uses staged collection/tags/note, else the collection chip) |
+| Find PDF | Runs Grab for that one `item_key` (Wanted path) |
+| Remove from library | Trashes the item (`[ui].citation_map_remove = trash`) |
+| Save tags / note / collection | Stages on the queue row; applies live when the paper is already in the library |
+| Open in Zotero / Summary | Deep links when `item_key` / PDF exist |
+
+Defaults: `citation_map_edit = both`, `citation_map_auto_search = false`
+(Find PDF after Add is opt-in), `citation_map_remove = trash`.
 
 `state/snowball/<run-id>/citation_graph.json` is `paperful.citation_graph.v1`,
 rebuilt from `candidates.jsonl`. Hops store `biblio.graph_links` so an edge

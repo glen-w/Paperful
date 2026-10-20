@@ -1075,16 +1075,28 @@ def apply_list(
     created = int(counts.get("created") or len(items))
     failed = int(counts.get("failed") or 0)
     skipped_exists += int(counts.get("skipped_exists") or 0)
+    landed: list[Candidate] = []
     for row in creatable:
         if row.status == "new" or row.identity:
             key = row.identity
             if key and row.status != "error":
                 applied.add(key)
+                landed.append(row)
     save_applied(cfg, name, applied)
+    ingested = write_ingest_briefing(
+        cfg,
+        name,
+        collection=dest,
+        created_rows=landed,
+        created=created,
+        skipped_exists=skipped_exists,
+        failed=failed,
+    )
     console.print(
         f"created {created} · exists {skipped_exists} · "
         f"already applied {already} · failed {failed}"
     )
+    console.print(f"Wrote [bold]{ingested}[/]")
     if created:
         console.print(f"Next: paperful run -C {dest}")
     return ApplyResult(
@@ -1251,6 +1263,102 @@ def write_briefing(
     dest = list_dir(cfg, name)
     path = dest / "briefing.md"
     path.write_text(_briefing_markdown(payload), encoding="utf-8")
+    return path
+
+
+def write_digest(cfg: Config, name: str) -> Path:
+    """Ranked inbox rollup. Does not create items (unlike apply)."""
+    body = load_watch(cfg, name)
+    rows = load_inbox(cfg, name)
+    pending = [row for row in rows if row.identity not in load_applied(cfg, name)]
+    pending = sorted(pending, key=lambda row: row.score, reverse=True)
+    dest = list_dir(cfg, name)
+    path = dest / "digest.md"
+    lines = [
+        f"# Authorwatch digest {name}",
+        "",
+        f"Inbox pending {len(pending)} · people baseline "
+        f"`{body.get('baseline_at') or 'not yet'}`.",
+        "",
+        "## New",
+        "",
+    ]
+    if not pending:
+        lines.append("None.")
+    else:
+        for row in pending[:25]:
+            title = str(row.biblio.get("title") or "").strip() or "(untitled)"
+            doi = row.ids.get("doi") or ""
+            why = (row.why or "").replace("\n", " ").strip()
+            bit = f"- {title}"
+            if doi:
+                bit += f" · `{doi}`"
+            if why:
+                bit += f" — {why}"
+            lines.append(bit)
+        if len(pending) > 25:
+            lines.append(f"- … and {len(pending) - 25} more")
+    lines.extend(
+        [
+            "",
+            "## Next",
+            "",
+            f"- `paperful authorwatch apply {name} -C <collection>`",
+            f"- `paperful authorwatch apply {name} -C <collection> --apply`",
+            "",
+        ]
+    )
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
+def write_ingest_briefing(
+    cfg: Config,
+    name: str,
+    *,
+    collection: str,
+    created_rows: list[Candidate],
+    created: int,
+    skipped_exists: int,
+    failed: int,
+) -> Path:
+    dest = list_dir(cfg, name)
+    dest.mkdir(parents=True, exist_ok=True)
+    path = dest / "ingested.md"
+    quoted = f'"{collection}"' if any(ch.isspace() for ch in collection) else collection
+    lines = [
+        f"# Authorwatch ingest {name}",
+        "",
+        f"Collection `{collection}`.",
+        f"created {created} · exists {skipped_exists} · failed {failed}",
+        "",
+        "## Created",
+        "",
+    ]
+    if not created_rows:
+        lines.append("None.")
+    else:
+        for row in created_rows:
+            title = str(row.biblio.get("title") or "").strip() or "(untitled)"
+            doi = row.ids.get("doi") or ""
+            why = (row.why or "").replace("\n", " ").strip()
+            bit = f"- {title}"
+            if doi:
+                bit += f" · `{doi}`"
+            if why:
+                bit += f" — {why}"
+            lines.append(bit)
+    lines.extend(
+        [
+            "",
+            "## Next",
+            "",
+            f"- `paperful run -C {quoted}`",
+            "- Open Wanted in the workbench for PDFs",
+            "",
+        ]
+    )
+    path.write_text("\n".join(lines), encoding="utf-8")
     return path
 
 

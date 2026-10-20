@@ -162,6 +162,7 @@ def register_discover(ui: UiContext) -> None:
                 deferred_run=snowball_deferred_run_id(cfg),
                 snowball_token=_last_review_token("snowball_apply"),
                 aw_token=_last_review_token("authorwatch_apply"),
+                watch_token=_last_review_token("watch_apply"),
                 ingest_token=_last_review_token("ingest_dois"),
                 note=(
                     last_job_result(cfg, "snowball_briefing")
@@ -375,7 +376,12 @@ def register_discover(ui: UiContext) -> None:
                 collection=prefs.collection,
             )
 
-        verb = "authorwatch_apply" if kind == "authorwatch" else "snowball_apply"
+        if kind == "authorwatch":
+            verb = "authorwatch_apply"
+        elif kind in {"watch", "topic"}:
+            verb = "watch_apply"
+        else:
+            verb = "snowball_apply"
         cmd_id = commands.enqueue(cfg, verb, work)
         return _after_job("/discover", cmd_id)
 
@@ -389,9 +395,12 @@ def register_discover(ui: UiContext) -> None:
         list_name = str(form.get("list_name") or "followed")
         token = str(form.get("review_token") or "")
         if not token:
-            token = _last_review_token(
-                "authorwatch_apply" if kind == "authorwatch" else "snowball_apply"
-            )
+            if kind == "authorwatch":
+                token = _last_review_token("authorwatch_apply")
+            elif kind in {"watch", "topic"}:
+                token = _last_review_token("watch_apply")
+            else:
+                token = _last_review_token("snowball_apply")
         ok, msg = jobs.discover_apply_consume(
             cfg,
             token=token,
@@ -443,7 +452,13 @@ def register_discover(ui: UiContext) -> None:
             if not run_id:
                 return JSONResponse({"ok": False, "error": "Missing run."}, status_code=400)
             try:
-                graph = graph_for_run(cfg.state_dir, run_id)
+                graph = graph_for_run(
+                    cfg.state_dir,
+                    run_id,
+                    map_categories=cfg.snowball_map_categories,
+                    map_category_defs=cfg.snowball_map_category_defs,
+                    out_dir=cfg.out_dir,
+                )
             except CitationGraphError as exc:
                 status = 404 if "queue" in str(exc).lower() else 400
                 return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
@@ -485,11 +500,157 @@ def register_discover(ui: UiContext) -> None:
                 run_id,
                 watch_seen=watch_seen,
                 compare_ids=compare_ids,
+                map_categories=cfg.snowball_map_categories,
+                map_category_defs=cfg.snowball_map_category_defs,
+                out_dir=cfg.out_dir,
             )
         except CitationGraphError as exc:
             status = 404 if "queue" in str(exc).lower() else 400
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
         return JSONResponse(graph)
+
+    @app.get("/discover/graph/meta")
+    def discover_graph_meta() -> JSONResponse:
+        from ..snowball.graph_library import graph_meta
+
+        return JSONResponse(graph_meta(cfg))
+
+    @app.post("/discover/graph/annotate")
+    async def discover_graph_annotate(request: Request) -> JSONResponse:
+        from ..snowball.citation_graph import CitationGraphError
+        from ..snowball.graph_library import annotate_queue
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        try:
+            graph = annotate_queue(
+                cfg,
+                str(body.get("run_id") or ""),
+                str(body.get("node_id") or ""),
+                tags=body.get("tags") if isinstance(body.get("tags"), list) else None,
+                note=None if body.get("note") is None else str(body.get("note")),
+                collection=(
+                    None if body.get("collection") is None else str(body.get("collection"))
+                ),
+            )
+        except CitationGraphError as exc:
+            status = 404 if "queue" in str(exc).lower() else 400
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
+        return JSONResponse({"ok": True, "graph": graph})
+
+    @app.post("/discover/graph/add")
+    async def discover_graph_add(request: Request) -> JSONResponse:
+        from ..snowball.citation_graph import CitationGraphError
+        from ..snowball.graph_library import add_one_to_library, find_pdf_for_key
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        prefs = prefs_from_request(request)
+        collection = str(body.get("collection") or prefs.collection or "").strip()
+        try:
+            result = add_one_to_library(
+                cfg,
+                str(body.get("run_id") or ""),
+                str(body.get("node_id") or ""),
+                collection=collection,
+            )
+        except CitationGraphError as exc:
+            status = 404 if "queue" in str(exc).lower() else 400
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
+        searched = False
+        search_error = ""
+        if result.get("auto_search") and result.get("item_key"):
+            try:
+                find_pdf_for_key(cfg, str(result["item_key"]), collection=collection)
+                searched = True
+            except CitationGraphError as exc:
+                search_error = str(exc)
+        return JSONResponse(
+            {
+                "ok": True,
+                "graph": result["graph"],
+                "item_key": result.get("item_key"),
+                "searched": searched,
+                "search_error": search_error,
+            }
+        )
+
+    @app.post("/discover/graph/find-pdf")
+    async def discover_graph_find_pdf(request: Request) -> JSONResponse:
+        from ..snowball.citation_graph import CitationGraphError, graph_for_run
+        from ..snowball.graph_library import find_pdf_for_key
+        from ..snowball.queue import load_queue
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        run_id = str(body.get("run_id") or "")
+        node_id = str(body.get("node_id") or "")
+        item_key = str(body.get("item_key") or "").strip()
+        prefs = prefs_from_request(request)
+        collection = str(body.get("collection") or prefs.collection or "").strip()
+        if not item_key and run_id and node_id:
+            try:
+                _, rows = load_queue(cfg.state_dir, run_id)
+                row = next((r for r in rows if r.identity == node_id), None)
+                if row and row.exists_match:
+                    item_key = str(row.exists_match.get("item_key") or "")
+            except FileNotFoundError:
+                return JSONResponse(
+                    {"ok": False, "error": "No queue for that run."}, status_code=404
+                )
+        try:
+            find_pdf_for_key(cfg, item_key, collection=collection)
+            graph = (
+                graph_for_run(
+                    cfg.state_dir,
+                    run_id,
+                    map_categories=cfg.snowball_map_categories,
+                    map_category_defs=cfg.snowball_map_category_defs,
+                    out_dir=cfg.out_dir,
+                )
+                if run_id
+                else {}
+            )
+        except CitationGraphError as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+        return JSONResponse({"ok": True, "graph": graph, "item_key": item_key})
+
+    @app.post("/discover/graph/remove")
+    async def discover_graph_remove(request: Request) -> JSONResponse:
+        from ..snowball.citation_graph import CitationGraphError
+        from ..snowball.graph_library import remove_from_library
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        prefs = prefs_from_request(request)
+        collection = str(body.get("collection") or prefs.collection or "").strip()
+        try:
+            graph = remove_from_library(
+                cfg,
+                str(body.get("run_id") or ""),
+                str(body.get("node_id") or ""),
+                collection=collection,
+            )
+        except CitationGraphError as exc:
+            status = 404 if "queue" in str(exc).lower() else 400
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
+        return JSONResponse({"ok": True, "graph": graph})
 
     @app.post("/discover/graph/repair")
     async def discover_graph_repair(request: Request) -> JSONResponse:
@@ -505,7 +666,14 @@ def register_discover(ui: UiContext) -> None:
             body = {}
         run_id = str(body.get("run_id") or "")
         try:
-            graph = repair_queue_links(cfg.state_dir, run_id, _openalex_client(cfg))
+            graph = repair_queue_links(
+                cfg.state_dir,
+                run_id,
+                _openalex_client(cfg),
+                map_categories=cfg.snowball_map_categories,
+                map_category_defs=cfg.snowball_map_category_defs,
+                out_dir=cfg.out_dir,
+            )
         except CitationGraphError as exc:
             status = 404 if "queue" in str(exc).lower() else 400
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
@@ -570,6 +738,8 @@ def register_discover(ui: UiContext) -> None:
                 node_id,
                 direction,
                 _openalex_client(cfg),
+                map_categories=cfg.snowball_map_categories,
+                map_category_defs=cfg.snowball_map_category_defs,
             )
         except CitationGraphError as exc:
             status = 404 if "queue" in str(exc).lower() else 400

@@ -95,8 +95,10 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
    per-row Keep/Skip, then **Preview apply** → **Add selected**
    (`snowball apply`, metadata only). **Map** draws that queue before you
    open a PDF: older + highly cited is foundational, recent + highly cited
-   is influential, recent + fewer citations may be emerging. Click a paper
-   to Keep/Skip or expand one hop (references, or papers that cite it).
+   is influential, recent + fewer citations may be emerging. OpenAlex study
+   designs (RCT, meta-analysis, …) appear as category badges and filter chips
+   on top of those roles. Click a paper to Keep/Skip or expand one hop
+   (references, or papers that cite it).
    When a [stopping rule](snowball.md#stopping-rules)
    is on, **Next hop** scores those marks and fetches one more hop
    (`snowball continue`). **Fill PDFs** opens Wanted.
@@ -111,8 +113,10 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
    HTML, **people briefing** (inbox plus OpenAlex recent works / co-authors for
    pollable members; same markdown as CLI `authorwatch briefing`); inbox uses the same Preview → apply pattern
    (`authorwatch apply`). **Check again** re-runs a saved topic watch or
-   person list. Advanced topic watches also offer **Watch briefing** /
-   **Watch digest** (same optional collection note).
+   person list. Topic watches also offer **Preview apply** / **Apply inbox**
+   (`snowball watch apply`). Advanced topic watches offer **Watch briefing** /
+   **Watch digest** (same optional collection note). Cron alert loop:
+   [`keepup`](keepup.md).
 3. **Library** — Nested collection collapsibles with item / missing-PDF counts; target icon sets scope (collection chip). Scoped items paginate (default 50 per page; sizes in `[ui]` — see `config.example.toml`).
 4. **Activity** — Command history + trust line from `last-run.json`.
 5. **System** — `doctor` rows with one next step each.
@@ -198,9 +202,14 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/discover/follow` | Follow ORCID into a list (`authorwatch` run) |
 | POST | `/discover/keep` | Mark queue DOI keep/skip |
 | GET | `/discover/graph` | Citation map JSON for `run_id` (`paperful.citation_graph.v1`); optional `watch_name`, `compare_run` |
+| GET | `/discover/graph/meta` | Collections/tags plus `[ui].citation_map_*` prefs for the map panel |
 | POST | `/discover/graph/expand` | One OpenAlex hop (`refs`, `cites`, or `both`) merged into that queue |
 | POST | `/discover/graph/repair` | Re-link rows to hop-0 seeds via OpenAlex (Keep unchanged) |
 | POST | `/discover/graph/halo` | Library neighbours as ghost overlay (mirror DOIs; not queued) |
+| POST | `/discover/graph/annotate` | Stage tags / note / collection on a queue node (live when already in library) |
+| POST | `/discover/graph/add` | Add one new candidate to the library; optional Find PDF when `citation_map_auto_search` |
+| POST | `/discover/graph/find-pdf` | Grab PDF for one `item_key` |
+| POST | `/discover/graph/remove` | Trash library item for a map node (`citation_map_remove = trash`) |
 | POST | `/discover/keep` | `format=json` or `Accept: application/json` returns `{ graph, keep, doi }` for the map panel |
 | POST | `/discover/check-again` | Re-run topic watch or person list |
 | POST | `/discover/resume` | Enqueue `snowball resume` |

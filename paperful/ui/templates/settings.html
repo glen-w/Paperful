@@ -27,6 +27,15 @@
       </select>
     </label>
     {% endif %}
+    <label>Citation map edits {{ info("Where the Discover map shows library actions (add, tags, Find PDF). both = sidebar panel (default).") }}
+      <select name="citation_map_edit">
+        <option value="both" {% if citation_map_edit == 'both' %}selected{% endif %}>Both</option>
+        <option value="sidebar" {% if citation_map_edit == 'sidebar' %}selected{% endif %}>Sidebar only</option>
+        <option value="popup" {% if citation_map_edit == 'popup' %}selected{% endif %}>Popup only</option>
+        <option value="off" {% if citation_map_edit == 'off' %}selected{% endif %}>Off</option>
+      </select>
+    </label>
+    <label><input type="checkbox" name="citation_map_auto_search" value="1" {% if citation_map_auto_search %}checked{% endif %}> Auto-search PDF after Add to library {{ info("When you add a paper from the map, also run Find PDF for that item. Off by default.") }}</label>
     <button type="submit">Save</button>
     {{ info("Write these values into config.toml on this machine.") }}
   </div>

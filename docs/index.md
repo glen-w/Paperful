@@ -72,6 +72,7 @@ comparison
 comparison-reference
 snowball
 authorwatch
+keepup
 bbnj-author-lanes
 e2e-stack
 e2e-nba

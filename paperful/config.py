@@ -260,6 +260,15 @@ class Config:
     snowball_default_tags: tuple[str, ...] = ()
     snowball_types: tuple[str, ...] = ()
     snowball_study_designs: tuple[str, ...] = ()
+    # Citation-map literature categories (OpenAlex study designs + user rules).
+    snowball_map_categories: tuple[str, ...] = (
+        "evidence-synthesis",
+        "trials",
+        "observational",
+        "case-reports",
+        "protocols",
+    )
+    snowball_map_category_defs: tuple[dict[str, Any], ...] = ()
     snowball_oa_only: bool = False
     # Opt-in OpenAlex snapshot store (SSH+DuckDB v1). Empty backend = API only.
     openalex_store_backend: str = ""  # ssh_duckdb | (later local_duckdb | http)
@@ -295,6 +304,8 @@ class Config:
     snowball_stop_tau: float = 0.95
     snowball_stop_min_points: int = 4
     snowball_stop_max_screened: int = 0
+    # Alert loop / collection digest cadence (days). 0 = every keepup run.
+    keepup_interval_days: int = 7
     searxng_base_url: str = ""
     # Where plain-language lines are written. note | tag | off.
     remarks_surface: str = "note"
@@ -344,6 +355,12 @@ class Config:
     # Workbench Grab: "manual" leaves PDFs in out/ until Attach; "auto" writes
     # them when the library supports it (Zotero 10+). CLI `attach` is separate.
     ui_attach_mode: str = "manual"
+    # Discover citation map library panel: sidebar | popup | both | off.
+    ui_citation_map_edit: str = "both"
+    # After Add to library from the map, also enqueue Find PDF.
+    ui_citation_map_auto_search: bool = False
+    # Remove from library: trash (default). remove_from_collection reserved.
+    ui_citation_map_remove: str = "trash"
     # Attachment hygiene. Off until `paperful attachments --apply`.
     attachments_fix_broken: bool = False
     attachments_merge_files: bool = False
@@ -701,6 +718,23 @@ def _apply_snowball(raw: Any, cfg: Config) -> None:
         from .snowball.expand import parse_study_designs
 
         cfg.snowball_study_designs = parse_study_designs(raw["study_designs"])
+    if "map_categories" in raw:
+        from .snowball.map_categories import parse_map_categories
+
+        cfg.snowball_map_categories = parse_map_categories(raw["map_categories"])
+    if "map_category_defs" in raw:
+        from .snowball.map_categories import parse_map_category_defs
+
+        cfg.snowball_map_category_defs = parse_map_category_defs(raw["map_category_defs"])
+        if "map_categories" not in raw:
+            # New custom defs join the default map set unless map_categories is set.
+            extra = tuple(
+                str(item.get("id") or "")
+                for item in cfg.snowball_map_category_defs
+                if str(item.get("id") or "")
+                and str(item.get("id") or "") not in cfg.snowball_map_categories
+            )
+            cfg.snowball_map_categories = cfg.snowball_map_categories + extra
     if "oa_only" in raw:
         cfg.snowball_oa_only = bool(raw["oa_only"])
     if "venue_include" in raw:

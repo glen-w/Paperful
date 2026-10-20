@@ -89,6 +89,12 @@ def request_from_profile(raw: dict[str, Any], cfg: Config) -> SnowballRequest:
         study_designs=_profile_study_designs(raw.get("study_designs"))
         if "study_designs" in raw
         else None,
+        map_categories=_profile_map_categories(raw.get("map_categories"))
+        if "map_categories" in raw
+        else None,
+        map_category_defs=_profile_map_category_defs(raw.get("map_category_defs"))
+        if "map_category_defs" in raw
+        else None,
         oa_only=bool(raw["oa_only"]) if "oa_only" in raw else None,
         venue_include=_strs(raw.get("venue_include")) if "venue_include" in raw else None,
         venue_exclude=_strs(raw.get("venue_exclude")) if "venue_exclude" in raw else None,
@@ -133,6 +139,24 @@ def _profile_study_designs(raw: Any) -> tuple[str, ...]:
     from .expand import parse_study_designs
 
     return parse_study_designs(raw)
+
+
+def _profile_map_categories(raw: Any) -> tuple[str, ...]:
+    from .map_categories import parse_map_categories
+
+    try:
+        return parse_map_categories(raw)
+    except ValueError as exc:
+        raise SnowballError(str(exc)) from exc
+
+
+def _profile_map_category_defs(raw: Any) -> tuple[dict[str, Any], ...]:
+    from .map_categories import parse_map_category_defs
+
+    try:
+        return parse_map_category_defs(raw)
+    except ValueError as exc:
+        raise SnowballError(str(exc)) from exc
 
 
 def orcids_from_profile(raw: dict[str, Any]) -> list[str]:

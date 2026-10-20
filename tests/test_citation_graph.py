@@ -41,6 +41,246 @@ def test_roles_follow_year_and_citations():
     assert role_for(None, 500, now_year=2026, threshold=50) == "other"
 
 
+def test_map_categories_from_study_designs():
+    from paperful.snowball.map_categories import (
+        categories_for,
+        parse_category_def,
+        resolve_catalog,
+    )
+
+    catalog = resolve_catalog()
+    assert [item.id for item in catalog] == [
+        "evidence-synthesis",
+        "trials",
+        "observational",
+        "case-reports",
+        "protocols",
+    ]
+    assert categories_for(
+        {"study_designs": ["meta-analysis", "systematic-review"]}, catalog
+    ) == ["evidence-synthesis"]
+    assert categories_for(
+        {"study_designs": ["randomized-controlled-trial", "clinical-trial"]}, catalog
+    ) == ["trials"]
+    custom = resolve_catalog(
+        enabled=["preprints"],
+        custom_defs=[
+            {
+                "id": "preprints",
+                "label": "Preprints",
+                "any_types": ["preprint", "posted-content"],
+            }
+        ],
+    )
+    assert categories_for({"type": "preprint"}, custom) == ["preprints"]
+    parsed = parse_category_def(
+        {"id": "rcts", "label": "RCTs", "any_study_designs": ["rct"]}
+    )
+    assert parsed.any_study_designs == ("randomized-controlled-trial",)
+
+
+def test_graph_nodes_carry_categories_and_legend():
+    seed = _candidate("10.1000/seed", "W1", "Seed paper", 2024, 12, hop=0, direction="search")
+    meta = _candidate(
+        "10.1000/meta",
+        "W2",
+        "A meta-analysis",
+        2018,
+        200,
+        hop=1,
+        direction="refs",
+        links=[{"parent": seed.identity, "direction": "refs"}],
+        study_designs=["meta-analysis"],
+    )
+    trial = _candidate(
+        "10.1000/rct",
+        "W3",
+        "An RCT",
+        2024,
+        5,
+        hop=1,
+        direction="refs",
+        links=[{"parent": seed.identity, "direction": "refs"}],
+        study_designs=["randomized-controlled-trial"],
+    )
+    graph = build_graph([seed, meta, trial], run_id="R1", now_year=2026)
+    assert graph["category_legend"]
+    assert {row["id"] for row in graph["category_legend"]} >= {
+        "evidence-synthesis",
+        "trials",
+    }
+    by_id = {node["id"]: node for node in graph["nodes"]}
+    assert by_id[meta.identity]["study_designs"] == ["meta-analysis"]
+    assert by_id[meta.identity]["categories"] == ["evidence-synthesis"]
+    assert by_id[meta.identity]["role"] == "foundational"
+    assert by_id[trial.identity]["categories"] == ["trials"]
+    assert by_id[trial.identity]["role"] == "emerging"
+
+
+def test_build_graph_respects_enabled_map_categories():
+    seed = _candidate("10.1000/seed", "W1", "Seed", 2020, 1, hop=0, direction="search")
+    meta = _candidate(
+        "10.1000/meta",
+        "W2",
+        "Meta",
+        2012,
+        90,
+        hop=1,
+        direction="refs",
+        links=[{"parent": seed.identity, "direction": "refs"}],
+        study_designs=["meta-analysis"],
+    )
+    graph = build_graph(
+        [seed, meta],
+        run_id="Rcat",
+        now_year=2026,
+        map_categories=["trials"],
+    )
+    assert [row["id"] for row in graph["category_legend"]] == ["trials"]
+    by_id = {node["id"]: node for node in graph["nodes"]}
+    assert by_id[meta.identity]["categories"] == []
+    assert by_id[meta.identity]["study_designs"] == ["meta-analysis"]
+
+
+def test_graph_for_run_reads_map_categories_from_summary(tmp_path: Path):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    seed = _candidate("10.1000/seed", "W1", "Seed", 2020, 1, hop=0, direction="search")
+    meta = _candidate(
+        "10.1000/meta",
+        "W2",
+        "Meta",
+        2012,
+        90,
+        hop=1,
+        direction="refs",
+        links=[{"parent": seed.identity, "direction": "refs"}],
+        study_designs=["meta-analysis"],
+    )
+    dest = write_queue(
+        cfg.state_dir,
+        "Rsum",
+        [seed, meta],
+        _client({}),
+        library_unread=False,
+        meta={"map_categories": ["evidence-synthesis"]},
+    )
+    summary = json.loads((dest / "summary.json").read_text(encoding="utf-8"))
+    assert summary["map_categories"] == ["evidence-synthesis"]
+    graph = graph_for_run(
+        cfg.state_dir,
+        "Rsum",
+        map_categories=["trials"],  # live cfg must not override the run summary
+    )
+    assert [row["id"] for row in graph["category_legend"]] == ["evidence-synthesis"]
+    by_id = {node["id"]: node for node in graph["nodes"]}
+    assert by_id[meta.identity]["categories"] == ["evidence-synthesis"]
+
+
+def test_annotate_queue_stages_tags_and_keeps_categories(tmp_path: Path):
+    """Map annotate writes operator tags and rebuilds categories (no live library)."""
+    from paperful.snowball.graph_library import annotate_queue
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.snowball_map_categories = ("evidence-synthesis", "trials")
+    seed = _candidate("10.1000/seed", "W1", "Seed", 2020, 9, hop=0, direction="search")
+    meta = _candidate(
+        "10.1000/meta",
+        "W2",
+        "Meta",
+        2015,
+        120,
+        hop=1,
+        direction="refs",
+        links=[{"parent": seed.identity, "direction": "refs"}],
+        study_designs=["meta-analysis"],
+    )
+    write_queue(cfg.state_dir, "Rann", [seed, meta], _client({}), library_unread=False)
+    graph = annotate_queue(
+        cfg, "Rann", meta.identity, tags=["paperful:frontier"], note="read next"
+    )
+    by_id = {node["id"]: node for node in graph["nodes"]}
+    assert by_id[meta.identity]["categories"] == ["evidence-synthesis"]
+    from paperful.snowball.queue import load_queue
+
+    _, rows = load_queue(cfg.state_dir, "Rann")
+    row = next(r for r in rows if r.identity == meta.identity)
+    assert row.operator is not None
+    assert "paperful:frontier" in (row.operator.get("tags") or [])
+    assert row.operator.get("note") == "read next"
+    assert by_id[meta.identity]["tags"] == ["paperful:frontier"]
+    assert by_id[meta.identity]["note"] == "read next"
+    assert by_id[meta.identity]["staged"] is True
+
+
+def test_graph_nodes_carry_library_and_operator_fields(tmp_path: Path):
+    seed = _candidate("10.1000/seed", "W1", "Seed", 2020, 9, hop=0, direction="search")
+    seed.status = "exists"
+    seed.exists_match = {"item_key": "ABCD1234", "doi": "10.1000/seed"}
+    new = _candidate("10.1000/new", "W2", "New work", 2024, 3, hop=1, direction="refs")
+    new.operator = {
+        "tags": ["to-read"],
+        "note": "check methods",
+        "collection": "Inbox/Snowball",
+    }
+    out = tmp_path / "out"
+    out.mkdir()
+    graph = build_graph([seed, new], run_id="Rlib", now_year=2026, out_dir=out)
+    by_id = {node["id"]: node for node in graph["nodes"]}
+    lib = by_id[seed.identity]
+    assert lib["in_library"] is True
+    assert lib["item_key"] == "ABCD1234"
+    assert lib["has_pdf"] is False
+    staged = by_id[new.identity]
+    assert staged["in_library"] is False
+    assert staged["tags"] == ["to-read"]
+    assert staged["note"] == "check methods"
+    assert staged["target_collection"] == "Inbox/Snowball"
+    assert staged["staged"] is True
+
+
+def test_discover_graph_meta_and_annotate_routes(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    from paperful.serve import create_app
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    row = _candidate("10.1000/a", "W1", "Paper A", 2021, 4, hop=0, direction="search")
+    write_queue(cfg.state_dir, "Rlib", [row], _client({}), library_unread=False)
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(
+        "paperful.snowball.graph_library.list_collection_paths",
+        lambda *_a, **_k: ["Inbox"],
+    )
+    monkeypatch.setattr(
+        "paperful.snowball.graph_library.list_tag_names",
+        lambda *_a, **_k: ["to-read"],
+    )
+    client = TestClient(create_app(cfg))
+    meta = client.get("/discover/graph/meta")
+    assert meta.status_code == 200
+    body = meta.json()
+    assert body["edit"] == "both"
+    assert body["auto_search"] is False
+    assert body["remove_mode"] == "trash"
+    assert "Inbox" in body["collections"]
+    ann = client.post(
+        "/discover/graph/annotate",
+        json={
+            "run_id": "Rlib",
+            "node_id": row.identity,
+            "tags": ["x"],
+            "note": "n",
+            "collection": "Inbox",
+        },
+    )
+    assert ann.status_code == 200
+    payload = ann.json()
+    assert payload["ok"] is True
+    assert payload["graph"]["nodes"][0]["staged"] is True
+
+
 def test_edges_and_threshold_from_queue():
     seed = _candidate("10.1000/seed", "W1", "Seed paper", 2024, 12, hop=0, direction="search")
     old = _candidate(
@@ -224,11 +464,6 @@ def test_graph_for_run_rewrites_the_file(tmp_path: Path):
         graph_for_run(state, "../etc")
 
 
-@pytest.mark.skipif(
-    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
-    reason="paperful[serve] extra missing",
-)
-
 def test_triage_orders_influential_before_library():
     nodes = [
         {"id": "a", "role": "influential", "in_library": False, "seed": False, "cited_by_count": 10},
@@ -247,6 +482,64 @@ def test_path_between_finds_a_short_chain():
     ]
     path = path_between(edges, "a", "c")
     assert path is not None and len(path) == 2
+
+
+def test_library_halo_returns_ghosts_without_queue_rows():
+    from paperful.snowball.citation_graph import library_halo
+
+    seed = _candidate("10.1000/seed", "W1", "Seed", 2020, 9, hop=0, direction="doi")
+    in_lib = _work("W2", "10.1000/lib", "Already mine", 2018, 4)
+    outside = _work("W3", "10.1000/out", "Not mine", 2019, 2)
+    seed_work = _work("W1", "10.1000/seed", "Seed", 2020, 9, refs=["W2", "W3"])
+    client = _client({"W1": seed_work, "W2": in_lib, "W3": outside})
+    overlay = library_halo(client, seed, {"10.1000/lib"}, cap=15)
+    assert [n["id"] for n in overlay["nodes"]] == ["doi:10.1000/lib"]
+    assert all(n.get("ghost") for n in overlay["nodes"])
+    assert overlay["edges"]
+
+
+def test_add_and_remove_library_from_queue(tmp_path: Path, monkeypatch):
+    from paperful.snowball.graph_library import add_one_to_library, remove_from_library
+    from paperful.snowball.queue import load_queue
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    row = _candidate("10.1000/new", "W1", "New paper", 2024, 3, hop=0, direction="search")
+    write_queue(cfg.state_dir, "Radd", [row], _client({}), library_unread=False)
+
+    class Item:
+        key = "ITEMKEY1"
+
+    monkeypatch.setattr(
+        "paperful.library.get_backend",
+        lambda _cfg: object(),
+    )
+    monkeypatch.setattr(
+        "paperful.snowball.ingest.create_new",
+        lambda backend, rows, collection, **kwargs: ([Item()], {"created": 1, "failed": 0}),
+    )
+    result = add_one_to_library(cfg, "Radd", row.identity, collection="Inbox")
+    assert result["item_key"] == "ITEMKEY1"
+    assert result["auto_search"] is False
+    node = next(n for n in result["graph"]["nodes"] if n["id"] == row.identity)
+    assert node["in_library"] is True
+    assert node["item_key"] == "ITEMKEY1"
+
+    class Backend:
+        def __init__(self):
+            self.trashed = []
+
+        def trash_item(self, key):
+            self.trashed.append(key)
+
+    backend = Backend()
+    monkeypatch.setattr("paperful.library.get_backend", lambda _cfg: backend)
+    graph = remove_from_library(cfg, "Radd", row.identity)
+    assert backend.trashed == ["ITEMKEY1"]
+    node = next(n for n in graph["nodes"] if n["id"] == row.identity)
+    assert node["in_library"] is False
+    _, rows = load_queue(cfg.state_dir, "Radd")
+    assert rows[0].exists_match is None
+    assert rows[0].status == "new"
 
 
 def test_select_nodes_prefers_focus_neighbours():
@@ -300,6 +593,44 @@ def test_repair_queue_links_writes_graph_links(tmp_path: Path):
     )
 
 
+def test_build_graph_marks_watch_and_compare_overlays():
+    seed = _candidate("10.1000/seed", "W1", "Seed", 2020, 5, hop=0, direction="search")
+    child = _candidate("10.1000/new", "W2", "New", 2024, 2, hop=1, direction="refs")
+    graph = build_graph(
+        [seed, child],
+        run_id="R1",
+        watch_seen={seed.identity},
+        compare_ids={seed.identity},
+    )
+    by_id = {n["id"]: n for n in graph["nodes"]}
+    assert by_id[seed.identity]["watch_seen"] is True
+    assert by_id[child.identity]["watch_new"] is True
+    assert by_id[child.identity]["compare_new"] is True
+
+
+def test_discover_graph_repair_route(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    from paperful.serve import create_app
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    seed = _candidate("10.1000/seed", "W1", "Seed", 2020, 9, hop=0, direction="search")
+    write_queue(cfg.state_dir, "Rrepair", [seed], _client({}), library_unread=False)
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(
+        "paperful.snowball.citation_graph.repair_queue_links",
+        lambda state_dir, run_id, client, **kwargs: graph_for_run(
+            state_dir, run_id, **kwargs
+        ),
+    )
+    client = TestClient(create_app(cfg))
+    resp = client.post("/discover/graph/repair", json={"run_id": "Rrepair"})
+    assert resp.status_code == 200
+    assert resp.json()["schema"] == SCHEMA
+
+
 def test_discover_page_includes_the_map(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
@@ -315,11 +646,15 @@ def test_discover_page_includes_the_map(tmp_path, monkeypatch):
     page = client.get("/discover")
     assert page.status_code == 200
     assert 'id="citationMapApp"' in page.text
+    assert 'id="citationCategoryFilters"' in page.text
     graph = client.get("/discover/graph", params={"run_id": "Rpage"})
     assert graph.status_code == 200
     body = graph.json()
     assert body["schema"] == SCHEMA
     assert body["nodes"][0]["title"] == "Seed paper"
+    assert "category_legend" in body
+    assert "categories" in body["nodes"][0]
+    assert "study_designs" in body["nodes"][0]
     missing = client.get("/discover/graph", params={"run_id": "no-such-run"})
     assert missing.status_code == 404
     bad = client.get("/discover/graph", params={"run_id": "../etc"})
@@ -355,6 +690,7 @@ def _candidate(
     hop: int,
     direction: str,
     links: list[dict[str, str]] | None = None,
+    study_designs: list[str] | None = None,
 ) -> Candidate:
     biblio: dict[str, object] = {
         "title": title,
@@ -364,6 +700,8 @@ def _candidate(
     }
     if links:
         biblio["graph_links"] = links
+    if study_designs:
+        biblio["study_designs"] = list(study_designs)
     return Candidate(
         run_id="R1",
         seed={"type": "doi", "value": "10.1000/seed"},
