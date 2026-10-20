@@ -930,7 +930,7 @@ header.wb-chrome .advanced-toggle .help-tip-bubble {
   border-right: 1px solid var(--line);
   padding-right: 0.75rem;
   overflow: auto;
-  max-height: 28rem;
+  max-height: 40rem;
 }
 
 .citation-triage h3 {
@@ -959,7 +959,9 @@ header.wb-chrome .advanced-toggle .help-tip-bubble {
 }
 
 .citation-canvas-wrap {
-  min-height: 28rem;
+  position: relative;
+  min-height: 40rem;
+  height: 40rem;
   background: rgba(255, 255, 255, 0.45);
   border: 1px solid var(--line);
   border-radius: 0.6rem;
@@ -969,7 +971,26 @@ header.wb-chrome .advanced-toggle .help-tip-bubble {
 .citation-canvas {
   display: block;
   width: 100%;
-  height: 28rem;
+  height: 100%;
+}
+
+.citation-popout {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  z-index: 2;
+  font-size: 0.82rem;
+  padding: 0.3rem 0.65rem;
+  background: rgba(247, 241, 232, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(16, 24, 32, 0.08);
+}
+
+.citation-popout:hover {
+  background: var(--paper);
 }
 
 .citation-panel {
@@ -978,7 +999,63 @@ header.wb-chrome .advanced-toggle .help-tip-bubble {
   padding: 0.85rem 0.9rem;
   background: rgba(255, 255, 255, 0.55);
   overflow: auto;
-  max-height: 28rem;
+  max-height: 40rem;
+}
+
+body.citation-large-open {
+  overflow: hidden;
+}
+
+#citationMapApp.is-large {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  margin: 0;
+  border-radius: 0;
+  border: none;
+  padding: 0.85rem 1.1rem 1rem;
+  background: var(--paper);
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#citationMapApp.is-large > h2,
+#citationMapApp.is-large > .section-lede {
+  flex: 0 0 auto;
+}
+
+#citationMapApp.is-large > .section-lede {
+  display: none;
+}
+
+#citationMapApp.is-large .citation-toolbar,
+#citationMapApp.is-large .citation-category-filters,
+#citationMapApp.is-large .citation-year,
+#citationMapApp.is-large .citation-legend {
+  flex: 0 0 auto;
+}
+
+#citationMapApp.is-large .citation-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
+#citationMapApp.is-large .citation-triage,
+#citationMapApp.is-large .citation-panel {
+  max-height: none;
+  height: 100%;
+}
+
+#citationMapApp.is-large .citation-canvas-wrap {
+  height: 100%;
+  min-height: 0;
+}
+
+#citationMapApp.is-large .citation-popout {
+  display: none;
 }
 
 .citation-panel h3 {

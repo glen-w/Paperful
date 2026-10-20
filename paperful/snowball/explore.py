@@ -145,13 +145,13 @@ def start_explore(
         },
     )
     try:
+        # expand_queue already focuses the graph on node_id when building.
         graph = expand_queue(
             cfg.state_dir,
             run_id,
             row.identity,
             "both",
             client,
-            focus=row.identity,
             map_categories=map_categories,
             map_category_defs=map_category_defs,
         )

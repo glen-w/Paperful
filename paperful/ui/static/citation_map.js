@@ -43,6 +43,7 @@
     metaCollections: [],
     metaTags: [],
     editMode: "both",
+    largeView: false,
   };
   var els = {};
 
@@ -65,6 +66,8 @@
     els.halo = document.getElementById("citationLibraryHalo");
     els.repair = document.getElementById("citationRepairLinks");
     els.pathMode = document.getElementById("citationPathMode");
+    els.largeView = document.getElementById("citationLargeView");
+    els.popout = document.getElementById("citationPopout");
     els.yearMin = document.getElementById("citationYearMin");
     els.yearMax = document.getElementById("citationYearMax");
     els.yearLabel = document.getElementById("citationYearLabel");
@@ -75,6 +78,16 @@
     state.watchName = root.getAttribute("data-watch-name") || "";
     state.compareRun = root.getAttribute("data-compare-run") || "";
     state.reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    function onLargeViewClick(event) {
+      if (event) event.stopPropagation();
+      setLargeView(!state.largeView);
+    }
+    if (els.largeView) els.largeView.addEventListener("click", onLargeViewClick);
+    if (els.popout) els.popout.addEventListener("click", onLargeViewClick);
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && state.largeView) setLargeView(false);
+    });
 
     root.querySelectorAll(".citation-filters .citation-filter").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -354,6 +367,27 @@
     if (els.status) els.status.textContent = text || "";
   }
 
+  function setLargeView(on) {
+    state.largeView = Boolean(on);
+    if (els.root) els.root.classList.toggle("is-large", state.largeView);
+    document.body.classList.toggle("citation-large-open", state.largeView);
+    if (els.largeView) {
+      els.largeView.textContent = state.largeView ? "Exit large view" : "Large view";
+      els.largeView.setAttribute("aria-pressed", state.largeView ? "true" : "false");
+      els.largeView.classList.toggle("is-active", state.largeView);
+    }
+    if (els.popout) {
+      els.popout.setAttribute(
+        "aria-label",
+        state.largeView ? "Exit large view" : "Open large view"
+      );
+      els.popout.title = state.largeView ? "Exit large view" : "Open large view";
+    }
+    window.requestAnimationFrame(function () {
+      if (state.nodes.length) renderGraph();
+    });
+  }
+
   function visibleNodes() {
     return state.nodes.filter(function (node) {
       if (!state.showOccasional && node.occasional && !node.seed) return false;
@@ -402,15 +436,21 @@
       setStatus("No papers to map yet. Search a topic, then come back.");
       return;
     }
-    setStatus(
-      state.showOccasional
-        ? papers.length + " papers · " + edges.length + " links"
-        : papers.length +
-            " papers · " +
-            edges.length +
-            " links" +
-            (hidden ? " (" + hidden + " other hidden)" : "")
-    );
+    var linkNote =
+      papers.length +
+      " papers · " +
+      edges.length +
+      " links" +
+      (state.showOccasional || !hidden ? "" : " (" + hidden + " other hidden)");
+    if (!edges.length && papers.length > 1) {
+      var allSeeds = papers.every(function (paper) {
+        return paper.seed;
+      });
+      linkNote += allSeeds
+        ? " — search hit list has no citation hops yet; expand a paper to draw links"
+        : " — expand a paper to pull who it cites or who cites it";
+    }
+    setStatus(linkNote);
 
     var wrap = els.root.querySelector(".citation-canvas-wrap");
     if (wrap && wrap.clientWidth === 0) return;
@@ -1185,14 +1225,35 @@
 
   function clearPanel() {
     if (!els.panel) return;
+    var hint =
+      state.edges && state.edges.length
+        ? "Click a paper to see why it is on the map, then expand who it cites or who cites it."
+        : "This map has no citation links yet. Click a paper, then use Papers it cites / Papers that cite it to pull neighbours from OpenAlex.";
     els.panel.innerHTML =
-      '<p class="citation-panel-empty">Click a paper to see why it is on the map, then expand who it cites or who cites it. A dark ring means it is already in your library. Larger nodes have more citations.</p>';
+      '<p class="citation-panel-empty">' +
+      hint +
+      " A dark ring means it is already in your library. Larger nodes have more citations.</p>";
   }
 
   function expand(nodeId, direction, btn) {
-    if (state.expandBlocked) return;
+    if (state.expandBlocked) {
+      setStatus("Expand is paused — OpenAlex budget is spent. Try again after it resets.");
+      return;
+    }
     if (btn) btn.disabled = true;
-    setStatus("Loading neighbours…");
+    var label =
+      direction === "refs"
+        ? "papers it cites"
+        : direction === "cites"
+          ? "papers that cite it"
+          : "neighbours";
+    setStatus("Loading " + label + "…");
+    if (els.panel) {
+      els.panel.innerHTML =
+        '<p class="citation-panel-empty">Loading ' +
+        escapeHtml(label) +
+        " from OpenAlex…</p>";
+    }
     fetch("/discover/graph/expand", {
       method: "POST",
       credentials: "same-origin",
@@ -1210,11 +1271,21 @@
       })
       .catch(function (error) {
         var msg = error.message || "Could not expand that paper.";
-        if (msg.toLowerCase().indexOf("budget") >= 0 || msg.toLowerCase().indexOf("429") >= 0) {
+        var budget =
+          msg.toLowerCase().indexOf("budget") >= 0 ||
+          msg.toLowerCase().indexOf("429") >= 0;
+        if (budget) {
           state.expandBlocked = true;
-          msg += " Expand is paused until you reload or OpenAlex resets.";
+          msg =
+            "OpenAlex daily budget is spent — expand is paused until the budget resets (or you reload after it does).";
         }
         setStatus(msg);
+        if (els.panel) {
+          els.panel.innerHTML =
+            "<h3>Could not expand</h3><p>" +
+            escapeHtml(msg) +
+            "</p><p class=\"citation-meta\">Citation links only appear after a refs/cites hop. A keyword search hit list has none until you expand.</p>";
+        }
         if (btn) btn.disabled = state.expandBlocked;
       });
   }

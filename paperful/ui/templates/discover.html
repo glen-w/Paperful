@@ -454,6 +454,7 @@
     <label class="citation-occasional"><input type="checkbox" id="citationLibraryHalo"> Library neighbours</label>
     <button type="button" class="secondary" id="citationRepairLinks">Repair links</button>
     <button type="button" class="secondary" id="citationPathMode">Path between two papers</button>
+    <button type="button" class="secondary" id="citationLargeView" aria-pressed="false">Large view</button>
     <p id="citationThresholds" class="citation-meta"></p>
     <p id="citationStatus" class="citation-status" role="status"></p>
   </div>
@@ -467,6 +468,7 @@
   <div class="citation-layout">
     <aside id="citationTriage" class="citation-triage" aria-label="Read first"></aside>
     <div class="citation-canvas-wrap">
+      <button type="button" class="citation-popout" id="citationPopout" title="Open large view" aria-label="Open large view">Large view</button>
       <svg id="citationCanvas" class="citation-canvas" role="img" aria-label="Citation map of this Discover queue"></svg>
     </div>
     <aside id="citationPanel" class="citation-panel" aria-live="polite">
@@ -654,6 +656,6 @@
 </script>
 {% if tab == 'queue' and run_id %}
 <script src="/static/vendor/d3.v7.min.js"></script>
-<script src="/static/citation_map.js?v=7"></script>
+<script src="/static/citation_map.js?v=9"></script>
 {% endif %}
 {% endblock %}
