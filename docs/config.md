@@ -267,7 +267,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[keepup].interval_days` | `7` | Default days between `keepup run` polls (`0` = every run). Per-job `--interval-days` overrides. No built-in scheduler — cron `keepup run`. See [Keepup](keepup.md) |
 | `[snowball].default_tags` | `()` | Extra tags on snowball `--gate auto` / `apply` creates, with `--tag` and `from-<seed-slug>` |
 | `[snowball].study_designs` | `()` | OpenAlex study design filter (`rct`, `meta-analysis`, …). CLI `--study-design`. See [snowball stop rules](snowball.md#stop-rules) |
-| `[snowball].map_categories` | five built-ins | Which literature-category ids appear on the citation map (badges/filters). Defaults: `evidence-synthesis`, `trials`, `observational`, `case-reports`, `protocols`. See [Citation map](snowball.md#citation-map) |
+| `[snowball].map_categories` | ten built-ins | Which literature-category ids appear on the citation map (badges/filters). Defaults include study-design ids (`evidence-synthesis`, `trials`, `clinical-trials`, …) and type ids (`preprints`, `books`, `narrative-reviews`, `commentary`). See [Citation map](snowball.md#citation-map) |
 | `[snowball].map_category_defs` | `()` | Extra category tables: `{ id, label, any_study_designs?, any_types?, color? }`. Ids listed here are appended to `map_categories` when that key is unset |
 | `[snowball].stop_rule` | `off` | `off`, `marginal_yield`, `asymptotic_coverage`, `budget`, or `any`. Off is one shot. A rule pauses for Keep/Skip between hops. CLI `--stop-rule`. See [snowball stopping rules](snowball.md#stopping-rules) |
 | `[snowball].stop_eps` / `stop_k` | `0.01` / `2` | Marginal yield: Keep rate below `eps` for `k` hops, not before hop `k + 1`. CLI `--stop-eps` / `--stop-k` |
