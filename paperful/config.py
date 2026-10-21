@@ -275,13 +275,15 @@ class Config:
     )
     snowball_map_category_defs: tuple[dict[str, Any], ...] = ()
     snowball_oa_only: bool = False
-    # Opt-in OpenAlex snapshot store (SSH+DuckDB v1). Empty backend = API only.
-    openalex_store_backend: str = ""  # ssh_duckdb | (later local_duckdb | http)
+    # Opt-in OpenAlex snapshot store. Empty backend = API only.
+    openalex_store_backend: str = ""  # ssh_duckdb | local_duckdb | (later http)
     openalex_store_ssh_host: str = ""
     openalex_store_ssh_user: str = ""
     openalex_store_parquet_glob: str = ""
+    openalex_store_cites_index_glob: str = ""
     openalex_store_duckdb_bin: str = "duckdb"
     openalex_store_timeout_s: float = 120.0
+    openalex_store_build_timeout_s: float = 7200.0
     snowball_venue_include: tuple[str, ...] = ()
     snowball_venue_exclude: tuple[str, ...] = ()
     snowball_languages: tuple[str, ...] = ()

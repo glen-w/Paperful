@@ -418,21 +418,37 @@ a shared host — and point Paperful at it. Paperful does **not** ship the dump;
 most installs leave this unset.
 
 When `[openalex_store]` is set, DOI and OpenAlex-id batch reads try the store
-first; misses and every other OpenAlex call (cited-by, search, keywords, ORCID)
-still use the live API. Rate-limit / budget handling stays API-only.
+first. Citing (`works_citing` / citation-map expand) needs a prebuilt inverted
+cites index — run `paperful openalex-store build-cites`, then set
+`cites_index_glob`. The build is **resumable**: one works `updated_date`
+partition at a time with `.done/<date>` markers (re-run after a crash skips
+finished slices). Store-side cites-query / `search=` filtering is
+**title-only** (`display_name`); abstract and fulltext stay on the live API.
+Keywords and ORCID stay API-only.
 
-v1 backend: `ssh_duckdb` — DuckDB runs **on the host that holds the parquet**
-(laptop path later; HTTP for campuses later). Paperful SSHs in, runs SQL, and
-copies small JSON rows back. Env overrides: `OPENALEX_STORE_SSH_HOST`,
-`OPENALEX_STORE_PARQUET_GLOB`.
+When the live API daily budget is spent, DOI/id and citing (with index) keep
+using the store; keyword / ORCID / full-text search still pause for
+`snowball resume`.
+
+Backends:
+
+- `local_duckdb` — DuckDB on this machine over a local parquet glob (needs
+  `duckdb` on `PATH`, or set `duckdb_bin`).
+- `ssh_duckdb` — DuckDB on a remote host; Paperful SSHs in, runs SQL, and
+  copies small JSON rows back.
+
+Env overrides: `OPENALEX_STORE_SSH_HOST`, `OPENALEX_STORE_PARQUET_GLOB`,
+`OPENALEX_STORE_CITES_INDEX_GLOB`.
 
 ```toml
 # Optional. Most users leave this unset.
 # [openalex_store]
-# backend = "ssh_duckdb"   # later: local_duckdb | http
-# ssh_host = "nuc"
-# # ssh_user = "you"
-# parquet_glob = "/mnt/files/openalex/data/parquet/**/*.parquet"
+# backend = "local_duckdb"   # or ssh_duckdb; later: http
+# parquet_glob = "/data/openalex/data/works/**/*.parquet"
+# cites_index_glob = "/data/openalex/cites/**/*.parquet"
 # # duckdb_bin = "duckdb"
 # # timeout_s = 120
+# # build_timeout_s = 7200
+# # ssh_host = "nuc"         # ssh_duckdb only
+# # ssh_user = "you"
 ```

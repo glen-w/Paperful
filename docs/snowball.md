@@ -759,11 +759,17 @@ environment, never in `config.toml`.
 If API limits or shared-IP budgets are the bottleneck, download the
 [OpenAlex snapshot](https://help.openalex.org/access/snapshot/) yourself — on
 your computer or a host you control — and configure `[openalex_store]`. Paperful
-does not ship the dump. v1 queries via SSH + DuckDB on the data host and serves
-DOI / OpenAlex-id batches only; everything else still hits the live API.
+does not ship the dump. Backends: `local_duckdb` (this machine) or
+`ssh_duckdb` (DuckDB on the data host). DOI / OpenAlex-id batches use the works
+parquet. Citing (citation-map expand, `--direction cites`) needs
+`paperful openalex-store build-cites` then `cites_index_glob` (resumable per
+works `updated_date`). Store
+cites-query matching is title-only. Keywords / ORCID / full-text search still
+hit the live API. When the API daily budget is spent, DOI/id and citing keep
+using the snapshot; the rest pause for `resume`.
 
 Setup and TOML: [config Advanced](config.md#openalex-api-limits-and-snapshot-store).
-Roadmap for cites/search parity and campus HTTP hosting:
+Roadmap for full search parity and campus HTTP hosting:
 [ROADMAP](ROADMAP.md#snowball).
 
 ## Where the crawl comes from

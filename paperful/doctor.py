@@ -694,10 +694,36 @@ def run_checks(
     checks.extend(_llm_checks(cfg))
     checks.extend(_rag_checks(cfg))
     checks.append(_snowball_check(cfg))
+    checks.append(_openalex_store_check(cfg))
     checks.append(_author_packs_check(cfg))
     checks.append(_authorwatch_check(cfg))
 
     return checks
+
+
+def _openalex_store_check(cfg: Config) -> Check:
+    backend = (cfg.openalex_store_backend or "").strip().lower()
+    if not backend:
+        return Check("openalex store", "green", "off (live API only)")
+    cites = (cfg.openalex_store_cites_index_glob or "").strip()
+    if not cites:
+        cites = os.environ.get("OPENALEX_STORE_CITES_INDEX_GLOB", "").strip()
+    works = (cfg.openalex_store_parquet_glob or "").strip()
+    detail = f"{backend}"
+    if works:
+        detail += " · works glob set"
+    if cites:
+        return Check(
+            "openalex store",
+            "green",
+            f"{detail} · cites index set (DOI/id + citing from snapshot)",
+        )
+    return Check(
+        "openalex store",
+        "amber",
+        f"{detail} · DOI/id only — run paperful openalex-store build-cites "
+        "and set cites_index_glob for citing under API budget",
+    )
 
 
 def _snowball_check(cfg: Config, *, probe: Callable[[str], str] | None = None) -> Check:

@@ -260,6 +260,15 @@ cache_app = typer.Typer(
     help="Manage throwaway files under state/pdf-cache/.",
 )
 app.add_typer(cache_app, name="cache")
+openalex_store_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help=(
+        "Optional OpenAlex parquet snapshot helpers (local or SSH DuckDB). "
+        "Most installs leave [openalex_store] unset and use the live API."
+    ),
+)
+app.add_typer(openalex_store_app, name="openalex-store")
 
 # Canonical top-level verbs. tests/test_cli.py asserts this matches `paperful --help`.
 JOBS: dict[str, tuple[str, ...]] = {
@@ -307,6 +316,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "pack",
         "profile",
         "playbooks",
+        "openalex-store",
         "mcp",
         "serve",
     ),
@@ -2683,6 +2693,58 @@ def cache_clean(
     from .cache_cmd import run_cache_clean
 
     run_cache_clean(console, apply=apply, config=config, fmt=fmt)
+
+
+@openalex_store_app.command("build-cites")
+def openalex_store_build_cites(
+    out: str = typer.Option(
+        "",
+        "--out",
+        help=(
+            "Directory for the inverted cites parquet tree. "
+            "Default: directory implied by [openalex_store].cites_index_glob."
+        ),
+    ),
+    timeout_s: float | None = typer.Option(
+        None,
+        "--timeout-s",
+        help=(
+            "Per-partition DuckDB timeout in seconds "
+            "(default: build_timeout_s or 7200)."
+        ),
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Invert works.referenced_works into a cites index for store-backed citing.
+
+    Needs [openalex_store] with a works parquet_glob. Point cites_index_glob at
+    ``<out>/**/*.parquet`` afterward (or use --out that matches that glob).
+
+    Builds one works ``updated_date`` partition at a time and writes
+    ``.done/<date>`` markers — safe to re-run after a crash. Full OpenAlex
+    dumps can take many hours; for a remote host prefer a nohup'd build on
+    that machine so a laptop disconnect does not stop the job.
+    """
+    from .snowball.local_openalex import OpenAlexStoreError, build_cites_index_from_config
+
+    cfg = _cfg(config)
+    try:
+        written, counts = build_cites_index_from_config(
+            cfg,
+            output_dir=out,
+            timeout_s=timeout_s,
+            progress=lambda msg: console.print(msg),
+        )
+    except OpenAlexStoreError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    example = written.rstrip("/") + "/**/*.parquet"
+    console.print(
+        f"Cites index under [bold]{written}[/] · "
+        f"built {counts['built']}, skipped {counts['skipped']}, "
+        f"total {counts['total']}. "
+        f"Set [openalex_store].cites_index_glob to that tree (e.g. {example})."
+    )
 
 
 @app.command()

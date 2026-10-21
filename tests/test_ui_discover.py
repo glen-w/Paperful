@@ -360,9 +360,11 @@ def test_discover_shows_stop_rule_and_next_hop(tmp_path, monkeypatch):
     monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
     client = TestClient(create_app(cfg))
     client.cookies.set("pf_advanced", "1")
-    page = client.get("/discover")
-    assert page.status_code == 200
-    assert 'name="stop_rule"' in page.text
-    assert "marginal_yield" in page.text
-    assert "Next hop" in page.text
-    assert "Waiting on Keep or Skip." in page.text
+    topic = client.get("/discover?tab=topic")
+    assert topic.status_code == 200
+    assert 'name="stop_rule"' in topic.text
+    assert "marginal_yield" in topic.text
+    queue = client.get("/discover?tab=queue")
+    assert queue.status_code == 200
+    assert "Next hop" in queue.text
+    assert "Waiting on Keep or Skip." in queue.text

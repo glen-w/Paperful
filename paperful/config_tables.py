@@ -636,11 +636,21 @@ def apply_openalex_store(raw: dict[str, Any], cfg: "Config") -> None:
             ("ssh_user", "openalex_store_ssh_user", lambda v: str(v).strip()),
             ("parquet_glob", "openalex_store_parquet_glob", lambda v: str(v).strip()),
             (
+                "cites_index_glob",
+                "openalex_store_cites_index_glob",
+                lambda v: str(v).strip(),
+            ),
+            (
                 "duckdb_bin",
                 "openalex_store_duckdb_bin",
                 lambda v: str(v).strip() or "duckdb",
             ),
             ("timeout_s", "openalex_store_timeout_s", lambda v: max(1.0, float(v))),
+            (
+                "build_timeout_s",
+                "openalex_store_build_timeout_s",
+                lambda v: max(60.0, float(v)),
+            ),
         ],
     )
 

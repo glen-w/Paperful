@@ -53,7 +53,7 @@ and is documented in [docs/e2e-nba.md](docs/e2e-nba.md). Do not enable it in CI.
 
 **Issues to watch:** CI colours CLI help (use `plain_text()` for flag assertions),
 the dev group needs a LanceDB-compatible platform, and the Compose **docker** job
-is not a substitute for the full pytest job. Details:
+is not a substitute for `pytest -m smoke`. Details:
 [developer guide — CI and local pitfalls](docs/developer.md#ci-and-local-pitfalls).
 
 ## Pull requests

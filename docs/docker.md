@@ -26,8 +26,8 @@ writable. See [Terms](TERMS.md).
 **What CI proves:** job `docker` in `.github/workflows/ci.yml` builds the
 **light** image (`PAPERFUL_IMAGE_MODE` unset) and runs `doctor --no-guide`
 with **no live Zotero**. Exit **2** is required (Zotero row red). That
-is a first-run stranger machine, not a failed Compose install. Pytest job
-`test` is not the Compose-first proof.
+is a first-run stranger machine, not a failed Compose install. The pytest
+`smoke` / `suite` jobs are not the Compose-first proof.
 
 ## What still runs on the host
 

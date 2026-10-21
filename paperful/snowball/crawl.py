@@ -764,6 +764,18 @@ def _defer(client: OpenAlexClient, exc: BaseException, **fields: Any) -> None:
             client.note(f"OpenAlex daily allowance for your API key is used up.{when}")
         else:
             client.note(keyless_limit_message(has_key=bool(client.api_key), reset_at=reset_at))
+        if client.store is not None:
+            if getattr(client.store, "has_cites_index", False):
+                client.note(
+                    "Snapshot store is configured — DOI/id and citing can continue "
+                    "from it; keywords / full-text search need resume after the API resets."
+                )
+            else:
+                client.note(
+                    "Snapshot store is configured — DOI/id lookups can continue from it; "
+                    "citing needs cites_index_glob (paperful openalex-store build-cites); "
+                    "keywords / full-text search need resume after the API resets."
+                )
     else:
         client.note(f"Crawl paused ({exc}). Partial queue kept. paperful snowball resume")
 

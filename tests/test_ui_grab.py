@@ -14,6 +14,8 @@ from paperful.store import (
 from paperful.ui import commands, jobs
 from paperful.ui.pages import scope_fingerprint
 
+pytestmark = pytest.mark.smoke
+
 
 class _Item:
     def __init__(self, key: str, doi: str):

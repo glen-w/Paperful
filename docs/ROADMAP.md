@@ -40,7 +40,7 @@ integrations.
 
 | **1.0** | **Post-1.0** |
 | --- | --- |
-| Trust checklist, locked `paperful.run_report.v1` / `paperful.item.v1`, snapshot contract | **Local OpenAlex parquet store** — phases 2B/2C (`works_citing`, full search parity, `local_duckdb` / `http`). Live OpenAlex API is enough for most installs; v1 `ssh_duckdb` remains opt-in for institutions |
+| Trust checklist, locked `paperful.run_report.v1` / `paperful.item.v1`, snapshot contract | **Local OpenAlex parquet store** — phase 2C (full search / keyword / ORCID / `http`). Live API is enough for most installs; `ssh_duckdb` / `local_duckdb` + cites index remain opt-in |
 | **GUI workbench** — Discover + Wanted simple loop (topic + people); command ids; review tokens; Advanced Repair / Mirror / Index / Briefs and the non-TTY CLI verbs | **Firefox extension** — optional native messaging into the mirror ([firefox.md](firefox.md)) |
 | **Ask in GUI** — `/ask` on the default nav, scoped chat with citations when `[rag]` + `[llm]` on | Discover keepup UX polish; `refs` on collection digest; retractions / living-review ([Keeping up](#after-110-keeping-up)) |
 | Zotero-proven fetch/mirror path; honest adapter docs (Mendeley / EndNote seeking testers) | SaaS tenancy polish; promoting other managers to “supported” after field reports; remote-manager parity beyond what 1.0 open/Docker needs |
@@ -197,7 +197,7 @@ Cheap housekeeping (can sit alongside 1.1.x):
 - Local snapshot users: OpenAlex says the change does not touch
   `updated_date`, so incremental syncs miss it. Users of `local_openalex.py`
   must reload fully from the 14 Oct 2026 snapshot. Document this; have
-  `doctor` warn about older snapshots. Park **2B/2C** (institutions only)
+  `doctor` warn about older snapshots. Park **2C** (full search / `http`)
   until someone asks — [OpenAlex snapshot store](#snowball).
 - Add a before/after snapshot test for keyword-based scoring.
 
@@ -407,7 +407,7 @@ Do not start these until testers ask, or until the main lane is boring.
 
 - **Firefox extension** — unsigned temporary add-on, mirror writes only.
   [firefox.md](firefox.md). Not a 1.0 gate.
-- **Local OpenAlex 2B/2C** — institutions only; live API is enough.
+- **Local OpenAlex 2C** — full search / keyword / ORCID / `http`; institutions only; live API is enough for most.
 - **SaaS / tenancy.**
 - **Catalogue unification** (managers as equals).
 - **LibGen** (same opt-in bar as Sci-Hub if ever).
@@ -1563,17 +1563,19 @@ snapshot](https://help.openalex.org/access/snapshot/) and point
 `[openalex_store]` at it. Architecture: a `WorksStore` transport behind
 `OpenAlexClient` — not an entry in `snowball_backends`.
 
-- **v1 (shipped):** `ssh_duckdb` — DuckDB runs on the data host; Paperful SSHs
-  SQL and gets small JSON rows. Covers `work_by_doi` / `works_by_dois` /
-  `works_by_ids` with API fallback for misses. Docs:
+- **v1 (shipped):** `ssh_duckdb` and `local_duckdb` — DuckDB over a parquet
+  snapshot (remote SSH or this machine). Covers `work_by_doi` /
+  `works_by_dois` / `works_by_ids` with API fallback for misses; when the API
+  daily budget is spent, DOI/id reads keep using the store. Docs:
   [config Advanced](config.md#openalex-api-limits-and-snapshot-store),
   [snowball Advanced](snowball.md#advanced).
-- **Post-1.0 (2B):** `works_citing` plus text search (`cites-query`) from the
-  snapshot (likely an inverted cites index or careful scan strategy). **Park**
-  until an institution asks — [Parked](#after-110-parked). The public API is
-  generous for typical snowball / ingest loads.
-- **Post-1.0 (2C):** keyword / ORCID / `search` parity; `local_duckdb` and `http`
-  backends for campus hosting without SSH. Same park.
+- **2B (shipped):** inverted cites index (`paperful openalex-store build-cites`
+  + `cites_index_glob`) for store-backed `works_citing`; title-only
+  cites-query / `search=` on citing and id batches. Abstract/fulltext search
+  remains live-API / 2C.
+- **Post-1.0 (2C):** keyword / ORCID / full `search` parity; `http` backend for
+  campus hosting without SSH. **Park** until an institution asks —
+  [Parked](#after-110-parked).
 
 OpenAlex **topic** classifier change (13 Jan 2027): nothing in Paperful
 breaks; housekeeping and topic-native watches are

@@ -8,6 +8,21 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- **OpenAlex cites build is resumable:** `build-cites` checkpoints per works
+  parquet file (`.done/<date>` + `.done/<date>.parts/<stem>`), with a DuckDB
+  memory limit and spill dir so huge `updated_date` folders (100G+) do not OOM.
+- **OpenAlex snapshot citing (2B):** `paperful openalex-store build-cites`
+  builds an inverted cites parquet from works `referenced_works`. Set
+  `cites_index_glob` so `works_citing` (citation-map expand, cites hops) uses
+  the snapshot. Store cites-query / id `search=` is title-only. When the API
+  budget is spent, DOI/id and citing keep using the store. See
+  [config Advanced](docs/config.md#openalex-api-limits-and-snapshot-store).
+- **Own-machine OpenAlex snapshot (`local_duckdb`):** Point
+  `[openalex_store]` at a local parquet dump (`backend = "local_duckdb"`,
+  `parquet_glob = …`). DOI/id lookups try the store first; when the live API
+  daily budget is spent, those lookups keep using the snapshot. Needs `duckdb`
+  on `PATH` (or `duckdb_bin`). See
+  [config Advanced](docs/config.md#openalex-api-limits-and-snapshot-store).
 - **Discover Explore map:** Paste a DOI or paper name to seed a citation map
   immediately (one auto-expand hop). Map **Seed search** fills the Topic
   snowball form from the selected node. See [Citation map](docs/snowball.md#citation-map).

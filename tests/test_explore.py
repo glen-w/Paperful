@@ -127,8 +127,8 @@ def test_discover_explore_route(tmp_path, monkeypatch):
 
     monkeypatch.setattr("paperful.snowball.explore.start_explore", fake_start)
     client = TestClient(create_app(cfg))
-    page = client.get("/discover")
+    page = client.get("/discover?tab=explore")
     assert "discoverExploreSection" in page.text
     resp = client.post("/discover/explore", data={"query": "10.1000/seed"}, follow_redirects=False)
     assert resp.status_code == 303
-    assert resp.headers["location"].endswith("#citationMapApp")
+    assert "/discover?tab=queue" in resp.headers["location"]

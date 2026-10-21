@@ -193,6 +193,12 @@ uv run paperful recover --from-last-run --from-last-run-mode missing -n 5
   items stay `retryable`. A paywall stops that item only. Sci-Hub's ALTCHA
   check is separate and still completed when it can be. Timeouts / no
   download → `not_found`.
+- **Mileage varies** for both `browser_agent` and opt-in [Camofox](camofox.md):
+  bulk recover often sees long strings of timeouts, Cloudflare / soft bot
+  walls, DOI pages with no PDF control, and empty downloads. Expect frequent
+  misses; keep these lanes off when you want a fast, predictable pass over
+  HTTP / vault sources only. Model and acceptance detail:
+  [browser-agent-models.md](browser-agent-models.md).
 - Access blocks (403 / "Request blocked" / paywall with no free PDF) are
   instructed as immediate stop — the agent must not open search engines or
   support/help pages. If it navigates to Google/Bing/etc. or a support/contact

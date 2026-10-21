@@ -266,10 +266,20 @@ Count requests when the point of a change is fewer of them: `FakeZotero.calls`.
 
 ### CI and local pitfalls
 
-GitHub Actions (`.github/workflows/ci.yml`) runs `uv sync --group dev --extra
-serve` and `uv run pytest` on Ubuntu. A second job builds the Compose image and
-smokes `paperful doctor`; it can pass while pytest fails, so check the **test**
-job when CI is red.
+GitHub Actions (`.github/workflows/ci.yml`) syncs with `--group dev --extra
+serve` on Ubuntu, then runs three jobs:
+
+- **smoke** (required): `pytest -m smoke` — CLI version, shell pages boot, and
+  workbench command/preview paths. Copy and tab layout changes should not fail
+  this job.
+- **docker** (required): Compose image, `paperful --help`, and `paperful doctor`
+  without Zotero (exit 2).
+- **suite** (advisory): full `pytest -m "not docs"` with coverage. It does not
+  fail the workflow. Coverage uploads when the suite is green; Actions overrides
+  the local 80% `fail_under` with `--cov-fail-under=0`.
+
+Reproduce the required gate with `uv run pytest -m smoke`. The full local suite
+is still `uv run pytest` (80% coverage gate in `pyproject.toml`).
 
 **CLI help assertions.** On CI, `CI` / `GITHUB_ACTIONS` is set and Typer/Rich
 style option names with ANSI codes. A flag like `--apply` is often split across
