@@ -12,6 +12,7 @@ from pyzotero import errors as ze
 
 from .attach import AttachResult, Attacher
 from .config import Config
+from .exclude import ExcludeDenied, ExcludeGuard, filter_library_scope_items
 from .zot import (
     Collection,
     Item,
@@ -346,6 +347,41 @@ class ZoteroBackend:
         self.zl = zl or ZoteroLocal()
         self._attacher: Attacher | None = None
 
+    def _exclude_guard(self) -> ExcludeGuard:
+        rules = getattr(self.cfg, "exclude_rules", ()) or ()
+        if not rules:
+            return ExcludeGuard.empty()
+        return ExcludeGuard(rules, self.collections())
+
+    def _deny_excluded(self, exc: ExcludeDenied) -> None:
+        raise LibraryError(exc.message) from exc
+
+    def _item_collection_keys(self, item_key: str) -> list[str]:
+        try:
+            raw = self.raw_item(item_key)
+        except Exception:
+            return []
+        if not isinstance(raw, dict):
+            return []
+        cols = (raw.get("data") or {}).get("collections") or []
+        return [str(k) for k in cols if k]
+
+    def _check_item_op(self, op: str, item_key: str) -> None:
+        if not (getattr(self.cfg, "exclude_rules", ()) or ()):
+            return
+        try:
+            self._exclude_guard().check_item(op, self._item_collection_keys(item_key))
+        except ExcludeDenied as exc:
+            self._deny_excluded(exc)
+
+    def _check_collection_op(self, op: str, collection_key: str) -> None:
+        if not (getattr(self.cfg, "exclude_rules", ()) or ()):
+            return
+        try:
+            self._exclude_guard().check_collection(op, collection_key)
+        except ExcludeDenied as exc:
+            self._deny_excluded(exc)
+
     def _read(self, what: str, fn: Callable[..., Any], *args: Any) -> Any:
         """One manager read. A missing key is ``None``; any other failure raises."""
         try:
@@ -413,11 +449,15 @@ class ZoteroBackend:
     ) -> list[Item]:
         if status is not None:
             try:
-                return self.zl.items_in_scope(collection_keys, status=status)
+                items = self.zl.items_in_scope(collection_keys, status=status)
             except TypeError:
                 status("Loading items from library…")
-                return self.zl.items_in_scope(collection_keys)
-        return self.zl.items_in_scope(collection_keys)
+                items = self.zl.items_in_scope(collection_keys)
+        else:
+            items = self.zl.items_in_scope(collection_keys)
+        if collection_keys is None:
+            items = filter_library_scope_items(items, self._exclude_guard())
+        return items
 
     def count_linked_url_only(self, collection_keys: list[str] | None) -> int:
         return self.zl.count_linked_url_only(collection_keys)
@@ -515,6 +555,11 @@ class ZoteroBackend:
         parts = [p for p in path.strip("/").split("/") if p]
         if not parts:
             raise LibraryError(f"empty collection path {path!r}")
+        if getattr(self.cfg, "exclude_rules", ()) or ():
+            try:
+                self._exclude_guard().check_path("ensure_path", "/".join(parts))
+            except ExcludeDenied as exc:
+                self._deny_excluded(exc)
         parent: str | None = None
         built: list[str] = []
         for part in parts:
@@ -525,8 +570,14 @@ class ZoteroBackend:
                 (c for c in self.collections().values() if c.path == sofar), None
             )
             if found is not None:
+                self._check_collection_op("ensure_path", found.key)
                 parent = found.key
                 continue
+            if getattr(self.cfg, "exclude_rules", ()) or ():
+                try:
+                    self._exclude_guard().check_path("ensure_path", sofar)
+                except ExcludeDenied as exc:
+                    self._deny_excluded(exc)
             payload: dict[str, Any] = {"name": part}
             if parent:
                 payload["parentCollection"] = parent
@@ -544,6 +595,9 @@ class ZoteroBackend:
     def create_parent(self, data: dict[str, Any]) -> str:
         """Create a top-level bibliographic item. Returns the new key."""
         self._ensure_write()
+        for ck in data.get("collections") or []:
+            if ck:
+                self._check_collection_op("create", str(ck))
         result = self.zl.zot.create_items([data])
         key = created_item_key(result)
         if not key:
@@ -558,6 +612,7 @@ class ZoteroBackend:
         cols = list(data.get("collections") or [])
         if collection_key in cols:
             return
+        self._check_collection_op("add", collection_key)
         cols.append(collection_key)
         data["collections"] = cols
         self.zl.zot.update_item(raw)
@@ -570,6 +625,7 @@ class ZoteroBackend:
         note: str | None = None,
     ) -> AttachResult:
         self._ensure_write()
+        self._check_item_op("attach", item_key)
         assert self._attacher is not None
         return self._attacher.attach(item_key, pdf_path, title, note=note)
 
@@ -631,6 +687,7 @@ class ZoteroBackend:
 
     def apply_patch(self, item_key: str, fields: dict[str, Any]) -> None:
         self._ensure_write()
+        self._check_item_op("update", item_key)
         mapping = {
             "doi": "DOI",
             "title": "title",
@@ -675,11 +732,11 @@ class ZoteroBackend:
     def trash_item(self, item_key: str) -> None:
         """Move a parent item to the Zotero trash. Does not delete files under out/."""
         self._ensure_write()
+        self._check_item_op("trash", item_key)
         self._delete_zotero_item(item_key)
 
     def trash_note(self, note_key: str, *, parent_key: str = "") -> None:
         """Trash a child or standalone note. Refuses parent items and attachments."""
-        del parent_key
         self._ensure_write()
         raw = self.zl.zot.item(note_key)
         data = raw.get("data") or {}
@@ -687,6 +744,13 @@ class ZoteroBackend:
             raise LibraryError(
                 f"{note_key} is a {data.get('itemType') or 'item'}, not a note."
             )
+        parent = (parent_key or data.get("parentItem") or "").strip()
+        if parent:
+            self._check_item_op("trash", parent)
+        else:
+            for ck in data.get("collections") or []:
+                if ck:
+                    self._check_collection_op("trash", str(ck))
         self.zl.zot.delete_item(raw)
 
     def preview_merge(self, keep_key: str, drop_key: str) -> dict[str, Any]:
@@ -719,6 +783,8 @@ class ZoteroBackend:
         from .dedupe import merge_parent_patch, plan_child_moves
 
         self._ensure_write()
+        self._check_item_op("merge", keep_key)
+        self._check_item_op("merge", drop_key)
         keep_raw = self.zl.zot.item(keep_key)
         drop_raw = self.zl.zot.item(drop_key)
         keep_kids = self.children(keep_key)
@@ -814,6 +880,7 @@ class ZoteroBackend:
 
     def create_or_update_note(self, item_key: str, html: str, tag: str) -> str:
         self._ensure_write()
+        self._check_item_op("notes", item_key)
         existing = self.find_child_note_keys(item_key, tag)
         if existing:
             key = existing[0]
@@ -840,6 +907,7 @@ class ZoteroBackend:
     def replace_prefixed_tag(self, item_key: str, prefix: str, tag: str) -> None:
         """Replace parent tags that start with ``prefix``. Other tags stay."""
         self._ensure_write()
+        self._check_item_op("tags", item_key)
         raw = self.zl.zot.item(item_key)
         data = raw.setdefault("data", {})
         want = prefix.strip().lower()
@@ -882,6 +950,7 @@ class ZoteroBackend:
     ) -> str:
         """Create or update a standalone note. The last tag is the idempotency key."""
         self._ensure_write()
+        self._check_collection_op("collection_notes", collection_key)
         lookup = tags[-1] if tags else "paperful-report"
         existing = self.find_collection_note_keys(collection_key, lookup)
         if existing:

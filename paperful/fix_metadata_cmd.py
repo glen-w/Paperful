@@ -24,6 +24,7 @@ def run_fix_metadata(
     year_to: int | None,
     item_type: list[str],
     limit: int | None,
+    offset: int = 0,
     apply: bool | None,
     overwrite: bool | None,
     profile: str | None,
@@ -73,8 +74,18 @@ def run_fix_metadata(
         item_type=item_type,
     )
     items, scope = loaded.items, loaded.label
+    scope_total = len(items)
+    # When fix_metadata is called as a plain function (e.g. paperful all), Typer
+    # defaults stay OptionInfo objects — coerce before slicing.
+    if not isinstance(offset, int):
+        offset = 0
+    elif offset < 0:
+        offset = 0
+    if offset:
+        items = items[offset:]
     if limit:
         items = items[:limit]
+    checked = len(items)
     started = time.time()
     with cli_mod._item_progress(json_out=json_out) as progress:
         patches = collect_patches(
@@ -115,6 +126,10 @@ def run_fix_metadata(
         errors=errors,
         apply=bool(apply),
         started=started,
+        offset=offset,
+        checked=checked,
+        scope_total=scope_total,
+        limit=limit,
     )
     from .agent_json import batch_exit, envelope
 
@@ -128,6 +143,9 @@ def run_fix_metadata(
             "fields_corrected_by_kind": field_counts,
             **({"patches_applied": applied_n} if applied_n is not None else {}),
             "errors": len(errors),
+            "offset": offset,
+            "checked": checked,
+            "scope_total": scope_total,
         },
         items=[
             {
@@ -139,12 +157,20 @@ def run_fix_metadata(
             for p in patches
         ],
         paths={"patches": str(cfg.patches_path)},
-        flags={"apply": bool(apply), "overwrite": bool(overwrite)},
+        flags={
+            "apply": bool(apply),
+            "overwrite": bool(overwrite),
+            "offset": offset,
+            "limit": limit,
+        },
         exit_code=code,
     )
 
     def _human_fix() -> None:
-        console.print(f"Scope: [bold]{scope}[/] — {len(patches)} proposed patches")
+        console.print(
+            f"Scope: [bold]{scope}[/] — checked {checked}/{scope_total} "
+            f"(offset {offset}) — {len(patches)} proposed patches"
+        )
         if patches:
             table = Table(title="Proposed patches")
             table.add_column("Key", style="dim")
@@ -202,6 +228,10 @@ def _write_fix_report(
     errors: list[str],
     apply: bool,
     started: float | None = None,
+    offset: int = 0,
+    checked: int | None = None,
+    scope_total: int | None = None,
+    limit: int | None = None,
 ) -> None:
     summary: dict[str, Any] = {
         "fields_corrected": sum(field_counts.values()),
@@ -210,6 +240,9 @@ def _write_fix_report(
         "errors_by_type": {"apply_failed": len(errors)} if errors else {},
         "pdfs_downloaded": 0,
         "sources_checked": {},
+        "offset": offset,
+        "checked": checked if checked is not None else len(patches),
+        "scope_total": scope_total if scope_total is not None else 0,
     }
     if applied is not None:
         summary["patches_applied"] = applied
@@ -229,7 +262,7 @@ def _write_fix_report(
             }
             for p in patches
         ],
-        flags={"apply": apply},
+        flags={"apply": apply, "offset": offset, "limit": limit},
         started=started,
         errors=errors,
         extra_paths={"patches": str(cfg.patches_path)},

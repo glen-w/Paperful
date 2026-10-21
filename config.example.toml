@@ -39,6 +39,25 @@ state_dir = "state"
 # stamp_fields = ["license", "oa_status", "version"]
 # license_block = []   # substring match on license, e.g. "cc-by-nc-nd"
 
+# Protect hand-curated collections from paperful writes. Subtree match on path
+# (or stable key). mode = full (no writes), add_only (create/add OK; no edit),
+# or custom with allow_* flags. protect_items blocks mutating items that sit in
+# the subtree even when they also belong elsewhere. skip_library_scope omits
+# items that live only under the rule from unscoped / --library runs.
+# [[exclude]]
+# path = "Hand curated"
+# mode = "full"
+# [[exclude]]
+# path = "Inbox/Staging"
+# mode = "add_only"
+# [[exclude]]
+# path = "Projects/BBNJ"
+# mode = "custom"
+# allow_create = true
+# allow_add = true
+# allow_update = false
+# # key = "ABCD1234"
+
 # Source order. Open-access first, then EZProxy, then HTML→PDF.
 # Google Scholar is opt-in (CAPTCHA / session login). Append "scholar" when you
 # want it, after `paperful session login scholar`. Remove "ezproxy" / "htmlpdf"

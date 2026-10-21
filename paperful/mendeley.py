@@ -18,6 +18,7 @@ import httpx
 
 from .attach import AttachResult, attach_failure_code
 from .config import Config
+from .exclude import ExcludeDenied, ExcludeGuard, filter_library_scope_items
 from .interop.types import mendeley_to_zotero, zotero_to_mendeley
 from .library import ChangeSet, LibraryError
 from .resolve import extract_arxiv_id, extract_doi, extract_pmid, normalize_doi
@@ -418,6 +419,35 @@ class MendeleyBackend:
         self._folder_docs: dict[str, set[str]] | None = None
         self._docs: dict[str, dict[str, Any]] | None = None
 
+    def _exclude_guard(self) -> ExcludeGuard:
+        rules = getattr(self.cfg, "exclude_rules", ()) or ()
+        if not rules:
+            return ExcludeGuard.empty()
+        return ExcludeGuard(rules, self.collections())
+
+    def _deny_excluded(self, exc: ExcludeDenied) -> None:
+        raise LibraryError(exc.message) from exc
+
+    def _item_collection_keys(self, item_key: str) -> list[str]:
+        membership = self._folder_membership()
+        return sorted(fid for fid, members in membership.items() if item_key in members)
+
+    def _check_item_op(self, op: str, item_key: str) -> None:
+        if not (getattr(self.cfg, "exclude_rules", ()) or ()):
+            return
+        try:
+            self._exclude_guard().check_item(op, self._item_collection_keys(item_key))
+        except ExcludeDenied as exc:
+            self._deny_excluded(exc)
+
+    def _check_collection_op(self, op: str, collection_key: str) -> None:
+        if not (getattr(self.cfg, "exclude_rules", ()) or ()):
+            return
+        try:
+            self._exclude_guard().check_collection(op, collection_key)
+        except ExcludeDenied as exc:
+            self._deny_excluded(exc)
+
     def ping(self) -> dict[str, Any]:
         return self.client.ping()
 
@@ -565,6 +595,8 @@ class MendeleyBackend:
                 i.label.lower(),
             )
         )
+        if collection_keys is None:
+            items = filter_library_scope_items(items, self._exclude_guard())
         return items
 
     def count_linked_url_only(self, collection_keys: list[str] | None) -> int:
@@ -702,6 +734,7 @@ class MendeleyBackend:
         note: str | None = None,
     ) -> AttachResult:
         del title, note
+        self._check_item_op("attach", item_key)
         if not pdf_path.is_file():
             return AttachResult(False, reason=f"file missing: {pdf_path}", code="other")
         try:
@@ -719,6 +752,7 @@ class MendeleyBackend:
         )
 
     def apply_patch(self, item_key: str, fields: dict[str, Any]) -> None:
+        self._check_item_op("update", item_key)
         body: dict[str, Any] = {}
         mapping = {
             "doi": "doi",
@@ -783,6 +817,7 @@ class MendeleyBackend:
         )
 
     def trash_item(self, item_key: str) -> None:
+        self._check_item_op("trash", item_key)
         self.client.post(
             f"/documents/{item_key}/trash",
             accept=ACCEPT_DOC,
@@ -826,6 +861,7 @@ class MendeleyBackend:
         return None
 
     def create_or_update_note(self, item_key: str, html: str, tag: str) -> str:
+        self._check_item_op("notes", item_key)
         marked = _mark_note(html, tag)
         existing = self.find_child_note_keys(item_key, tag)
         if existing:
@@ -853,6 +889,7 @@ class MendeleyBackend:
 
     def replace_prefixed_tag(self, item_key: str, prefix: str, tag: str) -> None:
         """Replace document tags that start with ``prefix``. Other tags stay."""
+        self._check_item_op("tags", item_key)
         want = prefix.strip().lower()
         existing: list[str] = []
         raw = self.raw_item(item_key)
@@ -891,6 +928,7 @@ class MendeleyBackend:
     def create_or_update_collection_note(
         self, collection_key: str, html: str, tags: list[str]
     ) -> str:
+        self._check_collection_op("collection_notes", collection_key)
         lookup = (tags[-1] if tags else "paperful-report").strip().lower()
         existing = self.find_collection_note_keys(collection_key, lookup)
         payload = {
@@ -930,6 +968,10 @@ class MendeleyBackend:
         parts = [p for p in path.strip("/").split("/") if p]
         if not parts:
             raise LibraryError(f"empty folder path {path!r}")
+        try:
+            self._exclude_guard().check_path("ensure_path", "/".join(parts))
+        except ExcludeDenied as exc:
+            self._deny_excluded(exc)
         parent: str | None = None
         built: list[str] = []
         for part in parts:
@@ -938,8 +980,13 @@ class MendeleyBackend:
             self._collections = None
             found = next((c for c in self.collections().values() if c.path == sofar), None)
             if found is not None:
+                self._check_collection_op("ensure_path", found.key)
                 parent = found.key
                 continue
+            try:
+                self._exclude_guard().check_path("ensure_path", sofar)
+            except ExcludeDenied as exc:
+                self._deny_excluded(exc)
             body: dict[str, Any] = {"name": part}
             if parent:
                 body["parent_id"] = parent
@@ -959,6 +1006,9 @@ class MendeleyBackend:
         return parent
 
     def create_parent(self, data: dict[str, Any]) -> str:
+        for ck in data.get("collections") or []:
+            if ck:
+                self._check_collection_op("create", str(ck))
         body = zotero_payload_to_mendeley(data)
         created = self.client.post(
             "/documents",
@@ -984,6 +1034,7 @@ class MendeleyBackend:
         members = self._folder_membership().get(collection_key) or set()
         if item_key in members:
             return
+        self._check_collection_op("add", collection_key)
         self.client.post(
             f"/folders/{collection_key}/documents",
             accept=ACCEPT_FOLDER,

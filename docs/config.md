@@ -38,6 +38,7 @@ and [architecture](architecture.md).
 | `[extension].concurrency` | `2` | How many selected tabs the add-on saves at once (1–4) |
 | `[oa_honesty].stamp_fields` | `license`, `oa_status`, `version` | Which Unpaywall / OpenAlex fields are written to `record.json` (`fetch.oa`) and the manifest on successful fetch |
 | `[oa_honesty].license_block` | `[]` | Substrings; when a stamped `license` matches, the run records `license_blocked` and does not save the PDF |
+| `[[exclude]]` | (none) | Protect collection subtrees from library writes. See [Exclude / protect collections](#exclude--protect-collections) |
 | `[remarks].surface` | `note` | Where the readable lines go: where a PDF came from, which duplicate to keep, and why a snowball hit belongs. `note` (child note), `tag` (parent tag), or `off`. The PDF attachment stamp stays the machine token |
 | `sources` | `unpaywall` → `openalex` → `arxiv` → `biorxiv` → `europepmc` → `semanticscholar` → `core` → `openaire` → `direct` → `ezproxy` → `htmlpdf` | Default **head** of a run. `[fetch].order = "policy"` (default) still runs these first; `scholar` and `scihub` are **not** included unless you opt in. When `scholar` is in `sources`, policy places it in the **late tail** (one try before `browser_agent` when that lane is on). `order = "list"` honors this array. `core` is skipped until `core_api_key` is set. `openaire` looks up repository copies by DOI |
 | `[fetch].order` | `policy` | `policy` late-tails Scholar / Camofox / `browser_agent` / SerpApi / Sci-Hub (and academic `htmlpdf`). `list` is the configured `sources` order |
@@ -333,6 +334,33 @@ Timeouts, context budgets, prompt templates, tags, attachment hygiene, and
 browser-agent step caps: [Advanced](#advanced).
 
 API keys stay in the environment (never in `config.toml`).
+
+## Exclude / protect collections
+
+Hand-curated folders that paperful must not mutate. Top-level `[[exclude]]`
+array (global safety policy — not a run profile).
+
+```toml
+[[exclude]]
+path = "Hand curated"
+mode = "full"
+
+[[exclude]]
+path = "Inbox/Staging"
+mode = "add_only"
+```
+
+| Key | Meaning |
+| --- | --- |
+| `path` / `key` | Match by collection path (preferred) or stable manager key. Subtree: `Hand` covers `Hand/...` |
+| `mode` | `full` — deny all writes; `add_only` — allow create / add-to-collection / ensure-path only; `custom` — set `allow_*` yourself |
+| `allow_create` / `allow_add` / `allow_ensure_path` / `allow_update` / `allow_notes` / `allow_tags` / `allow_attach` / `allow_trash` / `allow_collection_notes` / `allow_merge` | Fine-grained overrides (explicit values win over the preset) |
+| `protect_items` | Default `true`. Item writes (patch, notes, tags, attach, trash, merge) are blocked when the item is a member of the matched subtree |
+| `skip_library_scope` | Default `false`. When `true`, items that live *only* under the rule are omitted from unscoped / `--library` item lists. Explicit `-C` still reads; writes still honour the rule |
+
+Enforced on live library writes (Zotero / Mendeley). Denied ops raise a clear
+`excluded: …` error. Reads, lint, export, and RAG are unchanged unless
+`skip_library_scope` is on. `paperful doctor` lists active rules.
 
 ## Advanced
 

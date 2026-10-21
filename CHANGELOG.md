@@ -8,6 +8,11 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- **Collection exclude / protect (`[[exclude]]`):** Mark hand-curated folders
+  so paperful will not write to them. Presets `full` and `add_only`, plus
+  fine-grained `allow_*` flags, `protect_items`, and optional
+  `skip_library_scope`. Enforced on library backend writes. See
+  [config](docs/config.md#exclude--protect-collections).
 - **OpenAlex cites build is resumable:** `build-cites` checkpoints per works
   parquet file (`.done/<date>` + `.done/<date>.parts/<stem>`), with a DuckDB
   memory limit and spill dir so huge `updated_date` folders (100G+) do not OOM.

@@ -806,9 +806,17 @@ def nightshift_counts_line(report: dict[str, Any]) -> str:
             for k, v in sorted(s.get("fields_corrected_by_kind", {}).items())[:4]
         )
         extra = (" · %s" % kinds) if kinds else ""
+        chunk = ""
+        if s.get("scope_total") is not None and s.get("checked") is not None:
+            chunk = "checked %s/%s (offset %s) · " % (
+                s.get("checked", 0),
+                s.get("scope_total", 0),
+                s.get("offset", 0),
+            )
         return (
-            "proposed: %s · applied: %s/%s · fields corrected: %s · apply errors: %s%s"
+            "%sproposed: %s · applied: %s/%s · fields corrected: %s · apply errors: %s%s"
             % (
+                chunk,
                 s.get("patches_proposed", 0),
                 applied,
                 s.get("patches_proposed", 0),

@@ -39,6 +39,7 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_extension(raw, cfg)
     apply_remarks(raw, cfg)
     apply_oa_honesty(raw, cfg)
+    apply_exclude(raw, cfg)
     apply_attachments(raw, cfg)
     apply_ocr(raw, cfg)
     apply_rag(raw, cfg, source)
@@ -492,6 +493,15 @@ def apply_oa_honesty(raw: dict[str, Any], cfg: "Config") -> None:
         cfg.oa_honesty_stamp_fields = C._snowball_strs(oa_honesty["stamp_fields"])
     if "license_block" in oa_honesty:
         cfg.oa_honesty_license_block = C._snowball_strs(oa_honesty["license_block"])
+
+
+def apply_exclude(raw: dict[str, Any], cfg: "Config") -> None:
+    """Top-level ``[[exclude]]`` array — protect collection subtrees from writes."""
+    if "exclude" not in raw:
+        return
+    from .exclude import parse_exclude_rules
+
+    cfg.exclude_rules = parse_exclude_rules(raw.get("exclude"))
 
 
 def apply_attachments(raw: dict[str, Any], cfg: "Config") -> None:

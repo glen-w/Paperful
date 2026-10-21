@@ -315,6 +315,7 @@ def _dispatch_all_step(
             cli_mod.fix_metadata,
             **scope,
             limit=bound.limit,
+            offset=0,
             apply=False if dry_run else bound.apply,
             overwrite=bound.overwrite,
             fmt=fmt,

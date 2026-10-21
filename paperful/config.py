@@ -10,6 +10,7 @@ from pathlib import Path
 from collections.abc import Callable
 from typing import Any
 
+from .exclude import ExcludeRule
 from .playbooks import (
     GreyPlaybook,
     load_pack_dir,
@@ -153,6 +154,8 @@ class Config:
     grey_playbooks_builtin: bool = True
     grey_playbooks_dir: Path | None = None
     grey_playbooks: list[GreyPlaybook] = field(default_factory=list)
+    # Hand-curated collection protection: [[exclude]] rules (see paperful.exclude).
+    exclude_rules: tuple[ExcludeRule, ...] = ()
     config_path: Path | None = None
     # Learned publisher recipes: gated logs wins; auto writes packs/learned.toml.
     playbooks_promote: str = "gated"  # gated | auto

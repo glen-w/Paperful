@@ -20,6 +20,7 @@ from paperful.runreport import (
     classify_enrichment,
     error_type_for,
     low_download_advice,
+    nightshift_counts_line,
     outcome_banner,
     print_run_summary,
     recover_item_keys_from_report,
@@ -552,3 +553,26 @@ def test_recover_item_keys_from_report_modes():
     assert recover_item_keys_from_report(report, mode="browser_agent_not_found") == [
         "A"
     ]
+
+
+def test_nightshift_counts_line_fix_metadata_chunk():
+    line = nightshift_counts_line(
+        {
+            "command": "fix-metadata",
+            "summary": {
+                "failed": 0,
+                "patches_proposed": 4,
+                "patches_applied": 3,
+                "fields_corrected": 5,
+                "fields_corrected_by_kind": {"doi": 3, "title": 2},
+                "errors_by_type": {},
+                "offset": 400,
+                "checked": 400,
+                "scope_total": 1879,
+            },
+            "items": [],
+        }
+    )
+    assert "checked 400/1879 (offset 400)" in line
+    assert "proposed: 4" in line
+    assert "applied: 3/4" in line

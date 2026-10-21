@@ -691,6 +691,13 @@ def run_checks(
         )
 
     checks.append(_grey_playbooks_check(cfg))
+    exclude_cols = None
+    if zl is not None and info is not None:
+        try:
+            exclude_cols = zl.collections()
+        except Exception:
+            exclude_cols = None
+    checks.append(_exclude_check(cfg, collections=exclude_cols))
     checks.extend(_llm_checks(cfg))
     checks.extend(_rag_checks(cfg))
     checks.append(_snowball_check(cfg))
@@ -1046,6 +1053,42 @@ _NAMED_GREY_PACKS = (
     "bbnj-doalos-prepcom",
     "isa-deepdata",
 )
+
+
+def _exclude_check(
+    cfg: Config, *, collections: dict | None = None
+) -> Check:
+    """Summarise [[exclude]] protect rules; amber when a path/key is unmatched."""
+    from .exclude import ExcludeGuard
+
+    rules = getattr(cfg, "exclude_rules", ()) or ()
+    if not rules:
+        return Check("exclude", "green", "none")
+    parts: list[str] = []
+    for rule in rules:
+        label = rule.path or (f"key:{rule.key}" if rule.key else "?")
+        extra = []
+        if rule.skip_library_scope:
+            extra.append("skip-scope")
+        if not rule.protect_items:
+            extra.append("items-open")
+        suffix = f" [{', '.join(extra)}]" if extra else ""
+        parts.append(f"{label} ({rule.mode}){suffix}")
+    detail = "; ".join(parts)
+    if len(detail) > 120:
+        detail = f"{len(rules)} rule(s): " + "; ".join(
+            f"{(r.path or r.key or '?')}={r.mode}" for r in rules
+        )
+    if collections is not None:
+        guard = ExcludeGuard(rules, collections)
+        if guard.unmatched:
+            missing = ", ".join(r.label() for r in guard.unmatched)
+            return Check(
+                "exclude",
+                "amber",
+                f"{detail} — unmatched: {missing}",
+            )
+    return Check("exclude", "green", detail)
 
 
 def _grey_playbooks_check(cfg: Config) -> Check:

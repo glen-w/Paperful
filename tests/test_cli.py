@@ -1546,6 +1546,42 @@ def test_fix_metadata_apply(cfg_file, stub_zotero, monkeypatch):
     assert seen and seen[0][0].after["doi"] == "10.1/x"
 
 
+def test_fix_metadata_offset_and_limit(cfg_file, stub_zotero, tmp_path, monkeypatch):
+    seen: list = []
+
+    def fake_collect(client, cfg, items, **k):
+        seen.append([it.key for it in items])
+        return []
+
+    monkeypatch.setattr("paperful.metadata.collect_patches", fake_collect)
+    monkeypatch.setattr("paperful.lint.lint_item", lambda *a, **k: [])
+    monkeypatch.setattr("paperful.metadata.propose_patch", lambda *a, **k: None)
+    res = runner.invoke(
+        cli.app,
+        [
+            "fix-metadata",
+            "-c",
+            str(cfg_file),
+            "--library",
+            "--offset",
+            "1",
+            "--limit",
+            "1",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    assert seen == [["I2"]]
+    assert "checked 1/2 (offset 1)" in res.stdout
+    runs = list((tmp_path / "state" / "runs").glob("*-fix-metadata.json"))
+    assert len(runs) == 1
+    data = json.loads(runs[0].read_text())
+    assert data["summary"]["offset"] == 1
+    assert data["summary"]["checked"] == 1
+    assert data["summary"]["scope_total"] == 2
+    assert data["flags"]["offset"] == 1
+    assert data["flags"]["limit"] == 1
+
+
 def test_mendeley_manager_asks_for_auth(cfg_file, tmp_path):
     cfg_file.write_text(
         f'email = "t@example.org"\nout_dir = "{tmp_path / "out"}"\nstate_dir = "{tmp_path / "state"}"\n'
