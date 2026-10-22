@@ -2420,6 +2420,133 @@ def cache_clean(
     run_cache_clean(console, apply=apply, config=config, fmt=fmt)
 
 
+@openalex_store_app.command("status")
+def openalex_store_status(
+    probe: bool = typer.Option(
+        False,
+        "--probe",
+        help="Run a DESCRIBE smoke query against the works parquet glob.",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Show [openalex_store] config (backend, globs, cites index).
+
+    With ``--probe``, ask DuckDB for column names (SSH round-trip for
+    ``ssh_duckdb``). Exit 1 when the store is misconfigured or the probe fails.
+    """
+    from .snowball.local_openalex import store_status
+
+    cfg = _cfg(config)
+    status = store_status(cfg, probe=probe)
+    backend = status.get("backend") or "off"
+    console.print(f"backend: [bold]{backend}[/]")
+    if status.get("parquet_glob"):
+        console.print(f"parquet_glob: {status['parquet_glob']}")
+    if status.get("cites_index_glob"):
+        console.print(f"cites_index_glob: {status['cites_index_glob']}")
+    elif backend != "off":
+        console.print("cites_index_glob: (unset — DOI/id only)")
+    if backend == "ssh_duckdb":
+        host = status.get("ssh_host") or "?"
+        user = status.get("ssh_user") or ""
+        target = f"{user}@{host}" if user else host
+        console.print(f"ssh: {target}")
+        if status.get("ssh_port"):
+            console.print(f"ssh_port: {status['ssh_port']}")
+        console.print(f"ssh_connect_timeout_s: {status.get('ssh_connect_timeout_s')}")
+    console.print(f"duckdb_bin: {status.get('duckdb_bin')}")
+    console.print(f"timeout_s: {status.get('timeout_s')}")
+    console.print(f"memory_limit: {status.get('memory_limit')}")
+    console.print(f"detail: {status.get('detail')}")
+    probed = status.get("probe")
+    if isinstance(probed, dict):
+        cols = probed.get("columns") or []
+        console.print(
+            f"probe: {'ok' if probed.get('ok') else 'failed'} · "
+            f"{len(cols)} columns"
+            + (f" · {', '.join(cols[:8])}{'…' if len(cols) > 8 else ''}" if cols else "")
+        )
+        if probed.get("error"):
+            console.print(f"[red]{probed['error']}[/]")
+    if not status.get("ok", True):
+        raise typer.Exit(1)
+
+
+@openalex_store_app.command("write-build-script")
+def openalex_store_write_build_script(
+    out: Path = typer.Option(
+        ...,
+        "--out",
+        help="Path for the resumable bash script (e.g. state/openalex-cites-build.sh).",
+    ),
+    cites_out: str = typer.Option(
+        "",
+        "--cites-out",
+        help=(
+            "Directory for the cites parquet tree. "
+            "Default: directory implied by cites_index_glob."
+        ),
+    ),
+    memory_limit: str = typer.Option(
+        "",
+        "--memory-limit",
+        help="DuckDB memory_limit (default: [openalex_store].memory_limit or 48GB).",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Write a resumable bash script that builds the cites index on the data host.
+
+    Prefer this on ``ssh_duckdb`` hosts: copy the script to the machine that
+    holds the parquet, then ``nohup`` it so a laptop disconnect does not stop
+    the job. Safe to re-run after a crash (``.done`` markers).
+    """
+    from .snowball.local_openalex import (
+        DEFAULT_MEMORY_LIMIT,
+        OpenAlexStoreError,
+        store_status,
+        works_root_from_glob,
+        write_resumable_cites_build_script,
+    )
+
+    cfg = _cfg(config)
+    status = store_status(cfg)
+    parquet_glob = str(status.get("parquet_glob") or "").strip()
+    if not parquet_glob:
+        console.print("[red]openalex_store.parquet_glob is unset[/]")
+        raise typer.Exit(1)
+    cites_glob = str(status.get("cites_index_glob") or "").strip()
+    dest = (cites_out or "").strip()
+    if not dest:
+        if cites_glob.endswith("/**/*.parquet"):
+            dest = cites_glob[: -len("/**/*.parquet")]
+        elif cites_glob.endswith("/*.parquet"):
+            dest = cites_glob[: -len("/*.parquet")]
+        else:
+            dest = cites_glob.rstrip("/")
+    if not dest:
+        console.print(
+            "[red]pass --cites-out or set openalex_store.cites_index_glob[/]"
+        )
+        raise typer.Exit(1)
+    mem = (memory_limit or cfg.openalex_store_memory_limit or DEFAULT_MEMORY_LIMIT).strip()
+    duck = (cfg.openalex_store_duckdb_bin or "").strip() or "duckdb"
+    try:
+        path = write_resumable_cites_build_script(
+            works_root=works_root_from_glob(parquet_glob),
+            output_dir=dest,
+            duckdb_bin=duck,
+            script_path=str(out),
+            memory_limit=mem or DEFAULT_MEMORY_LIMIT,
+        )
+    except OpenAlexStoreError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    console.print(
+        f"Wrote [bold]{path}[/]. On the data host: "
+        f"nohup {path} >cites-build.log 2>&1 &"
+    )
+
+
 @openalex_store_app.command("build-cites")
 def openalex_store_build_cites(
     out: str = typer.Option(
@@ -2447,8 +2574,9 @@ def openalex_store_build_cites(
 
     Builds one works ``updated_date`` partition at a time and writes
     ``.done/<date>`` markers — safe to re-run after a crash. Full OpenAlex
-    dumps can take many hours; for a remote host prefer a nohup'd build on
-    that machine so a laptop disconnect does not stop the job.
+    dumps can take many hours; for a remote host prefer
+    ``paperful openalex-store write-build-script`` + nohup on that machine so a
+    laptop disconnect does not stop the job.
     """
     from .snowball.local_openalex import OpenAlexStoreError, build_cites_index_from_config
 

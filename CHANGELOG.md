@@ -8,6 +8,14 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- **OpenAlex snapshot store harden:** Decode nested DuckDB JSON strings on
+  store rows; SSH `ConnectTimeout` / keepalives plus optional `ssh_port` /
+  `ssh_identity_file` / `ssh_connect_timeout_s`; trip the store after three
+  consecutive failures (live API for the rest of that client); `doctor` red
+  on missing `parquet_glob` / `ssh_host` and amber when local `duckdb` is
+  off PATH; `paperful openalex-store status [--probe]` and
+  `write-build-script`; `[openalex_store].memory_limit` for cites builds.
+  See [config Advanced](docs/config.md#openalex-api-limits-and-snapshot-store).
 - **Local-trust hardening:** SSRF checks on PDF fetch URLs and redirects
   (block loopback / private / link-local / metadata), review-token path
   sanitization, `serve --allow-remote-bind` gate for non-loopback binds,

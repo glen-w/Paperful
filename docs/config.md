@@ -448,25 +448,55 @@ most installs leave this unset.
 When `[openalex_store]` is set, DOI and OpenAlex-id batch reads try the store
 first. Citing (`works_citing` / citation-map expand) needs a prebuilt inverted
 cites index — run `paperful openalex-store build-cites`, then set
-`cites_index_glob`. The build is **resumable**: one works `updated_date`
-partition at a time with `.done/<date>` markers (re-run after a crash skips
-finished slices). Store-side cites-query / `search=` filtering is
+`cites_index_glob`. The build is **resumable**: one works parquet file at a
+time inside each `updated_date` folder, with `.done/<date>` day markers and
+`.done/<date>.parts/<stem>` file markers (re-run after a crash skips finished
+slices). On a remote host prefer
+`paperful openalex-store write-build-script` + `nohup` so a laptop disconnect
+does not stop the job. Store-side cites-query / `search=` filtering is
 **title-only** (`display_name`); abstract and fulltext stay on the live API.
 Keywords and ORCID stay API-only.
 
 When the live API daily budget is spent, DOI/id and citing (with index) keep
 using the store; keyword / ORCID / full-text search still pause for
-`snowball resume`.
+`snowball resume`. After three consecutive store failures in one client
+(SSH/DuckDB errors), Paperful disables the store for that client and continues
+on the live API. Nested fields returned as JSON strings from DuckDB are
+decoded so rows match the live API shape.
 
 Backends:
 
 - `local_duckdb` — DuckDB on this machine over a local parquet glob (needs
   `duckdb` on `PATH`, or set `duckdb_bin`).
 - `ssh_duckdb` — DuckDB on a remote host; Paperful SSHs in, runs SQL, and
-  copies small JSON rows back.
+  copies small JSON rows back. SSH uses `BatchMode`, `ConnectTimeout`
+  (`ssh_connect_timeout_s`, default 15), and keepalives; optional `ssh_port`
+  and `ssh_identity_file`.
+
+Operator checks: `paperful doctor` (missing `parquet_glob` / `ssh_host` →
+**red**; DOI/id only without cites index → **amber**; local `duckdb` off
+PATH when cites index is set → **amber**),
+`paperful openalex-store status` (optional `--probe` DESCRIBE), and
+`paperful openalex-store write-build-script` for a nohup-friendly cites build
+on the data host.
 
 Env overrides: `OPENALEX_STORE_SSH_HOST`, `OPENALEX_STORE_PARQUET_GLOB`,
 `OPENALEX_STORE_CITES_INDEX_GLOB`.
+
+| Key | Default | Notes |
+| --- | --- | --- |
+| `backend` | `""` (off) | `local_duckdb` or `ssh_duckdb` (`http` later) |
+| `parquet_glob` | `""` | Works dump glob (e.g. `…/works/**/*.parquet`) |
+| `cites_index_glob` | `""` | Inverted cites tree after `build-cites` |
+| `duckdb_bin` | `duckdb` | Binary name or path |
+| `timeout_s` | `120` | Per query / SSH DuckDB call |
+| `build_timeout_s` | `7200` | Per-file timeout for `build-cites` |
+| `memory_limit` | `48GB` | DuckDB `SET memory_limit` during cites builds |
+| `ssh_host` | `""` | Required for `ssh_duckdb` |
+| `ssh_user` | `""` | Optional |
+| `ssh_port` | `0` | `0` = ssh default |
+| `ssh_connect_timeout_s` | `15` | SSH `ConnectTimeout` |
+| `ssh_identity_file` | `""` | Optional `-i` path |
 
 ```toml
 # Optional. Most users leave this unset.
@@ -477,6 +507,10 @@ Env overrides: `OPENALEX_STORE_SSH_HOST`, `OPENALEX_STORE_PARQUET_GLOB`,
 # # duckdb_bin = "duckdb"
 # # timeout_s = 120
 # # build_timeout_s = 7200
+# # memory_limit = "48GB"
 # # ssh_host = "nuc"         # ssh_duckdb only
 # # ssh_user = "you"
+# # ssh_port = 22
+# # ssh_connect_timeout_s = 15
+# # ssh_identity_file = ""
 ```

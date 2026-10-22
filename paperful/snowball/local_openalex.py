@@ -46,6 +46,18 @@ STORE_COLUMNS = (
 
 _ALLOWED_COLUMNS = frozenset(STORE_COLUMNS)
 
+#: Nested OpenAlex fields that DuckDB ``-json`` may emit as JSON strings.
+NESTED_JSON_FIELDS = frozenset(
+    {
+        "referenced_works",
+        "authorships",
+        "primary_location",
+        "open_access",
+        "keywords",
+        "study_designs",
+    }
+)
+
 #: Env overrides (optional; config wins when set).
 SSH_HOST_ENV = "OPENALEX_STORE_SSH_HOST"
 PARQUET_GLOB_ENV = "OPENALEX_STORE_PARQUET_GLOB"
@@ -53,6 +65,10 @@ CITES_INDEX_GLOB_ENV = "OPENALEX_STORE_CITES_INDEX_GLOB"
 
 #: Default build timeout for inverting referenced_works (full dumps are slow).
 DEFAULT_BUILD_TIMEOUT_S = 7200.0
+DEFAULT_SSH_CONNECT_TIMEOUT_S = 15.0
+DEFAULT_SSH_SERVER_ALIVE_INTERVAL_S = 30
+DEFAULT_SSH_SERVER_ALIVE_COUNT_MAX = 3
+DEFAULT_MEMORY_LIMIT = "48GB"
 
 
 class OpenAlexStoreError(RuntimeError):
@@ -326,6 +342,31 @@ def build_cites_file_sql(
     )
 
 
+def normalize_store_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Decode nested fields that DuckDB ``-json`` left as JSON strings.
+
+    OpenAlex API rows use real lists/dicts for ``referenced_works``,
+    ``authorships``, etc. Parquet → DuckDB ``-json`` sometimes emits those
+    columns as strings; snowball then walks characters or skips authors.
+    """
+    out = dict(row)
+    for key in NESTED_JSON_FIELDS:
+        if key not in out:
+            continue
+        value = out[key]
+        if not isinstance(value, str):
+            continue
+        text = value.strip()
+        if not text or text[0] not in "[{":
+            continue
+        try:
+            decoded = json.loads(text)
+        except json.JSONDecodeError:
+            continue
+        out[key] = decoded
+    return out
+
+
 def parse_duckdb_json(stdout: str) -> list[dict[str, Any]]:
     """Parse DuckDB ``-json`` stdout into a list of work dicts."""
     text = (stdout or "").strip()
@@ -333,10 +374,39 @@ def parse_duckdb_json(stdout: str) -> list[dict[str, Any]]:
         return []
     data = json.loads(text)
     if isinstance(data, list):
-        return [row for row in data if isinstance(row, dict)]
+        return [normalize_store_row(row) for row in data if isinstance(row, dict)]
     if isinstance(data, dict):
-        return [data]
+        return [normalize_store_row(data)]
     raise OpenAlexStoreError("openalex store returned non-object JSON")
+
+
+def ssh_argv(
+    target: str,
+    remote: str,
+    *,
+    connect_timeout_s: float = DEFAULT_SSH_CONNECT_TIMEOUT_S,
+    port: int = 0,
+    identity_file: str = "",
+) -> list[str]:
+    """Build an ``ssh`` argv with BatchMode and connect/keepalive options."""
+    cmd = [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        f"ConnectTimeout={max(1, int(connect_timeout_s))}",
+        "-o",
+        f"ServerAliveInterval={DEFAULT_SSH_SERVER_ALIVE_INTERVAL_S}",
+        "-o",
+        f"ServerAliveCountMax={DEFAULT_SSH_SERVER_ALIVE_COUNT_MAX}",
+    ]
+    if port and int(port) > 0:
+        cmd.extend(["-p", str(int(port))])
+    identity = (identity_file or "").strip()
+    if identity:
+        cmd.extend(["-i", identity])
+    cmd.extend([target, remote])
+    return cmd
 
 
 class _DuckDbWorksStore:
@@ -349,14 +419,27 @@ class _DuckDbWorksStore:
         duckdb_bin: str = "duckdb",
         timeout_s: float = 120.0,
         cites_index_glob: str = "",
+        memory_limit: str = DEFAULT_MEMORY_LIMIT,
     ):
         self.parquet_glob = parquet_glob.strip()
         self.duckdb_bin = (duckdb_bin or "duckdb").strip() or "duckdb"
         self.timeout_s = float(timeout_s)
         self.cites_index_glob = (cites_index_glob or "").strip()
+        self.memory_limit = (memory_limit or DEFAULT_MEMORY_LIMIT).strip() or DEFAULT_MEMORY_LIMIT
         self._parquet_columns: frozenset[str] | None = None
         if not self.parquet_glob:
             raise OpenAlexStoreError("openalex_store.parquet_glob is required")
+
+    def probe(self) -> dict[str, Any]:
+        """Smoke query: column names present in the works parquet glob."""
+        cols = sorted(self._probe_parquet_columns())
+        return {
+            "ok": bool(cols),
+            "columns": cols,
+            "has_cites_index": self.has_cites_index,
+            "parquet_glob": self.parquet_glob,
+            "cites_index_glob": self.cites_index_glob,
+        }
 
     @property
     def has_cites_index(self) -> bool:
@@ -461,7 +544,7 @@ class _DuckDbWorksStore:
         *,
         timeout_s: float | None = None,
         progress: Any = None,
-        memory_limit: str = "48GB",
+        memory_limit: str = "",
     ) -> dict[str, int]:
         """Invert referenced_works per parquet file (resumable).
 
@@ -482,6 +565,8 @@ class _DuckDbWorksStore:
         tmp = f"{out}/.duckdb_tmp"
         self._ensure_dir(tmp)
         wait = float(timeout_s) if timeout_s is not None else self.timeout_s
+        mem = (memory_limit or getattr(self, "memory_limit", "") or DEFAULT_MEMORY_LIMIT).strip()
+        mem = mem or DEFAULT_MEMORY_LIMIT
         skipped = built = 0
         for index, day in enumerate(dates, start=1):
             marker = cites_done_marker(out, day)
@@ -506,7 +591,7 @@ class _DuckDbWorksStore:
                 sql = build_cites_file_sql(
                     works_parquet=parquet_path,
                     output_dir=file_out,
-                    memory_limit=memory_limit,
+                    memory_limit=mem,
                     temp_directory=tmp,
                 )
                 if progress is not None:
@@ -559,6 +644,10 @@ class SshDuckDbStore(_DuckDbWorksStore):
         duckdb_bin: str = "duckdb",
         timeout_s: float = 120.0,
         cites_index_glob: str = "",
+        memory_limit: str = DEFAULT_MEMORY_LIMIT,
+        ssh_connect_timeout_s: float = DEFAULT_SSH_CONNECT_TIMEOUT_S,
+        ssh_port: int = 0,
+        ssh_identity_file: str = "",
         runner: Any = None,
         exec_runner: Any = None,
     ):
@@ -567,9 +656,15 @@ class SshDuckDbStore(_DuckDbWorksStore):
             duckdb_bin=duckdb_bin,
             timeout_s=timeout_s,
             cites_index_glob=cites_index_glob,
+            memory_limit=memory_limit,
         )
         self.ssh_host = ssh_host.strip()
         self.ssh_user = (ssh_user or "").strip()
+        self.ssh_connect_timeout_s = float(
+            ssh_connect_timeout_s or DEFAULT_SSH_CONNECT_TIMEOUT_S
+        )
+        self.ssh_port = int(ssh_port or 0)
+        self.ssh_identity_file = (ssh_identity_file or "").strip()
         self._runner = runner or _run_ssh_duckdb
         self._exec_runner = exec_runner or _run_ssh_duckdb_exec
         if not self.ssh_host:
@@ -578,8 +673,15 @@ class SshDuckDbStore(_DuckDbWorksStore):
     def _ssh_target(self) -> str:
         return f"{self.ssh_user}@{self.ssh_host}" if self.ssh_user else self.ssh_host
 
+    def _ssh_kwargs(self) -> dict[str, Any]:
+        return {
+            "connect_timeout_s": self.ssh_connect_timeout_s,
+            "port": self.ssh_port,
+            "identity_file": self.ssh_identity_file,
+        }
+
     def _ssh_run(self, remote: str, *, timeout_s: float = 120.0) -> str:
-        cmd = ["ssh", "-o", "BatchMode=yes", self._ssh_target(), remote]
+        cmd = ssh_argv(self._ssh_target(), remote, **self._ssh_kwargs())
         try:
             proc = subprocess.run(
                 cmd,
@@ -643,6 +745,9 @@ class SshDuckDbStore(_DuckDbWorksStore):
             duckdb_bin=self.duckdb_bin,
             sql=sql,
             timeout_s=self.timeout_s,
+            connect_timeout_s=self.ssh_connect_timeout_s,
+            port=self.ssh_port,
+            identity_file=self.ssh_identity_file,
         )
         return parse_duckdb_json(stdout)
 
@@ -653,6 +758,9 @@ class SshDuckDbStore(_DuckDbWorksStore):
             duckdb_bin=self.duckdb_bin,
             sql=sql,
             timeout_s=float(timeout_s) if timeout_s is not None else self.timeout_s,
+            connect_timeout_s=self.ssh_connect_timeout_s,
+            port=self.ssh_port,
+            identity_file=self.ssh_identity_file,
         )
 
 
@@ -666,6 +774,7 @@ class LocalDuckDbStore(_DuckDbWorksStore):
         duckdb_bin: str = "duckdb",
         timeout_s: float = 120.0,
         cites_index_glob: str = "",
+        memory_limit: str = DEFAULT_MEMORY_LIMIT,
         runner: Any = None,
         exec_runner: Any = None,
     ):
@@ -674,6 +783,7 @@ class LocalDuckDbStore(_DuckDbWorksStore):
             duckdb_bin=duckdb_bin,
             timeout_s=timeout_s,
             cites_index_glob=cites_index_glob,
+            memory_limit=memory_limit,
         )
         self._runner = runner or _run_local_duckdb
         self._exec_runner = exec_runner or _run_local_duckdb_exec
@@ -744,11 +854,20 @@ def _run_ssh_duckdb(
     duckdb_bin: str,
     sql: str,
     timeout_s: float,
+    connect_timeout_s: float = DEFAULT_SSH_CONNECT_TIMEOUT_S,
+    port: int = 0,
+    identity_file: str = "",
 ) -> str:
     target = f"{user}@{host}" if user else host
     remote = f"{shlex.quote(duckdb_bin)} -json"
     return _run_duckdb_cmd(
-        ["ssh", "-o", "BatchMode=yes", target, remote],
+        ssh_argv(
+            target,
+            remote,
+            connect_timeout_s=connect_timeout_s,
+            port=port,
+            identity_file=identity_file,
+        ),
         sql=sql,
         timeout_s=timeout_s,
         label="SSH",
@@ -762,11 +881,20 @@ def _run_ssh_duckdb_exec(
     duckdb_bin: str,
     sql: str,
     timeout_s: float,
+    connect_timeout_s: float = DEFAULT_SSH_CONNECT_TIMEOUT_S,
+    port: int = 0,
+    identity_file: str = "",
 ) -> None:
     target = f"{user}@{host}" if user else host
     remote = shlex.quote(duckdb_bin)
     _run_duckdb_cmd(
-        ["ssh", "-o", "BatchMode=yes", target, remote],
+        ssh_argv(
+            target,
+            remote,
+            connect_timeout_s=connect_timeout_s,
+            port=port,
+            identity_file=identity_file,
+        ),
         sql=sql,
         timeout_s=timeout_s,
         label="SSH",
@@ -821,6 +949,10 @@ def store_from_config(cfg: Any) -> WorksStore | None:
     timeout_s = float(getattr(cfg, "openalex_store_timeout_s", 120.0) or 120.0)
     parquet_glob = _parquet_glob_from(cfg)
     cites_index_glob = _cites_index_glob_from(cfg)
+    memory_limit = (
+        str(getattr(cfg, "openalex_store_memory_limit", "") or "").strip()
+        or DEFAULT_MEMORY_LIMIT
+    )
 
     if backend == "local_duckdb":
         if not parquet_glob:
@@ -833,6 +965,7 @@ def store_from_config(cfg: Any) -> WorksStore | None:
             duckdb_bin=duckdb_bin,
             timeout_s=timeout_s,
             cites_index_glob=cites_index_glob,
+            memory_limit=memory_limit,
         )
 
     if backend == "ssh_duckdb":
@@ -845,6 +978,12 @@ def store_from_config(cfg: Any) -> WorksStore | None:
                 "openalex_store backend ssh_duckdb needs ssh_host and parquet_glob "
                 f"(or {SSH_HOST_ENV} / {PARQUET_GLOB_ENV})"
             )
+        connect_timeout_s = float(
+            getattr(cfg, "openalex_store_ssh_connect_timeout_s", 0)
+            or DEFAULT_SSH_CONNECT_TIMEOUT_S
+        )
+        port = int(getattr(cfg, "openalex_store_ssh_port", 0) or 0)
+        identity = str(getattr(cfg, "openalex_store_ssh_identity_file", "") or "").strip()
         return SshDuckDbStore(
             ssh_host=host,
             ssh_user=user,
@@ -852,12 +991,74 @@ def store_from_config(cfg: Any) -> WorksStore | None:
             duckdb_bin=duckdb_bin,
             timeout_s=timeout_s,
             cites_index_glob=cites_index_glob,
+            memory_limit=memory_limit,
+            ssh_connect_timeout_s=connect_timeout_s,
+            ssh_port=port,
+            ssh_identity_file=identity,
         )
 
     raise OpenAlexStoreError(
         f"openalex_store.backend {backend!r} is not supported yet "
         "(supported: ssh_duckdb, local_duckdb; later: http)"
     )
+
+
+def store_status(cfg: Any, *, probe: bool = False) -> dict[str, Any]:
+    """Operator-facing status for ``paperful openalex-store status``."""
+    backend = str(getattr(cfg, "openalex_store_backend", "") or "").strip().lower()
+    parquet_glob = _parquet_glob_from(cfg)
+    cites_index_glob = _cites_index_glob_from(cfg)
+    status: dict[str, Any] = {
+        "backend": backend or "off",
+        "parquet_glob": parquet_glob,
+        "cites_index_glob": cites_index_glob,
+        "has_cites_index": bool(cites_index_glob),
+        "duckdb_bin": str(getattr(cfg, "openalex_store_duckdb_bin", "") or "").strip()
+        or "duckdb",
+        "timeout_s": float(getattr(cfg, "openalex_store_timeout_s", 120.0) or 120.0),
+        "memory_limit": str(getattr(cfg, "openalex_store_memory_limit", "") or "").strip()
+        or DEFAULT_MEMORY_LIMIT,
+    }
+    if not backend:
+        status["ok"] = True
+        status["detail"] = "off (live API only)"
+        return status
+    if backend == "ssh_duckdb":
+        status["ssh_host"] = str(getattr(cfg, "openalex_store_ssh_host", "") or "").strip()
+        status["ssh_user"] = str(getattr(cfg, "openalex_store_ssh_user", "") or "").strip()
+        status["ssh_port"] = int(getattr(cfg, "openalex_store_ssh_port", 0) or 0)
+        status["ssh_connect_timeout_s"] = float(
+            getattr(cfg, "openalex_store_ssh_connect_timeout_s", 0)
+            or DEFAULT_SSH_CONNECT_TIMEOUT_S
+        )
+    try:
+        store = store_from_config(cfg)
+    except OpenAlexStoreError as exc:
+        status["ok"] = False
+        status["detail"] = str(exc)
+        return status
+    if store is None:
+        status["ok"] = True
+        status["detail"] = "off (live API only)"
+        return status
+    status["ok"] = True
+    status["detail"] = (
+        f"{backend} · cites index set"
+        if cites_index_glob
+        else f"{backend} · DOI/id only (no cites_index_glob)"
+    )
+    if probe and isinstance(store, _DuckDbWorksStore):
+        try:
+            probed = store.probe()
+            status["probe"] = probed
+            status["ok"] = bool(probed.get("ok"))
+            if not status["ok"]:
+                status["detail"] = "probe returned no columns"
+        except OpenAlexStoreError as exc:
+            status["ok"] = False
+            status["detail"] = f"probe failed: {exc}"
+            status["probe"] = {"ok": False, "error": str(exc)}
+    return status
 
 
 def build_cites_index_from_config(
@@ -902,7 +1103,13 @@ def build_cites_index_from_config(
             getattr(cfg, "openalex_store_build_timeout_s", 0) or DEFAULT_BUILD_TIMEOUT_S
         )
     )
-    counts = store.build_cites_index(out, timeout_s=wait, progress=progress)
+    memory_limit = (
+        str(getattr(cfg, "openalex_store_memory_limit", "") or "").strip()
+        or DEFAULT_MEMORY_LIMIT
+    )
+    counts = store.build_cites_index(
+        out, timeout_s=wait, progress=progress, memory_limit=memory_limit
+    )
     return out, counts
 
 

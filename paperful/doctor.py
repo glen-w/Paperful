@@ -712,24 +712,64 @@ def _openalex_store_check(cfg: Config) -> Check:
     backend = (cfg.openalex_store_backend or "").strip().lower()
     if not backend:
         return Check("openalex store", "green", "off (live API only)")
+    if backend not in {"ssh_duckdb", "local_duckdb"}:
+        return Check(
+            "openalex store",
+            "red",
+            f"backend {backend!r} unsupported (use ssh_duckdb or local_duckdb)",
+            code="openalex_store_backend",
+        )
     cites = (cfg.openalex_store_cites_index_glob or "").strip()
     if not cites:
         cites = os.environ.get("OPENALEX_STORE_CITES_INDEX_GLOB", "").strip()
     works = (cfg.openalex_store_parquet_glob or "").strip()
-    detail = f"{backend}"
-    if works:
-        detail += " · works glob set"
-    if cites:
+    if not works:
+        works = os.environ.get("OPENALEX_STORE_PARQUET_GLOB", "").strip()
+    if not works:
         return Check(
             "openalex store",
-            "green",
-            f"{detail} · cites index set (DOI/id + citing from snapshot)",
+            "red",
+            f"{backend} · parquet_glob unset "
+            "(or OPENALEX_STORE_PARQUET_GLOB)",
+            code="openalex_store_glob",
+        )
+    if backend == "ssh_duckdb":
+        host = (cfg.openalex_store_ssh_host or "").strip() or os.environ.get(
+            "OPENALEX_STORE_SSH_HOST", ""
+        ).strip()
+        if not host:
+            return Check(
+                "openalex store",
+                "red",
+                "ssh_duckdb · ssh_host unset (or OPENALEX_STORE_SSH_HOST)",
+                code="openalex_store_ssh",
+            )
+    detail = f"{backend} · works glob set"
+    duck = (cfg.openalex_store_duckdb_bin or "").strip() or "duckdb"
+    duck_missing = (
+        backend == "local_duckdb"
+        and shutil.which(duck) is None
+        and not Path(duck).is_file()
+    )
+    if not cites:
+        return Check(
+            "openalex store",
+            "amber",
+            f"{detail} · DOI/id only — run paperful openalex-store build-cites "
+            "and set cites_index_glob for citing under API budget",
+        )
+    if duck_missing:
+        return Check(
+            "openalex store",
+            "amber",
+            f"{detail} · cites index set · {duck!r} not on PATH — "
+            "install DuckDB or set duckdb_bin",
+            code="openalex_store_duckdb",
         )
     return Check(
         "openalex store",
-        "amber",
-        f"{detail} · DOI/id only — run paperful openalex-store build-cites "
-        "and set cites_index_glob for citing under API budget",
+        "green",
+        f"{detail} · cites index set (DOI/id + citing from snapshot)",
     )
 
 
