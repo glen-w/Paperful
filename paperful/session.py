@@ -513,7 +513,11 @@ def _login_via_system_chrome(
         str(chrome),
         f"--user-data-dir={user_dir}",
         f"--remote-debugging-port={port}",
-        "--remote-allow-origins=*",
+        # Loopback CDP only — do not allow arbitrary web origins to attach.
+        (
+            f"--remote-allow-origins="
+            f"http://127.0.0.1:{port},http://localhost:{port}"
+        ),
         "--no-first-run",
         "--no-default-browser-check",
         url,

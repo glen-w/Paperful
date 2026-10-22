@@ -8,6 +8,12 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- **Local-trust hardening:** SSRF checks on PDF fetch URLs and redirects
+  (block loopback / private / link-local / metadata), review-token path
+  sanitization, `serve --allow-remote-bind` gate for non-loopback binds,
+  secret-redacted witness `config_sha256`, tighter Chrome CDP
+  `remote-allow-origins`, and [SECURITY.md](SECURITY.md). CI runs a curated
+  `ruff` lint job; `make test` / `make lint` match contributor parity.
 - **Collection exclude / protect (`[[exclude]]`):** Mark hand-curated folders
   so paperful will not write to them. Presets `full` and `add_only`, plus
   fine-grained `allow_*` flags, `protect_items`, and optional

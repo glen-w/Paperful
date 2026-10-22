@@ -34,9 +34,13 @@ Zotero must be running with the local API enabled for integration tests that tou
 ## Tests
 
 ```sh
-uv run pytest
+uv sync --group dev --extra serve
+make test                 # pytest -m "not docs" (CI suite parity)
+make lint                 # ruff (undefined-name + curated security rules)
 DOCS_STRICT=1 make docs   # after: uv sync --extra docs
 ```
+
+Local-trust boundaries and reporting: [SECURITY.md](SECURITY.md).
 
 CI runs pytest with coverage on every push and PR (`.github/workflows/ci.yml`).
 A green push to `main` refreshes `badges/coverage.json`, which the README

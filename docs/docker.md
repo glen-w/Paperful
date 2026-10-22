@@ -158,9 +158,11 @@ the host (or a second Compose service) and point `[camofox].base_url` at it
 not a Cloudflare-bypass product and does not reuse the vault Chromium profile.
 
 After doctor is green, `docker compose up` starts the GUI. It binds in the
-container on `0.0.0.0:8765` and **publishes only** `127.0.0.1:8765:8765` (no
-LAN). Same workbench as host `paperful serve` ([gui.md](gui.md) — Wanted, then
-Discover; Advanced Repair / Mirror / Index / Briefs):
+container on `0.0.0.0:8765` (Compose passes `--allow-remote-bind`; the
+workbench has **no HTTP auth**) and **publishes only** `127.0.0.1:8765:8765`
+(no LAN). Same workbench as host `paperful serve` ([gui.md](gui.md) — Wanted,
+then Discover; Advanced Repair / Mirror / Index / Briefs). Operator threat
+model: [SECURITY.md](../SECURITY.md).
 
 ```sh
 docker compose up

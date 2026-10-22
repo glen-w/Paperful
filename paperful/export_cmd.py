@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Any
 
 from rich.console import Console
 import typer
-from .store import Manifest
 from .library import LibraryError
+from .mirror import pdf_for
+from .store import Manifest
 
 
 def run_export_library(

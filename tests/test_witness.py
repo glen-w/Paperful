@@ -21,6 +21,26 @@ def test_config_sha256_stable_for_same_file(tmp_path: Path, cfg):
     assert config_sha256(cfg) != first
 
 
+def test_config_sha256_ignores_secret_keys(tmp_path: Path, cfg):
+    path = tmp_path / "config.toml"
+    path.write_text(
+        'email = "a@b.c"\ncore_api_key = "super-secret"\n',
+        encoding="utf-8",
+    )
+    cfg.config_path = path
+    first = config_sha256(cfg)
+    path.write_text(
+        'email = "a@b.c"\ncore_api_key = "different-secret"\n',
+        encoding="utf-8",
+    )
+    assert config_sha256(cfg) == first
+    path.write_text(
+        'email = "a@b.c"\n[mendeley]\nclient_secret = "x"\n',
+        encoding="utf-8",
+    )
+    assert config_sha256(cfg) == first
+
+
 def test_build_witness_shape(cfg):
     witness = build_witness(cfg, command="run")
     assert witness["schema"] == SCHEMA

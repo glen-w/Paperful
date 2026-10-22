@@ -70,6 +70,7 @@ Changelog = "https://github.com/glen-w/Paperful/blob/main/CHANGELOG.md"
 dev = [
     "pytest>=8",
     "pytest-cov>=6",
+    "ruff>=0.9",
     "lancedb>=0.39,<1",
     "fastapi>=0.115",
     "uvicorn>=0.32",
@@ -138,3 +139,52 @@ show_missing = true
 skip_empty = true
 # Stretch goal 85%; gate tracks offline suite + scoped omits below.
 fail_under = 80
+
+[tool.ruff]
+target-version = "py310"
+src = ["paperful", "tests"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert bind-refusal behaviour with literal 0.0.0.0 hosts.
+"tests/**" = ["S104"]
+
+[tool.ruff.lint]
+# Start narrow: real undefined-name bugs + security rules that are already green.
+# Do not widen to full E/F/S without a dedicated cleanup PR.
+select = [
+    "F821",
+    "S102",
+    "S103",
+    "S104",
+    "S201",
+    "S301",
+    "S302",
+    "S306",
+    "S307",
+    "S308",
+    "S312",
+    "S313",
+    "S315",
+    "S316",
+    "S317",
+    "S318",
+    "S319",
+    "S321",
+    "S501",
+    "S502",
+    "S503",
+    "S504",
+    "S505",
+    "S506",
+    "S507",
+    "S508",
+    "S509",
+    "S601",
+    "S602",
+    "S604",
+    "S605",
+    "S609",
+    "S610",
+    "S611",
+    "S612",
+]

@@ -4,16 +4,26 @@ JSON routes (health, doctor, collections, last-run, dry-run refs-gap / ask)
 do not write the library. Workbench forms write only after a review token
 (Grab fetches to disk; Attach and Apply write the catalogue). Optional extra:
 ``paperful[serve]``.
+
+Trust model: bind loopback only unless ``--allow-remote-bind``. There is no
+HTTP auth — anyone who can reach the port can drive Grab/Attach/Settings.
+See SECURITY.md.
 """
 
 from __future__ import annotations
 
+import ipaddress
 from typing import Any
 
 from . import __version__
 from .config import Config
 
 SERVE_HINT = "paperful serve needs FastAPI. Install with: uv sync --extra serve"
+REMOTE_BIND_HINT = (
+    "Refusing to bind {host!r} (not loopback). "
+    "Pass --allow-remote-bind if you intentionally expose the workbench "
+    "(no auth; anyone who can reach the port can Grab/Attach/change Settings)."
+)
 
 
 def fastapi_available() -> bool:
@@ -69,9 +79,28 @@ def create_app(cfg: Config) -> Any:
     return app
 
 
-def run_server(cfg: Config, *, host: str = "127.0.0.1", port: int = 8765) -> None:
+def is_loopback_bind_host(host: str) -> bool:
+    """True for addresses that only accept connections from this machine."""
+    raw = (host or "").strip().lower()
+    if raw in {"127.0.0.1", "::1", "localhost"}:
+        return True
+    try:
+        return bool(ipaddress.ip_address(raw).is_loopback)
+    except ValueError:
+        return False
+
+
+def run_server(
+    cfg: Config,
+    *,
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    allow_remote_bind: bool = False,
+) -> None:
     if not fastapi_available():
         raise RuntimeError(SERVE_HINT)
+    if not is_loopback_bind_host(host) and not allow_remote_bind:
+        raise RuntimeError(REMOTE_BIND_HINT.format(host=host))
     import uvicorn
 
     uvicorn.run(create_app(cfg), host=host, port=port)

@@ -727,6 +727,14 @@ def serve(
         help="Bind address. Default is localhost only.",
     ),
     port: int = typer.Option(8765, help="TCP port."),
+    allow_remote_bind: bool = typer.Option(
+        False,
+        "--allow-remote-bind",
+        help=(
+            "Allow binding a non-loopback address (e.g. 0.0.0.0). "
+            "The workbench has no HTTP auth."
+        ),
+    ),
     config: Path | None = ConfigOpt,
 ) -> None:
     """Localhost workbench and JSON API. Needs paperful[serve]."""
@@ -735,7 +743,16 @@ def serve(
     if not fastapi_available():
         console.print(f"[red]{SERVE_HINT}[/]")
         raise typer.Exit(1)
-    run_server(_cfg(config), host=host, port=port)
+    try:
+        run_server(
+            _cfg(config),
+            host=host,
+            port=port,
+            allow_remote_bind=allow_remote_bind,
+        )
+    except RuntimeError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
 
 @app.command()
 def version() -> None:
