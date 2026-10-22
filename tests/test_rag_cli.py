@@ -7,7 +7,7 @@ import json
 import pytest
 from typer.testing import CliRunner
 
-from paperful import cli
+from paperful import cli, cli_runtime
 from paperful.config import load_config
 from paperful.rag.index import ledger_path
 from paperful.rag.ledger import Ledger
@@ -35,6 +35,7 @@ def no_reference_manager(monkeypatch):
         raise AssertionError("rag verbs must not open the reference manager")
 
     monkeypatch.setattr(cli, "ZoteroLocal", boom)
+    monkeypatch.setattr(cli_runtime, "ZoteroLocal", boom)
     monkeypatch.setattr(cli, "get_backend", boom)
 
 

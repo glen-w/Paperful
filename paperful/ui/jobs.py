@@ -12,7 +12,7 @@ from ..store import Manifest
 from . import commands
 from .pages import scope_fingerprint
 
-# Test hooks
+# Test hooks (index_jobs reads these names from this module)
 run_fetch_fn: Callable[..., None] | None = None
 attach_fn: Callable[..., None] | None = None
 snowball_search_fn: Callable[..., Any] | None = None
@@ -31,6 +31,17 @@ rag_answered_fn: Callable[..., dict[str, Any]] | None = None
 summarize_fn: Callable[..., dict[str, Any]] | None = None
 synthesize_fn: Callable[..., dict[str, Any]] | None = None
 noop_sleep: float = 0.05
+
+from .index_jobs import (
+    ask_batch,
+    ask_turn,
+    rag_answered,
+    rag_ingest,
+    rag_questions,
+    summarize,
+    synthesize,
+    _attach_result,
+)
 
 
 def run_noop(cfg: Config, cmd_id: str) -> None:
@@ -57,6 +68,44 @@ def _load_scope_items(cfg: Config, collection: str) -> tuple[list[Any], Manifest
         return [], manifest
 
 
+def missing_items(cfg: Config, items: list[Any], manifest: Manifest) -> list[Any]:
+    """Items on the Wanted Missing tab (the list Preview/Grab mean by "all")."""
+    from .pages import wanted_rows
+
+    missing_keys = {row["key"] for row in wanted_rows(cfg, items, manifest)["missing"]}
+    return [it for it in items if it.key in missing_keys]
+
+
+def scope_for_fetch(
+    cfg: Config,
+    collection: str,
+    keys: list[str] | None,
+    flags: dict[str, Any] | None,
+) -> tuple[list[Any], Manifest]:
+    """Rows a Preview or Grab should consider.
+
+    Ticked keys win. With no ticks, the scope is the Missing list, then any
+    year/type flags. Have and Held rows are not fetched unless ticked.
+    """
+    flags = dict(flags or {})
+    items, manifest = _load_scope_items(cfg, collection)
+    if keys:
+        keyset = {k for k in keys if k}
+        items = [it for it in items if it.key in keyset]
+    else:
+        items = missing_items(cfg, items, manifest)
+    year_from = flags.get("year_from")
+    year_to = flags.get("year_to")
+    item_type = list(flags.get("item_type") or [])
+    if year_from is not None or year_to is not None or item_type:
+        items = [
+            it
+            for it in items
+            if _item_in_filters(it, year_from=year_from, year_to=year_to, item_type=item_type)
+        ]
+    return items, manifest
+
+
 def preview_run(
     cfg: Config,
     cmd_id: str,
@@ -67,19 +116,7 @@ def preview_run(
     flags: dict[str, Any] | None = None,
 ) -> None:
     flags = dict(flags or {})
-    items, manifest = _load_scope_items(cfg, collection)
-    if keys:
-        keyset = set(keys)
-        items = [it for it in items if it.key in keyset]
-    year_from = flags.get("year_from")
-    year_to = flags.get("year_to")
-    item_type = list(flags.get("item_type") or [])
-    if year_from is not None or year_to is not None or item_type:
-        items = [
-            it
-            for it in items
-            if _item_in_filters(it, year_from=year_from, year_to=year_to, item_type=item_type)
-        ]
+    items, manifest = scope_for_fetch(cfg, collection, keys, flags)
     fp = scope_fingerprint(items, manifest)
     if run_fetch_fn is not None:
         run_fetch_fn(
@@ -125,15 +162,80 @@ def _item_in_filters(
     return True
 
 
+def _flags_match(stored: dict[str, Any], current: dict[str, Any]) -> bool:
+    return dict(stored or {}) == dict(current or {})
+
+
+def matching_preview(
+    cfg: Config,
+    *,
+    collection: str,
+    preset: str,
+    posted_keys: list[str],
+    flags: dict[str, Any] | None,
+    explicit_token: str = "",
+) -> tuple[dict[str, Any] | None, str]:
+    """Find an unconsumed Preview token for this Grab.
+
+    Grab never borrows an Attach, Recover, or other review token. The token's
+    keys must be the ticked rows, or the current Missing list when nothing
+    is ticked.
+    """
+    flags = dict(flags or {})
+    posted = [k for k in posted_keys if str(k).strip()]
+
+    def _usable(token: str) -> dict[str, Any] | None:
+        review = commands.load_review(cfg, token)
+        if review is None or review.get("consumed"):
+            return None
+        if str(review.get("verb") or "") != "preview_run":
+            return None
+        if str(review.get("collection") or "") != collection:
+            return None
+        if str(review.get("preset") or "oa") != (preset or "oa"):
+            return None
+        if not _flags_match(dict(review.get("flags") or {}), flags):
+            return None
+        return review
+
+    review: dict[str, Any] | None = None
+    if explicit_token:
+        review = _usable(explicit_token)
+    if review is None:
+        for rec in commands.list_commands(cfg, limit=30):
+            token = str(rec.get("review_token") or "")
+            if not token:
+                continue
+            review = _usable(token)
+            if review is not None:
+                break
+    if review is None:
+        return None, "Preview the missing list, or the rows you ticked, before Grab."
+    items, _manifest = scope_for_fetch(cfg, collection, posted or None, flags)
+    intended = sorted(it.key for it in items)
+    if intended != sorted(review.get("keys") or []):
+        if posted:
+            return None, "Preview the ticked rows before Grab."
+        return None, "Preview the missing list before Grab."
+    return review, ""
+
+
+def grab_attaches(cfg: Config) -> bool:
+    """True when Settings says Grab should write the library after download."""
+    return cfg.ui_attach_mode == "auto"
+
+
 def grab_run(
     cfg: Config,
     *,
     token: str,
 ) -> tuple[bool, str]:
-    """Fetch to out/ only (never attaches to Zotero)."""
+    """Fetch into out/. Attach during Grab only when Settings is automatic."""
     review = commands.load_review(cfg, token)
     if review is None:
         return False, "unknown token"
+    if str(review.get("verb") or "") != "preview_run":
+        return False, "preview first"
     collection = str(review.get("collection") or "")
     preset = str(review.get("preset") or "oa")
     flags = dict(review.get("flags") or {})
@@ -145,6 +247,7 @@ def grab_run(
     if not ok:
         return False, msg
     item_keys = list(keyset)
+    auto_attach = grab_attaches(cfg)
     year_from = flags.get("year_from")
     year_to = flags.get("year_to")
     item_type = list(flags.get("item_type") or [])
@@ -162,7 +265,8 @@ def grab_run(
             library=not collection,
             dry_run=False,
             preset=preset,
-            no_attach=True,
+            no_attach=not auto_attach,
+            force_attach=auto_attach,
             item_keys=item_keys,
             flags=flags,
         )
@@ -182,7 +286,8 @@ def grab_run(
             year_to=year_to,
             item_type=item_type,
             limit=limit,
-            no_attach=True,
+            no_attach=not auto_attach,
+            force_attach=auto_attach,
             retry_failed=True if retry_failed else None,
             try_all=True if try_all else None,
             sources=sources,
@@ -208,37 +313,51 @@ def attach_run(
     *,
     keys: list[str],
     collection: str,
-) -> tuple[bool, str]:
+) -> tuple[bool, str, int]:
     """Attach selected pending PDFs to Zotero (doi_match defaults + hand-ticks)."""
-    selected = [k.strip() for k in keys if k and str(k).strip()]
-    if not selected:
-        return False, "no keys selected"
-    items, _manifest = _load_scope_items(cfg, collection)
-    keyset = set(selected)
-    scoped_keys = [it.key for it in items if it.key in keyset]
-    if not scoped_keys:
-        return False, "no matching items"
-    _attach_keys(cfg, scoped_keys)
-    return True, ""
+    posted = [k.strip() for k in keys if k and str(k).strip()]
+    items, manifest = _load_scope_items(cfg, collection)
+    if posted:
+        pending = [
+            r
+            for r in manifest.pending_attach()
+            if r.itemKey in set(posted)
+        ]
+        if not pending:
+            return False, "no attachable PDFs for that selection", 0
+        scoped_keys = [r.itemKey for r in pending]
+    else:
+        item_keys = {it.key for it in items}
+        pending = [
+            r for r in manifest.pending_attach() if r.itemKey in item_keys
+        ]
+        if not pending:
+            return False, "no attachable PDFs", 0
+        scoped_keys = [r.itemKey for r in pending]
+    n = _attach_keys(cfg, scoped_keys)
+    if n == 0:
+        return False, "no attachable PDFs", 0
+    return True, "", n
 
 
-def _attach_keys(cfg: Config, keys: list[str]) -> None:
+def _attach_keys(cfg: Config, keys: list[str]) -> int:
     if not keys:
-        return
-    if attach_fn is not None:
-        attach_fn(cfg, keys=keys)
-        return
-    from ..catalogue import open_library
-    from ..pipeline import Pipeline
-
+        return 0
     m = Manifest(cfg.manifest_path)
     pending = [r for r in m.pending_attach() if r.itemKey in keys]
     if not pending:
-        return
+        return 0
+    if attach_fn is not None:
+        attach_fn(cfg, keys=[r.itemKey for r in pending])
+        return len(pending)
+    from ..catalogue import open_library
+    from ..pipeline import Pipeline
+
     backend = open_library(cfg)
     pipe = Pipeline(cfg, m, _quiet_console(), attacher=backend)
     for rec in pending:
         pipe.attach_record(rec)
+    return len(pending)
 
 
 def track_topic(
@@ -463,6 +582,17 @@ def _authorwatch_apply_fingerprint(cfg: Config, list_name: str, collection: str)
     ).hexdigest()
 
 
+def _watch_apply_fingerprint(cfg: Config, watch_name: str, collection: str) -> str:
+    import hashlib
+
+    from ..snowball.watch import inbox_count
+
+    n = inbox_count(cfg, watch_name)
+    return hashlib.sha256(
+        f"watch|{watch_name}|{collection}|{n}".encode()
+    ).hexdigest()
+
+
 def discover_apply_preview(
     cfg: Config,
     cmd_id: str,
@@ -476,6 +606,11 @@ def discover_apply_preview(
         fp = _authorwatch_apply_fingerprint(cfg, list_name, collection)
         keys = [list_name]
         verb = "authorwatch_apply"
+    elif kind in {"watch", "topic"}:
+        name = list_name or run_id
+        fp = _watch_apply_fingerprint(cfg, name, collection)
+        keys = [name]
+        verb = "watch_apply"
     else:
         fp = _snowball_apply_fingerprint(cfg, run_id, collection)
         keys = [run_id]
@@ -505,6 +640,10 @@ def discover_apply_consume(
     if kind == "authorwatch":
         fp = _authorwatch_apply_fingerprint(cfg, list_name, collection)
         keys = [list_name]
+    elif kind in {"watch", "topic"}:
+        name = list_name or run_id
+        fp = _watch_apply_fingerprint(cfg, name, collection)
+        keys = [name]
     else:
         fp = _snowball_apply_fingerprint(cfg, run_id, collection)
         keys = [run_id]
@@ -513,6 +652,8 @@ def discover_apply_consume(
         return False, msg
     if kind == "authorwatch":
         discover_apply_authorwatch(cfg, list_name, collection)
+    elif kind in {"watch", "topic"}:
+        discover_apply_watch(cfg, list_name or run_id, collection)
     else:
         discover_apply_snowball(cfg, run_id, collection)
     return True, ""
@@ -535,6 +676,19 @@ def discover_apply_authorwatch(cfg: Config, list_name: str, collection: str) -> 
     from ..authorwatch import apply_list
 
     apply_list(cfg, list_name, collection, console=_quiet_console(), apply=True)
+
+
+def discover_apply_watch(cfg: Config, watch_name: str, collection: str) -> None:
+    """Create parents from a topic watch inbox (``snowball watch apply``)."""
+    from ..snowball.watch import apply_watch
+
+    apply_watch(
+        cfg,
+        watch_name,
+        collection,
+        console=_quiet_console(),
+        apply=True,
+    )
 
 
 def authorwatch_suggest(
@@ -590,636 +744,19 @@ def authorwatch_import(
     import_file(cfg, list_name, path=path, source=source, resolve=False)
 
 
-def ask_turn(
-    cfg: Config,
-    cmd_id: str,
-    *,
-    question: str,
-    thread_id: str | None,
-    collection: str,
-    year_from: int | None,
-    year_to: int | None,
-    focus: str | None,
-    top_k: int | None = None,
-    item_keys: list[str] | None = None,
-    item_types: frozenset[str] | None = None,
-    prompt_path: str | None = None,
-    prompt_text: str | None = None,
-) -> None:
-    if ask_turn_fn is not None:
-        result = ask_turn_fn(
-            cfg,
-            cmd_id,
-            question=question,
-            thread_id=thread_id,
-            collection=collection,
-            year_from=year_from,
-            year_to=year_to,
-            focus=focus,
-            top_k=top_k,
-            item_keys=item_keys,
-            item_types=item_types,
-            prompt_path=prompt_path,
-            prompt_text=prompt_text,
-        )
-    else:
-        from ..rag.ask_turn import run_ask_turn
-
-        result = run_ask_turn(
-            cfg,
-            question=question,
-            thread_id=thread_id,
-            collection=collection,
-            year_from=year_from,
-            year_to=year_to,
-            focus=focus,
-            top_k=top_k,
-            item_keys=item_keys,
-            item_types=item_types,
-            prompt_path=prompt_path,
-            prompt_text=prompt_text,
-        )
-    rec = commands.read_command(cfg, cmd_id) or {}
-    rec["result"] = result
-    commands.write_command(cfg, rec)
-
-
-def _attach_result(cfg: Config, cmd_id: str, result: dict[str, Any]) -> None:
-    rec = commands.read_command(cfg, cmd_id) or {}
-    rec["result"] = result
-    commands.write_command(cfg, rec)
-
-
-def rag_ingest(
-    cfg: Config,
-    cmd_id: str,
-    *,
-    collection: str,
-    year_from: int | None,
-    year_to: int | None,
-    limit: int | None,
-    dry_run: bool,
-) -> None:
-    if rag_ingest_fn is not None:
-        result = rag_ingest_fn(
-            cfg,
-            cmd_id,
-            collection=collection,
-            year_from=year_from,
-            year_to=year_to,
-            limit=limit,
-            dry_run=dry_run,
-        )
-        _attach_result(cfg, cmd_id, result)
-        return
-    if not cfg.rag_enabled:
-        raise ValueError("rag.enabled is false in config.toml")
-    from ..rag.ingest import ingest_entries, select_entries
-
-    collections = [collection] if collection.strip() else None
-    entries = select_entries(
-        cfg,
-        collections=collections,
-        year_from=year_from,
-        year_to=year_to,
-    )
-    embedder = None
-    if not dry_run:
-        from ..llm.preflight import validate_embedder
-
-        embedder = validate_embedder(cfg)
-    whole_mirror = not (collection or "").strip() and year_from is None and year_to is None
-    batch = ingest_entries(
-        cfg,
-        entries,
-        dry_run=dry_run,
-        prune=whole_mirror and limit is None,
-        limit=limit,
-        embedder=embedder,
-    )
-    _attach_result(
-        cfg,
-        cmd_id,
-        {
-            "dry_run": dry_run,
-            "scope": collection or "library",
-            "summary": batch.summary(),
-        },
-    )
-
-
-def ask_batch(
-    cfg: Config,
-    cmd_id: str,
-    *,
-    questions: list[str],
-    collection: str,
-    year_from: int | None,
-    year_to: int | None,
-    focus: str | None,
-    dest: str,
-    apply: bool,
-    top_k: int | None = None,
-    item_keys: list[str] | None = None,
-    item_types: frozenset[str] | None = None,
-    prompt_path: str | None = None,
-    prompt_text: str | None = None,
-    force: bool = False,
-) -> None:
-    if ask_batch_fn is not None:
-        result = ask_batch_fn(
-            cfg,
-            cmd_id,
-            questions=questions,
-            collection=collection,
-            year_from=year_from,
-            year_to=year_to,
-            focus=focus,
-            dest=dest,
-            apply=apply,
-            top_k=top_k,
-            item_keys=item_keys,
-            item_types=item_types,
-            prompt_path=prompt_path,
-            prompt_text=prompt_text,
-            force=force,
-        )
-        _attach_result(cfg, cmd_id, result)
-        return
-    from ..config import wants_zotero
-    from ..llm import get_client
-    from ..llm.preflight import validate_embedder, validate_llm_for_ask
-    from ..rag.batch import run_batch, write_pack
-    from ..rag.index import Index, ledger_path
-    from ..rag.ledger import Ledger
-    from ..rag.prompt import parse_focus
-    from ..rag.retrieve import scope_keys
-
-    validate_llm_for_ask(cfg)
-    focus_name = parse_focus(focus if focus is not None else cfg.rag_focus)
-    index = Index.open(cfg)
-    ledger = Ledger(ledger_path(cfg))
-    coll = (collection or "").strip()
-    keys = scope_keys(
-        ledger,
-        collections=[coll] if coll else None,
-        item_keys=item_keys or (),
-        year_from=year_from,
-        year_to=year_to,
-        item_types=item_types,
-    )
-    pack = run_batch(
-        cfg,
-        questions,
-        keys=keys,
-        focus=focus_name,
-        prompt_path=prompt_path,
-        prompt_text=prompt_text,
-        k=top_k,
-        force=force,
-        scope={
-            "collections": [coll] if coll else [],
-            "item": list(item_keys or []),
-            "year_from": year_from,
-            "year_to": year_to,
-        },
-        client=get_client(cfg),
-        embedder=validate_embedder(cfg),
-        index=index,
-        ledger=ledger,
-    )
-    folder = write_pack(cfg, pack)
-    note = False
-    if apply and wants_zotero(dest) and collection.strip():
-        from ..library import get_backend
-        from ..notehtml import wrap
-        from ..summarize import to_note_html
-
-        backend = get_backend(cfg)
-        body = (folder / "answers.md").read_text(encoding="utf-8")
-        html = wrap(
-            to_note_html(body),
-            note_type="review",
-            verb="ask",
-            model=pack.model,
-        )
-        target = backend.resolve_collection(collection)
-        backend.create_or_update_collection_note(target.key, html, "paperful-ask-batch")
-        note = True
-    _attach_result(
-        cfg,
-        cmd_id,
-        {
-            "stamp": pack.stamp,
-            "pack": str(folder),
-            "questions": pack.questions,
-            "answered": pack.answered,
-            "skipped": pack.skipped,
-            "failed": pack.failed,
-            "focus": pack.focus,
-            "note": note,
-        },
-    )
-
-
-def rag_questions(
-    cfg: Config,
-    cmd_id: str,
-    *,
-    collection: str,
-    whole_library: bool,
-    year_from: int | None,
-    year_to: int | None,
-    item_keys: list[str] | None,
-    item_types: frozenset[str] | None,
-    use_llm: bool,
-    limit: int | None,
-    dry_run: bool,
-) -> None:
-    if rag_questions_fn is not None:
-        result = rag_questions_fn(
-            cfg,
-            cmd_id,
-            collection=collection,
-            whole_library=whole_library,
-            year_from=year_from,
-            year_to=year_to,
-            item_keys=item_keys,
-            item_types=item_types,
-            use_llm=use_llm,
-            limit=limit,
-            dry_run=dry_run,
-        )
-        _attach_result(cfg, cmd_id, result)
-        return
-    if not cfg.rag_enabled:
-        raise ValueError("rag.enabled is false")
-    from ..llm import get_client
-    from ..llm.preflight import validate_llm_for_ask
-    from ..rag.index import ledger_path
-    from ..rag.ledger import Ledger
-    from ..rag.questions import extract_scope, write_item
-
-    coll = (collection or "").strip()
-    keys = item_keys or []
-    if not coll and not keys and not whole_library:
-        raise ValueError("scope required")
-    if whole_library and not coll:
-        collections: list[str] | None = None
-    elif coll:
-        collections = [coll]
-    else:
-        collections = []
-    client = None
-    if use_llm:
-        validate_llm_for_ask(cfg)
-        client = get_client(cfg)
-    ledger = Ledger(ledger_path(cfg))
-    items = extract_scope(
-        cfg,
-        ledger=ledger,
-        collections=collections,
-        item_keys=keys,
-        year_from=year_from,
-        year_to=year_to,
-        item_types=item_types,
-        use_llm=use_llm,
-        client=client,
-        limit=limit,
-    )
-    total_q = sum(len(it.questions) for it in items)
-    if not dry_run:
-        for it in items:
-            write_item(cfg, it)
-    _attach_result(
-        cfg,
-        cmd_id,
-        {
-            "dry_run": dry_run,
-            "items": len(items),
-            "questions": total_q,
-            "llm": use_llm,
-        },
-    )
-
-
-def rag_answered(
-    cfg: Config,
-    cmd_id: str,
-    *,
-    collection: str,
-    year_from: int | None,
-    year_to: int | None,
-    item_keys: list[str] | None,
-    item_types: frozenset[str] | None,
-    questions: list[tuple[str, str, int | None]],
-    after_item: str | None,
-    top_k: int | None,
-    force: bool,
-) -> None:
-    if rag_answered_fn is not None:
-        result = rag_answered_fn(
-            cfg,
-            cmd_id,
-            collection=collection,
-            year_from=year_from,
-            year_to=year_to,
-            item_keys=item_keys,
-            item_types=item_types,
-            questions=questions,
-            after_item=after_item,
-            top_k=top_k,
-            force=force,
-        )
-        _attach_result(cfg, cmd_id, result)
-        return
-    from ..llm import get_client
-    from ..llm.preflight import validate_embedder, validate_llm_for_ask
-    from ..rag.answered import run_answered, write_pack
-    from ..rag.index import Index, ledger_path
-    from ..rag.ledger import Ledger
-    from ..rag.retrieve import scope_keys
-
-    validate_llm_for_ask(cfg)
-    coll = (collection or "").strip()
-    index = Index.open(cfg)
-    ledger = Ledger(ledger_path(cfg))
-    keys = scope_keys(
-        ledger,
-        collections=[coll] if coll else None,
-        item_keys=item_keys or (),
-        year_from=year_from,
-        year_to=year_to,
-        item_types=item_types,
-    )
-    pack = run_answered(
-        cfg,
-        questions,
-        keys=keys,
-        after_item=(after_item or "").strip() or None,
-        k=top_k,
-        force=force,
-        scope={
-            "collections": [coll] if coll else [],
-            "item": list(item_keys or []),
-            "year_from": year_from,
-            "year_to": year_to,
-            "after_item": after_item,
-        },
-        client=get_client(cfg),
-        embedder=validate_embedder(cfg),
-        index=index,
-        ledger=ledger,
-    )
-    folder = write_pack(cfg, pack)
-    _attach_result(
-        cfg,
-        cmd_id,
-        {
-            "stamp": pack.stamp,
-            "pack": str(folder),
-            "questions": pack.questions,
-            "answered": pack.answered,
-            "partial": pack.partial,
-            "not_found": pack.not_found,
-            "failed": pack.failed,
-        },
-    )
-
-
-def summarize(
-    cfg: Config,
-    cmd_id: str,
-    *,
-    collection: str,
-    year_from: int | None,
-    year_to: int | None,
-    limit: int | None,
-    max_new: int | None,
-    dest: str,
-    order: str,
-    force: bool,
-    item_keys: list[str] | None = None,
-) -> None:
-    if summarize_fn is not None:
-        result = summarize_fn(
-            cfg,
-            cmd_id,
-            collection=collection,
-            year_from=year_from,
-            year_to=year_to,
-            limit=limit,
-            max_new=max_new,
-            dest=dest,
-            order=order,
-            force=force,
-            item_keys=item_keys,
-        )
-        if result is not None:
-            _attach_result(cfg, cmd_id, result)
-        return
-    from ..catalogue import open_library
-    from ..llm.preflight import validate_llm_for_verb
-    from ..scope import load_scope
-    from ..store import Manifest
-    from ..summarize import order_items, summarize_items
-
-    validate_llm_for_verb(cfg)
-    backend = open_library(cfg)
-    loaded = load_scope(
-        backend,
-        collections=[collection] if collection.strip() else [],
-        library=not bool(collection.strip()),
-        year_from=year_from,
-        year_to=year_to,
-        pdfs_only=True,
-    )
-    items = order_items(loaded.items, order)
-    if item_keys:
-        keyset = set(item_keys)
-        items = [it for it in items if it.key in keyset]
-    if limit:
-        items = items[:limit]
-    if not items:
-        _attach_result(cfg, cmd_id, {"error": "no items", "queued": 0})
-        rec = commands.read_command(cfg, cmd_id) or {}
-        rec["status"] = "failed"
-        rec["error"] = "no items in scope"
-        commands.write_command(cfg, rec)
-        return
-    batch = summarize_items(
-        cfg,
-        items,
-        Manifest(cfg.manifest_path),
-        backend,
-        dest=dest,
-        force=force,
-        max_new=max_new,
-    )
-    if batch.fatal:
-        raise ValueError(batch.fatal)
-    _attach_result(
-        cfg,
-        cmd_id,
-        {
-            "summarized": batch.summarized,
-            "failed": batch.failed,
-            "skipped": batch.skipped,
-            "not_reached": batch.not_reached,
-            "dest": dest,
-            "scope": loaded.label,
-            "queued": len(items),
-        },
-    )
-
-
-def synthesize(
-    cfg: Config,
-    cmd_id: str,
-    *,
-    collection: str,
-    year_from: int | None,
-    year_to: int | None,
-    limit: int | None,
-    dest: str,
-    dry_run: bool,
-    force: bool,
-) -> None:
-    if synthesize_fn is not None:
-        result = synthesize_fn(
-            cfg,
-            cmd_id,
-            collection=collection,
-            year_from=year_from,
-            year_to=year_to,
-            limit=limit,
-            dest=dest,
-            dry_run=dry_run,
-            force=force,
-        )
-        _attach_result(cfg, cmd_id, result)
-        return
-    from ..catalogue import open_library
-    from ..config import wants_disk, wants_zotero
-    from ..llm import get_client
-    from ..llm.preflight import validate_llm_for_verb
-    from ..scope import load_scope
-    from ..synthesize import (
-        prepare_synthesis,
-        report_is_current,
-        write_synthesis,
-    )
-
-    validate_llm_for_verb(cfg)
-    if wants_zotero(dest) and not collection.strip() and not dry_run:
-        raise ValueError("Pass a collection to file the Zotero note, or dest=disk.")
-    backend = open_library(cfg)
-    loaded = load_scope(
-        backend,
-        collections=[collection] if collection.strip() else [],
-        library=not bool(collection.strip()),
-        year_from=year_from,
-        year_to=year_to,
-    )
-    items = list(loaded.items)
-    items.sort(
-        key=lambda it: (it.year or 9999, (it.first_author or "").lower(), it.key)
-    )
-    if limit:
-        items = items[:limit]
-    targets = []
-    if wants_zotero(dest) and collection.strip():
-        targets = [backend.resolve_collection(collection)]
-    slug_parts: list[str] = []
-    if not collection.strip():
-        slug_parts.append("library")
-    else:
-        slug_parts.append(collection)
-    if year_from is not None or year_to is not None:
-        slug_parts.append(f"{year_from or ''}-{year_to or ''}")
-    prepared = prepare_synthesis(cfg, items, backend, slug_parts)
-    on_disk = sum(1 for src in prepared.sources if src.origin == "disk")
-    from_note = sum(1 for src in prepared.sources if src.origin == "note")
-    if dry_run:
-        _attach_result(
-            cfg,
-            cmd_id,
-            {
-                "dry_run": True,
-                "slug": prepared.slug,
-                "sources_disk": on_disk,
-                "sources_note": from_note,
-                "missing": len(prepared.missing),
-                "chunks": len(prepared.chunks),
-                "html_path": str(cfg.reports_dir / f"{prepared.slug}.html")
-                if wants_disk(dest)
-                else "",
-            },
-        )
-        return
-    if not prepared.sources:
-        _attach_result(
-            cfg,
-            cmd_id,
-            {
-                "dry_run": False,
-                "slug": prepared.slug,
-                "sources_disk": 0,
-                "sources_note": 0,
-                "missing": len(prepared.missing),
-                "skipped": "no_summaries",
-            },
-        )
-        return
-    if not force and report_is_current(cfg, prepared.slug, prepared.sources, dest=dest):
-        _attach_result(
-            cfg,
-            cmd_id,
-            {
-                "dry_run": False,
-                "slug": prepared.slug,
-                "sources_disk": on_disk,
-                "sources_note": from_note,
-                "skipped": "current",
-            },
-        )
-        return
-    written = write_synthesis(
-        cfg,
-        sources=prepared.sources,
-        missing=prepared.missing,
-        scope=loaded.label,
-        slug=prepared.slug,
-        dest=dest,
-        targets=targets,
-        backend=backend,
-        client=get_client(cfg),
-    )
-    _attach_result(
-        cfg,
-        cmd_id,
-        {
-            "dry_run": False,
-            "slug": prepared.slug,
-            "chunks": written.n_chunks,
-            "sources_disk": on_disk,
-            "sources_note": from_note,
-            "missing": len(prepared.missing),
-        },
-    )
-
-
 def set_snowball_keep(cfg: Config, run_id: str, dois: list[str], keep: bool) -> None:
     import json
 
     from ..snowball.queue import load_queue
 
     dest, rows = load_queue(cfg.state_dir, run_id)
-    doi_set = {d.strip().lower() for d in dois if d.strip()}
+    from ..resolve import doi_key
+
+    doi_set = {k for d in dois if (k := doi_key(d))}
     path = dest / "candidates.jsonl"
     out_lines: list[str] = []
     for row in rows:
-        if (row.ids.get("doi") or "").strip().lower() in doi_set:
+        if doi_key(row.ids.get("doi")) in doi_set:
             row.keep = keep
         out_lines.append(json.dumps(row.to_dict(), ensure_ascii=False))
     path.write_text("\n".join(out_lines) + "\n", encoding="utf-8")

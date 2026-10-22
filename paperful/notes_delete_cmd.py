@@ -31,7 +31,7 @@ def run_notes_delete(
     config: Path | None,
     fmt: str,
 ) -> None:
-    from . import cli as cli_mod
+    from . import cli_runtime as cli_mod
     from .agent_json import batch_exit, envelope
     from .notes import NOTE_TYPES, apply_delete, collect, select
 

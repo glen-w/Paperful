@@ -2,11 +2,15 @@
 
 A **local GUI** over the same verbs as the CLI. `docker compose up` (or
 `paperful serve`) binds http://127.0.0.1:8765. Zotero remains the catalogue
-and reader. Grab fetches to `out/`; Attach writes the library.
+and reader. Grab fetches to `out/`. Attach writes the library — you press
+it (manual, the default) or Grab does it (automatic, Settings) when the
+library can be written.
 
 **Status:** shipped. **Ask** is on the default nav (`/ask`;
-opt-in `[rag]` + `[llm]`). A Firefox extension and hosted SaaS are **post-1.0**
-— see [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10).
+opt-in `[rag]` + `[llm]`). An optional unsigned
+[Firefox add-on](firefox.md) saves the page you are reading into `out/`.
+The Zotero Connector stays the way to save into Zotero. Hosted SaaS stays
+later — see [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10).
 
 Jobs, with screenshots: [Walkthroughs](walkthroughs.md)
 ([first fill](first-fill.md), [grow](grow-library.md),
@@ -56,7 +60,7 @@ browser-agent. No built-in scheduler — **Check again** on Discover, not cron.
 | **Health** dot | Worst cached `doctor` status (amber until **System** runs doctor; pages never block on a full doctor) |
 | **Advanced** toggle | Cookie only; reveals extra nav and form fields |
 | **Row actions** | Icon buttons (detail drawer, set collection scope) with the action name as the tooltip |
-| **Long lists** | Discover lists, Ask threads and batches, Briefs archives, and the Repair queue fold into collapsible sections |
+| **Long lists** | Discover uses tabs (Explore / Topic / Grow / People / Queue / Following); Queue paginates. Ask threads and batches, Briefs archives, and the Repair queue fold into collapsible sections |
 
 Layout: table-first rows, native `<dialog>` drawer (no embedded PDF viewer).
 Long jobs return a **command id**; Activity subscribes to `GET /v1/runs/{id}/events` (SSE), with JSON poll fallback via `GET /v1/runs/{id}`.
@@ -67,11 +71,41 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
 
 ## Simple loop
 
-1. **Discover** — **Topic:** keyword search (`snowball search` dry-run queue),
-   per-row Keep/Skip, then **Preview apply** → **Add selected**
-   (`snowball apply`, metadata only). **Fill PDFs** opens Wanted.
+1. **Wanted** — first nav item, and `GET /` lands here. With no collection, or
+   when the library is down, an amber coach line points at **System**.
+   **Missing** rows use miss-surface icons (hover for `MISS_SURFACE_PLAIN`).
+   **Held** / **Have** use the same icon+tooltip pattern for PDF verification
+   (`doi_match`, `doi_mismatch`, `unverified`, `snapshot`; not “% complete”).
+   A library PDF flag with no file on the mirror (`verification` `missing`,
+   “No PDF file on disk”) lands on **Missing** with the missing-file icon.
+   The default tab is the first non-empty bucket (Missing → Held → Have).
+   **Preview** → **Grab** (fetch to the `out/` folder on this computer;
+   selected vs all; Grab passes the same `item_keys` as the preview token).
+   **Manual** (default): **Attach** writes attachable pending PDFs into
+   Zotero (`doi_match` and hand-ticked rows on **Held** with a pending file).
+   The main button skips DOI mismatches and short PDFs (use Advanced Attach
+   to override). CLI `paperful run` still attaches mismatches unless you pass
+   `--strict-pdf-doi`. The label shows **Attach N PDFs** when N are pending;
+   the button is disabled when N is 0 and no rows are ticked. **Attach** needs
+   Zotero 10 or newer; on 7–9, attach files in Zotero. **Automatic** (Settings
+   → **After Grab**, shown only after at least one successful Attach): Grab
+   also attaches when the library supports write. Zotero 7–9 never receives
+   the file from Paperful. DOI mismatch and short PDF still wait for Attach.
+2. **Discover** — Tabs: **Explore**, **Topic**, **Grow** (Advanced),
+   **People**, **Queue** (map + paginated candidates), **Following**.
+   **Topic:** keyword search (`snowball search` dry-run queue), then open
+   **Queue** for per-row Keep/Skip and **Preview apply** → **Add selected**
+   (`snowball apply`, metadata only). **Map** (on Queue) draws that queue
+   before you open a PDF: older + highly cited is foundational, recent +
+   highly cited is influential, recent + fewer citations may be emerging.
+   OpenAlex study designs (RCT, meta-analysis, …) appear as category badges
+   and filter chips on top of those roles. Click a paper to Keep/Skip or
+   expand one hop (references, or papers that cite it).
+   When a [stopping rule](snowball.md#stopping-rules)
+   is on, **Next hop** scores those marks and fetches one more hop
+   (`snowball continue`). **Fill PDFs** opens Wanted.
    **Briefing** / **Digest** write `briefing.md` / `digest.md` on the queue
-   (shown on the page; digests are not auto-created). Advanced can tick
+   (shown on Queue; digests are not auto-created). Advanced can tick
    **File collection note** (`--apply` + collection chip) to file a Zotero
    collection note tagged `paperful:frontier-briefing`. **Keep an eye on this**
    saves a topic watch only when a snowball **profile** is chosen. **People:**
@@ -81,20 +115,10 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
    HTML, **people briefing** (inbox plus OpenAlex recent works / co-authors for
    pollable members; same markdown as CLI `authorwatch briefing`); inbox uses the same Preview → apply pattern
    (`authorwatch apply`). **Check again** re-runs a saved topic watch or
-   person list. Advanced topic watches also offer **Watch briefing** /
-   **Watch digest** (same optional collection note).
-2. **Wanted** — first nav item, and `GET /` lands here. With no collection, or
-   when the library is down, an amber coach line points at **System**.
-   **Missing** rows use miss-surface icons (hover for `MISS_SURFACE_PLAIN`).
-   **Held** / **Have** use the same icon+tooltip pattern for PDF verification
-   (`doi_match`, `doi_mismatch`, `unverified`, `snapshot`; not “% complete”).
-   A library PDF flag with no file on the mirror (`verification` `missing`,
-   “No PDF file on disk”) lands on **Missing** with the missing-file icon.
-   The default tab is the first non-empty bucket (Missing → Held → Have).
-   **Preview** → **Grab** (fetch to `out/` only; selected vs all) → **Attach**
-   (explicit Zotero write for `doi_match` plus hand-ticks). Grab never writes
-   the library. The Attach control stays visible; there is no “attach verified
-   automatically” setting.
+   person list. Topic watches also offer **Preview apply** / **Apply inbox**
+   (`snowball watch apply`). Advanced topic watches offer **Watch briefing** /
+   **Watch digest** (same optional collection note). Cron alert loop:
+   [`keepup`](keepup.md).
 3. **Library** — Nested collection collapsibles with item / missing-PDF counts; target icon sets scope (collection chip). Scoped items paginate (default 50 per page; sizes in `[ui]` — see `config.example.toml`).
 4. **Activity** — Command history + trust line from `last-run.json`.
 5. **System** — `doctor` rows with one next step each.
@@ -105,6 +129,7 @@ Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
 
 Same shell; extra verbs call the same domain entrypoints as the CLI. Discover
 adds snowball kinds (hybrid/doi/orcid/collection), crawl knobs (including
+stop rule, stop eps, stop k, stop max screened, and
 **Twenty writeback** → `cfg.twenty_writeback_listings`), profile save/run,
 resume, briefing, frontier digest, **refs gap**, **ingest-dois**
 (Preview → Apply token), **authors**, and **packs promote**.
@@ -123,7 +148,9 @@ and a questions file upload. If the index is empty, Ask offers a compact
 ingest. **Index** (Advanced): `rag ingest` / `search` when
 `[rag]` is on; **Extract questions** (`rag questions`) and **Already answered?**
 (`rag answered`, `state/rq-answered/`) use the same scope. Collection chip is
-the scope. **Synthesize** on Index when `[llm]` is on.
+the scope. **Synthesize** on Index when `[llm]` is on. Structured IMRaD fields
+(`extract-sections` → `state/sections/`) are **CLI-only** today — mirror PDFs,
+no `[rag].enabled` required; see [rag.md](rag.md#structured-sections-mirror-only).
 
 ![Index: ingest scoped and a passage search run over ocean/BBNJ](_static/workflows/index.png)
 
@@ -157,9 +184,9 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/v1/ask` | Same as MCP `ask` (not linked from simple HTML) |
 | POST | `/v1/gui/noop` | Smoke / readiness for the GUI process |
 | POST | `/wanted/preview` | Review token for Grab (Advanced: year/type/retry/… flags) |
-| POST | `/wanted/grab` | Consume token; fetch to `out/` only (`item_keys` from preview) |
+| POST | `/wanted/grab` | Consume token; fetch to `out/` (`item_keys` from preview). Attaches only when `[ui].attach_mode` is `auto` and the library can write |
 | POST | `/wanted/attach/preview` | Review token for held PDF attach |
-| POST | `/wanted/attach` | Selected keys: attach pending `out/` PDFs. `review_token`: consume Advanced preview |
+| POST | `/wanted/attach` | Selected keys or all attachable pending in scope (no mismatch/short on the main button). `review_token`: consume Advanced preview |
 | POST | `/wanted/recover/preview` | Review token for browser-agent recover |
 | POST | `/wanted/recover` | Consume token; `recover` |
 | POST | `/wanted/handoff` | `list` / `tabs` / `walk` / `watch` (never fetches) |
@@ -167,6 +194,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/wanted/reachout` | Export contact rows; optional RG tabs |
 | POST | `/wanted/summarize` | Enqueue single-item `summarize`; redirect `?run=` |
 | GET | `/item/{key}/summary` | Per-item HTML under `state/summaries/` |
+| POST | `/discover/explore` | Resolve a DOI or title into an explore queue; open Map (picker when title is ambiguous) |
 | POST | `/discover/topic` | Enqueue snowball kind (Advanced) or keyword search |
 | POST | `/discover/profile-save` | Save snowball profile from the topic form |
 | POST | `/discover/refs-gap` | Dry-run refs gap pack for the collection chip |
@@ -176,6 +204,16 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/discover/packs-promote` | Promote a proposed field author pack |
 | POST | `/discover/follow` | Follow ORCID into a list (`authorwatch` run) |
 | POST | `/discover/keep` | Mark queue DOI keep/skip |
+| GET | `/discover/graph` | Citation map JSON for `run_id` (`paperful.citation_graph.v1`); optional `watch_name`, `compare_run` |
+| GET | `/discover/graph/meta` | Collections/tags plus `[ui].citation_map_*` prefs for the map panel |
+| POST | `/discover/graph/expand` | One OpenAlex hop (`refs`, `cites`, or `both`) merged into that queue |
+| POST | `/discover/graph/repair` | Re-link rows to hop-0 seeds via OpenAlex (Keep unchanged) |
+| POST | `/discover/graph/halo` | Library neighbours as ghost overlay (mirror DOIs; not queued) |
+| POST | `/discover/graph/annotate` | Stage tags / note / collection on a queue node (live when already in library) |
+| POST | `/discover/graph/add` | Add one new candidate to the library; optional Find PDF when `citation_map_auto_search` |
+| POST | `/discover/graph/find-pdf` | Grab PDF for one `item_key` |
+| POST | `/discover/graph/remove` | Trash library item for a map node (`citation_map_remove = trash`) |
+| POST | `/discover/keep` | `format=json` or `Accept: application/json` returns `{ graph, keep, doi }` for the map panel |
 | POST | `/discover/check-again` | Re-run topic watch or person list |
 | POST | `/discover/resume` | Enqueue `snowball resume` |
 | POST | `/discover/profile-run` | Enqueue snowball from a named profile |

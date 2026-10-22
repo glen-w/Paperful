@@ -29,7 +29,7 @@ def run_reachout(
     config: Path | None,
     fmt: str,
 ) -> None:
-    from . import cli as cli_mod
+    from . import cli_runtime as cli_mod
     from .author_request import apply_request_rg_override
     from .handoff import (
         HINT_AUTHOR_REQUEST,

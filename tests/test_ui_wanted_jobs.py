@@ -166,7 +166,7 @@ def test_wanted_attach_keys_ignore_stale_preview(tmp_path, monkeypatch):
 
     def fake_attach_run(cfg, *, keys, collection):
         attached.extend(keys)
-        return True, ""
+        return True, "", len(keys)
 
     monkeypatch.setattr(jobs, "attach_run", fake_attach_run)
     client = TestClient(create_app(cfg))

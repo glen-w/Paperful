@@ -81,6 +81,14 @@ def item() -> Item:
     return make_item()
 
 
+def patch_cli_runtime(monkeypatch, **attrs: object) -> None:
+    """Set helpers on ``cli_runtime`` (``cli`` re-exports the same names)."""
+    from paperful import cli_runtime
+
+    for name, value in attrs.items():
+        monkeypatch.setattr(cli_runtime, name, value)
+
+
 Handler = Callable[[httpx.Request], httpx.Response]
 
 

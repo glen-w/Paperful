@@ -74,10 +74,11 @@ def request_from_profile(raw: dict[str, Any], cfg: Config) -> SnowballRequest:
         per_hop_rank=_profile_rank(raw["per_hop_rank"]) if raw.get("per_hop_rank") else None,
         year_from=int(raw["year_from"]) if raw.get("year_from") is not None else None,
         year_to=int(raw["year_to"]) if raw.get("year_to") is not None else None,
-        direction=str(raw.get("direction") or cfg.snowball_direction or "refs"),
+        direction=str(raw.get("direction") or cfg.snowball_direction or "refs+keywords"),
         keyword_limit=raw.get("keyword_limit"),
         keyword_hop_limit=raw.get("keyword_hop_limit"),
         keyword_min_score=raw.get("keyword_min_score"),
+        search_keywords=bool(raw["search_keywords"]) if "search_keywords" in raw else None,
         cites_query=str(raw.get("cites_query") or "").strip(),
         dedupe_scope=str(raw["dedupe_scope"]) if raw.get("dedupe_scope") else None,
         tag_prefix=str(raw["tag_prefix"]) if raw.get("tag_prefix") else None,
@@ -87,6 +88,12 @@ def request_from_profile(raw: dict[str, Any], cfg: Config) -> SnowballRequest:
         types=_strs(raw.get("types")) if "types" in raw else None,
         study_designs=_profile_study_designs(raw.get("study_designs"))
         if "study_designs" in raw
+        else None,
+        map_categories=_profile_map_categories(raw.get("map_categories"))
+        if "map_categories" in raw
+        else None,
+        map_category_defs=_profile_map_category_defs(raw.get("map_category_defs"))
+        if "map_category_defs" in raw
         else None,
         oa_only=bool(raw["oa_only"]) if "oa_only" in raw else None,
         venue_include=_strs(raw.get("venue_include")) if "venue_include" in raw else None,
@@ -102,6 +109,12 @@ def request_from_profile(raw: dict[str, Any], cfg: Config) -> SnowballRequest:
         author_site_preflight=bool(raw["author_site_preflight"])
         if "author_site_preflight" in raw
         else None,
+        stop_rule=str(raw["stop_rule"]).strip() if raw.get("stop_rule") else None,
+        stop_eps=float(raw["stop_eps"]) if raw.get("stop_eps") is not None else None,
+        stop_k=int(raw["stop_k"]) if raw.get("stop_k") is not None else None,
+        stop_tau=float(raw["stop_tau"]) if raw.get("stop_tau") is not None else None,
+        stop_min_points=int(raw["stop_min_points"]) if raw.get("stop_min_points") is not None else None,
+        stop_max_screened=int(raw["stop_max_screened"]) if raw.get("stop_max_screened") is not None else None,
     )
 
 
@@ -126,6 +139,24 @@ def _profile_study_designs(raw: Any) -> tuple[str, ...]:
     from .expand import parse_study_designs
 
     return parse_study_designs(raw)
+
+
+def _profile_map_categories(raw: Any) -> tuple[str, ...]:
+    from .map_categories import parse_map_categories
+
+    try:
+        return parse_map_categories(raw)
+    except ValueError as exc:
+        raise SnowballError(str(exc)) from exc
+
+
+def _profile_map_category_defs(raw: Any) -> tuple[dict[str, Any], ...]:
+    from .map_categories import parse_map_category_defs
+
+    try:
+        return parse_map_category_defs(raw)
+    except ValueError as exc:
+        raise SnowballError(str(exc)) from exc
 
 
 def orcids_from_profile(raw: dict[str, Any]) -> list[str]:

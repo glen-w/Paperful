@@ -213,6 +213,125 @@ def _complete(cfg: Config, client, prompt: str) -> str:
     )
 
 
+_PROBE_SAMPLE = 3
+_REDUCE_PASSES = 3
+
+
+def pack_length_groups(lengths: list[int], budget: int) -> list[int]:
+    """Packed chunk sizes using the same greedy rule as :func:`pack_chunks`."""
+    if not lengths:
+        return []
+    budget = max(1, budget)
+    groups: list[int] = []
+    current_sum = 0
+    current_n = 0
+    for raw_len in lengths:
+        block_len = min(raw_len, budget)
+        sep = 2 if current_n else 0
+        if current_n and current_sum + sep + block_len > budget:
+            groups.append(current_sum)
+            current_sum = block_len
+            current_n = 1
+        else:
+            current_sum += sep + block_len
+            current_n += 1
+    if current_n:
+        groups.append(current_sum)
+    return groups
+
+
+def forecast_reduce(
+    chunk_count: int,
+    output_len: int,
+    budget: int,
+    *,
+    passes: int = _REDUCE_PASSES,
+) -> int:
+    """How many packed chunks remain after up to ``passes`` reduce rounds (1 = fits)."""
+    if chunk_count <= 0:
+        return 0
+    lengths = [output_len] * chunk_count
+    for _ in range(passes):
+        packed = pack_length_groups(lengths, budget)
+        if len(packed) <= 1:
+            return len(packed)
+        lengths = [output_len] * len(packed)
+    return len(pack_length_groups(lengths, budget))
+
+
+def forecast_reduce_variable(
+    chunk_count: int,
+    first_output_len: int,
+    later_output_len: int,
+    budget: int,
+    *,
+    passes: int = _REDUCE_PASSES,
+) -> int:
+    """Like :func:`forecast_reduce` but later passes use a different output size."""
+    if chunk_count <= 0:
+        return 0
+    lengths = [first_output_len] * chunk_count
+    for level in range(passes):
+        packed = pack_length_groups(lengths, budget)
+        if len(packed) <= 1:
+            return len(packed)
+        out = first_output_len if level == 0 else later_output_len
+        lengths = [out] * len(packed)
+    return len(pack_length_groups(lengths, budget))
+
+
+def _chunk_prompt(chunk: str) -> str:
+    return f"{_CHUNK_PROMPT}\n\n---\nSummaries:\n{chunk}"
+
+
+def _probe_reduce_fit(
+    cfg: Config,
+    client,
+    *,
+    sample_parts: list[str],
+    budget: int,
+    first_level_count: int,
+) -> None:
+    """Raise :class:`ReduceCapError` when a sample shows map-reduce cannot finish."""
+    if not sample_parts or first_level_count <= 1:
+        return
+    sample_lens = [len(part) for part in sample_parts]
+    avg_len = sum(sample_lens) // len(sample_lens)
+    max_len = max(sample_lens)
+
+    if forecast_reduce(first_level_count, avg_len, budget) > 1:
+        raise ReduceCapError(
+            "synthesis forecast: sample reduce replies average "
+            f"{avg_len} chars across {first_level_count} first-level chunks, "
+            f"but packing still leaves more than one chunk after "
+            f"{_REDUCE_PASSES} reduce passes — narrow the scope or raise "
+            "[synthesize].max_context_chars"
+        )
+
+    if forecast_reduce(first_level_count, max_len, budget) <= 1:
+        return
+
+    packed_sample = pack_chunks(sample_parts, budget)
+    probe_in = packed_sample[0] if packed_sample else ""
+    probe_out = _complete(cfg, client, _chunk_prompt(probe_in))
+    in_len = max(len(probe_in), 1)
+    ratio = len(probe_out) / in_len
+    later_len = min(budget, max(1, int(ratio * budget)))
+    refined = forecast_reduce_variable(
+        first_level_count, max_len, later_len, budget
+    )
+    if refined <= 1:
+        return
+    raise ReduceCapError(
+        "synthesis forecast: sample reduce replies average "
+        f"{avg_len} chars (max {max_len}) across {first_level_count} first-level "
+        f"chunks; probe ratio {ratio:.2f} implies ~{later_len} chars per later "
+        f"batch, but packing still leaves {refined} chunks after "
+        f"{_REDUCE_PASSES} reduce passes — narrow the scope or raise "
+        "[synthesize].max_context_chars"
+    )
+
+
 def map_reduce(
     cfg: Config,
     client,
@@ -225,18 +344,35 @@ def map_reduce(
     budget = body_budget(cfg, template)
     chunks = pack_chunks(blocks, budget)
     first = len(chunks)
-    for level in range(3):
+    for level in range(_REDUCE_PASSES):
         if len(chunks) == 1:
             kind = "Summaries" if level == 0 else "Batch syntheses"
             prompt = f"{template}\n\n---\n{kind}:\n{chunks[0]}"
             return to_note_html(_complete(cfg, client, prompt)), first
         parts: list[str] = []
-        for index, chunk in enumerate(chunks, 1):
+        start = 0
+        if level == 0 and len(chunks) > 1:
+            sample_n = min(_PROBE_SAMPLE, len(chunks))
+            for index in range(sample_n):
+                if log:
+                    log(f"level {level + 1} chunk {index + 1}/{len(chunks)}")
+                parts.append(_complete(cfg, client, _chunk_prompt(chunks[index])))
+            _probe_reduce_fit(
+                cfg,
+                client,
+                sample_parts=parts,
+                budget=budget,
+                first_level_count=first,
+            )
+            start = sample_n
+        for index in range(start, len(chunks)):
             if log:
-                log(f"level {level + 1} chunk {index}/{len(chunks)}")
-            prompt = f"{_CHUNK_PROMPT}\n\n---\nSummaries:\n{chunk}"
-            parts.append(_complete(cfg, client, prompt))
+                log(f"level {level + 1} chunk {index + 1}/{len(chunks)}")
+            parts.append(_complete(cfg, client, _chunk_prompt(chunks[index])))
         chunks = pack_chunks(parts, budget)
+    if len(chunks) == 1:
+        prompt = f"{template}\n\n---\nBatch syntheses:\n{chunks[0]}"
+        return to_note_html(_complete(cfg, client, prompt)), first
     raise ReduceCapError(
         "synthesis still exceeds the context budget after 3 reduce passes; "
         "narrow the scope or raise [synthesize].max_context_chars"

@@ -174,6 +174,47 @@ def test_snowball_default_tags(tmp_path):
     assert load_config(p).snowball_default_tags == ("bbnj", "grey")
 
 
+def test_keepup_and_map_categories_from_toml(tmp_path):
+    bare = Config()
+    assert bare.keepup_interval_days == 7
+    assert "evidence-synthesis" in bare.snowball_map_categories
+    p = tmp_path / "config.toml"
+    p.write_text(
+        'email = "me@example.org"\n\n'
+        "[keepup]\ninterval_days = 3\n\n"
+        "[snowball]\n"
+        'map_categories = ["trials", "protocols"]\n'
+        "map_category_defs = [\n"
+        '  { id = "grey", label = "Grey", any_types = ["report"] },\n'
+        "]\n",
+        encoding="utf-8",
+    )
+    cfg = load_config(p)
+    assert cfg.keepup_interval_days == 3
+    assert cfg.snowball_map_categories == ("trials", "protocols")
+    assert any(item.get("id") == "grey" for item in cfg.snowball_map_category_defs)
+
+
+def test_ui_citation_map_defaults_and_toml(tmp_path):
+    bare = Config()
+    assert bare.ui_citation_map_edit == "both"
+    assert bare.ui_citation_map_auto_search is False
+    assert bare.ui_citation_map_remove == "trash"
+    p = tmp_path / "config.toml"
+    p.write_text(
+        'email = "me@example.org"\n\n'
+        "[ui]\n"
+        'citation_map_edit = "off"\n'
+        "citation_map_auto_search = true\n"
+        'citation_map_remove = "trash"\n',
+        encoding="utf-8",
+    )
+    cfg = load_config(p)
+    assert cfg.ui_citation_map_edit == "off"
+    assert cfg.ui_citation_map_auto_search is True
+    assert cfg.ui_citation_map_remove == "trash"
+
+
 def test_remarks_surface(tmp_path):
     p = tmp_path / "config.toml"
     p.write_text('email = "me@example.org"\n\n[remarks]\nsurface = "tag"\n')
@@ -194,6 +235,23 @@ def test_example_config_toml_parses_and_omits_scihub_by_default():
     assert cfg.out_dir == (repo_cfg.parent / "out").resolve()
     assert cfg.state_dir == (repo_cfg.parent / "state").resolve()
     assert isinstance(cfg, Config)
+
+
+def test_extension_table_parses_and_rejects(tmp_path):
+    p = tmp_path / "c.toml"
+    p.write_text(
+        '[extension]\nsnapshot = "off"\ncollection = "Inbox"\nconcurrency = 4\n'
+    )
+    cfg = load_config(p)
+    assert cfg.extension_snapshot == "off"
+    assert cfg.extension_collection == "Inbox"
+    assert cfg.extension_concurrency == 4
+    p.write_text("[extension]\nconcurrency = 9\n")
+    with pytest.raises(ValueError):
+        load_config(p)
+    p.write_text('[extension]\nsnapshot = "always"\n')
+    with pytest.raises(ValueError):
+        load_config(p)
 
 
 def test_mirror_modes_parse_and_reject(tmp_path):
@@ -253,6 +311,26 @@ def test_rag_table_is_parsed_and_clamped(tmp_path):
     assert cfg.rag_model == "qwen3:8b"
 
 
+def test_extract_sections_table_is_parsed(tmp_path):
+    from paperful.config import _from_dict
+
+    cfg = _from_dict(
+        {
+            "extract_sections": {
+                "llm": True,
+                "raw_map": False,
+                "max_field_chars": 9000,
+                "fields": ["abstract", "methodology"],
+            }
+        },
+        tmp_path / "config.toml",
+    )
+    assert cfg.extract_sections_llm is True
+    assert cfg.extract_sections_raw_map is False
+    assert cfg.extract_sections_max_field_chars == 9000
+    assert cfg.extract_sections_fields == ("abstract", "methodology")
+
+
 @pytest.mark.parametrize(
     "table",
     [{"ocr": "always"}, {"parser": "pymupdf"}, {"embed_provider": "openai"}, {"embed_model": " "}],
@@ -279,3 +357,25 @@ def test_nested_tables_apply_through_config_tables(tmp_path, monkeypatch):
     cfg = _from_dict({"llm": {"enabled": True}}, tmp_path / "config.toml")
     assert seen == [True]
     assert cfg.llm_enabled is True
+
+
+def test_inbox_route_keys_parse(tmp_path):
+    from paperful.config import _from_dict
+
+    cfg = _from_dict(
+        {
+            "inbox": {
+                "route": "gated",
+                "llm_route": "when_thin",
+                "route_min_confidence": 0.8,
+                "route_auto_min": 0.99,
+            }
+        },
+        tmp_path / "config.toml",
+    )
+    assert cfg.inbox_route == "gated"
+    assert cfg.inbox_llm_route == "when_thin"
+    assert cfg.inbox_route_min_confidence == 0.8
+    assert cfg.inbox_route_auto_min == 0.99
+    with pytest.raises(ValueError):
+        _from_dict({"inbox": {"route": "maybe"}}, tmp_path / "config.toml")

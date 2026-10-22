@@ -390,7 +390,7 @@ def run_snowball_search(
         depth=depth,
         year_from=year_from,
         year_to=year_to,
-        direction=cfg.snowball_direction or "refs",
+        direction=cfg.snowball_direction or "refs+keywords",
     )
     console = Console(file=sys.stderr, highlight=False, quiet=True)
     try:

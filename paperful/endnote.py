@@ -18,6 +18,7 @@ from typing import Any
 
 from .attach import AttachResult
 from .config import Config
+from .exclude_backend import ExcludeMixin
 from .interop.endnote_xml import records_to_endnote_xml
 from .interop.types import endnote_db_to_zotero, endnote_to_zotero, zotero_to_endnote
 from .library import ChangeSet, LibraryError
@@ -121,7 +122,7 @@ def _fetchall(conn: sqlite3.Connection, sql: str, key: str):
     return rows
 
 
-class EndNoteBackend:
+class EndNoteBackend(ExcludeMixin):
     """Read the local EndNote library; stage XML bundles for write-back."""
 
     def __init__(self, cfg: Config, conn: sqlite3.Connection | None = None):
@@ -139,6 +140,34 @@ class EndNoteBackend:
         self._pending: list[dict[str, Any]] = []
         self._pending_by_key: dict[str, dict[str, Any]] = {}
         self._seq = 0
+
+    def _item_collection_keys(self, item_key: str) -> list[str]:
+        """Resolve live + pending collection_paths to collection keys."""
+        cols = self.collections()
+        by_path = {c.path: c.key for c in cols.values()}
+        paths: list[str] = []
+        rec = self._pending_by_key.get(item_key)
+        if rec is not None:
+            paths.extend(str(p) for p in (rec.get("collection_paths") or []) if p)
+        else:
+            item = self.get_item(item_key)
+            if item is not None:
+                paths.extend(
+                    p for p in item.collection_paths if p and p != UNCOLLECTED
+                )
+        keys: list[str] = []
+        seen: set[str] = set()
+        for path in paths:
+            key = by_path.get(path)
+            if key is None and path:
+                # Invented path keys from ensure_collection_path.
+                candidate = "path:" + path
+                if candidate in cols:
+                    key = candidate
+            if key and key not in seen:
+                seen.add(key)
+                keys.append(key)
+        return keys
 
     def _db(self) -> sqlite3.Connection:
         if self._conn is None:
@@ -329,6 +358,7 @@ class EndNoteBackend:
         note: str | None = None,
     ) -> AttachResult:
         del title, note
+        self._check_item_op("attach", item_key)
         if not pdf_path.is_file():
             return AttachResult(False, reason=f"file missing: {pdf_path}", code="other")
         rec = self._pending_by_key.get(item_key)
@@ -340,6 +370,7 @@ class EndNoteBackend:
         )
 
     def apply_patch(self, item_key: str, fields: dict[str, Any]) -> None:
+        self._check_item_op("update", item_key)
         rec = self._pending_by_key.get(item_key) or self._stage_from_live(item_key)
         mapping = {
             "doi": "doi",
@@ -407,6 +438,7 @@ class EndNoteBackend:
         return None
 
     def create_or_update_note(self, item_key: str, html: str, tag: str) -> str:
+        self._check_item_op("notes", item_key)
         rec = self._pending_by_key.get(item_key) or self._stage_from_live(item_key)
         notes = rec.setdefault("notes", [])
         for note in notes:
@@ -422,6 +454,7 @@ class EndNoteBackend:
 
     def replace_prefixed_tag(self, item_key: str, prefix: str, tag: str) -> None:
         """Replace keywords that start with ``prefix`` on the staged import record."""
+        self._check_item_op("tags", item_key)
         rec = self._pending_by_key.get(item_key) or self._stage_from_live(item_key)
         want = prefix.strip().lower()
         kept: list[dict[str, str]] = []
@@ -441,6 +474,7 @@ class EndNoteBackend:
     def create_or_update_collection_note(
         self, collection_key: str, html: str, tags: list[str]
     ) -> str:
+        self._check_collection_op("collection_notes", collection_key)
         lookup = tags[-1] if tags else "paperful-report"
         rec = {
             "item_type": "document",
@@ -457,18 +491,21 @@ class EndNoteBackend:
 
     def ensure_collection_path(self, path: str) -> str:
         """Groups are not created in EndNote XML; the path is stored as the Label."""
+        cleaned = path.strip().strip("/")
+        self._check_path_op("ensure_path", cleaned)
         cols = self.collections()
-        found = next((c for c in cols.values() if c.path == path), None)
+        found = next((c for c in cols.values() if c.path == cleaned), None)
         if found:
+            self._check_collection_op("ensure_path", found.key)
             return found.key
-        key = "path:" + path
-        name = path.rsplit("/", 1)[-1]
-        parent_path = path.rsplit("/", 1)[0] if "/" in path else None
+        key = "path:" + cleaned
+        name = cleaned.rsplit("/", 1)[-1]
+        parent_path = cleaned.rsplit("/", 1)[0] if "/" in cleaned else None
         parent = None
         if parent_path:
             parent = self.ensure_collection_path(parent_path)
         cols[key] = Collection(
-            key=key, name=name, parent=parent, path=path, raw_path=path
+            key=key, name=name, parent=parent, path=cleaned, raw_path=cleaned
         )
         return key
 
@@ -484,11 +521,17 @@ class EndNoteBackend:
         for ck in data.get("collections") or []:
             col = self.collections().get(str(ck))
             if col:
+                self._check_collection_op("create", col.key)
+                self._check_path_op("create", col.path)
                 paths.append(col.path)
             elif str(ck).startswith("path:"):
-                paths.append(str(ck)[5:])
+                path = str(ck)[5:]
+                self._check_path_op("create", path)
+                paths.append(path)
             elif "/" in str(ck):
-                paths.append(str(ck))
+                path = str(ck)
+                self._check_path_op("create", path)
+                paths.append(path)
         rec = {
             "item_type": data.get("itemType") or "document",
             "title": data.get("title") or "",

@@ -11,6 +11,8 @@ from paperful.config import Config
 from paperful.serve import create_app, fastapi_available
 from paperful.ui import jobs
 
+pytestmark = pytest.mark.smoke
+
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
 def test_noop_enqueue_and_poll(tmp_path):

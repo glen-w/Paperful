@@ -5,10 +5,10 @@
 Operators clone and `docker compose build`. Contributors use `uv`.
 [Docker](docs/docker.md) packs Python, Poppler, and Chromium
 (`PAPERFUL_IMAGE_MODE=light` or `heavy`); Zotero and headed session login
-still run on the host. A release checklist: version in `pyproject.toml`
-matches the README badge and the website footer, CHANGELOG has a section,
-and `docs/releases.md` still says install is clone plus Compose (no pull,
-no pip) unless a real artifact exists.
+still run on the host. A release checklist: run `make pre-release` (version in `pyproject.toml`,
+`CHANGELOG.md` section, website footer, and a clean `dist/` for that version),
+then tag or publish. PyPI is live — document pip when you change install paths
+in `docs/releases.md`.
 
 ```sh
 git clone https://github.com/glen-w/Paperful.git
@@ -38,7 +38,9 @@ uv run pytest
 DOCS_STRICT=1 make docs   # after: uv sync --extra docs
 ```
 
-CI runs pytest on every push and PR (`.github/workflows/ci.yml`). The Docs
+CI runs pytest with coverage on every push and PR (`.github/workflows/ci.yml`).
+A green push to `main` refreshes `badges/coverage.json`, which the README
+coverage badge reads. The Docs
 workflow (`.github/workflows/docs.yml`) runs the guide corpus tests and a strict
 Sphinx build; pushes to `main` that touch `docs/` or `website/` also redeploy
 Pages (`.github/workflows/pages.yml`).
@@ -51,7 +53,7 @@ and is documented in [docs/e2e-nba.md](docs/e2e-nba.md). Do not enable it in CI.
 
 **Issues to watch:** CI colours CLI help (use `plain_text()` for flag assertions),
 the dev group needs a LanceDB-compatible platform, and the Compose **docker** job
-is not a substitute for the full pytest job. Details:
+is not a substitute for `pytest -m smoke`. Details:
 [developer guide — CI and local pitfalls](docs/developer.md#ci-and-local-pitfalls).
 
 ## Pull requests

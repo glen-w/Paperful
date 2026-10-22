@@ -691,13 +691,46 @@ def run_checks(
         )
 
     checks.append(_grey_playbooks_check(cfg))
+    exclude_cols = None
+    if zl is not None and info is not None:
+        try:
+            exclude_cols = zl.collections()
+        except Exception:
+            exclude_cols = None
+    checks.append(_exclude_check(cfg, collections=exclude_cols))
     checks.extend(_llm_checks(cfg))
     checks.extend(_rag_checks(cfg))
     checks.append(_snowball_check(cfg))
+    checks.append(_openalex_store_check(cfg))
     checks.append(_author_packs_check(cfg))
     checks.append(_authorwatch_check(cfg))
 
     return checks
+
+
+def _openalex_store_check(cfg: Config) -> Check:
+    backend = (cfg.openalex_store_backend or "").strip().lower()
+    if not backend:
+        return Check("openalex store", "green", "off (live API only)")
+    cites = (cfg.openalex_store_cites_index_glob or "").strip()
+    if not cites:
+        cites = os.environ.get("OPENALEX_STORE_CITES_INDEX_GLOB", "").strip()
+    works = (cfg.openalex_store_parquet_glob or "").strip()
+    detail = f"{backend}"
+    if works:
+        detail += " · works glob set"
+    if cites:
+        return Check(
+            "openalex store",
+            "green",
+            f"{detail} · cites index set (DOI/id + citing from snapshot)",
+        )
+    return Check(
+        "openalex store",
+        "amber",
+        f"{detail} · DOI/id only — run paperful openalex-store build-cites "
+        "and set cites_index_glob for citing under API budget",
+    )
 
 
 def _snowball_check(cfg: Config, *, probe: Callable[[str], str] | None = None) -> Check:
@@ -1020,6 +1053,42 @@ _NAMED_GREY_PACKS = (
     "bbnj-doalos-prepcom",
     "isa-deepdata",
 )
+
+
+def _exclude_check(
+    cfg: Config, *, collections: dict | None = None
+) -> Check:
+    """Summarise [[exclude]] protect rules; amber when a path/key is unmatched."""
+    from .exclude import ExcludeGuard
+
+    rules = getattr(cfg, "exclude_rules", ()) or ()
+    if not rules:
+        return Check("exclude", "green", "none")
+    parts: list[str] = []
+    for rule in rules:
+        label = rule.path or (f"key:{rule.key}" if rule.key else "?")
+        extra = []
+        if rule.skip_library_scope:
+            extra.append("skip-scope")
+        if not rule.protect_items:
+            extra.append("items-open")
+        suffix = f" [{', '.join(extra)}]" if extra else ""
+        parts.append(f"{label} ({rule.mode}){suffix}")
+    detail = "; ".join(parts)
+    if len(detail) > 120:
+        detail = f"{len(rules)} rule(s): " + "; ".join(
+            f"{(r.path or r.key or '?')}={r.mode}" for r in rules
+        )
+    if collections is not None:
+        guard = ExcludeGuard(rules, collections)
+        if guard.unmatched:
+            missing = ", ".join(r.label() for r in guard.unmatched)
+            return Check(
+                "exclude",
+                "amber",
+                f"{detail} — unmatched: {missing}",
+            )
+    return Check("exclude", "green", detail)
 
 
 def _grey_playbooks_check(cfg: Config) -> Check:

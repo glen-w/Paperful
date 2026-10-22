@@ -30,7 +30,7 @@ version of this story.
 3. **Look for a free copy first.** Open-access indexes, then the item’s own
    URL, then campus access when you have it. News and blog items can be
    printed to PDF. Odd hosts use [playbooks](sources.md) you write, or recipes
-   learned on this machine ([sessions](sessions.md)).
+   learned on your computer ([sessions](sessions.md)).
 4. **Use your library login when you have it.** Log in once in Chrome or
    Edge. `run` reuses that campus session through EZProxy. Same pattern for
    Google Scholar if you opt in. See [Using your Scholar or library login](#using-your-scholar-or-library-login).
@@ -38,11 +38,12 @@ version of this story.
    the record already knows — a DOI, an arXiv id, a publisher URL. If a site
    says slow down, Paperful waits. If a site keeps blocking, that source is
    paused. See [Slowing down](#slowing-down).
-6. **Save on this machine first.** The PDF lands under `out/` with a
+6. **Save on your computer first.** The PDF lands under `out/` with a
    provenance stamp (`paperful oa:unpaywall`, `campus:ezproxy`, …) and a
    readable parent line (“Free copy from Unpaywall.”).
-7. **Attach** into Zotero 10+ when you ask. Older Zotero still gets the file
-   on disk. Sparse one-page stubs are dropped; denser one-pagers wait for
+7. **Attach** into Zotero 10 or newer when you ask, or automatically on Grab
+   when Settings is automatic. Zotero 7–9 still gets the file on disk only.
+   Sparse one-page stubs are dropped; denser one-pagers wait for
    `attach --allow-short-pdf`. [Wrong-work PDFs](research-ops.md#wrong-work-pdfs).
    Not every paywalled or DOI-less item comes back.
 
@@ -84,8 +85,10 @@ patches on disk; `--apply` writes them to the catalogue. `run` never writes
 bibliographic fields.
 
 **If you want notes**, `summarize` writes a grounded note from the PDF text
-(local model, off until you enable it). `synthesize` reviews those notes for
-a collection. Scans need a text layer first. [LLM](llm.md).
+(off until you enable `[llm]` — usually **Ollama** on your computer, or
+**LiteLLM** for a hosted API). `synthesize` reviews those notes for a
+collection. Scans need a text layer first. Scale and cost:
+[AI](ai.md) · [LLM](llm.md).
 
 `paperful all` is gaps → **run** → lint → fix → summarise. Dedupe is not in
 that chain; run it before a messy collection. [Workflows](workflows.md).
@@ -130,7 +133,7 @@ browser follows the PDF link or download control before giving up. Scholar
 fetches use the same browser profile, because Google often keys a CAPTCHA
 to the browser, not just cookies.
 
-Those logins live on this machine. Do not commit them or paste them into
+Those logins live on your computer. Do not commit them or paste them into
 chat. [Sessions](sessions.md) · [Campus EZProxy](ezproxy.md).
 
 ## What you get back
@@ -138,7 +141,7 @@ chat. [Sessions](sessions.md) · [Campus EZProxy](ezproxy.md).
 A PDF on disk, when a copy could be reached, with a readable source line on
 the item. Optional: a grounded summary note, then a collection-level review
 of those notes. A folder copy you can back up or export as RIS, BibTeX, or
-EndNote XML — not a sync service.
+EndNote XML.
 
 Why this shape: [Why Paperful](why.md). Commands: [Commands](commands.md).
 Architecture of the same flow: [Architecture](architecture.md). The same verbs

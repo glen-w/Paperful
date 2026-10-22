@@ -264,6 +264,14 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+def _paperful_command(root: Path) -> list[str]:
+    """Prefer repo ``.venv/bin/paperful`` when present (no ``uv`` required)."""
+    venv_bin = root / ".venv" / "bin" / "paperful"
+    if venv_bin.is_file():
+        return [str(venv_bin)]
+    return ["uv", "run", "paperful"]
+
+
 class E2ERunner:
     def __init__(
         self,
@@ -274,6 +282,8 @@ class E2ERunner:
         from_phase: str = "doctor",
         only_phase: str | None = None,
         dry_run_search: bool = False,
+        fetch_browser_agent: bool = True,
+        fetch_camofox: bool | None = None,
         paperful: Callable[..., subprocess.CompletedProcess[str]] | None = None,
         env: dict[str, str] | None = None,
     ) -> None:
@@ -285,6 +295,8 @@ class E2ERunner:
         self.from_phase = from_phase
         self.only_phase = only_phase
         self.dry_run_search = dry_run_search
+        self.fetch_browser_agent = fetch_browser_agent
+        self.fetch_camofox = fetch_camofox
         self._paperful = paperful or self._default_paperful
         self.env = env if env is not None else dict(os.environ)
         # Child paperful processes inherit a pipe; unbuffered stdio keeps phase
@@ -313,7 +325,7 @@ class E2ERunner:
     def _default_paperful(
         self, args: list[str], *, phase: str = "paperful", **kwargs: Any
     ) -> subprocess.CompletedProcess[str]:
-        cmd = ["uv", "run", "paperful", *args]
+        cmd = [*_paperful_command(self.root), *args]
         cwd = str(self.root)
         proc = subprocess.Popen(
             cmd,
@@ -635,20 +647,28 @@ class E2ERunner:
         return self._record(result)
 
     def phase_run_fetch(self) -> PhaseResult:
+        argv = [
+            "run",
+            "-C",
+            self.plan.collection,
+            "--year-from",
+            str(self.plan.year_from),
+            "--year-to",
+            str(self.plan.year_to),
+            "--try-all",
+            "--retry-failed",
+            "--upgrade-linked",
+        ]
+        if self.fetch_camofox is True:
+            argv.append("--camofox")
+        elif self.fetch_camofox is False:
+            argv.append("--no-camofox")
+        if self.fetch_browser_agent:
+            argv.append("--browser-agent")
+        else:
+            argv.append("--no-browser-agent")
         result, _ = self._run_cmd(
-            [
-                "run",
-                "-C",
-                self.plan.collection,
-                "--year-from",
-                str(self.plan.year_from),
-                "--year-to",
-                str(self.plan.year_to),
-                "--try-all",
-                "--retry-failed",
-                "--upgrade-linked",
-                "--browser-agent",
-            ],
+            argv,
             phase="run_fetch",
             required=True,
             want_json=True,
@@ -1002,6 +1022,32 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Reuse an existing state/e2e/<run-id> (or legacy state/e2e-nba/) directory.",
     )
+    parser.add_argument(
+        "--browser-agent",
+        dest="fetch_browser_agent",
+        action="store_true",
+        default=None,
+        help="Pass --browser-agent on run_fetch (default: on).",
+    )
+    parser.add_argument(
+        "--no-browser-agent",
+        dest="fetch_browser_agent",
+        action="store_false",
+        help="Pass --no-browser-agent on run_fetch (skip LLM browser-use lane).",
+    )
+    parser.add_argument(
+        "--camofox",
+        dest="fetch_camofox",
+        action="store_true",
+        default=None,
+        help="Pass --camofox on run_fetch (needs [camofox].enabled and server).",
+    )
+    parser.add_argument(
+        "--no-camofox",
+        dest="fetch_camofox",
+        action="store_false",
+        help="Pass --no-camofox on run_fetch.",
+    )
     args = parser.parse_args(argv)
     if os.environ.get("PAPERFUL_E2E") != "1" and not args.force:
         print(
@@ -1022,12 +1068,17 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 2
+    fetch_browser_agent = (
+        True if args.fetch_browser_agent is None else args.fetch_browser_agent
+    )
     runner = E2ERunner(
         plan=plan,
         run_id=args.run_id,
         from_phase=args.from_phase,
         only_phase=args.phase,
         dry_run_search=args.dry_run_search,
+        fetch_browser_agent=fetch_browser_agent,
+        fetch_camofox=args.fetch_camofox,
     )
     return runner.run()
 

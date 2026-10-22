@@ -71,6 +71,7 @@ frontier briefing or note but not under `-C`”, use `paperful coverage`
 | `state/runs/<stamp>-ingest-dois.json` | Created / exists / unresolved / held |
 | `state/last-run.json` | `paperful.run_report.v1` after `run` |
 | `state/snowball/<run-id>/digest.md` | Frontier digest for that queue |
+| `state/snowball/<run-id>/stop.json` | `paperful.snowball.stop.v1` when a stopping rule is on; `stops.jsonl` is the per-hop log |
 | `state/snowball/watches/<name>/digest.md` | Frontier digest for that watch |
 | `state/snowball/<run-id>/briefing.md` | Thin queue export |
 | `state/snowball/watches/<name>/briefing.md` | Thin watch inbox export |
@@ -98,6 +99,6 @@ lookup is [Twenty and SearXNG](snowball.md#twenty-and-searxng).
 ## Out of this playbook
 
 - Silent parent create from inbox (default stays DOI attach)
-- Newsletter / Scholar-alert ingest
-- Firefox extension
-- Newsletter-scale ingest beyond a one-shot `coverage --from-file` check
+- Alert loop / what-cites: [`keepup`](keepup.md) (poll → ingest → briefing; no email; you cron it)
+- Saving the page you are reading ([Firefox add-on](firefox.md); not this playbook)
+- Large-scale alert ingest beyond one-shot `coverage --from-file`

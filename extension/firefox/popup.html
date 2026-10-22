@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Paperful</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="wb-chrome">
+    <span class="brand">
+      <img class="brand-logo" src="icons/icon-48.png" alt="" width="48" height="48">
+      <span class="brand-word">Paperful</span>
+    </span>
+    <nav class="wb-nav" aria-label="Capture">
+      <button type="button" class="nav-btn active" id="show-page">This page</button>
+      <button type="button" class="nav-btn" id="show-tabs">Selected tabs</button>
+    </nav>
+  </header>
+  <p id="status" class="status" role="status"></p>
+  <section id="page-view" class="panel">
+    <p id="page-title" class="item-title"></p>
+    <p id="page-doi" class="chip"></p>
+    <p id="page-meta" class="meta"></p>
+    <p id="page-action" class="chip"></p>
+    <p id="page-maybe" class="lede"></p>
+    <div id="candidates" class="check-list" hidden></div>
+    <label id="unread-label" hidden>
+      <input type="checkbox" id="allow-unread">
+      Zotero didn't answer. Create a mirror item anyway?
+    </label>
+    <label id="pdf-label">
+      <input type="checkbox" id="save-pdf">
+      Save the PDF from this page
+    </label>
+    <label id="lanes-label">
+      <input type="checkbox" id="search-lanes">
+      Search my sources
+    </label>
+    <button type="button" id="save-page">Save</button>
+    <p id="saved-actions" class="toolbar" hidden>
+      <button type="button" class="secondary" id="open-folder">Open folder</button>
+      <button type="button" class="secondary" id="open-wanted">Open in Wanted</button>
+    </p>
+  </section>
+  <section id="tabs-view" class="panel" hidden>
+    <div id="tab-list" class="check-list"></div>
+    <p class="toolbar">
+      <button type="button" class="secondary" id="select-walk">From this walk</button>
+      <button type="button" class="secondary" id="select-all">Select all</button>
+      <button type="button" class="secondary" id="select-none">Select none</button>
+    </p>
+    <label>
+      <input type="checkbox" id="tabs-pdf" checked>
+      Save PDFs the tabs already show
+    </label>
+    <label>
+      <input type="checkbox" id="tabs-lanes">
+      Search my sources
+    </label>
+    <label id="tabs-unread-label" hidden>
+      <input type="checkbox" id="tabs-unread">
+      Zotero didn't answer. Create mirror items anyway?
+    </label>
+    <button type="button" id="review-tabs">Review selected</button>
+    <div id="tab-plans"></div>
+    <button type="button" id="save-tabs" hidden>Save reviewed</button>
+    <p id="tabs-summary" class="lede"></p>
+  </section>
+  <section id="shared" class="panel">
+    <label class="stack">
+      <span class="field-legend">Collection</span>
+      <input id="collection" list="collection-list" maxlength="200" autocomplete="off" placeholder="Capture">
+      <datalist id="collection-list"></datalist>
+    </label>
+    <div class="stack">
+      <span class="field-legend">Tags</span>
+      <div class="tag-box">
+        <div id="tag-chips" class="tag-chips"></div>
+        <input id="tag-input" type="text" maxlength="100" autocomplete="off" placeholder="Type to add, then Enter" aria-label="Tags">
+        <ul id="tag-suggest" class="suggest" hidden></ul>
+      </div>
+    </div>
+    <label class="stack">
+      <span class="field-legend">Note</span>
+      <textarea id="note" rows="2" maxlength="4000" placeholder="Why you saved this"></textarea>
+    </label>
+  </section>
+  <script src="popup.js"></script>
+</body>
+</html>

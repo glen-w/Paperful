@@ -4,7 +4,12 @@ from __future__ import annotations
 from typing import Any
 
 from .candidate import Candidate
+from .citation_graph import remember_link, work_node_id
 from .openalex import OpenAlexClient
+
+
+def _remember(row: Candidate, parent: dict[str, Any], direction: str) -> None:
+    remember_link(row, work_node_id(parent), direction)
 
 
 def hop_refs(
@@ -161,6 +166,7 @@ def hop_refs(
                         why=source_why.get(recovery, _with_query(f"ref of {why_prefix}", query)),
                         gate=gate,
                     )
+                    _remember(row, frontier[index], "refs")
                     row.provenance["backend"] = recovery
                     if _mark_year(row, year_from, year_to):
                         next_works.append(child)
@@ -188,6 +194,7 @@ def hop_refs(
                     why=_with_query(f"ref of {why_prefix}", query),
                     gate=gate,
                 )
+                _remember(row, frontier[index], "refs")
                 if _mark_year(row, year_from, year_to):
                     next_works.append(child)
                 rows.append(row)
@@ -314,6 +321,7 @@ def hop_cites(
                     why=_cites_why(why_prefix, query),
                     gate=gate,
                 )
+                _remember(row, work, "cites")
                 if _mark_year(row, year_from, year_to):
                     next_works.append(child)
                     kept += 1

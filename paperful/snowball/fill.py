@@ -9,7 +9,9 @@ from pathlib import Path
 from typing import Any, Callable, NoReturn
 
 from ..lint import usable_work_title
+from ..resolve import doi_key
 from .candidate import Candidate
+from .citation_graph import remember_link
 
 CrossrefGet = Callable[[str], dict[str, Any] | None]
 S2Get = Callable[[str], dict[str, Any] | None]
@@ -157,7 +159,8 @@ def _remaining_dois(rows: list[Candidate], start: Candidate) -> list[str]:
 def _wanted(row: Candidate, only_dois: set[str] | None) -> bool:
     if only_dois is None:
         return True
-    return (row.ids.get("doi") or "").lower() in only_dois
+    key = doi_key(row.ids.get("doi"))
+    return key is not None and key in only_dois
 
 
 def _ref_dicts(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -231,6 +234,7 @@ def _neighbor_rows(
                 gate=row.gate,
             )
         )
+        remember_link(added[-1], row.identity, "refs")
         kept += 1
     return added
 
@@ -574,7 +578,7 @@ def fill_europepmc(
     if not uncached:
         return added
     probe = spread_dois([row.ids.get("doi") or "" for row in uncached], PROBE_SIZE)
-    probe_set = {doi.lower() for doi in probe}
+    probe_set = {k for d in probe if (k := doi_key(d))}
     try:
         found = lookup_dois(probe, cache_dir=cache_dir)
     except FillPaused as exc:
@@ -582,14 +586,15 @@ def fill_europepmc(
     if tally is not None:
         tally.searches += len(probe)
     in_index = sum(1 for payload in found.values() if payload)
+    found_by_key = {doi_key(k) or k: v for k, v in found.items()}
     for row in uncached:
-        doi = (row.ids.get("doi") or "").lower()
-        if doi not in probe_set:
+        key = doi_key(row.ids.get("doi"))
+        if not key or key not in probe_set:
             continue
         added.extend(
             _apply_europepmc_row(
                 row,
-                found.get(doi),
+                found_by_key.get(key),
                 known=known,
                 per_hop_limit=per_hop_limit,
                 direction=direction,
@@ -597,7 +602,11 @@ def fill_europepmc(
                 expand_neighbors=expand_neighbors,
             )
         )
-    rest = [row for row in uncached if (row.ids.get("doi") or "").lower() not in probe_set]
+    rest = [
+        row
+        for row in uncached
+        if (k := doi_key(row.ids.get("doi"))) is None or k not in probe_set
+    ]
     if in_index == 0 and rest:
         if tally is not None:
             tally.emit(f"europepmc · {len(probe)} searched · 0 in index · skipped {len(rest)}")
@@ -682,7 +691,11 @@ def run_fill_pass(
 
     def once(names: list[str], *, retry: bool) -> None:
         for name in names:
-            only = {doi.lower() for doi in paused.get(name, [])} if retry else None
+            only = (
+                {k for doi in paused.get(name, []) if (k := doi_key(doi))}
+                if retry
+                else None
+            )
             if retry and not only:
                 continue
             if name == "europepmc" and europepmc_cache is not None:

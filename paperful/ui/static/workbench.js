@@ -31,6 +31,11 @@
       var sel = btn.getAttribute("data-label-sel");
       btn.textContent = any ? sel : all;
     });
+    var attachBtn = document.getElementById("attach-btn");
+    if (attachBtn) {
+      var attachCount = parseInt(attachBtn.getAttribute("data-attach-count") || "0", 10);
+      attachBtn.disabled = attachCount === 0 && !any;
+    }
   }
   document.querySelectorAll(".row-select").forEach(function (el) {
     el.addEventListener("change", updateToolbarLabels);
@@ -61,6 +66,12 @@
       fetch("/v1/runs/" + id)
         .then(function (r) { return r.json(); })
         .then(function (body) {
+          if (!body || body.ok === false || !body.status) {
+            if (iv) clearInterval(iv);
+            sessionStorage.setItem(key, "1");
+            if (btn) btn.classList.remove("spinning");
+            return;
+          }
           var st = body.status;
           applyStatusToRow(id, st);
           if (st === "done" || st === "failed") {

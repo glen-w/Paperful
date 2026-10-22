@@ -314,3 +314,57 @@ def test_discover_topic_redirects_with_run_status(tmp_path, monkeypatch):
     finally:
         gate.set()
         jobs.snowball_run_fn = None
+
+
+@pytest.mark.skipif(
+    not __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available(),
+    reason="paperful[serve] extra missing",
+)
+def test_discover_shows_stop_rule_and_next_hop(tmp_path, monkeypatch):
+    import json
+
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    from paperful.serve import create_app
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    run = cfg.state_dir / "snowball" / "run-stop"
+    run.mkdir(parents=True)
+    (run / "candidates.jsonl").write_text(
+        json.dumps(
+            {
+                "run_id": "run-stop",
+                "hop": 1,
+                "status": "new",
+                "ids": {"doi": "10.1000/hop1"},
+                "biblio": {"title": "Hop one"},
+                "keep": None,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (run / "stop.json").write_text(
+        json.dumps(
+            {
+                "rule": "marginal_yield",
+                "awaiting_labels": True,
+                "stopped_by": None,
+                "rationale": "Waiting on Keep or Skip.",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    client = TestClient(create_app(cfg))
+    client.cookies.set("pf_advanced", "1")
+    topic = client.get("/discover?tab=topic")
+    assert topic.status_code == 200
+    assert 'name="stop_rule"' in topic.text
+    assert "marginal_yield" in topic.text
+    queue = client.get("/discover?tab=queue")
+    assert queue.status_code == 200
+    assert "Next hop" in queue.text
+    assert "Waiting on Keep or Skip." in queue.text

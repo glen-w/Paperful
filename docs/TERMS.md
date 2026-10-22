@@ -17,7 +17,7 @@ reachout (contact, no fetch)  →  you email or click ResearchGate Request yours
 | **attach** | Write a PDF into Zotero as a stored child. The write gate. |
 | **admit** | **Do not use** in Paperful. That verb is TranscriptX (`originals/` → managed transcripts). |
 | **mirror** / **`out/`** | Quiet on-disk copy: one folder per item (`record.json`, PDF, notes). Copy it yourself. |
-| **`state/`** | Run reports, sessions, write keys. Lives next to `out/` under `PAPERFUL_DATA`. |
+| **`state/`** | Run reports, sessions, write keys. Lives under `PAPERFUL_DATA` (next to config). |
 | **import** | RIS / BibTeX / EndNote XML into the manager. Not an “import inbox.” |
 | **run** | Fill PDFs for items **already** in the library. |
 | **reachout** | Contact-only list of missing PDFs (CSV / RG tabs). Never fetches. Never sends mail. |
@@ -29,6 +29,7 @@ reachout (contact, no fetch)  →  you email or click ResearchGate Request yours
 
 ## Mounts
 
-Host `PAPERFUL_DATA` is mounted at container `/data`. `out/` and `state/` are
-directories **inside** that tree (`/data/out`, `/data/state`). Compose does not
-mount Zotero Storage as a writable volume.
+Host `PAPERFUL_DATA` → container `/data` (config, `state/`, packs). Host
+`PAPERFUL_OUT` → `/data/out` (PDF mirror). Separate mounts by default so the
+mirror can live on another disk. Compose does not mount Zotero Storage as a
+writable volume.

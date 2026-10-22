@@ -18,6 +18,12 @@ for browser-use. It does **not** reuse the vault Chromium SSO profile.
 Skip it when the PDF needs campus SSO that only lives in the vault Chrome
 profile — keep using EZProxy / Scholar / `browser_agent` for those.
 
+**Mileage varies.** On real collections Camofox often returns `not_found`,
+`skipped`, or `captcha` (Cloudflare / publisher bot walls, empty download
+artifacts, sites with no clear PDF control). Treat it as a best-effort
+opt-in — not something to rely on for completion rates. Prefer HTTP / vault
+lanes; keep Camofox (and `browser_agent`) off when you want a predictable run.
+
 ## Setup
 
 1. Run the server (once per machine):

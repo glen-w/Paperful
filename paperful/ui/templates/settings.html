@@ -19,6 +19,23 @@
         <option value="eoi" {% if prefs.preset == 'eoi' %}selected{% endif %}>Campus</option>
       </select>
     </label>
+    {% if show_auto_attach_setting %}
+    <label>After Grab {{ info("Manual: Grab only saves PDFs to the out/ folder on this computer. You press Attach for the copies you trust. Automatic: Grab also writes those PDFs into the library when Paperful can (Zotero 10 or newer, or Mendeley / EndNote). Zotero 7–9 always stays on disk — attach those files in Zotero. Files on the Held tab with a DOI mismatch or short PDF still wait for Attach.") }}
+      <select name="attach_mode">
+        <option value="manual" {% if attach_mode != 'auto' %}selected{% endif %}>Manual — I attach</option>
+        <option value="auto" {% if attach_mode == 'auto' %}selected{% endif %}>Automatic — Grab attaches</option>
+      </select>
+    </label>
+    {% endif %}
+    <label>Citation map edits {{ info("Where the Discover map shows library actions (add, tags, Find PDF). both = sidebar panel (default).") }}
+      <select name="citation_map_edit">
+        <option value="both" {% if citation_map_edit == 'both' %}selected{% endif %}>Both</option>
+        <option value="sidebar" {% if citation_map_edit == 'sidebar' %}selected{% endif %}>Sidebar only</option>
+        <option value="popup" {% if citation_map_edit == 'popup' %}selected{% endif %}>Popup only</option>
+        <option value="off" {% if citation_map_edit == 'off' %}selected{% endif %}>Off</option>
+      </select>
+    </label>
+    <label><input type="checkbox" name="citation_map_auto_search" value="1" {% if citation_map_auto_search %}checked{% endif %}> Auto-search PDF after Add to library {{ info("When you add a paper from the map, also run Find PDF for that item. Off by default.") }}</label>
     <button type="submit">Save</button>
     {{ info("Write these values into config.toml on this machine.") }}
   </div>

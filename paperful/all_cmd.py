@@ -11,6 +11,7 @@ from rich.console import Console
 from .pack import PackError, close_pack, current_id, open_pack, pack_join_disabled
 from .run_config import ResolvedRunConfig
 
+
 def run_all(
     console: Console,
     *,
@@ -42,8 +43,20 @@ def run_all(
     config: Path | None,
     fmt: str,
     camofox: bool | None = None,
+    handoff: str | None = None,
+    gaps_handoff: str | None = None,
+    include_doi_tabs: bool = False,
+    downloads_dir: Path | None = None,
+    promote: str | None = None,
+    htmlpdf: str | None = None,
+    keep_snapshot: bool = False,
+    ezproxy_relogin: bool | None = None,
+    twenty_writeback: bool | None = None,
+    request_rg: bool | None = None,
+    re_request: bool = False,
+    after_handoff_gaps: bool = False,
 ) -> None:
-    from . import cli as cli_mod
+    from . import cli_runtime as cli_mod
 
     if cli_mod._scope_unset(collection, library, profile, run_config):
         cli_mod._refuse_missing_scope()
@@ -75,7 +88,22 @@ def run_all(
         steps=steps,
         skip=skip,
         require_summarize=require_summarize,
+        handoff=handoff,
+        gaps_handoff=gaps_handoff,
+        include_doi_tabs=include_doi_tabs if include_doi_tabs else None,
+        downloads_dir=str(downloads_dir) if downloads_dir is not None else None,
+        promote=promote,
+        htmlpdf=htmlpdf,
+        keep_snapshot=keep_snapshot if keep_snapshot else None,
+        ezproxy_relogin=ezproxy_relogin,
+        twenty_writeback=twenty_writeback,
+        request_rg=request_rg,
+        re_request=re_request if re_request else None,
     )
+    if after_handoff_gaps and bound.effective_gaps_handoff():
+        steps = list(bound.steps)
+        if "gaps_handoff" not in steps:
+            bound.steps = steps + ["gaps_handoff"]
     if not bound.collections and not bound.library:
         cli_mod._refuse_missing_scope()
     opened = False
@@ -129,6 +157,7 @@ def run_all(
                 if json_out:
                     with suppress_stdout():
                         _dispatch_all_step(
+                            console,
                             step,
                             bound,
                             scope,
@@ -142,6 +171,7 @@ def run_all(
                         )
                 else:
                     _dispatch_all_step(
+                        console,
                         step,
                         bound,
                         scope,
@@ -200,7 +230,14 @@ def _all_scope(bound: ResolvedRunConfig, config: Path | None) -> dict[str, Any]:
         "config": config,
     }
 
+def _run_downloads_dir(bound: ResolvedRunConfig) -> Path | None:
+    if not bound.downloads_dir:
+        return None
+    return Path(bound.downloads_dir)
+
+
 def _dispatch_all_step(
+    console: Console,
     step: str,
     bound: ResolvedRunConfig,
     scope: dict[str, Any],
@@ -211,11 +248,22 @@ def _dispatch_all_step(
     serpapi_max: int | None = None,
     json_out: bool = False,
 ) -> None:
-    from . import cli as cli_mod
+    from .dedupe_cmd import run_dedupe
+    from .fix_metadata_cmd import run_fix_metadata
+    from .gaps_cmd import run_gaps_command
+    from .lint_cmd import run_lint
+    from .ocr_cmd import run_ocr
+    from .restore_cmd import run_restore
+    from .run_cmd import run_run_command
+    from .snapshot_cmd import run_snapshot_cmd
+    from .summarize_cmd import run_summarize
+    from .synthesize_cmd import run_synthesize
+
     fmt = "json" if json_out else "text"
     if step == "gaps":
         _call_step(
-            cli_mod.gaps,
+            run_gaps_command,
+            console=console,
             **scope,
             as_json=False,
             list_missing=False,
@@ -228,9 +276,26 @@ def _dispatch_all_step(
             fmt=fmt,
         )
         return
+    if step == "gaps_handoff":
+        _call_step(
+            run_gaps_command,
+            console=console,
+            **scope,
+            as_json=False,
+            list_missing=True,
+            handoff=bound.effective_gaps_handoff(),
+            include_doi_tabs=bound.include_doi_tabs,
+            downloads_dir=_run_downloads_dir(bound),
+            request_rg=bound.request_rg,
+            re_request=bound.re_request,
+            to=None,
+            fmt=fmt,
+        )
+        return
     if step == "run":
         _call_step(
-            cli_mod.run,
+            run_run_command,
+            console=console,
             **scope,
             dry_run=dry_run,
             limit=bound.limit,
@@ -243,30 +308,40 @@ def _dispatch_all_step(
             browser_agent=browser_agent,
             camofox=camofox,
             upgrade_linked=bound.upgrade_linked,
-            upgrade_snapshot=None,
-            keep_snapshot=False,
-            htmlpdf_mode=None,
+            upgrade_snapshot=bound.upgrade_snapshot,
+            keep_snapshot=bound.keep_snapshot,
+            htmlpdf_mode=bound.htmlpdf,
             strict_pdf_doi=bound.strict_pdf_doi,
-            handoff=None,
-            include_doi_tabs=False,
-            downloads_dir=None,
-            request_rg=None,
-            re_request=False,
-            ezproxy_relogin=None,
+            handoff=bound.handoff,
+            include_doi_tabs=bound.include_doi_tabs,
+            downloads_dir=_run_downloads_dir(bound),
+            request_rg=bound.request_rg,
+            re_request=bound.re_request,
+            ezproxy_relogin=bound.ezproxy_relogin,
             serpapi_max=serpapi_max,
-            twenty_writeback=None,
-            promote=None,
+            twenty_writeback=bound.twenty_writeback,
+            promote=bound.promote,
             fmt=fmt,
         )
         return
     if step == "lint":
-        _call_step(cli_mod.lint, **scope, limit=bound.limit, as_json=False, strict=False, fmt=fmt)
+        _call_step(
+            run_lint,
+            console=console,
+            **scope,
+            limit=bound.limit,
+            as_json=False,
+            strict=False,
+            fmt=fmt,
+        )
         return
     if step == "fix-metadata":
         _call_step(
-            cli_mod.fix_metadata,
+            run_fix_metadata,
+            console=console,
             **scope,
             limit=bound.limit,
+            offset=0,
             apply=False if dry_run else bound.apply,
             overwrite=bound.overwrite,
             fmt=fmt,
@@ -274,11 +349,12 @@ def _dispatch_all_step(
         return
     if step == "ocr":
         _call_step(
-            cli_mod.ocr,
+            run_ocr,
+            console=console,
             **scope,
             item=[],
             limit=bound.limit,
-            apply=False if dry_run else bound.apply,
+            apply=False if dry_run else bool(bound.apply),
             attach=False,
             max_minutes=None,
             fmt=fmt,
@@ -286,26 +362,36 @@ def _dispatch_all_step(
         return
     if step == "summarize":
         _call_step(
-            cli_mod.summarize,
+            run_summarize,
+            console=console,
             **scope,
             item=[],
             limit=bound.limit,
             apply=bound.apply,
-            to=None,
+            to_dest=None,
             prompt=None,
             force=False,
-            order=None,
+            order_value=None,
             max_new=None,
             max_minutes=None,
+            collections_file=None,
             fmt=fmt,
         )
         return
     if step == "snapshot":
-        _call_step(cli_mod.snapshot, **scope, limit=bound.limit, dry_run=dry_run, pdfs=None)
+        _call_step(
+            run_snapshot_cmd,
+            console=console,
+            **scope,
+            limit=bound.limit,
+            dry_run=dry_run,
+            pdfs=None,
+        )
         return
     if step == "dedupe":
         _call_step(
-            cli_mod.dedupe,
+            run_dedupe,
+            console=console,
             **scope,
             limit=bound.limit,
             dry_run=dry_run,
@@ -318,7 +404,8 @@ def _dispatch_all_step(
         return
     if step == "restore":
         _call_step(
-            cli_mod.restore,
+            run_restore,
+            console=console,
             **scope,
             limit=bound.limit,
             dry_run=dry_run,
@@ -328,10 +415,11 @@ def _dispatch_all_step(
         return
     if step == "synthesize":
         _call_step(
-            cli_mod.synthesize,
+            run_synthesize,
+            console=console,
             **scope,
             item=[],
-            to=None,
+            to_dest=None,
             report_collection=None,
             prompt=None,
             dry_run=dry_run,
@@ -340,6 +428,7 @@ def _dispatch_all_step(
             fmt=fmt,
         )
         return
-    cli_mod.console.print(f"[red]Unknown step {step!r}.[/]")
+    console.print(f"[red]Unknown step {step!r}.[/]")
     raise typer.Exit(1)
+
 

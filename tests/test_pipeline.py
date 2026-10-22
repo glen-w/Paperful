@@ -507,7 +507,7 @@ def test_make_client_loads_scholar_cookies(cfg, tmp_path):
 
 
 def test_scholar_is_serial_source():
-    assert "scholar" in pl._SERIAL_SOURCES
+    assert "scholar" in pl.SERIAL_SOURCES
 
 
 def test_circuit_breaker_trips_serial_scihub(pipe_factory):

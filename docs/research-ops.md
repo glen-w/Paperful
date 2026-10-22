@@ -95,7 +95,8 @@ letter or still junk. Manual `attach --item --file` and handoff walk/inbox
 reject sparse one-pagers but attach denser ones (you already chose the file).
 `inbox watch` / `drain` (shared `[inbox].dir`) default to whole-library DOI
 match; set `[inbox].match` for title/OCR/LLM, `[inbox].create` for gated
-proposals. Use `-C` only when you want a narrower index. See [sources](sources.md).
+proposals, and `[inbox].route` to pick a collection when `-C` is omitted.
+Use `-C` only when you want a narrower index or to skip routing. See [sources](sources.md).
 
 An in-memory DOI swap during fetch changes which work is requested. It does
 not write the library until `fix-metadata --apply`. Run `lint` before a large

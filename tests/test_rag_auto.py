@@ -128,9 +128,11 @@ def _ocr_cli(tmp_path, monkeypatch, *, apply: bool):
     )
     items = [make_item(key="SCAN0001"), make_item(key="TEXT0001")]
     loaded = types.SimpleNamespace(items=items, label="library")
+    from paperful import cli_runtime
+
     monkeypatch.setenv("PAPERFUL_PACK", "off")
-    monkeypatch.setattr(cli, "_connect", lambda cfg, quiet=False: object())
-    monkeypatch.setattr(cli, "_load_scope", lambda backend, **scope: loaded)
+    monkeypatch.setattr(cli_runtime, "_connect", lambda cfg, quiet=False: object())
+    monkeypatch.setattr(cli_runtime, "_load_scope", lambda backend, **scope: loaded)
 
     def ocr_items(
         cfg, items, manifest, backend, *, apply, attach=False, track=None, **kw
@@ -144,7 +146,9 @@ def _ocr_cli(tmp_path, monkeypatch, *, apply: bool):
     monkeypatch.setattr("paperful.ocr.ocr_items", ocr_items)
     calls = []
     monkeypatch.setattr(
-        cli, "_rag_auto", lambda cfg, since, keys=(): calls.append((since, list(keys)))
+        cli_runtime,
+        "_rag_auto",
+        lambda cfg, since, keys=(): calls.append((since, list(keys))),
     )
     args = ["ocr", "--library", "--config", str(config)] + (["--apply"] if apply else [])
     res = runner.invoke(cli.app, args)
@@ -165,15 +169,23 @@ def test_every_command_that_lands_pdfs_calls_the_hook():
     """Guards the wiring: a new landing path should add its own call."""
     import inspect
 
-    from paperful import gaps_cmd, ocr_cmd, run_cmd, run_hooks
+    from paperful import (
+        attach_cmd,
+        gaps_cmd,
+        inbox_cmd,
+        ocr_cmd,
+        run_cmd,
+        run_hooks,
+        snapshot_cmd,
+    )
 
     hooked = {
         "run": run_cmd.run_fetch,
         "gaps": gaps_cmd.run_gaps,
-        "attach": cli.attach,
-        "inbox watch": cli.inbox_watch,
-        "inbox drain": cli.inbox_drain,
-        "snapshot": cli.snapshot,
+        "attach": attach_cmd.run_attach,
+        "inbox watch": inbox_cmd.run_inbox_watch,
+        "inbox drain": inbox_cmd.run_inbox_drain,
+        "snapshot": snapshot_cmd.run_snapshot_cmd,
         "ocr": ocr_cmd.run_ocr,
         "handoff walk": run_hooks.run_session_handoff,
         "handoff inbox": run_hooks.inbox_handoff_session,

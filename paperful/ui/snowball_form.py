@@ -39,10 +39,16 @@ class DiscoverTopicPayload:
     backends: tuple[str, ...] | None = None
     refine: bool | None = None
     tags: tuple[str, ...] = ()
+    study_designs: tuple[str, ...] | None = None
+    map_categories: tuple[str, ...] | None = None
     dedupe_scope: str | None = None
     dedupe_after: str | None = None
     author_site_preflight: bool | None = None
     twenty_writeback: bool | None = None
+    stop_rule: str | None = None
+    stop_eps: float | None = None
+    stop_k: int | None = None
+    stop_max_screened: int | None = None
 
 
 def _opt_int(raw: object) -> int | None:
@@ -70,6 +76,24 @@ def _opt_tuple(raw: object) -> tuple[str, ...] | None:
         return None
     parts = tuple(p.strip() for p in text.replace(";", ",").split(",") if p.strip())
     return parts or None
+
+
+def _parse_study_designs(raw: object) -> tuple[str, ...] | None:
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    from ..snowball.expand import parse_study_designs
+
+    return parse_study_designs(text)
+
+
+def _parse_map_categories(raw: object) -> tuple[str, ...] | None:
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    from ..snowball.map_categories import parse_map_categories
+
+    return parse_map_categories(text)
 
 
 def parse_discover_topic(form: Mapping[str, Any], *, advanced: bool) -> DiscoverTopicPayload:
@@ -120,6 +144,8 @@ def parse_discover_topic(form: Mapping[str, Any], *, advanced: bool) -> Discover
         keyword_min_score=_opt_float(form.get("keyword_min_score")),
         cites_query=str(form.get("cites_query") or "").strip(),
         languages=_opt_tuple(form.get("languages")),
+        study_designs=_parse_study_designs(form.get("study_designs")),
+        map_categories=_parse_map_categories(form.get("map_categories")),
         min_seed_citations=_opt_int(form.get("min_seed_citations")),
         note_provenance=True if form.get("note_provenance") == "1" else None,
         backends=_opt_tuple(form.get("backends")),
@@ -129,6 +155,10 @@ def parse_discover_topic(form: Mapping[str, Any], *, advanced: bool) -> Discover
         dedupe_after=_opt_str(form.get("dedupe_after")),
         author_site_preflight=True if form.get("author_site_preflight") == "1" else None,
         twenty_writeback=True if form.get("twenty_writeback") == "1" else None,
+        stop_rule=_opt_str(form.get("stop_rule")),
+        stop_eps=_opt_float(form.get("stop_eps")),
+        stop_k=_opt_int(form.get("stop_k")),
+        stop_max_screened=_opt_int(form.get("stop_max_screened")),
     )
 
 
@@ -143,13 +173,15 @@ def build_request(cfg: Config, payload: DiscoverTopicPayload, collection: str) -
         per_hop_rank=payload.per_hop_rank,
         year_from=payload.year_from,
         year_to=payload.year_to,
-        direction=payload.direction or cfg.snowball_direction or "refs",
+        direction=payload.direction or cfg.snowball_direction or "refs+keywords",
         hybrid_seeds=payload.hybrid_seeds,
         keyword_limit=payload.keyword_limit,
         keyword_hop_limit=payload.keyword_hop_limit,
         keyword_min_score=payload.keyword_min_score,
         cites_query=payload.cites_query,
         languages=payload.languages,
+        study_designs=payload.study_designs,
+        map_categories=payload.map_categories,
         min_seed_citations=payload.min_seed_citations,
         note_provenance=payload.note_provenance,
         backends=payload.backends,
@@ -158,6 +190,10 @@ def build_request(cfg: Config, payload: DiscoverTopicPayload, collection: str) -
         dedupe_scope=payload.dedupe_scope,
         dedupe_after=payload.dedupe_after,
         author_site_preflight=payload.author_site_preflight,
+        stop_rule=payload.stop_rule,
+        stop_eps=payload.stop_eps,
+        stop_k=payload.stop_k,
+        stop_max_screened=payload.stop_max_screened,
     )
 
 
@@ -229,6 +265,10 @@ def profile_body_from_payload(
         body["seed_collection"] = collection or (payload.seeds[0] if payload.seeds else None)
     if payload.languages:
         body["languages"] = list(payload.languages)
+    if payload.study_designs:
+        body["study_designs"] = list(payload.study_designs)
+    if payload.map_categories:
+        body["map_categories"] = list(payload.map_categories)
     if payload.tags:
         body["tag"] = list(payload.tags)
     if payload.backends:
@@ -241,4 +281,12 @@ def profile_body_from_payload(
         body["refine"] = True
     if payload.author_site_preflight:
         body["author_site_preflight"] = True
+    if payload.stop_rule:
+        body["stop_rule"] = payload.stop_rule
+    if payload.stop_eps is not None:
+        body["stop_eps"] = payload.stop_eps
+    if payload.stop_k is not None:
+        body["stop_k"] = payload.stop_k
+    if payload.stop_max_screened is not None:
+        body["stop_max_screened"] = payload.stop_max_screened
     return {k: v for k, v in body.items() if v is not None and v != "" and v != []}

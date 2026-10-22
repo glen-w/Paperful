@@ -12,12 +12,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlparse
 
 from .config import Config
 from .download import looks_like_pdf
 from .library import LibraryBackend, LibraryError
 from .pdfid import probe_pdf_bytes, short_pdf_verdict
+from .playbooks import looks_like_pdf_url
 from .provenance import provenance_stamp
 from .store import (
     STATUS_ATTACHED,
@@ -102,16 +102,11 @@ def classify_missing_hint(
         for a in attempts
     )
     found = any(":found" in a for a in attempts)
-    if url and (_url_looks_like_pdf(url) or (found and soft)):
+    if url and (looks_like_pdf_url(url) or (found and soft)):
         return HINT_OPENABLE
     if doi:
         return HINT_DOI
     return HINT_HARD
-
-
-def _url_looks_like_pdf(url: str) -> bool:
-    path = urlparse(url).path.lower()
-    return path.endswith(".pdf") or "/downloadpdf/" in path or "/pdf/" in path
 
 
 def apply_rg_handoff(
@@ -220,7 +215,7 @@ def missing_from_run_outcomes(
         url = (item.url or "").strip() or str(row.get("url") or "")
         reason = str(row.get("reason") or "")
         hint = classify_missing_hint(doi=item.doi, url=url, attempts=attempts)
-        if reason == "soft block" or soft_attempts(attempts) or _url_looks_like_pdf(url):
+        if reason == "soft block" or soft_attempts(attempts) or looks_like_pdf_url(url):
             hint = HINT_OPENABLE
         scholar_url = _scholar_results_url(item, cfg)
         if hint != HINT_OPENABLE:
@@ -386,6 +381,32 @@ def handoff_targets(
     return targets
 
 
+def opening_url(row: MissingPdf, *, scholar: bool) -> str:
+    """The URL ``open_tabs`` / ``walk_missing`` hand the browser."""
+    url = row.tab_url(scholar=scholar)
+    if row.hint == HINT_OPENABLE and row.open_url:
+        url = row.open_url
+    elif row.hint == HINT_AUTHOR_REQUEST and row.request_url:
+        url = row.request_url
+    return url
+
+
+def write_handoff_session(cfg: Config, rows: list[tuple[MissingPdf, str]]) -> None:
+    """Overwrite ``state/handoff/session.json`` for the Firefox checklist."""
+    from .store import write_json
+
+    payload = {
+        "schema": "paperful.handoff.session.v1",
+        "opened_at": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "items": [
+            {"key": row.key, "doi": row.doi, "title": row.title, "url": url}
+            for row, url in rows
+            if url
+        ],
+    }
+    write_json(cfg.state_dir / "handoff" / "session.json", payload)
+
+
 def open_tabs(
     rows: list[MissingPdf],
     *,
@@ -407,14 +428,12 @@ def open_tabs(
             return 0
     open_fn = opener or webbrowser.open
     opened = 0
+    opened_rows: list[tuple[MissingPdf, str]] = []
     for row in targets:
-        url = row.tab_url(scholar=scholar)
-        if row.hint == HINT_OPENABLE and row.open_url:
-            url = row.open_url
-        elif row.hint == HINT_AUTHOR_REQUEST and row.request_url:
-            url = row.request_url
+        url = opening_url(row, scholar=scholar)
         if open_fn(url):
             opened += 1
+            opened_rows.append((row, url))
             if cfg is not None and row.hint == HINT_AUTHOR_REQUEST and row.request_url:
                 from .author_request import record_request
 
@@ -425,6 +444,8 @@ def open_tabs(
                     doi=row.doi,
                     title=row.title,
                 )
+    if cfg is not None and opened_rows:
+        write_handoff_session(cfg, opened_rows)
     return opened
 
 
@@ -528,16 +549,17 @@ def walk_missing(
     attached = skipped = 0
     scholar = cfg.handoff_scholar
     targets = handoff_targets(rows, scholar=scholar)
+    if targets:
+        write_handoff_session(
+            cfg,
+            [(row, opening_url(row, scholar=scholar)) for row in targets],
+        )
     for idx, row in enumerate(targets, start=1):
         item = items_by_key.get(row.key)
         if item is None:
             skipped += 1
             continue
-        url = row.tab_url(scholar=scholar)
-        if row.hint == HINT_OPENABLE and row.open_url:
-            url = row.open_url
-        elif row.hint == HINT_AUTHOR_REQUEST and row.request_url:
-            url = row.request_url
+        url = opening_url(row, scholar=scholar)
         say(f"[{idx}/{len(targets)}] {row.key} — {row.title}")
         if row.hint == HINT_AUTHOR_REQUEST:
             say("  ResearchGate: click Request full-text yourself (ToS; Paperful does not click).")

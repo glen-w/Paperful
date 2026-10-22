@@ -8,6 +8,151 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- **Collection exclude / protect (`[[exclude]]`):** Mark hand-curated folders
+  so paperful will not write to them. Presets `full` and `add_only`, plus
+  fine-grained `allow_*` flags, `protect_items`, and optional
+  `skip_library_scope`. Enforced on library backend writes (Zotero, Mendeley,
+  and EndNote create/path/attach/notes/tags/update). See
+  [config](docs/config.md#exclude--protect-collections).
+
+### Changed
+
+- **`paperful all` dispatches through `*_cmd` modules** (no Typer/`cli.py`
+  import cycle). Snapshot, restore, urls, and htmlpdf proposals extracted from
+  `cli.py` into dedicated command modules.
+- **DOI set membership** uses `doi_key()` (normalize when possible) in snowball
+  pause/fill and Discover keep toggles; handoff/bibliography share
+  `playbooks.looks_like_pdf_url`.
+- **OpenAlex cites build is resumable:** `build-cites` checkpoints per works
+  parquet file (`.done/<date>` + `.done/<date>.parts/<stem>`), with a DuckDB
+  memory limit and spill dir so huge `updated_date` folders (100G+) do not OOM.
+- **OpenAlex snapshot citing (2B):** `paperful openalex-store build-cites`
+  builds an inverted cites parquet from works `referenced_works`. Set
+  `cites_index_glob` so `works_citing` (citation-map expand, cites hops) uses
+  the snapshot. Store cites-query / id `search=` is title-only. When the API
+  budget is spent, DOI/id and citing keep using the store. See
+  [config Advanced](docs/config.md#openalex-api-limits-and-snapshot-store).
+- **Own-machine OpenAlex snapshot (`local_duckdb`):** Point
+  `[openalex_store]` at a local parquet dump (`backend = "local_duckdb"`,
+  `parquet_glob = …`). DOI/id lookups try the store first; when the live API
+  daily budget is spent, those lookups keep using the snapshot. Needs `duckdb`
+  on `PATH` (or `duckdb_bin`). See
+  [config Advanced](docs/config.md#openalex-api-limits-and-snapshot-store).
+- **Discover Explore map:** Paste a DOI or paper name to seed a citation map
+  immediately (one auto-expand hop). Map **Seed search** fills the Topic
+  snowball form from the selected node. See [Citation map](docs/snowball.md#citation-map).
+- **Keepup (alert loop / what cites):** `paperful keepup` polls topic watches,
+  authorwatch lists, and OpenAlex citers of `-C` on a configurable
+  `interval_days` (default 7). Baseline proposes nothing; later runs write
+  `digest.md`, and `--apply` creates parents plus `ingested.md`. Also
+  `snowball watch apply` (inbox → parents) and `authorwatch digest`. No
+  built-in scheduler or email — cron `keepup run`. Discover Following can
+  Preview/Apply a topic watch inbox. See [Keepup](docs/keepup.md).
+- **Citation map literature categories:** OpenAlex `study_designs` and work
+  `type` surface as badges and filter chips beside foundational /
+  influential / emerging roles (evidence synthesis, trials, clinical trials,
+  observational, case reports, protocols, narrative reviews, preprints,
+  books & chapters, commentary / letters). Config `[snowball].map_categories`
+  / `map_category_defs`; Discover advanced form also takes study-design crawl
+  filters and map category ids. See [Citation map](docs/snowball.md#citation-map).
+
+### Changed
+
+- **Discover tabs + queue pagination:** Explore, Topic, Grow (Advanced), People,
+  Queue, and Following are separate tabs so the page is shorter. The Queue table
+  paginates like Library / Wanted (`page` / `per_page`). Map lives on Queue.
+  Map **Seed search** opens the Topic tab with the form prefilled.
+- **`paperful all` run-step parity:** `--handoff`, `--include-doi-tabs`, `--downloads-dir`, `--promote`, `--htmlpdf`, `--upgrade-snapshot`, `--keep-snapshot`, `--ezproxy-relogin`, `--twenty-writeback`, `--request-rg`, and `--re-request` reach the internal `run`. Optional `gaps_handoff` step (or `--after-handoff-gaps`) runs leftover `gaps --list-missing` with `--gaps-handoff` or the same `--handoff`. Profiles may store the same keys. See [Workflows](docs/workflows.md).
+- **Firefox add-on 0.2:** richer page detection (Highwire / Dublin Core / JSON-LD), type-to-filter collection picker, capture tags with library and OpenAlex keyword suggestions, optional capture note, Review-then-Save for selected tabs, context menu and Alt+Shift+P, walk badge, open folder / Wanted after save. Native messages are correlated by id. Downloads are staged from the user Downloads folder into the drop directory. `install-host` writes a Windows launcher. Popup and options use the workbench paper, copper, and box-mark chrome. See [Firefox](docs/firefox.md).
+
+## 1.3.0 — 2026-10-19
+
+### Added
+
+- **Firefox add-on** (optional, unsigned, temporary load): save the current page or selected tabs into the quiet mirror. Reads Zotero so a stale snapshot does not create a second item. Writes `out/` only. A page with no PDF keeps `snapshot.html`, and can search the configured lanes. See [Firefox](docs/firefox.md).
+
+## 1.2.0 — 2026-10-16
+
+### Added
+
+- **Snowball stopping rules** (off by default): `marginal_yield`, `asymptotic_coverage`, `budget`, or `any`. One hop, then Keep/Skip, then `snowball continue` / Discover **Next hop**. Depth and candidate caps still apply. No recall estimate.
+
+## 1.1.1 — 2026-10-16
+
+Stop-ship hygiene before outside testers and launch gates.
+
+### Fixed
+
+- **Wanted Attach:** button disabled when there are no attachable PDFs; server
+  rejects empty attach with a clear message; attach count matches pending writes.
+- **Wanted:** Held row selection for attach (unverified pending OK; DOI mismatch
+  still requires Advanced). Preview token keys locked to ticked rows (tests).
+- **Packaging:** `paperful.__version__` reads from package metadata (single
+  source with `pyproject.toml`).
+
+### Changed
+
+- **Wanted / Settings copy:** `out/` folder naming, Zotero 10+ under Attach, GUI
+  vs CLI `--strict-pdf-doi`; Settings “Automatic after Grab” hidden until the
+  library has at least one attached PDF.
+
+## 1.1.0 — 2026-10-16
+
+**1.1.0** ships on [PyPI](https://pypi.org/project/paperful/) (`pip install paperful`).
+The operator path tested in CI remains **clone + Docker Compose**; pip is for a
+host CLI with Zotero’s local API on the same machine.
+
+### Changed
+
+- **CLI / workbench structure:** command bodies and UI routes split into focused
+  modules (`*_cmd.py`, `ui/*_routes.py`, `cli_runtime.py`) without changing the
+  default operator workflows.
+- **Docs:** [AI feasibility](docs/ai.md) (local Ollama vs hosted LiteLLM), pip
+  install in the README, and PyPI release notes in [developer.md](docs/developer.md).
+- **Packaging:** Hatchling metadata, trusted publishing workflow, and
+  `make pre-release` / `scripts/release/pre_release.sh` to block stale `dist/`
+  artifacts before `uv publish`.
+- **Compose mounts:** `PAPERFUL_OUT` is a separate volume at `/data/out`
+  (default `../paperful-out`). `PAPERFUL_DATA` holds config/`state`/packs only.
+  Repo-local setups set `PAPERFUL_OUT=./out` with `PAPERFUL_DATA=.`.
+
+### Fixed
+
+- **Wanted Grab:** with nothing ticked, Preview and Grab use the Missing list
+  (Have and Held stay put unless ticked). Grab only consumes a Preview token
+  for those same rows. An Attach or Recover token is not reused. A Grab with
+  no matching preview returns to Wanted with a message instead of a JSON error.
+- **Discover Keep:** queue rows that store the DOI at the top level (older
+  files) still match Keep / Skip, and the DOI is kept for apply.
+- **Job order:** the newest workbench command is the one with the latest
+  `created` time, so two jobs written in the same second no longer swap.
+- **Index search:** a bad top-k shows the limit message; a bad year shows the
+  year message.
+- **Contributor setup:** `uv sync --group dev` installs Jinja2 and
+  `python-multipart`, so `uv run pytest` can render the workbench.
+
+### Added
+
+- **`paperful extract-sections`:** deterministic IMRaD-style fields
+  (`abstract`, `conclusion`, `methodology`, `research_questions`) to
+  `state/sections/<key>.json`, with optional grounded LLM fill
+  (`[extract_sections].llm`). Shared heading synonyms with the RAG chunker;
+  optional `state/section-headings.toml` overlay.
+
+- **Smart inbox routing:** `[inbox].route` (`off` / `gated` / `auto`) picks an
+  existing collection for create-on-unmatched when `-C` is omitted. Deterministic
+  signals first (recent snowball/watch `target_collection`, last-run scope, DOI
+  already in the library, filename/title vs collection paths), then optional
+  `[inbox].llm_route`. Fail closed — never invents a collection. DOI attach is
+  unchanged.
+
+- **`[summarize].style = ste`**: ASD-STE100 Simplified Technical English
+  constraints in the summarize prompt (sentence/paragraph limits, active voice,
+  optional approved-word list). Post-generation heuristic check with
+  `ste_violation_policy` (`warn` or `fail`). Toggles the prompt SHA so plain
+  summaries are not reused. See [LLM](docs/llm.md#d-summarize-grounded-summary-note)
+  and [Configuration](docs/config.md#llm-optional-local-first).
+
 - Opt-in **`camofox`** recover lane: scripted DOI→PDF via an external
   [camofox-browser](https://github.com/jo-inc/camofox-browser) server, after
   vault Playwright lanes and before `browser_agent`. Config `[camofox]`,
@@ -108,8 +253,10 @@ create-missing restore, proven on Zotero. Install remains clone plus
   refs gap, ingest-dois, authors, packs promote; queue/watch briefing and
   digest can file a collection note (`paperful:frontier-briefing`). Route
   table: [gui.md](docs/gui.md).
-- **GUI thickening:** Index runs `rag ingest`, `rag search`, batch Ask, and collection
-  `synthesize`; Advanced **Briefs** runs collection `summarize` / `synthesize`.
+- **GUI thickening:** **Ask** (default nav) runs cited Ask and, when Advanced is
+  on, batch Ask. **Index** runs `rag ingest`, `rag search`, `rag questions`,
+  `rag answered`, and collection `synthesize`. Advanced **Briefs** runs
+  collection `summarize` / `synthesize`.
   Per-item summarize in Wanted/Library drawers (`/item/{key}/summary`, `/wanted/summarize`).
   Discover: snowball kinds (search/hybrid/doi/orcid/collection), keep/skip, profile run,
   resume, queue briefing/digest, watch via `save_watch` (profile required);
@@ -165,7 +312,7 @@ create-missing restore, proven on Zotero. Install remains clone plus
 - **Roadmap / 1.0 scope:** 1.0 now includes the workbench GUI (illuminate and
   run CLI workflows) and interactive Ask (chat-over-collection RAG in the GUI).
   Post-1.0: local OpenAlex snapshot phases 2B/2C, Firefox extension,
-  newsletter/alert ingest (rollup bridge). See [ROADMAP](docs/ROADMAP.md#product-split-10-vs-post-10).
+  alert loop (watch / authorwatch poll → ingest → briefing). See [ROADMAP](docs/ROADMAP.md#product-split-10-vs-post-10).
 - **Roadmap / adapters:** Mendeley and EndNote no longer gate 1.0; docs stay
   honest (seeking testers; Zotero well-tested).
 - BBNJ author-site / authorwatch dogfood plan: [bbnj-author-lanes](docs/bbnj-author-lanes.md)
@@ -179,11 +326,12 @@ create-missing restore, proven on Zotero. Install remains clone plus
 
 ### Added
 
-- **Index Ask:** Advanced Index page runs cited, threaded `ask` when `[rag]` and
-  `[llm]` are on and the index has rows. Collection chip is the scope; turns
-  persist under `state/rag/threads/` (`paperful.rag.thread.v1`). `rag ingest`,
-  `rag search`, and batch Ask (`state/ask-batch/`) are on Index; synthesize on
-  Index; per-item summarize in drawers. Advanced **Briefs** runs collection
+- **Ask:** cited, threaded `ask` when `[rag]` and `[llm]` are on and the index
+  has rows. The page is `/ask` on the default nav (see Changed). Collection
+  chip is the scope; turns persist under `state/rag/threads/`
+  (`paperful.rag.thread.v1`). Batch Ask (`state/ask-batch/`) is on that page
+  when Advanced is on. Index runs `rag ingest`, `rag search`, and synthesize;
+  per-item summarize stays in drawers. Advanced **Briefs** runs collection
   `summarize` / `synthesize`. See [gui.md](docs/gui.md).
 - **GUI P0:** required `paperful.item.v1` keys frozen (additive extras survive
   snapshot); restore is create-missing (DOI → key → title+year; skip gone /

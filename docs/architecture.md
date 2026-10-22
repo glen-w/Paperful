@@ -122,7 +122,7 @@ flowchart LR
 | `state/dedupe-packs/` | Duplicate review packs from `dedupe` (JSON + Markdown) |
 | `state/dedupe-applied.jsonl` | Merge audit; appended only on `dedupe --apply` |
 | `state/cites/<hash>.json` | OpenAlex reference lists for one DOI set, inverted so snowball can say how many items in the target collection cite a new work. Reused until that DOI set changes |
-| `state/snowball/<run-id>/` | One crawl queue: `candidates.jsonl`, `summary.json`, thin `briefing.md`, frontier `digest.md`. How the digest is cut is [Watch](snowball.md#watch) |
+| `state/snowball/<run-id>/` | One crawl queue: `candidates.jsonl`, `summary.json` (includes `target_collection` when `-C` was set), thin `briefing.md`, frontier `digest.md`. When a stopping rule is on, also `stop.json` and append-only `stops.jsonl` (`paperful.snowball.stop.v1`). How the digest is cut is [Watch](snowball.md#watch) |
 | `state/snowball/watches/<name>/` | Watch ledger: `watch.json`, `seen.json`, `inbox.jsonl`, `briefing.md`, `digest.md`. No scheduler in Paperful |
 | `state/version-packs/` | Preprint/published review packs (`paperful.version_pack.v1`) |
 | `state/versions-applied.jsonl` | One line per work updated by `versions --apply` |
@@ -130,11 +130,12 @@ flowchart LR
 | `state/coverage/<stamp>/` | `coverage` review pack (`paperful.coverage.pack.v1`, `pack.md`, `dois.txt`). Always dry-run — briefing/note/file vs `-C` |
 | `state/ingest/<stamp>/` | `ingest-dois` summary (`paperful.ingest_dois.v1`). Dry-run unless `--apply` |
 | `state/collections-add/<stamp>/` | `collections add` summary (`paperful.collections_add.v1`). Dry-run unless `--apply` |
-| `state/inbox/proposals/` | Gated inbox create/attach proposals (`paperful.inbox.proposal.v1`) |
+| `state/inbox/proposals/` | Gated inbox create/attach proposals (`paperful.inbox.proposal.v1`). Optional `route_*` keys when `[inbox].route` chose a collection |
 | `state/pdf-cache/` | Throwaway copies of manager PDFs, only when `[mirror].pdfs = "none"`. Otherwise an exported PDF goes into its item folder, and `sync` moves older cache files there. `paperful cache clean` removes absorbed or stale leftovers |
 | `state/summaries/<key>.html` | `summarize` output when dest includes disk; the Zotero child note is the other copy |
 | `state/ask-batch/<stamp>/` | `ask --from-file` / Index batch Ask pack (`paperful.ask_batch.v1`, `answers.md`); resume cache under `by-hash/` |
 | `state/rag/questions/<key>.json` | `rag questions` / Index extract RQs (`paperful.rag.questions.v1`, provenance `rule`\|`llm`) |
+| `state/sections/<key>.json` | `extract-sections` IMRaD fields (`paperful.sections.v1`, provenance `rule`\|`llm`; optional `state/section-headings.toml` synonyms) |
 | `state/rq-answered/<stamp>/` | `rag answered` / Index already-answered pack (`paperful.rq_answered.v1`, `pack.md`) |
 | `state/prompts/` | Operator-saved Ask system prompts from the Index form (“Save as…”); listed in the custom-prompt select |
 | `state/gui/uploads/` | Workbench uploads (Discover import, Index prompt/questions files); basename only |
@@ -148,7 +149,7 @@ flowchart LR
 | `state/fetch-wins.jsonl` | One line per vault or browser-agent PDF (host and path; query string dropped). Agent rows may include a `steps` trace and promotable `click:` / `rewrite` wins. Input to `paperful playbooks propose` |
 | `state/playbooks-proposed.toml` | Draft learned pack from `playbooks propose`. Not loaded until `playbooks promote` |
 | `state/last-run.json` | Latest `run` or `recover` report (`paperful.run_report.v1`). Other verbs do not replace it |
-| `state/runs/<stamp>-<command>.json` | One report per `run`, `recover`, `gaps`, `reachout`, `lint`, `fix-metadata` (dry-run and `--apply`), `attachments` (dry-run and `--apply`), `summarize`, `synthesize`, and `snapshot` |
+| `state/runs/<stamp>-<command>.json` | One report per `run`, `recover`, `gaps`, `reachout`, `lint`, `fix-metadata` (dry-run and `--apply`), `attachments` (dry-run and `--apply`), `summarize`, `synthesize`, `extract-sections`, and `snapshot` |
 | `state/packs/<id>.json` | Parent witness (`paperful.pack.v1`) listing those reports for one `pack open` … `pack close` sequence. `state/packs/current` names the open id |
 | `state/mendeley-oauth.json` | Mendeley tokens after `session login mendeley` (mode `0600`) |
 | `state/endnote-import/<stamp>/` | EndNote XML+PDF bundle for File → Import. Never an edit of `.enl` |
@@ -174,6 +175,8 @@ below.
 | `lint` identity check | `[lint].llm_pdf_match` | finding `pdf_identity_mismatch` | none |
 | `summarize` | `llm.enabled` | `state/summaries/<key>.html` when dest includes disk | child note unless `--to disk` |
 | `synthesize` | `llm.enabled` | `state/reports/<slug>.html` when dest includes disk | standalone note in the scoped collection unless `--to disk` |
+| `extract-sections` | rules always; optional `[extract_sections].llm` + `llm.enabled` | `state/sections/<key>.json` | none (disk only) |
+| `rag questions` | rules always; optional `[rag].extract_questions_llm` + `llm.enabled` | `state/rag/questions/<key>.json` | none |
 
 Opt-in **`camofox`** is a registered **serial** source (never in `DEFAULT_SOURCES`) that talks to an external [camofox-browser](https://github.com/jo-inc/camofox-browser) REST server for a scripted DOI→PDF grab. `run` injects it when `[camofox].enabled` and `[camofox].during_run` (default on); `--camofox` / `--no-camofox` override one invocation. Policy order places it after vault lanes and before `browser_agent`. It does not reuse the vault Chromium SSO profile (see [Camofox](camofox.md)).
 
@@ -232,9 +235,9 @@ folder sync is out of scope for this CLI.
 
 ## Ghost attachments
 
-Zotero can show **The attached file could not be found** for a path under the data directory’s `storage/<key>/`. The attachment record is there (MD5 and storage folder) but the bytes never landed on this machine. That is a ghost, not a file moved or deleted outside Zotero. `paperful attachments` reports it. `--fix-broken --apply` refills the row only when `out/` already has a PDF with the same MD5.
+Zotero can show **The attached file could not be found** for a path under the data directory’s `storage/<key>/`. The attachment record is there (MD5 and storage folder) but the bytes never landed on your computer. That is a ghost, not a file moved or deleted outside Zotero. `paperful attachments` reports it. `--fix-broken --apply` refills the row only when `out/` already has a PDF with the same MD5.
 
-Attachments created through the API as `imported_url` open that storage slot without always finishing a local download. `linked_url` attachments (including a quota-full open-access pass) do not use that path: they open in the browser and do not raise this dialog. Paperful’s attach path is `imported_file`: the PDF is already on disk, then uploaded through the local write API. The Zotero attachment note is a provenance stamp (`paperful oa:unpaywall`, `campus:ezproxy`, `grey:<playbook>`, `pirate:scihub`, …). Title stays `Full Text PDF`. The parent also gets a readable line ("Free copy from Unpaywall.") unless `[remarks].surface` is `off`. Prefer `paperful run` / `paperful attach` for gap-fills so the file is written on this machine.
+Attachments created through the API as `imported_url` open that storage slot without always finishing a local download. `linked_url` attachments (including a quota-full open-access pass) do not use that path: they open in the browser and do not raise this dialog. Paperful’s attach path is `imported_file`: the PDF is already on disk, then uploaded through the local write API. The Zotero attachment note is a provenance stamp (`paperful oa:unpaywall`, `campus:ezproxy`, `grey:<playbook>`, `pirate:scihub`, …). Title stays `Full Text PDF`. The parent also gets a readable line ("Free copy from Unpaywall.") unless `[remarks].surface` is `off`. Prefer `paperful run` / `paperful attach` for gap-fills so the file is written on your computer.
 
 [`paperful/attach.py`](../paperful/attach.py) subclasses `pyzotero._upload.Zupload` so filename spaces are sent as `%20`. That module is private. The dependency is pinned to `pyzotero>=1.15.1,<1.16`. It is not vendored.
 
@@ -324,17 +327,20 @@ payloads on read-only tools: `gaps`, `snowball_search` (dry-run), `snowball_tren
 parents), and `ask` (index only). Agent and MCP `export`
 build records in [`export_build.py`](../paperful/export_build.py) (notes omitted, no PDF
 copy). Proposal packs go through [`pack_bib.py`](../paperful/pack_bib.py). The CLI
-`export` command still overlays fields in `cli.py`, including the EndNote XML bundle
+`export` command overlays fields in `export_cmd.py`, including the EndNote XML bundle
 and `--pdfs`. Prefer `… --format json`
 from a shell. `paperful serve` (`paperful[serve]`) binds localhost HTTP: JSON
 capability routes (health, doctor, collections, last-run, dry-run `refs-gap` /
 `ask`) plus the server-rendered workbench (`paperful.ui` — Wanted, Discover,
 Ask, Library, Activity, System; Advanced Repair / Mirror / Index / Briefs / Settings).
+`mount_ui` registers HTML/form routes from `*_routes.py` modules; shared helpers stay in `app.py`.
 GUI long jobs enqueue under `state/gui/commands/`; Activity and post-submit pages
 subscribe to `GET /v1/runs/{id}/events` (SSE) with `GET /v1/runs/{id}` as JSON
 poll fallback. GUI writes use review tokens (`state/gui/reviews/`) then the same
-domain entrypoints as the CLI. Grab fetches to `out/` only; Attach and Apply
-write the catalogue. See [gui.md](gui.md).
+domain entrypoints as the CLI. Grab fetches to `out/`. Attach writes the catalogue
+when you press it (attachable pending only on the main Wanted button; mismatch
+and short PDF need Advanced), or during Grab when `[ui].attach_mode` is `auto`
+and the library can write. Apply writes the catalogue too. See [gui.md](gui.md).
 `collections add` is CLI-only (`--apply` writes) and is not an MCP tool.
 
 TTY-only paths (a GUI must not claim them): `session login`, `doctor --guide`,
@@ -428,8 +434,9 @@ stop at `no_identifier`.
 
 ## Related docs
 
-- [ROADMAP.md](ROADMAP.md) — 1.0 trust checklist; core vs maybe-later
+- [ROADMAP.md](ROADMAP.md) — 1.0 trust checklist; post-1.1 buffet by area; core vs maybe-later
 - [quiet-mirror.md](quiet-mirror.md) — `out/` as quiet browsable mirror (direction)
+- [firefox.md](firefox.md) — optional add-on; reads Zotero, writes the mirror only
 - [releases.md](releases.md) — 1.0 contract
 - [comparison.md](comparison.md) — where Paperful sits next to plugins and bib tools
 - [commands.md](commands.md) — CLI and disk artifacts

@@ -528,4 +528,4 @@ def test_roadmap_phase7_shipped_and_parked_stance():
     assert "Align `snowball apply` with saved `dedupe_scope`" in text
     assert "In-run create index" in text
     assert "expand = cited_authors" in text
-    assert "**Smart inbox (optional, later).**" in text
+    assert "**Smart inbox (config, shipped).**" in text

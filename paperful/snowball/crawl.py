@@ -7,6 +7,7 @@ from typing import Any
 from ..resolve import normalize_doi
 from .bibliography import recover_referenced_works
 from .candidate import Candidate
+from .citation_graph import merge_graph_links
 from .expand import (
     direction_sides,
     publication_year,
@@ -75,9 +76,10 @@ def _dedupe(rows: list[Candidate]) -> list[Candidate]:
             first[key] = row
             out.append(row)
             continue
+        existing = first[key]
+        merge_graph_links(existing, row)
         if row.hop < 1:
             continue
-        existing = first[key]
         keys = existing.biblio.setdefault("seed_keys", [])
         incoming = list(row.biblio.get("seed_keys") or [_seed_key(row)])
         for token in incoming:
@@ -192,7 +194,9 @@ def search_candidates(
     keyword_limit: int = 3,
     keyword_hop_limit: int = 50,
     keyword_min_score: float = 0.0,
+    search_keywords: bool = True,
     cites_query: str = "",
+    hop_end: int | None = None,
 ) -> list[Candidate]:
     _remember_keywords(
         client,
@@ -225,21 +229,76 @@ def search_candidates(
             why_prefix="search hit",
         )
         return []
+    by_oa: dict[str, dict[str, Any]] = {}
+    from_search: set[str] = set()
+    for work in works:
+        oa = short_id(str(work.get("id") or ""))
+        if oa:
+            by_oa[oa] = work
+            from_search.add(oa)
+    slugs: list[str] = []
+    if search_keywords:
+        try:
+            slugs = client.resolve_keyword_slugs(query, limit=max(1, keyword_limit))
+        except OpenAlexBudgetExceeded:
+            client.note("OpenAlex keyword resolve skipped — daily allowance spent")
+            slugs = []
+        except Exception as exc:
+            client.note(f"OpenAlex keyword resolve skipped · {exc}")
+            slugs = []
+        if slugs:
+            client.stage = "OpenAlex keyword tags"
+            client.note(f"OpenAlex keyword tags · {', '.join(slugs)}")
+            try:
+                tagged = client.works_by_keywords(
+                    slugs,
+                    limit=max_candidates,
+                    year_from=year_from,
+                    year_to=year_to,
+                )
+            except OpenAlexBudgetExceeded:
+                client.note("OpenAlex keyword tag fetch skipped — daily allowance spent")
+                tagged = []
+            except Exception as exc:
+                client.note(f"OpenAlex keyword tag fetch skipped · {exc}")
+                tagged = []
+            for work in tagged:
+                oa = short_id(str(work.get("id") or ""))
+                if oa and oa not in by_oa:
+                    by_oa[oa] = work
+    slug_set = set(slugs)
     rows: list[Candidate] = []
     expandable: list[dict[str, Any]] = []
-    for work in works:
+    for oa, work in by_oa.items():
+        owned = set(chosen_keywords(work, limit=0, min_score=0.0))
+        shared = [slug for slug in slugs if slug in owned] if slug_set else []
+        if shared and oa not in from_search:
+            why = f"OpenAlex keywords {', '.join(shared)}"
+        elif shared:
+            why = f"OpenAlex search · keywords {', '.join(shared)}"
+        else:
+            why = "OpenAlex search"
         row = work_to_candidate(
             work,
             run_id=run_id,
             seed=seed,
             hop=0,
             direction="search",
-            why="OpenAlex search",
+            why=why,
             gate=gate,
         )
+        if shared:
+            row.biblio["keyword_overlap"] = len(shared)
         if _mark_year(row, year_from, year_to):
             expandable.append(work)
         rows.append(row)
+    rows.sort(
+        key=lambda row: (
+            -int(row.biblio.get("keyword_overlap") or 0),
+            -float(row.score or 0),
+            row.ids.get("doi") or row.ids.get("openalex") or "",
+        )
+    )
     if depth >= 1:
         rows.extend(
             _expand_hops(
@@ -249,13 +308,14 @@ def search_candidates(
                 seed=seed,
                 gate=gate,
                 depth=depth,
-                direction=direction if direction != "search" else "refs",
+                direction=direction if direction != "search" else "refs+keywords",
                 per_hop_limit=per_hop_limit,
                 year_from=year_from,
                 year_to=year_to,
                 why_prefix="search hit",
                 min_seed_citations=min_seed_citations,
                 per_hop_rank=per_hop_rank,
+                hop_end=hop_end,
             )
         )
     return truncate(_dedupe(rows), max_candidates)
@@ -280,6 +340,7 @@ def doi_candidates(
     keyword_min_score: float = 0.0,
     cites_query: str = "",
     include_seeds: bool = True,
+    hop_end: int | None = None,
 ) -> tuple[list[Candidate], list[str]]:
     """Return each seed DOI (hop 0 when include_seeds), its neighbours, and failures."""
     _remember_keywords(
@@ -378,6 +439,7 @@ def doi_candidates(
                     why_prefix=doi,
                     min_seed_citations=min_seed_citations,
                     per_hop_rank=per_hop_rank,
+                    hop_end=hop_end,
                 )
             )
         _emit(client, rows)
@@ -408,6 +470,7 @@ def orcid_candidates(
     keyword_hop_limit: int = 50,
     keyword_min_score: float = 0.0,
     cites_query: str = "",
+    hop_end: int | None = None,
 ) -> tuple[list[Candidate], list[str]]:
     """One or more people's works (hop 0), then one expander over the combined seeds."""
     _remember_keywords(
@@ -472,6 +535,7 @@ def orcid_candidates(
                 why_prefix=why,
                 min_seed_citations=min_seed_citations,
                 per_hop_rank=per_hop_rank,
+                hop_end=hop_end,
             )
         )
     return truncate(_dedupe(rows), max_candidates), failed
@@ -700,6 +764,18 @@ def _defer(client: OpenAlexClient, exc: BaseException, **fields: Any) -> None:
             client.note(f"OpenAlex daily allowance for your API key is used up.{when}")
         else:
             client.note(keyless_limit_message(has_key=bool(client.api_key), reset_at=reset_at))
+        if client.store is not None:
+            if getattr(client.store, "has_cites_index", False):
+                client.note(
+                    "Snapshot store is configured — DOI/id and citing can continue "
+                    "from it; keywords / full-text search need resume after the API resets."
+                )
+            else:
+                client.note(
+                    "Snapshot store is configured — DOI/id lookups can continue from it; "
+                    "citing needs cites_index_glob (paperful openalex-store build-cites); "
+                    "keywords / full-text search need resume after the API resets."
+                )
     else:
         client.note(f"Crawl paused ({exc}). Partial queue kept. paperful snowball resume")
 
@@ -873,9 +949,16 @@ def _expand_hops(
     why_prefix: str,
     min_seed_citations: int = 0,
     per_hop_rank: str = "most-cited",
+    hop_start: int = 1,
+    hop_end: int | None = None,
+    seen_oa: set[str] | None = None,
 ) -> list[Candidate]:
-    """BFS from seed works through refs, cites, and/or keywords up to ``depth`` hops."""
-    if depth < 1:
+    """BFS from seed works through refs, cites, and/or keywords up to ``depth`` hops.
+
+    ``hop_end`` stops after that hop (inclusive). ``seen_oa`` skips works already queued.
+    """
+    end = depth if hop_end is None else min(hop_end, depth)
+    if end < 1 or hop_start > end:
         return []
     want_refs = _wants_refs(direction)
     want_cites = _wants_cites(direction)
@@ -889,10 +972,11 @@ def _expand_hops(
 
     rows: list[Candidate] = []
     frontier = list(seeds)
-    seen_oa: set[str] = {short_id(str(w.get("id") or "")) for w in seeds if w.get("id")}
-    seen_oa.discard("")
+    seen: set[str] = set(seen_oa or ())
+    seen.update(short_id(str(w.get("id") or "")) for w in seeds if w.get("id"))
+    seen.discard("")
 
-    for hop in range(1, depth + 1):
+    for hop in range(hop_start, end + 1):
         client.stage = f"hop {hop}/{depth}"
         client.note(f"hop {hop}/{depth} · {len(frontier)} seeds · {direction}")
         next_works: list[dict[str, Any]] = []
@@ -913,22 +997,22 @@ def _expand_hops(
         if want_refs:
             from .hops import hop_refs
 
-            if hop_refs(client, frontier, rows, next_works, seen_oa, **hop_kw):
+            if hop_refs(client, frontier, rows, next_works, seen, **hop_kw):
                 return rows
         if want_cites:
             from .hops import hop_cites
 
-            if hop_cites(client, frontier, rows, next_works, seen_oa, **hop_kw):
+            if hop_cites(client, frontier, rows, next_works, seen, **hop_kw):
                 return rows
         if want_keywords:
             from .hops import hop_keywords
 
-            if hop_keywords(client, frontier, rows, next_works, seen_oa, **hop_kw):
+            if hop_keywords(client, frontier, rows, next_works, seen, **hop_kw):
                 return rows
         if want_similar and hop == 1:
             from .hops import hop_similar
 
-            if hop_similar(client, frontier, rows, seen_oa, **hop_kw):
+            if hop_similar(client, frontier, rows, seen, **hop_kw):
                 return rows
         frontier = next_works
         if not frontier:
@@ -1103,6 +1187,7 @@ def hybrid_candidates(
     keyword_limit: int = 3,
     keyword_hop_limit: int = 50,
     keyword_min_score: float = 0.0,
+    search_keywords: bool = True,
     cites_query: str = "",
 ) -> tuple[list[Candidate], list[str]]:
     """Keyword hits, then one hop from the top DOI hits."""
@@ -1122,11 +1207,16 @@ def hybrid_candidates(
         keyword_limit=keyword_limit,
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
+        search_keywords=search_keywords,
         cites_query=cites_query,
     )
     ranked = sorted(
         [row for row in hits if row.ids.get("doi") and row.status != "error"],
-        key=lambda row: (-row.score, row.ids.get("doi") or ""),
+        key=lambda row: (
+            -int(row.biblio.get("keyword_overlap") or 0),
+            -row.score,
+            row.ids.get("doi") or "",
+        ),
     )
     limit = hybrid_seeds if max_candidates <= 0 else max(0, min(hybrid_seeds, max_candidates))
     seeds = [row.ids["doi"] for row in ranked[:limit]]
@@ -1340,7 +1430,7 @@ def continue_deferred(client: OpenAlexClient, deferred: dict[str, Any]) -> list[
             for key, value in (deferred.get("dois_by_orcid") or {}).items()
         }
         depth = int(deferred.get("depth") or 0)
-        direction = str(deferred.get("direction") or "refs")
+        direction = str(deferred.get("direction") or "refs+keywords")
         max_candidates = int(deferred.get("max_candidates") or per_hop or 50)
         failed: list[str] = []
         seed_works: list[dict[str, Any]] = []
@@ -1407,7 +1497,7 @@ def continue_deferred(client: OpenAlexClient, deferred: dict[str, Any]) -> list[
             current = str(seed.get("value") or "")
             people = ([current] if current else []) + remaining_orcids
             depth = int(deferred.get("depth") or 0)
-            direction = str(deferred.get("direction") or "refs")
+            direction = str(deferred.get("direction") or "refs+keywords")
             max_candidates = int(deferred.get("max_candidates") or per_hop or 50)
             failed = []
             seed_works: list[dict[str, Any]] = []

@@ -1,7 +1,7 @@
 # Build-local image against host Zotero / Ollama.
 #   cp .env.example .env
-#   # keep repo-local data: set PAPERFUL_DATA=. in .env
-#   # or: mkdir -p ../paperful-data && cp config.example.toml ../paperful-data/config.toml
+#   # keep repo-local data: PAPERFUL_DATA=. and PAPERFUL_OUT=./out
+#   # or sibling mounts: ../paperful-data + ../paperful-out (defaults)
 #   docker compose build
 #   docker compose up                 # GUI at http://127.0.0.1:8765 (assumes setup done)
 #   docker compose run --rm paperful doctor
@@ -25,8 +25,10 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      # Sibling data dir by default (packs/, out/, state/, config.toml).
+      # Durable config/state/packs (not the PDF tree).
       - ${PAPERFUL_DATA:-../paperful-data}:/data
+      # PDF mirror — separate mount so out/ can live on another disk/backup.
+      - ${PAPERFUL_OUT:-../paperful-out}:/data/out
     ports:
       # Localhost only (no LAN). Same workbench as host `paperful serve`.
       - "127.0.0.1:8765:8765"

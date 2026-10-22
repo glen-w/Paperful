@@ -8,8 +8,7 @@ import pytest
 from paperful import browser_agent as ba
 from paperful.browser_agent import BrowserAgentError, RecoverResult, recover_start_url
 from paperful.config import DEFAULT_SOURCES
-from paperful.pipeline import _SERIAL_SOURCES
-from paperful.routing import prior_playwright_miss, source_applicable
+from paperful.routing import SERIAL_SOURCES, prior_playwright_miss, source_applicable
 from paperful.sources import REGISTRY
 from paperful.sources.base import Candidate, Outcome
 from paperful.sources.browser_agent import find, set_runner
@@ -43,7 +42,7 @@ def stub_runner():
 def test_browser_agent_registered_serial_not_default():
     assert "browser_agent" in REGISTRY
     assert "browser_agent" not in DEFAULT_SOURCES
-    assert "browser_agent" in _SERIAL_SOURCES
+    assert "browser_agent" in SERIAL_SOURCES
 
 
 def test_browser_use_import_hides_pyzotero_request_logs(caplog):

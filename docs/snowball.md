@@ -8,6 +8,8 @@ OpenAlex keywords, depth up to 5 under caps, gates
 `--fetch-pdfs`, `--dedupe-scope` per invocation, optional `--dedupe-after`,
 opt-in author-site preflight / `snowball packs promote`, and pull-only `watch`
 are implemented, plus a frontier `digest` on a saved queue or watch.
+Optional [stopping rules](#stopping-rules) are off until you set them: one hop,
+then Keep/Skip, then `snowball continue`.
 Config honors `dedupe_scope`, `tag_prefix`, `default_tags`,
 `types`, `oa_only`, venues, `languages`, `min_seed_citations`,
 `note_provenance`, and `backends`. `--refine` writes query suggestions when
@@ -41,10 +43,12 @@ paperful snowball watch run bbnj --digest
 paperful snowball watch digest bbnj
 paperful snowball digest --run-id <run-id>
 paperful snowball watch briefing bbnj
+paperful snowball doi 10.1038/s41586-021-03819-2 --depth 3 --stop-rule marginal_yield
+paperful snowball continue <run-id>
 ```
 
 `--format json` on crawl (`search` / `hybrid` / `doi` / `orcid` / `collection`),
-`run`, `resume`, and `apply` prints one
+`run`, `resume`, `continue`, and `apply` prints one
 [`paperful.agent.json.v1`](commands.md#exits) object on stdout (run path +
 summary; progress on stderr). Mixed `apply` writes exit **3**. Prefer that
 over MCP for shell agents.
@@ -109,29 +113,36 @@ is the overlap with the prior frontier. If OpenAlex stopped early,
 new-only and keeps older proposals. Neither command creates library items. `--apply` with
 `-C` files a collection note tagged `paperful:frontier-briefing`. OA / grey
 stamps already on the row (`oa:…`, `grey:…`, `is_oa`, `oa_status`) are
-printed; there is no extra API call. Newsletter ingest stays later.
+printed; there is no extra API call. The **alert loop** (poll → ingest parents
+→ briefing) and weekly what-cites digest are [`keepup`](keepup.md). Standalone
+inbox apply:
+
+```text
+paperful snowball watch apply bbnj -C Inbox/Snowball          # dry-run
+paperful snowball watch apply bbnj -C Inbox/Snowball --apply  # parents + ingested.md
+```
 
 ### Schedule it yourself
 
-Paperful does not run a timer. Point cron, launchd, or a systemd user timer
-at `watch run --digest`. Replace the paths and the watch name.
+Paperful does not run a timer. Prefer [`keepup run`](keepup.md) for the full
+loop. For watch-only digest:
 
 Operators (Compose), from the repo:
 
 ```text
-15 7 * * 1 cd /path/to/paperful && docker compose run --rm paperful snowball watch run bbnj --digest
+15 7 * * 1 cd /path/to/paperful && docker compose run --rm paperful keepup run field --apply
 ```
 
 Contributors, on a host checkout:
 
 ```text
-15 7 * * 1 cd /path/to/library && uv run paperful snowball watch run bbnj --digest
+15 7 * * 1 cd /path/to/library && uv run paperful keepup run field --apply
 ```
 
 launchd and systemd below are the host-checkout form (`uv`). A Compose
 operator uses the cron line above (`docker compose run`).
 
-launchd (`~/Library/LaunchAgents/paperful.watch.bbnj.plist`):
+launchd (`~/Library/LaunchAgents/paperful.keepup.field.plist`):
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -139,7 +150,7 @@ launchd (`~/Library/LaunchAgents/paperful.watch.bbnj.plist`):
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>paperful.watch.bbnj</string>
+  <string>paperful.keepup.field</string>
   <key>WorkingDirectory</key>
   <string>/path/to/library</string>
   <key>ProgramArguments</key>
@@ -147,11 +158,10 @@ launchd (`~/Library/LaunchAgents/paperful.watch.bbnj.plist`):
     <string>/path/to/uv</string>
     <string>run</string>
     <string>paperful</string>
-    <string>snowball</string>
-    <string>watch</string>
+    <string>keepup</string>
     <string>run</string>
-    <string>bbnj</string>
-    <string>--digest</string>
+    <string>field</string>
+    <string>--apply</string>
   </array>
   <key>StartCalendarInterval</key>
   <dict>
@@ -216,9 +226,9 @@ A snowball profile is a named job in `profiles/`. `paperful run` and
 
 | Seed | What it collects | Default depth |
 | --- | --- | --- |
-| Keyword | OpenAlex title/abstract search. Pass several terms for one boolean query (AND by default; `--or` for any). One term is passed through unchanged | **0** — the hit list. Depth 1+ expands those hits and must be set explicitly. A global `depth = 1` does not expand every keyword hit |
+| Keyword | OpenAlex title/abstract search, plus (by default) works carrying matching OpenAlex keyword tags. Pass several terms for one boolean query (AND by default; `--or` for any). One term is passed through unchanged. Turn tags off with `search_keywords = false` or `--no-search-keywords` | **0** — the hit list. Depth 1+ expands those hits and must be set explicitly. A global `depth = 1` does not expand every keyword hit |
 | Hybrid | That hit list, then one hop from the top `hybrid_seeds` DOIs (default 5). Same multi-term rules as Keyword | The hop is always 1. `--depth` does not add further hops |
-| DOI | Each seed work (hop 0), then its neighbours (`referenced_works` and/or works that cite it). Pass several DOIs for one shared crawl | **1**, direction `refs` by default. Use `--direction cites` or `both` for cited-by |
+| DOI | Each seed work (hop 0), then its neighbours (`referenced_works` and/or works that cite it). Pass several DOIs for one shared crawl | **1**, direction `refs+keywords` by default. Use `--direction refs` to drop tags, or `cites` / `both` for cited-by |
 | ORCID | Those people’s works (ORCID public API, filled by OpenAlex author filter), then the same expander. Pass several ORCID iDs for one shared crawl | **1**. [One hop out](#how-a-hop-is-cut) from the combined works |
 | Collection | DOIs already in the seed collection path, then neighbours only | **1**. `-C` is the write target (defaults to the seed path) |
 
@@ -276,13 +286,23 @@ flowchart TB
 DOI and collection seeds use the same hop. For DOI, the seed work itself is
 included as hop 0, then neighbours. Collection expands DOIs already in the
 seed path. Keyword search stays on the hit list unless you set depth. The
-usual numbers are in [Stop rules](#stop-rules).
+usual numbers are in [Stop rules](#stop-rules). With a stopping rule on and
+depth greater than 1, that first command stops after hop 1 and waits. See
+[Stopping rules](#stopping-rules).
 
-`direction` including `keywords` adds another side. OpenAlex stores at most
-five scored keywords on a work. The hop takes the top `keyword_limit` (default
-3) at or above `keyword_min_score` and requests works with any of those slugs
-(`keywords.id:a|b|c`), then keeps `keyword_hop_limit` of them. `all` is refused
-on both keyword caps: the matching literature is not a closed neighbour list.
+`direction` including `keywords` adds another side (the built-in default is
+`refs+keywords`). OpenAlex stores at most five scored keywords on a work. The
+hop takes the top `keyword_limit` (default 3) at or above `keyword_min_score`
+and requests works with any of those slugs (`keywords.id:a|b|c`), then keeps
+`keyword_hop_limit` of them. `all` is refused on both keyword caps: the matching
+literature is not a closed neighbour list. Set `direction = "refs"` in config
+to restore reference-only hops.
+
+Keyword **search** (and hybrid hop 0) also uses those tags when
+`search_keywords` is on (default): the query is resolved via OpenAlex
+`/keywords`, then tagged works are unioned with full-text `search=` hits and
+ranked by tag overlap. `--no-search-keywords` or `search_keywords = false`
+keeps full-text retrieval only.
 
 Works with no topic have no keywords. That is about 12% of OpenAlex. When
 keywords are in the direction, the run says how many seeds have none and will
@@ -371,8 +391,9 @@ The picture is [How a hop is cut](#how-a-hop-is-cut).
 | Knob | Default | Meaning |
 | --- | --- | --- |
 | `depth` | 0 for keyword, 1 for DOI / ORCID / collection | Hops from the seed. Soft ceiling 5 |
-| `direction` | `refs` | `refs`, `cites`, `both`, `keywords`, `similar`, or combinations such as `refs+similar` and `refs+cites+keywords`. `both` stays references plus cited-by. `similar` is one ranked hop (shared references, plus Semantic Scholar recommendations), not a deeper crawl |
-| `keyword_limit` | 3 | How many of a work's OpenAlex keywords to expand. Integer 1–5. `all` and `0` are errors. 5 uses every keyword OpenAlex stored (at most five) |
+| `direction` | `refs+keywords` | `refs`, `cites`, `both`, `keywords`, `similar`, or combinations such as `refs+similar` and `refs+cites+keywords`. `both` stays references plus cited-by. `similar` is one ranked hop (shared references, plus Semantic Scholar recommendations), not a deeper crawl. Set `refs` to drop the keyword hop |
+| `search_keywords` | `true` | On `search` / `hybrid`, also pull works tagged with matching OpenAlex keywords (union with full-text hits). `--no-search-keywords` or `false` keeps full-text only |
+| `keyword_limit` | 3 | How many of a work's OpenAlex keywords to expand (and how many tag slugs search resolves). Integer 1–5. `all` and `0` are errors. 5 uses every keyword OpenAlex stored (at most five) |
 | `keyword_hop_limit` | 50 | Works kept per seed on the keyword side. A positive integer. `all` and `0` are errors. A keyword filter is an open query, so it never pages without a cap. Citation `per_hop_limit = all` still applies on a mixed run |
 | `keyword_min_score` | 0 | Drop seed keywords below this similarity. 0 keeps whatever OpenAlex already assigned |
 | `max_candidates` | 200 | Stops after this many `new` + `exists` rows. `all` (or `0`) keeps every row |
@@ -387,11 +408,47 @@ The picture is [How a hop is cut](#how-a-hop-is-cut).
 | `languages`, `venue_include`, `venue_exclude` | unset | Applied when the source has the field. A missing language does not drop the row |
 | `hybrid_seeds` | 5 | How many top DOI hits `hybrid` expands |
 | `approve_each_max` | 20 | Largest `approve-each` list. Above this, use `approve-batch` |
+| `stop_rule` | `off` | `off` walks the whole depth in one shot. `marginal_yield` pauses after each hop until Keep/Skip, then `snowball continue` (Discover: **Next hop**) expands only from kept rows. Also `asymptotic_coverage`, `budget`, and `any`. Depth, `per_hop_limit`, and `max_candidates` stay as ceilings. See [Stopping rules](#stopping-rules) |
+| `stop_eps` | `0.01` | `marginal_yield`: new Keeps divided by screened rows. Fires when that stays below this value |
+| `stop_k` | `2` | How many low-yield hops in a row. The rule does not fire before iteration `k + 1` |
+| `stop_tau` | `0.95` | `asymptotic_coverage`: fraction of a fitted Keep ceiling |
+| `stop_min_points` | `4` | Labeled hops required before that fit |
+| `stop_max_screened` | `0` | `budget`: screened new rows. `0` means no cap |
 | `refine` | false | With `[llm].enabled`, write up to five query suggestions. They do not start a second crawl |
 
 A seed that fails to resolve is `status = error`. Other seeds continue. The
 process exits non-zero if any seed failed, using the existing exit ladder
 (`2` for config / doctor).
+
+## Stopping rules
+
+`stop_rule` is off until you set it. The hop caps above still bound every crawl. Precedence is the usual one: built-in default, then `[snowball]` in `config.toml`, then a snowball profile, then flags.
+
+With a rule on and depth greater than 1, the first command fetches hop 1 and waits. Keyword depth 0 fetches the hit list only. `hybrid` is already one hop, so the rule scores that hop and does not walk further. Mark each new row Keep or Skip, then:
+
+```text
+paperful snowball continue <run-id>
+```
+
+The next hop expands only from kept `new` rows that have an OpenAlex id or a DOI. Screened rows are `status = new` on the open hop. `exists`, `filtered`, and `error` are not that batch. `approve-batch` does not pre-mark those rows as Skip while a rule is on, so they stay unlabeled until you set Keep or Skip.
+
+`--gate auto` on `continue` counts every unlabeled new row as Keep. Discover stays a dry-run search. Advanced Graph has Stop rule, Stop eps, Stop k, and Stop max screened. **Next hop** appears on the queue while the run is waiting.
+
+CLI flags on `search`, `hybrid`, `doi`, `orcid`, `collection`, `run`, and `profile save`: `--stop-rule`, `--stop-eps`, `--stop-k`, `--stop-max-screened`. `stop_tau` and `stop_min_points` are config and profile keys only.
+
+`continue` is not `resume`. `resume` finishes a crawl that OpenAlex paused (`deferred.json`). `continue` refuses while that file is present. If the pause happens on a later hop, resume first, then continue.
+
+| Rule | Fires when |
+| --- | --- |
+| `marginal_yield` | New Keeps / screened rows stay below `stop_eps` for `stop_k` hops, and not before hop `k + 1` |
+| `asymptotic_coverage` | Cumulative Keeps reach `stop_tau` of a fitted ceiling, after `stop_min_points` hops |
+| `budget` | Screened new rows reach `stop_max_screened` (`0` means no cap) |
+| `any` | The first of those three, or an empty kept frontier |
+| `exhaustion` | No kept work left to expand. Recorded on every hop. Stops the crawl even when another rule is selected |
+
+Each hop appends one line per rule to `state/snowball/<run-id>/stops.jsonl` (`paperful.snowball.stop.v1`), including rules that did not fire. The stopping sentence is in `stop.json` (`rationale`) and is meant for a methods section. `summary.json` records `stop_rule`, `stop_awaiting_labels`, and `stopped_by`. A depth ceiling or a full `max_candidates` budget stops the walk as well and says so (`stopped_by` `depth` or `max_candidates`).
+
+This is the saturation idea from SnowBallSLR, reimplemented here. It does not estimate how much of the literature you have found.
 
 ## Progress
 
@@ -493,7 +550,8 @@ then flags on the command.
 [snowball]
 enabled = false          # doctor and the CLI refuse snowball until true
 depth = 1                # keyword runs still default to depth 0
-direction = "refs"
+direction = "refs+keywords"
+search_keywords = true   # search/hybrid also unions OpenAlex keyword tags
 max_candidates = 200
 per_hop_limit = 50         # all keeps every neighbour of a seed
 per_hop_rank = "most-cited"  # most-cited | least-cited | random
@@ -514,6 +572,12 @@ dedupe_after = "off"     # off | classify | apply
 author_site_preflight = false
 author_site_max_authors = 15
 author_site_max_queries = 20
+stop_rule = "off"        # off | marginal_yield | asymptotic_coverage | budget | any
+stop_eps = 0.01
+stop_k = 2
+stop_tau = 0.95          # config and profile only; no CLI flag
+stop_min_points = 4
+stop_max_screened = 0    # budget; 0 means no cap
 ```
 
 `[searxng].base_url` (or `SEARXNG_BASE_URL`) is an optional metasearch for
@@ -694,12 +758,18 @@ environment, never in `config.toml`.
 
 If API limits or shared-IP budgets are the bottleneck, download the
 [OpenAlex snapshot](https://help.openalex.org/access/snapshot/) yourself — on
-this machine or a host you control — and configure `[openalex_store]`. Paperful
-does not ship the dump. v1 queries via SSH + DuckDB on the data host and serves
-DOI / OpenAlex-id batches only; everything else still hits the live API.
+your computer or a host you control — and configure `[openalex_store]`. Paperful
+does not ship the dump. Backends: `local_duckdb` (this machine) or
+`ssh_duckdb` (DuckDB on the data host). DOI / OpenAlex-id batches use the works
+parquet. Citing (citation-map expand, `--direction cites`) needs
+`paperful openalex-store build-cites` then `cites_index_glob` (resumable per
+works `updated_date`). Store
+cites-query matching is title-only. Keywords / ORCID / full-text search still
+hit the live API. When the API daily budget is spent, DOI/id and citing keep
+using the snapshot; the rest pause for `resume`.
 
 Setup and TOML: [config Advanced](config.md#openalex-api-limits-and-snapshot-store).
-Roadmap for cites/search parity and campus HTTP hosting:
+Roadmap for full search parity and campus HTTP hosting:
 [ROADMAP](ROADMAP.md#snowball).
 
 ## Where the crawl comes from
@@ -744,11 +814,81 @@ existing PDF lane. It is not a snowball source. Screening a RIS file stays
 with ASReview. Created items keep clean creators, DOI, and date so Better
 BibTeX citekeys still make sense. Snowball does not depend on that plugin.
 
+## Citation map
+
+**Explore** (Discover panel) seeds a tiny queue from one DOI or title, auto-expands
+one hop, and opens **Map** for ad-hoc hops and **Add to library**. **Seed search**
+on a map node fills the Topic form (DOI kind + seeds) for a full snowball run.
+
+Discover **Map** draws the current queue before you open PDFs. Node colour is
+year × `cited_by_count`:
+
+| Pattern | Role |
+| --- | --- |
+| Older + highly cited | foundational |
+| Recent + highly cited | influential |
+| Recent + fewer citations | emerging |
+
+Highly cited means at least 50 citations, or the median of the non-seed papers
+on this map when that median is higher. Recent means the last five years.
+
+**Literature categories** are a second layer (badges and filter chips), orthogonal
+to roles. Defaults map OpenAlex `study_designs` and work `type` onto:
+
+| Category id | Matches |
+| --- | --- |
+| `evidence-synthesis` | study designs: systematic-review, meta-analysis |
+| `trials` | study design: randomized-controlled-trial |
+| `clinical-trials` | study design: clinical-trial (non-RCT interventional; RCTs may also carry this when OpenAlex dual-tags) |
+| `observational` | study design: observational-study |
+| `case-reports` | study design: case-report |
+| `protocols` | study design: study-protocol |
+| `narrative-reviews` | type: review |
+| `preprints` | type: preprint, posted-content |
+| `books` | type: book, book-chapter, edited-book |
+| `commentary` | type: editorial, letter, paratext |
+
+Config `[snowball].map_categories` chooses which ids appear.
+`[snowball].map_category_defs` adds custom rules (`any_study_designs` and/or
+`any_types`). Graph JSON carries `category_legend`, and each node has
+`study_designs` plus `categories`. Untagged OpenAlex works stay uncategorised.
+
+Click a paper to Keep or Skip it, or to expand one hop (papers it cites, or
+papers that cite it). Expand merges neighbours into the same dry-run queue.
+It does not create Zotero items. The drawing code follows the personal-site
+force layout (zoom, drag, hover focus, side panel); nodes here are works,
+not people.
+
+**Library on the map.** Nodes already in the library show a **LIB** badge and
+a dark ring. The side panel lists `item_key`, whether a PDF is on disk, and
+(when `[ui].citation_map_edit` is not `off`) library actions:
+
+| Action | Behaviour |
+| --- | --- |
+| Add to library | Creates one parent (uses staged collection/tags/note, else the collection chip) |
+| Find PDF | Runs Grab for that one `item_key` (Wanted path) |
+| Remove from library | Trashes the item (`[ui].citation_map_remove = trash`) |
+| Save tags / note / collection | Stages on the queue row; applies live when the paper is already in the library |
+| Open in Zotero / Summary | Deep links when `item_key` / PDF exist |
+
+Defaults: `citation_map_edit = both`, `citation_map_auto_search = false`
+(Find PDF after Add is opt-in), `citation_map_remove = trash`.
+
+`state/snowball/<run-id>/citation_graph.json` is `paperful.citation_graph.v1`,
+rebuilt from `candidates.jsonl`. Hops store `biblio.graph_links` so an edge
+knows which paper it came from. The map caps at 150 nodes. Keyword and similar neighbours appear on the map
+without citation edges — only refs/cites hops draw links. Use **Repair links**
+on Discover when an older queue is missing `graph_links`. Optional overlays:
+read-first triage, a year scrubber, path-between-two-papers inside the current
+graph, library neighbours (ghost nodes from your mirror, not added to the queue),
+and watch/compare badges when you open Discover with `?watch_name=` or
+`?compare_run=`.
+
 ## Out of this lane
 
-- A hosted discovery service, a force-directed graph, or a second OpenAlex browser
+- A hosted discovery service or corpus-scale OpenAlex browser (Explore is one seed + hops, not the whole public graph)
 - A built-in scheduler or cron helper (call `watch run` yourself), or a snowball step inside `paperful all`
-- A TUI or local web reviewer
+- A dedicated screening TUI. Discover Keep/Skip and **Next hop** are the reviewer when a stopping rule is on
 - Sci-Hub or Scholar as ways to discover works
 - Pulling every publication of every cited author, until an explicit capped switch exists
 

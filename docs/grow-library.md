@@ -48,7 +48,8 @@ The screenshots are the Discover page on a live `ocean/BBNJ` chip.
 5. **Fill PDFs** opens Wanted. Continue with [First fill](first-fill.md).
 
 Advanced (toggle, cookie only) adds crawl kinds (hybrid / DOI / ORCID /
-collection), hop knobs, profile save/run, **refs gap**, and **ingest-dois**.
+collection), hop knobs, a stopping rule (off unless you set it; **Next hop**
+between hops), profile save/run, **refs gap**, and **ingest-dois**.
 Those are the [research pack](research-pack.md) and [snowball](snowball.md)
 surfaces, not the first click.
 
@@ -67,14 +68,14 @@ not a keyword hop.
 
 ![Discover People: suggestions ticked, members already on the list](_static/workflows/discover-people.png)
 
-Paperful does not live-scrape ResearchGate or LinkedIn. Save a follows page
-and **Import**. Details: [Author watch](authorwatch.md).
+Save a follows page from ResearchGate or LinkedIn and **Import**.
+Details: [Author watch](authorwatch.md).
 
 ## What to notice
 
 - Discover creates **parents**. Wanted fills **PDFs**. Do not conflate them
   with `run`.
-- There is no scheduler. **Check again** is the re-run.
+- **Check again** re-runs the same search.
 - `snowball watch` (saved keyword profile) is not `authorwatch` and not the
   PDF `inbox watch`.
 

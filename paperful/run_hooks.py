@@ -21,7 +21,7 @@ from .runreport import write_command_report
 from .store import Manifest
 
 def stdin_is_tty() -> bool:
-    from . import cli as cli_mod
+    from . import cli_runtime as cli_mod
 
     return cli_mod._stdin_is_tty()
 

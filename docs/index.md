@@ -1,16 +1,19 @@
 # Paperful documentation
 
 New here? [paperful.app](https://paperful.app/), then
-[Walkthroughs](walkthroughs.md). Search order: [How it works](how-it-works.md).
+[Walkthroughs](walkthroughs.md). Four ways to wire it up:
+[Example setups](example-setups.md). Search order:
+[How it works](how-it-works.md).
 
 Paperful is a **local workbench** for a Zotero library you already keep.
 Open access first; campus EZProxy when you have it. **Zotero is well tested.**
-Mendeley and EndNote are seeking testers. Not a sync client. Not every
-paywalled PDF. [Terms](TERMS.md).
+Mendeley and EndNote are seeking testers. You keep a folder copy on this
+machine and attach the PDFs you trust. [Terms](TERMS.md).
 
-`docker compose build`, then `docker compose up` →
-`http://127.0.0.1:8765` ([GUI](gui.md)). No `docker pull`, no PyPI.
+Clone the repo, then `docker compose build` and `docker compose up` →
+`http://127.0.0.1:8765` ([GUI](gui.md)).
 [Docker](docker.md) (light / heavy packs). CLI: `docker compose run --rm paperful …`.
+Host CLI without Docker: `pip install paperful` ([releases](releases.md#releases-and-stability)).
 Contributors: [`uv`](https://docs.astral.sh/uv/). Stability: [releases](releases.md).
 Why this shape: [Why Paperful](why.md).
 
@@ -20,6 +23,7 @@ Why this shape: [Why Paperful](why.md).
 
 how-it-works
 walkthroughs
+example-setups
 first-fill
 grow-library
 tidy-library
@@ -28,6 +32,7 @@ why
 docker
 zotero
 commands
+firefox
 workflows
 research-pack
 dedupe
@@ -53,6 +58,7 @@ sessions
 scihub
 serpapi
 camofox
+ai
 llm
 rag
 browser-agent-models
@@ -66,6 +72,7 @@ comparison
 comparison-reference
 snowball
 authorwatch
+keepup
 bbnj-author-lanes
 e2e-stack
 e2e-nba

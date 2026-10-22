@@ -91,6 +91,7 @@ def test_wanted_rows_counts(tmp_path):
     data = wanted_rows(cfg, items, manifest)
     assert data["counts"]["have"] == 1
     assert data["counts"]["missing"] == 1
+    assert data["counts"]["attach"] == 1
     assert "%" not in str(data["counts"])
 
 
@@ -110,6 +111,55 @@ def test_resolve_wanted_tab_defaults_to_first_non_empty():
     assert resolve_wanted_tab(None, {"missing": 0, "held": 4, "have": 0}) == "held"
     assert resolve_wanted_tab(None, {"missing": 2, "held": 4, "have": 0}) == "missing"
     assert resolve_wanted_tab("held", {"missing": 2, "held": 0, "have": 0}) == "held"
+
+
+def test_resolve_discover_tab_defaults_and_guards_grow():
+    from paperful.ui.pages import resolve_discover_tab
+
+    assert (
+        resolve_discover_tab(
+            None,
+            advanced=False,
+            has_candidates=True,
+            has_following=True,
+            explore_picks=False,
+            list_requested=False,
+        )
+        == "queue"
+    )
+    assert (
+        resolve_discover_tab(
+            "grow",
+            advanced=False,
+            has_candidates=False,
+            has_following=False,
+            explore_picks=False,
+            list_requested=False,
+        )
+        == "topic"
+    )
+    assert (
+        resolve_discover_tab(
+            "grow",
+            advanced=True,
+            has_candidates=False,
+            has_following=False,
+            explore_picks=False,
+            list_requested=False,
+        )
+        == "grow"
+    )
+    assert (
+        resolve_discover_tab(
+            None,
+            advanced=False,
+            has_candidates=False,
+            has_following=False,
+            explore_picks=False,
+            list_requested=True,
+        )
+        == "people"
+    )
 
 
 def test_nest_collection_rows_groups_paths():
@@ -289,36 +339,38 @@ def test_job_view_normalizes_command_record():
     assert view["summary"]["pdf"] == 0
 
 
-def test_last_job_result_prefers_matching_run(tmp_path):
-    import os
-    import time
+def test_keep_matches_legacy_top_level_doi(tmp_path):
+    from paperful.ui.jobs import set_snowball_keep
 
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    run = cfg.state_dir / "snowball" / "run1"
+    run.mkdir(parents=True)
+    row = {"schema": "paperful.snowball.candidate.v1", "title": "One", "doi": "10.1/legacy"}
+    (run / "candidates.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+    set_snowball_keep(cfg, "run1", ["10.1/legacy"], False)
+    saved = json.loads((run / "candidates.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    assert saved["keep"] is False
+    assert saved["ids"]["doi"] == "10.1/legacy"
+    assert saved["biblio"]["title"] == "One"
+
+
+def test_last_job_result_prefers_matching_run(tmp_path):
     from paperful.ui import commands
 
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     cfg.state_dir.mkdir(parents=True)
-    base = time.time()
-
-    def write_with_mtime(cmd_id: str, record: dict, offset: float) -> None:
-        commands.write_command(cfg, record)
-        path = cfg.state_dir / "gui" / "commands" / f"{cmd_id}.json"
-        ts = base + offset
-        os.utime(path, (ts, ts))
-
-    write_with_mtime(
-        "old",
-        {"id": "old", "verb": "ask", "status": "done", "result": {"answer": "old"}},
-        1.0,
+    # "old" is written last so its file mtime is newest; created time must win.
+    commands.write_command(
+        cfg,
+        {"id": "new", "verb": "ask", "status": "queued", "created": 30, "result": {}},
     )
-    write_with_mtime(
-        "new",
-        {"id": "new", "verb": "ask", "status": "queued", "result": {}},
-        2.0,
+    commands.write_command(
+        cfg,
+        {"id": "ingest", "verb": "rag_ingest", "status": "queued", "created": 20, "result": {}},
     )
-    write_with_mtime(
-        "ingest",
-        {"id": "ingest", "verb": "rag_ingest", "status": "queued", "result": {}},
-        3.0,
+    commands.write_command(
+        cfg,
+        {"id": "old", "verb": "ask", "status": "done", "created": 10, "result": {"answer": "old"}},
     )
     by_run = last_job_result(cfg, "ask", run="old")
     assert by_run["id"] == "old"

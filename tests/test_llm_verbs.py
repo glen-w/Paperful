@@ -340,6 +340,31 @@ def test_summarize_no_text_raises(llm_cfg, monkeypatch):
         summarize.summarize_item(llm_cfg, make_item(has_pdf=True), None, None)
 
 
+def test_summarize_items_skips_no_text_and_writes_miss(llm_cfg, monkeypatch):
+    """Empty PDFs are skipped (not failed) and land on the miss/skip ledger."""
+    _ground(monkeypatch, summarize, text="")
+    stub = StubLLM(text="<p>should not run</p>")
+    monkeypatch.setattr(summarize, "get_client", lambda cfg: stub)
+    empty = make_item(key="EMPTY001", has_pdf=True, title="Scan only")
+    batch = summarize.summarize_items(
+        llm_cfg, [empty], None, None, dest="disk"
+    )
+    assert batch.summarized == 0 and batch.failed == 0
+    assert batch.skipped == 1 and batch.skipped_no_text == 1
+    assert batch.rows[0].status == "skipped"
+    assert "no PDF text" in batch.rows[0].reason
+    assert not stub.calls
+    assert llm_cfg.summarize_skip_path.is_file()
+    miss = summarize.write_summarize_miss_digest(llm_cfg, batch.rows)
+    assert miss is not None and miss.is_file()
+    assert "EMPTY001" in miss.read_text()
+
+    again = summarize.summarize_items(
+        llm_cfg, [empty], None, None, dest="disk"
+    )
+    assert again.skipped_no_text == 1 and not stub.calls
+
+
 def test_summarize_custom_prompt_changes_sha(llm_cfg, monkeypatch, tmp_path):
     _ground(monkeypatch, summarize)
     monkeypatch.setattr(summarize, "get_client", lambda cfg: StubLLM(text="<p>s</p>"))
@@ -825,8 +850,45 @@ def test_map_reduce_raises_after_three_passes(llm_cfg, tmp_path):
             self.calls.append(request.prompt)
             return "Z" * 2000
 
-    with pytest.raises(ReduceCapError, match="3 reduce passes"):
-        map_reduce(llm_cfg, Big(), ["A" * 500, "B" * 500], "T")
+    stub = Big()
+    with pytest.raises(ReduceCapError, match="forecast"):
+        map_reduce(llm_cfg, stub, ["A" * 500, "B" * 500], "T")
+    assert len(stub.calls) == 2
+
+
+def test_map_reduce_finishes_when_third_pass_packs_to_one(
+    llm_cfg, tmp_path, monkeypatch
+):
+    from paperful import synthesize as syn_mod
+    from paperful.synthesize import map_reduce
+
+    monkeypatch.setattr(syn_mod, "_probe_reduce_fit", lambda *a, **k: None)
+
+    prompt = tmp_path / "p.md"
+    prompt.write_text("T")
+    llm_cfg.synthesize_prompt_template = str(prompt)
+    llm_cfg.synthesize_max_context_chars = 1000
+
+    class Staged(StubLLM):
+        def complete(self, request):
+            self.calls.append(request.prompt)
+            if request.prompt.startswith("T\n"):
+                return "<p>done</p>"
+            n = sum(1 for c in self.calls if c.startswith("You are synthesising"))
+            return "Z" * (2000 if n <= 4 else 80)
+
+    stub = Staged()
+    body, first = map_reduce(llm_cfg, stub, ["A" * 500, "B" * 500], "T")
+    assert first == 2 and "<p>done</p>" in body
+    assert len(stub.calls) == 7
+
+
+def test_forecast_reduce_and_pack_length_groups():
+    from paperful.synthesize import forecast_reduce, pack_length_groups
+
+    assert pack_length_groups([500, 500], 1000) == [500, 500]
+    assert forecast_reduce(2, 2000, 935) > 1
+    assert forecast_reduce(8, 80, 935) == 1
 
 
 def _two_sources(cfg):

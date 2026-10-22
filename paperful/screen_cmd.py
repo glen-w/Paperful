@@ -33,7 +33,7 @@ def run_screen(
     config: Path | None,
     fmt: str,
 ) -> None:
-    from . import cli as cli_mod
+    from . import cli_runtime as cli_mod
     from .screen import apply_screen, screen_items
 
     if cli_mod._scope_unset(collection, library, profile, run_config):

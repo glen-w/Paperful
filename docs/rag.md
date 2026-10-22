@@ -51,14 +51,15 @@ ollama pull nomic-embed-text        # default embedding model
 ```
 
 `ask` also needs a chat model: follow [llm.md](llm.md) and set
-`[llm].enabled = true`.
+`[llm].enabled = true`. For local vs hosted scale (including embeddings cost
+order of magnitude), see [AI for notes and Ask](ai.md).
 
 LanceDB ships wheels for Apple Silicon, Linux (x86_64, aarch64) and Windows.
-There is no wheel for Intel macOS; on an Apple Silicon Mac make sure the
-environment uses an arm64 Python (`uv venv --python /opt/homebrew/bin/python3`)
-and not an x86_64 build under Rosetta. The **heavy** Compose image
-(`PAPERFUL_IMAGE_MODE=heavy`) includes `[rag]`; **light** (CI default) does
-not. See [Docker](docker.md#image-mode-light-vs-heavy).
+On an Apple Silicon Mac, use an arm64 Python
+(`uv venv --python /opt/homebrew/bin/python3`). On Intel macOS, run Ask from
+the **heavy** Compose image (`PAPERFUL_IMAGE_MODE=heavy`), which includes
+`[rag]`. **light** (CI default) is the `[serve]` pack. See
+[Docker](docker.md#image-mode-light-vs-heavy).
 
 ## Configure
 
@@ -104,7 +105,9 @@ and the commands say so.
 ### Parser
 
 `light` uses `pdftotext` (Poppler), with `pypdf` as fallback. It is fast and
-keeps page numbers; section headings are detected by rule.
+keeps page numbers; section headings are detected by rule (synonym list shared
+with [`extract-sections`](rag.md#structured-sections-mirror-only) via
+`paperful/sections/headings.py`).
 
 `docling` reads layout and gives cleaner headings and tables, at a large cost in
 install size (it pulls in PyTorch) and time:
@@ -235,10 +238,36 @@ uv run paperful rag answered --from-file qs.txt --after-item AAAA1111
 `state/rq-answered/<stamp>/` (`paperful.rq_answered.v1`). `--after-item`
 keeps only newer years and drops the asking paper from retrieval.
 
+### Structured sections (mirror-only)
+
+`paperful extract-sections` is **not** part of the LanceDB index. It reads the
+same mirror PDFs (or `state/rag/text/<key>.json` when ingest already cached
+pages) and writes IMRaD-shaped fields to `state/sections/<key>.json`
+(`paperful.sections.v1`). The deterministic lane always runs; `--llm` fills
+only missing MVP fields when `[llm].enabled` and `[extract_sections].llm` (or
+`--llm` on the CLI). It does not write Zotero notes and does not require
+`[rag].enabled`.
+
+Use `rag questions` when you need a corpus-wide RQ queue for `rag answered`.
+Use `extract-sections` when you want structured `abstract`, `methodology`,
+`conclusion`, and `research_questions` beside each item for scripts, gap
+context, or downstream synthesis — without HTML summaries.
+
+```bash
+uv run paperful extract-sections -C ocean/BBNJ
+uv run paperful extract-sections --library --llm --dry-run
+```
+
+Heading synonyms ship in the tree; merge publisher-specific titles from
+`state/section-headings.toml` or `[extract_sections].headings`. See
+[config.md](config.md#section-extract-extract-sections).
+
+(workbench-advanced-index)=
 ### Workbench (Advanced Index)
 
-With `[rag]` and `[llm]` on, the workbench **Ask** page runs threaded Ask and
-batch Ask. Advanced **Index** covers ingest, search, extract questions,
+**Ask** is on the default nav. With `[rag]` and `[llm]` on, that page runs
+threaded Ask. Batch Ask is on the same page when Advanced is on. Advanced
+**Index** covers ingest, search, extract questions,
 already-answered checks, and synthesize. Scope follows the collection chip
 (plus optional item keys, years, types, top-k). Custom system prompts on
 Ask/batch, in order:

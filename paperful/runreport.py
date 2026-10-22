@@ -772,3 +772,86 @@ def _fmt_errors(errors: dict[str, int]) -> str:
         f"{k}={v}" for k, v in sorted(errors.items(), key=lambda kv: (-kv[1], kv[0]))
     )
     return f"{total}  ({parts})"
+
+
+def nightshift_counts_line(report: dict[str, Any]) -> str:
+    """One-line status for Nightshift index lines (matches jobs/paperful-summarize/run.sh)."""
+    import collections
+
+    s, items = report["summary"], report["items"]
+    why = collections.Counter(
+        i.get("reason", "")[:60]
+        for i in items
+        if i["status"] in ("failed", "missing")
+    )
+    top = "; ".join("%d× %s" % (n, t) for t, n in why.most_common(2))
+    failed = "%s%s" % (s["failed"], " (%s)" % top if top else "")
+    left = s.get("not_reached", 0)
+    cmd = report.get("command", "")
+    if cmd == "ocr":
+        return (
+            "text layer added: %s · failed: %s · already had text: %s · not checked: %s"
+            % (s["ocr"], failed, s["skipped"], left)
+        )
+    if cmd == "rag-ingest":
+        return (
+            "indexed: %s PDFs, %s abstracts · passages: %s · removed: %s · failed: %s · unchanged: %s"
+            % (s["pdf"] + s["ocr"], s["abstract"], s["chunks"], s["removed"], failed, s["unchanged"])
+        )
+    if cmd == "fix-metadata":
+        applied = s.get("patches_applied", 0)
+        errs = sum(s.get("errors_by_type", {}).values())
+        kinds = ", ".join(
+            "%s=%s" % (k, v)
+            for k, v in sorted(s.get("fields_corrected_by_kind", {}).items())[:4]
+        )
+        extra = (" · %s" % kinds) if kinds else ""
+        chunk = ""
+        if s.get("scope_total") is not None and s.get("checked") is not None:
+            chunk = "checked %s/%s (offset %s) · " % (
+                s.get("checked", 0),
+                s.get("scope_total", 0),
+                s.get("offset", 0),
+            )
+        return (
+            "%sproposed: %s · applied: %s/%s · fields corrected: %s · apply errors: %s%s"
+            % (
+                chunk,
+                s.get("patches_proposed", 0),
+                applied,
+                s.get("patches_proposed", 0),
+                s.get("fields_corrected", 0),
+                errs,
+                extra,
+            )
+        )
+    done = [i.get("reason", "") for i in items if i["status"] == "summarized"]
+    new = sum(1 for how in done if not how)
+    notes = sum(1 for how in done if not how or how.startswith(("attached", "synced note")))
+    if s.get("dest") == "disk":
+        notes = 0
+    no_text = int(s.get("skipped_no_text") or 0)
+    if not no_text:
+        no_text = sum(
+            1
+            for i in items
+            if i.get("status") == "skipped"
+            and "no PDF text" in str(i.get("reason") or "")
+        )
+    already = max(0, int(s.get("skipped", 0)) - no_text)
+    end = ""
+    if left:
+        flags = report.get("flags") or {}
+        max_new = flags.get("max_new", new + 1)
+        end = " (batch done)" if new >= max_new else " (out of time)"
+    no_text_bit = (" · no text: %s" % no_text) if no_text else ""
+    return (
+        "new summaries: %s · notes written: %s · failed: %s · already done: %s%s · not reached: %s%s"
+        % (new, notes, failed, already, no_text_bit, left, end)
+    )
+
+
+def nightshift_report_new_count(report: dict[str, Any]) -> int:
+    """New model summaries in a summarize run report (skips do not count)."""
+    done = [i.get("reason", "") for i in report["items"] if i["status"] == "summarized"]
+    return sum(1 for how in done if not how)

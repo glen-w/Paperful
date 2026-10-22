@@ -177,6 +177,16 @@ inbox_app = typer.Typer(
     ),
 )
 app.add_typer(inbox_app, name="inbox")
+capture_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    invoke_without_command=True,
+    help=(
+        "Save a browser page into the quiet mirror. Reads Zotero so a stale "
+        "snapshot cannot create a second item. Does not attach or create in the library."
+    ),
+)
+app.add_typer(capture_app, name="capture")
 htmlpdf_app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
@@ -228,6 +238,16 @@ authorwatch_app = typer.Typer(
     ),
 )
 app.add_typer(authorwatch_app, name="authorwatch")
+keepup_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help=(
+        "Alert loop and collection digests: poll watches / authorwatch / "
+        "what-cites, then apply into -C. Paperful does not schedule; "
+        "call keepup run from cron."
+    ),
+)
+app.add_typer(keepup_app, name="keepup")
 collections_app = typer.Typer(
     add_completion=False,
     invoke_without_command=True,
@@ -240,6 +260,15 @@ cache_app = typer.Typer(
     help="Manage throwaway files under state/pdf-cache/.",
 )
 app.add_typer(cache_app, name="cache")
+openalex_store_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help=(
+        "Optional OpenAlex parquet snapshot helpers (local or SSH DuckDB). "
+        "Most installs leave [openalex_store] unset and use the live API."
+    ),
+)
+app.add_typer(openalex_store_app, name="openalex-store")
 
 # Canonical top-level verbs. tests/test_cli.py asserts this matches `paperful --help`.
 JOBS: dict[str, tuple[str, ...]] = {
@@ -253,8 +282,9 @@ JOBS: dict[str, tuple[str, ...]] = {
         "twenty",
         "reachout",
         "authorwatch",
+        "keepup",
     ),
-    "find": ("run", "attach", "recover", "gaps", "inbox", "urls", "htmlpdf"),
+    "find": ("run", "attach", "recover", "gaps", "inbox", "capture", "urls", "htmlpdf"),
     "completeness": (
         "lint",
         "screen",
@@ -265,6 +295,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "ocr",
         "ocr-ignore",
         "summarize",
+        "extract-sections",
         "synthesize",
         "rag",
         "ask",
@@ -285,16 +316,88 @@ JOBS: dict[str, tuple[str, ...]] = {
         "pack",
         "profile",
         "playbooks",
+        "openalex-store",
         "mcp",
         "serve",
     ),
-    "utility": ("report", "version", "jobs"),
+    "utility": (
+        "report",
+        "run-report-counts",
+        "run-report-new-count",
+        "version",
+        "jobs",
+    ),
 }
 
-console = Console(highlight=False)
-
-def _stdin_is_tty() -> bool:
-    return sys.stdin.isatty()
+from .cli_runtime import (
+    console,
+    _OFFLINE,
+    _stdin_is_tty,
+    _bind_run,
+    _scope_unset,
+    _refuse_missing_scope,
+    _inbox_library_when_unscoped,
+    _take_scope,
+    _item_progress,
+    _track,
+    _spinner,
+    _load_scope,
+    _cfg,
+    _typer_opt,
+    _typer_enum_value,
+    _resolve_source_names,
+    _source_list,
+    _zotero,
+    _env_code,
+    _zotero_next_steps,
+    _print_exit_ladder,
+    _exit_env,
+    _warn_if_scihub,
+    _warn_if_recover,
+    _warn_if_camofox,
+    _require_manager,
+    _manager_name,
+    _offline,
+    _try_live,
+    _mirror_first,
+    _open_library,
+    _live_backend,
+    _connect,
+    _no_write,
+    _flush,
+    _scope_error,
+    _scope_keys,
+    _resolve_types,
+    _apply_item_filters,
+    _loaded_scope,
+    _opt_bool,
+    _child_bytes,
+    _print_attachment_table,
+    _print_version_table,
+    _print_dedupe_table,
+    _ezproxy_headed_login_and_probe,
+    _ensure_ezproxy_session,
+    _preflight_ezproxy_session,
+    _mid_run_ezproxy_hook,
+    _maybe_ezproxy_relogin,
+    _run_session_handoff,
+    _inbox_handoff_session,
+    _mirror_deferred,
+    _library_write_api,
+    _run_flags,
+    _agent_json,
+    _emit_agent,
+    _agent_wins,
+    _finish_run,
+    _load_last_run,
+    _rag_require,
+    _rag_embedder,
+    _rag_open,
+    _rag_auto,
+    _print_hits,
+    _ask_once,
+    _ask_questions,
+)
 
 ConfigOpt = typer.Option(
     None, "--config", "-c", help="Path to config.toml", exists=True, dir_okay=False
@@ -339,6 +442,14 @@ KeywordMinScoreOpt = typer.Option(
     "--keyword-min-score",
     help="Drop seed keywords below this similarity. 0 keeps whatever OpenAlex assigned.",
 )
+SearchKeywordsOpt = typer.Option(
+    None,
+    "--search-keywords/--no-search-keywords",
+    help=(
+        "On keyword search/hybrid, also pull works tagged with matching OpenAlex keywords "
+        "(union with full-text hits). Default: config, else on."
+    ),
+)
 CitesQueryOpt = typer.Option(
     None,
     "--cites-query",
@@ -376,6 +487,30 @@ AuthorSitePreflightOpt = typer.Option(
     None,
     "--author-site-preflight/--no-author-site-preflight",
     help="Opt-in co-author graph and proposed field pack. Default: config.",
+)
+StopRuleOpt = typer.Option(
+    None,
+    "--stop-rule",
+    help=(
+        "off, marginal_yield, asymptotic_coverage, budget, or any. "
+        "Off walks every hop in one shot. A rule pauses after each hop for Keep/Skip. "
+        "Default: config, else off."
+    ),
+)
+StopEpsOpt = typer.Option(
+    None,
+    "--stop-eps",
+    help="marginal_yield: Keep rate below this. Default 0.01.",
+)
+StopKOpt = typer.Option(
+    None,
+    "--stop-k",
+    help="Consecutive low-yield iterations. The rule cannot fire before iteration k+1. Default 2.",
+)
+StopMaxScreenedOpt = typer.Option(
+    None,
+    "--stop-max-screened",
+    help="budget: stop after this many screened new rows. 0 means no cap.",
 )
 TwentyWritebackOpt = typer.Option(
     None,
@@ -542,47 +677,6 @@ SkipOpt = typer.Option(
     help="Omit this step (repeatable or comma-separated).",
 )
 
-def _bind_run(cfg: Config, **kwargs: Any) -> ResolvedRunConfig:
-    try:
-        return resolve_run_config(cfg, **kwargs)
-    except RunConfigError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1) from exc
-
-def _scope_unset(
-    collection: list[str],
-    library: bool | None,
-    profile: str | None,
-    run_config: Path | None,
-) -> bool:
-    return not profile and run_config is None and not collection and library is None
-
-def _refuse_missing_scope() -> None:
-    console.print("[red]Give --collection PATH (repeatable) or --library.[/]")
-    raise typer.Exit(1)
-
-def _inbox_library_when_unscoped(
-    collection: list[str],
-    library: bool | None,
-    profile: str | None,
-    run_config: Path | None,
-) -> bool | None:
-    """Shared drop folder: default to whole-library DOI match when scope is omitted."""
-    if _scope_unset(collection, library, profile, run_config):
-        return True
-    return library
-
-def _take_scope(
-    bound: ResolvedRunConfig,
-) -> tuple[list[str], bool, int | None, int | None, list[str]]:
-    return (
-        bound.collections,
-        bound.library,
-        bound.year_from,
-        bound.year_to,
-        bound.types,
-    )
-
 class WriteDest(str, Enum):
     disk = "disk"
     zotero = "zotero"
@@ -593,452 +687,6 @@ class SummarizeOrder(str, Enum):
     oldest = "oldest"
     library = "library"
 
-def _item_progress(*, json_out: bool = False, transient: bool = False):
-    """Live bar that stays below scrolling per-item logs.
-
-    ``json_out`` keeps stdout pure: the bar moves to stderr, and only on a
-    terminal — except live E2E (``PAPERFUL_E2E=1``), which babysits over a pipe
-    and still wants progress on stderr.
-    """
-    live = Console(stderr=True, highlight=False) if json_out else console
-    e2e = os.environ.get("PAPERFUL_E2E") == "1"
-    # Off a terminal a spinner has nothing to show, and JSON runs stay quiet.
-    quiet = (json_out or transient) and not live.is_terminal and not e2e
-    return item_progress(live, disable=quiet, transient=transient)
-
-def _track(progress, description: str) -> Track:
-    return tracker(progress, description)
-
-@contextmanager
-def _spinner(
-    text: str, *, json_out: bool = False
-) -> Iterator[Callable[[str], None]]:
-    """Spinner and clock for one slow call that has no item count.
-
-    Yields a function that replaces the text. The line clears when done.
-    """
-    with _item_progress(json_out=json_out, transient=True) as progress:
-        task_id = progress.add_task(text, total=None)
-        yield lambda msg: progress.update(task_id, description=msg)
-
-def _load_scope(backend: LibraryBackend, *, json_out: bool = False, **scope: Any):
-    """``_loaded_scope`` behind a spinner that shows the loader's own status."""
-    with _spinner("Connecting to library scope…", json_out=json_out) as say:
-        return _loaded_scope(backend, status=say, **scope)
-
-def _cfg(path: Path | None) -> Config:
-    try:
-        cfg = load_config(path)
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1) from exc
-    cfg.out_dir.mkdir(parents=True, exist_ok=True)
-    cfg.state_dir.mkdir(parents=True, exist_ok=True)
-    return cfg
-
-def _typer_opt(value: Any, default: Any = None) -> Any:
-    """Unwrap Typer OptionInfo/ArgumentInfo when a command is called as a function.
-
-    ``paperful all`` dispatches verbs via ``_call_step``; omitted options then
-    arrive as OptionInfo objects instead of their Python defaults.
-    """
-    from typer.models import ArgumentInfo, OptionInfo
-
-    if isinstance(value, (OptionInfo, ArgumentInfo)):
-        raw = value.default
-        if raw is ... or isinstance(raw, (OptionInfo, ArgumentInfo)):
-            return default
-        return raw
-    return value
-
-def _typer_enum_value(value: Any) -> str | None:
-    """``Enum.value`` after ``_typer_opt``, or None."""
-    value = _typer_opt(value)
-    if value is None:
-        return None
-    return value.value if hasattr(value, "value") else str(value)
-
-def _resolve_source_names(sources: str | None, preset: str | None) -> list[str] | None:
-    """Return explicit source names from --sources or --preset, or None to use config."""
-    if preset:
-        key = preset.strip().lower()
-        if key not in SOURCE_PRESETS:
-            console.print(
-                f"[red]Unknown preset '{preset}'.[/] Known: {', '.join(sorted(SOURCE_PRESETS))}"
-            )
-            raise typer.Exit(1)
-        return list(SOURCE_PRESETS[key])
-    if not sources:
-        return None
-    token = sources.strip().lower()
-    if token in SOURCE_PRESETS:
-        return list(SOURCE_PRESETS[token])
-    return [s.strip() for s in sources.split(",") if s.strip()]
-
-def _source_list(
-    cfg: Config, sources: str | None, enable_scihub: bool, preset: str | None = None
-) -> list[str]:
-    """Configured order, optional --sources/--preset override, then optional --scihub append."""
-    resolved = _resolve_source_names(sources, preset)
-    listed = resolved if resolved is not None else list(cfg.sources)
-    if enable_scihub and "scihub" not in listed:
-        listed.append("scihub")
-    return listed
-
-def _zotero(*, quiet: bool = False) -> ZoteroLocal:
-    zl = ZoteroLocal()
-    try:
-        info = zl.ping()
-    except ConnectionError as exc:
-        _exit_env(str(exc))
-    except Exception as exc:  # Zotero not running
-        from .zot import zotero_local_label
-
-        _exit_env(f"Cannot reach Zotero local API at {zotero_local_label()}: {exc}")
-    if not quiet:
-        console.print(
-            f"[dim]Zotero {info.get('zotero_version') or '?'}, local API v{info['api_version']}, write support: "
-            f"{'yes' if info['supports_write'] else 'no (Zotero 10+ needed)'}[/]"
-        )
-    return zl
-
-def _env_code(message: str) -> str:
-    low = message.lower()
-    if "no write support" in low or "needs zotero 10" in low:
-        return "zotero_no_write"
-    if "local api is disabled" in low or "allow other applications" in low:
-        return "zotero_api_off"
-    if "400" in low and "host" in low:
-        return "zotero_bad_host"
-    if any(
-        token in low
-        for token in ("nodename", "name or service not known", "name resolution")
-    ):
-        return "zotero_host_unresolved"
-    if any(
-        token in low
-        for token in (
-            "cannot reach",
-            "connection refused",
-            "unreachable",
-            "timed out",
-            "connect",
-        )
-    ):
-        return "zotero_down"
-    return ""
-
-def _zotero_next_steps(code: str, *, in_doctor: bool) -> list[str]:
-    host = os.environ.get("PAPERFUL_ZOTERO_HOST", "").strip()
-    host_tip = (
-        "Host Zotero must be running on this machine. The Host header is always "
-        "localhost:23119; PAPERFUL_ZOTERO_HOST is only the TCP address. "
-        "See docs/zotero.md."
-    )
-    if code == "zotero_api_off":
-        steps = [
-            "Settings → Advanced → enable “Allow other applications on this computer to communicate with Zotero”.",
-            "See docs/zotero.md.",
-        ]
-    elif code == "zotero_no_write":
-        steps = [
-            "Attach needs Zotero 10+. This build can still download PDFs to out/.",
-            "Upgrade, then run paperful attach. See docs/zotero.md.",
-        ]
-    elif code == "zotero_host_unresolved":
-        configured = host or "the configured host"
-        steps = [
-            f"{configured} does not resolve on this machine. Unset PAPERFUL_ZOTERO_HOST when running outside Docker.",
-            "The Host header is always localhost:23119. See docs/zotero.md.",
-        ]
-    elif code in {"zotero_down", "zotero_bad_host"}:
-        steps = [
-            "The local mirror does not need Zotero. This command reads the live library, which is not reachable.",
-        ]
-        if host or code == "zotero_bad_host":
-            steps.append(host_tip)
-        steps.append(
-            "When you want this command to use the library, start Zotero and enable the local API."
-        )
-    else:
-        steps = [
-            "The local mirror does not need Zotero. This command reads the live library, which is not reachable.",
-            "When you want this command to use the library, start Zotero and enable the local API.",
-        ]
-        if host:
-            steps.append(host_tip)
-    if not in_doctor and code != "zotero_no_write":
-        steps.append("Run paperful doctor for a full check.")
-    if code not in {"zotero_no_write", "zotero_api_off"}:
-        steps.append(
-            "If you have no config yet: cp config.example.toml config.toml and set email."
-        )
-    return steps
-
-def _print_exit_ladder(
-    cfg: Config | None = None, *, code: str = "", in_doctor: bool = False
-) -> None:
-    manager = (cfg.manager if cfg else "zotero") or "zotero"
-    manager = manager.strip().lower()
-    if manager == "mendeley":
-        console.print(
-            "\n[bold]Next steps[/]\n"
-            "  1. Register an app at https://dev.mendeley.com/myapps.html\n"
-            "     (redirect http://127.0.0.1:8765/callback).\n"
-            "  2. Set [mendeley] client_id / client_secret in config.toml.\n"
-            "  3. Run [bold]paperful session login mendeley[/].\n"
-            "  4. Run [bold]paperful doctor[/].\n"
-        )
-        return
-    if manager == "endnote":
-        console.print(
-            "\n[bold]Next steps[/]\n"
-            '  1. Set [endnote] library = "/path/to/Library.enl".\n'
-            "  2. Confirm the matching .Data folder (sdb/sdb.eni, PDF/) is beside it.\n"
-            "  3. Run [bold]paperful doctor[/].\n"
-        )
-        return
-    steps = _zotero_next_steps(code, in_doctor=in_doctor)
-    body = "\n".join(f"  {i}. {step}" for i, step in enumerate(steps, start=1))
-    console.print(f"\n[bold]Next steps[/]\n{body}\n")
-
-def _exit_env(message: str, cfg: Config | None = None, *, code: str = "") -> None:
-    console.print(f"[red]{message}[/]")
-    _print_exit_ladder(cfg, code=code or _env_code(message))
-    raise typer.Exit(2)
-
-def _warn_if_scihub(source_list: list[str]) -> None:
-    if "scihub" in source_list:
-        console.print(f"[red]{SCIHUB_DISCLAIMER}[/]")
-
-def _warn_if_recover(source_list: list[str]) -> None:
-    if "browser_agent" in source_list:
-        console.print(f"[orange3]{RECOVER_DISCLAIMER}[/]")
-
-
-def _warn_if_camofox(source_list: list[str]) -> None:
-    if "camofox" in source_list:
-        console.print(f"[orange3]{CAMOFOX_DISCLAIMER}[/]")
-
-
-def _require_manager(cfg: Config) -> None:
-    manager = (cfg.manager or "zotero").strip().lower()
-    if manager not in KNOWN_MANAGERS:
-        console.print(
-            f"[red]Unknown manager={manager!r}.[/] Known: zotero, mendeley, endnote."
-        )
-        raise typer.Exit(1)
-
-def _manager_name(cfg: Config) -> str:
-    return (cfg.manager or "zotero").strip().lower() or "zotero"
-
-_OFFLINE = False
-
-def _offline() -> bool:
-    """``--offline`` or ``PAPERFUL_OFFLINE=1``: leave the manager alone."""
-    return _OFFLINE or os.environ.get("PAPERFUL_OFFLINE", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-    }
-
-def _try_live(cfg: Config, *, quiet: bool = False) -> tuple[LibraryBackend | None, str]:
-    """The manager itself, or (None, reason) when it is not reachable."""
-    manager = _manager_name(cfg)
-    try:
-        if manager == "zotero":
-            zl = ZoteroLocal()
-            info = zl.ping()
-            if not quiet:
-                console.print(
-                    f"[dim]Zotero {info.get('zotero_version') or '?'}, "
-                    f"local API v{info.get('api_version')}, write support: "
-                    f"{'yes' if info.get('supports_write') else 'no'}[/]"
-                )
-            return mirrored(cfg, get_backend(cfg, zl)), ""
-        backend = mirrored(cfg, get_backend(cfg))
-        info = backend.ping()
-        if not quiet and manager == "mendeley":
-            console.print(
-                f"[dim]Mendeley {info.get('display_name') or '?'}, write support: yes[/]"
-            )
-        elif not quiet and manager == "endnote":
-            console.print(
-                f"[dim]EndNote {info.get('library') or '?'}, "
-                f"{info.get('refs', '?')} refs, writes via import bundle[/]"
-            )
-        return backend, ""
-    except Exception as exc:
-        return None, str(exc)
-
-def _mirror_first(cfg: Config, live: LibraryBackend, *, quiet: bool) -> LibraryBackend:
-    """Refresh the mirror from ``live`` and read from it."""
-
-    def say(msg: str) -> None:
-        if not quiet:
-            console.print(f"[dim]{msg}[/]")
-
-    try:
-        return open_library(cfg, live=live, status=say)
-    except LibraryError as exc:
-        _exit_env(str(exc), cfg)
-
-def _open_library(cfg: Config, *, quiet: bool = False) -> tuple[LibraryBackend | None, str]:
-    """The library, or (None, reason) when the manager is not reachable.
-
-    A missing manager does not stop work that can stay on the local mirror.
-    """
-    if _offline():
-        return None, "offline was asked for"
-    live, reason = _try_live(cfg, quiet=quiet)
-    if live is None:
-        return None, reason
-    return _mirror_first(cfg, live, quiet=quiet), ""
-
-def _live_backend(cfg: Config, *, quiet: bool = False) -> LibraryBackend:
-    """The manager itself, for verbs that compare it with the mirror. Exits 2 when it is down."""
-    manager = (cfg.manager or "zotero").strip().lower()
-    if _offline():
-        _exit_env(f"This command reads {manager} directly and cannot run offline.", cfg)
-    if manager == "zotero":
-        zl = _zotero(quiet=quiet)
-        return mirrored(cfg, get_backend(cfg, zl))
-    try:
-        backend = mirrored(cfg, get_backend(cfg))
-        info = backend.ping()
-    except LibraryError as exc:
-        _exit_env(str(exc), cfg)
-    except Exception as exc:
-        _exit_env(f"Cannot reach {manager}: {exc}", cfg)
-    if not quiet:
-        if manager == "mendeley":
-            who = info.get("display_name") or "?"
-            console.print(f"[dim]Mendeley {who}, write support: yes[/]")
-        elif manager == "endnote":
-            console.print(
-                f"[dim]EndNote {info.get('library') or '?'}, "
-                f"{info.get('refs', '?')} refs, writes via import bundle[/]"
-            )
-    return backend
-
-def _connect(cfg: Config, *, quiet: bool = False) -> LibraryBackend:
-    """The library for a command: the mirror, refreshed when the manager answers.
-
-    With the manager down and a mirror on disk, reads carry on from the mirror
-    and writes are refused. With neither, exits 2.
-    """
-    catalogue = MirrorCatalogue(cfg.out_dir)
-    if _offline():
-        if not catalogue.usable():
-            _exit_env("Offline, and there is no mirror under out/ to work from.", cfg)
-        if not quiet:
-            console.print(f"[dim]Offline. Working from {catalogue.age_line()}.[/]")
-        return MirrorFirstBackend(cfg, catalogue, None)
-    if not catalogue.usable():
-        # Nothing on disk yet: the manager has to be there. Exits 2 with next steps.
-        return _mirror_first(cfg, _live_backend(cfg, quiet=quiet), quiet=quiet)
-    live, reason = _try_live(cfg, quiet=quiet)
-    if live is None:
-        if not quiet:
-            console.print(
-                f"[yellow]{_manager_name(cfg)} is not reachable ({reason}). "
-                f"Working from {catalogue.age_line()}. Nothing will be written to it.[/]"
-            )
-        return MirrorFirstBackend(cfg, catalogue, None)
-    return _mirror_first(cfg, live, quiet=quiet)
-
-def _no_write(backend: LibraryBackend) -> str:
-    if getattr(backend, "live", backend) is None:
-        return "The library is not reachable, so nothing can be written to it."
-    return "This library has no write support."
-
-def _flush(backend: LibraryBackend) -> None:
-    behind = getattr(backend, "unrefreshed", None)
-    err = Console(stderr=True, highlight=False)
-    if behind:
-        err.print(
-            f"[yellow]{len(behind)} item(s) changed in the library but not yet in "
-            f"the mirror. paperful snapshot brings them in.[/]"
-        )
-    fn = getattr(backend, "flush_writes", None)
-    if not callable(fn):
-        return
-    path = fn()
-    if path is None:
-        return
-    err.print(f"[green]EndNote import bundle[/] {path}")
-    err.print(
-        "[dim]In EndNote: File → Import → File → paperful.xml "
-        "(import option: EndNote Generated XML).[/]"
-    )
-
-def _scope_error(exc: ScopeError) -> None:
-    console.print(f"[red]{exc}[/]")
-    raise typer.Exit(1) from exc
-
-def _scope_keys(
-    backend: LibraryBackend, collection: list[str], library: bool
-) -> tuple[list[str] | None, str]:
-    try:
-        return resolve_keys(backend, collection, library)
-    except ScopeError as exc:
-        _scope_error(exc)
-
-def _resolve_types(item_type: list[str]) -> frozenset[str] | None:
-    try:
-        return resolve_item_types(item_type)
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1)
-
-def _apply_item_filters(
-    items: list,
-    scope: str,
-    *,
-    year_from: int | None = None,
-    year_to: int | None = None,
-    item_types: frozenset[str] | None = None,
-    label: bool = True,
-) -> tuple[list, str]:
-    """Filter by year and/or item type; optionally append labels to scope."""
-    try:
-        return filter_scope_items(
-            items,
-            scope,
-            year_from=year_from,
-            year_to=year_to,
-            item_types=item_types,
-            annotate=label,
-        )
-    except ScopeError as exc:
-        _scope_error(exc)
-
-def _loaded_scope(
-    backend: LibraryBackend,
-    *,
-    collection: list[str],
-    library: bool,
-    year_from: int | None,
-    year_to: int | None,
-    item_type: list[str],
-    item_keys: list[str] | None = None,
-    pdfs_only: bool = False,
-    status: Callable[[str], None] | None = None,
-):
-    try:
-        return load_scope(
-            backend,
-            item_keys=item_keys,
-            collections=collection,
-            library=library,
-            year_from=year_from,
-            year_to=year_to,
-            item_types=_resolve_types(item_type),
-            pdfs_only=pdfs_only,
-            status=status,
-        )
-    except ScopeError as exc:
-        _scope_error(exc)
 
 @app.callback()
 def _main(
@@ -1049,8 +697,9 @@ def _main(
     ),
 ) -> None:
     """paperful."""
-    global _OFFLINE
-    _OFFLINE = offline
+    from . import cli_runtime as _rt
+
+    _rt._OFFLINE = offline
 
 @app.command()
 def jobs() -> None:
@@ -1092,95 +741,6 @@ def serve(
 def version() -> None:
     console.print(__version__)
 
-def _collect_doctor_checks(cfg: Config, *, probe: bool = False) -> list[Check]:
-    try:
-        return run_checks(cfg, ZoteroLocal(), probe=probe)
-    except Exception:
-        return run_checks(cfg, None, probe=probe)
-
-def _print_doctor_table(checks: list[Check]) -> None:
-    table = Table(title="paperful doctor")
-    table.add_column("Check")
-    table.add_column("Status")
-    table.add_column("Detail")
-    colour = {"green": "green", "amber": "yellow", "red": "red"}
-    for ch in checks:
-        table.add_row(ch.name, f"[{colour[ch.status]}]{ch.status}[/]", ch.detail)
-    console.print(table)
-
-def _wait_doctor_continue() -> bool:
-    """Wait for Enter. Return False if the user stops (EOF / interrupt)."""
-    console.print("[dim]Press Enter when done (Ctrl-C to stop guide)…[/]")
-    try:
-        input()
-        return True
-    except EOFError:
-        return False
-    except KeyboardInterrupt:
-        console.print("\n[dim]Guide stopped.[/]")
-        return False
-
-def _print_doctor_remediations(cfg: Config, checks: list[Check]) -> None:
-    """Print amber/red fix steps once (no Enter wait)."""
-    docker = in_docker()
-    pending = actionable_checks(checks, cfg, docker=docker)
-    if not pending:
-        return
-    console.print("\n[bold]Fixes[/] — apply these, then re-run doctor.\n")
-    for check, text in pending:
-        colour = "red" if check.status == "red" else "yellow"
-        console.print(f"[{colour}]• {check.name}[/] ({check.status})")
-        console.print(f"[dim]{check.detail}[/]")
-        console.print(text)
-        console.print()
-
-def _guide_doctor(
-    cfg: Config, checks: list[Check], *, probe: bool = False
-) -> list[Check]:
-    """Walk amber/red remediations interactively; re-check after each step."""
-    docker = in_docker()
-    pending = actionable_checks(checks, cfg, docker=docker)
-    if not pending:
-        return checks
-
-    console.print(
-        "\n[bold]Guide[/] — fix the checks below one at a time. "
-        "Sessions need a headed browser"
-        + (" on the host" if docker else "")
-        + "; this process only re-checks.\n"
-    )
-    for check, _text in pending:
-        name = check.name
-        checks = _collect_doctor_checks(cfg, probe=probe)
-        current = next((c for c in checks if c.name == name), None)
-        if current is None or current.status == "green":
-            if current is not None:
-                console.print(f"[green]✓ {name}[/] already green — skipping.")
-            continue
-        text = remediation_text(current, cfg, docker=docker)
-        if not text:
-            continue
-        colour = "red" if current.status == "red" else "yellow"
-        console.print(f"\n[{colour}]• {current.name}[/] ({current.status})")
-        console.print(f"[dim]{current.detail}[/]")
-        console.print(text)
-        if not _wait_doctor_continue():
-            break
-        # Reload config so email / path edits are picked up mid-guide.
-        cfg = _cfg(cfg.config_path)
-        checks = _collect_doctor_checks(cfg, probe=probe)
-        updated = next((c for c in checks if c.name == name), None)
-        if updated is None:
-            continue
-        if updated.status == "green":
-            console.print(f"[green]✓ {name} is green[/]")
-        else:
-            console.print(f"[yellow]Still {updated.status}:[/] {updated.detail}")
-
-    console.print()
-    _print_doctor_table(checks)
-    return checks
-
 @app.command()
 def doctor(
     config: Path | None = ConfigOpt,
@@ -1199,66 +759,15 @@ def doctor(
     ),
 ) -> None:
     """Check Zotero, paths, email, and optional browser sessions (green / amber / red)."""
-    cfg = _cfg(config)
-    checks = _collect_doctor_checks(cfg, probe=probe)
-    if as_json:
-        payload = [
-            {
-                "name": c.name,
-                "status": c.status,
-                "code": c.code,
-                "detail": c.detail,
-            }
-            for c in checks
-        ]
-        sys.stdout.write(json.dumps(payload, indent=2) + "\n")
-        if has_red(checks):
-            raise typer.Exit(2)
-        return
-    _print_doctor_table(checks)
+    from .doctor_cmd import run_doctor
 
-    actionable = actionable_checks(checks, cfg)
-    if guide is None:
-        # Compose sets tty: true even for `docker compose up`, where Enter/Ctrl-C
-        # belong to Compose — not a usable interactive guide. Opt in with
-        # `docker compose run --rm paperful doctor --guide`.
-        want_guide = _stdin_is_tty() and not in_docker()
-    else:
-        want_guide = guide
-    if want_guide and actionable:
-        checks = _guide_doctor(cfg, checks, probe=probe)
-    elif actionable and not want_guide:
-        _print_doctor_remediations(cfg, checks)
-        if in_docker():
-            console.print(
-                "[dim]Step-by-step re-check:[/] "
-                "[bold]docker compose run --rm paperful doctor --guide[/]"
-            )
-        else:
-            console.print(
-                "[dim]Step-by-step re-check:[/] "
-                "[bold]paperful doctor --guide[/]"
-            )
-
-    if has_red(checks):
-        code = next((c.code for c in checks if c.status == "red" and c.code), "")
-        _print_exit_ladder(cfg, code=code, in_doctor=True)
-        raise typer.Exit(2)
-
-def _print_collections_table(cfg: Config, backend: LibraryBackend) -> None:
-    with _spinner("Counting collections…"):
-        cols = backend.collections()
-        counts = backend.collection_counts()
-    table = Table(title=f"{cfg.manager} collections (counts include subcollections)")
-    table.add_column("Path")
-    table.add_column("Items", justify="right")
-    table.add_column("No PDF", justify="right")
-    table.add_column("Key", style="dim")
-    for c in sorted(cols.values(), key=lambda c: c.path.lower()):
-        n, missing = counts.get(c.key, (0, 0))
-        depth = c.path.count("/")
-        table.add_row(("  " * depth) + c.name, str(n), str(missing), c.key)
-    console.print(table)
+    run_doctor(
+        console,
+        config=config,
+        guide=guide,
+        probe=probe,
+        as_json=as_json,
+    )
 
 @collections_app.callback(invoke_without_command=True)
 def collections_root(
@@ -1268,18 +777,44 @@ def collections_root(
     """Show the collection tree with item counts and how many lack a PDF."""
     if ctx.invoked_subcommand is not None:
         return
-    cfg = _cfg(config)
-    _require_manager(cfg)
-    backend = _connect(cfg)
-    _print_collections_table(cfg, backend)
+    from .collections_cmd import run_collections_show
+
+    run_collections_show(console, config=config)
+
 
 @collections_app.command("list")
 def collections_list(config: Path | None = ConfigOpt) -> None:
     """Show the collection tree with item counts and how many lack a PDF."""
-    cfg = _cfg(config)
-    _require_manager(cfg)
-    backend = _connect(cfg)
-    _print_collections_table(cfg, backend)
+    from .collections_cmd import run_collections_show
+
+    run_collections_show(console, config=config)
+
+
+@collections_app.command("children")
+def collections_children_cmd(
+    parent: str = typer.Option(
+        "ocean",
+        "--parent",
+        "-p",
+        help="Parent collection path (default: ocean).",
+    ),
+    exclude: str = typer.Option(
+        "BBNJ",
+        "--exclude",
+        help="Child collection name to omit (default: BBNJ).",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Print child collection paths under --parent (for night batch scripts)."""
+    from .collections_cmd import run_collections_children_paths
+
+    for path in run_collections_children_paths(
+        parent=parent,
+        exclude_name=exclude or None,
+        config=config,
+    ):
+        print(path)
+
 
 @collections_app.command("add")
 def collections_add_cmd(
@@ -1303,76 +838,20 @@ def collections_add_cmd(
     fmt: str = AgentFormatOpt,
 ) -> None:
     """File existing item keys into a collection. Dry-run unless --apply. Does not create items."""
-    from dataclasses import asdict as _asdict
+    from .collections_cmd import run_collections_add
 
-    from .agent_json import envelope
-    from .agent_ops import collections_add_exit
-    from .collections_add import apply_adds, classify_rows, keys_from_file, write_summary
-
-    if apply and dry_run:
-        console.print("[red]Pass either --dry-run or --apply, not both.[/]")
-        raise typer.Exit(1)
-    cfg = _cfg(config)
-    json_out = _agent_json(fmt)
-    bound = _bind_run(cfg, profile=profile, run_config=run_config, collection=collection)
-    collection, _library, _yf, _yt, _types = _take_scope(bound)
-    if not collection:
-        _refuse_missing_scope()
-    keys = keys_from_file(keys_file)
-    if not keys:
-        console.print("No keys to add.")
-        raise typer.Exit(0)
-    backend = _connect(cfg, quiet=json_out)
-    try:
-        target = backend.resolve_collection(collection[0])
-    except LookupError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1) from exc
-    batch = classify_rows(
-        keys,
-        backend,
-        collection_key=target.key,
-        collection_path=target.path,
-    )
-    if apply:
-        _require_manager(cfg)
-        if not backend.supports_write():
-            _exit_env("collections add --apply needs library write support.", cfg)
-        apply_adds(backend, batch, target.key)
-        _flush(backend)
-    folder = write_summary(cfg.state_dir, target.path, batch)
-    counts = batch.counts()
-    payload = envelope(
-        command="collections add",
-        summary=counts,
-        items=[_asdict(row) for row in batch.rows],
-        paths={"summary": str(folder)},
-        flags={"apply": apply, "dry_run": not apply},
-        exit_code=collections_add_exit(
-            apply=apply, added=int(counts["added"]), failed=int(counts["failed"])
-        ),
+    run_collections_add(
+        console,
+        collection=collection,
+        keys_file=keys_file,
+        apply=apply,
+        dry_run=dry_run,
+        profile=profile,
+        run_config=run_config,
+        config=config,
+        fmt=fmt,
     )
 
-    def _human_add() -> None:
-        table = Table(title="collections add")
-        table.add_column("Key")
-        table.add_column("Status")
-        table.add_column("Title")
-        table.add_column("Detail")
-        for row in batch.rows:
-            table.add_row(row.key, row.status, (row.title or "")[:50], row.detail)
-        console.print(table)
-        pending = int(counts["add"])
-        console.print(
-            f"added {counts['added']} · already-in {counts['already_in']} · "
-            f"not-found {counts['not_found']}"
-            + (f" · would-add {pending}" if not apply else "")
-            + (f" · failed {counts['failed']}" if counts["failed"] else "")
-            + (" (dry-run)" if not apply else "")
-        )
-        console.print(f"Summary: {folder}")
-
-    _emit_agent(payload, json_out=json_out, human=_human_add)
 
 @app.command()
 def lint(
@@ -1600,6 +1079,12 @@ def fix_metadata(
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
+    offset: int = typer.Option(
+        0,
+        "--offset",
+        help="Skip the first N items in library/collection order before applying --limit.",
+        min=0,
+    ),
     apply: bool | None = ApplyOpt,
     overwrite: bool | None = OverwriteOpt,
     profile: str | None = ProfileOpt,
@@ -1621,6 +1106,7 @@ def fix_metadata(
         year_to=year_to,
         item_type=item_type,
         limit=limit,
+        offset=offset,
         apply=apply,
         overwrite=overwrite,
         profile=profile,
@@ -1767,47 +1253,6 @@ def attachments(
         config=config,
     )
 
-def _opt_bool(flag: bool | None, configured: bool) -> bool:
-    return configured if flag is None else flag
-
-def _child_bytes(backend: Any, child: dict[str, Any]) -> bool:
-    data = child.get("data") or {}
-    key = str(child.get("key") or data.get("key") or "")
-    if data.get("linkMode") == "linked_file":
-        path = data.get("path")
-        return bool(path) and Path(str(path)).is_file()
-    probe = getattr(backend, "attachment_has_bytes", None)
-    if probe is None or not key:
-        return True
-    try:
-        return bool(probe(key))
-    except Exception:
-        return False
-
-def _print_attachment_table(counts: dict[str, int]) -> None:
-    table = Table(title="Attachments")
-    table.add_column("Finding")
-    table.add_column("Count", justify="right")
-    order = (
-        "ok",
-        "ghost",
-        "broken_link",
-        "unrepairable",
-        "duplicate_file",
-        "cross_parent",
-        "rename_drift",
-        "stored",
-    )
-    shown = set()
-    for kind in order:
-        if kind in counts:
-            table.add_row(kind, str(counts[kind]))
-            shown.add(kind)
-    for kind, count in sorted(counts.items()):
-        if kind not in shown:
-            table.add_row(kind, str(count))
-    console.print(table)
-
 @app.command()
 def versions(
     collection: list[str] = typer.Option(
@@ -1837,167 +1282,27 @@ def versions(
 ) -> None:
     """Link a preprint and its published paper as one work. Write only with --apply.
 
-    The older parent keeps the citation key. Its fields become the version of
-    record and the published PDF is attached beside the preprint PDF. A later
-    sibling is trashed only after that PDF is on the survivor. Title-only
-    matches are listed and not applied.
-    """
-    import httpx
+The older parent keeps the citation key. Its fields become the version of
+record and the published PDF is attached beside the preprint PDF. A later
+sibling is trashed only after that PDF is on the survivor. Title-only
+matches are listed and not applied."""
+    from .versions_cmd import run_versions
 
-    from .versions import (
-        apply_versions,
-        classify_versions,
-        http_fetch_published,
-        pack_counts,
-        resolver_for,
-        write_pack,
-    )
-
-    if _scope_unset(collection, library, profile, run_config):
-        _refuse_missing_scope()
-    cfg = _cfg(config)
-    bound = _bind_run(
-        cfg,
-        profile=profile,
-        run_config=run_config,
+    run_versions(
+        console,
         collection=collection,
         library=library,
+        dry_run=dry_run,
+        apply=apply,
         year_from=year_from,
         year_to=year_to,
         item_type=item_type,
         limit=limit,
-        apply=apply,
+        as_json=as_json,
+        profile=profile,
+        run_config=run_config,
+        config=config,
     )
-    collection, library, year_from, year_to, item_type = _take_scope(bound)
-    limit = bound.limit
-    apply = bound.apply
-    if dry_run and apply:
-        console.print("[red]Pass either --dry-run or --apply, not both.[/]")
-        raise typer.Exit(1)
-    if not collection and not library:
-        _refuse_missing_scope()
-    _require_manager(cfg)
-    backend = _connect(cfg, quiet=as_json)
-    loaded = _load_scope(
-        backend,
-        json_out=as_json,
-        collection=collection,
-        library=library,
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
-    )
-    items, scope = loaded.items, loaded.label
-    if limit:
-        items = items[:limit]
-    client = httpx.Client(follow_redirects=True, timeout=30)
-    errors: list[str] = []
-    try:
-        try:
-            with _item_progress(json_out=as_json) as progress:
-                proposals = classify_versions(
-                    items,
-                    resolver_for(client, cfg.email),
-                    track=_track(progress, "Checking versions"),
-                )
-        except Exception as exc:
-            console.print(f"[red]{exc}[/]")
-            raise typer.Exit(1)
-        json_path, md_path = write_pack(
-            cfg.state_dir, scope, proposals, n_items=len(items)
-        )
-        counts = pack_counts(proposals, len(items))
-        applied = 0
-        if apply:
-            if not backend.supports_write():
-                _exit_env(_no_write(backend), cfg)
-            try:
-                with _item_progress(json_out=as_json) as progress:
-                    applied, errors = apply_versions(
-                        backend,
-                        proposals,
-                        fetch_published=http_fetch_published(client, cfg.email),
-                        audit_path=cfg.versions_applied_path,
-                        scope=scope,
-                        pack=json_path,
-                        track=_track(progress, "Linking versions"),
-                    )
-            except LibraryError as exc:
-                _exit_env(str(exc))
-        payload = {
-            "pack": str(json_path),
-            "markdown": str(md_path),
-            "counts": counts,
-            "applied": applied,
-            "errors": errors,
-        }
-        if as_json:
-            console.print(
-                json.dumps(payload, indent=2),
-                soft_wrap=True,
-                highlight=False,
-                markup=False,
-            )
-        else:
-            console.print(f"Scope: [bold]{scope}[/] — {len(items)} items")
-            _print_version_table(proposals)
-            console.print(f"[dim]Wrote {json_path}[/]")
-            console.print(f"[dim]Wrote {md_path}[/]")
-            if apply:
-                console.print(f"Updated: {applied}")
-            else:
-                console.print(
-                    "Dry-run. Pass [bold]--apply[/] to keep the published citation and PDF "
-                    "on the existing item. The preprint stays as a version."
-                )
-            if errors:
-                console.print(f"Errors: {len(errors)}")
-                for err in errors[:20]:
-                    console.print(f"[yellow]{err}[/]")
-    finally:
-        client.close()
-    if errors:
-        raise typer.Exit(1)
-
-def _print_version_table(proposals: list) -> None:
-    if not proposals:
-        console.print("[green]No preprint / published pairs.[/]")
-        return
-    table = Table(title=f"{len(proposals)} version pairs")
-    table.add_column("Keep", style="dim")
-    table.add_column("Published DOI")
-    table.add_column("Sibling")
-    table.add_column("Note")
-    for row in proposals:
-        note = "needs review" if row.needs_review else row.source
-        table.add_row(
-            row.item_key,
-            row.published_doi,
-            row.sibling_key or "-",
-            note,
-        )
-    console.print(table)
-
-def _print_dedupe_table(groups: list) -> None:
-    if not groups:
-        console.print("[green]No duplicate groups.[/]")
-        return
-    table = Table(title=f"{len(groups)} duplicate groups")
-    table.add_column("Phase")
-    table.add_column("Keep", style="dim")
-    table.add_column("Merge")
-    table.add_column("Note")
-    for group in groups:
-        if group.held:
-            note = group.reason
-            keep = "-"
-            trash = "-"
-        else:
-            note = "needs review" if group.needs_review else group.reason
-            keep = group.keep or "-"
-            trash = ", ".join(group.trash)
-        table.add_row(group.phase, keep, trash, note)
-    console.print(table)
 
 @app.command("urls")
 def urls_check(
@@ -2015,83 +1320,17 @@ def urls_check(
     fmt: str = AgentFormatOpt,
 ) -> None:
     """HEAD/GET metadata and linked-PDF URLs. Report only unless --apply."""
-    import httpx
+    from .urls_cmd import run_urls
 
-    from .agent_json import envelope
-    from .urls import probe_target, targets_for_item
-
-    if _scope_unset(collection, library, None, None):
-        _refuse_missing_scope()
-    started = time.time()
-    cfg = _cfg(config)
-    json_out = _agent_json(fmt)
-    _require_manager(cfg)
-    backend = _connect(cfg, quiet=json_out)
-    keys, scope = _scope_keys(backend, collection, library)
-    items = backend.items_in_scope(keys)
-    if limit:
-        items = items[:limit]
-    findings = []
-    applied = 0
-    refused = 0
-    with httpx.Client(follow_redirects=True, timeout=8.0) as client:
-        for item in items:
-            children = []
-            if hasattr(backend, "children"):
-                try:
-                    children = backend.children(item.key)
-                except Exception:
-                    children = []
-            for target in targets_for_item(item, children):
-                finding = probe_target(
-                    client, target, playbooks=cfg.grey_playbooks
-                )
-                row = finding.to_dict()
-                if apply:
-                    patch_key = (
-                        finding.attachment_key
-                        if finding.role == "linked_pdf" and finding.attachment_key
-                        else item.key if finding.role == "parent" else ""
-                    )
-                    if not finding.rewrite or not patch_key or not backend.supports_write():
-                        refused += 1
-                        row["apply"] = "refused"
-                    else:
-                        backend.apply_patch(patch_key, {"url": finding.rewrite})
-                        applied += 1
-                        row["apply"] = "rewritten"
-                findings.append(row)
-    summary = {
-        "scope": scope,
-        "checked": len(findings),
-        "applied": applied,
-        "refused": refused,
-    }
-    for code in ("ok", "redirect", "soft_404", "hard_dead", "paywall_html"):
-        summary[code] = sum(1 for row in findings if row["code"] == code)
-    write_command_report(
-        cfg,
-        command="urls",
-        scope=scope,
-        summary=summary,
-        items=findings,
-        flags={"apply": apply},
-        started=started,
+    run_urls(
+        console,
+        collection=collection,
+        library=library,
+        apply=apply,
+        limit=limit,
+        config=config,
+        fmt=fmt,
     )
-    payload = envelope(command="urls check", summary=summary, items=findings, flags={"apply": apply})
-
-    def _human() -> None:
-        table = Table(title="URL health")
-        table.add_column("code")
-        table.add_column("item")
-        table.add_column("url")
-        for row in findings:
-            table.add_row(row["code"], row["item_key"], row["url"][:80])
-        console.print(table)
-        if apply:
-            console.print(f"Rewrote {applied}. Refused {refused} (no known playbook rewrite).")
-
-    _emit_agent(payload, json_out=json_out, human=_human)
 
 @htmlpdf_proposals_app.command("list")
 def htmlpdf_proposals_list(
@@ -2099,33 +1338,11 @@ def htmlpdf_proposals_list(
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
-    from .agent_json import envelope
-    from .sources.htmlpdf import list_proposals
+    from .htmlpdf_cmd import run_htmlpdf_proposals_list
 
-    cfg = _cfg(config)
-    json_out = _agent_json(fmt)
-    want = None if status == "all" else status
-    rows = list_proposals(cfg, status=want)
-    payload = envelope(
-        command="htmlpdf proposals list",
-        summary={"count": len(rows)},
-        items=rows,
-        flags={"status": status},
+    run_htmlpdf_proposals_list(
+        console, status=status, config=config, fmt=fmt
     )
-
-    def _human() -> None:
-        if not rows:
-            console.print("No HTML snapshot proposals.")
-            return
-        table = Table(title="htmlpdf proposals")
-        table.add_column("id")
-        table.add_column("item")
-        table.add_column("status")
-        for row in rows:
-            table.add_row(str(row.get("id")), str(row.get("item_key")), str(row.get("status")))
-        console.print(table)
-
-    _emit_agent(payload, json_out=json_out, human=_human)
 
 @htmlpdf_proposals_app.command("apply")
 def htmlpdf_proposals_apply(
@@ -2133,47 +1350,11 @@ def htmlpdf_proposals_apply(
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
-    from .agent_json import envelope
-    from .provenance import provenance_stamp
-    from .sources.htmlpdf import load_proposal, mark_applied, proposal_gate
+    from .htmlpdf_cmd import run_htmlpdf_proposals_apply
 
-    cfg = _cfg(config)
-    json_out = _agent_json(fmt)
-    _require_manager(cfg)
-    backend = _connect(cfg, quiet=json_out)
-    if not backend.supports_write():
-        _exit_env("htmlpdf proposals apply needs library write support.", cfg)
-    _path, payload_row = load_proposal(cfg, proposal_id)
-    if payload_row.get("status") != "pending":
-        console.print(f"[red]Proposal {proposal_id} is {payload_row.get('status') or 'not pending'}.[/]")
-        raise typer.Exit(1)
-    refusal = proposal_gate(payload_row)
-    if refusal:
-        console.print(f"[red]Proposal {proposal_id} failed the page gate ({refusal}).[/]")
-        raise typer.Exit(1)
-    pdf = Path(str(payload_row.get("pdf") or ""))
-    item_key = str(payload_row.get("item_key") or "")
-    if not pdf.is_file() or not item_key:
-        console.print("[red]Proposal is missing a PDF or item key.[/]")
-        raise typer.Exit(1)
-    note = provenance_stamp("htmlpdf")
-    result = backend.attach(item_key, pdf, note=note)
-    if not result.ok:
-        console.print(f"[red]{result.reason}[/]")
-        raise typer.Exit(1)
-    data = mark_applied(cfg, proposal_id, item_key=item_key)
-    _flush(backend)
-    payload = envelope(
-        command="htmlpdf proposals apply",
-        summary={"id": proposal_id, "item_key": item_key},
-        items=[data],
-        flags={"apply": True},
+    run_htmlpdf_proposals_apply(
+        console, proposal_id=proposal_id, config=config, fmt=fmt
     )
-
-    def _human_apply() -> None:
-        console.print(f"Attached snapshot {proposal_id} → {item_key}")
-
-    _emit_agent(payload, json_out=json_out, human=_human_apply)
 
 @htmlpdf_proposals_app.command("reject")
 def htmlpdf_proposals_reject(
@@ -2181,26 +1362,11 @@ def htmlpdf_proposals_reject(
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
-    from .agent_json import envelope
-    from .sources.htmlpdf import reject_proposal
+    from .htmlpdf_cmd import run_htmlpdf_proposals_reject
 
-    cfg = _cfg(config)
-    json_out = _agent_json(fmt)
-    try:
-        data = reject_proposal(cfg, proposal_id)
-    except FileNotFoundError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1) from exc
-    payload = envelope(
-        command="htmlpdf proposals reject",
-        summary={"id": proposal_id, "status": "rejected"},
-        items=[data],
+    run_htmlpdf_proposals_reject(
+        console, proposal_id=proposal_id, config=config, fmt=fmt
     )
-
-    def _human_reject() -> None:
-        console.print(f"Rejected proposal {proposal_id}")
-
-    _emit_agent(payload, json_out=json_out, human=_human_reject)
 
 @app.command()
 def gaps(
@@ -2252,64 +1418,27 @@ def gaps(
     Points at `run` (PDFs) and `lint` (identifiers). Does not write the library
     unless ``--handoff walk`` or ``--handoff watch`` attaches files.
     """
-    from .gaps_cmd import run_gaps
-    from .handoff import parse_handoff
+    from .gaps_cmd import run_gaps_command
 
-    if _scope_unset(collection, library, profile, run_config):
-        _refuse_missing_scope()
-    cfg = _cfg(config)
-    from .author_request import apply_request_rg_override
-
-    apply_request_rg_override(cfg, request_rg)
-    json_out, as_json = _agent_wins(fmt, as_json)
-    bound = _bind_run(
-        cfg,
-        profile=profile,
-        run_config=run_config,
-        collection=collection,
-        library=library,
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
-    )
-    collection, library, year_from, year_to, item_type = _take_scope(bound)
-    if not collection and not library:
-        _refuse_missing_scope()
-    try:
-        mode = parse_handoff(handoff, default=cfg.gaps_handoff)
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1) from exc
-    if mode in {"tabs", "walk", "watch"} and not list_missing:
-        list_missing = True
-    _require_manager(cfg)
-    quiet = as_json or json_out
-    backend = _connect(cfg, quiet=quiet)
-    loaded = _load_scope(
-        backend,
-        json_out=quiet,
-        collection=collection,
-        library=library,
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
-    )
-    run_gaps(
+    run_gaps_command(
         console,
-        cfg,
-        backend,
-        loaded.items,
-        loaded.label,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
         list_missing=list_missing,
-        mode=mode,
-        json_out=json_out,
-        as_json=as_json,
-        to=to,
+        handoff=handoff,
         include_doi_tabs=include_doi_tabs,
         downloads_dir=downloads_dir,
+        request_rg=request_rg,
         re_request=re_request,
-        emit_agent=_emit_agent,
-        inbox_handoff=_inbox_handoff_session,
+        to=to,
+        as_json=as_json,
+        profile=profile,
+        run_config=run_config,
+        config=config,
+        fmt=fmt,
     )
 
 @app.command()
@@ -2462,89 +1591,10 @@ def run(
     fmt: str = AgentFormatOpt,
 ) -> None:
     """Fill PDFs into the local mirror. Copies into the library when it is reachable. --dry-run does not write."""
-    if _scope_unset(collection, library, profile, run_config):
-        _refuse_missing_scope()
-    cfg = _cfg(config)
-    from .author_request import apply_request_rg_override
+    from .run_cmd import run_run_command
 
-    apply_request_rg_override(cfg, request_rg)
-    twenty_writeback = _typer_opt(twenty_writeback)
-    promote = _typer_opt(promote)
-    upgrade_snapshot = _typer_opt(upgrade_snapshot)
-    keep_snapshot = _typer_opt(keep_snapshot, False)
-    htmlpdf_mode = _typer_opt(htmlpdf_mode)
-    if twenty_writeback is not None:
-        cfg.twenty_writeback_listings = twenty_writeback
-    json_out = _agent_json(fmt)
-    if isinstance(promote, str):
-        from .config import parse_playbooks_promote
-
-        try:
-            cfg.playbooks_promote = parse_playbooks_promote(promote)
-        except ValueError as exc:
-            console.print(f"[red]{exc}[/]")
-            raise typer.Exit(2)
-    bound = _bind_run(
-        cfg,
-        use_run_policy=True,
-        profile=profile,
-        run_config=run_config,
-        collection=collection,
-        library=library,
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
-        limit=limit,
-        no_attach=no_attach,
-        retry_failed=retry_failed,
-        try_all=try_all,
-        sources=sources,
-        preset=preset,
-        scihub=scihub,
-        upgrade_linked=upgrade_linked,
-        upgrade_snapshot=upgrade_snapshot if isinstance(upgrade_snapshot, bool) else None,
-        strict_pdf_doi=strict_pdf_doi,
-    )
-    collection, library, year_from, year_to, item_type = _take_scope(bound)
-    limit = bound.limit
-    no_attach = bound.no_attach
-    retry_failed = bound.retry_failed
-    try_all = bound.try_all
-    sources = bound.sources_csv
-    preset = bound.preset
-    scihub = bound.scihub
-    upgrade_linked = bound.upgrade_linked
-    strict_pdf_doi = bound.strict_pdf_doi
-    if isinstance(htmlpdf_mode, str) and htmlpdf_mode.strip():
-        from .config import _one_of
-
-        try:
-            cfg.htmlpdf_academic = _one_of(
-                "--htmlpdf", htmlpdf_mode, ("off", "gated", "auto")
-            )
-        except ValueError as exc:
-            console.print(f"[red]{exc}[/]")
-            raise typer.Exit(2)
-    if isinstance(serpapi_max, int):
-        cfg.serpapi_max_calls = max(0, serpapi_max)
-    if isinstance(upgrade_snapshot, bool):
-        want_snapshot_upgrade = upgrade_snapshot
-    elif bound.upgrade_snapshot is not None:
-        want_snapshot_upgrade = bound.upgrade_snapshot
-    else:
-        want_snapshot_upgrade = cfg.htmlpdf_upgrade
-    if keep_snapshot:
-        cfg.htmlpdf_keep_snapshot = True
-    # `all` calls this function directly. An omitted flag is a Typer option
-    # object, not None; only an explicit bool overrides config.
-    relogin = (
-        ezproxy_relogin if isinstance(ezproxy_relogin, bool) else cfg.ezproxy_relogin
-    )
-    from .run_cmd import run_fetch
-
-    run_fetch(
+    run_run_command(
         console,
-        cfg,
         collection=collection,
         library=library,
         dry_run=dry_run,
@@ -2558,188 +1608,27 @@ def run(
         sources=sources,
         preset=preset,
         scihub=scihub,
-        relogin=relogin,
+        ezproxy_relogin=ezproxy_relogin,
         browser_agent=browser_agent,
+        camofox=camofox,
         upgrade_linked=upgrade_linked,
-        want_snapshot_upgrade=want_snapshot_upgrade,
+        upgrade_snapshot=upgrade_snapshot,
+        keep_snapshot=keep_snapshot,
+        htmlpdf_mode=htmlpdf_mode,
+        serpapi_max=serpapi_max,
         strict_pdf_doi=strict_pdf_doi,
         handoff=handoff,
         include_doi_tabs=include_doi_tabs,
         downloads_dir=downloads_dir,
+        request_rg=request_rg,
         re_request=re_request,
-        json_out=json_out,
-        camofox=camofox,
+        twenty_writeback=twenty_writeback,
+        promote=promote,
+        profile=profile,
+        run_config=run_config,
+        config=config,
+        fmt=fmt,
     )
-
-def _ezproxy_headed_login_and_probe(cfg: Config, pipe: Pipeline) -> bool:
-    return ezproxy_headed_login_and_probe(console, cfg, pipe)
-
-def _ensure_ezproxy_session(
-    cfg: Config,
-    pipe: Pipeline,
-    *,
-    enabled: bool,
-    prompt: str,
-) -> bool:
-    return ensure_ezproxy_session(
-        console, cfg, pipe, enabled=enabled, prompt=prompt
-    )
-
-def _preflight_ezproxy_session(
-    cfg: Config,
-    pipe: Pipeline,
-    source_list: list[str],
-    *,
-    enabled: bool,
-) -> None:
-    preflight_ezproxy_session(console, cfg, pipe, source_list, enabled=enabled)
-
-def _mid_run_ezproxy_hook(
-    cfg: Config, pipe: Pipeline, *, enabled: bool
-) -> Callable[[], bool] | None:
-    return mid_run_ezproxy_hook(console, cfg, pipe, enabled=enabled)
-
-def _maybe_ezproxy_relogin(
-    cfg: Config,
-    pipe: Pipeline,
-    todo: list,
-    *,
-    enabled: bool,
-) -> None:
-    maybe_ezproxy_relogin(console, cfg, pipe, todo, enabled=enabled)
-
-def _run_session_handoff(
-    cfg: Config,
-    backend: LibraryBackend | None,
-    manifest: Manifest,
-    catalog: list,
-    stats: RunStats,
-    *,
-    handoff: str,
-    include_doi_tabs: bool,
-    downloads_dir: Path | None,
-    re_request: bool = False,
-) -> None:
-    run_session_handoff(
-        console,
-        cfg,
-        backend,
-        manifest,
-        catalog,
-        stats,
-        handoff=handoff,
-        include_doi_tabs=include_doi_tabs,
-        downloads_dir=downloads_dir,
-        re_request=re_request,
-    )
-
-def _inbox_handoff_session(
-    cfg: Config,
-    backend: LibraryBackend,
-    manifest: Manifest,
-    items: list,
-    missing: list,
-    *,
-    scope: str,
-    once: bool,
-    idle_seconds: float | None = None,
-    use_fifo: bool = True,
-) -> None:
-    inbox_handoff_session(
-        console,
-        cfg,
-        backend,
-        manifest,
-        items,
-        missing,
-        scope=scope,
-        once=once,
-        idle_seconds=idle_seconds,
-        use_fifo=use_fifo,
-    )
-
-def _mirror_deferred(cfg: Config) -> None:
-    manager = _manager_name(cfg)
-    console.print(
-        f"[yellow]Saved to the local mirror ({cfg.out_dir}). "
-        f"Not copied to {manager} yet — it was not reachable. "
-        f"When it is, run paperful attach.[/]"
-    )
-
-def _library_write_api(backend: LibraryBackend) -> bool | None:
-    try:
-        return bool(backend.supports_write())
-    except Exception:
-        return None
-
-def _run_flags(**kwargs) -> dict:
-    return {k: v for k, v in kwargs.items() if v}
-
-def _agent_json(fmt: str) -> bool:
-    if not isinstance(fmt, str):
-        return False
-    kind = (fmt or "text").strip().lower()
-    if kind not in {"text", "json"}:
-        console.print("[red]--format must be text or json.[/]")
-        raise typer.Exit(1)
-    return kind == "json"
-
-def _emit_agent(payload: dict[str, Any], *, json_out: bool, human: Callable[[], None]) -> None:
-    from .agent_json import emit_stdout, stdout_suppressed
-
-    if json_out:
-        emit_stdout(payload)
-    elif not stdout_suppressed():
-        human()
-    code = int(payload.get("exit") or 0)
-    if code:
-        raise typer.Exit(code)
-
-def _agent_wins(fmt: str, as_json: bool = False) -> tuple[bool, bool]:
-    """``--format json`` wins over legacy ``--json``."""
-    json_out = _agent_json(fmt)
-    return json_out, bool(as_json) and not json_out
-
-def _finish_run(
-    cfg: Config,
-    stats: RunStats,
-    *,
-    scope: str,
-    flags: dict,
-    write_api: bool | None = None,
-    json_out: bool = False,
-) -> None:
-    from .agent_json import batch_exit, envelope
-
-    report = build_report(
-        stats, cfg, command="run", scope=scope, flags=flags, write_api=write_api
-    )
-    path = write_run_report(cfg, report)
-    summary = report.get("summary") or {}
-    attached = int(summary.get("attached") or 0)
-    attach_failed = int(summary.get("attach_failed") or 0)
-    code = batch_exit(ok=attached, failed=attach_failed)
-    payload = envelope(
-        command="run",
-        summary=summary if isinstance(summary, dict) else {},
-        items=list(report.get("items") or []),
-        paths={"report": str(path) if path else ""},
-        flags=flags,
-        report=report,
-        exit_code=code,
-    )
-
-    def _human() -> None:
-        print_run_summary(console, report, path)
-
-    _emit_agent(payload, json_out=json_out, human=_human)
-
-def _load_last_run(cfg: Config) -> dict | None:
-    path = cfg.state_dir / "last-run.json"
-    try:
-        return json.loads(path.read_text())
-    except (OSError, ValueError):
-        return None
 
 @app.command()
 def attach(
@@ -2766,71 +1655,18 @@ def attach(
 ) -> None:
     """Write already-downloaded PDFs into the library. This command attaches; it is not a dry-run.
 
-    Use ``--item KEY --file PATH`` to ingest a hand-downloaded PDF.
-    """
-    from .handoff import attach_pdf_file
+Use ``--item KEY --file PATH`` to ingest a hand-downloaded PDF."""
+    from .attach_cmd import run_attach
 
-    cfg = _cfg(config)
-    _require_manager(cfg)
-    backend = _connect(cfg)
-    manifest = Manifest(cfg.manifest_path)
-    if not backend.supports_write():
-        _exit_env(_no_write(backend), cfg)
-
-    if item or file is not None:
-        if len(item) != 1 or file is None:
-            console.print(
-                "[red]Manual ingest needs exactly one --item KEY and --file PATH.[/]"
-            )
-            raise typer.Exit(1)
-        loaded = _loaded_scope(backend, item_keys=item)
-        if not loaded.items:
-            console.print(f"[red]Unknown item {item[0]}.[/]")
-            raise typer.Exit(1)
-        try:
-            rec = attach_pdf_file(cfg, backend, manifest, loaded.items[0], file)
-        except (OSError, ValueError, LibraryError) as exc:
-            console.print(f"[red]{exc}[/]")
-            raise typer.Exit(1) from exc
-        _flush(backend)
-        console.print(f"[green]Attached[/] {rec.itemKey} ← {file}")
-        _rag_auto(cfg, time.time(), keys=[rec.itemKey])
-        return
-
-    pending = manifest.pending_attach(
+    run_attach(
+        console,
+        item=item,
+        file=file,
+        config=config,
+        limit=limit,
         allow_pdf_doi_mismatch=allow_pdf_doi_mismatch,
         allow_short_pdf=allow_short_pdf,
     )
-    if limit:
-        pending = pending[:limit]
-    console.print(f"{len(pending)} PDFs to attach")
-    if not allow_short_pdf:
-        held_short = sum(
-            1
-            for r in manifest.records.values()
-            if r.status == STATUS_OK and r.path and r.reason == REASON_SHORT_PDF
-        )
-        if held_short:
-            console.print(
-                f"[dim]{held_short} short PDF(s) held — "
-                "pass --allow-short-pdf to admit[/]"
-            )
-    if not pending:
-        console.print("[bold]Attached 0/0[/]")
-        return
-    pipe = Pipeline(cfg, manifest, console, attacher=backend)
-    done = 0
-    try:
-        with _item_progress() as progress:
-            task_id = progress.add_task("Attaching PDFs", total=len(pending))
-            for rec in pending:
-                if pipe.attach_record(rec):
-                    done += 1
-                progress.advance(task_id)
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Interrupted.[/]")
-    _flush(backend)
-    console.print(f"[bold]Attached {done}/{len(pending)}[/]")
 
 @inbox_app.command("watch")
 def inbox_watch(
@@ -2856,86 +1692,23 @@ def inbox_watch(
 ) -> None:
     """Long-running sidecar: poll inbox.dir and attach by PDF DOI (no FIFO).
 
-    Defaults to the whole library so one drop folder can serve every topic.
-    Pass ``-C`` only when you intentionally want a narrower DOI index.
-    """
-    from .inbox import (
-        ensure_inbox_dirs,
-        events_as_report_items,
-        process_candidates,
-        summary_from_stats,
-    )
+Defaults to the whole library so one drop folder can serve every topic.
+Pass ``-C`` only when you intentionally want a narrower DOI index."""
+    from .inbox_cmd import run_inbox_watch
 
-    library = _inbox_library_when_unscoped(collection, library, profile, run_config)
-    cfg = _cfg(config)
-    bound = _bind_run(
-        cfg,
-        profile=profile,
-        run_config=run_config,
+    run_inbox_watch(
+        console,
         collection=collection,
         library=library,
         year_from=year_from,
         year_to=year_to,
         item_type=item_type,
+        idle=idle,
+        profile=profile,
+        run_config=run_config,
+        config=config,
+        tag=tag,
     )
-    collection, library, year_from, year_to, item_type = _take_scope(bound)
-    if not collection and not library:
-        _refuse_missing_scope()
-    _require_manager(cfg)
-    backend = _connect(cfg)
-    if not backend.supports_write():
-        _exit_env("inbox watch needs library write support.", cfg)
-    try:
-        root = ensure_inbox_dirs(cfg)
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1) from exc
-    loaded = _load_scope(
-        backend,
-        collection=collection,
-        library=bool(library),
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
-    )
-    items, scope = loaded.items, loaded.label
-    manifest = Manifest(cfg.manifest_path)
-    started = time.time()
-    console.print(
-        f"[bold]Inbox[/] watching {root} for {scope} (DOI match only; Ctrl+C to stop)"
-    )
-    stats = process_candidates(
-        cfg,
-        backend,
-        manifest,
-        items,
-        fifo_queue=None,
-        once=False,
-        idle_seconds=idle,
-        collection=collection[0] if collection else "",
-        extra_tags=tag,
-        on_status=lambda msg: console.print(msg),
-    )
-    _flush(backend)
-    _rag_auto(cfg, started)
-    path = write_command_report(
-        cfg,
-        command="inbox",
-        scope=scope,
-        summary=summary_from_stats(stats),
-        items=events_as_report_items(stats.events),
-        flags={"once": False, "fifo": False, "idle": idle},
-        started=started,
-        extra_paths={"inbox_dir": str(root)},
-    )
-    console.print(
-        f"Inbox attached {stats.attached}, unmatched {stats.unmatched}, "
-        f"created_gated {stats.created_gated}, created_auto {stats.created_auto}, "
-        f"errors {stats.errors}, skipped {stats.skipped}"
-        + (f" ({stats.quit_reason})" if stats.quit_reason else "")
-    )
-    if path is not None:
-        console.print(f"Inbox report: {path}")
 
 @inbox_app.command("drain")
 def inbox_drain(
@@ -2957,102 +1730,24 @@ def inbox_drain(
 ) -> None:
     """One-shot: ingest current PDFs in inbox.dir.
 
-    Default match is DOI-only. ``[inbox].match`` can add title / OCR / LLM stages.
-    Defaults to the whole library so one drop folder can serve every topic.
-    Pass ``-C`` only when you intentionally want a narrower DOI index.
-    """
-    from .inbox import (
-        ensure_inbox_dirs,
-        events_as_report_items,
-        process_candidates,
-        summary_from_stats,
-    )
+Default match is DOI-only. ``[inbox].match`` can add title / OCR / LLM stages.
+Defaults to the whole library so one drop folder can serve every topic.
+Pass ``-C`` only when you intentionally want a narrower DOI index."""
+    from .inbox_cmd import run_inbox_drain
 
-    library = _inbox_library_when_unscoped(collection, library, profile, run_config)
-    cfg = _cfg(config)
-    json_out = _agent_json(fmt)
-    bound = _bind_run(
-        cfg,
-        profile=profile,
-        run_config=run_config,
+    run_inbox_drain(
+        console,
         collection=collection,
         library=library,
         year_from=year_from,
         year_to=year_to,
         item_type=item_type,
+        profile=profile,
+        run_config=run_config,
+        config=config,
+        tag=tag,
+        fmt=fmt,
     )
-    collection, library, year_from, year_to, item_type = _take_scope(bound)
-    if not collection and not library:
-        _refuse_missing_scope()
-    _require_manager(cfg)
-    backend = _connect(cfg, quiet=json_out)
-    if not backend.supports_write():
-        _exit_env("inbox drain needs library write support.", cfg)
-    try:
-        root = ensure_inbox_dirs(cfg)
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1) from exc
-    loaded = _load_scope(
-        backend,
-        json_out=json_out,
-        collection=collection,
-        library=bool(library),
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
-    )
-    items, scope = loaded.items, loaded.label
-    manifest = Manifest(cfg.manifest_path)
-    started = time.time()
-    if not json_out:
-        console.print(f"[bold]Inbox[/] draining {root} for {scope}")
-    stats = process_candidates(
-        cfg,
-        backend,
-        manifest,
-        items,
-        fifo_queue=None,
-        once=True,
-        collection=collection[0] if collection else "",
-        extra_tags=tag,
-        on_status=None if json_out else (lambda msg: console.print(msg)),
-    )
-    _flush(backend)
-    _rag_auto(cfg, started)
-    summary = summary_from_stats(stats)
-    items_out = events_as_report_items(stats.events)
-    path = write_command_report(
-        cfg,
-        command="inbox",
-        scope=scope,
-        summary=summary,
-        items=items_out,
-        flags={"once": True, "fifo": False},
-        started=started,
-        extra_paths={"inbox_dir": str(root)},
-    )
-    from .agent_json import batch_exit, envelope
-
-    payload = envelope(
-        command="inbox drain",
-        summary=summary,
-        items=items_out,
-        paths={"report": str(path) if path else "", "inbox_dir": str(root)},
-        flags={"once": True},
-        exit_code=batch_exit(ok=int(stats.attached or 0), failed=int(stats.errors or 0)),
-    )
-
-    def _human_drain() -> None:
-        console.print(
-            f"Inbox attached {stats.attached}, unmatched {stats.unmatched}, "
-            f"created_gated {stats.created_gated}, created_auto {stats.created_auto}, "
-            f"errors {stats.errors}, skipped {stats.skipped}"
-        )
-        if path is not None:
-            console.print(f"Inbox report: {path}")
-
-    _emit_agent(payload, json_out=json_out, human=_human_drain)
 
 inbox_proposals_app = typer.Typer(
     add_completion=False,
@@ -3067,41 +1762,14 @@ def inbox_proposals_list(
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
-    from .inbox_match import list_proposals
-    from .agent_json import envelope
+    from .inbox_cmd import run_inbox_proposals_list
 
-    cfg = _cfg(config)
-    json_out = _agent_json(fmt)
-    want = None if status == "all" else status
-    rows = list_proposals(cfg, status=want)
-    payload = envelope(
-        command="inbox proposals list",
-        summary={"count": len(rows)},
-        items=rows,
-        flags={"status": status},
+    run_inbox_proposals_list(
+        console,
+        status=status,
+        config=config,
+        fmt=fmt,
     )
-
-    def _human() -> None:
-        if not rows:
-            console.print("No inbox proposals.")
-            return
-        table = Table(title="inbox proposals")
-        table.add_column("id")
-        table.add_column("action")
-        table.add_column("doi")
-        table.add_column("title")
-        table.add_column("status")
-        for row in rows:
-            table.add_row(
-                str(row.get("id") or ""),
-                str(row.get("action") or ""),
-                str(row.get("doi") or ""),
-                str(row.get("title") or "")[:60],
-                str(row.get("status") or ""),
-            )
-        console.print(table)
-
-    _emit_agent(payload, json_out=json_out, human=_human)
 
 @inbox_proposals_app.command("apply")
 def inbox_proposals_apply(
@@ -3110,39 +1778,15 @@ def inbox_proposals_apply(
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
-    from .inbox import apply_proposal
-    from .agent_json import envelope
+    from .inbox_cmd import run_inbox_proposals_apply
 
-    cfg = _cfg(config)
-    json_out = _agent_json(fmt)
-    _require_manager(cfg)
-    backend = _connect(cfg, quiet=json_out)
-    if not backend.supports_write():
-        _exit_env("inbox proposals apply needs library write support.", cfg)
-    manifest = Manifest(cfg.manifest_path)
-    try:
-        data = apply_proposal(cfg, backend, manifest, proposal_id, extra_tags=tag)
-    except (FileNotFoundError, ValueError, LibraryError) as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1) from exc
-    _flush(backend)
-    payload = envelope(
-        command="inbox proposals apply",
-        summary={
-            "id": proposal_id,
-            "item_key": data.get("item_key") or "",
-            "action": data.get("action") or "",
-        },
-        items=[data],
-        flags={"apply": True},
+    run_inbox_proposals_apply(
+        console,
+        proposal_id=proposal_id,
+        tag=tag,
+        config=config,
+        fmt=fmt,
     )
-
-    def _human_apply() -> None:
-        console.print(
-            f"Applied proposal {proposal_id} → {data.get('item_key') or data.get('action')}"
-        )
-
-    _emit_agent(payload, json_out=json_out, human=_human_apply)
 
 @inbox_proposals_app.command("reject")
 def inbox_proposals_reject(
@@ -3150,26 +1794,14 @@ def inbox_proposals_reject(
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
-    from .inbox import reject_proposal
-    from .agent_json import envelope
+    from .inbox_cmd import run_inbox_proposals_reject
 
-    cfg = _cfg(config)
-    json_out = _agent_json(fmt)
-    try:
-        data = reject_proposal(cfg, proposal_id)
-    except (FileNotFoundError, ValueError) as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1) from exc
-    payload = envelope(
-        command="inbox proposals reject",
-        summary={"id": proposal_id, "status": data.get("status") or "rejected"},
-        items=[data],
+    run_inbox_proposals_reject(
+        console,
+        proposal_id=proposal_id,
+        config=config,
+        fmt=fmt,
     )
-
-    def _human_reject() -> None:
-        console.print(f"Rejected proposal {proposal_id}")
-
-    _emit_agent(payload, json_out=json_out, human=_human_reject)
 
 @notes_app.command("delete")
 def notes_delete(
@@ -3264,132 +1896,23 @@ def refs_gap(
     fmt: str = AgentFormatOpt,
 ) -> None:
     """Works cited inside collection PDFs that are not in the library. Never writes."""
-    from .identity import LibraryFingerprint
-    from .mirror import pdf_for
-    from .refs_gap import (
-        ScanFinding,
-        aggregate_citations,
-        scan_items,
-        scan_pdf_citations,
-        write_pack,
-    )
+    from .refs_gap_cmd import run_refs_gap
 
-    if _scope_unset(collection, library, profile, run_config) and not item and not pdf:
-        _refuse_missing_scope()
-    cfg = _cfg(config)
-    json_out = _agent_json(fmt)
-    bound = _bind_run(
-        cfg,
-        profile=profile,
-        run_config=run_config,
+    run_refs_gap(
+        console,
         collection=collection,
         library=library,
         year_from=year_from,
         year_to=year_to,
         item_type=item_type,
+        item=item,
+        pdf=pdf,
+        dedupe_scope=dedupe_scope,
+        profile=profile,
+        run_config=run_config,
+        config=config,
+        fmt=fmt,
     )
-    collection, library, year_from, year_to, item_type = _take_scope(bound)
-    backend = _connect(cfg, quiet=json_out)
-    loaded = _load_scope(
-        backend,
-        json_out=json_out,
-        collection=collection,
-        library=bool(library) or not collection,
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
-    )
-    items = loaded.items
-    scope = loaded.label
-    if item:
-        want = set(item)
-        items = [it for it in items if it.key in want]
-        if not items and not pdf:
-            console.print("[red]No matching --item keys in scope.[/]")
-            raise typer.Exit(1)
-    fingerprint = LibraryFingerprint.from_items(
-        list(backend.items_in_scope(None)) if hasattr(backend, "items_in_scope") else items,
-        scope=dedupe_scope,
-        collection=collection[0] if collection else "",
-    )
-
-    def _pdf(it):
-        return pdf_for(cfg.out_dir, it)
-
-    refs, findings = scan_items(items, _pdf, fingerprint)
-    extra_sources = []
-    for path in pdf:
-        entries, finding = scan_pdf_citations(path)
-        findings.append(ScanFinding(item_key=f"pdf:{path.name}", path=str(path), finding=finding))
-        if finding == "ok":
-            extra_sources.append((f"pdf:{path.name}", entries))
-    if extra_sources:
-        extra_refs = aggregate_citations(extra_sources, fingerprint)
-        by_id = {(r.doi or r.title, r.year): r for r in refs}
-        for row in extra_refs:
-            ident = (row.doi or row.title, row.year)
-            if ident in by_id:
-                host = by_id[ident]
-                for key in row.citing_keys:
-                    if key not in host.citing_keys:
-                        host.citing_keys.append(key)
-            else:
-                refs.append(row)
-    folder = write_pack(cfg.state_dir, scope, refs, findings)
-    missing = [r for r in refs if not r.already_exists]
-    ocr_n = sum(1 for f in findings if f.finding == "needs_ocr")
-    write_command_report(
-        cfg,
-        command="refs gap",
-        scope=scope,
-        summary={
-            "cited": len(refs),
-            "missing": len(missing),
-            "needs_ocr": ocr_n,
-            "write_api": None,
-        },
-        items=[
-            {
-                "doi": r.doi,
-                "title": r.title,
-                "suggested_action": r.suggested_action,
-            }
-            for r in missing[:200]
-        ],
-        flags={"dry_run": True, "dedupe_scope": dedupe_scope},
-        extra_paths={"pack": str(folder)},
-        bound=bound,
-    )
-    from .agent_ops import refs_gap_envelope
-
-    payload = refs_gap_envelope(
-        refs=refs,
-        findings=findings,
-        folder=folder,
-        flags={"dedupe_scope": dedupe_scope},
-    )
-
-    def _human_gap() -> None:
-        table = Table(title="refs gap")
-        table.add_column("n")
-        table.add_column("DOI")
-        table.add_column("Title")
-        table.add_column("Action")
-        for row in sorted(missing, key=lambda r: (-len(r.citing_keys), r.doi or r.title))[:50]:
-            table.add_row(
-                str(len(row.citing_keys)),
-                row.doi or "",
-                (row.title or "")[:50],
-                row.suggested_action,
-            )
-        console.print(table)
-        console.print(f"Cited {len(refs)} · missing {len(missing)} · needs_ocr {ocr_n}")
-        console.print(f"Pack: {folder}")
-        console.print(
-            f"Next: paperful ingest-dois --from-file {folder / 'dois.txt'} -C <collection> --dry-run"
-        )
-
-    _emit_agent(payload, json_out=json_out, human=_human_gap)
 
 
 @app.command("coverage")
@@ -3415,112 +1938,18 @@ def coverage_cmd(
     fmt: str = AgentFormatOpt,
 ) -> None:
     """DOIs named in a briefing/note/file that are not filed under -C. Always dry-run."""
-    from .coverage import (
-        classify_mentions,
-        extract_mentions,
-        load_text_from_note,
-        write_pack,
-    )
-    from .identity import LibraryFingerprint
+    from .coverage_cmd import run_coverage
 
-    if bool(from_note) == bool(from_file):
-        console.print("[red]Pass exactly one of --from-note or --from-file.[/]")
-        raise typer.Exit(1)
-    cfg = _cfg(config)
-    json_out = _agent_json(fmt)
-    bound = _bind_run(
-        cfg, profile=profile, run_config=run_config, collection=collection
+    run_coverage(
+        console,
+        collection=collection,
+        from_note=from_note,
+        from_file=from_file,
+        profile=profile,
+        run_config=run_config,
+        config=config,
+        fmt=fmt,
     )
-    collection, _library, _yf, _yt, _types = _take_scope(bound)
-    if not collection:
-        _refuse_missing_scope()
-    backend = _connect(cfg, quiet=json_out)
-    try:
-        if from_file is not None:
-            text = from_file.read_text(encoding="utf-8")
-            source = {"kind": "file", "ref": str(from_file)}
-        else:
-            text, source = load_text_from_note(
-                backend, from_note or "", out_dir=cfg.out_dir
-            )
-    except LookupError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1) from exc
-    except OSError as exc:
-        console.print(f"[red]Could not read source: {exc}[/]")
-        raise typer.Exit(1) from exc
-
-    mentions = extract_mentions(text)
-    all_items = (
-        list(backend.items_in_scope(None))
-        if hasattr(backend, "items_in_scope")
-        else []
-    )
-    collection_fp = LibraryFingerprint.from_items(
-        all_items, scope="collection", collection=collection[0]
-    )
-    library_fp = LibraryFingerprint.from_items(all_items, scope="library")
-    rows = classify_mentions(mentions, collection_fp, library_fp)
-    scope = collection[0]
-    folder = write_pack(cfg.state_dir, scope, rows, source)
-    missing = [r for r in rows if r.status == "missing"]
-    ambiguous = [r for r in rows if r.status == "ambiguous"]
-    write_command_report(
-        cfg,
-        command="coverage",
-        scope=scope,
-        summary={
-            "mentioned": len(rows),
-            "in_collection": sum(1 for r in rows if r.status == "in_collection"),
-            "missing": len(missing),
-            "ambiguous": len(ambiguous),
-            "write_api": None,
-        },
-        items=[
-            {
-                "doi": r.doi,
-                "title": r.title,
-                "status": r.status,
-                "suggested_action": r.suggested_action,
-            }
-            for r in rows
-            if r.status != "in_collection"
-        ][:200],
-        flags={"dry_run": True, **source},
-        extra_paths={"pack": str(folder)},
-        bound=bound,
-    )
-    from .agent_ops import coverage_envelope
-
-    payload = coverage_envelope(rows=rows, folder=folder, flags=source)
-
-    def _human_cov() -> None:
-        table = Table(title="coverage")
-        table.add_column("Status")
-        table.add_column("DOI")
-        table.add_column("Title")
-        table.add_column("Action")
-        show = [r for r in rows if r.status != "in_collection"][:50]
-        for row in show:
-            table.add_row(
-                row.status,
-                row.doi or "",
-                (row.title or "")[:50],
-                row.suggested_action,
-            )
-        console.print(table)
-        console.print(
-            f"Mentioned {len(rows)} · in collection "
-            f"{sum(1 for r in rows if r.status == 'in_collection')} · "
-            f"missing {len(missing)} · ambiguous {len(ambiguous)}"
-        )
-        console.print(f"Pack: {folder}")
-        console.print(
-            f"Next: paperful ingest-dois --from-file {folder / 'dois.txt'} "
-            f"-C {scope} --dry-run"
-        )
-
-    _emit_agent(payload, json_out=json_out, human=_human_cov)
 
 
 @twenty_app.command("lookup")
@@ -3915,75 +2344,22 @@ def snapshot(
     config: Path | None = ConfigOpt,
 ) -> None:
     """Write per-item restore folders under out/. --dry-run counts and does not write."""
-    from .snapshot import run_snapshot, snapshot_report
+    from .snapshot_cmd import run_snapshot_cmd
 
-    if _scope_unset(collection, library, profile, run_config):
-        _refuse_missing_scope()
-    cfg = _cfg(config)
-    bound = _bind_run(
-        cfg,
-        profile=profile,
-        run_config=run_config,
+    run_snapshot_cmd(
+        console,
         collection=collection,
         library=library,
         year_from=year_from,
         year_to=year_to,
         item_type=item_type,
         limit=limit,
+        dry_run=dry_run,
+        pdfs=pdfs,
+        profile=profile,
+        run_config=run_config,
+        config=config,
     )
-    collection, library, year_from, year_to, item_type = _take_scope(bound)
-    limit = bound.limit
-    if not collection and not library:
-        _refuse_missing_scope()
-    _require_manager(cfg)
-    try:
-        mode = parse_pdfs(pdfs) if pdfs else cfg.mirror_pdfs
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1) from exc
-    backend = _live_backend(cfg)
-    loaded = _load_scope(
-        backend,
-        collection=collection,
-        library=library,
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
-    )
-    items, scope = loaded.items, loaded.label
-    if limit:
-        items = items[:limit]
-    manifest = Manifest(cfg.manifest_path)
-    verb = "Would write" if dry_run else "Writing"
-    console.print(
-        f"{verb} restore folders for [bold]{len(items)}[/] items "
-        f"in [bold]{scope}[/] (pdfs={mode})"
-    )
-    with _item_progress() as progress:
-        stats = run_snapshot(
-            cfg,
-            backend,
-            items,
-            pdfs=mode,
-            dry_run=dry_run,
-            manifest=manifest,
-            track=_track(progress, "Counting folders" if dry_run else "Writing folders"),
-        )
-    report = snapshot_report(cfg, scope, mode, dry_run, stats)
-    if not dry_run:
-        write_run_report(cfg, report, as_last_run=False)
-    console.print(
-        f"[bold]records {stats.records}[/] · pdf exports {stats.pdf_exports} · "
-        f"notes {stats.notes}"
-    )
-    if stats.unread:
-        console.print(
-            f"[yellow]{stats.unread} item(s) could not be read. "
-            "Their folders were left as they were; run snapshot again.[/]"
-        )
-    if not dry_run:
-        # Exports do not go through the manifest, so name the items.
-        _rag_auto(cfg, time.time(), keys=stats.pdf_keys)
 
 def _print_sync(stats, *, dry_run: bool) -> None:
     was = "none" if stats.previous is None else f"v{stats.previous}"
@@ -4022,28 +2398,62 @@ def cache_clean(
 
     Dry-run unless ``--apply``. Does not touch ``out/``.
     """
-    from .sync import clean_pdf_cache
+    from .cache_cmd import run_cache_clean
 
-    cfg = load_config(config)
-    report = clean_pdf_cache(cfg, apply=apply)
-    payload = {
-        "schema": "paperful.agent.json.v1",
-        "command": "cache clean",
-        "exit": 0,
-        "summary": report,
-    }
+    run_cache_clean(console, apply=apply, config=config, fmt=fmt)
 
-    def _human() -> None:
-        action = "Removed" if apply else "Would remove"
-        console.print(
-            f"{action} {report['removed'] if apply else report['removable']} "
-            f"file(s) under {report['cache_dir']}; kept {report['kept']}."
+
+@openalex_store_app.command("build-cites")
+def openalex_store_build_cites(
+    out: str = typer.Option(
+        "",
+        "--out",
+        help=(
+            "Directory for the inverted cites parquet tree. "
+            "Default: directory implied by [openalex_store].cites_index_glob."
+        ),
+    ),
+    timeout_s: float | None = typer.Option(
+        None,
+        "--timeout-s",
+        help=(
+            "Per-partition DuckDB timeout in seconds "
+            "(default: build_timeout_s or 7200)."
+        ),
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Invert works.referenced_works into a cites index for store-backed citing.
+
+    Needs [openalex_store] with a works parquet_glob. Point cites_index_glob at
+    ``<out>/**/*.parquet`` afterward (or use --out that matches that glob).
+
+    Builds one works ``updated_date`` partition at a time and writes
+    ``.done/<date>`` markers — safe to re-run after a crash. Full OpenAlex
+    dumps can take many hours; for a remote host prefer a nohup'd build on
+    that machine so a laptop disconnect does not stop the job.
+    """
+    from .snowball.local_openalex import OpenAlexStoreError, build_cites_index_from_config
+
+    cfg = _cfg(config)
+    try:
+        written, counts = build_cites_index_from_config(
+            cfg,
+            output_dir=out,
+            timeout_s=timeout_s,
+            progress=lambda msg: console.print(msg),
         )
-        if not apply and report["removable"]:
-            console.print("[dim]Re-run with --apply to delete them.[/]")
+    except OpenAlexStoreError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    example = written.rstrip("/") + "/**/*.parquet"
+    console.print(
+        f"Cites index under [bold]{written}[/] · "
+        f"built {counts['built']}, skipped {counts['skipped']}, "
+        f"total {counts['total']}. "
+        f"Set [openalex_store].cites_index_glob to that tree (e.g. {example})."
+    )
 
-    json_out, _ = _agent_wins(fmt)
-    _emit_agent(payload, json_out=json_out, human=_human)
 
 @app.command()
 def sync(
@@ -4159,137 +2569,23 @@ def restore(
     fmt: str = AgentFormatOpt,
 ) -> None:
     """Recreate missing library items from out/. Dry-run unless --apply. Never overwrites fields."""
-    from .restore import (
-        apply_restore,
-        dedupe_restore_records,
-        iter_records,
-        plan_restore,
-        record_in_scope,
-    )
+    from .restore_cmd import run_restore
 
-    if _scope_unset(collection, library, profile, run_config):
-        _refuse_missing_scope()
-    cfg = _cfg(config)
-    json_out = _agent_json(fmt)
-    bound = _bind_run(
-        cfg,
-        profile=profile,
-        run_config=run_config,
+    run_restore(
+        console,
         collection=collection,
         library=library,
         year_from=year_from,
         year_to=year_to,
         item_type=item_type,
         limit=limit,
+        dry_run=dry_run,
         apply=apply,
+        profile=profile,
+        run_config=run_config,
+        config=config,
+        fmt=fmt,
     )
-    collection, library, year_from, year_to, item_type = _take_scope(bound)
-    limit = bound.limit
-    apply = bound.apply
-    if dry_run and apply:
-        console.print("[red]Pass either --dry-run or --apply, not both.[/]")
-        raise typer.Exit(1)
-    if not collection and not library:
-        _refuse_missing_scope()
-    _require_manager(cfg)
-    backend = _live_backend(cfg, quiet=json_out)
-    prefixes: list[str] | None = None
-    if not library:
-        prefixes = []
-        for spec in collection:
-            try:
-                root = backend.resolve_collection(spec)
-            except LookupError as exc:
-                console.print(f"[red]{exc}[/]")
-                raise typer.Exit(1) from exc
-            prefixes.append(root.path)
-    paths = iter_records(cfg.out_dir, prefixes)
-    records = []
-    for path in paths:
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except ValueError:
-            continue
-        if isinstance(data, dict):
-            records.append((path, data))
-    types = _resolve_types(item_type)
-    if year_from is not None and year_to is not None and year_from > year_to:
-        console.print("[red]--year-from must be ≤ --year-to.[/]")
-        raise typer.Exit(1)
-    records = [
-        pair
-        for pair in records
-        if record_in_scope(
-            pair[1], year_from=year_from, year_to=year_to, item_types=types
-        )
-    ]
-    records = dedupe_restore_records(records)
-    if limit:
-        records = records[:limit]
-    keys, _scope = _scope_keys(backend, collection, library)
-    with _spinner("Loading items from library…", json_out=json_out):
-        library_items = backend.items_in_scope(keys)
-    with _item_progress(json_out=json_out) as progress:
-        note_tags: dict[str, set[str]] = {}
-        for it in _track(progress, "Reading library notes")(library_items):
-            tags: set[str] = set()
-            try:
-                kids = backend.children(it.key)
-            except LibraryError as exc:
-                _exit_env(str(exc), cfg)
-            for ch in kids:
-                data = ch.get("data") or {}
-                if data.get("itemType") != "note":
-                    continue
-                for tag in data.get("tags") or []:
-                    if isinstance(tag, dict) and tag.get("tag"):
-                        tags.add(str(tag["tag"]))
-            if tags:
-                note_tags[it.key] = tags
-    planned = plan_restore(records, library_items, note_tags_for=note_tags)
-    counts = planned.counts()
-    from .agent_json import envelope
-
-    if not apply:
-        payload = envelope(
-            command="restore",
-            summary={"folders": len(records), **counts},
-            flags={"dry_run": True},
-        )
-
-        def _human_restore() -> None:
-            console.print(
-                f"{len(records)} restore folder(s) · "
-                f"create {counts.get('create_item', 0)} · "
-                f"exists {counts.get('exists', 0)} · "
-                f"skip {counts.get('skip', 0)} · "
-                f"attach {counts.get('attach_pdf', 0)} · "
-                f"notes {counts.get('create_note', 0)}"
-            )
-            console.print(
-                "[dim]Dry run. Pass --apply to write missing items into the library.[/]"
-            )
-
-        _emit_agent(payload, json_out=json_out, human=_human_restore)
-        return
-    with _item_progress(json_out=json_out) as progress:
-        done = apply_restore(
-            planned, backend, backend, track=_track(progress, "Restoring items")
-        )
-    payload = envelope(
-        command="restore",
-        summary=dict(done),
-        flags={"apply": True},
-    )
-
-    def _human_restore_done() -> None:
-        console.print(
-            f"[bold]created {done['create_item']}[/] · "
-            f"attached {done['attach_pdf']} · notes {done['create_note']}"
-        )
-
-    _emit_agent(payload, json_out=json_out, human=_human_restore_done)
-    _flush(backend)
 
 @app.command("import")
 def import_library(
@@ -4399,124 +2695,21 @@ def export_library(
     config: Path | None = ConfigOpt,
 ) -> None:
     """Export the scoped library to RIS, BibTeX, or EndNote XML."""
-    from .interop.load import dump_records, record_from_item_json
-    from .store import item_dirname, item_filename, load_json, record_path
+    from .export_cmd import run_export_library
 
-    if not collection and not library:
-        console.print("[red]Give --collection PATH (repeatable) or --library.[/]")
-        raise typer.Exit(1)
-    cfg = _cfg(config)
-    _require_manager(cfg)
-    kind = (fmt or dest.suffix.lstrip(".") or "").lower().replace("_", "-")
-    if kind in {"bib", "biblatex"}:
-        kind = "bibtex"
-    if kind in {"xml", "enw"}:
-        kind = "endnote-xml"
-    if kind not in {"ris", "bibtex", "endnote-xml"}:
-        console.print("[red]--format must be ris, bibtex, or endnote-xml.[/]")
-        raise typer.Exit(1)
-    backend = _connect(cfg)
-    loaded = _load_scope(
-        backend,
+    run_export_library(
+        console,
+        dest=dest,
+        fmt=fmt,
         collection=collection,
         library=library,
         year_from=year_from,
         year_to=year_to,
         item_type=item_type,
+        limit=limit,
+        pdfs=pdfs,
+        config=config,
     )
-    items, scope = loaded.items, loaded.label
-    if limit:
-        items = items[:limit]
-    bundle_dir: Path | None = None
-    pdf_dir: Path | None = None
-    if kind == "endnote-xml" or pdfs:
-        bundle_dir = dest if dest.suffix == "" else dest.parent / dest.stem
-        pdf_dir = bundle_dir / "PDF"
-        pdf_dir.mkdir(parents=True, exist_ok=True)
-    records = []
-    copied = 0
-    manifest = Manifest(cfg.manifest_path)
-    with _item_progress() as progress:
-        for it in _track(progress, "Exporting records")(items):
-            rec_json = None
-            for folder in it.collection_paths or ["_uncollected"]:
-                rec_json = load_json(record_path(cfg.out_dir / folder / item_dirname(it)))
-                if rec_json:
-                    break
-            rec = record_from_item_json(rec_json or {}, None)
-            rec["item_type"] = it.item_type
-            rec["title"] = it.title
-            rec["doi"] = it.doi
-            rec["year"] = it.year
-            rec["date"] = it.date or rec.get("date") or (str(it.year) if it.year else "")
-            rec["publication_title"] = it.publication_title or rec.get("publication_title")
-            rec["url"] = it.url
-            rec["pmid"] = it.pmid
-            rec["abstract"] = it.abstract or rec.get("abstract")
-            rec["collection_paths"] = [
-                p for p in it.collection_paths if p != "_uncollected"
-            ]
-            rec["item_key"] = it.key
-            pdf_list: list[str] = []
-            if pdf_dir is not None and it.has_pdf:
-                target = pdf_dir / item_filename(it)
-                local = pdf_for(cfg.out_dir, it, manifest)
-                try:
-                    if local is not None:
-                        exported = shutil.copyfile(local, target)
-                    else:
-                        exported = backend.export_pdf(it, target)
-                except LibraryError as exc:
-                    _exit_env(str(exc), cfg)
-                if exported is not None and Path(exported).is_file():
-                    pdf_list.append(str(exported))
-                    copied += 1
-            rec["pdfs"] = pdf_list
-            notes = []
-            try:
-                kids = backend.children(it.key)
-            except LibraryError as exc:
-                _exit_env(str(exc), cfg)
-            for ch in kids:
-                data = ch.get("data") or {}
-                if data.get("itemType") != "note":
-                    continue
-                html = str(data.get("note") or "")
-                if not html:
-                    continue
-                tags = [
-                    t.get("tag")
-                    for t in (data.get("tags") or [])
-                    if isinstance(t, dict) and t.get("tag")
-                ]
-                notes.append(
-                    {
-                        "file": f"{ch.get('key') or 'note'}.html",
-                        "html": html,
-                        "tag": tags[0] if tags else "paperful-exported",
-                    }
-                )
-            if notes:
-                rec["notes"] = notes
-            records.append(rec)
-    text = dump_records(records, kind)
-    if kind == "endnote-xml" and bundle_dir is not None:
-        bundle_dir.mkdir(parents=True, exist_ok=True)
-        xml_path = bundle_dir / "paperful.xml"
-        xml_path.write_text(text, encoding="utf-8")
-        (bundle_dir / "README.txt").write_text(
-            "Import paperful.xml in EndNote: File → Import → File, "
-            "option EndNote Generated XML. PDFs are in PDF/.\n",
-            encoding="utf-8",
-        )
-        console.print(
-            f"[green]Wrote[/] {xml_path} ({len(records)} records, {copied} PDFs) for {scope}"
-        )
-        return
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(text, encoding="utf-8")
-    extra = f", {copied} PDFs" if copied else ""
-    console.print(f"[green]Wrote[/] {dest} ({len(records)} records{extra}) for {scope}")
 
 
 @app.command("export-proposals")
@@ -4559,6 +2752,42 @@ def export_proposals(
     console.print(
         f"[green]Wrote[/] {dest} ({n} records from {jsonl.name})"
     )
+
+
+@app.command("run-report-counts")
+def run_report_counts_cmd(
+    report_file: Path = typer.Argument(
+        ...,
+        exists=True,
+        dir_okay=False,
+        help="paperful run report JSON from state/runs/",
+    ),
+) -> None:
+    """One-line counts summary for Nightshift index lines."""
+    import json
+
+    from .runreport import nightshift_counts_line
+
+    payload = json.loads(report_file.read_text(encoding="utf-8"))
+    print(nightshift_counts_line(payload))
+
+
+@app.command("run-report-new-count")
+def run_report_new_count_cmd(
+    report_file: Path = typer.Argument(
+        ...,
+        exists=True,
+        dir_okay=False,
+        help="paperful summarize run report JSON",
+    ),
+) -> None:
+    """Count new model summaries in a run report (skips do not count)."""
+    import json
+
+    from .runreport import nightshift_report_new_count
+
+    payload = json.loads(report_file.read_text(encoding="utf-8"))
+    print(nightshift_report_new_count(payload))
 
 
 @app.command()
@@ -4631,40 +2860,24 @@ def report(
             )
         console.print(t)
 
-def _fmt_pack_duration(seconds: float | None) -> str:
-    if seconds is None:
-        return "-"
-    return f"{seconds:g}s"
-
 @pack_app.command("open")
 def pack_open(
     label: str | None = typer.Option(None, "--label", help="Name stored on the pack."),
     config: Path | None = ConfigOpt,
 ) -> None:
     """Start a pack. Later commands append their run reports until `pack close`."""
-    from .pack import PackError, open_pack
+    from .pack_cmd import run_pack_open
 
-    cfg = _cfg(config)
-    try:
-        pack = open_pack(cfg, label=label)
-    except PackError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1)
-    console.print(pack["id"])
+    run_pack_open(console, label=label, config=config)
+
 
 @pack_app.command("close")
 def pack_close(config: Path | None = ConfigOpt) -> None:
     """Close the open pack and drop the current pointer."""
-    from .pack import PackError, close_pack
+    from .pack_cmd import run_pack_close
 
-    cfg = _cfg(config)
-    try:
-        pack = close_pack(cfg)
-    except PackError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1)
-    n = len(pack.get("steps") or [])
-    console.print(f"Closed {pack['id']} ({n} steps)")
+    run_pack_close(console, config=config)
+
 
 @pack_app.command("show")
 def pack_show(
@@ -4674,166 +2887,18 @@ def pack_show(
     config: Path | None = ConfigOpt,
 ) -> None:
     """Print the open pack, or the latest closed one. Does not open the library."""
-    from .pack import headline, latest_pack, show_payload
+    from .pack_cmd import run_pack_show
 
-    cfg = _cfg(config)
-    pack = latest_pack(cfg)
-    if pack is None:
-        console.print("No pack yet. Run [bold]paperful pack open[/] first.")
-        raise typer.Exit(0)
-    payload = show_payload(cfg, pack)
-    if as_json:
-        console.print(
-            json.dumps(payload, indent=2),
-            soft_wrap=True,
-            highlight=False,
-            markup=False,
-        )
-        return
-    title = pack.get("label") or pack["id"]
-    console.print(f"Pack [bold]{pack['id']}[/] ({pack.get('status')})")
-    if pack.get("label"):
-        console.print(pack["label"], markup=False)
-    if pack.get("scope"):
-        console.print(f"Scope: {pack['scope']}")
-    table = Table(title=str(title))
-    table.add_column("Command")
-    table.add_column("Duration", justify="right")
-    table.add_column("Counts")
-    for step in payload.get("steps") or []:
-        table.add_row(
-            str(step.get("command") or ""),
-            _fmt_pack_duration(step.get("duration_s")),
-            headline(str(step.get("command") or ""), step.get("summary") or {}),
-        )
-    console.print(table)
+    run_pack_show(console, as_json=as_json, config=config)
+
 
 @app.command()
 def mirrors(config: Path | None = ConfigOpt) -> None:
     """Ping the configured Sci-Hub mirrors."""
-    cfg = _cfg(config)
-    console.print(f"[red]{SCIHUB_DISCLAIMER}[/]")
-    if "scihub" not in cfg.sources:
-        console.print(
-            '[dim]Sci-Hub is off until you add "scihub" to sources or pass --scihub on run.[/]'
-        )
-    ctx = Context(config=cfg, client=make_client(cfg))
-    for mirror, status in ping_mirrors(ctx):
-        colour = "green" if status == "HTTP 200" else "red"
-        console.print(f"[{colour}]{status:<10}[/] {mirror}")
+    from .mirrors_cmd import run_mirrors
 
-def _confirm_session_login() -> None:
-    console.print("Complete login or CAPTCHA in the browser window, then press Enter.")
-    try:
-        input()
-    except EOFError:
-        pass
+    run_mirrors(console, config=config)
 
-def _netscape_fallback_hint(cookie_path: Path, *, scholar: bool) -> None:
-    extra = (
-        "Include [bold].google.com[/] and [bold]scholar.google.com[/]. "
-        if scholar
-        else "Include your EZProxy host (e.g. [bold]*.idm.oclc.org[/]). "
-    )
-    console.print(
-        f"\n[yellow]No session yet.[/] Preferred: [bold]paperful session login "
-        f"{'scholar' if scholar else 'ezproxy'}[/] "
-        f"(needs [bold]paperful[htmlpdf][/]).\n"
-        f"Or export a Netscape cookies.txt ({extra}) to:\n"
-        f"  {cookie_path}\n"
-        f"If an extension saved to your Desktop:\n"
-        f"  mv ~/Desktop/cookies.txt {cookie_path}\n"
-        f"  chmod 600 {cookie_path}\n"
-        "Firefox: addons.mozilla.org → cookies.txt · Chrome: Get cookies.txt LOCALLY\n"
-    )
-
-def _probe_slot(cfg: Config, slot: str) -> None:
-    from .cookies import cookie_domains, ezproxy_cookie_status
-    from .session import (
-        BrowserSession,
-        load_vault_cookies,
-        profile_ready,
-        storage_state_path,
-        vault_cookies_path,
-    )
-    from .sources import ezproxy as ez
-    from .sources import scholar as gs
-
-    browser = BrowserSession(cfg)
-    ctx = Context(config=cfg, client=make_client(cfg), browser=browser)
-    try:
-        if slot == "ezproxy":
-            cookie_path = cfg.ezproxy_cookie_path
-            if (
-                not cookie_path.is_file()
-                and not vault_cookies_path(cfg).is_file()
-                and not storage_state_path(cfg).is_file()
-                and not profile_ready(cfg)
-            ):
-                _netscape_fallback_hint(cookie_path, scholar=False)
-                _print_exit_ladder()
-                raise typer.Exit(2)
-            ticket = ezproxy_cookie_status(load_vault_cookies(cfg), cfg.ezproxy_base)
-            if ticket == "cas_only":
-                console.print(
-                    "[red]Session not ready:[/] CAS/IdP cookies only — "
-                    "no EZProxy proxy-host ticket"
-                )
-                console.print(
-                    "Run [bold]paperful session login ezproxy[/] and wait until a "
-                    "publisher page loads through the proxy "
-                    "(URL should include your idm.oclc.org host), then press Enter."
-                )
-                _print_exit_ladder()
-                raise typer.Exit(2)
-            if ticket != "proxy_ticket":
-                console.print(
-                    "[red]Session not ready:[/] no campus proxy cookies in the vault"
-                )
-                console.print("Run [bold]paperful session login ezproxy[/] and retry.")
-                _print_exit_ladder()
-                raise typer.Exit(2)
-            ok, detail = ez.session_ok(ctx)
-        else:
-            cookie_path = cfg.scholar_cookie_path
-            gs_domains = sorted(
-                d
-                for d in cookie_domains(ctx.client.cookies)
-                if "google" in (d or "").lower()
-            )
-            if gs_domains:
-                console.print(f"Loaded domains: {', '.join(gs_domains)}")
-            if (
-                not cookie_path.is_file()
-                and not vault_cookies_path(cfg).is_file()
-                and not profile_ready(cfg)
-            ):
-                _netscape_fallback_hint(cookie_path, scholar=True)
-                _print_exit_ladder()
-                raise typer.Exit(2)
-            ok, detail = gs.session_ok(ctx)
-    finally:
-        browser.close()
-    if ok:
-        console.print(f"[green]Session OK[/] — {detail}")
-        if slot == "ezproxy":
-            console.print("[dim]proxy-host ticket present in vault[/]")
-        warn = getattr(browser, "inject_warning", None)
-        if warn:
-            console.print(f"[yellow]{warn}[/]")
-        return
-    console.print(f"[red]Session not ready:[/] {detail}")
-    if slot == "scholar":
-        console.print(
-            "Solve the CAPTCHA in [bold]paperful session login scholar[/] "
-            "(the same Chromium profile used during [bold]run[/]).\n"
-            "A cookie file can still fail: Google often keys the pass to the browser, "
-            "not cookies alone. Do not retry in a tight loop."
-        )
-    else:
-        console.print("Run [bold]paperful session login ezproxy[/] and retry.")
-    _print_exit_ladder()
-    raise typer.Exit(2)
 
 @session_app.command("login")
 def session_login(
@@ -4846,65 +2911,10 @@ def session_login(
     ),
 ) -> None:
     """Open a headed browser on the local vault; log in once, reuse on run."""
-    from . import session as sess
+    from .session_cmd import run_session_login
 
-    cfg = _cfg(config)
-    key = slot.strip().lower()
-    if key == "mendeley":
-        from .mendeley import MendeleyAuthError, MendeleyClient
+    run_session_login(console, slot=slot, config=config, engine=engine)
 
-        console.print(
-            "Opening Mendeley / Elsevier authorization in your browser.\n"
-            "[dim]Redirect URI must match the app at "
-            f"{cfg.mendeley_redirect_uri}[/]"
-        )
-        try:
-            MendeleyClient(cfg).login()
-        except MendeleyAuthError as exc:
-            console.print(f"[red]{exc}[/]")
-            raise typer.Exit(2)
-        console.print(
-            "[green]Mendeley authorised.[/] Tokens in "
-            f"{cfg.state_dir / 'mendeley-oauth.json'} (mode 0600)."
-        )
-        return
-    if key not in sess.SLOTS:
-        console.print(
-            f"[red]Unknown slot {slot!r}.[/] Use scholar, ezproxy, or mendeley."
-        )
-        raise typer.Exit(1)
-    eng = engine.strip().lower()
-    if eng not in ("auto", "chrome", "playwright"):
-        console.print("[red]--engine must be auto, chrome, or playwright.[/]")
-        raise typer.Exit(1)
-    console.print(f"Vault: {sess.sessions_dir(cfg)}")
-    try:
-        url = sess.login_url_for(cfg, key)
-    except sess.SessionError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1)
-    console.print(f"Opening: {url}")
-    try:
-        written = sess.login_headed(
-            cfg,
-            key,
-            confirm=_confirm_session_login,
-            on_note=lambda msg: console.print(f"[dim]{msg}[/]"),
-            engine=eng,  # type: ignore[arg-type]
-        )
-    except sess.SessionError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(2)
-    for path in written:
-        console.print(f"Wrote {path}")
-    console.print(
-        "[green]Session saved.[/] Probe with [bold]paperful session status --probe[/]."
-    )
-    if key == "ezproxy":
-        console.print(
-            "[dim]storage_state + Netscape include a proxy-host ticket "
-            "(login probed a proxied publisher URL before saving).[/]"
-        )
 
 @session_app.command("status")
 def session_status(
@@ -4914,62 +2924,18 @@ def session_status(
     ),
 ) -> None:
     """Show the vault. Default is offline file presence; --probe runs session_ok."""
-    from . import session as sess
-    from .cookies import ezproxy_cookie_status
+    from .session_cmd import run_session_status
 
-    cfg = _cfg(config)
-    console.print(f"Vault:     {sess.sessions_dir(cfg)}")
-    console.print(f"Chromium:  {sess.chromium_dir(cfg)}")
-    console.print(f"Ready:     {sess.profile_ready(cfg)}")
-    meta = sess.load_meta(cfg)
-    slots = meta.get("slots") or {}
-    if slots:
-        for name, info in slots.items():
-            console.print(f"  {name}: {info}")
-    else:
-        console.print("[dim]No login slots recorded. Run paperful session login.[/]")
-    vault = sess.vault_cookies_path(cfg)
-    state = sess.storage_state_path(cfg)
-    ez_path = cfg.ezproxy_cookie_path
-    gs_path = cfg.scholar_cookie_path
-    console.print(f"storage_state:  {'yes' if state.is_file() else 'no'} ({state})")
-    console.print(f"Vault cookies:  {'yes' if vault.is_file() else 'no'} ({vault})")
-    console.print(f"EZProxy file:  {'yes' if ez_path.is_file() else 'no'} ({ez_path})")
-    console.print(f"Scholar file:   {'yes' if gs_path.is_file() else 'no'} ({gs_path})")
-    if cfg.ezproxy_base:
-        status = ezproxy_cookie_status(sess.load_vault_cookies(cfg), cfg.ezproxy_base)
-        if status == "proxy_ticket":
-            console.print("EZProxy cookies: [green]proxy-host ticket present[/]")
-        elif status == "cas_only":
-            console.print(
-                "EZProxy cookies: [yellow]CAS/IdP only — no proxy ticket[/] "
-                "(run [bold]paperful session login ezproxy[/] and wait for the publisher page)"
-            )
-        else:
-            console.print(
-                "EZProxy cookies: [yellow]none[/] "
-                "(run [bold]paperful session login ezproxy[/])"
-            )
-    if not probe:
-        return
-    if cfg.ezproxy_base:
-        _probe_slot(cfg, "ezproxy")
-    if "scholar" in cfg.sources:
-        _probe_slot(cfg, "scholar")
+    run_session_status(console, config=config, probe=probe)
+
 
 @session_app.command("export")
 def session_export(config: Path | None = ConfigOpt) -> None:
     """Refresh storage_state + Netscape from the vault (keeps session tickets)."""
-    from . import session as sess
+    from .session_cmd import run_session_export
 
-    cfg = _cfg(config)
-    try:
-        written = sess.dump_profile_cookies(cfg)
-    except sess.SessionError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(2)
-    for path in written:
-        console.print(f"Wrote {path}")
+    run_session_export(console, config=config)
+
 
 @app.command("ezproxy")
 def ezproxy_cmd(
@@ -4979,33 +2945,10 @@ def ezproxy_cmd(
     ),
 ) -> None:
     """Check / refresh the campus EZProxy session (wrapper for session login ezproxy)."""
-    from . import session as sess
-    from .sources import ezproxy as ez
+    from .session_cmd import run_ezproxy
 
-    cfg = _cfg(config)
-    cookie_path = cfg.ezproxy_cookie_path
-    if not cfg.ezproxy_base:
-        console.print("[red]ezproxy_base is empty in config.toml[/]")
-        console.print(
-            "Set it to your library EZProxy prefix, e.g. https://PREFIX.idm.oclc.org/login?url="
-        )
-        raise typer.Exit(1)
+    run_ezproxy(console, config=config, open_browser=open_browser)
 
-    console.print(f"Proxy:   {cfg.ezproxy_base}")
-    console.print(f"Cookies: {cookie_path}")
-    login_url = ez.proxify("https://www.sciencedirect.com/", cfg.ezproxy_base)
-    if open_browser:
-        if sess.playwright_available():
-            session_login("ezproxy", config)
-            return
-        import webbrowser
-
-        console.print(f"Opening login: {login_url}")
-        webbrowser.open(login_url)
-        _netscape_fallback_hint(cookie_path, scholar=False)
-        console.print("Then re-run: [bold]uv run paperful ezproxy --no-open[/]")
-        raise typer.Exit(2)
-    _probe_slot(cfg, "ezproxy")
 
 @app.command("scholar")
 def scholar_cmd(
@@ -5015,24 +2958,10 @@ def scholar_cmd(
     ),
 ) -> None:
     """Check / refresh Google Scholar (wrapper for session login scholar)."""
-    from . import session as sess
+    from .session_cmd import run_scholar
 
-    cfg = _cfg(config)
-    cookie_path = cfg.scholar_cookie_path
-    console.print(f"Scholar: {sess.SCHOLAR_URL}")
-    console.print(f"Cookies: {cookie_path}")
-    if open_browser:
-        if sess.playwright_available():
-            session_login("scholar", config)
-            return
-        import webbrowser
+    run_scholar(console, config=config, open_browser=open_browser)
 
-        console.print(f"Opening: {sess.SCHOLAR_URL}")
-        webbrowser.open(sess.SCHOLAR_URL)
-        _netscape_fallback_hint(cookie_path, scholar=True)
-        console.print("Then re-run: [bold]uv run paperful scholar --no-open[/]")
-        raise typer.Exit(2)
-    _probe_slot(cfg, "scholar")
 
 @app.command()
 def recover(
@@ -5198,96 +3127,6 @@ def ocr_ignore_import_failures(
 
 # ---- library index: `paperful rag` and `paperful ask` -------------------------
 # These read out_dir and state_dir only. None of them opens the reference manager.
-
-def _rag_require(cfg: Config) -> None:
-    if not cfg.rag_enabled:
-        console.print("[red]rag.enabled is false in config.toml[/]")
-        raise typer.Exit(1)
-
-def _rag_embedder(cfg: Config):
-    """A checked embedder, or exit 1 with the reason."""
-    from .llm import embed_egress_is_remote, validate_embedder
-    from .llm.validate import LlmConfigError
-
-    try:
-        embedder = validate_embedder(cfg)
-    except LlmConfigError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1) from exc
-    if embed_egress_is_remote(cfg):
-        console.print(
-            "[yellow]Remote embedding model — passage text leaves this machine.[/]"
-        )
-    return embedder
-
-def _rag_open(cfg: Config):
-    """The index and its ledger, or exit 1 when there is nothing to search."""
-    from .rag.index import (
-        Index,
-        IndexMismatch,
-        IndexMissing,
-        RagUnavailable,
-        ledger_path,
-    )
-    from .rag.ledger import Ledger
-
-    try:
-        return Index.open(cfg), Ledger(ledger_path(cfg))
-    except (RagUnavailable, IndexMissing, IndexMismatch) as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1) from exc
-
-def _rag_auto(cfg: Config, since: float, keys: Any = ()) -> None:
-    """Index PDFs this command just landed, when ``[rag].auto_ingest`` is on.
-
-    Never fails the command it follows: the index is a cache, and
-    ``paperful rag ingest`` catches up later.
-    """
-    if not (cfg.rag_enabled and cfg.rag_auto_ingest):
-        return
-    from .rag.auto import auto_ingest
-
-    try:
-        with _item_progress() as progress:
-            batch = auto_ingest(
-                cfg,
-                since=since,
-                keys=keys,
-                track=_track(progress, "Indexing new PDFs"),
-                ocr_track=_track(progress, "Running OCR"),
-            )
-    except KeyboardInterrupt:
-        console.print(
-            "[yellow]Indexing interrupted. `paperful rag ingest` resumes it.[/]"
-        )
-        return
-    except Exception as exc:
-        console.print(f"Index not updated: {exc}", markup=False, style="yellow")
-        console.print("[yellow]Run `paperful rag ingest` to catch up.[/]")
-        return
-    if batch is None:
-        return
-    done = batch.count("pdf", "ocr", "abstract")
-    if done:
-        console.print(
-            f"[dim]Index: {done} item(s) updated, {batch.chunks} passages.[/]"
-        )
-
-def _print_hits(hits: list) -> None:
-    from .rag.prompt import Source
-
-    for n, hit in enumerate(hits, start=1):
-        who = Source("", hit.item_key, hit.title, hit.authors, hit.year).citation
-        where = f", {hit.pages}" if hit.pages else ""
-        console.print(
-            f"{n}. {hit.score:.3f}  {who}. {hit.title}{where} [{hit.item_key}]",
-            markup=False,
-            highlight=False,
-        )
-        snippet = " ".join(hit.text.split())
-        if len(snippet) > 320:
-            snippet = snippet[:317] + "…"
-        console.print(f"   {snippet}", markup=False, highlight=False, style="dim")
 
 @rag_app.command("ingest")
 def rag_ingest(
@@ -5818,95 +3657,6 @@ def rag_answered(
     if pack.failed:
         raise typer.Exit(1)
 
-def _ask_once(
-    cfg: Config,
-    question: str,
-    *,
-    stream: bool,
-    show_context: bool,
-    history: list[dict[str, str]] | None = None,
-    retrieve_as: str | None = None,
-    quiet: bool = False,
-    focus: str | None = None,
-    prompt_path: str | None = None,
-    **retrieval: Any,
-) -> dict[str, Any]:
-    """Answer one question on the terminal and return it for the run report."""
-    from .rag.answer import answer
-
-    reply = answer(
-        cfg,
-        question,
-        history=history or (),
-        retrieve_as=retrieve_as,
-        focus=focus,
-        prompt_path=prompt_path,
-        **retrieval,
-    )
-    if quiet:
-        reply.read()
-    elif show_context and reply.hits:
-        console.print("[bold]Passages[/]")
-        _print_hits(reply.hits)
-        console.print()
-    if not quiet:
-        # Answers carry [S1]-style markers; Rich would read them as markup and drop them.
-        if stream:
-            for piece in reply:
-                console.out(piece, end="", highlight=False)
-            console.out("", highlight=False)
-        else:
-            with _spinner("Thinking…"):
-                reply.read()
-            console.print(reply.text, markup=False, highlight=False)
-        cited = reply.cited()
-        listed = cited or reply.sources
-        if listed:
-            heading = "Sources" if cited else "Retrieved, not cited"
-            console.print(f"\n[bold]{heading}[/]")
-            for source in listed:
-                pages = f" {', '.join(source.pages)}." if source.pages else ""
-                console.print(
-                    f"[{source.marker}] {source.citation}. {source.title}.{pages} "
-                    f"[{source.item_key}]",
-                    markup=False,
-                    highlight=False,
-                )
-    cited = reply.cited()
-    return {
-        "question": question,
-        "answer": reply.text,
-        "cited": [s.marker for s in cited],
-        "sources": [
-            {
-                "marker": s.marker,
-                "itemKey": s.item_key,
-                "title": s.title,
-                "pages": s.pages,
-            }
-            for s in reply.sources
-        ],
-    }
-
-def _ask_questions(first: str | None) -> Iterator[str]:
-    """The question given, or a prompt loop. Piped input is one question per line."""
-    if first is not None:
-        yield first
-        return
-    interactive = sys.stdin.isatty()
-    if interactive:
-        console.print("[dim]Ask about your library. Empty line or :q to leave.[/]")
-    while True:
-        try:
-            line = input("ask> " if interactive else "")
-        except EOFError:
-            return
-        line = line.strip()
-        if line in (":q", "exit", "quit") or (interactive and not line):
-            return
-        if line:
-            yield line
-
 @app.command()
 def ask(
     question: str | None = typer.Argument(
@@ -6045,6 +3795,13 @@ def summarize(
         min=0,
         help="Stop after this many minutes (finishes the paper in hand).",
     ),
+    collections_file: Path | None = typer.Option(
+        None,
+        "--collections-file",
+        exists=True,
+        dir_okay=False,
+        help="Text file: one collection path per line (appended to --collection).",
+    ),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
@@ -6069,11 +3826,127 @@ def summarize(
         limit=limit,
         max_new=_typer_opt(max_new),
         max_minutes=_typer_opt(max_minutes),
+        collections_file=collections_file,
         profile=profile,
         run_config=run_config,
         config=config,
         fmt=fmt,
     )
+
+
+@app.command("extract-sections")
+def extract_sections(
+    item: list[str] = typer.Option([], "--item", help="Item key (repeatable)."),
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path under the mirror (repeatable)."
+    ),
+    library: bool = typer.Option(False, "--library", help="Every item in the mirror."),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    llm: bool | None = typer.Option(
+        None,
+        "--llm/--no-llm",
+        help="Fill missing MVP fields with a grounded LLM pass. Default is [extract_sections].llm.",
+    ),
+    limit: int | None = typer.Option(None, "--limit", help="Max items this run."),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Print counts; do not write state/sections/.",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Re-extract even when state/sections/<key>.json already exists.",
+    ),
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Extract IMRaD-style sections to disk (rules; optional LLM)."""
+    from .agent_json import batch_exit, envelope
+    from .llm import get_client
+    from .llm.preflight import validate_llm_for_verb
+    from .llm.validate import LlmConfigError
+    from .sections.command import extract_scope, item_to_dict, write_item
+
+    cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    if not (item or collection or library):
+        console.print("[red]Pass --item, -C, or --library.[/]")
+        raise typer.Exit(1)
+    use_llm = cfg.extract_sections_llm if llm is None else llm
+    client = None
+    if use_llm:
+        try:
+            validate_llm_for_verb(cfg)
+        except LlmConfigError as exc:
+            console.print(str(exc), markup=False, style="red")
+            raise typer.Exit(1) from exc
+        client = get_client(cfg)
+    types = _resolve_types(item_type)
+    started = time.time()
+    items = extract_scope(
+        cfg,
+        collections=collection or None,
+        item_keys=item,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_types=types,
+        use_llm=use_llm,
+        client=client,
+        limit=limit,
+        force=force,
+        skip_existing=not force,
+    )
+    filled = sum(
+        1
+        for it in items
+        for name in cfg.extract_sections_fields
+        if it.fields.get(name) is not None
+    )
+    if not dry_run:
+        for it in items:
+            write_item(cfg, it)
+    scope = ", ".join(collection) or ("library" if library else "items")
+    if not json_out:
+        action = "Would extract" if dry_run else "Extracted"
+        console.print(
+            f"{action} sections for {len(items)} item(s)"
+            + (f" ({filled} field(s) present)" if items else "")
+            + (" (LLM on)" if use_llm else "")
+            + "."
+        )
+    write_command_report(
+        cfg,
+        command="extract-sections",
+        scope=scope,
+        summary={
+            "items": len(items),
+            "fields_present": filled,
+            "dry_run": dry_run,
+            "llm": use_llm,
+        },
+        items=[item_to_dict(it) for it in items],
+        flags={"limit": limit, "llm": use_llm, "force": force},
+        started=started,
+    )
+    code = batch_exit(ok=len(items), failed=0)
+    if json_out:
+        payload = envelope(
+            command="extract-sections",
+            summary={
+                "items": len(items),
+                "fields_present": filled,
+                "dry_run": dry_run,
+            },
+            items=[item_to_dict(it) for it in items],
+            flags={"read_only": dry_run, "llm": use_llm, "force": force},
+            exit_code=code,
+        )
+        _emit_agent(payload, json_out=True, human=lambda: None)
+
 
 @app.command()
 def synthesize(
@@ -6185,6 +4058,60 @@ def all_cmd(
         "--serpapi-max",
         help="Cap paid SerpApi Scholar searches on the run step (0 = unlimited).",
     ),
+    upgrade_snapshot: bool | None = UpgradeSnapshotOpt,
+    keep_snapshot: bool = typer.Option(
+        False,
+        "--keep-snapshot",
+        help="With --upgrade-snapshot on the run step, leave the HTML print beside the new PDF.",
+    ),
+    htmlpdf: str | None = typer.Option(
+        None,
+        "--htmlpdf",
+        help="Academic HTML snapshot on the run step: off, gated, or auto.",
+    ),
+    handoff: str | None = typer.Option(
+        None,
+        "--handoff",
+        help=(
+            "After the run step: list|tabs|walk|watch for soft-blocked openable PDF URLs. "
+            "watch = tabs then poll the inbox.dir folder."
+        ),
+    ),
+    gaps_handoff: str | None = typer.Option(
+        None,
+        "--gaps-handoff",
+        help=(
+            "Handoff mode for the optional gaps_handoff step (defaults to --handoff). "
+            "list|tabs|walk|watch."
+        ),
+    ),
+    include_doi_tabs: bool = typer.Option(
+        False,
+        "--include-doi-tabs",
+        help="With run or gaps_handoff handoff tabs|watch, also open doi.org for doi_only rows.",
+    ),
+    downloads_dir: Path | None = typer.Option(
+        None,
+        "--downloads-dir",
+        help="Downloads dir for run/gaps_handoff --handoff walk (default ~/Downloads).",
+    ),
+    ezproxy_relogin: bool | None = EzproxyReloginOpt,
+    twenty_writeback: bool | None = TwentyWritebackOpt,
+    request_rg: bool | None = RequestRgOpt,
+    re_request: bool = ReRequestOpt,
+    promote: str | None = typer.Option(
+        None,
+        "--promote",
+        help="Override [playbooks].promote on the run step: gated or auto.",
+    ),
+    after_handoff_gaps: bool = typer.Option(
+        False,
+        "--after-handoff-gaps",
+        help=(
+            "Append a gaps_handoff step after the chain when --handoff or --gaps-handoff is set: "
+            "gaps --list-missing with the same handoff options."
+        ),
+    ),
     label: str | None = typer.Option(
         None, "--label", help="Pack label when this command opens a pack."
     ),
@@ -6229,6 +4156,18 @@ def all_cmd(
         run_config=run_config,
         config=config,
         fmt=fmt,
+        handoff=_typer_opt(handoff),
+        gaps_handoff=_typer_opt(gaps_handoff),
+        include_doi_tabs=include_doi_tabs,
+        downloads_dir=_typer_opt(downloads_dir),
+        promote=_typer_opt(promote),
+        htmlpdf=_typer_opt(htmlpdf),
+        keep_snapshot=keep_snapshot,
+        ezproxy_relogin=_typer_opt(ezproxy_relogin),
+        twenty_writeback=_typer_opt(twenty_writeback),
+        request_rg=_typer_opt(request_rg),
+        re_request=re_request,
+        after_handoff_gaps=after_handoff_gaps,
     )
 
 def _dispatch_all_step(*args, **kwargs):
@@ -6640,6 +4579,7 @@ def _snowball_request(
     keyword_limit: str | int | None = None,
     keyword_hop_limit: str | int | None = None,
     keyword_min_score: float | None = None,
+    search_keywords: bool | None = None,
     cites_query: str | None = None,
     languages: str | None = None,
     study_designs: list[str] | str | None = None,
@@ -6653,6 +4593,10 @@ def _snowball_request(
     dedupe_after: str | None = None,
     author_site_preflight: bool | None = None,
     twenty_writeback: bool | None = None,
+    stop_rule: str | None = None,
+    stop_eps: float | None = None,
+    stop_k: int | None = None,
+    stop_max_screened: int | None = None,
 ) -> Any:
     from .snowball.command import SnowballRequest
     from .snowball.expand import parse_study_designs
@@ -6676,10 +4620,11 @@ def _snowball_request(
         per_hop_rank=per_hop_rank,
         year_from=year_from,
         year_to=year_to,
-        direction=direction or cfg.snowball_direction or "refs",
+        direction=direction or cfg.snowball_direction or "refs+keywords",
         keyword_limit=keyword_limit,
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
+        search_keywords=search_keywords,
         cites_query=(cites_query or "").strip(),
         languages=_csv(languages) if languages else None,
         study_designs=designs,
@@ -6693,6 +4638,10 @@ def _snowball_request(
         dedupe_scope=(dedupe_scope or "").strip() or None,
         dedupe_after=(dedupe_after or "").strip() or None,
         author_site_preflight=author_site_preflight,
+        stop_rule=(stop_rule or "").strip() or None,
+        stop_eps=stop_eps,
+        stop_k=stop_k,
+        stop_max_screened=stop_max_screened,
     )
 
 def _csv(raw: str | None) -> tuple[str, ...]:
@@ -6808,6 +4757,7 @@ def snowball_search(
     keyword_limit: str | None = KeywordLimitOpt,
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
+    search_keywords: bool | None = SearchKeywordsOpt,
     cites_query: str | None = CitesQueryOpt,
     study_design: list[str] = StudyDesignOpt,
     or_mode: bool = typer.Option(
@@ -6840,6 +4790,10 @@ def snowball_search(
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
     twenty_writeback: bool | None = TwentyWritebackOpt,
+    stop_rule: str | None = StopRuleOpt,
+    stop_eps: float | None = StopEpsOpt,
+    stop_k: int | None = StopKOpt,
+    stop_max_screened: int | None = StopMaxScreenedOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
@@ -6862,6 +4816,7 @@ def snowball_search(
         keyword_limit=keyword_limit,
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
+        search_keywords=search_keywords,
         cites_query=(cites_query or "").strip(),
         languages=languages,
         study_designs=study_design,
@@ -6874,6 +4829,10 @@ def snowball_search(
         dedupe_after=dedupe_after,
         author_site_preflight=author_site_preflight,
         twenty_writeback=twenty_writeback,
+        stop_rule=stop_rule,
+        stop_eps=stop_eps,
+        stop_k=stop_k,
+        stop_max_screened=stop_max_screened,
     )
     from .snowball.command import run_search
 
@@ -6906,6 +4865,7 @@ def snowball_hybrid(
     keyword_limit: str | None = KeywordLimitOpt,
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
+    search_keywords: bool | None = SearchKeywordsOpt,
     cites_query: str | None = CitesQueryOpt,
     study_design: list[str] = StudyDesignOpt,
     or_mode: bool = typer.Option(
@@ -6926,6 +4886,10 @@ def snowball_hybrid(
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
     twenty_writeback: bool | None = TwentyWritebackOpt,
+    stop_rule: str | None = StopRuleOpt,
+    stop_eps: float | None = StopEpsOpt,
+    stop_k: int | None = StopKOpt,
+    stop_max_screened: int | None = StopMaxScreenedOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
@@ -6948,6 +4912,7 @@ def snowball_hybrid(
         keyword_limit=keyword_limit,
         keyword_hop_limit=keyword_hop_limit,
         keyword_min_score=keyword_min_score,
+        search_keywords=search_keywords,
         cites_query=(cites_query or "").strip(),
         languages=languages,
         study_designs=study_design,
@@ -6959,6 +4924,10 @@ def snowball_hybrid(
         dedupe_after=dedupe_after,
         author_site_preflight=author_site_preflight,
         twenty_writeback=twenty_writeback,
+        stop_rule=stop_rule,
+        stop_eps=stop_eps,
+        stop_k=stop_k,
+        stop_max_screened=stop_max_screened,
     )
     from .snowball.command import run_hybrid
 
@@ -7007,6 +4976,10 @@ def snowball_doi(
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
     twenty_writeback: bool | None = TwentyWritebackOpt,
+    stop_rule: str | None = StopRuleOpt,
+    stop_eps: float | None = StopEpsOpt,
+    stop_k: int | None = StopKOpt,
+    stop_max_screened: int | None = StopMaxScreenedOpt,
     seeds_file: str | None = SeedsFileOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
@@ -7037,6 +5010,10 @@ def snowball_doi(
         dedupe_after=dedupe_after,
         author_site_preflight=author_site_preflight,
         twenty_writeback=twenty_writeback,
+        stop_rule=stop_rule,
+        stop_eps=stop_eps,
+        stop_k=stop_k,
+        stop_max_screened=stop_max_screened,
     )
     from .snowball.command import SnowballError, run_doi
 
@@ -7085,6 +5062,10 @@ def snowball_orcid(
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
     twenty_writeback: bool | None = TwentyWritebackOpt,
+    stop_rule: str | None = StopRuleOpt,
+    stop_eps: float | None = StopEpsOpt,
+    stop_k: int | None = StopKOpt,
+    stop_max_screened: int | None = StopMaxScreenedOpt,
     seeds_file: str | None = SeedsFileOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
@@ -7115,6 +5096,10 @@ def snowball_orcid(
         dedupe_after=dedupe_after,
         author_site_preflight=author_site_preflight,
         twenty_writeback=twenty_writeback,
+        stop_rule=stop_rule,
+        stop_eps=stop_eps,
+        stop_k=stop_k,
+        stop_max_screened=stop_max_screened,
     )
     from .snowball.command import SnowballError, run_orcid
 
@@ -7163,6 +5148,10 @@ def snowball_collection(
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
     twenty_writeback: bool | None = TwentyWritebackOpt,
+    stop_rule: str | None = StopRuleOpt,
+    stop_eps: float | None = StopEpsOpt,
+    stop_k: int | None = StopKOpt,
+    stop_max_screened: int | None = StopMaxScreenedOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
@@ -7193,6 +5182,10 @@ def snowball_collection(
         dedupe_after=dedupe_after,
         author_site_preflight=author_site_preflight,
         twenty_writeback=twenty_writeback,
+        stop_rule=stop_rule,
+        stop_eps=stop_eps,
+        stop_k=stop_k,
+        stop_max_screened=stop_max_screened,
     )
     from .snowball.command import run_collection
 
@@ -7349,6 +5342,30 @@ def snowball_resume(
         command="snowball resume",
     )
 
+@snowball_app.command("continue")
+def snowball_continue_cmd(
+    run_id: str = typer.Argument(..., help="Run id under state/snowball/<run-id>/ with stop.json."),
+    gate: str | None = typer.Option(
+        None,
+        "--gate",
+        help="auto marks unlabeled new rows as Keep. Default: the gate saved with the run.",
+    ),
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Score Keep/Skip on the latest hop, then walk one more hop unless a stopping rule fires."""
+    cfg = _cfg(config)
+    json_out = _agent_json(fmt)
+    out = _snowball_console(json_out=json_out)
+    from .snowball.command import run_continue
+
+    _run_snowball(
+        cfg,
+        lambda c: run_continue(c, run_id, console=out, gate=gate),
+        json_out=json_out,
+        command="snowball continue",
+    )
+
 @snowball_app.command("apply")
 def snowball_apply(
     run_id: str = typer.Argument(..., help="Run id under state/snowball/<run-id>/."),
@@ -7401,6 +5418,10 @@ def snowball_run(
     dedupe_after: str | None = DedupeAfterOpt,
     author_site_preflight: bool | None = AuthorSitePreflightOpt,
     twenty_writeback: bool | None = TwentyWritebackOpt,
+    stop_rule: str | None = StopRuleOpt,
+    stop_eps: float | None = StopEpsOpt,
+    stop_k: int | None = StopKOpt,
+    stop_max_screened: int | None = StopMaxScreenedOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
@@ -7443,6 +5464,14 @@ def snowball_run(
             request.dedupe_after = dedupe_after.strip()
         if author_site_preflight is not None:
             request.author_site_preflight = author_site_preflight
+        if stop_rule:
+            request.stop_rule = stop_rule.strip()
+        if stop_eps is not None:
+            request.stop_eps = stop_eps
+        if stop_k is not None:
+            request.stop_k = stop_k
+        if stop_max_screened is not None:
+            request.stop_max_screened = stop_max_screened
         description = str(raw.get("description") or "").strip()
         if description and not json_out:
             console.print(description)
@@ -7525,6 +5554,7 @@ def snowball_profile_save(
     keyword_limit: str | None = KeywordLimitOpt,
     keyword_hop_limit: str | None = KeywordHopLimitOpt,
     keyword_min_score: float | None = KeywordMinScoreOpt,
+    search_keywords: bool | None = SearchKeywordsOpt,
     cites_query: str | None = CitesQueryOpt,
     study_design: list[str] = StudyDesignOpt,
     year_from: int | None = YearFromOpt,
@@ -7547,6 +5577,10 @@ def snowball_profile_save(
     hybrid_seeds: int | None = typer.Option(None, "--hybrid-seeds"),
     refine: bool = typer.Option(False, "--refine"),
     author_site_preflight: bool = typer.Option(False, "--author-site-preflight"),
+    stop_rule: str = typer.Option("", "--stop-rule", help="off, marginal_yield, asymptotic_coverage, budget, or any."),
+    stop_eps: float | None = StopEpsOpt,
+    stop_k: int | None = StopKOpt,
+    stop_max_screened: int | None = StopMaxScreenedOpt,
     seeds_file: str | None = SeedsFileOpt,
     force: bool = typer.Option(
         False, "--force", help="Overwrite, or save a writing gate."
@@ -7655,6 +5689,8 @@ def snowball_profile_save(
             raise SnowballError(str(exc)) from exc
     if keyword_min_score is not None:
         body["keyword_min_score"] = keyword_min_score
+    if search_keywords is not None:
+        body["search_keywords"] = search_keywords
     if cites_query and cites_query.strip():
         body["cites_query"] = cites_query.strip()
     if study_design:
@@ -7684,6 +5720,14 @@ def snowball_profile_save(
         body["hybrid_seeds"] = hybrid_seeds
     if refine:
         body["refine"] = True
+    if stop_rule.strip():
+        body["stop_rule"] = stop_rule.strip()
+    if stop_eps is not None:
+        body["stop_eps"] = stop_eps
+    if stop_k is not None:
+        body["stop_k"] = stop_k
+    if stop_max_screened is not None:
+        body["stop_max_screened"] = stop_max_screened
     try:
         path = save_snowball_profile(cfg, name, body, force=force)
     except SnowballError as exc:
@@ -7838,6 +5882,51 @@ def snowball_watch_digest(
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
     _print_briefing(digest, apply=apply, collection=collection, cfg=cfg)
+
+
+@snowball_watch_app.command("apply")
+def snowball_watch_apply(
+    name: str = typer.Argument(..., help="Watch name."),
+    collection: str = typer.Option(
+        ..., "--collection", "-C", help="Target collection path."
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Create metadata parents from the watch inbox. Default is dry-run.",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Create parents from watches/<name>/inbox.jsonl. PDFs stay paperful run."""
+    from .snowball.command import SnowballError
+    from .snowball.watch import apply_watch
+
+    cfg = _cfg(config)
+    backend = None
+    if apply:
+        _require_manager(cfg)
+        backend = _connect(cfg)
+        if not backend.supports_write():
+            _exit_env(_no_write(backend), cfg)
+
+    def _go():
+        return apply_watch(
+            cfg,
+            name,
+            collection,
+            console=console,
+            apply=apply,
+            backend=backend,
+        )
+
+    try:
+        result = _go()
+    except SnowballError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(exc.code) from exc
+    if result.failed and result.created:
+        raise typer.Exit(3)
+
 
 def _authorwatch_call(action: Callable[[], Any]) -> Any:
     from .authorwatch import AuthorwatchError
@@ -8103,6 +6192,20 @@ def authorwatch_briefing(
 
     _authorwatch_call(_run)
 
+
+@authorwatch_app.command("digest")
+def authorwatch_digest_cmd(
+    name: str = typer.Argument(..., help="List name."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Write digest.md from the inbox. Does not create items."""
+    from .authorwatch import write_digest
+
+    cfg = _cfg(config)
+    path = _authorwatch_call(lambda: write_digest(cfg, name))
+    console.print(f"Wrote [bold]{path}[/]")
+
+
 @authorwatch_app.command("apply")
 def authorwatch_apply_cmd(
     name: str = typer.Argument(..., help="List name."),
@@ -8140,6 +6243,330 @@ def authorwatch_apply_cmd(
     result = _authorwatch_call(_go)
     if result.failed and result.created:
         raise typer.Exit(3)
+
+
+def _keepup_call(action: Callable[[], Any]) -> Any:
+    from .keepup import KeepupError
+    from .snowball.command import SnowballError
+
+    try:
+        return action()
+    except (KeepupError, SnowballError) as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(getattr(exc, "code", 2) or 2) from exc
+
+
+@keepup_app.command("save")
+def keepup_save(
+    name: str = typer.Argument(..., help="Job name under state/keepup/<name>/."),
+    collection: str = typer.Option(
+        ..., "--collection", "-C", help="Target Zotero collection path."
+    ),
+    watch: list[str] = typer.Option(
+        [], "--watch", help="Snowball watch name (repeatable)."
+    ),
+    authorwatch: list[str] = typer.Option(
+        [], "--authorwatch", help="Authorwatch list name (repeatable)."
+    ),
+    source: list[str] = typer.Option(
+        [],
+        "--source",
+        help="Built-in source type. Use cites for what-cites-my-collection.",
+    ),
+    interval_days: int | None = typer.Option(
+        None,
+        "--interval-days",
+        help="Days between polls (default [keepup].interval_days or 7).",
+    ),
+    per_seed_limit: int = typer.Option(
+        20, "--per-seed-limit", help="OpenAlex citing works per seed paper."
+    ),
+    max_candidates: int = typer.Option(
+        100, "--max-candidates", help="Cap proposed rows per cites poll (0 = no cap)."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Create or update a keepup job. No API keys."""
+    from .keepup import Source, save_job
+
+    cfg = _cfg(config)
+    sources = [Source(type="watch", name=item) for item in watch]
+    sources.extend(Source(type="authorwatch", name=item) for item in authorwatch)
+    for raw in source:
+        kind = raw.strip().lower()
+        sources.append(Source(type=kind, name=""))
+    path = _keepup_call(
+        lambda: save_job(
+            cfg,
+            name,
+            collection=collection,
+            sources=sources,
+            interval_days=interval_days,
+            per_seed_limit=per_seed_limit,
+            max_candidates=max_candidates,
+        )
+    )
+    console.print(f"Wrote [bold]{path}[/]")
+
+
+@keepup_app.command("list")
+def keepup_list_cmd(config: Path | None = ConfigOpt) -> None:
+    """List keepup jobs."""
+    from .keepup import list_jobs
+
+    cfg = _cfg(config)
+    names = list_jobs(cfg)
+    if not names:
+        console.print("No keepup jobs.")
+        return
+    for name in names:
+        console.print(name)
+
+
+@keepup_app.command("show")
+def keepup_show(
+    name: str = typer.Argument(..., help="Job name."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Show job ledger. Does not open the library."""
+    from .keepup import show_job
+
+    cfg = _cfg(config)
+    _keepup_call(lambda: show_job(cfg, name, console=console))
+
+
+@keepup_app.command("delete")
+def keepup_delete(
+    name: str = typer.Argument(..., help="Job name."),
+    yes: bool = typer.Option(False, "--yes", help="Remove state/keepup/<name>/."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Delete a keepup job ledger."""
+    from .keepup import delete_job
+
+    cfg = _cfg(config)
+    if not yes:
+        console.print("Pass --yes to delete the keepup job directory.")
+        raise typer.Exit(1)
+    path = _keepup_call(lambda: delete_job(cfg, name))
+    console.print(f"Deleted {path}")
+
+
+@keepup_app.command("run")
+def keepup_run(
+    name: str = typer.Argument(..., help="Job name."),
+    force: bool = typer.Option(
+        False, "--force", help="Ignore interval_days and poll now."
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="After polling, create parents in the job collection.",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Poll sources (respecting interval). Baseline proposes nothing."""
+    from .keepup import run_job
+
+    cfg = _cfg(config)
+    backend = None
+    if apply:
+        _require_manager(cfg)
+        backend = _connect(cfg)
+        if not backend.supports_write():
+            _exit_env(_no_write(backend), cfg)
+
+    def _go():
+        return run_job(
+            cfg,
+            name,
+            console=console,
+            force=force,
+            apply=apply,
+            backend=backend,
+        )
+
+    result = _keepup_call(_go)
+    if result.created and getattr(result, "created", 0):
+        pass
+
+
+@keepup_app.command("digest")
+def keepup_digest(
+    name: str = typer.Argument(..., help="Job name."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Rebuild digest.md from the keepup inbox. Does not create items."""
+    from .keepup import write_digest
+
+    cfg = _cfg(config)
+    path = _keepup_call(lambda: write_digest(cfg, name))
+    console.print(f"Wrote [bold]{path}[/]")
+
+
+@keepup_app.command("apply")
+def keepup_apply_cmd(
+    name: str = typer.Argument(..., help="Job name."),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Create metadata parents. Default is dry-run.",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Create parents from the keepup inbox into the job collection."""
+    from .keepup import apply_job, load_job
+
+    cfg = _cfg(config)
+    body = _keepup_call(lambda: load_job(cfg, name))
+    backend = None
+    if apply:
+        _require_manager(cfg)
+        backend = _connect(cfg)
+        if not backend.supports_write():
+            _exit_env(_no_write(backend), cfg)
+
+    def _go():
+        return apply_job(
+            cfg,
+            name,
+            console=console,
+            apply=apply,
+            backend=backend,
+        )
+
+    result = _keepup_call(_go)
+    _ = body
+    if result.failed and result.created:
+        raise typer.Exit(3)
+
+
+@keepup_app.command("dismiss")
+def keepup_dismiss(
+    name: str = typer.Argument(..., help="Job name."),
+    doi: str = typer.Option("", "--doi", help="DOI to mute."),
+    identity: str = typer.Option(
+        "", "--identity", help="Identity key (doi:… or openalex:…)."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Mute a work so keepup never re-proposes it."""
+    from .keepup import dismiss
+
+    cfg = _cfg(config)
+    key = _keepup_call(
+        lambda: dismiss(cfg, name, identity=identity, doi=doi)
+    )
+    console.print(f"Muted {key}")
+
+
+@capture_app.callback(invoke_without_command=True)
+def capture_main(
+    ctx: typer.Context,
+    stdio: bool = typer.Option(
+        False, "--stdio", help="Native messaging loop for the Firefox add-on."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Mirror capture. ``--stdio`` speaks Firefox native messaging."""
+    if ctx.invoked_subcommand is not None:
+        return
+    if not stdio:
+        console.print(ctx.get_help())
+        raise typer.Exit(0)
+    from .capture_host import serve_stdio
+
+    serve_stdio(_cfg(config))
+
+
+@capture_app.command("plan")
+def capture_plan(
+    doi: str = typer.Option("", "--doi"),
+    url: str = typer.Option("", "--url"),
+    title: str = typer.Option("", "--title"),
+    year: int | None = typer.Option(None, "--year"),
+    pdf_url: str = typer.Option("", "--pdf-url"),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Dry-run identity: create, update, blocked, or ambiguous. Writes nothing."""
+    from .capture import as_year, plan_page
+
+    result = plan_page(
+        _cfg(config),
+        doi=doi,
+        url=url,
+        title=title,
+        year=year if year is not None else as_year(year),
+        pdf_url=pdf_url,
+    )
+    console.print_json(json.dumps(result))
+
+
+@capture_app.command("apply")
+def capture_apply(config: Path | None = ConfigOpt) -> None:
+    """Read one JSON object on stdin and write the mirror."""
+    from .capture import apply_page
+
+    try:
+        body = json.loads(sys.stdin.read() or "{}")
+    except ValueError:
+        console.print_json(json.dumps({"ok": False, "reason": "invalid"}))
+        raise typer.Exit(2)
+    if not isinstance(body, dict):
+        console.print_json(json.dumps({"ok": False, "reason": "invalid"}))
+        raise typer.Exit(2)
+    result = apply_page(_cfg(config), body)
+    code = int(result.pop("code", 0 if result.get("ok") else 2))
+    console.print_json(json.dumps(result))
+    if code:
+        raise typer.Exit(code)
+
+
+@capture_app.command("session")
+def capture_session(config: Path | None = ConfigOpt) -> None:
+    """Print the open handoff tab list, or an empty list."""
+    from .capture import read_session
+
+    console.print_json(json.dumps(read_session(_cfg(config))))
+
+
+@capture_app.command("install-host")
+def capture_install_host(config: Path | None = ConfigOpt) -> None:
+    """Install the user-level Firefox native messaging host (macOS, Linux, Windows)."""
+    from .capture_host import install_host
+
+    line = install_host(_cfg(config), config)
+    console.print(line)
+
+
+def _reconcile_jobs() -> None:
+    """Keep JOBS aligned with registered top-level Typer commands.
+
+    Curated categories stay as written. Any command missing from JOBS is
+    appended to utility so ``paperful jobs`` and CI cannot drift when a new
+    ``@app.command`` is added. Stale JOBS entries (listed but not registered)
+    raise so typos surface at import time.
+    """
+    from typer.main import get_command
+
+    registered = set(get_command(app).commands)
+    listed = [verb for verbs in JOBS.values() for verb in verbs]
+    if len(listed) != len(set(listed)):
+        dupes = sorted({v for v in listed if listed.count(v) > 1})
+        raise RuntimeError(f"JOBS has duplicate verbs: {dupes}")
+    listed_set = set(listed)
+    orphans = sorted(registered - listed_set)
+    if orphans:
+        JOBS["utility"] = tuple((*JOBS["utility"], *orphans))
+    stale = sorted(listed_set - registered)
+    if stale:
+        raise RuntimeError(
+            f"JOBS lists commands that are not registered: {stale}. "
+            "Remove them from JOBS or restore the @app.command."
+        )
+
+
+_reconcile_jobs()
 
 if __name__ == "__main__":
     app()

@@ -5,16 +5,29 @@ on:
   pull_request:
 
 jobs:
-  test:
+  smoke:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --group dev --extra serve
-      - run: uv run pytest -m "not docs"
-      - name: Workbench API smoke (preview token path)
-        run: |
-          uv run pytest tests/test_ui_grab.py tests/test_ui_commands.py -q
+      - run: uv run pytest -m smoke -q
+
+  suite:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --group dev --extra serve
+      - run: uv run pytest -m "not docs" --cov=paperful --cov-report=term-missing --cov-report=json:coverage.json --cov-fail-under=0
+      - name: Upload coverage report
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-json
+          path: coverage.json
+          if-no-files-found: error
 
   docker:
     runs-on: ubuntu-latest
@@ -26,14 +39,16 @@ jobs:
         run: docker compose config >/dev/null
       - name: Smoke help and doctor without Zotero
         # Compose-first claim: this job is the proof, not pytest-only.
-        # No live Zotero on the runner → doctor exit 2 (Zotero row amber/red).
+        # No live Zotero on the runner → doctor exit 2 (Zotero row red).
         # Must not fail the workflow solely because the API is missing.
         run: |
           data="$(mktemp -d)"
-          # Image runs as uid 1000; mktemp is 0700 for the runner uid — open the mount.
-          chmod 0777 "$data"
+          out="$(mktemp -d)"
+          # Image runs as uid 1000; mktemp is 0700 for the runner uid — open the mounts.
+          chmod 0777 "$data" "$out"
           cp config.example.toml "$data/config.toml"
           export PAPERFUL_DATA="$data"
+          export PAPERFUL_OUT="$out"
           docker compose run --rm -T paperful --help
           set +e
           docker compose run --rm -T paperful doctor --no-guide

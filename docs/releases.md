@@ -1,9 +1,13 @@
 # Releases and stability
 
-**1.0.0** is tagged. Required schemas are frozen in this tree. The operator
-install is clone plus `docker compose build`.
-The image is build-local only. There is no `docker pull` and no
-`pip install paperful`. Image packs: **light** (`[serve]` only; CI default
+**1.3.0** is the current release (`pip install paperful` after this tag is published; optional extras
+`[llm]`, `[rag]`, `[serve]`, `[browser-agent]`). **1.1.0** introduced PyPI and
+trusted publishing. After install, run `playwright install chromium` once for
+campus login and HTML PDF paths. The **operator** install tested in CI is still
+clone plus `docker compose build` on your computer (see [Docker](docker.md)).
+
+**1.0.0** is tagged. Required schemas are frozen in this tree.
+Image packs: **light** (`[serve]` only; CI default
 when unset) or **heavy** (`[serve]` `[llm]` `[rag]` `[browser-agent]`; set in
 `.env.example`). See [Docker](docker.md#image-mode-light-vs-heavy).
 
@@ -16,14 +20,20 @@ same way.
 walkthroughs are in the guide ([Walkthroughs](walkthroughs.md)). Discover + Wanted, people lists,
 briefing/digest (optional collection note), Repair/Mirror Preview→Apply,
 command ids, review tokens, and Activity run-status SSE (`GET /v1/runs/{id}/events`)
-are in tree. **Interactive Ask** is on `/ask`,
-opt-in after `[rag]` + `[llm]`; Advanced **Briefs** runs summarize/synthesize.
+are in tree. **Interactive Ask** is on the default nav (`/ask`),
+opt-in after `[rag]` + `[llm]`. Batch Ask is on that page when Advanced is on.
+Advanced **Index** is ingest, search, and question extracts. **Briefs** runs
+summarize/synthesize.
 Item records and create-missing restore are locked; extra item keys may still
 be added. Required `paperful.run_report.v1` keys and imported-file attach
-(typed `attach_failed`, provenance note) are the contract. **Post-1.0:**
-local OpenAlex snapshot phases beyond opt-in v1, Firefox extension,
-newsletter/alert ingest — see
-[ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10).
+(typed `attach_failed`, provenance note) are the contract. **1.1.1** shipped
+Wanted stop-ship hygiene (Grab scope, Attach at zero, copy). Everything after
+that is a buffet by area (Wanted excellence first, testers before new features).
+**1.3.0** adds the optional unsigned [Firefox add-on](firefox.md): save the
+open page or selected tabs into `out/`. Local OpenAlex snapshot phases beyond
+opt-in v1 and the alert loop stay later — see
+[ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10)
+and [After 1.1.0](ROADMAP.md#after-110-buffet-by-area).
 
 ## Schema compatibility (1.0 contract)
 
@@ -46,8 +56,8 @@ Extra keys may still be added on frozen schemas.
 | Library index (`state/rag/`) | A rebuildable cache. Folder layout, ledger and table columns may change in any release; `rag ingest` rebuilds it | Not a promise |
 
 Install claim tested in CI (`.github/workflows/ci.yml`, job `docker`): clone,
-`docker compose build`, `doctor` exits 2 when Zotero is absent. That is the
-release. There is no wheel and no GHCR image.
+`docker compose build`, `doctor` exits 2 when Zotero is absent. That
+clone-and-build path is the release.
 
 A second manager is not owed as a finished feature and **does not gate 1.0**.
 Mendeley and EndNote adapters are in the tree and **seeking testers**;
@@ -94,7 +104,7 @@ are part of the 1.0 surface (additive extras allowed). See [LLM](llm.md).
 | Locked item record + snapshot/restore | Required `paperful.item.v1` keys frozen; restore is create-missing (not identity round-trip) |
 | Mendeley and EndNote adapters | Not a 1.0 blocker. In the tree; seeking testers; Zotero is the well-tested path |
 | Workbench GUI (Discover, Wanted, Preview/Grab) | Shipped on `paperful serve` (Jinja workbench; Wanted first; Grab fetches to disk, Attach writes the library; Advanced Repair / Mirror / Index / Briefs; review tokens; `docker compose up` at `127.0.0.1:8765`) — [gui.md](gui.md) |
-| Interactive Ask in GUI (cited chat-over-collection) | **Shipped** on `/ask` (opt-in `[rag]` + `[llm]`; threads, batch, custom prompts); Index for ingest/search/`rag questions` / `rag answered`; Briefs for summarize/synthesize |
+| Interactive Ask in GUI (cited chat-over-collection) | **Shipped** on the default nav (`/ask`; opt-in `[rag]` + `[llm]`; threads, batch when Advanced, custom prompts). Index is ingest/search/`rag questions`/`rag answered`. Briefs for summarize/synthesize |
 | Fresh-clone doctor stays quiet without Scholar | Shipped: `scholar` opt-in like `scihub` |
 
 ## Known limits (1.0)

@@ -10,6 +10,7 @@ from pathlib import Path
 from collections.abc import Callable
 from typing import Any
 
+from .exclude import ExcludeRule
 from .playbooks import (
     GreyPlaybook,
     load_pack_dir,
@@ -153,6 +154,8 @@ class Config:
     grey_playbooks_builtin: bool = True
     grey_playbooks_dir: Path | None = None
     grey_playbooks: list[GreyPlaybook] = field(default_factory=list)
+    # Hand-curated collection protection: [[exclude]] rules (see paperful.exclude).
+    exclude_rules: tuple[ExcludeRule, ...] = ()
     config_path: Path | None = None
     # Learned publisher recipes: gated logs wins; auto writes packs/learned.toml.
     playbooks_promote: str = "gated"  # gated | auto
@@ -171,6 +174,11 @@ class Config:
     mirror_pdfs: str = "all"  # all | lazy | none
     mirror_gone: str = "mark"  # mark | trash: an item that left the library
     mirror_refresh: str = "auto"  # auto | manual: refresh before a command reads
+    # Firefox capture. Independent of [mirror].refresh.
+    extension_snapshot: str = "auto"  # auto | off: refresh out/ once before a capture
+    extension_collection: str = "Capture"
+    extension_drop: str = ""  # empty → inbox dir, else state/capture/drop
+    extension_concurrency: int = 2
     browser_agent_max_steps: int = 20
     browser_agent_max_wall_s: float = 300.0
     browser_agent_model: str = ""
@@ -200,6 +208,9 @@ class Config:
     summarize_tag: str = "paperful-summary"
     summarize_dest: str = "both"  # disk | zotero | both
     summarize_order: str = "library"  # library | newest | oldest
+    summarize_style: str = "plain"  # plain | ste
+    ste_violation_policy: str = "warn"  # warn | fail
+    ste_word_list_path: Path | None = None
     synthesize_prompt_template: str = "default"
     synthesize_max_context_chars: int = 24_000
     synthesize_tag: str = "paperful-report"
@@ -222,6 +233,10 @@ class Config:
     inbox_model: str = ""
     inbox_provider: str = ""
     inbox_create: str = "attach_only"  # attach_only | create_gated | create_auto
+    inbox_route: str = "off"  # off | gated | auto
+    inbox_llm_route: str = "off"  # off | when_thin | always
+    inbox_route_min_confidence: float = 0.75
+    inbox_route_auto_min: float = 0.92
     inbox_title_resolve: bool = False
     inbox_manager_metadata_s: float = 0.0
     # Academic HTML→PDF. off leaves journals alone. gated writes a proposal.
@@ -235,10 +250,11 @@ class Config:
     snowball_per_hop_limit: int = 50
     snowball_per_hop_rank: str = "most-cited"  # most-cited | least-cited | random
     snowball_depth: int = 1
-    snowball_direction: str = "refs"
+    snowball_direction: str = "refs+keywords"
     snowball_keyword_limit: int = 3
     snowball_keyword_hop_limit: int = 50
     snowball_keyword_min_score: float = 0.0
+    snowball_search_keywords: bool = True
     snowball_gate: str = "dry-run"
     snowball_target_collection: str = ""
     snowball_fetch_pdfs: str = "off"  # off | fast | full
@@ -247,14 +263,30 @@ class Config:
     snowball_default_tags: tuple[str, ...] = ()
     snowball_types: tuple[str, ...] = ()
     snowball_study_designs: tuple[str, ...] = ()
+    # Citation-map literature categories (OpenAlex study designs + user rules).
+    snowball_map_categories: tuple[str, ...] = (
+        "evidence-synthesis",
+        "trials",
+        "clinical-trials",
+        "observational",
+        "case-reports",
+        "protocols",
+        "narrative-reviews",
+        "preprints",
+        "books",
+        "commentary",
+    )
+    snowball_map_category_defs: tuple[dict[str, Any], ...] = ()
     snowball_oa_only: bool = False
-    # Opt-in OpenAlex snapshot store (SSH+DuckDB v1). Empty backend = API only.
-    openalex_store_backend: str = ""  # ssh_duckdb | (later local_duckdb | http)
+    # Opt-in OpenAlex snapshot store. Empty backend = API only.
+    openalex_store_backend: str = ""  # ssh_duckdb | local_duckdb | (later http)
     openalex_store_ssh_host: str = ""
     openalex_store_ssh_user: str = ""
     openalex_store_parquet_glob: str = ""
+    openalex_store_cites_index_glob: str = ""
     openalex_store_duckdb_bin: str = "duckdb"
     openalex_store_timeout_s: float = 120.0
+    openalex_store_build_timeout_s: float = 7200.0
     snowball_venue_include: tuple[str, ...] = ()
     snowball_venue_exclude: tuple[str, ...] = ()
     snowball_languages: tuple[str, ...] = ()
@@ -275,6 +307,15 @@ class Config:
     snowball_author_site_preflight: bool = False
     snowball_author_site_max_authors: int = 15
     snowball_author_site_max_queries: int = 20
+    # Saturation stop. off keeps the one-shot hop caps.
+    snowball_stop_rule: str = "off"  # off | marginal_yield | asymptotic_coverage | budget | any
+    snowball_stop_eps: float = 0.01
+    snowball_stop_k: int = 2
+    snowball_stop_tau: float = 0.95
+    snowball_stop_min_points: int = 4
+    snowball_stop_max_screened: int = 0
+    # Alert loop / collection digest cadence (days). 0 = every keepup run.
+    keepup_interval_days: int = 7
     searxng_base_url: str = ""
     # Where plain-language lines are written. note | tag | off.
     remarks_surface: str = "note"
@@ -307,9 +348,29 @@ class Config:
     rag_prompt: str = ""  # custom system prompt file for ask; empty → focus preset
     rag_dest: str = "disk"  # disk | zotero | both — batch note writes (needs --apply)
     rag_extract_questions_llm: bool = False  # LLM lane for `rag questions`
+    # Structured IMRaD section extract (`extract-sections`).
+    extract_sections_llm: bool = False
+    extract_sections_headings: str = ""  # extra synonym TOML; also state/section-headings.toml
+    extract_sections_fields: tuple[str, ...] = (
+        "abstract",
+        "conclusion",
+        "methodology",
+        "research_questions",
+    )
+    extract_sections_raw_map: bool = True
+    extract_sections_max_field_chars: int = 20_000
     # Workbench Library item table (server-rendered pagination).
     ui_library_page_size: int = 50
     ui_library_page_sizes: tuple[int, ...] = (25, 50, 100, 200)
+    # Workbench Grab: "manual" leaves PDFs in out/ until Attach; "auto" writes
+    # them when the library supports it (Zotero 10+). CLI `attach` is separate.
+    ui_attach_mode: str = "manual"
+    # Discover citation map library panel: sidebar | popup | both | off.
+    ui_citation_map_edit: str = "both"
+    # After Add to library from the map, also enqueue Find PDF.
+    ui_citation_map_auto_search: bool = False
+    # Remove from library: trash (default). remove_from_collection reserved.
+    ui_citation_map_remove: str = "trash"
     # Attachment hygiene. Off until `paperful attachments --apply`.
     attachments_fix_broken: bool = False
     attachments_merge_files: bool = False
@@ -342,6 +403,16 @@ class Config:
         return self.state_dir / "ocr-ignore.jsonl"
 
     @property
+    def summarize_skip_path(self) -> Path:
+        """JSONL of items summarize should not retry (no PDF text, etc.)."""
+        return self.state_dir / "summarize-skip.jsonl"
+
+    @property
+    def summarize_miss_path(self) -> Path:
+        """Human miss digest for overnight / morning triage."""
+        return self.state_dir / "summarize-miss.md"
+
+    @property
     def pdf_cache_dir(self) -> Path:
         return self.state_dir / "pdf-cache"
 
@@ -368,6 +439,10 @@ class Config:
     @property
     def rag_dir(self) -> Path:
         return self.state_dir / "rag"
+
+    @property
+    def sections_dir(self) -> Path:
+        return self.state_dir / "sections"
 
     @property
     def inbox_path(self) -> Path | None:
@@ -617,6 +692,8 @@ def _apply_snowball(raw: Any, cfg: Config) -> None:
         cfg.snowball_depth = int(raw["depth"])
     if "direction" in raw and raw["direction"]:
         cfg.snowball_direction = str(raw["direction"]).strip()
+    if "search_keywords" in raw:
+        cfg.snowball_search_keywords = bool(raw["search_keywords"])
     if "keyword_limit" in raw:
         from .snowball.expand import parse_keyword_limit
 
@@ -651,6 +728,23 @@ def _apply_snowball(raw: Any, cfg: Config) -> None:
         from .snowball.expand import parse_study_designs
 
         cfg.snowball_study_designs = parse_study_designs(raw["study_designs"])
+    if "map_categories" in raw:
+        from .snowball.map_categories import parse_map_categories
+
+        cfg.snowball_map_categories = parse_map_categories(raw["map_categories"])
+    if "map_category_defs" in raw:
+        from .snowball.map_categories import parse_map_category_defs
+
+        cfg.snowball_map_category_defs = parse_map_category_defs(raw["map_category_defs"])
+        if "map_categories" not in raw:
+            # New custom defs join the default map set unless map_categories is set.
+            extra = tuple(
+                str(item.get("id") or "")
+                for item in cfg.snowball_map_category_defs
+                if str(item.get("id") or "")
+                and str(item.get("id") or "") not in cfg.snowball_map_categories
+            )
+            cfg.snowball_map_categories = cfg.snowball_map_categories + extra
     if "oa_only" in raw:
         cfg.snowball_oa_only = bool(raw["oa_only"])
     if "venue_include" in raw:
@@ -679,6 +773,33 @@ def _apply_snowball(raw: Any, cfg: Config) -> None:
         cfg.snowball_author_site_max_authors = int(raw["author_site_max_authors"])
     if "author_site_max_queries" in raw:
         cfg.snowball_author_site_max_queries = int(raw["author_site_max_queries"])
+    if any(
+        key in raw
+        for key in (
+            "stop_rule",
+            "stop_eps",
+            "stop_k",
+            "stop_tau",
+            "stop_min_points",
+            "stop_max_screened",
+        )
+    ):
+        from .snowball.stop import parse_stop_params
+
+        params = parse_stop_params(
+            rule=raw.get("stop_rule", cfg.snowball_stop_rule),
+            eps=raw.get("stop_eps", cfg.snowball_stop_eps),
+            k=raw.get("stop_k", cfg.snowball_stop_k),
+            tau=raw.get("stop_tau", cfg.snowball_stop_tau),
+            min_points=raw.get("stop_min_points", cfg.snowball_stop_min_points),
+            max_screened=raw.get("stop_max_screened", cfg.snowball_stop_max_screened),
+        )
+        cfg.snowball_stop_rule = params.rule
+        cfg.snowball_stop_eps = params.eps
+        cfg.snowball_stop_k = params.k
+        cfg.snowball_stop_tau = params.tau
+        cfg.snowball_stop_min_points = params.min_points
+        cfg.snowball_stop_max_screened = params.max_screened
 
 
 def _snowball_strs(raw: Any) -> tuple[str, ...]:
@@ -810,6 +931,8 @@ def parse_rag_embed_provider(value: str) -> str:
 
 
 _SUMMARIZE_ORDERS = frozenset({"library", "newest", "oldest"})
+_SUMMARIZE_STYLES = frozenset({"plain", "ste"})
+_STE_VIOLATION_POLICIES = frozenset({"warn", "fail"})
 
 
 def parse_summarize_order(value: str, *, key: str = "order") -> str:
@@ -820,6 +943,26 @@ def parse_summarize_order(value: str, *, key: str = "order") -> str:
     if order not in _SUMMARIZE_ORDERS:
         raise ValueError(f"config {key} {value!r} must be newest, oldest, or library")
     return order
+
+
+def parse_summarize_style(value: str, *, key: str = "style") -> str:
+    """Normalise summarize style. Blank means plain."""
+    style = str(value).strip().lower()
+    if not style:
+        return "plain"
+    if style not in _SUMMARIZE_STYLES:
+        raise ValueError(f"config {key} {value!r} must be plain or ste")
+    return style
+
+
+def parse_ste_violation_policy(value: str, *, key: str = "ste_violation_policy") -> str:
+    """Normalise STE violation policy. Blank means warn."""
+    policy = str(value).strip().lower()
+    if not policy:
+        return "warn"
+    if policy not in _STE_VIOLATION_POLICIES:
+        raise ValueError(f"config {key} {value!r} must be warn or fail")
+    return policy
 
 
 def wants_disk(dest: str) -> bool:

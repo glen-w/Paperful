@@ -65,6 +65,8 @@ def _client(
     by_orcid = by_orcid or {}
 
     def getter(path: str, params: dict) -> dict:
+        if path.startswith("/keywords"):
+            return {"results": []}
         if path.startswith("/works/https://doi.org/"):
             doi = path.split("/works/https://doi.org/", 1)[1]
             for work in works.values():
@@ -75,6 +77,8 @@ def _client(
         if filt.startswith("openalex:"):
             ids = filt.split(":", 1)[1].split("|")
             return {"results": [works[i] for i in ids if i in works]}
+        if filt.startswith("keywords.id:"):
+            return {"results": []}
         if "cites:" in filt:
             seed = ""
             for part in filt.split(","):
@@ -821,7 +825,9 @@ def test_multi_keyword_search_composes_openalex_query(tmp_path: Path):
     seen: list[str] = []
 
     def getter(path: str, params: dict) -> dict:
-        if "search" in params:
+        if path.startswith("/keywords"):
+            return {"results": []}
+        if path.startswith("/works") and "search" in params:
             seen.append(str(params["search"]))
             return {"results": list(works.values())}
         return {"results": []}
@@ -833,7 +839,7 @@ def test_multi_keyword_search_composes_openalex_query(tmp_path: Path):
     result = run_search(
         _cfg(tmp_path),
         query,
-        SnowballRequest(gate="dry-run", max_candidates=10),
+        SnowballRequest(gate="dry-run", max_candidates=10, search_keywords=False),
         console=Console(highlight=False, width=160),
         client=client,
     )
@@ -1660,11 +1666,14 @@ def test_filters_dedupe_scope_and_partial_create(tmp_path: Path):
     assert by["10.1000/book"]["status"] == "filtered"
     assert by["10.1000/same"]["status"] == "exists"
     assert by["10.1000/same"]["exists_match"]["title_year"].startswith("same title|")
-    assert result.exit_code == 1
+    from paperful.agent_json import EXIT_PARTIAL
+
+    assert result.exit_code == EXIT_PARTIAL
     summary = json.loads((result.run_dir / "summary.json").read_text())
     assert summary["score"] == "overlap * 1000 + cited_by_count"
     assert summary["filtered"] >= 1
     assert summary["dedupe_scope"] == "collection"
+    assert summary["target_collection"] == "Inbox/Snowball"
 
 
 def test_profile_save_refuses_secrets(tmp_path: Path):
@@ -2212,7 +2221,9 @@ def test_api_error_keeps_a_restorable_queue(tmp_path: Path):
         client=OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter),
         lookup=lambda doi, title: None,
     )
-    assert result.exit_code == 1
+    from paperful.agent_json import EXIT_PARTIAL
+
+    assert result.exit_code == EXIT_PARTIAL
     assert (result.run_dir / "candidates.jsonl").is_file()
     deferred = json.loads((result.run_dir / "deferred.json").read_text())
     assert deferred["kind"] == "cites"
@@ -2291,7 +2302,9 @@ def test_budget_stop_keeps_partial_rows_and_resume(tmp_path: Path):
         client=client,
         lookup=lambda doi, title: None,
     )
-    assert result.exit_code == 1
+    from paperful.agent_json import EXIT_PARTIAL
+
+    assert result.exit_code == EXIT_PARTIAL
     deferred_path = result.run_dir / "deferred.json"
     deferred = json.loads(deferred_path.read_text())
     assert deferred["kind"] == "cites"
@@ -2438,7 +2451,9 @@ def test_cites_query_survives_budget_resume(tmp_path: Path):
         client=client,
         lookup=lambda doi, title: None,
     )
-    assert result.exit_code == 1
+    from paperful.agent_json import EXIT_PARTIAL
+
+    assert result.exit_code == EXIT_PARTIAL
     deferred = json.loads((result.run_dir / "deferred.json").read_text())
     assert deferred["cites_query"] == "degrowth"
 
@@ -2654,6 +2669,120 @@ def _keyword_client(works: dict[str, dict]) -> tuple[OpenAlexClient, dict]:
         return {"results": []}
 
     return OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter), seen
+
+
+def test_default_direction_and_search_keywords_config(tmp_path: Path):
+    cfg = _cfg(tmp_path)
+    assert cfg.snowball_direction == "refs+keywords"
+    assert cfg.snowball_search_keywords is True
+    assert SnowballRequest().direction == "refs+keywords"
+    assert SnowballRequest().search_keywords is None
+    path = tmp_path / "config-off.toml"
+    path.write_text(
+        f'email = "t@example.org"\nout_dir = "{tmp_path / "out"}"\n'
+        f'state_dir = "{tmp_path / "state"}"\n'
+        '[snowball]\nenabled = true\ndirection = "refs"\nsearch_keywords = false\n'
+    )
+    off = load_config(path)
+    assert off.snowball_direction == "refs"
+    assert off.snowball_search_keywords is False
+
+
+def test_search_unions_openalex_keyword_tags(tmp_path: Path):
+    text_hit = _work("W1", "10.1000/text", "Text hit", 2020, 2)
+    tag_only = _work("W2", "10.1000/tag", "Tag only", 2021, 9)
+    tag_only["keywords"] = [_keyword("degrowth", 0.9)]
+    text_hit["keywords"] = [_keyword("degrowth", 0.5)]
+    seen: dict[str, list[str]] = {"paths": [], "filters": []}
+
+    def getter(path: str, params: dict) -> dict:
+        seen["paths"].append(path)
+        if path.startswith("/keywords"):
+            return {
+                "results": [
+                    {
+                        "id": "https://openalex.org/keywords/degrowth",
+                        "display_name": "degrowth",
+                        "works_count": 10,
+                    }
+                ]
+            }
+        filt = str(params.get("filter") or "")
+        if filt.startswith("keywords.id:"):
+            seen["filters"].append(filt.split(",", 1)[0])
+            return {"results": [tag_only, text_hit]}
+        if path.startswith("/works") and "search" in params:
+            return {"results": [text_hit]}
+        return {"results": []}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    result = run_search(
+        _cfg(tmp_path),
+        "degrowth",
+        SnowballRequest(gate="dry-run", max_candidates=10, search_keywords=True),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=client,
+        lookup=lambda doi, title: None,
+    )
+    assert result.exit_code == 0
+    assert any(p.startswith("/keywords") for p in seen["paths"])
+    assert seen["filters"] == ["keywords.id:degrowth"]
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    by_doi = {row["ids"]["doi"]: row for row in rows}
+    assert set(by_doi) == {"10.1000/text", "10.1000/tag"}
+    assert by_doi["10.1000/tag"]["why"].startswith("OpenAlex keywords")
+    assert by_doi["10.1000/text"]["biblio"]["keyword_overlap"] == 1
+    assert rows[0]["ids"]["doi"] in {"10.1000/tag", "10.1000/text"}
+
+
+def test_search_keywords_off_skips_tag_fetch(tmp_path: Path):
+    text_hit = _work("W1", "10.1000/text", "Text hit", 2020, 2)
+    seen_paths: list[str] = []
+
+    def getter(path: str, params: dict) -> dict:
+        seen_paths.append(path)
+        if path.startswith("/works") and "search" in params:
+            return {"results": [text_hit]}
+        return {"results": []}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    result = run_search(
+        _cfg(tmp_path),
+        "degrowth",
+        SnowballRequest(gate="dry-run", max_candidates=10, search_keywords=False),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=client,
+        lookup=lambda doi, title: None,
+    )
+    assert result.exit_code == 0
+    assert not any(p.startswith("/keywords") for p in seen_paths)
+    assert not any("keywords.id:" in p for p in seen_paths)
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    assert [row["ids"]["doi"] for row in rows] == ["10.1000/text"]
+    assert rows[0]["why"] == "OpenAlex search"
+
+
+def test_default_doi_direction_expands_keywords(tmp_path: Path):
+    seed = _work("W1", "10.1000/seed", "Seed", 2020, 4, ["W2"])
+    seed["keywords"] = [_keyword("alpha", 0.9)]
+    ref = _work("W2", "10.1000/ref", "Ref", 2019, 2)
+    hit = _work("H1", "10.1000/hit", "Hit", 2021, 3)
+    hit["keywords"] = [_keyword("alpha", 0.5)]
+    works = {"W1": seed, "W2": ref, "H1": hit}
+    client, seen = _keyword_client(works)
+    result = run_doi(
+        _cfg(tmp_path),
+        ["10.1000/seed"],
+        SnowballRequest(depth=1, per_hop_limit="all"),
+        console=Console(file=StringIO(), highlight=False, width=120),
+        client=client,
+        lookup=lambda doi, title: None,
+    )
+    assert result.exit_code == 0
+    assert seen.get("filter") == "keywords.id:alpha"
+    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    assert {row["direction"] for row in rows} >= {"doi", "refs", "keywords"}
+    assert {row["ids"]["doi"] for row in rows} >= {"10.1000/seed", "10.1000/ref", "10.1000/hit"}
 
 
 def test_keyword_hop_uses_top_slugs_and_finite_cap(tmp_path: Path):
@@ -3327,6 +3456,71 @@ def test_watch_apply_creates_from_proposed_queue(tmp_path: Path):
     assert lib.created[0]["DOI"] == "10.1000/b"
 
 
+def test_watch_apply_from_inbox(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from paperful.snowball.profile import save_profile
+    from paperful.snowball.watch import (
+        append_inbox,
+        apply_watch,
+        load_applied,
+        save_watch,
+    )
+
+    cfg = _cfg(tmp_path)
+    (tmp_path / "profiles").mkdir()
+    save_profile(
+        cfg,
+        "scout",
+        {"mode": "search", "query": "bbnj", "gate": "dry-run"},
+        force=False,
+    )
+    save_watch(cfg, "inbox-ap", "scout")
+    row = Candidate(
+        run_id="watch:inbox-ap",
+        seed={"type": "query", "value": "bbnj"},
+        hop=1,
+        direction="refs",
+        ids={"doi": "10.1000/inbox", "openalex": "W3"},
+        biblio={"title": "From inbox", "year": 2024, "cited_by_count": 2},
+        why="watch",
+        status="new",
+        provenance={"backend": "openalex"},
+        gate="dry-run",
+        keep=True,
+    )
+    append_inbox(cfg, "inbox-ap", [row])
+    console = Console(file=StringIO(), highlight=False, width=120)
+    dry = apply_watch(
+        cfg,
+        "inbox-ap",
+        "Inbox/Snowball",
+        console=console,
+        apply=False,
+        lookup=lambda *a, **k: None,
+        backend=object(),
+    )
+    assert dry.dry_run is True
+
+    created = []
+
+    def fake_create(backend, rows, collection, **kwargs):
+        created.extend(rows)
+        return [], {"created": len(rows), "skipped_exists": 0, "failed": 0}
+
+    monkeypatch.setattr("paperful.snowball.ingest.create_new", fake_create)
+    written = apply_watch(
+        cfg,
+        "inbox-ap",
+        "Inbox/Snowball",
+        console=console,
+        apply=True,
+        lookup=lambda *a, **k: None,
+        backend=object(),
+    )
+    assert written.created == 1
+    assert written.ingested_path and written.ingested_path.is_file()
+    assert "doi:10.1000/inbox" in load_applied(cfg, "inbox-ap")
+
+
 def test_fill_pause_continues_and_retries_then_writes_settled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from paperful.snowball.fill import FillPaused, run_fill_pass
     from paperful.snowball.candidate import Candidate
@@ -3606,6 +3800,8 @@ def test_reference_stub_takes_the_openalex_title_inside_the_year_window(tmp_path
     catalogue = {"10.1000/hit": hit, "10.1000/old": old, "10.1000/new": kept}
 
     def getter(path: str, params: dict) -> dict:
+        if path.startswith("/keywords"):
+            return {"results": []}
         if path.startswith("/works/https://doi.org/"):
             doi = path.split("/works/https://doi.org/", 1)[1]
             return catalogue.get(doi, {})
@@ -3613,7 +3809,7 @@ def test_reference_stub_takes_the_openalex_title_inside_the_year_window(tmp_path
         if filt.startswith("doi:"):
             wanted = set(filt.split(":", 1)[1].split("|"))
             return {"results": [work for doi, work in catalogue.items() if doi in wanted]}
-        if "search" in params:
+        if path.startswith("/works") and "search" in params:
             return {"results": [hit]}
         return {"results": []}
 
@@ -3631,7 +3827,13 @@ def test_reference_stub_takes_the_openalex_title_inside_the_year_window(tmp_path
     result = run_search(
         _cfg(tmp_path),
         "basketball",
-        SnowballRequest(depth=1, year_from=2023, year_to=2026),
+        SnowballRequest(
+            depth=1,
+            year_from=2023,
+            year_to=2026,
+            direction="refs",
+            search_keywords=False,
+        ),
         console=Console(file=StringIO(), highlight=False, width=160),
         client=OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter),
         lookup=lambda doi, title: None,
@@ -3720,6 +3922,50 @@ def test_create_new_adds_provenance_tags():
         "bbnj",
         "from-10-1000-seed",
     }
+
+
+def test_create_new_merges_operator_tags_note_and_collection():
+    from paperful.snowball.ingest import create_new
+
+    class Lib(_CreateLib):
+        def __init__(self):
+            super().__init__()
+            self.payloads: list[dict] = []
+            self.paths: list[str] = []
+
+        def ensure_collection_path(self, path: str) -> str:
+            self.paths.append(path)
+            return f"COL:{path}"
+
+        def create_parent(self, payload):
+            self.payloads.append(payload)
+            return super().create_parent(payload)
+
+    lib = Lib()
+    row = Candidate(
+        "r",
+        {"type": "doi", "value": "10.1000/seed"},
+        1,
+        "refs",
+        {"doi": "10.1000/op"},
+        {
+            "title": "A sufficiently long paper title about oceans",
+            "year": 2021,
+            "authors": ["Ada"],
+            "type": "article",
+        },
+        "ref of 10.1000/seed",
+        "new",
+        {"backend": "openalex"},
+        "auto",
+        operator={"tags": ["to-read"], "note": "check methods", "collection": "Inbox/Map"},
+    )
+    items, counts = create_new(lib, [row], "Inbox", note_provenance=False)
+    assert counts["created"] == 1 and items
+    tags = {t["tag"] for t in lib.payloads[0]["tags"]}
+    assert "to-read" in tags
+    assert "Inbox/Map" in lib.paths
+    assert any("check methods" in note for note in lib.notes)
 
 
 def test_similar_ranks_coupled_work_above_a_one_off(tmp_path: Path):
@@ -3834,7 +4080,8 @@ def test_config_and_profile_load_study_designs(tmp_path: Path):
         f'state_dir = "{tmp_path / "state"}"\n'
         "[snowball]\n"
         "enabled = true\n"
-        'study_designs = ["rct", "meta-analysis"]\n',
+        'study_designs = ["rct", "meta-analysis"]\n'
+        'map_categories = ["trials", "evidence-synthesis"]\n',
         encoding="utf-8",
     )
     cfg = load_config(path)
@@ -3842,15 +4089,18 @@ def test_config_and_profile_load_study_designs(tmp_path: Path):
         "randomized-controlled-trial",
         "meta-analysis",
     )
+    assert cfg.snowball_map_categories == ("trials", "evidence-synthesis")
     req = request_from_profile(
         {
             "mode": "search",
             "query": "semaglutide",
             "study_designs": ["sr"],
+            "map_categories": ["protocols"],
         },
         cfg,
     )
     assert req.study_designs == ("systematic-review",)
+    assert req.map_categories == ("protocols",)
 
 
 def test_work_to_candidate_maps_study_designs():

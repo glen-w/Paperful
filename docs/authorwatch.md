@@ -19,8 +19,10 @@ paperful authorwatch add ocean-people --orcid 0000-0002-1825-0097
 paperful authorwatch suggest ocean-people -C ocean/BBNJ --method mix --limit 15
 paperful authorwatch accept ocean-people --id sug_…   # optional --seed-from YYYY-MM-DD
 paperful authorwatch run ocean-people --backfill-from 2025-01-01
-paperful authorwatch apply ocean-people -C Watch/Ocean --apply
+paperful authorwatch digest ocean-people
+paperful authorwatch apply ocean-people -C Watch/Ocean --apply   # writes ingested.md
 paperful run -C Watch/Ocean
+# Or fold into the alert loop: paperful keepup save … --authorwatch ocean-people
 ```
 
 `--orcid` is the high-value path (OpenAlex may fill the display name). An

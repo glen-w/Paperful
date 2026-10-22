@@ -9,7 +9,8 @@ on any collection chip.
 
 CLI recipes for the same verbs live in [Workflows](workflows.md)
 (`paperful all`, named run configs). How a fill searches:
-[How it works](how-it-works.md).
+[How it works](how-it-works.md). Which pieces to turn on together:
+[Example setups](example-setups.md).
 
 ## Common workflows
 
@@ -31,6 +32,7 @@ Walkthroughs 1–3 do **not** need a local model. Ask and Briefs do
 | [Research pack](research-pack.md) | Cited-in-PDF works → parents → PDFs |
 | [Author watch](authorwatch.md) | Named people → their new papers |
 | [Snowball](snowball.md) | Keyword / DOI / ORCID crawl (CLI depth) |
+| [Firefox add-on](firefox.md) | Optional. Save the open page, or selected tabs, into `out/`. The Zotero Connector stays for saving into Zotero |
 | [Ask your library](rag.md) | Cited answers from PDFs already on disk |
 
 ## Prerequisites

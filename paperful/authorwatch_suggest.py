@@ -359,7 +359,7 @@ def load_collection_items(cfg: Config, collection: str, backend: Any = None) -> 
     coll = (collection or "").strip()
     if not coll:
         raise AuthorwatchError("authorwatch suggest needs a target collection (-C).")
-    from . import cli as cli_mod
+    from . import cli_runtime as cli_mod
 
     if backend is None:
         backend = cli_mod._connect(cfg, quiet=True)

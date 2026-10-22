@@ -23,13 +23,14 @@ those you open tomorrow.
 
 - `collections` shows what you have.
 - `snowball` proposes new works; parents are created only when the gate says so. [How a hop is cut](snowball.md#how-a-hop-is-cut).
+- `keepup` polls watches / author lists / what-cites on a cadence you cron; apply creates parents. [Keepup](keepup.md).
 - `import` / `export` speak RIS, BibTeX, and EndNote XML.
 - The PDF write gate is **attach**, not admit.
 - Zotero’s local API is the adapter to use. Mendeley and EndNote are seeking testers.
 
 **Find.** Search for a missing PDF. Open access first, campus EZProxy when you have it, playbooks (and an opt-in AI browser) for odd landings.
 
-- Not every paywalled or DOI-less item comes back.
+- Open-access and campus copies come back when a source has them. Preview lists what a fetch would try.
 - Google Scholar stays off until you opt in.
 - [How it works](how-it-works.md) · [Sources](sources.md).
 
@@ -43,7 +44,7 @@ those you open tomorrow.
 **Mirror.** `out/` is a folder copy, not a citation manager. One folder per item (`record.json`, optional PDF, notes). A closed manager costs write-back, not the read work.
 
 - `restore --apply` creates only what the catalogue is missing.
-- Copy `out/` yourself. Not a sync or WebDAV client. [Quiet mirror](quiet-mirror.md).
+- Copy `out/` yourself when you want a backup or a handoff. [Quiet mirror](quiet-mirror.md).
 
 **Control.** Disk first; write-back is a separate step. Dry-run before a big fetch. Scholar and the local model are opt-in. Session passwords are not in config. PDFs keep a provenance stamp.
 
@@ -62,7 +63,7 @@ Python, the Zotero local API, Ollama or LiteLLM, Docker.
 | EndNote (`manager = "endnote"`, local `.enl`) | Seeking testers. Reads `sdb.eni`. Writes stage `state/endnote-import/` for File → Import. Paperful does not edit the EndNote database, and it cannot trash items there |
 | Text layer for scanned PDFs | `paperful ocr` (OCRmyPDF on the disk file). Two-up page split stays with zotero-agent |
 | Linked-file cutover, hosted multi-user service, a second reading app | Cutover is `attachments --link --apply` (off by default; personal library only). Hosted service and a second reading app are not the product |
-| Local workbench (`paperful serve`) | Shipped. `docker compose up` opens Wanted first, then Discover; Advanced adds Repair, Mirror, Index, and Briefs. Grab fetches to disk; Attach is the library write. TTY stays the shell. Screenshots and click-throughs: [Walkthroughs](walkthroughs.md). [GUI](gui.md) |
+| Local workbench (`paperful serve`) | Shipped. `docker compose up` opens Wanted, then Discover and Ask. Advanced adds Repair, Mirror, Index, and Briefs. Grab fetches to disk; Attach is the library write. TTY stays the shell. Screenshots and click-throughs: [Walkthroughs](walkthroughs.md). [GUI](gui.md) |
 
 ## Related
 

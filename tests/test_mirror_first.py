@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from paperful import cli
+from paperful import cli, cli_runtime
 from paperful.catalogue import MirrorCatalogue, MirrorFirstBackend, open_library
 from paperful.config import Config
 from paperful.library import LibraryError, ZoteroBackend
@@ -261,6 +261,7 @@ class CountingZL(StubZL):
 def library(monkeypatch):
     zl = CountingZL()
     monkeypatch.setattr(cli, "ZoteroLocal", lambda *a, **k: zl)
+    monkeypatch.setattr(cli_runtime, "ZoteroLocal", lambda *a, **k: zl)
     return zl
 
 
@@ -273,10 +274,12 @@ def _close_manager(monkeypatch):
             raise ConnectionError("Zotero is not running")
 
     monkeypatch.setattr(cli, "ZoteroLocal", Down)
+    monkeypatch.setattr(cli_runtime, "ZoteroLocal", Down)
 
 
 READ_VERBS = [
     ["collections"],
+    ["extract-sections", "-C", "BBNJ", "--dry-run"],
     ["gaps", "-C", "BBNJ", "--json"],
     ["lint", "-C", "BBNJ", "--json"],
     ["fix-metadata", "-C", "BBNJ"],
@@ -336,6 +339,7 @@ def test_offline_flag_never_contacts_the_manager(cfg_file, library, monkeypatch)
         raise AssertionError("--offline contacted the manager")
 
     monkeypatch.setattr(cli, "ZoteroLocal", forbidden)
+    monkeypatch.setattr(cli_runtime, "ZoteroLocal", forbidden)
     res = runner.invoke(
         cli.app, ["--offline", "gaps", "-C", "BBNJ", "--json", "-c", str(cfg_file)]
     )

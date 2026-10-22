@@ -98,7 +98,8 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `gaps_cmd.py` | `gaps` body after the CLI parses flags | `handoff`, `run_hooks` |
 | `run_cmd.py` | `run` body after the CLI parses flags | `pipeline`, `run_hooks` |
 | `ask_cmd.py` | `ask` body after the CLI parses flags | `agent_ops`, rag |
-| `completeness_cmd.py` | `dedupe`, `attachments`, `summarize`, `synthesize` after flags | `run_hooks` helpers via cli |
+| `dedupe_cmd.py` / `attachments_cmd.py` / `summarize_cmd.py` / `synthesize_cmd.py` | Completeness verbs after flags | domain modules via `cli_runtime` |
+| `completeness_cmd.py` | Re-export shim for the four verbs (keep `cli` imports and monkeypatches stable) | the four `*_cmd` modules |
 | `lint_cmd.py` | `lint` after flags | `lint` |
 | `screen_cmd.py` | `screen` after flags | `screen` |
 | `fix_metadata_cmd.py` | `fix-metadata` after flags | `metadata` |
@@ -107,27 +108,41 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `reachout_cmd.py` | `reachout` after flags | `reachout`, `handoff` |
 | `notes_delete_cmd.py` | `notes delete` after flags | `notes` |
 | `authors_cmd.py` | `authors` after flags | `authors_report` |
-| `all_cmd.py` | `all` chain + step dispatch after flags | Typer wrappers via `cli` |
-| `cli.py` | Flags, progress, exits. No logic of its own | everything |
+| `all_cmd.py` | `all` chain + step dispatch after flags | Typer wrappers via `cli`; helpers via `cli_runtime` |
+| `cli_runtime.py` | Connect, scope, progress, agent emit, source-list helpers | `catalogue`, `library`, `scope`, `run_hooks` (not `cli`) |
+| `attach_cmd.py` | `attach` after flags | `attach`, `handoff`, `pipeline` |
+| `versions_cmd.py` | `versions` after flags | `versions` |
+| `refs_gap_cmd.py` | `refs gap` after flags | `refs_gap`, `agent_ops` |
+| `coverage_cmd.py` | `coverage` after flags | `coverage`, `agent_ops` |
+| `export_cmd.py` | CLI `export` (RIS/BibTeX/EndNote XML + `--pdfs`) after flags | `interop`, `store`, `mirror` |
+| `inbox_cmd.py` | `inbox` watch/drain/proposals after flags | `inbox`, `inbox_match`, `inbox_route` |
+| `capture.py` | Firefox page → mirror identity, blank-field merge, staged PDF/HTML, snapshot, capture note | `store`, `mirror`, `snapshot`, `run_cmd`, `notehtml` |
+| `capture_host.py` | Native-messaging stdio host and `install-host` | `capture` |
+| `doctor_cmd.py` / `collections_cmd.py` / `session_cmd.py` / `mirrors_cmd.py` / `pack_cmd.py` / `cache_cmd.py` | Operator verbs (doctor, collections, session/ezproxy/scholar, mirrors, pack, cache clean) | `cli_runtime`, domain modules |
+| `cli.py` | Flags, Typer apps, exits. Re-exports `cli_runtime` names | everything |
+| `routing.py` | Per-item lanes; owns `SERIAL_SOURCES` (Sci-Hub and other serial phases) | `config`, `zot` |
 | `agent_json.py` | `--format json` envelope (`paperful.agent.json.v1`) and exit 3 | none |
 | `agent_ops.py` | Shared builders for CLI JSON and MCP (`gaps`, snowball dry-run / trends, `export`, refs-gap, ask) plus CLI `coverage_envelope` | `agent_json`, catalogue, rag, `export_build`, `pack_bib`, `snowball.trends`, `coverage` |
-| `export_build.py` | Mirror-first interchange records for a scoped library export. Agent/MCP `export` calls this with notes off and no PDF directory. CLI `export` still builds the same overlay in `cli.py` (EndNote XML bundle and `--pdfs` live there) | `interop`, `store`, `mirror`, library protocol |
+| `export_build.py` | Mirror-first interchange records for a scoped library export. Agent/MCP `export` calls this with notes off and no PDF directory. CLI `export` overlays the same records in `export_cmd.py` (EndNote XML bundle and `--pdfs` live there) | `interop`, `store`, `mirror`, library protocol |
 | `pack_bib.py` | BibTeX/RIS from snowball / authorwatch proposal JSONL on disk | `interop`, snowball |
 | `notehtml.py` | First-line prefixes + `paperful.note.v1` comment | none |
 | `notes.py` | Classify and trash Paperful-owned notes | `notehtml`, library protocol |
 | `refs_gap.py` | Cited-in-PDF works missing from the library fingerprint | `identity`, bibliography parse |
 | `coverage.py` | Briefing/note/file DOI list vs `-C` membership | `identity`, `resolve` |
 | `witness.py` | Optional `paperful.witness.v1` on run reports | `config`, rag status tip |
+| `inbox.py` / `inbox_match.py` / `inbox_route.py` | Drop-folder watch/drain, match ladder, gated create, collection routing | `handoff`, `library`, optional `llm` |
 | `handoff_rank.py` | Missing-PDF sort: refs-gap cites × miss severity | `handoff` |
 | `reachout.py` | Contact-only missing-PDF rows (metadata / Twenty emails, CSV). No fetch | `handoff`, `twenty` |
 | `twenty.py` | Twenty People lookup (local cache) and `sync` (CRM create/enrich). User guide: [Twenty and SearXNG](snowball.md#twenty-and-searxng) | httpx |
 | `mcp_server.py` | Optional stdio MCP: read-only gaps, snowball preview / trends, export, proposal_export, refs_gap, ask | `agent_ops` |
 | `serve.py` | Localhost FastAPI: JSON capability API + mounts `ui` when the `serve` extra is installed | `agent_ops`, `ui` |
-| `ui/` | Server-rendered workbench (Jinja). `app.py` mounts HTML + form POSTs + `GET /v1/runs/{id}` and SSE `GET /v1/runs/{id}/events` (`commands.iter_command_status_events`). Ordinary pages do not run `doctor` (System does). `jobs.py`, `wanted_jobs.py`, `repair_jobs.py`, `discover_jobs.py` call the same domain entrypoints as the CLI; review tokens under `state/gui/reviews/`; command ledger under `state/gui/commands/` (`write_command` notifies SSE waiters) | CLI / MCP builders |
-| `authorwatch.py` | People lists → OpenAlex new works; `gather_briefing` / `write_briefing` (inbox + recent works / co-authors); `apply` creates parents; `accept` / `delete` | OpenAlex client, `identity`, `snowball.ingest`, `authorwatch_suggest` |
+| `ui/` | Server-rendered workbench (Jinja). `app.py` owns shared helpers + `mount_ui`; routes live in `wanted_routes` / `discover_routes` / `shell_routes` / `repair_routes` / `index_routes` (each `register_*`). Long jobs: `jobs.py` re-exports `wanted_jobs` / `discover_jobs` / `repair_jobs` / `index_jobs` (RAG, ask, summarize, synthesize). Ordinary pages do not run `doctor` (System does). Handlers resolve `doctor_payload` / `collections_tree` via `paperful.ui.app` so tests can monkeypatch there | CLI / MCP builders |
+| `authorwatch.py` | People lists → OpenAlex new works; `gather_briefing` / `write_briefing` / `write_digest`; `apply` creates parents + `ingested.md`; `accept` / `delete` | OpenAlex client, `identity`, `snowball.ingest`, `authorwatch_suggest` |
 | `authorwatch_suggest.py` | Corpus / cited / coauthor / mix suggestions → `suggestions.jsonl`; shared co-author accumulation for briefing | `authors_report`, OpenAlex, promoted packs |
 | `authorwatch_social.py` | Parse operator-saved RG / LinkedIn / Academia HTML or CSV (no network) | stdlib HTML/CSV |
-| `snowball/` | Crawl, hops, watch, thin briefing, frontier digest, `trends` (OpenAlex `group_by` year counts). Watch, digest, and trends do not create library items | OpenAlex; library protocol only on apply |
+| `keepup.py` / `keepup_cites.py` | Alert loop job ledger (`paperful.keepup.v1`); poll watch / authorwatch / collection citers; interval gate; apply + dismiss | `snowball.watch`, `authorwatch`, OpenAlex `works_citing` |
+| `snowball/` | Crawl, hops, watch (`watch apply` from inbox), thin briefing, frontier digest, `trends` (OpenAlex `group_by` year counts). `watch run` does not create library items. Citation-map categories live in `map_categories.py`; library annotate/add/remove in `graph_library.py` | OpenAlex; library protocol only on apply |
+| `sections/` | IMRaD field extract (`extract-sections`): deterministic split + optional LLM fill | `rag.extract` text cache, `rag.chunk` / `sections.headings`, gated `llm` |
 
 ## The refresh
 
@@ -171,7 +186,7 @@ Tier policy (1.0 contract):
 | `paperful.refs_gap.pack.v1` | `state/refs-gaps/<stamp>/pack.json` | `refs_gap` | T1 | `REFS_GAP_PACK_KEYS`; `tests/fixtures/refs_gap_pack_v1/` |
 | `paperful.coverage.pack.v1` | `state/coverage/<stamp>/pack.json` | `coverage` | T1 | `COVERAGE_PACK_KEYS`; `tests/fixtures/coverage_pack_v1/` |
 | `paperful.witness.v1` | optional `witness` on run reports | `witness` | T2 | additive; not in `RUN_REPORT_KEYS` |
-| `paperful.inbox.proposal.v1` | `state/inbox/proposals/*.json` | `inbox_match` | T1 | `INBOX_PROPOSAL_KEYS`; `tests/fixtures/inbox_proposal_v1/` |
+| `paperful.inbox.proposal.v1` | `state/inbox/proposals/*.json` | `inbox_match` | T1 | `INBOX_PROPOSAL_KEYS`; extra `route_*` keys allowed; `tests/fixtures/inbox_proposal_v1/` |
 | `paperful.sync.v1` | `out/_sync.json` | `sync` | T2 | — |
 | `paperful.annotations.v1` | `annotations.json` | `snapshot` | T2 | — |
 | `paperful.collections.v1` | `out/_collections.json` | `store` | T2 | — |
@@ -192,12 +207,15 @@ Tier policy (1.0 contract):
 | `paperful.authorwatch.suggestion.v1` | `state/authorwatch/<name>/suggestions.jsonl` | `authorwatch_suggest` | T2 | — |
 | `paperful.snowball.candidate.v1` | `state/snowball/<run-id>/` | `snowball.candidate` | T2 | Additive through 1.x |
 | `paperful.snowball.watch.v1` | snowball watch cursor | `snowball.watch` | T2 | — |
+| `paperful.keepup.v1` | `state/keepup/<name>/job.json` | `keepup` | T2 | Alert loop / what-cites; see [keepup.md](keepup.md) |
 | `paperful.snowball.coauthors.v1` | co-author graph | `snowball.authors` | T2 | — |
+| `paperful.citation_graph.v1` | `state/snowball/<run-id>/citation_graph.json` | `snowball.citation_graph` | T2 | Discover map. Rebuilt from the queue. Nodes carry `role`, `in_library`, `item_key`, `has_pdf`, optional operator staging (`tags` / `note` / `target_collection` / `staged`), optional `watch_new` / `compare_new`, `thresholds`, and `triage` (read-first list). Library actions: `paperful.snowball.graph_library`. |
 | `paperful.htmlpdf.proposal.v1` | `state/htmlpdf/proposals/` | `sources.htmlpdf` | T2 | — |
 | `paperful.synthesis.v1` | synthesize sidecar | `synthesize` | T2 | — |
 | `paperful.ask_batch.v1` | `state/ask-batch/<stamp>/` | `rag.batch` | T2 | — |
 | `paperful.rag.thread.v1` | `state/rag/threads/*.json` | `rag.thread` | T2 | — |
 | `paperful.rag.questions.v1` | `state/rag/questions/` | `rag.questions` | T2 | — |
+| `paperful.sections.v1` | `state/sections/<key>.json` | `extract-sections` | T2 | Required: `schema`, `item_key`, `title`, `year`, `source`, `fields`, `missing`. Optional: `sections` (raw heading map when `[extract_sections].raw_map`). Each `fields.<name>`: `text`, `provenance` (`rule`\|`llm`), optional `heading`, `pages` |
 | `paperful.rq_answered.v1` | `state/rq-answered/` | `rag.answered` | T2 | — |
 | `paperful.rag.text.v1` | extracted text cache | `rag.extract` | T3 | Rebuildable |
 | `paperful.rag.index.v1` | LanceDB meta | `rag.index` | T3 | Not a promise |
@@ -214,7 +232,8 @@ Contract tests: `tests/test_schema_freeze.py`.
 
 **A read verb.** `backend = _connect(cfg)`, `_load_scope(backend, …)`, do
 the work, write a run report. Add it to `READ_VERBS`. Disk-only verbs such as
-`authorwatch save` still belong there so a closed manager is not an accident.
+`authorwatch save` and `extract-sections` still belong there so a closed
+manager is not an accident.
 
 **A write verb.** Same, dry-run by default. Before applying:
 `if not backend.supports_write(): _exit_env(_no_write(backend), cfg)`.
@@ -247,10 +266,20 @@ Count requests when the point of a change is fewer of them: `FakeZotero.calls`.
 
 ### CI and local pitfalls
 
-GitHub Actions (`.github/workflows/ci.yml`) runs `uv sync --group dev --extra
-serve` and `uv run pytest` on Ubuntu. A second job builds the Compose image and
-smokes `paperful doctor`; it can pass while pytest fails, so check the **test**
-job when CI is red.
+GitHub Actions (`.github/workflows/ci.yml`) syncs with `--group dev --extra
+serve` on Ubuntu, then runs three jobs:
+
+- **smoke** (required): `pytest -m smoke` — CLI version, shell pages boot, and
+  workbench command/preview paths. Copy and tab layout changes should not fail
+  this job.
+- **docker** (required): Compose image, `paperful --help`, and `paperful doctor`
+  without Zotero (exit 2).
+- **suite** (advisory): full `pytest -m "not docs"` with coverage. It does not
+  fail the workflow. Coverage uploads when the suite is green; Actions overrides
+  the local 80% `fail_under` with `--cov-fail-under=0`.
+
+Reproduce the required gate with `uv run pytest -m smoke`. The full local suite
+is still `uv run pytest` (80% coverage gate in `pyproject.toml`).
 
 **CLI help assertions.** On CI, `CI` / `GITHUB_ACTIONS` is set and Typer/Rich
 style option names with ANSI codes. A flag like `--apply` is often split across
@@ -260,8 +289,11 @@ tokens (see the comment in that module). For table layout, several CLI test
 modules widen the shared `cli.console` (`width=250`) so Rich does not ellipsize
 cells — follow `tests/test_cli.py` when adding help or table assertions.
 
-**Dev sync and LanceDB.** `uv sync --group dev` pulls `lancedb` for index/RAG
-tests. PyPI wheels cover Linux x86_64/arm64, Windows, and **macOS arm64**; there
+**Dev sync and the workbench.** `uv sync --group dev` installs Jinja2 and
+`python-multipart` as well as FastAPI, so `uv run pytest` can render the
+workbench. CI still passes `--extra serve` (the operator extra). The same
+sync pulls `lancedb` for index/RAG tests. PyPI wheels cover Linux
+x86_64/arm64, Windows, and **macOS arm64**; there
 is no wheel for every macOS x86_64 / OS combo. If sync fails with “no wheel for
 the current platform”, use native **arm64** Python on Apple Silicon, run pytest
 inside the Linux dev container / CI image, or temporarily sync without the dev
@@ -276,3 +308,39 @@ expect host-only tests (for example default Zotero endpoint URLs) to pass when
 **Docs CI.** Pushes that change `docs/` or `website/` also run strict Sphinx
 (`DOCS_STRICT=1`) and may deploy Pages; new guide pages must be linked from
 `docs/index.md` (`tests/test_sphinx_docs.py`).
+
+## PyPI releases
+
+Wheels are built with Hatchling (`uv build` → `dist/`). Publishing uses
+[trusted publishing](https://docs.pypi.org/trusted-publishers/) from
+`.github/workflows/publish.yml` when a GitHub **Release** is published or a
+`v*` tag is pushed. Configure the pending publisher on [pypi.org](https://pypi.org)
+once:
+
+| Field | Value |
+| --- | --- |
+| PyPI project | `paperful` (created on first successful upload) |
+| Owner | `glen-w` |
+| Repository | `Paperful` |
+| Workflow | `publish.yml` |
+| Environment | `pypi` |
+
+Add a GitHub **environment** named `pypi` on the repo (Settings → Environments)
+if you want approval gates; the workflow references `environment: pypi`.
+
+**First upload before trusted publishing is wired:** build locally, then upload
+with an API token for the `glenwwright` account (PyPI → Account settings →
+API tokens). Do not commit the token.
+
+```sh
+make pre-release
+uv build
+bash scripts/release/pre_release.sh --dist-only
+UV_PUBLISH_TOKEN=pypi-… uv publish dist/paperful-$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")*
+```
+
+`uv publish` uploads **every** file in `dist/` unless you pass explicit paths.
+`pre_release.sh` fails if `dist/` contains wheels or sdists for an older
+version than `pyproject.toml`.
+
+Confirm: `pip install paperful==<version>` and `paperful --help`.

@@ -13,6 +13,7 @@ from paperful.e2e_nba import (
     PHASES,
     SCHEMA,
     E2ERunner,
+    _paperful_command,
     build_e2e_plan,
     collection_for_topic,
     extract_orcids_from_candidates,
@@ -115,6 +116,50 @@ def test_soft_skip_matrix():
 def test_main_refuses_without_env(monkeypatch):
     monkeypatch.delenv("PAPERFUL_E2E", raising=False)
     assert main([]) == 2
+
+
+def test_run_fetch_lane_flags(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("PAPERFUL_E2E", "1")
+    calls: list[list[str]] = []
+
+    def fake_paperful(args, **kwargs):
+        calls.append(list(args))
+        from subprocess import CompletedProcess
+
+        return CompletedProcess(
+            args,
+            0,
+            '{"ok": true, "exit": 0, "summary": {}, "paths": {}, "items": [], '
+            '"flags": {}, "schema": "paperful.agent.json.v1", "command": "run", '
+            '"partial": false}',
+            "",
+        )
+
+    runner = E2ERunner(
+        state_dir=tmp_path / "run",
+        run_id="run",
+        from_phase="run_fetch",
+        only_phase="run_fetch",
+        fetch_browser_agent=False,
+        fetch_camofox=True,
+        paperful=fake_paperful,
+        env={"PAPERFUL_E2E": "1"},
+    )
+    monkeypatch.setattr(runner, "root", tmp_path)
+    assert runner.run() == 0
+    assert calls
+    run_argv = calls[0]
+    assert "--no-browser-agent" in run_argv
+    assert "--camofox" in run_argv
+    assert "--browser-agent" not in run_argv
+
+
+def test_paperful_command_prefers_venv(tmp_path: Path):
+    venv = tmp_path / ".venv" / "bin"
+    venv.mkdir(parents=True)
+    paperful = venv / "paperful"
+    paperful.write_text("", encoding="utf-8")
+    assert _paperful_command(tmp_path) == [str(paperful)]
 
 
 def test_report_schema_and_resume(tmp_path: Path, monkeypatch):

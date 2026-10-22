@@ -92,6 +92,11 @@ def wanted_rows(
             }
         )
 
+    item_keys = {it.key for it in items}
+    attach_pending = len(
+        [r for r in manifest.pending_attach() if r.itemKey in item_keys]
+    )
+
     return {
         "have": have,
         "held": held,
@@ -100,8 +105,17 @@ def wanted_rows(
             "have": len(have),
             "held": len(held),
             "missing": len(missing),
+            "attach": attach_pending,
         },
     }
+
+
+def library_has_attached_pdf(cfg: Config) -> bool:
+    """True after at least one PDF has been written back to the library."""
+    from ..store import STATUS_ATTACHED, Manifest
+
+    manifest = Manifest(cfg.manifest_path)
+    return any(r.status == STATUS_ATTACHED for r in manifest.records.values())
 
 
 _WANTED_TABS = ("missing", "held", "have")
@@ -118,6 +132,9 @@ WANTED_FILTER_LABELS = (
     ("no_summary", "Without summary"),
 )
 
+_DISCOVER_TABS = ("explore", "topic", "grow", "people", "queue", "following")
+DISCOVER_TABS = _DISCOVER_TABS
+
 
 def resolve_wanted_tab(tab: str | None, counts: dict[str, int]) -> str:
     """Pick a Wanted tab; default to the first non-empty bucket."""
@@ -127,6 +144,32 @@ def resolve_wanted_tab(tab: str | None, counts: dict[str, int]) -> str:
         if counts.get(name, 0) > 0:
             return name
     return "missing"
+
+
+def resolve_discover_tab(
+    tab: str | None,
+    *,
+    advanced: bool,
+    has_candidates: bool,
+    has_following: bool,
+    explore_picks: bool,
+    list_requested: bool,
+) -> str:
+    """Pick a Discover tab; honour an explicit ``tab`` when allowed."""
+    allowed = {"explore", "topic", "people", "queue", "following"}
+    if advanced:
+        allowed.add("grow")
+    if tab in allowed:
+        return str(tab)
+    if explore_picks:
+        return "explore"
+    if list_requested:
+        return "people"
+    if has_candidates:
+        return "queue"
+    if has_following:
+        return "following"
+    return "topic"
 
 
 def scope_fingerprint(items: list[Any], manifest: Manifest) -> str:
@@ -184,6 +227,24 @@ def newest_snowball_queue(cfg: Config) -> tuple[str, list[dict[str, Any]]]:
                 }
             )
     return run_id, rows
+
+
+def snowball_stop_view(cfg: Config, run_id: str) -> tuple[bool, str]:
+    """Whether the newest queue is waiting for Next hop, and any stop sentence."""
+    if not run_id:
+        return False, ""
+    path = cfg.state_dir / "snowball" / run_id / "stop.json"
+    if not path.is_file():
+        return False, ""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False, ""
+    if not isinstance(data, dict):
+        return False, ""
+    note = str(data.get("rationale") or "").strip()
+    pending = bool(data.get("awaiting_labels")) and not data.get("stopped_by")
+    return pending, note
 
 
 def authorwatch_inbox_rows(cfg: Config) -> list[dict[str, Any]]:

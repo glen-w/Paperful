@@ -36,15 +36,19 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_ingest(raw, cfg)
     apply_playbooks(raw, cfg)
     apply_mirror(raw, cfg)
+    apply_extension(raw, cfg)
     apply_remarks(raw, cfg)
     apply_oa_honesty(raw, cfg)
+    apply_exclude(raw, cfg)
     apply_attachments(raw, cfg)
     apply_ocr(raw, cfg)
     apply_rag(raw, cfg, source)
+    apply_extract_sections(raw, cfg, source)
     apply_mendeley(raw, cfg)
     apply_endnote(raw, cfg, source)
     apply_openalex_store(raw, cfg)
     apply_searxng(raw, cfg)
+    apply_keepup(raw, cfg)
     apply_ui(raw, cfg)
     apply_prompt_paths(cfg, source)
 
@@ -159,6 +163,11 @@ def apply_summarize(raw: dict[str, Any], cfg: "Config") -> None:
                 "summarize_tag",
                 lambda v: str(v).strip() or "paperful-summary",
             ),
+            (
+                "ste_word_list_path",
+                "ste_word_list_path",
+                lambda v: Path(v).expanduser() if v else None,
+            ),
         ],
     )
     if "dest" in summ:
@@ -166,6 +175,15 @@ def apply_summarize(raw: dict[str, Any], cfg: "Config") -> None:
     if "order" in summ:
         cfg.summarize_order = C.parse_summarize_order(
             str(summ["order"]), key="[summarize].order"
+        )
+    if "style" in summ:
+        cfg.summarize_style = C.parse_summarize_style(
+            str(summ["style"]), key="[summarize].style"
+        )
+    if "ste_violation_policy" in summ:
+        cfg.ste_violation_policy = C.parse_ste_violation_policy(
+            str(summ["ste_violation_policy"]),
+            key="[summarize].ste_violation_policy",
         )
 
 
@@ -325,6 +343,8 @@ def apply_inbox(raw: dict[str, Any], cfg: "Config") -> None:
             ("ocr_for_match", "inbox_ocr_for_match", bool),
             ("llm_match_min_confidence", "inbox_llm_match_min_confidence", C._clamp01),
             ("llm_auto_attach_min", "inbox_llm_auto_attach_min", C._clamp01),
+            ("route_min_confidence", "inbox_route_min_confidence", C._clamp01),
+            ("route_auto_min", "inbox_route_auto_min", C._clamp01),
             ("model", "inbox_model", lambda v: str(v).strip()),
             ("provider", "inbox_provider", lambda v: str(v).strip()),
             ("title_resolve", "inbox_title_resolve", bool),
@@ -352,6 +372,18 @@ def apply_inbox(raw: dict[str, Any], cfg: "Config") -> None:
             "[inbox].create",
             inbox["create"],
             ("attach_only", "create_gated", "create_auto"),
+        )
+    if "route" in inbox:
+        cfg.inbox_route = C._one_of(
+            "[inbox].route",
+            inbox["route"],
+            ("off", "gated", "auto"),
+        )
+    if "llm_route" in inbox:
+        cfg.inbox_llm_route = C._one_of(
+            "[inbox].llm_route",
+            inbox["llm_route"],
+            ("off", "when_thin", "always"),
         )
 
 
@@ -420,6 +452,32 @@ def apply_mirror(raw: dict[str, Any], cfg: "Config") -> None:
         )
 
 
+def apply_extension(raw: dict[str, Any], cfg: "Config") -> None:
+    """``[extension]`` — Firefox capture. Does not change ``[mirror].refresh``."""
+    block = raw.get("extension")
+    if not isinstance(block, dict):
+        return
+    C = _mod()
+    if "snapshot" in block:
+        cfg.extension_snapshot = C._one_of(
+            "[extension].snapshot", block["snapshot"], ("auto", "off")
+        )
+    if "collection" in block and str(block["collection"]).strip():
+        cfg.extension_collection = str(block["collection"]).strip()
+    if "drop" in block:
+        cfg.extension_drop = str(block["drop"] or "").strip()
+    if "concurrency" in block:
+        try:
+            n = int(block["concurrency"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "[extension].concurrency must be 1–4"
+            ) from exc
+        if n < 1 or n > 4:
+            raise ValueError("[extension].concurrency must be 1–4")
+        cfg.extension_concurrency = n
+
+
 def apply_remarks(raw: dict[str, Any], cfg: "Config") -> None:
     remarks = raw.get("remarks")
     if isinstance(remarks, dict) and remarks.get("surface") not in (None, ""):
@@ -435,6 +493,15 @@ def apply_oa_honesty(raw: dict[str, Any], cfg: "Config") -> None:
         cfg.oa_honesty_stamp_fields = C._snowball_strs(oa_honesty["stamp_fields"])
     if "license_block" in oa_honesty:
         cfg.oa_honesty_license_block = C._snowball_strs(oa_honesty["license_block"])
+
+
+def apply_exclude(raw: dict[str, Any], cfg: "Config") -> None:
+    """Top-level ``[[exclude]]`` array — protect collection subtrees from writes."""
+    if "exclude" not in raw:
+        return
+    from .exclude import parse_exclude_rules
+
+    cfg.exclude_rules = parse_exclude_rules(raw.get("exclude"))
 
 
 def apply_attachments(raw: dict[str, Any], cfg: "Config") -> None:
@@ -511,6 +578,34 @@ def apply_rag(raw: dict[str, Any], cfg: "Config", source: Path) -> None:
     cfg.rag_chunk_overlap = min(cfg.rag_chunk_overlap, cfg.rag_chunk_chars // 2)
 
 
+def apply_extract_sections(raw: dict[str, Any], cfg: "Config", source: Path) -> None:
+    C = _mod()
+    table = raw.get("extract_sections")
+    if not isinstance(table, dict):
+        return
+    C._apply_config_table(
+        table,
+        cfg,
+        [
+            ("llm", "extract_sections_llm", bool),
+            ("raw_map", "extract_sections_raw_map", bool),
+            (
+                "max_field_chars",
+                "extract_sections_max_field_chars",
+                lambda v: max(500, int(v)),
+            ),
+        ],
+    )
+    if "headings" in table:
+        cfg.extract_sections_headings = C._resolve_prompt_path(
+            str(table["headings"]), source
+        )
+        if cfg.extract_sections_headings == "default":
+            cfg.extract_sections_headings = ""
+    if "fields" in table:
+        cfg.extract_sections_fields = C._snowball_strs(table["fields"])
+
+
 def apply_mendeley(raw: dict[str, Any], cfg: "Config") -> None:
     C = _mod()
     men = raw.get("mendeley")
@@ -551,11 +646,21 @@ def apply_openalex_store(raw: dict[str, Any], cfg: "Config") -> None:
             ("ssh_user", "openalex_store_ssh_user", lambda v: str(v).strip()),
             ("parquet_glob", "openalex_store_parquet_glob", lambda v: str(v).strip()),
             (
+                "cites_index_glob",
+                "openalex_store_cites_index_glob",
+                lambda v: str(v).strip(),
+            ),
+            (
                 "duckdb_bin",
                 "openalex_store_duckdb_bin",
                 lambda v: str(v).strip() or "duckdb",
             ),
             ("timeout_s", "openalex_store_timeout_s", lambda v: max(1.0, float(v))),
+            (
+                "build_timeout_s",
+                "openalex_store_build_timeout_s",
+                lambda v: max(60.0, float(v)),
+            ),
         ],
     )
 
@@ -564,6 +669,14 @@ def apply_searxng(raw: dict[str, Any], cfg: "Config") -> None:
     searx = raw.get("searxng")
     if isinstance(searx, dict) and searx.get("base_url"):
         cfg.searxng_base_url = str(searx["base_url"]).strip().rstrip("/")
+
+
+def apply_keepup(raw: dict[str, Any], cfg: "Config") -> None:
+    keepup = raw.get("keepup")
+    if not isinstance(keepup, dict):
+        return
+    if "interval_days" in keepup:
+        cfg.keepup_interval_days = max(0, int(keepup["interval_days"]))
 
 
 def _positive_int_tuple(raw: Any) -> tuple[int, ...]:
@@ -593,6 +706,17 @@ def apply_ui(raw: dict[str, Any], cfg: "Config") -> None:
     cfg.ui_library_page_size, cfg.ui_library_page_sizes = C.normalize_ui_library_page_sizes(
         default, sizes
     )
+    mode = str(ui.get("attach_mode") or "").strip().lower()
+    if mode in {"manual", "auto"}:
+        cfg.ui_attach_mode = mode
+    edit = str(ui.get("citation_map_edit") or "").strip().lower()
+    if edit in {"sidebar", "popup", "both", "off"}:
+        cfg.ui_citation_map_edit = edit
+    if "citation_map_auto_search" in ui:
+        cfg.ui_citation_map_auto_search = bool(ui["citation_map_auto_search"])
+    remove = str(ui.get("citation_map_remove") or "").strip().lower()
+    if remove in {"trash", "remove_from_collection"}:
+        cfg.ui_citation_map_remove = remove
 
 
 def apply_prompt_paths(cfg: "Config", source: Path) -> None:
@@ -603,3 +727,5 @@ def apply_prompt_paths(cfg: "Config", source: Path) -> None:
     cfg.synthesize_prompt_template = C._resolve_prompt_path(
         cfg.synthesize_prompt_template, source
     )
+    if cfg.ste_word_list_path is not None and not cfg.ste_word_list_path.is_absolute():
+        cfg.ste_word_list_path = (source.parent / cfg.ste_word_list_path).resolve()

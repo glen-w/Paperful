@@ -85,7 +85,9 @@ uv run paperful inbox drain                    # one-shot
 uv run paperful inbox watch -C Inbox/Fitzpatrick  # optional narrow
 ```
 
-`--handoff list` (default) only prints/exports. `tabs` opens each
+`--handoff list` (default) only prints/exports. `tabs` and `walk` also write
+`state/handoff/session.json`. The [Firefox add-on](firefox.md) pre-checks those
+tabs and saves into the mirror. It does not attach. `tabs` opens each
 `openable_url` in your default browser (confirms when more than 20). Opt-in
 `[request].channels = "rg"` also opens **existing** ResearchGate publication
 URLs (`author_request` hint) so you can click Request full-text yourself —
@@ -113,8 +115,10 @@ pass `-C` only to narrow the DOI index. Unmatched PDFs move to
 `<inbox>/unmatched/`. This folder is **not** snowball’s
 `state/snowball/watches/*/inbox.jsonl`. When `[inbox].watch_after_handoff` is
 true (default) and `dir` is set, `--handoff tabs` also enters the watch loop
-after opening tabs. Optional `[inbox].match` (title / OCR / LLM) and
-`[inbox].create` (`create_gated` / unique-DOI `create_auto`) are in
+after opening tabs. The [Firefox add-on](firefox.md) can take those open tabs
+into `out/` instead of waiting on the inbox. Optional `[inbox].match` (title / OCR / LLM),
+`[inbox].create` (`create_gated` / unique-DOI `create_auto`), and
+`[inbox].route` (collection when `-C` is omitted) are in
 [config](config.md) and [commands](commands.md). Config: `[gaps].handoff`, `[gaps].downloads_dir`,
 `[inbox].*`. After a snowball `--fetch-pdfs` pass, the same handoff is
 `gaps -C <collection> --list-missing --handoff …` (or `run --handoff` on a

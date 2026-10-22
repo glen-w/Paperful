@@ -87,15 +87,27 @@ def read_command(cfg: Config, cmd_id: str) -> dict[str, Any] | None:
 
 
 def list_commands(cfg: Config, limit: int = 50) -> list[dict[str, Any]]:
+    """Newest first. Prefer the record's ``created`` time over file mtime.
+
+    Several commands written in the same second share an mtime, so mtime
+    order is not a reliable "latest job" order.
+    """
     d = _commands_dir(cfg)
-    files = sorted(d.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
-    out: list[dict[str, Any]] = []
-    for path in files[:limit]:
+    loaded: list[tuple[float, float, dict[str, Any]]] = []
+    for path in d.glob("*.json"):
         try:
-            out.append(json.loads(path.read_text(encoding="utf-8")))
+            rec = json.loads(path.read_text(encoding="utf-8"))
         except ValueError:
             continue
-    return out
+        if not isinstance(rec, dict):
+            continue
+        try:
+            created = float(rec.get("created"))
+        except (TypeError, ValueError):
+            created = path.stat().st_mtime
+        loaded.append((created, path.stat().st_mtime, rec))
+    loaded.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    return [row[2] for row in loaded[:limit]]
 
 
 def _ensure_worker() -> None:

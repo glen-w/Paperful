@@ -168,6 +168,13 @@ def _actions(
     if watch:
         lines.append(f"`paperful snowball watch show {watch}`")
         lines.append(f"`paperful snowball watch run {watch} --digest`")
+        if collection:
+            lines.append(
+                f"`paperful snowball watch apply {watch} -C {_quote(collection)}`"
+            )
+            lines.append(
+                f"`paperful snowball watch apply {watch} -C {_quote(collection)} --apply`"
+            )
     if run_id and collection:
         lines.append(f"`paperful snowball apply {run_id} -C {_quote(collection)}`")
     elif run_id:

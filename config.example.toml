@@ -21,7 +21,7 @@ manager = "zotero"
 # library = "/path/to/Library.enl"
 
 # Where PDFs land. Sub-folders mirror the Zotero collection path.
-# Prefer relative paths (resolved against this config's folder; Compose mounts that folder at /data).
+# Prefer relative paths (resolved against this config's folder; Compose: /data, with PAPERFUL_OUT at /data/out).
 out_dir = "out"
 
 # Where manifest.jsonl, metadata-patches.jsonl, pdf-cache/, last-run.json,
@@ -38,6 +38,25 @@ state_dir = "state"
 # [oa_honesty]
 # stamp_fields = ["license", "oa_status", "version"]
 # license_block = []   # substring match on license, e.g. "cc-by-nc-nd"
+
+# Protect hand-curated collections from paperful writes. Subtree match on path
+# (or stable key). mode = full (no writes), add_only (create/add OK; no edit),
+# or custom with allow_* flags. protect_items blocks mutating items that sit in
+# the subtree even when they also belong elsewhere. skip_library_scope omits
+# items that live only under the rule from unscoped / --library runs.
+# [[exclude]]
+# path = "Hand curated"
+# mode = "full"
+# [[exclude]]
+# path = "Inbox/Staging"
+# mode = "add_only"
+# [[exclude]]
+# path = "Projects/BBNJ"
+# mode = "custom"
+# allow_create = true
+# allow_add = true
+# allow_update = false
+# # key = "ABCD1234"
 
 # Source order. Open-access first, then EZProxy, then HTML→PDF.
 # Google Scholar is opt-in (CAPTCHA / session login). Append "scholar" when you
@@ -168,6 +187,9 @@ mirror_failures_before_skip = 3
 # tag = "paperful-summary"       # child-note tag; re-runs update, never duplicate
 # dest = "both"                  # disk | zotero | both. disk keeps the Zotero tree clean
 # order = "library"              # library | newest | oldest (before --limit; undated last)
+# style = "plain"                # plain | ste (ASD-STE100 Simplified Technical English)
+# ste_violation_policy = "warn"  # warn | fail when style = ste
+# ste_word_list_path = ""        # optional approved-word list (one word per line)
 # [synthesize]
 # prompt_template = "default"
 # max_context_chars = 24000
@@ -247,6 +269,10 @@ mirror_failures_before_skip = 3
 # llm_match_min_confidence = 0.75
 # llm_auto_attach_min = 0.92
 # create = "attach_only"           # attach_only | create_gated | create_auto
+# route = "off"                    # off | gated | auto — pick -C when omitted
+# llm_route = "off"                # off | when_thin | always
+# route_min_confidence = 0.75
+# route_auto_min = 0.92
 # title_resolve = false            # Crossref/OpenAlex title search when local match is thin
 # manager_metadata_s = 0           # wait after attach for a manager recognizer
 # [ingest]
@@ -282,13 +308,26 @@ pdfs = "all"
 refresh = "auto"
 gone = "mark"
 
+# Firefox add-on capture. Independent of [mirror].refresh.
+# snapshot = auto refreshes out/ once before a capture, even when mirror
+# refresh is manual. off skips that refresh; a live Zotero read still runs.
+[extension]
+snapshot = "auto"
+collection = "Capture"
+# drop = ""         # empty: inbox dir, else state/capture/drop
+# The add-on copies a just-downloaded PDF from ~/Downloads into drop/.
+concurrency = 2
+
 # Snowball grows a library from a keyword, DOI, ORCID, or collection.
 # Off until you set enabled. Dry-run / approve-batch write state/snowball/.
 # gate = "auto" plus target_collection creates parents. fetch_pdfs is
 # off (metadata only), fast (first pass), or full (then the run stack).
 # true means fast. direction = refs|cites|both|keywords|refs+keywords|cites+keywords|refs+cites+keywords.
+# Default direction is refs+keywords. Set direction = "refs" to drop the keyword hop.
 # both stays references plus cited-by. keyword_limit is 1–5 (all is refused).
 # keyword_hop_limit is a positive integer (all is refused; a keyword is an open query).
+# search_keywords (default true) unions OpenAlex keyword-tag matches into search/hybrid
+# hit lists. Set search_keywords = false (or --no-search-keywords) for full-text only.
 # About 12% of works have no topic and therefore no keywords. Those seeds are
 # reported at the start of a keyword hop and skipped on that side.
 # OPENALEX_API_KEY belongs in the environment, not in this file.
@@ -300,23 +339,34 @@ gone = "mark"
 #
 # Optional. Most users leave this unset — see docs/config.md#advanced.
 # Download or host the OpenAlex parquet snapshot yourself; Paperful does not ship it.
+# DOI/id lookups try the store first. Citing needs a cites index:
+#   paperful openalex-store build-cites
+# then set cites_index_glob. Build is resumable (per updated_date + .done
+# markers). Store cites-query is title-only (display_name).
+# When the live API daily budget is spent, DOI/id and citing keep using the store.
+# Keywords / ORCID / full-text search stay API-only.
 # [openalex_store]
-# backend = "ssh_duckdb"   # later: local_duckdb | http
-# ssh_host = "nuc"
-# # ssh_user = "you"
-# parquet_glob = "/mnt/files/openalex/data/parquet/**/*.parquet"
+# backend = "local_duckdb"   # or ssh_duckdb; later: http
+# parquet_glob = "/data/openalex/data/works/**/*.parquet"
+# cites_index_glob = "/data/openalex/cites/**/*.parquet"
 # # duckdb_bin = "duckdb"
 # # timeout_s = 120
+# # build_timeout_s = 7200
+# # ssh_host = "nuc"         # ssh_duckdb only
+# # ssh_user = "you"
+# Alert loop / weekly collection digest. Paperful does not schedule;
+# point cron at `paperful keepup run <name>`. Interval is also stored per job.
+# [keepup]
+# interval_days = 7
+
 # [snowball]
 # enabled = false
 # max_candidates = 200     # all keeps every new+exists row
 # per_hop_limit = 50       # neighbours per seed per hop. all keeps every one
 # per_hop_rank = "most-cited"  # most-cited | least-cited | random
 # depth = 1
-# direction = "refs"
-# keyword_limit = 3       # 1–5. 5 uses every keyword OpenAlex stored. all is refused
-# keyword_hop_limit = 50  # works per seed on the keyword side. all is refused
-# keyword_min_score = 0   # 0 keeps whatever OpenAlex assigned
+# direction = "refs+keywords"
+# search_keywords = true  # search/hybrid also pulls matching OpenAlex keyword tags
 # keyword_limit = 3       # 1–5. 5 uses every keyword OpenAlex stored. all is refused
 # keyword_hop_limit = 50  # works per seed on the keyword side. all is refused
 # keyword_min_score = 0   # 0 keeps whatever OpenAlex assigned
@@ -328,6 +378,10 @@ gone = "mark"
 # default_tags = []
 # types = ["article", "review"]  # empty = journal-article-shaped
 # study_designs = []  # OpenAlex: rct, meta-analysis, systematic-review, …
+# map_categories = ["evidence-synthesis", "trials", "clinical-trials", "observational", "case-reports", "protocols", "narrative-reviews", "preprints", "books", "commentary"]
+# map_category_defs = [
+#   { id = "preprints", label = "Preprints", any_types = ["preprint", "posted-content"] },
+# ]
 # oa_only = false
 # venue_include = []
 # venue_exclude = []
@@ -342,6 +396,12 @@ gone = "mark"
 # author_site_preflight = false
 # author_site_max_authors = 15
 # author_site_max_queries = 20
+# stop_rule = "off"          # off | marginal_yield | asymptotic_coverage | budget | any
+# stop_eps = 0.01            # Keep rate below this for stop_k hops
+# stop_k = 2                 # cannot fire before hop k+1
+# stop_tau = 0.95
+# stop_min_points = 4
+# stop_max_screened = 0      # budget cap; 0 means unset
 
 # People lists: `paperful authorwatch`. Caps are CLI flags on `authorwatch run`
 # (`--max-authors` 50, `--per-author-limit` 200). No [authorwatch] table is
@@ -386,10 +446,25 @@ gone = "mark"
 # dest = "disk"                  # batch ask note writes: disk | zotero | both (needs --apply)
 # extract_questions_llm = false  # LLM lane for `rag questions` (rules always run)
 
+# IMRaD-style section extract (`paperful extract-sections`). Reads mirror PDFs / text cache only.
+# [extract_sections]
+# llm = false                    # fill missing MVP fields; still needs [llm].enabled
+# headings = ""                  # extra synonym TOML; also loads state/section-headings.toml when present
+# fields = ["abstract", "conclusion", "methodology", "research_questions"]
+# raw_map = true                 # include detected section headings in JSON
+# max_field_chars = 20000
+
 # Workbench UI (paperful serve). Library and Wanted item tables share these sizes.
+# attach_mode is the Grab write: manual (default) or auto.
+# auto attaches only when the library can be written (Zotero 10 or newer).
+# Zotero 7–9 always leaves the PDF under out/.
 # [ui]
 # library_page_size = 50
 # library_page_sizes = [25, 50, 100, 200]
+# attach_mode = "manual"
+# citation_map_edit = "both"           # sidebar | popup | both | off
+# citation_map_auto_search = false     # Find PDF right after Add to library
+# citation_map_remove = "trash"        # trash (default)
 
 # Attachment layout. Off until `paperful attachments --apply`.
 # [attachments]

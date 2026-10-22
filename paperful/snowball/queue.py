@@ -50,6 +50,15 @@ def write_queue(
     if meta:
         summary.update(meta)
     (dest / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    from .citation_graph import write_graph
+
+    write_graph(
+        dest,
+        rows,
+        run_id=run_id,
+        map_categories=summary.get("map_categories"),
+        map_category_defs=summary.get("map_category_defs"),
+    )
     return dest
 
 

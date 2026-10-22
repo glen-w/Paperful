@@ -2,8 +2,20 @@
 
 Everything here is **off by default**. Paperful’s PDF loop (`run` / `attach` /
 `lint` / `fix-metadata` / `dedupe`) never needs a model. Turn the LLM on only
-for the five verbs below, and only after `paperful doctor` shows the `LLM` row
-green.
+for the LLM-backed verbs below, and only after `paperful doctor` shows the
+`LLM` row green. `extract-sections` and `rag questions` run deterministic
+rules without a model; their `--llm` lanes need `[llm].enabled`.
+
+**Feasibility first.** Trying one summary is not the same job as summarizing
+or synthesizing ~1.5k PDFs. Hardware bands, overnight local runs, OpenRouter /
+LiteLLM setup, free-tier caveats, and order-of-magnitude hosted cost:
+[AI for notes and Ask](ai.md).
+
+**Two ways to run a model:** use **Ollama** on your computer when your RAM/VRAM
+can support the tags you need (default `provider = "ollama"`). Or install
+`paperful[llm]` and set **`provider = "litellm"`** to call a hosted API
+(OpenAI, Anthropic, or another LiteLLM provider) without running weights
+locally. RAG embeddings follow the same split (`[rag].embed_provider`).
 
 Design rules (see [architecture § LLM layer](architecture.md#llm-layer-optional-local-first)):
 
@@ -38,14 +50,14 @@ No Python extra is needed for Ollama: Paperful talks HTTP to the daemon.
 
 | Verb | Works well with | Notes |
 | --- | --- | --- |
-| `fix-metadata` titles, `lint` identity, `summarize`, `synthesize` | 7B–12B instruct models (`qwen2.5:7b`, `gemma3:12b`, `llama3.1:8b`) | JSON-capable instruct tags; thinking models are fine but slower. `summarize` and `synthesize` set Ollama `num_ctx` from the prompt, capped by `[llm].max_num_ctx` |
+| `fix-metadata` titles, `lint` identity, `summarize`, `synthesize`, `extract-sections --llm`, `rag questions --llm` | 7B–12B instruct models (`qwen2.5:7b`, `gemma3:12b`, `llama3.1:8b`) | JSON-capable instruct tags; thinking models are fine but slower. `summarize` and `synthesize` set Ollama `num_ctx` from the prompt, capped by `[llm].max_num_ctx` |
 | `recover` | 14B+ (`qwen2.5:14b`, `qwen3:14b`, larger); 32B / VL on 24 GB+ | Small models loop on cookie banners and publisher menus; `doctor` warns under ~10B by tag name. Full guidance: [browser-agent-models.md](browser-agent-models.md) |
 
 ### LiteLLM (paid / OpenAI-compatible APIs)
 
 ```sh
 uv sync --extra llm            # installs litellm
-export OPENAI_API_KEY=...      # or ANTHROPIC_API_KEY, etc. — provider-specific env var
+export OPENAI_API_KEY=...      # or ANTHROPIC_API_KEY, OPENROUTER_API_KEY, etc.
 ```
 
 ```toml
@@ -53,12 +65,14 @@ export OPENAI_API_KEY=...      # or ANTHROPIC_API_KEY, etc. — provider-specifi
 enabled = true
 provider = "litellm"
 model = "openai/gpt-4.1-mini"          # LiteLLM model id (provider/model)
-# api_base = "https://my-proxy.example/v1"   # optional OpenAI-compatible base
+# api_base = "https://openrouter.ai/api/v1"   # e.g. OpenRouter; optional otherwise
 ```
 
 Rules: `ollama/…` model ids are rejected on the LiteLLM path (use
 `provider = "ollama"` instead); `api_base` must be `http(s)`. With LiteLLM,
 title/abstract/PDF excerpts (and, for `recover`, page text) leave your machine.
+OpenRouter walkthrough, free-tier limits, and cost sketch:
+[AI for notes and Ask](ai.md#openrouter-setup).
 
 ### Browser agent (`recover` / last `run` lane)
 
@@ -99,6 +113,9 @@ max_context_chars = 24000
 tag = "paperful-summary"
 # dest = "both"                    # disk | zotero | both
 # order = "library"                # library | newest | oldest
+# style = "plain"                  # plain | ste (ASD-STE100 constraints)
+# ste_violation_policy = "warn"    # warn | fail (when style = ste)
+# ste_word_list_path = ""          # optional approved-word list (one word/line)
 
 [synthesize]                        # verb E
 prompt_template = "default"
@@ -176,6 +193,12 @@ uv run paperful recover --from-last-run --from-last-run-mode missing -n 5
   items stay `retryable`. A paywall stops that item only. Sci-Hub's ALTCHA
   check is separate and still completed when it can be. Timeouts / no
   download → `not_found`.
+- **Mileage varies** for both `browser_agent` and opt-in [Camofox](camofox.md):
+  bulk recover often sees long strings of timeouts, Cloudflare / soft bot
+  walls, DOI pages with no PDF control, and empty downloads. Expect frequent
+  misses; keep these lanes off when you want a fast, predictable pass over
+  HTTP / vault sources only. Model and acceptance detail:
+  [browser-agent-models.md](browser-agent-models.md).
 - Access blocks (403 / "Request blocked" / paywall with no free PDF) are
   instructed as immediate stop — the agent must not open search engines or
   support/help pages. If it navigates to Google/Bing/etc. or a support/contact
@@ -189,7 +212,7 @@ uv run paperful recover --from-last-run --from-last-run-mode missing -n 5
   is counted in that run’s report (`command = "run"`).
 - Prints an orange disclaimer: you are responsible for publisher terms; remote
   LLMs may receive page content; a local LLM does not send page content off
-  this machine.
+  your computer.
 
 Do not run two commands concurrently against the same vault: both would open
 the same Chromium profile.
@@ -252,6 +275,13 @@ uv run paperful summarize --item ABCD1234 --prompt prompts/one-liner.md
   truncation warning, lower `max_context_chars` or raise `max_num_ctx`.
 - If `[lint].llm_pdf_match` is on and the item is flagged, `summarize` refuses
   it; pass `--force` to override.
+- `[summarize].style = ste` appends ASD-STE100 Simplified Technical English
+  constraints to the prompt (≤25 words/sentence, ≤6 sentences/paragraph,
+  prefer active voice, approved vocabulary with domain terms allowed). The
+  prompt SHA changes, so existing plain summaries are regenerated. After the
+  model replies, a heuristic check runs: `ste_violation_policy = warn` (default)
+  keeps the summary and warns; `fail` marks the item failed. Optional
+  `ste_word_list_path` enables vocabulary checks against an approved list.
 
 ### E. `synthesize` — summary of summaries
 
@@ -271,6 +301,10 @@ uv run paperful synthesize -C BBNJ --force            # ignore the up-to-date si
   completion. Several chunks are synthesised in batches, then combined.
   If that still overflows, Paperful reduces again, at most three times, then
   exits 1 and asks you to narrow the scope or raise the budget.
+- When there is more than one first-level chunk, Paperful completes the first
+  three (or fewer), forecasts whether three reduce passes can fit the budget,
+  and may run one extra reduce on that sample. If the forecast still leaves
+  more than one chunk, it exits 1 before the rest of the chunks run.
 - The builtin prompt asks for Corpus / Themes / Points of agreement /
   Disagreements and tensions / Gaps and open questions / Suggested reading
   order, citing only `[Surname Year]`. `--prompt FILE` overrides it; its SHA
@@ -299,6 +333,24 @@ Use only the metadata and document text provided.
 
 The file’s SHA-256 is stamped in the footer so you can tell which prompt
 produced which note.
+
+### F. `extract-sections` — structured IMRaD JSON (optional LLM)
+
+```sh
+uv run paperful extract-sections -C BBNJ
+uv run paperful extract-sections -C BBNJ --llm    # fill missing MVP fields only
+uv run paperful extract-sections --library --dry-run
+```
+
+- **Rules always run** without `[llm].enabled`. Heading split uses the shared
+  synonym list (see `[extract_sections]` and `state/section-headings.toml`).
+- **`--llm`** (or `[extract_sections].llm`) asks the model for missing
+  `abstract`, `methodology`, `conclusion`, or `research_questions` only.
+  Outputs must ground in the excerpt or they are dropped.
+- Writes `state/sections/<key>.json` (`paperful.sections.v1`). Reuses
+  `state/rag/text/` when present; otherwise parses the mirror PDF. No Zotero
+  writes. Distinct from `summarize` (HTML prose) and `rag questions` (RQ queue
+  for `rag answered`). See [rag.md](rag.md#structured-sections-mirror-only).
 
 ## 5. Docker
 
@@ -370,12 +422,13 @@ allow_remote = true
 
 ## Related docs
 
+- [ai.md](ai.md) — feasibility: try-it vs ~1.5k library, LiteLLM / OpenRouter,
+  cost order of magnitude
 - [rag.md](rag.md): `paperful ask` and the library index. `ask` uses the chat
   model configured here (`[rag].model` overrides it); embeddings are set under
   `[rag]`.
-
 - [config.md](config.md#llm-optional-local-first) — key reference
-- [commands.md](commands.md) — `recover` / `summarize` / `synthesize` flags and exit codes
+- [commands.md](commands.md) — `recover` / `summarize` / `synthesize` / `extract-sections` flags and exit codes
 - [architecture.md](architecture.md#llm-layer-optional-local-first) — layer, gates, note write path
 - [camofox.md](camofox.md) — opt-in scripted Camoufox lane before `browser_agent`
 - [sessions.md](sessions.md) — vault profile ownership during `recover`

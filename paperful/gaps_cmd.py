@@ -6,7 +6,6 @@ import json
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
 
 import typer
 from rich.console import Console
@@ -266,4 +265,86 @@ def run_gaps(
     console.print(
         f"Walk attached {result.attached}, skipped {result.skipped}"
         + (" (quit early)" if result.quit_early else "")
+    )
+
+
+def run_gaps_command(
+    console: Console,
+    *,
+    collection: list[str],
+    library: bool | None,
+    year_from: int | None,
+    year_to: int | None,
+    item_type: list[str],
+    list_missing: bool,
+    handoff: str | None,
+    include_doi_tabs: bool,
+    downloads_dir: Path | None,
+    request_rg: bool | None,
+    re_request: bool,
+    to: Path | None,
+    as_json: bool,
+    profile: str | None,
+    run_config: Path | None,
+    config: Path | None,
+    fmt: str,
+) -> None:
+    """Flag-level entry for ``paperful gaps`` (and ``all`` dispatch)."""
+    from . import cli_runtime as cli_mod
+    from .author_request import apply_request_rg_override
+    from .handoff import parse_handoff
+
+    if cli_mod._scope_unset(collection, library, profile, run_config):
+        cli_mod._refuse_missing_scope()
+    cfg = cli_mod._cfg(config)
+    apply_request_rg_override(cfg, request_rg)
+    json_out, as_json = cli_mod._agent_wins(fmt, as_json)
+    bound = cli_mod._bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    collection, library, year_from, year_to, item_type = cli_mod._take_scope(bound)
+    if not collection and not library:
+        cli_mod._refuse_missing_scope()
+    try:
+        mode = parse_handoff(handoff, default=cfg.gaps_handoff)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    if mode in {"tabs", "walk", "watch"} and not list_missing:
+        list_missing = True
+    cli_mod._require_manager(cfg)
+    quiet = as_json or json_out
+    backend = cli_mod._connect(cfg, quiet=quiet)
+    loaded = cli_mod._load_scope(
+        backend,
+        json_out=quiet,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+    )
+    run_gaps(
+        console,
+        cfg,
+        backend,
+        loaded.items,
+        loaded.label,
+        list_missing=list_missing,
+        mode=mode,
+        json_out=json_out,
+        as_json=as_json,
+        to=to,
+        include_doi_tabs=include_doi_tabs,
+        downloads_dir=downloads_dir,
+        re_request=re_request,
+        emit_agent=cli_mod._emit_agent,
+        inbox_handoff=cli_mod._inbox_handoff_session,
     )

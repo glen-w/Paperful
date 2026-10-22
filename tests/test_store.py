@@ -3,8 +3,11 @@ import json as _json
 import os
 
 from paperful.store import (
+    STATUS_ATTACH_FAILED,
     STATUS_ATTACHED,
+    STATUS_CAPTCHA,
     STATUS_ERROR,
+    STATUS_NO_IDENTIFIER,
     STATUS_NOT_FOUND,
     STATUS_OK,
     STATUS_RETRYABLE,
@@ -154,6 +157,24 @@ def test_manifest_latest_record_wins_and_resume_logic(tmp_path):
         STATUS_ERROR: 1,
         STATUS_ATTACHED: 1,
     }
+
+
+def test_manifest_retries_captcha_and_holds_no_identifier(tmp_path):
+    path = tmp_path / "manifest.jsonl"
+    m = Manifest(path)
+    m.write(Record(itemKey="CAP", status=STATUS_CAPTCHA))
+    m.write(Record(itemKey="AF", status=STATUS_ATTACH_FAILED, path="a.pdf"))
+    m.write(Record(itemKey="NID", status=STATUS_NO_IDENTIFIER))
+    assert m.should_process("CAP", retry_failed=False)
+    assert m.should_process("AF", retry_failed=False)
+    assert [r.itemKey for r in m.pending_attach()] == ["AF"]
+    assert not m.should_process("NID", retry_failed=False)
+    assert m.should_process("NID", retry_failed=True)
+    m.write(Record(itemKey="AF", status=STATUS_ATTACHED, path="a.pdf"))
+    reloaded = Manifest(path)
+    assert reloaded.get("AF").status == STATUS_ATTACHED
+    assert not reloaded.should_process("AF", retry_failed=True)
+    assert reloaded.pending_attach() == []
 
 
 def test_pending_attach_skips_gated_reasons(tmp_path):

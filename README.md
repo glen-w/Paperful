@@ -1,13 +1,15 @@
 <h1 align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="website/images/logo-dark.png" />
-    <img src="website/images/logo.png" alt="Paperful" width="280" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/glen-w/Paperful/main/website/images/logo-dark.png" />
+    <img src="https://raw.githubusercontent.com/glen-w/Paperful/main/website/images/logo.png" alt="Paperful" width="280" />
   </picture>
 </h1>
 
 <p align="center">
   <a href="https://github.com/glen-w/Paperful/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/glen-w/Paperful/actions/workflows/ci.yml/badge.svg"></a>
-  <img alt="version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-blue">
+  <a href="https://github.com/glen-w/Paperful/actions/workflows/ci.yml"><img alt="Test coverage" src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/glen-w/Paperful/main/badges/coverage.json"></a>
+  <a href="https://paperful.app/guide/"><img alt="Docs" src="https://img.shields.io/badge/docs-paperful.app-blue"></a>
+  <a href="https://pypi.org/project/paperful/"><img alt="PyPI" src="https://img.shields.io/pypi/v/paperful?label=PyPI"></a>
   <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue">
   <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
 </p>
@@ -18,90 +20,72 @@
 
 Paperful is a **local workbench** for a Zotero library you already keep.
 
-Fill missing PDFs, tidy records, keep a folder copy on this machine. Open
-access first; campus access when you have it. Not a sync client, not
-Zotero-in-the-browser, not every paywalled PDF.
+It finds PDFs that are missing, tidies the records, and keeps a folder of
+copies on this computer. It looks for free copies first, then uses your
+campus login when you have one. Downloads always go into that folder first.
+On Zotero 10 or newer you can attach them yourself, or let a download attach
+them. On Zotero 7–9 the files stay in the folder; you attach them in Zotero.
 
 Zotero is well tested. Mendeley and EndNote are seeking testers.
 [How it compares](docs/comparison.md).
 
 ## What can I do with it?
 
-- See which items still need a PDF, preview a fetch, grab files onto `out/`, then attach the copies you trust
-- Grow the library from a topic search or from people you follow (metadata first; PDFs after)
-- Lint identifiers, review duplicates, and repair broken attachments
-- Keep a folder mirror you can back up or hand to another tool
-- Optionally ask the PDFs you already have (local model, off until you enable it)
+- See which items still need a PDF, check what a search would find, then download the files onto this computer
+- Add papers from a topic search or from people you follow (the record first; the PDF after)
+- Check identifiers, review duplicates, and repair broken attachments
+- Keep a folder of your papers that you can back up or give to another tool
+- Optionally ask questions of the PDFs you already have (local models via [Ollama](https://ollama.com) when your machine can run them, or hosted APIs via [LiteLLM](docs/llm.md#litellm-paid--openai-compatible-apis) — off until you turn it on)
+- Optionally, from Firefox, save the page you are reading or the tabs you have open into the folder on this computer ([Firefox add-on](docs/firefox.md)). The Zotero Connector stays the way to save into Zotero. This one writes the folder copy, can search your sources when the page has no PDF, and can take several tabs at once. It does not attach them.
 
 Walkthroughs: [first fill](docs/first-fill.md), [grow the library](docs/grow-library.md),
 [tidy a collection](docs/tidy-library.md). All of them: [Walkthroughs](docs/walkthroughs.md).
 
 ## Screenshots
 
-![Wanted: missing PDFs selected for Preview, then Grab, then Attach](docs/_static/workflows/wanted.png)
+![Wanted: missing PDFs selected for Preview, then Grab, then Attach](https://raw.githubusercontent.com/glen-w/Paperful/main/docs/_static/workflows/wanted.png)
 
-![Discover: topic filled, ready to search or follow people](docs/_static/workflows/discover.png)
+![Discover: topic filled, ready to search or follow people](https://raw.githubusercontent.com/glen-w/Paperful/main/docs/_static/workflows/discover.png)
 
-![Repair: lint, fix metadata, review duplicates](docs/_static/workflows/repair.png)
+![Repair: lint, fix metadata, review duplicates](https://raw.githubusercontent.com/glen-w/Paperful/main/docs/_static/workflows/repair.png)
 
-![Ask: a cited answer from PDFs already on disk](docs/_static/workflows/index-ask.png)
+![Ask: a cited answer from PDFs already on disk](https://raw.githubusercontent.com/glen-w/Paperful/main/docs/_static/workflows/index-ask.png)
 
-## On your machine
+## From a collection to PDFs on your computer
 
-Work lands on disk (`out/`, `state/`). Docker runs the workbench. Zotero and
-headed `session login` stay on the host. Optional [Ollama](docs/llm.md) stays
-off until you turn it on.
+1. Start the workbench and open http://127.0.0.1:8765 (the **Wanted** page).
+2. Choose a collection on **Library**.
+3. **Preview** what can be found, then **Grab** the files. They are saved in a folder on this computer (`out/`). By default you open that folder and **Attach** the copies you want. In Settings you can have Grab attach them for you on Zotero 10 or newer. On Zotero 7–9 the files stay in the folder; attach them in Zotero.
 
-**Trust the disk** before notes or Ask:
-
-1. Honesty — `gaps` / `attachments`
-2. Grab — bytes under `out/`
-3. You read `out/`
-4. Then `summarize` / `ask`
-
-**Attach** writes the PDF into Zotero. [Terms](docs/TERMS.md).
-
-| Claim | Quote / proof |
-| --- | --- |
-| Stranger install is **Compose-first** | GitHub Actions job `docker` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml): `docker compose build`, then `doctor --no-guide` with **no live Zotero**. Exit **2** is expected (Zotero row amber/red). |
-| Dry-run shows the hit before the network | Wanted **Preview**, or `run --dry-run` **Would-hit**. `gaps` counts missing without fetching. |
-| PDFs keep a source stamp | Provenance on the file (`paperful oa:unpaywall`, `campus:ezproxy`, `grey:undocs`) plus a readable parent line. |
-
-## From a collection to PDFs on disk
-
-1. `docker compose up` and open http://127.0.0.1:8765 (**Wanted**).
-2. Set a collection on **Library** (target icon).
-3. **Preview** → **Grab** (files land in `out/` only) → open `out/` yourself → **Attach**.
-
-Full walkthrough: [First fill](docs/first-fill.md). How a fill searches:
-[How it works](docs/how-it-works.md). The same verbs on the CLI for scripts
-and one-shots.
+Full walkthrough: [First fill](docs/first-fill.md). How a search works:
+[How it works](docs/how-it-works.md). The same actions from the command line:
+[Commands](docs/commands.md).
 
 ## Quick start
 
-Clone and **Compose build**. There is no GitHub Release binary, no published
-image, and no PyPI package: do not `docker pull` or `pip install paperful`.
+Clone the repo and build the image with Compose.
 
 **You need**
 
 - [Docker](https://docs.docker.com/get-docker/) with Compose v2.
 - Zotero **on the host** (not in Docker), local API enabled:
   Settings → Advanced → *Allow other applications on this computer to communicate with Zotero*.
-- Zotero 10+ to attach PDFs. On Zotero 7–9 the tool still downloads to disk;
-  attach later. [Zotero](docs/zotero.md).
-- [uv](https://docs.astral.sh/uv/) on the host only when you log in a browser
-  session (`uv run paperful session login ezproxy`). Operators do not need uv
-  for `doctor` or the workbench. [Docker](docs/docker.md).
-- A real `email` in config. Unpaywall is not called without it.
+- Zotero 10 or newer to attach PDFs (manual **Attach**, or automatic on Grab).
+  On Zotero 7–9 the tool still downloads to disk; attach later in Zotero.
+  [Zotero](docs/zotero.md).
+- A one-time browser sign-in on this computer if you use a campus library
+  login. The workbench itself runs from Docker. [Docker](docs/docker.md).
+- A real email address in the config file. The free-copy lookup (Unpaywall)
+  will not run without it.
 
-No campus access: **Open access** preset (`--preset oa`, or
-`config.minimal.toml`). Campus EZProxy: **Campus** (`--preset eoi`) after
-`ezproxy_base` is set. [Configuration](docs/config.md).
+No campus access: choose **Open access**. Campus library login: choose
+**Campus** after you set your library proxy address.
+[Configuration](docs/config.md).
 
 ```sh
-git clone https://github.com/glen-w/Paperful.git
+git clone --branch v1.3.0 https://github.com/glen-w/Paperful.git
 cd Paperful
-cp .env.example .env          # PAPERFUL_DATA=. keeps data in this checkout
+cp .env.example .env          # PAPERFUL_DATA=. PAPERFUL_OUT=./out keeps data here
                               # .env.example sets PAPERFUL_IMAGE_MODE=heavy
 cp config.minimal.toml config.toml   # set email; full file is config.example.toml
 docker compose build                 # heavy when set in .env; CI uses light
@@ -109,48 +93,87 @@ docker compose run --rm paperful doctor          # once; --guide for Enter walk
 docker compose up                                # stays up; workbench at http://127.0.0.1:8765
 ```
 
-First-run `doctor` without Zotero is **exit 2** (amber/red Zotero row) —
-same as CI job `docker` (light). Layout: [Docker](docs/docker.md).
+The sample `.env` keeps your config and downloads in this folder. Where those
+files live, and what the first health check means if Zotero is not open yet:
+[Docker](docs/docker.md).
 
-CLI one-shots (other terminal):
+The same jobs from the command line: [Commands](docs/commands.md).
 
-```sh
-docker compose run --rm paperful collections
-docker compose run --rm paperful run --collection interesting --preset oa --dry-run
-```
-
-Campus EZProxy: [ezproxy.md](docs/ezproxy.md), then `doctor --probe`.
-Optional adapters (seeking testers): [Mendeley](docs/mendeley.md),
+Campus library login: [EZProxy](docs/ezproxy.md).
+Optional libraries (seeking testers): [Mendeley](docs/mendeley.md),
 [EndNote](docs/endnote.md).
 
-Site: [paperful.app](https://paperful.app/). Local preview:
-`uv sync --extra docs && make pages-site`.
+Site: [paperful.app](https://paperful.app/).
 
 Reference:
 
 - [Walkthroughs](docs/walkthroughs.md) — Wanted, Discover, Repair
+- [Example setups](docs/example-setups.md) — one collection, campus, a growing desk, all-in
 - [Docker](docs/docker.md) — operator install; light/heavy packs
 - [Workbench](docs/gui.md) — pages, Preview tokens, what stays CLI
 - [Commands](docs/commands.md) · [Workflows](docs/workflows.md) · [Configuration](docs/config.md)
 - [Source routing](docs/sources.md) · [Camofox](docs/camofox.md) · [Quiet mirror](docs/quiet-mirror.md)
 - [Why Paperful](docs/why.md) · [Roadmap](docs/ROADMAP.md)
 
-## Optional local LLM and Ask
+## On your machine
 
-Off until `[llm].enabled` / `[rag].enabled`. Needs a **heavy** Compose image
-(or host `uv sync --extra llm --extra rag`). Grounded notes, collection
-reviews, and Ask live on Advanced **Briefs** / **Index**.
-[LLM](docs/llm.md) · [Ask your library](docs/rag.md).
+Paperful runs on this computer. It does not upload your library to a
+Paperful server. Downloads, notes, and the folder of copies stay here.
+Zotero stays your catalogue. Notes and questions use a model only when you
+enable one — usually **Ollama** on your computer, or an external provider
+through **LiteLLM** if you prefer hosted APIs. [Terms](docs/TERMS.md).
+
+Read the file before you trust a note or an answer:
+
+1. See which items are still missing a PDF.
+2. Paperful downloads the PDF and saves it in a folder on your computer.
+3. You open that folder and read the file.
+4. Then you write a note or ask a question.
+
+**Attach** is the step that puts the PDF into Zotero. How a search is checked
+before it runs, and how each file records where it came from:
+[How it works](docs/how-it-works.md).
+
+## Optional: ask your papers
+
+Asking questions of PDFs you already have is off until you turn it on.
+**Local first:** run models on this computer with Ollama when your hardware
+can support the tags you need (summaries from ~7B; the browser agent from
+~14B). **Optional hosted APIs:** install `paperful[llm]` and set
+`provider = "litellm"` to call OpenAI, Anthropic, or another LiteLLM-backed
+service (API keys in the environment, not in `config.toml`). Commands print
+a notice when text leaves the machine. **Ask** is in the workbench; notes and
+collection reviews are under Advanced.
+
+[What is feasible (local vs hosted, library scale)](docs/ai.md) ·
+[LLM setup](docs/llm.md) · [Ask your library](docs/rag.md).
 
 ```sh
-ollama pull qwen2.5:7b                       # then set [llm] enabled = true
-# Ask also needs: ollama pull nomic-embed-text and [rag] enabled = true
+ollama pull qwen2.5:7b                       # local default; then enable [llm] in config
+# Ask also needs: ollama pull nomic-embed-text
+# Hosted instead: uv sync --extra llm  — see docs/llm.md
 ```
+
+## Install with pip
+
+For a **CLI on the host** (Zotero local API on this machine; no Docker
+workbench image):
+
+```sh
+pip install paperful
+playwright install chromium    # once; needed for campus login / HTML PDF
+cp config.minimal.toml config.toml   # set email — see docs/config.md
+paperful doctor
+```
+
+Optional extras: `[llm]`, `[rag]`, `[browser-agent]`. The `[serve]` extra
+(workbench) is untested without Docker; the operator path tested in CI is
+**clone + Compose** ([Docker](docs/docker.md)).
 
 ## Develop
 
-Contributors use [uv](https://docs.astral.sh/uv/) (Python 3.10+). This is not
-the operator install.
+Contributors use [uv](https://docs.astral.sh/uv/) (Python 3.10+). Operators
+use the Compose steps above.
 
 ```sh
 uv sync --group dev
@@ -159,6 +182,7 @@ uv run paperful doctor
 uv run pytest
 ```
 
+Local docs preview: `uv sync --extra docs && make pages-site`.
 Workbench screenshots: `.venv/bin/python scripts/docs/capture_workbench.py`
 against a running `docker compose up`. See [CONTRIBUTING](CONTRIBUTING.md).
 

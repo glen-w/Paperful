@@ -3,7 +3,7 @@
 A plain-language map of where Paperful sits next to Zotero plugins, bibliography
 fixers, Mendeley export cleaners, and DOI-centric download scripts.
 
-**Last reviewed:** 2026-10-09. Feature lists for other products are based on public
+**Last reviewed:** 2026-10-19. Feature lists for other products are based on public
 docs and positioning — not paid pilots or exhaustive release testing.
 
 Vendor-by-vendor notes live in the [comparison reference](comparison-reference.md).
@@ -14,7 +14,7 @@ Prefer this page for “is this the right tool?”
 | If you need… | Look at… |
 |--------------|----------|
 | A platform-agnostic **mirror** of the library (backup, and a way out if the citation manager changes). **Zotero is well tested.** Mendeley and EndNote adapters are seeking testers | **Paperful** `snapshot` / `restore` — [quiet mirror](quiet-mirror.md). Do not treat the other adapters as proven |
-| Bulk **missing-PDF** fetch for a Zotero library (OA → campus proxy → optional Sci-Hub), collection-shaped folders, resumable CLI | **Paperful** (this repo) |
+| Bulk **missing-PDF** fetch for a Zotero library (open access first, campus proxy when you have it), collection-shaped folders, resumable CLI | **Paperful** (this repo) |
 | **In-Zotero** “find OA PDF” plus optional grey-zone sources in one plugin UI | [zotero-zotadata](https://github.com/ydeng11/zotero-zotadata) |
 | **Attachment hygiene** (broken links, rename, stored-to-linked, duplicate files on one parent) | **Paperful** `attachments` (report by default; surgery with a flag and `--apply`). In-app: [StorScan](https://github.com/brian-j-griffith/StorScan), [Attanger](https://github.com/MuiseDestiny/zotero-attanger), [ZotMoov](https://github.com/wileyyugioh/zotmoov) |
 | **Metadata repair** (DOI/ISBN/arXiv bulk update, parent-from-PDF) | Paperful `lint` / `fix-metadata`, or [ZotMeta](https://github.com/RoadToDream/ZotMeta) |
@@ -30,18 +30,19 @@ Prefer this page for “is this the right tool?”
 | **DOI-list PDF batch** without Zotero | [paperscraper](https://github.com/jannisborn/paperscraper) |
 | **Grow the library** from a keyword, one or more DOIs’ references, one or more ORCIDs, a similar-paper hop, or a hybrid hop, then optionally fill PDFs. Citation maps such as Research Rabbit link out; Paperful downloads. Re-check later with **watch** (baseline once, then propose new arrivals on disk; you schedule `watch run`) | **Paperful snowball** — dry-run, `approve-each`, `approve-batch`, `--gate auto`, `--fetch-pdfs`, and `watch` ([snowball](snowball.md)). In-app one-hop browsers stay separate ([zotero-snowball](https://github.com/socratic-irony/zotero-snowball), [Citegeist](https://github.com/phdemotions/zotero-citegeist)). General harvesters without the mirror: [findpapers](https://github.com/jonatasgrosman/findpapers), [opencite](https://github.com/neuromechanist/opencite) |
 | **People you follow** → their new papers (ORCID / OpenAlex; no hop; corpus `suggest`; briefing with recent works / co-authors; saved social HTML/CSV, no live scrape) | **Paperful authorwatch** ([authorwatch](authorwatch.md)). Distinct from `snowball watch`. |
-| **Local workbench** over the same CLI (Wanted / Discover / Ask; Advanced Repair, Mirror, Index, Briefs) | **Paperful** `docker compose up` or `paperful serve` — [gui.md](gui.md). Grab fetches to disk; Attach is the library write. Not Zotero-in-the-browser. TTY login stays the CLI |
+| **Alert loop / weekly what-cites** (poll watches + citers of `-C` on a cadence; apply into the library; no email; you cron it) | **Paperful keepup** ([keepup](keepup.md)) |
+| **Local workbench** over the same CLI (Wanted / Discover / Ask; Advanced Repair, Mirror, Index, Briefs) | **Paperful** `docker compose up` or `paperful serve` — [gui.md](gui.md). Grab fetches to disk; Attach writes the library. Zotero stays the catalogue. Browser login stays the CLI |
+| **Save the page open in Firefox** into the folder copy. Keep the Zotero Connector for saving into Zotero | **Paperful** [Firefox add-on](firefox.md), optional and unsigned. Writes `out/` only. No PDF on the page: HTML snapshot, plus your configured search lanes if you ask. Several selected tabs at once, reviewed before save. Context menu and Alt+Shift+P |
 | “Just use what ships in Zotero” | Built-in **Find Available PDF** plus [custom PDF resolvers](https://www.zotero.org/support/kb/custom_pdf_resolvers) |
 
-Paperful does **not** replace a full metadata editor, an in-app attachment
-reorganiser, or a `.bib` linter. It does **not** promise phone sync, mobile
-apps, or WebDAV — those stay with the citation manager. `attachments`
+Paperful’s jobs are library, find, completeness, mirror, and control. Fetch
+and lint run on disk; the manager is a write-back adapter (`manager = "zotero"`
+is well tested; Mendeley and EndNote are seeking testers). `attachments`
 reports layout problems and, with a flag plus `--apply`, repairs them from
-`out/`. `--link` is that surgery, not a Storage client. Incoming downloads,
-author folders, and tablet send/get stay with Attanger and ZotMoov. The jobs
-are library, find, completeness, mirror, and control. Fetch and lint run on
-disk; the manager is a write-back adapter (`manager = "zotero"` is well
-tested; Mendeley and EndNote are seeking testers).
+`out/`. `--link` is that repair. For a full metadata editor, phone sync,
+mobile apps, WebDAV, incoming downloads, author folders, or tablet send/get,
+use the citation manager or the tools named in the table (Attanger, ZotMoov,
+and the `.bib` linters).
 
 Architecture: [architecture.md](architecture.md).
 
@@ -181,7 +182,7 @@ How far a snowball hop reaches: [How a hop is cut](snowball.md#how-a-hop-is-cut)
 ## Related docs
 
 - [architecture.md](architecture.md) — disk-first adapters, circuit breaker, Sci-Hub
-- [ROADMAP.md](ROADMAP.md) — 1.0 trust + post-1.0; optional LLM; snowball phases
+- [ROADMAP.md](ROADMAP.md) — 1.0 trust + post-1.1 buffet by area; optional LLM; snowball phases
 - [snowball.md](snowball.md) — keyword, multi-DOI / multi-ORCID, collection, and hybrid library building
 - [authorwatch.md](authorwatch.md) — people lists → new papers (suggest / accept / import; no hop)
 - [comparison-reference.md](comparison-reference.md) — vendor notes and extra tables

@@ -8,6 +8,7 @@ from paperful.config import Config
 from paperful.serve import create_app, fastapi_available
 
 
+@pytest.mark.smoke
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
 def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
@@ -63,8 +64,28 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     wanted_adv = client.get("/wanted")
     assert "Recover" in wanted_adv.text
     assert "Handoff" in wanted_adv.text
-    discover_adv = client.get("/discover")
-    assert "Refs gap" in discover_adv.text
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_discover_grow_shows_refs_gap(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    monkeypatch.setattr(ops, "doctor_payload", lambda _cfg, probe=False: [])
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _cfg, probe=False: [])
+    monkeypatch.setattr(
+        ops,
+        "collections_tree",
+        lambda _cfg: {"ok": True, "collections": []},
+    )
+    client = TestClient(create_app(cfg))
+    client.cookies.set("pf_advanced", "1")
+    grow = client.get("/discover?tab=grow")
+    assert grow.status_code == 200
+    assert "Refs gap" in grow.text
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")

@@ -23,6 +23,7 @@ class Candidate:
     score: float = 0.0
     exists_match: dict[str, str] | None = None
     keep: bool | None = None
+    operator: dict[str, Any] | None = None
     schema: str = SCHEMA
 
     @property
@@ -39,17 +40,34 @@ class Candidate:
             row.pop("exists_match", None)
         if row.get("keep") is None:
             row.pop("keep", None)
+        if not row.get("operator"):
+            row.pop("operator", None)
         return row
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> Candidate:
+        # Live rows nest title/DOI. Older queue files used top-level keys;
+        # fold those in so Keep, apply, and the Discover table agree.
+        ids = dict(raw.get("ids") or {})
+        legacy_doi = str(raw.get("doi") or "").strip()
+        if legacy_doi and not str(ids.get("doi") or "").strip():
+            ids["doi"] = legacy_doi
+        biblio = dict(raw.get("biblio") or {})
+        legacy_title = str(raw.get("title") or "").strip()
+        if legacy_title and not str(biblio.get("title") or "").strip():
+            biblio["title"] = legacy_title
+        operator = raw.get("operator")
+        if not isinstance(operator, dict):
+            # Older staging lived under biblio.operator.
+            nested = biblio.get("operator")
+            operator = nested if isinstance(nested, dict) else None
         return cls(
             run_id=str(raw.get("run_id") or ""),
             seed=dict(raw.get("seed") or {}),
             hop=int(raw.get("hop") or 0),
             direction=str(raw.get("direction") or ""),
-            ids=dict(raw.get("ids") or {}),
-            biblio=dict(raw.get("biblio") or {}),
+            ids=ids,
+            biblio=biblio,
             why=str(raw.get("why") or ""),
             status=str(raw.get("status") or "new"),
             provenance=dict(raw.get("provenance") or {}),
@@ -57,5 +75,6 @@ class Candidate:
             score=float(raw.get("score") or 0),
             exists_match=raw.get("exists_match"),
             keep=raw.get("keep"),
+            operator=dict(operator) if operator else None,
             schema=str(raw.get("schema") or SCHEMA),
         )

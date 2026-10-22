@@ -97,6 +97,15 @@ enabled. Reserve `browser_agent` for **soft UI**
 (cookie banner → “Download PDF”) when metadata lanes and vault retry already failed.
 See [architecture § sources](architecture.md) and [workflows](workflows.md).
 
+**Mileage varies.** Local browser-use frequently ends in `not_found` /
+timeout with no file on disk. Common failure modes: Cloudflare / bot walls
+(this install does not use Browser Use Cloud’s CAPTCHA solver), DOI landings
+with no downloadable PDF control, page-readiness / CDP flakiness, empty
+download watchdog results, and agents that stop after one navigate step.
+A polite `done` in the logs is not a recovery — only a verified PDF under
+`out/` counts. Prefer deterministic lanes for bulk runs; enable
+`browser_agent` (and Camofox) when you can afford misses.
+
 ## LiteLLM / remote
 
 With `provider = "litellm"`, page text may leave the machine (orange disclaimer).

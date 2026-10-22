@@ -32,8 +32,13 @@ and [architecture](architecture.md).
 | `[mirror].pdfs` | `all` | PDFs the manager already holds: `all` (copy every one into its item folder; `paperful sync` does the first pass), `lazy` (copy one when a command first needs it; `additional` is the old name), `none` (keep them out of the mirror). `run` always writes PDFs it downloads |
 | `[mirror].refresh` | `auto` | `auto`: each command refreshes the mirror from the manager before it reads. `manual`: only `paperful sync` does. `--offline` or `PAPERFUL_OFFLINE=1` skips the manager for one command |
 | `[mirror].gone` | `mark` | An item trashed, merged, or deleted in the manager: `mark` keeps its folder in place and marks the record; `trash` also moves the folder under `out/_trash/`. Nothing is deleted either way |
+| `[extension].snapshot` | `auto` | Firefox capture only. `auto` refreshes `out/` once before a plan or apply, even when `[mirror].refresh` is `manual`. `off` skips that refresh. A live Zotero read still runs when Zotero is open. See [Firefox](firefox.md) |
+| `[extension].collection` | `Capture` | Collection path for a page that is in neither the mirror nor Zotero |
+| `[extension].drop` | (empty) | Where the add-on stages PDFs and HTML snapshots. Empty uses `[inbox].dir`, or `state/capture/drop`. The host also copies a just-downloaded file from your user Downloads folder into this directory. See [Firefox](firefox.md) |
+| `[extension].concurrency` | `2` | How many selected tabs the add-on saves at once (1–4) |
 | `[oa_honesty].stamp_fields` | `license`, `oa_status`, `version` | Which Unpaywall / OpenAlex fields are written to `record.json` (`fetch.oa`) and the manifest on successful fetch |
 | `[oa_honesty].license_block` | `[]` | Substrings; when a stamped `license` matches, the run records `license_blocked` and does not save the PDF |
+| `[[exclude]]` | (none) | Protect collection subtrees from library writes. See [Exclude / protect collections](#exclude--protect-collections) |
 | `[remarks].surface` | `note` | Where the readable lines go: where a PDF came from, which duplicate to keep, and why a snowball hit belongs. `note` (child note), `tag` (parent tag), or `off`. The PDF attachment stamp stays the machine token |
 | `sources` | `unpaywall` → `openalex` → `arxiv` → `biorxiv` → `europepmc` → `semanticscholar` → `core` → `openaire` → `direct` → `ezproxy` → `htmlpdf` | Default **head** of a run. `[fetch].order = "policy"` (default) still runs these first; `scholar` and `scihub` are **not** included unless you opt in. When `scholar` is in `sources`, policy places it in the **late tail** (one try before `browser_agent` when that lane is on). `order = "list"` honors this array. `core` is skipped until `core_api_key` is set. `openaire` looks up repository copies by DOI |
 | `[fetch].order` | `policy` | `policy` late-tails Scholar / Camofox / `browser_agent` / SerpApi / Sci-Hub (and academic `htmlpdf`). `list` is the configured `sources` order |
@@ -59,7 +64,10 @@ and [architecture](architecture.md).
 | `[playbooks].promote` | `gated` | `gated` only logs fetch wins. `auto` writes `learned.toml` after `auto_min_hits` matching wins. **Auto may promote flukes** (one-off article URLs, cookie-banner clicks). `run --promote` overrides one run |
 | `[playbooks].auto_min_hits` | `2` | How many matching wins `auto` needs before writing a recipe. Manual `playbooks promote` can install a single cluster |
 | `[[grey_playbooks]]` | (none) | User rewrite/scrape/synthesize rules; same `name` overrides the pack |
-| `attach` | `true` | Attach into Zotero after download (`--no-attach` overrides) |
+| `attach` | `true` | CLI: attach into Zotero after `run` (`--no-attach` overrides). Needs Zotero 10 or newer. The workbench uses `[ui].attach_mode` instead (`manual` or `auto`; Settings shows **After Grab** only after at least one PDF has been attached via the workbench) |
+| `[ui].citation_map_edit` | `both` | Discover map library panel: `sidebar` / `popup` / `both` / `off` |
+| `[ui].citation_map_auto_search` | `false` | After **Add to library** on the map, also run Find PDF for that item |
+| `[ui].citation_map_remove` | `trash` | Map **Remove from library** behaviour (trash only for now) |
 | `app_name` | `paperful` | Name shown in Zotero's authorisation dialog |
 
 Leave `ezproxy_base` empty (or remove `ezproxy` from `sources`) if you do not
@@ -128,8 +136,20 @@ Omitted `try_all` stays off unless the profile sets it.
 | `sources` | `--sources` (comma-separated; TOML is an array of strings) |
 | `apply` | `--apply` / `--no-apply` on `all`, `fix-metadata`, and `summarize` |
 | `overwrite` | `--overwrite` / `--no-overwrite` on `fix-metadata` |
-| `steps` | `--steps` (comma-separated). Optional extras: `snapshot`, `dedupe`, `synthesize`, `ocr` |
+| `steps` | `--steps` (comma-separated). Optional extras: `snapshot`, `dedupe`, `synthesize`, `ocr`, `gaps_handoff` |
 | `require_summarize` | `--require-summarize` — exit 1 if `summarize` cannot run because the LLM is off |
+| `handoff` | `--handoff` on `all` / `run` (`list` \| `tabs` \| `walk` \| `watch`) |
+| `gaps_handoff` | `--gaps-handoff` on `all` (defaults to `handoff` for the `gaps_handoff` step) |
+| `include_doi_tabs` | `--include-doi-tabs` |
+| `downloads_dir` | `--downloads-dir` |
+| `promote` | `--promote` (`gated` \| `auto`) |
+| `htmlpdf` | `--htmlpdf` (`off` \| `gated` \| `auto`) |
+| `upgrade_snapshot` | `--upgrade-snapshot` / `--no-upgrade-snapshot` |
+| `keep_snapshot` | `--keep-snapshot` |
+| `ezproxy_relogin` | `--ezproxy-relogin` / `--no-ezproxy-relogin` |
+| `twenty_writeback` | `--twenty-writeback` / `--no-twenty-writeback` |
+| `request_rg` | `--request-rg` / `--no-request-rg` |
+| `re_request` | `--re-request` |
 | `description` | `profile save --description` |
 
 `profile save NAME` writes `profiles/NAME.toml` from the flags on that
@@ -208,7 +228,8 @@ Off by default. Install extras: `uv sync --extra llm` (LiteLLM for paid APIs),
 lane and `recover`), or build the **heavy** Compose image
 (`PAPERFUL_IMAGE_MODE=heavy`; see [Docker](docker.md#image-mode-light-vs-heavy)).
 Batch recover: `recover --from-last-run` reads `state/last-run.json`
-(`--from-last-run-mode`, `--limit`). Setup walkthrough, model advice, Docker
+(`--from-last-run-mode`, `--limit`). Feasibility (try-it vs library scale,
+OpenRouter / cost sketch): [AI](ai.md). Setup walkthrough, verbs, Docker
 networking, and troubleshooting: [LLM](llm.md).
 
 | Table / key | Default | Role |
@@ -227,6 +248,9 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[screen].tag` | `paperful-pps` | Child note tag for `--apply` |
 | `[summarize].dest` | `both` | `disk` (`state/summaries/`), `zotero` (child note), or `both`. `--to` overrides |
 | `[summarize].order` | `library` | Summarize queue order before `--limit`: `library` (manager order), `newest`, or `oldest`. `--order` overrides. Undated items stay last under `newest` / `oldest`. Type stays a filter (`-T`) |
+| `[summarize].style` | `plain` | Summary writing style: `plain` (default) or `ste` (ASD-STE100 Simplified Technical English constraints in the prompt + post-check) |
+| `[summarize].ste_violation_policy` | `warn` | When `style = ste`: `warn` (keep the summary, emit a warning) or `fail` (mark the item failed) |
+| `[summarize].ste_word_list_path` | unset | Optional path to an approved-word list (one word per line). Relative paths resolve from the config file. Domain words from the PDF/metadata stay allowed |
 | `[synthesize].dest` | `both` | `disk` (`state/reports/`), `zotero` (standalone note in the collection), or `both` |
 | `[browser_agent].during_run` | `true` | When `[llm].enabled` and the extra is installed, `run` appends `browser_agent`. Policy order tries Scholar once immediately before it. Override per run with `--browser-agent` / `--no-browser-agent` |
 | `[gaps].handoff` | `list` | Default for `gaps --handoff` when the flag is omitted: `list`, `tabs`, `walk`, or `watch`. `run` only handoffs when you pass `--handoff` |
@@ -243,14 +267,25 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[inbox].llm_match_min_confidence` | `0.75` | LLM `match: true` below this does not auto-attach |
 | `[inbox].llm_auto_attach_min` | `0.92` | High bar for auto-attach; otherwise a gated proposal |
 | `[inbox].create` | `attach_only` | `attach_only` \| `create_gated` (proposals) \| `create_auto` (unique DOI, or a unique ISBN / report number / title+year+host) |
+| `[inbox].route` | `off` | `off` \| `gated` \| `auto`. When `-C` is omitted, pick an **existing** collection for create. Default off (create still needs `-C`). Never invents a path |
+| `[inbox].llm_route` | `off` | `off` \| `when_thin` \| `always`. Needs `[llm].enabled`. Ranks existing collections after deterministic signals |
+| `[inbox].route_min_confidence` | `0.75` | Below this, routing is thin (proposal / `review/`, no auto create) |
+| `[inbox].route_auto_min` | `0.92` | High bar for `route = auto` + `create_auto` |
 | `[htmlpdf].academic` | `off` | `off` \| `gated` \| `auto`. DOI journal items. `gated` proposes; `auto` attaches a page snapshot after landing checks. `--htmlpdf` overrides one `run` |
 | `[htmlpdf].upgrade` | `false` | When true, `run` retries items whose only PDF is an HTML snapshot. `--upgrade-snapshot` / `--no-upgrade-snapshot` override |
 | `[htmlpdf].keep_snapshot` | `false` | Leave the HTML print in place when a native PDF attaches. `--keep-snapshot` on `run` |
 | `[inbox].title_resolve` | `false` | Opt-in Crossref/OpenAlex title search when local title+year is thin (not silent create) |
 | `[inbox].manager_metadata_s` | `0` | Wait after attach so a manager recognizer can run (`0` when the backend has none) |
 | `[ingest].default_tags` | `()` | Tags on `ingest-dois --apply` and inbox-created parents |
+| `[keepup].interval_days` | `7` | Default days between `keepup run` polls (`0` = every run). Per-job `--interval-days` overrides. No built-in scheduler — cron `keepup run`. See [Keepup](keepup.md) |
 | `[snowball].default_tags` | `()` | Extra tags on snowball `--gate auto` / `apply` creates, with `--tag` and `from-<seed-slug>` |
 | `[snowball].study_designs` | `()` | OpenAlex study design filter (`rct`, `meta-analysis`, …). CLI `--study-design`. See [snowball stop rules](snowball.md#stop-rules) |
+| `[snowball].map_categories` | ten built-ins | Which literature-category ids appear on the citation map (badges/filters). Defaults include study-design ids (`evidence-synthesis`, `trials`, `clinical-trials`, …) and type ids (`preprints`, `books`, `narrative-reviews`, `commentary`). See [Citation map](snowball.md#citation-map) |
+| `[snowball].map_category_defs` | `()` | Extra category tables: `{ id, label, any_study_designs?, any_types?, color? }`. Ids listed here are appended to `map_categories` when that key is unset |
+| `[snowball].stop_rule` | `off` | `off`, `marginal_yield`, `asymptotic_coverage`, `budget`, or `any`. Off is one shot. A rule pauses for Keep/Skip between hops. CLI `--stop-rule`. See [snowball stopping rules](snowball.md#stopping-rules) |
+| `[snowball].stop_eps` / `stop_k` | `0.01` / `2` | Marginal yield: Keep rate below `eps` for `k` hops, not before hop `k + 1`. CLI `--stop-eps` / `--stop-k` |
+| `[snowball].stop_tau` / `stop_min_points` | `0.95` / `4` | Fitted Keep ceiling. Needs that many labeled hops. Config and profile only |
+| `[snowball].stop_max_screened` | `0` | `budget` cap. `0` means unset. CLI `--stop-max-screened` |
 | `[snowball].dedupe_after` | `off` | After create: `off`, `classify` (`state/dedupe-packs/`), or `apply` (merge high-DOI extras) |
 | `[snowball].author_site_preflight` | `false` | Co-author graph + proposed `state/author-packs/`. Promote before `author_site` fetch. Corpus frequency without a snowball run is `paperful authors -C … --apply` |
 | `[authorwatch]` | — | Not parsed. Caps are `authorwatch run --max-authors` / `--per-author-limit`. `doctor` ambers lists with people and no ORCID/OpenAlex id. No social scrape |
@@ -276,10 +311,56 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[rag].dest` | `disk` | Batch ask note destination: `disk`, `zotero`, or `both` (Zotero needs `--apply` + one `-C`) |
 | `[rag].extract_questions_llm` | `false` | Default for `rag questions --llm` grounded extract lane |
 
+### Section extract (`extract-sections`)
+
+Reads mirror PDFs and optional `state/rag/text/` cache only. No Zotero writes.
+Short bodies and table-of-contents noise are left in `missing` rather than
+written as garbage. Re-run with `--force` to replace an existing
+`state/sections/<key>.json`.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `[extract_sections].llm` | `false` | Default for `extract-sections --llm` (fill missing MVP fields; needs `[llm].enabled`) |
+| `[extract_sections].headings` | `""` | Extra heading-synonym TOML (`canonical = ["synonym", …]` rows). Also loads `state/section-headings.toml` when present |
+| `[extract_sections].fields` | `abstract`, `conclusion`, `methodology`, `research_questions` | MVP keys written under `fields` in `state/sections/<key>.json` |
+| `[extract_sections].raw_map` | `true` | Include detected section headings (`sections` array) in the JSON |
+| `[extract_sections].max_field_chars` | `20000` | Truncate each text field at this length |
+
+Each populated MVP field is an object: `text`, `provenance` (`rule` or `llm`),
+optional `heading`, optional `pages`. Top-level `source` is `pdf`, `abstract`,
+or `none`. Schema: `paperful.sections.v1` ([developer.md](developer.md)).
+
 Timeouts, context budgets, prompt templates, tags, attachment hygiene, and
 browser-agent step caps: [Advanced](#advanced).
 
 API keys stay in the environment (never in `config.toml`).
+
+## Exclude / protect collections
+
+Hand-curated folders that paperful must not mutate. Top-level `[[exclude]]`
+array (global safety policy — not a run profile).
+
+```toml
+[[exclude]]
+path = "Hand curated"
+mode = "full"
+
+[[exclude]]
+path = "Inbox/Staging"
+mode = "add_only"
+```
+
+| Key | Meaning |
+| --- | --- |
+| `path` / `key` | Match by collection path (preferred) or stable manager key. Subtree: `Hand` covers `Hand/...` |
+| `mode` | `full` — deny all writes; `add_only` — allow create / add-to-collection / ensure-path only; `custom` — set `allow_*` yourself |
+| `allow_create` / `allow_add` / `allow_ensure_path` / `allow_update` / `allow_notes` / `allow_tags` / `allow_attach` / `allow_trash` / `allow_collection_notes` / `allow_merge` | Fine-grained overrides (explicit values win over the preset) |
+| `protect_items` | Default `true`. Item writes (patch, notes, tags, attach, trash, merge) are blocked when the item is a member of the matched subtree |
+| `skip_library_scope` | Default `false`. When `true`, items that live *only* under the rule are omitted from unscoped / `--library` item lists. Explicit `-C` still reads; writes still honour the rule |
+
+Enforced on live library writes (Zotero / Mendeley). Denied ops raise a clear
+`excluded: …` error. Reads, lint, export, and RAG are unchanged unless
+`skip_library_scope` is on. `paperful doctor` lists active rules.
 
 ## Advanced
 
@@ -365,21 +446,37 @@ a shared host — and point Paperful at it. Paperful does **not** ship the dump;
 most installs leave this unset.
 
 When `[openalex_store]` is set, DOI and OpenAlex-id batch reads try the store
-first; misses and every other OpenAlex call (cited-by, search, keywords, ORCID)
-still use the live API. Rate-limit / budget handling stays API-only.
+first. Citing (`works_citing` / citation-map expand) needs a prebuilt inverted
+cites index — run `paperful openalex-store build-cites`, then set
+`cites_index_glob`. The build is **resumable**: one works `updated_date`
+partition at a time with `.done/<date>` markers (re-run after a crash skips
+finished slices). Store-side cites-query / `search=` filtering is
+**title-only** (`display_name`); abstract and fulltext stay on the live API.
+Keywords and ORCID stay API-only.
 
-v1 backend: `ssh_duckdb` — DuckDB runs **on the host that holds the parquet**
-(laptop path later; HTTP for campuses later). Paperful SSHs in, runs SQL, and
-copies small JSON rows back. Env overrides: `OPENALEX_STORE_SSH_HOST`,
-`OPENALEX_STORE_PARQUET_GLOB`.
+When the live API daily budget is spent, DOI/id and citing (with index) keep
+using the store; keyword / ORCID / full-text search still pause for
+`snowball resume`.
+
+Backends:
+
+- `local_duckdb` — DuckDB on this machine over a local parquet glob (needs
+  `duckdb` on `PATH`, or set `duckdb_bin`).
+- `ssh_duckdb` — DuckDB on a remote host; Paperful SSHs in, runs SQL, and
+  copies small JSON rows back.
+
+Env overrides: `OPENALEX_STORE_SSH_HOST`, `OPENALEX_STORE_PARQUET_GLOB`,
+`OPENALEX_STORE_CITES_INDEX_GLOB`.
 
 ```toml
 # Optional. Most users leave this unset.
 # [openalex_store]
-# backend = "ssh_duckdb"   # later: local_duckdb | http
-# ssh_host = "nuc"
-# # ssh_user = "you"
-# parquet_glob = "/mnt/files/openalex/data/parquet/**/*.parquet"
+# backend = "local_duckdb"   # or ssh_duckdb; later: http
+# parquet_glob = "/data/openalex/data/works/**/*.parquet"
+# cites_index_glob = "/data/openalex/cites/**/*.parquet"
 # # duckdb_bin = "duckdb"
 # # timeout_s = 120
+# # build_timeout_s = 7200
+# # ssh_host = "nuc"         # ssh_duckdb only
+# # ssh_user = "you"
 ```

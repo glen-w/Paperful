@@ -82,3 +82,24 @@ def test_parse_not_in_database_layout():
         "https://sci-hub.ru/10.18623/rvd.v14i28.1038",
     )
     assert res.outcome is Outcome.NOT_FOUND
+
+
+def test_parse_object_pdf_and_ignores_javascript_href():
+    html = (
+        "<html><body>"
+        '<a href="javascript:void(0)">save</a>'
+        '<object type="application/pdf" data="//sci-hub.ru/storage/x.pdf"></object>'
+        "</body></html>"
+    )
+    res = parse_page(html, BASE)
+    assert res.outcome is Outcome.FOUND
+    assert res.pdf_url == "https://sci-hub.ru/storage/x.pdf"
+
+
+def test_javascript_only_page_is_not_a_pdf_hit():
+    res = parse_page(
+        '<html><body><a href="javascript:void(0)">save</a></body></html>',
+        BASE,
+    )
+    assert res.outcome is Outcome.ERROR
+    assert res.pdf_url is None

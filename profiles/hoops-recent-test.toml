@@ -1,0 +1,11 @@
+# paperful snowball profile. Select with: paperful snowball run --profile hoops-recent-test
+kind = "snowball"
+kind = "snowball"
+gate = "dry-run"
+target_collection = "ocean/BBNJ"
+direction = "basketball"
+depth = 1
+max_candidates = "500"
+year_from = 2025
+year_to = 2026
+query = "BBNJ"

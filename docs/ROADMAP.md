@@ -9,21 +9,27 @@ adapter.** Mendeley and EndNote are in the tree and seeking testers. See
 
 Optional thin bridges (`paperful session login`) capture a local browser profile;
 they do not rewrite the fetcher. A **Zotero plugin** is not the 1.0 bet.
-**Firefox extension**, **local OpenAlex snapshot** (beyond today’s opt-in v1),
-and **newsletter / alert ingest** are **post-1.0** — see [Product split](#product-split-10-vs-post-10).
+The **Firefox extension** is an optional mirror bridge ([firefox.md](firefox.md)).
+**Local OpenAlex snapshot** (beyond today’s opt-in v1) stays later — see
+[Product split](#product-split-10-vs-post-10) and the
+[post-1.1 buffet](#after-110-buffet-by-area). Alert loop / what-cites:
+[`keepup`](keepup.md).
 
 **1.0** is the trust checklist below (all rows shipped), a locked item record
 (`paperful.item.v1` plus `snapshot` / `restore`), proven on **Zotero**, and the
-**workbench** ([GUI](#gui)): Discover + Wanted on the default nav, Preview/Grab
-with review tokens, full CLI surface behind **Advanced**. **Interactive Ask** is
-opt-in on `/ask` (`[rag]` + `[llm]`), not the home page
+**workbench** ([GUI](#gui)): Discover + Wanted + Ask on the default nav, Preview/Grab
+with review tokens, full CLI surface behind **Advanced**. **Interactive Ask**
+is `/ask` when `[rag]` + `[llm]` are on, not the home page
 ([Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer)).
 **Mendeley and EndNote do not gate 1.0** — they stay in the tree with honest
 docs (“seeking testers”; Zotero well-tested). Do not market them as supported
 until real-library reports say so.
 Still not a full-text reading index, not a WebDAV client, and not “AI fetch
-everything.” `paperful ocr` is the optional text layer for scans. **1.0.0 is
-tagged.** Post-1.0 items stay in the split below.
+everything.” `paperful ocr` is the optional text layer for scans. **1.0.0 and
+1.1.0 are tagged** (1.1.0 on PyPI). **1.1.1** is stop-ship hygiene (shipped in
+tree). **1.2.0** adds snowball stopping rules, off by default. Everything
+after that is a **buffet by area** — keep it on the map, pick later, prefer
+evidence from outside testers. See [After 1.1.0](#after-110-buffet-by-area).
 
 (product-split-10-vs-post-10)=
 ## Product split: 1.0 vs post-1.0
@@ -34,10 +40,426 @@ integrations.
 
 | **1.0** | **Post-1.0** |
 | --- | --- |
-| Trust checklist, locked `paperful.run_report.v1` / `paperful.item.v1`, snapshot contract | **Local OpenAlex parquet store** — phases 2B/2C (`works_citing`, full search parity, `local_duckdb` / `http`). Live OpenAlex API is enough for most installs; v1 `ssh_duckdb` remains opt-in for institutions |
-| **GUI workbench** — Discover + Wanted simple loop (topic + people); command ids; review tokens; Advanced Repair / Mirror / Index / Briefs and the non-TTY CLI verbs | **Firefox extension** — native messaging → CLI ([section below](#optional-thin-bridge--firefox-extension-post-10)) |
-| **Ask in GUI** — scoped chat on `/ask` with citations when `[rag]` + `[llm]` on | **Newsletter / alert ingest** — rollup bridge, Scholar alerts first ([Frontier digest](#frontier-digest-later-watch--external-ingest)) |
+| Trust checklist, locked `paperful.run_report.v1` / `paperful.item.v1`, snapshot contract | **Local OpenAlex parquet store** — phase 2C (full search / keyword / ORCID / `http`). Live API is enough for most installs; `ssh_duckdb` / `local_duckdb` + cites index remain opt-in |
+| **GUI workbench** — Discover + Wanted simple loop (topic + people); command ids; review tokens; Advanced Repair / Mirror / Index / Briefs and the non-TTY CLI verbs | **Firefox extension** — optional native messaging into the mirror ([firefox.md](firefox.md)) |
+| **Ask in GUI** — `/ask` on the default nav, scoped chat with citations when `[rag]` + `[llm]` on | Discover keepup UX polish; `refs` on collection digest; retractions / living-review ([Keeping up](#after-110-keeping-up)) |
 | Zotero-proven fetch/mirror path; honest adapter docs (Mendeley / EndNote seeking testers) | SaaS tenancy polish; promoting other managers to “supported” after field reports; remote-manager parity beyond what 1.0 open/Docker needs |
+
+**1.1.x vs later (still not a calendar).** 1.1.0 is the PyPI cut. **1.1.1**
+closes Wanted scoping, ticks, Attach-at-zero, version drift, and first-hour
+copy. After that the map is a buffet: **Wanted excellence** is the recommended
+main lane; Repair/Mirror, Ask depth, new sources, digest, embeddings, and
+bigger bets wait on outside-tester evidence. Detail by area below.
+
+(after-110-buffet-by-area)=
+## After 1.1.0 (buffet by area)
+
+Contributor map, not a commitment calendar. **Include all of it for now;
+choose later.** An item lands in a release only when an outside issue or a
+tester report backs it — or when it is stop-ship (1.1.1). Merged 16 Oct 2026
+from the post-v1 options compile (checked against `main` at `ae21bfb`).
+
+**Working stance:**
+
+1. **Ship 1.1.1** (scoping, ticks, Attach guard, version single-source, copy).
+2. **Run an outside-tester round before any new features.** 3–4 librarians or
+   researchers running Wanted on a real library is the floor; 5–10 is the
+   ceiling. Their miss/fill counts become screenshots, quotes, and (if ever)
+   paid-report evidence. The only demand number today is one library’s
+   “Missing 946”.
+3. **Make Wanted excellent** as the one main lane. Stranger evidence decides
+   anything bigger.
+
+Paperful knows what you *own*, which feed readers and discovery tools do not.
+The open question behind the longer bets: what would make a researcher open
+Paperful every week, not just once to fill gaps?
+
+(after-110-facts)=
+### Facts settled against 1.1.0
+
+- 1.1.0 is tagged and on PyPI; trusted publishing (`publish.yml`) exists.
+- Version: single source via `importlib.metadata` / `pyproject.toml` (1.3.0).
+- Attach is **manual by default** (`[ui].attach_mode`); Grab does not write to
+  Zotero unless Settings is automatic.
+- **1.1.1 closed P0s:** Grab-selected `item_keys`, Held hand-ticks, Attach at
+  zero disabled, attach count honesty, first-hour copy.
+- **Ask** is on the default nav (third after Wanted and Discover); it does
+  not need Advanced. Whether it *stays* there is an [open
+  question](#after-110-open-questions).
+- Install docs are pinned to `v1.3.0` (README, `docs/docker.md`,
+  `website/index.html`). Recheck every paperful.app claim before launch.
+
+(after-110-1-1-1)=
+### 1.1.1 (stop-ship) — shipped
+
+Landed in tree (tag when ready). Implementation notes:
+[docs/plans/1.1.1-stop-ship.md](plans/1.1.1-stop-ship.md). User-facing copy:
+[gui.md](gui.md), [first-fill.md](first-fill.md).
+
+- Grab-selected `item_keys`, preview token keys, tests.
+- Held hand-ticks; main Attach skips mismatch/short (Advanced overrides).
+- Attach disabled at zero; attach count matches pending writes.
+- `__version__` from package metadata; bind `127.0.0.1` tested.
+- First-hour copy and Settings **After Grab** hidden until first Attach.
+- Install pins: `v1.1.1` (README, docker, website). Recheck paperful.app
+  before launch gates.
+
+(after-110-wanted)=
+### Wanted (main lane)
+
+**Recommended next product work after 1.1.1.** It is what the site, share
+card, and paid cleaning report (`doi_match` only) already promise.
+
+- Stamps you can trust: a **found** stamp only on `doi_match` cards, a
+  **check** stamp on mismatches, no “% complete”. The paid report reuses the
+  same cards, so “N found” equals the number of stamps.
+- Hand-ticks (Missing and Held).
+- A one-line reason for each miss.
+- Snowball / digest **kept** items feed Wanted (strengthen this lane rather
+  than opening a second fill desk).
+
+Workbench layers after this lane proves out, not instead of it:
+
+| Option | For | Against | When |
+| --- | --- | --- | --- |
+| **A. Wanted excellent** | Already the public promise | Less flashy | **Now** (after 1.1.1 + testers) |
+| B. Repair / Mirror GUI (workbench vision) | Library hygiene is a real pain | More places that write to the library, so more trust copy | After A |
+| C. Ask / Index depth | Differentiating if it works | Weakest trust story; usage unknown | Keep optional, last |
+
+(after-110-discovery)=
+### Discovery and sources
+
+Paperful’s angle vs ResearchRabbit / Connected Papers / Litmaps: those tools
+do not touch your library, and Zotero plugins do not discover. The join is
+the product. Keyword search is crowded — keep it a thin layer, not a
+headline.
+
+- **Snowball done well.** Start from a paper’s references and citations via
+  OpenAlex, drop anything already in the library, rank, say why each was
+  suggested, then feed results into Wanted. See [Snowball](#snowball) and
+  [Snowballing and review methods](#after-110-snowball-review).
+- **ORCID / author harvest** is cheap but niche; keep, do not headline.
+- **OSF Preprints** as a thin DOI source: *test* by counting recent misses
+  with an OSF location before building.
+- **Author homepages:** promote ORCID / OpenAlex researcher URLs to a lookup
+  at miss time (*keep*). Add template parsers (al-folio, Hugo Academic) only
+  if winning author sites cluster on them (*test*). Co-author site preflight
+  is already shipped — [Snowball phase 7](#snowball).
+- Leave Twenty CRM as it is (shipped; not a growth bet).
+
+(after-110-keeping-up)=
+### Keeping up (digest, watches, alert loop)
+
+**Shipped (CLI):** [`keepup`](keepup.md) — alert loop
+(`watch` / `authorwatch` / `cites` → digest → apply → `ingested.md`) with
+configurable `interval_days` (default 7). Also `snowball watch apply` and
+`authorwatch digest`. Still **no** built-in scheduler and **no** email;
+operators cron `keepup run`.
+
+Pieces underneath: `watch.py`, `digest.py`, `briefing.py`;
+[Frontier digest](#frontier-digest-later-watch--external-ingest) and
+[author watch](#author-watch-lists-later-people-you-follow--their-papers).
+
+- **Alert loop** — shipped as `paperful keepup` (+ standalone watch/authorwatch apply).
+- **Weekly digest per Zotero collection.** Shipped as keepup `--source cites`
+  (why line `cites N of your papers`); combine with `--watch` / `--authorwatch`
+  on one job. Dismiss/mute via `keepup dismiss`. Discover one-click UX and
+  “cited by your collection” (`refs`) remain buffet polish.
+- **Infra variant:** a scheduled nightly or weekly job uses the library’s
+  own embeddings to query OpenAlex and preprint servers, optional local-model
+  summaries, lands as a Zotero note or email.
+- Add-ons: retractions and corrections on items you already hold, worded as
+  “flags to review”, never “detects” (`paperful screen` is the existing
+  lookup); preprint-to-published linking (`paperful versions` is the
+  existing merge); a monthly “living review” re-run of a saved snowball that
+  flags when a new cluster appears.
+
+(after-110-openalex-topics)=
+### OpenAlex topics (January 2027)
+
+**No breakage on 13 Jan 2027.** Paperful never requests topics: the `SELECT`
+in `paperful/snowball/openalex.py` lists no `topics` field. Grep finds no
+`primary_topic`, `concepts`, topic-ID filters, or `/text/topics` in
+`paperful/`, `tests/`, or `docs/`. The cutoff only retires the old classifier
+on OpenAlex’s `/text/topics?version=1` endpoint. Works already switched to
+the new topic assignments in early October 2026. Users need no notice.
+
+Cheap housekeeping (can sit alongside 1.1.x):
+
+- Stamp each snowball run with the OpenAlex date — pre-October runs cannot
+  be reproduced (keywords are now linked to topics; OpenAlex reports
+  keyword accuracy rising from 44% to 91%, so hops will return different,
+  probably better, neighbours).
+- Reset each keyword watch’s baseline once, so reassigned works do not
+  arrive as a flood of “new” papers.
+- Re-measure or drop the stale “about 12% of works have no topic and
+  therefore no keywords” figure (`config.example.toml`, `docs/snowball.md`).
+- Local snapshot users: OpenAlex says the change does not touch
+  `updated_date`, so incremental syncs miss it. Users of `local_openalex.py`
+  must reload fully from the 14 Oct 2026 snapshot. Document this; have
+  `doctor` warn about older snapshots. Park **2C** (full search / `http`)
+  until someone asks — [OpenAlex snapshot store](#snowball).
+- Add a before/after snapshot test for keyword-based scoring.
+
+Opportunity (pin to **topic IDs**, never to cached assignments):
+
+- **Topic follow:** topic-native watches, filtered by type, language, and
+  OA status.
+- **Library gap map:** which topics your library covers thinly.
+- **Grouping** Wanted and digests by subfield.
+
+(after-110-briefs-ask)=
+### Summaries, briefs, and Ask
+
+Depends on solving Ask’s trust problem ([Wanted table](#after-110-wanted)).
+Ask stays optional; whether it stays third on the default nav is open.
+
+- **Per-collection grounded brief:** themes, what is contested, and gaps.
+  Every sentence cites a paper you hold, with a click through to the
+  passage. Filed in Zotero as a starred note (`* Briefing — …`). Updates
+  incrementally and shows a diff of what changed (new clusters, papers that
+  shifted the picture). Flags disagreements between papers.
+- **Summaries with receipts:** each summary quotes the passages it relied
+  on and is stored as a Zotero child note marked as machine-written. Local
+  by default (Ollama); optional bring-your-own-key cloud. Turns Ask into
+  the place you check claims, rather than a chat toy.
+- Stretch: evidence-table export (study type, n, method, finding), each
+  cell tied to a passage and marked “check this” when unsure; local claim
+  tracking that sorts citing papers into supporting, contrasting, or just
+  mentioning. Study-type seed for that table: Discover citation-map
+  literature categories from OpenAlex `study_designs` and work `type` (see
+  [Citation map](snowball.md#citation-map)).
+- Existing RAG / Ask / Briefs surface: [Zotero-RAG
+  integration](#zotero-rag-integration-later-question-centric-layer),
+  [GUI](#gui). Question generation from summaries is still deferred there.
+
+(after-110-embeddings)=
+### Local embeddings
+
+Already in place: RAG supports Ollama embeddings (`nomic-embed-text`
+default, `bge-m3` for multilingual), one index per model — [rag.md](rag.md).
+Local-first and private by default; cloud models stay opt-in.
+
+- **Benchmark first.** Add EmbeddingGemma as a tested preset. Compare it
+  against nomic and bge-m3 on a real Zotero library, scoring recall@10 on
+  held-out “which paper said X” questions. Publishing the numbers doubles
+  as marketing. Key the index by model and dimension. Detail and spike
+  order: [EmbeddingGemma 2](#embeddinggemma-2-local-embeddings).
+- **Infra stack:** EmbeddingGemma (~300M, laptop CPU) stored with
+  sqlite-vec as a single local file next to the Zotero data. No cloud, no
+  API key. (Today’s RAG index is LanceDB; sqlite-vec is an alternative
+  storage bet, not a silent swap.)
+- Uses beyond chat: “papers like this” from your own library; duplicate
+  and near-duplicate detection for library hygiene; a collection map view
+  with clusters you can rename (most showable screenshot, stays a
+  secondary screen); screening that learns from accept/reject decisions
+  (ASReview-style); semantic snowball, where your library’s nearest
+  neighbours seed OpenAlex queries.
+
+(after-110-snowball-review)=
+### Snowballing and review methods
+
+[SnowBallSLR](https://github.com/s-matysik/SnowBallSLR) is a reference
+design, not a dependency: MIT, one author, young (v1.0.2, not on PyPI).
+Deterministic, saturation-aware backward and forward snowballing; five
+stopping rules with methods-section rationales; capture–recapture recall
+estimates; content-addressed response cache plus `verify --refresh` to
+classify drift; PRISMA counts/diagrams, `included.csv`, RIS. It does not
+screen (labels come from outside) and does not retrieve full text.
+
+Paperful grows libraries and keeps them current, with a path to write into
+Zotero. SnowBallSLR is a rigorous search stage. They overlap on citation
+chasing and complement each other everywhere else.
+
+**Borrow (do not vendor):**
+
+- A **stopping rule** (`marginal_yield` over Keep/Skip) instead of fixed
+  hop caps. **Shipped, off by default** (`[snowball].stop_rule`, per-run
+  flags / profile / Discover). One hop, then Keep/Skip, then
+  `snowball continue`. `asymptotic_coverage`, `budget`, and `any` are
+  included. Hop caps stay as ceilings. No recall percentage.
+- A **response-hash cache with drift classification** for watches — tells a
+  genuinely new paper apart from a reassigned or merged ID (matters for
+  [OpenAlex topics](#after-110-openalex-topics)).
+- **PRISMA-style counts** (identified, screened, kept, added) in the run
+  report.
+
+**Interoperate:** export a Discover queue as SnowBallSLR seeds or labels;
+import `included.csv` / RIS into Wanted. Reviewers do the rigorous chase
+there; Paperful does PDFs and Zotero. Writing to the author is cheap.
+
+**Recall estimate:** treat as an internal experiment only. SnowBallSLR’s
+own validation reports estimator undercoverage of 0–17% and calls the
+estimate advisory. Do not headline “we estimate you’ve found ~85%” or put
+any percentage in copy until it has been validated on real reviews.
+
+Parked in the snowball lane today, still true: systematic-review screening
+and a review UI — [Parked](#snowball). The Discover citation map is the
+queue canvas (year × citations), not a corpus browser: Wave 1 hardened
+edges / Keep / offline D3; Wave 2 added triage, year scrubber, path,
+library halo, and watch delta. Literature categories (OpenAlex
+`study_designs`) and in-map library actions (add / Find PDF / trash /
+tags) sit on that canvas — [Citation map](snowball.md#citation-map).
+
+(after-110-bigger-bets)=
+### Bigger bets (pick at most one a year)
+
+- **Systematic-review mode.** Guided snowball rounds, include/exclude
+  screening with reasons, PRISMA export, a reproducible run file. Sits
+  *alongside* Wanted, not in place of it. Audience: librarians and
+  Cochrane-style teams (grant money, real pain).
+- **Policy and grey-literature watchers.** BBNJ and RFMO work (for example
+  SPRFMO SC14 reports) lives outside DOIs. Watchers would follow meeting
+  documents and notifications on intergovernmental sites and feed them
+  into Zotero. Nobody serves that niche; the first user is already here.
+  Grey playbooks are shipped; this is scheduled watching of those hosts,
+  not more playbook parsers.
+- **Paperful as the local literature back end for AI assistants**, building
+  on `paperful/mcp_server.py`: “your assistant reads your library, not the
+  open web.” MCP read tools are shipped
+  ([Literature-discovery complement](#literature-discovery-complement-waves)).
+- **Shared lab library.** Needs authentication, so later. Aligns with
+  [Collaboration without SaaS](#maybe-later) (Syncthing/git, not tenancy).
+
+(after-110-distribution)=
+### Distribution and install
+
+- Make Playwright an optional extra (`[browser]`), with a lazy import and a
+  friendly “install this” message, so `paperful[serve]` really is lean.
+- CI on Linux, macOS, and Windows for Python 3.10–3.13, plus a “fresh
+  install launches the GUI” job. Add a smoke test to the existing release
+  workflow.
+- Install options, in order: **(1)** `pipx` / `uv tool install paperful` as
+  the main route, now. **(2)** A Docker image for labs and NAS boxes, only
+  if testers ask. **(3)** A signed desktop bundle, only if marketing
+  targets non-technical researchers. Which of these is *the* main route is
+  still open (PyPI stays on 1.1.1 until `v1.2.0` is published; Docker remains the CI-tested operator
+  path in [releases.md](releases.md)).
+- Possibly an opt-in update notice that checks PyPI and sends no telemetry.
+
+(after-110-findability)=
+### Findability and launch
+
+**Who it is for:** researchers and PhD students with big Zotero libraries;
+librarians and research-support staff (also the paid cleaning report);
+policy / NGO researchers (warmest first trial).
+
+**Pitch:** the clean-up step that comes after discovery tools, not a rival
+to them. It runs locally and is open source, so library data stays on the
+user’s machine. Never promise “every paywalled PDF”. Never call Camofox
+“stealth”. Own one search phrase: **“find missing PDFs in Zotero”**. Keep
+Ask, Discover, and snowball out of the title, meta, share card, and GitHub
+About.
+
+**Adoption copy:** document auto-attach as off by default, Zotero 10+ only,
+and switched on in Settings. Make the PyPI README lead with Wanted. Hold
+Repair and further Ask work until Wanted proves out.
+
+Launch gates, in order:
+
+1. The paperful.io collision strip, then a link-preview paste test.
+2. Re-crop the share image as `og-v2.png` so the Wanted heading and count
+   show.
+3. A `robots.txt` with the sitemap line.
+4. A ~60-character title.
+5. A homepage link and topics on GitHub About.
+
+Then: a plain-text “What it won’t do” section and FAQ. Never mention
+Sci-Hub in copy, keywords, or alt text. Describe Camofox only as an
+optional scripted browser. After a stranger test passes: one honest listing
+each on the Zotero forums and a tools directory. Cross-link from
+glenwright.earth and glenwright.net.
+
+Outreach order: launch gates → tag 1.1.1 → quiet outreach to the Zotero
+forums and research-software circles, alongside testers → Show HN →
+LinkedIn in the operator’s own voice, link in the comments.
+
+**Cohort:** keep the tools separate, with no suite page. TranscriptX and
+Transcribe can go out as a joint post. Rollup cannot say “1.0” until it is
+tagged.
+
+(after-110-trust-gaps)=
+### Trust, legal, privacy, sustainability
+
+Gaps that had no owner in the 1.0 push:
+
+1. **Legal and fetch stance:** a written position on publisher terms, which
+   PDF sources are fair game, and polite rate limits. Needed before
+   anything paid or public. Complements [Compliance &
+   provenance](#maybe-later) and [CAPTCHA / soft bot walls](#optional-llm-assist-local-litellm).
+2. **Evidence after the first hour:** an opt-in “send a report” button, or
+   local-only miss telemetry in the run report, so demand tests have data.
+3. **Credentials and privacy:** document where Zotero keys and tokens live
+   and what never leaves the machine. Prefer the OS keyring (via `keyring`)
+   rather than a plain config file, with an environment-variable fallback;
+   add a test that the key is never logged or sent anywhere except
+   `api.zotero.org`.
+4. **Sustainability:** one maintainer. State the licence and contribution
+   stance, what happens if that person steps back, and how this fits with
+   the paid cleaning report.
+5. **Docs as product:** one “first 10 minutes” page that uses the same
+   labels as the GUI — [Documentation (thicken)](#documentation-thicken).
+
+(after-110-parked)=
+### Parked or hold
+
+Do not start these until testers ask, or until the main lane is boring.
+
+- **Firefox extension** — unsigned temporary add-on, mirror writes only.
+  [firefox.md](firefox.md). Not a 1.0 gate.
+- **Local OpenAlex 2C** — full search / keyword / ORCID / `http`; institutions only; live API is enough for most.
+- **SaaS / tenancy.**
+- **Catalogue unification** (managers as equals).
+- **LibGen** (same opt-in bar as Sci-Hub if ever).
+- **CSL / Quarto export** — point people at Better BibTeX.
+- **Licence gate** on attach (stamps exist; the gate is later).
+- **Mendeley / EndNote “supported”** — promote only after a single call
+  for testers gets replies. [Seeking testers](#mendeley-and-endnote-seeking-testers).
+
+Repo hygiene (not a product feature): freeze the post-1.0 list so an item
+is added only when an outside issue or tester report backs it. Splitting
+this file into decisions plus `docs/backlog/` stays available if the map
+gets unwieldy; it is not a prerequisite for picking from the buffet.
+
+(after-110-sequence)=
+### One possible order (not a calendar)
+
+1. **1.1.1** — P0 scoping and ticks, Attach-at-zero, review-token test,
+   version single-source, first-hour copy.
+2. **Launch gates** — paperful.io strip, share image, robots, title,
+   GitHub About.
+3. **Outside-tester round** (3–10), with opt-in run reports on, before new
+   features.
+4. **Wanted excellence** — stamps, reasons, hand-ticks; snowball results
+   feeding Wanted.
+5. **Cheap OpenAlex housekeeping** alongside 1.1.x (date stamp, stale
+   figure, keyword snapshot test, watch baseline reset, snapshot-reload
+   note).
+6. **Then decide with evidence:** hand-built weekly digest → alert loop,
+   OSF and author-site parsers, Docker, EmbeddingGemma benchmark then
+   dedupe / “papers like this”, borrow SnowBallSLR stopping rule / drift
+   cache / PRISMA counts, Repair/Mirror, grounded brief once Ask’s trust
+   story is solid, then **one** bigger bet (systematic-review mode or
+   grey-literature watchers).
+
+(after-110-open-questions)=
+### Open questions
+
+- Should the next habit feature be the **weekly digest** or the **grounded
+  brief**? Is **systematic-review mode** or **grey-literature watching**
+  the one bigger bet worth exploring?
+- Keep **Ask** visible by default, or hide it? It is third in the default
+  nav today. Product and UX both lean last and optional.
+- What is the **main install route** now that PyPI 1.1.1 is live? Hold pip
+  until `pip install "paperful[serve]"` → `paperful serve` reaches Wanted
+  without Docker; switch to `pipx` / `uv tool` now; keep Docker for
+  operators; or a one-line PyPI install as the public story.
+- Agree that **Wanted** is the one main lane for now?
+- Who are the first outside testers, how many (3–4 / 5 / 5–10), and where
+  to ask (Zotero forums, r/AskAcademia, existing network)?
+- Should the CLI default to `--strict-pdf-doi`?
+- Stance on legal and fetch questions, and on accepting outside
+  contributions?
 
 (trust-10)=
 ## 0.1 → 1.0 (trust + mirror contract)
@@ -153,7 +575,7 @@ for real-library runs; keep filled reports under gitignored `assessments/`.
   uses its own latch and does not trip Scholar.
 - **Inbox create-on-unmatched (config, shipped).** Optional `[inbox]` mode so
   `watch` / `drain` still ingests when no missing-PDF parent matches: create a
-  parent in a configured collection (or a routed target once smart inbox exists),
+  parent in a configured collection (or a routed target from `[inbox].route`),
   attach the PDF, and fill bibliographic fields from Paperful’s identifier
   pipelines (DOI from PDF → Crossref / OpenAlex / Semantic Scholar; title /
   first-page fallbacks when DOI is missing). **Reference-manager metadata
@@ -212,26 +634,17 @@ for real-library runs; keep filled reports under gitignored `assessments/`.
   `manager_metadata` | `none`. **Not in scope:** guessing parents outside the
   missing-PDF index without create-on-unmatched; bulk OCR of the whole library
   inside `watch`.
-- **Smart inbox (optional, later).** Create-on-unmatched and the match ladder
-  can attach or propose a parent; they still do not choose a collection.
-  A smarter drop-folder lane would
-  **route** (and optionally ingest) each PDF toward the right collection using
-  **deterministic** signals first — ongoing / recent snowball runs and watches
-  (`state/snowball/…`, open packs, last `-C` / profile), DOI already in the
-  library, filename / PDF metadata / first-page text (and ladder OCR/title
-  fingerprints) against collection titles and recent candidates — then an
-  optional LLM ranker.
-  **LLM use** is configurable per this lane: `off` | `when_thin` (only when
-  deterministic signals conflict or score below a bar) | `always`. **Model**
-  follows the house pattern: global `[llm].provider` + `[llm].model` (and the
-  LiteLLM `provider/model` id form), overridable **per function** (e.g.
-  `[inbox].model` / `[inbox].provider`, same idea as `[browser_agent].model`
-  today; other verbs keep their own overrides). Apply modes: **gated** (propose
-  collection ± create-parent → human confirm / edit) or **auto** (apply when
-  confidence clears a config bar). Fail closed to today’s `unmatched/` (or a
-  review queue) — never silent misfile. Builds on the Firefox-bridge
-  create-parent ingest gap; keep DOI attach as the fast path when a miss already
-  exists.
+- **Smart inbox (config, shipped).** Create-on-unmatched and the match ladder
+  attach or propose a parent; this lane chooses a **collection** when `-C` is
+  omitted. Deterministic signals first — recent snowball runs and watches
+  (`state/snowball/…`, `target_collection` on `summary.json`, last `-C` /
+  profile), DOI already in the library, filename / PDF metadata / first-page
+  text against **existing** collection titles — then an optional LLM ranker.
+  **LLM use:** `[inbox].llm_route` `off` | `when_thin` | `always`. Model follows
+  the house pattern: global `[llm]` plus `[inbox].model` / `[inbox].provider`.
+  Apply modes: `[inbox].route` `off` (default) | `gated` | `auto`. Fail closed
+  to `review/` / a proposal — never silent misfile, never invent a collection.
+  DOI attach stays the fast path when a missing-PDF parent already matches.
 - **OA honesty / miss taxonomy (shipped).** Project internal miss status to a frozen
   surface enum for dry-run, `gaps`, and the run report:
   `no_doi | paywalled | no_oa | fetch_failed | license_blocked | import_ok`
@@ -355,7 +768,7 @@ for the end-to-end operator story.
 | Priority | Item | Status |
 | --- | --- | --- |
 | 1 | [`paperful refs gap`](#bibliography-gap-scan-later-not-gaps) — cited-in-PDF, not-in-library pack | Shipped |
-| 2 | [Inbox match ladder](#inbox-match-ladder) (defer quarantine, title/OCR, optional `llm_when_thin`) + [create-on-unmatched](#core-keep-sharpening) (gated proposals) | Shipped (`create_auto`: unique DOI, or unique ISBN / report / title+year+host) |
+| 2 | [Inbox match ladder](#inbox-match-ladder) (defer quarantine, title/OCR, optional `llm_when_thin`) + [create-on-unmatched](#core-keep-sharpening) (gated proposals) + smart inbox routing | Shipped (`create_auto`: unique DOI, or unique ISBN / report / title+year+host; `[inbox].route` picks `-C` when omitted) |
 | 3 | `paperful ingest-dois` — DOI list → `-C`, `--dry-run` / `--apply`, `--tag` | Shipped |
 | 4 | Provenance tags on create (`--tag`, `[snowball]` / `[ingest]` default_tags, `from-<seed-slug>`) | Shipped |
 | 4b | OA honesty miss enum + license/OA stamps on `run --dry-run`, `gaps`, handoff list, run report | Shipped |
@@ -364,7 +777,7 @@ for the end-to-end operator story.
 | 7 | Non-DOI grey fingerprint (`norm(title)|year|registrant_host`; ISBN/report # when present) in snowball / dedupe / inbox ladder + inbox-create | Shipped (ISBN/report like DOI; title\|year\|host is review-tier; host mismatch is not `exists`) |
 | 8 | `paperful collections add --keys-file` — membership batch, dry-run / apply | Shipped |
 | 9 | Acronym allowlist harvest (Core `fix-metadata`) | Shipped (`paperful acronyms`; Title Case consumes `state/acronyms/`) |
-| 10 | [Frontier digest](#frontier-digest-later-watch--external-ingest); thin [snowball briefing](#frontier-digest-later-watch--external-ingest) export before full digest | Shipped (`snowball digest`, `watch digest`, `watch run --digest`); newsletter ingest later |
+| 10 | [Frontier digest](#frontier-digest-later-watch--external-ingest); thin [snowball briefing](#frontier-digest-later-watch--external-ingest) export before full digest | Shipped (`snowball digest`, `watch digest`, `watch run --digest`); alert loop + what-cites as [`keepup`](keepup.md) — [Keeping up](#after-110-keeping-up) |
 | 11 | Scholar late tail + latch + opt-in SerpApi | Shipped (`[fetch].order` policy; interleave with `browser_agent`; `[handoff].scholar`; `[serpapi].enabled` / `max_calls`) |
 | 12 | Authors/orgs frequency report from `-C` (`state/reports/…`; seed **field author packs**) | Shipped (`paperful authors`; `--apply` writes report + proposed pack) |
 | 13 | Handoff list ranking (Core handoff) | Shipped (cite count × miss severity) |
@@ -450,6 +863,7 @@ vault login still stays on the host (shared `state/`).
 
 | Doc | Role |
 | --- | --- |
+| [ai.md](ai.md) | Feasibility: try-it vs ~1.5k library, overnight local reality, LiteLLM/OpenRouter setup, cost order of magnitude |
 | [llm.md](llm.md) | Install extras, `[llm]` / `[browser_agent]` keys, `recover` behaviour, troubleshooting table |
 | [browser-agent-models.md](browser-agent-models.md) | **Local Ollama tag guidance** for PDF UI loops (VRAM bands, avoid list, acceptance test) |
 | [config.md](config.md#llm-optional-local-first) | Key table: `model`, `fallback_model`, `use_vision`, `during_run`, caps |
@@ -684,6 +1098,101 @@ scheduling nightly “ask everything” jobs without an explicit operator comman
 `summarize` / `synthesize` — summaries stay the human-readable layer; RAG stays
 the evidence-linked Q&A layer.
 
+(embeddinggemma-2-local-embeddings)=
+### EmbeddingGemma 2 (later; stronger offline embeddings)
+
+**Status:** roadmap only — evaluate as an optional `[rag].embed_model`, not a
+default swap and not a new product. Today’s path stays
+`nomic-embed-text` (small, English-leaning) or `bge-m3` (multilingual) via
+Ollama / LiteLLM; each model already keeps its own index under `state/rag/`.
+Announced 2026-10 ([Google Open Source roundup](https://opensource.googleblog.com/2026/10/this-week-in-open-source-for-october-15.html);
+[developer guide](https://developers.googleblog.com/embeddinggemma-2-the-developer-guide/);
+weights on [Hugging Face](https://huggingface.co/google/embeddinggemma-2)).
+
+**Why it matters for Paperful:** Ask / `rag search` already run fully from the
+on-disk mirror with local embeddings. EmbeddingGemma 2 is **Apache 2.0**,
+sub-1B, and tuned for on-device RAG — so it strengthens the “passages never
+leave the machine” story without inventing a second index stack. Quantized
+footprint Google cites: ~**191 MB** active RAM for **text-only**, ~**567 MB**
+for the full multimodal load (Pixel-class numbers; laptop CPU/GPU will differ).
+Ollama already ships tags (`embeddinggemma-2`, plus size slices such as
+`270m` text-only / `440m` text+vision / `740m` full), so the first spike can
+stay on the existing `embed_provider = "ollama"` path.
+
+| Property | EmbeddingGemma 2 | Paperful fit |
+| --- | --- | --- |
+| License | Apache 2.0 | Matches local-first / redistributable tooling posture |
+| Text backbone | 270M (modular; vision +170M, audio +300M → 740M full) | Default Paperful path is **text from PDFs/abstracts** — load text-only |
+| Output | 768-d native; MRL truncates to 512 / 256 / 128 | Large libraries: shorter vectors cut LanceDB storage (re-normalize after truncate) |
+| Context | 8,192 tokens | Longer chunks than many small embed models; still respect `[rag]` chunk settings |
+| Languages | 100+ (MTEB multilingual ~par with EmbeddingGemma 1) | Candidate alternative to documenting `bge-m3` as the only multilingual pick |
+| Task prompts | Asymmetric `SearchQuery` / `Document` / `QuestionAnswering` (and titled `title: … \| text: …`) | Quality depends on prefixes — Ollama/LiteLLM passthrough may need an explicit Paperful wrapper |
+| Multimodal | Shared space for text, images, video, audio | **Later:** figure / page-image retrieval; not required for the text spike |
+| Precision note | Prefer **bfloat16** or float32; float16 can NaN or silently degrade | Document in `rag.md` / doctor; prefer bf16 Ollama tags when available |
+
+**Direction (ship in order; each stage can stop):**
+
+1. **Spike (config-only, no new provider)** — On a dogfood collection (e.g.
+   `ocean/BBNJ` or a fixture pack), set
+   `embed_model = "embeddinggemma-2:270m-…"` (pin a text-only / bf16 tag once
+   the Ollama library naming is stable), run `rag ingest`, then compare
+   `rag search` / `ask` recall against `nomic-embed-text` and `bge-m3` on the
+   same questions. Record wall-clock, peak RSS, and citation hit rate in
+   `assessments/` (local; not a published benchmark). Confirm `doctor` green
+   and that switching models leaves the old index folder intact (existing
+   contract).
+2. **Task-prompt honesty** — EmbeddingGemma 2 expects different prefixes for
+   queries vs documents. Spike whether Ollama’s embed API applies them, or
+   whether Paperful must format passages (`title: {item title} | text: {chunk}`)
+   and queries (`prompt_name` / instruction string) in `rag.ingest` /
+   `rag.retrieve`. Fail closed: never claim “drop-in” if bare strings regress
+   vs nomic. Document the required `[rag]` knobs (or a model-family hint) in
+   [rag.md](rag.md).
+3. **Docs + recommended tags** — If the spike is clearly better for multilingual
+   or long-passage corpora, add a short “optional stronger local embedder”
+   subsection beside the existing `nomic` / `bge-m3` guidance: pull command,
+   RAM band, “rebuild index” reminder, float16 warning. **Do not** change the
+   default until dogfood + CI fakes stay green; defaults stay small and boring.
+4. **MRL / storage (optional)** — For libraries with tens of thousands of
+   chunks, expose an opt-in truncate dim (256 default candidate for text) on
+   ingest + query, with `normalize_embeddings` behaviour documented. Index
+   folder name must include dim so 768-d and 256-d indexes do not collide.
+5. **Vision path (parked until text is boring)** — With the 440M text+vision
+   slice, embed page renders or extracted figures for “find the chart that
+   shows …” queries. Only after OCR / `light`|`docling` text RAG is solid;
+   keep citations grounded to item key + page. Audio/video are out of scope
+   for a PDF library workbench.
+
+**Config sketch (names TBD; additive only):**
+
+```toml
+[rag]
+enabled = true
+embed_provider = "ollama"
+# Optional stronger local model (after spike); default remains nomic-embed-text
+# embed_model = "embeddinggemma-2:270m-bf16-text"
+# embed_dim = 768          # or 256 / 128 when MRL ships; part of index id
+# embed_task = "qa"        # maps to QuestionAnswering vs SearchQuery prefixes
+```
+
+**Acceptance (spike):**
+
+- Text-only tag embeds offline with `[llm].allow_remote = false`.
+- `rag ingest` + `rag search` + `ask` work with zero manager calls (same as today).
+- Side-by-side note vs `nomic-embed-text` on ≥10 fixed questions; no silent
+  quality cliff from missing task prefixes.
+- Peak embedding RSS in the same ballpark as Google’s text-only claim on a
+  laptop-class machine (order-of-magnitude, not a hard CI gate).
+
+**Non-goals:** replacing LanceDB; making EmbeddingGemma 2 the CI default;
+shipping torch / sentence-transformers as a required extra when Ollama
+suffices; cloud embedding endpoints; multimodal as a 1.0 or near-term
+research-ops blocker; fine-tuning the model in-tree.
+
+Post-1.1 buffet (after the text spike): “papers like this”, semantic
+dedupe, a collection map, ASReview-style screening, semantic snowball, and
+an optional sqlite-vec store — [Local embeddings](#after-110-embeddings).
+
 (bibliography-gap-scan-later-not-gaps)=
 ### Bibliography gap scan (shipped; not `gaps`)
 
@@ -728,9 +1237,12 @@ as `refs gap`. Optional `provenance_hint` when tags are available.
 
 ### Frontier digest (later; watch + external ingest)
 
-**Status:** digest shipped. Newsletter / alert ingest stays later. Snowball
+**Status:** digest shipped. Alert loop shipped as [`keepup`](keepup.md)
+(poll → ingest → briefing; Paperful-local only — no email / rollup). Snowball
 **watch** stays dry-run and does not download PDFs. There is still **no**
-built-in scheduler.
+built-in scheduler. Post-1.1 buffet: Discover keepup UX, `refs` direction on
+collection digest, retractions / living-review add-ons —
+[Keeping up](#after-110-keeping-up).
 
 **Digest (Paperful):** `paperful snowball digest --run-id`,
 `snowball watch digest`, or `snowball watch run --digest` writes
@@ -750,14 +1262,13 @@ launchd / systemd / cron examples are in [snowball.md](snowball.md#watch).
 grey-vs-peer / OA stamp hints in briefing tables where provenance
 exists (`grey:…`, `oa:…`).
 
-**Newsletter / alert ingest (rollup bridge; post-1.0):** optional plug-in or HTTP client
-to sibling **[rollup](Documents/rollup)**-style ingest architecture — pull
-candidate papers from the operator’s **newsletters and alerts**, first source
-**Google Scholar** email/alert feeds (opt-in; same honesty bar as Scholar in
-handoff, not a silent `run` source). Normalise to DOI/title rows → Paperful
-snowball queue or bibliography-gap / ingest path. Rollup owns fetch/parse of
-mail sources; Paperful owns library fingerprint, gates, and ledger. Spike
-shared message shapes before hard-wiring repos.
+**Alert loop (shipped; Paperful-only):** `paperful keepup run` (operator cron;
+no built-in scheduler) polls configured sources → `digest.md` →
+`keepup apply --apply` (or `run --apply`) into the job `-C` → `ingested.md` →
+`paperful run` for PDFs. Standalone: `snowball watch apply` /
+`authorwatch apply` read **inbox jsonl**, not `digest.md`. Distinct from
+digest `--apply`, which only files a `paperful:frontier-briefing` note.
+No email, IMAP, or sibling rollup coupling.
 
 (author-watch-lists-later-people-you-follow--their-papers)=
 ### Author watch lists (in tree; people you follow → their papers)
@@ -786,10 +1297,11 @@ mirror and honesty contract as snowball).
 RG; cloud “who to follow” recommendations; live authenticated scraping of social
 follow pages; treating social HTML as a `run` PDF source.
 
-### Structured section extract (MVP; later)
+### Structured section extract (MVP; shipped)
 
-**Status:** roadmap — narrower than full `summarize`; structured fields for
-downstream RAG, synthesis, and gap scan context.
+**Status:** shipped — `paperful extract-sections`. Narrower than full
+`summarize`; structured fields for downstream RAG, synthesis, and gap scan
+context.
 
 **MVP fields (per item, on disk):** `abstract`, `conclusion`, `methodology`,
 `research_questions` (plus optional raw section map). **Stage 1 — deterministic:**
@@ -802,8 +1314,8 @@ heuristics + known IMRaD patterns; fail partial sections to findings, not
 garbage writes. **Stage 2 — LLM inference** only when `[llm].enabled` and a
 dedicated gate (e.g. `[extract_sections].llm`): fill missing MVP fields from
 the bounded excerpt; reject outputs that do not quote-ground in the supplied
-spans. Writes `state/sections/<key>.json` (and optional mirror into
-`record.json` on snapshot); **no** silent Zotero parent mutation. Overlaps
+spans. Writes `state/sections/<key>.json`; **no** silent Zotero parent mutation
+(mirroring fields into `record.json` on snapshot remains a later option). Overlaps
 Zotero-RAG RQ extraction (deterministic + LLM) — share heading list and
 provenance enums where possible.
 
@@ -868,8 +1380,9 @@ LLM tags as source of truth without stage 1–2 anchors.
 **Status:** keyword, multi-DOI / multi-ORCID, and collection seeds, hybrid keyword-then-hop,
 `direction` sides `refs` / `cites` / `both` / `keywords` / `similar` (and
 combos), gates including `approve-each`, overlap ranking, and optional `[llm]`
-query suggestions are in the tree. Contract: [snowball.md](snowball.md). Still
-outside: `expand = cited_authors`.
+query suggestions are in the tree. Discover **Map** draws the queue
+(`paperful.citation_graph.v1`) and can expand one hop. Contract:
+[snowball.md](snowball.md). Still outside: `expand = cited_authors`.
 
 Snowball grows a library outward from a keyword, one or more DOIs, one or more
 ORCIDs, or DOIs already in a collection. It writes a candidate queue on disk, then
@@ -1039,8 +1552,13 @@ as the **Large corpus from scratch** worked example under [Documentation
   resolver graph**, Maybe later §3); snowball keeps skip-only semantics.
 
 Still outside this lane: every paper by every cited author; a snowball step
-inside `paperful all`; a built-in scheduler; a review UI; systematic-review screening; a
-citation-graph canvas; Sci-Hub or Google Scholar as snowball sources.
+inside `paperful all`; a built-in scheduler; a review UI; systematic-review screening;
+Sci-Hub or Google Scholar as snowball sources. The Discover map
+(`paperful.citation_graph.v1`) is a view of one queue, with one-hop expand.
+Post-1.1 buffet for stopping rules, drift cache, PRISMA counts, SnowBallSLR
+interop, and a possible systematic-review mode —
+[Snowballing and review methods](#after-110-snowball-review),
+[Bigger bets](#after-110-bigger-bets).
 
 **OpenAlex snapshot store (opt-in).** Most installs use the live API only.
 Institutions (or a personal homeserver) may host an [OpenAlex parquet
@@ -1048,16 +1566,23 @@ snapshot](https://help.openalex.org/access/snapshot/) and point
 `[openalex_store]` at it. Architecture: a `WorksStore` transport behind
 `OpenAlexClient` — not an entry in `snowball_backends`.
 
-- **v1 (shipped):** `ssh_duckdb` — DuckDB runs on the data host; Paperful SSHs
-  SQL and gets small JSON rows. Covers `work_by_doi` / `works_by_dois` /
-  `works_by_ids` with API fallback for misses. Docs:
+- **v1 (shipped):** `ssh_duckdb` and `local_duckdb` — DuckDB over a parquet
+  snapshot (remote SSH or this machine). Covers `work_by_doi` /
+  `works_by_dois` / `works_by_ids` with API fallback for misses; when the API
+  daily budget is spent, DOI/id reads keep using the store. Docs:
   [config Advanced](config.md#openalex-api-limits-and-snapshot-store),
   [snowball Advanced](snowball.md#advanced).
-- **Post-1.0 (2B):** `works_citing` plus text search (`cites-query`) from the
-  snapshot (likely an inverted cites index or careful scan strategy). Not required
-  for 1.0 — the public API is generous for typical snowball / ingest loads.
-- **Post-1.0 (2C):** keyword / ORCID / `search` parity; `local_duckdb` and `http`
-  backends for campus hosting without SSH.
+- **2B (shipped):** inverted cites index (`paperful openalex-store build-cites`
+  + `cites_index_glob`) for store-backed `works_citing`; title-only
+  cites-query / `search=` on citing and id batches. Abstract/fulltext search
+  remains live-API / 2C.
+- **Post-1.0 (2C):** keyword / ORCID / full `search` parity; `http` backend for
+  campus hosting without SSH. **Park** until an institution asks —
+  [Parked](#after-110-parked).
+
+OpenAlex **topic** classifier change (13 Jan 2027): nothing in Paperful
+breaks; housekeeping and topic-native watches are
+[OpenAlex topics](#after-110-openalex-topics).
 
 ## Maybe later, not core
 
@@ -1075,17 +1600,16 @@ prerequisites for the fetch / lint / attach loop.
    plus FAO, RFMO, IUCN/DOSI, IDDRI/Pew). IEA/IRENA and OECD/WHO/UNEP/UNDP
    are optional files in `paperful/data/grey_playbooks_examples/` — extend
    via `grey_playbooks_dir` or `[[grey_playbooks]]`. **Shipped:**
-   **inbox match ladder** and **inbox create-on-unmatched** (config; unique-DOI
-   `create_auto`; gated proposals). Still parked: **smart inbox** routing (Core
-   above — snowball/recent-run context + ladder
-   signals; LLM `off` | `when_thin` | `always`; model global + per-function;
-   gated or auto);
+   **inbox match ladder**, **inbox create-on-unmatched**, and **smart inbox**
+   routing (config; snowball/recent-run context + ladder signals; LLM
+   `off` | `when_thin` | `always`; gated or auto). Still parked:
    SI/dataset/code siblings;
    **opt-in LibGen** for `book` / `bookSection` gap-fill (title or ISBN routing;
    unofficial scrapers only — spike
    [libgen-api](https://pypi.org/project/libgen-api/) /
    [libgenesis-api](https://pypi.org/project/libgenesis-api/) first; same
-   opt-in + disclaimer bar as Sci-Hub; no third-party HTTP gateways);
+   opt-in + disclaimer bar as Sci-Hub; no third-party HTTP gateways;
+   **park** until testers ask — [Parked](#after-110-parked));
    **opt-in SearXNG** for author / personal-site / institutional-repo PDFs that
    Unpaywall / OpenAIRE / CORE never indexed. **Shipped** as author-site
    remainder search against `[searxng].base_url` (your instance, or a public
@@ -1219,19 +1743,26 @@ Larger product bets. Park until the ledger and core loop justify them.
    evidence packs; briefs grounded only in local PDFs. **Planned (see Optional
    LLM + subsections above):** [Zotero-RAG
    integration](#zotero-rag-integration-later-question-centric-layer);
+   [EmbeddingGemma 2](#embeddinggemma-2-local-embeddings) (optional stronger
+   offline embedder; text spike before any vision path);
    [bibliography gap scan](#bibliography-gap-scan-later-not-gaps) (cited-but-not-owned,
    distinct from shipped `gaps`); [structured section
-   extract](#structured-section-extract-mvp-later); [annotation
+   extract](#structured-section-extract-mvp-shipped) (shipped —
+   `extract-sections`); [annotation
    mirror](#annotation-mirror-later); [frontier
    digest](#frontier-digest-later-watch--external-ingest) (watch rollup shipped;
-   optional rollup newsletter bridge, Scholar alerts first, still later); [author watch
+   alert loop + what-cites as [`keepup`](keepup.md)); [author watch
    lists](#author-watch-lists-later-people-you-follow--their-papers) (shipped;
    saved social HTML/CSV import; live scrape still out). **[Run
    witness](#run-witness-shipped-trust-thicken)** (shipped) ties batches to
-   config/model/index for reproducibility.
+   config/model/index for reproducibility. Post-1.1 buffet for grounded
+   living briefs, summaries with receipts, and Ask-as-claim-check —
+   [Summaries, briefs, and Ask](#after-110-briefs-ask).
 6. **Writing & export** — CSL / BibLaTeX / Quarto sync; living review / gap lists;
    git-friendly CSL-JSON dumps; [briefing ↔ collection coverage](#briefing--collection-coverage-shipped-sibling-of-refs-gap)
-   (shipped thin slice of parked “gap lists,” collection-scoped only)
+   (shipped thin slice of parked “gap lists,” collection-scoped only).
+   **Park CSL/Quarto as a Paperful feature** — point people at Better BibTeX
+   until testers ask — [Parked](#after-110-parked).
 7. **Agent surface** — MCP + CLI sharing one capability API; dry-run defaults;
    typed source/policy permissions; playbooks. **Shipped (CLI convenience,
    not a GUI):** named run configs and `paperful all` repeat a collection /
@@ -1290,51 +1821,21 @@ Larger product bets. Park until the ledger and core loop justify them.
 
 ## Optional thin bridge — Firefox extension (post-1.0)
 
-**Status:** design-only; **post-1.0** ([Product split](#product-split-10-vs-post-10)) — **not** a replacement
-for the Zotero Connector. Same Control posture as the CLI (dry-run default,
-explicit Apply, fail closed if Paperful is unreachable). Feasibility +
-contracts researched 2026-09-29 (local notes; substance locked below).
+**Status:** implemented, unsigned, temporary add-on. Not a 1.0 gate and not a
+replacement for the Zotero Connector. Operator notes: [firefox.md](firefox.md).
 
-Three explicit toolbar actions (no single “grab everything”):
-
-| Action | Maps to | Priority |
-| --- | --- | --- |
-| **Snowball this DOI** — detect DOI on the current page → `paperful snowball doi` | CLI already writes `paperful.snowball.candidate.v1`; dry-run → optional Apply + `-C` | **P0** |
-| **Ingest to quiet mirror** — current page → `out/` (`paperful.item.v1`) → Zotero upsert via LibraryBackend | `ingest-dois` / inbox create exist on the CLI; extension still needs a thin ingest action | **P1** |
-| **PDFs from open tabs** — enumerate tabs, confirm checklist, download with tab cookies into `[inbox].dir`, then `inbox drain` | Campus entitlement strength; refuse pirate hosts; park unattended mass download | **P1** spike |
-
-**v0 transport (room lock):** Extension → **`nativeMessaging`** host → shells
-`paperful` CLI (dry-run JSON → confirm → write). No new daemon and no invented
-localhost Capability API for these three actions. Thin `paperful serve` /
-Capability API for the 1.0 workbench targets HTTP — [gui.md](gui.md). The
-extension may reuse the same API later via native messaging. **Wrong:** extension → Zotero `:23119`
-directly (skips quiet mirror + provenance; do not replace Connector for
-cite-save).
-
-**Contracts (names):** NM message shapes `snowball.doi`, `ingest`,
-`tabs.pdfs.plan` / confirm with the same dry-run + miss-enum honesty as the
-CLI. DOI detect: Unpaywall-style meta list first (`citation_doi`,
-`dc.identifier.doi`, …), then doi.org links, then bounded regex — not a full
-Zotero translator VM. Provenance: `paperful web:extension` (or `campus:…`
-when the URL matches a configured proxy host). Hard-refuse Sci-Hub / LibGen /
-known pirate hosts on the tab-PDF job.
-
-**P0 spike:** content-script DOI → native host → `paperful snowball doi …`
-`--dry-run` → popup shows `run_id` + new/exists counts.
-
-**Blockers / gaps:** `[snowball].enabled` opt-in; ingest create-parent verb
-missing; mass-download ToS / campus AUP (confirm count, concurrency cap);
-AMO friction (sideload fine for personal spike); do not collide with Zotero
-23119.
-
-**Inspo (steal patterns, not product identity):**
-[zotero-connectors](https://github.com/zotero/zotero-connectors) (inject /
-background / localhost maturity),
-[unpaywall-extension](https://github.com/ourresearch/unpaywall-extension)
-(DOI meta + legal OA posture),
-[JabRef browser extension](https://docs.jabref.org/collect/jabref-browser-extension)
-(local-manager pairing; JabRef’s HTTP direction informs later Capability API),
-DownThemAll / Pull Tabs for paced tab-download UX only.
+The add-on saves the current page or selected tabs into the quiet mirror.
+Identity is the mirror plus a live Zotero read, so a stale snapshot does not
+create a second item. `[extension].snapshot = auto` (default) refreshes `out/`
+once first. Writes stay on disk: no `create_items`, no attach. Transport is
+native messaging to `paperful capture --stdio`. PDF bytes go to a drop
+directory; the host receives a path (and will copy a just-downloaded file from
+Downloads into that drop dir). Pirate hosts are refused. Snowball and
+gaps `--handoff tabs` / `walk` write `state/handoff/session.json`, which the
+tab checklist pre-checks (URL or DOI). Review selected plans each tab before
+apply. Context menu, Alt+Shift+P, collection picker, capture notes, and
+open-folder / Wanted links shipped in add-on 0.2. Starting a snowball from the
+toolbar is not this cut. AMO signing is not this cut.
 
 ## Documentation (thicken)
 
@@ -1344,28 +1845,32 @@ remain; keep them aligned with the GUI.
 
 Ship in layers:
 
-0. **Research pack playbook** — [research-pack.md](research-pack.md) (narrative spine for `-C` topic builds):
+0. **First 10 minutes** — one page that uses the **same labels as the GUI**
+   (Wanted, Held, Grab, Attach, the `out/` folder on this computer). Walkthroughs
+   exist; this is the stranger door that matches first-hour copy in
+   [1.1.1](#after-110-1-1-1) and [Docs as product](#after-110-trust-gaps).
+1. **Research pack playbook** — [research-pack.md](research-pack.md) (narrative spine for `-C` topic builds):
    seed greys + seed papers → `refs gap` → `ingest-dois --dry-run` → `--apply`
    with provenance tags → `run` / handoff / inbox for PDFs → `dedupe` hygiene →
    optional `snowball watch` + [frontier digest](#frontier-digest-later-watch--external-ingest)
    → `summarize` / RAG only after the ledger is honest.
-1. **Example commands and templates** — copy-paste invocations plus
+2. **Example commands and templates** — copy-paste invocations plus
    `profiles/*.toml` and config snippets for recurring flows: `-C` / collection
    scoping, `--dry-run` → `--apply`, `paperful all`, snowball profiles and
    gates, `[inbox].dir` handoff, `session login` (Zotero / Mendeley / campus
    vault), and `[llm]` gates spelled as one-liners with expected exit codes.
-2. **Worked examples** — **Shipped (workbench):** [Walkthroughs](walkthroughs.md)
+3. **Worked examples** — **Shipped (workbench):** [Walkthroughs](walkthroughs.md)
    ([first fill](first-fill.md), [grow](grow-library.md),
    [tidy](tidy-library.md)); [research-pack](research-pack.md). CLI depth for
    hop gates and `paperful all` stays [workflows](workflows.md) /
    [snowball](snowball.md). Remaining: a side-by-side **full** fetch (EZProxy
    relogin, browser-agent, handoff walk / inbox) as its own page.
-3. **Screenshots and video guides** — **Shipped (stills):** workbench Wanted,
+4. **Screenshots and video guides** — **Shipped (stills):** workbench Wanted,
    Discover, Repair, Index, Index Ask, System, Mirror (`docs/_static/workflows/`;
    homepage copies under `website/images/`). Recapture:
    `scripts/docs/capture_workbench.py`. Remaining: dry-run table callouts,
    Zotero provenance, short screen recordings.
-4. **Developer guide** — [developer.md](developer.md). **Shipped:** the
+5. **Developer guide** — [developer.md](developer.md). **Shipped:** the
    mirror-first rule, what a command's backend serves from disk, rules for
    new code, the module map, the refresh, disk schemas, and how to add a
    verb, a source, or an adapter method. Keep it current when a rule or a
@@ -1385,14 +1890,16 @@ second doc tree that drifts from the CLI.
 - [bbnj-author-lanes.md](bbnj-author-lanes.md) — dogfood `author_site` + `authorwatch` on `ocean/BBNJ` / `ocean/BBNJ-test`
 - Site career / domain timeline plan (consumer of durable tags):
   `/Users/89298/Documents/website/glen-w.github.io/docs/dev/career-timeline-plan.md`
-- Firefox extension (post-1.0 thin bridge) — section above; not a separate doc yet
+- [firefox.md](firefox.md) — optional Firefox add-on; mirror writes, Zotero read
+- [After 1.1.0 (buffet by area)](#after-110-buffet-by-area) — Wanted, testers,
+  digest, embeddings, review methods, launch, parked bets
 
 ## GUI
 
 **1.0 deliverable** — workbench (open / Docker first): [gui.md](gui.md).
 **Shipped:** `paperful.item.v1` lock, `paperful serve` HTTP + server-rendered UI
-under `paperful/ui/` — default nav **Wanted** (also `GET /`) then **Discover**,
-Preview → Grab (fetch to `out/` only) → Attach (explicit library write), with
+under `paperful/ui/` — default nav **Wanted** (also `GET /`), **Discover**, **Ask**,
+Preview → Grab (fetch to `out/`; Attach is manual by default, or automatic via `[ui].attach_mode`), with
 review tokens and command ids under `state/gui/commands/`; Activity run-status
 SSE on `GET /v1/runs/{id}/events`. Empty Wanted shows a
 coach line when there is no collection or the library is down. Discover covers topic
@@ -1408,12 +1915,20 @@ Screenshots: [Walkthroughs](walkthroughs.md).
 
 The CLI stays the source of truth; the GUI marshals the same verbs with dry-run
 default and explicit Apply. Not a second fetch stack or Zotero’s reader.
-**Firefox extension** is post-1.0.
+The optional [Firefox add-on](firefox.md) saves pages into the mirror and
+does not attach.
 
-**Ask (opt-in, `/ask`):** **Shipped** — scoped chat with citations when `[llm]` and
-`[rag]` are on and the index has rows. Collection chip is the scope; threads live
-under `state/rag/threads/` (same as `ask --thread`). Index (Advanced) runs
-`rag ingest`, `rag search`, batch Ask (item/year/type/top-k/force, custom prompts),
-`rag questions`, and `rag answered`. **Briefs** (Advanced) runs `summarize` and
-`synthesize`. CLI `ask` remains for scripts, TTY multi-turn, and run profiles.
+Post-1.1: **Wanted is the recommended main lane** (stamps, hand-ticks, miss
+reasons) before Repair/Mirror polish or Ask depth —
+[Wanted](#after-110-wanted). 1.1.1 stop-ship items (Grab-selected keys, Held
+ticks, Attach-at-zero) are [1.1.1](#after-110-1-1-1). Whether Ask stays on
+the default nav is [open](#after-110-open-questions).
+
+**Ask (default nav, opt-in):** **Shipped** — `/ask` runs scoped chat with citations
+when `[llm]` and `[rag]` are on and the index has rows. Collection chip is the
+scope; threads live under `state/rag/threads/` (same as `ask --thread`). Batch
+Ask (item/year/type/top-k/force, custom prompts) is on that page when Advanced
+is on. **Index** (Advanced) runs `rag ingest`, `rag search`, `rag questions`,
+and `rag answered`. **Briefs** (Advanced) runs `summarize` and `synthesize`.
+CLI `ask` remains for scripts, TTY multi-turn, and run profiles.
 See [Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer).

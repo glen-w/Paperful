@@ -97,7 +97,7 @@ def test_gui_md_documents_discover_and_wanted_routes():
         "Stays CLI",
         "docker compose up",
         "browser_agent_miss",
-        "Grab never writes",
+        "After Grab",
     )
     missing = [path for path in required if path not in text]
     assert not missing, f"docs/gui.md missing workbench routes/surfaces: {', '.join(missing)}"

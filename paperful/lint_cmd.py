@@ -30,7 +30,7 @@ def run_lint(
     config: Path | None,
     fmt: str,
 ) -> None:
-    from . import cli as cli_mod
+    from . import cli_runtime as cli_mod
     from .lint import Finding, lint_items
     from .pipeline import make_client
     from .zot import Item
