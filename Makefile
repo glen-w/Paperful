@@ -2,7 +2,7 @@
 
 .DEFAULT_GOAL := help
 
-.PHONY: help test lint docs docs-clean pages-site pre-release docker-build docker-build-heavy docker-doctor e2e-nba e2e-stack
+.PHONY: help smoke test lint docs docs-clean pages-site pre-release docker-build docker-build-heavy docker-doctor e2e-nba e2e-stack
 
 help:
 	@echo "paperful Makefile"
@@ -14,7 +14,8 @@ help:
 	@echo "  docker-build-heavy  Build heavy image (llm + rag + browser-agent)"
 	@echo "  docker-doctor       Run paperful doctor in the container"
 	@echo ""
-	@echo "Test / lint (contributor path; CI parity):"
+	@echo "Test / lint (contributor path):"
+	@echo "  smoke             uv run pytest -m smoke (required CI gate)"
 	@echo "  test              uv run pytest -m \"not docs\" (needs: uv sync --group dev --extra serve)"
 	@echo "  lint              uv run ruff check paperful tests"
 	@echo ""
@@ -33,6 +34,9 @@ help:
 	@echo "Usage: uv run paperful <cmd>"
 	@echo "       docker compose run --rm paperful <cmd>   # optional image"
 	@echo "       uv sync --extra docs && make docs"
+
+smoke:
+	uv run pytest -m smoke -q
 
 test:
 	uv run pytest -m "not docs"

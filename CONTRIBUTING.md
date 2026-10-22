@@ -35,19 +35,21 @@ Zotero must be running with the local API enabled for integration tests that tou
 
 ```sh
 uv sync --group dev --extra serve
-make test                 # pytest -m "not docs" (CI suite parity)
-make lint                 # ruff (undefined-name + curated security rules)
+make smoke                # required CI gate (pytest -m smoke)
+make test                 # full suite (advisory in CI)
+make lint                 # ruff (advisory in CI)
 DOCS_STRICT=1 make docs   # after: uv sync --extra docs
 ```
 
 Local-trust boundaries and reporting: [SECURITY.md](SECURITY.md).
 
-CI runs pytest with coverage on every push and PR (`.github/workflows/ci.yml`).
-A green push to `main` refreshes `badges/coverage.json`, which the README
-coverage badge reads. The Docs
-workflow (`.github/workflows/docs.yml`) runs the guide corpus tests and a strict
-Sphinx build; pushes to `main` that touch `docs/` or `website/` also redeploy
-Pages (`.github/workflows/pages.yml`).
+CI’s merge gate is the **smoke** job in [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+(`paperful version` + a tiny boot suite). lint, the full pytest suite, and
+Docker Compose are advisory and do not block merges. When the suite is green on
+a push to `main`, Actions refreshes `badges/coverage.json` for the README
+badge. The Docs workflow (`.github/workflows/docs.yml`) is also advisory;
+pushes to `main` that touch `docs/` or `website/` may redeploy Pages
+(`.github/workflows/pages.yml`).
 User-facing changes: note them in [CHANGELOG.md](CHANGELOG.md) and
 [docs/releases.md](docs/releases.md) when they affect 1.0 vs post-1.0 promises.
 
@@ -56,8 +58,7 @@ Default pytest stays offline. The opt-in all-in E2E (`make e2e-nba`, marker
 and is documented in [docs/e2e-nba.md](docs/e2e-nba.md). Do not enable it in CI.
 
 **Issues to watch:** CI colours CLI help (use `plain_text()` for flag assertions),
-the dev group needs a LanceDB-compatible platform, and the Compose **docker** job
-is not a substitute for `pytest -m smoke`. Details:
+and the dev group needs a LanceDB-compatible platform. Details:
 [developer guide — CI and local pitfalls](docs/developer.md#ci-and-local-pitfalls).
 
 ## Pull requests

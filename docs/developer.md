@@ -267,19 +267,20 @@ Count requests when the point of a change is fewer of them: `FakeZotero.calls`.
 ### CI and local pitfalls
 
 GitHub Actions (`.github/workflows/ci.yml`) syncs with `--group dev --extra
-serve` on Ubuntu, then runs three jobs:
+serve` on Ubuntu. Only **smoke** gates merges:
 
-- **smoke** (required): `pytest -m smoke` — CLI version, shell pages boot, and
-  workbench command/preview paths. Copy and tab layout changes should not fail
-  this job.
-- **docker** (required): Compose image, `paperful --help`, and `paperful doctor`
-  without Zotero (exit 2).
-- **suite** (advisory): full `pytest -m "not docs"` with coverage. It does not
-  fail the workflow. Coverage uploads when the suite is green; Actions overrides
-  the local 80% `fail_under` with `--cov-fail-under=0`.
+- **smoke** (required): `paperful version` / `--help`, then `pytest -m smoke`
+  (CLI boots + main workbench pages return 200). Keep assertions coarse so
+  copy and feature edits do not turn CI red.
+- **lint**, **suite**, and **docker** (advisory): ruff, full
+  `pytest -m "not docs"` with coverage, and Compose image + `doctor` without
+  Zotero (exit 2). They do not fail the workflow. Coverage uploads when the
+  suite is green; Actions overrides the local 80% `fail_under` with
+  `--cov-fail-under=0`.
 
-Reproduce the required gate with `uv run pytest -m smoke`. The full local suite
-is still `uv run pytest` (80% coverage gate in `pyproject.toml`).
+Reproduce the required gate with `make smoke` (or `uv run pytest -m smoke`).
+The full local suite is still `make test` / `uv run pytest` (80% coverage gate
+in `pyproject.toml`).
 
 **CLI help assertions.** On CI, `CI` / `GITHUB_ACTIONS` is set and Typer/Rich
 style option names with ANSI codes. A flag like `--apply` is often split across
