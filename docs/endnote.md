@@ -8,6 +8,11 @@ Schema notes below are from inspecting EndNote 20/21 library folders
 **This adapter is seeking testers.** Zotero remains the well-tested path.
 Do not treat a first EndNote run as proven.
 
+**Field testing:** copy [adapter-field-assessment.md](templates/adapter-field-assessment.md)
+into gitignored `assessments/` and complete the EndNote checklist (copied library,
+`snapshot`, File → Import of `state/endnote-import/` bundles). CI contract tests
+live in `tests/test_endnote.py`.
+
 ## Setup
 
 1. Point config at the `.enl` file. The matching `.Data` folder must sit

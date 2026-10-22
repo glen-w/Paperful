@@ -491,6 +491,9 @@ The code is in the tree. It has not been proven on real libraries the way
 Zotero has. **1.0 does not wait on tester sign-off** — ship with clear limits
 in README, [why.md](why.md), [mendeley.md](mendeley.md), and [endnote.md](endnote.md).
 Do not call either adapter **supported** until field reports justify it.
+Use the committed template
+[`docs/templates/adapter-field-assessment.md`](templates/adapter-field-assessment.md)
+for real-library runs; keep filled reports under gitignored `assessments/`.
 
 1. **Mendeley** — `MendeleyBackend` talks to `api.mendeley.com` (no official
    SDK). OAuth via `paperful session login mendeley`. `supports_write` is true

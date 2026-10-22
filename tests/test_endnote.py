@@ -302,3 +302,118 @@ def test_endnote_changes_full_noop_and_gone(cfg, tmp_path):
     assert after.full
     assert "1" not in after.top_keys
     assert any(t.get("key") == "1" for t in after.trashed)
+
+
+def test_endnote_xml_journal_ref_type_17_not_db_zero(cfg, tmp_path):
+    backend = _backend(cfg, make_endnote_library(tmp_path))
+    backend.apply_patch("1", {"title": "Journal export"})
+    dest = backend.flush_writes()
+    xml = (dest / "paperful.xml").read_text(encoding="utf-8")
+    assert 'name="Journal Article"' in xml
+    assert "<ref-type" in xml and ">17<" in xml.replace(" ", "")
+    assert "<groups" not in xml.lower()
+
+
+def test_endnote_db_reference_type_17_maps_to_bill_not_journal(cfg, tmp_path):
+    enl = tmp_path / "Lib.enl"
+    enl.write_bytes(b"enl")
+    data = tmp_path / "Lib.Data"
+    (data / "sdb").mkdir(parents=True)
+    conn = sqlite3.connect(str(data / "sdb" / "sdb.eni"))
+    conn.execute(
+        """
+        CREATE TABLE refs (
+            id INTEGER PRIMARY KEY,
+            title TEXT,
+            trash_state INTEGER,
+            reference_type INTEGER,
+            electronic_resource_number TEXT
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO refs VALUES (2, 'A Bill', 0, 17, '')"
+    )
+    conn.commit()
+    conn.close()
+    backend = _backend(cfg, enl)
+    it = backend.get_item("2")
+    assert it is not None
+    assert it.item_type == "bill"
+
+
+def test_endnote_readme_matches_clarivate_import_steps(cfg, tmp_path):
+    backend = _backend(cfg, make_endnote_library(tmp_path))
+    backend.apply_patch("1", {"title": "Readme check"})
+    dest = backend.flush_writes()
+    readme = (dest / "README.txt").read_text(encoding="utf-8")
+    assert "EndNote Generated XML" in readme
+    assert "Duplicates" in readme
+    assert "File → Import" in readme
+    assert (dest / "paperful.xml").parent == dest
+    assert (dest / "PDF").is_dir()
+    assert "sdb" not in str(dest / "PDF")
+
+
+def test_endnote_bundle_xml_label_only_for_collection_path(cfg, tmp_path):
+    backend = _backend(cfg, make_endnote_library(tmp_path))
+    backend.apply_patch("1", {"title": "Labeled"})
+    rec = backend._pending_by_key.get("1") or backend._pending[0]
+    rec["collection_paths"] = ["BBNJ/EIA"]
+    dest = backend.flush_writes()
+    xml = (dest / "paperful.xml").read_text(encoding="utf-8")
+    assert "BBNJ/EIA" in xml
+    assert "<label>" in xml or "BBNJ/EIA" in xml
+
+
+def test_endnote_internal_pdf_round_trip_in_bundle(cfg, tmp_path):
+    from paperful.interop.endnote_xml import parse_endnote_xml
+
+    backend = _backend(cfg, make_endnote_library(tmp_path))
+    extra = tmp_path / "round.pdf"
+    extra.write_bytes(PDF_BYTES)
+    backend.attach("1", extra)
+    dest = backend.flush_writes()
+    xml_path = dest / "paperful.xml"
+    records = parse_endnote_xml(xml_path.read_text(encoding="utf-8"), xml_path=xml_path)
+    assert records[0]["pdfs"]
+    assert (dest / "PDF" / extra.name).is_file()
+
+
+def test_endnote_refuses_add_to_collection(cfg, tmp_path):
+    backend = _backend(cfg, make_endnote_library(tmp_path))
+    with pytest.raises(LibraryError, match="group"):
+        backend.add_to_collection("1", "10")
+
+
+def test_endnote_copy_on_lock_includes_wal_and_shm(cfg, tmp_path, monkeypatch):
+    import shutil
+
+    from paperful.endnote import connect_readonly
+
+    make_endnote_library(tmp_path)
+    eni = tmp_path / "Lib.Data" / "sdb" / "sdb.eni"
+    for suffix in ("-wal", "-shm", "-journal"):
+        eni.with_name(eni.name + suffix).write_bytes(b"x")
+    copied: list[str] = []
+    real_copy = shutil.copy2
+
+    def spy(src, dst, *args, **kwargs):
+        copied.append(Path(src).name)
+        return real_copy(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr("paperful.endnote.shutil.copy2", spy)
+    real_connect = sqlite3.connect
+
+    def locked(database, *args, **kwargs):
+        if kwargs.get("uri") or str(database).startswith("file:"):
+            raise sqlite3.OperationalError("database is locked")
+        return real_connect(database, *args, **kwargs)
+
+    monkeypatch.setattr("paperful.endnote.sqlite3.connect", locked)
+    conn = connect_readonly(eni)
+    assert conn.execute("SELECT COUNT(*) FROM refs").fetchone()[0] == 1
+    assert "sdb.eni" in copied
+    assert "sdb.eni-wal" in copied
+    assert "sdb.eni-shm" in copied
+    assert "sdb.eni-journal" in copied
