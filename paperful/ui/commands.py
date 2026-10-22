@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import secrets
 import threading
 import time
@@ -13,6 +14,8 @@ from typing import Any, Callable
 from ..config import Config
 
 TERMINAL_STATUSES = frozenset({"done", "failed"})
+# secrets.token_urlsafe charset; reject path separators / traversal.
+_REVIEW_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{8,128}$")
 
 _watch_lock = threading.Lock()
 _watch_cond = threading.Condition(_watch_lock)
@@ -208,9 +211,23 @@ def create_review_token(
     return token
 
 
+def _review_path(cfg: Config, token: str) -> Path | None:
+    """Resolve ``reviews/<token>.json`` only for a safe token charset."""
+    if not _REVIEW_TOKEN_RE.fullmatch(token or ""):
+        return None
+    root = _reviews_dir(cfg)
+    try:
+        base = root.resolve()
+        path = (base / f"{token}.json").resolve()
+        path.relative_to(base)
+    except (OSError, ValueError):
+        return None
+    return path
+
+
 def load_review(cfg: Config, token: str) -> dict[str, Any] | None:
-    path = _reviews_dir(cfg) / f"{token}.json"
-    if not path.is_file():
+    path = _review_path(cfg, token)
+    if path is None or not path.is_file():
         return None
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -236,6 +253,9 @@ def consume_review(
         allowed = set(data.get("keys") or [])
         if not set(keys).issubset(allowed):
             return False, "keys not in preview"
+    path = _review_path(cfg, token)
+    if path is None:
+        return False, "unknown token"
     data["consumed"] = True
-    _atomic_write(_reviews_dir(cfg) / f"{token}.json", data)
+    _atomic_write(path, data)
     return True, ""

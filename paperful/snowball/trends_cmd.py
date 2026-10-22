@@ -33,16 +33,17 @@ def run_trends(
             year_to=year_to,
         )
     except SnowballError as exc:
+        err_text = str(exc)
         payload = envelope(
             command="snowball trends",
             exit_code=exc.code,
-            summary={"error": str(exc)},
+            summary={"error": err_text},
             flags={"read_only": True},
         )
         cli_mod._emit_agent(
             payload,
             json_out=json_out,
-            human=lambda: console.print(f"[red]{exc}[/]"),
+            human=lambda: console.print(f"[red]{err_text}[/]"),
         )
         return
 

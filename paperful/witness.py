@@ -16,7 +16,7 @@ from .config import Config
 
 SCHEMA = "paperful.witness.v1"
 
-# Never hash secrets into the witness.
+# Never hash secrets into the witness (attrs on Config and TOML keys).
 _SECRET_ATTRS = frozenset(
     {
         "core_api_key",
@@ -26,15 +26,69 @@ _SECRET_ATTRS = frozenset(
         "mendeley_client_secret",
         "mendeley_access_token",
         "mendeley_refresh_token",
+        "client_secret",
+        "access_token",
+        "refresh_token",
+        "api_key",
+        "token",
+        "password",
+        "secret",
     }
 )
 
 
+def _is_secret_key(key: str) -> bool:
+    lowered = key.lower()
+    if lowered in _SECRET_ATTRS:
+        return True
+    return any(
+        part in lowered
+        for part in ("api_key", "token", "password", "secret", "client_secret")
+    )
+
+
+def _redact_mapping(data: Any) -> Any:
+    """Drop secret-looking keys from nested TOML/JSON structures."""
+    if isinstance(data, dict):
+        out: dict[str, Any] = {}
+        for key, value in data.items():
+            name = str(key)
+            if _is_secret_key(name):
+                continue
+            redacted = _redact_mapping(value)
+            # Drop tables that only held secrets (e.g. ``[mendeley]`` with
+            # ``client_secret`` alone) so digests stay stable.
+            if isinstance(redacted, dict) and not redacted:
+                continue
+            out[name] = redacted
+        return out
+    if isinstance(data, list):
+        return [_redact_mapping(item) for item in data]
+    return data
+
+
 def config_sha256(cfg: Config) -> str:
-    """SHA-256 of the loaded config file, or of a stable non-secret snapshot."""
+    """SHA-256 of a secret-redacted config fingerprint.
+
+    Prefer hashing the on-disk TOML with secret keys stripped so shared run
+    reports never fingerprint ``core_api_key`` / Mendeley secrets. Fall back to
+    a redacted in-memory snapshot when no file is loaded.
+    """
     path = cfg.config_path
     if path is not None and Path(path).is_file():
-        return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+        try:
+            import tomllib
+        except ModuleNotFoundError:  # pragma: no cover — py<3.11
+            import tomli as tomllib  # type: ignore[no-redef]
+
+        try:
+            raw = tomllib.loads(Path(path).read_text(encoding="utf-8"))
+        except Exception:
+            raw = None
+        if isinstance(raw, dict):
+            payload = _redact_mapping(raw)
+            blob = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
+            return hashlib.sha256(blob.encode("utf-8")).hexdigest()
     payload = _effective_snapshot(cfg)
     blob = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
@@ -43,7 +97,7 @@ def config_sha256(cfg: Config) -> str:
 def _effective_snapshot(cfg: Config) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for key, value in sorted(cfg.__dict__.items()):
-        if key in _SECRET_ATTRS:
+        if key in _SECRET_ATTRS or _is_secret_key(key):
             continue
         if key.startswith("_"):
             continue
@@ -54,7 +108,7 @@ def _effective_snapshot(cfg: Config) -> dict[str, Any]:
         elif isinstance(value, (list, tuple)):
             out[key] = list(value)
         elif isinstance(value, dict):
-            out[key] = {str(k): v for k, v in value.items()}
+            out[key] = _redact_mapping({str(k): v for k, v in value.items()})
     return out
 
 

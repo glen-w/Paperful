@@ -33,7 +33,17 @@ services:
       # Localhost only (no LAN). Same workbench as host `paperful serve`.
       - "127.0.0.1:8765:8765"
     # `compose up` → GUI. CLI one-shots: docker compose run --rm paperful <cmd>
-    command: ["serve", "--host", "0.0.0.0", "--port", "8765"]
+    # 0.0.0.0 is required inside the container; publish stays 127.0.0.1:8765.
+    # --allow-remote-bind is the explicit opt-in for non-loopback bind (no auth).
+    command:
+      [
+        "serve",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8765",
+        "--allow-remote-bind",
+      ]
     # TTY for coloured CLI when using compose run. Scripts: -T.
     stdin_open: true
     tty: true

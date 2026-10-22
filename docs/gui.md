@@ -65,6 +65,8 @@ browser-agent. No built-in scheduler — **Check again** on Discover, not cron.
 Layout: table-first rows, native `<dialog>` drawer (no embedded PDF viewer).
 Long jobs return a **command id**; Activity subscribes to `GET /v1/runs/{id}/events` (SSE), with JSON poll fallback via `GET /v1/runs/{id}`.
 Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
+Non-loopback bind (`--host 0.0.0.0`) requires `--allow-remote-bind` and still has
+**no HTTP auth** — see [SECURITY.md](../SECURITY.md).
 `compose.gui.yaml` is a no-op shim for older `-f compose.gui.yaml --profile gui` invocations.
 
 ---

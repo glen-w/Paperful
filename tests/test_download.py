@@ -138,6 +138,44 @@ def test_fetch_pdf_rejects_javascript_void_instead_of_crashing():
         fetch_pdf(client, "javascript:void(0)")
 
 
+def test_is_fetchable_url_blocks_loopback_and_metadata():
+    assert not is_fetchable_url("http://127.0.0.1/a.pdf", resolve=False)
+    assert not is_fetchable_url("http://localhost/a.pdf", resolve=False)
+    assert not is_fetchable_url("http://[::1]/a.pdf", resolve=False)
+    assert not is_fetchable_url("http://169.254.169.254/latest/meta-data", resolve=False)
+    assert not is_fetchable_url("http://10.0.0.5/secret.pdf", resolve=False)
+    assert not is_fetchable_url("http://192.168.1.1/a.pdf", resolve=False)
+    assert not is_fetchable_url("http://metadata.google.internal/", resolve=False)
+    assert is_fetchable_url("https://x.test/a.pdf", resolve=False)
+
+
+def test_is_fetchable_url_blocks_hostname_resolving_to_private(monkeypatch):
+    monkeypatch.setattr(dl, "_resolve_host_ips", lambda _host: ["10.1.2.3"])
+    assert not is_fetchable_url("https://evil.example/a.pdf", resolve=True)
+
+
+def test_fetch_pdf_rejects_redirect_to_loopback():
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.host == "x.test":
+            return httpx.Response(
+                302, headers={"location": "http://127.0.0.1/secret.pdf"}
+            )
+        return httpx.Response(200, content=PDF_BYTES)
+
+    with pytest.raises(DownloadError, match="blocked host"):
+        fetch_pdf(mock_client(handler), "https://x.test/a.pdf", min_bytes=10)
+
+
+def test_fetch_pdf_follows_safe_redirect():
+    def handler(req: httpx.Request) -> httpx.Response:
+        if str(req.url).endswith("/start"):
+            return httpx.Response(302, headers={"location": "/final.pdf"})
+        return httpx.Response(200, content=PDF_BYTES)
+
+    got = fetch_pdf(mock_client(handler), "https://x.test/start", min_bytes=10)
+    assert got.content == PDF_BYTES
+
+
 def test_fetch_pdf_size_cap(monkeypatch):
     monkeypatch.setattr(dl, "MAX_PDF_BYTES", 5000)
     client = mock_client(lambda req: httpx.Response(200, content=PDF_BYTES))

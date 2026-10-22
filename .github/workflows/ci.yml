@@ -13,6 +13,16 @@ jobs:
       - run: uv sync --group dev --extra serve
       - run: uv run pytest -m smoke -q
 
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --group dev
+      # Curated gate: undefined names + high-signal security rules that are clean today.
+      # Broader ruff (full E/F/S) is still noisy; expand selects deliberately.
+      - run: uv run ruff check paperful tests
+
   suite:
     runs-on: ubuntu-latest
     continue-on-error: true

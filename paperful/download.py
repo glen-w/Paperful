@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
+import socket
 import time
 from dataclasses import dataclass
+from typing import Callable
+from urllib.parse import urljoin
 
 import httpx
 
@@ -21,6 +25,18 @@ _TRANSPORT_ERRORS = (
 )
 # Transport blips get one retry; status retries use the caller ``retries`` cap.
 _TRANSPORT_ATTEMPTS = 2
+# Manual redirect hops (client may have follow_redirects=True by default).
+_MAX_REDIRECTS = 10
+
+# Hostnames that must never be fetched even when DNS is skipped (offline tests).
+_BLOCKED_HOSTNAMES = frozenset(
+    {
+        "localhost",
+        "metadata",
+        "metadata.google.internal",
+        "metadata.goog",
+    }
+)
 
 
 class DownloadError(Exception):
@@ -51,11 +67,87 @@ def looks_like_pdf(head: bytes) -> bool:
     return b"%PDF-" in head[:1024]
 
 
-def is_fetchable_url(url: str) -> bool:
+def _ip_is_blocked(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """True for loopback, private, link-local, multicast, unspecified, reserved."""
+    return bool(
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_unspecified
+        or ip.is_reserved
+    )
+
+
+def is_public_fetch_host(
+    host: str,
+    *,
+    resolve: bool = True,
+    resolver: Callable[[str], list[str]] | None = None,
+) -> bool:
+    """True when ``host`` is safe to fetch for library PDF URLs.
+
+    Blocks loopback / RFC1918 / link-local / metadata literals and known
+    metadata hostnames. When ``resolve`` is true, also rejects names that
+    resolve only to blocked addresses. DNS failure is fail-open so offline
+    fixture hosts (``x.test``) still pass ``is_fetchable_url``.
+    """
+    raw = (host or "").strip().lower().rstrip(".")
+    if not raw:
+        return False
+    # Strip IPv6 brackets from URL hosts.
+    if raw.startswith("[") and raw.endswith("]"):
+        raw = raw[1:-1]
+    if raw in _BLOCKED_HOSTNAMES or raw.endswith(".localhost"):
+        return False
+    if raw.endswith(".local") or raw.endswith(".internal"):
+        return False
+    try:
+        if _ip_is_blocked(ipaddress.ip_address(raw)):
+            return False
+        return True
+    except ValueError:
+        pass
+
+    if not resolve:
+        return True
+
+    lookup = resolver or _resolve_host_ips
+    try:
+        addrs = lookup(raw)
+    except OSError:
+        return True
+    if not addrs:
+        return True
+    for addr in addrs:
+        try:
+            if _ip_is_blocked(ipaddress.ip_address(addr)):
+                return False
+        except ValueError:
+            continue
+    return True
+
+
+def _resolve_host_ips(host: str) -> list[str]:
+    infos = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    out: list[str] = []
+    seen: set[str] = set()
+    for info in infos:
+        addr = info[4][0]
+        if addr not in seen:
+            seen.add(addr)
+            out.append(addr)
+    return out
+
+
+def is_fetchable_url(url: str, *, resolve: bool = True) -> bool:
     """Absolute http(s) URL that httpx can request while the client holds cookies.
 
     `javascript:void(0)` is a relative URL to httpx. Cookie merging then asks
     urllib to parse `/void(0)` and raises ValueError, which aborts a run.
+
+    Also rejects loopback / private / link-local / cloud-metadata targets so a
+    poisoned library URL cannot SSRF the operator machine (see SECURITY.md).
     """
     raw = (url or "").strip()
     if not raw.lower().startswith(("http://", "https://")):
@@ -64,7 +156,9 @@ def is_fetchable_url(url: str) -> bool:
         parsed = httpx.URL(raw)
     except httpx.InvalidURL:
         return False
-    return parsed.scheme in {"http", "https"} and bool(parsed.host)
+    if parsed.scheme not in {"http", "https"} or not parsed.host:
+        return False
+    return is_public_fetch_host(parsed.host, resolve=resolve)
 
 
 def fetch_pdf(
@@ -76,7 +170,7 @@ def fetch_pdf(
 ) -> Download:
     """GET `url`, insisting on real PDF bytes. Raises DownloadError otherwise."""
     if not is_fetchable_url(url):
-        raise DownloadError("not an http(s) URL")
+        raise DownloadError("not an http(s) URL or blocked host")
     headers = {"Accept": "application/pdf,*/*;q=0.8"}
     if referer:
         headers["Referer"] = referer
@@ -87,37 +181,60 @@ def fetch_pdf(
     max_attempts = max(retries, _TRANSPORT_ATTEMPTS)
     for attempt in range(max_attempts):
         try:
-            with client.stream("GET", url, headers=headers, timeout=_PDF_TIMEOUT) as resp:
-                if resp.status_code in _RETRY_STATUSES:
-                    last = f"HTTP {resp.status_code}"
-                    status_fails += 1
-                    if status_fails >= retries:
+            current = url
+            for _ in range(_MAX_REDIRECTS + 1):
+                if not is_fetchable_url(current):
+                    raise DownloadError("not an http(s) URL or blocked host")
+                with client.stream(
+                    "GET",
+                    current,
+                    headers=headers,
+                    timeout=_PDF_TIMEOUT,
+                    follow_redirects=False,
+                ) as resp:
+                    if resp.status_code in {301, 302, 303, 307, 308}:
+                        location = resp.headers.get("location")
+                        if not location:
+                            raise DownloadError(
+                                f"HTTP {resp.status_code} without Location"
+                            )
+                        current = urljoin(str(resp.url), location)
+                        continue
+                    if resp.status_code in _RETRY_STATUSES:
+                        last = f"HTTP {resp.status_code}"
+                        status_fails += 1
+                        if status_fails >= retries:
+                            raise DownloadError(last)
+                        _sleep(resp, attempt)
                         break
-                    _sleep(resp, attempt)
-                    continue
-                if resp.status_code >= 400:
-                    raise DownloadError(f"HTTP {resp.status_code}")
-                chunks: list[bytes] = []
-                total = 0
-                first = b""
-                for chunk in resp.iter_bytes(chunk_size=64 * 1024):
-                    if not first:
-                        first = chunk
-                        if not looks_like_pdf(first):
-                            ctype = resp.headers.get("content-type", "?")
-                            raise DownloadError(f"not a PDF (content-type {ctype})")
-                    chunks.append(chunk)
-                    total += len(chunk)
-                    if total > MAX_PDF_BYTES:
-                        raise DownloadError("file exceeds size cap")
-                content = b"".join(chunks)
-            if len(content) < min_bytes:
-                raise DownloadError(f"too small ({len(content)} bytes)")
-            return Download(
-                content=content,
-                md5=hashlib.md5(content).hexdigest(),
-                final_url=str(resp.url),
-            )
+                    if resp.status_code >= 400:
+                        raise DownloadError(f"HTTP {resp.status_code}")
+                    chunks: list[bytes] = []
+                    total = 0
+                    first = b""
+                    for chunk in resp.iter_bytes(chunk_size=64 * 1024):
+                        if not first:
+                            first = chunk
+                            if not looks_like_pdf(first):
+                                ctype = resp.headers.get("content-type", "?")
+                                raise DownloadError(
+                                    f"not a PDF (content-type {ctype})"
+                                )
+                        chunks.append(chunk)
+                        total += len(chunk)
+                        if total > MAX_PDF_BYTES:
+                            raise DownloadError("file exceeds size cap")
+                    content = b"".join(chunks)
+                    final_url = str(resp.url)
+                if len(content) < min_bytes:
+                    raise DownloadError(f"too small ({len(content)} bytes)")
+                return Download(
+                    content=content,
+                    md5=hashlib.md5(content).hexdigest(),
+                    final_url=final_url,
+                )
+            else:
+                raise DownloadError("too many redirects")
         except DownloadError:
             raise
         except ValueError as exc:
