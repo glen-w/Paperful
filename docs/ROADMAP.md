@@ -196,9 +196,10 @@ Cheap housekeeping (can sit alongside 1.1.x):
   therefore no keywords” figure (`config.example.toml`, `docs/snowball.md`).
 - Local snapshot users: OpenAlex says the change does not touch
   `updated_date`, so incremental syncs miss it. Users of `local_openalex.py`
-  must reload fully from the 14 Oct 2026 snapshot. Document this; have
-  `doctor` warn about older snapshots. Park **2C** (full search / `http`)
-  until someone asks — [OpenAlex snapshot store](#snowball).
+  must reload fully from the 14 Oct 2026 snapshot. **Still open:** `doctor`
+  amber when a configured works dump looks older than that cut (housekeeping;
+  store harden / status / circuit are shipped — [OpenAlex snapshot
+  store](#snowball)). Park **2C** (full search / `http`) until someone asks.
 - Add a before/after snapshot test for keyword-based scoring.
 
 Opportunity (pin to **topic IDs**, never to cached assignments):

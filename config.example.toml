@@ -337,12 +337,15 @@ concurrency = 2
 # SEMANTIC_SCHOLAR_API_KEY is optional and also stays in the environment.
 # The public API is enough until heavy use; request a key, it is not self-serve.
 #
-# Optional. Most users leave this unset — see docs/config.md#advanced.
+# Optional. Most users leave this unset — see docs/config.md (OpenAlex snapshot store).
 # Download or host the OpenAlex parquet snapshot yourself; Paperful does not ship it.
 # DOI/id lookups try the store first. Citing needs a cites index:
 #   paperful openalex-store build-cites
-# then set cites_index_glob. Build is resumable (per updated_date + .done
-# markers). Store cites-query is title-only (display_name).
+# then set cites_index_glob. Build is resumable (per parquet file + .done markers).
+# On a remote host: paperful openalex-store write-build-script --out … && nohup.
+# Check: paperful openalex-store status [--probe] · paperful doctor.
+# Store cites-query is title-only (display_name). Three consecutive store
+# failures disable the snapshot for that client (live API only).
 # When the live API daily budget is spent, DOI/id and citing keep using the store.
 # Keywords / ORCID / full-text search stay API-only.
 # [openalex_store]

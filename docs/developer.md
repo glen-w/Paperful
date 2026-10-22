@@ -142,6 +142,8 @@ is the command's job. Today that is `sync`, `snapshot`, `restore`, and
 | `authorwatch_social.py` | Parse operator-saved RG / LinkedIn / Academia HTML or CSV (no network) | stdlib HTML/CSV |
 | `keepup.py` / `keepup_cites.py` | Alert loop job ledger (`paperful.keepup.v1`); poll watch / authorwatch / collection citers; interval gate; apply + dismiss | `snowball.watch`, `authorwatch`, OpenAlex `works_citing` |
 | `snowball/` | Crawl, hops, watch (`watch apply` from inbox), thin briefing, frontier digest, `trends` (OpenAlex `group_by` year counts). `watch run` does not create library items. Citation-map categories live in `map_categories.py`; library annotate/add/remove in `graph_library.py` | OpenAlex; library protocol only on apply |
+| `snowball/local_openalex.py` | Opt-in parquet `WorksStore` (`ssh_duckdb` / `local_duckdb`), cites-index build, SSH runners, `store_status` | Wired through `OpenAlexClient(store=…)`; not a `snowball_backends` entry |
+| `snowball/openalex.py` | Live OpenAlex client + store-first DOI/id/citing merge, budget latch, store failure circuit | `local_openalex` when configured |
 | `sections/` | IMRaD field extract (`extract-sections`): deterministic split + optional LLM fill | `rag.extract` text cache, `rag.chunk` / `sections.headings`, gated `llm` |
 
 ## The refresh
