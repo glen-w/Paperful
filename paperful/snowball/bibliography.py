@@ -6,12 +6,12 @@ import re
 import tempfile
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import urlparse
 
 import httpx
 from bs4 import BeautifulSoup
 
 from ..pdfid import text_from_pdf
+from ..playbooks import looks_like_pdf_url
 from ..resolve import extract_doi, normalize_doi, title_similarity
 from .fill import FillPaused, s2_api_key, s2_paper
 from .openalex import OpenAlexClient, short_id
@@ -468,25 +468,18 @@ def open_pdf_url(work: dict[str, Any]) -> str:
     oa = work.get("open_access") if isinstance(work.get("open_access"), dict) else {}
     for key in ("oa_url",):
         url = str(oa.get(key) or "").strip()
-        if _looks_like_pdf_url(url):
+        if url.startswith("http") and looks_like_pdf_url(url):
             return url
     loc = work.get("primary_location") if isinstance(work.get("primary_location"), dict) else {}
     for key in ("pdf_url",):
         url = str(loc.get(key) or "").strip()
-        if _looks_like_pdf_url(url):
+        if url.startswith("http") and looks_like_pdf_url(url):
             return url
     # Bronze OA sometimes only has oa_url that is the PDF itself.
     url = str(oa.get("oa_url") or "").strip()
     if url.startswith("http"):
         return url
     return ""
-
-
-def _looks_like_pdf_url(url: str) -> bool:
-    if not url.startswith("http"):
-        return False
-    path = urlparse(url).path.lower()
-    return path.endswith(".pdf") or "/pdf" in path
 
 
 def pdf_payload_for_row(row: Any) -> dict[str, Any] | None:

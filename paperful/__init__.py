@@ -5,15 +5,17 @@ from __future__ import annotations
 
 def _version() -> str:
     try:
-        from importlib.metadata import version
+        from importlib.metadata import PackageNotFoundError, version
 
         return version("paperful")
-    except Exception:
-        import tomllib
+    except (PackageNotFoundError, OSError, ValueError):
         from pathlib import Path
 
+        import tomllib
+
         root = Path(__file__).resolve().parents[1]
-        data = tomllib.loads(root.joinpath("pyproject.toml").read_bytes())
+        with root.joinpath("pyproject.toml").open("rb") as fh:
+            data = tomllib.load(fh)
         return str(data["project"]["version"])
 
 

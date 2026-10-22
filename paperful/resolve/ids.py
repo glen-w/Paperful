@@ -31,7 +31,7 @@ _AGGREGATOR_HOSTS = (
 
 _DOI_META_NAMES = re.compile(
     r"^(?:citation_doi|dc\.identifier|dc\.identifier\.doi|bepress_citation_doi)$",
-    re.I,
+    re.IGNORECASE,
 )
 
 PREPRINT_DOI_PREFIXES = ("10.48550/arxiv.", "10.1101/")
@@ -97,6 +97,16 @@ def normalize_doi(raw: str | None) -> str | None:
     doi = re.split(r"(?i)[.;](?:pmid|pmcid):", doi, maxsplit=1)[0]
     doi = doi.rstrip(_TRAILING_PUNCT_NO_PAREN).rstrip("/")
     return doi.lower()
+
+
+def doi_key(raw: str | None) -> str | None:
+    """Stable set/dict key for a DOI. Prefers normalize_doi; else lowercased text."""
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    return normalize_doi(text) or text.lower()
 
 
 def extract_doi(text: str | None) -> str | None:
@@ -309,7 +319,7 @@ def doi_from_url(url: str | None) -> EnrichMatch | None:
     host = (parsed.hostname or "").lower().removeprefix("www.")
     qs = parse_qs(parsed.query)
     for key in ("doi", "DOI"):
-        if key in qs and qs[key]:
+        if qs.get(key):
             d = normalize_doi(qs[key][0])
             if d:
                 return EnrichMatch(doi=d, source="url")

@@ -1,12 +1,60 @@
 import httpx
 
 from paperful.resolve import (
+    doi_key,
     extract_arxiv_id,
     extract_doi,
     extract_pmid,
     normalize_doi,
     title_similarity,
 )
+
+
+def test_doi_key_normalizes_resolver_prefix():
+    assert doi_key("https://doi.org/10.1016/J.MARPOL.2017.05.011") == doi_key(
+        "10.1016/j.marpol.2017.05.011"
+    )
+    assert doi_key("DOI:10.1080/00908320.2025.2563269") == (
+        "10.1080/00908320.2025.2563269"
+    )
+
+
+def test_doi_key_empty():
+    assert doi_key(None) is None
+    assert doi_key("") is None
+    assert doi_key("   ") is None
+
+
+def test_doi_key_fallback_lower():
+    assert doi_key("NotADoi") == "notadoi"
+
+
+def test_doi_key_set_membership_unifies_resolver_and_bare():
+    """Snowball pause/fill sets must treat resolver URLs and bare DOIs as one key."""
+    blocked = {doi_key("https://doi.org/10.1080/00908320.2025.2563269")}
+    assert doi_key("10.1080/00908320.2025.2563269") in blocked
+    assert doi_key("DOI:10.1080/00908320.2025.2563269") in blocked
+
+
+def test_fill_wanted_uses_doi_key():
+    from paperful.snowball.candidate import Candidate
+    from paperful.snowball.fill import _wanted
+
+    row = Candidate(
+        run_id="r1",
+        seed={},
+        hop=0,
+        direction="refs",
+        ids={"doi": "https://doi.org/10.1080/00908320.2025.2563269"},
+        biblio={},
+        why="",
+        status="new",
+        provenance={},
+        gate="",
+    )
+    only = {doi_key("10.1080/00908320.2025.2563269")}
+    assert _wanted(row, only) is True
+    assert _wanted(row, {"other"}) is False
 
 
 def test_normalize_doi_strips_prefixes_and_case():

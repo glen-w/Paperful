@@ -18,6 +18,7 @@ from paperful import (
     doctor_cmd,
     export_cmd,
     fix_metadata_cmd,
+    htmlpdf_cmd,
     inbox_cmd,
     lint_cmd,
     mirrors_cmd,
@@ -27,8 +28,11 @@ from paperful import (
     reachout_cmd,
     recover_cmd,
     refs_gap_cmd,
+    restore_cmd,
     screen_cmd,
     session_cmd,
+    snapshot_cmd,
+    urls_cmd,
     versions_cmd,
 )
 from paperful import cli
@@ -68,6 +72,12 @@ ENTRIES = [
     ("pack_close", pack_cmd, "run_pack_close", "pack_cmd"),
     ("pack_show", pack_cmd, "run_pack_show", "pack_cmd"),
     ("cache_clean", cache_cmd, "run_cache_clean", "cache_cmd"),
+    ("snapshot", snapshot_cmd, "run_snapshot_cmd", "snapshot_cmd"),
+    ("restore", restore_cmd, "run_restore", "restore_cmd"),
+    ("urls_check", urls_cmd, "run_urls", "urls_cmd"),
+    ("htmlpdf_proposals_list", htmlpdf_cmd, "run_htmlpdf_proposals_list", "htmlpdf_cmd"),
+    ("htmlpdf_proposals_apply", htmlpdf_cmd, "run_htmlpdf_proposals_apply", "htmlpdf_cmd"),
+    ("htmlpdf_proposals_reject", htmlpdf_cmd, "run_htmlpdf_proposals_reject", "htmlpdf_cmd"),
 ]
 
 
@@ -89,11 +99,20 @@ def test_cli_wrapper_delegates_to_cmd(cli_name, mod, entry, pkg):
     assert "write_command_report(" not in src
 
 
-def test_all_dispatch_keeps_typer_wrappers():
+def test_all_dispatch_uses_cmd_modules_not_cli():
     src = inspect.getsource(all_cmd._dispatch_all_step)
-    assert "cli_mod.lint" in src
-    assert "cli_mod.run" in src
-    assert "cli_mod.gaps" in src
+    assert "run_lint" in src
+    assert "run_ocr" in src
+    assert "run_fix_metadata" in src
+    assert "run_dedupe" in src
+    assert "run_summarize" in src
+    assert "run_synthesize" in src
+    assert "run_snapshot_cmd" in src
+    assert "run_restore" in src
+    assert "run_gaps_command" in src
+    assert "run_run_command" in src
+    assert "cli_mod." not in src
+    assert "import cli" not in src
 
 
 def test_cli_dispatch_alias_forwards():

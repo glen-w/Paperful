@@ -12,12 +12,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlparse
 
 from .config import Config
 from .download import looks_like_pdf
 from .library import LibraryBackend, LibraryError
 from .pdfid import probe_pdf_bytes, short_pdf_verdict
+from .playbooks import looks_like_pdf_url
 from .provenance import provenance_stamp
 from .store import (
     STATUS_ATTACHED,
@@ -102,16 +102,11 @@ def classify_missing_hint(
         for a in attempts
     )
     found = any(":found" in a for a in attempts)
-    if url and (_url_looks_like_pdf(url) or (found and soft)):
+    if url and (looks_like_pdf_url(url) or (found and soft)):
         return HINT_OPENABLE
     if doi:
         return HINT_DOI
     return HINT_HARD
-
-
-def _url_looks_like_pdf(url: str) -> bool:
-    path = urlparse(url).path.lower()
-    return path.endswith(".pdf") or "/downloadpdf/" in path or "/pdf/" in path
 
 
 def apply_rg_handoff(
@@ -220,7 +215,7 @@ def missing_from_run_outcomes(
         url = (item.url or "").strip() or str(row.get("url") or "")
         reason = str(row.get("reason") or "")
         hint = classify_missing_hint(doi=item.doi, url=url, attempts=attempts)
-        if reason == "soft block" or soft_attempts(attempts) or _url_looks_like_pdf(url):
+        if reason == "soft block" or soft_attempts(attempts) or looks_like_pdf_url(url):
             hint = HINT_OPENABLE
         scholar_url = _scholar_results_url(item, cfg)
         if hint != HINT_OPENABLE:

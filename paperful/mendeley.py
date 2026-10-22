@@ -18,7 +18,8 @@ import httpx
 
 from .attach import AttachResult, attach_failure_code
 from .config import Config
-from .exclude import ExcludeDenied, ExcludeGuard, filter_library_scope_items
+from .exclude import filter_library_scope_items
+from .exclude_backend import ExcludeMixin
 from .interop.types import mendeley_to_zotero, zotero_to_mendeley
 from .library import ChangeSet, LibraryError
 from .resolve import extract_arxiv_id, extract_doi, extract_pmid, normalize_doi
@@ -409,7 +410,7 @@ def _retry_after(resp: httpx.Response) -> float:
         return 5.0
 
 
-class MendeleyBackend:
+class MendeleyBackend(ExcludeMixin):
     """Live Mendeley library via REST. Folders map to paperful collections."""
 
     def __init__(self, cfg: Config, client: MendeleyClient | None = None):
@@ -419,34 +420,9 @@ class MendeleyBackend:
         self._folder_docs: dict[str, set[str]] | None = None
         self._docs: dict[str, dict[str, Any]] | None = None
 
-    def _exclude_guard(self) -> ExcludeGuard:
-        rules = getattr(self.cfg, "exclude_rules", ()) or ()
-        if not rules:
-            return ExcludeGuard.empty()
-        return ExcludeGuard(rules, self.collections())
-
-    def _deny_excluded(self, exc: ExcludeDenied) -> None:
-        raise LibraryError(exc.message) from exc
-
     def _item_collection_keys(self, item_key: str) -> list[str]:
         membership = self._folder_membership()
         return sorted(fid for fid, members in membership.items() if item_key in members)
-
-    def _check_item_op(self, op: str, item_key: str) -> None:
-        if not (getattr(self.cfg, "exclude_rules", ()) or ()):
-            return
-        try:
-            self._exclude_guard().check_item(op, self._item_collection_keys(item_key))
-        except ExcludeDenied as exc:
-            self._deny_excluded(exc)
-
-    def _check_collection_op(self, op: str, collection_key: str) -> None:
-        if not (getattr(self.cfg, "exclude_rules", ()) or ()):
-            return
-        try:
-            self._exclude_guard().check_collection(op, collection_key)
-        except ExcludeDenied as exc:
-            self._deny_excluded(exc)
 
     def ping(self) -> dict[str, Any]:
         return self.client.ping()
@@ -968,10 +944,7 @@ class MendeleyBackend:
         parts = [p for p in path.strip("/").split("/") if p]
         if not parts:
             raise LibraryError(f"empty folder path {path!r}")
-        try:
-            self._exclude_guard().check_path("ensure_path", "/".join(parts))
-        except ExcludeDenied as exc:
-            self._deny_excluded(exc)
+        self._check_path_op("ensure_path", "/".join(parts))
         parent: str | None = None
         built: list[str] = []
         for part in parts:
@@ -983,10 +956,7 @@ class MendeleyBackend:
                 self._check_collection_op("ensure_path", found.key)
                 parent = found.key
                 continue
-            try:
-                self._exclude_guard().check_path("ensure_path", sofar)
-            except ExcludeDenied as exc:
-                self._deny_excluded(exc)
+            self._check_path_op("ensure_path", sofar)
             body: dict[str, Any] = {"name": part}
             if parent:
                 body["parent_id"] = parent

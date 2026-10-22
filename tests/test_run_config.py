@@ -348,24 +348,23 @@ def test_all_dry_run_skips_summarize_and_closes_pack(stubbed, tmp_path):
 
 
 def test_all_stops_on_first_failure(stubbed, monkeypatch, tmp_path):
+    from paperful import gaps_cmd, lint_cmd, run_cmd
+
     order: list[str] = []
 
-    def fail_run(**kwargs):
+    def fail_run(console, **kwargs):
         order.append("run")
         raise typer.Exit(1)
 
-    def lint_spy(**kwargs):
+    def lint_spy(console, **kwargs):
         order.append("lint")
 
-    real_gaps = cli.gaps
-
-    def gaps_spy(**kwargs):
+    def gaps_spy(console, **kwargs):
         order.append("gaps")
-        return real_gaps(**kwargs)
 
-    monkeypatch.setattr(cli, "gaps", gaps_spy)
-    monkeypatch.setattr(cli, "run", fail_run)
-    monkeypatch.setattr(cli, "lint", lint_spy)
+    monkeypatch.setattr(gaps_cmd, "run_gaps_command", gaps_spy)
+    monkeypatch.setattr(run_cmd, "run_run_command", fail_run)
+    monkeypatch.setattr(lint_cmd, "run_lint", lint_spy)
     res = runner.invoke(cli.app, ["all", "-c", str(stubbed), "-C", "BBNJ"])
     assert res.exit_code == 1, res.stdout
     assert order == ["gaps", "run"]
@@ -449,7 +448,7 @@ def test_all_summarize_passes_order_none():
     from paperful import all_cmd
 
     src = inspect.getsource(all_cmd._dispatch_all_step)
-    assert "order=None" in src
+    assert "order_value=None" in src
     assert "max_new=None" in src
     assert "max_minutes=None" in src
 
@@ -519,17 +518,19 @@ def test_resolve_run_config_run_extras(tmp_path):
 
 
 def test_all_forwards_run_flags(stubbed, monkeypatch):
+    from paperful import gaps_cmd, run_cmd
+
     captured: dict = {}
 
-    def run_spy(**kwargs):
+    def run_spy(console, **kwargs):
         captured.update(kwargs)
         raise typer.Exit(0)
 
-    def gaps_spy(**kwargs):
+    def gaps_spy(console, **kwargs):
         raise typer.Exit(0)
 
-    monkeypatch.setattr(cli, "run", run_spy)
-    monkeypatch.setattr(cli, "gaps", gaps_spy)
+    monkeypatch.setattr(run_cmd, "run_run_command", run_spy)
+    monkeypatch.setattr(gaps_cmd, "run_gaps_command", gaps_spy)
     res = runner.invoke(
         cli.app,
         [
@@ -557,19 +558,23 @@ def test_all_forwards_run_flags(stubbed, monkeypatch):
 
 
 def test_all_after_handoff_gaps_step(stubbed, monkeypatch):
+    from paperful import gaps_cmd, lint_cmd, run_cmd
+
     order: list[str] = []
 
-    def gaps_spy(**kwargs):
+    def gaps_spy(console, **kwargs):
         order.append(f"gaps:{kwargs.get('list_missing')}:{kwargs.get('handoff')}")
         raise typer.Exit(0)
 
-    def run_spy(**kwargs):
+    def run_spy(console, **kwargs):
         order.append("run")
         raise typer.Exit(0)
 
-    monkeypatch.setattr(cli, "gaps", gaps_spy)
-    monkeypatch.setattr(cli, "run", run_spy)
-    monkeypatch.setattr(cli, "lint", lambda **k: (_ for _ in ()).throw(typer.Exit(0)))
+    monkeypatch.setattr(gaps_cmd, "run_gaps_command", gaps_spy)
+    monkeypatch.setattr(run_cmd, "run_run_command", run_spy)
+    monkeypatch.setattr(
+        lint_cmd, "run_lint", lambda console, **k: (_ for _ in ()).throw(typer.Exit(0))
+    )
     res = runner.invoke(
         cli.app,
         [

@@ -429,3 +429,130 @@ def test_backend_ensure_path_and_notes_denied(tmp_path: Path):
         backend.create_or_update_note("ITEM1", "<p>x</p>", "paperful-summary")
     with pytest.raises(LibraryError, match="excluded"):
         backend.create_or_update_collection_note("HAND", "<p>x</p>", ["paperful-report"])
+
+
+def test_mendeley_add_denied_full(tmp_path: Path):
+    from paperful.mendeley import MendeleyBackend
+
+    cfg = Config(
+        email="t@example.org",
+        out_dir=tmp_path / "out",
+        state_dir=tmp_path / "state",
+        exclude_rules=(ExcludeRule(path="Hand curated", mode="full"),),
+    )
+
+    class FakeClient:
+        def post(self, *args, **kwargs):
+            raise AssertionError("should not write")
+
+    backend = MendeleyBackend(cfg, client=FakeClient())
+    backend.collections = lambda: _cols()  # type: ignore[method-assign]
+    backend._folder_membership = lambda: {"HAND": set(), "WORK": set()}  # type: ignore[method-assign]
+    with pytest.raises(LibraryError, match="excluded"):
+        backend.add_to_collection("DOC1", "HAND")
+
+
+def test_mendeley_add_allowed_add_only(tmp_path: Path):
+    from paperful.mendeley import MendeleyBackend
+
+    cfg = Config(
+        email="t@example.org",
+        out_dir=tmp_path / "out",
+        state_dir=tmp_path / "state",
+        exclude_rules=(
+            parse_exclude_rule({"path": "Inbox/Staging", "mode": "add_only"}),
+        ),
+    )
+    posted: list[tuple] = []
+
+    class FakeClient:
+        def post(self, path, **kwargs):
+            posted.append((path, kwargs.get("body")))
+            return {"id": "DOC1"}
+
+    backend = MendeleyBackend(cfg, client=FakeClient())
+    backend.collections = lambda: _cols()  # type: ignore[method-assign]
+    backend._folder_membership = lambda: {"STAGE": set()}  # type: ignore[method-assign]
+    backend.add_to_collection("DOC1", "STAGE")
+    assert posted == [("/folders/STAGE/documents", {"id": "DOC1"})]
+
+
+def test_mendeley_patch_denied_when_item_in_excluded(tmp_path: Path):
+    from paperful.mendeley import MendeleyBackend
+
+    cfg = Config(
+        email="t@example.org",
+        out_dir=tmp_path / "out",
+        state_dir=tmp_path / "state",
+        exclude_rules=(ExcludeRule(path="Hand curated", mode="full"),),
+    )
+
+    class FakeClient:
+        def patch(self, *args, **kwargs):
+            raise AssertionError("should not write")
+
+    backend = MendeleyBackend(cfg, client=FakeClient())
+    backend.collections = lambda: _cols()  # type: ignore[method-assign]
+    backend._item_collection_keys = lambda key: ["HAND"]  # type: ignore[method-assign]
+    with pytest.raises(LibraryError, match="excluded"):
+        backend.apply_patch("DOC1", {"title": "X"})
+
+
+def test_endnote_create_parent_denied(tmp_path: Path):
+    from paperful.endnote import EndNoteBackend
+    from tests.test_endnote import make_endnote_library
+
+    cfg = Config(
+        email="t@example.org",
+        out_dir=tmp_path / "out",
+        state_dir=tmp_path / "state",
+        exclude_rules=(ExcludeRule(path="Hand curated", mode="full"),),
+    )
+    cfg.endnote_library = make_endnote_library(tmp_path)
+    backend = EndNoteBackend(cfg)
+    backend.collections = lambda: _cols()  # type: ignore[method-assign]
+    with pytest.raises(LibraryError, match="excluded"):
+        backend.create_parent(
+            {
+                "collections": ["HAND"],
+                "title": "T",
+                "itemType": "journalArticle",
+            }
+        )
+
+
+def test_endnote_ensure_path_denied(tmp_path: Path):
+    from paperful.endnote import EndNoteBackend
+    from tests.test_endnote import make_endnote_library
+
+    cfg = Config(
+        email="t@example.org",
+        out_dir=tmp_path / "out",
+        state_dir=tmp_path / "state",
+        exclude_rules=(ExcludeRule(path="Hand curated", mode="full"),),
+    )
+    cfg.endnote_library = make_endnote_library(tmp_path)
+    backend = EndNoteBackend(cfg)
+    backend.collections = lambda: _cols()  # type: ignore[method-assign]
+    with pytest.raises(LibraryError, match="excluded"):
+        backend.ensure_collection_path("Hand curated/NewChild")
+
+
+def test_endnote_attach_denied(tmp_path: Path):
+    from paperful.endnote import EndNoteBackend
+    from tests.test_endnote import make_endnote_library
+
+    cfg = Config(
+        email="t@example.org",
+        out_dir=tmp_path / "out",
+        state_dir=tmp_path / "state",
+        exclude_rules=(ExcludeRule(path="Hand curated", mode="full"),),
+    )
+    cfg.endnote_library = make_endnote_library(tmp_path)
+    backend = EndNoteBackend(cfg)
+    backend.collections = lambda: _cols()  # type: ignore[method-assign]
+    backend._item_collection_keys = lambda key: ["HAND"]  # type: ignore[method-assign]
+    pdf = tmp_path / "x.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+    with pytest.raises(LibraryError, match="excluded"):
+        backend.attach("ITEM1", pdf)

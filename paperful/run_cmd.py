@@ -297,3 +297,149 @@ def run_fetch(
             downloads_dir=downloads_dir,
             re_request=re_request,
         )
+
+
+def run_run_command(
+    console: Console,
+    *,
+    collection: list[str],
+    library: bool | None,
+    dry_run: bool,
+    year_from: int | None,
+    year_to: int | None,
+    item_type: list[str],
+    limit: int | None,
+    no_attach: bool | None,
+    retry_failed: bool | None,
+    try_all: bool | None,
+    sources: str | None,
+    preset: str | None,
+    scihub: bool | None,
+    ezproxy_relogin: bool | None,
+    browser_agent: bool | None,
+    camofox: bool | None,
+    upgrade_linked: bool | None,
+    upgrade_snapshot: bool | None,
+    keep_snapshot: bool,
+    htmlpdf_mode: str | None,
+    serpapi_max: int | None,
+    strict_pdf_doi: bool | None,
+    handoff: str | None,
+    include_doi_tabs: bool,
+    downloads_dir: Path | None,
+    request_rg: bool | None,
+    re_request: bool,
+    twenty_writeback: bool | None,
+    promote: str | None,
+    profile: str | None,
+    run_config: Path | None,
+    config: Path | None,
+    fmt: str,
+) -> None:
+    """Flag-level entry for ``paperful run`` (and ``all`` dispatch)."""
+    from . import cli_runtime as cli_mod
+    from .author_request import apply_request_rg_override
+
+    if cli_mod._scope_unset(collection, library, profile, run_config):
+        cli_mod._refuse_missing_scope()
+    cfg = cli_mod._cfg(config)
+    apply_request_rg_override(cfg, request_rg)
+    twenty_writeback = cli_mod._typer_opt(twenty_writeback)
+    promote = cli_mod._typer_opt(promote)
+    upgrade_snapshot = cli_mod._typer_opt(upgrade_snapshot)
+    keep_snapshot = cli_mod._typer_opt(keep_snapshot, False)
+    htmlpdf_mode = cli_mod._typer_opt(htmlpdf_mode)
+    if twenty_writeback is not None:
+        cfg.twenty_writeback_listings = twenty_writeback
+    json_out = cli_mod._agent_json(fmt)
+    if isinstance(promote, str):
+        from .config import parse_playbooks_promote
+
+        try:
+            cfg.playbooks_promote = parse_playbooks_promote(promote)
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(2)
+    bound = cli_mod._bind_run(
+        cfg,
+        use_run_policy=True,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=limit,
+        no_attach=no_attach,
+        retry_failed=retry_failed,
+        try_all=try_all,
+        sources=sources,
+        preset=preset,
+        scihub=scihub,
+        upgrade_linked=upgrade_linked,
+        upgrade_snapshot=upgrade_snapshot if isinstance(upgrade_snapshot, bool) else None,
+        strict_pdf_doi=strict_pdf_doi,
+    )
+    collection, library, year_from, year_to, item_type = cli_mod._take_scope(bound)
+    limit = bound.limit
+    no_attach = bound.no_attach
+    retry_failed = bound.retry_failed
+    try_all = bound.try_all
+    sources = bound.sources_csv
+    preset = bound.preset
+    scihub = bound.scihub
+    upgrade_linked = bound.upgrade_linked
+    strict_pdf_doi = bound.strict_pdf_doi
+    if isinstance(htmlpdf_mode, str) and htmlpdf_mode.strip():
+        from .config import _one_of
+
+        try:
+            cfg.htmlpdf_academic = _one_of(
+                "--htmlpdf", htmlpdf_mode, ("off", "gated", "auto")
+            )
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(2)
+    if isinstance(serpapi_max, int):
+        cfg.serpapi_max_calls = max(0, serpapi_max)
+    if isinstance(upgrade_snapshot, bool):
+        want_snapshot_upgrade = upgrade_snapshot
+    elif bound.upgrade_snapshot is not None:
+        want_snapshot_upgrade = bound.upgrade_snapshot
+    else:
+        want_snapshot_upgrade = cfg.htmlpdf_upgrade
+    if keep_snapshot:
+        cfg.htmlpdf_keep_snapshot = True
+    # `all` calls this with real bools/None; only an explicit bool overrides config.
+    relogin = (
+        ezproxy_relogin if isinstance(ezproxy_relogin, bool) else cfg.ezproxy_relogin
+    )
+    run_fetch(
+        console,
+        cfg,
+        collection=collection,
+        library=library,
+        dry_run=dry_run,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=limit,
+        no_attach=no_attach,
+        retry_failed=retry_failed,
+        try_all=try_all,
+        sources=sources,
+        preset=preset,
+        scihub=scihub,
+        relogin=relogin,
+        browser_agent=browser_agent,
+        upgrade_linked=upgrade_linked,
+        want_snapshot_upgrade=want_snapshot_upgrade,
+        strict_pdf_doi=strict_pdf_doi,
+        handoff=handoff,
+        include_doi_tabs=include_doi_tabs,
+        downloads_dir=downloads_dir,
+        re_request=re_request,
+        json_out=json_out,
+        camofox=camofox,
+    )

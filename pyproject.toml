@@ -88,7 +88,25 @@ packages = ["paperful"]
 
 [tool.hatch.build.targets.sdist]
 # Personal config (email), runtime state/output and editor files never ship.
-exclude = ["config.toml", "out/", "state/", "packs/", ".cursor/", ".claude/", ".coverage", "*.log"]
+# Keep the sdist lean: wheel already ships the package; skip lockfile, site
+# marketing assets, and Sphinx static captures (duplicated logos/screenshots).
+exclude = [
+    "config.toml",
+    "out/",
+    "state/",
+    "packs/",
+    ".cursor/",
+    ".claude/",
+    ".coverage",
+    "*.log",
+    "uv.lock",
+    "website/",
+    "paperful-cloud/",
+    "docs/_static/",
+    "docs/logo.png",
+    "docs/logo-dark.png",
+    "docs/icon.png",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

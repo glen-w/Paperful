@@ -11,6 +11,7 @@ from rich.console import Console
 from .pack import PackError, close_pack, current_id, open_pack, pack_join_disabled
 from .run_config import ResolvedRunConfig
 
+
 def run_all(
     console: Console,
     *,
@@ -156,6 +157,7 @@ def run_all(
                 if json_out:
                     with suppress_stdout():
                         _dispatch_all_step(
+                            console,
                             step,
                             bound,
                             scope,
@@ -169,6 +171,7 @@ def run_all(
                         )
                 else:
                     _dispatch_all_step(
+                        console,
                         step,
                         bound,
                         scope,
@@ -234,6 +237,7 @@ def _run_downloads_dir(bound: ResolvedRunConfig) -> Path | None:
 
 
 def _dispatch_all_step(
+    console: Console,
     step: str,
     bound: ResolvedRunConfig,
     scope: dict[str, Any],
@@ -244,11 +248,22 @@ def _dispatch_all_step(
     serpapi_max: int | None = None,
     json_out: bool = False,
 ) -> None:
-    from . import cli as cli_mod
+    from .dedupe_cmd import run_dedupe
+    from .fix_metadata_cmd import run_fix_metadata
+    from .gaps_cmd import run_gaps_command
+    from .lint_cmd import run_lint
+    from .ocr_cmd import run_ocr
+    from .restore_cmd import run_restore
+    from .run_cmd import run_run_command
+    from .snapshot_cmd import run_snapshot_cmd
+    from .summarize_cmd import run_summarize
+    from .synthesize_cmd import run_synthesize
+
     fmt = "json" if json_out else "text"
     if step == "gaps":
         _call_step(
-            cli_mod.gaps,
+            run_gaps_command,
+            console=console,
             **scope,
             as_json=False,
             list_missing=False,
@@ -263,7 +278,8 @@ def _dispatch_all_step(
         return
     if step == "gaps_handoff":
         _call_step(
-            cli_mod.gaps,
+            run_gaps_command,
+            console=console,
             **scope,
             as_json=False,
             list_missing=True,
@@ -278,7 +294,8 @@ def _dispatch_all_step(
         return
     if step == "run":
         _call_step(
-            cli_mod.run,
+            run_run_command,
+            console=console,
             **scope,
             dry_run=dry_run,
             limit=bound.limit,
@@ -308,11 +325,20 @@ def _dispatch_all_step(
         )
         return
     if step == "lint":
-        _call_step(cli_mod.lint, **scope, limit=bound.limit, as_json=False, strict=False, fmt=fmt)
+        _call_step(
+            run_lint,
+            console=console,
+            **scope,
+            limit=bound.limit,
+            as_json=False,
+            strict=False,
+            fmt=fmt,
+        )
         return
     if step == "fix-metadata":
         _call_step(
-            cli_mod.fix_metadata,
+            run_fix_metadata,
+            console=console,
             **scope,
             limit=bound.limit,
             offset=0,
@@ -323,11 +349,12 @@ def _dispatch_all_step(
         return
     if step == "ocr":
         _call_step(
-            cli_mod.ocr,
+            run_ocr,
+            console=console,
             **scope,
             item=[],
             limit=bound.limit,
-            apply=False if dry_run else bound.apply,
+            apply=False if dry_run else bool(bound.apply),
             attach=False,
             max_minutes=None,
             fmt=fmt,
@@ -335,26 +362,36 @@ def _dispatch_all_step(
         return
     if step == "summarize":
         _call_step(
-            cli_mod.summarize,
+            run_summarize,
+            console=console,
             **scope,
             item=[],
             limit=bound.limit,
             apply=bound.apply,
-            to=None,
+            to_dest=None,
             prompt=None,
             force=False,
-            order=None,
+            order_value=None,
             max_new=None,
             max_minutes=None,
+            collections_file=None,
             fmt=fmt,
         )
         return
     if step == "snapshot":
-        _call_step(cli_mod.snapshot, **scope, limit=bound.limit, dry_run=dry_run, pdfs=None)
+        _call_step(
+            run_snapshot_cmd,
+            console=console,
+            **scope,
+            limit=bound.limit,
+            dry_run=dry_run,
+            pdfs=None,
+        )
         return
     if step == "dedupe":
         _call_step(
-            cli_mod.dedupe,
+            run_dedupe,
+            console=console,
             **scope,
             limit=bound.limit,
             dry_run=dry_run,
@@ -367,7 +404,8 @@ def _dispatch_all_step(
         return
     if step == "restore":
         _call_step(
-            cli_mod.restore,
+            run_restore,
+            console=console,
             **scope,
             limit=bound.limit,
             dry_run=dry_run,
@@ -377,10 +415,11 @@ def _dispatch_all_step(
         return
     if step == "synthesize":
         _call_step(
-            cli_mod.synthesize,
+            run_synthesize,
+            console=console,
             **scope,
             item=[],
-            to=None,
+            to_dest=None,
             report_collection=None,
             prompt=None,
             dry_run=dry_run,
@@ -389,6 +428,7 @@ def _dispatch_all_step(
             fmt=fmt,
         )
         return
-    cli_mod.console.print(f"[red]Unknown step {step!r}.[/]")
+    console.print(f"[red]Unknown step {step!r}.[/]")
     raise typer.Exit(1)
+
 

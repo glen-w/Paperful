@@ -5,12 +5,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from paperful.config import load_config
+import pytest
+
 from paperful.playbooks import (
     GreyPlaybook,
     apply_rewrite,
     apply_synthesize,
     load_builtin_pack,
     load_pack_dir,
+    looks_like_pdf_url,
     merge_playbooks,
     rewrite_playbook_name,
     scrape_playbooks_for_host,
@@ -35,6 +38,18 @@ _NAMED_PACKS = (
     "bbnj-doalos-prepcom",
     "isa-deepdata",
 )
+
+
+@pytest.mark.parametrize(
+    "url,want",
+    [
+        ("https://ex.org/a.pdf", True),
+        ("https://ex.org/pdf/123", True),
+        ("https://ex.org/article/123", False),
+    ],
+)
+def test_looks_like_pdf_url_cases(url, want):
+    assert looks_like_pdf_url(url) is want
 
 
 def test_builtin_ocean_pack_loads():

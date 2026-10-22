@@ -47,6 +47,12 @@ RUNTIME_CLIENTS = [
     "mirrors_cmd.py",
     "pack_cmd.py",
     "cache_cmd.py",
+    "all_cmd.py",
+    "gaps_cmd.py",
+    "urls_cmd.py",
+    "htmlpdf_cmd.py",
+    "snapshot_cmd.py",
+    "restore_cmd.py",
 ]
 
 
@@ -78,11 +84,11 @@ def test_cmd_modules_do_not_import_cli(rel: str):
     assert not _imports_cli(path), f"{rel} still imports paperful.cli"
 
 
-def test_all_cmd_dispatch_still_imports_cli():
+def test_all_cmd_dispatch_uses_runtime_not_cli():
     path = PAPERFUL / "all_cmd.py"
     src = path.read_text(encoding="utf-8")
-    assert "from . import cli as cli_mod" in src
     assert "from . import cli_runtime as cli_mod" in src
+    assert "from . import cli as cli_mod" not in src
 
 
 def test_cli_reexports_runtime_helpers():

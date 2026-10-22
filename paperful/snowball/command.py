@@ -18,7 +18,7 @@ from ..dedupe import normalize_dedupe_title
 from ..catalogue import open_library
 from ..library import LibraryError
 from ..identity import library_lookup, merge_tags
-from ..resolve import normalize_doi
+from ..resolve import doi_key, normalize_doi
 from .candidate import Candidate
 from .crawl import NoKeywordSeeds, doi_candidates, hybrid_candidates, orcid_candidates, search_candidates
 from .expand import (
@@ -1951,11 +1951,11 @@ def _approve_each(
 
 
 def _blocked_dois(paused: dict[str, list[str]]) -> set[str]:
-    return {doi.lower() for ids in paused.values() for doi in ids if doi}
+    return {k for ids in paused.values() for doi in ids if (k := doi_key(doi))}
 
 
 def _settled_rows(rows: list[Candidate], blocked: set[str]) -> list[Candidate]:
-    return [row for row in rows if (row.ids.get("doi") or "").lower() not in blocked]
+    return [row for row in rows if doi_key(row.ids.get("doi")) not in blocked]
 
 
 def _fill_metadata(
@@ -2001,7 +2001,10 @@ def _fill_metadata(
         from .bibliography import pdf_payload_for_row
 
         def pdf_getter(doi: str, _rows: list[Candidate] = rows) -> dict | None:  # type: ignore[no-redef]
-            match = next((row for row in _rows if (row.ids.get("doi") or "").lower() == doi.lower()), None)
+            match = next(
+                (row for row in _rows if doi_key(row.ids.get("doi")) == doi_key(doi)),
+                None,
+            )
             return pdf_payload_for_row(match) if match is not None else None
 
     paused = run_fill_pass(

@@ -1320,83 +1320,17 @@ def urls_check(
     fmt: str = AgentFormatOpt,
 ) -> None:
     """HEAD/GET metadata and linked-PDF URLs. Report only unless --apply."""
-    import httpx
+    from .urls_cmd import run_urls
 
-    from .agent_json import envelope
-    from .urls import probe_target, targets_for_item
-
-    if _scope_unset(collection, library, None, None):
-        _refuse_missing_scope()
-    started = time.time()
-    cfg = _cfg(config)
-    json_out = _agent_json(fmt)
-    _require_manager(cfg)
-    backend = _connect(cfg, quiet=json_out)
-    keys, scope = _scope_keys(backend, collection, library)
-    items = backend.items_in_scope(keys)
-    if limit:
-        items = items[:limit]
-    findings = []
-    applied = 0
-    refused = 0
-    with httpx.Client(follow_redirects=True, timeout=8.0) as client:
-        for item in items:
-            children = []
-            if hasattr(backend, "children"):
-                try:
-                    children = backend.children(item.key)
-                except Exception:
-                    children = []
-            for target in targets_for_item(item, children):
-                finding = probe_target(
-                    client, target, playbooks=cfg.grey_playbooks
-                )
-                row = finding.to_dict()
-                if apply:
-                    patch_key = (
-                        finding.attachment_key
-                        if finding.role == "linked_pdf" and finding.attachment_key
-                        else item.key if finding.role == "parent" else ""
-                    )
-                    if not finding.rewrite or not patch_key or not backend.supports_write():
-                        refused += 1
-                        row["apply"] = "refused"
-                    else:
-                        backend.apply_patch(patch_key, {"url": finding.rewrite})
-                        applied += 1
-                        row["apply"] = "rewritten"
-                findings.append(row)
-    summary = {
-        "scope": scope,
-        "checked": len(findings),
-        "applied": applied,
-        "refused": refused,
-    }
-    for code in ("ok", "redirect", "soft_404", "hard_dead", "paywall_html"):
-        summary[code] = sum(1 for row in findings if row["code"] == code)
-    write_command_report(
-        cfg,
-        command="urls",
-        scope=scope,
-        summary=summary,
-        items=findings,
-        flags={"apply": apply},
-        started=started,
+    run_urls(
+        console,
+        collection=collection,
+        library=library,
+        apply=apply,
+        limit=limit,
+        config=config,
+        fmt=fmt,
     )
-    payload = envelope(command="urls check", summary=summary, items=findings, flags={"apply": apply})
-
-    def _human() -> None:
-        table = Table(title="URL health")
-        table.add_column("code")
-        table.add_column("item")
-        table.add_column("url")
-        for row in findings:
-            table.add_row(row["code"], row["item_key"], row["url"][:80])
-        console.print(table)
-        if apply:
-            console.print(f"Rewrote {applied}. Refused {refused} (no known playbook rewrite).")
-
-    _emit_agent(payload, json_out=json_out, human=_human)
 
 @htmlpdf_proposals_app.command("list")
 def htmlpdf_proposals_list(
@@ -1404,33 +1338,11 @@ def htmlpdf_proposals_list(
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
-    from .agent_json import envelope
-    from .sources.htmlpdf import list_proposals
+    from .htmlpdf_cmd import run_htmlpdf_proposals_list
 
-    cfg = _cfg(config)
-    json_out = _agent_json(fmt)
-    want = None if status == "all" else status
-    rows = list_proposals(cfg, status=want)
-    payload = envelope(
-        command="htmlpdf proposals list",
-        summary={"count": len(rows)},
-        items=rows,
-        flags={"status": status},
+    run_htmlpdf_proposals_list(
+        console, status=status, config=config, fmt=fmt
     )
-
-    def _human() -> None:
-        if not rows:
-            console.print("No HTML snapshot proposals.")
-            return
-        table = Table(title="htmlpdf proposals")
-        table.add_column("id")
-        table.add_column("item")
-        table.add_column("status")
-        for row in rows:
-            table.add_row(str(row.get("id")), str(row.get("item_key")), str(row.get("status")))
-        console.print(table)
-
-    _emit_agent(payload, json_out=json_out, human=_human)
 
 @htmlpdf_proposals_app.command("apply")
 def htmlpdf_proposals_apply(
@@ -1438,47 +1350,11 @@ def htmlpdf_proposals_apply(
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
-    from .agent_json import envelope
-    from .provenance import provenance_stamp
-    from .sources.htmlpdf import load_proposal, mark_applied, proposal_gate
+    from .htmlpdf_cmd import run_htmlpdf_proposals_apply
 
-    cfg = _cfg(config)
-    json_out = _agent_json(fmt)
-    _require_manager(cfg)
-    backend = _connect(cfg, quiet=json_out)
-    if not backend.supports_write():
-        _exit_env("htmlpdf proposals apply needs library write support.", cfg)
-    _path, payload_row = load_proposal(cfg, proposal_id)
-    if payload_row.get("status") != "pending":
-        console.print(f"[red]Proposal {proposal_id} is {payload_row.get('status') or 'not pending'}.[/]")
-        raise typer.Exit(1)
-    refusal = proposal_gate(payload_row)
-    if refusal:
-        console.print(f"[red]Proposal {proposal_id} failed the page gate ({refusal}).[/]")
-        raise typer.Exit(1)
-    pdf = Path(str(payload_row.get("pdf") or ""))
-    item_key = str(payload_row.get("item_key") or "")
-    if not pdf.is_file() or not item_key:
-        console.print("[red]Proposal is missing a PDF or item key.[/]")
-        raise typer.Exit(1)
-    note = provenance_stamp("htmlpdf")
-    result = backend.attach(item_key, pdf, note=note)
-    if not result.ok:
-        console.print(f"[red]{result.reason}[/]")
-        raise typer.Exit(1)
-    data = mark_applied(cfg, proposal_id, item_key=item_key)
-    _flush(backend)
-    payload = envelope(
-        command="htmlpdf proposals apply",
-        summary={"id": proposal_id, "item_key": item_key},
-        items=[data],
-        flags={"apply": True},
+    run_htmlpdf_proposals_apply(
+        console, proposal_id=proposal_id, config=config, fmt=fmt
     )
-
-    def _human_apply() -> None:
-        console.print(f"Attached snapshot {proposal_id} → {item_key}")
-
-    _emit_agent(payload, json_out=json_out, human=_human_apply)
 
 @htmlpdf_proposals_app.command("reject")
 def htmlpdf_proposals_reject(
@@ -1486,26 +1362,11 @@ def htmlpdf_proposals_reject(
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
-    from .agent_json import envelope
-    from .sources.htmlpdf import reject_proposal
+    from .htmlpdf_cmd import run_htmlpdf_proposals_reject
 
-    cfg = _cfg(config)
-    json_out = _agent_json(fmt)
-    try:
-        data = reject_proposal(cfg, proposal_id)
-    except FileNotFoundError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1) from exc
-    payload = envelope(
-        command="htmlpdf proposals reject",
-        summary={"id": proposal_id, "status": "rejected"},
-        items=[data],
+    run_htmlpdf_proposals_reject(
+        console, proposal_id=proposal_id, config=config, fmt=fmt
     )
-
-    def _human_reject() -> None:
-        console.print(f"Rejected proposal {proposal_id}")
-
-    _emit_agent(payload, json_out=json_out, human=_human_reject)
 
 @app.command()
 def gaps(
@@ -1557,64 +1418,27 @@ def gaps(
     Points at `run` (PDFs) and `lint` (identifiers). Does not write the library
     unless ``--handoff walk`` or ``--handoff watch`` attaches files.
     """
-    from .gaps_cmd import run_gaps
-    from .handoff import parse_handoff
+    from .gaps_cmd import run_gaps_command
 
-    if _scope_unset(collection, library, profile, run_config):
-        _refuse_missing_scope()
-    cfg = _cfg(config)
-    from .author_request import apply_request_rg_override
-
-    apply_request_rg_override(cfg, request_rg)
-    json_out, as_json = _agent_wins(fmt, as_json)
-    bound = _bind_run(
-        cfg,
-        profile=profile,
-        run_config=run_config,
-        collection=collection,
-        library=library,
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
-    )
-    collection, library, year_from, year_to, item_type = _take_scope(bound)
-    if not collection and not library:
-        _refuse_missing_scope()
-    try:
-        mode = parse_handoff(handoff, default=cfg.gaps_handoff)
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1) from exc
-    if mode in {"tabs", "walk", "watch"} and not list_missing:
-        list_missing = True
-    _require_manager(cfg)
-    quiet = as_json or json_out
-    backend = _connect(cfg, quiet=quiet)
-    loaded = _load_scope(
-        backend,
-        json_out=quiet,
-        collection=collection,
-        library=library,
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
-    )
-    run_gaps(
+    run_gaps_command(
         console,
-        cfg,
-        backend,
-        loaded.items,
-        loaded.label,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
         list_missing=list_missing,
-        mode=mode,
-        json_out=json_out,
-        as_json=as_json,
-        to=to,
+        handoff=handoff,
         include_doi_tabs=include_doi_tabs,
         downloads_dir=downloads_dir,
+        request_rg=request_rg,
         re_request=re_request,
-        emit_agent=_emit_agent,
-        inbox_handoff=_inbox_handoff_session,
+        to=to,
+        as_json=as_json,
+        profile=profile,
+        run_config=run_config,
+        config=config,
+        fmt=fmt,
     )
 
 @app.command()
@@ -1767,89 +1591,10 @@ def run(
     fmt: str = AgentFormatOpt,
 ) -> None:
     """Fill PDFs into the local mirror. Copies into the library when it is reachable. --dry-run does not write."""
-    if _scope_unset(collection, library, profile, run_config):
-        _refuse_missing_scope()
-    cfg = _cfg(config)
-    from .author_request import apply_request_rg_override
+    from .run_cmd import run_run_command
 
-    apply_request_rg_override(cfg, request_rg)
-    twenty_writeback = _typer_opt(twenty_writeback)
-    promote = _typer_opt(promote)
-    upgrade_snapshot = _typer_opt(upgrade_snapshot)
-    keep_snapshot = _typer_opt(keep_snapshot, False)
-    htmlpdf_mode = _typer_opt(htmlpdf_mode)
-    if twenty_writeback is not None:
-        cfg.twenty_writeback_listings = twenty_writeback
-    json_out = _agent_json(fmt)
-    if isinstance(promote, str):
-        from .config import parse_playbooks_promote
-
-        try:
-            cfg.playbooks_promote = parse_playbooks_promote(promote)
-        except ValueError as exc:
-            console.print(f"[red]{exc}[/]")
-            raise typer.Exit(2)
-    bound = _bind_run(
-        cfg,
-        use_run_policy=True,
-        profile=profile,
-        run_config=run_config,
-        collection=collection,
-        library=library,
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
-        limit=limit,
-        no_attach=no_attach,
-        retry_failed=retry_failed,
-        try_all=try_all,
-        sources=sources,
-        preset=preset,
-        scihub=scihub,
-        upgrade_linked=upgrade_linked,
-        upgrade_snapshot=upgrade_snapshot if isinstance(upgrade_snapshot, bool) else None,
-        strict_pdf_doi=strict_pdf_doi,
-    )
-    collection, library, year_from, year_to, item_type = _take_scope(bound)
-    limit = bound.limit
-    no_attach = bound.no_attach
-    retry_failed = bound.retry_failed
-    try_all = bound.try_all
-    sources = bound.sources_csv
-    preset = bound.preset
-    scihub = bound.scihub
-    upgrade_linked = bound.upgrade_linked
-    strict_pdf_doi = bound.strict_pdf_doi
-    if isinstance(htmlpdf_mode, str) and htmlpdf_mode.strip():
-        from .config import _one_of
-
-        try:
-            cfg.htmlpdf_academic = _one_of(
-                "--htmlpdf", htmlpdf_mode, ("off", "gated", "auto")
-            )
-        except ValueError as exc:
-            console.print(f"[red]{exc}[/]")
-            raise typer.Exit(2)
-    if isinstance(serpapi_max, int):
-        cfg.serpapi_max_calls = max(0, serpapi_max)
-    if isinstance(upgrade_snapshot, bool):
-        want_snapshot_upgrade = upgrade_snapshot
-    elif bound.upgrade_snapshot is not None:
-        want_snapshot_upgrade = bound.upgrade_snapshot
-    else:
-        want_snapshot_upgrade = cfg.htmlpdf_upgrade
-    if keep_snapshot:
-        cfg.htmlpdf_keep_snapshot = True
-    # `all` calls this function directly. An omitted flag is a Typer option
-    # object, not None; only an explicit bool overrides config.
-    relogin = (
-        ezproxy_relogin if isinstance(ezproxy_relogin, bool) else cfg.ezproxy_relogin
-    )
-    from .run_cmd import run_fetch
-
-    run_fetch(
+    run_run_command(
         console,
-        cfg,
         collection=collection,
         library=library,
         dry_run=dry_run,
@@ -1863,17 +1608,26 @@ def run(
         sources=sources,
         preset=preset,
         scihub=scihub,
-        relogin=relogin,
+        ezproxy_relogin=ezproxy_relogin,
         browser_agent=browser_agent,
+        camofox=camofox,
         upgrade_linked=upgrade_linked,
-        want_snapshot_upgrade=want_snapshot_upgrade,
+        upgrade_snapshot=upgrade_snapshot,
+        keep_snapshot=keep_snapshot,
+        htmlpdf_mode=htmlpdf_mode,
+        serpapi_max=serpapi_max,
         strict_pdf_doi=strict_pdf_doi,
         handoff=handoff,
         include_doi_tabs=include_doi_tabs,
         downloads_dir=downloads_dir,
+        request_rg=request_rg,
         re_request=re_request,
-        json_out=json_out,
-        camofox=camofox,
+        twenty_writeback=twenty_writeback,
+        promote=promote,
+        profile=profile,
+        run_config=run_config,
+        config=config,
+        fmt=fmt,
     )
 
 @app.command()
@@ -2590,75 +2344,22 @@ def snapshot(
     config: Path | None = ConfigOpt,
 ) -> None:
     """Write per-item restore folders under out/. --dry-run counts and does not write."""
-    from .snapshot import run_snapshot, snapshot_report
+    from .snapshot_cmd import run_snapshot_cmd
 
-    if _scope_unset(collection, library, profile, run_config):
-        _refuse_missing_scope()
-    cfg = _cfg(config)
-    bound = _bind_run(
-        cfg,
-        profile=profile,
-        run_config=run_config,
+    run_snapshot_cmd(
+        console,
         collection=collection,
         library=library,
         year_from=year_from,
         year_to=year_to,
         item_type=item_type,
         limit=limit,
+        dry_run=dry_run,
+        pdfs=pdfs,
+        profile=profile,
+        run_config=run_config,
+        config=config,
     )
-    collection, library, year_from, year_to, item_type = _take_scope(bound)
-    limit = bound.limit
-    if not collection and not library:
-        _refuse_missing_scope()
-    _require_manager(cfg)
-    try:
-        mode = parse_pdfs(pdfs) if pdfs else cfg.mirror_pdfs
-    except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1) from exc
-    backend = _live_backend(cfg)
-    loaded = _load_scope(
-        backend,
-        collection=collection,
-        library=library,
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
-    )
-    items, scope = loaded.items, loaded.label
-    if limit:
-        items = items[:limit]
-    manifest = Manifest(cfg.manifest_path)
-    verb = "Would write" if dry_run else "Writing"
-    console.print(
-        f"{verb} restore folders for [bold]{len(items)}[/] items "
-        f"in [bold]{scope}[/] (pdfs={mode})"
-    )
-    with _item_progress() as progress:
-        stats = run_snapshot(
-            cfg,
-            backend,
-            items,
-            pdfs=mode,
-            dry_run=dry_run,
-            manifest=manifest,
-            track=_track(progress, "Counting folders" if dry_run else "Writing folders"),
-        )
-    report = snapshot_report(cfg, scope, mode, dry_run, stats)
-    if not dry_run:
-        write_run_report(cfg, report, as_last_run=False)
-    console.print(
-        f"[bold]records {stats.records}[/] · pdf exports {stats.pdf_exports} · "
-        f"notes {stats.notes}"
-    )
-    if stats.unread:
-        console.print(
-            f"[yellow]{stats.unread} item(s) could not be read. "
-            "Their folders were left as they were; run snapshot again.[/]"
-        )
-    if not dry_run:
-        # Exports do not go through the manifest, so name the items.
-        _rag_auto(cfg, time.time(), keys=stats.pdf_keys)
 
 def _print_sync(stats, *, dry_run: bool) -> None:
     was = "none" if stats.previous is None else f"v{stats.previous}"
@@ -2868,137 +2569,23 @@ def restore(
     fmt: str = AgentFormatOpt,
 ) -> None:
     """Recreate missing library items from out/. Dry-run unless --apply. Never overwrites fields."""
-    from .restore import (
-        apply_restore,
-        dedupe_restore_records,
-        iter_records,
-        plan_restore,
-        record_in_scope,
-    )
+    from .restore_cmd import run_restore
 
-    if _scope_unset(collection, library, profile, run_config):
-        _refuse_missing_scope()
-    cfg = _cfg(config)
-    json_out = _agent_json(fmt)
-    bound = _bind_run(
-        cfg,
-        profile=profile,
-        run_config=run_config,
+    run_restore(
+        console,
         collection=collection,
         library=library,
         year_from=year_from,
         year_to=year_to,
         item_type=item_type,
         limit=limit,
+        dry_run=dry_run,
         apply=apply,
+        profile=profile,
+        run_config=run_config,
+        config=config,
+        fmt=fmt,
     )
-    collection, library, year_from, year_to, item_type = _take_scope(bound)
-    limit = bound.limit
-    apply = bound.apply
-    if dry_run and apply:
-        console.print("[red]Pass either --dry-run or --apply, not both.[/]")
-        raise typer.Exit(1)
-    if not collection and not library:
-        _refuse_missing_scope()
-    _require_manager(cfg)
-    backend = _live_backend(cfg, quiet=json_out)
-    prefixes: list[str] | None = None
-    if not library:
-        prefixes = []
-        for spec in collection:
-            try:
-                root = backend.resolve_collection(spec)
-            except LookupError as exc:
-                console.print(f"[red]{exc}[/]")
-                raise typer.Exit(1) from exc
-            prefixes.append(root.path)
-    paths = iter_records(cfg.out_dir, prefixes)
-    records = []
-    for path in paths:
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except ValueError:
-            continue
-        if isinstance(data, dict):
-            records.append((path, data))
-    types = _resolve_types(item_type)
-    if year_from is not None and year_to is not None and year_from > year_to:
-        console.print("[red]--year-from must be ≤ --year-to.[/]")
-        raise typer.Exit(1)
-    records = [
-        pair
-        for pair in records
-        if record_in_scope(
-            pair[1], year_from=year_from, year_to=year_to, item_types=types
-        )
-    ]
-    records = dedupe_restore_records(records)
-    if limit:
-        records = records[:limit]
-    keys, _scope = _scope_keys(backend, collection, library)
-    with _spinner("Loading items from library…", json_out=json_out):
-        library_items = backend.items_in_scope(keys)
-    with _item_progress(json_out=json_out) as progress:
-        note_tags: dict[str, set[str]] = {}
-        for it in _track(progress, "Reading library notes")(library_items):
-            tags: set[str] = set()
-            try:
-                kids = backend.children(it.key)
-            except LibraryError as exc:
-                _exit_env(str(exc), cfg)
-            for ch in kids:
-                data = ch.get("data") or {}
-                if data.get("itemType") != "note":
-                    continue
-                for tag in data.get("tags") or []:
-                    if isinstance(tag, dict) and tag.get("tag"):
-                        tags.add(str(tag["tag"]))
-            if tags:
-                note_tags[it.key] = tags
-    planned = plan_restore(records, library_items, note_tags_for=note_tags)
-    counts = planned.counts()
-    from .agent_json import envelope
-
-    if not apply:
-        payload = envelope(
-            command="restore",
-            summary={"folders": len(records), **counts},
-            flags={"dry_run": True},
-        )
-
-        def _human_restore() -> None:
-            console.print(
-                f"{len(records)} restore folder(s) · "
-                f"create {counts.get('create_item', 0)} · "
-                f"exists {counts.get('exists', 0)} · "
-                f"skip {counts.get('skip', 0)} · "
-                f"attach {counts.get('attach_pdf', 0)} · "
-                f"notes {counts.get('create_note', 0)}"
-            )
-            console.print(
-                "[dim]Dry run. Pass --apply to write missing items into the library.[/]"
-            )
-
-        _emit_agent(payload, json_out=json_out, human=_human_restore)
-        return
-    with _item_progress(json_out=json_out) as progress:
-        done = apply_restore(
-            planned, backend, backend, track=_track(progress, "Restoring items")
-        )
-    payload = envelope(
-        command="restore",
-        summary=dict(done),
-        flags={"apply": True},
-    )
-
-    def _human_restore_done() -> None:
-        console.print(
-            f"[bold]created {done['create_item']}[/] · "
-            f"attached {done['attach_pdf']} · notes {done['create_note']}"
-        )
-
-    _emit_agent(payload, json_out=json_out, human=_human_restore_done)
-    _flush(backend)
 
 @app.command("import")
 def import_library(

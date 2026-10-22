@@ -750,11 +750,13 @@ def set_snowball_keep(cfg: Config, run_id: str, dois: list[str], keep: bool) -> 
     from ..snowball.queue import load_queue
 
     dest, rows = load_queue(cfg.state_dir, run_id)
-    doi_set = {d.strip().lower() for d in dois if d.strip()}
+    from ..resolve import doi_key
+
+    doi_set = {k for d in dois if (k := doi_key(d))}
     path = dest / "candidates.jsonl"
     out_lines: list[str] = []
     for row in rows:
-        if (row.ids.get("doi") or "").strip().lower() in doi_set:
+        if doi_key(row.ids.get("doi")) in doi_set:
             row.keep = keep
         out_lines.append(json.dumps(row.to_dict(), ensure_ascii=False))
     path.write_text("\n".join(out_lines) + "\n", encoding="utf-8")

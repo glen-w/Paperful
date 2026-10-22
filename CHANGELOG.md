@@ -11,8 +11,18 @@ may still be added). See [releases](docs/releases.md).
 - **Collection exclude / protect (`[[exclude]]`):** Mark hand-curated folders
   so paperful will not write to them. Presets `full` and `add_only`, plus
   fine-grained `allow_*` flags, `protect_items`, and optional
-  `skip_library_scope`. Enforced on library backend writes. See
+  `skip_library_scope`. Enforced on library backend writes (Zotero, Mendeley,
+  and EndNote create/path/attach/notes/tags/update). See
   [config](docs/config.md#exclude--protect-collections).
+
+### Changed
+
+- **`paperful all` dispatches through `*_cmd` modules** (no Typer/`cli.py`
+  import cycle). Snapshot, restore, urls, and htmlpdf proposals extracted from
+  `cli.py` into dedicated command modules.
+- **DOI set membership** uses `doi_key()` (normalize when possible) in snowball
+  pause/fill and Discover keep toggles; handoff/bibliography share
+  `playbooks.looks_like_pdf_url`.
 - **OpenAlex cites build is resumable:** `build-cites` checkpoints per works
   parquet file (`.done/<date>` + `.done/<date>.parts/<stem>`), with a DuckDB
   memory limit and spill dir so huge `updated_date` folders (100G+) do not OOM.
