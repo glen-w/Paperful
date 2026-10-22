@@ -25,6 +25,8 @@ SELECT = (
     "referenced_works,authorships,primary_location,open_access,keywords,"
     "study_designs"
 )
+#: Trip the snapshot store for this client after this many consecutive failures.
+STORE_FAIL_THRESHOLD = 3
 Getter = Callable[[str, dict[str, Any]], dict[str, Any]]
 
 
@@ -88,8 +90,33 @@ class OpenAlexClient:
         self._last = 0.0
         self._budget: OpenAlexBudgetExceeded | None = None
         self._store_only = False
+        self._store_fail_count = 0
+        self._store_tripped = False
         self._using_key = False
         self._http_client: httpx.Client | None = None
+
+    def _store_available(self) -> bool:
+        """True when a snapshot store is configured and not circuit-tripped."""
+        return self.store is not None and not self._store_tripped
+
+    def _store_ok(self) -> None:
+        """Reset consecutive store failure count after a successful call."""
+        self._store_fail_count = 0
+
+    def _store_failed(self, exc: BaseException, *, label: str = "failed") -> None:
+        """Note a store failure; trip the store after STORE_FAIL_THRESHOLD."""
+        self._store_fail_count += 1
+        self.note(f"openalex store {label} · {exc}")
+        if (
+            self._store_fail_count >= STORE_FAIL_THRESHOLD
+            and not self._store_tripped
+            and self.store is not None
+        ):
+            self._store_tripped = True
+            self.note(
+                f"openalex store disabled for this client after "
+                f"{self._store_fail_count} failures · live API only"
+            )
 
     def _created_filter(self, from_created_date: str | None = None) -> str | None:
         """OpenAlex ``from_created_date`` (YYYY-MM-DD). Watch cursor, or an override."""
@@ -124,7 +151,7 @@ class OpenAlexClient:
     def _latch_budget(self, exc: OpenAlexBudgetExceeded) -> None:
         """Remember the budget stop; DOI/id can keep using a configured store."""
         self._budget = exc
-        if self.store is not None and not self._store_only:
+        if self._store_available() and not self._store_only:
             self._store_only = True
             self.note(
                 "OpenAlex API budget spent · using local snapshot for DOI/id "
@@ -375,13 +402,14 @@ class OpenAlexClient:
         return out
 
     def _store_work_by_doi(self, doi: str) -> dict[str, Any] | None:
-        if self.store is None:
+        if not self._store_available():
             return None
         try:
             hit = self.store.work_by_doi(doi)
         except Exception as exc:
-            self.note(f"openalex store failed · {exc}")
+            self._store_failed(exc)
             return None
+        self._store_ok()
         if hit is not None and (hit.get("id") or hit.get("doi")):
             return hit
         return None
@@ -394,7 +422,8 @@ class OpenAlexClient:
                 self.note("openalex store · 1/1 doi")
                 return hit
         if self._api_blocked():
-            if self.store is not None:
+            if self._store_available() or self.store is not None:
+                # Store configured (even if tripped/miss): soft-miss under budget.
                 return None
             raise self._budget or OpenAlexBudgetExceeded("OpenAlex daily budget is spent")
         payload = self.get(f"/works/https://doi.org/{cleaned or doi}", {"select": SELECT})
@@ -410,12 +439,14 @@ class OpenAlexClient:
         if not ids:
             return []
         by_doi: dict[str, dict[str, Any]] = {}
-        if self.store is not None:
+        if self._store_available():
             try:
                 stored = self.store.works_by_dois(ids, select=select)
             except Exception as exc:
-                self.note(f"openalex store failed · {exc}")
+                self._store_failed(exc)
                 stored = []
+            else:
+                self._store_ok()
             for row in stored:
                 key = normalize_doi(str(row.get("doi") or "")) or ""
                 if key:
@@ -502,13 +533,14 @@ class OpenAlexClient:
 
     def _store_works_by_ids(self, openalex_ids: list[str]) -> dict[str, dict[str, Any]]:
         by_id: dict[str, dict[str, Any]] = {}
-        if self.store is None or not openalex_ids:
+        if not self._store_available() or not openalex_ids:
             return by_id
         try:
             stored = self.store.works_by_ids(openalex_ids)
         except Exception as exc:
-            self.note(f"openalex store failed · {exc}")
+            self._store_failed(exc)
             return by_id
+        self._store_ok()
         for row in stored:
             key = short_id(str(row.get("id") or ""))
             if key:
@@ -542,7 +574,7 @@ class OpenAlexClient:
             self.tally.track(len(ids))
         if text:
             if self._api_blocked():
-                if self.store is None:
+                if not self._store_available() and self.store is None:
                     raise self._budget or OpenAlexBudgetExceeded(
                         "OpenAlex daily budget is spent"
                     )
@@ -568,8 +600,10 @@ class OpenAlexClient:
                         self.tally.advance(len(by_id))
                 return [by_id[short_id(i)] for i in ids if short_id(i) in by_id]
 
-        if self.store is None:
+        if not self._store_available():
             if self._api_blocked():
+                if self.store is not None:
+                    return []
                 raise self._budget or OpenAlexBudgetExceeded(
                     "OpenAlex daily budget is spent"
                 )
@@ -628,8 +662,9 @@ class OpenAlexClient:
         return out
 
     def _store_can_cite(self) -> bool:
-        store = self.store
-        return store is not None and bool(getattr(store, "has_cites_index", False))
+        return self._store_available() and bool(
+            getattr(self.store, "has_cites_index", False)
+        )
 
     def _store_works_citing(
         self,
@@ -654,8 +689,9 @@ class OpenAlexClient:
                 search=search,
             )
         except Exception as exc:
-            self.note(f"openalex store citing failed · {exc}")
+            self._store_failed(exc, label="citing failed")
             return None
+        self._store_ok()
         return list(rows or [])
 
     def works_citing(

@@ -40,7 +40,7 @@ integrations.
 
 | **1.0** | **Post-1.0** |
 | --- | --- |
-| Trust checklist, locked `paperful.run_report.v1` / `paperful.item.v1`, snapshot contract | **Local OpenAlex parquet store** — phase 2C (full search / keyword / ORCID / `http`). Live API is enough for most installs; `ssh_duckdb` / `local_duckdb` + cites index remain opt-in |
+| Trust checklist, locked `paperful.run_report.v1` / `paperful.item.v1`, snapshot contract | **Local OpenAlex parquet store** — phase 2C (full search / keyword / ORCID / `http`). v1/2B + harden shipped; live API is enough for most installs |
 | **GUI workbench** — Discover + Wanted simple loop (topic + people); command ids; review tokens; Advanced Repair / Mirror / Index / Briefs and the non-TTY CLI verbs | **Firefox extension** — optional native messaging into the mirror ([firefox.md](firefox.md)) |
 | **Ask in GUI** — `/ask` on the default nav, scoped chat with citations when `[rag]` + `[llm]` on | Discover keepup UX polish; `refs` on collection digest; retractions / living-review ([Keeping up](#after-110-keeping-up)) |
 | Zotero-proven fetch/mirror path; honest adapter docs (Mendeley / EndNote seeking testers) | SaaS tenancy polish; promoting other managers to “supported” after field reports; remote-manager parity beyond what 1.0 open/Docker needs |
@@ -1576,6 +1576,12 @@ snapshot](https://help.openalex.org/access/snapshot/) and point
   + `cites_index_glob`) for store-backed `works_citing`; title-only
   cites-query / `search=` on citing and id batches. Abstract/fulltext search
   remains live-API / 2C.
+- **Harden (shipped):** nested JSON decode on store rows; SSH
+  `ConnectTimeout` / keepalives / optional port + identity; store failure
+  circuit (3 consecutive failures → API-only for that client); deeper
+  `doctor` (missing glob/host red; local DuckDB PATH amber);
+  `openalex-store status [--probe]` and `write-build-script`;
+  `memory_limit` for cites builds.
 - **Post-1.0 (2C):** keyword / ORCID / full `search` parity; `http` backend for
   campus hosting without SSH. **Park** until an institution asks —
   [Parked](#after-110-parked).

@@ -18,11 +18,18 @@ from paperful.snowball.local_openalex import (
     columns_for_select,
     normalize_store_doi,
     normalize_store_id,
+    normalize_store_row,
     parse_duckdb_json,
+    ssh_argv,
     store_from_config,
+    store_status,
     title_matches,
 )
-from paperful.snowball.openalex import OpenAlexBudgetExceeded, OpenAlexClient
+from paperful.snowball.openalex import (
+    STORE_FAIL_THRESHOLD,
+    OpenAlexBudgetExceeded,
+    OpenAlexClient,
+)
 
 
 class FakeStore:
@@ -106,6 +113,13 @@ class FakeStore:
         return rows[: max(0, int(limit))] if limit > 0 else rows
 
 
+def test_store_columns_match_openalex_select():
+    from paperful.snowball.local_openalex import STORE_COLUMNS
+    from paperful.snowball.openalex import SELECT
+
+    assert list(STORE_COLUMNS) == [part.strip() for part in SELECT.split(",") if part.strip()]
+
+
 def test_columns_for_select_rejects_unknown():
     assert columns_for_select("id,doi") == ["id", "doi"]
     with pytest.raises(OpenAlexStoreError):
@@ -139,6 +153,49 @@ def test_parse_duckdb_json():
     assert parse_duckdb_json("") == []
     assert parse_duckdb_json('[{"id":"W1"}]') == [{"id": "W1"}]
     assert parse_duckdb_json('{"id":"W1"}') == [{"id": "W1"}]
+
+
+def test_normalize_store_row_decodes_nested_json_strings():
+    row = normalize_store_row(
+        {
+            "id": "https://openalex.org/W1",
+            "referenced_works": '["https://openalex.org/W2"]',
+            "authorships": '[{"author":{"display_name":"Ada"}}]',
+            "primary_location": '{"source":{"display_name":"Journal"}}',
+            "open_access": '{"is_oa":true}',
+            "keywords": "not-json",
+            "display_name": "Title",
+        }
+    )
+    assert row["referenced_works"] == ["https://openalex.org/W2"]
+    assert row["authorships"][0]["author"]["display_name"] == "Ada"
+    assert row["primary_location"]["source"]["display_name"] == "Journal"
+    assert row["open_access"]["is_oa"] is True
+    assert row["keywords"] == "not-json"
+
+
+def test_parse_duckdb_json_normalizes_nested_strings():
+    rows = parse_duckdb_json(
+        '[{"id":"W1","referenced_works":"[\\"W2\\"]","authorships":[]}]'
+    )
+    assert rows[0]["referenced_works"] == ["W2"]
+    assert rows[0]["authorships"] == []
+
+
+def test_ssh_argv_includes_connect_timeout_and_keepalive():
+    cmd = ssh_argv(
+        "me@nuc",
+        "duckdb -json",
+        connect_timeout_s=12,
+        port=2222,
+        identity_file="/tmp/id_ed25519",
+    )
+    assert cmd[:3] == ["ssh", "-o", "BatchMode=yes"]
+    assert "ConnectTimeout=12" in cmd
+    assert "ServerAliveInterval=30" in cmd
+    assert cmd[cmd.index("-p") + 1] == "2222"
+    assert cmd[cmd.index("-i") + 1] == "/tmp/id_ed25519"
+    assert cmd[-2:] == ["me@nuc", "duckdb -json"]
 
 
 def test_ssh_store_uses_runner(monkeypatch):
@@ -965,9 +1022,80 @@ def test_doctor_openalex_store_amber_without_cites_index():
     assert "build-cites" in check.detail
 
     cfg.openalex_store_cites_index_glob = "/cites/**/*.parquet"
+    cfg.openalex_store_duckdb_bin = "/bin/true"
     ok = _openalex_store_check(cfg)
     assert ok.status == "green"
     assert "cites index set" in ok.detail
+
+    cfg.openalex_store_duckdb_bin = "duckdb-not-on-path-xyz"
+    duck_amber = _openalex_store_check(cfg)
+    assert duck_amber.status == "amber"
+    assert "not on PATH" in duck_amber.detail
+
+    missing = Config()
+    missing.openalex_store_backend = "local_duckdb"
+    red = _openalex_store_check(missing)
+    assert red.status == "red"
+    assert "parquet_glob" in red.detail
+
+    bad = Config()
+    bad.openalex_store_backend = "http"
+    assert _openalex_store_check(bad).status == "red"
+
+    ssh = Config()
+    ssh.openalex_store_backend = "ssh_duckdb"
+    ssh.openalex_store_parquet_glob = "/works/**/*.parquet"
+    assert _openalex_store_check(ssh).status == "red"
+    assert "ssh_host" in _openalex_store_check(ssh).detail
+
+
+def test_store_status_reports_backend():
+    off = store_status(Config())
+    assert off["backend"] == "off"
+    assert off["ok"] is True
+
+    cfg = Config()
+    cfg.openalex_store_backend = "local_duckdb"
+    cfg.openalex_store_parquet_glob = "/works/**/*.parquet"
+    status = store_status(cfg)
+    assert status["backend"] == "local_duckdb"
+    assert status["ok"] is True
+    assert status["has_cites_index"] is False
+
+
+def test_store_circuit_breaker_trips_after_threshold():
+    http_calls: list[str] = []
+
+    def getter(path: str, params: dict[str, Any]) -> dict[str, Any]:
+        http_calls.append(path)
+        return {
+            "results": [
+                {
+                    "id": "https://openalex.org/W1",
+                    "doi": "https://doi.org/10.1234/a",
+                    "display_name": "From API",
+                }
+            ]
+        }
+
+    store = FakeStore(fail=True)
+    notes: list[str] = []
+    client = OpenAlexClient(
+        email="t@example.org",
+        api_key="",
+        sleep_s=0,
+        getter=getter,
+        store=store,
+        progress=notes.append,
+    )
+    for _ in range(STORE_FAIL_THRESHOLD):
+        client.works_by_ids(["W1"])
+    assert client._store_tripped
+    assert any("disabled for this client" in n for n in notes)
+    before = len(store.id_calls)
+    client.works_by_ids(["W1"])
+    assert len(store.id_calls) == before  # tripped — no more store calls
+    assert http_calls  # API still used
 
 
 def test_works_citing_api_budget_falls_back_to_store_mid_call():

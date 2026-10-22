@@ -456,14 +456,23 @@ Keywords and ORCID stay API-only.
 
 When the live API daily budget is spent, DOI/id and citing (with index) keep
 using the store; keyword / ORCID / full-text search still pause for
-`snowball resume`.
+`snowball resume`. After three consecutive store failures in one client
+(SSH/DuckDB errors), Paperful disables the store for that client and continues
+on the live API.
 
 Backends:
 
 - `local_duckdb` — DuckDB on this machine over a local parquet glob (needs
   `duckdb` on `PATH`, or set `duckdb_bin`).
 - `ssh_duckdb` — DuckDB on a remote host; Paperful SSHs in, runs SQL, and
-  copies small JSON rows back.
+  copies small JSON rows back. SSH uses `BatchMode`, `ConnectTimeout`
+  (`ssh_connect_timeout_s`, default 15), and keepalives; optional `ssh_port`
+  and `ssh_identity_file`.
+
+Operator checks: `paperful doctor` (config completeness + local DuckDB on
+PATH), `paperful openalex-store status` (optional `--probe` DESCRIBE), and
+`paperful openalex-store write-build-script` for a nohup-friendly cites build
+on the data host.
 
 Env overrides: `OPENALEX_STORE_SSH_HOST`, `OPENALEX_STORE_PARQUET_GLOB`,
 `OPENALEX_STORE_CITES_INDEX_GLOB`.
@@ -477,6 +486,10 @@ Env overrides: `OPENALEX_STORE_SSH_HOST`, `OPENALEX_STORE_PARQUET_GLOB`,
 # # duckdb_bin = "duckdb"
 # # timeout_s = 120
 # # build_timeout_s = 7200
+# # memory_limit = "48GB"
 # # ssh_host = "nuc"         # ssh_duckdb only
 # # ssh_user = "you"
+# # ssh_port = 22
+# # ssh_connect_timeout_s = 15
+# # ssh_identity_file = ""
 ```

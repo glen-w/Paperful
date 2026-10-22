@@ -763,10 +763,12 @@ does not ship the dump. Backends: `local_duckdb` (this machine) or
 `ssh_duckdb` (DuckDB on the data host). DOI / OpenAlex-id batches use the works
 parquet. Citing (citation-map expand, `--direction cites`) needs
 `paperful openalex-store build-cites` then `cites_index_glob` (resumable per
-works `updated_date`). Store
+works `updated_date`; or `write-build-script` + nohup on the data host). Store
 cites-query matching is title-only. Keywords / ORCID / full-text search still
 hit the live API. When the API daily budget is spent, DOI/id and citing keep
-using the snapshot; the rest pause for `resume`.
+using the snapshot; the rest pause for `resume`. Three consecutive store
+failures disable the snapshot for that client (live API only). Check with
+`paperful openalex-store status [--probe]` and `paperful doctor`.
 
 Setup and TOML: [config Advanced](config.md#openalex-api-limits-and-snapshot-store).
 Roadmap for full search parity and campus HTTP hosting:

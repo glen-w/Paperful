@@ -644,6 +644,21 @@ def apply_openalex_store(raw: dict[str, Any], cfg: "Config") -> None:
             ),
             ("ssh_host", "openalex_store_ssh_host", lambda v: str(v).strip()),
             ("ssh_user", "openalex_store_ssh_user", lambda v: str(v).strip()),
+            (
+                "ssh_port",
+                "openalex_store_ssh_port",
+                lambda v: max(0, int(v)),
+            ),
+            (
+                "ssh_connect_timeout_s",
+                "openalex_store_ssh_connect_timeout_s",
+                lambda v: max(1.0, float(v)),
+            ),
+            (
+                "ssh_identity_file",
+                "openalex_store_ssh_identity_file",
+                lambda v: str(v).strip(),
+            ),
             ("parquet_glob", "openalex_store_parquet_glob", lambda v: str(v).strip()),
             (
                 "cites_index_glob",
@@ -660,6 +675,11 @@ def apply_openalex_store(raw: dict[str, Any], cfg: "Config") -> None:
                 "build_timeout_s",
                 "openalex_store_build_timeout_s",
                 lambda v: max(60.0, float(v)),
+            ),
+            (
+                "memory_limit",
+                "openalex_store_memory_limit",
+                lambda v: str(v).strip() or "48GB",
             ),
         ],
     )

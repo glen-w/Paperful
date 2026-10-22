@@ -282,11 +282,15 @@ class Config:
     openalex_store_backend: str = ""  # ssh_duckdb | local_duckdb | (later http)
     openalex_store_ssh_host: str = ""
     openalex_store_ssh_user: str = ""
+    openalex_store_ssh_port: int = 0  # 0 = ssh default
+    openalex_store_ssh_connect_timeout_s: float = 15.0
+    openalex_store_ssh_identity_file: str = ""
     openalex_store_parquet_glob: str = ""
     openalex_store_cites_index_glob: str = ""
     openalex_store_duckdb_bin: str = "duckdb"
     openalex_store_timeout_s: float = 120.0
     openalex_store_build_timeout_s: float = 7200.0
+    openalex_store_memory_limit: str = "48GB"
     snowball_venue_include: tuple[str, ...] = ()
     snowball_venue_exclude: tuple[str, ...] = ()
     snowball_languages: tuple[str, ...] = ()
