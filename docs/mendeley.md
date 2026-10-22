@@ -8,6 +8,11 @@ Lines marked **Paperful** are client rules, not Elsevier’s.
 **This adapter is seeking testers.** Zotero remains the well-tested path.
 Do not treat a first Mendeley run as proven.
 
+**Field testing:** copy [adapter-field-assessment.md](templates/adapter-field-assessment.md)
+into gitignored `assessments/` and complete the Mendeley checklist (OAuth on the
+host, real library list / fetch / attach / notes). CI contract tests live in
+`tests/test_mendeley.py`.
+
 ## Setup
 
 1. Register an OAuth app at

@@ -432,3 +432,178 @@ def test_mendeley_changes_full_delta_and_deleted(cfg):
     gone = backend.changes(full.version)
     assert any(t.get("key") == DOC_ID for t in gone.trashed)
     assert DOC_ID not in gone.top_keys
+
+
+def test_mendeley_requests_send_vendor_accept_types(cfg):
+    accepts: list[tuple[str, str]] = []
+    fake = FakeMendeley()
+    orig = fake.handler
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        accept = request.headers.get("accept")
+        if accept:
+            accepts.append((request.url.path, accept))
+        return orig(request)
+
+    backend = _backend(cfg, fake)
+    backend.client.http = mock_client(handler)
+    backend.ping()
+    backend.children(DOC_ID)
+    kinds = {a[1] for a in accepts}
+    assert any("mendeley-profile" in k for k in kinds)
+    assert any("mendeley-document" in k for k in kinds)
+    assert any("mendeley-file" in k for k in kinds)
+    assert any("mendeley-annotation" in k for k in kinds)
+
+
+def test_mendeley_upload_file_uses_raw_post_headers(cfg, tmp_path):
+    captured: dict[str, str | bool] = {}
+    fake = FakeMendeley()
+    orig = fake.handler
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/files" and request.method == "POST":
+            ct = request.headers.get("content-type") or ""
+            captured["content_type"] = ct
+            captured["disposition"] = request.headers.get("content-disposition") or ""
+            captured["link"] = request.headers.get("link") or ""
+            captured["multipart"] = "multipart" in ct.lower()
+        return orig(request)
+
+    cfg.state_dir.mkdir(parents=True, exist_ok=True)
+    (cfg.state_dir / "mendeley-oauth.json").write_text(
+        json.dumps({"access_token": "tok", "expires_at": time.time() + 3600}),
+        encoding="utf-8",
+    )
+    client = MendeleyClient(cfg, http=mock_client(handler))
+    pdf = tmp_path / "paper.pdf"
+    pdf.write_bytes(PDF_BYTES)
+    client.upload_file(DOC_ID, pdf)
+    assert captured["content_type"] == "application/pdf"
+    assert captured["multipart"] is False
+    assert "filename=" in str(captured["disposition"])
+    assert 'rel="document"' in str(captured["link"])
+
+
+def test_mendeley_s3_download_rejects_forwarded_bearer(cfg, tmp_path):
+    fake = FakeMendeley()
+    backend = _backend(cfg, fake)
+    pdf = tmp_path / "p.pdf"
+    pdf.write_bytes(PDF_BYTES)
+    backend.attach(DOC_ID, pdf)
+    s3_calls: list[str | None] = []
+    orig = fake.handler
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if (request.url.host or "") == "s3.example.test":
+            s3_calls.append(request.headers.get("Authorization"))
+            if request.headers.get("Authorization"):
+                return httpx.Response(403, text="bearer on s3")
+            fid = request.url.path.rsplit("/", 1)[-1]
+            return httpx.Response(
+                200, content=fake.file_bytes.get(fid) or PDF_BYTES
+            )
+        return orig(request)
+
+    backend2 = _backend(cfg, fake)
+    backend2.client.http = mock_client(handler)
+    dest = tmp_path / "out.pdf"
+    assert backend2.export_pdf(backend2.get_item(DOC_ID), dest) == dest
+    assert dest.read_bytes() == PDF_BYTES
+    assert s3_calls == [None]
+
+
+def test_mendeley_delta_changes_send_iso8601_modified_since(cfg):
+    seen: list[str] = []
+    fake = FakeMendeley()
+    orig = fake.handler
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/documents" and request.method == "GET":
+            ms = request.url.params.get("modified_since")
+            if ms is not None:
+                seen.append(ms)
+        return orig(request)
+
+    backend = _backend(cfg, fake)
+    backend.client.http = mock_client(handler)
+    full = backend.changes(None)
+    fake.docs[DOC_ID]["title"] = "Revised again"
+    fake.docs[DOC_ID]["last_modified"] = "2026-07-15T12:00:00.000Z"
+    backend.changes(full.version)
+    assert seen
+    iso = seen[0]
+    assert iso.endswith("Z") and "T" in iso
+    assert not iso.isdigit()
+
+
+def test_mendeley_refresh_rotates_stored_tokens(cfg):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/oauth/token":
+            return _json(
+                {
+                    "access_token": "new-access",
+                    "refresh_token": "new-refresh",
+                    "expires_in": 3600,
+                }
+            )
+        if request.url.path == "/profiles/me":
+            return _json({"id": "p1", "display_name": "Ada"})
+        return httpx.Response(404, text="unhandled")
+
+    cfg.state_dir.mkdir(parents=True, exist_ok=True)
+    (cfg.state_dir / "mendeley-oauth.json").write_text(
+        json.dumps(
+            {
+                "access_token": "old",
+                "refresh_token": "old-refresh",
+                "expires_at": time.time() - 10,
+            }
+        ),
+        encoding="utf-8",
+    )
+    client = MendeleyClient(cfg, http=mock_client(handler))
+    assert client.ensure_token() == "new-access"
+    stored = json.loads(
+        (cfg.state_dir / "mendeley-oauth.json").read_text(encoding="utf-8")
+    )
+    assert stored["refresh_token"] == "new-refresh"
+
+
+def test_mendeley_collection_note_creates_generic_in_folder(cfg):
+    fake = FakeMendeley()
+    backend = _backend(cfg, fake)
+    doc_id = backend.create_or_update_collection_note(
+        "f1", "<p>brief</p>", ["paperful-report"]
+    )
+    assert doc_id in fake.docs
+    assert fake.docs[doc_id]["type"] == "generic"
+    assert doc_id in fake.membership.get("f1", [])
+
+
+def test_mendeley_trash_note_refused(cfg):
+    backend = _backend(cfg, FakeMendeley())
+    with pytest.raises(LibraryError, match="annotation"):
+        backend.trash_note("ann-1", parent_key=DOC_ID)
+
+
+def test_mendeley_note_write_updates_annotation_not_document_notes(cfg):
+    fake = FakeMendeley()
+    backend = _backend(cfg, fake)
+    ann_calls: list[tuple[str, str]] = []
+    orig = fake.handler
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.startswith("/annotations/") and request.method == "PATCH":
+            ann_calls.append((request.method, request.url.path))
+        if request.url.path == "/annotations" and request.method == "POST":
+            ann_calls.append((request.method, request.url.path))
+        return orig(request)
+
+    backend = _backend(cfg, fake)
+    backend.client.http = mock_client(handler)
+    backend.create_or_update_note(DOC_ID, "<p>one</p>", "paperful-summary")
+    backend.create_or_update_note(DOC_ID, "<p>two</p>", "paperful-summary")
+    assert ann_calls[0] == ("POST", "/annotations")
+    assert ann_calls[1][0] == "PATCH"
+    assert fake.docs[DOC_ID]["notes"] == "<p>library note</p>"
