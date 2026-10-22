@@ -537,6 +537,29 @@ def test_mendeley_delta_changes_send_iso8601_modified_since(cfg):
     assert not iso.isdigit()
 
 
+def test_mendeley_deleted_since_is_iso8601(cfg):
+    seen: list[str] = []
+    fake = FakeMendeley()
+    orig = fake.handler
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/documents" and request.method == "GET":
+            ds = request.url.params.get("deleted_since")
+            if ds is not None:
+                seen.append(ds)
+        return orig(request)
+
+    backend = _backend(cfg, fake)
+    backend.client.http = mock_client(handler)
+    full = backend.changes(None)
+    backend.trash_item(DOC_ID)
+    fake.deleted[DOC_ID] = "2026-08-01T00:00:00.000Z"
+    backend.changes(full.version)
+    assert seen
+    assert seen[0].endswith("Z") and "T" in seen[0]
+    assert not seen[0].isdigit()
+
+
 def test_mendeley_refresh_rotates_stored_tokens(cfg):
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/oauth/token":

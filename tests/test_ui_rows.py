@@ -290,21 +290,35 @@ def test_job_view_normalizes_command_record():
 
 
 def test_last_job_result_prefers_matching_run(tmp_path):
+    import os
+    import time
+
     from paperful.ui import commands
 
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     cfg.state_dir.mkdir(parents=True)
-    commands.write_command(
-        cfg,
+    base = time.time()
+
+    def write_with_mtime(cmd_id: str, record: dict, offset: float) -> None:
+        commands.write_command(cfg, record)
+        path = cfg.state_dir / "gui" / "commands" / f"{cmd_id}.json"
+        ts = base + offset
+        os.utime(path, (ts, ts))
+
+    write_with_mtime(
+        "old",
         {"id": "old", "verb": "ask", "status": "done", "result": {"answer": "old"}},
+        1.0,
     )
-    commands.write_command(
-        cfg,
+    write_with_mtime(
+        "new",
         {"id": "new", "verb": "ask", "status": "queued", "result": {}},
+        2.0,
     )
-    commands.write_command(
-        cfg,
+    write_with_mtime(
+        "ingest",
         {"id": "ingest", "verb": "rag_ingest", "status": "queued", "result": {}},
+        3.0,
     )
     by_run = last_job_result(cfg, "ask", run="old")
     assert by_run["id"] == "old"
