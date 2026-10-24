@@ -1,5 +1,5 @@
 # Advisory docs build — does not gate merges (see continue-on-error).
-# Merge blockers live in ci.yml (pytest + Docker). Maintainers: DOCS_STRICT=1 make docs locally.
+# Merge blocker is the smoke job in ci.yml. Maintainers: DOCS_STRICT=1 make docs locally.
 name: Docs
 
 on:
