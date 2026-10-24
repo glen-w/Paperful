@@ -121,7 +121,8 @@ These stay true after the tag. They are not unfinished 1.0 work.
 - Open-access fill is DOI-scoped; Unpaywall often returns a landing page.
   Grey literature is configured playbooks only. Sci-Hub is opt-in and thin
   after ~2021.
-- `attachments` still reads live children from the manager.
+- Report-only `attachments` reads children from the mirror (1.3.1); `--apply`
+  still needs the manager.
 - The RAG index (`state/rag/`) is a rebuildable cache, not a layout promise.
 - TTY stays the shell for `session login`, `doctor --guide`, mid-run EZProxy,
   and Sci-Hub.

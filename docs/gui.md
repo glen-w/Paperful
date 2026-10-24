@@ -89,7 +89,8 @@ Non-loopback bind (`--host 0.0.0.0`) requires `--allow-remote-bind` and still ha
    The default tab is the first non-empty bucket (Missing → Held → Have).
    **Waiting from Discover** (a read-only panel above the tabs) lists kept
    queue rows and watch / keepup / authorwatch inbox rows that are not yet in
-   the collection; add them from Discover and they appear under Missing.
+   the collection; each row can show a **Why suggested** line from the
+   candidate's `why`. Add them from Discover and they appear under Missing.
    **Preview** → **Grab** (fetch to the `out/` folder on this computer;
    selected vs all; Grab passes the same `item_keys` as the preview token).
    **Manual** (default): **Attach** writes attachable pending PDFs into
@@ -106,7 +107,8 @@ Non-loopback bind (`--host 0.0.0.0`) requires `--allow-remote-bind` and still ha
    **People**, **Queue** (map + paginated candidates), **Following**.
    **Topic:** keyword search (`snowball search` dry-run queue), then open
    **Queue** for per-row Keep/Skip and **Preview apply** → **Add selected**
-   (`snowball apply`, metadata only). **Map** (on Queue) draws that queue
+   (`snowball apply`, metadata only). Queue rows show **Why suggested** when
+   the candidate carries a `why` line. **Map** (on Queue) draws that queue
    before you open a PDF: older + highly cited is foundational, recent +
    highly cited is influential, recent + fewer citations may be emerging.
    OpenAlex study designs (RCT, meta-analysis, …) appear as category badges

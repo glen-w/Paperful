@@ -209,8 +209,10 @@ host, so the file is downloaded through the API instead.
 **Writes.** Only on attach, `--apply`, and note or tag writes. After each,
 the item and its children are read once so its folder is true.
 
-`sync`, `snapshot`, `restore`, and `attachments` read the library directly.
-Nothing else does.
+`sync`, `snapshot`, and `restore` read the library directly. `attachments`
+report-only reads children from the mirror and proves stored files by MD5;
+`--apply` still needs the manager (exit 2 when it is down). Nothing else
+talks to the manager for ordinary reads.
 
 ## Local API vs web API
 

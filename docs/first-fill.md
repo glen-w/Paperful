@@ -84,10 +84,11 @@ The screenshots are `ocean/BBNJ`. The clicks are the same for any collection.
   one line under the title.
 - **Waiting from Discover** (above the tabs) lists papers you kept in a
   Discover queue, or that a topic watch, keepup digest, or author watch
-  proposed, and that are not in this collection yet. It is the same fill
-  desk, not a second one: add them in Discover (metadata only), then they
-  show up under Missing for Preview and Grab. The panel has no buttons of its
-  own and never writes.
+  proposed, and that are not in this collection yet. Rows can show
+  **Why suggested** from the candidate's `why`. It is the same fill desk, not
+  a second one: add them in Discover (metadata only), then they show up under
+  Missing for Preview and Grab. The panel has no buttons of its own and never
+  writes.
 - Open access first. Campus EZProxy is the **Campus** preset after
   `paperful session login ezproxy` on the host — [EZProxy](ezproxy.md).
 - Not every paywalled or DOI-less item comes back.

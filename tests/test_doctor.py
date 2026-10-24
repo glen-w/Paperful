@@ -145,3 +145,23 @@ def test_osf_check_quiet_without_a_manifest_and_green_below_the_bar(tmp_path):
     manifest.write(Record(itemKey="A", status=STATUS_NOT_FOUND, url="https://osf.io/a"))
     check = _osf_check(cfg)
     assert check.status == "green" and "no OSF source needed" in check.detail
+
+
+def test_osf_check_amber_when_the_demand_bar_is_met(tmp_path):
+    from paperful.config import Config
+    from paperful.doctor import _osf_check
+    from paperful.osf_signal import MIN_OSF_MISSES
+    from paperful.store import Manifest, Record, STATUS_NOT_FOUND
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    manifest = Manifest(cfg.manifest_path)
+    for i in range(MIN_OSF_MISSES):
+        manifest.write(
+            Record(itemKey=f"O{i}", status=STATUS_NOT_FOUND, url=f"https://psyarxiv.com/x{i}")
+        )
+    check = _osf_check(cfg)
+    assert check is not None
+    assert check.status == "amber"
+    assert "enough signal to build a thin OSF source" in check.detail
+    assert f"{MIN_OSF_MISSES} of {MIN_OSF_MISSES}" in check.detail

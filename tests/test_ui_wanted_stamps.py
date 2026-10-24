@@ -244,6 +244,43 @@ def test_pending_fill_empty_state(tmp_path):
     assert pending_fill(_cfg(tmp_path))["total"] == 0
 
 
+def test_pending_fill_tolerates_corrupt_ledgers_and_skips_blank_rows(tmp_path):
+    """Corrupt jsonl / muted.json and empty rows must not hide good candidates."""
+    import json
+
+    from paperful.pending_fill import pending_fill
+
+    cfg = _cfg(tmp_path)
+    run = cfg.state_dir / "snowball" / "r1"
+    run.mkdir(parents=True)
+    (run / "candidates.jsonl").write_text(
+        "\n"
+        "{not-json}\n"
+        + json.dumps(
+            {"ids": {"doi": "10.9/ok"}, "biblio": {"title": "Good"}, "keep": True, "status": "new"}
+        )
+        + "\n"
+        + json.dumps({"keep": True, "status": "new"})  # no title, no DOI
+        + "\n"
+        + json.dumps(
+            {"biblio": {"title": "Title only"}, "keep": True, "status": "new"}
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    keep = cfg.state_dir / "keepup" / "j1"
+    keep.mkdir(parents=True)
+    (keep / "muted.json").write_text("{broken", encoding="utf-8")
+    (keep / "inbox.jsonl").write_text(
+        json.dumps({"ids": {"doi": "10.9/up"}, "biblio": {"title": "Up"}}) + "\n",
+        encoding="utf-8",
+    )
+    out = pending_fill(cfg)
+    by_title = {r["title"]: r["doi"] for r in out["rows"]}
+    assert by_title == {"Good": "10.9/ok", "Title only": "", "Up": "10.9/up"}
+    assert out["total"] == 3
+
+
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
 def test_wanted_page_lists_pending_fill_without_second_desk(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
