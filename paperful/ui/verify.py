@@ -24,6 +24,23 @@ REASON_PLAIN: dict[str, str] = {
 }
 
 
+STAMP_FOUND = "found"
+STAMP_CHECK = "check"
+
+
+def stamp_for_state(state: str | None) -> str:
+    """Wanted stamp: ``found`` only for ``doi_match``; ``check`` for other PDFs on disk.
+
+    The workbench and the cleaning-report cards both read this, so "N found"
+    always equals the number of Found stamps.
+    """
+    if state == "doi_match":
+        return STAMP_FOUND
+    if state in {"doi_mismatch", "unverified", "snapshot"}:
+        return STAMP_CHECK
+    return ""
+
+
 def verification_plain(state: str | None) -> str:
     if not state:
         return ""

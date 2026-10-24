@@ -45,3 +45,5 @@
 {% endif %}
 {% endmacro %}
 {% macro miss_surface_icon(code, plain, tip_extra='') %}{{ status_icon(code, plain, tip_extra) }}{% endmacro %}
+{# Stamps come from verify.stamp_for_state: "Found" only for doi_match. #}
+{% macro verify_stamp(stamp) %}{% if stamp == 'found' %}<span class="stamp-found" data-stamp="found">Found</span>{% elif stamp == 'check' %}<span class="stamp-check" data-stamp="check">Check</span>{% endif %}{% endmacro %}

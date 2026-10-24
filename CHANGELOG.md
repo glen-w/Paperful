@@ -8,6 +8,13 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- **Wanted stamps and report cards:** Rows with a PDF on disk carry a visible
+  **Found** stamp (only when the PDF's DOI matches the library item) or a
+  **Check** stamp (mismatch, unverified, snapshot). Missing rows print their
+  one-line reason under the title. New read-only `GET /wanted/report`
+  (`md`, `json`, `csv`) and `paperful.wanted_cards` build the same cards the
+  cleaning service reports, so "N found" equals the number of Found stamps.
+  The "summary" chip no longer reuses the Found style.
 - **Collection exclude / protect (`[[exclude]]`):** Mark hand-curated folders
   so paperful will not write to them. Presets `full` and `add_only`, plus
   fine-grained `allow_*` flags, `protect_items`, and optional

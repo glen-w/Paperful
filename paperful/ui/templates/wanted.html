@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_help.html" import info %}
-{% from "_miss_surface.html" import status_icon %}
+{% from "_miss_surface.html" import status_icon, verify_stamp %}
 {% from "_icon_btn.html" import icon_button %}
 {% from "_job_status.html" import job_status %}
 {% block title %}Wanted — Paperful{% endblock %}
@@ -11,7 +11,7 @@
 {% if coach %}<div class="coach-banner">{{ coach }} <a href="/system">System</a></div>{% endif %}
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
 {{ job_status(job) }}
-<p class="counts">Have {{ counts.have }} · Held {{ counts.held }} · Missing {{ counts.missing }}</p>
+<p class="counts">Have {{ counts.have }} · Held {{ counts.held }} · Missing {{ counts.missing }}{% if prefs.collection %} · <a href="/wanted/report?format=md">Report</a>{% endif %}</p>
 <div class="tabs">
   <span class="tab-with-help">
     <a href="{{ wanted_pagination.tab_urls.missing }}" {% if tab == 'missing' %}class="active"{% endif %}>Missing</a>
@@ -203,6 +203,7 @@
     <td><input type="checkbox" name="keys" value="{{ row.key }}" form="wanted-form" class="row-select"
       {% if row.ticked %}checked{% endif %}></td>
     <td>{{ row.title }}
+      {% if row.miss_plain %}<span class="miss-reason" data-miss-surface="{{ row.miss_surface }}">{{ row.miss_plain }}</span>{% endif %}
       {{ icon_button('Detail', 'detail', onclick="openDrawer('d-" ~ row.key ~ "')") }}
       <dialog class="wb-drawer" id="d-{{ row.key }}">
         <p><strong>{{ row.title }}</strong></p>
@@ -228,9 +229,9 @@
     </td>
     <td>
       {% if row.miss_plain %}{{ status_icon(row.miss_surface, row.miss_plain, row.miss_detail) }}
-      {% elif row.state %}{{ status_icon(row.state, row.verify_plain, row.verify_tip) }}
+      {% elif row.state %}{{ verify_stamp(row.stamp) }}{{ status_icon(row.state, row.verify_plain, row.verify_tip) }}
       {% endif %}
-      {% if row.has_summary %}<span class="stamp-found">summary</span>{% endif %}
+      {% if row.has_summary %}<span class="chip-summary">summary</span>{% endif %}
     </td>
   </tr>
   {% endfor %}

@@ -274,6 +274,30 @@ def register_wanted(ui: UiContext) -> None:
         return response
 
 
+    @app.get("/wanted/report", response_model=None)
+    def wanted_report(request: Request, format: str = "md"):
+        """Read-only report cards: same stamps as the Wanted table."""
+        from ..wanted_cards import render_markdown, render_misses_csv, report_cards
+        from fastapi.responses import PlainTextResponse
+
+        prefs = prefs_from_request(request)
+        if not prefs.collection:
+            return PlainTextResponse("Pick a collection first.", status_code=400)
+        try:
+            data = _load_wanted(cfg, prefs.collection)
+        except Exception as exc:
+            return PlainTextResponse(str(exc), status_code=502)
+        report = report_cards(data, collection=prefs.collection)
+        if format == "json":
+            return JSONResponse(report)
+        if format == "csv":
+            return PlainTextResponse(
+                render_misses_csv(report), media_type="text/csv; charset=utf-8"
+            )
+        return PlainTextResponse(
+            render_markdown(report), media_type="text/markdown; charset=utf-8"
+        )
+
     @app.post("/wanted/summarize")
     async def wanted_summarize(request: Request) -> RedirectResponse:
         prefs = prefs_from_request(request)
