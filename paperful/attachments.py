@@ -513,6 +513,20 @@ def mirror_pdfs_for(out_dir: Path, item: Item) -> list[MirrorPdf]:
     return found
 
 
+def mirror_has_bytes(raw_child: dict[str, Any], mirror: list[MirrorPdf]) -> bool:
+    """True when the mirror folder already holds this child's file (same MD5).
+
+    A match proves the manager had the bytes when the mirror was written, so
+    no manager call is needed. No MD5 or no match proves nothing; the caller
+    decides whether to ask the manager.
+    """
+    data = raw_child.get("data") or {}
+    md5 = str(data.get("md5") or "").strip().lower()
+    if not md5:
+        return False
+    return any(pdf.md5.lower() == md5 for pdf in mirror)
+
+
 def stem_filename(item: Item) -> str:
     return item_filename(item)
 

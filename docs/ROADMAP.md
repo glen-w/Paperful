@@ -735,12 +735,12 @@ and write through it. Read verbs run with Zotero closed. A first refresh of
 a 22,700-item library takes about a minute; a refresh with nothing changed
 is six requests.
 
-Still open:
-
-- **`attachments`** still reads each item's children from the manager. It
-  no longer downloads files to test for them.
-
 Closed in this pass:
+
+- **`attachments`** reads children from the mirror and proves a stored file
+  by MD5 against the item folder. The manager is asked only about bytes the
+  folder lacks (and for `--apply`). With it closed, report-only runs finish
+  and say how many attachments went unchecked (`READ_VERBS` covers it).
 
 - **Mendeley and EndNote** implement `changes(since)` (Mendeley via
   `modified_since` / `deleted_since`; EndNote via `sdb.eni` mtime). Their

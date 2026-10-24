@@ -62,9 +62,12 @@ How the code does it:
   [`library.py`](../paperful/library.py)). A trashed or merged parent is
   marked in its record. Nothing under `out/` is deleted.
 
-Four verbs talk to the manager directly, because comparing it with the
-mirror is their job: `sync`, `snapshot`, `restore`, and `attachments`. They
-exit 2 when it is down. So does any `--apply`, attach, or note write.
+Three verbs talk to the manager directly, because comparing it with the
+mirror is their job: `sync`, `snapshot`, and `restore`. They exit 2 when it is
+down. So does any `--apply`, attach, or note write. `attachments` reads each
+item's children from the mirror (`record.json`) and proves a stored file by
+MD5 against the item folder; it asks the manager only about files the folder
+does not hold, and with the manager down it does not call those ghosts.
 
 Mendeley and EndNote implement `changes(since)` and take the same
 mirror-first path as Zotero. They remain seeking testers; Zotero is the
@@ -271,8 +274,8 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
   linked-URL skips. `write-api` is `unknown` when the library was not probed.
 
 When Zotero is unreachable and there is a mirror, read commands carry on
-from it. `sync`, `snapshot`, `restore`, `attachments`, `attach`, and any
-`--apply` exit **2** and print next steps (start Zotero, enable local API,
+from it (`attachments` report-only included). `sync`, `snapshot`, `restore`,
+`attach`, and any `--apply` exit **2** and print next steps (start Zotero, enable local API,
 `paperful doctor`). With no mirror yet, every library command exits 2.
 
 (run-report-v1)=

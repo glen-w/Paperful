@@ -6,6 +6,13 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+### Changed
+
+- **`paperful attachments` is mirror-first.** The report reads children from
+  the mirror and proves stored files by MD5 against the item folder; it runs
+  with the manager closed (and notes unchecked attachments). `--apply` still
+  needs the manager and exits 2 when it is down.
+
 ### Added
 
 - **Wanted stamps and report cards:** Rows with a PDF on disk carry a visible

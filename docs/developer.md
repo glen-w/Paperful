@@ -44,8 +44,9 @@ With the manager down, the write calls raise `LibraryError` and
 `_no_write(backend)`.
 
 Use `cli._live_backend(cfg)` only when comparing the manager with the mirror
-is the command's job. Today that is `sync`, `snapshot`, `restore`, and
-`attachments`.
+is the command's job. Today that is `sync`, `snapshot`, and `restore`.
+`attachments` reads the mirror (`_connect`) and uses the manager only to
+probe stored bytes the mirror folder lacks, and for `--apply`.
 
 ## Rules for new code
 
