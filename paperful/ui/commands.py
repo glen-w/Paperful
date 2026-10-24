@@ -81,11 +81,11 @@ def iter_command_status_events(cfg: Config, cmd_id: str):
 
 def read_command(cfg: Config, cmd_id: str) -> dict[str, Any] | None:
     path = _commands_dir(cfg) / f"{cmd_id}.json"
-    if not path.is_file():
-        return None
     try:
+        if not path.is_file():
+            return None
         return json.loads(path.read_text(encoding="utf-8"))
-    except ValueError:
+    except (OSError, ValueError):
         return None
 
 

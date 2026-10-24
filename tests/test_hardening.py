@@ -308,7 +308,7 @@ def test_rag_form_upload_and_prompt_names_are_sanitized(cfg):
 @pytest.mark.skipif(fastapi_missing, reason="paperful[serve] extra missing")
 def test_run_ids_with_odd_characters_do_not_read_outside_commands(ui_client, cfg, tmp_path):
     (tmp_path / "secret.json").write_text('{"leak": true}', encoding="utf-8")
-    for bad in ("..%2f..%2fsecret", "%2e%2e", "....//secret"):
+    for bad in ("..%2f..%2fsecret", "%2e%2e", "....//secret", "x" * 400):
         res = ui_client.get(f"/v1/runs/{bad}")
         assert res.status_code in {400, 404, 422}, (bad, res.status_code)
         assert "leak" not in res.text
