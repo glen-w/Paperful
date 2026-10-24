@@ -1061,7 +1061,7 @@ def work_to_candidate(
         ids={"doi": doi, "openalex": oa},
         biblio={
             "title": work.get("display_name") or "",
-            "year": int(year) if year else None,
+            "year": _year_or_none(year),
             "authors": authors,
             "author_records": author_records,
             "venue": venue,
@@ -1142,6 +1142,17 @@ def chosen_keywords(work: dict[str, Any], *, limit: int, min_score: float) -> li
         if limit > 0 and len(out) >= limit:
             break
     return out
+
+
+def _year_or_none(value: Any) -> int | None:
+    """Publication year as int. Snapshot rows can carry strings or junk."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        year = int(float(str(value).strip()))
+    except ValueError:
+        return None
+    return year or None
 
 
 def referenced_ids(work: dict[str, Any], per_hop_limit: int = 0) -> list[str]:

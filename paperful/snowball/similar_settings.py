@@ -121,6 +121,26 @@ SIMILAR_SAVE_KEYS = (
 )
 
 
+POOL_CAP_KEYS = _POOL_KEYS
+
+
+def written_cap_keys(toml_text: str) -> list[str]:
+    """Pool cap keys present in the ``[similar_map]`` table of ``toml_text``."""
+    import sys
+
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:  # pragma: no cover
+        import tomli as tomllib
+    try:
+        table = tomllib.loads(toml_text).get("similar_map")
+    except tomllib.TOMLDecodeError:
+        return []
+    if not isinstance(table, dict):
+        return []
+    return [key for key in POOL_CAP_KEYS if key in table]
+
+
 def toml_literal(value: Any) -> str:
     """TOML literal for a settings value. ``None`` years are written as 0 (= any)."""
     if value is None:

@@ -8,7 +8,6 @@ the reasons go into ``warnings`` on the graph and the run summary.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any, Callable
 
 import httpx
@@ -80,6 +79,30 @@ def similar_client(
     return built, warnings
 
 
+def _watch_store_failures(client: OpenAlexClient) -> list[str]:
+    """Collect the client's "openalex store … failed" notes (they are not raised)."""
+    failures: list[str] = []
+    previous = client.progress
+
+    def progress(message: str) -> None:
+        if "openalex store" in message and "failed" in message:
+            failures.append(message)
+        if previous is not None:
+            previous(message)
+
+    client.progress = progress
+    return failures
+
+
+def _store_warning(failures: list[str], *, store_only: bool) -> list[str]:
+    if not failures:
+        return []
+    tail = "" if store_only else " The live API filled in where it could."
+    return [
+        f"The OpenAlex store failed {len(failures)} time(s) ({failures[0]}).{tail}"
+    ]
+
+
 def _store_can_cite(client: OpenAlexClient) -> bool:
     return client.store is not None and bool(getattr(client.store, "has_cites_index", False))
 
@@ -87,8 +110,9 @@ def _store_can_cite(client: OpenAlexClient) -> bool:
 class _Pool:
     """Pool works by OpenAlex short id, plus what went wrong while gathering."""
 
-    def __init__(self, seed_oa: str) -> None:
+    def __init__(self, seed_oa: str, client: OpenAlexClient | None = None) -> None:
         self.seed_oa = seed_oa
+        self.client = client
         self.works: dict[str, dict[str, Any]] = {}
         self.warnings: list[str] = []
         self.budget_hit = False
@@ -118,6 +142,14 @@ class _Pool:
             self.warnings.append(f"{label}: stopped early ({exc}).")
         except (OpenAlexError, httpx.HTTPError) as exc:
             self.warnings.append(f"{label}: failed ({exc}).")
+            client = self.client
+            if client is not None and client.store is not None and not client.store_only:
+                # The live API is down or unreachable. Each further call would
+                # sit through the full retry backoff, so finish from the store.
+                client.use_store_only()
+                self.warnings.append(
+                    "The live OpenAlex API did not answer, so the rest of this map used your store only."
+                )
 
 
 def similar_pool(
@@ -129,7 +161,7 @@ def similar_pool(
     from .similar import collect_partners, reference_sample
 
     seed_oa = short_id(str(work.get("id") or ""))
-    pool = _Pool(seed_oa)
+    pool = _Pool(seed_oa, client)
     can_cite = not client.store_only or _store_can_cite(client)
     if not can_cite:
         pool.warnings.append(NO_CITES_INDEX)
@@ -176,15 +208,28 @@ def similar_pool(
     return pool
 
 
-def _new_run_id() -> str:
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    return f"similar-{stamp}"
+def _release_run(state_dir: Any, run_id: str) -> None:
+    """Drop a reserved run folder that never got a queue."""
+    from pathlib import Path
+
+    try:
+        (Path(state_dir) / "snowball" / run_id).rmdir()
+    except OSError:
+        pass
+
+
+def _new_run_id(state_dir: Any) -> str:
+    from .explore import new_run_id
+
+    return new_run_id(state_dir, "similar")
 
 
 def _in_years(work: dict[str, Any], settings: SimilarSettings) -> bool:
+    if settings.year_from is None and settings.year_to is None:
+        return True
     year = work.get("publication_year")
     if year is None:
-        return settings.year_from is None and settings.year_to is None
+        return False
     try:
         value = int(year)
     except (TypeError, ValueError):
@@ -228,6 +273,7 @@ def start_similar_explore(
 
     opts = settings or for_config(cfg)
     client, warnings = similar_client(cfg, opts, client=client)
+    store_failures = _watch_store_failures(client)
     if client.store_only and not node_id.strip() and not normalize_doi(query or ""):
         raise CitationGraphError(
             "With the Similar map source set to store, paste a DOI. Title search needs the live OpenAlex API."
@@ -244,6 +290,7 @@ def start_similar_explore(
     api_before = client.requests
     pool = similar_pool(client, work, opts)
     warnings.extend(pool.warnings)
+    warnings.extend(_store_warning(store_failures, store_only=client.store_only))
 
     refs = {oa: ref_set(row) for oa, row in pool.works.items()}
     refs[seed_oa] = ref_set(work)
@@ -261,7 +308,7 @@ def start_similar_explore(
             "Not enough shared citations to build a similarity map for this paper." + hint
         )
 
-    run_id = _new_run_id()
+    run_id = _new_run_id(cfg.state_dir)
     seed_label = (query or node_id or work_node_id(work)).strip()
     seed = {"type": "explore", "value": seed_label[:200]}
     title = str(work.get("display_name") or seed_label)
@@ -305,6 +352,7 @@ def start_similar_explore(
         if len(picked) >= opts.nodes:
             break
     if not picked:
+        _release_run(cfg.state_dir, run_id)
         raise CitationGraphError(
             "Every similar paper is already in your library. Turn off Hide library papers to see them."
         )
@@ -333,7 +381,7 @@ def start_similar_explore(
     missing = [oa for oa, _ in prior if oa not in pool.works]
     fetched: dict[str, dict[str, Any]] = {}
     if missing:
-        extra_pool = _Pool(seed_oa)
+        extra_pool = _Pool(seed_oa, client)
         extra_pool.run("prior", "Prior works", lambda: client.works_by_ids(missing))
         fetched = extra_pool.works
         warnings.extend(extra_pool.warnings)

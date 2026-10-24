@@ -369,10 +369,25 @@
     var form = document.createElement("form");
     form.method = "post";
     form.action = "/discover/explore";
-    [
+    var fields = [
       ["node_id", nodeId],
       ["map", "similar"],
-    ].forEach(function (pair) {
+    ];
+    // Keep this map's own options (years, depth, …) for the next map.
+    var current = (state.similar && state.similar.settings) || null;
+    if (current) {
+      ["nodes", "coupling_weight", "pool", "year_from", "year_to", "hide_in_library", "source"].forEach(
+        function (key) {
+          if (!(key in current)) return;
+          var value = current[key];
+          if (value === null || value === undefined) value = "";
+          else if (value === true) value = "1";
+          else if (value === false) value = "0";
+          fields.push([key, String(value)]);
+        }
+      );
+    }
+    fields.forEach(function (pair) {
       var input = document.createElement("input");
       input.type = "hidden";
       input.name = pair[0];
@@ -1029,14 +1044,19 @@
     state.pathEdges = path || [];
     state.pathMode = false;
     if (els.pathMode) els.pathMode.classList.remove("is-active");
+    state.pathFirst = "";
+    // Render first: renderGraph writes its own status line.
+    renderGraph();
     if (!path) {
-      setStatus("No citation path between those papers on this map. Try Expand on each end.");
+      setStatus(
+        isSimilarity()
+          ? "No path between those papers on this map. Raise Links per paper in Settings for a denser map."
+          : "No citation path between those papers on this map. Try Expand on each end."
+      );
     } else {
       setStatus("Path: " + path.length + " link(s) on this map.");
       showPathPanel(path, paper);
     }
-    state.pathFirst = "";
-    renderGraph();
   }
 
   function bfsPath(start, end) {
@@ -1072,6 +1092,7 @@
     })[0];
     var labels = path
       .map(function (edge) {
+        if (edge.direction === "similar") return "similar to";
         return edge.direction === "cites" ? "cites" : "references";
       })
       .join(" → ");

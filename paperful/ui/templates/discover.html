@@ -97,7 +97,7 @@
     {% if explore_map == 'similar' %}
     {% for k in ['nodes', 'coupling_weight', 'pool', 'year_from', 'year_to', 'hide_in_library', 'source'] %}
     {% set v = (similar_opts or {}).get(k) %}
-    {% if v is not none %}<input type="hidden" name="{{ k }}" value="{{ 1 if v is sameas true else (0 if v is sameas false else v) }}">{% endif %}
+    <input type="hidden" name="{{ k }}" value="{{ '' if v is none else (1 if v is sameas true else (0 if v is sameas false else v)) }}">
     {% endfor %}
     {% endif %}
     {% for pick in explore_picks %}

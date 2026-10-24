@@ -127,7 +127,8 @@ def build_graph(
     catalog = resolve_catalog(enabled=map_categories, custom_defs=map_category_defs)
     similar = is_similarity_queue(rows)
     chosen = (
-        select_similar_nodes(rows, max_nodes=max_nodes)
+        # The Similar map is already capped by [similar_map].nodes (plus the origin).
+        select_similar_nodes(rows, max_nodes=max(max_nodes, len(rows)) if max_nodes > 0 else 0)
         if similar
         else select_nodes(rows, focus=focus, max_nodes=max_nodes)
     )
@@ -292,6 +293,8 @@ def repair_queue_links(
         dest, rows = load_queue(state_dir, run_id)
     except FileNotFoundError as exc:
         raise CitationGraphError("No queue for that run.") from exc
+    if is_similarity_queue(rows):
+        raise CitationGraphError("Repair links is for citation maps; a Similar map has no citation links.")
     by_id = {row.identity: row for row in rows}
     seeds = [row for row in rows if row.hop == 0]
     if not seeds:

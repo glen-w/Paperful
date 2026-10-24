@@ -43,6 +43,11 @@ may still be added). See [releases](docs/releases.md).
   They are now selected through `to_json()`, and string-encoded rows are
   decoded. `openalex-store build-cites` also creates the partition folders
   DuckDB needs, so a first build into an empty folder no longer fails.
+- **Explore maps started in the same second** (a double click) no longer share
+  one queue folder; each run reserves its own id.
+- **Citation map "Path between two papers"** kept its result message hidden
+  behind the redraw; the path result now stays on the status line.
+- **Snapshot rows with a non-numeric year** no longer crash snowball hops.
 
 ### Changed
 

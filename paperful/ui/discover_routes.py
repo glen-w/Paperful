@@ -109,6 +109,29 @@ SIMILAR_FORM_KEYS = (
 )
 
 
+def similar_overrides(cfg: Config, form: Any) -> dict[str, Any]:
+    """Per-map overrides from the Explore form.
+
+    An empty year means "any year" for this map. ``pool`` is dropped when it
+    matches the configured depth, so exact caps from config.toml still apply.
+    """
+    from ..snowball.similar_settings import for_config
+
+    base = for_config(cfg)
+    out: dict[str, Any] = {}
+    for key in SIMILAR_FORM_KEYS:
+        if key not in form:
+            continue
+        value = form.get(key)
+        if key in ("year_from", "year_to"):
+            out[key] = value if str(value or "").strip() else 0
+        elif value not in (None, ""):
+            out[key] = value
+    if str(out.get("pool") or "").strip().lower() == base.pool:
+        out.pop("pool")
+    return out
+
+
 def _similar_form_values(cfg: Config, overrides: dict[str, Any] | None) -> dict[str, Any]:
     """Explore form defaults: config, then whatever the last submit chose."""
     from ..snowball.similar_settings import for_config
@@ -333,11 +356,7 @@ def register_discover(ui: UiContext) -> None:
         query = str(form.get("query") or "").strip()
         node_id = str(form.get("node_id") or "").strip()
         map_kind = "similar" if str(form.get("map") or "").strip() == "similar" else "citation"
-        overrides = {
-            key: form.get(key)
-            for key in SIMILAR_FORM_KEYS
-            if form.get(key) not in (None, "")
-        }
+        overrides = similar_overrides(cfg, form)
         try:
             if map_kind == "similar":
                 similar_explore.start_similar_explore(
@@ -379,12 +398,12 @@ def register_discover(ui: UiContext) -> None:
             )
         except CitationGraphError as exc:
             return RedirectResponse(
-                url=_page_url("/discover", tab="explore", error=str(exc)[:120]),
+                url=_page_url("/discover", tab="explore", error=str(exc)[:400]),
                 status_code=303,
             )
         except OpenAlexBudgetExceeded as exc:
             return RedirectResponse(
-                url=_page_url("/discover", tab="explore", error=str(exc)[:120]),
+                url=_page_url("/discover", tab="explore", error=str(exc)[:400]),
                 status_code=303,
             )
         return RedirectResponse(

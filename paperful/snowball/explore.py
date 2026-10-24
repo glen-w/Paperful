@@ -98,9 +98,30 @@ def resolve_work(
     raise ExploreAmbiguous([_pick_from_work(item) for item in works])
 
 
-def _new_explore_run_id() -> str:
+def new_run_id(state_dir: Path, prefix: str) -> str:
+    """``<prefix>-<UTC stamp>``, with ``-2``, ``-3`` … when that run already exists.
+
+    Two maps started in the same second (a double click on Map this) must not
+    share one queue folder.
+    """
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    return f"explore-{stamp}"
+    base = f"{prefix}-{stamp}"
+    root = Path(state_dir) / "snowball"
+    root.mkdir(parents=True, exist_ok=True)
+    run_id = base
+    n = 2
+    while True:
+        try:
+            # mkdir is the reservation: concurrent requests cannot both win.
+            (root / run_id).mkdir()
+            return run_id
+        except FileExistsError:
+            run_id = f"{base}-{n}"
+            n += 1
+
+
+def _new_explore_run_id(state_dir: Path) -> str:
+    return new_run_id(state_dir, "explore")
 
 
 def start_explore(
@@ -114,7 +135,7 @@ def start_explore(
 ) -> tuple[str, dict[str, Any]]:
     """Seed a tiny queue, mark library overlap, expand one both-direction hop."""
     work = resolve_work(client, query=query, node_id=node_id)
-    run_id = _new_explore_run_id()
+    run_id = _new_explore_run_id(cfg.state_dir)
     seed_label = (query or node_id or work_node_id(work)).strip()
     row = work_to_candidate(
         work,
