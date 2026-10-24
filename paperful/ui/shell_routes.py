@@ -219,6 +219,8 @@ def register_shell(ui: UiContext) -> None:
 
     @app.get("/settings", response_class=HTMLResponse)
     def page_settings(request: Request, saved: int = 0) -> HTMLResponse:
+        from ..snowball.similar_settings import for_config
+
         return templates.TemplateResponse(
             request,
             "settings.html",
@@ -233,8 +235,38 @@ def register_shell(ui: UiContext) -> None:
                 show_auto_attach_setting=library_has_attached_pdf(cfg),
                 citation_map_edit=cfg.ui_citation_map_edit,
                 citation_map_auto_search=cfg.ui_citation_map_auto_search,
+                similar=for_config(cfg).to_dict(),
+                similar_store_configured=bool((cfg.openalex_store_backend or "").strip()),
+                config_writable=cfg.config_path is not None and cfg.config_path.is_file(),
             ),
         )
+
+    @app.post("/settings/similar-map")
+    async def save_similar_map(request: Request) -> RedirectResponse:
+        from ..snowball.similar_settings import DEFAULT, SIMILAR_SAVE_KEYS, for_config, toml_literal
+
+        form = await request.form()
+        if form.get("reset") == "1":
+            chosen = DEFAULT
+        else:
+            raw = {key: form.get(key) for key in SIMILAR_SAVE_KEYS if key in form}
+            # Unchecked boxes are absent from the form.
+            raw["hide_in_library"] = form.get("hide_in_library") == "1"
+            for key in ("year_from", "year_to"):
+                if not str(raw.get(key) or "").strip():
+                    raw[key] = 0
+            chosen = for_config(cfg).merged(raw)
+        cfg.similar_map = chosen
+        path = cfg.config_path
+        if path is not None and path.is_file():
+            text = path.read_text(encoding="utf-8")
+            values = chosen.to_dict()
+            for key in SIMILAR_SAVE_KEYS:
+                text = _patch_section_assignment(
+                    text, "similar_map", key, toml_literal(values.get(key))
+                )
+            path.write_text(text, encoding="utf-8")
+        return RedirectResponse(url="/settings?saved=1#similar-map", status_code=303)
 
 
     @app.post("/settings")

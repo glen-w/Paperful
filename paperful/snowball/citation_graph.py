@@ -146,12 +146,14 @@ def build_graph(
         )
         for row in chosen
     ]
+    similar_report: dict[str, Any] | None = None
     if similar:
         edges = _sim_edges(chosen)
         _attach_origin_paths(chosen, nodes, edges)
+        similar_report = _similar_report(rows)
     else:
         edges = _edges(chosen)
-    return {
+    graph = {
         "v": 1,
         "schema": SCHEMA,
         "run_id": run_id,
@@ -171,6 +173,25 @@ def build_graph(
         "nodes": nodes,
         "edges": edges,
     }
+    if similar_report is not None:
+        on_map = {node["id"] for node in nodes}
+        report = dict(similar_report)
+        for key in ("prior", "derivative"):
+            items = report.get(key)
+            report[key] = [
+                item for item in items if isinstance(item, dict) and item.get("id") not in on_map
+            ] if isinstance(items, list) else []
+        graph["similar"] = report
+    return graph
+
+
+def _similar_report(rows: list[Candidate]) -> dict[str, Any]:
+    """Run report saved on the origin row (settings, source, warnings, extras)."""
+    for row in rows:
+        report = row.biblio.get("similar_report")
+        if row.hop == 0 and isinstance(report, dict):
+            return report
+    return {}
 
 
 def write_graph(
@@ -498,7 +519,7 @@ def expand_queue(
         raise CitationGraphError("No queue for that run.") from exc
     if is_similarity_queue(rows):
         raise CitationGraphError(
-            "Expand is for citation maps. Start a new Similar explore from this paper instead."
+            "Expand is for citation maps. Use New Similar map from this paper instead."
         )
     target = next((row for row in rows if row.identity == target_id), None)
     if target is None:

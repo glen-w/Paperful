@@ -354,6 +354,20 @@ concurrency = 2
 # # build_timeout_s = 7200
 # # ssh_host = "nuc"         # ssh_duckdb only
 # # ssh_user = "you"
+# Similar map defaults (Discover → Explore → Similar papers; also Settings).
+# [similar_map]
+# nodes = 40              # papers on the map (5–150)
+# peers = 4               # links per paper (1–10)
+# min_similarity = 0.02
+# coupling_weight = 0.5   # 1 = shared references only, 0 = co-citation only
+# pool = "standard"       # small | standard | large
+# year_from = 0           # 0 = any
+# year_to = 0
+# hide_in_library = false
+# prior_works = 10
+# derivative_works = 10
+# color = "role"          # role | year
+# source = "auto"         # auto | store (self-hosted OpenAlex only) | api
 # Alert loop / weekly collection digest. Paperful does not schedule;
 # point cron at `paperful keepup run <name>`. Interval is also stored per job.
 # [keepup]

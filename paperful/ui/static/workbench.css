@@ -1165,3 +1165,27 @@ body.citation-large-open {
     grid-template-columns: 1fr;
   }
 }
+
+/* Similar map: run warnings and prior / derivative lists. */
+.citation-warning {
+  color: var(--accent-deep);
+}
+.citation-extras {
+  margin-top: 0.9rem;
+}
+.citation-extras h4 {
+  margin: 0 0 0.2rem;
+}
+.citation-extras ol {
+  margin: 0.3rem 0 0;
+  padding-left: 1.2rem;
+}
+.citation-extras li {
+  margin-bottom: 0.35rem;
+  overflow-wrap: anywhere;
+}
+.citation-mini {
+  font-size: 0.75rem;
+  padding: 0.1rem 0.45rem;
+  margin-left: 0.25rem;
+}

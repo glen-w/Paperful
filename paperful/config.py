@@ -371,6 +371,9 @@ class Config:
     ui_citation_map_auto_search: bool = False
     # Remove from library: trash (default). remove_from_collection reserved.
     ui_citation_map_remove: str = "trash"
+    # [similar_map] knobs (paperful.snowball.similar_settings.SimilarSettings).
+    # None means the defaults; read it through similar_settings.for_config(cfg).
+    similar_map: Any = None
     # Attachment hygiene. Off until `paperful attachments --apply`.
     attachments_fix_broken: bool = False
     attachments_merge_files: bool = False

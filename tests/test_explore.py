@@ -144,8 +144,10 @@ def test_discover_explore_route_similar(tmp_path, monkeypatch):
     monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
     monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
     calls: list[str] = []
+    seen: dict = {}
 
-    def fake_similar(_cfg, _client, **kwargs):
+    def fake_similar(_cfg, **kwargs):
+        seen.update(kwargs)
         calls.append("similar")
         return "similar-test", {"layout": "similarity", "nodes": [], "edges": []}
 
@@ -153,16 +155,19 @@ def test_discover_explore_route_similar(tmp_path, monkeypatch):
         calls.append("citation")
         return "explore-test", {"nodes": [], "edges": []}
 
-    monkeypatch.setattr("paperful.snowball.explore.start_similar_explore", fake_similar)
+    monkeypatch.setattr("paperful.snowball.similar_explore.start_similar_explore", fake_similar)
     monkeypatch.setattr("paperful.snowball.explore.start_explore", fake_citation)
     client = TestClient(create_app(cfg))
     page = client.get("/discover?tab=explore")
     assert 'name="map" value="similar"' in page.text
     resp = client.post(
         "/discover/explore",
-        data={"query": "10.1000/seed", "map": "similar"},
+        data={"query": "10.1000/seed", "map": "similar", "nodes": "12", "coupling_weight": "0.8", "source": "api"},
         follow_redirects=False,
     )
     assert resp.status_code == 303
     assert "/discover?tab=queue" in resp.headers["location"]
     assert calls == ["similar"]
+    assert seen["settings"].nodes == 12
+    assert seen["settings"].coupling_weight == 0.8
+    assert seen["settings"].source == "api"

@@ -46,6 +46,52 @@ STORE_COLUMNS = (
 
 _ALLOWED_COLUMNS = frozenset(STORE_COLUMNS)
 
+#: List / struct columns. The DuckDB CLI prints these as display strings
+#: ("[a, b]") in -json mode, so they are selected through to_json().
+NESTED_COLUMNS = frozenset(
+    {
+        "referenced_works",
+        "authorships",
+        "primary_location",
+        "open_access",
+        "keywords",
+        "study_designs",
+    }
+)
+
+
+def select_list(columns: list[str], prefix: str = "") -> str:
+    """SELECT list with nested columns wrapped in to_json() and aliased back."""
+    parts: list[str] = []
+    for name in columns:
+        ref = f"{prefix}{name}"
+        parts.append(f"to_json({ref}) AS {name}" if name in NESTED_COLUMNS else ref)
+    return ", ".join(parts)
+
+
+def _decode_nested(row: dict[str, Any]) -> dict[str, Any]:
+    """Undo string-encoded nested values (older output or a different runner)."""
+    for name in NESTED_COLUMNS:
+        value = row.get(name)
+        if not isinstance(value, str):
+            continue
+        text = value.strip()
+        if not text:
+            row[name] = None if name != "referenced_works" else []
+            continue
+        try:
+            row[name] = json.loads(text)
+            continue
+        except ValueError:
+            pass
+        if name == "referenced_works" and text.startswith("[") and text.endswith("]"):
+            # DuckDB display form: [https://openalex.org/W1, https://openalex.org/W2]
+            inner = text[1:-1].strip()
+            row[name] = [part.strip() for part in inner.split(",") if part.strip()] if inner else []
+        else:
+            row[name] = None
+    return row
+
 #: Env overrides (optional; config wins when set).
 SSH_HOST_ENV = "OPENALEX_STORE_SSH_HOST"
 PARQUET_GLOB_ENV = "OPENALEX_STORE_PARQUET_GLOB"
@@ -153,7 +199,7 @@ def build_works_sql(
     """Build a DuckDB SELECT over ``read_parquet`` for DOI or id batches."""
     if bool(dois) == bool(openalex_ids):
         raise OpenAlexStoreError("build_works_sql needs exactly one of dois or openalex_ids")
-    cols = ", ".join(columns)
+    cols = select_list(columns)
     source = (
         f"read_parquet({_sql_str(parquet_glob)}, union_by_name := true)"
     )
@@ -187,13 +233,13 @@ def build_citing_sql(
     cols_list = list(columns or STORE_COLUMNS)
     cited = normalize_store_id(openalex_id)
     if not cited:
-        cols = ", ".join(f"w.{c}" for c in cols_list)
+        cols = select_list(cols_list, "w.")
         return (
             f"SELECT {cols} FROM read_parquet({_sql_str(works_glob)}, "
             f"union_by_name := true) AS w WHERE 1 = 0"
         )
     cap = max(0, int(limit))
-    cols = ", ".join(f"w.{c}" for c in cols_list)
+    cols = select_list(cols_list, "w.")
     cites = (
         f"read_parquet({_sql_str(cites_index_glob)}, union_by_name := true) AS c"
     )
@@ -333,9 +379,9 @@ def parse_duckdb_json(stdout: str) -> list[dict[str, Any]]:
         return []
     data = json.loads(text)
     if isinstance(data, list):
-        return [row for row in data if isinstance(row, dict)]
+        return [_decode_nested(row) for row in data if isinstance(row, dict)]
     if isinstance(data, dict):
-        return [data]
+        return [_decode_nested(data)]
     raise OpenAlexStoreError("openalex store returned non-object JSON")
 
 
@@ -503,6 +549,8 @@ class _DuckDbWorksStore:
                 if self._path_exists(file_marker):
                     continue
                 self._remove_tree(file_out)
+                # DuckDB's partitioned COPY does not create missing parent folders.
+                self._ensure_dir(file_out.rsplit("/", 1)[0])
                 sql = build_cites_file_sql(
                     works_parquet=parquet_path,
                     output_dir=file_out,

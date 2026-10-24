@@ -827,19 +827,40 @@ It is not a citation tree. Papers sit close together when they cite the same
 works (bibliographic coupling) or are cited together by the same works
 (co-citation), even if neither cites the other.
 
-- **Pool.** The seed's references (up to 200), the works citing it (up to
-  150, most cited first), works that cite its eight most-shared references,
-  and the 60 works its citers cite most. That is roughly 15–25 OpenAlex calls.
-- **Score.** Each measure is a Salton cosine (`shared / √(|A|·|B|)`), and the
-  score is their mean, from 0 to 1. Co-citation counts only the citing works in
-  the pool, so it is a sample, not the whole corpus.
-- **Map.** The 40 papers most similar to the seed. Each keeps links to its four
-  strongest peers, and stronger links pull papers closer. Clicking a paper
-  highlights its strongest path back to the origin.
-- **Limits.** A Similar map cannot be expanded; start a new Similar explore
-  from another node instead. Keep, Add to library, Find PDF, and tags work as on
-  a citation map. If the OpenAlex budget runs out mid-pool, the map is built
-  from what was gathered (`budget_hit` in the run `summary.json`).
+- **Pool.** The seed's references, the works citing it (most cited first),
+  works that cite its most-shared references, and the works its citers cite
+  most. *Standard* depth caps these at 200 / 150 / 8×25 / 60, which is roughly
+  15–25 OpenAlex calls; *Small* and *Large* halve or double that.
+- **Score.** Each measure is a Salton cosine (`shared / √(|A|·|B|)`). The
+  score is their weighted mean, from 0 to 1 (`coupling_weight`, 0.5 by
+  default). Co-citation counts only the citing works in the pool, so it is a
+  sample, not the whole corpus.
+- **Map.** The 40 papers most similar to the seed (`nodes`). Each keeps links to
+  its four strongest peers (`peers`), and stronger links pull papers closer.
+  Clicking a paper highlights its strongest path back to the origin. Colour is
+  by role (default) or by publication year.
+- **Beside the map.** Until you pick a paper, the side panel lists **prior
+  works** (papers many map papers cite) and **derivative works** (pool papers
+  citing many map papers). **Map this** and **New Similar map from this paper**
+  start a fresh Similar map from any of them.
+- **Limits.** A Similar map cannot be expanded; start a new Similar map from
+  another paper instead. Keep, Add to library, Find PDF, and tags work as on a
+  citation map. Each gathering step can fail on its own (budget, network,
+  store): the map is built from what arrived, and the reasons show above the
+  map and in the run `summary.json` (`similar.warnings`, `budget_hit`).
+
+**Settings.** Defaults live in `[similar_map]` ([config](config.md#similar-map))
+and on **Settings → Similar map**. The Explore form's *Similar map options*
+change papers on the map, similarity measure, search depth, years, library
+papers, and data source for one map only.
+
+**Self-hosted OpenAlex.** With an [`[openalex_store]`](config.md#openalex-api-limits-and-snapshot-store)
+configured, `source = "auto"` (the default) reads the store first and asks the
+live API only for what is missing. `source = "store"` never calls the live API:
+paste a DOI (title search needs the API) and build a cites index
+(`paperful openalex-store build-cites`), or citing papers are skipped and the
+map leans on shared references. `source = "api"` ignores the store. The status
+line above the map says which source was used and how many API calls it made.
 
 Discover **Map** draws the current queue before you open PDFs. Node colour is
 year × `cited_by_count`:

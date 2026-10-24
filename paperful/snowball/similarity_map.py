@@ -2,7 +2,8 @@
 
 Two papers count as similar when they cite the same works (bibliographic
 coupling) or are cited together by the same works (co-citation). Each measure
-is a Salton cosine, and the score is their mean, from 0 to 1. The map keeps the
+is a Salton cosine, and the score is their weighted mean, from 0 to 1
+(``coupling_weight`` 0.5 by default). The map keeps the
 works most similar to the seed, links each one to its strongest peers, and
 records the strongest route from every node back to the seed.
 
@@ -63,13 +64,18 @@ def similarity(
     b: str,
     refs: dict[str, set[str]],
     citers: dict[str, set[str]],
+    coupling_weight: float = 0.5,
 ) -> tuple[float, int, int]:
-    """``(score, shared refs, co-citing works)`` for two works in the pool."""
+    """``(score, shared refs, co-citing works)`` for two works in the pool.
+
+    ``coupling_weight`` 1.0 scores shared references only; 0.0 co-citation only.
+    """
     if a == b:
         return 0.0, 0, 0
+    w = max(0.0, min(1.0, float(coupling_weight)))
     coupling, shared_refs = _cosine(refs.get(a, set()), refs.get(b, set()))
     cocite, shared_citers = _cosine(citers.get(a, set()), citers.get(b, set()))
-    return (coupling + cocite) / 2.0, shared_refs, shared_citers
+    return w * coupling + (1.0 - w) * cocite, shared_refs, shared_citers
 
 
 def score_to_seed(
@@ -77,13 +83,15 @@ def score_to_seed(
     refs: dict[str, set[str]],
     citers: dict[str, set[str]],
     candidates: Iterable[str],
+    *,
+    coupling_weight: float = 0.5,
 ) -> dict[str, tuple[float, int, int]]:
     """Similarity to the seed for each candidate. Works scoring zero are left out."""
     out: dict[str, tuple[float, int, int]] = {}
     for oa in candidates:
         if oa == seed or oa in out:
             continue
-        hit = similarity(seed, oa, refs, citers)
+        hit = similarity(seed, oa, refs, citers, coupling_weight)
         if hit[0] > 0:
             out[oa] = hit
     return out
@@ -108,6 +116,7 @@ def pairwise_links(
     *,
     k: int = SIM_K,
     floor: float = SIM_MIN,
+    coupling_weight: float = 0.5,
 ) -> dict[tuple[str, str], tuple[float, int, int]]:
     """Undirected edges: each node's ``k`` strongest peers at or above ``floor``.
 
@@ -117,7 +126,7 @@ def pairwise_links(
     scored: dict[tuple[str, str], tuple[float, int, int]] = {}
     for i, a in enumerate(ids):
         for b in ids[i + 1 :]:
-            hit = similarity(a, b, refs, citers)
+            hit = similarity(a, b, refs, citers, coupling_weight)
             if hit[0] < floor or hit[0] <= 0:
                 continue
             key = (a, b) if a < b else (b, a)
@@ -214,3 +223,48 @@ def origin_paths(
             cur = prev
         out[node] = path
     return out
+
+
+def prior_works(
+    map_ids: list[str],
+    refs: dict[str, set[str]],
+    *,
+    limit: int,
+    min_count: int = 2,
+) -> list[tuple[str, int]]:
+    """Works the map cites most that are not on it: ``[(id, map papers citing it)]``."""
+    if limit <= 0:
+        return []
+    on_map = set(map_ids)
+    counts: dict[str, int] = {}
+    for oa in map_ids:
+        for ref in refs.get(oa, ()):
+            if ref not in on_map:
+                counts[ref] = counts.get(ref, 0) + 1
+    ranked = sorted(
+        (oa for oa, n in counts.items() if n >= min_count),
+        key=lambda oa: (-counts[oa], oa),
+    )
+    return [(oa, counts[oa]) for oa in ranked[:limit]]
+
+
+def derivative_works(
+    map_ids: list[str],
+    refs: dict[str, set[str]],
+    *,
+    limit: int,
+    min_count: int = 2,
+) -> list[tuple[str, int]]:
+    """Pool works citing the most map papers, not on the map: ``[(id, map papers cited)]``."""
+    if limit <= 0:
+        return []
+    on_map = set(map_ids)
+    counts: dict[str, int] = {}
+    for oa, cited in refs.items():
+        if oa in on_map:
+            continue
+        hits = len(cited & on_map)
+        if hits >= min_count:
+            counts[oa] = hits
+    ranked = sorted(counts, key=lambda oa: (-counts[oa], oa))
+    return [(oa, counts[oa]) for oa in ranked[:limit]]

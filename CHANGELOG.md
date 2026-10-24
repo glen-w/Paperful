@@ -13,7 +13,15 @@ may still be added). See [releases](docs/releases.md).
   references and citers with the origin (bibliographic coupling plus
   co-citation), places them by similarity, and highlights each paper's
   strongest path back to the origin. Add to library and Find PDF work as on
-  the citation map. See [snowball](docs/snowball.md#similar-map).
+  the citation map. Defaults are set in `[similar_map]` or Settings →
+  Similar map (papers on the map, links per paper, shared references vs
+  co-citation, minimum similarity, search depth, years, hide library papers,
+  colour by role or year, data source). The Explore form can override them for
+  one map. The side panel lists prior and derivative works, and any paper can
+  start a new Similar map. Runs on a self-hosted OpenAlex store
+  (`source = "store"` never calls the live API). A failing step (budget,
+  network, store) becomes a warning on the map instead of an error. See
+  [snowball](docs/snowball.md#similar-map).
 - **Local-trust hardening:** SSRF checks on PDF fetch URLs and redirects
   (block loopback / private / link-local / metadata), review-token path
   sanitization, `serve --allow-remote-bind` gate for non-loopback binds,
@@ -26,6 +34,15 @@ may still be added). See [releases](docs/releases.md).
   `skip_library_scope`. Enforced on library backend writes (Zotero, Mendeley,
   and EndNote create/path/attach/notes/tags/update). See
   [config](docs/config.md#exclude--protect-collections).
+
+### Fixed
+
+- **OpenAlex snapshot store:** list and struct columns (`referenced_works`,
+  `authorships`, `primary_location`, …) came back from the DuckDB CLI as
+  display strings, so reference hops from a self-hosted store found nothing.
+  They are now selected through `to_json()`, and string-encoded rows are
+  decoded. `openalex-store build-cites` also creates the partition folders
+  DuckDB needs, so a first build into an empty folder no longer fails.
 
 ### Changed
 

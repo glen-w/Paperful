@@ -196,7 +196,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/wanted/reachout` | Export contact rows; optional RG tabs |
 | POST | `/wanted/summarize` | Enqueue single-item `summarize`; redirect `?run=` |
 | GET | `/item/{key}/summary` | Per-item HTML under `state/summaries/` |
-| POST | `/discover/explore` | Resolve a DOI or title into an explore queue; open Map (picker when title is ambiguous). `map=similar` builds a [similarity map](snowball.md#similar-map) instead of a citation map |
+| POST | `/discover/explore` | Resolve a DOI or title into an explore queue; open Map (picker when title is ambiguous). `map=similar` builds a [similarity map](snowball.md#similar-map) instead of a citation map; `nodes`, `coupling_weight`, `pool`, `year_from`, `year_to`, `hide_in_library`, `source` override `[similar_map]` for that map |
 | POST | `/discover/topic` | Enqueue snowball kind (Advanced) or keyword search |
 | POST | `/discover/profile-save` | Save snowball profile from the topic form |
 | POST | `/discover/refs-gap` | Dry-run refs gap pack for the collection chip |
@@ -240,6 +240,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/prefs/advanced` | Toggle Advanced cookie |
 | POST | `/prefs/collection` | Remember collection chip cookie |
 | POST | `/settings` | Write allowed `config.toml` fields |
+| POST | `/settings/similar-map` | Write `[similar_map]` defaults (`reset=1` restores them) |
 | POST | `/repair/preview` | Dry-run repair verb + review token |
 | POST | `/repair/apply` | Consume token; apply repair verb |
 | POST | `/mirror/preview` | Dry-run mirror verb + review token |

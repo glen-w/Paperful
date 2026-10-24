@@ -47,6 +47,7 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_mendeley(raw, cfg)
     apply_endnote(raw, cfg, source)
     apply_openalex_store(raw, cfg)
+    apply_similar_map(raw, cfg)
     apply_searxng(raw, cfg)
     apply_keepup(raw, cfg)
     apply_ui(raw, cfg)
@@ -663,6 +664,15 @@ def apply_openalex_store(raw: dict[str, Any], cfg: "Config") -> None:
             ),
         ],
     )
+
+
+def apply_similar_map(raw: dict[str, Any], cfg: "Config") -> None:
+    table = raw.get("similar_map")
+    if not isinstance(table, dict):
+        return
+    from .snowball.similar_settings import from_mapping
+
+    cfg.similar_map = from_mapping(table)
 
 
 def apply_searxng(raw: dict[str, Any], cfg: "Config") -> None:

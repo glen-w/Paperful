@@ -51,12 +51,55 @@
       <label><input type="radio" name="map" value="citation" {% if explore_map != 'similar' %}checked{% endif %}> Citation map</label>
       <label><input type="radio" name="map" value="similar" {% if explore_map == 'similar' %}checked{% endif %}> Similar papers (co-citation + shared references)</label>
     </div>
+    {% set so = similar_opts or {} %}
+    <details class="field-group" id="similarOptions">
+      <summary>Similar map options {{ info("Only used for Similar papers. Defaults come from Settings → Similar map ([similar_map] in config.toml). Changes here apply to this map only.") }}</summary>
+      <label>Papers on the map {{ info("How many similar papers to show around the origin (5–150).") }}
+        <input type="number" name="nodes" min="5" max="150" value="{{ so.nodes }}">
+      </label>
+      <label>Similarity measure {{ info("Shared references (bibliographic coupling) favour papers built on the same literature. Co-citation favours papers that later work reads together. Balanced mixes both.") }}
+        <select name="coupling_weight">
+          <option value="0.5" {% if so.coupling_weight == 0.5 %}selected{% endif %}>Balanced</option>
+          <option value="0.8" {% if so.coupling_weight == 0.8 %}selected{% endif %}>Mostly shared references</option>
+          <option value="0.2" {% if so.coupling_weight == 0.2 %}selected{% endif %}>Mostly co-citation</option>
+          <option value="1" {% if so.coupling_weight == 1.0 %}selected{% endif %}>Shared references only</option>
+          <option value="0" {% if so.coupling_weight == 0.0 %}selected{% endif %}>Co-citation only</option>
+          {% if so.coupling_weight not in [0.0, 0.2, 0.5, 0.8, 1.0] %}<option value="{{ so.coupling_weight }}" selected>Custom ({{ so.coupling_weight }})</option>{% endif %}
+        </select>
+      </label>
+      <label>Search depth {{ info("How many papers to gather and score. Small is quickest; Large finds more but makes more OpenAlex calls (or store queries).") }}
+        <select name="pool">
+          {% for p in ['small', 'standard', 'large'] %}<option value="{{ p }}" {% if so.pool == p %}selected{% endif %}>{{ p|capitalize }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>From year <input type="number" name="year_from" min="1000" max="3000" value="{{ so.year_from or '' }}" placeholder="any"></label>
+      <label>To year <input type="number" name="year_to" min="1000" max="3000" value="{{ so.year_to or '' }}" placeholder="any"></label>
+      <label>Library papers {{ info("Hide papers you already have, so the map only shows what is new to you.") }}
+        <select name="hide_in_library">
+          <option value="0" {% if not so.hide_in_library %}selected{% endif %}>Show (ringed)</option>
+          <option value="1" {% if so.hide_in_library %}selected{% endif %}>Hide</option>
+        </select>
+      </label>
+      <label>Data source {{ info("Auto: your OpenAlex store first ([openalex_store]), then the live API. Store: never call the live API (needs a DOI, and a cites index for citing papers). Live API: ignore the store.") }}
+        <select name="source">
+          <option value="auto" {% if so.source == 'auto' %}selected{% endif %}>Auto</option>
+          <option value="store" {% if so.source == 'store' %}selected{% endif %} {% if not so.store_configured %}disabled{% endif %}>Local store only{% if not so.store_configured %} (not configured){% endif %}</option>
+          <option value="api" {% if so.source == 'api' %}selected{% endif %}>Live API only</option>
+        </select>
+      </label>
+    </details>
     <button type="submit">Open map</button>
   </form>
   {% if explore_picks %}
   <form method="post" action="/discover/explore" class="form-stack explore-picks">
     <p class="field-legend">Several matches — choose one</p>
     <input type="hidden" name="map" value="{{ explore_map or 'citation' }}">
+    {% if explore_map == 'similar' %}
+    {% for k in ['nodes', 'coupling_weight', 'pool', 'year_from', 'year_to', 'hide_in_library', 'source'] %}
+    {% set v = (similar_opts or {}).get(k) %}
+    {% if v is not none %}<input type="hidden" name="{{ k }}" value="{{ 1 if v is sameas true else (0 if v is sameas false else v) }}">{% endif %}
+    {% endfor %}
+    {% endif %}
     {% for pick in explore_picks %}
     <label class="explore-pick-row">
       <input type="radio" name="node_id" value="{{ pick.id }}" {% if loop.first %}checked{% endif %}>
@@ -449,7 +492,8 @@
 {% if run_id %}
 <section class="panel" id="citationMapApp" data-run-id="{{ run_id }}" data-graph="/discover/graph?run_id={{ run_id }}" data-watch-name="{{ map_watch_name }}" data-compare-run="{{ map_compare_run }}">
   <h2>Map</h2>
-  <p class="section-lede">Not every paper deserves the same time. Older and highly cited work is likely foundational. Recent and highly cited work is influential now. Recent work with fewer citations may be emerging. Keyword and similar neighbours appear without citation links. Expand a node to see who it cites and who cites it, then Keep what you will read.</p>
+  <p class="section-lede" id="citationLedeSimilar" style="display:none">This is a similarity map, not a citation tree. Papers sit close together when they share references or are cited together, even if they never cite each other. Click a paper to trace its strongest path to the origin, or start a new Similar map from it. Prior and derivative works are listed beside the map until you pick a paper.</p>
+  <p class="section-lede" id="citationLedeCitation">Not every paper deserves the same time. Older and highly cited work is likely foundational. Recent and highly cited work is influential now. Recent work with fewer citations may be emerging. Keyword and similar neighbours appear without citation links. Expand a node to see who it cites and who cites it, then Keep what you will read.</p>
   <div class="citation-toolbar">
     <div class="citation-filters" role="group" aria-label="Citation direction">
       <button type="button" class="citation-filter is-active" data-direction="both" aria-pressed="true">Both</button>
@@ -481,7 +525,12 @@
       <p class="citation-panel-empty">Click a paper to see why it is on the map.</p>
     </aside>
   </div>
-  <ul class="citation-legend">
+  <ul class="citation-legend" id="citationYearLegend" style="display:none">
+    <li><span class="citation-swatch" style="background:#c9d6e3" aria-hidden="true"></span> Older</li>
+    <li><span class="citation-swatch" style="background:#1d3557" aria-hidden="true"></span> Newer</li>
+    <li><span class="citation-swatch library" aria-hidden="true"></span> In your library (dark ring)</li>
+  </ul>
+  <ul class="citation-legend" id="citationRoleLegend">
     <li><span class="citation-swatch foundational" aria-hidden="true"></span> Foundational</li>
     <li><span class="citation-swatch influential" aria-hidden="true"></span> Influential</li>
     <li><span class="citation-swatch emerging" aria-hidden="true"></span> Emerging</li>

@@ -106,6 +106,18 @@ class OpenAlexClient:
             return None
         return "study_designs.id:" + "|".join(cleaned)
 
+    def use_store_only(self) -> None:
+        """Never call the live API. DOI/id and citing (with a cites index) use the store."""
+        self._store_only = True
+        if self._budget is None:
+            self._budget = OpenAlexBudgetExceeded(
+                "The live OpenAlex API is off (source = store); only the local store is used"
+            )
+
+    @property
+    def store_only(self) -> bool:
+        return self._store_only
+
     def get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         if self._budget is not None:
             raise self._budget

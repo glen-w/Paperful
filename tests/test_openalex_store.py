@@ -1013,3 +1013,33 @@ def test_works_citing_api_budget_falls_back_to_store_mid_call():
     rows2 = client2.works_citing("Wmissing", limit=5)
     assert rows2 == []
     assert client2._store_only
+
+
+def test_nested_columns_selected_as_json():
+    from paperful.snowball.local_openalex import build_works_sql, select_list
+
+    assert select_list(["id", "referenced_works"], "w.") == (
+        "w.id, to_json(w.referenced_works) AS referenced_works"
+    )
+    sql = build_works_sql(
+        parquet_glob="/x/*.parquet", columns=["id", "authorships"], openalex_ids=["W1"]
+    )
+    assert "to_json(authorships) AS authorships" in sql
+
+
+def test_parse_decodes_string_encoded_lists():
+    from paperful.snowball.local_openalex import parse_duckdb_json
+    from paperful.snowball.openalex import referenced_ids
+
+    rows = parse_duckdb_json(
+        '[{"id": "https://openalex.org/W1",'
+        ' "referenced_works": "[https://openalex.org/W2, https://openalex.org/W3]",'
+        ' "primary_location": "{\\"source\\": null}",'
+        ' "authorships": "[]"}]'
+    )
+    assert referenced_ids(rows[0]) == ["W2", "W3"]
+    assert rows[0]["primary_location"] == {"source": None}
+    assert rows[0]["authorships"] == []
+    # Real JSON lists (to_json output) pass through untouched.
+    rows = parse_duckdb_json('[{"referenced_works": ["https://openalex.org/W9"]}]')
+    assert referenced_ids(rows[0]) == ["W9"]

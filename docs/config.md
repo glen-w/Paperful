@@ -431,6 +431,36 @@ which public instances can answer, is
 | `[twenty].provenance_keyword` | `paperful` | Keyword added beside the collection slug |
 | `[searxng].base_url` | `""` | Instance root, or `SEARXNG_BASE_URL`. Paperful calls `GET /search?format=json`. A public host works only when that instance enables JSON; otherwise run your own ([install](https://docs.searxng.org/admin/installation.html)) |
 
+### Similar map
+
+`[similar_map]` sets the defaults for Discover → Explore → *Similar papers*
+([how it works](snowball.md#similar-map)). Settings → Similar map writes the
+same keys. Values outside the limits are clamped; unknown values fall back to
+the default.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `nodes` | `40` | Papers on the map besides the origin (5–150) |
+| `peers` | `4` | Links each paper keeps to its closest neighbours (1–10) |
+| `min_similarity` | `0.02` | Papers and links below this score (0–1) are dropped |
+| `coupling_weight` | `0.5` | 1 = shared references only, 0 = co-citation only |
+| `pool` | `"standard"` | `small` / `standard` / `large`: how many papers are gathered and scored |
+| `ref_cap`, `citer_cap`, `cocited_cap`, `partner_refs`, `partners_per_ref` | from `pool` | Exact caps; set after `pool` to override one |
+| `year_from`, `year_to` | `0` (any) | Keep only papers published in this range (the origin always stays) |
+| `hide_in_library` | `false` | Leave papers already in the library off the map |
+| `prior_works`, `derivative_works` | `10` | Length of the lists beside the map (0 = off) |
+| `color` | `"role"` | `role` (foundational / influential / …) or `year` |
+| `source` | `"auto"` | `auto`: store first, then live API. `store`: never call the live API. `api`: ignore the store |
+
+```toml
+# [similar_map]
+# nodes = 40
+# peers = 4
+# coupling_weight = 0.5
+# pool = "standard"
+# source = "auto"      # store = self-hosted OpenAlex only (DOI input; build-cites for citers)
+```
+
 ### OpenAlex API limits and snapshot store
 
 Snowball and large fills talk to the live [OpenAlex](https://openalex.org/) API
@@ -456,7 +486,8 @@ Keywords and ORCID stay API-only.
 
 When the live API daily budget is spent, DOI/id and citing (with index) keep
 using the store; keyword / ORCID / full-text search still pause for
-`snowball resume`.
+`snowball resume`. The [Similar map](#similar-map) can run on the store alone
+(`[similar_map].source = "store"`).
 
 Backends:
 

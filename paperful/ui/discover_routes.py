@@ -97,6 +97,27 @@ from .app import (
     _patch_section_assignment,
 )
 
+# Similar map knobs the Explore form may override for one map.
+SIMILAR_FORM_KEYS = (
+    "nodes",
+    "coupling_weight",
+    "pool",
+    "year_from",
+    "year_to",
+    "hide_in_library",
+    "source",
+)
+
+
+def _similar_form_values(cfg: Config, overrides: dict[str, Any] | None) -> dict[str, Any]:
+    """Explore form defaults: config, then whatever the last submit chose."""
+    from ..snowball.similar_settings import for_config
+
+    opts = for_config(cfg).merged(overrides or {}).to_dict()
+    opts["store_configured"] = bool((cfg.openalex_store_backend or "").strip())
+    return opts
+
+
 def register_discover(ui: UiContext) -> None:
     app = ui.app
     cfg = ui.cfg
@@ -138,6 +159,7 @@ def register_discover(ui: UiContext) -> None:
         explore_picks: list[dict[str, Any]] | None = None,
         explore_query: str = "",
         explore_map: str = "citation",
+        explore_overrides: dict[str, Any] | None = None,
         note: Any = ...,
         status_code: int = 200,
     ) -> HTMLResponse:
@@ -270,6 +292,7 @@ def register_discover(ui: UiContext) -> None:
                 explore_picks=picks,
                 explore_query=explore_query,
                 explore_map=explore_map,
+                similar_opts=_similar_form_values(cfg, explore_overrides),
                 queue_pagination=queue_pagination,
             ),
             status_code=status_code,
@@ -301,25 +324,39 @@ def register_discover(ui: UiContext) -> None:
         from ..snowball.citation_graph import CitationGraphError
         from ..snowball.command import _openalex_client
         from ..snowball import explore as explore_mod
+        from ..snowball import similar_explore
         from ..snowball.explore import ExploreAmbiguous
         from ..snowball.openalex import OpenAlexBudgetExceeded
+        from ..snowball.similar_settings import for_config
 
         form = await request.form()
         query = str(form.get("query") or "").strip()
         node_id = str(form.get("node_id") or "").strip()
         map_kind = "similar" if str(form.get("map") or "").strip() == "similar" else "citation"
-        starter = (
-            explore_mod.start_similar_explore if map_kind == "similar" else explore_mod.start_explore
-        )
+        overrides = {
+            key: form.get(key)
+            for key in SIMILAR_FORM_KEYS
+            if form.get(key) not in (None, "")
+        }
         try:
-            starter(
-                cfg,
-                _openalex_client(cfg),
-                query=query,
-                node_id=node_id,
-                map_categories=cfg.snowball_map_categories,
-                map_category_defs=cfg.snowball_map_category_defs,
-            )
+            if map_kind == "similar":
+                similar_explore.start_similar_explore(
+                    cfg,
+                    query=query,
+                    node_id=node_id,
+                    settings=for_config(cfg).merged(overrides),
+                    map_categories=cfg.snowball_map_categories,
+                    map_category_defs=cfg.snowball_map_category_defs,
+                )
+            else:
+                explore_mod.start_explore(
+                    cfg,
+                    _openalex_client(cfg),
+                    query=query,
+                    node_id=node_id,
+                    map_categories=cfg.snowball_map_categories,
+                    map_category_defs=cfg.snowball_map_category_defs,
+                )
         except ExploreAmbiguous as exc:
             picks = [
                 {
@@ -337,6 +374,7 @@ def register_discover(ui: UiContext) -> None:
                 explore_picks=picks,
                 explore_query=query,
                 explore_map=map_kind,
+                explore_overrides=overrides,
                 note=None,
             )
         except CitationGraphError as exc:

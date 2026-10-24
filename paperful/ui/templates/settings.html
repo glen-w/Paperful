@@ -41,4 +41,64 @@
   </div>
 </form>
 </section>
+<section class="panel" id="similar-map">
+  <h2>Similar map</h2>
+  <p class="section-lede">Defaults for Discover → Explore → <em>Similar papers</em>. Papers are placed by shared references and by being cited together, not by who cites whom. The Explore form can still change some of these for one map. Saved to <code>[similar_map]</code> in config.toml.</p>
+  {% if not config_writable %}<p class="citation-meta">No config.toml file was found, so these changes last until Paperful restarts.</p>{% endif %}
+  <form method="post" action="/settings/similar-map" class="form-stack">
+    <div class="field-group">
+      <p class="field-legend">What goes on the map</p>
+      <label>Papers on the map {{ info("How many similar papers surround the origin. 5–150. Default 40.") }}
+        <input type="number" name="nodes" min="5" max="150" value="{{ similar.nodes }}">
+      </label>
+      <label>Shared references vs co-citation {{ info("0 = co-citation only (papers later work reads together). 1 = shared references only (papers built on the same literature). Default 0.5.") }}
+        <input type="number" name="coupling_weight" min="0" max="1" step="0.05" value="{{ similar.coupling_weight }}">
+      </label>
+      <label>Minimum similarity {{ info("Papers and links scoring below this (0–1) are dropped. Raise it to keep only close matches. Default 0.02.") }}
+        <input type="number" name="min_similarity" min="0" max="1" step="0.01" value="{{ similar.min_similarity }}">
+      </label>
+      <label>From year {{ info("Leave empty for any year.") }} <input type="number" name="year_from" min="1000" max="3000" value="{{ similar.year_from or '' }}" placeholder="any"></label>
+      <label>To year <input type="number" name="year_to" min="1000" max="3000" value="{{ similar.year_to or '' }}" placeholder="any"></label>
+      <label><input type="checkbox" name="hide_in_library" value="1" {% if similar.hide_in_library %}checked{% endif %}> Hide papers already in my library {{ info("Off by default: library papers stay on the map with a dark ring.") }}</label>
+    </div>
+    <div class="field-group">
+      <p class="field-legend">Layout</p>
+      <label>Links per paper {{ info("Each paper links to this many of its closest neighbours (1–10). Fewer links give a cleaner map. Default 4.") }}
+        <input type="number" name="peers" min="1" max="10" value="{{ similar.peers }}">
+      </label>
+      <label>Node colour {{ info("Role: foundational / influential / emerging, as on the citation map. Year: light for older, dark for newer, as on Connected Papers.") }}
+        <select name="color">
+          <option value="role" {% if similar.color == 'role' %}selected{% endif %}>Role</option>
+          <option value="year" {% if similar.color == 'year' %}selected{% endif %}>Publication year</option>
+        </select>
+      </label>
+      <label>Prior works listed {{ info("Older papers that many map papers cite, shown beside the map. 0 turns the list off. Default 10.") }}
+        <input type="number" name="prior_works" min="0" max="50" value="{{ similar.prior_works }}">
+      </label>
+      <label>Derivative works listed {{ info("Papers that cite many map papers. 0 turns the list off. Default 10.") }}
+        <input type="number" name="derivative_works" min="0" max="50" value="{{ similar.derivative_works }}">
+      </label>
+    </div>
+    <div class="field-group">
+      <p class="field-legend">Data</p>
+      <label>Search depth {{ info("Small ≈ 100 refs / 60 citers; Standard ≈ 200 / 150; Large ≈ 400 / 300. Larger finds more but costs more OpenAlex calls or store queries. Exact caps can be set in config.toml (ref_cap, citer_cap, cocited_cap, partner_refs, partners_per_ref).") }}
+        <select name="pool">
+          {% for p in ['small', 'standard', 'large'] %}<option value="{{ p }}" {% if similar.pool == p %}selected{% endif %}>{{ p|capitalize }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Data source {{ info("Auto: your self-hosted OpenAlex store first, then the live API for anything missing. Local store only: never call the live API; paste DOIs, and build a cites index (paperful openalex-store build-cites) for citing papers. Live API only: ignore the store.") }}
+        <select name="source">
+          <option value="auto" {% if similar.source == 'auto' %}selected{% endif %}>Auto</option>
+          <option value="store" {% if similar.source == 'store' %}selected{% endif %}>Local store only</option>
+          <option value="api" {% if similar.source == 'api' %}selected{% endif %}>Live API only</option>
+        </select>
+      </label>
+      {% if not similar_store_configured %}<p class="citation-meta">No <code>[openalex_store]</code> is configured, so Auto uses the live API. See the config docs to point Paperful at a self-hosted OpenAlex snapshot.</p>{% endif %}
+    </div>
+    <div class="citation-actions">
+      <button type="submit">Save Similar map defaults</button>
+      <button type="submit" name="reset" value="1" class="secondary">Reset to defaults</button>
+    </div>
+  </form>
+</section>
 {% endblock %}

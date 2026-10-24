@@ -24,6 +24,7 @@
     ghostEdges: [],
     direction: "both",
     layout: "citation",
+    similar: null,
     applyPath: null,
     showOccasional: false,
     showHalo: false,
@@ -178,6 +179,10 @@
     state.nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
     state.edges = Array.isArray(graph.edges) ? graph.edges : [];
     state.layout = graph.layout === "similarity" ? "similarity" : "citation";
+    state.similar =
+      state.layout === "similarity" && graph.similar && typeof graph.similar === "object"
+        ? graph.similar
+        : null;
     if (state.layout === "similarity") state.direction = "both";
     applyLayoutControls();
     state.triage = Array.isArray(graph.triage) ? graph.triage : [];
@@ -227,6 +232,15 @@
     ].forEach(function (el) {
       if (el) el.style.display = sim ? "none" : "";
     });
+    var byYear = sim && state.similar && state.similar.color === "year";
+    var show = function (id, on) {
+      var el = document.getElementById(id);
+      if (el) el.style.display = on ? "" : "none";
+    };
+    show("citationLedeSimilar", sim);
+    show("citationLedeCitation", !sim);
+    show("citationYearLegend", byYear);
+    show("citationRoleLegend", !byYear);
   }
 
   function renderCategoryControls() {
@@ -285,6 +299,10 @@
 
   function renderThresholds(graph) {
     if (!els.thresholds) return;
+    if (isSimilarity()) {
+      renderSimilarReport();
+      return;
+    }
     var t = graph.thresholds || graph.threshold || {};
     var recent = t.recent_from_year || t.recent_from_year;
     var cited = t.highly_cited;
@@ -298,6 +316,119 @@
     } else {
       els.thresholds.textContent = "";
     }
+  }
+
+  var SOURCE_LABEL = {
+    api: "live OpenAlex API",
+    store: "your OpenAlex store (no live API)",
+    "store+api": "your OpenAlex store, then the live API",
+  };
+
+  function renderSimilarReport() {
+    var report = state.similar || {};
+    var bits = [];
+    if (report.source) bits.push("Source: " + (SOURCE_LABEL[report.source] || report.source));
+    if (typeof report.pool_size === "number") bits.push(report.pool_size + " papers scored");
+    if (typeof report.api_calls === "number") bits.push(report.api_calls + " API calls");
+    if (report.hidden_in_library) bits.push(report.hidden_in_library + " library papers hidden");
+    if (report.color === "year") bits.push("Colour: lighter is older");
+    var warnings = Array.isArray(report.warnings) ? report.warnings : [];
+    els.thresholds.innerHTML =
+      escapeHtml(bits.join(" · ")) +
+      warnings
+        .map(function (w) {
+          return '<br><span class="citation-warning">⚠ ' + escapeHtml(w) + "</span>";
+        })
+        .join("");
+  }
+
+  function yearFill(year) {
+    if (!year) return ROLE_FILL.other;
+    var years = state.nodes
+      .map(function (n) {
+        return n.year;
+      })
+      .filter(Boolean);
+    var lo = Math.min.apply(null, years);
+    var hi = Math.max.apply(null, years);
+    var t = hi > lo ? (year - lo) / (hi - lo) : 1;
+    return d3.interpolateRgb("#c9d6e3", "#1d3557")(Math.max(0, Math.min(1, t)));
+  }
+
+  function nodeFill(d) {
+    if (isSimilarity() && state.similar && state.similar.color === "year") return yearFill(d.year);
+    return ROLE_FILL[d.role] || ROLE_FILL.other;
+  }
+
+  // Start a new Similar map from a paper (map node or a prior/derivative row).
+  function openSimilarMap(nodeId) {
+    if (!nodeId || !/^(doi|openalex):/.test(nodeId)) {
+      setStatus("This paper has no DOI or OpenAlex id to map from.");
+      return;
+    }
+    var form = document.createElement("form");
+    form.method = "post";
+    form.action = "/discover/explore";
+    [
+      ["node_id", nodeId],
+      ["map", "similar"],
+    ].forEach(function (pair) {
+      var input = document.createElement("input");
+      input.type = "hidden";
+      input.name = pair[0];
+      input.value = pair[1];
+      form.appendChild(input);
+    });
+    document.body.appendChild(form);
+    setStatus("Building a Similar map from that paper…");
+    form.submit();
+  }
+
+  function extrasHtml(title, hint, items, unit) {
+    if (!Array.isArray(items) || !items.length) return "";
+    return (
+      '<div class="citation-extras"><h4>' +
+      escapeHtml(title) +
+      "</h4>" +
+      '<p class="citation-meta">' +
+      escapeHtml(hint) +
+      "</p><ol>" +
+      items
+        .map(function (item) {
+          var label =
+            escapeHtml(item.title || item.id) +
+            (item.year ? " (" + item.year + ")" : "") +
+            ' <span class="citation-meta">· ' +
+            (item.count || 0) +
+            " " +
+            unit +
+            "</span>";
+          var link = item.doi
+            ? '<a href="https://doi.org/' +
+              escapeAttr(item.doi) +
+              '" rel="noopener noreferrer">' +
+              label +
+              "</a>"
+            : label;
+          return (
+            "<li>" +
+            link +
+            ' <button type="button" class="secondary citation-mini" data-similar-map="' +
+            escapeAttr(item.id) +
+            '">Map this</button></li>'
+          );
+        })
+        .join("") +
+      "</ol></div>"
+    );
+  }
+
+  function bindSimilarButtons(rootEl) {
+    rootEl.querySelectorAll("[data-similar-map]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        openSimilarMap(btn.getAttribute("data-similar-map") || "");
+      });
+    });
   }
 
   function renderTriage() {
@@ -656,9 +787,7 @@
     node
       .append("circle")
       .attr("r", radius)
-      .attr("fill", function (d) {
-        return ROLE_FILL[d.role] || ROLE_FILL.other;
-      })
+      .attr("fill", nodeFill)
       .attr("stroke", function (d) {
         if (d.ghost) return "#101820";
         return d.in_library ? "#101820" : "#f7f1e8";
@@ -1035,6 +1164,13 @@
     var seedSearchBtn =
       '<div class="citation-actions">' +
       '<button type="button" class="secondary" data-action="seed-search">Seed search</button>' +
+      (paper.ghost
+        ? ""
+        : '<button type="button" class="secondary" data-similar-map="' +
+          escapeAttr(paper.id) +
+          '">' +
+          (isSimilarity() && paper.seed ? "Rebuild Similar map" : "New Similar map from this paper") +
+          "</button>") +
       "</div>";
     editForm = "";
     if (canEdit) {
@@ -1132,6 +1268,7 @@
         seedSnowballForm(paper);
       });
     });
+    bindSimilarButtons(els.panel);
   }
 
   function seedSnowballForm(paper) {
@@ -1321,10 +1458,28 @@
       : state.edges && state.edges.length
         ? "Click a paper to see why it is on the map, then expand who it cites or who cites it."
         : "This map has no citation links yet. Click a paper, then use Papers it cites / Papers that cite it to pull neighbours from OpenAlex.";
+    var extras = "";
+    if (isSimilarity() && state.similar) {
+      extras =
+        extrasHtml(
+          "Prior works",
+          "Older papers many map papers cite. Often the field's foundations.",
+          state.similar.prior,
+          "map papers cite it"
+        ) +
+        extrasHtml(
+          "Derivative works",
+          "Papers citing many map papers. Often reviews or newer work that builds on this area.",
+          state.similar.derivative,
+          "map papers cited"
+        );
+    }
     els.panel.innerHTML =
       '<p class="citation-panel-empty">' +
       hint +
-      " A dark ring means it is already in your library. Larger nodes have more citations.</p>";
+      " A dark ring means it is already in your library. Larger nodes have more citations.</p>" +
+      extras;
+    bindSimilarButtons(els.panel);
   }
 
   function expand(nodeId, direction, btn) {
