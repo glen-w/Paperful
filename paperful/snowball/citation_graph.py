@@ -125,7 +125,12 @@ def build_graph(
     """JSON map for the Discover canvas. Caps nodes; edges stay inside that set."""
     year_now = now_year if now_year is not None else datetime.now(timezone.utc).year
     catalog = resolve_catalog(enabled=map_categories, custom_defs=map_category_defs)
-    chosen = select_nodes(rows, focus=focus, max_nodes=max_nodes)
+    similar = is_similarity_queue(rows)
+    chosen = (
+        select_similar_nodes(rows, max_nodes=max_nodes)
+        if similar
+        else select_nodes(rows, focus=focus, max_nodes=max_nodes)
+    )
     counts = [_cited(row) for row in chosen if row.hop != 0]
     threshold = CITATION_FLOOR if not counts else max(CITATION_FLOOR, _median(counts))
     recent_from = year_now - RECENT_YEARS
@@ -141,11 +146,16 @@ def build_graph(
         )
         for row in chosen
     ]
-    edges = _edges(chosen)
+    if similar:
+        edges = _sim_edges(chosen)
+        _attach_origin_paths(chosen, nodes, edges)
+    else:
+        edges = _edges(chosen)
     return {
         "v": 1,
         "schema": SCHEMA,
         "run_id": run_id,
+        "layout": "similarity" if similar else "citation",
         "threshold": {
             "highly_cited": threshold,
             "recent_from_year": recent_from,
@@ -486,6 +496,10 @@ def expand_queue(
         dest, rows = load_queue(state_dir, run_id)
     except FileNotFoundError as exc:
         raise CitationGraphError("No queue for that run.") from exc
+    if is_similarity_queue(rows):
+        raise CitationGraphError(
+            "Expand is for citation maps. Start a new Similar explore from this paper instead."
+        )
     target = next((row for row in rows if row.identity == target_id), None)
     if target is None:
         raise CitationGraphError("That paper is not in this queue.")
@@ -622,6 +636,95 @@ def select_nodes(
         if len(chosen) >= limit:
             break
     return chosen
+
+
+def is_similarity_queue(rows: list[Candidate]) -> bool:
+    """True when rows came from a Similar explore (they carry ``sim_links``)."""
+    return any(isinstance(row.biblio.get("sim_links"), list) for row in rows)
+
+
+def _similarity(row: Candidate) -> float:
+    try:
+        return float(row.biblio.get("similarity") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def select_similar_nodes(rows: list[Candidate], *, max_nodes: int) -> list[Candidate]:
+    """Seed first, then most similar. Citation count breaks ties."""
+    ranked = sorted(
+        (row for row in rows if row.identity),
+        key=lambda row: (row.hop == 0, _similarity(row), _cited(row)),
+        reverse=True,
+    )
+    chosen: list[Candidate] = []
+    seen: set[str] = set()
+    limit = max_nodes if max_nodes > 0 else len(ranked)
+    for row in ranked:
+        if row.identity in seen:
+            continue
+        seen.add(row.identity)
+        chosen.append(row)
+        if len(chosen) >= limit:
+            break
+    return chosen
+
+
+def _sim_edges(rows: list[Candidate]) -> list[dict[str, Any]]:
+    """Undirected similarity edges inside ``rows``. ``weight`` is scaled to 0-1."""
+    by_id = {row.identity for row in rows}
+    found: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in rows:
+        raw = row.biblio.get("sim_links")
+        if not isinstance(raw, list):
+            continue
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            peer = str(item.get("peer") or "").strip()
+            if not peer or peer == row.identity or peer not in by_id:
+                continue
+            a, b = sorted((row.identity, peer))
+            if (a, b) in found:
+                continue
+            try:
+                score = float(item.get("score") or 0.0)
+            except (TypeError, ValueError):
+                score = 0.0
+            if score <= 0:
+                continue
+            found[(a, b)] = {
+                "source": a,
+                "target": b,
+                "direction": "similar",
+                "score": round(score, 4),
+                "shared_refs": int(item.get("shared_refs") or 0),
+                "co_citing": int(item.get("co_citing") or 0),
+            }
+    top = max((edge["score"] for edge in found.values()), default=0.0)
+    edges = sorted(found.values(), key=lambda edge: (edge["source"], edge["target"]))
+    for edge in edges:
+        edge["weight"] = round(edge["score"] / top, 4) if top else 0.0
+    return edges
+
+
+def _attach_origin_paths(
+    rows: list[Candidate],
+    nodes: list[dict[str, Any]],
+    edges: list[dict[str, Any]],
+) -> None:
+    """Give each node its similarity score and strongest path to the seed."""
+    from .similarity_map import origin_paths
+
+    seed = next((row.identity for row in rows if row.hop == 0), "")
+    paths = origin_paths(edges, seed) if seed else {}
+    scores = {row.identity: _similarity(row) for row in rows}
+    for node in nodes:
+        node["similarity"] = round(scores.get(node["id"], 0.0), 4)
+        node["origin_path"] = [
+            {"source": edge["source"], "target": edge["target"], "direction": edge["direction"]}
+            for edge in paths.get(node["id"], [])
+        ]
 
 
 def _node(

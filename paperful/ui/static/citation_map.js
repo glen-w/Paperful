@@ -23,6 +23,8 @@
     ghostNodes: [],
     ghostEdges: [],
     direction: "both",
+    layout: "citation",
+    applyPath: null,
     showOccasional: false,
     showHalo: false,
     yearMin: 1900,
@@ -175,6 +177,9 @@
   function adopt(graph) {
     state.nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
     state.edges = Array.isArray(graph.edges) ? graph.edges : [];
+    state.layout = graph.layout === "similarity" ? "similarity" : "citation";
+    if (state.layout === "similarity") state.direction = "both";
+    applyLayoutControls();
     state.triage = Array.isArray(graph.triage) ? graph.triage : [];
     state.triageById = {};
     state.triage.forEach(function (row) {
@@ -204,6 +209,24 @@
       })[0];
       if (still) showNode(still);
     }
+  }
+
+  function isSimilarity() {
+    return state.layout === "similarity";
+  }
+
+  // The similarity map has no edge direction and cannot be expanded.
+  function applyLayoutControls() {
+    if (!els.root) return;
+    var sim = isSimilarity();
+    // Toolbar CSS sets display, which beats the hidden attribute.
+    [
+      els.root.querySelector(".citation-filters"),
+      els.repair,
+      els.toggle && els.toggle.parentNode,
+    ].forEach(function (el) {
+      if (el) el.style.display = sim ? "none" : "";
+    });
   }
 
   function renderCategoryControls() {
@@ -390,7 +413,7 @@
 
   function visibleNodes() {
     return state.nodes.filter(function (node) {
-      if (!state.showOccasional && node.occasional && !node.seed) return false;
+      if (!isSimilarity() && !state.showOccasional && node.occasional && !node.seed) return false;
       if (!node.seed && node.year) {
         if (node.year < state.yearLo || node.year > state.yearHi) return false;
       }
@@ -427,9 +450,11 @@
         })
     );
     var edges = visibleEdges(ids).concat(state.showHalo ? state.ghostEdges : []);
-    var hidden = state.nodes.filter(function (paper) {
-      return paper.occasional && !paper.seed;
-    }).length;
+    var hidden = isSimilarity()
+      ? 0
+      : state.nodes.filter(function (paper) {
+          return paper.occasional && !paper.seed;
+        }).length;
 
     if (!papers.length && !ghostPapers.length) {
       els.svg.selectAll("*").remove();
@@ -442,7 +467,16 @@
       edges.length +
       " links" +
       (state.showOccasional || !hidden ? "" : " (" + hidden + " other hidden)");
-    if (!edges.length && papers.length > 1) {
+    if (isSimilarity()) {
+      var origin = papers.filter(function (paper) {
+        return paper.seed;
+      })[0];
+      linkNote =
+        papers.length +
+        " papers similar to " +
+        shortTitle(origin ? origin.title : "the origin") +
+        " · closer means more shared citations and references. Click a paper to trace its path to the origin.";
+    } else if (!edges.length && papers.length > 1) {
       var allSeeds = papers.every(function (paper) {
         return paper.seed;
       });
@@ -527,6 +561,21 @@
       labeledIds.add(node.id);
     });
 
+    function linkStroke(d) {
+      if (d.direction === "similar") {
+        var key = d.source.id + "|" + d.target.id + "|" + d.direction;
+        return pathKeys.size && pathKeys.has(key) ? "#c46a2a" : "#8d99a6";
+      }
+      return d.direction === "cites" ? "#3d5a80" : "#c46a2a";
+    }
+
+    function linkWidth(d) {
+      var key = d.source.id + "|" + d.target.id + "|" + d.direction;
+      var onPath = pathKeys.size && pathKeys.has(key);
+      if (d.direction === "similar") return onPath ? 3.4 : 0.8 + 2.4 * (d.weight || 0);
+      return onPath ? 2.4 : 1.4;
+    }
+
     var g = els.svg.append("g").attr("class", "citation-zoom");
     var zoom = d3
       .zoom()
@@ -542,22 +591,19 @@
       .selectAll("line")
       .data(links)
       .join("line")
-      .attr("stroke", function (d) {
-        return d.direction === "cites" ? "#3d5a80" : "#c46a2a";
-      })
+      .attr("stroke", linkStroke)
       .attr("stroke-opacity", function (d) {
         var key = d.source.id + "|" + d.target.id + "|" + d.direction;
         if (pathKeys.size && pathKeys.has(key)) return 0.95;
         return crowded ? 0.35 : 0.55;
       })
-      .attr("stroke-width", function (d) {
-        var key = d.source.id + "|" + d.target.id + "|" + d.direction;
-        return pathKeys.size && pathKeys.has(key) ? 2.4 : 1.4;
-      })
+      .attr("stroke-width", linkWidth)
       .attr("stroke-dasharray", function (d) {
         return d.source.ghost || d.target.ghost ? "4 3" : null;
       })
-      .attr("marker-end", "url(#citation-arrow)")
+      .attr("marker-end", function (d) {
+        return d.direction === "similar" ? null : "url(#citation-arrow)";
+      })
       .style("cursor", "pointer")
       .on("click", function (event, d) {
         event.stopPropagation();
@@ -596,6 +642,7 @@
           return;
         }
         state.selectedId = d.id;
+        if (isSimilarity() && state.applyPath) state.applyPath(d.origin_path || []);
         showNode(d);
         if (state.showHalo) loadHalo(d.id);
       })
@@ -761,8 +808,21 @@
       });
     }
 
+    // Highlight a path without re-running the layout.
+    state.applyPath = function (pathEdges) {
+      state.pathEdges = pathEdges || [];
+      pathKeys.clear();
+      state.pathEdges.forEach(function (edge) {
+        pathKeys.add(edge.source + "|" + edge.target + "|" + edge.direction);
+        pathKeys.add(edge.target + "|" + edge.source + "|" + edge.direction);
+      });
+      link.attr("stroke", linkStroke).attr("stroke-width", linkWidth);
+      setFocus(null);
+    };
+
     els.svg.on("click", function () {
       state.selectedId = "";
+      if (isSimilarity() && state.applyPath) state.applyPath([]);
       clearPanel();
     });
 
@@ -776,8 +836,12 @@
           .id(function (d) {
             return d.id;
           })
-          .distance(70)
-          .strength(0.35)
+          .distance(function (d) {
+            return d.direction === "similar" ? 40 + (1 - (d.weight || 0)) * 140 : 70;
+          })
+          .strength(function (d) {
+            return d.direction === "similar" ? 0.15 + 0.85 * (d.weight || 0) : 0.35;
+          })
       )
       .force("charge", d3.forceManyBody().strength(crowded ? -220 : -160))
       .force("center", d3.forceCenter(width / 2, height / 2))
@@ -993,6 +1057,27 @@
         "</div>";
     }
     var expandDisabled = state.expandBlocked ? " disabled" : "";
+    var simLine = "";
+    if (isSimilarity() && !paper.seed && typeof paper.similarity === "number") {
+      simLine =
+        '<p class="citation-meta">Similarity to origin: ' +
+        Math.round(paper.similarity * 100) +
+        "%" +
+        (paper.origin_path && paper.origin_path.length
+          ? " · " + paper.origin_path.length + " step(s) to the origin"
+          : "") +
+        "</p>";
+    }
+    var expandRow = isSimilarity()
+      ? ""
+      : '<div class="citation-actions">' +
+        '<button type="button" class="secondary" data-expand="refs"' +
+        expandDisabled +
+        ">Papers it cites</button>" +
+        '<button type="button" class="secondary" data-expand="cites"' +
+        expandDisabled +
+        ">Papers that cite it</button>" +
+        "</div>";
     els.panel.innerHTML =
       "<h3>" +
       escapeHtml(paper.title || "Untitled") +
@@ -1014,20 +1099,14 @@
       catLine +
       designLine +
       triageLine +
+      simLine +
       doi +
       why +
       keep +
       libActions +
       seedSearchBtn +
       editForm +
-      '<div class="citation-actions">' +
-      '<button type="button" class="secondary" data-expand="refs"' +
-      expandDisabled +
-      ">Papers it cites</button>" +
-      '<button type="button" class="secondary" data-expand="cites"' +
-      expandDisabled +
-      ">Papers that cite it</button>" +
-      "</div>";
+      expandRow;
     fillCollectionList();
     els.panel.querySelectorAll("[data-keep]").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -1215,6 +1294,18 @@
   function showEdge(edge) {
     var source = edge.source.title || edge.source.id;
     var target = edge.target.title || edge.target.id;
+    if (edge.direction === "similar") {
+      els.panel.innerHTML =
+        "<h3>" +
+        escapeHtml(source + " is similar to " + target) +
+        "</h3>" +
+        '<p class="citation-meta">' +
+        (edge.shared_refs || 0) +
+        " shared references · " +
+        (edge.co_citing || 0) +
+        " papers cite both. Neither has to cite the other.</p>";
+      return;
+    }
     var label =
       edge.direction === "cites"
         ? source + " cites " + target
@@ -1225,8 +1316,9 @@
 
   function clearPanel() {
     if (!els.panel) return;
-    var hint =
-      state.edges && state.edges.length
+    var hint = isSimilarity()
+      ? "Papers sit close together when they share citations and references, even if they never cite each other. Click a paper to see its strongest path to the origin."
+      : state.edges && state.edges.length
         ? "Click a paper to see why it is on the map, then expand who it cites or who cites it."
         : "This map has no citation links yet. Click a paper, then use Papers it cites / Papers that cite it to pull neighbours from OpenAlex.";
     els.panel.innerHTML =

@@ -137,6 +137,7 @@ def register_discover(ui: UiContext) -> None:
         tab: str | None = None,
         explore_picks: list[dict[str, Any]] | None = None,
         explore_query: str = "",
+        explore_map: str = "citation",
         note: Any = ...,
         status_code: int = 200,
     ) -> HTMLResponse:
@@ -268,6 +269,7 @@ def register_discover(ui: UiContext) -> None:
                 map_compare_run=(compare_run or "").strip(),
                 explore_picks=picks,
                 explore_query=explore_query,
+                explore_map=explore_map,
                 queue_pagination=queue_pagination,
             ),
             status_code=status_code,
@@ -298,14 +300,19 @@ def register_discover(ui: UiContext) -> None:
     async def discover_explore(request: Request):
         from ..snowball.citation_graph import CitationGraphError
         from ..snowball.command import _openalex_client
-        from ..snowball.explore import ExploreAmbiguous, start_explore
+        from ..snowball import explore as explore_mod
+        from ..snowball.explore import ExploreAmbiguous
         from ..snowball.openalex import OpenAlexBudgetExceeded
 
         form = await request.form()
         query = str(form.get("query") or "").strip()
         node_id = str(form.get("node_id") or "").strip()
+        map_kind = "similar" if str(form.get("map") or "").strip() == "similar" else "citation"
+        starter = (
+            explore_mod.start_similar_explore if map_kind == "similar" else explore_mod.start_explore
+        )
         try:
-            start_explore(
+            starter(
                 cfg,
                 _openalex_client(cfg),
                 query=query,
@@ -329,6 +336,7 @@ def register_discover(ui: UiContext) -> None:
                 tab="explore",
                 explore_picks=picks,
                 explore_query=query,
+                explore_map=map_kind,
                 note=None,
             )
         except CitationGraphError as exc:

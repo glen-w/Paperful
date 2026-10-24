@@ -132,3 +132,37 @@ def test_discover_explore_route(tmp_path, monkeypatch):
     resp = client.post("/discover/explore", data={"query": "10.1000/seed"}, follow_redirects=False)
     assert resp.status_code == 303
     assert "/discover?tab=queue" in resp.headers["location"]
+
+
+def test_discover_explore_route_similar(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    from paperful.serve import create_app
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    calls: list[str] = []
+
+    def fake_similar(_cfg, _client, **kwargs):
+        calls.append("similar")
+        return "similar-test", {"layout": "similarity", "nodes": [], "edges": []}
+
+    def fake_citation(_cfg, _client, **kwargs):
+        calls.append("citation")
+        return "explore-test", {"nodes": [], "edges": []}
+
+    monkeypatch.setattr("paperful.snowball.explore.start_similar_explore", fake_similar)
+    monkeypatch.setattr("paperful.snowball.explore.start_explore", fake_citation)
+    client = TestClient(create_app(cfg))
+    page = client.get("/discover?tab=explore")
+    assert 'name="map" value="similar"' in page.text
+    resp = client.post(
+        "/discover/explore",
+        data={"query": "10.1000/seed", "map": "similar"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert "/discover?tab=queue" in resp.headers["location"]
+    assert calls == ["similar"]

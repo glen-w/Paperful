@@ -196,7 +196,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/wanted/reachout` | Export contact rows; optional RG tabs |
 | POST | `/wanted/summarize` | Enqueue single-item `summarize`; redirect `?run=` |
 | GET | `/item/{key}/summary` | Per-item HTML under `state/summaries/` |
-| POST | `/discover/explore` | Resolve a DOI or title into an explore queue; open Map (picker when title is ambiguous) |
+| POST | `/discover/explore` | Resolve a DOI or title into an explore queue; open Map (picker when title is ambiguous). `map=similar` builds a [similarity map](snowball.md#similar-map) instead of a citation map |
 | POST | `/discover/topic` | Enqueue snowball kind (Advanced) or keyword search |
 | POST | `/discover/profile-save` | Save snowball profile from the topic form |
 | POST | `/discover/refs-gap` | Dry-run refs gap pack for the collection chip |

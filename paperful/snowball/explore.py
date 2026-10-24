@@ -176,3 +176,187 @@ def start_explore(
             )
             write_graph_file(dest, graph)
     return run_id, graph
+
+
+# Similar explore budget. Roughly 15-25 OpenAlex calls per map.
+SIM_REF_CAP = 200
+SIM_CITER_CAP = 150
+SIM_COCITED_CAP = 60
+SIM_PARTNER_REFS = 8
+SIM_PARTNERS_PER_REF = 25
+
+
+def _new_similar_run_id() -> str:
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return f"similar-{stamp}"
+
+
+def similar_pool(
+    client: OpenAlexClient,
+    work: dict[str, Any],
+) -> tuple[dict[str, dict[str, Any]], bool]:
+    """Works around ``work`` keyed by OpenAlex short id, and whether the budget ran out.
+
+    The pool is the seed's references, the works citing it, works that cite
+    its top references (coupling partners), and the works its citers cite most
+    (co-citation partners). Each pool work carries ``referenced_works``.
+    """
+    from .openalex import referenced_ids, short_id
+    from .similar import collect_partners, reference_sample
+
+    seed_oa = short_id(str(work.get("id") or ""))
+    pool: dict[str, dict[str, Any]] = {}
+    budget_hit = False
+
+    def add(rows: list[dict[str, Any]]) -> None:
+        for row in rows or []:
+            oa = short_id(str(row.get("id") or ""))
+            if oa and oa != seed_oa:
+                pool.setdefault(oa, row)
+
+    try:
+        ids = referenced_ids(work, SIM_REF_CAP)
+        if ids:
+            add(client.works_by_ids(ids))
+        if seed_oa:
+            add(client.works_citing(seed_oa, limit=SIM_CITER_CAP, sort="cited_by_count:desc"))
+    except OpenAlexBudgetExceeded:
+        budget_hit = True
+    if not budget_hit:
+        try:
+            partners, _ = collect_partners(
+                client,
+                reference_sample([work], limit=SIM_PARTNER_REFS),
+                per_ref=SIM_PARTNERS_PER_REF,
+                year_from=None,
+                year_to=None,
+            )
+            add([row for _, row in partners])
+        except OpenAlexBudgetExceeded as exc:
+            budget_hit = True
+            add(list((getattr(exc, "coupling_works", None) or {}).values()))
+    if not budget_hit and seed_oa:
+        # Works the seed's citers also cite are co-cited with the seed.
+        own = set(referenced_ids(work))
+        counts: dict[str, int] = {}
+        for row in list(pool.values()):
+            if seed_oa not in referenced_ids(row):
+                continue
+            for sid in referenced_ids(row):
+                if sid != seed_oa and sid not in pool and sid not in own:
+                    counts[sid] = counts.get(sid, 0) + 1
+        top = sorted(counts, key=lambda sid: (-counts[sid], sid))[:SIM_COCITED_CAP]
+        if top:
+            try:
+                add(client.works_by_ids(top))
+            except OpenAlexBudgetExceeded:
+                budget_hit = True
+    return pool, budget_hit
+
+
+def start_similar_explore(
+    cfg: Config,
+    client: OpenAlexClient,
+    *,
+    query: str = "",
+    node_id: str = "",
+    map_categories: list[str] | tuple[str, ...] | None = None,
+    map_category_defs: list[dict[str, Any]] | tuple[dict[str, Any], ...] | None = None,
+) -> tuple[str, dict[str, Any]]:
+    """Seed a similarity map: co-citation plus shared references, top ``SIM_NODES``."""
+    from .citation_graph import build_graph, write_graph_file
+    from .openalex import short_id
+    from .similarity_map import (
+        SIM_NODES,
+        citer_index,
+        connect_to_seed,
+        pairwise_links,
+        pick_top,
+        ref_set,
+        score_to_seed,
+    )
+
+    work = resolve_work(client, query=query, node_id=node_id)
+    seed_oa = short_id(str(work.get("id") or ""))
+    if not seed_oa:
+        raise CitationGraphError("OpenAlex has no id for this paper.")
+    try:
+        pool, budget_hit = similar_pool(client, work)
+    except (OpenAlexError, httpx.HTTPError) as exc:
+        raise CitationGraphError("OpenAlex could not gather papers around this one.") from exc
+    refs = {oa: ref_set(row) for oa, row in pool.items()}
+    refs[seed_oa] = ref_set(work)
+    citers = citer_index(refs)
+    seed_scores = score_to_seed(seed_oa, refs, citers, pool)
+    cited_by = {oa: int(row.get("cited_by_count") or 0) for oa, row in pool.items()}
+    picked = pick_top(seed_scores, limit=SIM_NODES, cited_by=cited_by)
+    if not picked:
+        raise CitationGraphError("Not enough shared citations to build a similarity map for this paper.")
+    ids = [seed_oa] + picked
+    links = pairwise_links(ids, refs, citers)
+    connect_to_seed(seed_oa, ids, links, seed_scores)
+
+    run_id = _new_similar_run_id()
+    seed_label = (query or node_id or work_node_id(work)).strip()
+    seed = {"type": "explore", "value": seed_label[:200]}
+    title = str(work.get("display_name") or seed_label)
+    works = {seed_oa: work, **{oa: pool[oa] for oa in picked}}
+    rows: list[Candidate] = []
+    identity: dict[str, str] = {}
+    for oa in ids:
+        if oa == seed_oa:
+            row = work_to_candidate(
+                work, run_id=run_id, seed=seed, hop=0, direction="explore",
+                why="Similar map origin", gate="dry-run",
+            )
+            row.biblio["similarity"] = 1.0
+        else:
+            score, shared_refs, co_citing = seed_scores[oa]
+            row = work_to_candidate(
+                works[oa], run_id=run_id, seed=seed, hop=1, direction="similar",
+                why=f"similar to {title[:80]}: {co_citing} co-citing, {shared_refs} shared refs",
+                gate="dry-run",
+            )
+            row.biblio["similarity"] = round(score, 4)
+        row.biblio["sim_links"] = []
+        identity[oa] = row.identity
+        rows.append(row)
+    by_oa = dict(zip(ids, rows))
+    for (a, b), (score, shared_refs, co_citing) in links.items():
+        for here, there in ((a, b), (b, a)):
+            by_oa[here].biblio["sim_links"].append(
+                {
+                    "peer": identity[there],
+                    "score": round(score, 4),
+                    "shared_refs": shared_refs,
+                    "co_citing": co_citing,
+                }
+            )
+    try:
+        backend = get_backend(cfg)
+        finder = _library_lookup(backend, scope="library", collection="")
+        _mark_exists(rows, finder)
+    except Exception:
+        pass
+    write_queue(
+        cfg.state_dir,
+        run_id,
+        rows,
+        client,
+        library_unread=False,
+        meta={
+            "mode": "similar",
+            "pool_size": len(pool),
+            "budget_hit": budget_hit,
+            "map_categories": list(map_categories or ()),
+            "map_category_defs": list(map_category_defs or ()),
+        },
+    )
+    graph = build_graph(
+        rows,
+        run_id=run_id,
+        map_categories=map_categories,
+        map_category_defs=map_category_defs,
+    )
+    write_graph_file(cfg.state_dir / "snowball" / run_id, graph)
+    return run_id, graph

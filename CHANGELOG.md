@@ -8,6 +8,12 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- **Similar map in Explore:** Discover → Explore can open a similarity map
+  instead of a citation map. It shows the 40 papers that share the most
+  references and citers with the origin (bibliographic coupling plus
+  co-citation), places them by similarity, and highlights each paper's
+  strongest path back to the origin. Add to library and Find PDF work as on
+  the citation map. See [snowball](docs/snowball.md#similar-map).
 - **Local-trust hardening:** SSRF checks on PDF fetch URLs and redirects
   (block loopback / private / link-local / metadata), review-token path
   sanitization, `serve --allow-remote-bind` gate for non-loopback binds,

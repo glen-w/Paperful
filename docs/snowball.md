@@ -820,6 +820,27 @@ BibTeX citekeys still make sense. Snowball does not depend on that plugin.
 one hop, and opens **Map** for ad-hoc hops and **Add to library**. **Seed search**
 on a map node fills the Topic form (DOI kind + seeds) for a full snowball run.
 
+### Similar map
+
+Explore can also open a **Similar** map (pick *Similar papers* under **Map**).
+It is not a citation tree. Papers sit close together when they cite the same
+works (bibliographic coupling) or are cited together by the same works
+(co-citation), even if neither cites the other.
+
+- **Pool.** The seed's references (up to 200), the works citing it (up to
+  150, most cited first), works that cite its eight most-shared references,
+  and the 60 works its citers cite most. That is roughly 15–25 OpenAlex calls.
+- **Score.** Each measure is a Salton cosine (`shared / √(|A|·|B|)`), and the
+  score is their mean, from 0 to 1. Co-citation counts only the citing works in
+  the pool, so it is a sample, not the whole corpus.
+- **Map.** The 40 papers most similar to the seed. Each keeps links to its four
+  strongest peers, and stronger links pull papers closer. Clicking a paper
+  highlights its strongest path back to the origin.
+- **Limits.** A Similar map cannot be expanded; start a new Similar explore
+  from another node instead. Keep, Add to library, Find PDF, and tags work as on
+  a citation map. If the OpenAlex budget runs out mid-pool, the map is built
+  from what was gathered (`budget_hit` in the run `summary.json`).
+
 Discover **Map** draws the current queue before you open PDFs. Node colour is
 year × `cited_by_count`:
 

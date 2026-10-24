@@ -41,16 +41,22 @@
 {% if tab == 'explore' %}
 <section class="panel" id="discoverExploreSection">
   <h2>Explore</h2>
-  <p class="section-lede">Paste a DOI or paper name to open a citation map immediately. Hop on the map, add papers to the library, or use <strong>Seed search</strong> on a node to start a full snowball from that work.</p>
+  <p class="section-lede">Paste a DOI or paper name to open a map immediately. Hop on the map, add papers to the library, or use <strong>Seed search</strong> on a node to start a full snowball from that work.</p>
   <form method="post" action="/discover/explore" class="form-stack">
     <label>Paper {{ info("DOI or title. Titles with several OpenAlex matches show a picker.") }}
       <input name="query" value="{{ explore_query }}" placeholder="10.1038/… or paper title" {% if explore_picks %}autofocus{% endif %}>
     </label>
+    <div class="field-group">
+      <p class="field-legend">Map {{ info("Citation: who this paper cites and who cites it. Similar: about 40 papers that share citations and references with it, even when they never cite each other.") }}</p>
+      <label><input type="radio" name="map" value="citation" {% if explore_map != 'similar' %}checked{% endif %}> Citation map</label>
+      <label><input type="radio" name="map" value="similar" {% if explore_map == 'similar' %}checked{% endif %}> Similar papers (co-citation + shared references)</label>
+    </div>
     <button type="submit">Open map</button>
   </form>
   {% if explore_picks %}
   <form method="post" action="/discover/explore" class="form-stack explore-picks">
     <p class="field-legend">Several matches — choose one</p>
+    <input type="hidden" name="map" value="{{ explore_map or 'citation' }}">
     {% for pick in explore_picks %}
     <label class="explore-pick-row">
       <input type="radio" name="node_id" value="{{ pick.id }}" {% if loop.first %}checked{% endif %}>
