@@ -702,10 +702,33 @@ def run_checks(
     checks.extend(_rag_checks(cfg))
     checks.append(_snowball_check(cfg))
     checks.append(_openalex_store_check(cfg))
+    osf = _osf_check(cfg)
+    if osf is not None:
+        checks.append(osf)
     checks.append(_author_packs_check(cfg))
     checks.append(_authorwatch_check(cfg))
 
     return checks
+
+
+def _osf_check(cfg: Config) -> Check | None:
+    """Demand test for an OSF Preprints source: recent misses that point at osf.io."""
+    from .osf_signal import MIN_OSF_MISSES, MIN_SHARE, osf_signal
+    from .store import Manifest
+
+    if not cfg.manifest_path.is_file():
+        return None
+    sig = osf_signal(Manifest(cfg.manifest_path))
+    if not sig.misses:
+        return None
+    line = f"{sig.osf} of {sig.misses} recent misses point at OSF hosts ({sig.share:.0%})"
+    if sig.meaningful:
+        return Check("osf preprints", "amber", f"{line} · enough signal to build a thin OSF source")
+    return Check(
+        "osf preprints",
+        "green",
+        f"{line} · below the bar ({MIN_OSF_MISSES}+ and {MIN_SHARE:.0%}+), no OSF source needed",
+    )
 
 
 def _openalex_store_check(cfg: Config) -> Check:

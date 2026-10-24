@@ -15,6 +15,11 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- **Discover rows say why.** The Discover Queue and the Wanted "Waiting from
+  Discover" panel show a "Why suggested" line from each candidate's `why`.
+- **OSF demand check.** `paperful doctor` reports how many recent misses point
+  at OSF hosts and when that is enough to justify a thin source (10+ and 5%+);
+  no OSF fetch source ships. See [sources](docs/sources.md).
 - **OpenAlex topic-change housekeeping (Oct 2026).** Every snowball run's
   `summary.json` records `openalex_run_date` and `openalex_topic_epoch`.
   `paperful snowball watch rebaseline [NAME | --all] [--apply]` resets keyword

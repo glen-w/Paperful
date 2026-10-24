@@ -111,3 +111,37 @@ def test_core_check_green_optional_or_keyed(cfg):
     assert by_name["CORE"].status == "green"
     assert "set" in by_name["CORE"].detail.lower()
     assert remediation_text(by_name["CORE"], cfg) is None
+
+
+def test_osf_signal_counts_recent_misses_only(tmp_path):
+    import time
+
+    from paperful.osf_signal import MIN_OSF_MISSES, osf_signal
+    from paperful.store import Manifest, Record, STATUS_NOT_FOUND, STATUS_OK
+
+    manifest = Manifest(tmp_path / "manifest.jsonl")
+    for i in range(MIN_OSF_MISSES):
+        manifest.write(
+            Record(itemKey=f"O{i}", status=STATUS_NOT_FOUND, url=f"https://osf.io/preprints/x{i}")
+        )
+    manifest.write(Record(itemKey="OLD", status=STATUS_NOT_FOUND, url="https://osf.io/old"))
+    manifest.records["OLD"].ts = time.time() - 200 * 86400  # write() stamps now; age it after
+    manifest.write(Record(itemKey="HAVE", status=STATUS_OK, url="https://osf.io/have"))
+    manifest.write(Record(itemKey="ELSE", status=STATUS_NOT_FOUND, attempts=["unpaywall:not_found"]))
+    sig = osf_signal(manifest)
+    assert (sig.misses, sig.osf) == (MIN_OSF_MISSES + 1, MIN_OSF_MISSES)
+    assert sig.meaningful
+
+
+def test_osf_check_quiet_without_a_manifest_and_green_below_the_bar(tmp_path):
+    from paperful.config import Config
+    from paperful.doctor import _osf_check
+    from paperful.store import Manifest, Record, STATUS_NOT_FOUND
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    assert _osf_check(cfg) is None
+    manifest = Manifest(cfg.manifest_path)
+    manifest.write(Record(itemKey="A", status=STATUS_NOT_FOUND, url="https://osf.io/a"))
+    check = _osf_check(cfg)
+    assert check.status == "green" and "no OSF source needed" in check.detail

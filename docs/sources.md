@@ -124,6 +124,15 @@ into `out/` instead of waiting on the inbox. Optional `[inbox].match` (title / O
 `gaps -C <collection> --list-missing --handoff …` (or `run --handoff` on a
 retry of soft-blocked keys).
 
+## OSF Preprints (demand check, no source yet)
+
+Paperful has no OSF fetch source. `paperful doctor` counts misses from the last
+90 days whose URL or attempts mention `osf.io` (or the PsyArXiv, SocArXiv,
+engrXiv, EdArXiv hosts) in the local manifest, with no network call. The row
+turns amber, "enough signal to build a thin OSF source", only at **10 or more**
+such misses **and at least 5%** of all recent misses; below that it stays green
+and nothing should be built. Decide on your own library's number.
+
 ## HTML→PDF (web, news, blogs)
 
 Items typed as `webpage`, `blogPost`, `newspaperArticle`, `magazineArticle`, or
