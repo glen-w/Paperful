@@ -1,6 +1,6 @@
 # Releases and stability
 
-**1.3.0** is the current release (`pip install paperful` after this tag is published; optional extras
+**1.3.1** is the current release (`pip install paperful` after this tag is published; optional extras
 `[llm]`, `[rag]`, `[serve]`, `[browser-agent]`). **1.1.0** introduced PyPI and
 trusted publishing. After install, run `playwright install chromium` once for
 campus login and HTML PDF paths. The **operator** install tested in CI is still
@@ -29,8 +29,12 @@ be added. Required `paperful.run_report.v1` keys and imported-file attach
 (typed `attach_failed`, provenance note) are the contract. **1.1.1** shipped
 Wanted stop-ship hygiene (Grab scope, Attach at zero, copy). Everything after
 that is a buffet by area (Wanted excellence first, testers before new features).
-**1.3.0** adds the optional unsigned [Firefox add-on](firefox.md): save the
-open page or selected tabs into `out/`. Local OpenAlex snapshot phases beyond
+**1.3.1** hardens local-trust boundaries (PDF fetch SSRF checks, review-token
+sanitization, non-loopback `serve` gate, redacted witness digests; see
+[SECURITY.md](../SECURITY.md)) and adds Mendeley/EndNote adapter contract tests
+plus a field-assessment template for testers. **1.3.0** adds the optional
+unsigned [Firefox add-on](firefox.md): save the open page or selected tabs into
+`out/`. Local OpenAlex snapshot phases beyond
 opt-in v1 and the alert loop stay later — see
 [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10)
 and [After 1.1.0](ROADMAP.md#after-110-buffet-by-area).

@@ -8,12 +8,6 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
-- **Local-trust hardening:** SSRF checks on PDF fetch URLs and redirects
-  (block loopback / private / link-local / metadata), review-token path
-  sanitization, `serve --allow-remote-bind` gate for non-loopback binds,
-  secret-redacted witness `config_sha256`, tighter Chrome CDP
-  `remote-allow-origins`, and [SECURITY.md](SECURITY.md). CI runs a curated
-  `ruff` lint job; `make test` / `make lint` match contributor parity.
 - **Collection exclude / protect (`[[exclude]]`):** Mark hand-curated folders
   so paperful will not write to them. Presets `full` and `add_only`, plus
   fine-grained `allow_*` flags, `protect_items`, and optional
@@ -70,6 +64,22 @@ may still be added). See [releases](docs/releases.md).
   Map **Seed search** opens the Topic tab with the form prefilled.
 - **`paperful all` run-step parity:** `--handoff`, `--include-doi-tabs`, `--downloads-dir`, `--promote`, `--htmlpdf`, `--upgrade-snapshot`, `--keep-snapshot`, `--ezproxy-relogin`, `--twenty-writeback`, `--request-rg`, and `--re-request` reach the internal `run`. Optional `gaps_handoff` step (or `--after-handoff-gaps`) runs leftover `gaps --list-missing` with `--gaps-handoff` or the same `--handoff`. Profiles may store the same keys. See [Workflows](docs/workflows.md).
 - **Firefox add-on 0.2:** richer page detection (Highwire / Dublin Core / JSON-LD), type-to-filter collection picker, capture tags with library and OpenAlex keyword suggestions, optional capture note, Review-then-Save for selected tabs, context menu and Alt+Shift+P, walk badge, open folder / Wanted after save. Native messages are correlated by id. Downloads are staged from the user Downloads folder into the drop directory. `install-host` writes a Windows launcher. Popup and options use the workbench paper, copper, and box-mark chrome. See [Firefox](docs/firefox.md).
+
+## 1.3.1 — 2026-10-24
+
+### Added
+
+- **Local-trust hardening:** SSRF checks on PDF fetch URLs and redirects
+  (block loopback / private / link-local / metadata), review-token path
+  sanitization, `serve --allow-remote-bind` gate for non-loopback binds,
+  secret-redacted witness `config_sha256`, tighter Chrome CDP
+  `remote-allow-origins`, and [SECURITY.md](SECURITY.md). CI runs a curated
+  `ruff` lint job; `make test` / `make lint` match contributor parity.
+- **Mendeley and EndNote adapter contracts:** Mocked API and synthetic library
+  tests encode Elsevier and Clarivate import expectations; committed
+  [adapter field assessment](docs/templates/adapter-field-assessment.md)
+  template linked from [Mendeley](docs/mendeley.md) and
+  [EndNote](docs/endnote.md) (adapters still seeking testers).
 
 ## 1.3.0 — 2026-10-19
 
