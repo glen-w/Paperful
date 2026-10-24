@@ -1,0 +1,205 @@
+{
+  "_note": "Frozen OpenAlex keyword payloads for the same five works before and after the Oct 2026 topic reassignment. Scoring code must keep these outputs; a change here is a deliberate behaviour change.",
+  "min_score": 0.5,
+  "keyword_limit": 5,
+  "epochs": {
+    "pre-2026-10": {
+      "seed": {
+        "id": "https://openalex.org/W1",
+        "title": "High seas treaty",
+        "cited_by_count": 100,
+        "keywords": [
+          {
+            "id": "https://openalex.org/keywords/ocean",
+            "display_name": "ocean",
+            "score": 0.9
+          },
+          {
+            "id": "https://openalex.org/keywords/treaty",
+            "display_name": "treaty",
+            "score": 0.7
+          },
+          {
+            "id": "https://openalex.org/keywords/fish",
+            "display_name": "fish",
+            "score": 0.3
+          }
+        ]
+      },
+      "neighbours": [
+        {
+          "id": "https://openalex.org/W10",
+          "title": "A",
+          "cited_by_count": 10,
+          "keywords": [
+            {
+              "id": "https://openalex.org/keywords/ocean",
+              "display_name": "ocean",
+              "score": 0.8
+            },
+            {
+              "id": "https://openalex.org/keywords/fish",
+              "display_name": "fish",
+              "score": 0.9
+            }
+          ]
+        },
+        {
+          "id": "https://openalex.org/W11",
+          "title": "B",
+          "cited_by_count": 500,
+          "keywords": [
+            {
+              "id": "https://openalex.org/keywords/treaty",
+              "display_name": "treaty",
+              "score": 0.8
+            }
+          ]
+        },
+        {
+          "id": "https://openalex.org/W12",
+          "title": "C",
+          "cited_by_count": 5,
+          "keywords": [
+            {
+              "id": "https://openalex.org/keywords/treaty",
+              "display_name": "treaty",
+              "score": 0.6
+            },
+            {
+              "id": "https://openalex.org/keywords/ocean",
+              "display_name": "ocean",
+              "score": 0.6
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "seed_keywords": [
+          "ocean",
+          "treaty"
+        ],
+        "overlap": {
+          "W10": 1,
+          "W11": 1,
+          "W12": 2
+        },
+        "scores": {
+          "W10": 1010.0,
+          "W11": 1500.0,
+          "W12": 2005.0
+        },
+        "ranked": [
+          "W12",
+          "W11",
+          "W10"
+        ]
+      }
+    },
+    "2026-10": {
+      "seed": {
+        "id": "https://openalex.org/W1",
+        "title": "High seas treaty",
+        "cited_by_count": 100,
+        "keywords": [
+          {
+            "id": "https://openalex.org/keywords/ocean",
+            "display_name": "ocean",
+            "score": 0.95
+          },
+          {
+            "id": "https://openalex.org/keywords/high-seas",
+            "display_name": "high-seas",
+            "score": 0.9
+          },
+          {
+            "id": "https://openalex.org/keywords/treaty",
+            "display_name": "treaty",
+            "score": 0.8
+          },
+          {
+            "id": "https://openalex.org/keywords/biodiversity",
+            "display_name": "biodiversity",
+            "score": 0.6
+          }
+        ]
+      },
+      "neighbours": [
+        {
+          "id": "https://openalex.org/W10",
+          "title": "A",
+          "cited_by_count": 10,
+          "keywords": [
+            {
+              "id": "https://openalex.org/keywords/ocean",
+              "display_name": "ocean",
+              "score": 0.9
+            }
+          ]
+        },
+        {
+          "id": "https://openalex.org/W11",
+          "title": "B",
+          "cited_by_count": 500,
+          "keywords": [
+            {
+              "id": "https://openalex.org/keywords/treaty",
+              "display_name": "treaty",
+              "score": 0.9
+            },
+            {
+              "id": "https://openalex.org/keywords/high-seas",
+              "display_name": "high-seas",
+              "score": 0.85
+            }
+          ]
+        },
+        {
+          "id": "https://openalex.org/W12",
+          "title": "C",
+          "cited_by_count": 5,
+          "keywords": [
+            {
+              "id": "https://openalex.org/keywords/ocean",
+              "display_name": "ocean",
+              "score": 0.9
+            },
+            {
+              "id": "https://openalex.org/keywords/treaty",
+              "display_name": "treaty",
+              "score": 0.7
+            },
+            {
+              "id": "https://openalex.org/keywords/kelp",
+              "display_name": "kelp",
+              "score": 0.4
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "seed_keywords": [
+          "ocean",
+          "high-seas",
+          "treaty",
+          "biodiversity"
+        ],
+        "overlap": {
+          "W10": 1,
+          "W11": 2,
+          "W12": 2
+        },
+        "scores": {
+          "W10": 1010.0,
+          "W11": 2500.0,
+          "W12": 2005.0
+        },
+        "ranked": [
+          "W11",
+          "W12",
+          "W10"
+        ]
+      }
+    }
+  }
+}

@@ -79,6 +79,15 @@ The screenshots are `ocean/BBNJ`. The clicks are the same for any collection.
   `out/`. Automatic attaches during Grab on Zotero 10 or newer.
 - Held is not failure. A one-page stub or a DOI mismatch waits for an
   explicit attach (Advanced can allow those holds).
+- **Found** means the DOI inside the PDF matches the library item. Anything
+  else with a file on disk wears a **Check** stamp. Missing rows say why in
+  one line under the title.
+- **Waiting from Discover** (above the tabs) lists papers you kept in a
+  Discover queue, or that a topic watch, keepup digest, or author watch
+  proposed, and that are not in this collection yet. It is the same fill
+  desk, not a second one: add them in Discover (metadata only), then they
+  show up under Missing for Preview and Grab. The panel has no buttons of its
+  own and never writes.
 - Open access first. Campus EZProxy is the **Campus** preset after
   `paperful session login ezproxy` on the host — [EZProxy](ezproxy.md).
 - Not every paywalled or DOI-less item comes back.

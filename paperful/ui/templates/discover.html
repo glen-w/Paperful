@@ -554,7 +554,7 @@
   <tbody>
   {% for row in candidates %}
   <tr>
-    <td>{{ row.title }}</td>
+    <td>{{ row.title }}{% if row.why %}<span class="row-why">Why suggested: {{ row.why }}</span>{% endif %}</td>
     <td>{{ row.doi }}</td>
     <td>
       {{ row.keep }}

@@ -40,6 +40,7 @@ def run_attachments(
 
     from .attachments import (
         SurgeryFlags,
+        mirror_has_bytes,
         apply_actions,
         apply_refusal,
         mirror_pdfs_for,
@@ -77,7 +78,10 @@ def run_attachments(
         link=cli_mod._opt_bool(link, cfg.attachments_link),
     )
     cli_mod._require_manager(cfg)
-    backend = cli_mod._live_backend(cfg, quiet=as_json)
+    # Mirror-first: the scan reads children from the mirror (record.json). The
+    # manager is only asked about bytes the mirror folder does not hold, and
+    # for writes (--apply), which exit 2 when it is closed.
+    backend = cli_mod._connect(cfg, quiet=as_json)
     loaded = cli_mod._load_scope(
         backend,
         json_out=as_json,
@@ -95,6 +99,8 @@ def run_attachments(
     mirrors: dict = {}
     stems: dict = {}
     unread: list[str] = []
+    unchecked = 0
+    offline = getattr(backend, "live", backend) is None
     with cli_mod._item_progress(json_out=as_json) as progress:
         for item in cli_mod._track(progress, "Scanning attachments")(items):
             try:
@@ -103,16 +109,21 @@ def run_attachments(
                 # Not the same as an item with no attachments. Leave it out.
                 unread.append(item.key)
                 continue
-            present = {
-                str(ch.get("key") or (ch.get("data") or {}).get("key") or ""): cli_mod._child_bytes(
-                    backend, ch
-                )
-                for ch in raw
-                if isinstance(ch, dict)
-            }
+            mirrors[item.key] = mirror_pdfs_for(cfg.out_dir, item)
+            present: dict[str, bool] = {}
+            for ch in raw:
+                if not isinstance(ch, dict):
+                    continue
+                ckey = str(ch.get("key") or (ch.get("data") or {}).get("key") or "")
+                if mirror_has_bytes(ch, mirrors[item.key]):
+                    present[ckey] = True
+                    continue
+                if offline and (ch.get("data") or {}).get("linkMode") != "linked_file":
+                    # Cannot tell a missing file from a lazy mirror. Do not call it a ghost.
+                    unchecked += 1
+                present[ckey] = cli_mod._child_bytes(backend, ch)
             kids = pdf_children(item.key, raw, present=present)
             children.extend(kids)
-            mirrors[item.key] = mirror_pdfs_for(cfg.out_dir, item)
             stems[item.key] = stem_filename(item)
     scan = plan_actions(
         children,
@@ -126,6 +137,12 @@ def run_attachments(
     errors: list[str] = list(scan.refusals)
     if unread:
         errors.append(f"{len(unread)} item(s) could not be read and were skipped")
+    notes: list[str] = []
+    if unchecked:
+        notes.append(
+            f"{unchecked} attachment(s) not in the mirror folder were not checked "
+            "for a stored file: the library is not reachable."
+        )
     if apply and flags.any:
         refusal = apply_refusal(
             manager=cfg.manager,
@@ -192,6 +209,7 @@ def run_attachments(
         ],
         "applied": applied,
         "errors": errors,
+        "notes": notes,
     }
     if as_json:
         console.print(
@@ -211,6 +229,8 @@ def run_attachments(
                 "Report only. Pass [bold]--fix-broken[/], [bold]--merge-files[/], "
                 "[bold]--rename[/], or [bold]--link[/] with [bold]--apply[/] to change Zotero."
             )
+        for note in notes:
+            console.print(f"[yellow]{note}[/]")
         if errors:
             console.print(f"Errors: {len(errors)}")
             for err in errors[:20]:

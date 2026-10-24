@@ -8,7 +8,7 @@ from typing import Any
 from ..config import Config
 from ..miss_surface import honesty_row_for_item, miss_surface_plain, project_miss_surface
 from ..store import Manifest, STATUS_ATTACHED, STATUS_OK
-from .verify import file_verification, reason_plain, verification_plain
+from .verify import file_verification, reason_plain, stamp_for_state, verification_plain
 
 
 def _has_summary(cfg: Config, key: str) -> bool:
@@ -47,6 +47,7 @@ def wanted_rows(
                 "verify_plain": verification_plain(ver["state"]),
                 "verify_tip": reason_plain(ver.get("reason") or ""),
                 "ticked": ver["state"] == "doi_match",
+                "stamp": stamp_for_state(ver["state"]),
             }
             state = ver["state"]
             if state == "doi_match":
@@ -106,6 +107,8 @@ def wanted_rows(
             "held": len(held),
             "missing": len(missing),
             "attach": attach_pending,
+            "found": sum(1 for r in have + held if r.get("stamp") == "found"),
+            "check": sum(1 for r in have + held if r.get("stamp") == "check"),
         },
     }
 
@@ -223,6 +226,7 @@ def newest_snowball_queue(cfg: Config) -> tuple[str, list[dict[str, Any]]]:
                     "title": title,
                     "doi": doi,
                     "keep": data.get("keep"),
+                    "why": str(data.get("why") or "").strip(),
                     "run_id": run_id,
                 }
             )

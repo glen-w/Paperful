@@ -288,6 +288,7 @@ READ_VERBS = [
     ["export", "OUT.ris", "-C", "BBNJ"],
     ["ocr", "-C", "BBNJ"],
     ["run", "-C", "BBNJ", "--dry-run"],
+    ["attachments", "-C", "BBNJ", "--json"],
     ["authorwatch", "save", "ocean-people"],
 ]
 
@@ -314,7 +315,7 @@ WRITE_VERBS = [
     ["snapshot", "-C", "BBNJ"],
     ["sync"],
     ["restore", "-C", "BBNJ"],
-    ["attachments", "-C", "BBNJ"],
+    ["attachments", "-C", "BBNJ", "--fix-broken", "--apply"],
     ["authorwatch", "apply", "ocean-people", "-C", "BBNJ", "--apply"],
 ]
 
@@ -434,3 +435,41 @@ def test_doctor_mirror_row_includes_last_refresh_counts(cfg):
     check = _mirror_check(cfg)
     assert check.name == "Mirror"
     assert "written" in check.detail and "gone" in check.detail
+
+
+def test_attachments_children_and_bytes_come_from_the_mirror(cfg):
+    """With the manager closed the scan still sees children and proves bytes by MD5."""
+    from paperful.attachments import mirror_has_bytes, mirror_pdfs_for, pdf_children
+
+    zot = _library()
+    run_sync(cfg, zot, pdfs="all")
+    forget_index()
+    backend = MirrorFirstBackend(cfg, MirrorCatalogue(cfg.out_dir), live=None)
+    item = backend.get_item("ITEM0001")
+    raw = backend.children("ITEM0001")
+    mirrors = mirror_pdfs_for(cfg.out_dir, item)
+    present = {
+        ch["key"]: mirror_has_bytes(ch, mirrors) for ch in raw if ch["data"]["itemType"] == "attachment"
+    }
+    assert present == {"ATT00001": True}
+    kids = pdf_children("ITEM0001", raw, present=present)
+    assert [(k.key, k.bytes_present) for k in kids] == [("ATT00001", True)]
+    # No mirror copy and no MD5 match proves nothing.
+    assert mirror_has_bytes(raw[0], []) is False
+    assert mirror_has_bytes({"data": {}}, mirrors) is False
+
+
+def test_attachments_report_only_never_asks_the_manager_for_children(
+    cfg_file, library, monkeypatch
+):
+    assert runner.invoke(cli.app, ["gaps", "-C", "BBNJ", "-c", str(cfg_file)]).exit_code == 0
+
+    def forbidden(*a, **k):
+        raise AssertionError("attachments read children from the manager")
+
+    monkeypatch.setattr(type(library), "children", forbidden, raising=False)
+    _close_manager(monkeypatch)
+    forget_index()
+    res = runner.invoke(cli.app, ["attachments", "-C", "BBNJ", "--json", "-c", str(cfg_file)])
+    assert res.exit_code == 0, res.stdout
+    assert json.loads(res.stdout)["items"] == 2

@@ -78,9 +78,18 @@ Non-loopback bind (`--host 0.0.0.0`) requires `--allow-remote-bind` and still ha
    **Missing** rows use miss-surface icons (hover for `MISS_SURFACE_PLAIN`).
    **Held** / **Have** use the same icon+tooltip pattern for PDF verification
    (`doi_match`, `doi_mismatch`, `unverified`, `snapshot`; not “% complete”).
+   A **Found** stamp appears only on `doi_match` (the PDF's DOI equals the
+   library item's); every other file on disk gets a **Check** stamp. Each
+   **Missing** row prints its one-line reason under the title (the same
+   `MISS_SURFACE_PLAIN` text as the tooltip). **Report** (`GET /wanted/report`,
+   `format=md|json|csv`) uses the same stamps, so "N found" equals the number
+   of Found stamps; `csv` is the `misses.csv` shape for the cleaning service.
    A library PDF flag with no file on the mirror (`verification` `missing`,
    “No PDF file on disk”) lands on **Missing** with the missing-file icon.
    The default tab is the first non-empty bucket (Missing → Held → Have).
+   **Waiting from Discover** (a read-only panel above the tabs) lists kept
+   queue rows and watch / keepup / authorwatch inbox rows that are not yet in
+   the collection; add them from Discover and they appear under Missing.
    **Preview** → **Grab** (fetch to the `out/` folder on this computer;
    selected vs all; Grab passes the same `item_keys` as the preview token).
    **Manual** (default): **Attach** writes attachable pending PDFs into
@@ -185,6 +194,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/v1/refs-gap` | Dry-run `refs gap` envelope |
 | POST | `/v1/ask` | Same as MCP `ask` (not linked from simple HTML) |
 | POST | `/v1/gui/noop` | Smoke / readiness for the GUI process |
+| GET | `/wanted/report` | Read-only stamp cards for the scoped collection (`format=md|json|csv`; no `% complete`) |
 | POST | `/wanted/preview` | Review token for Grab (Advanced: year/type/retry/… flags) |
 | POST | `/wanted/grab` | Consume token; fetch to `out/` (`item_keys` from preview). Attaches only when `[ui].attach_mode` is `auto` and the library can write |
 | POST | `/wanted/attach/preview` | Review token for held PDF attach |

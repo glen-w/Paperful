@@ -145,6 +145,20 @@ def register_wanted(ui: UiContext) -> None:
         }
 
 
+    def _pending_fill(data: dict[str, Any]) -> dict[str, Any]:
+        """Discover output not yet in the scoped collection (read-only ledgers)."""
+        from ..pending_fill import pending_fill
+
+        dois = {
+            str(r.get("doi") or "")
+            for name in ("have", "held", "missing")
+            for r in data.get(name, [])
+        }
+        try:
+            return pending_fill(cfg, dois)
+        except Exception:
+            return {"rows": [], "total": 0, "by_source": {}}
+
     @app.get("/wanted", response_class=HTMLResponse)
     def page_wanted(request: Request, tab: str | None = None, error: str = "") -> HTMLResponse:
         from .pages import resolve_wanted_tab
@@ -163,6 +177,7 @@ def register_wanted(ui: UiContext) -> None:
             except Exception as exc:
                 load_error = str(exc)
         counts = data["counts"]
+        pending = _pending_fill(data)
         tab = resolve_wanted_tab(tab, counts)
         bucket = data.get(tab, []) if tab in {"have", "held", "missing"} else data["missing"]
         per_page = library_per_page_from_request(request, cfg)
@@ -247,6 +262,7 @@ def register_wanted(ui: UiContext) -> None:
                 tab=tab,
                 rows=rows,
                 counts=data["counts"],
+                pending=pending,
                 error=banner,
                 coach=coach,
                 briefs=briefs,
@@ -273,6 +289,30 @@ def register_wanted(ui: UiContext) -> None:
             set_cookie(response, COOKIE_LIBRARY_PER_PAGE, str(per_page))
         return response
 
+
+    @app.get("/wanted/report", response_model=None)
+    def wanted_report(request: Request, format: str = "md"):
+        """Read-only report cards: same stamps as the Wanted table."""
+        from ..wanted_cards import render_markdown, render_misses_csv, report_cards
+        from fastapi.responses import PlainTextResponse
+
+        prefs = prefs_from_request(request)
+        if not prefs.collection:
+            return PlainTextResponse("Pick a collection first.", status_code=400)
+        try:
+            data = _load_wanted(cfg, prefs.collection)
+        except Exception as exc:
+            return PlainTextResponse(str(exc), status_code=502)
+        report = report_cards(data, collection=prefs.collection)
+        if format == "json":
+            return JSONResponse(report)
+        if format == "csv":
+            return PlainTextResponse(
+                render_misses_csv(report), media_type="text/csv; charset=utf-8"
+            )
+        return PlainTextResponse(
+            render_markdown(report), media_type="text/markdown; charset=utf-8"
+        )
 
     @app.post("/wanted/summarize")
     async def wanted_summarize(request: Request) -> RedirectResponse:

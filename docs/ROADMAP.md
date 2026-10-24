@@ -78,7 +78,7 @@ Paperful every week, not just once to fill gaps?
 ### Facts settled against 1.1.0
 
 - 1.1.0 is tagged and on PyPI; trusted publishing (`publish.yml`) exists.
-- Version: single source via `importlib.metadata` / `pyproject.toml` (1.3.0).
+- Version: single source via `importlib.metadata` / `pyproject.toml` (1.3.1).
 - Attach is **manual by default** (`[ui].attach_mode`); Grab does not write to
   Zotero unless Settings is automatic.
 - **1.1.1 closed P0s:** Grab-selected `item_keys`, Held hand-ticks, Attach at
@@ -86,7 +86,7 @@ Paperful every week, not just once to fill gaps?
 - **Ask** is on the default nav (third after Wanted and Discover); it does
   not need Advanced. Whether it *stays* there is an [open
   question](#after-110-open-questions).
-- Install docs are pinned to `v1.3.0` (README, `docs/docker.md`,
+- Install docs are pinned to `v1.3.1` (README, `docs/docker.md`,
   `website/index.html`). Recheck every paperful.app claim before launch.
 
 (after-110-1-1-1)=
@@ -184,7 +184,11 @@ in `paperful/snowball/openalex.py` lists no `topics` field. Grep finds no
 on OpenAlex’s `/text/topics?version=1` endpoint. Works already switched to
 the new topic assignments in early October 2026. Users need no notice.
 
-Cheap housekeeping (can sit alongside 1.1.x):
+Cheap housekeeping (can sit alongside 1.1.x). **Shipped (unreleased):** run
+stamp (`openalex_run_date`, `openalex_topic_epoch`), `snowball watch
+rebaseline`, the stale 12% figure dropped, `doctor` snapshot warning via
+`[openalex_store].snapshot_date`, and a frozen before/after scoring fixture
+(`tests/fixtures/openalex_topics/`). Original list:
 
 - Stamp each snowball run with the OpenAlex date — pre-October runs cannot
   be reproduced (keywords are now linked to topics; OpenAlex reports
@@ -735,12 +739,12 @@ and write through it. Read verbs run with Zotero closed. A first refresh of
 a 22,700-item library takes about a minute; a refresh with nothing changed
 is six requests.
 
-Still open:
-
-- **`attachments`** still reads each item's children from the manager. It
-  no longer downloads files to test for them.
-
 Closed in this pass:
+
+- **`attachments`** reads children from the mirror and proves a stored file
+  by MD5 against the item folder. The manager is asked only about bytes the
+  folder lacks (and for `--apply`). With it closed, report-only runs finish
+  and say how many attachments went unchecked (`READ_VERBS` covers it).
 
 - **Mendeley and EndNote** implement `changes(since)` (Mendeley via
   `modified_since` / `deleted_since`; EndNote via `sdb.eni` mtime). Their

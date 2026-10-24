@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_help.html" import info %}
-{% from "_miss_surface.html" import status_icon %}
+{% from "_miss_surface.html" import status_icon, verify_stamp %}
 {% from "_icon_btn.html" import icon_button %}
 {% from "_job_status.html" import job_status %}
 {% block title %}Wanted — Paperful{% endblock %}
@@ -11,7 +11,20 @@
 {% if coach %}<div class="coach-banner">{{ coach }} <a href="/system">System</a></div>{% endif %}
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
 {{ job_status(job) }}
-<p class="counts">Have {{ counts.have }} · Held {{ counts.held }} · Missing {{ counts.missing }}</p>
+<p class="counts">Have {{ counts.have }} · Held {{ counts.held }} · Missing {{ counts.missing }}{% if prefs.collection %} · <a href="/wanted/report?format=md">Report</a>{% endif %}</p>
+{% if pending and pending.total %}
+<section class="panel pending-fill" id="pending-fill">
+  <h2>Waiting from Discover <span class="counts">{{ pending.total }}</span></h2>
+  <p class="section-lede">Papers you kept, or that a watch or keepup digest proposed, and that are not in this collection yet. Add them in Discover (metadata only); they then appear under <strong>Missing</strong> here for Preview and Grab.
+    <a href="/discover?tab=queue">Open queue</a> · <a href="/discover?tab=following">Following</a></p>
+  <ul class="pending-list">
+    {% for row in pending.rows[:10] %}
+    <li data-pending-source="{{ row.source }}">{{ row.title or row.doi }} <span class="chip-summary">{{ row.source_plain }}</span>{% if row.why %}<span class="row-why">Why suggested: {{ row.why }}</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% if pending.total > 10 %}<p class="section-lede">and {{ pending.total - 10 }} more.</p>{% endif %}
+</section>
+{% endif %}
 <div class="tabs">
   <span class="tab-with-help">
     <a href="{{ wanted_pagination.tab_urls.missing }}" {% if tab == 'missing' %}class="active"{% endif %}>Missing</a>
@@ -203,6 +216,7 @@
     <td><input type="checkbox" name="keys" value="{{ row.key }}" form="wanted-form" class="row-select"
       {% if row.ticked %}checked{% endif %}></td>
     <td>{{ row.title }}
+      {% if row.miss_plain %}<span class="miss-reason" data-miss-surface="{{ row.miss_surface }}">{{ row.miss_plain }}</span>{% endif %}
       {{ icon_button('Detail', 'detail', onclick="openDrawer('d-" ~ row.key ~ "')") }}
       <dialog class="wb-drawer" id="d-{{ row.key }}">
         <p><strong>{{ row.title }}</strong></p>
@@ -228,9 +242,9 @@
     </td>
     <td>
       {% if row.miss_plain %}{{ status_icon(row.miss_surface, row.miss_plain, row.miss_detail) }}
-      {% elif row.state %}{{ status_icon(row.state, row.verify_plain, row.verify_tip) }}
+      {% elif row.state %}{{ verify_stamp(row.stamp) }}{{ status_icon(row.state, row.verify_plain, row.verify_tip) }}
       {% endif %}
-      {% if row.has_summary %}<span class="stamp-found">summary</span>{% endif %}
+      {% if row.has_summary %}<span class="chip-summary">summary</span>{% endif %}
     </td>
   </tr>
   {% endfor %}

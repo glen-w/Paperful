@@ -6,8 +6,39 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+### Changed
+
+- **`paperful attachments` is mirror-first.** The report reads children from
+  the mirror and proves stored files by MD5 against the item folder; it runs
+  with the manager closed (and notes unchecked attachments). `--apply` still
+  needs the manager and exits 2 when it is down.
+
 ### Added
 
+- **Discover rows say why.** The Discover Queue and the Wanted "Waiting from
+  Discover" panel show a "Why suggested" line from each candidate's `why`.
+- **OSF demand check.** `paperful doctor` reports how many recent misses point
+  at OSF hosts and when that is enough to justify a thin source (10+ and 5%+);
+  no OSF fetch source ships. See [sources](docs/sources.md).
+- **OpenAlex topic-change housekeeping (Oct 2026).** Every snowball run's
+  `summary.json` records `openalex_run_date` and `openalex_topic_epoch`.
+  `paperful snowball watch rebaseline [NAME | --all] [--apply]` resets keyword
+  watches baselined before 14 Oct 2026 once, so reassigned works do not arrive
+  as new. `paperful doctor` warns when `[openalex_store].snapshot_date` predates
+  the change (full reload needed; see [config](docs/config.md)). The stale
+  "about 12% of works have no topic" figure is gone from the docs. A frozen
+  before/after fixture pins keyword scoring.
+- **Wanted stamps and report cards:** Rows with a PDF on disk carry a visible
+  **Found** stamp (only when the PDF's DOI matches the library item) or a
+  **Check** stamp (mismatch, unverified, snapshot). Missing rows print their
+  one-line reason under the title. New read-only `GET /wanted/report`
+  (`md`, `json`, `csv`) and `paperful.wanted_cards` build the same cards the
+  cleaning service reports, so "N found" equals the number of Found stamps.
+  The "summary" chip no longer reuses the Found style.
+- **Wanted: Waiting from Discover.** Kept snowball candidates, topic watch,
+  keepup, and authorwatch inboxes (minus anything already in the collection or
+  muted) appear in one read-only panel on Wanted (`paperful.pending_fill`),
+  so Discover feeds the one fill desk. See [first fill](docs/first-fill.md).
 - **Collection exclude / protect (`[[exclude]]`):** Mark hand-curated folders
   so paperful will not write to them. Presets `full` and `add_only`, plus
   fine-grained `allow_*` flags, `protect_items`, and optional

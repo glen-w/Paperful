@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from paperful.config import Config
 from paperful.miss_surface import project_miss_surface
@@ -417,3 +418,20 @@ def test_briefs_synth_form_prefers_query_then_last_job():
     )
     assert fresh["dest"] == "both"
     assert fresh["limit"] == ""
+
+
+def test_discover_queue_rows_carry_the_why_line(tmp_path):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    run = cfg.state_dir / "snowball" / "run-why"
+    run.mkdir(parents=True)
+    rows = [
+        {"biblio": {"title": "Cited"}, "ids": {"doi": "10.1/c"}, "why": "cited by 3 of your seeds"},
+        {"biblio": {"title": "Bare"}, "ids": {"doi": "10.1/b"}},
+    ]
+    (run / "candidates.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8"
+    )
+    _run_id, candidates = newest_snowball_queue(cfg)
+    assert candidates[0]["why"] == "cited by 3 of your seeds"
+    assert candidates[1]["why"] == ""
+    assert "Why suggested" in Path("paperful/ui/templates/discover.html").read_text(encoding="utf-8")

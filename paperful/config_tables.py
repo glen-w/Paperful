@@ -651,6 +651,11 @@ def apply_openalex_store(raw: dict[str, Any], cfg: "Config") -> None:
                 lambda v: str(v).strip(),
             ),
             (
+                "snapshot_date",
+                "openalex_store_snapshot_date",
+                lambda v: str(v).strip()[:10],
+            ),
+            (
                 "duckdb_bin",
                 "openalex_store_duckdb_bin",
                 lambda v: str(v).strip() or "duckdb",

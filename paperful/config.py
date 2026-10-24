@@ -284,6 +284,7 @@ class Config:
     openalex_store_ssh_user: str = ""
     openalex_store_parquet_glob: str = ""
     openalex_store_cites_index_glob: str = ""
+    openalex_store_snapshot_date: str = ""  # YYYY-MM-DD of the full snapshot loaded
     openalex_store_duckdb_bin: str = "duckdb"
     openalex_store_timeout_s: float = 120.0
     openalex_store_build_timeout_s: float = 7200.0

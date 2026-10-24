@@ -588,10 +588,32 @@ table.wb-table tbody tr:hover {
   font-size: 0.75rem;
   text-transform: uppercase;
 }
-.stamp-check {
+.stamp-found {
   border: 1px solid var(--accent);
-  padding: 0 0.25rem;
+  border-radius: 0.2rem;
+  padding: 0 0.3rem;
+  margin-right: 0.35rem;
+}
+.stamp-check {
+  border: 1px dashed var(--ink-soft);
+  border-radius: 0.2rem;
+  color: var(--ink-soft);
+  font-weight: 700;
+  padding: 0 0.3rem;
+  margin-right: 0.35rem;
   font-size: 0.75rem;
+  text-transform: uppercase;
+}
+.chip-summary {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+.row-why,
+.miss-reason {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
 }
 
 .miss-status {
