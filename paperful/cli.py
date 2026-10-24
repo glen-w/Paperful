@@ -5834,6 +5834,46 @@ def snowball_watch_run(
 
     _run_snowball(cfg, _run)
 
+@snowball_watch_app.command("rebaseline")
+def snowball_watch_rebaseline(
+    name: str = typer.Argument(
+        "", help="Watch name. Leave empty with --all to check every watch."
+    ),
+    all_watches: bool = typer.Option(False, "--all", help="Every saved watch."),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Write the reset. Without it this only reports what would change.",
+    ),
+    force: bool = typer.Option(
+        False, "--force", help="Reset even if the watch was already reset or baselined after the change."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Re-baseline keyword watches once after OpenAlex's Oct 2026 topic change.
+
+    The next `watch run` then absorbs reassigned works as seen instead of
+    proposing them as new. Does not touch the inbox or open the library.
+    """
+    cfg = _cfg(config)
+    from .snowball.command import SnowballError
+    from .snowball.watch import list_watch_names, rebaseline_watch
+
+    if bool(name) == all_watches:
+        console.print("[red]Pass a watch name or --all (not both).[/]")
+        raise typer.Exit(1)
+    names = list_watch_names(cfg) if all_watches else [name]
+    try:
+        for n in names:
+            res = rebaseline_watch(cfg, n, apply=apply, force=force)
+            verb = "reset" if res["applied"] else ("would reset" if res["action"] == "rebaseline" else "skip")
+            console.print(f"{n}: {verb} · {res['reason']}")
+    except SnowballError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(exc.code) from exc
+    if not apply and any(True for _ in names):
+        console.print("[dim]Dry run. Pass --apply to write.[/]")
+
 @snowball_watch_app.command("show")
 def snowball_watch_show(
     name: str = typer.Argument(..., help="Watch name."),

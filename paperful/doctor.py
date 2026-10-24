@@ -719,6 +719,20 @@ def _openalex_store_check(cfg: Config) -> Check:
     detail = f"{backend}"
     if works:
         detail += " · works glob set"
+    from .snowball.openalex_epoch import TOPIC_MIGRATION, parse_day, predates_migration
+
+    loaded = (cfg.openalex_store_snapshot_date or "").strip()
+    if predates_migration(loaded):
+        return Check(
+            "openalex store",
+            "amber",
+            f"{detail} · snapshot {loaded} predates the {TOPIC_MIGRATION:%b %Y} OpenAlex "
+            "topic change; reload fully (incremental syncs miss it) — see docs/config.md",
+        )
+    if loaded and parse_day(loaded) is None:
+        detail += f" · snapshot_date {loaded!r} is not YYYY-MM-DD"
+    elif not loaded:
+        detail += " · snapshot_date unset (reload fully if loaded before 14 Oct 2026)"
     if cites:
         return Check(
             "openalex store",

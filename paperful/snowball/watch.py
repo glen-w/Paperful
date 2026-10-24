@@ -27,6 +27,7 @@ from .command import (
     run_orcid,
     run_search,
 )
+from .openalex_epoch import EPOCH_AFTER, TOPIC_MIGRATION, predates_migration
 from .profile import load_profile, request_from_profile
 from .queue import load_queue
 
@@ -391,6 +392,76 @@ def _cursor_date(iso: str | None) -> str | None:
     if not text:
         return None
     return text[:10]
+
+
+REBASELINE_EPOCH = EPOCH_AFTER
+
+
+def watch_is_keyword_based(cfg: Config, body: dict[str, Any]) -> bool:
+    """Search / hybrid watches, or any profile whose direction includes keywords."""
+    profile = str(body.get("profile") or "").strip()
+    if not profile:
+        return False
+    try:
+        raw = load_profile(cfg, profile)
+    except Exception:
+        return False
+    if str(raw.get("mode") or "") in {"search", "hybrid"}:
+        return True
+    direction = str(raw.get("direction") or cfg.snowball_direction or "refs+keywords")
+    return "keywords" in direction
+
+
+def list_watch_names(cfg: Config) -> list[str]:
+    root = watches_root(cfg)
+    if not root.is_dir():
+        return []
+    return sorted(p.name for p in root.iterdir() if (p / "watch.json").is_file())
+
+
+def rebaseline_watch(
+    cfg: Config, name: str, *, apply: bool = False, force: bool = False
+) -> dict[str, Any]:
+    """Make the next run a baseline again, once, after the OpenAlex topic change.
+
+    Keyword hits were reassigned in October 2026, so old works can reappear as
+    "new". Clearing ``baseline_at`` makes the next run absorb them into
+    ``seen.json`` and propose nothing. The inbox, ``seen``, and ``applied`` are
+    left alone. Dry-run unless ``apply``. A watch is skipped when it is not
+    keyword-based, has not baselined yet, baselined after the migration, or was
+    already reset for this epoch (``force`` overrides the last three).
+    """
+    _check_watch_name(name)
+    body = load_watch(cfg, name)
+    result: dict[str, Any] = {"watch": name, "action": "skip", "reason": "", "applied": False}
+    if not watch_is_keyword_based(cfg, body):
+        result["reason"] = "not keyword-based"
+        return result
+    baseline_at = body.get("baseline_at")
+    if not baseline_at:
+        result["reason"] = "no baseline yet (the first run is one)"
+        return result
+    if not force:
+        if body.get("rebaselined_for") == REBASELINE_EPOCH:
+            result["reason"] = "already reset for the 2026-10 topic change"
+            return result
+        if not predates_migration(str(baseline_at)):
+            result["reason"] = "baseline is after the topic change"
+            return result
+    result.update(action="rebaseline", reason=f"baseline {baseline_at} predates {TOPIC_MIGRATION}")
+    if apply:
+        body.update(
+            {
+                "baseline_at": None,
+                "rebaselined_at": _now(),
+                "rebaselined_for": REBASELINE_EPOCH,
+            }
+        )
+        (watch_dir(cfg, name) / "watch.json").write_text(
+            json.dumps(body, indent=2) + "\n", encoding="utf-8"
+        )
+        result["applied"] = True
+    return result
 
 
 def _now() -> str:

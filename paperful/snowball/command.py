@@ -35,6 +35,7 @@ from .expand import (
     truncate,
 )
 from .fill import FillPaused, crossref_work, run_fill_pass, s2_api_key, s2_paper
+from .openalex_epoch import openalex_stamp
 from .ingest import create_new, fill_pdfs
 from .local_cites import load_local_cites
 from .local_openalex import store_from_config
@@ -2067,6 +2068,7 @@ def _summary_meta(
         "keyword_min_score": _keyword_caps(cfg, request)[2],
         "filtered": filtered,
         "dedupe_scope": scope,
+        **openalex_stamp(),
     }
     if request.collection.strip():
         meta["target_collection"] = request.collection.strip()

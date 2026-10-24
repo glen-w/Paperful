@@ -15,6 +15,14 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- **OpenAlex topic-change housekeeping (Oct 2026).** Every snowball run's
+  `summary.json` records `openalex_run_date` and `openalex_topic_epoch`.
+  `paperful snowball watch rebaseline [NAME | --all] [--apply]` resets keyword
+  watches baselined before 14 Oct 2026 once, so reassigned works do not arrive
+  as new. `paperful doctor` warns when `[openalex_store].snapshot_date` predates
+  the change (full reload needed; see [config](docs/config.md)). The stale
+  "about 12% of works have no topic" figure is gone from the docs. A frozen
+  before/after fixture pins keyword scoring.
 - **Wanted stamps and report cards:** Rows with a PDF on disk carry a visible
   **Found** stamp (only when the PDF's DOI matches the library item) or a
   **Check** stamp (mismatch, unverified, snapshot). Missing rows print their

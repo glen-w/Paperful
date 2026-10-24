@@ -328,8 +328,9 @@ concurrency = 2
 # keyword_hop_limit is a positive integer (all is refused; a keyword is an open query).
 # search_keywords (default true) unions OpenAlex keyword-tag matches into search/hybrid
 # hit lists. Set search_keywords = false (or --no-search-keywords) for full-text only.
-# About 12% of works have no topic and therefore no keywords. Those seeds are
-# reported at the start of a keyword hop and skipped on that side.
+# Works with no topic have no keywords (the share is unmeasured since OpenAlex
+# reassigned topics in Oct 2026). Those seeds are reported at the start of a
+# keyword hop and skipped on that side.
 # OPENALEX_API_KEY belongs in the environment, not in this file.
 # Snowball tries OpenAlex without a key first (enough for a small search; the
 # allowance is shared by IP, including a VPN exit). A configured key takes over
@@ -352,6 +353,7 @@ concurrency = 2
 # # duckdb_bin = "duckdb"
 # # timeout_s = 120
 # # build_timeout_s = 7200
+# # snapshot_date = "2026-10-14"  # full snapshot you loaded; doctor warns if older than 14 Oct 2026
 # # ssh_host = "nuc"         # ssh_duckdb only
 # # ssh_user = "you"
 # Alert loop / weekly collection digest. Paperful does not schedule;

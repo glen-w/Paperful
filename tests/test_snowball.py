@@ -1674,6 +1674,9 @@ def test_filters_dedupe_scope_and_partial_create(tmp_path: Path):
     assert summary["filtered"] >= 1
     assert summary["dedupe_scope"] == "collection"
     assert summary["target_collection"] == "Inbox/Snowball"
+    # Every run records which side of OpenAlex's Oct 2026 topic change it ran on.
+    assert summary["openalex_topic_epoch"] in {"pre-2026-10", "2026-10"}
+    assert len(summary["openalex_run_date"]) == 10
 
 
 def test_profile_save_refuses_secrets(tmp_path: Path):

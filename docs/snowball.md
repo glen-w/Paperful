@@ -78,12 +78,24 @@ paperful snowball watch save bbnj --profile keyword-scout
 paperful snowball watch run bbnj          # first time: baseline, inbox empty
 paperful snowball watch run bbnj --digest # later: N new, then digest.md
 paperful snowball watch show bbnj
+paperful snowball watch rebaseline --all  # dry run; --apply once after the Oct 2026 OpenAlex topic change
 paperful snowball watch digest bbnj       # ranked rollup; --apply -C files a note
 paperful snowball digest --run-id <run-id>
 paperful snowball watch briefing bbnj     # thin markdown; same note tag
 paperful snowball briefing --run-id <run-id>
 paperful snowball apply <run-id> -C Inbox/Snowball   # only if you want parents
 ```
+
+**Oct 2026 topic change.** OpenAlex reassigned work topics (and keywords) in
+October 2026, so a keyword watch baselined earlier can see old works reappear as
+"new". `snowball watch rebaseline` (dry run by default; `--apply`) clears
+`baseline_at` for keyword-based watches baselined before 14 Oct 2026, so the
+next `watch run` absorbs the current hits as seen and proposes nothing. It
+keeps `seen.json`, `applied.json`, and the inbox, and marks the watch
+(`rebaselined_for`) so it is done once; `--force` repeats it. Every snowball
+run's `summary.json` now records `openalex_run_date` and `openalex_topic_epoch`
+(`pre-2026-10` or `2026-10`), because keyword hops before the change cannot be
+reproduced.
 
 Ledger under `state/snowball/watches/<name>/`:
 
@@ -304,8 +316,9 @@ Keyword **search** (and hybrid hop 0) also uses those tags when
 ranked by tag overlap. `--no-search-keywords` or `search_keywords = false`
 keeps full-text retrieval only.
 
-Works with no topic have no keywords. That is about 12% of OpenAlex. When
-keywords are in the direction, the run says how many seeds have none and will
+Works with no topic have no keywords. Paperful does not quote a share: the
+old "about 12%" figure predates OpenAlex's October 2026 topic reassignment and
+has not been re-measured. When keywords are in the direction, the run says how many seeds have none and will
 not expand on that side:
 
 ```text

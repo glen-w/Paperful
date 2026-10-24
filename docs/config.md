@@ -477,6 +477,17 @@ Env overrides: `OPENALEX_STORE_SSH_HOST`, `OPENALEX_STORE_PARQUET_GLOB`,
 # # duckdb_bin = "duckdb"
 # # timeout_s = 120
 # # build_timeout_s = 7200
+# # snapshot_date = "2026-10-14"  # date of the full snapshot you loaded
 # # ssh_host = "nuc"         # ssh_duckdb only
 # # ssh_user = "you"
 ```
+
+**October 2026 topic change.** OpenAlex moved works to new topic assignments
+(keywords are now linked to topics). The change does not touch `updated_date`,
+so an incremental sync of an older snapshot never picks it up. If you loaded
+your snapshot before 14 Oct 2026, **reload it fully** from a newer release and
+set `snapshot_date`; `paperful doctor` warns (amber) when `snapshot_date` is
+before that day and notes when it is unset. Keyword hops against an old
+snapshot return different neighbours than the live API. After the API-side
+change, also run `paperful snowball watch rebaseline --all --apply` once so
+reassigned works do not arrive as "new" ([Snowball](snowball.md)).

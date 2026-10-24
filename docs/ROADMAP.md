@@ -184,7 +184,11 @@ in `paperful/snowball/openalex.py` lists no `topics` field. Grep finds no
 on OpenAlex’s `/text/topics?version=1` endpoint. Works already switched to
 the new topic assignments in early October 2026. Users need no notice.
 
-Cheap housekeeping (can sit alongside 1.1.x):
+Cheap housekeeping (can sit alongside 1.1.x). **Shipped (unreleased):** run
+stamp (`openalex_run_date`, `openalex_topic_epoch`), `snowball watch
+rebaseline`, the stale 12% figure dropped, `doctor` snapshot warning via
+`[openalex_store].snapshot_date`, and a frozen before/after scoring fixture
+(`tests/fixtures/openalex_topics/`). Original list:
 
 - Stamp each snowball run with the OpenAlex date — pre-October runs cannot
   be reproduced (keywords are now linked to topics; OpenAlex reports
