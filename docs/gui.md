@@ -208,6 +208,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/discover/keep` | Mark queue DOI keep/skip |
 | GET | `/discover/graph` | Citation map JSON for `run_id` (`paperful.citation_graph.v1`); optional `watch_name`, `compare_run` |
 | GET | `/discover/graph/meta` | Collections/tags plus `[ui].citation_map_*` prefs for the map panel |
+| POST | `/discover/graph/follow` | Follow a map author: `{name, openalex, orcid, list_name}` (default list `followed`); no network lookup |
 | POST | `/discover/graph/expand` | One OpenAlex hop (`refs`, `cites`, or `both`) merged into that queue |
 | POST | `/discover/graph/repair` | Re-link rows to hop-0 seeds via OpenAlex (Keep unchanged) |
 | POST | `/discover/graph/halo` | Library neighbours as ghost overlay (mirror DOIs; not queued) |
@@ -240,6 +241,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/prefs/advanced` | Toggle Advanced cookie |
 | POST | `/prefs/collection` | Remember collection chip cookie |
 | POST | `/settings` | Write allowed `config.toml` fields |
+| POST | `/settings/map` | Write `[map]` (look, author view, citation map reach; `reset=1` restores defaults) |
 | POST | `/settings/similar-map` | Write `[similar_map]` defaults (`reset=1` restores them) |
 | POST | `/repair/preview` | Dry-run repair verb + review token |
 | POST | `/repair/apply` | Consume token; apply repair verb |

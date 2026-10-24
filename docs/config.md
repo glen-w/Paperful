@@ -431,6 +431,35 @@ which public instances can answer, is
 | `[twenty].provenance_keyword` | `paperful` | Keyword added beside the collection slug |
 | `[searxng].base_url` | `""` | Instance root, or `SEARXNG_BASE_URL`. Paperful calls `GET /search?format=json`. A public host works only when that instance enables JSON; otherwise run your own ([install](https://docs.searxng.org/admin/installation.html)) |
 
+### Maps
+
+`[map]` sets how every Discover map looks (citation and Similar) and how far
+the citation map reaches ([map views](snowball.md#map-views-and-controls)).
+Settings → Maps writes the same keys. Values are clamped; unknown values fall
+back to the default.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `color` | `"role"` | `role` (foundational / influential / emerging / other), `year`, or `category` |
+| `size_by` | `"citations"` | `citations` or `uniform` |
+| `labels` | `"auto"` | `auto`, `all`, `seeds`, or `none` |
+| `fit` | `true` | Zoom to fit once the layout settles |
+| `authors` | `12` | Authors listed beside the map (0 = off) |
+| `default_view` | `"papers"` | View a new map opens in: `papers` or `authors` |
+| `author_nodes` | `60` | Most people the author view draws (5–300); authors of the starting paper are always kept |
+| `author_min_papers` | `1` | Only draw authors with at least this many papers on the map |
+| `author_peers` | `5` | Links each author keeps (1–15) |
+| `author_links` | `"both"` | `both`: co-authors plus authors whose papers are linked. `coauthor`: shared papers only |
+| `max_nodes` | `150` | Papers the citation map draws (20–400) |
+| `neighbors` | `25` | Papers one Expand adds (5–100) |
+| `ref_fetch_cap` | `200` | References Expand reads per paper before picking the most cited |
+| `direction` | `"both"` | Links Explore pulls first and the map shows on open: `both`, `refs`, `cites` |
+| `recent_years` | `5` | Years counted as recent for node roles |
+| `citation_floor` | `50` | Citations that count as highly cited (or the map's median, if higher) |
+
+`[similar_map].color = "map"` (the default) follows `[map].color`; set it to
+`role`, `year`, or `category` to colour Similar maps differently.
+
 ### Similar map
 
 `[similar_map]` sets the defaults for Discover → Explore → *Similar papers*
@@ -449,7 +478,7 @@ the default.
 | `year_from`, `year_to` | `0` (any) | Keep only papers published in this range (the origin always stays) |
 | `hide_in_library` | `false` | Leave papers already in the library off the map |
 | `prior_works`, `derivative_works` | `10` | Length of the lists beside the map (0 = off) |
-| `color` | `"role"` | `role` (foundational / influential / …) or `year` |
+| `color` | `"map"` | `map` (follow `[map].color`), `role`, `year`, or `category` |
 | `source` | `"auto"` | `auto`: store first, then live API. `store`: never call the live API. `api`: ignore the store |
 
 ```toml

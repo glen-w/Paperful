@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import uuid
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -23,9 +25,7 @@ def write_queue(
     dest = state_dir / "snowball" / run_id
     dest.mkdir(parents=True, exist_ok=True)
     path = dest / "candidates.jsonl"
-    with path.open("w", encoding="utf-8") as handle:
-        for row in rows:
-            handle.write(json.dumps(row.to_dict(), ensure_ascii=False) + "\n")
+    write_rows(path, rows)
     by_status = Counter(row.status for row in rows)
     by_hop = Counter(str(row.hop) for row in rows)
     by_backend = Counter(row.provenance.get("backend") or "" for row in rows)
@@ -68,16 +68,53 @@ def write_report(dest: Path, report: dict[str, Any]) -> None:
     )
 
 
-def load_queue(state_dir: Path, run_id: str) -> tuple[Path, list[Candidate]]:
+def atomic_write_text(path: Path, text: str) -> None:
+    """Write ``text`` to ``path`` via a temp file and rename.
+
+    A crash or a concurrent reader never sees a half-written queue.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+
+
+def write_rows(path: Path, rows: list[Candidate]) -> None:
+    """Replace a candidates.jsonl atomically."""
+    atomic_write_text(
+        path, "".join(json.dumps(row.to_dict(), ensure_ascii=False) + "\n" for row in rows)
+    )
+
+
+def load_queue_checked(state_dir: Path, run_id: str) -> tuple[Path, list[Candidate], int]:
+    """Like ``load_queue``, plus how many damaged lines were skipped."""
     dest = state_dir / "snowball" / run_id
     path = dest / "candidates.jsonl"
     if not path.is_file():
         raise FileNotFoundError(str(path))
     rows: list[Candidate] = []
-    with path.open(encoding="utf-8") as handle:
+    skipped = 0
+    with path.open(encoding="utf-8", errors="replace") as handle:
         for line in handle:
             line = line.strip()
             if not line:
                 continue
-            rows.append(Candidate.from_dict(json.loads(line)))
+            try:
+                data = json.loads(line)
+                if not isinstance(data, dict):
+                    raise ValueError("not an object")
+                rows.append(Candidate.from_dict(data))
+            except Exception:
+                # One damaged line (an interrupted write, a hand edit) must not
+                # take the whole queue down.
+                skipped += 1
+    return dest, rows, skipped
+
+
+def load_queue(state_dir: Path, run_id: str) -> tuple[Path, list[Candidate]]:
+    dest, rows, _skipped = load_queue_checked(state_dir, run_id)
     return dest, rows

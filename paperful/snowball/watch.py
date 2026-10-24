@@ -485,10 +485,9 @@ def _rewrite_candidates(
     meta: dict[str, Any],
 ) -> None:
     """Replace candidates.jsonl after a watch filter. Keep crawl request counts."""
-    path = run_dir / "candidates.jsonl"
-    with path.open("w", encoding="utf-8") as handle:
-        for row in rows:
-            handle.write(json.dumps(row.to_dict(), ensure_ascii=False) + "\n")
+    from .queue import write_rows
+
+    write_rows(run_dir / "candidates.jsonl", rows)
     summary_path = run_dir / "summary.json"
     summary: dict[str, Any] = {}
     if summary_path.is_file():

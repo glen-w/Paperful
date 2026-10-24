@@ -134,6 +134,9 @@ def start_explore(
     map_category_defs: list[dict[str, Any]] | tuple[dict[str, Any], ...] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """Seed a tiny queue, mark library overlap, expand one both-direction hop."""
+    from .map_settings import for_config
+
+    map_opts = for_config(cfg)
     work = resolve_work(client, query=query, node_id=node_id)
     run_id = _new_explore_run_id(cfg.state_dir)
     seed_label = (query or node_id or work_node_id(work)).strip()
@@ -171,10 +174,11 @@ def start_explore(
             cfg.state_dir,
             run_id,
             row.identity,
-            "both",
+            map_opts.direction if map_opts.direction in ("refs", "cites") else "both",
             client,
             map_categories=map_categories,
             map_category_defs=map_category_defs,
+            settings=map_opts,
         )
     except OpenAlexBudgetExceeded:
         raise
@@ -194,6 +198,7 @@ def start_explore(
                 focus=row.identity,
                 map_categories=map_categories,
                 map_category_defs=map_category_defs,
+                settings=map_opts,
             )
             write_graph_file(dest, graph)
     return run_id, graph

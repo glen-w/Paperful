@@ -820,6 +820,43 @@ BibTeX citekeys still make sense. Snowball does not depend on that plugin.
 one hop, and opens **Map** for ad-hoc hops and **Add to library**. **Seed search**
 on a map node fills the Topic form (DOI kind + seeds) for a full snowball run.
 
+### Map views and controls
+
+Every map (citation or Similar) has two views, switched with **Papers | Authors**
+above the canvas:
+
+- **Papers** — one circle per paper, as described below.
+- **Authors** — the same map drawn as people. Each circle is someone who wrote
+  papers on this map; bigger circles wrote more of them, and the authors of the
+  starting paper are orange. Solid lines join co-authors; dashed lines join
+  people whose papers cite or resemble each other on the map. Clicking someone
+  lists their papers here, their co-authors, and links to OpenAlex / ORCID.
+  **Follow** adds them to People → followed (no network lookup), and **Show their
+  papers** switches back to Papers with their papers highlighted. The author
+  view needs no extra OpenAlex calls, so it works on a self-hosted store too.
+
+Beside the map, until you pick something, the panel lists the **authors on this
+map** (click to highlight their papers, or Follow). Toolbar:
+
+- **Find** highlights papers (title, author, DOI) or people that match; Enter
+  opens the first match, Esc clears.
+- **Fit** zooms to show everything. Maps fit themselves once the layout settles
+  unless you have zoomed (Settings → Maps → Fit).
+- **Download** saves the map as a picture (SVG), the paper or author list (CSV),
+  or the raw map data (JSON).
+- **Path between two papers / people** works in both views.
+- Every node is reachable with Tab; Enter or Space opens it.
+
+How maps look and how far the citation map reaches are set in `[map]`
+([config](config.md#maps)) or **Settings → Maps**: node colour (role, year, or
+literature category), node size (citations or uniform), labels, the view maps
+open in, how many authors the author view draws and how they are linked, papers
+drawn, papers per Expand, references read per paper, and the *recent* /
+*highly cited* thresholds behind node roles.
+
+If a queue file has a damaged line (an interrupted write or a hand edit), the
+map skips that line and says so above the canvas instead of failing.
+
 ### Similar map
 
 Explore can also open a **Similar** map (pick *Similar papers* under **Map**).

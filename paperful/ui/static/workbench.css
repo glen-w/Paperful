@@ -1189,3 +1189,80 @@ body.citation-large-open {
   padding: 0.1rem 0.45rem;
   margin-left: 0.25rem;
 }
+
+/* Map toolbar: find, export, highlight note. */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.citation-search input {
+  min-width: 14rem;
+  max-width: 100%;
+}
+.citation-export select {
+  max-width: 100%;
+}
+.citation-highlight {
+  flex-basis: 100%;
+  margin: 0.2rem 0 0;
+}
+/* Author names and similar in-text actions. */
+.citation-link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--accent-deep);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.citation-link-btn:hover,
+.citation-link-btn:focus-visible {
+  color: var(--accent);
+}
+.citation-extras > summary {
+  cursor: pointer;
+  list-style: revert;
+}
+.citation-extras > summary h4 {
+  display: inline;
+}
+/* Keyboard focus on map nodes. */
+#citationCanvas .nodes > g:focus {
+  outline: none;
+}
+#citationCanvas .nodes > g:focus-visible circle:first-of-type {
+  stroke: #c46a2a;
+  stroke-width: 3.5px;
+}
+@media (max-width: 640px) {
+  .citation-search input {
+    min-width: 0;
+    width: 100%;
+  }
+}
+.citation-views {
+  display: inline-flex;
+  gap: 0.35rem;
+  margin-right: 0.5rem;
+}
+.citation-line {
+  display: inline-block;
+  width: 1.4rem;
+  height: 0;
+  border-top: 2px solid #3d5a80;
+  vertical-align: middle;
+  margin-right: 0.25rem;
+}
+.citation-line.dashed {
+  border-top: 2px dashed #8d99a6;
+}

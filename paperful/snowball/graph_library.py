@@ -16,11 +16,9 @@ from .queue import load_queue
 
 
 def _rewrite_queue(dest: Path, rows: list[Candidate]) -> None:
-    path = dest / "candidates.jsonl"
-    path.write_text(
-        "".join(json.dumps(row.to_dict(), ensure_ascii=False) + "\n" for row in rows),
-        encoding="utf-8",
-    )
+    from .queue import write_rows
+
+    write_rows(dest / "candidates.jsonl", rows)
 
 
 def _find_row(rows: list[Candidate], node_id: str) -> Candidate:
@@ -31,12 +29,15 @@ def _find_row(rows: list[Candidate], node_id: str) -> Candidate:
 
 
 def _rebuild_graph(cfg: Config, rows: list[Candidate], run_id: str) -> dict[str, Any]:
+    from .map_settings import for_config
+
     return build_graph(
         rows,
         run_id=run_id,
         map_categories=getattr(cfg, "snowball_map_categories", None),
         map_category_defs=getattr(cfg, "snowball_map_category_defs", None),
         out_dir=cfg.out_dir,
+        settings=for_config(cfg),
     )
 
 
@@ -55,7 +56,14 @@ def graph_meta(cfg: Config) -> dict[str, Any]:
         "edit": getattr(cfg, "ui_citation_map_edit", "both") or "both",
         "auto_search": bool(getattr(cfg, "ui_citation_map_auto_search", False)),
         "remove_mode": getattr(cfg, "ui_citation_map_remove", "trash") or "trash",
+        "view": _view(cfg),
     }
+
+
+def _view(cfg: Config) -> dict[str, Any]:
+    from .map_settings import for_config
+
+    return for_config(cfg).view()
 
 
 def annotate_queue(

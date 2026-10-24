@@ -219,6 +219,7 @@ def register_shell(ui: UiContext) -> None:
 
     @app.get("/settings", response_class=HTMLResponse)
     def page_settings(request: Request, saved: int = 0) -> HTMLResponse:
+        from ..snowball.map_settings import for_config as map_for_config
         from ..snowball.similar_settings import for_config
 
         return templates.TemplateResponse(
@@ -236,10 +237,34 @@ def register_shell(ui: UiContext) -> None:
                 citation_map_edit=cfg.ui_citation_map_edit,
                 citation_map_auto_search=cfg.ui_citation_map_auto_search,
                 similar=for_config(cfg).to_dict(),
+                map_opts=map_for_config(cfg).to_dict(),
                 similar_store_configured=bool((cfg.openalex_store_backend or "").strip()),
                 config_writable=cfg.config_path is not None and cfg.config_path.is_file(),
             ),
         )
+
+    @app.post("/settings/map")
+    async def save_map_settings(request: Request) -> RedirectResponse:
+        from ..snowball.map_settings import DEFAULT as MAP_DEFAULT
+        from ..snowball.map_settings import MAP_SAVE_KEYS, for_config as map_for_config
+        from ..snowball.similar_settings import toml_literal
+
+        form = await request.form()
+        if form.get("reset") == "1":
+            chosen = MAP_DEFAULT
+        else:
+            raw = {key: form.get(key) for key in MAP_SAVE_KEYS if key in form}
+            raw["fit"] = form.get("fit") == "1"
+            chosen = map_for_config(cfg).merged(raw)
+        cfg.map_settings = chosen
+        path = cfg.config_path
+        if path is not None and path.is_file():
+            text = path.read_text(encoding="utf-8")
+            values = chosen.to_dict()
+            for key in MAP_SAVE_KEYS:
+                text = _patch_section_assignment(text, "map", key, toml_literal(values.get(key)))
+            path.write_text(text, encoding="utf-8")
+        return RedirectResponse(url="/settings?saved=1#maps", status_code=303)
 
     @app.post("/settings/similar-map")
     async def save_similar_map(request: Request) -> RedirectResponse:

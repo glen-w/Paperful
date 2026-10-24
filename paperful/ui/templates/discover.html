@@ -494,7 +494,12 @@
   <h2>Map</h2>
   <p class="section-lede" id="citationLedeSimilar" style="display:none">This is a similarity map, not a citation tree. Papers sit close together when they share references or are cited together, even if they never cite each other. Click a paper to trace its strongest path to the origin, or start a new Similar map from it. Prior and derivative works are listed beside the map until you pick a paper.</p>
   <p class="section-lede" id="citationLedeCitation">Not every paper deserves the same time. Older and highly cited work is likely foundational. Recent and highly cited work is influential now. Recent work with fewer citations may be emerging. Keyword and similar neighbours appear without citation links. Expand a node to see who it cites and who cites it, then Keep what you will read.</p>
+  <p class="section-lede" id="citationLedeAuthors" style="display:none">The same map, drawn as people. Each circle is an author of papers on this map; bigger circles wrote more of them. Solid lines join co-authors, dashed lines join authors whose papers cite or resemble each other. Click someone to see their papers, co-authors, and Follow them.</p>
   <div class="citation-toolbar">
+    <div class="citation-views" role="group" aria-label="Map view">
+      <button type="button" class="citation-filter is-active" data-map-view="papers" aria-pressed="true">Papers</button>
+      <button type="button" class="citation-filter" data-map-view="authors" aria-pressed="false">Authors</button>
+    </div>
     <div class="citation-filters" role="group" aria-label="Citation direction">
       <button type="button" class="citation-filter is-active" data-direction="both" aria-pressed="true">Both</button>
       <button type="button" class="citation-filter" data-direction="refs" aria-pressed="false">References</button>
@@ -505,6 +510,21 @@
     <button type="button" class="secondary" id="citationRepairLinks">Repair links</button>
     <button type="button" class="secondary" id="citationPathMode">Path between two papers</button>
     <button type="button" class="secondary" id="citationLargeView" aria-pressed="false">Large view</button>
+    <button type="button" class="secondary" id="citationFit" title="Zoom to show every paper">Fit</button>
+    <label class="citation-search">
+      <span class="visually-hidden">Find on map</span>
+      <input type="search" id="citationSearch" placeholder="Find title, author, DOI" autocomplete="off" aria-describedby="citationHighlight">
+    </label>
+    <label class="citation-export">
+      <span class="visually-hidden">Download map</span>
+      <select id="citationExport" aria-label="Download map">
+        <option value="">Download…</option>
+        <option value="svg">Picture (SVG)</option>
+        <option value="csv">Paper list (CSV)</option>
+        <option value="json">Map data (JSON)</option>
+      </select>
+    </label>
+    <p id="citationHighlight" class="citation-meta citation-highlight" role="status" hidden></p>
     <p id="citationThresholds" class="citation-meta"></p>
     <p id="citationStatus" class="citation-status" role="status"></p>
   </div>
@@ -529,6 +549,14 @@
     <li><span class="citation-swatch" style="background:#c9d6e3" aria-hidden="true"></span> Older</li>
     <li><span class="citation-swatch" style="background:#1d3557" aria-hidden="true"></span> Newer</li>
     <li><span class="citation-swatch library" aria-hidden="true"></span> In your library (dark ring)</li>
+  </ul>
+  <ul class="citation-legend" id="citationAuthorLegend" style="display:none">
+    <li><span class="citation-swatch" style="background:#c46a2a" aria-hidden="true"></span> Wrote the starting paper</li>
+    <li><span class="citation-swatch" style="background:#1d3557" aria-hidden="true"></span> More papers here</li>
+    <li><span class="citation-swatch" style="background:#9fb3c8" aria-hidden="true"></span> Fewer papers here</li>
+    <li><span class="citation-swatch" style="background:#2f6f4e" aria-hidden="true"></span> Following</li>
+    <li><span class="citation-line solid" aria-hidden="true"></span> Co-authors</li>
+    <li><span class="citation-line dashed" aria-hidden="true"></span> Linked papers</li>
   </ul>
   <ul class="citation-legend" id="citationRoleLegend">
     <li><span class="citation-swatch foundational" aria-hidden="true"></span> Foundational</li>

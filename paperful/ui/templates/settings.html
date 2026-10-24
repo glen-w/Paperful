@@ -41,6 +41,91 @@
   </div>
 </form>
 </section>
+<section class="panel" id="maps">
+  <h2>Maps</h2>
+  <p class="section-lede">How every Discover map looks (citation and Similar), and how far the citation map reaches. Saved to <code>[map]</code> in config.toml.</p>
+  {% if not config_writable %}<p class="citation-meta">No config.toml file was found, so these changes last until Paperful restarts.</p>{% endif %}
+  <form method="post" action="/settings/map" class="form-stack">
+    <div class="field-group">
+      <p class="field-legend">Look</p>
+      <label>Node colour {{ info("Role: foundational / influential / emerging / other, from year and citations. Year: light for older, dark for newer. Category: the first literature category (review, trial, preprint …).") }}
+        <select name="color">
+          <option value="role" {% if map_opts.color == 'role' %}selected{% endif %}>Role</option>
+          <option value="year" {% if map_opts.color == 'year' %}selected{% endif %}>Publication year</option>
+          <option value="category" {% if map_opts.color == 'category' %}selected{% endif %}>Literature category</option>
+        </select>
+      </label>
+      <label>Node size {{ info("Citations: more-cited papers are larger. Uniform: every paper the same size.") }}
+        <select name="size_by">
+          <option value="citations" {% if map_opts.size_by == 'citations' %}selected{% endif %}>Citations</option>
+          <option value="uniform" {% if map_opts.size_by == 'uniform' %}selected{% endif %}>Uniform</option>
+        </select>
+      </label>
+      <label>Labels {{ info("Auto: the most-cited papers and the seeds. All: every paper. Seeds: only starting papers. None: hover to see titles.") }}
+        <select name="labels">
+          {% for v, l in [('auto', 'Auto'), ('all', 'All papers'), ('seeds', 'Seeds only'), ('none', 'None')] %}<option value="{{ v }}" {% if map_opts.labels == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Authors listed {{ info("How many top authors appear beside the map (0 turns the list off). Click one to highlight their papers or follow them.") }}
+        <input type="number" name="authors" min="0" max="50" value="{{ map_opts.authors }}">
+      </label>
+      <label><input type="checkbox" name="fit" value="1" {% if map_opts.fit %}checked{% endif %}> Fit the map to the window after it settles</label>
+    </div>
+    <div class="field-group">
+      <p class="field-legend">Author view</p>
+      <label>Open maps on {{ info("Papers: the usual map. Authors: the same map drawn as the people who wrote those papers. You can switch on any map.") }}
+        <select name="default_view">
+          <option value="papers" {% if map_opts.default_view == 'papers' %}selected{% endif %}>Papers</option>
+          <option value="authors" {% if map_opts.default_view == 'authors' %}selected{% endif %}>Authors</option>
+        </select>
+      </label>
+      <label>Authors drawn {{ info("Most people the author view draws (5–300). Authors of the starting paper are always kept. Default 60.") }}
+        <input type="number" name="author_nodes" min="5" max="300" value="{{ map_opts.author_nodes }}">
+      </label>
+      <label>Papers needed {{ info("Only draw authors with at least this many papers on the map (1–20). Raise it on busy maps. Default 1.") }}
+        <input type="number" name="author_min_papers" min="1" max="20" value="{{ map_opts.author_min_papers }}">
+      </label>
+      <label>Links per author {{ info("Each author keeps this many of their strongest links (1–15). Default 5.") }}
+        <input type="number" name="author_peers" min="1" max="15" value="{{ map_opts.author_peers }}">
+      </label>
+      <label>Link authors by {{ info("Co-authors and linked papers: also join people whose papers cite or resemble each other. Co-authors only: just people who wrote a paper together.") }}
+        <select name="author_links">
+          <option value="both" {% if map_opts.author_links == 'both' %}selected{% endif %}>Co-authors and linked papers</option>
+          <option value="coauthor" {% if map_opts.author_links == 'coauthor' %}selected{% endif %}>Co-authors only</option>
+        </select>
+      </label>
+    </div>
+    <div class="field-group">
+      <p class="field-legend">Citation map</p>
+      <label>Papers drawn {{ info("Most papers the citation map draws at once (20–400). Larger maps are slower. Default 150.") }}
+        <input type="number" name="max_nodes" min="20" max="400" value="{{ map_opts.max_nodes }}">
+      </label>
+      <label>Papers per Expand {{ info("How many references or citing papers one Expand adds (5–100). Default 25.") }}
+        <input type="number" name="neighbors" min="5" max="100" value="{{ map_opts.neighbors }}">
+      </label>
+      <label>References read per paper {{ info("How many of a paper's references Expand looks at before picking the most cited (20–1000). Default 200.") }}
+        <input type="number" name="ref_fetch_cap" min="20" max="1000" value="{{ map_opts.ref_fetch_cap }}">
+      </label>
+      <label>Start with {{ info("Which links Explore pulls first and the map shows on open.") }}
+        <select name="direction">
+          <option value="both" {% if map_opts.direction == 'both' %}selected{% endif %}>References and citing papers</option>
+          <option value="refs" {% if map_opts.direction == 'refs' %}selected{% endif %}>References</option>
+          <option value="cites" {% if map_opts.direction == 'cites' %}selected{% endif %}>Citing papers</option>
+        </select>
+      </label>
+      <label>"Recent" means the last {{ info("Years counted as recent for the emerging / influential roles (1–30). Default 5.") }}
+        <input type="number" name="recent_years" min="1" max="30" value="{{ map_opts.recent_years }}"> years
+      </label>
+      <label>"Highly cited" from {{ info("Citation count that marks a paper as highly cited, unless the map's median is higher. Default 50.") }}
+        <input type="number" name="citation_floor" min="0" max="100000" value="{{ map_opts.citation_floor }}"> citations
+      </label>
+    </div>
+    <div class="citation-actions">
+      <button type="submit">Save map settings</button>
+      <button type="submit" name="reset" value="1" class="secondary">Reset to defaults</button>
+    </div>
+  </form>
+</section>
 <section class="panel" id="similar-map">
   <h2>Similar map</h2>
   <p class="section-lede">Defaults for Discover → Explore → <em>Similar papers</em>. Papers are placed by shared references and by being cited together, not by who cites whom. The Explore form can still change some of these for one map. Saved to <code>[similar_map]</code> in config.toml.</p>
@@ -66,10 +151,12 @@
       <label>Links per paper {{ info("Each paper links to this many of its closest neighbours (1–10). Fewer links give a cleaner map. Default 4.") }}
         <input type="number" name="peers" min="1" max="10" value="{{ similar.peers }}">
       </label>
-      <label>Node colour {{ info("Role: foundational / influential / emerging, as on the citation map. Year: light for older, dark for newer, as on Connected Papers.") }}
+      <label>Node colour {{ info("Same as Maps follows Settings → Maps. Role, year, or category override it for Similar maps only.") }}
         <select name="color">
+          <option value="map" {% if similar.color == 'map' %}selected{% endif %}>Same as Maps</option>
           <option value="role" {% if similar.color == 'role' %}selected{% endif %}>Role</option>
           <option value="year" {% if similar.color == 'year' %}selected{% endif %}>Publication year</option>
+          <option value="category" {% if similar.color == 'category' %}selected{% endif %}>Literature category</option>
         </select>
       </label>
       <label>Prior works listed {{ info("Older papers that many map papers cite, shown beside the map. 0 turns the list off. Default 10.") }}

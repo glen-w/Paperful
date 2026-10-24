@@ -759,4 +759,6 @@ def set_snowball_keep(cfg: Config, run_id: str, dois: list[str], keep: bool) -> 
         if doi_key(row.ids.get("doi")) in doi_set:
             row.keep = keep
         out_lines.append(json.dumps(row.to_dict(), ensure_ascii=False))
-    path.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+    from ..snowball.queue import atomic_write_text
+
+    atomic_write_text(path, "\n".join(out_lines) + "\n")

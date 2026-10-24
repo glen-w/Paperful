@@ -421,11 +421,14 @@ def start_similar_explore(
             "map_category_defs": list(map_category_defs or ()),
         },
     )
+    from .map_settings import for_config as map_for_config
+
     graph = build_graph(
         rows,
         run_id=run_id,
         map_categories=map_categories,
         map_category_defs=map_category_defs,
+        settings=map_for_config(cfg),
     )
     write_graph_file(cfg.state_dir / "snowball" / run_id, graph)
     return run_id, graph

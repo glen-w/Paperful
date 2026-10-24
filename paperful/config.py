@@ -374,6 +374,8 @@ class Config:
     # [similar_map] knobs (paperful.snowball.similar_settings.SimilarSettings).
     # None means the defaults; read it through similar_settings.for_config(cfg).
     similar_map: Any = None
+    # [map] knobs shared by every Discover map (paperful.snowball.map_settings).
+    map_settings: Any = None
     # Attachment hygiene. Off until `paperful attachments --apply`.
     attachments_fix_broken: bool = False
     attachments_merge_files: bool = False

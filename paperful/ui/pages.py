@@ -216,7 +216,12 @@ def newest_snowball_queue(cfg: Config) -> tuple[str, list[dict[str, Any]]]:
             line = line.strip()
             if not line:
                 continue
-            data = json.loads(line)
+            try:
+                data = json.loads(line)
+            except ValueError:
+                continue  # a damaged line must not take the Discover page down
+            if not isinstance(data, dict):
+                continue
             title, doi = candidate_title_doi(data)
             rows.append(
                 {

@@ -354,6 +354,24 @@ concurrency = 2
 # # build_timeout_s = 7200
 # # ssh_host = "nuc"         # ssh_duckdb only
 # # ssh_user = "you"
+# Every Discover map (also Settings → Maps).
+# [map]
+# color = "role"          # role | year | category
+# size_by = "citations"   # citations | uniform
+# labels = "auto"         # auto | all | seeds | none
+# fit = true
+# authors = 12            # authors listed beside the map (0 = off)
+# default_view = "papers" # papers | authors
+# author_nodes = 60
+# author_min_papers = 1
+# author_peers = 5
+# author_links = "both"   # both | coauthor
+# max_nodes = 150         # citation map
+# neighbors = 25          # papers per Expand
+# ref_fetch_cap = 200
+# direction = "both"      # both | refs | cites
+# recent_years = 5
+# citation_floor = 50
 # Similar map defaults (Discover → Explore → Similar papers; also Settings).
 # [similar_map]
 # nodes = 40              # papers on the map (5–150)
@@ -366,7 +384,7 @@ concurrency = 2
 # hide_in_library = false
 # prior_works = 10
 # derivative_works = 10
-# color = "role"          # role | year
+# color = "map"           # map (follow [map].color) | role | year | category
 # source = "auto"         # auto | store (self-hosted OpenAlex only) | api
 # Alert loop / weekly collection digest. Paperful does not schedule;
 # point cron at `paperful keepup run <name>`. Interval is also stored per job.

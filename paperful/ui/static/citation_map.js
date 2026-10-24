@@ -25,6 +25,21 @@
     direction: "both",
     layout: "citation",
     similar: null,
+    view: { color: "role", size_by: "citations", labels: "auto", fit: true, authors: 12, direction: "both" },
+    directionRun: "",
+    mapView: "papers",
+    viewRun: "",
+    authorNodes: [],
+    authorEdges: [],
+    authorTruncated: 0,
+    authors: [],
+    highlight: new Set(),
+    highlightLabel: "",
+    userZoomed: false,
+    fitFn: null,
+    focusFn: null,
+    restyle: null,
+    lastGraph: null,
     applyPath: null,
     showOccasional: false,
     showHalo: false,
@@ -70,6 +85,31 @@
     els.repair = document.getElementById("citationRepairLinks");
     els.pathMode = document.getElementById("citationPathMode");
     els.largeView = document.getElementById("citationLargeView");
+    els.search = document.getElementById("citationSearch");
+    root.querySelectorAll("[data-map-view]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        setMapView(btn.getAttribute("data-map-view") || "papers");
+      });
+    });
+    els.fit = document.getElementById("citationFit");
+    els.exportSel = document.getElementById("citationExport");
+    els.highlightNote = document.getElementById("citationHighlight");
+    if (els.search) {
+      els.search.addEventListener("input", onSearch);
+      els.search.addEventListener("keydown", onSearchKey);
+    }
+    if (els.fit) {
+      els.fit.addEventListener("click", function () {
+        if (state.fitFn) state.fitFn(true);
+      });
+    }
+    if (els.exportSel) {
+      els.exportSel.addEventListener("change", function () {
+        var kind = els.exportSel.value;
+        els.exportSel.value = "";
+        if (kind) exportMap(kind);
+      });
+    }
     els.popout = document.getElementById("citationPopout");
     els.yearMin = document.getElementById("citationYearMin");
     els.yearMax = document.getElementById("citationYearMax");
@@ -183,7 +223,39 @@
       state.layout === "similarity" && graph.similar && typeof graph.similar === "object"
         ? graph.similar
         : null;
-    if (state.layout === "similarity") state.direction = "both";
+    state.lastGraph = graph;
+    state.view = Object.assign(
+      { color: "role", size_by: "citations", labels: "auto", fit: true, authors: 12, direction: "both" },
+      graph.view && typeof graph.view === "object" ? graph.view : {}
+    );
+    state.authors = Array.isArray(graph.authors) ? graph.authors : [];
+    var network = graph.author_network && typeof graph.author_network === "object" ? graph.author_network : {};
+    state.authorNodes = (Array.isArray(network.nodes) ? network.nodes : []).map(authorAsNode);
+    state.authorEdges = Array.isArray(network.edges) ? network.edges : [];
+    state.authorTruncated = network.truncated || 0;
+    if (state.viewRun !== graph.run_id) {
+      state.viewRun = graph.run_id || "";
+      state.mapView = state.view.default_view === "authors" && state.authorNodes.length ? "authors" : "papers";
+    }
+    if (state.mapView === "authors" && !state.authorNodes.length) state.mapView = "papers";
+    syncViewButtons();
+    if (state.layout === "similarity") {
+      state.direction = "both";
+    } else if (state.directionRun !== graph.run_id) {
+      // A new map opens on the configured direction; later re-renders keep the user's pick.
+      state.directionRun = graph.run_id || "";
+      state.direction = ["refs", "cites"].indexOf(state.view.direction) >= 0 ? state.view.direction : "both";
+      syncDirectionButtons();
+    }
+    var known = new Set(
+      state.nodes.map(function (n) {
+        return n.id;
+      })
+    );
+    state.highlight.forEach(function (id) {
+      if (!known.has(id)) state.highlight.delete(id);
+    });
+    if (!state.highlight.size) state.highlightLabel = "";
     applyLayoutControls();
     state.triage = Array.isArray(graph.triage) ? graph.triage : [];
     state.triageById = {};
@@ -224,23 +296,162 @@
   function applyLayoutControls() {
     if (!els.root) return;
     var sim = isSimilarity();
+    var people = isAuthorView();
+    if (els.pathMode) {
+      els.pathMode.textContent = people ? "Path between two people" : "Path between two papers";
+    }
     // Toolbar CSS sets display, which beats the hidden attribute.
     [
       els.root.querySelector(".citation-filters"),
       els.repair,
       els.toggle && els.toggle.parentNode,
     ].forEach(function (el) {
-      if (el) el.style.display = sim ? "none" : "";
+      if (el) el.style.display = sim || people ? "none" : "";
     });
-    var byYear = sim && state.similar && state.similar.color === "year";
+    [els.halo && els.halo.parentNode, els.categoryFilters, els.categoryLegend].forEach(function (el) {
+      if (el) el.style.display = people ? "none" : "";
+    });
+    var byYear = state.view.color === "year";
+    var byCategory = state.view.color === "category";
     var show = function (id, on) {
       var el = document.getElementById(id);
       if (el) el.style.display = on ? "" : "none";
     };
     show("citationLedeSimilar", sim);
     show("citationLedeCitation", !sim);
-    show("citationYearLegend", byYear);
-    show("citationRoleLegend", !byYear);
+    show("citationYearLegend", byYear && !people);
+    show("citationRoleLegend", !byYear && !byCategory && !people);
+    show("citationAuthorLegend", people);
+    show("citationLedeAuthors", people);
+    if (people) {
+      show("citationLedeSimilar", false);
+      show("citationLedeCitation", false);
+    }
+  }
+
+  function isAuthorView() {
+    return state.mapView === "authors";
+  }
+
+  function syncViewButtons() {
+    if (!els.root) return;
+    els.root.querySelectorAll("[data-map-view]").forEach(function (btn) {
+      var on = btn.getAttribute("data-map-view") === state.mapView;
+      btn.classList.toggle("is-active", on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+      if (btn.getAttribute("data-map-view") === "authors") {
+        btn.disabled = !state.authorNodes.length;
+        btn.title = state.authorNodes.length ? "" : "No author data on this map";
+      }
+    });
+  }
+
+  function setMapView(view, opts) {
+    var next = view === "authors" && state.authorNodes.length ? "authors" : "papers";
+    if (next === state.mapView && !(opts && opts.force)) return;
+    state.mapView = next;
+    state.pathEdges = [];
+    state.pathFirst = "";
+    state.pathMode = false;
+    if (els.pathMode) els.pathMode.classList.remove("is-active");
+    var keep = opts && opts.highlight;
+    state.highlight = new Set(keep || []);
+    state.highlightLabel = keep ? (opts.label || "") : "";
+    if (els.search) els.search.value = "";
+    state.selectedId = (opts && opts.select) || "";
+    syncViewButtons();
+    applyLayoutControls();
+    renderThresholds(state.lastGraph || {});
+    renderTriage();
+    renderGraph();
+    renderHighlightNote();
+    var picked = state.selectedId
+      ? activeNodes().filter(function (n) {
+          return n.id === state.selectedId;
+        })[0]
+      : null;
+    if (picked && !isAuthorView() && !isDrawn(picked)) {
+      // The paper is behind a filter; lift the filters so it can be shown.
+      revealPaper(picked);
+      renderGraph();
+    }
+    if (picked) {
+      if (isAuthorView()) showAuthor(picked);
+      else showNode(picked);
+      window.setTimeout(function () {
+        if (state.focusFn) state.focusFn(picked.id);
+      }, 650);
+    } else {
+      clearPanel();
+    }
+  }
+
+  function isDrawn(n) {
+    return visibleNodes().some(function (v) {
+      return v.id === n.id;
+    });
+  }
+
+  function revealPaper(n) {
+    if (n.occasional && !state.showOccasional) {
+      state.showOccasional = true;
+      if (els.toggle) els.toggle.checked = true;
+    }
+    if (state.categoryFilter) {
+      state.categoryFilter = "";
+      renderCategoryControls();
+    }
+    if (n.year && (n.year < state.yearLo || n.year > state.yearHi)) {
+      state.yearLo = Math.min(state.yearLo, n.year);
+      state.yearHi = Math.max(state.yearHi, n.year);
+      if (els.yearMin) els.yearMin.value = state.yearLo;
+      if (els.yearMax) els.yearMax.value = state.yearHi;
+      updateYearLabel();
+    }
+    if (state.direction !== "both" && !isDrawn(n)) {
+      state.direction = "both";
+      syncDirectionButtons();
+    }
+  }
+
+  function authorAsNode(a) {
+    return {
+      id: a.id,
+      kind: "author",
+      key: a.key,
+      title: a.name || a.key,
+      name: a.name || a.key,
+      openalex: a.openalex || "",
+      orcid: a.orcid || "",
+      count: a.count || 0,
+      cited_by_count: a.citations || 0,
+      node_ids: Array.isArray(a.node_ids) ? a.node_ids : [],
+      seed: !!a.seed,
+      followed: !!a.followed,
+      library_papers: a.in_library || 0,
+      year: a.year_to || null,
+      year_from: a.year_from || null,
+      year_to: a.year_to || null,
+      coauthors: a.coauthors || 0,
+      rank: (a.count || 0) * 1000000 + (a.citations || 0),
+    };
+  }
+
+  function activeNodes() {
+    return isAuthorView() ? state.authorNodes : state.nodes;
+  }
+
+  function activeEdges() {
+    return isAuthorView() ? state.authorEdges : state.edges;
+  }
+
+  function syncDirectionButtons() {
+    if (!els.root) return;
+    els.root.querySelectorAll(".citation-filters .citation-filter").forEach(function (btn) {
+      var on = (btn.getAttribute("data-direction") || "both") === state.direction;
+      btn.classList.toggle("is-active", on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+    });
   }
 
   function renderCategoryControls() {
@@ -299,8 +510,21 @@
 
   function renderThresholds(graph) {
     if (!els.thresholds) return;
+    if (isAuthorView()) {
+      var linksBy =
+        state.view.author_links === "coauthor"
+          ? "linked by co-authorship only"
+          : "linked by co-authorship and by their papers' links";
+      els.thresholds.textContent =
+        linksBy.charAt(0).toUpperCase() +
+        linksBy.slice(1) +
+        (state.authorTruncated ? " · " + state.authorTruncated + " more authors not drawn (Settings → Maps)" : "");
+      appendGraphWarnings(graph);
+      return;
+    }
     if (isSimilarity()) {
       renderSimilarReport();
+      appendGraphWarnings(graph);
       return;
     }
     var t = graph.thresholds || graph.threshold || {};
@@ -316,6 +540,17 @@
     } else {
       els.thresholds.textContent = "";
     }
+    appendGraphWarnings(graph);
+  }
+
+  function appendGraphWarnings(graph) {
+    var warnings = graph && Array.isArray(graph.warnings) ? graph.warnings : [];
+    warnings.forEach(function (w) {
+      els.thresholds.insertAdjacentHTML(
+        "beforeend",
+        '<br><span class="citation-warning">⚠ ' + escapeHtml(w) + "</span>"
+      );
+    });
   }
 
   var SOURCE_LABEL = {
@@ -331,7 +566,7 @@
     if (typeof report.pool_size === "number") bits.push(report.pool_size + " papers scored");
     if (typeof report.api_calls === "number") bits.push(report.api_calls + " API calls");
     if (report.hidden_in_library) bits.push(report.hidden_in_library + " library papers hidden");
-    if (report.color === "year") bits.push("Colour: lighter is older");
+    if (state.view.color === "year") bits.push("Colour: lighter is older");
     var warnings = Array.isArray(report.warnings) ? report.warnings : [];
     els.thresholds.innerHTML =
       escapeHtml(bits.join(" · ")) +
@@ -356,7 +591,18 @@
   }
 
   function nodeFill(d) {
-    if (isSimilarity() && state.similar && state.similar.color === "year") return yearFill(d.year);
+    if (d.kind === "author") {
+      if (d.followed) return "#2f6f4e";
+      if (d.seed) return "#c46a2a";
+      var top = d3.max(state.authorNodes, function (a) { return a.count || 1; }) || 1;
+      return d3.interpolateRgb("#9fb3c8", "#1d3557")(Math.min(1, (d.count || 1) / top));
+    }
+    if (state.view.color === "year") return yearFill(d.year);
+    if (state.view.color === "category") {
+      var cats = Array.isArray(d.categories) ? d.categories : [];
+      var meta = cats.length ? state.categoryById[cats[0]] : null;
+      return (meta && meta.color) || "#b8c1cb";
+    }
     return ROLE_FILL[d.role] || ROLE_FILL.other;
   }
 
@@ -448,6 +694,40 @@
 
   function renderTriage() {
     if (!els.triage) return;
+    if (isAuthorView()) {
+      var top = state.authorNodes.slice(0, 12);
+      els.triage.innerHTML =
+        '<h3>Most papers here</h3><ol class="citation-triage-list">' +
+        top
+          .map(function (a) {
+            return (
+              '<li><button type="button" class="citation-triage-btn" data-id="' +
+              escapeAttr(a.id) +
+              '">' +
+              escapeHtml(a.name) +
+              '</button><span class="citation-meta">' +
+              a.count +
+              (a.count === 1 ? " paper" : " papers") +
+              (a.seed ? " · wrote the starting paper" : "") +
+              "</span></li>"
+            );
+          })
+          .join("") +
+        "</ol>";
+      els.triage.querySelectorAll(".citation-triage-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var hit = state.authorNodes.filter(function (n) {
+            return n.id === btn.getAttribute("data-id");
+          })[0];
+          if (hit) {
+            state.selectedId = hit.id;
+            showAuthor(hit);
+            if (state.focusFn) state.focusFn(hit.id);
+          }
+        });
+      });
+      return;
+    }
     if (!state.triage.length) {
       els.triage.innerHTML = "";
       return;
@@ -558,6 +838,12 @@
   }
 
   function visibleNodes() {
+    if (isAuthorView()) {
+      return state.authorNodes.filter(function (a) {
+        if (a.seed || (!a.year_from && !a.year_to)) return true;
+        return (a.year_to || 0) >= state.yearLo && (a.year_from || 9999) <= state.yearHi;
+      });
+    }
     return state.nodes.filter(function (node) {
       if (!isSimilarity() && !state.showOccasional && node.occasional && !node.seed) return false;
       if (!node.seed && node.year) {
@@ -578,6 +864,11 @@
   }
 
   function visibleEdges(ids) {
+    if (isAuthorView()) {
+      return state.authorEdges.filter(function (edge) {
+        return ids.has(edge.source) && ids.has(edge.target);
+      });
+    }
     return state.edges.filter(function (edge) {
       if (!ids.has(edge.source) || !ids.has(edge.target)) return false;
       if (state.direction === "both") return true;
@@ -587,7 +878,7 @@
 
   function renderGraph() {
     var papers = visibleNodes();
-    var ghostPapers = state.showHalo ? state.ghostNodes : [];
+    var ghostPapers = state.showHalo && !isAuthorView() ? state.ghostNodes : [];
     var ids = new Set(
       papers
         .concat(ghostPapers)
@@ -595,8 +886,8 @@
           return paper.id;
         })
     );
-    var edges = visibleEdges(ids).concat(state.showHalo ? state.ghostEdges : []);
-    var hidden = isSimilarity()
+    var edges = visibleEdges(ids).concat(state.showHalo && !isAuthorView() ? state.ghostEdges : []);
+    var hidden = isSimilarity() || isAuthorView()
       ? 0
       : state.nodes.filter(function (paper) {
           return paper.occasional && !paper.seed;
@@ -613,7 +904,15 @@
       edges.length +
       " links" +
       (state.showOccasional || !hidden ? "" : " (" + hidden + " other hidden)");
-    if (isSimilarity()) {
+    if (isAuthorView()) {
+      linkNote =
+        papers.length +
+        " authors · " +
+        edges.length +
+        " links · solid lines join co-authors, dashed lines join authors whose papers are linked on this map" +
+        (state.authorTruncated ? " (" + state.authorTruncated + " more authors not drawn)" : "") +
+        ".";
+    } else if (isSimilarity()) {
       var origin = papers.filter(function (paper) {
         return paper.seed;
       })[0];
@@ -658,7 +957,14 @@
         return paper.cited_by_count || 1;
       }) || 1;
     var radiusScale = d3.scaleSqrt().domain([0, maxCited]).range([7, 26]);
+    var maxCount =
+      d3.max(papers, function (p) {
+        return p.count || 1;
+      }) || 1;
+    var countScale = d3.scaleSqrt().domain([0, maxCount]).range([7, 24]);
     function radius(paper) {
+      if (state.view.size_by === "uniform") return paper.seed ? 13 : 10;
+      if (paper.kind === "author") return countScale(paper.count || 0);
       return radiusScale(paper.cited_by_count || 0);
     }
 
@@ -691,23 +997,42 @@
     var seeds = nodes.filter(function (node) {
       return node.seed;
     });
-    var labelCap = papers.length > 40 ? 8 : papers.length > 20 ? 12 : 18;
+    var labelCap =
+      state.view.labels === "all"
+        ? nodes.length
+        : state.view.labels === "seeds" || state.view.labels === "none"
+          ? 0
+          : papers.length > 40
+            ? 8
+            : papers.length > 20
+              ? 12
+              : 18;
     var labeledIds = new Set(
       nodes
         .slice()
         .sort(function (a, b) {
-          return (b.cited_by_count || 0) - (a.cited_by_count || 0);
+          var rb = b.rank !== undefined ? b.rank : b.cited_by_count || 0;
+          var ra = a.rank !== undefined ? a.rank : a.cited_by_count || 0;
+          return rb - ra;
         })
         .slice(0, labelCap)
         .map(function (node) {
           return node.id;
         })
     );
-    seeds.forEach(function (node) {
-      labeledIds.add(node.id);
-    });
+    if (state.view.labels !== "none") {
+      seeds.forEach(function (node) {
+        labeledIds.add(node.id);
+      });
+    }
+    state.userZoomed = false;
 
     function linkStroke(d) {
+      if (d.direction === "coauthor" || d.direction === "linked") {
+        var akey = d.source.id + "|" + d.target.id + "|" + d.direction;
+        if (pathKeys.size && pathKeys.has(akey)) return "#c46a2a";
+        return d.direction === "coauthor" ? "#3d5a80" : "#8d99a6";
+      }
       if (d.direction === "similar") {
         var key = d.source.id + "|" + d.target.id + "|" + d.direction;
         return pathKeys.size && pathKeys.has(key) ? "#c46a2a" : "#8d99a6";
@@ -718,7 +1043,9 @@
     function linkWidth(d) {
       var key = d.source.id + "|" + d.target.id + "|" + d.direction;
       var onPath = pathKeys.size && pathKeys.has(key);
-      if (d.direction === "similar") return onPath ? 3.4 : 0.8 + 2.4 * (d.weight || 0);
+      if (d.direction === "similar" || d.direction === "coauthor" || d.direction === "linked") {
+        return onPath ? 3.4 : 0.8 + 2.4 * (d.weight || 0);
+      }
       return onPath ? 2.4 : 1.4;
     }
 
@@ -728,8 +1055,9 @@
       .scaleExtent([0.35, 4])
       .on("zoom", function (event) {
         g.attr("transform", event.transform);
+        if (event.sourceEvent) state.userZoomed = true;
       });
-    els.svg.call(zoom);
+    els.svg.call(zoom).on("dblclick.zoom", null);
 
     var link = g
       .append("g")
@@ -745,10 +1073,11 @@
       })
       .attr("stroke-width", linkWidth)
       .attr("stroke-dasharray", function (d) {
+        if (d.direction === "linked") return "4 3";
         return d.source.ghost || d.target.ghost ? "4 3" : null;
       })
       .attr("marker-end", function (d) {
-        return d.direction === "similar" ? null : "url(#citation-arrow)";
+        return d.direction === "refs" || d.direction === "cites" ? "url(#citation-arrow)" : null;
       })
       .style("cursor", "pointer")
       .on("click", function (event, d) {
@@ -781,16 +1110,27 @@
             d.fy = null;
           })
       )
+      .attr("tabindex", 0)
+      .attr("role", "button")
+      .attr("aria-label", function (d) {
+        return (d.title || "Untitled") + (d.year ? ", " + d.year : "") + (d.seed ? ", starting paper" : "");
+      })
       .on("click", function (event, d) {
         event.stopPropagation();
-        if (state.pathMode) {
-          pickPathNode(d);
-          return;
+        activateNode(d);
+      })
+      .on("keydown", function (event, d) {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          event.stopPropagation();
+          activateNode(d);
         }
-        state.selectedId = d.id;
-        if (isSimilarity() && state.applyPath) state.applyPath(d.origin_path || []);
-        showNode(d);
-        if (state.showHalo) loadHalo(d.id);
+      })
+      .on("focus", function (event, d) {
+        setFocus(d.id);
+      })
+      .on("blur", function () {
+        setFocus(null);
       })
       .on("mouseenter", function (event, d) {
         setFocus(d.id);
@@ -829,6 +1169,7 @@
       .attr("fill", "#f7f1e8")
       .attr("pointer-events", "none")
       .text(function (d) {
+        if (d.kind === "author") return d.count > 1 ? String(d.count) : "";
         if (d.ghost) return "LIB";
         if (d.in_library) return "LIB";
         if (d.staged) return "…";
@@ -868,6 +1209,13 @@
     });
 
     node.append("title").text(function (d) {
+      if (d.kind === "author") {
+        var abits = [d.name, d.count + (d.count === 1 ? " paper" : " papers") + " on this map", d.cited_by_count + " citations"];
+        if (d.year_from) abits.push(d.year_from === d.year_to ? String(d.year_from) : d.year_from + "–" + d.year_to);
+        if (d.seed) abits.push("wrote the starting paper");
+        if (d.followed) abits.push("following");
+        return abits.join(" · ");
+      }
       var bits = [
         d.title || "Untitled",
         d.year || "n.d.",
@@ -917,17 +1265,14 @@
 
     function setFocus(focusId) {
       if (!focusId) {
-        node.style("opacity", function (d) {
-          if (d.keep === false) return 0.35;
-          if (d.watch_seen) return 0.45;
-          return 1;
-        });
+        node.style("opacity", baseOpacity);
         link.attr("stroke-opacity", function (d) {
           var key = d.source.id + "|" + d.target.id + "|" + d.direction;
           if (pathKeys.size && pathKeys.has(key)) return 0.95;
           return crowded ? 0.35 : 0.55;
         });
         labels.style("opacity", function (d) {
+          if (state.highlight.size) return state.highlight.has(d.id) ? 1 : 0;
           return labeledIds.has(d.id) ? 1 : 0;
         });
         return;
@@ -951,6 +1296,49 @@
         return connected.has(d.id) ? 1 : 0;
       });
     }
+
+    function baseOpacity(d) {
+      if (state.highlight.size) return state.highlight.has(d.id) ? 1 : 0.12;
+      if (d.keep === false) return 0.35;
+      if (d.watch_seen) return 0.45;
+      return 1;
+    }
+
+    state.restyle = function () {
+      setFocus(null);
+    };
+
+    function fitView(animate) {
+      var placed = nodes.filter(function (n) {
+        return typeof n.x === "number" && !isNaN(n.x);
+      });
+      if (!placed.length) return;
+      var x0 = d3.min(placed, function (n) { return n.x - radius(n); });
+      var x1 = d3.max(placed, function (n) { return n.x + radius(n); });
+      var y0 = d3.min(placed, function (n) { return n.y - radius(n); });
+      var y1 = d3.max(placed, function (n) { return n.y + radius(n) + 18; });
+      var w = Math.max(x1 - x0, 1);
+      var h = Math.max(y1 - y0, 1);
+      var k = Math.max(0.35, Math.min(2.2, 0.9 * Math.min(width / w, height / h)));
+      var t = d3.zoomIdentity
+        .translate(width / 2 - k * (x0 + w / 2), height / 2 - k * (y0 + h / 2))
+        .scale(k);
+      if (animate && !state.reduceMotion) els.svg.transition().duration(450).call(zoom.transform, t);
+      else els.svg.call(zoom.transform, t);
+    }
+    state.fitFn = fitView;
+
+    state.focusFn = function (id) {
+      var n = nodes.filter(function (x) {
+        return x.id === id;
+      })[0];
+      if (!n || typeof n.x !== "number") return;
+      var current = d3.zoomTransform(els.svg.node());
+      var k = Math.max(current.k, 1.2);
+      var t = d3.zoomIdentity.translate(width / 2 - k * n.x, height / 2 - k * n.y).scale(k);
+      if (state.reduceMotion) els.svg.call(zoom.transform, t);
+      else els.svg.transition().duration(400).call(zoom.transform, t);
+    };
 
     // Highlight a path without re-running the layout.
     state.applyPath = function (pathEdges) {
@@ -981,10 +1369,15 @@
             return d.id;
           })
           .distance(function (d) {
-            return d.direction === "similar" ? 40 + (1 - (d.weight || 0)) * 140 : 70;
+            if (d.direction === "similar") return 40 + (1 - (d.weight || 0)) * 140;
+            if (d.direction === "coauthor" || d.direction === "linked") return 45 + (1 - (d.weight || 0)) * 120;
+            return 70;
           })
           .strength(function (d) {
-            return d.direction === "similar" ? 0.15 + 0.85 * (d.weight || 0) : 0.35;
+            if (d.direction === "similar" || d.direction === "coauthor" || d.direction === "linked") {
+              return 0.15 + 0.85 * (d.weight || 0);
+            }
+            return 0.35;
           })
       )
       .force("charge", d3.forceManyBody().strength(crowded ? -220 : -160))
@@ -1002,6 +1395,13 @@
     }
 
     state.simulation.on("tick", function () {
+      // Fit once the layout has mostly settled, not only when it fully stops.
+      if (!fitted && state.view.fit && !state.userZoomed && state.simulation.alpha() < 0.12) {
+        fitted = true;
+        window.requestAnimationFrame(function () {
+          fitView(true);
+        });
+      }
       link
         .attr("x1", function (d) {
           return d.source.x;
@@ -1023,11 +1423,268 @@
       });
     });
 
+    var fitted = false;
+    state.simulation.on("end.fit", function () {
+      if (state.view.fit && !state.userZoomed && !fitted) fitView(true);
+      fitted = true;
+    });
+
     if (state.reduceMotion) {
       state.simulation.stop();
       for (var i = 0; i < 200; i += 1) state.simulation.tick();
       state.simulation.on("tick")();
+      if (state.view.fit) fitView(false);
     }
+    setFocus(null);
+  }
+
+  function activateNode(d) {
+    if (state.pathMode) {
+      pickPathNode(d);
+      return;
+    }
+    state.selectedId = d.id;
+    if (d.kind === "author") {
+      showAuthor(d);
+      return;
+    }
+    if (isSimilarity() && state.applyPath) state.applyPath(d.origin_path || []);
+    showNode(d);
+    if (state.showHalo) loadHalo(d.id);
+  }
+
+  // --- highlight, search, authors, export ------------------------------------
+
+  function setHighlight(ids, label) {
+    state.highlight = new Set(ids || []);
+    state.highlightLabel = state.highlight.size ? label || "" : "";
+    if (state.restyle) state.restyle();
+    renderHighlightNote();
+  }
+
+  function renderHighlightNote() {
+    if (!els.highlightNote) return;
+    if (!state.highlight.size) {
+      els.highlightNote.hidden = true;
+      els.highlightNote.innerHTML = "";
+      return;
+    }
+    els.highlightNote.hidden = false;
+    els.highlightNote.innerHTML =
+      escapeHtml(
+        state.highlight.size + " highlighted" + (state.highlightLabel ? ": " + state.highlightLabel : "")
+      ) + ' <button type="button" class="secondary citation-mini" data-clear-highlight="1">Clear</button>';
+    els.highlightNote.querySelector("[data-clear-highlight]").addEventListener("click", function () {
+      if (els.search) els.search.value = "";
+      setHighlight([], "");
+    });
+  }
+
+  function nodeMatches(n, q) {
+    if ((n.title || "").toLowerCase().indexOf(q) >= 0) return true;
+    if ((n.doi || "").toLowerCase().indexOf(q) >= 0) return true;
+    var names = Array.isArray(n.authors) ? n.authors : [];
+    for (var i = 0; i < names.length; i += 1) {
+      if (String(names[i]).toLowerCase().indexOf(q) >= 0) return true;
+    }
+    return false;
+  }
+
+  function onSearch() {
+    var q = (els.search.value || "").trim().toLowerCase();
+    if (q.length < 2) {
+      setHighlight([], "");
+      return;
+    }
+    var ids = activeNodes()
+      .filter(function (n) {
+        return nodeMatches(n, q);
+      })
+      .map(function (n) {
+        return n.id;
+      });
+    setHighlight(ids, "“" + els.search.value.trim() + "”");
+    if (!ids.length) setStatus("Nothing on this map matches “" + els.search.value.trim() + "”.");
+  }
+
+  function onSearchKey(event) {
+    if (event.key === "Escape") {
+      els.search.value = "";
+      setHighlight([], "");
+      return;
+    }
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    var first = activeNodes().filter(function (n) {
+      return state.highlight.has(n.id);
+    })[0];
+    if (!first) return;
+    state.selectedId = first.id;
+    if (first.kind === "author") showAuthor(first);
+    else showNode(first);
+    if (state.focusFn) state.focusFn(first.id);
+  }
+
+  function authorKeyNodes(key) {
+    return state.nodes
+      .filter(function (n) {
+        return Array.isArray(n.author_keys) && n.author_keys.indexOf(key) >= 0;
+      })
+      .map(function (n) {
+        return n.id;
+      });
+  }
+
+  function authorsHtml() {
+    var list = state.authors || [];
+    if (!list.length) return "";
+    return (
+      '<details class="citation-extras" open><summary><h4>Authors on this map</h4></summary>' +
+      '<p class="citation-meta">Click a name to highlight their papers. Follow adds them to People → followed.</p><ol>' +
+      list
+        .map(function (a, i) {
+          var follow = a.followed
+            ? '<span class="citation-meta">· following</span>'
+            : '<button type="button" class="secondary citation-mini" data-follow-index="' +
+              i +
+              '">Follow</button>';
+          return (
+            '<li><button type="button" class="citation-link-btn" data-author-index="' +
+            i +
+            '">' +
+            escapeHtml(a.name || a.key) +
+            '</button> <span class="citation-meta">· ' +
+            (a.count || 0) +
+            (a.count === 1 ? " paper" : " papers") +
+            "</span> " +
+            follow +
+            "</li>"
+          );
+        })
+        .join("") +
+      "</ol></details>"
+    );
+  }
+
+  function bindAuthorButtons(rootEl) {
+    rootEl.querySelectorAll("[data-author-index]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var a = state.authors[Number(btn.getAttribute("data-author-index"))];
+        if (!a) return;
+        if (isAuthorView()) {
+          var hit = state.authorNodes.filter(function (n) {
+            return n.key === a.key;
+          })[0];
+          if (hit) {
+            state.selectedId = hit.id;
+            showAuthor(hit);
+            if (state.focusFn) state.focusFn(hit.id);
+          }
+          return;
+        }
+        var ids = a.node_ids && a.node_ids.length ? a.node_ids : authorKeyNodes(a.key);
+        var same = state.highlightLabel === a.name && state.highlight.size === ids.length;
+        setHighlight(same ? [] : ids, a.name);
+      });
+    });
+    rootEl.querySelectorAll("[data-author-key]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var key = btn.getAttribute("data-author-key") || "";
+        setHighlight(authorKeyNodes(key), btn.textContent || "");
+      });
+    });
+    rootEl.querySelectorAll("[data-follow-index]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var a = state.authors[Number(btn.getAttribute("data-follow-index"))];
+        if (!a) return;
+        btn.disabled = true;
+        fetch("/discover/graph/follow", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: a.name, openalex: a.openalex || "", orcid: a.orcid || "" }),
+        })
+          .then(readJson)
+          .then(function (body) {
+            if (!body || body.ok === false) throw new Error((body && body.error) || "Could not follow.");
+            markFollowed(a.key);
+            setStatus("Following " + (a.name || "this author") + " (People → followed).");
+            if (!state.selectedId) clearPanel();
+          })
+          .catch(function (error) {
+            btn.disabled = false;
+            setStatus(error.message || "Could not follow this author.");
+          });
+      });
+    });
+  }
+
+  function download(name, type, text) {
+    var blob = new Blob([text], { type: type });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(function () {
+      URL.revokeObjectURL(url);
+    }, 1000);
+  }
+
+  function csvCell(value) {
+    var text = value === null || value === undefined ? "" : String(value);
+    // Guard spreadsheet formula injection from titles that start with = + - @.
+    if (/^[=+\-@]/.test(text)) text = "'" + text;
+    return '"' + text.replace(/"/g, '""') + '"';
+  }
+
+  function exportMap(kind) {
+    var base = "paperful-map-" + (state.runId || "run");
+    if (kind === "json") {
+      download(base + ".json", "application/json", JSON.stringify(state.lastGraph || {}, null, 2));
+    } else if (kind === "csv" && isAuthorView()) {
+      var acols = ["name", "count", "cited_by_count", "year_from", "year_to", "coauthors", "seed", "followed", "openalex", "orcid"];
+      var alines = [acols.map(csvCell).join(",")];
+      state.authorNodes.forEach(function (a) {
+        alines.push(
+          acols
+            .map(function (c) {
+              return csvCell(a[c]);
+            })
+            .join(",")
+        );
+      });
+      download(base + "-authors.csv", "text/csv", alines.join("\n") + "\n");
+    } else if (kind === "csv") {
+      var cols = ["id", "title", "year", "cited_by_count", "doi", "role", "similarity", "in_library", "keep", "seed", "authors"];
+      var lines = [cols.join(",")];
+      state.nodes.forEach(function (n) {
+        lines.push(
+          cols
+            .map(function (c) {
+              var v = n[c];
+              if (c === "authors") v = (Array.isArray(n.authors) ? n.authors : []).join("; ");
+              return csvCell(v);
+            })
+            .join(",")
+        );
+      });
+      download(base + ".csv", "text/csv", lines.join("\n") + "\n");
+    } else if (kind === "svg") {
+      var node = els.svg.node();
+      var clone = node.cloneNode(true);
+      clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      var bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      bg.setAttribute("width", "100%");
+      bg.setAttribute("height", "100%");
+      bg.setAttribute("fill", "#fbf8f3");
+      clone.insertBefore(bg, clone.firstChild);
+      clone.setAttribute("font-family", "system-ui, sans-serif");
+      download(base + ".svg", "image/svg+xml", new XMLSerializer().serializeToString(clone));
+    }
+    setStatus("Downloaded the map as " + kind.toUpperCase() + ".");
   }
 
   function pickPathNode(paper) {
@@ -1061,7 +1718,7 @@
 
   function bfsPath(start, end) {
     var adj = {};
-    state.edges.forEach(function (edge) {
+    activeEdges().forEach(function (edge) {
       adj[edge.source] = adj[edge.source] || [];
       adj[edge.source].push({ next: edge.target, edge: edge });
       adj[edge.target] = adj[edge.target] || [];
@@ -1087,12 +1744,14 @@
   }
 
   function showPathPanel(path, endPaper) {
-    var start = state.nodes.filter(function (n) {
+    var start = activeNodes().filter(function (n) {
       return n.id === path[0].source || n.id === path[0].target;
     })[0];
     var labels = path
       .map(function (edge) {
         if (edge.direction === "similar") return "similar to";
+        if (edge.direction === "coauthor") return "co-wrote with";
+        if (edge.direction === "linked") return "linked papers with";
         return edge.direction === "cites" ? "cites" : "references";
       })
       .join(" → ");
@@ -1104,6 +1763,162 @@
       "</p><p>" +
       escapeHtml(labels) +
       "</p>";
+  }
+
+  function markFollowed(key) {
+    state.authors.forEach(function (a) {
+      if (a.key === key) a.followed = true;
+    });
+    state.authorNodes.forEach(function (a) {
+      if (a.key === key) a.followed = true;
+    });
+    // The renderer draws copies of each node; flag those too, then recolour
+    // without moving the layout.
+    els.svg.selectAll(".nodes > g").each(function (d) {
+      if (d && d.key === key) d.followed = true;
+    });
+    if (isAuthorView()) {
+      els.svg.selectAll(".nodes > g").select("circle").attr("fill", nodeFill);
+    }
+  }
+
+  function followAuthor(a, btn) {
+    if (btn) btn.disabled = true;
+    return fetch("/discover/graph/follow", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: a.name, openalex: a.openalex || "", orcid: a.orcid || "" }),
+    })
+      .then(readJson)
+      .then(function (body) {
+        if (!body || body.ok === false) throw new Error((body && body.error) || "Could not follow.");
+        markFollowed(a.key);
+        setStatus("Following " + (a.name || "this author") + " (People → followed).");
+        return true;
+      })
+      .catch(function (error) {
+        if (btn) btn.disabled = false;
+        setStatus(error.message || "Could not follow this author.");
+        return false;
+      });
+  }
+
+  function showAuthor(a) {
+    var papers = state.nodes.filter(function (n) {
+      return a.node_ids.indexOf(n.id) >= 0;
+    });
+    papers.sort(function (x, y) {
+      return (y.year || 0) - (x.year || 0) || (y.cited_by_count || 0) - (x.cited_by_count || 0);
+    });
+    var span = a.year_from ? (a.year_from === a.year_to ? String(a.year_from) : a.year_from + "–" + a.year_to) : "";
+    var links = [];
+    if (a.openalex) {
+      links.push(
+        '<a href="https://openalex.org/' + escapeAttr(a.openalex) + '" rel="noopener noreferrer">OpenAlex</a>'
+      );
+    }
+    if (a.orcid) {
+      links.push(
+        '<a href="https://orcid.org/' + escapeAttr(a.orcid) + '" rel="noopener noreferrer">ORCID</a>'
+      );
+    }
+    var coauthors = state.authorEdges
+      .filter(function (e) {
+        return e.coauthored && (e.source === a.id || e.target === a.id);
+      })
+      .map(function (e) {
+        var other = e.source === a.id ? e.target : e.source;
+        return state.authorNodes.filter(function (n) {
+          return n.id === other;
+        })[0];
+      })
+      .filter(Boolean);
+    els.panel.innerHTML =
+      "<h3>" +
+      escapeHtml(a.name) +
+      "</h3>" +
+      '<p class="citation-meta">' +
+      a.count +
+      (a.count === 1 ? " paper" : " papers") +
+      " on this map · " +
+      (a.cited_by_count || 0) +
+      " citations" +
+      (span ? " · " + escapeHtml(span) : "") +
+      "</p>" +
+      (a.seed ? "<p><strong>Wrote the starting paper</strong></p>" : "") +
+      (a.library_papers ? '<p class="citation-meta">' + a.library_papers + " already in your library</p>" : "") +
+      (links.length ? '<p class="citation-meta">' + links.join(" · ") + "</p>" : "") +
+      '<div class="citation-actions">' +
+      (a.followed
+        ? '<span class="citation-meta">Following</span>'
+        : '<button type="button" data-author-follow="1">Follow</button>') +
+      '<button type="button" class="secondary" data-author-papers="1">Show their papers</button>' +
+      "</div>" +
+      (coauthors.length
+        ? '<p class="citation-meta">Co-authors here: ' +
+          coauthors
+            .map(function (c) {
+              return (
+                '<button type="button" class="citation-link-btn" data-author-node="' +
+                escapeAttr(c.id) +
+                '">' +
+                escapeHtml(c.name) +
+                "</button>"
+              );
+            })
+            .join(", ") +
+          "</p>"
+        : "") +
+      '<div class="citation-extras"><h4>Their papers on this map</h4><ol>' +
+      papers
+        .map(function (p) {
+          return (
+            '<li><button type="button" class="citation-link-btn" data-paper-id="' +
+            escapeAttr(p.id) +
+            '">' +
+            escapeHtml(p.title || p.id) +
+            "</button>" +
+            (p.year ? ' <span class="citation-meta">(' + p.year + ")</span>" : "") +
+            (p.in_library ? ' <span class="citation-meta">· in library</span>' : "") +
+            "</li>"
+          );
+        })
+        .join("") +
+      "</ol></div>";
+    var follow = els.panel.querySelector("[data-author-follow]");
+    if (follow) {
+      follow.addEventListener("click", function () {
+        followAuthor(a, follow).then(function (ok) {
+          if (ok && state.selectedId === a.id) showAuthor(a);
+        });
+      });
+    }
+    els.panel.querySelector("[data-author-papers]").addEventListener("click", function () {
+      setMapView("papers", { force: true, highlight: a.node_ids, label: a.name });
+    });
+    els.panel.querySelectorAll("[data-paper-id]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        setMapView("papers", {
+          force: true,
+          highlight: a.node_ids,
+          label: a.name,
+          select: btn.getAttribute("data-paper-id"),
+        });
+      });
+    });
+    els.panel.querySelectorAll("[data-author-node]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var hit = state.authorNodes.filter(function (n) {
+          return n.id === btn.getAttribute("data-author-node");
+        })[0];
+        if (hit) {
+          state.selectedId = hit.id;
+          showAuthor(hit);
+          if (state.focusFn) state.focusFn(hit.id);
+        }
+      });
+    });
   }
 
   function showNode(paper) {
@@ -1118,6 +1933,23 @@
           ? "No PDF on disk yet"
           : "";
     var author = paper.first_author ? escapeHtml(paper.first_author) + " · " : "";
+    var names = Array.isArray(paper.authors) ? paper.authors : [];
+    var keys = Array.isArray(paper.author_keys) ? paper.author_keys : [];
+    var authorLine = names.length
+      ? '<p class="citation-meta citation-authors">By ' +
+        names
+          .map(function (name, i) {
+            return keys[i]
+              ? '<button type="button" class="citation-link-btn" data-author-key="' +
+                  escapeAttr(keys[i]) +
+                  '" title="Highlight this author\'s papers">' +
+                  escapeHtml(name) +
+                  "</button>"
+              : escapeHtml(name);
+          })
+          .join(", ") +
+        "</p>"
+      : "";
     var doi = paper.doi
       ? '<p class="citation-meta"><a href="https://doi.org/' +
         escapeAttr(paper.doi) +
@@ -1256,6 +2088,7 @@
       catLine +
       designLine +
       triageLine +
+      authorLine +
       simLine +
       doi +
       why +
@@ -1290,6 +2123,7 @@
       });
     });
     bindSimilarButtons(els.panel);
+    bindAuthorButtons(els.panel);
   }
 
   function seedSnowballForm(paper) {
@@ -1452,6 +2286,15 @@
   function showEdge(edge) {
     var source = edge.source.title || edge.source.id;
     var target = edge.target.title || edge.target.id;
+    if (edge.direction === "coauthor" || edge.direction === "linked") {
+      var bits = [];
+      if (edge.coauthored) bits.push(edge.coauthored + (edge.coauthored === 1 ? " paper" : " papers") + " written together");
+      if (edge.linked) bits.push("their papers are linked " + Math.round(edge.linked) + "× on this map");
+      els.panel.innerHTML =
+        "<h3>" + escapeHtml(source + " and " + target) + "</h3>" +
+        '<p class="citation-meta">' + escapeHtml(bits.join(" · ") || "Linked on this map") + "</p>";
+      return;
+    }
     if (edge.direction === "similar") {
       els.panel.innerHTML =
         "<h3>" +
@@ -1474,7 +2317,9 @@
 
   function clearPanel() {
     if (!els.panel) return;
-    var hint = isSimilarity()
+    var hint = isAuthorView()
+      ? "Each circle is a person; bigger circles wrote more of the papers on this map. Click someone to see their papers, co-authors, and Follow."
+      : isSimilarity()
       ? "Papers sit close together when they share citations and references, even if they never cite each other. Click a paper to see its strongest path to the origin."
       : state.edges && state.edges.length
         ? "Click a paper to see why it is on the map, then expand who it cites or who cites it."
@@ -1498,9 +2343,15 @@
     els.panel.innerHTML =
       '<p class="citation-panel-empty">' +
       hint +
-      " A dark ring means it is already in your library. Larger nodes have more citations.</p>" +
+      (isAuthorView()
+        ? ""
+        : " A dark ring means it is already in your library." +
+          (state.view.size_by === "uniform" ? "" : " Larger nodes have more citations.")) +
+      "</p>" +
+      authorsHtml() +
       extras;
     bindSimilarButtons(els.panel);
+    bindAuthorButtons(els.panel);
   }
 
   function expand(nodeId, direction, btn) {

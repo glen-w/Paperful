@@ -16,7 +16,8 @@ POOL_PRESETS: dict[str, tuple[int, int, int, int, int]] = {
     "large": (400, 300, 120, 16, 40),
 }
 SOURCES = ("auto", "store", "api")
-COLORS = ("role", "year")
+# "map" follows [map].color (the shared default for every map).
+COLORS = ("map", "role", "year", "category")
 
 _INT_LIMITS: dict[str, tuple[int, int]] = {
     "nodes": (5, 150),
@@ -56,7 +57,7 @@ class SimilarSettings:
     hide_in_library: bool = False
     prior_works: int = 10
     derivative_works: int = 10
-    color: str = "role"
+    color: str = "map"
     # auto: store first, then the live API. store: never call the API. api: ignore the store.
     source: str = "auto"
 

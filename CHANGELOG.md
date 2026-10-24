@@ -35,6 +35,18 @@ may still be added). See [releases](docs/releases.md).
   and EndNote create/path/attach/notes/tags/update). See
   [config](docs/config.md#exclude--protect-collections).
 
+- **Author view for every map:** a Papers | Authors switch redraws any citation
+  or Similar map as the people who wrote its papers (co-authors and linked
+  papers, starting-paper authors marked). Click someone for their papers and
+  co-authors; Follow adds them to People → followed. Top authors are also listed
+  beside the paper view.
+- **Map controls and settings:** Find on map, Fit (and fit after layout),
+  Download as SVG / CSV / JSON, keyboard-reachable nodes, colour by role / year
+  / category, uniform node size, label modes. `[map]` and Settings → Maps hold
+  these plus the citation map's reach (papers drawn, papers per Expand,
+  references read, start direction) and its recent / highly-cited thresholds,
+  which were fixed before.
+
 ### Fixed
 
 - **OpenAlex snapshot store:** list and struct columns (`referenced_works`,
@@ -48,6 +60,9 @@ may still be added). See [releases](docs/releases.md).
 - **Citation map "Path between two papers"** kept its result message hidden
   behind the redraw; the path result now stays on the status line.
 - **Snapshot rows with a non-numeric year** no longer crash snowball hops.
+- **A damaged line in a queue file** no longer breaks the Discover page or its
+  map; the line is skipped and the map says so. Queue and map files are now
+  written atomically, so an interrupted write cannot leave a half-written queue.
 
 ### Changed
 

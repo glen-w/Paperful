@@ -23,6 +23,9 @@ import httpx
 from ..resolve import normalize_doi
 from .candidate import Candidate
 from .expand import select_works_by_citations
+from .map_authors import author_network, author_summary, node_authors
+from .map_settings import DEFAULT as DEFAULT_MAP
+from .map_settings import MapSettings
 from .map_categories import (
     CategoryDef,
     categories_for,
@@ -94,11 +97,18 @@ def merge_graph_links(existing: Candidate, incoming: Candidate) -> None:
         )
 
 
-def role_for(year: int | None, cited: int, *, now_year: int, threshold: int) -> str:
+def role_for(
+    year: int | None,
+    cited: int,
+    *,
+    now_year: int,
+    threshold: int,
+    recent_years: int = RECENT_YEARS,
+) -> str:
     """foundational, influential, emerging, or other."""
     if year is None:
         return "other"
-    recent = year >= now_year - RECENT_YEARS
+    recent = year >= now_year - recent_years
     high = cited >= threshold
     if recent and high:
         return "influential"
@@ -114,15 +124,21 @@ def build_graph(
     *,
     run_id: str,
     now_year: int | None = None,
-    max_nodes: int = MAX_NODES,
+    max_nodes: int | None = None,
     focus: str | None = None,
     watch_seen: set[str] | None = None,
     compare_ids: set[str] | None = None,
     map_categories: list[str] | tuple[str, ...] | None = None,
     map_category_defs: list[dict[str, Any]] | tuple[dict[str, Any], ...] | None = None,
     out_dir: Path | None = None,
+    settings: MapSettings | None = None,
 ) -> dict[str, Any]:
     """JSON map for the Discover canvas. Caps nodes; edges stay inside that set."""
+    opts = settings or DEFAULT_MAP
+    if max_nodes is None:
+        max_nodes = opts.max_nodes
+    floor = opts.citation_floor
+    recent_years = opts.recent_years
     year_now = now_year if now_year is not None else datetime.now(timezone.utc).year
     catalog = resolve_catalog(enabled=map_categories, custom_defs=map_category_defs)
     similar = is_similarity_queue(rows)
@@ -133,13 +149,14 @@ def build_graph(
         else select_nodes(rows, focus=focus, max_nodes=max_nodes)
     )
     counts = [_cited(row) for row in chosen if row.hop != 0]
-    threshold = CITATION_FLOOR if not counts else max(CITATION_FLOOR, _median(counts))
-    recent_from = year_now - RECENT_YEARS
+    threshold = floor if not counts else max(floor, _median(counts))
+    recent_from = year_now - recent_years
     nodes = [
         _node(
             row,
             now_year=year_now,
             threshold=threshold,
+            recent_years=recent_years,
             watch_seen=watch_seen,
             compare_ids=compare_ids,
             catalog=catalog,
@@ -164,8 +181,8 @@ def build_graph(
             "recent_from_year": recent_from,
         },
         "thresholds": {
-            "recent_years": RECENT_YEARS,
-            "citation_floor": CITATION_FLOOR,
+            "recent_years": recent_years,
+            "citation_floor": floor,
             "highly_cited": threshold,
             "recent_from_year": recent_from,
         },
@@ -174,6 +191,22 @@ def build_graph(
         "nodes": nodes,
         "edges": edges,
     }
+    view = opts.view()
+    if similar_report is not None:
+        own = str(similar_report.get("color") or "map")
+        if own in ("role", "year", "category"):
+            view["color"] = own
+    graph["view"] = view
+    graph["authors"] = author_summary(nodes, chosen, limit=opts.authors)
+    graph["author_network"] = author_network(
+        nodes,
+        chosen,
+        edges,
+        max_authors=opts.author_nodes,
+        min_papers=opts.author_min_papers,
+        peers=opts.author_peers,
+        links=opts.author_links,
+    )
     if similar_report is not None:
         on_map = {node["id"] for node in nodes}
         report = dict(similar_report)
@@ -203,6 +236,7 @@ def write_graph(
     map_categories: list[str] | tuple[str, ...] | None = None,
     map_category_defs: list[dict[str, Any]] | tuple[dict[str, Any], ...] | None = None,
     out_dir: Path | None = None,
+    settings: MapSettings | None = None,
 ) -> Path:
     graph = build_graph(
         rows,
@@ -210,14 +244,17 @@ def write_graph(
         map_categories=map_categories,
         map_category_defs=map_category_defs,
         out_dir=out_dir,
+        settings=settings,
     )
     return write_graph_file(dest, graph)
 
 
 def write_graph_file(dest: Path, graph: dict[str, Any]) -> Path:
+    from .queue import atomic_write_text
+
     dest.mkdir(parents=True, exist_ok=True)
     path = dest / GRAPH_FILE
-    path.write_text(json.dumps(graph, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    atomic_write_text(path, json.dumps(graph, ensure_ascii=False, indent=2) + "\n")
     return path
 
 
@@ -250,14 +287,15 @@ def graph_for_run(
     map_categories: list[str] | tuple[str, ...] | None = None,
     map_category_defs: list[dict[str, Any]] | tuple[dict[str, Any], ...] | None = None,
     out_dir: Path | None = None,
+    settings: MapSettings | None = None,
 ) -> dict[str, Any]:
     """Rebuild the map from the queue on disk."""
-    from .queue import load_queue
+    from .queue import load_queue_checked
 
     if not valid_run_id(run_id):
         raise CitationGraphError("Unknown run.")
     try:
-        dest, rows = load_queue(state_dir, run_id)
+        dest, rows, skipped = load_queue_checked(state_dir, run_id)
     except FileNotFoundError as exc:
         raise CitationGraphError("No queue for that run.") from exc
     # Run summary wins so a profile-saved map_categories set sticks on that queue.
@@ -270,7 +308,12 @@ def graph_for_run(
         map_categories=summary_cats if summary_cats is not None else map_categories,
         map_category_defs=summary_defs if summary_defs is not None else map_category_defs,
         out_dir=out_dir,
+        settings=settings,
     )
+    if skipped:
+        graph["warnings"] = [
+            f"{skipped} damaged line(s) in this queue could not be read and are not shown."
+        ]
     write_graph_file(dest, graph)
     return graph
 
@@ -283,6 +326,7 @@ def repair_queue_links(
     map_categories: list[str] | tuple[str, ...] | None = None,
     map_category_defs: list[dict[str, Any]] | tuple[dict[str, Any], ...] | None = None,
     out_dir: Path | None = None,
+    settings: MapSettings | None = None,
 ) -> dict[str, Any]:
     """Re-link queue rows to hop-0 seeds from OpenAlex refs/cites (Keep unchanged)."""
     from .queue import load_queue
@@ -309,7 +353,7 @@ def repair_queue_links(
         if work is None:
             continue
         parent = seed_row.identity
-        ref_ids = referenced_ids(work, REF_FETCH_CAP)
+        ref_ids = referenced_ids(work, (settings or DEFAULT_MAP).ref_fetch_cap)
         if ref_ids:
             for child in client.works_by_ids(ref_ids):
                 cid = work_node_id(child)
@@ -318,7 +362,7 @@ def repair_queue_links(
         oa = short_id(str(work.get("id") or "")) or (seed_row.ids.get("openalex") or "")
         if oa:
             try:
-                citing = client.works_citing(oa, limit=NEIGHBOR_CAP, sort="cited_by_count:desc")
+                citing = client.works_citing(oa, limit=(settings or DEFAULT_MAP).neighbors, sort="cited_by_count:desc")
             except OpenAlexBudgetExceeded:
                 raise
             except (OpenAlexError, httpx.HTTPError) as exc:
@@ -338,6 +382,7 @@ def repair_queue_links(
         map_categories=map_categories,
         map_category_defs=map_category_defs,
         out_dir=out_dir,
+        settings=settings,
     )
     write_graph_file(dest, graph)
     return graph
@@ -503,6 +548,7 @@ def expand_queue(
     now_year: int | None = None,
     map_categories: list[str] | tuple[str, ...] | None = None,
     map_category_defs: list[dict[str, Any]] | tuple[dict[str, Any], ...] | None = None,
+    settings: MapSettings | None = None,
 ) -> dict[str, Any]:
     """One OpenAlex hop from ``node_id``. Merges neighbours into the queue."""
     from .crawl import _dedupe
@@ -536,17 +582,15 @@ def expand_queue(
     if work is None:
         raise CitationGraphError("OpenAlex has no record for this paper.")
     try:
-        added = _neighbours(client, work, target, side)
+        added = _neighbours(client, work, target, side, settings or DEFAULT_MAP)
     except OpenAlexBudgetExceeded:
         raise
     except (OpenAlexError, httpx.HTTPError) as exc:
         raise CitationGraphError("OpenAlex could not expand this paper.") from exc
     merged = _dedupe(list(rows) + added)
-    path = dest / "candidates.jsonl"
-    path.write_text(
-        "".join(json.dumps(row.to_dict(), ensure_ascii=False) + "\n" for row in merged),
-        encoding="utf-8",
-    )
+    from .queue import write_rows
+
+    write_rows(dest / "candidates.jsonl", merged)
     graph = build_graph(
         merged,
         run_id=run_id,
@@ -554,6 +598,7 @@ def expand_queue(
         focus=target_id,
         map_categories=map_categories,
         map_category_defs=map_category_defs,
+        settings=settings,
     )
     write_graph_file(dest, graph)
     return graph
@@ -564,14 +609,15 @@ def _neighbours(
     work: dict[str, Any],
     target: Candidate,
     side: str,
+    opts: MapSettings = DEFAULT_MAP,
 ) -> list[Candidate]:
     parent_id = target.identity
     title = str(target.biblio.get("title") or parent_id)
     added: list[Candidate] = []
     if side in {"refs", "both"}:
-        ids = referenced_ids(work, REF_FETCH_CAP)
+        ids = referenced_ids(work, opts.ref_fetch_cap)
         children = client.works_by_ids(ids) if ids else []
-        children = select_works_by_citations(children, NEIGHBOR_CAP, "most-cited")
+        children = select_works_by_citations(children, opts.neighbors, "most-cited")
         for child in children:
             row = work_to_candidate(
                 child,
@@ -588,7 +634,7 @@ def _neighbours(
         oa = short_id(str(work.get("id") or "")) or (target.ids.get("openalex") or "")
         citing = client.works_citing(
             oa,
-            limit=NEIGHBOR_CAP,
+            limit=opts.neighbors,
             sort="cited_by_count:desc",
         )
         for child in citing:
@@ -756,6 +802,7 @@ def _node(
     *,
     now_year: int,
     threshold: int,
+    recent_years: int = RECENT_YEARS,
     watch_seen: set[str] | None = None,
     compare_ids: set[str] | None = None,
     catalog: list[CategoryDef] | None = None,
@@ -763,11 +810,12 @@ def _node(
 ) -> dict[str, Any]:
     year = _year(row)
     cited = _cited(row)
-    kind = role_for(year, cited, now_year=now_year, threshold=threshold)
+    kind = role_for(year, cited, now_year=now_year, threshold=threshold, recent_years=recent_years)
     authors = row.biblio.get("authors") or []
     first = ""
     if isinstance(authors, list) and authors:
         first = str(authors[0] or "")
+    names_all, author_keys = node_authors(row)
     designs = study_designs_of(row.biblio)
     active = catalog if catalog is not None else resolve_catalog()
     in_library = row.status == "exists" or bool(row.exists_match)
@@ -802,6 +850,8 @@ def _node(
         "openalex": str(row.ids.get("openalex") or ""),
         "why": str(row.why or ""),
         "first_author": first,
+        "authors": names_all,
+        "author_keys": author_keys,
         "study_designs": designs,
         "categories": categories_for(row.biblio, active),
         "tags": staged_tags,

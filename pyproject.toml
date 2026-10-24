@@ -116,6 +116,7 @@ markers = [
     "e2e_live: opt-in all-in E2E (NBA 2025–2026); set PAPERFUL_E2E=1 — see docs/e2e-nba.md",
     "docs: guide corpus / Sphinx toctree hygiene (advisory in CI; see .github/workflows/docs.yml)",
     "smoke: install/boot/route smoke for CI gate",
+    "browser: drives the map in headless Chromium (skipped when Playwright/Chromium are missing)",
 ]
 
 [tool.coverage.run]

@@ -97,6 +97,24 @@ from .app import (
     _patch_section_assignment,
 )
 
+def with_follow(cfg: Config, graph: Any) -> Any:
+    """Mark authors already on an authorwatch list. Never fails the map."""
+    if not isinstance(graph, dict) or not (graph.get("authors") or graph.get("author_network")):
+        return graph
+    try:
+        from ..snowball.map_authors import followed_keys, mark_followed
+
+        return mark_followed(graph, followed_keys(cfg))
+    except Exception:
+        return graph
+
+
+def map_settings_for(cfg: Config) -> Any:
+    from ..snowball.map_settings import for_config
+
+    return for_config(cfg)
+
+
 # Similar map knobs the Explore form may override for one map.
 SIMILAR_FORM_KEYS = (
     "nodes",
@@ -717,11 +735,12 @@ def register_discover(ui: UiContext) -> None:
                     map_categories=cfg.snowball_map_categories,
                     map_category_defs=cfg.snowball_map_category_defs,
                     out_dir=cfg.out_dir,
+                    settings=map_settings_for(cfg),
                 )
             except CitationGraphError as exc:
                 status = 404 if "queue" in str(exc).lower() else 400
                 return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
-            return JSONResponse({"ok": True, "graph": graph, "doi": doi, "keep": keep})
+            return JSONResponse({"ok": True, "graph": with_follow(cfg, graph), "doi": doi, "keep": keep})
         return RedirectResponse(
             url=_page_url("/discover", tab="queue", page=page if page > 1 else ""),
             status_code=303,
@@ -765,11 +784,12 @@ def register_discover(ui: UiContext) -> None:
                 map_categories=cfg.snowball_map_categories,
                 map_category_defs=cfg.snowball_map_category_defs,
                 out_dir=cfg.out_dir,
+                settings=map_settings_for(cfg),
             )
         except CitationGraphError as exc:
             status = 404 if "queue" in str(exc).lower() else 400
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
-        return JSONResponse(graph)
+        return JSONResponse(with_follow(cfg, graph))
 
     @app.get("/discover/graph/meta")
     def discover_graph_meta() -> JSONResponse:
@@ -802,7 +822,7 @@ def register_discover(ui: UiContext) -> None:
         except CitationGraphError as exc:
             status = 404 if "queue" in str(exc).lower() else 400
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
-        return JSONResponse({"ok": True, "graph": graph})
+        return JSONResponse({"ok": True, "graph": with_follow(cfg, graph)})
 
     @app.post("/discover/graph/add")
     async def discover_graph_add(request: Request) -> JSONResponse:
@@ -838,7 +858,7 @@ def register_discover(ui: UiContext) -> None:
         return JSONResponse(
             {
                 "ok": True,
-                "graph": result["graph"],
+                "graph": with_follow(cfg, result["graph"]),
                 "item_key": result.get("item_key"),
                 "searched": searched,
                 "search_error": search_error,
@@ -881,13 +901,14 @@ def register_discover(ui: UiContext) -> None:
                     map_categories=cfg.snowball_map_categories,
                     map_category_defs=cfg.snowball_map_category_defs,
                     out_dir=cfg.out_dir,
+                    settings=map_settings_for(cfg),
                 )
                 if run_id
                 else {}
             )
         except CitationGraphError as exc:
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
-        return JSONResponse({"ok": True, "graph": graph, "item_key": item_key})
+        return JSONResponse({"ok": True, "graph": with_follow(cfg, graph), "item_key": item_key})
 
     @app.post("/discover/graph/remove")
     async def discover_graph_remove(request: Request) -> JSONResponse:
@@ -912,7 +933,7 @@ def register_discover(ui: UiContext) -> None:
         except CitationGraphError as exc:
             status = 404 if "queue" in str(exc).lower() else 400
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
-        return JSONResponse({"ok": True, "graph": graph})
+        return JSONResponse({"ok": True, "graph": with_follow(cfg, graph)})
 
     @app.post("/discover/graph/repair")
     async def discover_graph_repair(request: Request) -> JSONResponse:
@@ -935,13 +956,14 @@ def register_discover(ui: UiContext) -> None:
                 map_categories=cfg.snowball_map_categories,
                 map_category_defs=cfg.snowball_map_category_defs,
                 out_dir=cfg.out_dir,
+                settings=map_settings_for(cfg),
             )
         except CitationGraphError as exc:
             status = 404 if "queue" in str(exc).lower() else 400
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
         except OpenAlexBudgetExceeded as exc:
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=429)
-        return JSONResponse(graph)
+        return JSONResponse(with_follow(cfg, graph))
 
     @app.post("/discover/graph/halo")
     async def discover_graph_halo(request: Request) -> JSONResponse:
@@ -978,6 +1000,29 @@ def register_discover(ui: UiContext) -> None:
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=429)
         return JSONResponse({"ok": True, **overlay})
 
+    @app.post("/discover/graph/follow")
+    async def discover_graph_follow(request: Request) -> JSONResponse:
+        """Follow an author from the map (authorwatch list, default "followed")."""
+        from ..snowball.map_authors import follow_author
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        try:
+            person = follow_author(
+                cfg,
+                list_name=str(body.get("list_name") or "followed"),
+                name=str(body.get("name") or ""),
+                openalex=str(body.get("openalex") or ""),
+                orcid=str(body.get("orcid") or ""),
+            )
+        except ValueError as exc:
+            return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+        return JSONResponse({"ok": True, "person": person})
+
     @app.post("/discover/graph/expand")
     async def discover_graph_expand(request: Request) -> JSONResponse:
         from ..snowball.citation_graph import CitationGraphError, expand_queue
@@ -1002,13 +1047,14 @@ def register_discover(ui: UiContext) -> None:
                 _openalex_client(cfg),
                 map_categories=cfg.snowball_map_categories,
                 map_category_defs=cfg.snowball_map_category_defs,
+                settings=map_settings_for(cfg),
             )
         except CitationGraphError as exc:
             status = 404 if "queue" in str(exc).lower() else 400
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=status)
         except OpenAlexBudgetExceeded as exc:
             return JSONResponse({"ok": False, "error": str(exc)}, status_code=429)
-        return JSONResponse(graph)
+        return JSONResponse(with_follow(cfg, graph))
 
 
     @app.post("/discover/watch")

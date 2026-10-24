@@ -380,7 +380,7 @@ def test_settings_round_trip_and_idempotent():
         assert s.merged(s.to_dict()) == s
         assert 5 <= s.nodes <= 150 and 1 <= s.peers <= 10
         assert 0 <= s.coupling_weight <= 1 and 0 <= s.min_similarity <= 1
-        assert s.source in ("auto", "store", "api") and s.color in ("role", "year")
+        assert s.source in ("auto", "store", "api") and s.color in ("map", "role", "year", "category")
         if s.year_from is not None and s.year_to is not None:
             assert s.year_from <= s.year_to
 
