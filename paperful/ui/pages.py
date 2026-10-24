@@ -226,6 +226,7 @@ def newest_snowball_queue(cfg: Config) -> tuple[str, list[dict[str, Any]]]:
                     "title": title,
                     "doi": doi,
                     "keep": data.get("keep"),
+                    "why": str(data.get("why") or "").strip(),
                     "run_id": run_id,
                 }
             )

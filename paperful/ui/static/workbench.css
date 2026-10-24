@@ -609,6 +609,7 @@ table.wb-table tbody tr:hover {
   font-size: 0.75rem;
   text-transform: uppercase;
 }
+.row-why,
 .miss-reason {
   display: block;
   color: var(--ink-soft);

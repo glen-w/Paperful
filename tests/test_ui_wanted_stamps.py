@@ -197,7 +197,7 @@ def _seed_discover_state(cfg: Config) -> None:
     _write_jsonl(
         snow / "run1" / "candidates.jsonl",
         [
-            {"ids": {"doi": "10.5/kept"}, "biblio": {"title": "Kept paper"}, "keep": True, "status": "new"},
+            {"ids": {"doi": "10.5/kept"}, "biblio": {"title": "Kept paper"}, "keep": True, "status": "new", "why": "cited by 2 of your seeds"},
             {"ids": {"doi": "10.5/skipped"}, "biblio": {"title": "Skipped"}, "keep": False, "status": "new"},
             {"ids": {"doi": "10.5/undecided"}, "biblio": {"title": "Undecided"}, "status": "new"},
             {"ids": {"doi": "10.1/e"}, "biblio": {"title": "Already here"}, "keep": True, "status": "new"},
@@ -264,6 +264,7 @@ def test_wanted_page_lists_pending_fill_without_second_desk(tmp_path, monkeypatc
     # The feed adds no write controls: no extra Grab/Attach forms in the panel.
     panel = text.split('id="pending-fill"')[1].split("</section>")[0]
     assert "<form" not in panel and "<button" not in panel
+    assert "Why suggested: cited by 2 of your seeds" in panel
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")

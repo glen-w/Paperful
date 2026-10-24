@@ -64,7 +64,13 @@ def _children(root: Path) -> Iterable[Path]:
 
 def _row(source: str, origin: str, data: dict[str, Any]) -> dict[str, Any]:
     title, doi = _title_doi(data)
-    return {"source": source, "origin": origin, "title": title, "doi": doi}
+    return {
+        "source": source,
+        "origin": origin,
+        "title": title,
+        "doi": doi,
+        "why": str(data.get("why") or "").strip(),
+    }
 
 
 def _rows(cfg: Config) -> Iterator[dict[str, Any]]:
