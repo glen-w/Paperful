@@ -15,6 +15,10 @@ may still be added). See [releases](docs/releases.md).
   (`md`, `json`, `csv`) and `paperful.wanted_cards` build the same cards the
   cleaning service reports, so "N found" equals the number of Found stamps.
   The "summary" chip no longer reuses the Found style.
+- **Wanted: Waiting from Discover.** Kept snowball candidates, topic watch,
+  keepup, and authorwatch inboxes (minus anything already in the collection or
+  muted) appear in one read-only panel on Wanted (`paperful.pending_fill`),
+  so Discover feeds the one fill desk. See [first fill](docs/first-fill.md).
 - **Collection exclude / protect (`[[exclude]]`):** Mark hand-curated folders
   so paperful will not write to them. Presets `full` and `add_only`, plus
   fine-grained `allow_*` flags, `protect_items`, and optional

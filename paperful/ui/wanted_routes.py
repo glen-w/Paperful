@@ -145,6 +145,20 @@ def register_wanted(ui: UiContext) -> None:
         }
 
 
+    def _pending_fill(data: dict[str, Any]) -> dict[str, Any]:
+        """Discover output not yet in the scoped collection (read-only ledgers)."""
+        from ..pending_fill import pending_fill
+
+        dois = {
+            str(r.get("doi") or "")
+            for name in ("have", "held", "missing")
+            for r in data.get(name, [])
+        }
+        try:
+            return pending_fill(cfg, dois)
+        except Exception:
+            return {"rows": [], "total": 0, "by_source": {}}
+
     @app.get("/wanted", response_class=HTMLResponse)
     def page_wanted(request: Request, tab: str | None = None, error: str = "") -> HTMLResponse:
         from .pages import resolve_wanted_tab
@@ -163,6 +177,7 @@ def register_wanted(ui: UiContext) -> None:
             except Exception as exc:
                 load_error = str(exc)
         counts = data["counts"]
+        pending = _pending_fill(data)
         tab = resolve_wanted_tab(tab, counts)
         bucket = data.get(tab, []) if tab in {"have", "held", "missing"} else data["missing"]
         per_page = library_per_page_from_request(request, cfg)
@@ -247,6 +262,7 @@ def register_wanted(ui: UiContext) -> None:
                 tab=tab,
                 rows=rows,
                 counts=data["counts"],
+                pending=pending,
                 error=banner,
                 coach=coach,
                 briefs=briefs,

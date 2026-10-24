@@ -87,6 +87,9 @@ Non-loopback bind (`--host 0.0.0.0`) requires `--allow-remote-bind` and still ha
    A library PDF flag with no file on the mirror (`verification` `missing`,
    “No PDF file on disk”) lands on **Missing** with the missing-file icon.
    The default tab is the first non-empty bucket (Missing → Held → Have).
+   **Waiting from Discover** (a read-only panel above the tabs) lists kept
+   queue rows and watch / keepup / authorwatch inbox rows that are not yet in
+   the collection; add them from Discover and they appear under Missing.
    **Preview** → **Grab** (fetch to the `out/` folder on this computer;
    selected vs all; Grab passes the same `item_keys` as the preview token).
    **Manual** (default): **Attach** writes attachable pending PDFs into

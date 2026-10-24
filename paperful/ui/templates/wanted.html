@@ -12,6 +12,19 @@
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
 {{ job_status(job) }}
 <p class="counts">Have {{ counts.have }} · Held {{ counts.held }} · Missing {{ counts.missing }}{% if prefs.collection %} · <a href="/wanted/report?format=md">Report</a>{% endif %}</p>
+{% if pending and pending.total %}
+<section class="panel pending-fill" id="pending-fill">
+  <h2>Waiting from Discover <span class="counts">{{ pending.total }}</span></h2>
+  <p class="section-lede">Papers you kept, or that a watch or keepup digest proposed, and that are not in this collection yet. Add them in Discover (metadata only); they then appear under <strong>Missing</strong> here for Preview and Grab.
+    <a href="/discover?tab=queue">Open queue</a> · <a href="/discover?tab=following">Following</a></p>
+  <ul class="pending-list">
+    {% for row in pending.rows[:10] %}
+    <li data-pending-source="{{ row.source }}">{{ row.title or row.doi }} <span class="chip-summary">{{ row.source_plain }}</span></li>
+    {% endfor %}
+  </ul>
+  {% if pending.total > 10 %}<p class="section-lede">and {{ pending.total - 10 }} more.</p>{% endif %}
+</section>
+{% endif %}
 <div class="tabs">
   <span class="tab-with-help">
     <a href="{{ wanted_pagination.tab_urls.missing }}" {% if tab == 'missing' %}class="active"{% endif %}>Missing</a>

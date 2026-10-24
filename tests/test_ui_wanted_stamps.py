@@ -178,3 +178,103 @@ def test_no_percent_complete_in_shipped_copy():
     files = [p for r in roots for p in (r.rglob("*.html") if r.is_dir() else [r])]
     for path in files:
         assert "% complete" not in path.read_text(encoding="utf-8").lower(), path
+
+
+# --- Discover -> Wanted pending-fill feed -------------------------------------
+
+
+def _write_jsonl(path: Path, rows: list[dict]) -> None:
+    import json
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+
+
+def _seed_discover_state(cfg: Config) -> None:
+    import json
+
+    snow = cfg.state_dir / "snowball"
+    _write_jsonl(
+        snow / "run1" / "candidates.jsonl",
+        [
+            {"ids": {"doi": "10.5/kept"}, "biblio": {"title": "Kept paper"}, "keep": True, "status": "new"},
+            {"ids": {"doi": "10.5/skipped"}, "biblio": {"title": "Skipped"}, "keep": False, "status": "new"},
+            {"ids": {"doi": "10.5/undecided"}, "biblio": {"title": "Undecided"}, "status": "new"},
+            {"ids": {"doi": "10.1/e"}, "biblio": {"title": "Already here"}, "keep": True, "status": "new"},
+        ],
+    )
+    _write_jsonl(
+        snow / "watches" / "w1" / "inbox.jsonl",
+        [
+            {"ids": {"doi": "10.5/watch"}, "biblio": {"title": "Watch hit"}},
+            {"ids": {"doi": "10.5/KEPT"}, "biblio": {"title": "Same as kept, other case"}},
+        ],
+    )
+    _write_jsonl(
+        cfg.state_dir / "keepup" / "j1" / "inbox.jsonl",
+        [
+            {"ids": {"doi": "10.5/up"}, "biblio": {"title": "Keepup hit"}},
+            {"ids": {"doi": "10.5/muted"}, "biblio": {"title": "Muted"}},
+        ],
+    )
+    (cfg.state_dir / "keepup" / "j1" / "muted.json").write_text(
+        json.dumps({"identities": ["doi:10.5/muted"]}), encoding="utf-8"
+    )
+    _write_jsonl(
+        cfg.state_dir / "authorwatch" / "lab" / "inbox.jsonl",
+        [{"ids": {"doi": "10.5/person"}, "biblio": {"title": "Person hit"}}],
+    )
+
+
+def test_pending_fill_collects_dedupes_and_skips_library(tmp_path):
+    from paperful.pending_fill import pending_fill
+
+    cfg = _cfg(tmp_path)
+    _seed_discover_state(cfg)
+    out = pending_fill(cfg, {"10.1/e"})
+    dois = sorted(r["doi"].lower() for r in out["rows"])
+    assert dois == ["10.5/kept", "10.5/person", "10.5/up", "10.5/watch"]
+    assert out["total"] == 4
+    assert out["by_source"] == {"kept": 1, "watch": 1, "keepup": 1, "authorwatch": 1}
+
+
+def test_pending_fill_empty_state(tmp_path):
+    from paperful.pending_fill import pending_fill
+
+    assert pending_fill(_cfg(tmp_path))["total"] == 0
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_wanted_page_lists_pending_fill_without_second_desk(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    cfg, items, manifest = _mixed(tmp_path)
+    _seed_discover_state(cfg)
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _cfg, probe=False: [])
+    monkeypatch.setattr(
+        "paperful.ui.app.collections_tree", lambda _cfg: {"ok": True, "collections": []}
+    )
+    monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: (items, manifest))
+    client = TestClient(create_app(cfg))
+    client.cookies.set("pf_collection", "ocean")
+    text = client.get("/wanted").text
+    assert 'id="pending-fill"' in text
+    assert text.count("data-pending-source=") == 4
+    assert "Kept paper" in text and "Skipped" not in text.split('id="pending-fill"')[1].split("</section>")[0]
+    # The feed adds no write controls: no extra Grab/Attach forms in the panel.
+    panel = text.split('id="pending-fill"')[1].split("</section>")[0]
+    assert "<form" not in panel and "<button" not in panel
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_hand_ticks_on_missing_and_held_are_enabled(wanted_client):
+    for tab, expect in (("missing", 2), ("held", 3)):
+        text = wanted_client.get(f"/wanted?tab={tab}").text
+        boxes = re.findall(r'<input type="checkbox" name="keys"[^>]*>', text)
+        assert len(boxes) == expect
+        assert all("disabled" not in b for b in boxes)
+        assert all("checked" not in b for b in boxes)  # hand-ticks start unticked
+    have = re.findall(
+        r'<input type="checkbox" name="keys"[^>]*>', wanted_client.get("/wanted?tab=have").text
+    )
+    assert len(have) == 1 and "checked" in have[0]
