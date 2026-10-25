@@ -243,8 +243,8 @@ def test_ngram_overlap_true_and_false_positive(cfg):
 
     collapsed = collapse_nested_hits(hits)
     other_hits = [h for h in collapsed if h.other_key == "OTHER"]
-    assert 1 <= len(other_hits) <= 2
-    assert any("tungsten carbide coating" in h.ngram for h in other_hits)
+    assert len(other_hits) == 1
+    assert "tungsten carbide coating" in other_hits[0].ngram
 
 
 def test_overlap_checker_against_rag_text_cache(cfg, tmp_path: Path):
@@ -278,7 +278,7 @@ def test_overlap_checker_against_rag_text_cache(cfg, tmp_path: Path):
     overlap = pack["overlap"]
     assert overlap and overlap[0]["other_key"] == "OTHER"
     assert overlap[0]["source"] == "phrase"
-    assert len(overlap) <= 2
+    assert len(overlap) == 1
 
 
 def test_overlap_uses_rag_text_without_scope_items(cfg, tmp_path: Path):

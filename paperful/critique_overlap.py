@@ -237,8 +237,16 @@ def overlap_findings(
     return collapse_nested_hits(hits), ""
 
 
+def _shares_core(a: str, b: str, n: int = 6) -> bool:
+    aw, bw = a.split(), b.split()
+    if min(len(aw), len(bw)) < n:
+        return a in b or b in a
+    cores = {" ".join(aw[i : i + n]) for i in range(len(aw) - n + 1)}
+    return any(" ".join(bw[j : j + n]) in cores for j in range(len(bw) - n + 1))
+
+
 def collapse_nested_hits(hits: list[OverlapHit]) -> list[OverlapHit]:
-    """Keep the longest span per other item; drop n-grams nested in a longer match."""
+    """Keep the longest span per other item; drop nested or heavily overlapping windows."""
     by_other: dict[tuple[str, str], list[OverlapHit]] = {}
     for h in hits:
         by_other.setdefault((h.other_key, h.source), []).append(h)
@@ -246,7 +254,11 @@ def collapse_nested_hits(hits: list[OverlapHit]) -> list[OverlapHit]:
     for group in by_other.values():
         kept: list[OverlapHit] = []
         for h in sorted(group, key=lambda row: (-row.n_words, row.ngram)):
-            if any(h.ngram != k.ngram and h.ngram in k.ngram for k in kept):
+            if any(
+                h.ngram != k.ngram
+                and (h.ngram in k.ngram or _shares_core(h.ngram, k.ngram))
+                for k in kept
+            ):
                 continue
             kept.append(h)
         out.extend(kept)
