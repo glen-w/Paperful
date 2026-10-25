@@ -106,7 +106,7 @@ docker compose run --rm paperful run -C ocean/BBNJ --preset oa --dry-run
 # manual: download only, then attach
 docker compose run --rm paperful run -C ocean/BBNJ --preset oa --no-attach
 # open out/ yourself
-docker compose run --rm paperful attach -C ocean/BBNJ
+docker compose run --rm paperful attach   # every PDF waiting in the manifest; attach has no -C
 # automatic is `run` without --no-attach (config attach = true), on Zotero 10+
 ```
 

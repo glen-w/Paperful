@@ -16,7 +16,7 @@ Use a **copy** of a small library (roughly 10–30 parents). Do not point EndNot
 | Field | Value |
 | --- | --- |
 | Manager | `mendeley` or `endnote` |
-| Paperful version | `uv run paperful --version` or git SHA |
+| Paperful version | `uv run paperful version` or git SHA |
 | Host OS | |
 | Manager version | Mendeley Reference Manager / EndNote 20–21 / 2025 |
 | Config | path to throwaway `config.toml` (no secrets in git) |
@@ -87,7 +87,7 @@ uv run paperful run -C '<folder>'
 | E7 | EndNote: File → Import → File… → `paperful.xml` | Import Option **EndNote Generated XML**; Duplicates per your policy; **No Translation** | |
 | E8 | PDFs | Attached or import `PDF/` folder per Clarivate; paths under `.Data/PDF/` beside `sdb/` | |
 | E9 | Groups after import | Rebuilt manually from **Label** field (XML has no groups) | |
-| E10 | `trash` / `dedupe --apply` / `attachments --apply` | Refused; live `.eni` not edited by Paperful | |
+| E10 | `dedupe --apply` / `attachments --apply` (anything that would trash or edit an item) | Refused; live `.eni` not edited by Paperful | |
 
 **Commands (reference):**
 
