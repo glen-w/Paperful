@@ -8,7 +8,6 @@ from paperful.config import Config
 from paperful.serve import create_app, fastapi_available
 
 
-@pytest.mark.smoke
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
 def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient

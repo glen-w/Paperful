@@ -118,7 +118,6 @@ def stub_zotero(monkeypatch):
     return zl
 
 
-@pytest.mark.smoke
 def test_version():
     res = runner.invoke(cli.app, ["version"])
     assert res.exit_code == 0 and res.stdout.strip()

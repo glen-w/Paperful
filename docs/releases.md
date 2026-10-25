@@ -59,9 +59,10 @@ Extra keys may still be added on frozen schemas.
 | Snapshot / restore | Create-missing locked (DOI → key → title+year; no field overwrite; skip trashed/gone). Not a lossless round-trip | Same |
 | Library index (`state/rag/`) | A rebuildable cache. Folder layout, ledger and table columns may change in any release; `rag ingest` rebuilds it | Not a promise |
 
-Install claim tested in CI (`.github/workflows/ci.yml`, job `docker`): clone,
-`docker compose build`, `doctor` exits 2 when Zotero is absent. That
-clone-and-build path is the release.
+Install claim exercised in CI (`.github/workflows/ci.yml`, advisory job
+`docker`): clone, `docker compose build`, `doctor` exits 2 when Zotero is
+absent. That clone-and-build path is the stranger install; the merge gate is
+the `smoke` job.
 
 A second manager is not owed as a finished feature and **does not gate 1.0**.
 Mendeley and EndNote adapters are in the tree and **seeking testers**;
