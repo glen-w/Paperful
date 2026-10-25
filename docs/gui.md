@@ -33,7 +33,7 @@ Three jobs sit on the default nav:
 | **Ask** | `ask`, `ask --from-file` | Cited answers from PDFs already copied to disk (needs `[rag]` + `[llm]` and an index) |
 
 **Library**, **Activity**, and **System** support the loop. **Repair**, **Mirror**,
-**Index** (ingest / search / extract), **Briefs**, and **Settings** appear only
+**Index** (ingest / search / extract), **Briefs**, **Critique**, and **Settings** appear only
 when **Advanced** is on (reveal only; does not enable Scholar, Sci-Hub, or LLM).
 
 ```text
@@ -172,6 +172,11 @@ no `[rag].enabled` required; see [rag.md](rag.md#structured-sections-mirror-only
 **Briefs**: collection **summarize** / **synthesize** when `[llm]` is on.
 Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
 `config.toml`; it does not enable `[rag]` or `[llm]`.
+**Critique** (Advanced): pick a collection item **or** drop a draft
+(pdf/docx/odt/html/rtf/txt/md/pptx). Writes `state/critiques/` (`pack.md`).
+Uploads stay under `state/critiques/uploads/` and are not imported to `out/`
+or Zotero. Optional LLM comments need `[llm]`. Not a score. See
+[critique.md](critique.md).
 
 **Stays CLI** (no GUI control): `session login`, `doctor --guide`, mid-run
 EZProxy re-login, snowball `approve-each`, `collections add`, Sci-Hub source
@@ -252,6 +257,8 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/prefs/advanced` | Toggle Advanced cookie |
 | POST | `/prefs/collection` | Remember collection chip cookie |
 | POST | `/settings` | Write allowed `config.toml` fields |
+| GET | `/critique` | Advanced Critique: item picker, upload, last pack |
+| POST | `/critique` | Enqueue `critique` for `--item` or a staged `--file`; redirect `?run=` |
 | POST | `/repair/preview` | Dry-run repair verb + review token |
 | POST | `/repair/apply` | Consume token; apply repair verb |
 | POST | `/mirror/preview` | Dry-run mirror verb + review token |

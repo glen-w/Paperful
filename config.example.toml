@@ -181,6 +181,16 @@ mirror_failures_before_skip = 3
 # pubpeer = false                # needs env PUBPEER_DEVKEY
 # fingerprint_max_age_days = 14
 # tag = "paperful-pps"
+# [critique]
+# # Local manuscript pack (see docs/critique.md). Not a grade.
+# llm = false
+# tag = "paperful-critique"
+# overlap_top_k = 40
+# overlap_n_min = 6
+# overlap_n_max = 12
+# overlap_df_max = 0              # 0 = auto from corpus size
+# cite_age_years = 10
+# max_context_chars = 24000
 # [summarize]
 # prompt_template = "default"    # or "prompts/summary.md"
 # max_context_chars = 24000

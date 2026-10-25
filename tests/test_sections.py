@@ -46,6 +46,7 @@ def _imrad_pages() -> list[str]:
 def test_canonical_for_heading_synonyms():
     assert canonical_for_heading("Materials and Methods") == "methodology"
     assert canonical_for_heading("Conclusions") == "conclusion"
+    assert canonical_for_heading("Related Work") == "related_work"
 
 
 def test_extract_fields_imrad(cfg: Config):

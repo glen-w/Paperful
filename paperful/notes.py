@@ -18,6 +18,7 @@ FIXED_TAGS = {
     "paperful-linked": "linked",
     "paperful:frontier-briefing": "briefing",
     "paperful-pps": "screen",
+    "paperful-critique": "critique",
 }
 
 
@@ -37,6 +38,7 @@ def tag_types(cfg: Config) -> dict[str, str]:
     mapping = dict(FIXED_TAGS)
     mapping[(cfg.summarize_tag or "paperful-summary").strip().lower()] = "summary"
     mapping[(cfg.synthesize_tag or "paperful-report").strip().lower()] = "review"
+    mapping[(cfg.critique_tag or "paperful-critique").strip().lower()] = "critique"
     prefix = (cfg.snowball_tag_prefix or "paperful-snowball").strip().lower()
     if prefix:
         mapping[prefix] = "snowball"

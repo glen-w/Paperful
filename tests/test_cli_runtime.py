@@ -20,6 +20,7 @@ RUNTIME_CLIENTS = [
     "run_hooks.py",
     "lint_cmd.py",
     "screen_cmd.py",
+    "critique_cmd.py",
     "fix_metadata_cmd.py",
     "ocr_cmd.py",
     "ocr_ignore_cmd.py",

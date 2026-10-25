@@ -203,6 +203,14 @@ class Config:
     screen_pubpeer: bool = False
     screen_fingerprint_max_age_days: int = 14
     screen_tag: str = "paperful-pps"
+    critique_llm: bool = False
+    critique_tag: str = "paperful-critique"
+    critique_overlap_top_k: int = 40
+    critique_overlap_n_min: int = 6
+    critique_overlap_n_max: int = 12
+    critique_overlap_df_max: int = 0  # 0 → auto from corpus size
+    critique_cite_age_years: int = 10
+    critique_max_context_chars: int = 24_000
     summarize_prompt_template: str = "default"
     summarize_max_context_chars: int = 24_000
     summarize_tag: str = "paperful-summary"
@@ -444,6 +452,10 @@ class Config:
     @property
     def sections_dir(self) -> Path:
         return self.state_dir / "sections"
+
+    @property
+    def critiques_dir(self) -> Path:
+        return self.state_dir / "critiques"
 
     @property
     def inbox_path(self) -> Path | None:

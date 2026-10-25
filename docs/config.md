@@ -246,6 +246,13 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[screen].pubpeer` | `false` | PubPeer batch lookup |
 | `[screen].fingerprint_max_age_days` | `14` | Re-download PPS CSV dumps after this age (`doctor` ambers when stale) |
 | `[screen].tag` | `paperful-pps` | Child note tag for `--apply` |
+| `[critique].llm` | `false` | Optional suggested-lane comments (`--llm` / `--no-llm` override) |
+| `[critique].tag` | `paperful-critique` | Child note tag for `critique --apply` |
+| `[critique].overlap_top_k` | `40` | Distinctive n-grams ranked for library text overlap |
+| `[critique].overlap_n_min` / `overlap_n_max` | `6` / `12` | Word n-gram window |
+| `[critique].overlap_df_max` | `0` | Drop grams in this many other docs (`0` = auto from corpus size) |
+| `[critique].cite_age_years` | `10` | `info` when that share of bibliography years is this old |
+| `[critique].max_context_chars` | `24000` | LLM excerpt budget |
 | `[summarize].dest` | `both` | `disk` (`state/summaries/`), `zotero` (child note), or `both`. `--to` overrides |
 | `[summarize].order` | `library` | Summarize queue order before `--limit`: `library` (manager order), `newest`, or `oldest`. `--order` overrides. Undated items stay last under `newest` / `oldest`. Type stays a filter (`-T`) |
 | `[summarize].style` | `plain` | Summary writing style: `plain` (default) or `ste` (ASD-STE100 Simplified Technical English constraints in the prompt + post-check) |

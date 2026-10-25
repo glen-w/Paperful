@@ -50,7 +50,7 @@ No Python extra is needed for Ollama: Paperful talks HTTP to the daemon.
 
 | Verb | Works well with | Notes |
 | --- | --- | --- |
-| `fix-metadata` titles, `lint` identity, `summarize`, `synthesize`, `extract-sections --llm`, `rag questions --llm` | 7B–12B instruct models (`qwen2.5:7b`, `gemma3:12b`, `llama3.1:8b`) | JSON-capable instruct tags; thinking models are fine but slower. `summarize` and `synthesize` set Ollama `num_ctx` from the prompt, capped by `[llm].max_num_ctx` |
+| `fix-metadata` titles, `lint` identity, `summarize`, `synthesize`, `extract-sections --llm`, `rag questions --llm`, `critique --llm` | 7B–12B instruct models (`qwen2.5:7b`, `gemma3:12b`, `llama3.1:8b`) | JSON-capable instruct tags; thinking models are fine but slower. `summarize` and `synthesize` set Ollama `num_ctx` from the prompt, capped by `[llm].max_num_ctx`. `critique` comments are suggested-lane only |
 | `recover` | 14B+ (`qwen2.5:14b`, `qwen3:14b`, larger); 32B / VL on 24 GB+ | Small models loop on cookie banners and publisher menus; `doctor` warns under ~10B by tag name. Full guidance: [browser-agent-models.md](browser-agent-models.md) |
 
 ### LiteLLM (paid / OpenAI-compatible APIs)
@@ -235,6 +235,19 @@ two pages match the record (title, author surnames, year, DOI). A `false`, or a
 `pdf_identity_mismatch` (detail carries the model’s reason and confidence).
 Nothing is deleted or re-attached; you decide. Model or extraction failure is
 silent (no finding).
+
+### C2. `critique --llm` — suggested comments only
+
+```sh
+uv run paperful critique --file ./draft.pdf --llm
+uv run paperful critique --item ABCD1234 --llm --force
+```
+
+Additive. The default pack is checkers with no model. `--llm` (or
+`[critique].llm = true`) asks for a contribution summary, up to eight comments
+tied to a finding code or a quoted span, and author questions. Every row is
+`lane=suggested`. Ungrounded spans are dropped. No overall score. Identity
+mismatch refuses the lane unless `--force`. See [critique.md](critique.md).
 
 ### D. `summarize` — grounded summary note
 

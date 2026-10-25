@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from ..config import Config
@@ -801,6 +802,59 @@ def job_view(rec: dict[str, Any] | None) -> dict[str, Any]:
     skipped = str(out.get("skipped") or "")
     out["skip_plain"] = SYNTHESIZE_SKIP_MESSAGES.get(skipped, "")
     return out
+
+
+def list_recent_critiques(cfg: Config, limit: int = 12) -> list[dict[str, Any]]:
+    root = cfg.state_dir / "critiques"
+    if not root.is_dir():
+        return []
+    packs: list[tuple[float, dict[str, Any]]] = []
+    for cid_dir in root.iterdir():
+        if not cid_dir.is_dir() or cid_dir.name == "uploads":
+            continue
+        for stamp in cid_dir.iterdir():
+            md = stamp / "pack.md"
+            js = stamp / "pack.json"
+            if not stamp.is_dir() or not js.is_file():
+                continue
+            body: dict[str, Any] = {}
+            try:
+                raw = json.loads(js.read_text(encoding="utf-8"))
+                if isinstance(raw, dict):
+                    body = raw
+            except (OSError, ValueError):
+                body = {}
+            counts = body.get("counts") or {}
+            packs.append(
+                (
+                    stamp.stat().st_mtime,
+                    {
+                        "critique_id": cid_dir.name,
+                        "stamp": stamp.name,
+                        "title": (body.get("input") or {}).get("title") or cid_dir.name,
+                        "findings": counts.get("findings", 0),
+                        "pack_dir": str(stamp),
+                        "has_md": md.is_file(),
+                    },
+                )
+            )
+    packs.sort(key=lambda row: row[0], reverse=True)
+    return [row[1] for row in packs[:limit]]
+
+
+def critique_pack_markdown(cfg: Config, pack_dir: str) -> str:
+    folder = Path(pack_dir)
+    try:
+        folder.resolve().relative_to((cfg.state_dir / "critiques").resolve())
+    except (ValueError, OSError):
+        return ""
+    md = folder / "pack.md"
+    if not md.is_file():
+        return ""
+    try:
+        return md.read_text(encoding="utf-8")
+    except OSError:
+        return ""
 
 
 def last_job_result(cfg: Config, verb: str, run: str = "") -> dict[str, Any]:

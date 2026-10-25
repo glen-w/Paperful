@@ -214,6 +214,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     from .repair_routes import register_repair
     from .index_routes import register_index
     from .shell_routes import register_shell
+    from .critique_routes import register_critique
 
     templates = Jinja2Templates(directory=str(_ui_dir() / "templates"))
     static_dir = _ui_dir() / "static"
@@ -224,3 +225,4 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     register_shell(ui)
     register_repair(ui)
     register_index(ui)
+    register_critique(ui)
