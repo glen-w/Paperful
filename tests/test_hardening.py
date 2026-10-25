@@ -554,3 +554,45 @@ def test_cdp_launch_is_loopback_only(cfg, monkeypatch, tmp_path):
     assert set(origins.split(",")) == {f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
     assert "*" not in origins
     assert not any(a.startswith("--remote-debugging-address") for a in cmd)
+
+
+# --- SSRF: obfuscated loopback spellings (SECURITY.md "Outbound PDF / landing fetches") ---
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://2130706433/a.pdf",  # decimal 127.0.0.1
+        "http://0x7f000001/a.pdf",  # hex
+        "http://017700000001/a.pdf",  # octal
+        "http://127.1/a.pdf",  # short form
+        "http://[::ffff:127.0.0.1]/a.pdf",  # IPv4-mapped IPv6
+        "http://[::ffff:10.0.0.1]/a.pdf",
+        "http://[fd00::1]/a.pdf",  # unique-local
+        "http://[fe80::1]/a.pdf",  # link-local
+        "http://0.0.0.0/a.pdf",
+        "http://localhost./a.pdf",  # trailing dot
+        "http://LOCALHOST/a.pdf",
+        "http://foo.localhost/a.pdf",
+        "http://printer.local/a.pdf",
+        "http://metadata.google.internal./",
+        "http://169.254.169.254./latest/meta-data",
+        "http://user@127.0.0.1/a.pdf",  # userinfo does not change the host
+        "http://127.0.0.1:8765/wanted",  # the workbench itself
+        "file:///etc/passwd",
+        "ftp://x.test/a.pdf",
+        " http://127.0.0.1/a.pdf",
+    ],
+)
+def test_fetch_gate_blocks_obfuscated_private_targets(url):
+    """The default (resolving) gate is what ``fetch_pdf`` uses; numeric forms need no DNS."""
+    from paperful.download import is_fetchable_url
+
+    assert is_fetchable_url(url) is False
+
+
+def test_fetch_gate_allows_fixture_hosts_and_public_literals():
+    from paperful.download import is_fetchable_url
+
+    assert is_fetchable_url("https://x.test/a.pdf", resolve=False)
+    assert is_fetchable_url("https://93.184.216.34/a.pdf")
