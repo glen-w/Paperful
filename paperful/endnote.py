@@ -70,7 +70,9 @@ def connect_readonly(eni: Path) -> sqlite3.Connection:
     """Open sdb.eni read-only. If EndNote holds a lock, copy to a temp file first."""
     if not eni.is_file():
         raise LibraryError(f"EndNote database not found: {eni}")
-    uri = f"file:{eni}?mode=ro"
+    # as_uri() percent-encodes "#", "?" and "%"; a bare f-string would make SQLite
+    # open a different, empty database for a library under e.g. "My Library #2".
+    uri = f"{eni.absolute().as_uri()}?mode=ro"
     try:
         conn = sqlite3.connect(uri, uri=True)
         _prepare_sqlite(conn)

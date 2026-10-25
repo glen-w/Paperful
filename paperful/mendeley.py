@@ -272,6 +272,10 @@ class MendeleyClient:
         data = pdf_path.read_bytes()
         resp = self.http.post(f"{API}/files", headers=headers, content=data)
         if resp.status_code == 401:
+            with self._lock:
+                tokens = self._load()
+                if tokens.get("refresh_token"):
+                    self._refresh(tokens)
             token = self.ensure_token()
             headers["Authorization"] = f"Bearer {token}"
             resp = self.http.post(f"{API}/files", headers=headers, content=data)
