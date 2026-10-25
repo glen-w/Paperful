@@ -120,11 +120,10 @@ markers = [
 
 [tool.coverage.run]
 source = ["paperful"]
-# Opt-in E2E and alternate managers are not part of the default offline unit gate.
+# Opt-in E2E and live-browser lanes are not part of the default offline unit gate.
+# Mendeley and EndNote are measured: their offline fixtures are the adapter contract.
 omit = [
     "paperful/e2e_nba.py",
-    "paperful/mendeley.py",
-    "paperful/endnote.py",
     # Workbench job bodies: exercised via ``paperful[serve]`` route tests.
     "paperful/ui/repair_jobs.py",
     "paperful/ui/discover_jobs.py",
