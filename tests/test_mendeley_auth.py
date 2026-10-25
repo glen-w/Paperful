@@ -238,6 +238,27 @@ def test_download_redirect_without_location_and_http_errors(cfg, tmp_path, sleep
     assert not (tmp_path / "a.pdf").exists() and not (tmp_path / "c.pdf").exists()
 
 
+def test_upload_refreshes_on_401_and_sends_document_link(cfg, tmp_path):
+    pdf = tmp_path / "paper.pdf"
+    pdf.write_bytes(b"%PDF-1.4 body")
+    seen: list[httpx.Request] = []
+
+    def handler(request):
+        if request.url.path == "/oauth/token":
+            return _token_reply()
+        seen.append(request)
+        if request.headers.get("authorization") != "Bearer new-access":
+            return httpx.Response(401, text="expired")
+        return httpx.Response(201, json={"id": "F9"})
+
+    _write_tokens(cfg, access_token="old", refresh_token="r", expires_at=time.time() + 3600)
+    client = MendeleyClient(cfg, http=mock_client(handler))
+    assert client.upload_file("DOC1", pdf) == {"id": "F9"}
+    assert len(seen) == 2
+    assert 'rel="document"' in seen[-1].headers["link"] and "/documents/DOC1" in seen[-1].headers["link"]
+    assert seen[-1].headers["content-disposition"] == 'attachment; filename="paper.pdf"'
+
+
 @pytest.mark.parametrize(
     ("status", "text", "expect"),
     [(400, "File ALREADY exists", {"id": None, "duplicate": True}), (500, "boom", None), (400, "bad pdf", None)],
