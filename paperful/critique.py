@@ -86,12 +86,14 @@ def make_finding(
     )
 
 
-def critique_id(*, kind: str, item_key: str = "", staged: Path | None = None) -> str:
+def critique_id(*, kind: str, item_key: str = "", original_name: str = "") -> str:
+    """Stable id: item key, or ``file-<stem>`` so re-runs keep dismissals."""
     if kind == "item" and item_key:
         return item_key
-    if staged is not None:
-        return staged.parent.name[:80]
-    return "file"
+    from .critique_extract import safe_filename
+
+    stem = Path(safe_filename(original_name or "file")).stem.strip(".-") or "file"
+    return f"file-{stem[:60]}"
 
 
 def dismissed_path(cfg: Config, cid: str) -> Path:
@@ -313,15 +315,20 @@ def build_critique(
         kind = "file"
         assert file_path is not None
         src = file_path
+        original_name = file_path.name
         if stage_uploads:
             staged = stage_file(cfg, file_path)
             src = staged
         doc = extract_path(src)
         fmt = doc.format
-        title = src.name
+        title = original_name or src.name
         item_key = ""
 
-    cid = critique_id(kind=kind, item_key=item_key, staged=staged or src)
+    cid = critique_id(
+        kind=kind,
+        item_key=item_key,
+        original_name=file_path.name if file_path is not None else "",
+    )
     scope = _scope_label(collections, library, item)
     findings, overlap_rows, sections_used = run_checks(
         cfg,

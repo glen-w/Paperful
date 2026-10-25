@@ -1021,7 +1021,7 @@ def critique(
 def critique_dismiss(
     finding_id: str = typer.Argument(..., help="Finding id from pack.json / the critique table."),
     critique_id: str | None = typer.Option(
-        None, "--critique-id", help="Pack folder name (item key or upload stamp). Default: newest."
+        None, "--critique-id", help="Pack folder name (item key or file-<stem>). Default: newest."
     ),
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,

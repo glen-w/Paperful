@@ -55,9 +55,11 @@ uv run paperful critique dismiss FINDING_ID --critique-id KEY
 posts a tagged child note only for a library `--item`. Uploads stay disk-only.
 
 Packs land in `state/critiques/<id>/<stamp>/` as `pack.json`
-(`paperful.critique.pack.v1`) and `pack.md`. Dismissals are
-`state/critiques/<id>/dismissed.jsonl`. Re-runs keep them. Dismissed rows stay
-in JSON and are omitted from `pack.md` unless `--show-dismissed`.
+(`paperful.critique.pack.v1`) and `pack.md`. `<id>` is the library item key
+or `file-<filename-stem>` for `--file` / uploads, so re-running the same draft
+keeps dismissals. Dismissals are `state/critiques/<id>/dismissed.jsonl`.
+Dismissed rows stay in JSON and are omitted from `pack.md` unless
+`--show-dismissed`.
 
 `--format json` prints a `paperful.agent.json.v1` envelope. Run report:
 `state/runs/<stamp>-critique.json`.

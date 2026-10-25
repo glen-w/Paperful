@@ -181,10 +181,12 @@ def test_dismiss_persists_and_hides_from_markdown(cfg, tmp_path: Path):
     src.write_text(MANUSCRIPT, encoding="utf-8")
     pack = build_critique(cfg, file_path=src, offline=True)
     cid = pack["critique_id"]
+    assert cid == "file-draft"
     fid = pack["findings"][0]["id"]
     dismiss_finding(cfg, cid, fid)
     assert fid in load_dismissed(cfg, cid)
     pack2 = build_critique(cfg, file_path=src, offline=True)
+    assert pack2["critique_id"] == cid
     dismissed = [f for f in pack2["findings"] if f["id"] == fid]
     assert dismissed and dismissed[0]["dismissed"] is True
     md = Path(pack2["pack_dir"], "pack.md").read_text(encoding="utf-8")
@@ -271,6 +273,29 @@ def test_overlap_checker_against_rag_text_cache(cfg, tmp_path: Path):
     overlap = pack["overlap"]
     assert overlap and overlap[0]["other_key"] == "OTHER"
     assert overlap[0]["source"] == "phrase"
+
+
+def test_overlap_uses_rag_text_without_scope_items(cfg, tmp_path: Path):
+    from paperful.store import write_json
+
+    distinctive = (
+        "unique tungsten carbide coating survived the salt spray chamber overnight without peeling"
+    )
+    text_dir = cfg.rag_dir / "text"
+    text_dir.mkdir(parents=True)
+    write_json(
+        text_dir / "OTHER.json",
+        {"pages": [f"Background. {distinctive}. filler words for length here."]},
+    )
+    src = tmp_path / "draft.md"
+    src.write_text(
+        f"Methods. {distinctive}. Enough extra words here so extract is not empty.\n",
+        encoding="utf-8",
+    )
+    pack = build_critique(cfg, file_path=src, offline=True)
+    codes = {f["code"] for f in pack["findings"]}
+    assert "text_overlap" in codes
+    assert "overlap_skipped_no_text" not in codes
 
 
 def test_llm_suggested_lane_drops_ungrounded_and_scores(cfg, tmp_path, monkeypatch):
@@ -377,6 +402,8 @@ def test_cli_file_xor_and_json(cfg, tmp_path, monkeypatch):
     assert body["command"] == "critique"
     assert body["summary"]["findings"] >= 1
     fid = body["items"][0]["id"]
+    cid = body["summary"]["critique_id"]
+    assert cid == "file-draft"
     dismissed = runner.invoke(
         app,
         ["critique", "dismiss", fid, "--config", str(cfg_path), "--format", "json"],
@@ -384,6 +411,23 @@ def test_cli_file_xor_and_json(cfg, tmp_path, monkeypatch):
     assert dismissed.exit_code == 0, dismissed.output
     dbody = json.loads(dismissed.stdout)
     assert dbody["summary"]["id"] == fid
+    again = runner.invoke(
+        app,
+        [
+            "critique",
+            "--file",
+            str(src),
+            "--config",
+            str(cfg_path),
+            "--format",
+            "json",
+        ],
+    )
+    assert again.exit_code == 0, again.output
+    body2 = json.loads(again.stdout)
+    assert body2["summary"]["critique_id"] == cid
+    hid = [i for i in body2["items"] if i["id"] == fid]
+    assert hid and hid[0]["dismissed"] is True
 
 
 def test_cli_unsupported_binary(tmp_path, monkeypatch):
