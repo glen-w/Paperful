@@ -651,6 +651,10 @@ def _floats(doc: ExtractedDoc) -> list[Finding]:
             captions[key] = loc or chunk[:40]
         for m in _FIG_MENTION.finditer(chunk):
             key = _float_kind(m.group(0).split()[0]) + m.group(1).lower()
+            line_start = chunk.rfind("\n", 0, m.start()) + 1
+            prefix = chunk[line_start : m.start()]
+            if not prefix.strip() and _FIG_CAPTION.match(chunk[line_start:]):
+                continue
             mentions.setdefault(key, loc)
     out: list[Finding] = []
     for key, loc in captions.items():
@@ -958,7 +962,7 @@ def _overlap(
                 quote=sample.ngram,
                 detail=(
                     f"{len(group)} distinctive span(s) also in library item {other} "
-                    f"(flags to review, not a plagiarism verdict)."
+                    f"(flags to review)."
                 ),
                 source=sample.source,
                 extra={"other_key": other},

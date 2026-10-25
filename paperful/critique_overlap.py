@@ -121,7 +121,7 @@ def rank_phrases(
             continue
         seen.add(phrase)
         df = sum(1 for body in folded.values() if phrase in body)
-        if df >= df_cap:
+        if df < 1 or df >= df_cap:
             continue
         idf = math.log((n_docs + 1) / (df + 1))
         scored.append((phrase, count * idf, df))

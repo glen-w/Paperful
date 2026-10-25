@@ -59,7 +59,11 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     assert "/critique" in res.text
     assert "/v1/ask" not in res.text
     assert client.get("/repair").status_code == 200
-    assert client.get("/critique").status_code == 200
+    critique = client.get("/critique")
+    assert critique.status_code == 200
+    assert "drop-zone" in critique.text
+    assert 'name="item_key"' in critique.text
+    assert 'name="file"' in critique.text
     assert client.get("/mirror").status_code == 200
     assert client.get("/index").status_code == 200
     assert client.get("/briefs").status_code == 200

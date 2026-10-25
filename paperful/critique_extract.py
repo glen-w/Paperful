@@ -135,6 +135,13 @@ def extract_path(path: Path) -> ExtractedDoc:
             finding="empty_extract",
             error="could not parse file",
         )
+    except ET.ParseError:
+        return ExtractedDoc(
+            text="",
+            format=suffix.lstrip("."),
+            finding="empty_extract",
+            error="could not parse file",
+        )
     return ExtractedDoc(text="", format=suffix.lstrip("."), finding="unsupported")
 
 
@@ -284,7 +291,10 @@ def _from_pptx(path: Path) -> ExtractedDoc:
     )
     with zf:
         for name in names:
-            root = ET.fromstring(zf.read(name))
+            try:
+                root = ET.fromstring(zf.read(name))
+            except ET.ParseError as exc:
+                raise ExtractError(f"not a readable .pptx: {path.name}") from exc
             bits = [t.text or "" for t in root.iter(f"{_A_NS}t")]
             line = "\n".join(b.strip() for b in bits if b.strip())
             slides.append(line)

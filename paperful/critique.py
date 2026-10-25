@@ -55,8 +55,8 @@ class Finding:
         return row
 
 
-def finding_id(code: str, loc: str, quote: str) -> str:
-    raw = f"{code}|{loc}|{(quote or '')[:120]}"
+def finding_id(code: str, loc: str, quote: str, detail: str = "") -> str:
+    raw = f"{code}|{loc}|{(quote or '')[:120]}|{(detail or '')[:120]}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
 
@@ -72,15 +72,16 @@ def make_finding(
     extra: dict[str, Any] | None = None,
 ) -> Finding:
     q = re.sub(r"\s+", " ", (quote or "").strip())[:200]
+    d = re.sub(r"\s+", " ", (detail or "").strip())
     return Finding(
-        id=finding_id(code, loc, q),
+        id=finding_id(code, loc, q, d),
         code=code,
         lane=lane if lane in LANES else "checked",
         severity=severity if severity in SEVERITIES else "info",
         loc=loc,
         quote=q,
         source=source,
-        detail=detail,
+        detail=d,
         extra=dict(extra or {}),
     )
 
