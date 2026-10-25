@@ -22,7 +22,7 @@ from paperful.critique import (
     render_markdown,
 )
 from paperful.critique_extract import extract_path, stage_file
-from paperful.critique_overlap import match_phrases, rank_phrases
+from paperful.critique_overlap import collapse_nested_hits, match_phrases, rank_phrases
 from paperful.critique_stats import grim_possible, scan_stats
 from tests.conftest import make_item
 
@@ -241,6 +241,11 @@ def test_ngram_overlap_true_and_false_positive(cfg):
     assert "OTHER" in others
     assert not any(k.startswith("ETH") for k in others)
 
+    collapsed = collapse_nested_hits(hits)
+    other_hits = [h for h in collapsed if h.other_key == "OTHER"]
+    assert 1 <= len(other_hits) <= 2
+    assert any("tungsten carbide coating" in h.ngram for h in other_hits)
+
 
 def test_overlap_checker_against_rag_text_cache(cfg, tmp_path: Path):
     from paperful.store import write_json
@@ -273,6 +278,7 @@ def test_overlap_checker_against_rag_text_cache(cfg, tmp_path: Path):
     overlap = pack["overlap"]
     assert overlap and overlap[0]["other_key"] == "OTHER"
     assert overlap[0]["source"] == "phrase"
+    assert len(overlap) <= 2
 
 
 def test_overlap_uses_rag_text_without_scope_items(cfg, tmp_path: Path):

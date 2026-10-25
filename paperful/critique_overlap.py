@@ -234,4 +234,20 @@ def overlap_findings(
         if ident not in seen:
             hits.append(h)
             seen.add(ident)
-    return hits, ""
+    return collapse_nested_hits(hits), ""
+
+
+def collapse_nested_hits(hits: list[OverlapHit]) -> list[OverlapHit]:
+    """Keep the longest span per other item; drop n-grams nested in a longer match."""
+    by_other: dict[tuple[str, str], list[OverlapHit]] = {}
+    for h in hits:
+        by_other.setdefault((h.other_key, h.source), []).append(h)
+    out: list[OverlapHit] = []
+    for group in by_other.values():
+        kept: list[OverlapHit] = []
+        for h in sorted(group, key=lambda row: (-row.n_words, row.ngram)):
+            if any(h.ngram != k.ngram and h.ngram in k.ngram for k in kept):
+                continue
+            kept.append(h)
+        out.extend(kept)
+    return out
