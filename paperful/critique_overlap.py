@@ -234,32 +234,42 @@ def overlap_findings(
         if ident not in seen:
             hits.append(h)
             seen.add(ident)
-    return collapse_nested_hits(hits), ""
+    return collapse_nested_hits(hits, target_text=doc.text), ""
 
 
-def _shares_core(a: str, b: str, n: int = 6) -> bool:
-    aw, bw = a.split(), b.split()
-    if min(len(aw), len(bw)) < n:
-        return a in b or b in a
-    cores = {" ".join(aw[i : i + n]) for i in range(len(aw) - n + 1)}
-    return any(" ".join(bw[j : j + n]) in cores for j in range(len(bw) - n + 1))
+def _span_in(hay: str, phrase: str) -> tuple[int, int] | None:
+    needle = " ".join(_tokens(phrase))
+    if not needle or not hay:
+        return None
+    i = hay.find(needle)
+    if i < 0:
+        return None
+    return i, i + len(needle)
 
 
-def collapse_nested_hits(hits: list[OverlapHit]) -> list[OverlapHit]:
-    """Keep the longest span per other item; drop nested or heavily overlapping windows."""
+def collapse_nested_hits(
+    hits: list[OverlapHit], *, target_text: str = ""
+) -> list[OverlapHit]:
+    """Keep the longest span per other item; drop nested or overlapping windows."""
+    hay = " ".join(_tokens(target_text)) if target_text else ""
     by_other: dict[tuple[str, str], list[OverlapHit]] = {}
     for h in hits:
         by_other.setdefault((h.other_key, h.source), []).append(h)
     out: list[OverlapHit] = []
     for group in by_other.values():
-        kept: list[OverlapHit] = []
+        kept: list[tuple[OverlapHit, tuple[int, int] | None]] = []
         for h in sorted(group, key=lambda row: (-row.n_words, row.ngram)):
-            if any(
-                h.ngram != k.ngram
-                and (h.ngram in k.ngram or _shares_core(h.ngram, k.ngram))
-                for k in kept
-            ):
+            span = _span_in(hay, h.ngram)
+            drop = False
+            for k, kspan in kept:
+                if h.ngram != k.ngram and h.ngram in k.ngram:
+                    drop = True
+                    break
+                if span and kspan and span[0] < kspan[1] and kspan[0] < span[1]:
+                    drop = True
+                    break
+            if drop:
                 continue
-            kept.append(h)
-        out.extend(kept)
+            kept.append((h, span))
+        out.extend(h for h, _span in kept)
     return out

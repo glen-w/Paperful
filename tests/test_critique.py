@@ -241,7 +241,7 @@ def test_ngram_overlap_true_and_false_positive(cfg):
     assert "OTHER" in others
     assert not any(k.startswith("ETH") for k in others)
 
-    collapsed = collapse_nested_hits(hits)
+    collapsed = collapse_nested_hits(hits, target_text=target)
     other_hits = [h for h in collapsed if h.other_key == "OTHER"]
     assert len(other_hits) == 1
     assert "tungsten carbide coating" in other_hits[0].ngram
