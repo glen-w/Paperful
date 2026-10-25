@@ -142,6 +142,7 @@ flowchart LR
 | `state/rq-answered/<stamp>/` | `rag answered` / Index already-answered pack (`paperful.rq_answered.v1`, `pack.md`) |
 | `state/prompts/` | Operator-saved Ask system prompts from the Index form (“Save as…”); listed in the custom-prompt select |
 | `state/gui/uploads/` | Workbench uploads (Discover import, Index prompt/questions files); basename only |
+| `state/critiques/<id>/<stamp>/` | `critique` pack (`paperful.critique.pack.v1`, `pack.md`). `<id>` is a library item key or `file-<filename-stem>` for uploads. Dismissals: `state/critiques/<id>/dismissed.jsonl`. Uploads: `state/critiques/uploads/` |
 | `state/reports/<slug>.html` | `synthesize` literature review; sibling `<slug>.json` records source hashes |
 | `state/reports/<slug>-authors.json` | `authors --apply` creator frequency (`paperful.authors_report.v1`); seeds proposed field packs |
 | `state/author-packs/` | Proposed / promoted field author packs (`paperful.author_pack.v1`). From `authors --apply`, snowball preflight, or `twenty lookup --apply` |
@@ -180,6 +181,7 @@ below.
 | `synthesize` | `llm.enabled` | `state/reports/<slug>.html` when dest includes disk | standalone note in the scoped collection unless `--to disk` |
 | `extract-sections` | rules always; optional `[extract_sections].llm` + `llm.enabled` | `state/sections/<key>.json` | none (disk only) |
 | `rag questions` | rules always; optional `[rag].extract_questions_llm` + `llm.enabled` | `state/rag/questions/<key>.json` | none |
+| `critique` | checkers always; optional `--llm` / `[critique].llm` + `llm.enabled` | `state/critiques/<id>/<stamp>/` | child note with `--apply` on `--item` only |
 
 Opt-in **`camofox`** is a registered **serial** source (never in `DEFAULT_SOURCES`) that talks to an external [camofox-browser](https://github.com/jo-inc/camofox-browser) REST server for a scripted DOI→PDF grab. `run` injects it when `[camofox].enabled` and `[camofox].during_run` (default on); `--camofox` / `--no-camofox` override one invocation. Policy order places it after vault lanes and before `browser_agent`. It does not reuse the vault Chromium SSO profile (see [Camofox](camofox.md)).
 
@@ -261,6 +263,8 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
 - `paperful run --dry-run` — no downloads. Per item: **Would-hit** is the
   routed source list in order (full `sources` when `--try-all`).
 - `paperful lint` / `paperful fix-metadata` — identifier hygiene; apply is explicit.
+- `paperful critique` — local manuscript pack (`state/critiques/`). Checkers
+  without an LLM; optional suggested comments. Not a grade and not in `all`.
 - `paperful dedupe` / `paperful gaps` / `paperful reachout` / `paperful refs gap` / `paperful coverage` — duplicate packs, PDF/DOI counts, contact-only missing-PDF CSV (never fetches, never sends mail), cited-in-PDF missing-from-library packs, and briefing/note/file vs `-C` coverage. `refs gap` and `coverage` are always dry-run (`state/refs-gaps/`, `state/coverage/`). `ingest-dois` creates parents from those packs or a DOI file only with `--apply`.
   `dedupe` writes `state/dedupe-packs/` and merges only with `--apply`
   (the spare-copy line is written then; title+year also needs `--apply-medium`).

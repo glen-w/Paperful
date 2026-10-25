@@ -30,6 +30,7 @@ rag_questions_fn: Callable[..., dict[str, Any]] | None = None
 rag_answered_fn: Callable[..., dict[str, Any]] | None = None
 summarize_fn: Callable[..., dict[str, Any]] | None = None
 synthesize_fn: Callable[..., dict[str, Any]] | None = None
+critique_fn: Callable[..., dict[str, Any]] | None = None
 noop_sleep: float = 0.05
 
 from .index_jobs import (
@@ -448,6 +449,145 @@ def snowball_run(
         rec["error"] = str(exc)
         commands.write_command(cfg, rec)
         raise
+
+
+def critique(
+    cfg: Config,
+    cmd_id: str,
+    *,
+    item_key: str = "",
+    staged_path: Any | None = None,
+    collection: str = "",
+    apply: bool = False,
+    llm: bool = False,
+    force: bool = False,
+    show_dismissed: bool = False,
+) -> None:
+    if critique_fn is not None:
+        result = critique_fn(
+            cfg,
+            cmd_id,
+            item_key=item_key,
+            staged_path=staged_path,
+            collection=collection,
+            apply=apply,
+            llm=llm,
+            force=force,
+            show_dismissed=show_dismissed,
+        )
+        if result is not None:
+            _attach_result(cfg, cmd_id, result)
+        return
+    import os
+
+    from ..critique import build_critique, note_html
+    from ..critique_extract import ExtractError
+    from ..llm import get_client
+    from ..llm.preflight import validate_llm_for_verb
+    from ..llm.validate import LlmConfigError
+    from ..pipeline import make_client
+
+    offline = os.environ.get("PAPERFUL_OFFLINE", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    backend = None
+    target = None
+    scope_items: list[Any] = []
+    coll = (collection or "").strip()
+    key = (item_key or "").strip()
+    if key or coll:
+        items, _manifest = _load_scope_items(cfg, coll)
+        scope_items = items
+        if key:
+            target = next((it for it in items if it.key == key), None)
+            if target is None:
+                from ..catalogue import open_library
+                from ..scope import load_scope
+
+                try:
+                    backend = open_library(cfg)
+                    loaded = load_scope(
+                        backend, collections=[], library=True, item_keys=[key]
+                    )
+                    items = loaded.items
+                    target = items[0] if items else None
+                    if not scope_items:
+                        scope_items = items
+                except Exception:
+                    target = None
+        if backend is None and (apply or key):
+            try:
+                from ..catalogue import open_library
+
+                backend = open_library(cfg)
+            except Exception:
+                backend = None
+    if key and target is None:
+        rec = commands.read_command(cfg, cmd_id) or {}
+        rec["status"] = "failed"
+        rec["error"] = "item not in the mirror / scope"
+        commands.write_command(cfg, rec)
+        return
+    llm_client = None
+    use_llm = bool(llm)
+    if use_llm:
+        try:
+            validate_llm_for_verb(cfg)
+            llm_client = get_client(cfg)
+        except LlmConfigError as exc:
+            rec = commands.read_command(cfg, cmd_id) or {}
+            rec["status"] = "failed"
+            rec["error"] = str(exc)
+            commands.write_command(cfg, rec)
+            return
+    http = None if offline else make_client(cfg)
+    try:
+        pack = build_critique(
+            cfg,
+            item=target,
+            file_path=staged_path,
+            collections=[coll] if coll else None,
+            library=not bool(coll),
+            dry_run=False,
+            use_llm=use_llm,
+            force=force,
+            show_dismissed=show_dismissed,
+            offline=offline,
+            client=http,
+            llm_client=llm_client,
+            backend=backend,
+            scope_items=scope_items,
+            stage_uploads=staged_path is None,
+        )
+    except (ExtractError, ValueError) as exc:
+        rec = commands.read_command(cfg, cmd_id) or {}
+        rec["status"] = "failed"
+        rec["error"] = str(exc)
+        commands.write_command(cfg, rec)
+        return
+    finally:
+        if http is not None:
+            http.close()
+    applied = 0
+    if apply and target is not None and backend is not None and backend.supports_write():
+        html = note_html(pack)
+        tag = (cfg.critique_tag or "paperful-critique").strip()
+        backend.create_or_update_note(target.key, html, tag)
+        applied = 1
+    counts = pack.get("counts") or {}
+    _attach_result(
+        cfg,
+        cmd_id,
+        {
+            "pack_dir": pack.get("pack_dir") or "",
+            "critique_id": pack.get("critique_id") or "",
+            "counts": counts,
+            "applied": applied,
+            "findings": counts.get("findings", 0),
+        },
+    )
 
 
 def repair_preview(

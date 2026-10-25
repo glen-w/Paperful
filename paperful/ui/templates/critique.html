@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% from "_help.html" import info %}
+{% from "_job_status.html" import job_status %}
+{% block title %}Critique — Paperful{% endblock %}
+{% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
+{% block content %}
+<h1>Critique</h1>
+<p class="page-lede">A local pre-submission / reading-aid pack. Deterministic checkers always run. Optional LLM comments are a separate <em>suggested</em> lane. There is no score, grade, or accept/reject. Uploads stay under <code>state/critiques/uploads/</code> and are not written to <code>out/</code> or Zotero.</p>
+{% if error == 'target' %}<div class="error-banner">Pick a library item <em>or</em> upload a file, not both and not neither.</div>{% endif %}
+{% if error == 'format' %}<div class="error-banner">That file type is not supported. Use pdf, txt, md, html, rtf, docx, odt, pptx (legacy .doc needs a converter on PATH).</div>{% endif %}
+{% if error == 'size' %}<div class="error-banner">The upload is larger than 40 MB.</div>{% endif %}
+{% if error and error not in ('target', 'format', 'size') %}<div class="error-banner">{{ error }}</div>{% endif %}
+
+{{ job_status(run_rec, 'Critique') }}
+
+<section class="panel">
+  <h2>Library item</h2>
+  <p class="section-lede">Scope follows the collection chip. Overlap and “cited but not in library” use that collection’s extracted text when <code>state/rag/text/</code> exists.</p>
+  <form method="post" action="/critique" class="toolbar" enctype="multipart/form-data">
+    <label>Item {{ info("A paper already mirrored under out/. --item on the CLI.") }}
+      <select name="item_key">
+        <option value="">Choose an item</option>
+        {% for it in items %}
+        <option value="{{ it.key }}">{{ it.title }}{% if it.year %} ({{ it.year }}){% endif %} — {{ it.key }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% if llm_on %}
+    <label><input type="checkbox" name="llm" value="1"> LLM comments {{ info("Suggested lane only. Grounded in the manuscript text and checked findings. Needs [llm].enabled.") }}</label>
+    <label><input type="checkbox" name="force" value="1"> Force LLM {{ info("Run suggested comments even when identity lint flagged the PDF.") }}</label>
+    {% endif %}
+    <label><input type="checkbox" name="apply" value="1"> Write child note {{ info("Library item only. Tagged paperful-critique. Uploads stay disk-only.", danger=true) }}</label>
+    <label><input type="checkbox" name="show_dismissed" value="1"> Show dismissed {{ info("Include findings you previously dismissed in pack.md.") }}</label>
+    <button type="submit">Critique item</button>
+    {{ info("Writes state/critiques/<item-key>/<stamp>/pack.json and pack.md. Does not fetch or attach.") }}
+  </form>
+  {% if not items %}
+  <p class="section-lede">No items in the current collection chip. Set a collection on Library, or upload a draft below.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Upload a draft</h2>
+  <p class="section-lede">Drop a manuscript you have not imported. The copy stays under <code>state/critiques/uploads/</code>. It is never a Zotero parent and never lands in <code>out/</code>.</p>
+  <form method="post" action="/critique" class="toolbar" enctype="multipart/form-data">
+    <label class="drop-zone">Drop a draft (pdf, docx, odt, html, rtf, txt, md, pptx) or choose a file
+      <input type="file" name="file" accept="{{ accept }}">
+    </label>
+    {% if llm_on %}
+    <label><input type="checkbox" name="llm" value="1"> LLM comments {{ info("Suggested lane only. Grounded in the uploaded text and checked findings.") }}</label>
+    {% endif %}
+    <button type="submit">Critique file</button>
+    {{ info("Same checkers as --file. Collection chip is the overlap corpus when text is already cached.") }}
+  </form>
+</section>
+
+{% if result and result.counts %}
+<section class="panel">
+  <h2>This pack</h2>
+  <p>Findings: {{ result.findings or result.counts.findings or 0 }}
+    {% if result.critique_id %}· id <code>{{ result.critique_id }}</code>{% endif %}
+    {% if result.applied %}· child note written{% endif %}
+  </p>
+  {% if pack_md %}
+  <pre class="pack-md">{{ pack_md }}</pre>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if recent %}
+<section class="panel">
+  <h2>Recent packs</h2>
+  <p class="section-lede">On disk under <code>state/critiques/</code>. Dismiss findings with <code>paperful critique dismiss ID</code>.</p>
+  <table class="wb-table">
+    <thead><tr><th>Title</th><th>Id</th><th>Findings</th><th>Stamp</th></tr></thead>
+    <tbody>
+    {% for row in recent %}
+      <tr>
+        <td>{{ row.title }}</td>
+        <td><code>{{ row.critique_id }}</code></td>
+        <td>{{ row.findings }}</td>
+        <td>{{ row.stamp }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

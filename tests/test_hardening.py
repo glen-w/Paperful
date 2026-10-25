@@ -248,6 +248,37 @@ def test_ingest_preview_upload_stays_under_uploads(ui_client, cfg, tmp_path, mon
 
 
 @pytest.mark.skipif(fastapi_missing, reason="paperful[serve] extra missing")
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "../escape.md",
+        "../../escape.md",
+        "..\\..\\escape.md",
+        "/tmp/abs-escape.md",
+        "a/b/c.md",
+        "..",
+        "name with spaces.md",
+        "x" * 300 + ".md",
+    ],
+)
+def test_critique_upload_stays_under_uploads(ui_client, cfg, tmp_path, monkeypatch, filename):
+    monkeypatch.setattr("paperful.ui.commands.enqueue", lambda *a, **k: "cmd")
+    before = _snapshot(tmp_path)
+    body = b"Hello paragraph with enough letters to pass the extract minimum.\n" * 4
+    ui_client.post(
+        "/critique",
+        files={"file": (filename, body, "text/markdown")},
+        follow_redirects=False,
+    )
+    uploads = (cfg.state_dir / "critiques" / "uploads").resolve()
+    for path in _snapshot(tmp_path) - before:
+        if path.is_file():
+            path.resolve().relative_to(uploads)
+    assert not (tmp_path / "escape.md").exists()
+    assert not Path("/tmp/abs-escape.md").exists()
+
+
+@pytest.mark.skipif(fastapi_missing, reason="paperful[serve] extra missing")
 @pytest.mark.parametrize("filename", HOSTILE_NAMES)
 def test_aw_import_upload_stays_under_uploads(ui_client, cfg, tmp_path, monkeypatch, filename):
     monkeypatch.setattr("paperful.ui.jobs.authorwatch_import", lambda *a, **k: None)

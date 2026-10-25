@@ -39,6 +39,12 @@ _SHIPPED: dict[str, tuple[str, ...]] = {
         "questions addressed",
     ),
     "limitations": ("limitations", "limitation", "study limitations"),
+    "related_work": (
+        "related work",
+        "related works",
+        "literature review",
+        "prior work",
+    ),
     "references": ("references", "bibliography", "works cited"),
     "acknowledgements": ("acknowledgements", "acknowledgments", "acknowledgement"),
     "appendix": ("appendix", "appendices", "supplementary material"),

@@ -52,6 +52,7 @@ mendeley
 endnote
 sources
 screen
+critique
 ezproxy
 research-ops
 sessions

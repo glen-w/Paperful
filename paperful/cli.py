@@ -269,6 +269,15 @@ openalex_store_app = typer.Typer(
     ),
 )
 app.add_typer(openalex_store_app, name="openalex-store")
+critique_app = typer.Typer(
+    add_completion=False,
+    invoke_without_command=True,
+    help=(
+        "Local manuscript critique pack: checked deterministic findings, "
+        "optional LLM suggestions. --item KEY or --file PATH. Not a grade."
+    ),
+)
+app.add_typer(critique_app, name="critique")
 
 # Canonical top-level verbs. tests/test_cli.py asserts this matches `paperful --help`.
 JOBS: dict[str, tuple[str, ...]] = {
@@ -288,6 +297,7 @@ JOBS: dict[str, tuple[str, ...]] = {
     "completeness": (
         "lint",
         "screen",
+        "critique",
         "fix-metadata",
         "dedupe",
         "attachments",
@@ -945,6 +955,84 @@ def screen(
         refresh=refresh,
         profile=profile,
         run_config=run_config,
+        config=config,
+        fmt=fmt,
+    )
+
+
+@critique_app.callback(invoke_without_command=True)
+def critique(
+    ctx: typer.Context,
+    item: list[str] = typer.Option(
+        [], "--item", help="Library item key already in the mirror."
+    ),
+    file_path: Path | None = typer.Option(
+        None,
+        "--file",
+        help="Manuscript on disk (pdf, txt, md, html, rtf, docx, odt, pptx; .doc if a converter is on PATH).",
+        exists=True,
+        dir_okay=False,
+        readable=True,
+    ),
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Print findings; do not write state/critiques/."
+    ),
+    apply: bool = typer.Option(
+        False, "--apply", help="Write a child note. Needs --item (not --file)."
+    ),
+    llm: bool | None = typer.Option(
+        None, "--llm/--no-llm", help="Optional grounded LLM comments (suggested lane)."
+    ),
+    force: bool = typer.Option(
+        False, "--force", help="Run the LLM lane even when identity lint flagged the PDF."
+    ),
+    show_dismissed: bool = typer.Option(
+        False, "--show-dismissed", help="Include dismissed findings in the table and Markdown."
+    ),
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Local manuscript critique pack. Checked findings always; suggested only with --llm. Not a grade."""
+    if ctx.invoked_subcommand is not None:
+        return
+    from .critique_cmd import run_critique
+
+    run_critique(
+        console,
+        item=item,
+        file_path=file_path,
+        collection=collection,
+        library=library,
+        dry_run=dry_run,
+        apply=apply,
+        llm=llm,
+        force=force,
+        show_dismissed=show_dismissed,
+        config=config,
+        fmt=fmt,
+    )
+
+
+@critique_app.command("dismiss")
+def critique_dismiss(
+    finding_id: str = typer.Argument(..., help="Finding id from pack.json / the critique table."),
+    critique_id: str | None = typer.Option(
+        None, "--critique-id", help="Pack folder name (item key or file-<stem>). Default: newest."
+    ),
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Omit a finding from later pack.md (id stays in JSON). Re-runs keep the dismissal."""
+    from .critique_cmd import run_dismiss
+
+    run_dismiss(
+        console,
+        finding_id=finding_id,
+        critique_id=critique_id,
         config=config,
         fmt=fmt,
     )

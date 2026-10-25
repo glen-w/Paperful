@@ -38,6 +38,7 @@ def test_mount_ui_has_no_inline_wanted_or_discover_routes():
     assert "register_index" in src
     assert "register_repair" in src
     assert "register_shell" in src
+    assert "register_critique" in src
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
@@ -107,4 +108,7 @@ def test_post_smokes_per_family(tmp_path, monkeypatch):
         data={"collection": "BBNJ"},
         follow_redirects=False,
     )
+    assert res.status_code < 500
+
+    res = client.post("/critique", data={}, follow_redirects=False)
     assert res.status_code < 500

@@ -15,7 +15,12 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
-- **Discover rows say why.** The Discover Queue and the Wanted "Waiting from
+- **`paperful critique`.** Local-first manuscript pack (`--item` or `--file`):
+  deterministic checkers (refs, floats, acronyms, stats/GRIM, checklists,
+  library n-gram overlap) as `lane=checked`; optional `--llm` comments as
+  `lane=suggested`. No scores. Dismiss findings. Advanced workbench page with
+  item picker and upload (`state/critiques/`). See [critique](docs/critique.md).
+- **Discover rows say why.** The Discover Queue and the Wanted "Waiting from"
   Discover" panel show a "Why suggested" line from each candidate's `why`.
 - **OSF demand check.** `paperful doctor` reports how many recent misses point
   at OSF hosts and when that is enough to justify a thin source (10+ and 5%+);

@@ -21,6 +21,7 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_fix_metadata(raw, cfg)
     apply_lint(raw, cfg)
     apply_screen(raw, cfg)
+    apply_critique(raw, cfg)
     apply_summarize(raw, cfg)
     apply_synthesize(raw, cfg)
     apply_fetch(raw, cfg)
@@ -141,6 +142,33 @@ def apply_screen(raw: dict[str, Any], cfg: "Config") -> None:
     )
     if "detectors" in section:
         cfg.screen_detectors = C._snowball_strs(section["detectors"])
+
+
+def apply_critique(raw: dict[str, Any], cfg: "Config") -> None:
+    C = _mod()
+    table = raw.get("critique")
+    if not isinstance(table, dict):
+        return
+    C._apply_config_table(
+        table,
+        cfg,
+        [
+            ("llm", "critique_llm", bool),
+            ("tag", "critique_tag", lambda v: str(v).strip() or "paperful-critique"),
+            ("overlap_top_k", "critique_overlap_top_k", lambda v: max(1, int(v))),
+            ("overlap_n_min", "critique_overlap_n_min", lambda v: max(2, int(v))),
+            ("overlap_n_max", "critique_overlap_n_max", lambda v: max(2, int(v))),
+            ("overlap_df_max", "critique_overlap_df_max", lambda v: max(0, int(v))),
+            ("cite_age_years", "critique_cite_age_years", lambda v: max(1, int(v))),
+            (
+                "max_context_chars",
+                "critique_max_context_chars",
+                lambda v: max(1000, int(v)),
+            ),
+        ],
+    )
+    if cfg.critique_overlap_n_min > cfg.critique_overlap_n_max:
+        cfg.critique_overlap_n_max = cfg.critique_overlap_n_min
 
 
 def apply_summarize(raw: dict[str, Any], cfg: "Config") -> None:

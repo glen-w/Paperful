@@ -1172,6 +1172,27 @@ body.citation-large-open {
   border-radius: 2px;
 }
 
+.drop-zone {
+  display: block;
+  border: 2px dashed var(--line, #c5c0b6);
+  border-radius: 8px;
+  padding: 1.25rem 1rem;
+  background: var(--panel-2, #faf8f4);
+  cursor: pointer;
+}
+
+.drop-zone input[type="file"] {
+  display: block;
+  margin-top: 0.6rem;
+}
+
+.pack-md {
+  white-space: pre-wrap;
+  overflow: auto;
+  max-height: 36rem;
+  font-size: 0.92rem;
+}
+
 @media (max-width: 800px) {
   .citation-triage {
     flex: 1 1 100%;

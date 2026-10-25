@@ -311,6 +311,33 @@ def test_rag_table_is_parsed_and_clamped(tmp_path):
     assert cfg.rag_model == "qwen3:8b"
 
 
+def test_critique_table_is_parsed(tmp_path):
+    from paperful.config import _from_dict
+
+    cfg = _from_dict(
+        {
+            "critique": {
+                "llm": True,
+                "tag": "  ",
+                "overlap_top_k": 10,
+                "overlap_n_min": 8,
+                "overlap_n_max": 4,
+                "cite_age_years": 7,
+                "max_context_chars": 5000,
+            }
+        },
+        tmp_path / "config.toml",
+    )
+    assert cfg.critique_llm is True
+    assert cfg.critique_tag == "paperful-critique"
+    assert cfg.critique_overlap_top_k == 10
+    assert cfg.critique_overlap_n_min == 8
+    assert cfg.critique_overlap_n_max == 8
+    assert cfg.critique_cite_age_years == 7
+    assert cfg.critique_max_context_chars == 5000
+    assert cfg.critiques_dir == cfg.state_dir / "critiques"
+
+
 def test_extract_sections_table_is_parsed(tmp_path):
     from paperful.config import _from_dict
 
