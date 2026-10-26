@@ -113,6 +113,7 @@ llm_pdf_match_min_confidence = 0.6
 llm = false
 # advanced = false                 # MARG-S lane; additive with llm (see critique.md)
 # vale = false                     # house-style pass; needs vale on PATH (not an LLM)
+# glossary = true                  # fuzzy house expansions from state/glossary/
 # [[critique.reviewers]]            # omit the table for one builtin JSON reviewer
 # id = "reviewer-2"
 # prompt = "prompts/critique-reviewer-2.md"

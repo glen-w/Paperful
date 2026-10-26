@@ -788,6 +788,46 @@ def test_pack_metrics_contract_keys(cfg, tmp_path: Path):
     assert "sentence_length" not in {f["code"] for f in pack["findings"]}
 
 
+def test_critique_offline_pps_tortured_from_cache(cfg, tmp_path: Path):
+    cfg.screen_detectors = ("tortured",)
+    cache = cfg.state_dir / "pps" / "fingerprints" / "tortured.json"
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_text(
+        '{"family":"tortured","fetched_at":1,"rows":[["sign to clamor","snr"]]}',
+        encoding="utf-8",
+    )
+    pad = "Methods and results are described below. " * 30
+    path = tmp_path / "mill.txt"
+    path.write_text("We improved sign to clamor ratio. " + pad, encoding="utf-8")
+    pack = build_critique(cfg, file_path=path, offline=True)
+    assert "pps_tortured" in {f["code"] for f in pack["findings"]}
+
+
+def test_critique_file_pps_tortured_phrases(cfg, tmp_path: Path):
+    cfg.screen_detectors = ("tortured",)
+    cache = cfg.state_dir / "pps" / "fingerprints" / "tortured.json"
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_text(
+        '{"family":"tortured","fetched_at":9999999999,"rows":[["sign to clamor","snr"]]}',
+        encoding="utf-8",
+    )
+    pad = "Methods and results are described below. " * 30
+    path = tmp_path / "mill.txt"
+    path.write_text(
+        "We improved sign to clamor ratio in the model. " + pad,
+        encoding="utf-8",
+    )
+    import httpx
+
+    with httpx.Client() as client:
+        pack = build_critique(cfg, file_path=path, offline=False, client=client)
+    codes = {f["code"] for f in pack["findings"]}
+    assert "pps_tortured" in codes
+    row = next(f for f in pack["findings"] if f["code"] == "pps_tortured")
+    assert row["lane"] == "checked"
+    assert "sign to clamor" in (row.get("quote") or "").lower()
+
+
 def test_ai_tell_phrases_are_suggested_info(cfg, tmp_path: Path):
     pad = (
         "The working group met in New York to compare notes about article twelve. "

@@ -80,6 +80,40 @@ def test_load_fingerprints_from_cache(tmp_path, monkeypatch):
     assert rows[0].expression == '"foo bar"'
 
 
+def test_load_fingerprints_offline_uses_cache(tmp_path):
+    from paperful.config import Config
+    from paperful.screen import load_fingerprints
+
+    cfg = Config()
+    cfg.state_dir = tmp_path / "state"
+    cache = cfg.state_dir / "pps" / "fingerprints" / "tortured.json"
+    cache.parent.mkdir(parents=True)
+    cache.write_text(
+        '{"family":"tortured","fetched_at":1,"rows":[["sign to clamor","snr"]]}',
+        encoding="utf-8",
+    )
+    rows = load_fingerprints(None, cfg, "tortured", offline=True)
+    assert len(rows) == 1
+    assert "clamor" in rows[0].expression
+
+
+def test_load_fingerprints_fingerprint_dir_csv(tmp_path):
+    from paperful.config import Config
+    from paperful.screen import load_fingerprints
+
+    cfg = Config()
+    cfg.state_dir = tmp_path / "state"
+    folder = tmp_path / "pps-fingerprints"
+    folder.mkdir()
+    (folder / "tortured.csv").write_text(
+        "Fingerprint,Expected\n\"sign to clamor\",signal-to-noise\n",
+        encoding="utf-8",
+    )
+    cfg.screen_fingerprint_dir = folder
+    rows = load_fingerprints(None, cfg, "tortured", offline=True)
+    assert len(rows) == 1
+
+
 def test_lookup_doi_status_crossref_and_openalex(cfg, monkeypatch):
     from paperful.screen import lookup_doi_status
 

@@ -12,6 +12,7 @@ from typing import Any
 
 from .config import Config, CritiqueReviewer, critique_reviewers_for
 from .critique import Finding, make_finding
+from .critique_direct_quotes import snippet_in_direct_quote
 from .critique_extract import ExtractedDoc
 from .grounding import budget_slice
 from .zot import Item
@@ -38,6 +39,8 @@ Rules:
 - Mark unverified true when you go beyond the excerpt or checked findings.
 - Do not give an overall score, grade, or accept/reject.
 - Do not claim plagiarism or misconduct.
+- Do not suggest edits to direct quotations (text inside quotation marks or block quotes).
+  Comment only on how the author integrates or attributes quoted material.
 """
 
 
@@ -97,6 +100,8 @@ def findings_from_comments(
         if not detail:
             continue
         if is_scoreish(detail):
+            continue
+        if quote and snippet_in_direct_quote(hay, quote):
             continue
         if quote and quote.lower() not in hay and not grounded(quote, hay):
             continue

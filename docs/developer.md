@@ -89,7 +89,8 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `catalogue.py` | `MirrorCatalogue`, `MirrorFirstBackend`, `open_library` | `sync`, `mirror`, `library` |
 | `scope.py` | Collection, year, type selection | `library` errors |
 | `resolve/` (`ids.py`, `enrich.py`), `lint.py`, `acronyms.py`, `authors_report.py`, `metadata.py`, `dedupe.py`, `pdfid.py` | Identifier, hygiene, and corpus-frequency logic. Take a backend; never name a manager | the protocol |
-| `critique.py`, `critique_checks.py`, `critique_extract.py`, `critique_llm.py`, `critique_marg.py`, `critique_metrics.py`, `critique_ai_tells.py`, `critique_ai_model.py`, `critique_vale.py`, `critique_overlap.py`, `critique_stats.py` | Local manuscript pack (`paperful.critique.pack.v1`). Checkers always; gated LLM comments; optional MARG-S advanced lane (optional GROBID TEI chunks); optional Binoculars extra (no torch at import); optional Vale house-style pass (no vale at import) | `cli_runtime`, gated `llm`, optional `grobid_client` |
+| `glossary.py` / `glossary_cmd.py` | House expansions (`paperful.glossary.v1` in `state/glossary/`). Critique fuzzy-match + Vale alias export | `config` |
+| `critique.py`, `critique_checks.py`, `critique_extract.py`, `critique_llm.py`, `critique_marg.py`, `critique_metrics.py`, `critique_ai_tells.py`, `critique_ai_model.py`, `critique_vale.py`, `critique_overlap.py`, `critique_stats.py` | Local manuscript pack (`paperful.critique.pack.v1`). Checkers always; gated LLM comments; optional MARG-S advanced lane (optional GROBID TEI chunks); optional Binoculars extra (no torch at import); optional Vale house-style pass (no vale at import); glossary expansions when `state/glossary/` has entries | `cli_runtime`, gated `llm`, optional `grobid_client` |
 | `config_tables.py` | Nested TOML sections applied onto `Config` | `config` parsers |
 | `sources/` | One fetch lane each. Return bytes or a miss | `sources.base` |
 | `camofox_client.py` / `camofox_recover.py` | Opt-in Camoufox REST recover (before `browser_agent`) | `sources.camofox`, [camofox.md](camofox.md) |
@@ -105,6 +106,7 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `lint_cmd.py` | `lint` after flags | `lint` |
 | `screen_cmd.py` | `screen` after flags | `screen` |
 | `critique_cmd.py` | `critique` after flags | `critique` |
+| `glossary_cmd.py` | `glossary validate` / `export-vale` after flags | `glossary` |
 | `fix_metadata_cmd.py` | `fix-metadata` after flags | `metadata` |
 | `ocr_cmd.py` | `ocr` after flags | `ocr` |
 | `recover_cmd.py` | `recover` after flags | `pipeline`, `browser_agent` |
@@ -202,6 +204,7 @@ Tier policy (1.0 contract):
 | `paperful.ingest_dois.v1` | `state/ingest/<stamp>/` | `ingest_dois` | T2 | — |
 | `paperful.collections_add.v1` | `state/collections-add/<stamp>/` | `collections_add` | T2 | — |
 | `paperful.acronyms.v1` | `state/acronyms/<scope>.json` | `acronyms` | T2 | — |
+| `paperful.glossary.v1` | `state/glossary/<scope>.json` | hand-edited; `glossary` CLI | T2 | — |
 | `paperful.authors_report.v1` | `state/reports/<slug>-authors.json` | `authors_report` | T2 | — |
 | `paperful.author_pack.v1` | `state/author-packs/` | `snowball.authors` | T2 | — |
 | `paperful.author_contact.v1` | `state/author-contacts/` | `twenty` | T2 | — |

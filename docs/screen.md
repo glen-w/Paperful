@@ -8,7 +8,7 @@
 | --- | --- |
 | Retraction / withdrawal / expression of concern | Crossref `update-to` and OpenAlex `is_retracted` |
 | PubPeer comments | Optional `POST` to PubPeer API (`[screen].pubpeer` + `PUBPEER_DEVKEY`) |
-| Tortured phrases, SCIgen, Mathgen, suspect templates | Local PDF text vs PPS [fingerprint CSV dumps](https://dbrech.irit.fr/pls/apex/f?p=9999:5) |
+| Tortured phrases, SCIgen, Mathgen, suspect templates | Local PDF/text vs fingerprint lists (cached under `state/pps/fingerprints/`, optional `[screen].fingerprint_dir`, or fetched from PPS [CSV dumps](https://dbrech.irit.fr/pls/apex/f?p=9999:5)) |
 
 Tortured-phrase hits follow PPS practice: **5+** fingerprint matches, or **one** bundled “obvious” phrase (for example `sign to clamor`). Other families flag on any match.
 
@@ -22,6 +22,8 @@ uv run paperful screen --refresh                   # bypass status cache; re-fet
 ```
 
 Reports land in `state/runs/<stamp>-screen.json`. Status lookups are cached under `state/pps/status/`; fingerprint CSVs under `state/pps/fingerprints/`.
+
+Matching is **fully local** once lists are on disk. Run `paperful screen --refresh` (or any online screen/critique that fetches CSVs) to populate the cache; copy the four families from PPS into `[screen].fingerprint_dir` as `tortured.csv`, `scigen.csv`, `mathgen.csv`, and `suspect.csv` if you want an air-gapped source of truth. Offline critique and screen use cache or `fingerprint_dir` and do not call IRIT.
 
 ## Write-back (`--apply`)
 

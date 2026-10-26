@@ -253,6 +253,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[screen].tortured_min` | `5` | Minimum tortured-phrase hits before flagging (obvious phrases always flag) |
 | `[screen].pubpeer` | `false` | PubPeer batch lookup |
 | `[screen].fingerprint_max_age_days` | `14` | Re-download PPS CSV dumps after this age (`doctor` ambers when stale) |
+| `[screen].fingerprint_dir` | unset | Optional folder with `tortured.csv` / `.json` (and `scigen`, `mathgen`, `suspect`). Relative paths resolve from the config file. Used when cache is missing or offline |
 | `[screen].tag` | `paperful-pps` | Child note tag for `--apply` |
 | `[critique].llm` | `false` | Optional suggested-lane comments (`--llm` / `--no-llm` override) |
 | `[critique].tag` | `paperful-critique` | Child note tag for `critique --apply` |
@@ -261,6 +262,9 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[critique].vale_config` | unset | Path to your `.vale.ini`. Relative paths resolve from the config file. If unset, `.vale.ini` next to the paperful config is used when present |
 | `[critique].vale_min_alert_level` | `suggestion` | Lowest Vale level to keep: `suggestion`, `warning`, or `error` |
 | `[critique].vale_timeout_s` | `60` | Subprocess timeout for one Vale run |
+| `[critique].glossary` | `true` | Fuzzy house-list acronym expansions from `state/glossary/*.json`. No findings when the directory is empty. `paperful glossary validate` / `export-vale` |
+| `[critique].glossary_dir` | `glossary` | Directory under `state_dir` (absolute paths allowed) |
+| `[critique].glossary_similarity_min` | `0.88` | Minimum `difflib` ratio to flag a near-miss expansion or phrase |
 | `[critique].advanced` | `false` | Optional MARG-S-style multi-agent suggested lane (`--advanced` / `--no-advanced`). Additive with `[critique].llm`. Set both `true` to run reviewers and MARG on every critique |
 | `[critique].advanced_max_rounds` | `4` | Leader turns per aspect group |
 | `[critique].advanced_max_workers` | `4` | Paper chunks (worker agents) |

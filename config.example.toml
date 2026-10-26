@@ -180,6 +180,7 @@ mirror_failures_before_skip = 3
 # tortured_min = 5               # PPS-style threshold; obvious phrases always flag
 # pubpeer = false                # needs env PUBPEER_DEVKEY
 # fingerprint_max_age_days = 14
+# fingerprint_dir = "pps-fingerprints"  # optional local CSV/JSON copies (offline / air-gap)
 # tag = "paperful-pps"
 # [critique]
 # # Local manuscript pack (see docs/critique.md). Not a grade.
@@ -190,6 +191,9 @@ mirror_failures_before_skip = 3
 # vale_config = ".vale.ini"        # your house .vale.ini (relative to this file)
 # vale_min_alert_level = "suggestion"  # suggestion | warning | error
 # vale_timeout_s = 60
+# glossary = true                  # fuzzy house-list expansions (state/glossary/)
+# glossary_dir = "glossary"        # directory under state_dir
+# glossary_similarity_min = 0.88
 # advanced = false                 # MARG-S-style multi-agent lane; additive with llm
 # advanced_max_rounds = 4
 # advanced_max_workers = 4

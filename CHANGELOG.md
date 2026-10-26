@@ -20,6 +20,13 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- **House glossary for `paperful critique`.** Canonical expansions in
+  `state/glossary/*.json` (`paperful.glossary.v1`) fuzzy-match parenthetical
+  expansions and bare phrases (`acronym_expansion_mismatch` /
+  `acronym_phrase_mismatch`). `paperful glossary validate` and
+  `paperful glossary export-vale` (exact Vale `swap` rules from aliases).
+  Default `[critique].glossary = true`; no findings when the directory is
+  empty. See [critique](docs/critique.md).
 - Optional **Vale** house-style pass on `paperful critique` (`--vale` /
   `[critique].vale`). Needs `vale` on PATH and a `.vale.ini`; missing extra
   records `vale_unavailable` / `vale_no_config` / `vale_failed`. Alerts are

@@ -17,6 +17,7 @@ from typing import Any
 
 from .config import Config
 from .critique import Finding, make_finding
+from .critique_direct_quotes import line_column_span_in_direct_quote, snippet_in_direct_quote
 from .critique_extract import ExtractedDoc, loc_of_span
 
 MAX_VALE_FINDINGS = 100
@@ -99,7 +100,12 @@ def run_vale(cfg: Config, doc: ExtractedDoc) -> tuple[list[Finding], dict[str, A
     except ValueError:
         return _skip("failed", extra=stderr or "vale JSON was not parseable")
     alerts = _alerts_from_json(raw)
-    findings = [_finding_from_alert(doc, alert) for alert in alerts[:MAX_VALE_FINDINGS]]
+    findings = [
+        f
+        for alert in alerts[:MAX_VALE_FINDINGS]
+        for f in (_finding_from_alert(doc, alert),)
+        if f is not None
+    ]
     if len(alerts) > MAX_VALE_FINDINGS:
         findings.append(
             make_finding(
@@ -156,12 +162,26 @@ def _alerts_from_json(raw: Any) -> list[dict[str, Any]]:
     return []
 
 
-def _finding_from_alert(doc: ExtractedDoc, alert: dict[str, Any]) -> Finding:
+def _finding_from_alert(doc: ExtractedDoc, alert: dict[str, Any]) -> Finding | None:
     check = str(alert.get("Check") or "alert")
     message = str(alert.get("Message") or "").strip()
     match = str(alert.get("Match") or "").strip()
     line = _int(alert.get("Line"))
-    quote = match or _span_quote(doc.text or "", line, alert.get("Span"))
+    text = doc.text or ""
+    span = alert.get("Span")
+    if line and isinstance(span, (list, tuple)) and len(span) >= 2:
+        try:
+            if line_column_span_in_direct_quote(
+                text, line, int(span[0]), int(span[1])
+            ):
+                return None
+        except (TypeError, ValueError):
+            pass
+    if match and snippet_in_direct_quote(text, match):
+        return None
+    quote = match or _span_quote(text, line, span)
+    if quote and not match and snippet_in_direct_quote(text, quote):
+        return None
     loc = loc_of_span(doc, quote) if quote else ""
     if not loc and line:
         loc = f"line {line}"

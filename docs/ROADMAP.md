@@ -191,6 +191,92 @@ Pieces underneath: `watch.py`, `digest.py`, `briefing.py`;
   existing merge); a monthly “living review” re-run of a saved snowball that
   flags when a new cluster appears.
 
+(after-110-research-integrity-paperguard)=
+### Research integrity forensics ([PaperGuard](https://github.com/exergyleizhou-ux/PaperGuard))
+
+**Last reviewed:** 2026-10-26 against PaperGuard **2.17.0** (public README,
+[ROADMAP](https://github.com/exergyleizhou-ux/PaperGuard/blob/main/ROADMAP.md),
+PyPI `paperguard`). PaperGuard is a **sibling OSS tool**, not a dependency.
+Paperful’s lane stays **library + mirror + fetch + light manuscript packs**;
+PaperGuard stays **tabular / statistical / image / metadata anomaly screening**
+on files you point at.
+
+**Epistemic overlap (keep aligned).** Both projects flag **anomalies to
+investigate**, never misconduct verdicts. PaperGuard reports severity tiers,
+BH–FDR across findings, and mandatory `innocent_explanations` per hit; it
+refuses “fraud” vocabulary in reports. Paperful uses the same copy pattern on
+[`screen`](screen.md) and [`critique`](critique.md) (`pps_*`, overlap,
+`cited_retracted`). Do not merge the tools into one “integrity score.”
+
+**What PaperGuard ships that Paperful does not (and should not re-vendor).**
+
+| Area | PaperGuard (indicative) | Paperful today |
+| --- | --- | --- |
+| **Spreadsheet / table fabrication** | Terminal-digit tests (Mosimann; Geng 0/5 preference), Benford, constant-diff/ratio columns, decimal consistency, implausible sentinels | No — manuscripts are prose/PDF, not lab notebooks |
+| **Stats recomputation** | Full **statcheck** (t/F/χ²/r/z/Q; one- and two-tailed); **GRIM / GRIMMER / SPRITE**; **TIVA**; **P-curve**; decision-reversal flags | [`critique`](critique.md): stdlib **subset** (`statcheck_p_mismatch`, `grim_impossible_mean`, `p_without_n`) — no scipy/R, not a statcheck port |
+| **RCT / trials** | Carlisle baseline imbalance; ClinicalTrials.gov outcome consistency (T2); trial-ID extraction (NCT, ISRCTN, …) | Critique **checklist mentions** only (`checklist_prisma` / `consort`) |
+| **Image forensics** | Cross-image pHash (F1), intra-image ORB+RANSAC (F2), splice/copy-move (F3/F6), persistent cross-paper pHash store (F4), EXIF timelines (G1) | No — optional figure **pullouts** in briefs are captions + pages, not forensics |
+| **Text / mill signals** | Corpus similarity (T1), 150+ tortured phrases (T4), stylometry (T5), AI-text stack (T6–T9, opt-in `--ml-check`), paper-mill **citation-graph** fingerprints (M1) | [`screen`](screen.md): PPS CSV fingerprints + retraction/PubPeer; critique repeats tortured phrases on the **draft extract** |
+| **Cross-corpus checks** | Retraction Watch + CrossRef, PubPeer, ORI CSV, OpenAlex DOI metadata | Same **retraction / EoC** cache for `screen` and **cited** works in critique |
+| **Operator surface** | `paperguard scan`, batch, HTML/JSON, plugin detectors, optional multi-tenant Web UI, LLM `explain` | `screen` / `critique` on collection or `--file`; mirror paths under `out/` |
+
+**What Paperful already covers without PaperGuard.** Collection-wide **PPS +
+retraction** on holdings (`screen`); **pre-submission reading packs**
+(`critique`: structure, refs, floats, ethics mentions, library overlap, optional
+Vale/LLM lanes). That is “does this draft hang together and cite retracted
+works?” — not “are these CSV means GRIM-impossible?”
+
+**Buffet — integrate, don’t duplicate (ship in order; each stage can stop):**
+
+1. **Docs + comparison routing (now).** Short-answer row in
+   [comparison.md](comparison.md); vendor notes in
+   [comparison reference](comparison-reference.md#paperguard). Critique
+   `statcheck_p_mismatch` footer should point heavy stats/table jobs at
+   PaperGuard, not promise parity.
+2. **Mirror hand-off (test).** For a mirrored item, document a stable recipe:
+   export supplementary CSV/XLSX from `out/…/attachments/` (or operator path)
+   → `paperguard scan -f …` → keep JSON beside the item folder. No PyPI
+   dependency until a tester asks for one-command glue.
+3. **`paperful critique --forensics` (roadmap).** Optional subprocess wrapper:
+   run PaperGuard on `--file` or on extracted tables next to `--item`; ingest
+   findings as a **separate pack section** (`suggested` lane, external tool
+   attribution). Fail closed if `paperguard` is not on `PATH`. Never fold
+   PaperGuard severities into a single Paperful grade.
+4. **Collection batch (roadmap, after `screen` proves boring).**
+   `paperful screen --supplements` or a sibling verb: for items with tagged
+   supplementary data, batch-invoke PaperGuard in report-only mode; write
+   `state/runs/<stamp>-forensics.json` (schema TBD). Still no auto-tag of
+   misconduct — optional `--apply` might only add a child note “forensics pack
+   available” with a path, same honesty as `screen --apply`.
+5. **Workbench (roadmap).** Advanced Critique panel: “Open forensics report”
+   when a sidecar JSON exists; link out to PaperGuard HTML export. Not on the
+   default nav.
+6. **MCP (roadmap).** Read-only `forensics_status` for agents: “last
+   PaperGuard scan stamp + path” on an item key — no remote scan from MCP.
+
+**Explicit non-goals (Paperful side).** Porting 41 detectors; hosting PaperGuard’s
+Web UI; training T9-style classifiers inside Paperful; image-duplication store
+as a default background job on every library; replacing institutional integrity
+offices or journal editors. PaperGuard’s roadmap items (full Cabanac PDCN graph,
+ML western-blot classifier, Redis-backed Web UI cache) stay **their** bets.
+
+**Borrow only where cheap and honest.**
+
+- **Convergence framing** — when multiple independent checker families fire,
+  critique pack prose can say “multiple clusters — investigate” (PaperGuard’s
+  combiner pattern), without importing their severity math.
+- **Recall discipline** — PaperGuard documents cohort mismatch (e.g. OA PDF
+  text vs inline NHST; vector figures vs raster supplements). Mirror the same
+  honesty in critique overlap and screen copy (“supplementary CSV only”, “PDF
+  text layer required”).
+- **Keeping-up hook** — when `keepup` or `screen` surfaces a new retraction,
+  optional footnote: “re-run file forensics if you relied on supplementary
+  tables from this item” (operator checklist, not automated).
+
+Factory-stage context: PaperGuard strengthens **screen / audit** on **files**;
+Paperful 1.x **screen** is **metadata + PPS on PDFs you hold**. See
+[paper factory stages](comparison-reference.md#paper-factory-stages).
+
 (after-110-openalex-topics)=
 ### OpenAlex topics (January 2027)
 
@@ -481,6 +567,7 @@ until Wanted has tester evidence. Do not grow 1.x into a second product.
 | Point at Better BibTeX + Quarto (do not vendor CSL) | Write / export | Parked until testers ask | [Parked](#after-110-parked) |
 | ASReview-class ranking only as optional local embeddings | Screen | Not dual review | [Embeddings](#after-110-embeddings) |
 | Post-hoc Crossref / retraction check after a draft | Critique | Existence ≠ claim support | [critique.md](critique.md) |
+| Deep forensics on supplementary tables / stats / figures (external tool) | Screen / audit | No merged score; subprocess or hand-off | [PaperGuard](#research-integrity-forensics-paperguard) |
 | Named MCP read jobs (`ask` vs precedent vs `refs_gap`); writes stay `--apply` | Agent | Table stakes without a hosted corpus | [Literature-discovery](#literature-discovery-complement-waves) |
 
 **Stay out (v2 included):** hosted multi-user as the product; Kosmos world

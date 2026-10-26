@@ -132,6 +132,40 @@ found Elicit Pro Review-mode sensitivity ~40% vs traditional searches
 
 Sources and caveats: repo `reports/AI academic paper factories.md` (contributor research, Oct 2026).
 
+(paperguard)=
+### PaperGuard (research integrity screener)
+
+- **Sites:** [GitHub](https://github.com/exergyleizhou-ux/PaperGuard) · [PyPI](https://pypi.org/project/paperguard/) · [live demo](https://huggingface.co/spaces/exergyleizhou/paperguard-demo)
+- **Fit:** Offline-first **anomaly screener** for tabular data, reported statistics,
+  images, and manuscript metadata. ~41 built-in detectors (GRIM/GRIMMER/SPRITE,
+  statcheck, TIVA/P-curve, Carlisle RCT imbalance, tortured phrases, stylometry,
+  opt-in AI-text classifiers, paper-mill citation-graph subgraph, image pHash /
+  splice forensics, EXIF/rsid checks, Retraction Watch / PubPeer / ORI cross-checks).
+  Batch CLI, HTML/JSON reports, optional Web UI and LLM `explain`. MIT license.
+- **Epistemic line:** flags **statistical anomalies**, mandatory innocent
+  explanations, no “fraud” wording in reports — aligned with Paperful
+  [`screen`](screen.md) / [`critique`](critique.md) copy.
+- **With Paperful:** Paperful owns **Zotero mirror, fetch, and light manuscript
+  packs**; PaperGuard owns **deep forensics on files** (especially supplementary
+  CSV/XLSX and raster figures). Overlap is narrow: retraction/PubPeer/tortured
+  phrases — Paperful `screen` + critique `pps_*` on PDF text; PaperGuard adds
+  full statcheck, table digit tests, and image duplication. Run PaperGuard on
+  exports from `out/`; integration bets (wrapper, workbench link) are
+  [roadmap only](ROADMAP.md#research-integrity-forensics-paperguard).
+- **Not a substitute for:** Missing-PDF fetch, snowball discovery, Ask/RAG over
+  your library, or institutional integrity investigations.
+
+| Capability | Paperful | PaperGuard |
+| --- | --- | --- |
+| Retraction / EoC on **library items** | Yes (`screen`, critique cited works) | Yes (DOI cross-check) |
+| PPS tortured phrases on PDF text | Yes (`screen`, critique extract) | Yes (T4 dictionary + M1 graph) |
+| GRIM / statcheck on **manuscript** inline stats | Partial (stdlib subset in critique) | Yes (full statcheck + GRIMMER/SPRITE) |
+| Spreadsheet / table fabrication tests | No | Yes (A1/A3/A5, Benford, …) |
+| Image duplication / splice forensics | No | Yes (F1–F6; raster supplements) |
+| TIVA / P-curve / Carlisle | No | Yes |
+| Pre-submission structure / refs / overlap pack | Yes (`critique`) | No |
+| Zotero write-back / mirror restore | Yes | No |
+
 ## Complementary: Zotero plugins and built-ins
 
 ### Paperful

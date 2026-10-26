@@ -20,7 +20,7 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_browser_agent(raw, cfg)
     apply_fix_metadata(raw, cfg)
     apply_lint(raw, cfg)
-    apply_screen(raw, cfg)
+    apply_screen(raw, cfg, source)
     apply_critique(raw, cfg)
     apply_summarize(raw, cfg)
     apply_synthesize(raw, cfg)
@@ -122,7 +122,7 @@ def apply_lint(raw: dict[str, Any], cfg: "Config") -> None:
     )
 
 
-def apply_screen(raw: dict[str, Any], cfg: "Config") -> None:
+def apply_screen(raw: dict[str, Any], cfg: "Config", source: Path) -> None:
     C = _mod()
     section = raw.get("screen")
     if not isinstance(section, dict):
@@ -138,9 +138,19 @@ def apply_screen(raw: dict[str, Any], cfg: "Config") -> None:
                 "screen_fingerprint_max_age_days",
                 lambda v: max(1, int(v)),
             ),
+            (
+                "fingerprint_dir",
+                "screen_fingerprint_dir",
+                lambda v: Path(str(v).strip()) if str(v).strip() else None,
+            ),
             ("tag", "screen_tag", lambda v: str(v).strip() or "paperful-pps"),
         ],
     )
+    if (
+        cfg.screen_fingerprint_dir is not None
+        and not cfg.screen_fingerprint_dir.is_absolute()
+    ):
+        cfg.screen_fingerprint_dir = (source.parent / cfg.screen_fingerprint_dir).resolve()
     if "detectors" in section:
         cfg.screen_detectors = C._snowball_strs(section["detectors"])
 
@@ -168,6 +178,17 @@ def apply_critique(raw: dict[str, Any], cfg: "Config") -> None:
             ),
             ("ai_model", "critique_ai_model", bool),
             ("vale", "critique_vale", bool),
+            ("glossary", "critique_glossary", bool),
+            (
+                "glossary_dir",
+                "critique_glossary_dir",
+                lambda v: Path(str(v).strip()).expanduser() if str(v).strip() else None,
+            ),
+            (
+                "glossary_similarity_min",
+                "critique_glossary_similarity_min",
+                lambda v: min(1.0, max(0.5, float(v))),
+            ),
             (
                 "vale_config",
                 "critique_vale_config",

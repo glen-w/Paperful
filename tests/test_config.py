@@ -377,6 +377,10 @@ def test_critique_table_is_parsed(tmp_path):
     assert cfg.critique_vale_config is None
     assert cfg.critique_vale_min_alert_level == "suggestion"
     assert cfg.critique_vale_timeout_s == 60.0
+    assert cfg.critique_glossary is True
+    assert cfg.critique_glossary_dir is None
+    assert cfg.critique_glossary_similarity_min == 0.88
+    assert cfg.glossary_dir == cfg.state_dir / "glossary"
     assert cfg.critique_advanced is False
     assert cfg.critique_advanced_max_rounds == 4
     assert cfg.critique_advanced_max_workers == 4
@@ -465,6 +469,26 @@ def test_critique_vale_config_resolves_relative(tmp_path):
     assert cfg.critique_vale_config == ini.resolve()
     assert cfg.critique_vale_min_alert_level == "warning"
     assert cfg.critique_vale_timeout_s == 12.0
+
+
+def test_critique_glossary_knobs_are_parsed(tmp_path):
+    from paperful.config import _from_dict
+
+    cfg = _from_dict(
+        {
+            "state_dir": str(tmp_path / "state"),
+            "critique": {
+                "glossary": False,
+                "glossary_dir": "house-terms",
+                "glossary_similarity_min": 0.91,
+            }
+        },
+        tmp_path / "config.toml",
+    )
+    assert cfg.critique_glossary is False
+    assert cfg.critique_glossary_dir == Path("house-terms")
+    assert cfg.critique_glossary_similarity_min == 0.91
+    assert cfg.glossary_dir == (cfg.state_dir / "house-terms").resolve()
     with pytest.raises(ValueError, match="suggestion"):
         _from_dict(
             {"critique": {"vale_min_alert_level": "loud"}},

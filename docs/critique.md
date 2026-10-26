@@ -27,20 +27,24 @@ house-style alerts are **checked**.
 | Bibliography | checked | `cite_not_in_bibliography`, `bibliography_not_cited`, `cited_not_in_library` |
 | Cited-work status (online) | checked | `unresolved_doi`; `cited_retracted` (major); `cited_withdrawn` / `cited_expression_of_concern` (warn); `citation_age`; `self_citation`. Same Crossref/OpenAlex cache as [screen](screen.md) |
 | Floats | checked | `caption_not_referenced`, `mention_without_caption` (both directions) |
-| Acronyms | checked | `acronym_undefined` (first use before an expansion) |
+| Acronyms | checked | `acronym_undefined` (first use before an expansion); house glossary `acronym_expansion_mismatch` / `acronym_phrase_mismatch` when `state/glossary/` has entries |
 | Abstract numbers | checked | `abstract_number_missing` (`info`; rounding can false-positive) |
 | Reproducibility / ethics | checked | `missing_mention` (limitations, data, funding, ethics, COI, code/data URL) |
 | Checklists | checked | `checklist_prisma` / `checklist_consort` — mention only, when the text looks like a review or trial |
-| Stats | checked | `statcheck_p_mismatch`, `grim_impossible_mean`, `p_without_n` (stdlib; no scipy/R) |
-| Prose | checked | `long_sentence` (≥40 words), `hedge_words`, `passive_voice` (`info` only) |
+| Stats | checked | `statcheck_p_mismatch`, `grim_impossible_mean`, `p_without_n` (stdlib; no scipy/R). Full statcheck, GRIMMER/SPRITE, TIVA, and table digit tests: use [PaperGuard](https://github.com/exergyleizhou-ux/PaperGuard) — [roadmap interop](ROADMAP.md#research-integrity-forensics-paperguard) |
+| Prose | checked | `long_sentence` (≥40 words), `hedge_words`, `passive_voice` (`info` only). Skips direct quotations (quoted spans and `>` block lines) |
 | Metrics | checked | `readability_summary` (Flesch / Fog / ARI), `lexical_diversity_summary` (TTR / MTLD / hapax). Academic FRE is often 0–30; that is expected, not a defect |
 | Heuristic AI-prose tells | suggested | `ai_tell`, `ai_tell_summary`, `ai_tells_abstain` (abstain below 150 words). Formal academic English often looks “smooth” on the same signals |
 | Library text overlap | checked | `text_overlap` (distinctive n-grams vs `state/rag/text/`); `overlap_skipped_no_text` |
-| House style (optional Vale) | checked | `vale_*` from your `.vale.ini` rules; `vale_unavailable` / `vale_no_config` / `vale_failed` / `vale_truncated` when the extra is on |
+| House style (optional Vale) | checked | `vale_*` from your `.vale.ini` rules; alerts inside direct quotations are dropped; `vale_unavailable` / `vale_no_config` / `vale_failed` / `vale_truncated` when the extra is on |
 
-Offline (`PAPERFUL_OFFLINE=1` or no HTTP client): skip Crossref/OpenAlex rows
-and emit `doi_status_skipped_offline` / `identity_skipped_offline`. Overlap
-still runs when extracted library text is on disk.
+Offline (`PAPERFUL_OFFLINE=1` or no HTTP client): skip Crossref/OpenAlex rows and
+emit `doi_status_skipped_offline` / `identity_skipped_offline`. PPS fingerprints
+still run when `state/pps/fingerprints/` or `[screen].fingerprint_dir` has CSV/JSON
+(see [screen](screen.md)); warm the cache once with `paperful screen --refresh`.
+When online, tortured-phrase and other PPS fingerprints run on the **critique
+extract** for both `--item` and `--file` (same `[screen].detectors` and
+`tortured_min` as screen).
 
 Overlap is **flags to review**, not a plagiarism verdict. Boilerplate that
 appears in many library texts is dropped. Do not narrate misconduct.
@@ -129,6 +133,7 @@ Workbench uploads are copied under `state/critiques/uploads/<stamp>-<safe>/`
 Follows [llm.md](llm.md): local Ollama by default, egress notice, grounded in
 the extracted text already on disk plus the checked finding list. No web
 search. Comments are `lane=suggested` only. Ungrounded spans are dropped.
+Direct quotations are not rewritten; comments on quoted spans are dropped.
 `pdf_identity_mismatch` refuses the lane unless `--force`. Never emits scores.
 
 Default is **one** reviewer (`[llm].model` + builtin JSON prompt). Add more
@@ -184,6 +189,47 @@ Requests a Binoculars-style score
 does not install torch or Binoculars. If the extra is missing, the pack
 records `ai_model_unavailable` (suggested / `info`) and still keeps the
 heuristic tells. Never treated as proof of authorship.
+
+## House glossary (`state/glossary/`)
+
+Canonical acronym expansions live in `state/glossary/<slug>.json`
+(`paperful.glossary.v1`), not in the Title Case allowlist from
+`paperful acronyms`. Critique reads every JSON file in that directory when
+`[critique].glossary` is true (the default). Empty or missing files add no
+findings.
+
+```json
+{
+  "schema": "paperful.glossary.v1",
+  "scope": "ocean/BBNJ",
+  "entries": [
+    {
+      "token": "BBNJ",
+      "expansion": "Areas Beyond National Jurisdiction",
+      "aliases": [
+        "Maritime Area beyond national jurisdictions",
+        "marine areas beyond national jurisdiction"
+      ]
+    }
+  ]
+}
+```
+
+`acronym_expansion_mismatch` (`warn`) fires when a parenthetical expansion for
+a listed token is close to the canonical form or an alias but not the
+canonical text. `acronym_phrase_mismatch` (`info`) slides a window over the
+body (stdlib `difflib`, default `[critique].glossary_similarity_min = 0.88`)
+and flags near-misses of the long form even without the acronym. Exact
+canonical wording is silent. Direct quotations are skipped. Findings suggest
+the canonical string; they do not rewrite the manuscript.
+
+`paperful glossary validate` checks the files. `paperful glossary export-vale`
+prints (or `--out` writes) a Vale Substitution fragment from **exact**
+aliases. Vale cannot fuzzy-match; keep the glossary for similarity, and merge
+the export into your `.vale.ini` styles if you also run `--vale`.
+
+Set `[critique].glossary = false` to skip the checker. `[critique].glossary_dir`
+is a directory under `state_dir` (default `glossary`).
 
 ## Optional Vale (`--vale` / `[critique].vale`)
 

@@ -11,6 +11,7 @@ import re
 import statistics
 from typing import Any
 
+from .critique_direct_quotes import elide_direct_quotes
 from .critique_metrics import split_sentences, tokenize
 
 MIN_AI_TELL_WORDS = 150
@@ -144,8 +145,9 @@ def _discourse_flags(text: str, paragraphs: list[str]) -> list[str]:
 
 def compute_ai_tells(text: str, paragraphs: list[str] | None = None) -> dict[str, Any]:
     """Return metrics for the pack ``ai_tells`` object (always safe JSON)."""
-    paras = paragraphs if paragraphs is not None else [p for p in text.split("\n\n") if p.strip()]
-    tokens = tokenize(text)
+    prose = elide_direct_quotes(text)
+    paras = paragraphs if paragraphs is not None else [p for p in prose.split("\n\n") if p.strip()]
+    tokens = tokenize(prose)
     word_count = len(tokens)
     if word_count < MIN_AI_TELL_WORDS:
         return {
@@ -157,7 +159,7 @@ def compute_ai_tells(text: str, paragraphs: list[str] | None = None) -> dict[str
             "discourse": [],
             "abstain": True,
         }
-    lower = text.casefold()
+    lower = prose.casefold()
     hits: list[dict[str, Any]] = []
     seen: set[str] = set()
     for phrase in _DISTINCTIVE_PHRASES:
@@ -173,14 +175,14 @@ def compute_ai_tells(text: str, paragraphs: list[str] | None = None) -> dict[str
             hits.append({"phrase": word, "count": n, "kind": "distinctive"})
     connector_total = sum(_phrase_count(lower, c) for c in _CONNECTORS)
     tell_total = sum(h["count"] for h in hits) + connector_total
-    sentences = split_sentences(text)
+    sentences = split_sentences(prose)
     return {
         "word_count": word_count,
         "burstiness_cv": _burstiness_cv(sentences),
         "tell_phrase_hits": hits,
         "tell_phrase_total": tell_total,
         "connector_hits": connector_total,
-        "unicode_flags": _unicode_flags(text),
-        "discourse": _discourse_flags(text, paras),
+        "unicode_flags": _unicode_flags(prose),
+        "discourse": _discourse_flags(prose, paras),
         "abstain": False,
     }

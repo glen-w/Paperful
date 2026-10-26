@@ -219,6 +219,7 @@ class Config:
     screen_tortured_min: int = 5
     screen_pubpeer: bool = False
     screen_fingerprint_max_age_days: int = 14
+    screen_fingerprint_dir: Path | None = None
     screen_tag: str = "paperful-pps"
     critique_llm: bool = False
     critique_tag: str = "paperful-critique"
@@ -233,6 +234,9 @@ class Config:
     critique_vale_config: Path | None = None
     critique_vale_min_alert_level: str = "suggestion"
     critique_vale_timeout_s: float = 60.0
+    critique_glossary: bool = True
+    critique_glossary_dir: Path | None = None  # None → state_dir / "glossary"
+    critique_glossary_similarity_min: float = 0.88
     critique_advanced: bool = False
     critique_advanced_max_rounds: int = 4
     critique_advanced_max_workers: int = 4
@@ -501,6 +505,15 @@ class Config:
     @property
     def critiques_dir(self) -> Path:
         return self.state_dir / "critiques"
+
+    @property
+    def glossary_dir(self) -> Path:
+        raw = self.critique_glossary_dir
+        if raw is None:
+            return self.state_dir / "glossary"
+        if raw.is_absolute():
+            return raw
+        return (self.state_dir / raw).resolve()
 
     @property
     def inbox_path(self) -> Path | None:

@@ -278,6 +278,15 @@ critique_app = typer.Typer(
     ),
 )
 app.add_typer(critique_app, name="critique")
+glossary_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help=(
+        "House glossary for critique acronym expansions. "
+        "JSON files in state/glossary/; optional Vale swap export."
+    ),
+)
+app.add_typer(glossary_app, name="glossary")
 
 # Canonical top-level verbs. tests/test_cli.py asserts this matches `paperful --help`.
 JOBS: dict[str, tuple[str, ...]] = {
@@ -312,6 +321,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "refs",
         "coverage",
         "acronyms",
+        "glossary",
         "authors",
         "notes",
         "all",
@@ -1148,6 +1158,34 @@ def acronyms(
         n_items=len(loaded.items),
     )
     console.print(f"Wrote [bold]{path}[/]")
+
+
+@glossary_app.command("validate")
+def glossary_validate(
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Check state/glossary/*.json (paperful.glossary.v1)."""
+    from .glossary_cmd import run_glossary_validate
+
+    run_glossary_validate(console, config=config, fmt=fmt)
+
+
+@glossary_app.command("export-vale")
+def glossary_export_vale(
+    out: Path | None = typer.Option(
+        None,
+        "--out",
+        help="Write YAML here. Default prints a Substitution style fragment.",
+    ),
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Write Vale swap rules from glossary aliases (exact forms only)."""
+    from .glossary_cmd import run_glossary_export_vale
+
+    run_glossary_export_vale(console, config=config, fmt=fmt, out=out)
+
 
 @app.command()
 def authors(

@@ -120,46 +120,16 @@ def _fingerprint_stale(cfg: Config, family: str) -> bool:
     return age_s > cfg.screen_fingerprint_max_age_days * 86400
 
 
-def load_fingerprints(
-    client: httpx.Client,
-    cfg: Config,
-    family: str,
-    *,
-    refresh: bool = False,
-) -> list[FingerprintRow]:
-    fam = family.strip().lower()
-    if fam not in FINGERPRINT_FAMILIES:
-        return []
-    cache = _fingerprint_cache_path(cfg, fam)
-    if not refresh and not _fingerprint_stale(cfg, fam) and cache.is_file():
-        try:
-            raw = json.loads(cache.read_text(encoding="utf-8"))
-            rows = raw.get("rows") or []
-            return [
-                FingerprintRow(str(r[0]), str(r[1]))
-                for r in rows
-                if isinstance(r, (list, tuple)) and len(r) >= 2
-            ]
-        except (OSError, ValueError, TypeError):
-            pass
-    headers = {"User-Agent": f"paperful ({cfg.email or 'no-email'})"}
-    try:
-        resp = client.get(fingerprint_csv_url(fam), headers=headers, timeout=120)
-        resp.raise_for_status()
-        text = resp.text
-    except httpx.HTTPError:
-        if cache.is_file():
-            try:
-                raw = json.loads(cache.read_text(encoding="utf-8"))
-                rows = raw.get("rows") or []
-                return [
-                    FingerprintRow(str(r[0]), str(r[1]))
-                    for r in rows
-                    if isinstance(r, (list, tuple)) and len(r) >= 2
-                ]
-            except (OSError, ValueError, TypeError):
-                pass
-        return []
+def _rows_from_fingerprint_json(raw: dict[str, Any]) -> list[FingerprintRow]:
+    rows = raw.get("rows") or []
+    return [
+        FingerprintRow(str(r[0]), str(r[1]))
+        for r in rows
+        if isinstance(r, (list, tuple)) and len(r) >= 2
+    ]
+
+
+def parse_fingerprint_csv(text: str) -> list[FingerprintRow]:
     rows: list[FingerprintRow] = []
     reader = csv.reader(io.StringIO(text))
     for i, row in enumerate(reader):
@@ -171,6 +141,85 @@ def load_fingerprints(
         expected = (row[1] or "").strip()
         if expr:
             rows.append(FingerprintRow(expr, expected))
+    return rows
+
+
+def _read_fingerprint_cache_file(path: Path) -> list[FingerprintRow]:
+    if not path.is_file():
+        return []
+    try:
+        raw_text = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    if path.suffix.lower() == ".csv":
+        return parse_fingerprint_csv(raw_text)
+    try:
+        raw = json.loads(raw_text)
+    except (ValueError, TypeError):
+        return []
+    if isinstance(raw, dict):
+        return _rows_from_fingerprint_json(raw)
+    return []
+
+
+def _read_fingerprint_cache(cfg: Config, family: str, *, allow_stale: bool) -> list[FingerprintRow]:
+    cache = _fingerprint_cache_path(cfg, family)
+    if not cache.is_file():
+        return []
+    if not allow_stale and _fingerprint_stale(cfg, family):
+        return []
+    return _read_fingerprint_cache_file(cache)
+
+
+def _read_fingerprint_dir(cfg: Config, family: str) -> list[FingerprintRow]:
+    folder = cfg.screen_fingerprint_dir
+    if folder is None:
+        return []
+    for name in (f"{family}.csv", f"{family}.json"):
+        path = folder / name
+        rows = _read_fingerprint_cache_file(path)
+        if rows:
+            return rows
+    return []
+
+
+def load_fingerprints(
+    client: httpx.Client | None,
+    cfg: Config,
+    family: str,
+    *,
+    refresh: bool = False,
+    offline: bool = False,
+) -> list[FingerprintRow]:
+    """Load PPS fingerprint rows (local cache/dir first; optional IRIT CSV fetch)."""
+    fam = family.strip().lower()
+    if fam not in FINGERPRINT_FAMILIES:
+        return []
+
+    def local_rows() -> list[FingerprintRow]:
+        rows = _read_fingerprint_cache(cfg, fam, allow_stale=True)
+        if rows:
+            return rows
+        return _read_fingerprint_dir(cfg, fam)
+
+    if offline or client is None:
+        return local_rows()
+
+    cache = _fingerprint_cache_path(cfg, fam)
+    if not refresh and not _fingerprint_stale(cfg, fam):
+        rows = _read_fingerprint_cache(cfg, fam, allow_stale=True)
+        if rows:
+            return rows
+
+    headers = {"User-Agent": f"paperful ({cfg.email or 'no-email'})"}
+    try:
+        resp = client.get(fingerprint_csv_url(fam), headers=headers, timeout=120)
+        resp.raise_for_status()
+        text = resp.text
+    except httpx.HTTPError:
+        rows = local_rows()
+        return rows
+    rows = parse_fingerprint_csv(text)
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_text(
         json.dumps(

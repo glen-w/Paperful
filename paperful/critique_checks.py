@@ -11,6 +11,11 @@ import httpx
 
 from .config import Config
 from .critique import Finding, make_finding
+from .critique_direct_quotes import (
+    offset_in_direct_quote,
+    snippet_in_direct_quote,
+    span_in_direct_quote,
+)
 from .critique_extract import ExtractedDoc, loc_for, loc_of_span
 from .critique_overlap import OverlapHit, overlap_findings
 from .critique_stats import scan_stats
@@ -154,6 +159,7 @@ def run_checks(
     say("Checkers: floats, acronyms, stats, prose")
     findings.extend(_floats(doc))
     findings.extend(_acronyms(doc))
+    findings.extend(_glossary_acronyms(cfg, doc))
     findings.extend(_abstract_numbers(doc))
     findings.extend(_mentions_and_urls(doc))
     findings.extend(_checklists(doc, item))
@@ -161,10 +167,13 @@ def run_checks(
     findings.extend(_prose(doc))
     findings.extend(_style_metrics(doc))
 
+    say("Checkers: PPS fingerprints (tortured phrases, etc.)")
+    findings.extend(_pps_fingerprint_findings(cfg, client, doc.text, offline=offline))
+
     if item is not None:
         say("Checkers: identity and integrity")
         findings.extend(_identity(cfg, item, client, backend, offline))
-        findings.extend(_integrity_item(cfg, item, client, backend, offline, doc))
+        findings.extend(_integrity_item(cfg, item, client, backend, offline))
 
     n_scope = len(scope_items)
     if n_scope:
@@ -316,17 +325,68 @@ def _identity(
     return out
 
 
+def _pps_fingerprint_findings(
+    cfg: Config,
+    client: httpx.Client | None,
+    text: str,
+    *,
+    offline: bool,
+) -> list[Finding]:
+    """PPS-style fingerprint families on critique extract (same rules as ``screen``)."""
+    if not (text or "").strip():
+        return []
+    from .screen import (
+        FINGERPRINT_FAMILIES,
+        _detector_on,
+        load_fingerprints,
+        scan_text_fingerprints,
+    )
+
+    out: list[Finding] = []
+    for family in FINGERPRINT_FAMILIES:
+        if not _detector_on(cfg, family):
+            continue
+        try:
+            fps = load_fingerprints(
+                client, cfg, family, refresh=False, offline=offline
+            )
+            hits = scan_text_fingerprints(
+                text,
+                fps,
+                family=family,
+                tortured_min=cfg.screen_tortured_min,
+            )
+        except Exception:
+            continue
+        if not hits:
+            continue
+        sample = hits[:8]
+        more = len(hits) - len(sample)
+        detail = f"{len(hits)} fingerprint hit(s) (flags to review)."
+        if more > 0:
+            detail = f"{len(hits)} fingerprint hit(s) (flags to review; showing {len(sample)})."
+        out.append(
+            make_finding(
+                code=f"pps_{family}",
+                severity="info",
+                detail=detail,
+                quote="; ".join(sample[:2]),
+                source="pps",
+            )
+        )
+    return out
+
+
 def _integrity_item(
     cfg: Config,
     item: Item,
     client: httpx.Client | None,
     backend: Any,
     offline: bool,
-    doc: ExtractedDoc,
 ) -> list[Finding]:
     if offline or client is None:
         return []
-    from .screen import FINGERPRINT_FAMILIES, load_fingerprints, scan_text_fingerprints, screen_item
+    from .screen import FINGERPRINT_FAMILIES, screen_item
     from .store import Manifest
 
     try:
@@ -341,6 +401,8 @@ def _integrity_item(
         rows = []
     out: list[Finding] = []
     for row in rows:
+        if row.code in FINGERPRINT_FAMILIES:
+            continue
         out.append(
             make_finding(
                 code=f"pps_{row.code}",
@@ -350,25 +412,6 @@ def _integrity_item(
                 source="pps",
             )
         )
-    if not rows and doc.text.strip():
-        try:
-            for family in FINGERPRINT_FAMILIES:
-                fps = load_fingerprints(client, cfg, family, refresh=False)
-                hits = scan_text_fingerprints(
-                    doc.text, fps, family=family, tortured_min=cfg.screen_tortured_min
-                )
-                if hits:
-                    out.append(
-                        make_finding(
-                            code=f"pps_{family}",
-                            severity="info",
-                            detail=f"{len(hits)} fingerprint hit(s) (flags to review).",
-                            quote=hits[0],
-                            source="pps",
-                        )
-                    )
-        except Exception:
-            pass
     return out
 
 
@@ -772,6 +815,42 @@ def _acronyms(doc: ExtractedDoc) -> list[Finding]:
     return out
 
 
+def _glossary_acronyms(cfg: Config, doc: ExtractedDoc) -> list[Finding]:
+    if not cfg.critique_glossary:
+        return []
+    from .glossary import MAX_HITS_PER_CODE, load_glossary, scan_glossary
+
+    entries, _issues = load_glossary(cfg)
+    if not entries:
+        return []
+    body, _biblio = _split_body_biblio(doc.text)
+    hits = scan_glossary(
+        body, entries, similarity_min=cfg.critique_glossary_similarity_min
+    )
+    out: list[Finding] = []
+    counts = {"acronym_expansion_mismatch": 0, "acronym_phrase_mismatch": 0}
+    for hit in hits:
+        if span_in_direct_quote(body, hit.start, hit.end):
+            continue
+        n = counts.get(hit.code, 0)
+        if n >= MAX_HITS_PER_CODE:
+            continue
+        counts[hit.code] = n + 1
+        severity = "warn" if hit.code == "acronym_expansion_mismatch" else "info"
+        out.append(
+            make_finding(
+                code=hit.code,
+                severity=severity,
+                loc=loc_of_span(doc, hit.quote),
+                quote=hit.quote,
+                detail=hit.detail,
+                source="glossary",
+                extra={"token": hit.token, "suggested": hit.suggested},
+            )
+        )
+    return out
+
+
 def _abstract_numbers(doc: ExtractedDoc) -> list[Finding]:
     pages = doc.pages or [doc.text]
     abstract = pages[0]
@@ -1041,9 +1120,18 @@ def _prose(doc: ExtractedDoc) -> list[Finding]:
     sentences = [s.strip() for s in _SENTENCE.findall(doc.text) if s.strip()]
     if not sentences:
         return []
-    long = [s for s in sentences if len(s.split()) >= 40]
-    hedges = list(_HEDGE.finditer(doc.text))
-    passive = list(_PASSIVE.finditer(doc.text))
+    body = doc.text or ""
+    long = [
+        s
+        for s in sentences
+        if len(s.split()) >= 40 and not snippet_in_direct_quote(body, s)
+    ]
+    hedges = [
+        m for m in _HEDGE.finditer(body) if not offset_in_direct_quote(body, m.start())
+    ]
+    passive = [
+        m for m in _PASSIVE.finditer(body) if not offset_in_direct_quote(body, m.start())
+    ]
     words = len(doc.text.split())
     out: list[Finding] = []
     if long:

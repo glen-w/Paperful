@@ -36,6 +36,7 @@ Rules:
 - Quotes MUST appear in the paper chunks you were told about.
 - Do not give an overall score, grade, or accept/reject.
 - Do not claim plagiarism or misconduct.
+- Do not suggest edits inside direct quotations; comment on attribution or integration only.
 - At most 8 comments.
 """
 
@@ -44,6 +45,7 @@ Return JSON only:
 {{"reply": "your reply", "comments": [{{"quote": "span from YOUR chunk", "detail": "comment"}}]}}
 If the leader's message is not for you, reply with {{"reply": "NO_RESPONSE", "comments": []}}.
 Quotes MUST be substrings of your chunk. No score, grade, or accept/reject.
+Do not suggest edits inside direct quotations.
 """
 
 _EXPERT_SYSTEM = {
