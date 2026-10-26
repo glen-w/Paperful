@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 import pytest
 
 from paperful.config import Config
@@ -65,6 +67,7 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     assert 'name="item_key"' in critique.text
     assert 'name="file"' in critique.text
     assert 'name="ai_model"' in critique.text
+    assert 'name="vale"' in critique.text
     assert client.get("/mirror").status_code == 200
     assert client.get("/index").status_code == 200
     assert client.get("/briefs").status_code == 200
@@ -479,6 +482,74 @@ def test_pages_include_beginner_help(tmp_path, monkeypatch):
 
     settings = client.get("/settings")
     assert "Unpaywall needs a real email" in settings.text
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_critique_workbench_llm_checkboxes(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    from paperful.ui import jobs
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.llm_enabled = True
+    cfg.critique_llm = True
+    cfg.critique_advanced = True
+    cfg.grobid_enabled = True
+    monkeypatch.setattr(ops, "doctor_payload", lambda _cfg, probe=False: [])
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _cfg, probe=False: [])
+    monkeypatch.setattr(
+        ops,
+        "collections_tree",
+        lambda _cfg: {"ok": True, "collections": []},
+    )
+    seen: list[dict] = []
+
+    def fake(cfg, cmd_id, **kw):
+        seen.append(kw)
+        return {"ok": True, "pack_dir": str(tmp_path / "pack")}
+
+    jobs.critique_fn = fake
+    try:
+        client = TestClient(create_app(cfg))
+        client.cookies.set("pf_advanced", "1")
+        page = client.get("/critique")
+        assert page.status_code == 200
+        assert 'name="llm"' in page.text
+        assert 'name="advanced"' in page.text
+        assert 'name="grobid"' in page.text
+        assert page.text.count("checked") >= 3
+        res = client.post(
+            "/critique",
+            data={"advanced": "1", "grobid": "1", "llm": "1"},
+            files={
+                "file": (
+                    "draft.md",
+                    b"See Figure 2 under the ABC protocol.",
+                    "text/markdown",
+                )
+            },
+            follow_redirects=False,
+        )
+        assert res.status_code == 303
+        loc = res.headers.get("location") or ""
+        assert "run=" in loc
+        deadline = time.time() + 3.0
+        rec = {}
+        cmd_id = loc.split("run=")[1].split("&")[0]
+        while time.time() < deadline:
+            rec = client.get(f"/v1/runs/{cmd_id}").json()
+            if rec.get("status") in {"done", "failed"}:
+                break
+            time.sleep(0.02)
+        assert rec.get("status") == "done", rec
+        assert seen
+        assert seen[0]["advanced"] is True
+        assert seen[0]["grobid"] is True
+        assert seen[0]["llm"] is True
+    finally:
+        jobs.critique_fn = None
 
 
 def test_dockerfile_includes_serve_extra():

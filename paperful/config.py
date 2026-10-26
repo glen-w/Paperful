@@ -229,6 +229,16 @@ class Config:
     critique_cite_age_years: int = 10
     critique_max_context_chars: int = 24_000
     critique_ai_model: bool = False
+    critique_vale: bool = False
+    critique_vale_config: Path | None = None
+    critique_vale_min_alert_level: str = "suggestion"
+    critique_vale_timeout_s: float = 60.0
+    critique_advanced: bool = False
+    critique_advanced_max_rounds: int = 4
+    critique_advanced_max_workers: int = 4
+    critique_advanced_max_comments: int = 12
+    critique_advanced_refine: bool = True
+    critique_advanced_timeout_s: float = 0.0  # 0 → max(llm.timeout_s, 600)
     critique_reviewers: tuple[CritiqueReviewer, ...] = ()
     summarize_prompt_template: str = "default"
     summarize_max_context_chars: int = 24_000
@@ -1009,6 +1019,7 @@ def parse_rag_embed_provider(value: str) -> str:
 _SUMMARIZE_ORDERS = frozenset({"library", "newest", "oldest"})
 _SUMMARIZE_STYLES = frozenset({"plain", "ste"})
 _STE_VIOLATION_POLICIES = frozenset({"warn", "fail"})
+_VALE_MIN_ALERT_LEVELS = frozenset({"suggestion", "warning", "error"})
 
 
 def parse_summarize_order(value: str, *, key: str = "order") -> str:
@@ -1039,6 +1050,20 @@ def parse_ste_violation_policy(value: str, *, key: str = "ste_violation_policy")
     if policy not in _STE_VIOLATION_POLICIES:
         raise ValueError(f"config {key} {value!r} must be warn or fail")
     return policy
+
+
+def parse_vale_min_alert_level(
+    value: str, *, key: str = "[critique].vale_min_alert_level"
+) -> str:
+    """Normalise Vale MinAlertLevel. Blank means suggestion."""
+    level = str(value).strip().lower()
+    if not level:
+        return "suggestion"
+    if level not in _VALE_MIN_ALERT_LEVELS:
+        raise ValueError(
+            f"config {key} {value!r} must be suggestion, warning, or error"
+        )
+    return level
 
 
 def wants_disk(dest: str) -> bool:

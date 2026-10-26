@@ -89,7 +89,7 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `catalogue.py` | `MirrorCatalogue`, `MirrorFirstBackend`, `open_library` | `sync`, `mirror`, `library` |
 | `scope.py` | Collection, year, type selection | `library` errors |
 | `resolve/` (`ids.py`, `enrich.py`), `lint.py`, `acronyms.py`, `authors_report.py`, `metadata.py`, `dedupe.py`, `pdfid.py` | Identifier, hygiene, and corpus-frequency logic. Take a backend; never name a manager | the protocol |
-| `critique.py`, `critique_checks.py`, `critique_extract.py`, `critique_llm.py`, `critique_metrics.py`, `critique_ai_tells.py`, `critique_ai_model.py`, `critique_overlap.py`, `critique_stats.py` | Local manuscript pack (`paperful.critique.pack.v1`). Checkers always; gated LLM comments; optional Binoculars extra (no torch at import) | `cli_runtime`, gated `llm` |
+| `critique.py`, `critique_checks.py`, `critique_extract.py`, `critique_llm.py`, `critique_marg.py`, `critique_metrics.py`, `critique_ai_tells.py`, `critique_ai_model.py`, `critique_vale.py`, `critique_overlap.py`, `critique_stats.py` | Local manuscript pack (`paperful.critique.pack.v1`). Checkers always; gated LLM comments; optional MARG-S advanced lane (optional GROBID TEI chunks); optional Binoculars extra (no torch at import); optional Vale house-style pass (no vale at import) | `cli_runtime`, gated `llm`, optional `grobid_client` |
 | `config_tables.py` | Nested TOML sections applied onto `Config` | `config` parsers |
 | `sources/` | One fetch lane each. Return bytes or a miss | `sources.base` |
 | `camofox_client.py` / `camofox_recover.py` | Opt-in Camoufox REST recover (before `browser_agent`) | `sources.camofox`, [camofox.md](camofox.md) |
@@ -221,7 +221,7 @@ Tier policy (1.0 contract):
 | `paperful.rag.questions.v1` | `state/rag/questions/` | `rag.questions` | T2 | — |
 | `paperful.sections.v1` | `state/sections/<key>.json` | `extract-sections` | T2 | Required: `schema`, `item_key`, `title`, `year`, `source`, `fields`, `missing`. Optional: `sections`, `engine` (`grobid`\|`rule`), `pdf_sha256`, `notes` (scan skip / GROBID failure). Each `fields.<name>`: `text`, `provenance` (`rule`\|`grobid`\|`llm`), optional `heading`, `pages` |
 | `paperful.grobid.tei.v1` | `state/grobid/<sha256>.json` next to `.tei.xml` | `sections.grobid` | T3 | Rebuildable cache |
-| `paperful.critique.pack.v1` | `state/critiques/<id>/<stamp>/pack.json` | `critique` | T1 | `CRITIQUE_PACK_KEYS` (`findings`, `overlap`, `metrics`, `llm`, …). `llm` may be `null` |
+| `paperful.critique.pack.v1` | `state/critiques/<id>/<stamp>/pack.json` | `critique` | T1 | `CRITIQUE_PACK_KEYS` (`findings`, `overlap`, `metrics`, `llm`, …). `llm` may be `null`. Optional `ai_model` / `vale` only when those extras ran |
 | `paperful.rq_answered.v1` | `state/rq-answered/` | `rag.answered` | T2 | — |
 | `paperful.rag.text.v1` | extracted text cache | `rag.extract` | T3 | Rebuildable |
 | `paperful.rag.index.v1` | LanceDB meta | `rag.index` | T3 | Not a promise |

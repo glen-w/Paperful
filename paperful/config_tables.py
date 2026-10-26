@@ -167,8 +167,46 @@ def apply_critique(raw: dict[str, Any], cfg: "Config") -> None:
                 lambda v: max(1000, int(v)),
             ),
             ("ai_model", "critique_ai_model", bool),
+            ("vale", "critique_vale", bool),
+            (
+                "vale_config",
+                "critique_vale_config",
+                lambda v: Path(v).expanduser() if v else None,
+            ),
+            (
+                "vale_timeout_s",
+                "critique_vale_timeout_s",
+                lambda v: max(1.0, float(v)),
+            ),
+            ("advanced", "critique_advanced", bool),
+            (
+                "advanced_max_rounds",
+                "critique_advanced_max_rounds",
+                lambda v: max(1, int(v)),
+            ),
+            (
+                "advanced_max_workers",
+                "critique_advanced_max_workers",
+                lambda v: max(1, int(v)),
+            ),
+            (
+                "advanced_max_comments",
+                "critique_advanced_max_comments",
+                lambda v: max(1, int(v)),
+            ),
+            ("advanced_refine", "critique_advanced_refine", bool),
+            (
+                "advanced_timeout_s",
+                "critique_advanced_timeout_s",
+                lambda v: max(0.0, float(v)),
+            ),
         ],
     )
+    if "vale_min_alert_level" in table:
+        cfg.critique_vale_min_alert_level = C.parse_vale_min_alert_level(
+            str(table.get("vale_min_alert_level") or ""),
+            key="[critique].vale_min_alert_level",
+        )
     if "reviewers" in table:
         cfg.critique_reviewers = C.parse_critique_reviewers(table.get("reviewers"))
     if cfg.critique_overlap_n_min > cfg.critique_overlap_n_max:
@@ -854,3 +892,8 @@ def apply_prompt_paths(cfg: "Config", source: Path) -> None:
         )
     if cfg.ste_word_list_path is not None and not cfg.ste_word_list_path.is_absolute():
         cfg.ste_word_list_path = (source.parent / cfg.ste_word_list_path).resolve()
+    if (
+        cfg.critique_vale_config is not None
+        and not cfg.critique_vale_config.is_absolute()
+    ):
+        cfg.critique_vale_config = (source.parent / cfg.critique_vale_config).resolve()

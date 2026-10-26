@@ -9,13 +9,16 @@ point `[grobid].base_url` at it.
 GROBID is off by default. The core fetch / lint / attach loop never needs it.
 `paperful extract-sections` still works with heading-heuristic rules when GROBID
 is down. Optional `[rag].parser = "grobid"` uses the same TEI cache for RAG
-ingest.
+ingest. `paperful critique --advanced` reuses that cache for section-labeled
+chunks and falls back to ordinary extract text when GROBID is off, the file is
+not a PDF, the PDF is a scan, or the sidecar errors.
 
 ## When to use it
 
 - Structured IMRaD fields (`abstract`, `methodology`, `conclusion`,
   `research_questions`) that heading regexes miss
 - Cleaner section labels on `rag ingest` than `pdftotext`
+- Section-labeled chunks for `critique --advanced` (MARG-S-style)
 
 Skip it for scans until `paperful ocr` has added a text layer. GROBID is not
 a metadata write-back path and does not edit Zotero parents.
@@ -63,7 +66,7 @@ Disabled stays green. Enabled and down is amber.
 PDF to `/api/processFulltextDocument` and caches TEI under
 `state/grobid/<sha256>.tei.xml` (`paperful.grobid.tei.v1`). Unchanged hashes
 skip the HTTP call unless `--force`. A warm cache for that PDF hash is enough
-for `[rag].parser = "grobid"` even if the sidecar is briefly down. Fields land
+for `[rag].parser = "grobid"` and for `critique --advanced` chunks even if the sidecar is briefly down. Fields land
 in `state/sections/<key>.json` with provenance `grobid` (heading rules fill
 gaps; optional `--llm` still only fills missing MVP fields). Scans are skipped
 with a note until `paperful ocr` has added a text layer.

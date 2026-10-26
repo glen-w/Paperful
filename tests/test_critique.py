@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import zipfile
 from pathlib import Path
@@ -143,6 +144,22 @@ def test_stage_file_sanitizes_name(cfg, tmp_path: Path):
     dest.resolve().relative_to(uploads)
     assert ".." not in dest.name
     assert dest.name.endswith(".md")
+
+
+def test_build_critique_emits_status(cfg, tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
+    src = tmp_path / "draft.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    seen: list[str] = []
+    pack = build_critique(
+        cfg, file_path=src, offline=True, on_status=seen.append
+    )
+    joined = "\n".join(seen)
+    assert "Extracting" in joined
+    assert "Extracted" in joined
+    assert "Checkers: bibliography" in joined
+    assert "Library overlap" in joined
+    assert pack["schema"] == SCHEMA
 
 
 def test_pack_keys_and_lanes_offline(cfg, tmp_path: Path, monkeypatch):
@@ -370,11 +387,19 @@ def test_llm_refuses_identity_mismatch_without_force(cfg, tmp_path):
     findings = [
         make_finding(code="pdf_identity_mismatch", severity="warn", detail="mismatch")
     ]
+    seen: list[str] = []
     extra, meta = suggested_from_llm(
-        cfg, doc, findings, item=None, client=object(), force=False
+        cfg,
+        doc,
+        findings,
+        item=None,
+        client=object(),
+        force=False,
+        on_status=seen.append,
     )
     assert extra[0].code == "llm_refused_identity"
     assert meta is None
+    assert any("pdf_identity_mismatch" in msg for msg in seen)
 
 
 def test_cli_file_xor_and_json(cfg, tmp_path, monkeypatch):
@@ -412,6 +437,7 @@ def test_cli_file_xor_and_json(cfg, tmp_path, monkeypatch):
         ],
     )
     assert ok.exit_code == 0, ok.output
+    assert "Extracting" not in ok.stdout
     body = json.loads(ok.stdout)
     assert body["command"] == "critique"
     assert body["summary"]["findings"] >= 1
@@ -447,6 +473,7 @@ def test_cli_file_xor_and_json(cfg, tmp_path, monkeypatch):
 def test_cli_ai_model_flag_writes_unavailable(cfg, tmp_path, monkeypatch):
     from paperful.cli import app
 
+    monkeypatch.setattr("paperful.critique_ai_model.run_ai_model", lambda _t: None)
     cfg_path = tmp_path / "config.toml"
     cfg_path.write_text(
         f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
@@ -478,6 +505,7 @@ def test_cli_ai_model_flag_writes_unavailable(cfg, tmp_path, monkeypatch):
 def test_cli_config_ai_model_ors_without_flag(cfg, tmp_path, monkeypatch):
     from paperful.cli import app
 
+    monkeypatch.setattr("paperful.critique_ai_model.run_ai_model", lambda _t: None)
     cfg_path = tmp_path / "config.toml"
     cfg_path.write_text(
         f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
@@ -560,7 +588,47 @@ def test_cli_unsupported_binary(tmp_path, monkeypatch):
     assert res.exit_code == 1
 
 
+def test_run_critique_prints_phase_lines(cfg, tmp_path, monkeypatch):
+    from contextlib import contextmanager
+
+    from paperful.critique_cmd import run_critique
+
+    src = tmp_path / "draft.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
+    monkeypatch.setattr("paperful.cli_runtime._cfg", lambda _p: cfg)
+    monkeypatch.setattr("paperful.cli_runtime._agent_json", lambda fmt: False)
+    monkeypatch.setattr("paperful.cli_runtime._offline", lambda: True)
+
+    @contextmanager
+    def fake_spinner(_text, *, json_out=False):
+        yield lambda _msg: None
+
+    monkeypatch.setattr("paperful.cli_runtime._spinner", fake_spinner)
+    c = _console()
+    run_critique(
+        c,
+        item=[],
+        file_path=src,
+        collection=[],
+        library=False,
+        dry_run=True,
+        apply=False,
+        llm=False,
+        force=False,
+        show_dismissed=False,
+        config=None,
+        fmt="text",
+    )
+    text = c.export_text()
+    assert "Extracting" in text
+    assert "Checkers: bibliography" in text
+    assert "Library overlap" in text
+
+
 def test_run_critique_apply_item_note(cfg, tmp_path, monkeypatch):
+    from contextlib import contextmanager
+
     from paperful.critique_cmd import run_critique
     from paperful.scope import ItemScope
 
@@ -602,6 +670,12 @@ def test_run_critique_apply_item_note(cfg, tmp_path, monkeypatch):
             "paperful.critique_extract", fromlist=["ExtractedDoc"]
         ).ExtractedDoc(text=MANUSCRIPT, format="pdf", finding="ok", pages=[MANUSCRIPT]),
     )
+
+    @contextmanager
+    def fake_spinner(_text, *, json_out=False):
+        yield lambda _msg: None
+
+    monkeypatch.setattr("paperful.cli_runtime._spinner", fake_spinner)
     run_critique(
         _console(),
         item=["ITEM0001"],
@@ -745,7 +819,8 @@ def test_short_file_ai_tells_abstain(cfg, tmp_path: Path):
     assert "ai_tells_abstain" in {f["code"] for f in pack["findings"]}
 
 
-def test_ai_model_flag_records_unavailable(cfg, tmp_path: Path):
+def test_ai_model_flag_records_unavailable(cfg, tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("paperful.critique_ai_model.run_ai_model", lambda _t: None)
     path = tmp_path / "model.txt"
     path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
     pack = build_critique(cfg, file_path=path, offline=True, use_ai_model=True)
@@ -754,6 +829,282 @@ def test_ai_model_flag_records_unavailable(cfg, tmp_path: Path):
     assert pack.get("ai_model") == {"skipped": "unavailable"}
     row = next(f for f in pack["findings"] if f["code"] == "ai_model_unavailable")
     assert row["lane"] == "suggested"
+
+
+def test_default_critique_does_not_run_vale(cfg, tmp_path: Path, monkeypatch):
+    def boom(*_a, **_k):
+        raise AssertionError("vale must not run")
+
+    monkeypatch.setattr("paperful.critique_vale.shutil.which", boom)
+    monkeypatch.setattr("paperful.critique_vale.subprocess.run", boom)
+    path = tmp_path / "plain.txt"
+    path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
+    pack = build_critique(cfg, file_path=path, offline=True)
+    assert "vale" not in pack
+    assert not any(
+        str(f.get("code") or "").startswith("vale_") for f in pack["findings"]
+    )
+
+
+def test_vale_unavailable_when_not_on_path(cfg, tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("paperful.critique_vale.shutil.which", lambda _name: None)
+    path = tmp_path / "vale.txt"
+    path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
+    pack = build_critique(cfg, file_path=path, offline=True, use_vale=True)
+    codes = {f["code"] for f in pack["findings"]}
+    assert "vale_unavailable" in codes
+    assert pack.get("vale") == {"skipped": "unavailable"}
+    row = next(f for f in pack["findings"] if f["code"] == "vale_unavailable")
+    assert row["lane"] == "checked"
+    assert row["source"] == "vale"
+    assert row["severity"] == "info"
+
+
+def test_vale_no_config_when_ini_missing(cfg, tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(
+        "paperful.critique_vale.shutil.which", lambda _name: "/usr/bin/vale"
+    )
+    cfg.config_path = tmp_path / "config.toml"
+    path = tmp_path / "vale.txt"
+    path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
+    pack = build_critique(cfg, file_path=path, offline=True, use_vale=True)
+    assert pack.get("vale") == {"skipped": "no_config"}
+    row = next(f for f in pack["findings"] if f["code"] == "vale_no_config")
+    assert row["lane"] == "checked"
+    assert row["source"] == "vale"
+
+
+def test_vale_maps_alerts_to_findings(cfg, tmp_path: Path, monkeypatch):
+    ini = tmp_path / ".vale.ini"
+    ini.write_text("MinAlertLevel = suggestion\n", encoding="utf-8")
+    cfg.critique_vale_config = ini
+    alerts = [
+        {
+            "Check": "House.Terms",
+            "Severity": "error",
+            "Match": "utilize",
+            "Message": "Use 'use' instead of 'utilize'.",
+            "Line": 1,
+            "Span": [8, 15],
+        },
+        {
+            "Check": "write-good.Weasel",
+            "Severity": "suggestion",
+            "Match": "very",
+            "Message": "'very' is a weasel word!",
+            "Line": 1,
+            "Span": [29, 33],
+        },
+    ]
+    payload = json.dumps({"manuscript.txt": alerts})
+
+    def fake_run(cmd, **_kwargs):
+        assert cmd[0] == "/usr/bin/vale"
+        assert "sync" not in cmd
+        assert "--output=JSON" in cmd
+        assert "--no-exit" in cmd
+        assert "--no-global" in cmd
+        assert "--ignore-syntax" in cmd
+        assert any(str(a).startswith("--config=") for a in cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout=payload, stderr="")
+
+    monkeypatch.setattr(
+        "paperful.critique_vale.shutil.which", lambda _name: "/usr/bin/vale"
+    )
+    monkeypatch.setattr("paperful.critique_vale.subprocess.run", fake_run)
+    path = tmp_path / "vale.txt"
+    path.write_text(
+        "Please utilize this very protocol in the methods section.\n",
+        encoding="utf-8",
+    )
+    pack = build_critique(cfg, file_path=path, offline=True, use_vale=True)
+    rows = [f for f in pack["findings"] if f.get("source") == "vale"]
+    codes = {f["code"] for f in rows}
+    assert "vale_house_terms" in codes
+    assert "vale_write_good_weasel" in codes
+    terms = next(f for f in rows if f["code"] == "vale_house_terms")
+    assert terms["lane"] == "checked"
+    assert terms["severity"] == "warn"
+    assert terms["quote"] == "utilize"
+    weasel = next(f for f in rows if f["code"] == "vale_write_good_weasel")
+    assert weasel["severity"] == "info"
+    assert pack.get("vale", {}).get("alert_count") == 2
+    assert pack["vale"]["config"] == str(ini)
+
+
+def test_vale_truncates_after_cap(cfg, tmp_path: Path, monkeypatch):
+    from paperful.critique_vale import MAX_VALE_FINDINGS
+
+    ini = tmp_path / ".vale.ini"
+    ini.write_text("MinAlertLevel = suggestion\n", encoding="utf-8")
+    cfg.critique_vale_config = ini
+    alerts = [
+        {
+            "Check": "House.Terms",
+            "Severity": "warning",
+            "Match": "utilize",
+            "Message": f"alert {i}",
+            "Line": 1,
+            "Span": [8, 15],
+        }
+        for i in range(MAX_VALE_FINDINGS + 3)
+    ]
+    payload = json.dumps({"manuscript.txt": alerts})
+    monkeypatch.setattr(
+        "paperful.critique_vale.shutil.which", lambda _name: "/usr/bin/vale"
+    )
+    monkeypatch.setattr(
+        "paperful.critique_vale.subprocess.run",
+        lambda cmd, **_k: subprocess.CompletedProcess(
+            cmd, 0, stdout=payload, stderr=""
+        ),
+    )
+    path = tmp_path / "vale.txt"
+    path.write_text(
+        "Please utilize this protocol in the methods section.\n", encoding="utf-8"
+    )
+    pack = build_critique(cfg, file_path=path, offline=True, use_vale=True)
+    vale_rows = [f for f in pack["findings"] if f.get("source") == "vale"]
+    assert (
+        sum(1 for f in vale_rows if f["code"] == "vale_house_terms")
+        == MAX_VALE_FINDINGS
+    )
+    assert any(f["code"] == "vale_truncated" for f in vale_rows)
+    assert pack["vale"]["alert_count"] == MAX_VALE_FINDINGS + 3
+
+
+def test_cli_vale_flag_writes_unavailable(cfg, tmp_path, monkeypatch):
+    from paperful.cli import app
+
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
+    )
+    src = tmp_path / "draft.md"
+    src.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
+    monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
+    monkeypatch.setattr("paperful.critique_vale.shutil.which", lambda _name: None)
+    ok = runner.invoke(
+        app,
+        [
+            "critique",
+            "--file",
+            str(src),
+            "--vale",
+            "--config",
+            str(cfg_path),
+            "--format",
+            "json",
+        ],
+    )
+    assert ok.exit_code == 0, ok.output
+    body = json.loads(ok.stdout)
+    assert any(i["code"] == "vale_unavailable" for i in body["items"])
+    pack_dir = Path(body["summary"]["pack_dir"])
+    on_disk = json.loads((pack_dir / "pack.json").read_text(encoding="utf-8"))
+    assert on_disk.get("vale") == {"skipped": "unavailable"}
+
+
+def test_cli_config_vale_ors_without_flag(cfg, tmp_path, monkeypatch):
+    from paperful.cli import app
+
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
+        "[critique]\nvale = true\n"
+    )
+    src = tmp_path / "draft.md"
+    src.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
+    monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
+    monkeypatch.setattr("paperful.critique_vale.shutil.which", lambda _name: None)
+    ok = runner.invoke(
+        app,
+        ["critique", "--file", str(src), "--config", str(cfg_path), "--format", "json"],
+    )
+    assert ok.exit_code == 0, ok.output
+    body = json.loads(ok.stdout)
+    assert any(i["code"] == "vale_unavailable" for i in body["items"])
+
+
+def test_vale_sibling_ini_and_min_alert_level(cfg, tmp_path: Path, monkeypatch):
+    cfg.config_path = tmp_path / "config.toml"
+    (tmp_path / ".vale.ini").write_text("MinAlertLevel = suggestion\n", encoding="utf-8")
+    cfg.critique_vale_min_alert_level = "warning"
+    seen: list[list[str]] = []
+
+    def fake_run(cmd, **_kwargs):
+        seen.append(list(cmd))
+        return subprocess.CompletedProcess(cmd, 0, stdout="{}", stderr="")
+
+    monkeypatch.setattr(
+        "paperful.critique_vale.shutil.which", lambda _name: "/usr/bin/vale"
+    )
+    monkeypatch.setattr("paperful.critique_vale.subprocess.run", fake_run)
+    path = tmp_path / "vale.txt"
+    path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
+    pack = build_critique(cfg, file_path=path, offline=True, use_vale=True)
+    assert pack.get("vale", {}).get("alert_count") == 0
+    assert seen and "--minAlertLevel=warning" in seen[0]
+    assert any(str(a).endswith(".vale.ini") or ".vale.ini" in str(a) for a in seen[0])
+    assert "sync" not in seen[0]
+
+
+def test_vale_failed_on_bad_exit(cfg, tmp_path: Path, monkeypatch):
+    ini = tmp_path / ".vale.ini"
+    ini.write_text("MinAlertLevel = suggestion\n", encoding="utf-8")
+    cfg.critique_vale_config = ini
+    monkeypatch.setattr(
+        "paperful.critique_vale.shutil.which", lambda _name: "/usr/bin/vale"
+    )
+    monkeypatch.setattr(
+        "paperful.critique_vale.subprocess.run",
+        lambda cmd, **_k: subprocess.CompletedProcess(
+            cmd, 2, stdout="", stderr="StylesPath does not exist"
+        ),
+    )
+    path = tmp_path / "vale.txt"
+    path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
+    pack = build_critique(cfg, file_path=path, offline=True, use_vale=True)
+    assert pack.get("vale") == {"skipped": "failed"}
+    row = next(f for f in pack["findings"] if f["code"] == "vale_failed")
+    assert row["lane"] == "checked"
+    assert "StylesPath" in row["detail"]
+
+
+def test_vale_warning_maps_to_warn(cfg, tmp_path: Path, monkeypatch):
+    ini = tmp_path / ".vale.ini"
+    ini.write_text("MinAlertLevel = suggestion\n", encoding="utf-8")
+    cfg.critique_vale_config = ini
+    payload = json.dumps(
+        {
+            "manuscript.txt": [
+                {
+                    "Check": "House.Passive",
+                    "Severity": "warning",
+                    "Match": "was written",
+                    "Message": "Avoid passive voice.",
+                    "Line": 1,
+                    "Span": [1, 12],
+                }
+            ]
+        }
+    )
+    monkeypatch.setattr(
+        "paperful.critique_vale.shutil.which", lambda _name: "/usr/bin/vale"
+    )
+    monkeypatch.setattr(
+        "paperful.critique_vale.subprocess.run",
+        lambda cmd, **_k: subprocess.CompletedProcess(
+            cmd, 0, stdout=payload, stderr=""
+        ),
+    )
+    path = tmp_path / "vale.txt"
+    path.write_text("It was written clearly.\n", encoding="utf-8")
+    pack = build_critique(cfg, file_path=path, offline=True, use_vale=True)
+    row = next(f for f in pack["findings"] if f["code"] == "vale_house_passive")
+    assert row["severity"] == "warn"
+    assert row["lane"] == "checked"
+    assert "major" not in {f["severity"] for f in pack["findings"] if f.get("source") == "vale"}
 
 
 def test_default_critique_does_not_import_torch(cfg, tmp_path: Path):
@@ -929,13 +1280,485 @@ def test_cited_withdrawn_and_eoc_are_warn(cfg, tmp_path: Path, monkeypatch):
         + ("Findings show p < 0.05. " * 20),
         encoding="utf-8",
     )
+    seen: list[str] = []
     pack = build_critique(
         cfg,
         file_path=path,
         offline=False,
         client=object(),
+        on_status=seen.append,
     )
     by_code = {f["code"]: f for f in pack["findings"]}
     assert by_code["cited_withdrawn"]["severity"] == "warn"
+    assert any("Cited-work status:" in msg for msg in seen)
     assert by_code["cited_expression_of_concern"]["severity"] == "warn"
     assert "cited_retracted" not in by_code
+
+
+def _marg_chat(_client, request):
+    sys_msg = request.messages[0]["content"]
+    blob = " ".join(m["content"] for m in request.messages)
+    if "refine a list" in sys_msg:
+        return json.dumps(
+            {
+                "comments": [
+                    {
+                        "quote": "See Figure 2",
+                        "detail": "The methods omit how Figure 2 was produced under the ABC protocol.",
+                        "code": "clarity",
+                    }
+                ]
+            }
+        )
+    if "lead a small review group" in sys_msg:
+        if "Replies:" in blob:
+            return json.dumps(
+                {
+                    "action": "final",
+                    "summary": "The paper reports a 47.2 percent increase and cites Figure 2.",
+                    "comments": [
+                        {
+                            "quote": "See Figure 2",
+                            "detail": "Figure 2 is mentioned without methods for the ABC protocol.",
+                            "code": "experiments",
+                        }
+                    ],
+                }
+            )
+        return json.dumps(
+            {"action": "broadcast", "message": "Please comment on the methods."}
+        )
+    return json.dumps(
+        {
+            "reply": "The methods omit N for the ABC protocol.",
+            "comments": [
+                {
+                    "quote": "ABC protocol",
+                    "detail": "State the sample size for the ABC protocol.",
+                }
+            ],
+        }
+    )
+
+
+def test_default_llm_does_not_call_marg(cfg, tmp_path, monkeypatch):
+    def boom(*_a, **_k):
+        raise AssertionError("default reviewers must not call MARG")
+
+    monkeypatch.setattr("paperful.critique_marg.suggested_from_marg", boom)
+    monkeypatch.setattr(
+        "paperful.llm.client.chat",
+        lambda _c, _r: json.dumps(
+            {
+                "summary": "We report a 47.2 percent increase in yield.",
+                "comments": [],
+                "questions": [],
+            }
+        ),
+    )
+    src = tmp_path / "draft.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        use_llm=True,
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    assert pack["llm"]["mode"] == "default"
+
+
+def test_llm_status_reports_each_reviewer(cfg, tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "paperful.llm.client.chat",
+        lambda _c, _r: json.dumps(
+            {
+                "summary": "We report a 47.2 percent increase in yield.",
+                "comments": [],
+                "questions": [],
+            }
+        ),
+    )
+    src = tmp_path / "draft.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    seen: list[str] = []
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        use_llm=True,
+        llm_client=type("C", (), {"provider": "stub"})(),
+        on_status=seen.append,
+    )
+    joined = "\n".join(seen)
+    assert "Reviewer 1/1 reviewer ·" in joined
+    assert "Reviewer 1/1 reviewer done" in joined
+    assert pack["llm"]["mode"] == "default"
+
+
+def test_vale_and_ai_model_status_lines(cfg, tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("paperful.critique_vale.shutil.which", lambda _n: None)
+    monkeypatch.setattr("paperful.critique_ai_model.run_ai_model", lambda _t: None)
+    src = tmp_path / "draft.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    seen: list[str] = []
+    build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        use_vale=True,
+        use_ai_model=True,
+        on_status=seen.append,
+    )
+    joined = "\n".join(seen)
+    assert "Vale house-style pass" in joined
+    assert "AI-text model" in joined
+
+
+def test_advanced_only_skips_independent_reviewers(cfg, tmp_path, monkeypatch):
+    seen: list[str] = []
+
+    def fake_chat(_client, request):
+        seen.append(request.messages[0]["content"])
+        return _marg_chat(_client, request)
+
+    monkeypatch.setattr("paperful.llm.client.chat", fake_chat)
+    src = tmp_path / "adv.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        use_llm=False,
+        use_advanced=True,
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    assert pack["llm"]["mode"] == "marg"
+    assert pack["llm"]["marg"]["parser"] == "extract"
+    assert all("You review a manuscript using ONLY" not in s for s in seen)
+    assert any("lead a small review group" in s for s in seen)
+    suggested = [f for f in pack["findings"] if f["lane"] == "suggested"]
+    llm_rows = [f for f in suggested if f.get("source") == "llm"]
+    assert llm_rows
+    assert any(str(f.get("reviewer") or "").startswith("marg") for f in llm_rows)
+    md = Path(pack["pack_dir"], "pack.md").read_text(encoding="utf-8")
+    assert "marg-experiments" in md or "Reviewer" in md
+
+
+def test_both_lanes_concatenate_reviewers_and_marg(cfg, tmp_path, monkeypatch):
+    prompt = tmp_path / "general.md"
+    prompt.write_text("You are reviewer A. No accept/reject.\n", encoding="utf-8")
+    cfg.critique_reviewers = (
+        CritiqueReviewer(id="general", model="model-a", prompt=str(prompt)),
+    )
+    cfg.critique_advanced_refine = False
+
+    def fake_chat(_client, request):
+        sys_msg = request.messages[0]["content"]
+        if "You are reviewer A" in sys_msg:
+            return "Opinion from model-a about the ABC protocol and Figure 2."
+        return _marg_chat(_client, request)
+
+    monkeypatch.setattr("paperful.llm.client.chat", fake_chat)
+    src = tmp_path / "both.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        use_llm=True,
+        use_advanced=True,
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    assert pack["llm"]["mode"] == "both"
+    ids = [r["id"] for r in pack["llm"]["reviewers"]]
+    assert "general" in ids
+    assert "marg-experiments" in ids
+    md = Path(pack["pack_dir"], "pack.md").read_text(encoding="utf-8")
+    assert "Opinion from model-a" in md
+
+
+def test_advanced_identity_mismatch_refuses_without_force(cfg, tmp_path):
+    from paperful.critique_extract import ExtractedDoc
+    from paperful.critique_llm import suggested_from_llm
+
+    doc = ExtractedDoc(text=MANUSCRIPT, format="md")
+    findings = [
+        make_finding(code="pdf_identity_mismatch", severity="warn", detail="mismatch")
+    ]
+    extra, meta = suggested_from_llm(
+        cfg,
+        doc,
+        findings,
+        item=None,
+        client=object(),
+        force=False,
+        use_llm=False,
+        advanced=True,
+    )
+    assert extra[0].code == "llm_refused_identity"
+    assert meta is None
+
+
+def test_advanced_drops_scoreish_and_respects_max_rounds(cfg, tmp_path, monkeypatch):
+    cfg.critique_advanced_max_rounds = 1
+    cfg.critique_advanced_refine = False
+    cfg.critique_advanced_max_comments = 4
+    calls = {"n": 0}
+
+    def fake_chat(_client, request):
+        calls["n"] += 1
+        sys_msg = request.messages[0]["content"]
+        if "lead a small review group" in sys_msg:
+            return json.dumps(
+                {
+                    "action": "broadcast",
+                    "message": "go",
+                    "comments": [
+                        {
+                            "quote": "See Figure 2",
+                            "detail": "I would reject this paper with overall score 2.",
+                        },
+                        {
+                            "quote": "ABC protocol",
+                            "detail": "Report the sample size for the ABC protocol.",
+                        },
+                    ],
+                }
+            )
+        return json.dumps({"reply": "NO_RESPONSE", "comments": []})
+
+    monkeypatch.setattr("paperful.llm.client.chat", fake_chat)
+    src = tmp_path / "rounds.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        use_advanced=True,
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    details = [
+        f["detail"]
+        for f in pack["findings"]
+        if f.get("source") == "llm" and f["lane"] == "suggested"
+    ]
+    assert not any("reject" in d.lower() for d in details)
+    assert any("sample size" in d.lower() for d in details)
+    # 3 aspects × (1 leader + workers + expert); refine off. Stay bounded.
+    assert calls["n"] <= 30
+    assert pack["llm"]["marg"]["rounds"] == 3
+
+
+def test_advanced_grobid_chunks_then_extract_fallback(cfg, tmp_path, monkeypatch):
+    from paperful.critique_extract import ExtractedDoc
+    from paperful.critique_marg import paper_chunks
+
+    pdf = tmp_path / "draft.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n")
+    doc = ExtractedDoc(
+        text=MANUSCRIPT,
+        format="pdf",
+        paragraphs=[p.strip() for p in MANUSCRIPT.split("\n\n") if p.strip()],
+    )
+
+    def fake_md(_cfg, _pdf, item_key=""):
+        return [
+            "# Methods\n\nSee Figure 2 under the ABC protocol.\n\n# Results\n\nYield rose 47.2 percent."
+        ], ""
+
+    monkeypatch.setattr("paperful.critique_marg.grobid_markdown", fake_md)
+    chunks, meta = paper_chunks(
+        cfg, doc, use_grobid=True, pdf_path=pdf, item_key=""
+    )
+    assert meta["parser"] == "grobid"
+    assert chunks
+    assert any("Methods" in c.text or c.heading == "Methods" for c in chunks)
+
+    monkeypatch.setattr(
+        "paperful.critique_marg.grobid_markdown", lambda *_a, **_k: (None, "scan")
+    )
+    chunks2, meta2 = paper_chunks(
+        cfg, doc, use_grobid=True, pdf_path=pdf, item_key=""
+    )
+    assert meta2["parser"] == "extract"
+    assert meta2["grobid_skipped"] == "scan"
+    assert chunks2
+
+
+def test_cli_advanced_flag_runs_marg(cfg, tmp_path, monkeypatch):
+    from paperful.cli import app
+
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
+        "[llm]\nenabled = true\nmodel = \"stub\"\n"
+    )
+    src = tmp_path / "draft.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_llm_for_verb", lambda _cfg: None
+    )
+    monkeypatch.setattr(
+        "paperful.llm.get_client",
+        lambda _cfg: type("C", (), {"provider": "stub"})(),
+    )
+    monkeypatch.setattr("paperful.llm.client.chat", _marg_chat)
+    ok = runner.invoke(
+        app,
+        [
+            "critique",
+            "--file",
+            str(src),
+            "--advanced",
+            "--no-llm",
+            "--config",
+            str(cfg_path),
+            "--format",
+            "json",
+        ],
+    )
+    assert ok.exit_code == 0, ok.output
+    body = json.loads(ok.stdout)
+    pack_dir = Path(body["summary"]["pack_dir"])
+    on_disk = json.loads((pack_dir / "pack.json").read_text(encoding="utf-8"))
+    assert on_disk["llm"]["mode"] == "marg"
+
+
+def test_advanced_duplicate_broadcast_hard_stop(cfg, tmp_path, monkeypatch):
+    cfg.critique_advanced_max_rounds = 4
+    cfg.critique_advanced_refine = False
+    calls = {"n": 0}
+
+    def fake_chat(_client, request):
+        calls["n"] += 1
+        sys_msg = request.messages[0]["content"]
+        if "lead a small review group" in sys_msg:
+            return json.dumps(
+                {
+                    "action": "broadcast",
+                    "message": "same question every time",
+                    "comments": [
+                        {
+                            "quote": "ABC protocol",
+                            "detail": "Name the sample size for the ABC protocol.",
+                        }
+                    ],
+                }
+            )
+        return json.dumps({"reply": "NO_RESPONSE", "comments": []})
+
+    monkeypatch.setattr("paperful.llm.client.chat", fake_chat)
+    src = tmp_path / "dup.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        use_advanced=True,
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    reviewers = pack["llm"].get("reviewers") or []
+    assert any(r.get("skipped") == "loop" for r in reviewers)
+    assert calls["n"] <= 40
+
+
+def test_advanced_timeout_aborts_later_groups(cfg, tmp_path, monkeypatch):
+    cfg.critique_advanced_timeout_s = 0.01
+    cfg.critique_advanced_refine = False
+    clock = {"t": 1_000.0}
+    monkeypatch.setattr("paperful.critique_marg.time.monotonic", lambda: clock["t"])
+
+    def fake_chat(_client, request):
+        clock["t"] += 10.0
+        sys_msg = request.messages[0]["content"]
+        if "lead a small review group" in sys_msg:
+            return json.dumps(
+                {
+                    "action": "final",
+                    "comments": [
+                        {
+                            "quote": "ABC protocol",
+                            "detail": "Report the sample size for the ABC protocol.",
+                        }
+                    ],
+                }
+            )
+        return json.dumps({"reply": "NO_RESPONSE", "comments": []})
+
+    monkeypatch.setattr("paperful.llm.client.chat", fake_chat)
+    src = tmp_path / "timeout.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        use_advanced=True,
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    reviewers = pack["llm"].get("reviewers") or []
+    assert any(r.get("skipped") == "timeout" for r in reviewers)
+
+
+def _cli_critique_pdf(tmp_path, cfg, monkeypatch, *flags):
+    from paperful.cli import app
+
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
+        '[llm]\nenabled = true\nmodel = "stub"\n',
+        encoding="utf-8",
+    )
+    src = tmp_path / "draft.pdf"
+    src.write_bytes(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n1 0 obj<<>>endobj\ntrailer<<>>\n")
+    hits = {"n": 0}
+
+    def fake_md(_cfg, _pdf, item_key=""):
+        hits["n"] += 1
+        return [
+            "# Methods\n\nSee Figure 2 under the ABC protocol.\n\n# Results\n\nYield rose 47.2 percent."
+        ], ""
+
+    monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_llm_for_verb", lambda _cfg: None
+    )
+    monkeypatch.setattr(
+        "paperful.llm.get_client",
+        lambda _cfg: type("C", (), {"provider": "stub"})(),
+    )
+    monkeypatch.setattr("paperful.llm.client.chat", _marg_chat)
+    monkeypatch.setattr("paperful.critique_marg.grobid_markdown", fake_md)
+    ok = runner.invoke(
+        app,
+        [
+            "critique",
+            "--file",
+            str(src),
+            *flags,
+            "--config",
+            str(cfg_path),
+            "--format",
+            "json",
+        ],
+    )
+    return ok, hits
+
+
+def test_cli_grobid_flag_attempts_sidecar_without_enabled(cfg, tmp_path, monkeypatch):
+    ok, hits = _cli_critique_pdf(
+        tmp_path, cfg, monkeypatch, "--advanced", "--no-llm", "--grobid"
+    )
+    assert ok.exit_code == 0, ok.output
+    assert hits["n"] == 1
+    body = json.loads(ok.stdout)
+    pack_dir = Path(body["summary"]["pack_dir"])
+    on_disk = json.loads((pack_dir / "pack.json").read_text(encoding="utf-8"))
+    assert on_disk["llm"]["marg"]["parser"] == "grobid"
+
+
+def test_cli_grobid_without_advanced_is_ignored(cfg, tmp_path, monkeypatch):
+    ok, hits = _cli_critique_pdf(tmp_path, cfg, monkeypatch, "--no-llm", "--grobid")
+    assert ok.exit_code == 0, ok.output
+    assert hits["n"] == 0

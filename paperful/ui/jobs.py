@@ -463,6 +463,9 @@ def critique(
     apply: bool = False,
     llm: bool = False,
     ai_model: bool = False,
+    vale: bool = False,
+    advanced: bool = False,
+    grobid: bool = False,
     force: bool = False,
     show_dismissed: bool = False,
 ) -> None:
@@ -476,6 +479,9 @@ def critique(
             apply=apply,
             llm=llm,
             ai_model=ai_model,
+            vale=vale,
+            advanced=advanced,
+            grobid=grobid,
             force=force,
             show_dismissed=show_dismissed,
         )
@@ -536,7 +542,9 @@ def critique(
         return
     llm_client = None
     use_llm = bool(llm)
-    if use_llm:
+    use_advanced = bool(advanced)
+    use_grobid = bool(grobid)
+    if use_llm or use_advanced:
         try:
             validate_llm_for_verb(cfg)
             llm_client = get_client(cfg)
@@ -547,6 +555,12 @@ def critique(
             commands.write_command(cfg, rec)
             return
     http = None if offline else make_client(cfg)
+
+    def on_status(msg: str) -> None:
+        rec = commands.read_command(cfg, cmd_id) or {}
+        rec["detail"] = msg
+        commands.write_command(cfg, rec)
+
     try:
         pack = build_critique(
             cfg,
@@ -557,6 +571,9 @@ def critique(
             dry_run=False,
             use_llm=use_llm,
             use_ai_model=bool(ai_model),
+            use_vale=bool(vale) or cfg.critique_vale,
+            use_advanced=use_advanced,
+            use_grobid=use_grobid,
             force=force,
             show_dismissed=show_dismissed,
             offline=offline,
@@ -565,6 +582,7 @@ def critique(
             backend=backend,
             scope_items=scope_items,
             stage_uploads=staged_path is None,
+            on_status=on_status,
         )
     except (ExtractError, ValueError) as exc:
         rec = commands.read_command(cfg, cmd_id) or {}

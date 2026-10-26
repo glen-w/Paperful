@@ -992,6 +992,21 @@ def critique(
         "--ai-model",
         help="Optional Binoculars-style AI-text extra (suggested lane; not installed by default).",
     ),
+    vale: bool = typer.Option(
+        False,
+        "--vale",
+        help="Optional Vale house-style pass (checked lane). Needs vale on PATH and a .vale.ini.",
+    ),
+    advanced: bool | None = typer.Option(
+        None,
+        "--advanced/--no-advanced",
+        help="Optional MARG-S-style multi-agent comments (suggested lane). Additive with --llm.",
+    ),
+    grobid: bool | None = typer.Option(
+        None,
+        "--grobid/--no-grobid",
+        help="Use the GROBID sidecar for advanced chunking. Default is [grobid].enabled. Only used with --advanced.",
+    ),
     reviewer: list[str] = typer.Option(
         [],
         "--reviewer",
@@ -1021,6 +1036,9 @@ def critique(
         apply=apply,
         llm=llm,
         ai_model=ai_model,
+        vale=vale,
+        advanced=advanced,
+        grobid=grobid,
         reviewer=reviewer,
         force=force,
         show_dismissed=show_dismissed,

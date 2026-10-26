@@ -116,7 +116,18 @@ def _spinner(
     """Spinner and clock for one slow call that has no item count.
 
     Yields a function that replaces the text. The line clears when done.
+    Off a TTY the callback is a no-op so piped and pytest runs cannot deadlock
+    a Rich Live display against captured stdio.
     """
+    e2e = os.environ.get("PAPERFUL_E2E") == "1"
+    stream = sys.stderr if json_out else sys.stdout
+    # Pytest capture + Rich Live on a TTY deadlocks. Piped CLI has no spinner
+    # anyway; phase print lines still go through on_status.
+    if os.environ.get("PYTEST_CURRENT_TEST") or (
+        not e2e and not stream.isatty()
+    ):
+        yield lambda _msg: None
+        return
     with _item_progress(json_out=json_out, transient=True) as progress:
         task_id = progress.add_task(text, total=None)
         yield lambda msg: progress.update(task_id, description=msg)

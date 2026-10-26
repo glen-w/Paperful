@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -192,7 +193,9 @@ def _render_metrics_md(metrics: dict[str, Any]) -> list[str]:
     lex = metrics.get("lexical_diversity") or {}
     lines.append("| Metric | Value |")
     lines.append("| --- | --- |")
-    lines.append(f"| Flesch Reading Ease | {_fmt_metric(read.get('flesch_reading_ease'))} |")
+    lines.append(
+        f"| Flesch Reading Ease | {_fmt_metric(read.get('flesch_reading_ease'))} |"
+    )
     lines.append(f"| Gunning Fog | {_fmt_metric(read.get('gunning_fog'))} |")
     lines.append(f"| ARI | {_fmt_metric(read.get('ari'))} |")
     lines.append(
@@ -224,7 +227,9 @@ def _render_metrics_md(metrics: dict[str, Any]) -> list[str]:
             f"- Burstiness (sentence-length CV): {_fmt_metric(tells.get('burstiness_cv'), 2)}"
         )
         lines.append(f"- Tell-phrase hits: {tells.get('tell_phrase_total', 0)}")
-        flags = list(tells.get("unicode_flags") or []) + list(tells.get("discourse") or [])
+        flags = list(tells.get("unicode_flags") or []) + list(
+            tells.get("discourse") or []
+        )
         if flags:
             lines.append(f"- Other flags: {', '.join(str(f) for f in flags)}")
     lines.append("")
@@ -290,7 +295,11 @@ def render_markdown(pack: dict[str, Any], *, show_dismissed: bool = False) -> st
             f"- dismissed: {counts.get('dismissed', 0)}",
         ]
     )
-    for label, key in (("lane", "by_lane"), ("severity", "by_severity"), ("code", "by_code")):
+    for label, key in (
+        ("lane", "by_lane"),
+        ("severity", "by_severity"),
+        ("code", "by_code"),
+    ):
         bucket = counts.get(key) or {}
         if bucket:
             parts = ", ".join(f"{k} {v}" for k, v in sorted(bucket.items()))
@@ -352,9 +361,9 @@ def write_pack(
     folder = cfg.state_dir / "critiques" / cid / stamp
     folder.mkdir(parents=True, exist_ok=True)
     payload.setdefault("schema", SCHEMA)
-    payload["created_at"] = payload.get("created_at") or datetime.now(
-        tz=timezone.utc
-    ).isoformat()
+    payload["created_at"] = (
+        payload.get("created_at") or datetime.now(tz=timezone.utc).isoformat()
+    )
     write_json(folder / "pack.json", payload)
     (folder / "pack.md").write_text(
         render_markdown(payload, show_dismissed=show_dismissed), encoding="utf-8"
@@ -366,7 +375,9 @@ def latest_pack_dir(cfg: Config, cid: str) -> Path | None:
     root = cfg.state_dir / "critiques" / cid
     if not root.is_dir():
         return None
-    dirs = sorted((p for p in root.iterdir() if p.is_dir() and (p / "pack.json").is_file()))
+    dirs = sorted(
+        (p for p in root.iterdir() if p.is_dir() and (p / "pack.json").is_file())
+    )
     return dirs[-1] if dirs else None
 
 
@@ -391,6 +402,9 @@ def build_critique(
     dry_run: bool = False,
     use_llm: bool = False,
     use_ai_model: bool = False,
+    use_vale: bool = False,
+    use_advanced: bool = False,
+    use_grobid: bool = False,
     reviewer_ids: list[str] | None = None,
     force: bool = False,
     show_dismissed: bool = False,
@@ -400,12 +414,15 @@ def build_critique(
     backend: Any | None = None,
     scope_items: list[Item] | None = None,
     stage_uploads: bool = True,
+    on_status: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """Run checkers and write a pack (unless ``dry_run``)."""
     from .critique_checks import run_checks
     from .critique_llm import suggested_from_llm
     from .lint import resolve_pdf_path
     from .store import Manifest
+
+    say = on_status or (lambda _msg: None)
 
     if bool(item) == bool(file_path):
         raise ValueError("pass exactly one of item or file_path")
@@ -423,8 +440,10 @@ def build_critique(
         manifest = Manifest(cfg.manifest_path)
         src = resolve_pdf_path(cfg, item, manifest)
         if src is None:
+            say(f"No PDF on disk for {item_key}")
             doc = ExtractedDoc(text="", format="pdf", finding="no_file")
         else:
+            say(f"Extracting {src.name}…")
             doc = extract_path(src)
             fmt = doc.format
     else:
@@ -435,11 +454,14 @@ def build_critique(
         if stage_uploads:
             staged = stage_file(cfg, file_path)
             src = staged
+        say(f"Extracting {original_name}…")
         doc = extract_path(src)
         fmt = doc.format
         title = original_name or src.name
         item_key = ""
 
+    words = len((doc.text or "").split())
+    say(f"Extracted {words:,} words ({fmt or doc.format or 'unknown'})")
     cid = critique_id(
         kind=kind,
         item_key=item_key,
@@ -457,15 +479,24 @@ def build_critique(
         backend=backend,
         scope_items=scope_items or [],
         force=force,
+        on_status=on_status,
     )
     from .critique_ai_model import run_ai_model
     from .critique_ai_tells import compute_ai_tells
     from .critique_metrics import compute_style_metrics
+    from .critique_vale import run_vale
 
+    say("Metrics and heuristic AI-prose tells…")
     metrics = compute_style_metrics(doc.text or "")
     metrics["ai_tells"] = compute_ai_tells(doc.text or "", doc.paragraphs or None)
+    vale_meta: dict[str, Any] | None = None
+    if use_vale:
+        say("Vale house-style pass…")
+        vale_findings, vale_meta = run_vale(cfg, doc)
+        findings.extend(vale_findings)
     ai_model_meta: dict[str, Any] | None = None
     if use_ai_model:
+        say("AI-text model (Binoculars) on full extract…")
         ai_result = run_ai_model(doc.text or "")
         if ai_result is None:
             findings.append(
@@ -500,7 +531,8 @@ def build_critique(
             ai_model_meta = ai_result
 
     llm_meta: dict[str, Any] | None = None
-    if use_llm:
+    if use_llm or use_advanced:
+        pdf = src if src is not None and src.suffix.lower() == ".pdf" else None
         extra, llm_meta = suggested_from_llm(
             cfg,
             doc,
@@ -510,6 +542,11 @@ def build_critique(
             force=force,
             metrics=metrics,
             reviewer_ids=reviewer_ids,
+            use_llm=use_llm,
+            advanced=use_advanced,
+            use_grobid=use_grobid,
+            pdf_path=pdf,
+            on_status=on_status,
         )
         findings.extend(extra)
 
@@ -542,8 +579,11 @@ def build_critique(
     }
     if ai_model_meta is not None:
         payload["ai_model"] = ai_model_meta
+    if vale_meta is not None:
+        payload["vale"] = vale_meta
     folder: Path | None = None
     if not dry_run:
+        say("Writing pack…")
         folder = write_pack(
             cfg, cid=cid, payload=payload, show_dismissed=show_dismissed
         )
@@ -554,7 +594,9 @@ def build_critique(
     return payload
 
 
-def _scope_label(collections: list[str] | None, library: bool, item: Item | None) -> str:
+def _scope_label(
+    collections: list[str] | None, library: bool, item: Item | None
+) -> str:
     if library:
         return "library"
     if collections:
@@ -577,7 +619,7 @@ def note_html(pack: dict[str, Any]) -> str:
         "Checked rows are deterministic; suggested rows (if any) are a model. "
         "Not a referee report.</p>",
         f"<p>Findings: {counts.get('findings', 0)} "
-        f"(checked { (counts.get('by_lane') or {}).get('checked', 0) }, "
+        f"(checked {(counts.get('by_lane') or {}).get('checked', 0)}, "
         f"suggested {(counts.get('by_lane') or {}).get('suggested', 0)}).</p>",
         "<ul>",
     ]

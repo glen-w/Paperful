@@ -16,7 +16,7 @@ Deterministic checkers always run (no model). **Checked** findings carry a
 quote and a page / paragraph / slide loc when one exists. Heuristic AI-prose
 tells always run too, as **suggested** `info` — they are not an LLM and not
 proof of authorship. Optional `--llm` comments and `--ai-model` are separate
-suggested extras.
+suggested extras. Optional `--vale` house-style alerts are **checked**.
 
 | Area | Lane | Codes (examples) |
 | --- | --- | --- |
@@ -35,6 +35,7 @@ suggested extras.
 | Metrics | checked | `readability_summary` (Flesch / Fog / ARI), `lexical_diversity_summary` (TTR / MTLD / hapax). Academic FRE is often 0–30; that is expected, not a defect |
 | Heuristic AI-prose tells | suggested | `ai_tell`, `ai_tell_summary`, `ai_tells_abstain` (abstain below 150 words). Formal academic English often looks “smooth” on the same signals |
 | Library text overlap | checked | `text_overlap` (distinctive n-grams vs `state/rag/text/`); `overlap_skipped_no_text` |
+| House style (optional Vale) | checked | `vale_*` from your `.vale.ini` rules; `vale_unavailable` / `vale_no_config` / `vale_failed` / `vale_truncated` when the extra is on |
 
 Offline (`PAPERFUL_OFFLINE=1` or no HTTP client): skip Crossref/OpenAlex rows
 and emit `doi_status_skipped_offline` / `identity_skipped_offline`. Overlap
@@ -52,8 +53,12 @@ uv run paperful critique --item KEY -C "My Collection"
 uv run paperful critique --file ./draft.docx -C "My Collection"
 uv run paperful critique --file ./draft.pdf --llm
 uv run paperful critique --file ./draft.pdf --llm --reviewer reviewer-2
+uv run paperful critique --file ./draft.pdf --advanced
+uv run paperful critique --file ./draft.pdf --llm --advanced --grobid
+uv run paperful critique --file ./draft.pdf --no-llm --no-advanced
 uv run paperful critique --file ./draft.pdf --no-llm   # override [critique].llm
 uv run paperful critique --file ./draft.pdf --ai-model
+uv run paperful critique --file ./draft.pdf --vale
 uv run paperful critique --item KEY --llm --force      # LLM despite identity lint
 uv run paperful critique --item KEY --apply            # child note; needs --item
 uv run paperful critique --item KEY --show-dismissed
@@ -63,10 +68,15 @@ uv run paperful critique dismiss FINDING_ID --critique-id KEY
 
 `--dry-run` prints findings and does not write `state/critiques/`. `--apply`
 posts a tagged child note only for a library `--item`. Uploads stay disk-only.
-`--llm` / `--no-llm` override `[critique].llm`. `--ai-model` turns the
+`--llm` / `--no-llm` override `[critique].llm`. `--advanced` / `--no-advanced`
+override `[critique].advanced` (MARG-S-style multi-agent lane; additive with
+`--llm`). `--grobid` / `--no-grobid` override `[grobid].enabled` and only
+affect advanced chunking. `--ai-model` turns the
 Binoculars extra on for this run (there is no `--no-ai-model`; set
-`[critique].ai_model = false` in config). `-C` is the overlap / “cited but
-not in library” corpus. `paperful jobs` lists `critique` under completeness.
+`[critique].ai_model = false` in config). `--vale` turns the Vale house-style
+pass on for this run (there is no `--no-vale`; set `[critique].vale = false`).
+`-C` is the overlap / “cited but not in library” corpus. `paperful jobs` lists
+`critique` under completeness.
 Not in `paperful all`.
 
 Packs land in `state/critiques/<id>/<stamp>/` as `pack.json`
@@ -76,14 +86,20 @@ keeps dismissals. Dismissals are `state/critiques/<id>/dismissed.jsonl`.
 Dismissed rows stay in JSON and are omitted from `pack.md` unless
 `--show-dismissed`.
 
-`--format json` prints a `paperful.agent.json.v1` envelope. Run report:
-`state/runs/<stamp>-critique.json`.
+Human CLI prints elapsed phase lines (extract, checkers, cited-work DOI
+counts, overlap, each reviewer, extras) so a long run is not silent until
+the pack. `--format json` keeps stdout as the envelope only; a spinner still
+goes to stderr on a TTY. Run report: `state/runs/<stamp>-critique.json`.
 
 `pack.json` always has `findings`, `overlap`, `metrics`, and `llm`. `metrics`
 holds readability, lexical diversity, and the AI-tell summary (also rendered
-as a Metrics section in `pack.md`). `llm` is `null` until `--llm` runs; then
-it records `model`, `prompt_sha`, `provider`, optional `narrative`, and a
-`reviewers` list (per-id model, skip reason, Markdown note).
+as a Metrics section in `pack.md`). `llm` is `null` until `--llm` or `--advanced` runs; then
+it records `mode` (`default` / `marg` / `both`), `model`, `prompt_sha`,
+`provider`, optional `narrative`, a `reviewers` list (per-id model, skip
+reason, Markdown note, including `marg-experiments` / `marg-clarity` /
+`marg-impact` when advanced ran), and optional `marg` stats (`parser`,
+`rounds`, `calls`, `skipped`). `ai_model` and
+`vale` appear only when those extras ran (skip reason or alert counts).
 
 ## Input formats
 
@@ -124,6 +140,34 @@ still returns JSON comments as suggested findings. One LLM call per reviewer.
 
 No-LLM users still get the pack (checkers, metrics, heuristic tells).
 
+## Optional advanced multi-agent (`--advanced` / `[critique].advanced`)
+
+Additive suggested lane inspired by MARG-S
+([D’Arcy et al., arXiv:2401.04259](https://arxiv.org/abs/2401.04259);
+[allenai/marg-reviewer](https://github.com/allenai/marg-reviewer), Apache-2.0).
+Paperful does not vendor that repo. Python orchestrates JSON turns with a
+leader, chunk workers, and one expert per aspect group (experiments, clarity,
+impact), then a refine pass. Same grounding and no-score rules as `--llm`.
+Identity mismatch refuses **both** LLM lanes unless `--force`.
+
+Set both on to run reviewers and MARG on every critique:
+
+```toml
+[critique]
+llm = true
+advanced = true
+```
+
+`--reviewer ID` still subsets only `[[critique.reviewers]]`. `--no-llm` does
+not turn off advanced; `--no-advanced` does not turn off reviewers.
+
+Advanced PDF chunks prefer the optional GROBID TEI cache (`process_pdf` /
+`tei_to_markdown_pages`, same as [extract-sections](grobid.md)). Scans,
+non-PDFs, and sidecar errors fall back to `ExtractedDoc` and record
+`marg.parser = "extract"`. Checkers never require GROBID. Caps:
+`advanced_max_rounds`, `advanced_max_workers`, `advanced_max_comments`,
+`advanced_timeout_s`.
+
 ## Optional AI-text extra (`--ai-model` / `[critique].ai_model`)
 
 Requests a Binoculars-style score
@@ -132,14 +176,40 @@ does not install torch or Binoculars. If the extra is missing, the pack
 records `ai_model_unavailable` (suggested / `info`) and still keeps the
 heuristic tells. Never treated as proof of authorship.
 
+## Optional Vale (`--vale` / `[critique].vale`)
+
+House-style lint via [Vale](https://vale.sh) on the **already extracted**
+manuscript text (not the original `.docx` / PDF markup). Paperful does not
+install Vale, does not put it in the Compose image, and does not run
+`vale sync`. You install the binary, keep your own `.vale.ini` and styles, and
+opt in. `paperful doctor` reports whether `vale` is on PATH (amber if missing;
+not fatal).
+
+Set `[critique].vale_config` to that ini (path relative to the paperful
+config). If unset, Paperful looks for `.vale.ini` next to the paperful config
+file only — not `$HOME` and not Vale’s global config (`--no-global`).
+`[critique].vale_min_alert_level` (`suggestion` / `warning` / `error`) and
+`vale_timeout_s` (default 60) apply to that subprocess. Missing binary, missing
+config, or a Vale crash records `vale_unavailable` / `vale_no_config` /
+`vale_failed` (`checked` / `info`) and the rest of the pack still runs. Alerts
+map to `vale_<check>` findings (`lane=checked`, `source=vale`). Vale `suggestion`
+is paperful `info`; Vale `warning` and `error` are `warn`, never `major`. More
+than 100 alerts yields `vale_truncated`. Built-in prose checkers
+(`long_sentence`, `hedge_words`, `passive_voice`) still run; overlap with Vale
+rules is expected.
+
 ## Workbench
 
 Advanced **Critique** (not on the default Wanted/Discover/Ask nav): pick an
 item from the collection chip **or** drop a file. Same checkers as the CLI.
-When `[llm]` is on, checkboxes add suggested comments and (library item only)
-force the lane past identity lint. **Write child note** is `--apply` (item
+When `[llm]` is on, **LLM comments** and **Advanced multi-agent** are
+independent checkboxes (pre-checked from `[critique].llm` / `[critique].advanced`).
+**GROBID sidecar** is for advanced chunks only (pre-checked from `[grobid].enabled`).
+Library item form also has force-LLM past identity lint. **Write child note** is `--apply` (item
 only). **Show dismissed** is `--show-dismissed`. **AI model** is `--ai-model`.
-Uploads have no apply / force / dismissed controls.
+**Vale** is `--vale`. The Vale checkbox is not pre-checked; `[critique].vale =
+true` still runs the pass even if the box is empty. Uploads have no apply /
+force / dismissed controls.
 
 ## Config
 

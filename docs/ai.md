@@ -5,7 +5,8 @@ never needs a model. Optional AI covers grounded notes (`summarize`), a
 collection review (`synthesize`), Ask / RAG, title and identity helpers, the
 browser agent, and suggested `critique --llm` comments. Heuristic AI-prose
 tells and the optional Binoculars extra on `critique` are **not** authorship
-proof. This page is the **feasibility and scale** guide: what works on
+proof. Optional `--vale` is house-style lint, not a model. This page is the
+**feasibility and scale** guide: what works on
 ordinary academic hardware, what is a “try it” experiment, and what a large
 library actually costs in time or hosted tokens.
 

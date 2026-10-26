@@ -191,6 +191,12 @@ def remediation_text(
             "apt install ocrmypdf tesseract-ocr-eng). "
             "Then: paperful ocr -C … --apply"
         )
+    if check.name == "vale":
+        return (
+            "Install Vale for optional critique house-style lint "
+            "(brew install vale / see https://vale.sh). "
+            "Set [critique].vale_config to your .vale.ini; Paperful does not run vale sync."
+        )
     if check.name == "Playwright":
         if "missing" in check.detail:
             return (
@@ -699,6 +705,18 @@ def run_checks(
             )
         )
 
+    if shutil.which("vale"):
+        checks.append(Check("vale", "green", "on PATH"))
+    else:
+        checks.append(
+            Check(
+                "vale",
+                "amber",
+                "missing — optional for critique house style "
+                "(https://vale.sh; brew install vale)",
+            )
+        )
+
     checks.append(_grey_playbooks_check(cfg))
     exclude_cols = None
     if zl is not None and info is not None:
@@ -925,7 +943,7 @@ def _model_below_agent_floor(model: str) -> bool:
 
 
 def _grobid_checks(cfg) -> list[Check]:
-    """External GROBID sidecar for ``extract-sections`` / ``[rag].parser = grobid``."""
+    """External GROBID sidecar for extract-sections / RAG parser / critique --advanced."""
     if not cfg.grobid_enabled:
         return [Check("GROBID", "green", "disabled (grobid.enabled false)")]
     from .grobid_client import GrobidConfigError, grobid_client_from_config

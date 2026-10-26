@@ -336,8 +336,18 @@ def test_job_view_normalizes_command_record():
     assert view["verb"] == "rag_ingest"
     assert view["status"] == "failed"
     assert view["error"] == "no index"
+    assert view["detail"] == ""
     assert view["args"]["limit"] == 3
     assert view["summary"]["pdf"] == 0
+    running = job_view(
+        {
+            "id": "c1",
+            "verb": "critique",
+            "status": "running",
+            "detail": "Reviewer 2/5 reviewer-2 · mistral-small:latest",
+        }
+    )
+    assert running["detail"].startswith("Reviewer 2/5")
 
 
 def test_keep_matches_legacy_top_level_doi(tmp_path):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from typing import Any
 from urllib.parse import quote, urlparse
 
@@ -132,16 +133,25 @@ def run_checks(
     backend: Any | None,
     scope_items: list[Item],
     force: bool,
+    on_status: Callable[[str], None] | None = None,
 ) -> tuple[list[Finding], list[dict[str, Any]], list[str]]:
     findings: list[Finding] = []
     sections_used: list[str] = []
+    say = on_status or (lambda _msg: None)
 
+    say("Checkers: file health and structure")
     findings.extend(_file_health(doc))
     if doc.finding in {"no_file", "unsupported", "empty_extract", "needs_ocr"} and not doc.text.strip():
         return findings, [], sections_used
 
     findings.extend(_structure(cfg, doc, sections_used))
-    findings.extend(_bibliography_and_cites(cfg, doc, item, scope_items, offline, client))
+    say("Checkers: bibliography")
+    findings.extend(
+        _bibliography_and_cites(
+            cfg, doc, item, scope_items, offline, client, on_status=on_status
+        )
+    )
+    say("Checkers: floats, acronyms, stats, prose")
     findings.extend(_floats(doc))
     findings.extend(_acronyms(doc))
     findings.extend(_abstract_numbers(doc))
@@ -152,9 +162,15 @@ def run_checks(
     findings.extend(_style_metrics(doc))
 
     if item is not None:
+        say("Checkers: identity and integrity")
         findings.extend(_identity(cfg, item, client, backend, offline))
         findings.extend(_integrity_item(cfg, item, client, backend, offline, doc))
 
+    n_scope = len(scope_items)
+    if n_scope:
+        say(f"Library overlap vs {n_scope} scoped item(s)…")
+    else:
+        say("Library overlap (corpus on disk)…")
     overlap_rows: list[dict[str, Any]] = []
     findings.extend(_overlap(cfg, doc, item, scope_items, overlap_rows))
     return findings, overlap_rows, sections_used
@@ -377,6 +393,7 @@ def _bibliography_and_cites(
     scope_items: list[Item],
     offline: bool,
     client: httpx.Client | None,
+    on_status: Callable[[str], None] | None = None,
 ) -> list[Finding]:
     out: list[Finding] = []
     body, biblio = _split_body_biblio(doc.text)
@@ -464,7 +481,11 @@ def _bibliography_and_cites(
             )
 
     if not offline and client is not None:
-        out.extend(_cited_work_status(cfg, client, dois, entries, item))
+        out.extend(
+            _cited_work_status(
+                cfg, client, dois, entries, item, on_status=on_status
+            )
+        )
     elif dois:
         out.append(
             make_finding(
@@ -541,14 +562,22 @@ def _cited_work_status(
     dois: list[str],
     entries: list[dict[str, Any]],
     item: Item | None,
+    on_status: Callable[[str], None] | None = None,
 ) -> list[Finding]:
     from .screen import lookup_doi_status
 
+    say = on_status or (lambda _msg: None)
     out: list[Finding] = []
     authors = [s.lower() for s in (getattr(item, "creator_surnames", None) or [])] if item else []
     self_hits = 0
     resolved = 0
-    for doi in dois[:80]:
+    cap = min(len(dois), 80)
+    if cap:
+        extra = f" of {len(dois)}" if len(dois) > cap else ""
+        say(f"Cited-work status: 0/{cap}{extra} DOI(s) at Crossref/OpenAlex")
+    for i, doi in enumerate(dois[:80], start=1):
+        if i == 1 or i % 10 == 0 or i == cap:
+            say(f"Cited-work status: {i}/{cap} DOI(s)")
         codes = lookup_doi_status(client, cfg, doi, refresh=False)
         if "retracted" in codes:
             out.append(

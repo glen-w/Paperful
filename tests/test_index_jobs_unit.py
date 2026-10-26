@@ -80,6 +80,41 @@ def test_extract_sections_hook_forwards_grobid(tmp_path):
     assert rec["result"]["grobid"] is True
 
 
+def test_critique_job_records_status_detail(tmp_path, monkeypatch):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cmd_id = "cmd-critique-detail"
+    commands.write_command(
+        cfg, {"id": cmd_id, "verb": "critique", "status": "running"}
+    )
+    src = tmp_path / "draft.md"
+    src.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
+
+    def fake_build(*_a, **kw):
+        on_status = kw.get("on_status")
+        if on_status:
+            on_status("Extracting draft.md…")
+        return {
+            "counts": {"findings": 0, "by_code": {}, "by_lane": {}},
+            "findings": [],
+            "pack_dir": str(tmp_path / "pack"),
+            "critique_id": "file-draft",
+            "input": {"title": "draft.md"},
+            "scope": "",
+        }
+
+    monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
+    monkeypatch.setattr("paperful.critique.build_critique", fake_build)
+    prev = jobs.critique_fn
+    jobs.critique_fn = None
+    try:
+        jobs.critique(cfg, cmd_id, staged_path=src)
+    finally:
+        jobs.critique_fn = prev
+    rec = commands.read_command(cfg, cmd_id)
+    assert rec["detail"] == "Extracting draft.md…"
+
+
 def test_summarize_hook_writes_result(tmp_path):
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     cfg.state_dir.mkdir(parents=True)

@@ -89,6 +89,16 @@ def test_remediation_rg_and_twenty(cfg):
     assert tw and "TWENTY_API_KEY" in tw and "twenty lookup" in tw
 
 
+def test_remediation_vale(cfg):
+    text = remediation_text(
+        Check("vale", "amber", "missing — optional for critique house style"),
+        cfg,
+    )
+    assert text and "vale.sh" in text
+    assert "vale sync" in text
+    assert remediation_text(Check("vale", "green", "on PATH"), cfg) is None
+
+
 def test_remediation_playwright(cfg):
     missing = Check("Playwright", "amber", "missing — run: uv sync")
     text = remediation_text(missing, cfg, docker=False)

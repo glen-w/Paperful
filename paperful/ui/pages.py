@@ -799,6 +799,7 @@ def job_view(rec: dict[str, Any] | None) -> dict[str, Any]:
         "args": extra_args,
         **result,
     }
+    out["detail"] = rec.get("detail") or out.get("detail") or ""
     skipped = str(out.get("skipped") or "")
     out["skip_plain"] = SYNTHESIZE_SKIP_MESSAGES.get(skipped, "")
     return out

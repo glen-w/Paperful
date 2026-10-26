@@ -373,6 +373,16 @@ def test_critique_table_is_parsed(tmp_path):
     assert cfg.critique_cite_age_years == 7
     assert cfg.critique_max_context_chars == 5000
     assert cfg.critique_ai_model is False
+    assert cfg.critique_vale is False
+    assert cfg.critique_vale_config is None
+    assert cfg.critique_vale_min_alert_level == "suggestion"
+    assert cfg.critique_vale_timeout_s == 60.0
+    assert cfg.critique_advanced is False
+    assert cfg.critique_advanced_max_rounds == 4
+    assert cfg.critique_advanced_max_workers == 4
+    assert cfg.critique_advanced_max_comments == 12
+    assert cfg.critique_advanced_refine is True
+    assert cfg.critique_advanced_timeout_s == 0.0
     assert cfg.critique_reviewers == ()
     assert cfg.critiques_dir == cfg.state_dir / "critiques"
 
@@ -408,6 +418,58 @@ def test_critique_reviewers_and_ai_model_are_parsed(tmp_path):
     with pytest.raises(ValueError, match="duplicate"):
         parse_critique_reviewers([{"id": "a"}, {"id": "a"}])
     assert isinstance(cfg.critique_reviewers[0], CritiqueReviewer)
+
+
+def test_critique_advanced_knobs_are_parsed(tmp_path):
+    from paperful.config import _from_dict
+
+    cfg = _from_dict(
+        {
+            "critique": {
+                "advanced": True,
+                "advanced_max_rounds": 2,
+                "advanced_max_workers": 3,
+                "advanced_max_comments": 5,
+                "advanced_refine": False,
+                "advanced_timeout_s": 90,
+            }
+        },
+        tmp_path / "config.toml",
+    )
+    assert cfg.critique_advanced is True
+    assert cfg.critique_advanced_max_rounds == 2
+    assert cfg.critique_advanced_max_workers == 3
+    assert cfg.critique_advanced_max_comments == 5
+    assert cfg.critique_advanced_refine is False
+    assert cfg.critique_advanced_timeout_s == 90.0
+
+
+def test_critique_vale_config_resolves_relative(tmp_path):
+    from paperful.config import _from_dict
+
+    ini = tmp_path / "house" / ".vale.ini"
+    ini.parent.mkdir()
+    ini.write_text("MinAlertLevel = suggestion\n", encoding="utf-8")
+    cfg = _from_dict(
+        {
+            "critique": {
+                "vale": True,
+                "vale_config": "house/.vale.ini",
+                "vale_min_alert_level": "warning",
+                "vale_timeout_s": 12,
+            }
+        },
+        tmp_path / "config.toml",
+    )
+    assert cfg.critique_vale is True
+    assert cfg.critique_vale_config == ini.resolve()
+    assert cfg.critique_vale_min_alert_level == "warning"
+    assert cfg.critique_vale_timeout_s == 12.0
+    with pytest.raises(ValueError, match="suggestion"):
+        _from_dict(
+            {"critique": {"vale_min_alert_level": "loud"}},
+            tmp_path / "config.toml",
+        )
 
 
 def test_extract_sections_table_is_parsed(tmp_path):

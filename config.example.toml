@@ -186,6 +186,18 @@ mirror_failures_before_skip = 3
 # llm = false
 # tag = "paperful-critique"
 # ai_model = false                 # optional Binoculars extra; --ai-model turns on (no CLI off)
+# vale = false                     # optional Vale house style; --vale turns on (no CLI off)
+# vale_config = ".vale.ini"        # your house .vale.ini (relative to this file)
+# vale_min_alert_level = "suggestion"  # suggestion | warning | error
+# vale_timeout_s = 60
+# advanced = false                 # MARG-S-style multi-agent lane; additive with llm
+# advanced_max_rounds = 4
+# advanced_max_workers = 4
+# advanced_max_comments = 12
+# advanced_refine = true
+# advanced_timeout_s = 0           # 0 = max([llm].timeout_s, 600)
+# # With llm = true and advanced = true, every critique runs reviewers + MARG.
+# # Advanced PDF chunks reuse [grobid] when enabled (see docs/grobid.md).
 # overlap_top_k = 40
 # overlap_n_min = 6
 # overlap_n_max = 12

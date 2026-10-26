@@ -184,7 +184,7 @@ below.
 | `extract-sections` | rules always; optional GROBID sidecar; optional `[extract_sections].llm` + `llm.enabled` | `state/sections/<key>.json` | none (disk only) |
 | `ask` | `llm.enabled` + `rag.enabled` | `state/runs/<stamp>-ask.json`; advanced summaries under `state/rag/evidence/` | none unless batch `--apply` |
 | `rag questions` | rules always; optional `[rag].extract_questions_llm` + `llm.enabled` | `state/rag/questions/<key>.json` | none |
-| `critique` | checkers, metrics, heuristic AI-tells always; optional `--llm` / `[critique].llm` + `llm.enabled`; optional `--ai-model` Binoculars extra | `state/critiques/<id>/<stamp>/` | child note with `--apply` on `--item` only |
+| `critique` | checkers, metrics, heuristic AI-tells always; optional `--llm` / `[critique].llm` + `llm.enabled`; optional `--advanced` / `[critique].advanced` MARG-S lane; optional `--ai-model` Binoculars extra; optional `--vale` / `[critique].vale` house-style pass | `state/critiques/<id>/<stamp>/` | child note with `--apply` on `--item` only |
 
 Opt-in **`camofox`** is a registered **serial** source (never in `DEFAULT_SOURCES`) that talks to an external [camofox-browser](https://github.com/jo-inc/camofox-browser) REST server for a scripted DOI→PDF grab. `run` injects it when `[camofox].enabled` and `[camofox].during_run` (default on); `--camofox` / `--no-camofox` override one invocation. Policy order places it after vault lanes and before `browser_agent`. It does not reuse the vault Chromium SSO profile (see [Camofox](camofox.md)).
 
@@ -257,7 +257,8 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
 
 - `paperful doctor` — preflight. Colours: **green** = ready; **amber** = usable with
   a degraded path (empty email, missing session, expired session when `--probe`,
-  no `pdftotext`, Playwright / Chromium not ready, Zotero 7–9 write API,
+  no `pdftotext`, missing `vale` (optional critique house style), Playwright /
+  Chromium not ready, Zotero 7–9 write API,
   incomplete grey-lit pack); **red** on `Zotero :23119` / `out_dir` / `state_dir`
   is fatal (`doctor` and any command that needs Zotero). Reports grey-lit packs
   (UNGA/undocs · BBNJ/DOALOS · ISA) when builtin is on. On a TTY, walks amber/red
@@ -268,7 +269,8 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
 - `paperful lint` / `paperful fix-metadata` — identifier hygiene; apply is explicit.
 - `paperful critique` — local manuscript pack (`state/critiques/`). Checkers,
   metrics, and heuristic AI-tells without an LLM; optional suggested comments
-  and Binoculars extra. Not a grade and not in `all`.
+  (`--llm` / `--advanced`), Binoculars extra, and Vale house-style pass.
+  Not a grade and not in `all`.
 - `paperful dedupe` / `paperful gaps` / `paperful reachout` / `paperful refs gap` / `paperful coverage` — duplicate packs, PDF/DOI counts, contact-only missing-PDF CSV (never fetches, never sends mail), cited-in-PDF missing-from-library packs, and briefing/note/file vs `-C` coverage. `refs gap` and `coverage` are always dry-run (`state/refs-gaps/`, `state/coverage/`). `ingest-dois` creates parents from those packs or a DOI file only with `--apply`.
   `dedupe` writes `state/dedupe-packs/` and merges only with `--apply`
   (the spare-copy line is written then; title+year also needs `--apply-medium`).

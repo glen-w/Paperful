@@ -8,6 +8,7 @@ from typing import Any
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from .runreport import write_command_report
@@ -24,6 +25,9 @@ def run_critique(
     apply: bool,
     llm: bool | None,
     ai_model: bool = False,
+    vale: bool = False,
+    advanced: bool | None = None,
+    grobid: bool | None = None,
     reviewer: list[str] | None = None,
     force: bool,
     show_dismissed: bool,
@@ -62,15 +66,25 @@ def run_critique(
 
     use_llm = cfg.critique_llm if llm is None else llm
     use_ai_model = bool(ai_model) or cfg.critique_ai_model
+    use_vale = bool(vale) or cfg.critique_vale
+    use_advanced = cfg.critique_advanced if advanced is None else advanced
+    use_grobid = cfg.grobid_enabled if grobid is None else grobid
     reviewer_ids = [r.strip() for r in (reviewer or []) if r and str(r).strip()]
     llm_client = None
-    if use_llm:
+    if use_llm or use_advanced:
         try:
             validate_llm_for_verb(cfg)
         except LlmConfigError as exc:
             console.print(str(exc), markup=False, style="red")
             raise typer.Exit(1) from exc
         llm_client = get_client(cfg)
+    if use_advanced and use_grobid and not json_out:
+        from .grobid_client import grobid_egress_is_remote
+
+        if grobid_egress_is_remote(cfg):
+            console.print(
+                "[yellow]GROBID is not local — PDF bytes leave this machine.[/]"
+            )
 
     offline = cli_mod._offline()
     backend = None
@@ -127,27 +141,47 @@ def run_critique(
     if apply and backend is not None and not backend.supports_write():
         raise LibraryError("critique --apply needs write access to the library")
 
+    if scope_items and not json_out:
+        console.print(f"[dim]Scope: {len(scope_items)} item(s)[/]")
+
     http = None if offline else make_client(cfg)
     started = time.time()
+    t0 = time.perf_counter()
+
+    def _on_status(msg: str) -> None:
+        elapsed = time.perf_counter() - t0
+        console.print(f"[dim]{elapsed:5.0f}s[/] {escape(msg)}")
+
     try:
-        pack = build_critique(
-            cfg,
-            item=target,
-            file_path=file_path,
-            collections=collection or None,
-            library=bool(library),
-            dry_run=dry_run,
-            use_llm=use_llm,
-            use_ai_model=use_ai_model,
-            reviewer_ids=reviewer_ids or None,
-            force=force,
-            show_dismissed=show_dismissed,
-            offline=offline,
-            client=http,
-            llm_client=llm_client,
-            backend=backend,
-            scope_items=scope_items,
-        )
+        with cli_mod._spinner("Critique", json_out=json_out) as spin:
+
+            def on_status(msg: str) -> None:
+                spin(msg)
+                if not json_out:
+                    _on_status(msg)
+
+            pack = build_critique(
+                cfg,
+                item=target,
+                file_path=file_path,
+                collections=collection or None,
+                library=bool(library),
+                dry_run=dry_run,
+                use_llm=use_llm,
+                use_ai_model=use_ai_model,
+                use_vale=use_vale,
+                use_advanced=use_advanced,
+                use_grobid=use_grobid,
+                reviewer_ids=reviewer_ids or None,
+                force=force,
+                show_dismissed=show_dismissed,
+                offline=offline,
+                client=http,
+                llm_client=llm_client,
+                backend=backend,
+                scope_items=scope_items,
+                on_status=on_status,
+            )
     except ExtractError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1) from exc
@@ -190,6 +224,9 @@ def run_critique(
             "apply": apply,
             "llm": use_llm,
             "ai_model": use_ai_model,
+            "vale": use_vale,
+            "advanced": use_advanced,
+            "grobid": use_grobid,
             "offline": offline,
         },
         started=started,
@@ -216,7 +253,13 @@ def run_critique(
             }
             for f in findings
         ],
-        flags={"dry_run": dry_run, "apply": apply, "llm": use_llm},
+        flags={
+            "dry_run": dry_run,
+            "apply": apply,
+            "llm": use_llm,
+            "advanced": use_advanced,
+            "grobid": use_grobid,
+        },
         exit_code=0,
     )
 

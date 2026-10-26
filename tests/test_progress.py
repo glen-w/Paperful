@@ -78,6 +78,27 @@ def test_ensure_ezproxy_session_pauses_live_progress(monkeypatch):
     sys.stderr = sys.__stderr__
 
 
+def test_spinner_is_noop_when_stdio_is_not_a_tty():
+    from paperful.cli_runtime import _spinner
+
+    class _Pipe(io.StringIO):
+        def isatty(self) -> bool:
+            return False
+
+    fake_out = _Pipe()
+    fake_err = _Pipe()
+    sys.stdout = fake_out
+    sys.stderr = fake_err
+    try:
+        with _spinner("Critique", json_out=False) as say:
+            say("extracting")
+        with _spinner("Critique", json_out=True) as say:
+            say("extracting")
+    finally:
+        sys.stdout = sys.__stdout__
+        sys.stderr = sys.__stderr__
+
+
 def test_item_progress_disabled_never_starts_live():
     console = Console(file=_TtyBuffer(), force_terminal=True)
     with item_progress(console, disable=True) as progress:

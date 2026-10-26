@@ -110,6 +110,8 @@ llm_pdf_match_min_confidence = 0.6
 
 [critique]                          # verb C2: suggested comments only
 llm = false
+# advanced = false                 # MARG-S lane; additive with llm (see critique.md)
+# vale = false                     # house-style pass; needs vale on PATH (not an LLM)
 # [[critique.reviewers]]            # omit the table for one builtin JSON reviewer
 # id = "reviewer-2"
 # prompt = "prompts/critique-reviewer-2.md"
@@ -249,17 +251,23 @@ silent (no finding).
 uv run paperful critique --file ./draft.pdf --llm
 uv run paperful critique --file ./draft.pdf --llm --reviewer reviewer-2
 uv run paperful critique --file ./draft.pdf --llm --reviewer reviewer-5
+uv run paperful critique --file ./draft.pdf --advanced
+uv run paperful critique --file ./draft.pdf --llm --advanced
 uv run paperful critique --item ABCD1234 --llm --force
 ```
 
 Additive. The default pack is checkers, metrics, and heuristic AI-tells with
 no model. `--llm` (or `[critique].llm = true`; `--no-llm` overrides) asks for
 a contribution summary, up to eight comments tied to a finding code or a
-quoted span, and author questions. Every row is `lane=suggested`. Ungrounded
-spans are dropped. No overall score. Identity mismatch refuses the lane
+quoted span, and author questions. `--advanced` (or `[critique].advanced = true`)
+adds a MARG-S-style multi-agent pass (experiments / clarity / impact, then
+refine). The two flags are independent; set both in config to run both on
+every critique. Every row is `lane=suggested`. Ungrounded
+spans are dropped. No overall score. Identity mismatch refuses both LLM lanes
 unless `--force`. Optional `[[critique.reviewers]]` run one call each (per-id
-model and prompt). A Markdown prompt file becomes a **Reviewer note** in
-`pack.md`; the builtin prompt still returns JSON comments. See
+model and prompt) and do not replace advanced. A Markdown prompt file becomes a **Reviewer note** in
+`pack.md`; the builtin prompt still returns JSON comments. Optional `--vale`
+house-style lint is a separate **checked** pass (no model). See
 [critique.md](critique.md).
 
 ### D. `summarize` — grounded summary note

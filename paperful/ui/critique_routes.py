@@ -68,6 +68,9 @@ def register_critique(ui: UiContext) -> None:
                 recent=list_recent_critiques(cfg),
                 accept=ACCEPT,
                 llm_on=bool(cfg.llm_enabled),
+                critique_llm=bool(cfg.critique_llm),
+                critique_advanced=bool(cfg.critique_advanced),
+                grobid_enabled=bool(cfg.grobid_enabled),
             ),
         )
 
@@ -79,6 +82,9 @@ def register_critique(ui: UiContext) -> None:
         apply = form.get("apply") == "1"
         llm = form.get("llm") == "1"
         ai_model = form.get("ai_model") == "1"
+        vale = form.get("vale") == "1"
+        advanced = form.get("advanced") == "1"
+        grobid = form.get("grobid") == "1"
         force = form.get("force") == "1"
         show_dismissed = form.get("show_dismissed") == "1"
         upload = form.get("file")
@@ -120,6 +126,9 @@ def register_critique(ui: UiContext) -> None:
                 apply=apply,
                 llm=llm,
                 ai_model=ai_model,
+                vale=vale,
+                advanced=advanced,
+                grobid=grobid,
                 force=force,
                 show_dismissed=show_dismissed,
             )

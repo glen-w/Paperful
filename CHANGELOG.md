@@ -8,6 +8,11 @@ may still be added). See [releases](docs/releases.md).
 
 ### Changed
 
+- **`paperful critique` prints phase progress.** Extract, checkers,
+  cited-work DOI counts, overlap, each reviewer, and extras log elapsed
+  seconds so a long `--llm` run is not silent. `--format json` keeps stdout
+  clean; a spinner still goes to stderr on a TTY. The workbench job line
+  shows the same current phase.
 - **`paperful attachments` is mirror-first.** The report reads children from
   the mirror and proves stored files by MD5 against the item folder; it runs
   with the manager closed (and notes unchecked attachments). `--apply` still
@@ -15,6 +20,18 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- Optional **Vale** house-style pass on `paperful critique` (`--vale` /
+  `[critique].vale`). Needs `vale` on PATH and a `.vale.ini`; missing extra
+  records `vale_unavailable` / `vale_no_config` / `vale_failed`. Alerts are
+  `lane=checked`. `doctor` ambers when Vale is missing. Paperful does not
+  install Vale, ship it in Compose, or run `vale sync`. See
+  [critique](docs/critique.md).
+- **`critique --advanced`.** Optional MARG-S-style multi-agent suggested lane
+  (leader / chunk workers / aspect experts, then refine). Additive with
+  `--llm` / `[[critique.reviewers]]`; set `[critique].llm` and
+  `[critique].advanced` both true to run both on every critique. Advanced PDF
+  chunks reuse the optional GROBID TEI cache (`--grobid` / `--no-grobid`).
+  See [critique](docs/critique.md).
 - **Ask modes.** `simple` (default: raw excerpts, one completion) and
   `advanced` (summarize and score each passage, then answer). Global
   `[rag].ask_mode`; a run can override from `--ask-mode`, the Ask / batch
@@ -22,8 +39,8 @@ may still be added). See [releases](docs/releases.md).
 - Opt-in **GROBID** sidecar for structured section extract: `[grobid]`,
   `extract-sections --grobid` / `--no-grobid`, TEI cache under `state/grobid/`,
   optional `[rag].parser = "grobid"`, `doctor` health check, Advanced Index
-  form. Paperful does not start the Java service. See
-  [docs/grobid.md](docs/grobid.md).
+  form, and `critique --advanced` chunking. Paperful does not start the Java
+  service. See [docs/grobid.md](docs/grobid.md).
 - **`paperful critique`.** Local-first manuscript pack (`--item` or `--file`):
   deterministic checkers (refs, floats, acronyms, stats/GRIM, checklists,
   library n-gram overlap, Flesch/Fog/ARI + MTLD metrics) as `lane=checked`;
