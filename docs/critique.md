@@ -119,6 +119,8 @@ config file). `--reviewer ID` (repeatable) runs a subset. A Markdown prompt
 file yields a **Reviewer note** at the head of `pack.md`; the builtin prompt
 still returns JSON comments as suggested findings. One LLM call per reviewer.
 `prompts/critique-reviewer-2.md` is the shipped Markdown example.
+`prompts/critique-reviewer-5.md` is the OpenReviewer-style general review
+(local `llama-openreviewer-8b`).
 
 No-LLM users still get the pack (checkers, metrics, heuristic tells).
 

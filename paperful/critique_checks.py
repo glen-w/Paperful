@@ -1015,6 +1015,7 @@ def _prose(doc: ExtractedDoc) -> list[Finding]:
     long = [s for s in sentences if len(s.split()) >= 40]
     hedges = list(_HEDGE.finditer(doc.text))
     passive = list(_PASSIVE.finditer(doc.text))
+    words = len(doc.text.split())
     out: list[Finding] = []
     if long:
         out.append(
