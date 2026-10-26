@@ -215,6 +215,9 @@ Need reproducible .bib for a paper submission?
 Chat agent needs the whole public literature (graph, trends, author intel), not just Zotero?
   → Valency MCP Bond (complement Paperful for *your* PDFs and mirror)
 
+Need a hosted cited review, “has anyone done this?”, or Kosmos on a dataset?
+  → Edison Scientific. Keep Paperful for PDFs, the disk ledger, and Ask over held papers
+
 Already have a reading list on disk and want gaps vs what your PDFs cite?
   → paperful refs gap (CLI or MCP refs_gap)
 ```
