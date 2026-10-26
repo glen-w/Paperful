@@ -1,7 +1,13 @@
 # How Paperful compares
 
 A plain-language map of where Paperful sits next to Zotero plugins, bibliography
-fixers, Mendeley export cleaners, and DOI-centric download scripts.
+fixers, Mendeley export cleaners, DOI-centric download scripts, and the 2026
+cluster of hosted literature / AI-scientist / manuscript tools.
+
+**1.x** is still a disk-first Zotero helper whose public job is **find missing
+PDFs**. Hosted “paper factories” (Edison, Elicit, Deep Research, Jenni) own
+discover and draft; they do not own campus-proxy fetch, grey playbooks, or a
+restore ledger. Factory-stage matrix: [comparison reference](comparison-reference.md#paper-factory-stages).
 
 **Last reviewed:** 2026-10-26. Feature lists for other products are based on public
 docs and positioning — not paid pilots or exhaustive release testing.
@@ -24,8 +30,13 @@ Prefer this page for “is this the right tool?”
 | **Scriptable library surgery** (merge, enrich, disk GC, two-up scan split) via CLI/MCP | [zotero-agent](https://github.com/alex-roc/zotero-agent) |
 | **AI assistant** read/write over the library, including chat and (on some forks) OCR of scans | zotero-mcp forks ([richardjlyon](https://github.com/richardjlyon/zotero-mcp), [cookjohn](https://github.com/cookjohn/zotero-mcp), [mcp-zotero](https://github.com/Xevos117/mcp-zotero)) |
 | **Semantic search, citation graph, author/trend tools** over the public literature via MCP (hosted corpus; not your Zotero tree) | [Valency MCP Bond](https://www.valency.io/) — see [reference](comparison-reference.md#valency-mcp-bond-and-hub) |
-| **Hosted AI scientist** — cited reviews over ~175M papers/trials/patents, “has anyone done this?”, optional multi-hour discovery + experimental analysis | [Edison Scientific](https://docs.edisonscientific.com/) (Literature / Precedent / Kosmos) — see [reference](comparison-reference.md#edison-scientific) |
-| **Grounded Q&A over PDFs you already have** (local index; same collection mirror as fetch) | **Paperful** `rag ingest` / `ask` — optional `paperful mcp` (`ask`, `refs_gap`, `gaps`, `snowball_search`, `snowball_trends`, `export`, `proposal_export`) |
+| **Hosted literature search / cited review** over a public corpus (not your Zotero tree) | [Elicit](https://elicit.com/), [Consensus](https://consensus.app/), [Undermind](https://undermind.ai/), [SciSpace](https://www.typeset.io/), [Scite](https://scite.ai/) — see [reference](comparison-reference.md#hosted-literature-search) |
+| **Hosted AI scientist** — cited reviews over ~175M papers/trials/patents, “has anyone done this?”, optional multi-hour discovery + experimental analysis | [Edison Scientific](https://docs.edisonscientific.com/) (Literature / Precedent / Kosmos). Nearby loops: [Google Co-Scientist](https://deepmind.google/blog/co-scientist-a-multi-agent-ai-partner-to-accelerate-research/), [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) (workshop-grade, not a library helper) — [reference](comparison-reference.md#edison-scientific) |
+| **Web Deep Research memo** (cited longform from the open web in minutes; not a journal manuscript) | OpenAI / Gemini / Perplexity Deep Research. Paperful Ask is over **held** PDFs |
+| **Systematic-review screening** (dual review, extraction forms, PRISMA counts; usually no discovery corpus) | [Covidence](https://www.covidence.org/), [Rayyan](https://www.rayyan.ai/), DistillerSR; local [ASReview](https://asreview.nl/). Paperful Discover Keep/Skip is hop triage, not dual review |
+| **Chat with PDFs you upload** (no scholarly search, no Zotero restore) | Scholarcy, Explainpaper, Humata, [Gemini Notebook](https://notebooklm.google/). Paperful `ask` uses the **same** `out/` tree as fetch |
+| **Draft a manuscript with citations** (library ∪ global index; language/LaTeX) | [Jenni](https://jenni.ai/), [Paperpal](https://paperpal.com/), SciSpace Writer, Writefull in [Overleaf](https://docs.overleaf.com/integrations-and-add-ons/ai-features). Living cites without a model: Better BibTeX → Quarto. Paperful does not draft papers |
+| **Grounded Q&A over PDFs you already have** (local index; same collection mirror as fetch) | **Paperful** `rag ingest` / `ask` (`simple` default; `--ask-mode advanced` scores passages then answers) — optional `paperful mcp` (`ask`, `refs_gap`, `gaps`, `snowball_search`, `snowball_trends`, `export`, `proposal_export`). OSS cousin: [PaperQA2](https://github.com/future-house/paper-qa) (you supply the PDFs) |
 | **`.bib` normalize / dedupe / upgrade preprints** (no Zotero required) | [bibcite](https://github.com/leo1oel/bibcite), [bibtex-tidy](https://github.com/FlamingTempura/bibtex-tidy), [bibmanager](https://bibmanager.readthedocs.io/) |
 | **Mendeley** dedup inside the app; clean **exported** BibTeX | Mendeley Duplicates smart collection; export cleaners such as [mendeley_bibtex_cleaner](https://gist.github.com/alexandrehuat/6d3263f73ccae87d0107977978316c02) |
 | **DOI-list PDF batch** without Zotero | [paperscraper](https://github.com/jannisborn/paperscraper) |
@@ -119,7 +130,10 @@ Legend: **Yes** = first-class · **Partial** = adjacent or lighter · **No** = a
 | Grounded summary / collection review | Partial (opt-in, local, text layer) | No | No | No | No | Partial (public README: summarize PDFs into notes) |
 | OCR for scanned PDFs | Partial (`ocr`, OCRmyPDF text layer on disk) | No | No | No | No | Partial (`pdf-prep`, OCRmyPDF) |
 
-zotero-mcp, Valency MCP Bond, Edison Scientific, and BibTeX-cluster columns: [comparison reference](comparison-reference.md#capability-snapshot).
+zotero-mcp, Valency, Edison, Elicit/Consensus, SR tools, writers, and BibTeX
+columns: [comparison reference](comparison-reference.md#capability-snapshot).
+Factory stages (discover → PDF → screen → write): [paper factory
+stages](comparison-reference.md#paper-factory-stages).
 
 ## What Paperful does not do today
 
@@ -129,6 +143,8 @@ zotero-mcp, Valency MCP Bond, Edison Scientific, and BibTeX-cluster columns: [co
 - Two-up scan split, or a chat agent over the library (`ocr` adds a text layer; it does not split pages. `summarize` / `synthesize` / `recover` are opt-in and local)
 - Hosted multi-user service
 - Autonomous AI-scientist runs, experimental-data kernels, or molecular design (use [Edison Scientific](https://docs.edisonscientific.com/) or similar)
+- A journal manuscript, related-work draft, or “overnight PhD” (use Jenni/Paperpal/Overleaf for drafting; Edison/Sakana are not Paperful’s job)
+- Systematic-review dual screening and PRISMA-grade recall (use Covidence / Rayyan / ASReview; Discover Keep/Skip is hop triage)
 - Jeffersonian transcription or qualitative coding
 
 ## Choosing in one glance
@@ -179,6 +195,21 @@ Need semantic search / citation graph / trends across all public papers, not jus
 
 Need a hosted cited review, “has this been tried?”, or a Kosmos-style run over a dataset plus the public literature?
   → Edison Scientific (Literature / Precedent / Kosmos). Paperful still owns PDFs, the disk mirror, and Ask over *your* collection
+
+Need Elicit/Consensus-style tables over the public record, not campus PDFs?
+  → Elicit, Consensus, Undermind, SciSpace. Then snowball / ingest-dois → paperful run
+
+Need dual-review screening and a PRISMA flow?
+  → Covidence, Rayyan, DistillerSR, or local ASReview. Paperful fills PDFs and can later export counts
+
+Need a Deep Research memo from the web?
+  → OpenAI / Gemini / Perplexity. Not a Zotero collection and not a journal paper
+
+Need a manuscript draft with extra cites from a huge index?
+  → Jenni, Paperpal, SciSpace Writer, Overleaf AI. Paperful will not invent BibTeX; extra cites belong in Zotero first
+
+Need cited Q&A on a folder of PDFs with no Zotero?
+  → PaperQA2 (OSS). Paperful when those PDFs should also live in a restore ledger
 ```
 
 More branches: [comparison reference](comparison-reference.md#choosing-in-one-glance).
@@ -187,7 +218,7 @@ How far a snowball hop reaches: [How a hop is cut](snowball.md#how-a-hop-is-cut)
 ## Related docs
 
 - [architecture.md](architecture.md) — disk-first adapters, circuit breaker, Sci-Hub
-- [ROADMAP.md](ROADMAP.md) — 1.0 trust + post-1.1 buffet by area; optional LLM; snowball phases
+- [ROADMAP.md](ROADMAP.md) — 1.x Wanted + mirror; v2 factory packs after the ledger is honest
 - [snowball.md](snowball.md) — keyword, multi-DOI / multi-ORCID, collection, and hybrid library building
 - [authorwatch.md](authorwatch.md) — people lists → new papers (suggest / accept / import; no hop)
 - [comparison-reference.md](comparison-reference.md) — vendor notes and extra tables

@@ -17,6 +17,7 @@ from ..snowball.seeds import parse_seed_lines, read_seeds_text
 from .answer import answer
 from .index import Index, index_dir
 from .ledger import Ledger
+from .mode import resolve_ask_mode
 from .prompt import PROMPT_VERSION, resolve_system_prompt
 
 SCHEMA = "paperful.ask_batch.v1"
@@ -50,6 +51,7 @@ class BatchPack:
     skipped: int
     failed: int
     rows: list[BatchRow] = field(default_factory=list)
+    ask_mode: str = "simple"
 
 
 def question_sha(text: str) -> str:
@@ -81,6 +83,7 @@ def resume_key(
     focus: str,
     prompt_label: str,
     index_fp: str,
+    ask_mode: str = "simple",
 ) -> str:
     payload = "|".join(
         [
@@ -89,6 +92,7 @@ def resume_key(
             prompt_label,
             str(PROMPT_VERSION),
             index_fp,
+            ask_mode,
         ]
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
@@ -149,6 +153,7 @@ def run_batch(
     embedder: Embedder | None = None,
     index: Index | None = None,
     ledger: Ledger | None = None,
+    ask_mode: str | None = None,
 ) -> BatchPack:
     """Answer each question; reuse cache when the resume key matches."""
     path = prompt_path if prompt_path is not None else (cfg.rag_prompt or None)
@@ -158,6 +163,7 @@ def run_batch(
         prompt_text=prompt_text,
     )
     del system  # answer() resolves the same way
+    mode = resolve_ask_mode(cfg, ask_mode)
     index_fp = index_fingerprint(cfg)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     rows: list[BatchRow] = []
@@ -171,6 +177,7 @@ def run_batch(
             focus=focus_name,
             prompt_label=prompt_label,
             index_fp=index_fp,
+            ask_mode=mode,
         )
         if not force:
             cached = load_cached(cfg, key)
@@ -191,6 +198,7 @@ def run_batch(
                 embedder=embedder,
                 index=index,
                 ledger=ledger,
+                ask_mode=mode,
             )
             text = reply.read()
             cited = reply.cited()
@@ -230,6 +238,7 @@ def run_batch(
         prompt_version=PROMPT_VERSION,
         embed_fingerprint=index_fp,
         model=(cfg.rag_model or cfg.llm_model).strip(),
+        ask_mode=mode,
         scope=scope or {},
         questions=len(rows),
         answered=answered,
@@ -251,6 +260,7 @@ def write_pack(cfg: Config, pack: BatchPack) -> Path:
         "prompt_version": pack.prompt_version,
         "embed_fingerprint": pack.embed_fingerprint,
         "model": pack.model,
+        "ask_mode": pack.ask_mode,
         "scope": pack.scope,
         "questions": pack.questions,
         "answered": pack.answered,
@@ -271,6 +281,7 @@ def _answers_md(pack: BatchPack) -> str:
         f"# Ask batch {pack.stamp}",
         "",
         f"- focus: `{pack.focus}`",
+        f"- ask_mode: `{pack.ask_mode}`",
         f"- answered: {pack.answered} · skipped: {pack.skipped} · failed: {pack.failed}",
         "",
     ]

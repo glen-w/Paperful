@@ -93,6 +93,44 @@ not a paid pilot.
 
 Valency **Hub** (publish, fork, public review) is a separate product; Paperful does not host papers.
 Edison **Kosmos** is a separate autonomous-scientist job, not an MCP Bond analogue.
+Docs say Literature covers **175M+** works; Edison’s February 2026 PaperQA3 post says **150M+** with figures — do not reconcile those numbers in a customer table.
+
+(paper-factory-stages)=
+### Paper-factory stages (Oct 2026)
+
+Nobody ships discover → campus PDF → dual screen → extract → synthesize →
+novelty → journal manuscript → keep current, **and** local/offline Zotero
+restore. Hosted tools saturate discover/synthesize. Paperful 1.x owns **get
+PDF** (proxy + grey + provenance) and the **restore ledger**. Scores are
+public-docs positioning (2026-10-26), not a paid audit.
+
+Legend: **Yes** · **Partial** · **No**. **Novelty** is split from synthesize
+on purpose (Edison Literature vs Precedent). **Write MS** means a
+submission-shaped draft, not a Deep Research memo. Independent 2025 work
+found Elicit Pro Review-mode sensitivity ~40% vs traditional searches
+~95% — do **not** mark Elicit **screen** as Yes.
+
+| Platform | Discover | Get PDF | Screen | Synthesize | Novelty | Write MS | Keep current | Local | Zotero |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **Paperful 1.x** | Partial (`snowball` / `authorwatch`) | **Yes** (OA, CORE, EZProxy, grey; Sci-Hub opt-in) | Partial (`screen`; Discover Keep/Skip ≠ dual review) | Partial (`summarize` / `synthesize` / `ask` on held PDFs) | Partial (`refs gap`; never claims absence) | No (`stuff` unshipped) | Yes (you cron `keepup`) | **Yes** | **Yes** |
+| Edison Literature | Yes (hosted PaperQA3) | Partial (OA/licensed corpus; no campus fetch) | No | Yes | No (that is Precedent) | Partial (cited report) | Partial (hosted index) | No | No |
+| Edison Precedent | Yes | Partial | No | No | **Yes** (not a legal prior-art search) | No | Partial | No | No |
+| Edison Kosmos | Partial (inside the run) | No | No | Yes (reports; paper: interpretation weaker than quotes) | Partial | Partial (report, not a Zotero MS) | No | No | No |
+| Elicit | Yes (~138M) | Partial (upload / OA) | Partial (SR UI; low independent recall) | Yes | No | Partial (report templates) | Partial | No | Yes (import) |
+| Consensus | Yes | Partial (OA + uploads; LibKey = **links**) | Partial | Yes | No | **No** (will not write your literature review) | Partial | No | Yes (one-way) |
+| Undermind | Yes | Partial | No | Yes | No | No | **Yes** (alerts) | No | No |
+| SciSpace | Yes | Partial | Partial (claimed SLR) | Yes | No | Yes (AI Writer) | No | No | Partial |
+| Scite | Yes | No | No | Partial | Partial (supporting/contrasting) | No | No | No | No |
+| Valency Bond | Yes | Partial (Hub = OA) | No | No | No | No | Yes | No | No |
+| Covidence / Rayyan | No | Partial (imported PDFs) | **Yes** | Partial / No | No | No | No | No / Partial | Yes / Partial |
+| ASReview | No | No | **Yes** (local active learning) | No | No | No | No | **Yes** | Partial |
+| Jenni / Paperpal | Partial (200–300M + uploads) | Partial | No | Partial | No | **Yes** (drafting workspace) | No | No | Jenni: one-way |
+| OpenAI / Gemini / Perplexity DR | Yes | Partial (web / uploads) | No | Yes (**report**) | No | No | No | No | No |
+| Sakana AI Scientist | Partial | No | No | Partial | Partial | Yes as **workshop-grade LaTeX** | No | Partial (you run it; LLM APIs) | No |
+| PaperQA2 (OSS) | No (you supply PDFs) | Partial | No | Yes (cited Q&A) | No | No | No | **Yes** | Partial (`paper-qa[zotero]`; last test is old) |
+| Gemini Notebook / Humata | No | No | No | Yes (on uploads) | No | Partial | No | No | No |
+
+Sources and caveats: repo `reports/AI academic paper factories.md` (contributor research, Oct 2026).
 
 ## Complementary: Zotero plugins and built-ins
 
@@ -155,10 +193,35 @@ Edison **Kosmos** is a separate autonomous-scientist job, not an MCP Bond analog
 ### Edison Scientific
 
 - **Sites:** [docs.edisonscientific.com](https://docs.edisonscientific.com/) · [platform.edisonscientific.com](https://platform.edisonscientific.com) · FutureHouse spinout
-- **Fit:** Hosted agents that *do research*, not a Zotero helper. **Literature** (PaperQA3) — cited Q&A and deep reviews over 175M+ papers, trials, and patents, including conflicting-evidence synthesis and figure pullouts. **Precedent** (formerly Has Anyone) — novelty / “has this been tried?”. **Kosmos** — autonomous scientist (objective + datasets; parallel literature and analysis agents; structured world model; ~1,500 papers and ~42k lines of code per run; auditable traces; not on the public API). **Analysis** and **Molecules** — experimental data and chemistry. Python **`edison-client`** (`JobNames`, task continuation, file storage); enterprise agent profiles.
-- **With Paperful:** Edison when the question is a public-corpus review, a novelty search, or a Kosmos/Analysis run on a dataset. Paperful when the question is “fill, fix, mirror, and Ask **this** library.” Typical stack: Edison Literature or Precedent → snowball / `ingest-dois` → `run` / Wanted → local `ask`. Do not treat their workspace as the quiet mirror.
+- **Fit:** Hosted agents that *do research*, not a Zotero helper. Split the jobs in copy: **Literature** (PaperQA3) is cited review over a licensed public corpus (docs 175M+; a 2026 blog says 150M+ with figures). **Precedent** (formerly Has Anyone) is novelty, not a second Literature call. **Kosmos** is UI-only (not on the public task API): ~1,500 papers and ~42k lines of code per run, shared world model, traces; the Kosmos paper’s expert eval is weaker on *interpretation* than on quotes. Academic credits moved between 2025–2026 posts — treat pricing as policy, not SLA. **Analysis** / **Molecules** are lab/chem. Local OSS cousin is **PaperQA2** (`paper-qa`); hosted Literature is **not** “chat with my Zotero.”
+- **With Paperful:** Edison when the question is a public-corpus review, a novelty search, or a Kosmos/Analysis run on a dataset. Paperful when the question is “fill, fix, mirror, and Ask **this** library.” Typical stack: Edison Literature or Precedent → snowball / `ingest-dois` → `run` / Wanted → local `ask`. Do not treat their workspace as the quiet mirror. Do not borrow their paper-scraper lane as a default (their own docs flag publisher ToS grey).
 - **Not a substitute for:** missing-PDF fetch, EZProxy / grey playbooks, `snapshot` / `restore`, collection-scoped RAG that never leaves the machine, or unattended attach.
-- **Roadmap borrow (not a clone):** precedent pack over held PDFs + OpenAlex, named MCP read jobs, conflicting-evidence briefs — [ROADMAP — Hosted AI scientists](ROADMAP.md#hosted-ai-scientists-edison-scientific).
+- **Nearby (not Edison):** Google Co-Scientist / Labs Hypothesis Generation (hypotheses, not manuscripts); Sakana AI Scientist (workshop-grade auto-papers; authors documented citation errors); OpenAI / Gemini / Perplexity Deep Research (web memos; vendors warn about hallucinated cites).
+- **Roadmap borrow (not a clone):** [ROADMAP — Hosted AI scientists](ROADMAP.md#hosted-ai-scientists-edison-scientific) and [v2 factory packs](ROADMAP.md#after-110-paper-factory).
+
+### Hosted literature search
+
+- **Sites:** [Elicit](https://elicit.com/) · [Consensus](https://consensus.app/) · [Undermind](https://undermind.ai/) · [SciSpace](https://www.typeset.io/) · [Scite](https://scite.ai/)
+- **Fit:** Semantic search and cited tables/reviews over Semantic Scholar / OpenAlex / PubMed remixes. MCP is spreading. Consensus LibKey **link-resolves**; it does not ingest LibKey full text. Elicit’s SR UI is **not** PRISMA-grade recall in independent 2025 comparisons.
+- **With Paperful:** public-record question → their tool; then snowball / `ingest-dois` → `run` / Wanted for PDFs you intend to own. Overlaps Valency Bond on “ask the corpus”; Bond is MCP-first, these are researcher UIs.
+
+### Systematic-review screening
+
+- **Sites:** [Covidence](https://www.covidence.org/) · [Rayyan](https://www.rayyan.ai/) · DistillerSR · [ASReview](https://asreview.nl/) (local OSS)
+- **Fit:** Import → dual screen → extraction forms → audit / PRISMA counts. Usually **no** discovery corpus and **no** campus PDF fetch.
+- **With Paperful:** they screen; Paperful fills PDFs and writes Zotero. Discover Keep/Skip is hop triage. Interop (export queue / import `included.csv`) is the SnowBallSLR lesson, not vendoring Covidence.
+
+### Manuscript assist
+
+- **Sites:** [Jenni](https://jenni.ai/) · [Paperpal](https://paperpal.com/) · SciSpace AI Writer · Writefull in [Overleaf](https://docs.overleaf.com/integrations-and-add-ons/ai-features)
+- **Fit:** Draft + cite from library ∪ a 200–300M index. Mitigations are mostly **existence** checks (real DOIs), not “this sentence is supported by that passage.” Elsevier’s 2026 author factsheet still wants a human intellectual contribution and forbids fabricating references.
+- **With Paperful:** do **not** become Jenni. Extra cites belong in Zotero before `\cite` ([`stuff`](ROADMAP.md#stuff-later-extra-citations-from-the-library)). Living reviews without a model: Better BibTeX → Quarto.
+
+### PaperQA2 (local OSS)
+
+- **Sites:** [future-house/paper-qa](https://github.com/future-house/paper-qa)
+- **Fit:** Cited Q&A over **PDFs you supply**. This is the cloneable pattern (chunk → retrieve → refuse if missing). Hosted PaperQA3 / Edison Literature is a different product (licensed corpus + figures).
+- **With Paperful:** Paperful already owns get-PDF + mirror + Zotero write-back. Ask `--ask-mode advanced` is the score-then-answer path on the **local** index (not a vendored `paper-qa`, no 175M corpus). Do not wrap their Zotero extra (maintainers note it has been a while since they tested it).
 
 ### ZotFile (legacy)
 
@@ -217,6 +280,21 @@ Chat agent needs the whole public literature (graph, trends, author intel), not 
 
 Need a hosted cited review, “has anyone done this?”, or Kosmos on a dataset?
   → Edison Scientific. Keep Paperful for PDFs, the disk ledger, and Ask over held papers
+
+Need Elicit/Consensus tables over the public record?
+  → those UIs, then Paperful for PDFs you will own
+
+Need dual-review SR screening?
+  → Covidence / Rayyan / ASReview
+
+Need a web Deep Research memo?
+  → OpenAI / Gemini / Perplexity. Not Zotero
+
+Need a manuscript draft?
+  → Jenni / Paperpal / Overleaf. Paperful does not write the paper
+
+Need local cited Q&A on a folder, no Zotero?
+  → PaperQA2. Paperful when the folder should also restore into a manager
 
 Already have a reading list on disk and want gaps vs what your PDFs cite?
   → paperful refs gap (CLI or MCP refs_gap)

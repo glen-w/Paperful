@@ -51,6 +51,18 @@ copy. After that the map is a buffet: **Wanted excellence** is the recommended
 main lane; Repair/Mirror, Ask depth, new sources, digest, embeddings, and
 bigger bets wait on outside-tester evidence. Detail by area below.
 
+(after-110-v2-factory-framing)=
+**1.x vs v2 (factory, still not a calendar).** Public 1.x copy stays
+**“find missing PDFs in Zotero.”** Internally, v2 is **named packs on that
+ledger**, not a hosted Kosmos clone and not launch-page “academic paper
+factory.” Sequence: Wanted honest → grow/keep current → Ask **your** PDFs →
+then (gated) precedent pack, conflicting-evidence briefs, `stuff` into
+Zotero, PRISMA **counts**. At most **one** bigger bet a year (SR mode *or*
+grey-host watchers). Never auto-manuscript. Comparison routing:
+[comparison.md](comparison.md); stage matrix:
+[paper factory stages](comparison-reference.md#paper-factory-stages);
+packs: [v2 factory](#after-110-paper-factory).
+
 (after-110-buffet-by-area)=
 ## After 1.1.0 (buffet by area)
 
@@ -241,9 +253,10 @@ Ask stays optional; whether it stays third on the default nav is open.
 - **Borrow from hosted literature agents** (Edison Scientific’s Literature /
   PaperQA line — [Hosted AI scientists](#after-110-edison-scientific)), still
   over **your** PDFs, never a 175M-paper cloud index:
-  - A **conflicting-evidence** `synthesize` / `--focus` (already adjacent to
+  - A **conflicting-evidence** `synthesize` layout (already adjacent to
     `gaps` and “what is contested”) that names the camps, the methods that
-    disagree, and the passages — not a single smoothed narrative.
+    disagree, and the passages — not a single smoothed narrative. Ask
+    `--focus conflict` is **shipped**; the synthesize layout is still later.
   - A **review-shaped** synthesize layout (question → methods in the set →
     findings → limits), closer to Edison’s “report with abstract and
     conclusions” than a chat dump. Same note provenance as today.
@@ -329,9 +342,12 @@ tags) sit on that canvas — [Citation map](snowball.md#citation-map).
 ### Bigger bets (pick at most one a year)
 
 - **Systematic-review mode.** Guided snowball rounds, include/exclude
-  screening with reasons, PRISMA export, a reproducible run file. Sits
+  screening with reasons, PRISMA **counts** (then official PRISMA flow from
+  those counts — not an AI-illustrated diagram), a reproducible run file.
+  Interop with Covidence/Rayyan/ASReview rather than replacing them. Sits
   *alongside* Wanted, not in place of it. Audience: librarians and
-  Cochrane-style teams (grant money, real pain).
+  Cochrane-style teams (grant money, real pain). Do not claim Elicit-like
+  SR recall; independent 2025 work put that UI far below traditional search.
 - **Policy and grey-literature watchers.** BBNJ and RFMO work (for example
   SPRFMO SC14 reports) lives outside DOIs. Watchers would follow meeting
   documents and notifications on intergovernmental sites and feed them
@@ -417,6 +433,71 @@ snowball / `ingest-dois` → `run` / Wanted → local `ask`. Do not upload
   agent-profile deploys.
 - Claiming completeness of “the literature” from OpenAlex metadata.
 
+(after-110-paper-factory)=
+### v2 paper factory (packs after the ledger is honest)
+
+Contributor framing, **not** user-facing launch copy. The 2026 market uses
+“paper factory” for four different artifacts (Deep Research memo, wiki
+survey, workshop-grade ML paper, hypothesis memo). A strict factory —
+manuscript + real citations + novelty check + (for reviews) PRISMA +
+code/data — **does not exist as a reliable public product**. Sakana’s own
+workshop experiment was withdrawn by prior agreement; their internal
+conference-bar review said none of three papers would pass, and they
+documented a false citation. Kosmos’s paper is weaker on **interpretation**
+than on quoted statements; Edison’s ACU grant still requires human
+validation before publication. Elsevier’s June 2026 author factsheet allows
+literature overview and language help and forbids writing substantive parts
+without the author’s intellectual contribution, fabricating references, and
+generating primary images.
+
+Paperful’s scarce asset is the opposite of those hosted loops: a fail-closed
+path from a Zotero item to a file on disk with a restore ledger. **Factory
+here means a sequence of dry-run verbs** (`research-pack.md` already:
+`refs gap` → ingest → `run` → `dedupe` → optional `summarize`/`ask`).
+`paperful all` is fill + tidy + summarize, **not** a scientist.
+
+Landscape (route, do not flatten): Edison / Google Co-Scientist / Sakana =
+discovery loops; Elicit / Consensus / Undermind / SciSpace / Scite / Valency
+= public-corpus search; Covidence / Rayyan / ASReview = screening; Jenni /
+Paperpal / Overleaf = draft; PaperQA2 / GPT Researcher / STORM = local or
+web reports. Detail: [comparison reference](comparison-reference.md#paper-factory-stages).
+
+**1.x stays Wanted.** v2 packs stay off until `[llm]` / `[rag]` / gates, and
+until Wanted has tester evidence. Do not grow 1.x into a second product.
+
+**Borrow (local, dry-run default, fail closed):**
+
+| Borrow | Stage | Honesty bar | Home |
+| --- | --- | --- | --- |
+| PaperQA2 loop: held PDFs → chunk → retrieve → **cited answer with page pointers**; no answer if the PDF is missing. **Shipped** as Ask `simple` plus `--ask-mode advanced` (score then answer on the local index; no vendored `paper-qa`) | Extract / synthesize | `[rag]` off by default; never call the manager from Ask | [Zotero-RAG](#zotero-rag-integration-later-question-centric-layer) |
+| Refuse the sentence if you cannot click the passage (`has_successful_answer`) | Synthesize / critique | Copy test, not a world-model store | Edison borrow #4 above |
+| Split **novelty pack** from **synthesis** before any outline | Novelty vs synthesize | Stamp `held` vs `public-metadata-only`; never “nobody has done this” | Wave 4 |
+| Continuation / cheap vs high-effort as a **user-visible** Ask control | Synthesize | Local model; do not claim LABBench wins | [Ask](#after-110-briefs-ask) |
+| Conflicting-evidence `synthesize` (question → methods → findings → limits) over **your** PDFs | Synthesize | Held full text only | [Briefs](#after-110-briefs-ask) |
+| Figure/table **pullouts** (caption + page + stem), not generated artwork | Extract | Publisher bans on genAI primary images | [Briefs](#after-110-briefs-ask) |
+| `stuff`: sentence → `rag search`; extra cites enter **Zotero before** `\cite`; no invented BibTeX | Write | Fail closed if index empty | [`stuff`](#stuff-later-extra-citations-from-the-library) |
+| PRISMA **counts** in the run report; watch **drift** hash; export Discover / import `included.csv` | Screen / keep current | Counts only; no fake recall % | [Snowballing](#after-110-snowball-review) |
+| Official PRISMA flow from **exact counts**, not AI-illustrated diagrams | Screen / export | Methods figure | [SR mode](#after-110-bigger-bets) |
+| Point at Better BibTeX + Quarto (do not vendor CSL) | Write / export | Parked until testers ask | [Parked](#after-110-parked) |
+| ASReview-class ranking only as optional local embeddings | Screen | Not dual review | [Embeddings](#after-110-embeddings) |
+| Post-hoc Crossref / retraction check after a draft | Critique | Existence ≠ claim support | [critique.md](critique.md) |
+| Named MCP read jobs (`ask` vs precedent vs `refs_gap`); writes stay `--apply` | Agent | Table stakes without a hosted corpus | [Literature-discovery](#literature-discovery-complement-waves) |
+
+**Stay out (v2 included):** hosted multi-user as the product; Kosmos world
+model / unattended 12-hour code / “overnight PhD”; 150M multimodal corpus;
+Analysis / Molecules / ChemCrow; publisher-gray scraping or Sci-Hub/LibGen
+as **default** or in marketing; uploading `out/` to a vendor as Ask;
+auto manuscript in public copy; “has never been done”; replacing Zotero as
+reader; CAPTCHA bypass; “AI fetch everything”; draft-then-stuff extra cites
+from the **open web** without a Zotero queue; genAI blots / graphical
+abstracts; a bird-named agent zoo as UX.
+
+**Safe internal subtitle:** after the Wanted list is honest, grow the
+collection, keep it current, and ask **your** PDFs. Complementary sentence
+already in comparison: Edison/Valency/Elicit when the question is the
+**public** literature; Paperful when the question is fill, fix, mirror, and
+reason over **this** collection.
+
 (after-110-distribution)=
 ### Distribution and install
 
@@ -444,8 +525,10 @@ policy / NGO researchers (warmest first trial).
 to them. It runs locally and is open source, so library data stays on the
 user’s machine. Never promise “every paywalled PDF”. Never call Camofox
 “stealth”. Own one search phrase: **“find missing PDFs in Zotero”**. Keep
-Ask, Discover, and snowball out of the title, meta, share card, and GitHub
-About.
+Ask, Discover, snowball, and “paper factory” / “AI scientist” out of the
+title, meta, share card, and GitHub About. Do not promise journal
+manuscripts. Point Edison/Elicit/Jenni from [comparison.md](comparison.md)
+instead.
 
 **Adoption copy:** document auto-attach as off by default, Zotero 10+ only,
 and switched on in Settings. Make the PyPI README lead with Wanted. Hold
@@ -508,6 +591,8 @@ Do not start these until testers ask, or until the main lane is boring.
 - **Kosmos-class autonomous scientist** (multi-hour world-model runs over
   public literature plus uploaded datasets; experimental pipelines;
   molecular design) — [Hosted AI scientists](#after-110-edison-scientific).
+- **Auto manuscript / related-work generator** (Jenni/STORM/Sakana job).
+  `stuff` may queue extra cites into Zotero; it does not write the paper.
 - **Catalogue unification** (managers as equals).
 - **LibGen** (same opt-in bar as Sci-Hub if ever).
 - **CSL / Quarto export** — point people at Better BibTeX.
@@ -1158,7 +1243,9 @@ shipped. Still proposals on disk; never a silent library write. **Note cleanup**
 is built in Paperful from the on-disk mirror (no separate zotero-rag install, no
 reference manager calls): `paperful rag ingest | search | status | questions |
 answered` and `paperful ask` (one cited answer, TTY/`--thread` follow-ups, or
-`--from-file` batch). Opt-in under `[rag]`; `auto_ingest` is off by default.
+`--from-file` batch). Ask has two modes (`simple` default, `advanced` scores
+passages then answers); `--ask-mode` / the Ask form / MCP `ask_mode` override
+one run. Opt-in under `[rag]`; `auto_ingest` is off by default.
 
 **Interactive Ask in the GUI is shipped** — see [GUI](#gui) and [Product
 split](#product-split-10-vs-post-10). Terminal multi-turn and the Index page
@@ -1182,15 +1269,17 @@ as `[summarize].model`, `[browser_agent].model`, `[rag].model`).
    before batch RAG (same patch / dry-run honesty as other LLM verbs). Still
    roadmap (deferred; batch/`rag answered` already accept operator files).
 3. **Prompt variants and `--focus`** — **Shipped:** `--focus`
-   default|questions|gaps|methods|answered; `[rag].focus`; `--prompt FILE`;
-   profile `focus` field.
+   default|questions|gaps|methods|answered|conflict; `[rag].focus`;
+   `--prompt FILE`; profile `focus` field. `conflict` is an Ask prompt, not
+   a third Ask mode.
 4. **Extract questions posed by papers** — **Shipped:** `rag questions`
    (deterministic rules + optional `--llm` / `[rag].extract_questions_llm`) →
    `state/rag/questions/<key>.json` with provenance `rule`|`llm`.
 5. **Corpus-wide RAG on those questions** — **Shipped:** `rag answered`
    `--from-file` / `--from-extract`, `--after-item`, year filters →
    `state/rq-answered/` (`paperful.rq_answered.v1`).
-6. **Config** — **Shipped:** `[rag]` focus/prompt/dest/extract_questions_llm;
+6. **Config** — **Shipped:** `[rag]` ask_mode/focus/prompt/dest/extract_questions_llm
+   plus advanced knobs (defaults keep one summary pass);
    profile `focus` + existing SCOPE. `doctor` ambers when the index is missing,
    the embedding model is unavailable, or the index is behind the mirror.
 7. **Per-claim extra citations (`stuff`)** — **Roadmap:** batch `rag search`
@@ -2006,6 +2095,8 @@ Larger product bets. Park until the ledger and core loop justify them.
   retrosynthesis). Point people at [Edison Scientific](https://docs.edisonscientific.com/)
   or similar; keep Paperful on library / find / completeness / mirror / control
   — [Hosted AI scientists](#after-110-edison-scientific)
+- Journal-ready manuscript generation, Deep Research memos as a product, or
+  “overnight PhD” copy — [v2 factory](#after-110-paper-factory)
 
 ## Optional thin bridge — Firefox extension (post-1.0)
 
@@ -2074,7 +2165,11 @@ second doc tree that drifts from the CLI.
 - [quiet-mirror.md](quiet-mirror.md) — `out/` as the copy you keep
 - [releases.md](releases.md) — 1.0 contract; known limits
 - [comparison.md](comparison.md) — what Paperful does and does not replace today
-  (Zotero plugins, Valency Bond, [Edison Scientific](comparison-reference.md#edison-scientific))
+  (Zotero plugins, Valency, Edison, Elicit/Consensus, SR tools, writers)
+- [comparison-reference.md](comparison-reference.md#paper-factory-stages) —
+  factory-stage matrix (Oct 2026)
+- Repo `reports/AI academic paper factories.md` — contributor research behind
+  the matrix (not user-facing)
 - [snowball.md](snowball.md) — library-building from a keyword, multi-DOI / multi-ORCID, or collection
 - [bbnj-author-lanes.md](bbnj-author-lanes.md) — dogfood `author_site` + `authorwatch` on `ocean/BBNJ` / `ocean/BBNJ-test`
 - Site career / domain timeline plan (consumer of durable tags):
@@ -2114,12 +2209,14 @@ ticks, Attach-at-zero) are [1.1.1](#after-110-1-1-1). Whether Ask stays on
 the default nav is [open](#after-110-open-questions).
 
 **Ask (default nav, opt-in):** **Shipped** — `/ask` runs scoped chat with citations
-when `[llm]` and `[rag]` are on and the index has rows. Collection chip is the
-scope; threads live under `state/rag/threads/` (same as `ask --thread`). Batch
-Ask (item/year/type/top-k/force, custom prompts) is on that page when Advanced
-is on. **Index** (Advanced) runs `rag ingest`, `rag search`, `rag questions`,
-and `rag answered`. **Briefs** (Advanced) runs `summarize` and `synthesize`.
-CLI `ask` remains for scripts, TTY multi-turn, and run profiles.
+when `[llm]` and `[rag]` are on and the index has rows. Mode (`simple` /
+`advanced`) starts at `[rag].ask_mode` and is this run only. Collection chip is
+the scope; threads live under `state/rag/threads/` (same as `ask --thread`).
+Batch Ask (item/year/type/top-k/force, custom prompts, same Mode select) is on
+that page when Advanced is on. **Index** (Advanced) runs `rag ingest`,
+`rag search`, `rag questions`, and `rag answered`. **Briefs** (Advanced) runs
+`summarize` and `synthesize`. CLI `ask` remains for scripts, TTY multi-turn,
+`--ask-mode`, and run profiles.
 See [Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer).
 Later: Advanced **Stuff** as a Critique sibling — per-sentence `rag search`,
 no Ask chat ([`stuff`](#stuff-later-extra-citations-from-the-library)).

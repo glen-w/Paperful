@@ -1107,6 +1107,10 @@ def focus_options() -> list[str]:
     return sorted(names)
 
 
+def ask_mode_options() -> list[str]:
+    return ["simple", "advanced"]
+
+
 def queue_fingerprint(cfg: Config, verb: str) -> str:
     import hashlib
 

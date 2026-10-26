@@ -289,6 +289,17 @@ def test_ask_streams_an_answer_and_lists_cited_sources(mirror):
     item = json.loads(report.read_text())["items"][0]
     assert item["question"] == "What do krill eat?" and item["cited"] == ["S1"]
     assert item["answer"] == "Krill eat algae [S1]."
+    assert item.get("ask_mode", "simple") == "simple"
+
+
+def test_ask_mode_advanced_records_on_the_run(mirror):
+    _ingest(mirror)
+    res = _run(["ask", "What do krill eat?", "--ask-mode", "advanced", "--no-stream"], mirror["config"])
+    assert res.exit_code == 0, plain_text(res.stdout)
+    assert mirror["chat"].json_requests
+    report = sorted((mirror["cfg"].state_dir / "runs").glob("*-ask.json"))[-1]
+    flags = json.loads(report.read_text())["flags"]
+    assert flags["ask_mode"] == "advanced"
 
 
 def test_ask_no_stream_and_show_context(mirror):

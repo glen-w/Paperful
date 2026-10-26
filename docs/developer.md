@@ -137,7 +137,7 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `handoff_rank.py` | Missing-PDF sort: refs-gap cites × miss severity | `handoff` |
 | `reachout.py` | Contact-only missing-PDF rows (metadata / Twenty emails, CSV). No fetch | `handoff`, `twenty` |
 | `twenty.py` | Twenty People lookup (local cache) and `sync` (CRM create/enrich). User guide: [Twenty and SearXNG](snowball.md#twenty-and-searxng) | httpx |
-| `mcp_server.py` | Optional stdio MCP: read-only gaps, snowball preview / trends, export, proposal_export, refs_gap, ask | `agent_ops` |
+| `mcp_server.py` | Optional stdio MCP: read-only gaps, snowball preview / trends, export, proposal_export, refs_gap, ask (optional `ask_mode`) | `agent_ops` |
 | `serve.py` | Localhost FastAPI: JSON capability API + mounts `ui` when the `serve` extra is installed | `agent_ops`, `ui` |
 | `ui/` | Server-rendered workbench (Jinja). `app.py` owns shared helpers + `mount_ui`; routes live in `wanted_routes` / `discover_routes` / `shell_routes` / `repair_routes` / `index_routes` / `critique_routes` (each `register_*`). Long jobs: `jobs.py` re-exports `wanted_jobs` / `discover_jobs` / `repair_jobs` / `index_jobs` (RAG, ask, summarize, synthesize) and defines `critique`. Ordinary pages do not run `doctor` (System does). Handlers resolve `doctor_payload` / `collections_tree` via `paperful.ui.app` so tests can monkeypatch there | CLI / MCP builders |
 | `authorwatch.py` | People lists → OpenAlex new works; `gather_briefing` / `write_briefing` / `write_digest`; `apply` creates parents + `ingested.md`; `accept` / `delete` | OpenAlex client, `identity`, `snowball.ingest`, `authorwatch_suggest` |
@@ -225,6 +225,7 @@ Tier policy (1.0 contract):
 | `paperful.rq_answered.v1` | `state/rq-answered/` | `rag.answered` | T2 | — |
 | `paperful.rag.text.v1` | extracted text cache | `rag.extract` | T3 | Rebuildable |
 | `paperful.rag.index.v1` | LanceDB meta | `rag.index` | T3 | Not a promise |
+| (no schema) | `state/rag/evidence/` | `rag.evidence` | T3 | Advanced Ask summary cache; keyed by chunk, question, model |
 | `paperful.e2e_stack.report.v1` | e2e stack reports | `e2e_nba` | T2 | Internal / CI |
 
 **Consumers:** `recover --from-last-run`, GUI Activity, and `agent_ops` read `paperful.run_report.v1` (`state/last-run.json`). `restore` requires `paperful.item.v1`. Batch verbs and optional `paperful mcp` emit `paperful.agent.json.v1`.

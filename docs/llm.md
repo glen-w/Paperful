@@ -51,7 +51,7 @@ No Python extra is needed for Ollama: Paperful talks HTTP to the daemon.
 
 | Verb | Works well with | Notes |
 | --- | --- | --- |
-| `fix-metadata` titles, `lint` identity, `summarize`, `synthesize`, `extract-sections --llm`, `rag questions --llm`, `critique --llm` | 7B–12B instruct models (`qwen2.5:7b`, `gemma3:12b`, `llama3.1:8b`) | JSON-capable instruct tags; thinking models are fine but slower. `summarize` and `synthesize` set Ollama `num_ctx` from the prompt, capped by `[llm].max_num_ctx`. `critique` comments are suggested-lane only |
+| `fix-metadata` titles, `lint` identity, `summarize`, `synthesize`, `extract-sections --llm`, `rag questions --llm`, `critique --llm`, `ask` | 7B–12B instruct models (`qwen2.5:7b`, `gemma3:12b`, `llama3.1:8b`) | JSON-capable instruct tags; thinking models are fine but slower. `summarize` and `synthesize` set Ollama `num_ctx` from the prompt, capped by `[llm].max_num_ctx`. `critique` comments are suggested-lane only. `ask` default is **simple** (one completion); **advanced** adds about `evidence_k` summary calls — [rag.md](rag.md#ask-modes) |
 | `recover` | 14B+ (`qwen2.5:14b`, `qwen3:14b`, larger); 32B / VL on 24 GB+ | Small models loop on cookie banners and publisher menus; `doctor` warns under ~10B by tag name. Full guidance: [browser-agent-models.md](browser-agent-models.md) |
 
 ### LiteLLM (paid / OpenAI-compatible APIs)
@@ -248,6 +248,7 @@ silent (no finding).
 ```sh
 uv run paperful critique --file ./draft.pdf --llm
 uv run paperful critique --file ./draft.pdf --llm --reviewer reviewer-2
+uv run paperful critique --file ./draft.pdf --llm --reviewer reviewer-5
 uv run paperful critique --item ABCD1234 --llm --force
 ```
 
@@ -450,8 +451,9 @@ allow_remote = true
 - [ai.md](ai.md) — feasibility: try-it vs ~1.5k library, LiteLLM / OpenRouter,
   cost order of magnitude
 - [rag.md](rag.md): `paperful ask` and the library index. `ask` uses the chat
-  model configured here (`[rag].model` overrides it); embeddings are set under
-  `[rag]`.
+  model configured here (`[rag].model` overrides it; advanced summaries use
+  `[rag].summary_model` when set). Embeddings are under `[rag]`. Two modes:
+  `simple` (default) and `advanced` (`--ask-mode` / `[rag].ask_mode`).
 - [config.md](config.md#llm-optional-local-first) — key reference
 - [commands.md](commands.md) — `recover` / `summarize` / `synthesize` / `extract-sections` flags and exit codes
 - [architecture.md](architecture.md#llm-layer-optional-local-first) — layer, gates, note write path

@@ -15,6 +15,10 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- **Ask modes.** `simple` (default: raw excerpts, one completion) and
+  `advanced` (summarize and score each passage, then answer). Global
+  `[rag].ask_mode`; a run can override from `--ask-mode`, the Ask / batch
+  form, or MCP `ask_mode` without writing config. See [rag](docs/rag.md#ask-modes).
 - Opt-in **GROBID** sidecar for structured section extract: `[grobid]`,
   `extract-sections --grobid` / `--no-grobid`, TEI cache under `state/grobid/`,
   optional `[rag].parser = "grobid"`, `doctor` health check, Advanced Index

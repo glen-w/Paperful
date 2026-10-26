@@ -201,6 +201,10 @@ mirror_failures_before_skip = 3
 # id = "reviewer-2"
 # model = "qwen2.5:14b"
 # prompt = "prompts/critique-reviewer-2.md"
+# [[critique.reviewers]]
+# id = "reviewer-5"
+# model = "llama-openreviewer-8b"
+# prompt = "prompts/critique-reviewer-5.md"
 # [summarize]
 # prompt_template = "default"    # or "prompts/summary.md"
 # max_context_chars = 24000
@@ -466,15 +470,32 @@ concurrency = 2
 # embed_batch_size = 32
 # chunk_chars = 2048
 # chunk_overlap = 256
-# top_k = 10                     # passages sent to the model per question
+# top_k = 10                     # passages sent to the model per question (simple mode)
 # max_context_chars = 24000
 # hybrid = true                  # vector + full-text search
 # abstracts = true               # index the abstract when an item has no readable PDF
 # # model = ""                   # chat model for `ask`; empty uses [llm].model
-# focus = "default"              # default | questions | gaps | methods | answered
+# focus = "default"              # default | questions | gaps | methods | answered | conflict
 # # prompt = ""                  # custom system prompt file; overrides focus when set
 # dest = "disk"                  # batch ask note writes: disk | zotero | both (needs --apply)
 # extract_questions_llm = false  # LLM lane for `rag questions` (rules always run)
+# ask_mode = "simple"            # simple (raw excerpts) | advanced (score then answer)
+# max_chunks_per_item = 3
+# overfetch = 3
+# # Advanced-only knobs. Ignored when ask_mode is simple. --ask-mode overrides the mode for one run.
+# evidence_k = 8                 # candidate passages to score
+# answer_max_sources = 5
+# relevance_cutoff = 1           # drop scores below this (0 still dropped)
+# # summary_model = ""           # empty uses [rag].model or [llm].model
+# summary_length = "about 80 words"
+# summary_concurrency = 2
+# evidence_fallback = "raw"      # raw keeps the chunk if a summary call fails; drop discards it
+# query_variants = 1             # 2–4: extra search phrasings, fused
+# insufficient_retries = 0       # 1: re-gather once if excerpts are not enough
+# cite_hops = 0                  # 1: one hop along on-disk citation edges inside the Ask scope
+# cite_scope = "scope"           # scope | library
+# mmr_lambda = 1.0               # 1.0 off; below 1 diversity rerank
+# context_neighbors = 0          # advanced: append the next stored chunk onto each hit
 
 # IMRaD-style section extract (`paperful extract-sections`). Reads mirror PDFs / text cache only.
 # [extract_sections]

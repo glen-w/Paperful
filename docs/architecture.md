@@ -137,6 +137,7 @@ flowchart LR
 | `state/pdf-cache/` | Throwaway copies of manager PDFs, only when `[mirror].pdfs = "none"`. Otherwise an exported PDF goes into its item folder, and `sync` moves older cache files there. `paperful cache clean` removes absorbed or stale leftovers |
 | `state/summaries/<key>.html` | `summarize` output when dest includes disk; the Zotero child note is the other copy |
 | `state/ask-batch/<stamp>/` | `ask --from-file` / Index batch Ask pack (`paperful.ask_batch.v1`, `answers.md`); resume cache under `by-hash/` |
+| `state/rag/evidence/` | Advanced Ask passage summaries (chunk + question + model cache). Rebuildable |
 | `state/rag/questions/<key>.json` | `rag questions` / Index extract RQs (`paperful.rag.questions.v1`, provenance `rule`\|`llm`) |
 | `state/sections/<key>.json` | `extract-sections` IMRaD fields (`paperful.sections.v1`, provenance `rule`\|`grobid`\|`llm`; optional `engine`; optional `state/section-headings.toml` synonyms) |
 | `state/grobid/<sha256>.tei.xml` | GROBID TEI cache (`paperful.grobid.tei.v1` sidecar JSON). Reused by `extract-sections` and `[rag].parser = "grobid"` |
@@ -181,6 +182,7 @@ below.
 | `summarize` | `llm.enabled` | `state/summaries/<key>.html` when dest includes disk | child note unless `--to disk` |
 | `synthesize` | `llm.enabled` | `state/reports/<slug>.html` when dest includes disk | standalone note in the scoped collection unless `--to disk` |
 | `extract-sections` | rules always; optional GROBID sidecar; optional `[extract_sections].llm` + `llm.enabled` | `state/sections/<key>.json` | none (disk only) |
+| `ask` | `llm.enabled` + `rag.enabled` | `state/runs/<stamp>-ask.json`; advanced summaries under `state/rag/evidence/` | none unless batch `--apply` |
 | `rag questions` | rules always; optional `[rag].extract_questions_llm` + `llm.enabled` | `state/rag/questions/<key>.json` | none |
 | `critique` | checkers, metrics, heuristic AI-tells always; optional `--llm` / `[critique].llm` + `llm.enabled`; optional `--ai-model` Binoculars extra | `state/critiques/<id>/<stamp>/` | child note with `--apply` on `--item` only |
 
@@ -333,7 +335,7 @@ Exit **3** is a mixed **write** batch (`run` uses attached vs attach_failed). Le
 unless `--format json` is also passed. `paperful mcp` is optional stdio sugar for the same
 payloads on read-only tools: `gaps`, `snowball_search` (dry-run), `snowball_trends`
 (publication-year counts), `export`, `proposal_export`, `refs_gap` (never creates
-parents), and `ask` (index only). Agent and MCP `export`
+parents), and `ask` (index only; optional `ask_mode`). Agent and MCP `export`
 build records in [`export_build.py`](../paperful/export_build.py) (notes omitted, no PDF
 copy). Proposal packs go through [`pack_bib.py`](../paperful/pack_bib.py). The CLI
 `export` command overlays fields in `export_cmd.py`, including the EndNote XML bundle
@@ -361,7 +363,9 @@ with a scannable line and a `<!-- paperful.note.v1 {…} -->` comment (`type`,
 
 Ask follow-ups with `--thread` (or a TTY prompt loop) live in
 `state/rag/threads/<id>.json` (`paperful.rag.thread.v1`). Retrieval uses a
-rewritten standalone query; the chat model still sees the turns.
+rewritten standalone query; the chat model still sees the turns. Run reports
+record the mode actually used (`simple` or `advanced`). In advanced, a
+follow-up may cite only this turn’s excerpts.
 
 Manifest `counts` keys match ledger statuses (`ok`, `attached`, `not_found`, …).
 

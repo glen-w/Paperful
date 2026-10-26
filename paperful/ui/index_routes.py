@@ -35,6 +35,7 @@ from .pages import (
     briefs_synth_form,
     dest_for_form,
     dest_options,
+    ask_mode_options,
     focus_options,
     following_lists,
     last_ask_result,
@@ -168,6 +169,8 @@ def register_index(ui: UiContext) -> None:
                 dest_options=dest_options(),
                 rag_dest=cfg.rag_dest or "disk",
                 focus_options=focus_options(),
+                ask_mode_options=ask_mode_options(),
+                rag_ask_mode=cfg.rag_ask_mode or "simple",
                 year_from="",
                 year_to="",
                 poll_run=(run or "").strip(),
@@ -426,6 +429,7 @@ def register_index(ui: UiContext) -> None:
         question = str(form.get("question") or "").strip()
         thread_id = str(form.get("thread_id") or "").strip()
         focus_raw = str(form.get("focus") or "").strip() or None
+        ask_mode_raw = str(form.get("ask_mode") or "").strip() or None
 
         def _redir(*, err: str = "", tid: str = "", run: str = "") -> RedirectResponse:
             return RedirectResponse(
@@ -457,9 +461,12 @@ def register_index(ui: UiContext) -> None:
                 return _redir(err="type", tid=thread_id)
             return _redir(err="prompt", tid=thread_id)
         try:
+            from ..config import parse_rag_ask_mode
             from ..rag.prompt import parse_focus
 
             parse_focus(focus_raw if focus_raw is not None else cfg.rag_focus)
+            if ask_mode_raw:
+                parse_rag_ask_mode(ask_mode_raw)
         except ValueError:
             return _redir(err="focus", tid=thread_id)
         if not thread_id:
@@ -483,6 +490,7 @@ def register_index(ui: UiContext) -> None:
                 item_types=scope.item_types,
                 prompt_path=resolved.prompt_path,
                 prompt_text=resolved.prompt_text,
+                ask_mode=ask_mode_raw,
             )
 
         cmd_id = commands.enqueue(cfg, "ask", work)
@@ -530,10 +538,14 @@ def register_index(ui: UiContext) -> None:
         if apply and (dest == "disk" or not prefs.collection):
             return RedirectResponse(url=_page_url("/ask", error="apply"), status_code=303)
         focus_raw = str(form.get("focus") or "").strip() or None
+        ask_mode_raw = str(form.get("ask_mode") or "").strip() or None
         try:
+            from ..config import parse_rag_ask_mode
             from ..rag.prompt import parse_focus
 
             parse_focus(focus_raw if focus_raw is not None else cfg.rag_focus)
+            if ask_mode_raw:
+                parse_rag_ask_mode(ask_mode_raw)
         except ValueError:
             return RedirectResponse(url=_page_url("/ask", error="focus"), status_code=303)
         _save_prompt_if_asked(form, resolved)
@@ -555,6 +567,7 @@ def register_index(ui: UiContext) -> None:
                 prompt_path=resolved.prompt_path,
                 prompt_text=resolved.prompt_text,
                 force=scope.force,
+                ask_mode=ask_mode_raw,
             )
 
         cmd_id = commands.enqueue(cfg, "ask_batch", work)

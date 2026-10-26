@@ -113,6 +113,7 @@ def run_answered(
     embedder: Embedder | None = None,
     index: Index | None = None,
     ledger: Ledger | None = None,
+    ask_mode: str | None = None,
 ) -> AnsweredPack:
     """Run batch ask with ``focus=answered``; attach asking-item metadata."""
     if ledger is None:
@@ -145,6 +146,7 @@ def run_answered(
         embedder=embedder,
         index=index,
         ledger=ledger,
+        ask_mode=ask_mode,
     )
     meta = {q: (ask_key, ask_year) for q, ask_key, ask_year in ordered}
     rows: list[AnsweredRow] = []

@@ -58,6 +58,9 @@
     </div>
   {% endfor %}
   </div>
+  {% if last_result.ask_mode == "advanced" and last_result.evidence %}
+  <p class="counts">{{ last_result.evidence.candidates or 0 }} passages scored, {{ last_result.evidence.kept or 0 }} kept</p>
+  {% endif %}
   {% if last_result.sources %}
   <div class="ask-sources">
     <p><strong>{% if last_result.cited %}Sources{% else %}Retrieved, not cited{% endif %}</strong></p>
@@ -73,7 +76,8 @@
     <div class="field-group">
       <p class="field-legend">Question {{ info("One question for this turn. A custom prompt below overrides Focus.") }}</p>
       <label>Question {{ info("Plain-language question. The model may only use retrieved passages from the index.") }} <textarea name="question" rows="3" required></textarea></label>
-      <label>Focus {{ info("Prompt preset. default: a grounded answer. questions: research questions. gaps: what the papers leave open. methods: how the studies were done. answered: whether the corpus already answers this.") }} <select name="focus">{% for f in focus_options %}<option value="{{ f }}">{{ f }}</option>{% endfor %}</select></label>
+      <label>Mode {{ info("simple: today's Ask — raw excerpts, one completion. advanced: summarize and score each passage, then answer from what survives. Costs extra completions. This run only; it does not change config.toml.") }} <select name="ask_mode">{% for m in ask_mode_options %}<option value="{{ m }}" {% if m == rag_ask_mode %}selected{% endif %}>{{ m }}</option>{% endfor %}</select></label>
+      <label>Focus {{ info("Prompt preset. default: a grounded answer. questions: research questions. gaps: what the papers leave open. methods: how the studies were done. answered: whether the corpus already answers this. conflict: agreement vs disagreement.") }} <select name="focus">{% for f in focus_options %}<option value="{{ f }}">{{ f }}</option>{% endfor %}</select></label>
       <button type="submit">Ask</button>
       {{ info("Retrieve passages and answer this question. Follow-ups stay in this thread.") }}
     </div>
@@ -100,6 +104,7 @@
     {% include "_rag_scope_fields.html" %}
     <div class="field-group">
       <p class="field-legend">Output {{ info("Where answers go and whether cached answers may be reused.") }}</p>
+      <label>Mode {{ info("simple or advanced for every question in this batch. Default is the config Ask mode. This run only.") }} <select name="ask_mode">{% for m in ask_mode_options %}<option value="{{ m }}" {% if m == rag_ask_mode %}selected{% endif %}>{{ m }}</option>{% endfor %}</select></label>
       <label>Focus {{ info("Prompt preset for every question in this batch. A custom prompt below overrides it.") }} <select name="focus">{% for f in focus_options %}<option value="{{ f }}">{{ f }}</option>{% endfor %}</select></label>
       <label>Dest {{ info("disk: files under state/ask-batch/ only. zotero: a collection note (needs a collection chip). both: files and a note.") }} <select name="dest">{% for d in dest_options %}<option value="{{ d }}" {% if d == rag_dest %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></label>
       <label><input type="checkbox" name="apply" value="1"> Write Zotero note {{ info("File a collection note when Dest is zotero or both. Needs a collection chip.") }}</label>

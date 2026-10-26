@@ -10,8 +10,8 @@ version of this story.
 
 **Trust the disk** before notes or Ask: `gaps` → `attachments` (honesty) →
 `run` (bytes on disk under `out/`) → you read `out/` → then `summarize` /
-`ask`. `attach` is the write gate into Zotero. Do not call that step
-**admit**.
+`ask` ([Ask your library](rag.md)). `attach` is the write gate into Zotero. Do
+not call that step **admit**.
 
 | Claim | Quote |
 | --- | --- |

@@ -39,6 +39,8 @@ class LedgerRow:
     authors: list[str] = field(default_factory=list)
     year: int | None = None
     item_type: str = ""
+    publication_title: str = ""
+    doi: str = ""
     dirs: list[str] = field(default_factory=list)  # item folders, relative to out_dir
     pdf: str = ""  # indexed file, relative to out_dir
     pdf_size: int = 0
@@ -149,6 +151,8 @@ def describe(entry: MirrorEntry) -> dict[str, object]:
         "authors": list(item.creator_surnames),
         "year": item.year,
         "item_type": item.item_type,
+        "publication_title": item.publication_title or "",
+        "doi": item.doi or "",
         "dirs": list(entry.dirs),
     }
 

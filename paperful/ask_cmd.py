@@ -37,6 +37,7 @@ def run_ask(
     profile: str | None,
     run_config: Path | None,
     json_out: bool,
+    ask_mode: str | None = None,
 ) -> None:
     from . import cli_runtime as cli_mod
     from .agent_json import batch_exit
@@ -45,6 +46,7 @@ def run_ask(
     from .llm.preflight import validate_llm_for_ask
     from .llm.validate import LlmConfigError
     from .library import get_backend
+    from .rag.mode import resolve_ask_mode
     from .rag.prompt import parse_focus
     from .rag.retrieve import scope_keys
 
@@ -86,6 +88,11 @@ def run_ask(
         focus_name = parse_focus(
             focus if focus is not None else (bound.focus or cfg.rag_focus)
         )
+    except ValueError as exc:
+        console.print(str(exc), markup=False, style="red")
+        raise typer.Exit(1) from exc
+    try:
+        mode = resolve_ask_mode(cfg, ask_mode)
     except ValueError as exc:
         console.print(str(exc), markup=False, style="red")
         raise typer.Exit(1) from exc
@@ -143,6 +150,7 @@ def run_ask(
             prompt_path=prompt_path,
             k=top_k,
             force=force,
+            ask_mode=mode,
             scope={
                 "collections": list(collection),
                 "item": list(item),
@@ -196,6 +204,7 @@ def run_ask(
                 "top_k": top_k or cfg.rag_top_k,
                 "model": pack.model,
                 "focus": pack.focus,
+                "ask_mode": pack.ask_mode,
                 "from_file": str(from_file),
                 "batch": True,
             },
@@ -216,6 +225,7 @@ def run_ask(
                     "read_only": not apply,
                     "batch": True,
                     "focus": pack.focus,
+                    "ask_mode": pack.ask_mode,
                     "top_k": top_k or cfg.rag_top_k,
                 },
                 exit_code=code,
@@ -263,9 +273,11 @@ def run_ask(
                 index=index,
                 ledger=ledger,
                 quiet=json_out,
+                ask_mode=mode,
             )
             row["retrieve_as"] = retrieve_as
             row["focus"] = focus_name
+            row["ask_mode"] = mode
             answered.append(row)
             if use_thread:
                 turns.append({"role": "user", "content": asked})
@@ -303,6 +315,7 @@ def run_ask(
                 "model": cfg.rag_model or cfg.llm_model,
                 "embed_model": cfg.rag_embed_model,
                 "focus": focus_name,
+                "ask_mode": mode,
                 **({"thread": thread_id} if thread_id else {}),
             },
             started=started,
@@ -325,6 +338,7 @@ def run_ask(
                 "read_only": True,
                 "top_k": top_k or cfg.rag_top_k,
                 "focus": focus_name,
+                "ask_mode": mode,
                 **({"thread": thread_id} if thread_id else {}),
             },
             exit_code=code,

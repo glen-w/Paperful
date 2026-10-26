@@ -134,6 +134,9 @@ def test_tools_call_routes_each_tool_with_normalised_args(cfg, monkeypatch):
     assert calls["proposal_export"][0] == (cfg, "p1") and calls["proposal_export"][1] == {"kind": "csljson"}
     call("ask", question="what?", collection="C")
     assert calls["ask"][0] == (cfg, "what?", "C")
+    assert calls["ask"][1] == {"ask_mode": None}
+    call("ask", question="what?", ask_mode="advanced")
+    assert calls["ask"][1] == {"ask_mode": "advanced"}
 
 
 def test_tools_call_tolerates_non_dict_arguments(cfg, monkeypatch):

@@ -70,6 +70,7 @@ def create_app(cfg: Config) -> Any:
             cfg,
             str(payload.get("question") or ""),
             str(payload.get("collection") or ""),
+            ask_mode=str(payload["ask_mode"]) if payload.get("ask_mode") else None,
         )
 
     from .ui.app import mount_ui

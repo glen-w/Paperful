@@ -132,10 +132,13 @@ def ask_envelope(
     )
 
 
-def run_ask(cfg: Config, question: str, collection: str = "") -> dict[str, Any]:
+def run_ask(
+    cfg: Config, question: str, collection: str = "", ask_mode: str | None = None
+) -> dict[str, Any]:
     """One-shot RAG answer. Read-only for the reference manager."""
     from .llm import LLMClientError
     from .rag.answer import answer
+    from .rag.mode import resolve_ask_mode
     from .rag.retrieve import scope_keys
 
     q = (question or "").strip()
@@ -160,11 +163,14 @@ def run_ask(cfg: Config, question: str, collection: str = "") -> dict[str, Any]:
         keys = None
         if (collection or "").strip():
             keys = scope_keys(ledger, collections=[collection.strip()])
-        reply = answer(cfg, q, keys=keys, index=index, ledger=ledger)
+        mode = resolve_ask_mode(cfg, ask_mode)
+        reply = answer(
+            cfg, q, keys=keys, index=index, ledger=ledger, ask_mode=mode
+        )
         text = reply.read()
         cited = reply.cited() or reply.sources
         return ask_envelope(
-            summary={"question": q, "questions": 1, "answered": 1},
+            summary={"question": q, "questions": 1, "answered": 1, "ask_mode": mode},
             items=[
                 {
                     "question": q,
@@ -173,9 +179,11 @@ def run_ask(cfg: Config, question: str, collection: str = "") -> dict[str, Any]:
                         {"marker": s.marker, "itemKey": s.item_key, "title": s.title}
                         for s in cited
                     ],
+                    "ask_mode": reply.ask_mode,
+                    "evidence": reply.evidence,
                 }
             ],
-            flags={"read_only": True},
+            flags={"read_only": True, "ask_mode": mode},
         )
     except (LLMClientError, Exception) as exc:
         return envelope(command="ask", exit_code=EXIT_USER, summary={"error": str(exc)})

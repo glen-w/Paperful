@@ -62,7 +62,7 @@ def test_refs_gap_and_ask_use_agent_ops(tmp_path, monkeypatch):
     monkeypatch.setattr(
         ops,
         "run_ask",
-        lambda _cfg, question, collection="": envelope(
+        lambda _cfg, question, collection="", ask_mode=None: envelope(
             command="ask",
             summary={"question": question, "answered": 1},
             items=[{"question": question, "answer": "stub"}],

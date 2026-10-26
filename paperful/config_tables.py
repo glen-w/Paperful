@@ -619,6 +619,62 @@ def apply_rag(raw: dict[str, Any], cfg: "Config", source: Path) -> None:
             ("focus", "rag_focus", lambda v: C.parse_rag_focus(str(v))),
             ("dest", "rag_dest", lambda v: C.parse_dest(str(v), key="[rag].dest")),
             ("extract_questions_llm", "rag_extract_questions_llm", bool),
+            ("ask_mode", "rag_ask_mode", lambda v: C.parse_rag_ask_mode(str(v))),
+            (
+                "max_chunks_per_item",
+                "rag_max_chunks_per_item",
+                lambda v: max(1, int(v)),
+            ),
+            ("overfetch", "rag_overfetch", lambda v: max(1, int(v))),
+            ("evidence_k", "rag_evidence_k", lambda v: max(1, int(v))),
+            (
+                "answer_max_sources",
+                "rag_answer_max_sources",
+                lambda v: max(1, int(v)),
+            ),
+            (
+                "relevance_cutoff",
+                "rag_relevance_cutoff",
+                lambda v: max(0, min(10, int(v))),
+            ),
+            ("summary_model", "rag_summary_model", lambda v: str(v).strip()),
+            (
+                "summary_concurrency",
+                "rag_summary_concurrency",
+                lambda v: max(1, int(v)),
+            ),
+            (
+                "summary_length",
+                "rag_summary_length",
+                lambda v: str(v).strip() or "about 80 words",
+            ),
+            (
+                "evidence_fallback",
+                "rag_evidence_fallback",
+                lambda v: C.parse_rag_evidence_fallback(str(v)),
+            ),
+            (
+                "query_variants",
+                "rag_query_variants",
+                lambda v: max(1, min(4, int(v))),
+            ),
+            (
+                "insufficient_retries",
+                "rag_insufficient_retries",
+                lambda v: max(0, min(2, int(v))),
+            ),
+            ("cite_hops", "rag_cite_hops", lambda v: max(0, min(2, int(v)))),
+            ("cite_scope", "rag_cite_scope", lambda v: C.parse_rag_cite_scope(str(v))),
+            (
+                "mmr_lambda",
+                "rag_mmr_lambda",
+                lambda v: min(1.0, max(0.0, float(v))),
+            ),
+            (
+                "context_neighbors",
+                "rag_context_neighbors",
+                lambda v: max(0, int(v)),
+            ),
         ],
     )
     if "embed_model" in rag:

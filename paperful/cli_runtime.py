@@ -947,6 +947,8 @@ def _ask_once(
             }
             for s in reply.sources
         ],
+        "ask_mode": getattr(reply, "ask_mode", "simple"),
+        "evidence": getattr(reply, "evidence", {}) or {},
     }
 
 def _ask_questions(first: str | None) -> Iterator[str]:

@@ -64,10 +64,22 @@ class StubChat:
 
     provider = "stub"
 
-    def __init__(self, pieces=("Krill eat algae ", "[S1]."), error: str = ""):
+    def __init__(
+        self,
+        pieces=("Krill eat algae ", "[S1]."),
+        error: str = "",
+        json_replies=None,
+        completes=None,
+    ):
         self.pieces = list(pieces)
         self.error = error
         self.requests: list = []
+        self.json_requests: list = []
+        self.complete_requests: list = []
+        self.json_replies = list(json_replies or [])
+        self.completes = list(completes or [])
+        self._json_i = 0
+        self._complete_i = 0
 
     def check_config(self, model):
         return True, "ok"
@@ -77,6 +89,28 @@ class StubChat:
         if self.error:
             raise LLMClientError(self.error)
         yield from self.pieces
+
+    def complete(self, request):
+        self.complete_requests.append(request)
+        if self.error:
+            raise LLMClientError(self.error)
+        if self._complete_i < len(self.completes):
+            text = self.completes[self._complete_i]
+            self._complete_i += 1
+            return text
+        return ""
+
+    def complete_json(self, request):
+        self.json_requests.append(request)
+        if self.error:
+            raise LLMClientError(self.error)
+        if self._json_i < len(self.json_replies):
+            data = self.json_replies[self._json_i]
+            self._json_i += 1
+            if isinstance(data, Exception):
+                raise data
+            return data
+        return {"summary": "relevant excerpt", "relevance_score": 8}
 
 
 def add_item(

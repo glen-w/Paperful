@@ -318,15 +318,31 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[rag].embed_base_url` / `embed_api_base` | `""` | Ollama root / LiteLLM base URL for embeddings; empty uses `[llm].base_url` / `[llm].api_base` |
 | `[rag].embed_batch_size` | `32` | Passages per embedding request |
 | `[rag].chunk_chars` / `chunk_overlap` | `2048` / `256` | Passage size and overlap in characters. Changing them re-indexes on the next ingest |
-| `[rag].top_k` | `10` | Passages sent to the chat model per question (`-k` overrides) |
+| `[rag].top_k` | `10` | Passages sent to the chat model per question in **simple** mode, and for `rag search` (`-k` overrides) |
 | `[rag].max_context_chars` | `24000` | Cap on excerpt text in the prompt |
 | `[rag].hybrid` | `true` | Blend vector and full-text search; falls back to vector only |
 | `[rag].abstracts` | `true` | Index the abstract when an item has no readable PDF |
 | `[rag].model` | `""` | Chat model for `ask`; empty uses `[llm].model` |
-| `[rag].focus` | `default` | Prompt preset for `ask` / batch: `default`, `questions`, `gaps`, `methods`, `answered` |
+| `[rag].focus` | `default` | Prompt preset for `ask` / batch: `default`, `questions`, `gaps`, `methods`, `answered`, `conflict` |
 | `[rag].prompt` | `""` | Custom system prompt file; when set, overrides `focus`. Ask/batch can override per run (inline, upload, path, or a file under `state/prompts/`) — see [rag.md](rag.md#workbench-advanced-index) |
 | `[rag].dest` | `disk` | Batch ask note destination: `disk`, `zotero`, or `both` (Zotero needs `--apply` + one `-C`) |
 | `[rag].extract_questions_llm` | `false` | Default for `rag questions --llm` grounded extract lane |
+| `[rag].ask_mode` | `simple` | Global default for Ask. `simple` is raw excerpts and one completion. `advanced` scores passages then answers. `--ask-mode` / the Ask form override one run and are not written back |
+| `[rag].max_chunks_per_item` | `3` | Cap on passages from one paper in the retrieved set |
+| `[rag].overfetch` | `3` | Extra index rows fetched so the per-item cap can still fill `top_k` / `evidence_k` |
+| `[rag].evidence_k` | `8` | Advanced: candidate passages to summarize and score. Ignored in simple mode |
+| `[rag].answer_max_sources` | `5` | Advanced: papers kept after scoring |
+| `[rag].relevance_cutoff` | `1` | Advanced: drop scores below this (inclusive). Score 0 always drops |
+| `[rag].summary_model` | `""` | Advanced: model for passage summaries; empty uses `[rag].model` or `[llm].model` |
+| `[rag].summary_length` | `about 80 words` | Advanced: length hint in the summary prompt |
+| `[rag].summary_concurrency` | `2` | Advanced: parallel summary calls |
+| `[rag].evidence_fallback` | `raw` | Advanced: `raw` keeps the chunk if a summary call fails; `drop` discards it |
+| `[rag].query_variants` | `1` | Advanced: extra search phrasings fused by reciprocal rank. Default stays one query |
+| `[rag].insufficient_retries` | `0` | Advanced: re-gather once when the excerpts are not enough |
+| `[rag].cite_hops` | `0` | Advanced: hop along on-disk citation edges inside the Ask scope. No network |
+| `[rag].cite_scope` | `scope` | Advanced hop stays inside `-C` / years / types (`library` uses any indexed key) |
+| `[rag].mmr_lambda` | `1.0` | Advanced: `1.0` is off; below 1 diversity-reranks candidates |
+| `[rag].context_neighbors` | `0` | Advanced: append the next stored chunk onto each hit |
 
 ### Section extract (`extract-sections`)
 

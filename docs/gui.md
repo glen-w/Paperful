@@ -30,7 +30,7 @@ Three jobs sit on the default nav:
 | --- | --- | --- |
 | **Wanted** | `gaps`, `run`, `attach` | See missing PDFs, preview fetch, grab to `out/`, attach chosen copies |
 | **Discover** | `snowball`, `authorwatch`, watches | Find new works (topic or person), review, add metadata parents |
-| **Ask** | `ask`, `ask --from-file` | Cited answers from PDFs already copied to disk (needs `[rag]` + `[llm]` and an index) |
+| **Ask** | `ask`, `ask --from-file` | Cited answers from PDFs already copied to disk (`simple` / `advanced`; needs `[rag]` + `[llm]` and an index) |
 
 **Library**, **Activity**, and **System** support the loop. **Repair**, **Mirror**,
 **Index** (ingest / search / extract), **Briefs**, **Critique**, and **Settings** appear only
@@ -154,11 +154,14 @@ plus Grab filters (`year` / type / retry / try-all / browser-agent / upgrade).
 `fix-metadata`, `dedupe`, `versions`, `attachments`, `ocr`.
 **Mirror** Preview/Apply: `sync`, `snapshot`, `restore`, `cache clean`.
 **Ask**: cited Ask when `[rag]` and `[llm]` are on and the index has rows.
-Batch Ask (`state/ask-batch/`) is on the same page when **Advanced** is on.
-Focus presets, custom prompts (inline, upload, path, or saved under
+**Mode** (`simple` / `advanced`) starts at `[rag].ask_mode`; a change is this
+run only (Settings does not write it). After an advanced answer the page
+shows how many passages were scored and kept. Batch Ask (`state/ask-batch/`)
+is on the same page when **Advanced** is on (same Mode select). Focus presets
+(including `conflict`), custom prompts (inline, upload, path, or saved under
 `state/prompts/`), item keys, types, years, and top-k; batch adds `--force`
 and a questions file upload. If the index is empty, Ask offers a compact
-ingest. **Index** (Advanced): `rag ingest` / `search` when
+ingest. Details: [rag.md](rag.md#ask-modes). **Index** (Advanced): `rag ingest` / `search` when
 `[rag]` is on; **Extract questions** (`rag questions`) and **Already answered?**
 (`rag answered`, `state/rq-answered/`) use the same scope. Collection chip is
 the scope. **Synthesize** on Index when `[llm]` is on. **Extract sections**
@@ -202,7 +205,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | GET | `/v1/runs/{id}` | GUI command record under `state/gui/commands/` |
 | GET | `/v1/runs/{id}/events` | SSE `status` events until `done` or `failed` |
 | POST | `/v1/refs-gap` | Dry-run `refs gap` envelope |
-| POST | `/v1/ask` | Same as MCP `ask` (not linked from simple HTML) |
+| POST | `/v1/ask` | Same as MCP `ask` (optional `ask_mode`; not linked from simple HTML) |
 | POST | `/v1/gui/noop` | Smoke / readiness for the GUI process |
 | GET | `/wanted/report` | Read-only stamp cards for the scoped collection (`format=md|json|csv`; no `% complete`) |
 | POST | `/wanted/preview` | Review token for Grab (Advanced: year/type/retry/… flags) |
@@ -267,8 +270,8 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/mirror/preview` | Dry-run mirror verb + review token |
 | POST | `/mirror/apply` | Consume token; apply mirror verb |
 | GET | `/ask` | Ask page (threads, cited answer, batch). `?thread=` selects a thread |
-| POST | `/ask` | Enqueue cited Ask turn; redirect to `/ask?thread=&run=` |
-| POST | `/ask/batch` | Enqueue batch Ask; redirect `/ask?run=` |
+| POST | `/ask` | Enqueue cited Ask turn (`ask_mode` on the form); redirect to `/ask?thread=&run=` |
+| POST | `/ask/batch` | Enqueue batch Ask (`ask_mode` on the form); redirect `/ask?run=` |
 | POST | `/index/ask` | Alias of `POST /ask` |
 | POST | `/index/ask-batch` | Alias of `POST /ask/batch` |
 | POST | `/index/ingest` | Enqueue `rag ingest` (Preview dry-run or Build); redirect `?run=` (`next=ask` returns to `/ask`) |

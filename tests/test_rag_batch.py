@@ -75,7 +75,14 @@ def mirror(tmp_path, fakes):
 
 
 def test_focus_presets_resolve():
-    assert set(FOCI) >= {"default", "questions", "gaps", "methods", "answered"}
+    assert set(FOCI) >= {
+        "default",
+        "questions",
+        "gaps",
+        "methods",
+        "answered",
+        "conflict",
+    }
     assert parse_focus("") == "default"
     system, name, label = resolve_system_prompt(focus="gaps")
     assert name == "gaps" == label and "gaps" in system.lower()

@@ -22,6 +22,7 @@ def ask_turn(
     item_types: frozenset[str] | None = None,
     prompt_path: str | None = None,
     prompt_text: str | None = None,
+    ask_mode: str | None = None,
 ) -> None:
     if jobs.ask_turn_fn is not None:
         result = jobs.ask_turn_fn(
@@ -38,6 +39,7 @@ def ask_turn(
             item_types=item_types,
             prompt_path=prompt_path,
             prompt_text=prompt_text,
+            ask_mode=ask_mode,
         )
     else:
         from ..rag.ask_turn import run_ask_turn
@@ -55,6 +57,7 @@ def ask_turn(
             item_types=item_types,
             prompt_path=prompt_path,
             prompt_text=prompt_text,
+            ask_mode=ask_mode,
         )
     rec = commands.read_command(cfg, cmd_id) or {}
     rec["result"] = result
@@ -142,6 +145,7 @@ def ask_batch(
     prompt_path: str | None = None,
     prompt_text: str | None = None,
     force: bool = False,
+    ask_mode: str | None = None,
 ) -> None:
     if jobs.ask_batch_fn is not None:
         result = jobs.ask_batch_fn(
@@ -160,6 +164,7 @@ def ask_batch(
             prompt_path=prompt_path,
             prompt_text=prompt_text,
             force=force,
+            ask_mode=ask_mode,
         )
         _attach_result(cfg, cmd_id, result)
         return
@@ -204,6 +209,7 @@ def ask_batch(
         embedder=validate_embedder(cfg),
         index=index,
         ledger=ledger,
+        ask_mode=ask_mode,
     )
     folder = write_pack(cfg, pack)
     note = False

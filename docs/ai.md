@@ -49,7 +49,7 @@ unusable for a 1,500-PDF collection overnight.
 | Whole collection summarize | ~10²–10³ PDFs | Local: only with patience or strong silicon; hosted: budget tokens + rate limits | Resume-safe; already-done items skip |
 | `synthesize` over ~10³ summaries | One review from notes already written | Local: can take hours and many map-reduce chunks; hosted: far fewer tokens than summarizing every PDF again | Run `synthesize --dry-run` for the chunk plan first |
 | Browser agent (`recover`) | Per stubborn landing | Needs ~14B+ local or a capable hosted tool-calling model | Not a free-tier hobby lane |
-| Ask / RAG | After `rag ingest` | Embeddings dominate first ingest; chat is per question | Local `nomic-embed-text` or hosted `embed_provider = "litellm"` |
+| Ask / RAG | After `rag ingest` | Embeddings dominate first ingest; chat is per question | **simple** (default): one completion. **advanced**: about `evidence_k` extra summary calls, cached under `state/rag/evidence/`. Local `nomic-embed-text` or hosted `embed_provider = "litellm"` |
 
 **Try it out** means: one item, five papers, or a free hosted model while you
 watch for timeouts and bad grounding. **Library scale** means: hundreds or
@@ -238,6 +238,9 @@ ollama pull qwen2.5:7b
 # [llm] enabled, provider = "ollama", model = "qwen2.5:7b"
 uv run paperful summarize --item ABCD1234
 uv run paperful synthesize -C "My Collection" --year-from 2024   # narrow scope
+# Ask (after rag ingest): simple is one completion; advanced scores passages first
+uv run paperful ask "What does this collection say about EIAs?" -C "My Collection"
+uv run paperful ask "…" --ask-mode advanced
 ```
 
 **Small hosted batch (OpenRouter mid-tier)**

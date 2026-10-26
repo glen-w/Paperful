@@ -3631,6 +3631,11 @@ def rag_answered(
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
     top_k: int | None = typer.Option(None, "-k", "--top-k", help="Passages per question."),
+    ask_mode: str | None = typer.Option(
+        None,
+        "--ask-mode",
+        help="simple or advanced. Default is [rag].ask_mode.",
+    ),
     force: bool = typer.Option(False, "--force", help="Ignore batch answer cache."),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
@@ -3729,6 +3734,7 @@ def rag_answered(
         embedder=embedder,
         index=index,
         ledger=ledger,
+        ask_mode=ask_mode,
     )
     folder = write_pack(cfg, pack)
     if not json_out:
@@ -3797,10 +3803,15 @@ def ask(
     focus: str | None = typer.Option(
         None,
         "--focus",
-        help="Prompt preset: default, questions, gaps, methods, answered.",
+        help="Prompt preset: default, questions, gaps, methods, answered, conflict.",
     ),
     prompt: Path | None = typer.Option(
         None, "--prompt", help="Override system prompt file for this run."
+    ),
+    ask_mode: str | None = typer.Option(
+        None,
+        "--ask-mode",
+        help="simple (raw excerpts) or advanced (score then answer). Default is [rag].ask_mode.",
     ),
     force: bool = typer.Option(
         False, "--force", help="Batch: re-answer even when a cached row matches."
@@ -3858,6 +3869,7 @@ def ask(
         profile=profile,
         run_config=run_config,
         json_out=json_out,
+        ask_mode=ask_mode,
     )
 
 @app.command()

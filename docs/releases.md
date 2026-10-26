@@ -21,7 +21,9 @@ walkthroughs are in the guide ([Walkthroughs](walkthroughs.md)). Discover + Want
 briefing/digest (optional collection note), Repair/Mirror Preview→Apply,
 command ids, review tokens, and Activity run-status SSE (`GET /v1/runs/{id}/events`)
 are in tree. **Interactive Ask** is on the default nav (`/ask`),
-opt-in after `[rag]` + `[llm]`. Batch Ask is on that page when Advanced is on.
+opt-in after `[rag]` + `[llm]`. Mode is `simple` (default) or `advanced`
+(`--ask-mode` / the Ask form; not written back to config). Batch Ask is on
+that page when Advanced is on.
 Advanced **Index** is ingest, search, and question extracts. **Briefs** runs
 summarize/synthesize.
 Item records and create-missing restore are locked; extra item keys may still

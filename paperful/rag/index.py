@@ -169,6 +169,7 @@ class Index:
         k: int,
         keys: set[str] | None = None,
         hybrid: bool = True,
+        include_vector: bool = False,
     ) -> list[dict[str, Any]]:
         """Nearest passages, best first. Each row gets a ``score`` (higher is closer).
 
@@ -184,7 +185,10 @@ class Index:
                 if where:
                     query = query.where(where)
                 rows = query.limit(k).to_list()
-                return [_hit(row, row.get("_relevance_score")) for row in rows]
+                return [
+                    _hit(row, row.get("_relevance_score"), include_vector=include_vector)
+                    for row in rows
+                ]
             except Exception:
                 pass
         query = self._table.search(vector)
@@ -192,7 +196,28 @@ class Index:
             query = query.where(where)
         rows = query.limit(k).to_list()
         # Unit vectors: squared L2 distance d gives cosine similarity 1 - d / 2.
-        return [_hit(row, 1.0 - float(row.get("_distance") or 0.0) / 2.0) for row in rows]
+        return [
+            _hit(
+                row,
+                1.0 - float(row.get("_distance") or 0.0) / 2.0,
+                include_vector=include_vector,
+            )
+            for row in rows
+        ]
+
+    def fetch_chunk(self, item_key: str, chunk_index: int) -> dict[str, Any] | None:
+        """One stored passage, or None. Used to glue a neighbouring chunk."""
+        if not _SAFE_KEY.match(item_key):
+            raise ValueError(f"unsafe item key {item_key!r}")
+        where = f"item_key = '{item_key}' AND chunk_index = {int(chunk_index)}"
+        try:
+            arrow = self._table.to_lance().to_table(filter=where)
+            rows = arrow.to_pylist()
+        except Exception:
+            return None
+        if not rows:
+            return None
+        return _hit(rows[0], 0.0)
 
     def finish(self) -> None:
         """Compact what an ingest run wrote and bring the full-text index up to date."""
@@ -208,9 +233,15 @@ class Index:
         self._table.optimize(cleanup_older_than=timedelta(0))
 
 
-def _hit(row: dict[str, Any], score: Any) -> dict[str, Any]:
+def _hit(
+    row: dict[str, Any], score: Any, *, include_vector: bool = False
+) -> dict[str, Any]:
     hit = {name: row.get(name) for name in _COLUMNS}
     hit["score"] = float(score or 0.0)
+    if include_vector:
+        vector = row.get("vector")
+        if vector is not None:
+            hit["vector"] = [float(x) for x in vector]
     return hit
 
 

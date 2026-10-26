@@ -2,8 +2,10 @@
 
 `paperful rag ingest` builds a search index from the PDFs and abstracts in the
 on-disk mirror. `paperful ask` answers a question from that index and names the
-papers and pages it used. `paperful rag search` shows the matching passages
-without a chat model. On the workbench, that is **Ask** on the default nav.
+papers and pages it used. Default mode is **simple** (raw excerpts, one
+completion); **advanced** scores passages first — [Ask modes](#ask-modes).
+`paperful rag search` shows the matching passages without a chat model. On the
+workbench, that is **Ask** on the default nav.
 
 ![Ask: a cited answer from PDFs already on disk in ocean/BBNJ](_static/workflows/index-ask.png)
 
@@ -13,9 +15,11 @@ Everything here is optional and off until `[rag].enabled = true`.
 
 - **Reads** `out_dir` only: `record.json` and the PDFs beside it. It never calls
   Zotero, Mendeley or EndNote, and works with the reference manager closed.
-- **Writes** under `state_dir/rag/`: extracted text, the index, and a ledger of
-  what was indexed. The index is a cache; delete the folder and run
-  `rag ingest` to rebuild it.
+- **Writes** under `state_dir/rag/`: extracted text, the index, a ledger of
+  what was indexed, and (in **advanced** Ask) scored passage summaries under
+  `evidence/`. The index is a cache; delete the folder and run `rag ingest`
+  to rebuild it. Evidence files are a question cache; they do not require a
+  re-ingest.
 - **Changes one thing in the mirror**: a scanned PDF. With `[rag].ocr = "auto"`
   (the default) ingest runs OCRmyPDF on PDFs that have no text layer and
   replaces the file under `out_dir` with the text-layer version, the same
@@ -71,11 +75,45 @@ ocr = "auto"                   # auto | off
 parser = "light"               # light | docling | grobid
 embed_provider = "ollama"      # ollama | litellm
 embed_model = "nomic-embed-text"
-top_k = 10                     # passages sent to the model per question
+top_k = 10                     # passages sent to the model per question (simple mode)
+ask_mode = "simple"            # simple | advanced — `--ask-mode` overrides one run
 # model = "qwen2.5:14b"        # chat model for ask; default is [llm].model
 ```
 
 All keys and defaults are in `config.example.toml`.
+
+### Ask modes
+
+Ask has two modes on the same index. The global default is `simple`. A run can
+override it from `paperful ask --ask-mode`, the Ask / batch form, or MCP
+`ask_mode`. The override is not written back to config. `rag search` has no
+mode: it stays retrieval-only.
+
+| Mode | What it does | Cost |
+| --- | --- | --- |
+| **simple** | One hybrid search (`top_k` / `-k`), raw excerpts, one chat completion | One completion per question |
+| **advanced** | Retrieve `evidence_k` passages, summarize each for this question with a 0–10 score, drop the weak ones, answer from at most `answer_max_sources` papers | About `evidence_k` extra completions, then one answer. Repeated questions reuse `state/rag/evidence/` |
+
+`simple` ignores the advanced knobs. Setting `evidence_k` does not change a
+simple run; `-k` does not change an advanced run.
+
+Advanced excerpt headers include venue, item type, and DOI when the ledger
+has them. A follow-up turn may cite only the markers in the current excerpts;
+prior turns stay in the chat for continuity, not as evidence. `--show-context`
+still lists the raw passages.
+
+Optional advanced knobs default so the mode stays one summary pass. Raising
+them is a config change, not a third mode (`query_variants`,
+`insufficient_retries`, `mmr_lambda`, `cite_hops`, `context_neighbors`).
+`cite_hops` reads citation edges already on disk (snowball
+`citation_graph.json`); it does not download or call OpenAlex. Batch and
+`rag answered` follow the same default-or-flag rule. Keys:
+[config.md](config.md).
+
+```bash
+uv run paperful ask "What does the BBNJ Agreement require for EIAs?" -C ocean/BBNJ
+uv run paperful ask "…" --ask-mode advanced
+```
 
 ### Embedding model
 
@@ -187,9 +225,10 @@ prints one line and `rag ingest` catches up later. It is off by default.
 ```bash
 uv run paperful rag search "environmental impact assessment thresholds" -C ocean/BBNJ
 uv run paperful ask "What does the BBNJ Agreement require for EIAs?" -C ocean/BBNJ
+uv run paperful ask "…" --ask-mode advanced
 uv run paperful ask "…" --show-context     # also list the passages used
 uv run paperful ask "…" --format json      # one paperful.agent.json.v1 object (implies --no-stream)
-uv run paperful ask "…" --focus gaps       # prompt preset (default|questions|gaps|methods|answered)
+uv run paperful ask "…" --focus gaps       # prompt preset (default|questions|gaps|methods|answered|conflict)
 uv run paperful ask --from-file questions.txt -C ocean/BBNJ   # batch → state/ask-batch/
 uv run paperful ask                        # prompt for several; follow-ups share a thread
 uv run paperful ask --thread new "…"       # start a stored thread
@@ -233,8 +272,10 @@ index tip rows are skipped unless `--force`. Optional
 parent edit).
 
 `--focus` selects a bundled system prompt (`default`, `questions`, `gaps`,
-`methods`, `answered`). `[rag].focus` sets the default; `--prompt FILE` wins
-over focus. Named run profiles may set `focus` alongside scope keys.
+`methods`, `answered`, `conflict`). `conflict` names agreement vs disagreement
+and says when the excerpts do not decide. `[rag].focus` sets the default;
+`--prompt FILE` wins over focus. Named run profiles may set `focus` alongside
+scope keys. Focus is a prompt, not a third Ask mode.
 
 ```bash
 uv run paperful rag questions -C ocean/BBNJ          # rules → state/rag/questions/
@@ -278,11 +319,14 @@ Heading synonyms ship in the tree; merge publisher-specific titles from
 ### Workbench (Advanced Index)
 
 **Ask** is on the default nav. With `[rag]` and `[llm]` on, that page runs
-threaded Ask. Batch Ask is on the same page when Advanced is on. Advanced
-**Index** covers ingest, search, extract questions,
-already-answered checks, and synthesize. Scope follows the collection chip
-(plus optional item keys, years, types, top-k). Custom system prompts on
-Ask/batch, in order:
+threaded Ask. A **Mode** select (`simple` / `advanced`) starts at
+`[rag].ask_mode`; changing it is this run only and is not written back to
+config. After an advanced answer the page shows how many passages were scored
+and how many were kept. Batch Ask is on the same page when Advanced is on
+(same Mode select). Advanced **Index** covers ingest, search, extract
+questions, already-answered checks, and synthesize. Scope follows the
+collection chip (plus optional item keys, years, types, top-k). Custom system
+prompts on Ask/batch, in order:
 
 1. Inline textarea
 2. Uploaded `.md`/`.txt` (stored under `state/gui/uploads/`)

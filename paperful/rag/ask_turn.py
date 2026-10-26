@@ -9,6 +9,7 @@ from ..llm import get_client, validate_embedder, validate_llm_for_ask
 from .answer import answer
 from .index import Index, IndexMismatch, IndexMissing, RagUnavailable, ledger_path
 from .ledger import Ledger
+from .mode import resolve_ask_mode
 from .prompt import parse_focus
 from .retrieve import scope_keys
 from .thread import Thread, load_thread, new_id, rewrite_query, save_thread
@@ -28,6 +29,7 @@ def run_ask_turn(
     item_types: frozenset[str] | None = None,
     prompt_path: str | None = None,
     prompt_text: str | None = None,
+    ask_mode: str | None = None,
 ) -> dict[str, Any]:
     """Answer one question, append to a thread, and return a GUI/CLI row."""
     q = (question or "").strip()
@@ -38,6 +40,7 @@ def run_ask_turn(
     validate_llm_for_ask(cfg)
     embedder = validate_embedder(cfg)
     focus_name = parse_focus(focus if focus is not None else cfg.rag_focus)
+    mode = resolve_ask_mode(cfg, ask_mode)
     try:
         index = Index.open(cfg)
         ledger = Ledger(ledger_path(cfg))
@@ -71,6 +74,7 @@ def run_ask_turn(
         embedder=embedder,
         index=index,
         ledger=ledger,
+        ask_mode=mode,
     )
     reply.read()
     cited = reply.cited()
@@ -98,4 +102,6 @@ def run_ask_turn(
         "cited": [s.marker for s in cited],
         "sources": sources,
         "focus": focus_name,
+        "ask_mode": reply.ask_mode,
+        "evidence": reply.evidence,
     }

@@ -136,6 +136,8 @@ def test_index_ask_enqueues_and_writes_thread(tmp_path, monkeypatch):
         client.cookies.set("pf_collection", "ocean/BBNJ")
         gated = client.get("/ask")
         assert 'action="/ask"' in gated.text
+        assert 'name="ask_mode"' in gated.text
+        assert 'value="simple" selected' in gated.text or 'value="simple"  selected' in gated.text
         res = client.post(
             "/ask",
             data={"question": "What is BBNJ?", "focus": "default"},
@@ -421,6 +423,7 @@ def test_index_ask_forwards_prompt_and_scope(tmp_path, monkeypatch):
                 "prompt_inline": "Be terse.",
                 "item_keys": "ABCD1234",
                 "top_k": "5",
+                "ask_mode": "advanced",
             },
             follow_redirects=False,
         )
@@ -431,6 +434,85 @@ def test_index_ask_forwards_prompt_and_scope(tmp_path, monkeypatch):
         assert seen[0]["prompt_text"] == "Be terse."
         assert seen[0]["item_keys"] == ["ABCD1234"]
         assert seen[0]["top_k"] == 5
+        assert seen[0]["ask_mode"] == "advanced"
+    finally:
+        jobs.ask_turn_fn = None
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_ask_mode_select_follows_config_not_last_run(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.rag_enabled = True
+    cfg.llm_enabled = True
+    cfg.rag_ask_mode = "advanced"
+    _ops(monkeypatch)
+    _fresh_index(monkeypatch)
+
+    def fake(cfg, cmd_id, **kw):
+        tid = kw.get("thread_id") or "modecheck123"
+        save_thread(
+            cfg.state_dir,
+            Thread(
+                thread_id=tid,
+                turns=[
+                    {"role": "user", "content": kw["question"]},
+                    {"role": "assistant", "content": "ok"},
+                ],
+                last_query=kw["question"],
+            ),
+        )
+        return {
+            "thread_id": tid,
+            "question": kw["question"],
+            "retrieve_as": kw["question"],
+            "answer": "ok",
+            "cited": [],
+            "sources": [],
+            "focus": "default",
+            "ask_mode": kw.get("ask_mode") or "advanced",
+            "evidence": {"candidates": 8, "kept": 4},
+        }
+
+    jobs.ask_turn_fn = fake
+    try:
+        client = TestClient(create_app(cfg))
+        page = client.get("/ask")
+        assert 'value="advanced" selected' in page.text or 'value="advanced"  selected' in page.text
+        simple = client.post(
+            "/ask",
+            data={"question": "What is BBNJ?", "ask_mode": "simple"},
+            follow_redirects=False,
+        )
+        loc = simple.headers.get("location") or ""
+        cmd_id = loc.split("run=")[1].split("&")[0]
+        thread_id = loc.split("thread=")[1].split("&")[0]
+        assert _wait_done(client, cmd_id).get("status") == "done"
+        after_simple = client.get(f"/ask?thread={thread_id}")
+        assert (
+            'value="advanced" selected' in after_simple.text
+            or 'value="advanced"  selected' in after_simple.text
+        )
+        adv = client.post(
+            "/ask",
+            data={
+                "question": "And EIAs?",
+                "ask_mode": "advanced",
+                "thread_id": thread_id,
+            },
+            follow_redirects=False,
+        )
+        loc = adv.headers.get("location") or ""
+        cmd_id = loc.split("run=")[1].split("&")[0]
+        assert _wait_done(client, cmd_id).get("status") == "done"
+        after_adv = client.get(f"/ask?thread={thread_id}")
+        assert "8 passages scored, 4 kept" in after_adv.text
+        assert (
+            'value="advanced" selected' in after_adv.text
+            or 'value="advanced"  selected' in after_adv.text
+        )
     finally:
         jobs.ask_turn_fn = None
 

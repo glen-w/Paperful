@@ -140,8 +140,9 @@ TOOLS = [
     {
         "name": "ask",
         "description": (
-            "Answer a question from the on-disk RAG index. Read-only for the "
-            "reference manager. Needs rag ingest first."
+            "Answer a question from the on-disk RAG index. Optional ask_mode "
+            "simple (default) or advanced (score then answer). Read-only for "
+            "the reference manager. Needs rag ingest first."
         ),
         "inputSchema": {
             "type": "object",
@@ -150,6 +151,10 @@ TOOLS = [
                 "collection": {
                     "type": "string",
                     "description": "Optional mirror collection path.",
+                },
+                "ask_mode": {
+                    "type": "string",
+                    "description": "simple or advanced. Omitted uses [rag].ask_mode.",
                 },
             },
             "required": ["question"],
@@ -236,8 +241,10 @@ def call_refs_gap(cfg: Config, collection: str) -> dict[str, Any]:
     return run_refs_gap(cfg, collection)
 
 
-def call_ask(cfg: Config, question: str, collection: str = "") -> dict[str, Any]:
-    return run_ask(cfg, question, collection)
+def call_ask(
+    cfg: Config, question: str, collection: str = "", ask_mode: str | None = None
+) -> dict[str, Any]:
+    return run_ask(cfg, question, collection, ask_mode=ask_mode)
 
 
 def call_gaps(cfg: Config, collection: str = "", library: bool = False) -> dict[str, Any]:
@@ -307,6 +314,7 @@ def handle_tools_call(cfg: Config, req_id: Any, params: dict[str, Any]) -> dict[
             cfg,
             str(args.get("question") or ""),
             str(args.get("collection") or ""),
+            ask_mode=str(args["ask_mode"]) if args.get("ask_mode") else None,
         )
     else:
         return _error(req_id, -32601, f"unknown tool {name}")

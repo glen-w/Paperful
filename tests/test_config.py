@@ -309,6 +309,43 @@ def test_rag_table_is_parsed_and_clamped(tmp_path):
     assert cfg.rag_chunk_chars == 1000 and cfg.rag_chunk_overlap == 500
     assert cfg.rag_hybrid is False and cfg.rag_abstracts is False
     assert cfg.rag_model == "qwen3:8b"
+    assert cfg.rag_ask_mode == "simple"
+    assert cfg.rag_evidence_k == 8 and cfg.rag_query_variants == 1
+    assert cfg.rag_cite_hops == 0 and cfg.rag_mmr_lambda == 1.0
+
+
+def test_rag_ask_mode_and_advanced_knobs(tmp_path):
+    from paperful.config import _from_dict, parse_rag_ask_mode
+
+    assert parse_rag_ask_mode("") == "simple"
+    assert parse_rag_ask_mode("ADVANCED") == "advanced"
+    with pytest.raises(ValueError, match="simple or advanced"):
+        parse_rag_ask_mode("thorough")
+    cfg = _from_dict(
+        {
+            "rag": {
+                "ask_mode": "Advanced",
+                "evidence_k": 0,
+                "query_variants": 9,
+                "insufficient_retries": 8,
+                "cite_hops": 5,
+                "mmr_lambda": 1.5,
+                "relevance_cutoff": 12,
+                "evidence_fallback": "DROP",
+                "cite_scope": "Library",
+            }
+        },
+        tmp_path / "config.toml",
+    )
+    assert cfg.rag_ask_mode == "advanced"
+    assert cfg.rag_evidence_k == 1
+    assert cfg.rag_query_variants == 4
+    assert cfg.rag_insufficient_retries == 2
+    assert cfg.rag_cite_hops == 2
+    assert cfg.rag_mmr_lambda == 1.0
+    assert cfg.rag_relevance_cutoff == 10
+    assert cfg.rag_evidence_fallback == "drop"
+    assert cfg.rag_cite_scope == "library"
 
 
 def test_critique_table_is_parsed(tmp_path):

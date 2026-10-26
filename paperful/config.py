@@ -372,10 +372,26 @@ class Config:
     rag_hybrid: bool = True  # vector + full-text; falls back to vector only
     rag_abstracts: bool = True  # index the abstract when an item has no readable PDF
     rag_model: str = ""  # chat model for `ask`; empty → llm.model
-    rag_focus: str = "default"  # default | questions | gaps | methods | answered
+    rag_focus: str = "default"  # default | questions | gaps | methods | answered | conflict
     rag_prompt: str = ""  # custom system prompt file for ask; empty → focus preset
     rag_dest: str = "disk"  # disk | zotero | both — batch note writes (needs --apply)
     rag_extract_questions_llm: bool = False  # LLM lane for `rag questions`
+    rag_ask_mode: str = "simple"  # simple | advanced — per-run --ask-mode overrides
+    rag_max_chunks_per_item: int = 3
+    rag_overfetch: int = 3
+    rag_evidence_k: int = 8  # advanced: candidate pool (simple uses top_k)
+    rag_answer_max_sources: int = 5
+    rag_relevance_cutoff: int = 1  # inclusive; 0 still drops "not applicable"
+    rag_summary_model: str = ""  # empty → rag.model or llm.model
+    rag_summary_concurrency: int = 2
+    rag_summary_length: str = "about 80 words"
+    rag_evidence_fallback: str = "raw"  # raw | drop
+    rag_query_variants: int = 1  # advanced; 2–4 multi-query fusion
+    rag_insufficient_retries: int = 0
+    rag_cite_hops: int = 0
+    rag_cite_scope: str = "scope"  # scope | library
+    rag_mmr_lambda: float = 1.0  # 1.0 = off; below 1 diversity rerank
+    rag_context_neighbors: int = 0
     # Structured IMRaD section extract (`extract-sections`).
     extract_sections_llm: bool = False
     extract_sections_headings: str = ""  # extra synonym TOML; also state/section-headings.toml
@@ -924,7 +940,12 @@ def parse_dest(value: str, *, key: str = "dest") -> str:
 _RAG_OCR_MODES = frozenset({"auto", "off"})
 _RAG_PARSERS = frozenset({"light", "docling", "grobid"})
 _RAG_EMBED_PROVIDERS = frozenset({"ollama", "litellm"})
-_RAG_FOCI = frozenset({"default", "questions", "gaps", "methods", "answered"})
+_RAG_FOCI = frozenset(
+    {"default", "questions", "gaps", "methods", "answered", "conflict"}
+)
+_RAG_ASK_MODES = frozenset({"simple", "advanced"})
+_RAG_EVIDENCE_FALLBACKS = frozenset({"raw", "drop"})
+_RAG_CITE_SCOPES = frozenset({"scope", "library"})
 
 
 def parse_rag_focus(value: str) -> str:
@@ -935,6 +956,27 @@ def parse_rag_focus(value: str) -> str:
             + ", ".join(sorted(_RAG_FOCI))
         )
     return focus
+
+
+def parse_rag_ask_mode(value: str) -> str:
+    mode = str(value).strip().lower() or "simple"
+    if mode not in _RAG_ASK_MODES:
+        raise ValueError("config [rag].ask_mode must be simple or advanced")
+    return mode
+
+
+def parse_rag_evidence_fallback(value: str) -> str:
+    fallback = str(value).strip().lower() or "raw"
+    if fallback not in _RAG_EVIDENCE_FALLBACKS:
+        raise ValueError("config [rag].evidence_fallback must be raw or drop")
+    return fallback
+
+
+def parse_rag_cite_scope(value: str) -> str:
+    scope = str(value).strip().lower() or "scope"
+    if scope not in _RAG_CITE_SCOPES:
+        raise ValueError("config [rag].cite_scope must be scope or library")
+    return scope
 
 
 def parse_rag_ocr(value: str) -> str:
