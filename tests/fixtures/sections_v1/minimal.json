@@ -1,0 +1,20 @@
+{
+  "schema": "paperful.sections.v1",
+  "item_key": "KEY1",
+  "title": "Example paper",
+  "year": 2020,
+  "source": "pdf",
+  "fields": {
+    "abstract": {
+      "text": "We study ocean governance with a long abstract body that exceeds the minimum length required for a valid section extract here.",
+      "provenance": "rule",
+      "heading": "Abstract",
+      "pages": "1"
+    },
+    "methodology": null,
+    "conclusion": null,
+    "research_questions": null
+  },
+  "missing": ["methodology", "conclusion", "research_questions"],
+  "engine": "rule"
+}

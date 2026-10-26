@@ -3977,11 +3977,21 @@ def extract_sections(
         "--force",
         help="Re-extract even when state/sections/<key>.json already exists.",
     ),
+    grobid: bool | None = typer.Option(
+        None,
+        "--grobid/--no-grobid",
+        help="Use the GROBID sidecar when available. Default is [grobid].enabled.",
+    ),
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
-    """Extract IMRaD-style sections to disk (rules; optional LLM)."""
+    """Extract IMRaD-style sections to disk (rules; optional GROBID / LLM)."""
     from .agent_json import batch_exit, envelope
+    from .grobid_client import (
+        GrobidConfigError,
+        grobid_client_from_config,
+        grobid_egress_is_remote,
+    )
     from .llm import get_client
     from .llm.preflight import validate_llm_for_verb
     from .llm.validate import LlmConfigError
@@ -3993,7 +4003,9 @@ def extract_sections(
         console.print("[red]Pass --item, -C, or --library.[/]")
         raise typer.Exit(1)
     use_llm = cfg.extract_sections_llm if llm is None else llm
+    use_grobid = cfg.grobid_enabled if grobid is None else grobid
     client = None
+    grobid_client = None
     if use_llm:
         try:
             validate_llm_for_verb(cfg)
@@ -4001,22 +4013,38 @@ def extract_sections(
             console.print(str(exc), markup=False, style="red")
             raise typer.Exit(1) from exc
         client = get_client(cfg)
+    if use_grobid:
+        try:
+            grobid_client = grobid_client_from_config(cfg)
+        except GrobidConfigError as exc:
+            console.print(str(exc), markup=False, style="red")
+            raise typer.Exit(1) from exc
+        if grobid_egress_is_remote(cfg) and not json_out:
+            console.print(
+                "[yellow]GROBID is not local — PDF bytes leave this machine.[/]"
+            )
     types = _resolve_types(item_type)
     started = time.time()
-    items = extract_scope(
-        cfg,
-        collections=collection or None,
-        item_keys=item,
-        library=library,
-        year_from=year_from,
-        year_to=year_to,
-        item_types=types,
-        use_llm=use_llm,
-        client=client,
-        limit=limit,
-        force=force,
-        skip_existing=not force,
-    )
+    try:
+        items = extract_scope(
+            cfg,
+            collections=collection or None,
+            item_keys=item,
+            library=library,
+            year_from=year_from,
+            year_to=year_to,
+            item_types=types,
+            use_llm=use_llm,
+            client=client,
+            limit=limit,
+            force=force,
+            skip_existing=not force,
+            use_grobid=use_grobid,
+            grobid=grobid_client,
+        )
+    finally:
+        if grobid_client is not None:
+            grobid_client.close()
     filled = sum(
         1
         for it in items
@@ -4033,6 +4061,7 @@ def extract_sections(
             f"{action} sections for {len(items)} item(s)"
             + (f" ({filled} field(s) present)" if items else "")
             + (" (LLM on)" if use_llm else "")
+            + (" (GROBID on)" if use_grobid else "")
             + "."
         )
     write_command_report(
@@ -4044,9 +4073,11 @@ def extract_sections(
             "fields_present": filled,
             "dry_run": dry_run,
             "llm": use_llm,
+            "grobid": use_grobid,
+            "notes": sum(1 for it in items if it.notes),
         },
         items=[item_to_dict(it) for it in items],
-        flags={"limit": limit, "llm": use_llm, "force": force},
+        flags={"limit": limit, "llm": use_llm, "force": force, "grobid": use_grobid},
         started=started,
     )
     code = batch_exit(ok=len(items), failed=0)
@@ -4059,7 +4090,12 @@ def extract_sections(
                 "dry_run": dry_run,
             },
             items=[item_to_dict(it) for it in items],
-            flags={"read_only": dry_run, "llm": use_llm, "force": force},
+            flags={
+                "read_only": dry_run,
+                "llm": use_llm,
+                "force": force,
+                "grobid": use_grobid,
+            },
             exit_code=code,
         )
         _emit_agent(payload, json_out=True, human=lambda: None)

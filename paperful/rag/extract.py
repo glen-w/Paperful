@@ -180,9 +180,45 @@ def _strip_placeholders(markdown: str) -> str:
     return markdown.replace("<!-- image -->", "")
 
 
+class GrobidParser:
+    """Markdown pages from an operator-owned GROBID sidecar. Needs ``[grobid]``.
+
+    TEI is cached under ``state/grobid/<sha256>.tei.xml``. OCR stays off here:
+    scans should get a text layer from OCRmyPDF first.
+    """
+
+    name = "grobid"
+    version = 1
+
+    def __init__(self, cfg: Config) -> None:
+        if not cfg.grobid_enabled:
+            raise ParserUnavailable(
+                "GROBID parser needs [grobid].enabled = true and a running "
+                "server at [grobid].base_url; see docs/grobid.md"
+            )
+        self.cfg = cfg
+
+    def pages(self, path: Path) -> list[str]:
+        from ..grobid_client import GrobidError
+        from ..sections.grobid import process_pdf, tei_to_markdown_pages
+
+        if not path.is_file():
+            raise ParseError(f"no such file: {path}")
+        try:
+            tei = process_pdf(self.cfg, path)
+        except GrobidError as exc:
+            raise ParseError(f"grobid failed: {exc}") from exc
+        pages = tei_to_markdown_pages(tei)
+        if pages:
+            return pages
+        raise ParseError("GROBID returned empty TEI")
+
+
 def get_parser(cfg: Config) -> Parser:
     if cfg.rag_parser == "docling":
         return DoclingParser()
+    if cfg.rag_parser == "grobid":
+        return GrobidParser(cfg)
     return LightParser()
 
 

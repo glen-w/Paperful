@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0">
+  <teiHeader>
+    <fileDesc>
+      <titleStmt>
+        <title>Ocean governance and monitoring</title>
+      </titleStmt>
+    </fileDesc>
+    <profileDesc>
+      <abstract>
+        <p>We study ocean governance with a long abstract body that exceeds the minimum length required for a valid section extract here and names the institutions involved.</p>
+      </abstract>
+    </profileDesc>
+  </teiHeader>
+  <text>
+    <body>
+      <div>
+        <head n="1">Introduction</head>
+        <p>Background on the topic of marine policy and the institutions that implement it across regions.</p>
+        <div>
+          <head n="1.1">Background</head>
+          <p>Nested background on earlier treaties, regional fisheries bodies, and the gap this paper addresses in monitoring.</p>
+        </div>
+      </div>
+      <div>
+        <head n="2">Methods</head>
+        <p>We surveyed twelve sites using structured interviews and coding. Each site received the same protocol, blinded coders, and inter-rater checks before analysis.</p>
+      </div>
+      <div>
+        <head n="3">Results</head>
+        <p>Most sites showed improvement after the protocol was applied, with measurable gains in reporting completeness.</p>
+      </div>
+      <div>
+        <head n="4">Conclusion</head>
+        <p>Marine policy should adopt stronger monitoring frameworks soon. Future work must tie enforcement data to measurable ecological outcomes across exclusive economic zones.</p>
+      </div>
+      <div>
+        <head>Research questions</head>
+        <p>RQ1. How do institutions adapt?</p>
+        <p>RQ2. What limits enforcement?</p>
+      </div>
+    </body>
+  </text>
+</TEI>

@@ -359,6 +359,49 @@ def test_index_rag_questions_scope_and_answered_pack(tmp_path, monkeypatch):
         jobs.rag_answered_fn = None
 
 
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_index_extract_sections_form_and_grobid(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.grobid_enabled = True
+    _ops(monkeypatch)
+    _fresh_index(monkeypatch)
+    seen: list[dict] = []
+
+    def fake(cfg, cmd_id, **kw):
+        seen.append(kw)
+        return {
+            "dry_run": kw["dry_run"],
+            "items": 1,
+            "fields_present": 3,
+            "grobid": kw["use_grobid"],
+        }
+
+    jobs.extract_sections_fn = fake
+    try:
+        client = TestClient(create_app(cfg))
+        client.cookies.set("pf_collection", "ocean/BBNJ")
+        page = client.get("/index")
+        assert 'action="/index/extract-sections"' in page.text
+        assert "GROBID sidecar" in page.text
+        res = client.post(
+            "/index/extract-sections",
+            data={"dry_run": "1", "use_grobid": "1"},
+            follow_redirects=False,
+        )
+        assert res.status_code == 303
+        cmd_id = (res.headers.get("location") or "").split("run=")[1].split("&")[0]
+        rec = _wait_done(client, cmd_id)
+        assert rec.get("status") == "done"
+        assert seen[0]["use_grobid"] is True
+        assert seen[0]["dry_run"] is True
+        assert seen[0]["collection"] == "ocean/BBNJ"
+    finally:
+        jobs.extract_sections_fn = None
+
+
 def test_ask_batch_job_forwards_prompt_path(tmp_path, monkeypatch):
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     cfg.state_dir.mkdir(parents=True)

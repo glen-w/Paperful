@@ -239,6 +239,14 @@ mirror_failures_before_skip = 3
 # max_wall_s = 90
 # # Optional bearer: env CAMOFOX_ACCESS_KEY when the server sets CAMOFOX_ACCESS_KEY
 # # See docs/camofox.md — not a Cloudflare-bypass product; no vault SSO cookies
+# [grobid]
+# enabled = false                # opt-in GROBID sidecar for extract-sections / rag parser
+# base_url = "http://127.0.0.1:8070"  # operator-owned GROBID (Docker); Paperful does not start it
+# timeout_s = 120
+# allow_remote = false           # PDF bytes leave the machine if the host is not local
+# consolidate_header = 0         # 0 = no Crossref (keep local)
+# consolidate_citations = 0
+# # See docs/grobid.md
 # [handoff]
 # scholar = true                 # open Scholar in the system browser when there is no PDF URL
 
@@ -450,7 +458,7 @@ concurrency = 2
 # enabled = false
 # auto_ingest = false            # index new PDFs after run / attach / inbox / snapshot / ocr
 # ocr = "auto"                   # auto | off. auto runs OCRmyPDF on scans and rewrites them under out_dir
-# parser = "light"               # light (pdftotext) | docling (needs paperful[rag-docling])
+# parser = "light"               # light | docling | grobid (grobid needs [grobid].enabled)
 # embed_provider = "ollama"      # ollama | litellm
 # embed_model = "nomic-embed-text"   # multilingual library: "bge-m3". LiteLLM: "openai/text-embedding-3-small"
 # # embed_base_url = ""          # Ollama root; empty uses [llm].base_url

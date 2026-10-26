@@ -49,6 +49,12 @@ and [architecture](architecture.md).
 | `[camofox].during_run` | `true` | Inject on `run` when enabled. `--camofox` / `--no-camofox` override one run |
 | `[camofox].base_url` | `http://127.0.0.1:9377` | REST base for the camofox-browser server |
 | `[camofox].max_wall_s` | `90` | Wall-clock budget per item for the scripted grab |
+| `[grobid].enabled` | `false` | Opt-in GROBID sidecar for `extract-sections` and `[rag].parser = "grobid"`. Needs an external GROBID server. Never a silent default. See [GROBID](grobid.md) |
+| `[grobid].base_url` | `http://127.0.0.1:8070` | REST base. Loopback is rewritten to `host.docker.internal` inside Compose (`PAPERFUL_GROBID_HOST`) |
+| `[grobid].timeout_s` | `120` | Full-text POST budget |
+| `[grobid].allow_remote` | `false` | Permit a non-local host. PDF bytes then leave this machine |
+| `[grobid].consolidate_header` | `0` | GROBID Crossref header consolidate. Keep `0` to stay local |
+| `[grobid].consolidate_citations` | `0` | GROBID Crossref citation consolidate. Keep `0` to stay local |
 | `[handoff].scholar` | `true` | Put a Scholar results URL on miss rows and open it in the system browser when there is no direct PDF URL |
 | `[request].channels` | `off` | Author-request policy: `off` \| `rg` \| `email` \| `both` \| `rg_then_email_after_days`. **`rg` is handoff-only:** opens an existing ResearchGate publication URL in your system browser so **you** click Request full-text (RG ToS). Paperful never clicks and does not search RG. `email` / delay are recorded for later mail-merge; Paperful does not send mail. Override one `gaps` / `run --handoff` / `reachout` with `--request-rg` / `--no-request-rg`. `--re-request` ignores the `state/author-requests.jsonl` ledger |
 | `[request].email_after_days` | `14` | Used when `channels = rg_then_email_after_days` (policy only until a draft verb exists) |
@@ -77,6 +83,8 @@ use a library proxy. Google Scholar is off until you add `scholar` to
 search is off until `[serpapi].enabled` and `SERPAPI_API_KEY`; cap with
 `[serpapi].max_calls` / `--serpapi-max`. Opt-in [Camofox](camofox.md) is off
 until `[camofox].enabled` and a reachable server at `[camofox].base_url`.
+Opt-in [GROBID](grobid.md) is off until `[grobid].enabled` and a reachable
+server at `[grobid].base_url`.
 Sci-Hub is off until
 you add `"scihub"` to `sources` or pass `--scihub` — see [Sci-Hub](scihub.md).
 Items dated after 2021 are not sent to Sci-Hub; a `--year-from` past that
@@ -335,9 +343,12 @@ written as garbage. Re-run with `--force` to replace an existing
 | `[extract_sections].raw_map` | `true` | Include detected section headings (`sections` array) in the JSON |
 | `[extract_sections].max_field_chars` | `20000` | Truncate each text field at this length |
 
-Each populated MVP field is an object: `text`, `provenance` (`rule` or `llm`),
-optional `heading`, optional `pages`. Top-level `source` is `pdf`, `abstract`,
-or `none`. Schema: `paperful.sections.v1` ([developer.md](developer.md)).
+Each populated MVP field is an object: `text`, `provenance` (`rule`, `grobid`,
+or `llm`), optional `heading`, optional `pages`. Top-level `source` is `pdf`,
+`abstract`, or `none`. Optional `engine` is `grobid` or `rule`. Schema:
+`paperful.sections.v1` ([developer.md](developer.md)). When `[grobid].enabled`
+(or `--grobid`), Paperful prefers TEI from the sidecar and falls back to
+heading rules if GROBID is down or the PDF is a scan.
 
 Timeouts, context budgets, prompt templates, tags, attachment hygiene, and
 browser-agent step caps: [Advanced](#advanced).

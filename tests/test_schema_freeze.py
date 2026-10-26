@@ -26,6 +26,8 @@ from paperful.runreport import (
     RUN_REPORT_SUMMARY_KEYS,
     build_report,
 )
+from paperful.sections.command import SCHEMA as SECTIONS_SCHEMA, SECTION_KEYS
+from paperful.sections.grobid import TEI_META_KEYS, TEI_SCHEMA
 from paperful.store import ITEM_RECORD_KEYS, empty_item_record
 from tests.conftest import make_item
 
@@ -163,3 +165,19 @@ def test_item_empty_shell_covers_required_keys():
     live = empty_item_record(item)
     assert ITEM_RECORD_KEYS <= live.keys()
     assert set(live) >= ITEM_RECORD_KEYS
+
+
+def test_sections_v1_keys_match_golden():
+    keys = json.loads((FIX / "sections_v1" / "keys.json").read_text(encoding="utf-8"))
+    assert keys == sorted(SECTION_KEYS)
+    golden = json.loads((FIX / "sections_v1" / "minimal.json").read_text(encoding="utf-8"))
+    assert golden["schema"] == SECTIONS_SCHEMA
+    assert SECTION_KEYS <= golden.keys()
+
+
+def test_grobid_tei_v1_keys_match_golden():
+    keys = json.loads((FIX / "grobid_tei_v1" / "keys.json").read_text(encoding="utf-8"))
+    assert keys == sorted(TEI_META_KEYS)
+    golden = json.loads((FIX / "grobid_tei_v1" / "meta.json").read_text(encoding="utf-8"))
+    assert golden["schema"] == TEI_SCHEMA
+    assert TEI_META_KEYS <= golden.keys()

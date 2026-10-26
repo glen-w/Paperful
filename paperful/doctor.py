@@ -224,6 +224,13 @@ def remediation_text(
             "(npx @askjo/camofox-browser), set [camofox].base_url if needed, "
             "or set enabled = false. See docs/camofox.md."
         )
+    if check.name == "GROBID":
+        return (
+            "Start the external GROBID server "
+            "(docker run -p 8070:8070 lfoppiano/grobid:0.8.2), "
+            "set [grobid].base_url if needed, or set enabled = false. "
+            "See docs/grobid.md."
+        )
     if check.name == "browser-agent extra":
         if "not installed" in check.detail:
             return (
@@ -588,6 +595,8 @@ def run_checks(
                 )
             )
 
+    checks.extend(_grobid_checks(cfg))
+
     if cfg.serpapi_enabled:
         from .routing import serpapi_api_key
 
@@ -913,6 +922,45 @@ def _model_below_agent_floor(model: str) -> bool:
     if not m:
         return False
     return float(m.group(1)) < _AGENT_FLOOR_B
+
+
+def _grobid_checks(cfg) -> list[Check]:
+    """External GROBID sidecar for ``extract-sections`` / ``[rag].parser = grobid``."""
+    if not cfg.grobid_enabled:
+        return [Check("GROBID", "green", "disabled (grobid.enabled false)")]
+    from .grobid_client import GrobidConfigError, grobid_client_from_config
+
+    try:
+        client = grobid_client_from_config(cfg)
+    except GrobidConfigError as exc:
+        return [Check("GROBID", "amber", str(exc))]
+    try:
+        if not client.health():
+            base = (cfg.grobid_base_url or "").strip() or "(empty)"
+            return [
+                Check(
+                    "GROBID",
+                    "amber",
+                    f"enabled but unreachable at {base} — "
+                    "start GROBID (docker run -p 8070:8070 lfoppiano/grobid:0.8.2) "
+                    "or see docs/grobid.md",
+                )
+            ]
+        version = ""
+        try:
+            version = client.version()
+        except Exception:
+            version = ""
+        extra = f" · {version}" if version else ""
+        return [
+            Check(
+                "GROBID",
+                "green",
+                f"server ok at {cfg.grobid_base_url}{extra}",
+            )
+        ]
+    finally:
+        client.close()
 
 
 def _llm_checks(cfg) -> list[Check]:

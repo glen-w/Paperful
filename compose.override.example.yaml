@@ -13,3 +13,17 @@
 #   paperful:
 #     environment:
 #       PAPERFUL_ZOTERO_HOST: host.docker.internal
+#
+# Optional GROBID sidecar (CRF CPU image). Paperful does not start this
+# unless you copy this file to compose.override.yaml. Several GB of RAM.
+# Same Compose network: set [grobid].base_url = "http://grobid:8070" and
+# enabled = true. Scans need `paperful ocr` first. See docs/grobid.md.
+#
+# services:
+#   grobid:
+#     image: lfoppiano/grobid:0.8.2
+#     init: true
+#     ports:
+#       - "127.0.0.1:8070:8070"
+#     ulimits:
+#       core: 0

@@ -147,6 +147,19 @@ so a shared `.env` does not break host `uv run`.
 inside the container. Headed `session login` still stays on the host (shared
 `state/` vault).
 
+### Optional GROBID sidecar
+
+The opt-in [`grobid`](grobid.md) client talks to an **external**
+[GROBID](https://github.com/grobidOrg/grobid) REST server. Paperful does not
+install Java or GROBID models in the light/heavy images. Run the server on the
+host (`docker run -p 8070:8070 lfoppiano/grobid:0.8.2`) or a second Compose
+service via [`compose.override.example.yaml`](https://github.com/glen-w/Paperful/blob/main/compose.override.example.yaml)
+and point `[grobid].base_url` at it (for example
+`http://host.docker.internal:8070` from a container, or `http://grobid:8070`
+on the Compose network). Keep loopback in `config.toml`; Paperful rewrites it
+via `PAPERFUL_GROBID_HOST`. Plan for several GB of RAM. Scans need
+`paperful ocr` first.
+
 ### Optional Camofox sidecar
 
 The opt-in [`camofox`](camofox.md) lane talks to an **external**

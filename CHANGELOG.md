@@ -15,6 +15,11 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- Opt-in **GROBID** sidecar for structured section extract: `[grobid]`,
+  `extract-sections --grobid` / `--no-grobid`, TEI cache under `state/grobid/`,
+  optional `[rag].parser = "grobid"`, `doctor` health check, Advanced Index
+  form. Paperful does not start the Java service. See
+  [docs/grobid.md](docs/grobid.md).
 - **`paperful critique`.** Local-first manuscript pack (`--item` or `--file`):
   deterministic checkers (refs, floats, acronyms, stats/GRIM, checklists,
   library n-gram overlap, Flesch/Fog/ARI + MTLD metrics) as `lane=checked`;

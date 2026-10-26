@@ -133,6 +133,13 @@ class Config:
     camofox_during_run: bool = True
     camofox_base_url: str = "http://127.0.0.1:9377"
     camofox_max_wall_s: float = 90.0
+    # External GROBID sidecar for structured PDF sections. Off by default.
+    grobid_enabled: bool = False
+    grobid_base_url: str = "http://127.0.0.1:8070"
+    grobid_timeout_s: float = 120.0
+    grobid_allow_remote: bool = False
+    grobid_consolidate_header: int = 0
+    grobid_consolidate_citations: int = 0
     handoff_scholar: bool = True
     request_channels: str = "off"  # off | rg | email | both | rg_then_email_after_days
     request_email_after_days: int = 14
@@ -352,7 +359,7 @@ class Config:
         False  # index new PDFs after run / attach / inbox / snapshot / ocr
     )
     rag_ocr: str = "auto"  # auto | off. auto rewrites scanned PDFs under out/
-    rag_parser: str = "light"  # light | docling
+    rag_parser: str = "light"  # light | docling | grobid
     rag_embed_provider: str = "ollama"  # ollama | litellm
     rag_embed_model: str = "nomic-embed-text"
     rag_embed_base_url: str = ""  # empty → llm.base_url
@@ -915,7 +922,7 @@ def parse_dest(value: str, *, key: str = "dest") -> str:
 
 
 _RAG_OCR_MODES = frozenset({"auto", "off"})
-_RAG_PARSERS = frozenset({"light", "docling"})
+_RAG_PARSERS = frozenset({"light", "docling", "grobid"})
 _RAG_EMBED_PROVIDERS = frozenset({"ollama", "litellm"})
 _RAG_FOCI = frozenset({"default", "questions", "gaps", "methods", "answered"})
 
@@ -942,7 +949,9 @@ def parse_rag_parser(value: str) -> str:
     """Normalise ``[rag].parser``. ``light`` is the default."""
     parser = str(value).strip().lower()
     if parser not in _RAG_PARSERS:
-        raise ValueError(f"config [rag].parser {value!r} must be light or docling")
+        raise ValueError(
+            f"config [rag].parser {value!r} must be light, docling, or grobid"
+        )
     return parser
 
 
