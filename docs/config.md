@@ -266,7 +266,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[critique].advanced_max_workers` | `4` | Paper chunks (worker agents) |
 | `[critique].advanced_max_comments` | `12` | Cap after the refine pass |
 | `[critique].advanced_refine` | `true` | Extra pass to drop or split comments |
-| `[critique].advanced_timeout_s` | `0` | Wall clock for the whole advanced pass (`0` → `max([llm].timeout_s, 600)`) |
+| `[critique].advanced_timeout_s` | `0` | Wall clock for the whole advanced pass (`0` → `max([llm].timeout_s, 600)`). Duplicate leader broadcasts abort (`loop`); overrun records `timeout` |
 | `[[critique.reviewers]]` | one implicit reviewer | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path relative to the config file). `--reviewer ID` selects a subset. Unused by the advanced lane |
 | `[critique].overlap_top_k` | `40` | Distinctive n-grams ranked for library text overlap |
 | `[critique].overlap_n_min` / `overlap_n_max` | `6` / `12` | Word n-gram window |

@@ -15,8 +15,9 @@ on disk**.
 Deterministic checkers always run (no model). **Checked** findings carry a
 quote and a page / paragraph / slide loc when one exists. Heuristic AI-prose
 tells always run too, as **suggested** `info` — they are not an LLM and not
-proof of authorship. Optional `--llm` comments and `--ai-model` are separate
-suggested extras. Optional `--vale` house-style alerts are **checked**.
+proof of authorship. Optional `--llm` comments, `--advanced` multi-agent
+comments, and `--ai-model` are separate suggested extras. Optional `--vale`
+house-style alerts are **checked**.
 
 | Area | Lane | Codes (examples) |
 | --- | --- | --- |
@@ -71,7 +72,8 @@ posts a tagged child note only for a library `--item`. Uploads stay disk-only.
 `--llm` / `--no-llm` override `[critique].llm`. `--advanced` / `--no-advanced`
 override `[critique].advanced` (MARG-S-style multi-agent lane; additive with
 `--llm`). `--grobid` / `--no-grobid` override `[grobid].enabled` and only
-affect advanced chunking. `--ai-model` turns the
+affect advanced PDF chunking (`--grobid` still attempts the sidecar even when
+`[grobid].enabled` is false, same as `extract-sections`). `--ai-model` turns the
 Binoculars extra on for this run (there is no `--no-ai-model`; set
 `[critique].ai_model = false` in config). `--vale` turns the Vale house-style
 pass on for this run (there is no `--no-vale`; set `[critique].vale = false`).
@@ -97,8 +99,9 @@ as a Metrics section in `pack.md`). `llm` is `null` until `--llm` or `--advanced
 it records `mode` (`default` / `marg` / `both`), `model`, `prompt_sha`,
 `provider`, optional `narrative`, a `reviewers` list (per-id model, skip
 reason, Markdown note, including `marg-experiments` / `marg-clarity` /
-`marg-impact` when advanced ran), and optional `marg` stats (`parser`,
-`rounds`, `calls`, `skipped`). `ai_model` and
+`marg-impact` when advanced ran), and optional `marg` stats (`parser` is
+`grobid` or `extract`; `rounds`, `calls`, `skipped`; optional
+`grobid_skipped`). `ai_model` and
 `vale` appear only when those extras ran (skip reason or alert counts).
 
 ## Input formats
@@ -160,13 +163,19 @@ advanced = true
 
 `--reviewer ID` still subsets only `[[critique.reviewers]]`. `--no-llm` does
 not turn off advanced; `--no-advanced` does not turn off reviewers.
+`--no-llm --no-advanced` is checkers only. Advanced needs `[llm].enabled`;
+otherwise the lane records `skipped: llm_disabled` and the pack still writes.
 
 Advanced PDF chunks prefer the optional GROBID TEI cache (`process_pdf` /
 `tei_to_markdown_pages`, same as [extract-sections](grobid.md)). Scans,
 non-PDFs, and sidecar errors fall back to `ExtractedDoc` and record
-`marg.parser = "extract"`. Checkers never require GROBID. Caps:
-`advanced_max_rounds`, `advanced_max_workers`, `advanced_max_comments`,
-`advanced_timeout_s`.
+`marg.parser = "extract"` plus `grobid_skipped`. Checkers never require GROBID.
+Remote GROBID prints the same yellow egress notice as extract-sections
+(PDF bytes leave this machine). Caps: `advanced_max_rounds`,
+`advanced_max_workers`, `advanced_max_comments`, `advanced_refine`,
+`advanced_timeout_s` (`0` → `max([llm].timeout_s, 600)`). A duplicated
+leader broadcast is a hard stop (`skipped: loop`). A wall-clock overrun
+records `skipped: timeout` rather than hanging a workbench job.
 
 ## Optional AI-text extra (`--ai-model` / `[critique].ai_model`)
 

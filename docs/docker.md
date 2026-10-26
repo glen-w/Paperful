@@ -159,7 +159,8 @@ and point `[grobid].base_url` at it (for example
 `http://host.docker.internal:8070` from a container, or `http://grobid:8070`
 on the Compose network). Keep loopback in `config.toml`; Paperful rewrites it
 via `PAPERFUL_GROBID_HOST`. Plan for several GB of RAM. Scans need
-`paperful ocr` first.
+`paperful ocr` first. `critique --advanced` reuses the same TEI cache for
+PDF chunks.
 
 ### Optional Camofox sidecar
 

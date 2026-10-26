@@ -80,5 +80,6 @@ this machine**. Paperful does not call public demo GROBID servers.
 so the existing chunker keeps section labels. Changing the parser re-indexes
 on the next ingest.
 
-See [Section extract](config.md#section-extract-extract-sections) and
-[RAG parsers](rag.md#parser).
+See [Section extract](config.md#section-extract-extract-sections),
+[RAG parsers](rag.md#parser), and [Critique](critique.md) (`--advanced` /
+`--grobid`).

@@ -220,8 +220,8 @@ Tier policy (1.0 contract):
 | `paperful.rag.thread.v1` | `state/rag/threads/*.json` | `rag.thread` | T2 | — |
 | `paperful.rag.questions.v1` | `state/rag/questions/` | `rag.questions` | T2 | — |
 | `paperful.sections.v1` | `state/sections/<key>.json` | `extract-sections` | T2 | Required: `schema`, `item_key`, `title`, `year`, `source`, `fields`, `missing`. Optional: `sections`, `engine` (`grobid`\|`rule`), `pdf_sha256`, `notes` (scan skip / GROBID failure). Each `fields.<name>`: `text`, `provenance` (`rule`\|`grobid`\|`llm`), optional `heading`, `pages` |
-| `paperful.grobid.tei.v1` | `state/grobid/<sha256>.json` next to `.tei.xml` | `sections.grobid` | T3 | Rebuildable cache |
-| `paperful.critique.pack.v1` | `state/critiques/<id>/<stamp>/pack.json` | `critique` | T1 | `CRITIQUE_PACK_KEYS` (`findings`, `overlap`, `metrics`, `llm`, …). `llm` may be `null`. Optional `ai_model` / `vale` only when those extras ran |
+| `paperful.grobid.tei.v1` | `state/grobid/<sha256>.json` next to `.tei.xml` | `sections.grobid` | T3 | Rebuildable cache (`extract-sections`, `[rag].parser = "grobid"`, `critique --advanced`) |
+| `paperful.critique.pack.v1` | `state/critiques/<id>/<stamp>/pack.json` | `critique` | T1 | `CRITIQUE_PACK_KEYS` (`findings`, `overlap`, `metrics`, `llm`, …). `llm` may be `null`. When set: `mode` `default`\|`marg`\|`both`, optional `marg.parser`. Optional `ai_model` / `vale` only when those extras ran |
 | `paperful.rq_answered.v1` | `state/rq-answered/` | `rag.answered` | T2 | — |
 | `paperful.rag.text.v1` | extracted text cache | `rag.extract` | T3 | Rebuildable |
 | `paperful.rag.index.v1` | LanceDB meta | `rag.index` | T3 | Not a promise |

@@ -256,7 +256,7 @@ mirror_failures_before_skip = 3
 # # Optional bearer: env CAMOFOX_ACCESS_KEY when the server sets CAMOFOX_ACCESS_KEY
 # # See docs/camofox.md — not a Cloudflare-bypass product; no vault SSO cookies
 # [grobid]
-# enabled = false                # opt-in GROBID sidecar for extract-sections / rag parser
+# enabled = false                # opt-in GROBID sidecar for extract-sections / rag parser / critique --advanced
 # base_url = "http://127.0.0.1:8070"  # operator-owned GROBID (Docker); Paperful does not start it
 # timeout_s = 120
 # allow_remote = false           # PDF bytes leave the machine if the host is not local

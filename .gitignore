@@ -1,4 +1,5 @@
 config.toml
+.vale.ini
 .venv/
 out/
 state/

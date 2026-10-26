@@ -3,7 +3,7 @@
 Paperful’s PDF loop (`run` / `attach` / `lint` / `fix-metadata` / `dedupe`)
 never needs a model. Optional AI covers grounded notes (`summarize`), a
 collection review (`synthesize`), Ask / RAG, title and identity helpers, the
-browser agent, and suggested `critique --llm` comments. Heuristic AI-prose
+browser agent, and suggested `critique --llm` / `--advanced` comments. Heuristic AI-prose
 tells and the optional Binoculars extra on `critique` are **not** authorship
 proof. Optional `--vale` is house-style lint, not a model. This page is the
 **feasibility and scale** guide: what works on
@@ -51,6 +51,8 @@ unusable for a 1,500-PDF collection overnight.
 | `synthesize` over ~10³ summaries | One review from notes already written | Local: can take hours and many map-reduce chunks; hosted: far fewer tokens than summarizing every PDF again | Run `synthesize --dry-run` for the chunk plan first |
 | Browser agent (`recover`) | Per stubborn landing | Needs ~14B+ local or a capable hosted tool-calling model | Not a free-tier hobby lane |
 | Ask / RAG | After `rag ingest` | Embeddings dominate first ingest; chat is per question | **simple** (default): one completion. **advanced**: about `evidence_k` extra summary calls, cached under `state/rag/evidence/`. Local `nomic-embed-text` or hosted `embed_provider = "litellm"` |
+| `critique --llm` | One manuscript | Yes (same 7B–12B band as summarize) | One completion per `[[critique.reviewers]]` row |
+| `critique --advanced` | One manuscript | Yes locally; slower than `--llm` | Three aspect groups (leader + chunk workers + expert) then refine. Caps in `[critique]`. Optional GROBID for PDF chunks |
 
 **Try it out** means: one item, five papers, or a free hosted model while you
 watch for timeouts and bad grounding. **Library scale** means: hundreds or

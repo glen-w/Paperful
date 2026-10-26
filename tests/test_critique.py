@@ -31,6 +31,12 @@ from tests.conftest import make_item
 
 runner = CliRunner()
 
+
+@pytest.fixture(autouse=True)
+def _no_live_binoculars(monkeypatch):
+    """Keep the default suite offline even if the optional extra is installed."""
+    monkeypatch.setattr("paperful.critique_ai_model.run_ai_model", lambda _t: None)
+
 MANUSCRIPT = """
 Abstract
 We report a 47.2 percent increase in yield under the ABC protocol.
