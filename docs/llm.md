@@ -3,7 +3,8 @@
 Everything here is **off by default**. Paperful’s PDF loop (`run` / `attach` /
 `lint` / `fix-metadata` / `dedupe`) never needs a model. Turn the LLM on only
 for the LLM-backed verbs below, and only after `paperful doctor` shows the
-`LLM` row green. `extract-sections`, `rag questions`, and `critique` run
+`LLM` row green. `extract-sections` (optional GROBID then optional LLM),
+`rag questions`, and `critique` run
 deterministic rules without a model; their `--llm` lanes need `[llm].enabled`.
 
 **Feasibility first.** Trying one summary is not the same job as summarizing

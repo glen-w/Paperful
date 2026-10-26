@@ -59,6 +59,7 @@ sessions
 scihub
 serpapi
 camofox
+grobid
 ai
 llm
 rag

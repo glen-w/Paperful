@@ -145,7 +145,8 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `authorwatch_social.py` | Parse operator-saved RG / LinkedIn / Academia HTML or CSV (no network) | stdlib HTML/CSV |
 | `keepup.py` / `keepup_cites.py` | Alert loop job ledger (`paperful.keepup.v1`); poll watch / authorwatch / collection citers; interval gate; apply + dismiss | `snowball.watch`, `authorwatch`, OpenAlex `works_citing` |
 | `snowball/` | Crawl, hops, watch (`watch apply` from inbox), thin briefing, frontier digest, `trends` (OpenAlex `group_by` year counts). `watch run` does not create library items. Citation-map categories live in `map_categories.py`; library annotate/add/remove in `graph_library.py` | OpenAlex; library protocol only on apply |
-| `sections/` | IMRaD field extract (`extract-sections`): deterministic split + optional LLM fill | `rag.extract` text cache, `rag.chunk` / `sections.headings`, gated `llm` |
+| `sections/` | IMRaD field extract (`extract-sections`): deterministic split + optional GROBID TEI + optional LLM fill | `rag.extract` text cache, `rag.chunk` / `sections.headings`, `grobid_client`, gated `llm` |
+| `grobid_client.py` | Thin httpx client for an operator-owned GROBID REST server | `sections.grobid`, `rag.extract.GrobidParser`, `doctor` |
 
 ## The refresh
 
@@ -218,7 +219,8 @@ Tier policy (1.0 contract):
 | `paperful.ask_batch.v1` | `state/ask-batch/<stamp>/` | `rag.batch` | T2 | — |
 | `paperful.rag.thread.v1` | `state/rag/threads/*.json` | `rag.thread` | T2 | — |
 | `paperful.rag.questions.v1` | `state/rag/questions/` | `rag.questions` | T2 | — |
-| `paperful.sections.v1` | `state/sections/<key>.json` | `extract-sections` | T2 | Required: `schema`, `item_key`, `title`, `year`, `source`, `fields`, `missing`. Optional: `sections` (raw heading map when `[extract_sections].raw_map`). Each `fields.<name>`: `text`, `provenance` (`rule`\|`llm`), optional `heading`, `pages` |
+| `paperful.sections.v1` | `state/sections/<key>.json` | `extract-sections` | T2 | Required: `schema`, `item_key`, `title`, `year`, `source`, `fields`, `missing`. Optional: `sections`, `engine` (`grobid`\|`rule`), `pdf_sha256`, `notes` (scan skip / GROBID failure). Each `fields.<name>`: `text`, `provenance` (`rule`\|`grobid`\|`llm`), optional `heading`, `pages` |
+| `paperful.grobid.tei.v1` | `state/grobid/<sha256>.json` next to `.tei.xml` | `sections.grobid` | T3 | Rebuildable cache |
 | `paperful.critique.pack.v1` | `state/critiques/<id>/<stamp>/pack.json` | `critique` | T1 | `CRITIQUE_PACK_KEYS` (`findings`, `overlap`, `metrics`, `llm`, …). `llm` may be `null` |
 | `paperful.rq_answered.v1` | `state/rq-answered/` | `rag.answered` | T2 | — |
 | `paperful.rag.text.v1` | extracted text cache | `rag.extract` | T3 | Rebuildable |

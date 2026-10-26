@@ -230,6 +230,18 @@ def _serialize_fields(fields: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def stamp_provenance(result: ExtractResult, provenance: str) -> None:
+    """Rewrite field provenance after a GROBID pass (leave empty slots alone)."""
+    for name, val in list(result.fields.items()):
+        if name == "research_questions" and isinstance(val, list):
+            for row in val:
+                if isinstance(row, dict) and row.get("text"):
+                    row["provenance"] = provenance
+            continue
+        if isinstance(val, dict) and val.get("text"):
+            val["provenance"] = provenance
+
+
 def merge_llm_fields(
     result: ExtractResult,
     llm_fields: dict[str, Any],

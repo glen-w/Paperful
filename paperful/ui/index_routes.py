@@ -16,8 +16,9 @@ from fastapi.responses import (
 )
 
 from ..agent_ops import last_run
-from . import app as _ui_app
 from ..config import Config
+from ..grobid_client import grobid_egress_is_remote
+from . import app as _ui_app
 from . import commands, jobs
 from .context import UiContext
 from .doctor_steps import next_step
@@ -282,6 +283,11 @@ def register_index(ui: UiContext) -> None:
                 saved_prompts=list_saved_prompts(cfg),
                 rag_config_prompt=cfg.rag_prompt or "",
                 extract_questions_llm=cfg.rag_extract_questions_llm,
+                sections_result=last_job_result(cfg, "extract_sections", run),
+                grobid_enabled=cfg.grobid_enabled,
+                grobid_remote=bool(cfg.grobid_enabled)
+                and grobid_egress_is_remote(cfg),
+                extract_sections_llm=cfg.extract_sections_llm,
                 hits=hits,
                 search_q=search_q,
                 search_k=k,
@@ -595,6 +601,51 @@ def register_index(ui: UiContext) -> None:
             )
 
         cmd_id = commands.enqueue(cfg, "rag_questions", work)
+        return RedirectResponse(url=_page_url("/index", run=cmd_id), status_code=303)
+
+
+    @app.post("/index/extract-sections")
+    async def index_extract_sections(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        dry_run = str(form.get("dry_run") or "1") != "0"
+        whole_library = form.get("whole_library") == "1"
+        use_llm = form.get("use_llm") == "1"
+        use_grobid = form.get("use_grobid") == "1"
+        force = form.get("force") == "1"
+        try:
+            year_from = _optional_int(form.get("year_from"))
+            year_to = _optional_int(form.get("year_to"))
+            limit = _optional_int(form.get("limit"), positive=True)
+            scope = parse_rag_scope(
+                form,
+                prefs.collection,
+                year_from=year_from,
+                year_to=year_to,
+            )
+        except ValueError:
+            return RedirectResponse(url=_page_url("/index", error="year"), status_code=303)
+        if not scope_has_target(scope, whole_library=whole_library):
+            return RedirectResponse(url=_page_url("/index", error="scope"), status_code=303)
+
+        def work(cmd_id: str) -> None:
+            jobs.extract_sections(
+                cfg,
+                cmd_id,
+                collection=scope.collection,
+                whole_library=whole_library,
+                year_from=scope.year_from,
+                year_to=scope.year_to,
+                item_keys=scope.item_keys or None,
+                item_types=scope.item_types,
+                use_llm=use_llm,
+                use_grobid=use_grobid,
+                limit=limit,
+                dry_run=dry_run,
+                force=force,
+            )
+
+        cmd_id = commands.enqueue(cfg, "extract_sections", work)
         return RedirectResponse(url=_page_url("/index", run=cmd_id), status_code=303)
 
 

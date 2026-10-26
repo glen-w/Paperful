@@ -41,6 +41,45 @@ def test_rag_ingest_uses_jobs_hook(tmp_path):
     assert rec["result"]["summary"]["chunks"] == 2
 
 
+def test_extract_sections_hook_forwards_grobid(tmp_path):
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cmd_id = "cmd-sections"
+    commands.write_command(
+        cfg,
+        {"id": cmd_id, "command": "extract_sections", "status": "running"},
+    )
+    seen: list[dict] = []
+
+    def fake(cfg, cmd_id, **kw):
+        seen.append(kw)
+        return {"dry_run": True, "items": 1, "fields_present": 2, "grobid": True}
+
+    jobs.extract_sections_fn = fake
+    try:
+        index_jobs.extract_sections(
+            cfg,
+            cmd_id,
+            collection="BBNJ",
+            whole_library=False,
+            year_from=None,
+            year_to=None,
+            item_keys=None,
+            item_types=None,
+            use_llm=False,
+            use_grobid=True,
+            limit=3,
+            dry_run=True,
+            force=False,
+        )
+    finally:
+        jobs.extract_sections_fn = None
+    assert seen[0]["use_grobid"] is True
+    assert seen[0]["collection"] == "BBNJ"
+    rec = commands.read_command(cfg, cmd_id)
+    assert rec["result"]["grobid"] is True
+
+
 def test_summarize_hook_writes_result(tmp_path):
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     cfg.state_dir.mkdir(parents=True)

@@ -1476,9 +1476,9 @@ follow pages; treating social HTML as a `run` PDF source.
 
 ### Structured section extract (MVP; shipped)
 
-**Status:** shipped — `paperful extract-sections`. Narrower than full
-`summarize`; structured fields for downstream RAG, synthesis, and gap scan
-context.
+**Status:** shipped — `paperful extract-sections` (rules + optional GROBID
+sidecar + optional LLM fill). Narrower than full `summarize`; structured
+fields for downstream RAG, synthesis, and gap scan context.
 
 **MVP fields (per item, on disk):** `abstract`, `conclusion`, `methodology`,
 `research_questions` (plus optional raw section map). **Stage 1 — deterministic:**
@@ -1488,13 +1488,15 @@ and methods, Results, Discussion, Conclusion(s), Summary, Research questions,
 Limitations, References / Bibliography (locale and publisher variants in
 `state/section-headings.toml` or shipped defaults). Boundaries from line-start
 heuristics + known IMRaD patterns; fail partial sections to findings, not
-garbage writes. **Stage 2 — LLM inference** only when `[llm].enabled` and a
+garbage writes. Optional **GROBID** sidecar (`[grobid].enabled`, TEI cache
+under `state/grobid/`) is the high-quality Stage 1 engine; heading rules remain
+the fallback. **Stage 2 — LLM inference** only when `[llm].enabled` and a
 dedicated gate (e.g. `[extract_sections].llm`): fill missing MVP fields from
 the bounded excerpt; reject outputs that do not quote-ground in the supplied
 spans. Writes `state/sections/<key>.json`; **no** silent Zotero parent mutation
 (mirroring fields into `record.json` on snapshot remains a later option). Overlaps
 Zotero-RAG RQ extraction (deterministic + LLM) — share heading list and
-provenance enums where possible.
+provenance enums where possible. `[rag].parser = "grobid"` reuses the TEI cache.
 
 ### Annotation mirror (later)
 

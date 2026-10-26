@@ -320,6 +320,104 @@ def rag_questions(
     )
 
 
+def extract_sections(
+    cfg: Config,
+    cmd_id: str,
+    *,
+    collection: str,
+    whole_library: bool,
+    year_from: int | None,
+    year_to: int | None,
+    item_keys: list[str] | None,
+    item_types: frozenset[str] | None,
+    use_llm: bool,
+    use_grobid: bool,
+    limit: int | None,
+    dry_run: bool,
+    force: bool,
+) -> None:
+    if jobs.extract_sections_fn is not None:
+        result = jobs.extract_sections_fn(
+            cfg,
+            cmd_id,
+            collection=collection,
+            whole_library=whole_library,
+            year_from=year_from,
+            year_to=year_to,
+            item_keys=item_keys,
+            item_types=item_types,
+            use_llm=use_llm,
+            use_grobid=use_grobid,
+            limit=limit,
+            dry_run=dry_run,
+            force=force,
+        )
+        _attach_result(cfg, cmd_id, result)
+        return
+    from ..grobid_client import grobid_client_from_config
+    from ..llm import get_client
+    from ..llm.preflight import validate_llm_for_verb
+    from ..sections.command import extract_scope, write_item
+
+    coll = (collection or "").strip()
+    keys = item_keys or []
+    if not coll and not keys and not whole_library:
+        raise ValueError("scope required")
+    if whole_library and not coll:
+        collections: list[str] | None = None
+    elif coll:
+        collections = [coll]
+    else:
+        collections = []
+    client = None
+    grobid = None
+    if use_llm:
+        validate_llm_for_verb(cfg)
+        client = get_client(cfg)
+    if use_grobid:
+        grobid = grobid_client_from_config(cfg)
+    try:
+        items = extract_scope(
+            cfg,
+            collections=collections,
+            item_keys=keys,
+            library=whole_library and not coll,
+            year_from=year_from,
+            year_to=year_to,
+            item_types=item_types,
+            use_llm=use_llm,
+            client=client,
+            limit=limit,
+            force=force,
+            skip_existing=not force,
+            use_grobid=use_grobid,
+            grobid=grobid,
+        )
+    finally:
+        if grobid is not None:
+            grobid.close()
+    filled = sum(
+        1
+        for it in items
+        for name in cfg.extract_sections_fields
+        if it.fields.get(name) is not None
+    )
+    if not dry_run:
+        for it in items:
+            write_item(cfg, it)
+    _attach_result(
+        cfg,
+        cmd_id,
+        {
+            "dry_run": dry_run,
+            "items": len(items),
+            "fields_present": filled,
+            "llm": use_llm,
+            "grobid": use_grobid,
+        },
+    )
+
+
 def rag_answered(
     cfg: Config,
     cmd_id: str,

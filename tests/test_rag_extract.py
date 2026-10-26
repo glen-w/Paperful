@@ -129,6 +129,9 @@ def test_get_parser_follows_config(cfg):
     assert get_parser(cfg).name == "light"
     cfg.rag_parser = "docling"
     assert get_parser(cfg).name == "docling"
+    cfg.rag_parser = "grobid"
+    cfg.grobid_enabled = True
+    assert get_parser(cfg).name == "grobid"
 
 
 def test_docling_parser_names_the_extra_when_missing(tmp_path, monkeypatch):

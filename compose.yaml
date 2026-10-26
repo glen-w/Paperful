@@ -21,6 +21,8 @@ services:
       PAPERFUL_ZOTERO_HOST: ${PAPERFUL_ZOTERO_HOST:-host.docker.internal}
       # Reach host Ollama; loopback [llm].base_url is rewritten the same way.
       PAPERFUL_OLLAMA_HOST: ${PAPERFUL_OLLAMA_HOST:-host.docker.internal}
+      # Reach host GROBID; loopback [grobid].base_url is rewritten the same way.
+      PAPERFUL_GROBID_HOST: ${PAPERFUL_GROBID_HOST:-host.docker.internal}
       PAPERFUL_IMAGE_MODE: ${PAPERFUL_IMAGE_MODE:-light}
     extra_hosts:
       - "host.docker.internal:host-gateway"

@@ -1,0 +1,8 @@
+{
+  "schema": "paperful.grobid.tei.v1",
+  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "item_key": "KEY1",
+  "grobid_version": "0.8.2",
+  "consolidate_header": 0,
+  "consolidate_citations": 0
+}

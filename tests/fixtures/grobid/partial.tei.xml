@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0">
+  <teiHeader>
+    <profileDesc>
+      <abstract>
+        <p>Only an abstract is present in this partial extract, and it is long enough to clear the minimum body length used by the structured section writer.</p>
+      </abstract>
+    </profileDesc>
+  </teiHeader>
+  <text>
+    <body>
+      <div>
+        <head n="1">Introduction</head>
+        <p>No methods or conclusion heads follow this introduction paragraph, which is still long enough to count as a real section body.</p>
+      </div>
+    </body>
+  </text>
+</TEI>

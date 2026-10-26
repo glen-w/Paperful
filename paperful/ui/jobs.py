@@ -28,6 +28,7 @@ rag_ingest_fn: Callable[..., dict[str, Any]] | None = None
 ask_batch_fn: Callable[..., dict[str, Any]] | None = None
 rag_questions_fn: Callable[..., dict[str, Any]] | None = None
 rag_answered_fn: Callable[..., dict[str, Any]] | None = None
+extract_sections_fn: Callable[..., dict[str, Any]] | None = None
 summarize_fn: Callable[..., dict[str, Any]] | None = None
 synthesize_fn: Callable[..., dict[str, Any]] | None = None
 critique_fn: Callable[..., dict[str, Any]] | None = None
@@ -39,6 +40,7 @@ from .index_jobs import (
     rag_answered,
     rag_ingest,
     rag_questions,
+    extract_sections,
     summarize,
     synthesize,
     _attach_result,

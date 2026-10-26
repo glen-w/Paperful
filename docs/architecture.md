@@ -138,7 +138,8 @@ flowchart LR
 | `state/summaries/<key>.html` | `summarize` output when dest includes disk; the Zotero child note is the other copy |
 | `state/ask-batch/<stamp>/` | `ask --from-file` / Index batch Ask pack (`paperful.ask_batch.v1`, `answers.md`); resume cache under `by-hash/` |
 | `state/rag/questions/<key>.json` | `rag questions` / Index extract RQs (`paperful.rag.questions.v1`, provenance `rule`\|`llm`) |
-| `state/sections/<key>.json` | `extract-sections` IMRaD fields (`paperful.sections.v1`, provenance `rule`\|`llm`; optional `state/section-headings.toml` synonyms) |
+| `state/sections/<key>.json` | `extract-sections` IMRaD fields (`paperful.sections.v1`, provenance `rule`\|`grobid`\|`llm`; optional `engine`; optional `state/section-headings.toml` synonyms) |
+| `state/grobid/<sha256>.tei.xml` | GROBID TEI cache (`paperful.grobid.tei.v1` sidecar JSON). Reused by `extract-sections` and `[rag].parser = "grobid"` |
 | `state/rq-answered/<stamp>/` | `rag answered` / Index already-answered pack (`paperful.rq_answered.v1`, `pack.md`) |
 | `state/prompts/` | Operator-saved Ask system prompts from the Index form (“Save as…”); listed in the custom-prompt select |
 | `state/gui/uploads/` | Workbench uploads (Discover import, Index prompt/questions files); basename only |
@@ -179,7 +180,7 @@ below.
 | `lint` identity check | `[lint].llm_pdf_match` | finding `pdf_identity_mismatch` | none |
 | `summarize` | `llm.enabled` | `state/summaries/<key>.html` when dest includes disk | child note unless `--to disk` |
 | `synthesize` | `llm.enabled` | `state/reports/<slug>.html` when dest includes disk | standalone note in the scoped collection unless `--to disk` |
-| `extract-sections` | rules always; optional `[extract_sections].llm` + `llm.enabled` | `state/sections/<key>.json` | none (disk only) |
+| `extract-sections` | rules always; optional GROBID sidecar; optional `[extract_sections].llm` + `llm.enabled` | `state/sections/<key>.json` | none (disk only) |
 | `rag questions` | rules always; optional `[rag].extract_questions_llm` + `llm.enabled` | `state/rag/questions/<key>.json` | none |
 | `critique` | checkers, metrics, heuristic AI-tells always; optional `--llm` / `[critique].llm` + `llm.enabled`; optional `--ai-model` Binoculars extra | `state/critiques/<id>/<stamp>/` | child note with `--apply` on `--item` only |
 

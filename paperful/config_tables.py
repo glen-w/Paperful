@@ -28,6 +28,7 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_scholar(raw, cfg)
     apply_serpapi(raw, cfg)
     apply_camofox(raw, cfg)
+    apply_grobid(raw, cfg)
     apply_handoff(raw, cfg)
     apply_request(raw, cfg)
     apply_twenty(raw, cfg)
@@ -285,6 +286,29 @@ def apply_camofox(raw: dict[str, Any], cfg: "Config") -> None:
             ("during_run", "camofox_during_run", bool),
             ("base_url", "camofox_base_url", lambda v: str(v).strip()),
             ("max_wall_s", "camofox_max_wall_s", float),
+        ],
+    )
+
+
+def apply_grobid(raw: dict[str, Any], cfg: "Config") -> None:
+    _mod()._apply_config_table(
+        raw.get("grobid"),
+        cfg,
+        [
+            ("enabled", "grobid_enabled", bool),
+            ("base_url", "grobid_base_url", lambda v: str(v).strip()),
+            ("timeout_s", "grobid_timeout_s", float),
+            ("allow_remote", "grobid_allow_remote", bool),
+            (
+                "consolidate_header",
+                "grobid_consolidate_header",
+                lambda v: max(0, min(3, int(v))),
+            ),
+            (
+                "consolidate_citations",
+                "grobid_consolidate_citations",
+                lambda v: max(0, min(2, int(v))),
+            ),
         ],
     )
 

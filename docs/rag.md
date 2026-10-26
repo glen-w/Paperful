@@ -68,7 +68,7 @@ the **heavy** Compose image (`PAPERFUL_IMAGE_MODE=heavy`), which includes
 enabled = true
 auto_ingest = false            # true: index new PDFs after run / attach / inbox / snapshot / ocr
 ocr = "auto"                   # auto | off
-parser = "light"               # light | docling
+parser = "light"               # light | docling | grobid
 embed_provider = "ollama"      # ollama | litellm
 embed_model = "nomic-embed-text"
 top_k = 10                     # passages sent to the model per question
@@ -119,6 +119,16 @@ uv sync --extra rag --extra rag-docling
 ```toml
 [rag]
 parser = "docling"
+```
+
+`grobid` POSTs the PDF to an operator-owned GROBID sidecar and projects TEI to
+markdown pages (`# Heading`) so this chunker keeps section labels. It needs
+`[grobid].enabled` and a reachable server, or a warm TEI cache for that PDF
+hash. It is not the default. See [GROBID](grobid.md).
+
+```toml
+[rag]
+parser = "grobid"
 ```
 
 Changing the parser re-indexes every PDF on the next ingest.
@@ -243,10 +253,11 @@ keeps only newer years and drops the asking paper from retrieval.
 `paperful extract-sections` is **not** part of the LanceDB index. It reads the
 same mirror PDFs (or `state/rag/text/<key>.json` when ingest already cached
 pages) and writes IMRaD-shaped fields to `state/sections/<key>.json`
-(`paperful.sections.v1`). The deterministic lane always runs; `--llm` fills
-only missing MVP fields when `[llm].enabled` and `[extract_sections].llm` (or
-`--llm` on the CLI). It does not write Zotero notes and does not require
-`[rag].enabled`.
+(`paperful.sections.v1`). The deterministic lane always runs; `--grobid` (or
+`[grobid].enabled`) prefers TEI from the sidecar and falls back to heading
+rules; `--llm` fills only missing MVP fields when `[llm].enabled` and
+`[extract_sections].llm` (or `--llm` on the CLI). It does not write Zotero
+notes and does not require `[rag].enabled`. Advanced Index has the same form.
 
 Use `rag questions` when you need a corpus-wide RQ queue for `rag answered`.
 Use `extract-sections` when you want structured `abstract`, `methodology`,
@@ -255,6 +266,7 @@ context, or downstream synthesis — without HTML summaries.
 
 ```bash
 uv run paperful extract-sections -C ocean/BBNJ
+uv run paperful extract-sections --library --grobid
 uv run paperful extract-sections --library --llm --dry-run
 ```
 

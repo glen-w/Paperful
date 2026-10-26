@@ -7,16 +7,28 @@ from pathlib import Path
 from typing import Any
 
 from ..config import Config
+from ..grobid_client import GrobidClient, GrobidError
 from ..llm import LLMClient
-from ..rag.extract import TEXT_SCHEMA, LightParser, text_cache_path
+from ..rag.extract import TEXT_SCHEMA, LightParser, file_sha256, text_cache_path
 from ..rag.ingest import select_entries
 from ..rag.ledger import abstract_of, pick_pdf
 from ..store import MirrorEntry, load_json, write_json
-from .extract import ExtractResult, extract_fields, merge_llm_fields
+from .extract import extract_fields, merge_llm_fields, stamp_provenance
 from .headings import DEFAULT_MVP_FIELDS
 from .llm import fill_missing_llm
 
 SCHEMA = "paperful.sections.v1"
+SECTION_KEYS = frozenset(
+    {
+        "schema",
+        "item_key",
+        "title",
+        "year",
+        "source",
+        "fields",
+        "missing",
+    }
+)
 
 
 @dataclass
@@ -29,6 +41,9 @@ class ItemSections:
     fields: dict[str, Any] = field(default_factory=dict)
     sections: list[dict[str, Any]] = field(default_factory=list)
     missing: list[str] = field(default_factory=list)
+    engine: str = "rule"  # grobid | rule
+    pdf_sha256: str = ""
+    notes: list[str] = field(default_factory=list)
 
 
 def sections_dir(cfg: Config) -> Path:
@@ -64,13 +79,24 @@ def extract_item(
     use_llm: bool = False,
     client: LLMClient | None = None,
     force: bool = False,
+    use_grobid: bool = False,
+    grobid: GrobidClient | None = None,
 ) -> ItemSections | None:
     pages = load_pages(cfg, entry)
     abstract = abstract_of(entry)
     mvp = cfg.extract_sections_fields or DEFAULT_MVP_FIELDS
     raw_map = cfg.extract_sections_raw_map
     max_chars = cfg.extract_sections_max_field_chars
+    pdf = pick_pdf(entry)
+    sha = ""
+    if pdf is not None:
+        try:
+            sha = file_sha256(pdf.path)
+        except OSError:
+            sha = ""
 
+    engine = "rule"
+    notes: list[str] = []
     result = extract_fields(
         cfg,
         pages,
@@ -79,6 +105,49 @@ def extract_item(
         raw_map=raw_map,
         max_field_chars=max_chars,
     )
+
+    if use_grobid and pdf is not None:
+        from .grobid import (
+            pdf_is_scan,
+            process_pdf,
+            tei_section_rows,
+            tei_to_markdown_pages,
+        )
+
+        if pdf_is_scan(pdf.path):
+            notes.append("scan — GROBID skipped; run paperful ocr first")
+        else:
+            try:
+                tei = process_pdf(
+                    cfg,
+                    pdf.path,
+                    client=grobid,
+                    item_key=entry.key,
+                    force=force,
+                )
+                md_pages = tei_to_markdown_pages(tei)
+                if md_pages:
+                    grobid_result = extract_fields(
+                        cfg,
+                        md_pages,
+                        record_abstract=abstract,
+                        mvp_fields=mvp,
+                        raw_map=raw_map,
+                        max_field_chars=max_chars,
+                    )
+                    stamp_provenance(grobid_result, "grobid")
+                    merge_llm_fields(grobid_result, result.fields, mvp)
+                    if raw_map:
+                        tei_map = tei_section_rows(tei, cfg)
+                        if tei_map:
+                            grobid_result.sections = tei_map
+                        elif not grobid_result.sections:
+                            grobid_result.sections = result.sections
+                    result = grobid_result
+                    engine = "grobid"
+                    pages = md_pages
+            except GrobidError as exc:
+                notes.append(f"GROBID failed ({exc}); used heading rules")
 
     if use_llm and result.missing:
         from .extract import split_sections
@@ -104,6 +173,9 @@ def extract_item(
         fields=result.fields,
         sections=result.sections if raw_map else [],
         missing=result.missing,
+        engine=engine,
+        pdf_sha256=sha,
+        notes=notes,
     )
     return payload
 
@@ -119,9 +191,14 @@ def write_item(cfg: Config, item: ItemSections) -> Path:
         "source": item.source,
         "fields": item.fields,
         "missing": item.missing,
+        "engine": item.engine,
     }
+    if item.pdf_sha256:
+        body["pdf_sha256"] = item.pdf_sha256
     if item.sections:
         body["sections"] = item.sections
+    if item.notes:
+        body["notes"] = item.notes
     write_json(path, body)
     return path
 
@@ -139,6 +216,9 @@ def load_item(cfg: Config, key: str) -> ItemSections | None:
         fields=dict(data.get("fields") or {}),
         sections=list(data.get("sections") or []),
         missing=list(data.get("missing") or []),
+        engine=str(data.get("engine") or "rule"),
+        pdf_sha256=str(data.get("pdf_sha256") or ""),
+        notes=[str(n) for n in (data.get("notes") or []) if str(n).strip()],
     )
 
 
@@ -156,6 +236,8 @@ def extract_scope(
     limit: int | None = None,
     force: bool = False,
     skip_existing: bool = True,
+    use_grobid: bool = False,
+    grobid: GrobidClient | None = None,
 ) -> list[ItemSections]:
     col_arg: list[str] | None
     if library and not collections:
@@ -182,7 +264,13 @@ def extract_scope(
                 out.append(loaded)
                 continue
         item = extract_item(
-            cfg, entry, use_llm=use_llm, client=client, force=force
+            cfg,
+            entry,
+            use_llm=use_llm,
+            client=client,
+            force=force,
+            use_grobid=use_grobid,
+            grobid=grobid,
         )
         if item is not None:
             out.append(item)
@@ -193,4 +281,8 @@ def item_to_dict(item: ItemSections) -> dict[str, Any]:
     d = asdict(item)
     if not item.sections:
         d.pop("sections", None)
+    if not item.pdf_sha256:
+        d.pop("pdf_sha256", None)
+    if not item.notes:
+        d.pop("notes", None)
     return d
