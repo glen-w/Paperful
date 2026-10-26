@@ -3,7 +3,7 @@
 Vendor-by-vendor notes and longer capability tables. Most readers only need
 [How Paperful compares](comparison.md).
 
-**Last reviewed:** 2026-10-09. Feature lists for other products are based on public
+**Last reviewed:** 2026-10-26. Feature lists for other products are based on public
 docs and positioning — not paid pilots.
 
 ## Capability snapshot
@@ -69,23 +69,30 @@ Verify against each project’s latest release before upgrading Zotero.
 ### Hosted literature MCP (global corpus)
 
 Legend: **Yes** · **Partial** · **No**. Valency rows reflect public positioning for
-[MCP Bond](https://www.valency.io/) (not a hands-on product audit).
+[MCP Bond](https://www.valency.io/) (not a hands-on product audit). Edison
+rows reflect [public docs](https://docs.edisonscientific.com/) (2026-10-26),
+not a paid pilot.
 
-| Capability | Paperful | Valency MCP Bond | zotero-mcp (typical) |
-|------------|----------|------------------|----------------------|
-| Semantic search over **public** papers / preprints | Partial (`snowball` keyword / similar hops; OpenAlex-backed discovery — not a single “ask the whole web” MCP) | Yes | Partial (search library + sometimes Unpaywall) |
-| Semantic search over **your** PDFs | Yes (`rag ingest` + `ask`; GUI Ask) | No | Yes (chat reads attached PDFs) |
-| Citation graph (corpus-scale, both directions) | Partial (`snowball` `refs` / `cites` / `both`; Discover map of one queue, not the whole public corpus) | Yes | Partial |
-| Author profiles / co-author networks | Partial (`authorwatch briefing`, `suggest -C`) | Yes | Partial |
-| Keyword / publication **trends** | Partial (`snowball trends`, MCP `snowball_trends`; OpenAlex filters in snowball) | Yes | No |
-| BibTeX (or similar) **export** | Yes (`export`; `export-proposals` from snowball / authorwatch queues on disk) | Yes (positioning) | Partial |
-| Bulk **missing-PDF** fetch into a collection | Yes | No | Partial |
-| Disk mirror + **restore** ledger | Yes | No | No |
-| Campus EZProxy / grey-lit PDF playbooks | Yes | No | No |
-| MCP tools (indicative breadth) | Partial (read-only: `gaps`, `snowball_search`, `snowball_trends`, `export`, `proposal_export`, `refs_gap`, `ask`; no `--apply`) | Yes (positioning: large tool surface) | Yes (varies by fork) |
-| Corpus freshness (vendor SLA) | Partial (`snowball watch`, `authorwatch run` — you schedule polls) | Yes (positioning: index within hours) | N/A (local library) |
+| Capability | Paperful | Valency MCP Bond | Edison Scientific | zotero-mcp (typical) |
+|------------|----------|------------------|-------------------|----------------------|
+| Semantic search over **public** papers / preprints | Partial (`snowball` keyword / similar hops; OpenAlex-backed discovery — not a single “ask the whole web” MCP) | Yes | Yes (Literature / PaperQA3 over 175M+ papers; also trials and patents) | Partial (search library + sometimes Unpaywall) |
+| Semantic search over **your** PDFs | Yes (`rag ingest` + `ask`; GUI Ask) | No | Partial (upload / workspace files; not your Zotero tree) | Yes (chat reads attached PDFs) |
+| Citation graph (corpus-scale, both directions) | Partial (`snowball` `refs` / `cites` / `both`; Discover map of one queue, not the whole public corpus) | Yes | Yes (Literature: native citation-graph understanding) | Partial |
+| Author profiles / co-author networks | Partial (`authorwatch briefing`, `suggest -C`) | Yes | Partial (via literature search, not a dedicated author MCP) | Partial |
+| Keyword / publication **trends** | Partial (`snowball trends`, MCP `snowball_trends`; OpenAlex filters in snowball) | Yes | Partial (reviews, not a trends MCP) | No |
+| Novelty / “has anyone done this?” | Partial (`refs gap`, similar hops, `ask --focus gaps` — never claims absence) | No | Yes (**Precedent**, formerly Has Anyone) | No |
+| Cited literature **synthesis** / conflicting evidence | Partial (opt-in `synthesize` / Ask over held PDFs) | Partial (search/export, not a review agent) | Yes (Literature; `LITERATURE_HIGH` reasoning mode) | Partial (chat) |
+| Bulk **missing-PDF** fetch into a collection | Yes | No | No | Partial |
+| Disk mirror + **restore** ledger | Yes | No | No | No |
+| Campus EZProxy / grey-lit PDF playbooks | Yes | No | No | No |
+| Experimental-data analysis / molecular design | No | No | Yes (**Analysis**, **Molecules**; **Kosmos** joins literature + code) | No |
+| Programmatic API | Partial (`paperful mcp` + `--format json`; writes stay CLI `--apply`) | Yes (MCP) | Yes (`edison-client` jobs; Kosmos **not** on the public API) | Yes (MCP) |
+| MCP tools (indicative breadth) | Partial (read-only: `gaps`, `snowball_search`, `snowball_trends`, `export`, `proposal_export`, `refs_gap`, `ask`; no `--apply`) | Yes (positioning: large tool surface) | No (Python/REST client; chat sessions) | Yes (varies by fork) |
+| Runs **local** / library stays on disk | Yes | No | No (hosted platform; academic free tier) | Yes |
+| Corpus freshness (vendor SLA) | Partial (`snowball watch`, `authorwatch run` — you schedule polls) | Yes (positioning: index within hours) | Yes (hosted index; SLA not audited here) | N/A (local library) |
 
 Valency **Hub** (publish, fork, public review) is a separate product; Paperful does not host papers.
+Edison **Kosmos** is a separate autonomous-scientist job, not an MCP Bond analogue.
 
 ## Complementary: Zotero plugins and built-ins
 
@@ -144,6 +151,14 @@ Valency **Hub** (publish, fork, public review) is a separate product; Paperful d
 - **Fit:** **MCP Bond** — hosted semantic access to a very large public paper/preprint corpus (search, citation graph, authors, trends, export) for LLM clients. **Hub** — open publishing, versioning, and review; out of scope for Paperful’s library/mirror jobs.
 - **With Paperful:** Bond when the question is “what does the literature say?” across hundreds of millions of works. Paperful when the question is “fill, fix, mirror, and reason over **my** collection” — `run`, `snapshot`, `snowball` / `authorwatch` to grow it, `ask` / `refs_gap` / `gaps` / dry-run `snowball_search` / `snowball trends` / `export-proposals` (and optional `paperful mcp` with the same JSON envelopes) over the on-disk index. Typical stack: Bond (or similar) for discovery → snowball / `ingest-dois` / manual save → Paperful for PDFs and disk-first hygiene.
 - **Not a substitute for:** EZProxy-backed fetch, grey-literature playbooks, collection-shaped `out/` restore, or unattended batch attach.
+
+### Edison Scientific
+
+- **Sites:** [docs.edisonscientific.com](https://docs.edisonscientific.com/) · [platform.edisonscientific.com](https://platform.edisonscientific.com) · FutureHouse spinout
+- **Fit:** Hosted agents that *do research*, not a Zotero helper. **Literature** (PaperQA3) — cited Q&A and deep reviews over 175M+ papers, trials, and patents, including conflicting-evidence synthesis and figure pullouts. **Precedent** (formerly Has Anyone) — novelty / “has this been tried?”. **Kosmos** — autonomous scientist (objective + datasets; parallel literature and analysis agents; structured world model; ~1,500 papers and ~42k lines of code per run; auditable traces; not on the public API). **Analysis** and **Molecules** — experimental data and chemistry. Python **`edison-client`** (`JobNames`, task continuation, file storage); enterprise agent profiles.
+- **With Paperful:** Edison when the question is a public-corpus review, a novelty search, or a Kosmos/Analysis run on a dataset. Paperful when the question is “fill, fix, mirror, and Ask **this** library.” Typical stack: Edison Literature or Precedent → snowball / `ingest-dois` → `run` / Wanted → local `ask`. Do not treat their workspace as the quiet mirror.
+- **Not a substitute for:** missing-PDF fetch, EZProxy / grey playbooks, `snapshot` / `restore`, collection-scoped RAG that never leaves the machine, or unattended attach.
+- **Roadmap borrow (not a clone):** precedent pack over held PDFs + OpenAlex, named MCP read jobs, conflicting-evidence briefs — [ROADMAP — Hosted AI scientists](ROADMAP.md#hosted-ai-scientists-edison-scientific).
 
 ### ZotFile (legacy)
 

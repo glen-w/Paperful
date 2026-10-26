@@ -165,8 +165,11 @@ def apply_critique(raw: dict[str, Any], cfg: "Config") -> None:
                 "critique_max_context_chars",
                 lambda v: max(1000, int(v)),
             ),
+            ("ai_model", "critique_ai_model", bool),
         ],
     )
+    if "reviewers" in table:
+        cfg.critique_reviewers = C.parse_critique_reviewers(table.get("reviewers"))
     if cfg.critique_overlap_n_min > cfg.critique_overlap_n_max:
         cfg.critique_overlap_n_max = cfg.critique_overlap_n_min
 
@@ -760,5 +763,14 @@ def apply_prompt_paths(cfg: "Config", source: Path) -> None:
     cfg.synthesize_prompt_template = C._resolve_prompt_path(
         cfg.synthesize_prompt_template, source
     )
+    if cfg.critique_reviewers:
+        cfg.critique_reviewers = tuple(
+            C.CritiqueReviewer(
+                id=row.id,
+                model=row.model,
+                prompt=C._resolve_prompt_path(row.prompt, source),
+            )
+            for row in cfg.critique_reviewers
+        )
     if cfg.ste_word_list_path is not None and not cfg.ste_word_list_path.is_absolute():
         cfg.ste_word_list_path = (source.parent / cfg.ste_word_list_path).resolve()

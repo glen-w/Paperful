@@ -173,9 +173,11 @@ no `[rag].enabled` required; see [rag.md](rag.md#structured-sections-mirror-only
 Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
 `config.toml`; it does not enable `[rag]` or `[llm]`.
 **Critique** (Advanced): pick a collection item **or** drop a draft
-(pdf/docx/odt/html/rtf/txt/md/pptx). Writes `state/critiques/` (`pack.md`).
+(pdf/docx/odt/html/rtf/txt/md/pptx, 40 MB). Writes `state/critiques/` (`pack.md`).
 Uploads stay under `state/critiques/uploads/` and are not imported to `out/`
-or Zotero. Optional LLM comments need `[llm]`. Not a score. See
+or Zotero. Optional LLM comments need `[llm]` (item form also has force-LLM
+and write-child-note). Optional AI-model checkbox requests a Binoculars extra
+(not installed by default). Show-dismissed is item-only. Not a score. See
 [critique.md](critique.md).
 
 **Stays CLI** (no GUI control): `session login`, `doctor --guide`, mid-run

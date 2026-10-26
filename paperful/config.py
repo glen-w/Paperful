@@ -23,6 +23,16 @@ if sys.version_info >= (3, 11):
 else:  # pragma: no cover
     import tomli as tomllib
 
+
+@dataclass(frozen=True)
+class CritiqueReviewer:
+    """One LLM reviewer for ``paperful critique --llm``."""
+
+    id: str
+    model: str = ""  # empty → [llm].model
+    prompt: str = "default"  # default builtin JSON prompt, or a path
+
+
 # Sci-Hub is opt-in (legal grey zone in some jurisdictions). Add "scihub" to
 # `sources` or pass --scihub; it is not in the default list.
 # Google Scholar is also opt-in: CAPTCHA / session login ambers first-run doctor
@@ -211,6 +221,8 @@ class Config:
     critique_overlap_df_max: int = 0  # 0 → auto from corpus size
     critique_cite_age_years: int = 10
     critique_max_context_chars: int = 24_000
+    critique_ai_model: bool = False
+    critique_reviewers: tuple[CritiqueReviewer, ...] = ()
     summarize_prompt_template: str = "default"
     summarize_max_context_chars: int = 24_000
     summarize_tag: str = "paperful-summary"
@@ -993,6 +1005,44 @@ def _resolve_prompt_path(value: str, source: Path) -> str:
     if not path.is_absolute():
         path = (source.parent / path).resolve()
     return str(path)
+
+
+def parse_critique_reviewers(raw: Any) -> tuple[CritiqueReviewer, ...]:
+    """Parse ``[[critique.reviewers]]`` tables."""
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise ValueError(
+            "[critique].reviewers must be an array of tables ([[critique.reviewers]])"
+        )
+    out: list[CritiqueReviewer] = []
+    seen: set[str] = set()
+    for i, row in enumerate(raw, start=1):
+        if not isinstance(row, dict):
+            raise ValueError(f"[critique.reviewers] entry {i} must be a table")
+        default_id = "reviewer" if len(raw) == 1 else f"reviewer-{i}"
+        rid = str(row.get("id") or "").strip() or default_id
+        if rid in seen:
+            raise ValueError(f"[critique.reviewers] duplicate id {rid!r}")
+        seen.add(rid)
+        model = str(row.get("model") or "").strip()
+        prompt = str(row.get("prompt") or "default").strip() or "default"
+        out.append(CritiqueReviewer(id=rid, model=model, prompt=prompt))
+    return tuple(out)
+
+
+def critique_reviewers_for(
+    cfg: Config, wanted: list[str] | None = None
+) -> tuple[CritiqueReviewer, ...]:
+    """Configured reviewers, or one implicit default reviewer."""
+    rows = cfg.critique_reviewers
+    if not rows:
+        rows = (CritiqueReviewer(id="reviewer", model="", prompt="default"),)
+    if wanted:
+        want = {w.strip() for w in wanted if str(w).strip()}
+        if want:
+            rows = tuple(r for r in rows if r.id in want)
+    return rows
 
 
 def _clamp01(value: Any) -> float:

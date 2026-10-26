@@ -149,6 +149,7 @@ def run_checks(
     findings.extend(_checklists(doc, item))
     findings.extend(_stats(doc))
     findings.extend(_prose(doc))
+    findings.extend(_style_metrics(doc))
 
     if item is not None:
         findings.extend(_identity(cfg, item, client, backend, offline))
@@ -549,13 +550,35 @@ def _cited_work_status(
     resolved = 0
     for doi in dois[:80]:
         codes = lookup_doi_status(client, cfg, doi, refresh=False)
-        if "retracted" in codes or "withdrawn" in codes:
-            kind = "retracted" if "retracted" in codes else "withdrawn"
+        if "retracted" in codes:
             out.append(
                 make_finding(
                     code="cited_retracted",
                     severity="major",
-                    detail=f"Bibliography DOI {doi} has Crossref/OpenAlex status {kind}.",
+                    detail=f"Bibliography DOI {doi} has Crossref/OpenAlex status retracted.",
+                    quote=doi,
+                    source="crossref",
+                )
+            )
+        elif "withdrawn" in codes:
+            out.append(
+                make_finding(
+                    code="cited_withdrawn",
+                    severity="warn",
+                    detail=f"Bibliography DOI {doi} has Crossref/OpenAlex status withdrawn.",
+                    quote=doi,
+                    source="crossref",
+                )
+            )
+        elif "expression_of_concern" in codes:
+            out.append(
+                make_finding(
+                    code="cited_expression_of_concern",
+                    severity="warn",
+                    detail=(
+                        f"Bibliography DOI {doi} has Crossref/OpenAlex status "
+                        "expression_of_concern."
+                    ),
                     quote=doi,
                     source="crossref",
                 )
@@ -858,6 +881,133 @@ def _stats(doc: ExtractedDoc) -> list[Finding]:
     return out
 
 
+def _fmt_metric(value: Any, digits: int = 1) -> str:
+    if value is None:
+        return "n/a"
+    if isinstance(value, float):
+        return f"{value:.{digits}f}"
+    return str(value)
+
+
+def _style_metrics(doc: ExtractedDoc) -> list[Finding]:
+    """Readability / lexical summaries plus suggested AI-prose tells."""
+    from .critique_ai_tells import MAX_PHRASE_FINDINGS, MIN_AI_TELL_WORDS, compute_ai_tells
+    from .critique_metrics import compute_style_metrics
+
+    text = doc.text or ""
+    metrics = compute_style_metrics(text)
+    tells = compute_ai_tells(text, doc.paragraphs or None)
+    out: list[Finding] = []
+    read = metrics.get("readability") or {}
+    if not read.get("insufficient"):
+        out.append(
+            make_finding(
+                code="readability_summary",
+                severity="info",
+                loc="document",
+                detail=(
+                    f"Flesch {_fmt_metric(read.get('flesch_reading_ease'))}; "
+                    f"Gunning Fog {_fmt_metric(read.get('gunning_fog'))}; "
+                    f"ARI {_fmt_metric(read.get('ari'))}. "
+                    "Academic FRE is often 0–30; that is expected, not a defect."
+                ),
+                source="readability",
+            )
+        )
+    lex = metrics.get("lexical_diversity") or {}
+    mtld = lex.get("mtld")
+    mtld_bit = (
+        f"MTLD {_fmt_metric(mtld, 1)}" if mtld is not None else "MTLD omitted (<50 tokens)"
+    )
+    if lex.get("token_count"):
+        out.append(
+            make_finding(
+                code="lexical_diversity_summary",
+                severity="info",
+                loc="document",
+                detail=(
+                    f"TTR {_fmt_metric(lex.get('ttr'), 3)}; {mtld_bit}; "
+                    f"hapax rate {_fmt_metric(lex.get('hapax_rate'), 3)} "
+                    f"({lex.get('type_count')} types / {lex.get('token_count')} tokens)."
+                ),
+                source="lexical_diversity",
+            )
+        )
+    if tells.get("abstain"):
+        out.append(
+            make_finding(
+                code="ai_tells_abstain",
+                severity="info",
+                lane="suggested",
+                loc="document",
+                detail=(
+                    f"Fewer than {MIN_AI_TELL_WORDS} words; "
+                    "heuristic AI-prose signals skipped."
+                ),
+                source="ai_tells",
+            )
+        )
+        return out
+    cv = tells.get("burstiness_cv")
+    out.append(
+        make_finding(
+            code="ai_tell_summary",
+            severity="info",
+            lane="suggested",
+            loc="document",
+            detail=(
+                f"Burstiness CV {_fmt_metric(cv, 2)}; "
+                f"{tells.get('tell_phrase_total', 0)} tell-phrase hits "
+                f"({len(tells.get('tell_phrase_hits') or [])} distinctive). "
+                "Not proof of AI authorship."
+            ),
+            source="ai_tells",
+        )
+    )
+    for hit in (tells.get("tell_phrase_hits") or [])[:MAX_PHRASE_FINDINGS]:
+        phrase = str(hit.get("phrase") or "")
+        count = hit.get("count") or 0
+        out.append(
+            make_finding(
+                code="ai_tell",
+                severity="info",
+                lane="suggested",
+                loc="prose",
+                quote=phrase,
+                detail=(
+                    f"Stock phrase {phrase!r} ×{count}. Associated with some "
+                    "LLM-style prose; not proof of AI."
+                ),
+                source="ai_tells",
+            )
+        )
+    for flag in tells.get("unicode_flags") or []:
+        out.append(
+            make_finding(
+                code="ai_tell",
+                severity="info",
+                lane="suggested",
+                loc="unicode",
+                quote=str(flag),
+                detail=f"Typography flag {flag}. Provenance hint, not authorship proof.",
+                source="ai_tells",
+            )
+        )
+    for flag in tells.get("discourse") or []:
+        out.append(
+            make_finding(
+                code="ai_tell",
+                severity="info",
+                lane="suggested",
+                loc="discourse",
+                quote=str(flag),
+                detail=f"Discourse scaffold {flag}. Not proof of AI authorship.",
+                source="ai_tells",
+            )
+        )
+    return out
+
+
 def _prose(doc: ExtractedDoc) -> list[Finding]:
     sentences = [s.strip() for s in _SENTENCE.findall(doc.text) if s.strip()]
     if not sentences:
@@ -865,20 +1015,7 @@ def _prose(doc: ExtractedDoc) -> list[Finding]:
     long = [s for s in sentences if len(s.split()) >= 40]
     hedges = list(_HEDGE.finditer(doc.text))
     passive = list(_PASSIVE.finditer(doc.text))
-    words = max(1, len(re.findall(r"[A-Za-z]+", doc.text)))
-    syllables = max(1, int(words * 1.5))  # rough
-    flesch = 206.835 - 1.015 * (words / max(1, len(sentences))) - 84.6 * (syllables / words)
-    out: list[Finding] = [
-        make_finding(
-            code="readability",
-            severity="info",
-            detail=(
-                f"Flesch-style estimate {flesch:.0f} "
-                f"({len(sentences)} sentences, {words} words). Not a grade."
-            ),
-            source="rule",
-        )
-    ]
+    out: list[Finding] = []
     if long:
         out.append(
             make_finding(

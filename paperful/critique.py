@@ -28,10 +28,16 @@ CRITIQUE_PACK_KEYS = frozenset(
         "overlap",
         "sections_used",
         "llm",
+        "metrics",
     }
 )
 LANES = ("checked", "suggested")
 SEVERITIES = ("info", "warn", "major")
+_AI_TELL_DISCLAIMER = (
+    "These signals are associated with some LLM-style prose. They are **not proof** "
+    "of AI authorship. Formal academic English (including ESL) often looks “smooth” "
+    "on the same metrics. Do not use this pack for integrity proceedings."
+)
 
 
 @dataclass
@@ -165,6 +171,104 @@ def count_findings(findings: list[Finding]) -> dict[str, Any]:
     }
 
 
+def _fmt_metric(value: Any, digits: int = 1) -> str:
+    if value is None:
+        return "n/a"
+    if isinstance(value, float):
+        return f"{value:.{digits}f}"
+    return str(value)
+
+
+def _render_metrics_md(metrics: dict[str, Any]) -> list[str]:
+    from .critique_ai_tells import MIN_AI_TELL_WORDS
+
+    lines = ["## Metrics", ""]
+    lines.append(
+        "Academic Flesch Reading Ease is often 0–30; that is expected, not a defect. "
+        "TTR is length-sensitive — quote MTLD when it is present."
+    )
+    lines.append("")
+    read = metrics.get("readability") or {}
+    lex = metrics.get("lexical_diversity") or {}
+    lines.append("| Metric | Value |")
+    lines.append("| --- | --- |")
+    lines.append(f"| Flesch Reading Ease | {_fmt_metric(read.get('flesch_reading_ease'))} |")
+    lines.append(f"| Gunning Fog | {_fmt_metric(read.get('gunning_fog'))} |")
+    lines.append(f"| ARI | {_fmt_metric(read.get('ari'))} |")
+    lines.append(
+        f"| Avg sentence length (words) | {_fmt_metric(read.get('avg_sentence_length'))} |"
+    )
+    lines.append(
+        f"| Words / sentences | {read.get('word_count', 'n/a')} / "
+        f"{read.get('sentence_count', 'n/a')} |"
+    )
+    lines.append(f"| TTR | {_fmt_metric(lex.get('ttr'), 3)} |")
+    lines.append(f"| MTLD | {_fmt_metric(lex.get('mtld'), 1)} |")
+    lines.append(f"| Hapax rate | {_fmt_metric(lex.get('hapax_rate'), 3)} |")
+    lines.append(
+        f"| Types / tokens | {lex.get('type_count', 'n/a')} / {lex.get('token_count', 'n/a')} |"
+    )
+    lines.append("")
+    tells = metrics.get("ai_tells") or {}
+    lines.append("### AI-prose signals")
+    lines.append("")
+    lines.append(_AI_TELL_DISCLAIMER)
+    lines.append("")
+    if tells.get("abstain"):
+        lines.append(
+            f"- Abstain: fewer than {MIN_AI_TELL_WORDS} words "
+            f"({tells.get('word_count', 0)} tokens)."
+        )
+    else:
+        lines.append(
+            f"- Burstiness (sentence-length CV): {_fmt_metric(tells.get('burstiness_cv'), 2)}"
+        )
+        lines.append(f"- Tell-phrase hits: {tells.get('tell_phrase_total', 0)}")
+        flags = list(tells.get("unicode_flags") or []) + list(tells.get("discourse") or [])
+        if flags:
+            lines.append(f"- Other flags: {', '.join(str(f) for f in flags)}")
+    lines.append("")
+    return lines
+
+
+def _render_reviewer_notes(llm: dict[str, Any]) -> list[str]:
+    reviewer_rows = [
+        r
+        for r in (llm.get("reviewers") or [])
+        if isinstance(r, dict) and (r.get("narrative") or "").strip()
+    ]
+    if not reviewer_rows:
+        narrative = (llm.get("narrative") or "").strip()
+        if narrative:
+            reviewer_rows = [
+                {
+                    "id": "reviewer",
+                    "model": llm.get("model") or "",
+                    "narrative": narrative,
+                }
+            ]
+    if not reviewer_rows:
+        return []
+    heading = "Reviewer notes" if len(reviewer_rows) > 1 else "Reviewer note"
+    lines = [f"## {heading}", ""]
+    for row in reviewer_rows:
+        model = row.get("model") or ""
+        rid = row.get("id") or "reviewer"
+        if len(reviewer_rows) > 1:
+            label = f"{rid} ({model})" if model else rid
+            lines.append(f"### {label}")
+            lines.append("")
+        model_bit = f" ({model})" if model and len(reviewer_rows) == 1 else ""
+        lines.append(
+            f"*Suggested{model_bit} — grounded in the checkers and an excerpt. "
+            "Not a score or accept/reject.*"
+        )
+        lines.append("")
+        lines.append(str(row.get("narrative") or "").strip())
+        lines.append("")
+    return lines
+
+
 def render_markdown(pack: dict[str, Any], *, show_dismissed: bool = False) -> str:
     counts = pack.get("counts") or {}
     inp = pack.get("input") or {}
@@ -174,17 +278,27 @@ def render_markdown(pack: dict[str, Any], *, show_dismissed: bool = False) -> st
         "",
         "Pre-submission / reading-aid pack. Not a referee report and not a grade.",
         "",
-        "## Counts",
-        "",
-        f"- findings: {counts.get('findings', 0)}",
-        f"- dismissed: {counts.get('dismissed', 0)}",
     ]
+    llm = pack.get("llm") or {}
+    if isinstance(llm, dict):
+        lines.extend(_render_reviewer_notes(llm))
+    lines.extend(
+        [
+            "## Counts",
+            "",
+            f"- findings: {counts.get('findings', 0)}",
+            f"- dismissed: {counts.get('dismissed', 0)}",
+        ]
+    )
     for label, key in (("lane", "by_lane"), ("severity", "by_severity"), ("code", "by_code")):
         bucket = counts.get(key) or {}
         if bucket:
             parts = ", ".join(f"{k} {v}" for k, v in sorted(bucket.items()))
             lines.append(f"- {label}: {parts}")
     lines.append("")
+    metrics = pack.get("metrics")
+    if isinstance(metrics, dict) and metrics:
+        lines.extend(_render_metrics_md(metrics))
     findings = list(pack.get("findings") or [])
     if not show_dismissed:
         findings = [f for f in findings if not f.get("dismissed")]
@@ -276,6 +390,8 @@ def build_critique(
     library: bool = False,
     dry_run: bool = False,
     use_llm: bool = False,
+    use_ai_model: bool = False,
+    reviewer_ids: list[str] | None = None,
     force: bool = False,
     show_dismissed: bool = False,
     offline: bool = False,
@@ -342,6 +458,47 @@ def build_critique(
         scope_items=scope_items or [],
         force=force,
     )
+    from .critique_ai_model import run_ai_model
+    from .critique_ai_tells import compute_ai_tells
+    from .critique_metrics import compute_style_metrics
+
+    metrics = compute_style_metrics(doc.text or "")
+    metrics["ai_tells"] = compute_ai_tells(doc.text or "", doc.paragraphs or None)
+    ai_model_meta: dict[str, Any] | None = None
+    if use_ai_model:
+        ai_result = run_ai_model(doc.text or "")
+        if ai_result is None:
+            findings.append(
+                make_finding(
+                    code="ai_model_unavailable",
+                    severity="info",
+                    lane="suggested",
+                    loc="document",
+                    detail=(
+                        "Optional AI-text model extra is not installed "
+                        "(Binoculars / torch). Heuristic tells still ran."
+                    ),
+                    source="ai_model",
+                )
+            )
+            ai_model_meta = {"skipped": "unavailable"}
+        else:
+            findings.append(
+                make_finding(
+                    code="ai_tell_summary",
+                    severity="info",
+                    lane="suggested",
+                    loc="model",
+                    detail=(
+                        f"{ai_result.get('backend')} score "
+                        f"{ai_result.get('score')}. "
+                        "Not proof of AI authorship; do not use for integrity proceedings."
+                    ),
+                    source="ai_model",
+                )
+            )
+            ai_model_meta = ai_result
+
     llm_meta: dict[str, Any] | None = None
     if use_llm:
         extra, llm_meta = suggested_from_llm(
@@ -351,6 +508,8 @@ def build_critique(
             item=item,
             client=llm_client,
             force=force,
+            metrics=metrics,
+            reviewer_ids=reviewer_ids,
         )
         findings.extend(extra)
 
@@ -379,7 +538,10 @@ def build_critique(
         "overlap": overlap_rows,
         "sections_used": sections_used,
         "llm": llm_meta,
+        "metrics": metrics,
     }
+    if ai_model_meta is not None:
+        payload["ai_model"] = ai_model_meta
     folder: Path | None = None
     if not dry_run:
         folder = write_pack(

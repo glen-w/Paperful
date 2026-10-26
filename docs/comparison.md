@@ -3,7 +3,7 @@
 A plain-language map of where Paperful sits next to Zotero plugins, bibliography
 fixers, Mendeley export cleaners, and DOI-centric download scripts.
 
-**Last reviewed:** 2026-10-19. Feature lists for other products are based on public
+**Last reviewed:** 2026-10-26. Feature lists for other products are based on public
 docs and positioning — not paid pilots or exhaustive release testing.
 
 Vendor-by-vendor notes live in the [comparison reference](comparison-reference.md).
@@ -24,6 +24,7 @@ Prefer this page for “is this the right tool?”
 | **Scriptable library surgery** (merge, enrich, disk GC, two-up scan split) via CLI/MCP | [zotero-agent](https://github.com/alex-roc/zotero-agent) |
 | **AI assistant** read/write over the library, including chat and (on some forks) OCR of scans | zotero-mcp forks ([richardjlyon](https://github.com/richardjlyon/zotero-mcp), [cookjohn](https://github.com/cookjohn/zotero-mcp), [mcp-zotero](https://github.com/Xevos117/mcp-zotero)) |
 | **Semantic search, citation graph, author/trend tools** over the public literature via MCP (hosted corpus; not your Zotero tree) | [Valency MCP Bond](https://www.valency.io/) — see [reference](comparison-reference.md#valency-mcp-bond-and-hub) |
+| **Hosted AI scientist** — cited reviews over ~175M papers/trials/patents, “has anyone done this?”, optional multi-hour discovery + experimental analysis | [Edison Scientific](https://docs.edisonscientific.com/) (Literature / Precedent / Kosmos) — see [reference](comparison-reference.md#edison-scientific) |
 | **Grounded Q&A over PDFs you already have** (local index; same collection mirror as fetch) | **Paperful** `rag ingest` / `ask` — optional `paperful mcp` (`ask`, `refs_gap`, `gaps`, `snowball_search`, `snowball_trends`, `export`, `proposal_export`) |
 | **`.bib` normalize / dedupe / upgrade preprints** (no Zotero required) | [bibcite](https://github.com/leo1oel/bibcite), [bibtex-tidy](https://github.com/FlamingTempura/bibtex-tidy), [bibmanager](https://bibmanager.readthedocs.io/) |
 | **Mendeley** dedup inside the app; clean **exported** BibTeX | Mendeley Duplicates smart collection; export cleaners such as [mendeley_bibtex_cleaner](https://gist.github.com/alexandrehuat/6d3263f73ccae87d0107977978316c02) |
@@ -118,7 +119,7 @@ Legend: **Yes** = first-class · **Partial** = adjacent or lighter · **No** = a
 | Grounded summary / collection review | Partial (opt-in, local, text layer) | No | No | No | No | Partial (public README: summarize PDFs into notes) |
 | OCR for scanned PDFs | Partial (`ocr`, OCRmyPDF text layer on disk) | No | No | No | No | Partial (`pdf-prep`, OCRmyPDF) |
 
-zotero-mcp, Valency MCP Bond, and BibTeX-cluster columns: [comparison reference](comparison-reference.md#capability-snapshot).
+zotero-mcp, Valency MCP Bond, Edison Scientific, and BibTeX-cluster columns: [comparison reference](comparison-reference.md#capability-snapshot).
 
 ## What Paperful does not do today
 
@@ -127,6 +128,7 @@ zotero-mcp, Valency MCP Bond, and BibTeX-cluster columns: [comparison reference]
 - Mendeley and EndNote item merge (`dedupe --apply` is Zotero-only)
 - Two-up scan split, or a chat agent over the library (`ocr` adds a text layer; it does not split pages. `summarize` / `synthesize` / `recover` are opt-in and local)
 - Hosted multi-user service
+- Autonomous AI-scientist runs, experimental-data kernels, or molecular design (use [Edison Scientific](https://docs.edisonscientific.com/) or similar)
 - Jeffersonian transcription or qualitative coding
 
 ## Choosing in one glance
@@ -174,6 +176,9 @@ Want a chat agent in the loop?
 
 Need semantic search / citation graph / trends across all public papers, not just your library?
   → Valency MCP Bond (or similar lit MCP). Paperful snowball + authorwatch grow *your* collection; `snowball trends` for year histograms on a query; `mcp` / CLI JSON for gaps, dry-run discovery, trends, export, and ask over *your* mirror
+
+Need a hosted cited review, “has this been tried?”, or a Kosmos-style run over a dataset plus the public literature?
+  → Edison Scientific (Literature / Precedent / Kosmos). Paperful still owns PDFs, the disk mirror, and Ask over *your* collection
 ```
 
 More branches: [comparison reference](comparison-reference.md#choosing-in-one-glance).

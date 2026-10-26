@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import re
+from hashlib import sha256
+from pathlib import Path
 from typing import Any
 
-from .config import Config
+from .config import Config, CritiqueReviewer, critique_reviewers_for
 from .critique import Finding, make_finding
 from .critique_extract import ExtractedDoc
 from .grounding import budget_slice
@@ -16,6 +18,7 @@ _SCOREISH = re.compile(
     r"\b(?:accept|reject|overall score|grade\s*[1-6]|score\s*[1-6]\s*/\s*6)\b",
     re.I,
 )
+_FENCE = re.compile(r"^```[a-zA-Z]*\s*$")
 
 _PROMPT = """You review a manuscript using ONLY the excerpt and the checked findings.
 Return JSON:
@@ -43,6 +46,28 @@ def _grounded(text: str, hay: str) -> bool:
     return hits >= max(2, min(3, len(words) // 4)) if len(words) > 2 else hits >= 1
 
 
+def load_reviewer_prompt(reviewer: CritiqueReviewer) -> str | None:
+    """Builtin JSON prompt, or file contents. None if the path is missing."""
+    raw = (reviewer.prompt or "default").strip() or "default"
+    if raw == "default":
+        return _PROMPT
+    path = Path(raw)
+    if not path.is_file():
+        return None
+    try:
+        text = path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return text or None
+
+
+def _strip_fences(text: str) -> str:
+    lines = (text or "").splitlines()
+    if len(lines) >= 2 and _FENCE.match(lines[0]) and _FENCE.match(lines[-1]):
+        return "\n".join(lines[1:-1]).strip()
+    return (text or "").strip()
+
+
 def suggested_from_llm(
     cfg: Config,
     doc: ExtractedDoc,
@@ -51,9 +76,15 @@ def suggested_from_llm(
     item: Item | None,
     client: Any | None,
     force: bool,
+    metrics: dict[str, Any] | None = None,
+    reviewer_ids: list[str] | None = None,
 ) -> tuple[list[Finding], dict[str, Any] | None]:
+    wanted = [w for w in (reviewer_ids or []) if str(w).strip()]
+    reviewers = critique_reviewers_for(cfg, wanted or None)
+    if wanted and not reviewers:
+        return [], {"skipped": "no_matching_reviewers"}
     if client is None:
-        return [], None
+        return [], {"skipped": "llm_disabled"}
     if not force:
         for f in findings:
             if f.code == "pdf_identity_mismatch":
@@ -84,34 +115,134 @@ def suggested_from_llm(
         f"Title: {title}\n\nExcerpt:\n{excerpt}\n\nChecked findings:\n"
         + json.dumps(checked, ensure_ascii=False)
     )
-    from .llm.client import ChatRequest, chat
-    from hashlib import sha256
+    if metrics:
+        user += "\n\nMetrics:\n" + json.dumps(metrics, ensure_ascii=False, default=str)[:4000]
 
-    prompt_sha = sha256((_PROMPT + user[:2000]).encode("utf-8")).hexdigest()[:12]
-    request = ChatRequest(
-        model=cfg.llm_model,
-        messages=(
-            {"role": "system", "content": _PROMPT},
-            {"role": "user", "content": user},
-        ),
-        timeout_seconds=float(cfg.llm_timeout_s or 120),
-        temperature=0.2,
-    )
-    try:
-        raw = chat(client, request)
-    except Exception as exc:
+    out: list[Finding] = []
+    reviewer_meta: list[dict[str, Any]] = []
+    first_narrative = ""
+    first_model = ""
+    first_sha = ""
+    skip_reason = ""
+    from .llm.client import ChatRequest, chat
+
+    for reviewer in reviewers:
+        prompt = load_reviewer_prompt(reviewer)
+        model = reviewer.model or cfg.llm_model
+        if prompt is None:
+            reviewer_meta.append(
+                {"id": reviewer.id, "model": model, "skipped": "prompt_missing"}
+            )
+            skip_reason = skip_reason or "prompt_missing"
+            continue
+        prompt_sha = sha256((prompt + user[:2000]).encode("utf-8")).hexdigest()[:12]
+        request = ChatRequest(
+            model=model,
+            messages=(
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": user},
+            ),
+            timeout_seconds=float(cfg.llm_timeout_s or 120),
+            temperature=0.2,
+        )
+        try:
+            raw = chat(client, request)
+        except Exception as exc:
+            reviewer_meta.append(
+                {
+                    "id": reviewer.id,
+                    "model": model,
+                    "prompt_sha": prompt_sha,
+                    "skipped": "llm_error",
+                    "error": str(exc),
+                }
+            )
+            skip_reason = skip_reason or "llm_error"
+            out.append(
+                make_finding(
+                    code="llm_failed",
+                    severity="info",
+                    lane="suggested",
+                    detail=f"LLM lane failed ({reviewer.id}): {exc}",
+                    source="llm",
+                    extra={"reviewer": reviewer.id},
+                )
+            )
+            continue
+        extra, narrative = _findings_from_reply(
+            raw, hay=hay, reviewer_id=reviewer.id, json_prompt=prompt == _PROMPT
+        )
+        out.extend(extra)
+        row: dict[str, Any] = {
+            "id": reviewer.id,
+            "model": model,
+            "prompt_sha": prompt_sha,
+        }
+        if narrative:
+            row["narrative"] = narrative
+            if not first_narrative:
+                first_narrative = narrative
+                first_model = model
+        if extra or narrative:
+            first_sha = first_sha or prompt_sha
+        elif not extra:
+            row["skipped"] = "empty_reply"
+            skip_reason = skip_reason or "empty_reply"
+        reviewer_meta.append(row)
+
+    if not out and not first_narrative:
+        meta: dict[str, Any] = {
+            "model": first_model or cfg.llm_model,
+            "skipped": skip_reason or "empty_reply",
+        }
+        if reviewer_meta:
+            meta["reviewers"] = reviewer_meta
+        return [], meta
+
+    meta = {
+        "model": first_model or (reviewers[0].model if reviewers else "") or cfg.llm_model,
+        "prompt_sha": first_sha,
+        "provider": getattr(client, "provider", ""),
+        "reviewers": reviewer_meta,
+    }
+    if first_narrative:
+        meta["narrative"] = first_narrative
+    return out[: 16 * max(1, len(reviewers))], meta
+
+
+def _findings_from_reply(
+    raw: str,
+    *,
+    hay: str,
+    reviewer_id: str,
+    json_prompt: bool,
+) -> tuple[list[Finding], str]:
+    extra = {"reviewer": reviewer_id} if reviewer_id else {}
+    data = _parse_json(raw)
+    if data is None and json_prompt:
+        return [], ""
+    if data is None:
+        narrative = _strip_fences(raw)[:4000]
+        if not narrative:
+            return [], ""
+        # Keep the reviewer note even if it says accept/reject; do not also
+        # copy that verdict into suggested findings.
+        if _SCOREISH.search(narrative):
+            return [], narrative
         return [
             make_finding(
-                code="llm_failed",
+                code="llm_summary",
                 severity="info",
                 lane="suggested",
-                detail=f"LLM lane failed: {exc}",
+                detail=narrative[:500],
+                quote=narrative[:200],
                 source="llm",
+                extra=extra,
             )
-        ], {"model": cfg.llm_model, "prompt_sha": prompt_sha, "error": str(exc)}
-    data = _parse_json(raw)
+        ], narrative
     out: list[Finding] = []
-    summary = str((data or {}).get("summary") or "").strip()
+    summary = str(data.get("summary") or "").strip()
+    narrative = ""
     if summary and _grounded(summary, hay):
         out.append(
             make_finding(
@@ -121,9 +252,11 @@ def suggested_from_llm(
                 detail=summary[:500],
                 quote=summary[:200],
                 source="llm",
+                extra=extra,
             )
         )
-    for row in (data or {}).get("comments") or []:
+        narrative = summary
+    for row in data.get("comments") or []:
         if not isinstance(row, dict):
             continue
         quote = str(row.get("quote") or "").strip()
@@ -136,9 +269,13 @@ def suggested_from_llm(
             continue
         if not _grounded(detail, hay) and not quote:
             continue
-        unverified = bool(row.get("unverified")) or (quote.lower() not in hay if quote else True)
+        unverified = bool(row.get("unverified")) or (
+            quote.lower() not in hay if quote else True
+        )
         code = str(row.get("code") or "llm_comment").strip() or "llm_comment"
-        extra = {"unverified": True} if unverified else {}
+        row_extra = dict(extra)
+        if unverified:
+            row_extra["unverified"] = True
         out.append(
             make_finding(
                 code=code[:40],
@@ -148,10 +285,10 @@ def suggested_from_llm(
                 quote=quote,
                 detail=detail[:500],
                 source="llm",
-                extra=extra,
+                extra=row_extra,
             )
         )
-    for q in (data or {}).get("questions") or []:
+    for q in data.get("questions") or []:
         text = str(q).strip()
         if not text:
             continue
@@ -162,16 +299,12 @@ def suggested_from_llm(
                 lane="suggested",
                 detail=text[:400],
                 source="llm",
+                extra=extra,
             )
         )
         if sum(1 for f in out if f.code == "author_question") >= 5:
             break
-    meta = {
-        "model": cfg.llm_model,
-        "prompt_sha": prompt_sha,
-        "provider": getattr(client, "provider", ""),
-    }
-    return out[:16], meta
+    return out[:16], narrative
 
 
 def _parse_json(raw: str) -> dict[str, Any] | None:

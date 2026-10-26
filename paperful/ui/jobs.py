@@ -460,6 +460,7 @@ def critique(
     collection: str = "",
     apply: bool = False,
     llm: bool = False,
+    ai_model: bool = False,
     force: bool = False,
     show_dismissed: bool = False,
 ) -> None:
@@ -472,6 +473,7 @@ def critique(
             collection=collection,
             apply=apply,
             llm=llm,
+            ai_model=ai_model,
             force=force,
             show_dismissed=show_dismissed,
         )
@@ -552,6 +554,7 @@ def critique(
             library=not bool(coll),
             dry_run=False,
             use_llm=use_llm,
+            use_ai_model=bool(ai_model),
             force=force,
             show_dismissed=show_dismissed,
             offline=offline,

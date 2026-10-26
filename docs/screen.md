@@ -30,6 +30,10 @@ Reports land in `state/runs/<stamp>-screen.json`. Status lookups are cached unde
 
 Bibliographic fields are never changed.
 
+`paperful critique` reuses the same Crossref / OpenAlex status cache for
+**cited** works in a manuscript bibliography (`cited_retracted`,
+`cited_withdrawn`, `cited_expression_of_concern`). See [critique](critique.md).
+
 ## Config
 
 See `[screen]` in [config.md](config.md) and `config.example.toml`.

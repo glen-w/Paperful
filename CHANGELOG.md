@@ -17,8 +17,10 @@ may still be added). See [releases](docs/releases.md).
 
 - **`paperful critique`.** Local-first manuscript pack (`--item` or `--file`):
   deterministic checkers (refs, floats, acronyms, stats/GRIM, checklists,
-  library n-gram overlap) as `lane=checked`; optional `--llm` comments as
-  `lane=suggested`. No scores. Dismiss findings. Advanced workbench page with
+  library n-gram overlap, Flesch/Fog/ARI + MTLD metrics) as `lane=checked`;
+  optional `--llm` comments (multi-reviewer via `[[critique.reviewers]]`) and
+  heuristic AI-prose tells as `lane=suggested`; optional `--ai-model`
+  Binoculars extra. No scores. Dismiss findings. Advanced workbench page with
   item picker and upload (`state/critiques/`). See [critique](docs/critique.md).
 - **Discover rows say why.** The Discover Queue and the Wanted "Waiting from"
   Discover" panel show a "Why suggested" line from each candidate's `why`.

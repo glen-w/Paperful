@@ -89,6 +89,7 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `catalogue.py` | `MirrorCatalogue`, `MirrorFirstBackend`, `open_library` | `sync`, `mirror`, `library` |
 | `scope.py` | Collection, year, type selection | `library` errors |
 | `resolve/` (`ids.py`, `enrich.py`), `lint.py`, `acronyms.py`, `authors_report.py`, `metadata.py`, `dedupe.py`, `pdfid.py` | Identifier, hygiene, and corpus-frequency logic. Take a backend; never name a manager | the protocol |
+| `critique.py`, `critique_checks.py`, `critique_extract.py`, `critique_llm.py`, `critique_metrics.py`, `critique_ai_tells.py`, `critique_ai_model.py`, `critique_overlap.py`, `critique_stats.py` | Local manuscript pack (`paperful.critique.pack.v1`). Checkers always; gated LLM comments; optional Binoculars extra (no torch at import) | `cli_runtime`, gated `llm` |
 | `config_tables.py` | Nested TOML sections applied onto `Config` | `config` parsers |
 | `sources/` | One fetch lane each. Return bytes or a miss | `sources.base` |
 | `camofox_client.py` / `camofox_recover.py` | Opt-in Camoufox REST recover (before `browser_agent`) | `sources.camofox`, [camofox.md](camofox.md) |
@@ -103,6 +104,7 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `completeness_cmd.py` | Re-export shim for the four verbs (keep `cli` imports and monkeypatches stable) | the four `*_cmd` modules |
 | `lint_cmd.py` | `lint` after flags | `lint` |
 | `screen_cmd.py` | `screen` after flags | `screen` |
+| `critique_cmd.py` | `critique` after flags | `critique` |
 | `fix_metadata_cmd.py` | `fix-metadata` after flags | `metadata` |
 | `ocr_cmd.py` | `ocr` after flags | `ocr` |
 | `recover_cmd.py` | `recover` after flags | `pipeline`, `browser_agent` |
@@ -137,7 +139,7 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `twenty.py` | Twenty People lookup (local cache) and `sync` (CRM create/enrich). User guide: [Twenty and SearXNG](snowball.md#twenty-and-searxng) | httpx |
 | `mcp_server.py` | Optional stdio MCP: read-only gaps, snowball preview / trends, export, proposal_export, refs_gap, ask | `agent_ops` |
 | `serve.py` | Localhost FastAPI: JSON capability API + mounts `ui` when the `serve` extra is installed | `agent_ops`, `ui` |
-| `ui/` | Server-rendered workbench (Jinja). `app.py` owns shared helpers + `mount_ui`; routes live in `wanted_routes` / `discover_routes` / `shell_routes` / `repair_routes` / `index_routes` (each `register_*`). Long jobs: `jobs.py` re-exports `wanted_jobs` / `discover_jobs` / `repair_jobs` / `index_jobs` (RAG, ask, summarize, synthesize). Ordinary pages do not run `doctor` (System does). Handlers resolve `doctor_payload` / `collections_tree` via `paperful.ui.app` so tests can monkeypatch there | CLI / MCP builders |
+| `ui/` | Server-rendered workbench (Jinja). `app.py` owns shared helpers + `mount_ui`; routes live in `wanted_routes` / `discover_routes` / `shell_routes` / `repair_routes` / `index_routes` / `critique_routes` (each `register_*`). Long jobs: `jobs.py` re-exports `wanted_jobs` / `discover_jobs` / `repair_jobs` / `index_jobs` (RAG, ask, summarize, synthesize) and defines `critique`. Ordinary pages do not run `doctor` (System does). Handlers resolve `doctor_payload` / `collections_tree` via `paperful.ui.app` so tests can monkeypatch there | CLI / MCP builders |
 | `authorwatch.py` | People lists → OpenAlex new works; `gather_briefing` / `write_briefing` / `write_digest`; `apply` creates parents + `ingested.md`; `accept` / `delete` | OpenAlex client, `identity`, `snowball.ingest`, `authorwatch_suggest` |
 | `authorwatch_suggest.py` | Corpus / cited / coauthor / mix suggestions → `suggestions.jsonl`; shared co-author accumulation for briefing | `authors_report`, OpenAlex, promoted packs |
 | `authorwatch_social.py` | Parse operator-saved RG / LinkedIn / Academia HTML or CSV (no network) | stdlib HTML/CSV |
@@ -217,6 +219,7 @@ Tier policy (1.0 contract):
 | `paperful.rag.thread.v1` | `state/rag/threads/*.json` | `rag.thread` | T2 | — |
 | `paperful.rag.questions.v1` | `state/rag/questions/` | `rag.questions` | T2 | — |
 | `paperful.sections.v1` | `state/sections/<key>.json` | `extract-sections` | T2 | Required: `schema`, `item_key`, `title`, `year`, `source`, `fields`, `missing`. Optional: `sections` (raw heading map when `[extract_sections].raw_map`). Each `fields.<name>`: `text`, `provenance` (`rule`\|`llm`), optional `heading`, `pages` |
+| `paperful.critique.pack.v1` | `state/critiques/<id>/<stamp>/pack.json` | `critique` | T1 | `CRITIQUE_PACK_KEYS` (`findings`, `overlap`, `metrics`, `llm`, …). `llm` may be `null` |
 | `paperful.rq_answered.v1` | `state/rq-answered/` | `rag.answered` | T2 | — |
 | `paperful.rag.text.v1` | extracted text cache | `rag.extract` | T3 | Rebuildable |
 | `paperful.rag.index.v1` | LanceDB meta | `rag.index` | T3 | Not a promise |

@@ -64,6 +64,7 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     assert "drop-zone" in critique.text
     assert 'name="item_key"' in critique.text
     assert 'name="file"' in critique.text
+    assert 'name="ai_model"' in critique.text
     assert client.get("/mirror").status_code == 200
     assert client.get("/index").status_code == 200
     assert client.get("/briefs").status_code == 200

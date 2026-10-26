@@ -3,8 +3,8 @@
 Everything here is **off by default**. Paperful’s PDF loop (`run` / `attach` /
 `lint` / `fix-metadata` / `dedupe`) never needs a model. Turn the LLM on only
 for the LLM-backed verbs below, and only after `paperful doctor` shows the
-`LLM` row green. `extract-sections` and `rag questions` run deterministic
-rules without a model; their `--llm` lanes need `[llm].enabled`.
+`LLM` row green. `extract-sections`, `rag questions`, and `critique` run
+deterministic rules without a model; their `--llm` lanes need `[llm].enabled`.
 
 **Feasibility first.** Trying one summary is not the same job as summarizing
 or synthesizing ~1.5k PDFs. Hardware bands, overnight local runs, OpenRouter /
@@ -106,6 +106,12 @@ llm_title = false                   # verb B: grounded title proposals
 [lint]
 llm_pdf_match = false               # verb C: pdf_identity_mismatch finding
 llm_pdf_match_min_confidence = 0.6
+
+[critique]                          # verb C2: suggested comments only
+llm = false
+# [[critique.reviewers]]            # omit the table for one builtin JSON reviewer
+# id = "reviewer-2"
+# prompt = "prompts/critique-reviewer-2.md"
 
 [summarize]                         # verb D
 prompt_template = "default"         # or a path, e.g. "prompts/summary.md"
@@ -240,14 +246,19 @@ silent (no finding).
 
 ```sh
 uv run paperful critique --file ./draft.pdf --llm
+uv run paperful critique --file ./draft.pdf --llm --reviewer reviewer-2
 uv run paperful critique --item ABCD1234 --llm --force
 ```
 
-Additive. The default pack is checkers with no model. `--llm` (or
-`[critique].llm = true`) asks for a contribution summary, up to eight comments
-tied to a finding code or a quoted span, and author questions. Every row is
-`lane=suggested`. Ungrounded spans are dropped. No overall score. Identity
-mismatch refuses the lane unless `--force`. See [critique.md](critique.md).
+Additive. The default pack is checkers, metrics, and heuristic AI-tells with
+no model. `--llm` (or `[critique].llm = true`; `--no-llm` overrides) asks for
+a contribution summary, up to eight comments tied to a finding code or a
+quoted span, and author questions. Every row is `lane=suggested`. Ungrounded
+spans are dropped. No overall score. Identity mismatch refuses the lane
+unless `--force`. Optional `[[critique.reviewers]]` run one call each (per-id
+model and prompt). A Markdown prompt file becomes a **Reviewer note** in
+`pack.md`; the builtin prompt still returns JSON comments. See
+[critique.md](critique.md).
 
 ### D. `summarize` — grounded summary note
 

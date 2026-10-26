@@ -29,6 +29,7 @@
     <label><input type="checkbox" name="llm" value="1"> LLM comments {{ info("Suggested lane only. Grounded in the manuscript text and checked findings. Needs [llm].enabled.") }}</label>
     <label><input type="checkbox" name="force" value="1"> Force LLM {{ info("Run suggested comments even when identity lint flagged the PDF.") }}</label>
     {% endif %}
+    <label><input type="checkbox" name="ai_model" value="1"> AI model {{ info("Optional Binoculars extra. Paperful does not install torch. Missing extra records ai_model_unavailable. Not proof of authorship.") }}</label>
     <label><input type="checkbox" name="apply" value="1"> Write child note {{ info("Library item only. Tagged paperful-critique. Uploads stay disk-only.", danger=true) }}</label>
     <label><input type="checkbox" name="show_dismissed" value="1"> Show dismissed {{ info("Include findings you previously dismissed in pack.md.") }}</label>
     <button type="submit">Critique item</button>
@@ -49,6 +50,7 @@
     {% if llm_on %}
     <label><input type="checkbox" name="llm" value="1"> LLM comments {{ info("Suggested lane only. Grounded in the uploaded text and checked findings.") }}</label>
     {% endif %}
+    <label><input type="checkbox" name="ai_model" value="1"> AI model {{ info("Optional Binoculars extra. Missing extra records ai_model_unavailable. Not proof of authorship.") }}</label>
     <button type="submit">Critique file</button>
     {{ info("Same checkers as --file. Collection chip is the overlap corpus when text is already cached.") }}
   </form>

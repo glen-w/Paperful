@@ -240,7 +240,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[llm].base_url` | `http://127.0.0.1:11434` | Ollama API. Inside Compose, a loopback URL is rewritten to `host.docker.internal` (`PAPERFUL_OLLAMA_HOST`). A remote hostname stays as configured and still needs `allow_remote` |
 | `[llm].api_base` | `""` | OpenAI-compatible base when `provider = litellm` |
 | `[fix_metadata].llm_title` | `false` | Grounded title proposals in `fix-metadata` |
-| `[lint].llm_pdf_match` | `false` | `pdf_identity_mismatch` finding; `summarize` refuses flagged items unless `--force` |
+| `[lint].llm_pdf_match` | `false` | `pdf_identity_mismatch` finding; `summarize` and `critique --llm` refuse flagged items unless `--force` |
 | `[screen].detectors` | retracted, withdrawal, EoC, pubpeer, tortured, scigen, mathgen, suspect | Which lanes run. PubPeer needs `[screen].pubpeer = true` and `PUBPEER_DEVKEY` |
 | `[screen].tortured_min` | `5` | Minimum tortured-phrase hits before flagging (obvious phrases always flag) |
 | `[screen].pubpeer` | `false` | PubPeer batch lookup |
@@ -248,6 +248,8 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[screen].tag` | `paperful-pps` | Child note tag for `--apply` |
 | `[critique].llm` | `false` | Optional suggested-lane comments (`--llm` / `--no-llm` override) |
 | `[critique].tag` | `paperful-critique` | Child note tag for `critique --apply` |
+| `[critique].ai_model` | `false` | Optional Binoculars extra. `--ai-model` turns it on for one run (no `--no-ai-model`). Not installed by default; missing extra records `ai_model_unavailable` |
+| `[[critique.reviewers]]` | one implicit reviewer | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path relative to the config file). `--reviewer ID` selects a subset |
 | `[critique].overlap_top_k` | `40` | Distinctive n-grams ranked for library text overlap |
 | `[critique].overlap_n_min` / `overlap_n_max` | `6` / `12` | Word n-gram window |
 | `[critique].overlap_df_max` | `0` | Drop grams in this many other docs (`0` = auto from corpus size) |

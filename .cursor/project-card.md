@@ -35,6 +35,7 @@ backup_excludes:
 backup_includes:
   - paperful/***
   - extension/***
+  - prompts/***
 verify_paths:
   - paperful
   - tests

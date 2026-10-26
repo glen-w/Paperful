@@ -142,7 +142,7 @@ flowchart LR
 | `state/rq-answered/<stamp>/` | `rag answered` / Index already-answered pack (`paperful.rq_answered.v1`, `pack.md`) |
 | `state/prompts/` | Operator-saved Ask system prompts from the Index form (“Save as…”); listed in the custom-prompt select |
 | `state/gui/uploads/` | Workbench uploads (Discover import, Index prompt/questions files); basename only |
-| `state/critiques/<id>/<stamp>/` | `critique` pack (`paperful.critique.pack.v1`, `pack.md`). `<id>` is a library item key or `file-<filename-stem>` for uploads. Dismissals: `state/critiques/<id>/dismissed.jsonl`. Uploads: `state/critiques/uploads/` |
+| `state/critiques/<id>/<stamp>/` | `critique` pack (`paperful.critique.pack.v1`, `pack.md`: findings, metrics, optional reviewer notes). `<id>` is a library item key or `file-<filename-stem>` for uploads. Dismissals: `state/critiques/<id>/dismissed.jsonl`. Uploads: `state/critiques/uploads/` |
 | `state/reports/<slug>.html` | `synthesize` literature review; sibling `<slug>.json` records source hashes |
 | `state/reports/<slug>-authors.json` | `authors --apply` creator frequency (`paperful.authors_report.v1`); seeds proposed field packs |
 | `state/author-packs/` | Proposed / promoted field author packs (`paperful.author_pack.v1`). From `authors --apply`, snowball preflight, or `twenty lookup --apply` |
@@ -153,7 +153,7 @@ flowchart LR
 | `state/fetch-wins.jsonl` | One line per vault or browser-agent PDF (host and path; query string dropped). Agent rows may include a `steps` trace and promotable `click:` / `rewrite` wins. Input to `paperful playbooks propose` |
 | `state/playbooks-proposed.toml` | Draft learned pack from `playbooks propose`. Not loaded until `playbooks promote` |
 | `state/last-run.json` | Latest `run` or `recover` report (`paperful.run_report.v1`). Other verbs do not replace it |
-| `state/runs/<stamp>-<command>.json` | One report per `run`, `recover`, `gaps`, `reachout`, `lint`, `fix-metadata` (dry-run and `--apply`), `attachments` (dry-run and `--apply`), `summarize`, `synthesize`, `extract-sections`, and `snapshot` |
+| `state/runs/<stamp>-<command>.json` | One report per `run`, `recover`, `gaps`, `reachout`, `lint`, `screen`, `critique`, `fix-metadata` (dry-run and `--apply`), `attachments` (dry-run and `--apply`), `summarize`, `synthesize`, `extract-sections`, `ask`, and `snapshot` |
 | `state/packs/<id>.json` | Parent witness (`paperful.pack.v1`) listing those reports for one `pack open` … `pack close` sequence. `state/packs/current` names the open id |
 | `state/mendeley-oauth.json` | Mendeley tokens after `session login mendeley` (mode `0600`) |
 | `state/endnote-import/<stamp>/` | EndNote XML+PDF bundle for File → Import. Never an edit of `.enl` |
@@ -181,7 +181,7 @@ below.
 | `synthesize` | `llm.enabled` | `state/reports/<slug>.html` when dest includes disk | standalone note in the scoped collection unless `--to disk` |
 | `extract-sections` | rules always; optional `[extract_sections].llm` + `llm.enabled` | `state/sections/<key>.json` | none (disk only) |
 | `rag questions` | rules always; optional `[rag].extract_questions_llm` + `llm.enabled` | `state/rag/questions/<key>.json` | none |
-| `critique` | checkers always; optional `--llm` / `[critique].llm` + `llm.enabled` | `state/critiques/<id>/<stamp>/` | child note with `--apply` on `--item` only |
+| `critique` | checkers, metrics, heuristic AI-tells always; optional `--llm` / `[critique].llm` + `llm.enabled`; optional `--ai-model` Binoculars extra | `state/critiques/<id>/<stamp>/` | child note with `--apply` on `--item` only |
 
 Opt-in **`camofox`** is a registered **serial** source (never in `DEFAULT_SOURCES`) that talks to an external [camofox-browser](https://github.com/jo-inc/camofox-browser) REST server for a scripted DOI→PDF grab. `run` injects it when `[camofox].enabled` and `[camofox].during_run` (default on); `--camofox` / `--no-camofox` override one invocation. Policy order places it after vault lanes and before `browser_agent`. It does not reuse the vault Chromium SSO profile (see [Camofox](camofox.md)).
 
@@ -263,8 +263,9 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
 - `paperful run --dry-run` — no downloads. Per item: **Would-hit** is the
   routed source list in order (full `sources` when `--try-all`).
 - `paperful lint` / `paperful fix-metadata` — identifier hygiene; apply is explicit.
-- `paperful critique` — local manuscript pack (`state/critiques/`). Checkers
-  without an LLM; optional suggested comments. Not a grade and not in `all`.
+- `paperful critique` — local manuscript pack (`state/critiques/`). Checkers,
+  metrics, and heuristic AI-tells without an LLM; optional suggested comments
+  and Binoculars extra. Not a grade and not in `all`.
 - `paperful dedupe` / `paperful gaps` / `paperful reachout` / `paperful refs gap` / `paperful coverage` — duplicate packs, PDF/DOI counts, contact-only missing-PDF CSV (never fetches, never sends mail), cited-in-PDF missing-from-library packs, and briefing/note/file vs `-C` coverage. `refs gap` and `coverage` are always dry-run (`state/refs-gaps/`, `state/coverage/`). `ingest-dois` creates parents from those packs or a DOI file only with `--apply`.
   `dedupe` writes `state/dedupe-packs/` and merges only with `--apply`
   (the spare-copy line is written then; title+year also needs `--apply-medium`).
@@ -353,7 +354,7 @@ and the library can write. Apply writes the catalogue too. See [gui.md](gui.md).
 TTY-only paths (a GUI must not claim them): `session login`, `doctor --guide`,
 mid-run EZProxy re-login, and snowball `approve-each`.
 
-Child notes from summarize / synthesize / remarks / snowball / briefing start
+Child notes from summarize / synthesize / remarks / snowball / briefing / critique `--apply` start
 with a scannable line and a `<!-- paperful.note.v1 {…} -->` comment (`type`,
 `verb`, `model`, `run_id`, `prompt_sha`).
 
@@ -363,7 +364,7 @@ rewritten standalone query; the chat model still sees the turns.
 
 Manifest `counts` keys match ledger statuses (`ok`, `attached`, `not_found`, …).
 
-`gaps`, `lint`, `summarize`, and `fix-metadata` (dry-run and `--apply`) write the same schema under `state/runs/` and do not replace `last-run.json`. Their `summary` adds command-specific keys (`no_stored_pdf`, `findings` / `findings_by_code`, `summarized` / `failed`, `patches_proposed`). A dry-run `fix-metadata` report omits `patches_applied`.
+`gaps`, `lint`, `screen`, `critique`, `summarize`, and `fix-metadata` (dry-run and `--apply`) write the same schema under `state/runs/` and do not replace `last-run.json`. Their `summary` adds command-specific keys (`no_stored_pdf`, `findings` / `findings_by_code`, `summarized` / `failed`, `patches_proposed`). A dry-run `fix-metadata` report omits `patches_applied`.
 
 (pack-v1)=
 ## Run packs (`paperful.pack.v1`)

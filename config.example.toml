@@ -185,12 +185,22 @@ mirror_failures_before_skip = 3
 # # Local manuscript pack (see docs/critique.md). Not a grade.
 # llm = false
 # tag = "paperful-critique"
+# ai_model = false                 # optional Binoculars extra; --ai-model turns on (no CLI off)
 # overlap_top_k = 40
 # overlap_n_min = 6
 # overlap_n_max = 12
 # overlap_df_max = 0              # 0 = auto from corpus size
 # cite_age_years = 10
 # max_context_chars = 24000
+# # Optional. Omit the table for one reviewer ([llm].model + builtin JSON prompt).
+# [[critique.reviewers]]
+# id = "reviewer-1"
+# model = ""                       # empty → [llm].model
+# prompt = "default"
+# [[critique.reviewers]]
+# id = "reviewer-2"
+# model = "qwen2.5:14b"
+# prompt = "prompts/critique-reviewer-2.md"
 # [summarize]
 # prompt_template = "default"    # or "prompts/summary.md"
 # max_context_chars = 24000

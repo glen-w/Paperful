@@ -987,6 +987,16 @@ def critique(
     llm: bool | None = typer.Option(
         None, "--llm/--no-llm", help="Optional grounded LLM comments (suggested lane)."
     ),
+    ai_model: bool = typer.Option(
+        False,
+        "--ai-model",
+        help="Optional Binoculars-style AI-text extra (suggested lane; not installed by default).",
+    ),
+    reviewer: list[str] = typer.Option(
+        [],
+        "--reviewer",
+        help="Run a subset of critique.reviewers ids (repeatable). Default: all.",
+    ),
     force: bool = typer.Option(
         False, "--force", help="Run the LLM lane even when identity lint flagged the PDF."
     ),
@@ -1010,6 +1020,8 @@ def critique(
         dry_run=dry_run,
         apply=apply,
         llm=llm,
+        ai_model=ai_model,
+        reviewer=reviewer,
         force=force,
         show_dismissed=show_dismissed,
         config=config,

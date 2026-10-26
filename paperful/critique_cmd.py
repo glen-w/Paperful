@@ -23,6 +23,8 @@ def run_critique(
     dry_run: bool,
     apply: bool,
     llm: bool | None,
+    ai_model: bool = False,
+    reviewer: list[str] | None = None,
     force: bool,
     show_dismissed: bool,
     config: Path | None,
@@ -59,6 +61,8 @@ def run_critique(
         raise typer.Exit(1)
 
     use_llm = cfg.critique_llm if llm is None else llm
+    use_ai_model = bool(ai_model) or cfg.critique_ai_model
+    reviewer_ids = [r.strip() for r in (reviewer or []) if r and str(r).strip()]
     llm_client = None
     if use_llm:
         try:
@@ -134,6 +138,8 @@ def run_critique(
             library=bool(library),
             dry_run=dry_run,
             use_llm=use_llm,
+            use_ai_model=use_ai_model,
+            reviewer_ids=reviewer_ids or None,
             force=force,
             show_dismissed=show_dismissed,
             offline=offline,
@@ -183,6 +189,7 @@ def run_critique(
             "dry_run": dry_run,
             "apply": apply,
             "llm": use_llm,
+            "ai_model": use_ai_model,
             "offline": offline,
         },
         started=started,

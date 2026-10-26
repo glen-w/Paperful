@@ -78,6 +78,7 @@ def register_critique(ui: UiContext) -> None:
         item_key = str(form.get("item_key") or "").strip()
         apply = form.get("apply") == "1"
         llm = form.get("llm") == "1"
+        ai_model = form.get("ai_model") == "1"
         force = form.get("force") == "1"
         show_dismissed = form.get("show_dismissed") == "1"
         upload = form.get("file")
@@ -118,6 +119,7 @@ def register_critique(ui: UiContext) -> None:
                 collection=prefs.collection,
                 apply=apply,
                 llm=llm,
+                ai_model=ai_model,
                 force=force,
                 show_dismissed=show_dismissed,
             )

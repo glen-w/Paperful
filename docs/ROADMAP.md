@@ -141,6 +141,11 @@ headline.
 - **ORCID / author harvest** is cheap but niche; keep, do not headline.
 - **OSF Preprints** as a thin DOI source: *test* by counting recent misses
   with an OSF location before building.
+- **Patents / trial registries** (Edison Literature indexes trials and
+  patents): *test* the same way — how many Wanted misses or precedent
+  questions would have been a ClinicalTrials.gov or patent-family hit —
+  before any ingest lane. Detail:
+  [Hosted AI scientists](#after-110-edison-scientific).
 - **Author homepages:** promote ORCID / OpenAlex researcher URLs to a lookup
   at miss time (*keep*). Add template parsers (al-folio, Hugo Academic) only
   if winning author sites cluster on them (*test*). Co-author site preflight
@@ -233,6 +238,21 @@ Ask stays optional; whether it stays third on the default nav is open.
   mentioning. Study-type seed for that table: Discover citation-map
   literature categories from OpenAlex `study_designs` and work `type` (see
   [Citation map](snowball.md#citation-map)).
+- **Borrow from hosted literature agents** (Edison Scientific’s Literature /
+  PaperQA line — [Hosted AI scientists](#after-110-edison-scientific)), still
+  over **your** PDFs, never a 175M-paper cloud index:
+  - A **conflicting-evidence** `synthesize` / `--focus` (already adjacent to
+    `gaps` and “what is contested”) that names the camps, the methods that
+    disagree, and the passages — not a single smoothed narrative.
+  - A **review-shaped** synthesize layout (question → methods in the set →
+    findings → limits), closer to Edison’s “report with abstract and
+    conclusions” than a chat dump. Same note provenance as today.
+  - **Figure / table pullouts** from local PDFs into the brief (caption +
+    page + file stem). Diagram *generation* stays out; we already hold the
+    PDFs.
+  - Rank or label retrieved passages with **study design / work type**
+    (OpenAlex fields we already expose on the citation map) and, when the
+    item has it, venue — never a proprietary “journal quality” score.
 - Existing RAG / Ask / Briefs surface: [Zotero-RAG
   integration](#zotero-rag-integration-later-question-centric-layer),
   [GUI](#gui). Question generation from summaries is still deferred there.
@@ -322,8 +342,80 @@ tags) sit on that canvas — [Citation map](snowball.md#citation-map).
   on `paperful/mcp_server.py`: “your assistant reads your library, not the
   open web.” MCP read tools are shipped
   ([Literature-discovery complement](#literature-discovery-complement-waves)).
+  Named **job-shaped** read tools (`ask` vs novelty/`precedent` vs `refs_gap`)
+  are the Edison-client lesson — same envelope, still no `--apply` on MCP.
+  Do **not** take the other Edison bet: a hosted Kosmos-class loop that
+  reads 1,500 papers and runs analysis code for hours
+  ([Hosted AI scientists](#after-110-edison-scientific)).
 - **Shared lab library.** Needs authentication, so later. Aligns with
   [Collaboration without SaaS](#maybe-later) (Syncthing/git, not tenancy).
+
+(after-110-edison-scientific)=
+### Hosted AI scientists (Edison Scientific)
+
+[Edison Scientific](https://docs.edisonscientific.com/) is the commercial
+spinout of FutureHouse. Public docs (reviewed 2026-10-26) describe a
+**hosted** R&D platform at platform.edisonscientific.com: specialised agents
+over a large public corpus plus, for some jobs, uploaded datasets. Academic
+free tier; paid rate limits. Feature lists below are positioning from those
+docs, not a paid pilot.
+
+| Agent (docs name) | What they claim | Paperful analogue today |
+| --- | --- | --- |
+| **Literature** (PaperQA3; `JobNames.LITERATURE` / `LITERATURE_HIGH`) | Cited answers and deep reviews over **175M+** papers, trials, and patents; citation graph, journal quality, clinical-trial structure; conflicting-evidence synthesis; diagrams / figure pullouts; follow-up via `continued_job_id` | `ask` / `synthesize` / `rag` over **your** mirror; OpenAlex hops on snowball; Ask `--thread`. No patents index, no trial registry, no 175M full-text |
+| **Precedent** (formerly Has Anyone) | “Has this been tried?” novelty / gap search across fields | `refs gap`, coverage, snowball similar hops, `rag search` — none of these say “nobody has done this” |
+| **Kosmos** | Autonomous scientist: objective + datasets → parallel literature + analysis agents sharing a structured **world model**; ~1,500 papers and ~42k lines of code per run; up to ~12h; every claim traces to code or a passage; publication-ready figures. **Not on the public API** | None. Run witness + typed notes + RAG citations are the audit trail we have. No code-execution scientist |
+| **Analysis** | Flow cytometry, RNA-seq, stats, publication figures from **experimental** files | Out of jobs. Mirror holds PDFs, not assay pipelines |
+| **Molecules** (Phoenix / ChemCrow line) | SMILES/CAS/IUPAC → ADMET, retrosynthesis, ChEMBL, safety | Out of jobs |
+| **Client / storage** | `edison-client`: create/cancel tasks, chat sessions, dataset store (search/fetch/delete), enterprise **profiles** (image tier, tools, sub-agents, skills) | `paperful mcp` + `--format json` + profiles.toml. No hosted workspace, no code kernel |
+
+Same stance as [SnowBallSLR](#after-110-snowball-review) and [Valency](#literature-discovery-complement-waves): **borrow shapes, do not vendor, do not become the hosted product.**
+
+**Borrow (local, dry-run default, fail closed):**
+
+1. **Precedent pack** — given a hypothesis or methods phrase, retrieve (a)
+   passages you already hold (`rag search` / `ask --focus gaps`) and (b)
+   OpenAlex keyword / similar works **not** in the library. Stamp each hit
+   `held` vs `public-metadata-only`. Title the verb so operators cannot
+   confuse it with “the literature has never done this.” Wave 4 under
+   [Literature-discovery complement](#literature-discovery-complement-waves).
+2. **Named read jobs on MCP** — Edison’s `JobNames` enum is the lesson:
+   one client, distinct jobs. Map onto existing tools (`ask`, `refs_gap`,
+   `snowball_search`) plus the precedent pack. Still read-only; writes stay
+   CLI `--apply`.
+3. **Conflicting-evidence + review-shaped briefs** — [Summaries, briefs, and
+   Ask](#after-110-briefs-ask). Edison’s Literature agent is the existence
+   proof that “synthesis of contradictory findings” is a productised job,
+   not a chat temperature.
+4. **Audit trail** — every machine sentence already needs a passage (Ask /
+   summarize). Edison’s Kosmos bar (“trace to code or literature”) is the
+   copy test for receipts: if we cannot click through, we do not write the
+   sentence. No world-model store; `paperful.note.v1`, run witness, and the
+   RAG thread log are enough.
+5. **Study-design / type as retrieval context** — OpenAlex `study_designs`
+   and work `type` already on the citation map. Pass them into `ask` /
+   synthesize ranking. Do **not** invent a journal-impact score.
+6. **Patents and trial registries as discovery sources** — *test* before
+   build, same as OSF: count how often a miss or a precedent query would
+   have been a USPTO / ClinicalTrials.gov / patent-family hit. Thin DOI or
+   registry-id ingest at most. Not a second PaperQA corpus.
+
+**Interoperate:** Edison (or Valency Bond) when the question is “what does
+the public literature / trial / patent record say?” or “run Kosmos on this
+dataset.” Paperful when the question is fill, fix, mirror, and reason over
+**this** collection. Typical stack: their Literature or Precedent →
+snowball / `ingest-dois` → `run` / Wanted → local `ask`. Do not upload
+`out/` to their store by default.
+
+**Non-goals (park, do not spike):**
+
+- Hosting or wrapping Kosmos, Analysis, or Molecules.
+- A shared world model, code-execution kernel, or “6 months of a PhD”
+  overnight run.
+- Uploading the quiet mirror into a vendor workspace as the Ask path.
+- Clinical-trial–native PaperQA, glyph/Markush transcription, or enterprise
+  agent-profile deploys.
+- Claiming completeness of “the literature” from OpenAlex metadata.
 
 (after-110-distribution)=
 ### Distribution and install
@@ -413,6 +505,9 @@ Do not start these until testers ask, or until the main lane is boring.
   [firefox.md](firefox.md). Not a 1.0 gate.
 - **Local OpenAlex 2C** — full search / keyword / ORCID / `http`; institutions only; live API is enough for most.
 - **SaaS / tenancy.**
+- **Kosmos-class autonomous scientist** (multi-hour world-model runs over
+  public literature plus uploaded datasets; experimental pipelines;
+  molecular design) — [Hosted AI scientists](#after-110-edison-scientific).
 - **Catalogue unification** (managers as equals).
 - **LibGen** (same opt-in bar as Sci-Hub if ever).
 - **CSL / Quarto export** — point people at Better BibTeX.
@@ -800,10 +895,13 @@ for the end-to-end operator story.
 (literature-discovery-complement-waves)=
 ### Literature-discovery complement (waves)
 
-**Context:** Hosted literature MCP (e.g. [Valency MCP Bond](comparison-reference.md#valency-mcp-bond-and-hub))
-covers corpus-scale semantic search, citation graph, and keyword trends. Paperful
-does not replicate that index; these waves tighten the **local** loop and agent
-surface so Bond-class tools pair cleanly with snowball, mirror, and `ask`.
+**Context:** Hosted literature products (e.g. [Valency MCP Bond](comparison-reference.md#valency-mcp-bond-and-hub),
+[Edison Scientific](comparison-reference.md#edison-scientific)) cover
+corpus-scale search, citation graph, keyword trends, and (Edison) cited
+reviews, novelty (“has anyone”), trials/patents, and optional data-analysis
+agents. Paperful does not replicate those indexes or kernels; these waves
+tighten the **local** loop and agent surface so Bond- / Edison-class tools
+pair cleanly with snowball, mirror, and `ask`.
 
 Same bars as [near-term research-ops](#near-term-research-ops): dry-run default,
 explicit `--apply` for anything that touches the manager, fail closed, one JSON
@@ -814,9 +912,11 @@ envelope for CLI and MCP.
 | **1** | **Agent MCP + proposal export** — Extend optional `paperful mcp` with read-only tools that call the same builders as CLI `--format json`: `gaps`; snowball crawl dry-run / keyword preview (no gate that writes parents); collection `export` (BibTeX/RIS). Emit BibTeX or RIS from on-disk snowball / `authorwatch` proposal packs (DOIs already resolved in the pack). | **Shipped** — `export-proposals` + MCP tools; docs in [commands](commands.md#agent-channel-format-json-and-mcp), [snowball](snowball.md#bibtex--ris-from-the-queue), [authorwatch](authorwatch.md#ledger). |
 | **2** | **Publication trends** — Count works by publication year for an OpenAlex query or a saved snowball profile seed; reuse `OpenAlexClient` and budget posture as snowball. | **Shipped** — `snowball trends`, MCP `snowball_trends`; dry-run table + `--format json`; no library writes. |
 | **3** | **Author briefing thicken** — `authorwatch show` / list briefing adds co-author network and recent works from OpenAlex (same resolution paths as `resolve` / `suggest`). | **Shipped** — `authorwatch briefing` + compact `show`; `--format json`; no new polling scheduler. |
+| **4** | **Precedent / novelty pack** — Edison Precedent shape, local honesty: phrase in → `rag search` over held PDFs **plus** OpenAlex keyword/similar works not in the library; stamp `held` vs `public-metadata-only`; dry-run pack + read-only MCP tool; never a “nobody has done this” claim. | **Roadmap** — [Hosted AI scientists](#after-110-edison-scientific). |
 
 **Non-goals for these waves:** hosting a global full-text index; Valency Hub–style
-publishing; replacing Bond for “ask the whole literature” chat.
+publishing; replacing Bond or Edison Literature for “ask the whole literature”
+chat; wrapping Edison Kosmos / Analysis / Molecules.
 
 **Spike acceptance (one week, eng):** `refs gap` dry-run pack with zero manager
 writes; `ingest-dois` idempotent apply + `held` on ambiguous resolve; `collections
@@ -1093,14 +1193,87 @@ as `[summarize].model`, `[browser_agent].model`, `[rag].model`).
 6. **Config** — **Shipped:** `[rag]` focus/prompt/dest/extract_questions_llm;
    profile `focus` + existing SCOPE. `doctor` ambers when the index is missing,
    the embedding model is unavailable, or the index is behind the mirror.
+7. **Per-claim extra citations (`stuff`)** — **Roadmap:** batch `rag search`
+   over manuscript sentences; no Ask narrative. Detail:
+   [`stuff`](#stuff-later-extra-citations-from-the-library).
 
 **Non-goals for this lane:** replacing Zotero’s reader; cloud-default RAG;
 answers without citations; auto-mutating parent metadata from Q&A output;
-scheduling nightly “ask everything” jobs without an explicit operator command.
+scheduling nightly “ask everything” jobs without an explicit operator command;
+Edison Literature / PaperQA over a vendor corpus (Ask stays the local index;
+their client is complementary — [Hosted AI scientists](#after-110-edison-scientific)).
 
 **Consumer fit:** extends **Reading & knowledge** (below) and complements
 `summarize` / `synthesize` — summaries stay the human-readable layer; RAG stays
-the evidence-linked Q&A layer.
+the evidence-linked Q&A layer. `stuff` is the writing-side reuse of `rag search`
+(sources only), not another chat verb.
+
+(stuff-later-extra-citations-from-the-library)=
+### `stuff` (later; extra citations from the library)
+
+**Status:** roadmap only — a named CLI (and later Advanced workbench) verb,
+not a 1.0/1.1 gate. Needs `[rag].enabled` and a built index. Does **not**
+need `[llm]` or Ask: no reviewer note, no grounded paragraph, no claim
+rewrite.
+
+**Job:** for each phrase/claim in a manuscript (or a paper you already
+hold), suggest **X** additional citations from the local index. Implementation
+is the boring loop: split the document into sentences (reuse
+`critique_metrics.split_sentences`), run each sentence through the same
+retriever as `paperful rag search` (`-k` = X), and return the sources
+(item key, title, pages, score, passage snippet). Narrative summary stays
+off — this is not `ask`.
+
+Same input shape as [`critique`](critique.md): `--item ITEMKEY` (mirror PDF)
+or `--file` (draft path). Search scope is `-C` / year / type, same as
+`rag search`. Exclude the source item from hits. Skip bibliography /
+reference-list blocks and tiny fragments so the pack is not a self-cite
+of the reference section.
+
+**Direction (ship in order; each stage can stop):**
+
+1. **CLI pack** — `paperful stuff --item KEY -C … --k 3` (or `--file`
+   draft). Writes `state/stuff/<id>/<stamp>/` (`pack.json` + `pack.md`,
+   schema `paperful.stuff.pack.v1`). One row per sentence: quote, locator,
+   up to `k` hits. Fail closed when the index is missing or empty. Zero
+   manager writes. `--format json` → `paperful.agent.json.v1`.
+2. **Workbench** — Advanced sibling of Critique: pick item or upload,
+   background job, download pack.md. Not on the default nav.
+3. **Later (parked until the pack is boring)** — optional `--apply` child
+   note on the item; stance labels (supports / contrasts / mentions);
+   auto-insert into the manuscript. Those are writing-product bets, not
+   the first slice.
+
+**Config sketch (names TBD; additive only):**
+
+```toml
+[stuff]
+k = 3                    # extra sources per sentence (CLI `--k` wins)
+min_sentence_words = 8   # skip captions / headings / fragments
+```
+
+Reuse `[rag].top_k` only as a ceiling; `stuff`’s `k` is the per-claim
+request, typically smaller than Ask’s passage budget.
+
+**Acceptance:**
+
+- Each row is a sentence from the input plus `≤ k` index hits; no LLM
+  prose in the pack.
+- Hits are in-library (mirror index) only — not OpenAlex / web invent.
+- Source item (when `--item`) is never listed as a hit for itself.
+- `refs gap` stays the cited-but-not-owned scan; `stuff` does not create
+  parents or propose ingest.
+
+**Non-goals:** generating citation keys or CSL; rewriting the draft;
+claim verification (“this sentence is true”); stuffing from outside the
+corpus; nightly batch over the whole library; treating heuristic
+similarity as proof the source supports the claim.
+
+Complements `critique` (checkers on the same document), `rag search`
+(one query), and `ask` (one narrative answer). Distinct from
+[`refs gap`](#bibliography-gap-scan-later-not-gaps) (works named in the
+PDF that you do not own). Buffet context:
+[Summaries, briefs, and Ask](#after-110-briefs-ask).
 
 (embeddinggemma-2-local-embeddings)=
 ### EmbeddingGemma 2 (later; stronger offline embeddings)
@@ -1759,9 +1932,11 @@ Larger product bets. Park until the ledger and core loop justify them.
    lists](#author-watch-lists-later-people-you-follow--their-papers) (shipped;
    saved social HTML/CSV import; live scrape still out). **[Run
    witness](#run-witness-shipped-trust-thicken)** (shipped) ties batches to
-   config/model/index for reproducibility. Post-1.1 buffet for grounded
-   living briefs, summaries with receipts, and Ask-as-claim-check —
-   [Summaries, briefs, and Ask](#after-110-briefs-ask).
+   config/model/index for reproducibility.    Post-1.1 buffet for grounded
+   living briefs, summaries with receipts, Ask-as-claim-check, and
+   Edison-shaped conflicting-evidence / review layouts over **held** PDFs —
+   [Summaries, briefs, and Ask](#after-110-briefs-ask),
+   [Hosted AI scientists](#after-110-edison-scientific).
 6. **Writing & export** — CSL / BibLaTeX / Quarto sync; living review / gap lists;
    git-friendly CSL-JSON dumps; [briefing ↔ collection coverage](#briefing--collection-coverage-shipped-sibling-of-refs-gap)
    (shipped thin slice of parked “gap lists,” collection-scoped only).
@@ -1796,8 +1971,9 @@ Larger product bets. Park until the ledger and core loop justify them.
    and not a prerequisite for research-ops. (`coverage` is CLI `--format json` only.) **Literature-discovery complement shipped**
    (waves 1–3): read-only MCP for `gaps`, snowball preview, `snowball_trends`,
    `export`, `proposal_export`, plus `export-proposals`, `snowball trends`, and
-   thickened `authorwatch briefing` — [Literature-discovery complement](#literature-discovery-complement-waves). Writes stay
-   CLI `--apply`. `collections add` is CLI-only (not an MCP tool).
+   thickened `authorwatch briefing` — [Literature-discovery complement](#literature-discovery-complement-waves).
+   **Wave 4 (roadmap):** precedent / novelty pack as another named read job.
+   Writes stay CLI `--apply`. `collections add` is CLI-only (not an MCP tool).
    **Shipped:** Twenty sync, lookup, and `--twenty-writeback` —
    [Twenty and SearXNG](snowball.md#twenty-and-searxng).
    Request-channel policy stays config (`[request].channels`), not agent-default.
@@ -1822,6 +1998,12 @@ Larger product bets. Park until the ledger and core loop justify them.
 - Replacing Zotero as a reading UI
 - Shipping Sci-Hub or proxy abuse as defaults (opt-in + presets stay as today)
 - Jeffersonian transcription / qualitative coding apps
+- Autonomous AI-scientist loops (Kosmos-class world models, multi-hour code
+  execution, publication-from-dataset), experimental-data pipelines
+  (RNA-seq / flow cytometry kernels), and molecular design (ADMET /
+  retrosynthesis). Point people at [Edison Scientific](https://docs.edisonscientific.com/)
+  or similar; keep Paperful on library / find / completeness / mirror / control
+  — [Hosted AI scientists](#after-110-edison-scientific)
 
 ## Optional thin bridge — Firefox extension (post-1.0)
 
@@ -1890,6 +2072,7 @@ second doc tree that drifts from the CLI.
 - [quiet-mirror.md](quiet-mirror.md) — `out/` as the copy you keep
 - [releases.md](releases.md) — 1.0 contract; known limits
 - [comparison.md](comparison.md) — what Paperful does and does not replace today
+  (Zotero plugins, Valency Bond, [Edison Scientific](comparison-reference.md#edison-scientific))
 - [snowball.md](snowball.md) — library-building from a keyword, multi-DOI / multi-ORCID, or collection
 - [bbnj-author-lanes.md](bbnj-author-lanes.md) — dogfood `author_site` + `authorwatch` on `ocean/BBNJ` / `ocean/BBNJ-test`
 - Site career / domain timeline plan (consumer of durable tags):
@@ -1936,3 +2119,5 @@ is on. **Index** (Advanced) runs `rag ingest`, `rag search`, `rag questions`,
 and `rag answered`. **Briefs** (Advanced) runs `summarize` and `synthesize`.
 CLI `ask` remains for scripts, TTY multi-turn, and run profiles.
 See [Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer).
+Later: Advanced **Stuff** as a Critique sibling — per-sentence `rag search`,
+no Ask chat ([`stuff`](#stuff-later-extra-citations-from-the-library)).

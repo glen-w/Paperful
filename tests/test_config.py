@@ -335,7 +335,42 @@ def test_critique_table_is_parsed(tmp_path):
     assert cfg.critique_overlap_n_max == 8
     assert cfg.critique_cite_age_years == 7
     assert cfg.critique_max_context_chars == 5000
+    assert cfg.critique_ai_model is False
+    assert cfg.critique_reviewers == ()
     assert cfg.critiques_dir == cfg.state_dir / "critiques"
+
+
+def test_critique_reviewers_and_ai_model_are_parsed(tmp_path):
+    from paperful.config import CritiqueReviewer, _from_dict, parse_critique_reviewers
+
+    prompt = tmp_path / "prompts" / "methods.md"
+    prompt.parent.mkdir()
+    prompt.write_text("methods prompt", encoding="utf-8")
+    cfg = _from_dict(
+        {
+            "critique": {
+                "ai_model": True,
+                "reviewers": [
+                    {"id": "general"},
+                    {
+                        "id": "methods",
+                        "model": "qwen2.5:14b",
+                        "prompt": "prompts/methods.md",
+                    },
+                ],
+            }
+        },
+        tmp_path / "config.toml",
+    )
+    assert cfg.critique_ai_model is True
+    assert [r.id for r in cfg.critique_reviewers] == ["general", "methods"]
+    assert cfg.critique_reviewers[0].model == ""
+    assert cfg.critique_reviewers[0].prompt == "default"
+    assert cfg.critique_reviewers[1].model == "qwen2.5:14b"
+    assert cfg.critique_reviewers[1].prompt == str(prompt.resolve())
+    with pytest.raises(ValueError, match="duplicate"):
+        parse_critique_reviewers([{"id": "a"}, {"id": "a"}])
+    assert isinstance(cfg.critique_reviewers[0], CritiqueReviewer)
 
 
 def test_extract_sections_table_is_parsed(tmp_path):
