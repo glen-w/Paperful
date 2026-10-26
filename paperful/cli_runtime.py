@@ -12,6 +12,7 @@ import sys
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -92,6 +93,94 @@ def _take_scope(
         bound.year_to,
         bound.types,
     )
+
+
+@dataclass
+class BoundScope:
+    """Config plus resolved collection/year/type after ``_bind_scoped``."""
+
+    cfg: Config
+    bound: ResolvedRunConfig
+    collection: list[str]
+    library: bool
+    year_from: int | None
+    year_to: int | None
+    item_type: list[str]
+    limit: int | None
+
+
+def _bind_scoped(
+    *,
+    collection: list[str],
+    library: bool | None,
+    profile: str | None,
+    run_config: Path | None,
+    config: Path | None,
+    year_from: int | None = None,
+    year_to: int | None = None,
+    item_type: list[str] | None = None,
+    limit: int | None = None,
+    refuse_unset: bool = True,
+    refuse_empty: bool = True,
+    **bind_kwargs: Any,
+) -> BoundScope:
+    """Load config, bind a run profile, and refuse a missing collection/library."""
+    if refuse_unset and _scope_unset(collection, library, profile, run_config):
+        _refuse_missing_scope()
+    cfg = _cfg(config)
+    bound = _bind_run(
+        cfg,
+        profile=profile,
+        run_config=run_config,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type or [],
+        limit=limit,
+        **bind_kwargs,
+    )
+    collection, library, year_from, year_to, item_type = _take_scope(bound)
+    if refuse_empty and not collection and not library:
+        _refuse_missing_scope()
+    return BoundScope(
+        cfg=cfg,
+        bound=bound,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=bound.limit,
+    )
+
+
+def _connect_scope(
+    scoped: BoundScope,
+    *,
+    quiet: bool = False,
+    json_out: bool = False,
+    require_manager: bool = False,
+    apply_limit: bool = True,
+    library: bool | None = None,
+) -> tuple[LibraryBackend, Any, list[Any]]:
+    """Open the library for ``scoped`` and load items (optional ``limit`` slice)."""
+    if require_manager:
+        _require_manager(scoped.cfg)
+    backend = _connect(scoped.cfg, quiet=quiet)
+    loaded = _load_scope(
+        backend,
+        json_out=json_out,
+        collection=scoped.collection,
+        library=scoped.library if library is None else library,
+        year_from=scoped.year_from,
+        year_to=scoped.year_to,
+        item_type=scoped.item_type,
+    )
+    items = loaded.items
+    if apply_limit and scoped.limit:
+        items = items[: scoped.limit]
+    return backend, loaded, items
 
 def _item_progress(*, json_out: bool = False, transient: bool = False):
     """Live bar that stays below scrolling per-item logs.

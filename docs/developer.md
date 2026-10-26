@@ -114,7 +114,18 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `notes_delete_cmd.py` | `notes delete` after flags | `notes` |
 | `authors_cmd.py` | `authors` after flags | `authors_report` |
 | `all_cmd.py` | `all` chain + step dispatch after flags | Typer wrappers via `cli`; helpers via `cli_runtime` |
-| `cli_runtime.py` | Connect, scope, progress, agent emit, source-list helpers | `catalogue`, `library`, `scope`, `run_hooks` (not `cli`) |
+| `cli_runtime.py` | Connect, scope, progress, agent emit, source-list helpers. `_bind_scoped` / `_connect_scope` are the shared collection/year/type ladder used by command modules | `catalogue`, `library`, `scope`, `run_hooks` (not `cli`) |
+| `rag_cmd.py` | `rag ingest/status/search/questions/answered` after flags | rag, `cli_runtime` |
+| `sections_cmd.py` | `extract-sections` after flags | `sections.command`, grobid, llm |
+| `twenty_cmd.py` | `twenty lookup/sync` after flags | `twenty` |
+| `ingest_cmd.py` | `ingest-dois` after flags | ingest |
+| `sync_cmd.py` | `sync`, `import`, `openalex-store build-cites` after flags | `sync`, `snapshot` |
+| `report_cmd.py` | `report`, `export-proposals`, run-report-count helpers after flags | `store`, `runreport` |
+| `playbooks_cmd.py` | `playbooks` probe/propose/promote after flags | `playbooks` |
+| `profile_cmd.py` | `profile` list/show/save after flags | `run_config` |
+| `snowball_cmd.py` | `snowball` verbs and request helpers after flags | `snowball.command` |
+| `authorwatch_cmd.py` | `authorwatch` verbs after flags | `authorwatch` |
+| `keepup_cmd.py` | `keepup` verbs after flags | `keepup` |
 | `attach_cmd.py` | `attach` after flags | `attach`, `handoff`, `pipeline` |
 | `versions_cmd.py` | `versions` after flags | `versions` |
 | `refs_gap_cmd.py` | `refs gap` after flags | `refs_gap`, `agent_ops` |
@@ -141,7 +152,7 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `twenty.py` | Twenty People lookup (local cache) and `sync` (CRM create/enrich). User guide: [Twenty and SearXNG](snowball.md#twenty-and-searxng) | httpx |
 | `mcp_server.py` | Optional stdio MCP: read-only gaps, snowball preview / trends, export, proposal_export, refs_gap, ask (optional `ask_mode`) | `agent_ops` |
 | `serve.py` | Localhost FastAPI: JSON capability API + mounts `ui` when the `serve` extra is installed | `agent_ops`, `ui` |
-| `ui/` | Server-rendered workbench (Jinja). `app.py` owns shared helpers + `mount_ui`; routes live in `wanted_routes` / `discover_routes` / `shell_routes` / `repair_routes` / `index_routes` / `critique_routes` (each `register_*`). Long jobs: `jobs.py` re-exports `wanted_jobs` / `discover_jobs` / `repair_jobs` / `index_jobs` (RAG, ask, summarize, synthesize) and defines `critique`. Ordinary pages do not run `doctor` (System does). Handlers resolve `doctor_payload` / `collections_tree` via `paperful.ui.app` so tests can monkeypatch there | CLI / MCP builders |
+| `ui/` | Server-rendered workbench (Jinja). `app.py` owns shared helpers + `mount_ui`; routes live in `wanted_routes` / `discover_routes` / `shell_routes` / `repair_routes` / `index_routes` / `critique_routes` (each `register_*`). Discover HTTP bodies are module-level `handle_*` functions; `register_discover` only binds them. Row builders: `pages.py` re-exports `wanted_rows` / `discover_rows` / `ask_rows` plus `page_common` (pagination, dest, fingerprints). Long jobs: `jobs.py` re-exports `wanted_jobs` / `discover_jobs` / `repair_jobs` / `index_jobs` (RAG, ask, summarize, synthesize) and defines `critique`. Ordinary pages do not run `doctor` (System does). Handlers resolve `doctor_payload` / `collections_tree` via `paperful.ui.app` so tests can monkeypatch there | CLI / MCP builders |
 | `authorwatch.py` | People lists → OpenAlex new works; `gather_briefing` / `write_briefing` / `write_digest`; `apply` creates parents + `ingested.md`; `accept` / `delete` | OpenAlex client, `identity`, `snowball.ingest`, `authorwatch_suggest` |
 | `authorwatch_suggest.py` | Corpus / cited / coauthor / mix suggestions → `suggestions.jsonl`; shared co-author accumulation for briefing | `authors_report`, OpenAlex, promoted packs |
 | `authorwatch_social.py` | Parse operator-saved RG / LinkedIn / Academia HTML or CSV (no network) | stdlib HTML/CSV |

@@ -247,3 +247,60 @@ def test_grey_live_corpus_has_a_pass_per_playbook():
         if not any(row.status == "pass" for row in group)
     ]
     assert missing == [], [(row.playbook, row.status, row.detail, row.url) for row in rows]
+
+
+def test_redact_save_and_snapshot_dict(tmp_path):
+    from paperful.grey_probe import (
+        ProbeRow,
+        _redact_row,
+        _status,
+        load_corpus,
+        playbooks_for_probe,
+        redact_url,
+        save_recorded,
+    )
+    from paperful.playbooks import default_playbooks
+
+    assert redact_url("not-a-url") == "not-a-url"
+    assert redact_url("https://ex.org/a") == "https://ex.org/a"
+    redacted = redact_url("https://ex.org/a?utm_source=x&keep=1")
+    assert "utm_source" not in redacted
+    assert "keep=1" in redacted
+
+    books = playbooks_for_probe(default_playbooks(), examples=False)
+    assert books
+    with pytest.raises(FileNotFoundError):
+        load_corpus(tmp_path / "missing.toml")
+    bad = tmp_path / "bad.toml"
+    bad.write_text("targets = [1]\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="not a table"):
+        load_corpus(bad)
+    incomplete = tmp_path / "inc.toml"
+    incomplete.write_text('[[targets]]\nplaybook = ""\nurl = ""\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="needs playbook"):
+        load_corpus(incomplete)
+
+    row = ProbeRow(
+        playbook="x",
+        url="https://ex.org/a?utm_source=x",
+        extra="",
+        note="",
+        stamp="x",
+        status="pass",
+        chosen="https://ex.org/p.pdf?utm_medium=y",
+        resolved="https://ex.org/p.pdf",
+        detail="ok",
+        checked=[{"url": "https://ex.org/p.pdf?fbclid=1"}],
+        anchors=[{"href": "https://ex.org/a?utm_campaign=z", "text": "A"}],
+        metas=[{"name": "citation_pdf_url", "content": "https://ex.org/p.pdf?utm_id=1"}],
+        probed_at="now",
+    )
+    snap = row.to_dict(with_snapshot=True)
+    assert "anchors" in snap
+    _redact_row(row)
+    assert "utm_source" not in row.url
+    path = save_recorded(tmp_path / "rec", [row])
+    assert path.name == "index.json"
+    assert _status(True, False, "a", "a") == "pass"
+    assert _status(False, True, "a", "a") == "alternate"
+    assert _status(False, False, "a", "b") == "wrong-playbook"

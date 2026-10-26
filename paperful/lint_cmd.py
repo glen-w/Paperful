@@ -35,44 +35,28 @@ def run_lint(
     from .pipeline import make_client
     from .zot import Item
 
-    if cli_mod._scope_unset(collection, library, profile, run_config):
-        cli_mod._refuse_missing_scope()
-    cfg = cli_mod._cfg(config)
     json_out, as_json = cli_mod._agent_wins(fmt, as_json)
-    bound = cli_mod._bind_run(
-        cfg,
-        profile=profile,
-        run_config=run_config,
+    quiet = as_json or json_out
+    scoped = cli_mod._bind_scoped(
         collection=collection,
         library=library,
+        profile=profile,
+        run_config=run_config,
+        config=config,
         year_from=year_from,
         year_to=year_to,
         item_type=item_type,
         limit=limit,
     )
-    collection, library, year_from, year_to, item_type = cli_mod._take_scope(bound)
-    limit = bound.limit
-    if not collection and not library:
-        cli_mod._refuse_missing_scope()
-    cli_mod._require_manager(cfg)
-    quiet = as_json or json_out
-    backend = cli_mod._connect(cfg, quiet=quiet)
+    cfg = scoped.cfg
+    backend, loaded, items = cli_mod._connect_scope(
+        scoped, quiet=quiet, json_out=quiet, require_manager=True
+    )
     manifest = Manifest(cfg.manifest_path)
     partial: list[Finding] = []
     done = 0
     interrupted = False
-    loaded = cli_mod._load_scope(
-        backend,
-        json_out=quiet,
-        collection=collection,
-        library=library,
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
-    )
-    items, scope = loaded.items, loaded.label
-    if limit:
-        items = items[:limit]
+    scope = loaded.label
     if not quiet:
         console.print(f"Scope: [bold]{scope}[/] — linting {len(items)} items")
     with cli_mod._item_progress(json_out=quiet) as progress:

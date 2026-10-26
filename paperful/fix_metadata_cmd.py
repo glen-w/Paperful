@@ -36,44 +36,31 @@ def run_fix_metadata(
     from .metadata import apply_patches, collect_patches, write_patches
     from .pipeline import make_client
 
-    if cli_mod._scope_unset(collection, library, profile, run_config):
-        cli_mod._refuse_missing_scope()
-    cfg = cli_mod._cfg(config)
     json_out = cli_mod._agent_json(fmt)
-    bound = cli_mod._bind_run(
-        cfg,
-        use_apply=True,
-        profile=profile,
-        run_config=run_config,
+    scoped = cli_mod._bind_scoped(
         collection=collection,
         library=library,
+        profile=profile,
+        run_config=run_config,
+        config=config,
         year_from=year_from,
         year_to=year_to,
         item_type=item_type,
         limit=limit,
+        use_apply=True,
         apply=apply,
         overwrite=overwrite,
     )
-    collection, library, year_from, year_to, item_type = cli_mod._take_scope(bound)
-    limit = bound.limit
-    apply = bound.apply
-    overwrite = bound.overwrite
-    if not collection and not library:
-        cli_mod._refuse_missing_scope()
-    cli_mod._require_manager(cfg)
-    backend = cli_mod._connect(cfg, quiet=json_out)
+    cfg = scoped.cfg
+    apply = scoped.bound.apply
+    overwrite = scoped.bound.overwrite
+    limit = scoped.limit
+    backend, loaded, items = cli_mod._connect_scope(
+        scoped, quiet=json_out, json_out=json_out, require_manager=True, apply_limit=False
+    )
     manifest = Manifest(cfg.manifest_path)
     client = make_client(cfg)
-    loaded = cli_mod._load_scope(
-        backend,
-        json_out=json_out,
-        collection=collection,
-        library=library,
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
-    )
-    items, scope = loaded.items, loaded.label
+    scope = loaded.label
     scope_total = len(items)
     # When fix_metadata is called as a plain function (e.g. paperful all), Typer
     # defaults stay OptionInfo objects — coerce before slicing.
@@ -83,8 +70,8 @@ def run_fix_metadata(
         offset = 0
     if offset:
         items = items[offset:]
-    if limit:
-        items = items[:limit]
+    if scoped.limit:
+        items = items[: scoped.limit]
     checked = len(items)
     started = time.time()
     with cli_mod._item_progress(json_out=json_out) as progress:

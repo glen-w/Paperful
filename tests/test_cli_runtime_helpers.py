@@ -130,3 +130,89 @@ def test_offline_flag(monkeypatch):
     monkeypatch.delenv("PAPERFUL_OFFLINE", raising=False)
     assert cli_runtime._offline() is True
     cli_runtime._OFFLINE = False
+
+
+class _FakeBound:
+    collections = ["ocean"]
+    library = False
+    year_from = 2010
+    year_to = 2020
+    types = ["journalArticle"]
+    limit = 2
+    apply = False
+
+
+def test_bind_scoped_refuses_unset():
+    with pytest.raises(typer.Exit) as exc:
+        cli_runtime._bind_scoped(
+            collection=[],
+            library=None,
+            profile=None,
+            run_config=None,
+            config=None,
+        )
+    assert exc.value.exit_code == 1
+
+
+def test_bind_scoped_and_connect_scope(cfg, monkeypatch):
+    monkeypatch.setattr(cli_runtime, "_cfg", lambda path: cfg)
+    monkeypatch.setattr(cli_runtime, "_bind_run", lambda cfg, **k: _FakeBound())
+    scoped = cli_runtime._bind_scoped(
+        collection=["ocean"],
+        library=False,
+        profile=None,
+        run_config=None,
+        config=None,
+        year_from=2010,
+        year_to=2020,
+        item_type=["journalArticle"],
+        limit=2,
+    )
+    assert scoped.collection == ["ocean"]
+    assert scoped.limit == 2
+    assert scoped.cfg is cfg
+
+    class Loaded:
+        items = ["a", "b", "c"]
+        label = "ocean"
+
+    backend = object()
+    required: list[bool] = []
+
+    def _require(cfg):
+        required.append(True)
+
+    monkeypatch.setattr(cli_runtime, "_require_manager", _require)
+    monkeypatch.setattr(cli_runtime, "_connect", lambda cfg, quiet=False: backend)
+    monkeypatch.setattr(
+        cli_runtime, "_load_scope", lambda *a, **k: Loaded()
+    )
+    got, loaded, items = cli_runtime._connect_scope(
+        scoped, quiet=True, json_out=True, require_manager=True
+    )
+    assert required == [True]
+    assert got is backend
+    assert loaded.label == "ocean"
+    assert items == ["a", "b"]
+
+
+def test_bind_scoped_refuses_empty_after_bind(cfg, monkeypatch):
+    class Empty:
+        collections: list[str] = []
+        library = False
+        year_from = None
+        year_to = None
+        types: list[str] = []
+        limit = None
+
+    monkeypatch.setattr(cli_runtime, "_cfg", lambda path: cfg)
+    monkeypatch.setattr(cli_runtime, "_bind_run", lambda cfg, **k: Empty())
+    with pytest.raises(typer.Exit) as exc:
+        cli_runtime._bind_scoped(
+            collection=["ghost"],
+            library=False,
+            profile=None,
+            run_config=None,
+            config=None,
+        )
+    assert exc.value.exit_code == 1

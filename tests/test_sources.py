@@ -815,3 +815,77 @@ def test_core_finds_download_url(ctx_factory, cfg):
 
     cand = core.find(make_item(), ctx_factory(handler))
     assert cand.outcome is Outcome.FOUND and cand.url.endswith("x.pdf")
+
+
+def test_core_skipped_without_doi(ctx_factory, cfg):
+    cfg.core_api_key = "k"
+    cand = core.find(make_item(doi=""), ctx_factory(lambda r: httpx.Response(500)))
+    assert cand.outcome is Outcome.SKIPPED
+
+
+def test_core_empty_results_and_links(ctx_factory, cfg, monkeypatch):
+    cfg.core_api_key = "k"
+
+    def empty(_req):
+        return _json({"results": []})
+
+    cand = core.find(make_item(), ctx_factory(empty))
+    assert cand.outcome is Outcome.NOT_FOUND
+
+    def none_data(_req):
+        return httpx.Response(204)
+
+    # http_json None path is mocked via landing-less payload
+    def html_only(_req):
+        return _json(
+            {
+                "results": [
+                    {
+                        "downloadUrl": None,
+                        "links": [
+                            "skip-me",
+                            {"type": "html"},
+                            {
+                                "url": "https://ex.org/paper",
+                                "type": "fulltext",
+                            },
+                            {
+                                "url": "https://ex.org/a.pdf",
+                                "title": "PDF",
+                            },
+                        ],
+                    }
+                ]
+            }
+        )
+
+    cand = core.find(make_item(), ctx_factory(html_only))
+    assert cand.outcome is Outcome.FOUND
+    assert cand.url.endswith(".pdf")
+
+    def landings_only(_req):
+        return _json(
+            {
+                "results": [
+                    {
+                        "downloadUrl": None,
+                        "links": [{"href": "https://ex.org/abs", "type": "html"}],
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr(
+        "paperful.sources.core.resolve_landings",
+        lambda *_a, **_k: ["https://ex.org/via-landing.pdf"],
+    )
+    cand = core.find(make_item(), ctx_factory(landings_only))
+    assert cand.outcome is Outcome.FOUND
+    assert cand.note == "landing"
+
+    monkeypatch.setattr(
+        "paperful.sources.core.resolve_landings", lambda *_a, **_k: []
+    )
+    cand = core.find(make_item(), ctx_factory(landings_only))
+    assert cand.outcome is Outcome.NOT_FOUND
+    assert "no OA PDF" in (cand.note or "")

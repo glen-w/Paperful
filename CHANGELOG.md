@@ -6,8 +6,11 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.4.0 — 2026-10-26
+
 ### Changed
 
+- **CLI and workbench modules.** Command bodies live in `*_cmd.py`; `cli.py` is Typer flags. Workbench row builders split by desk (`wanted_rows`, `discover_rows`, `ask_rows`) with `pages.py` re-exports. Discover HTTP handlers are module-level `handle_*` functions.
 - **`paperful critique` prints phase progress.** Extract, checkers,
   cited-work DOI counts, overlap, each reviewer, and extras log elapsed
   seconds so a long `--llm` run is not silent. `--format json` keeps stdout

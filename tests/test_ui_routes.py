@@ -29,6 +29,18 @@ def test_shell_routes_resolve_doctor_and_collections_via_app():
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_discover_handlers_are_module_level():
+    from paperful.ui import discover_routes
+
+    assert callable(discover_routes.handle_page_discover)
+    assert callable(discover_routes.handle_discover_explore)
+    assert callable(discover_routes._discover_page)
+    src = inspect.getsource(discover_routes.register_discover)
+    assert "handle_page_discover(" in src
+    assert "def _discover_page(" not in src
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
 def test_mount_ui_has_no_inline_wanted_or_discover_routes():
     src = inspect.getsource(ui_app.mount_ui)
     assert '@app.get("/wanted"' not in src

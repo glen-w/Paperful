@@ -54,6 +54,17 @@ RUNTIME_CLIENTS = [
     "htmlpdf_cmd.py",
     "snapshot_cmd.py",
     "restore_cmd.py",
+    "rag_cmd.py",
+    "sections_cmd.py",
+    "twenty_cmd.py",
+    "ingest_cmd.py",
+    "sync_cmd.py",
+    "report_cmd.py",
+    "playbooks_cmd.py",
+    "profile_cmd.py",
+    "snowball_cmd.py",
+    "authorwatch_cmd.py",
+    "keepup_cmd.py",
 ]
 
 

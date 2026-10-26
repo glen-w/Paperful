@@ -37,32 +37,21 @@ def run_authors(
     )
     from .snowball.authors import pack_slug
 
-    if cli_mod._scope_unset(collection, library, profile, run_config):
-        cli_mod._refuse_missing_scope()
-    cfg = cli_mod._cfg(config)
     json_out = cli_mod._agent_json(fmt)
-    bound = cli_mod._bind_run(
-        cfg,
-        profile=profile,
-        run_config=run_config,
+    scoped = cli_mod._bind_scoped(
         collection=collection,
         library=library,
+        profile=profile,
+        run_config=run_config,
+        config=config,
         year_from=year_from,
         year_to=year_to,
         item_type=item_type,
     )
-    collection, library, year_from, year_to, item_type = cli_mod._take_scope(bound)
-    if not collection and not library:
-        cli_mod._refuse_missing_scope()
-    backend = cli_mod._connect(cfg, quiet=json_out)
-    loaded = cli_mod._load_scope(
-        backend,
-        collection=collection,
-        library=library,
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
-        json_out=json_out,
+    cfg = scoped.cfg
+    collection, library = scoped.collection, scoped.library
+    backend, loaded, _items = cli_mod._connect_scope(
+        scoped, quiet=json_out, json_out=json_out, apply_limit=False
     )
     report = harvest(loaded.items, min_count=min_count)
     slug = scope_slug(collection, library=library or not collection)

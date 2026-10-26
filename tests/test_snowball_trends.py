@@ -64,3 +64,68 @@ def test_snowball_trends_cli_json(tmp_path, monkeypatch):
     payload = json.loads(result.stdout)
     assert payload["summary"]["total"] == 5
     assert payload["summary"]["years"][0]["year"] == 2020
+
+
+def test_run_trends_error_and_empty_years(cfg, monkeypatch):
+    from paperful.snowball.command import SnowballError
+    from paperful.snowball.trends import TrendsReport, YearCount
+    from paperful.snowball.trends_cmd import run_trends
+
+    monkeypatch.setattr("paperful.cli_runtime._cfg", lambda _p: cfg)
+    monkeypatch.setattr("paperful.cli_runtime._agent_json", lambda _fmt: False)
+    printed = []
+    monkeypatch.setattr(
+        "paperful.cli_runtime._emit_agent",
+        lambda payload, json_out=False, human=None: printed.append(
+            (payload, human and human())
+        ),
+    )
+
+    def boom(*_a, **_k):
+        raise SnowballError("Pass a search query or --profile.")
+
+    monkeypatch.setattr("paperful.snowball.trends_cmd.trends_for_scope", boom)
+    run_trends(
+        console,
+        query=None,
+        profile=None,
+        year_from=None,
+        year_to=None,
+        config=None,
+        fmt="text",
+    )
+    assert printed[0][0]["summary"]["error"]
+
+    printed.clear()
+    monkeypatch.setattr(
+        "paperful.snowball.trends_cmd.trends_for_scope",
+        lambda *_a, **_k: TrendsReport(query="x", total=0, years=(), profile="p1"),
+    )
+    run_trends(
+        console,
+        query="x",
+        profile=None,
+        year_from=None,
+        year_to=None,
+        config=None,
+        fmt="text",
+    )
+    assert printed
+
+    printed.clear()
+    monkeypatch.setattr(
+        "paperful.snowball.trends_cmd.trends_for_scope",
+        lambda *_a, **_k: TrendsReport(
+            query="x", total=3, years=(YearCount(2024, 3),), profile=None
+        ),
+    )
+    run_trends(
+        console,
+        query="x",
+        profile=None,
+        year_from=None,
+        year_to=None,
+        config=None,
+        fmt="text",
+    )
+    assert printed

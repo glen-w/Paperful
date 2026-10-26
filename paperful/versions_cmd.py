@@ -41,43 +41,27 @@ def run_versions(
         write_pack,
     )
 
-    if cli_mod._scope_unset(collection, library, profile, run_config):
-        cli_mod._refuse_missing_scope()
-    cfg = cli_mod._cfg(config)
-    bound = cli_mod._bind_run(
-        cfg,
-        profile=profile,
-        run_config=run_config,
+    scoped = cli_mod._bind_scoped(
         collection=collection,
         library=library,
+        profile=profile,
+        run_config=run_config,
+        config=config,
         year_from=year_from,
         year_to=year_to,
         item_type=item_type,
         limit=limit,
         apply=apply,
     )
-    collection, library, year_from, year_to, item_type = cli_mod._take_scope(bound)
-    limit = bound.limit
-    apply = bound.apply
+    cfg = scoped.cfg
+    apply = scoped.bound.apply
     if dry_run and apply:
         console.print("[red]Pass either --dry-run or --apply, not both.[/]")
         raise typer.Exit(1)
-    if not collection and not library:
-        cli_mod._refuse_missing_scope()
-    cli_mod._require_manager(cfg)
-    backend = cli_mod._connect(cfg, quiet=as_json)
-    loaded = cli_mod._load_scope(
-        backend,
-        json_out=as_json,
-        collection=collection,
-        library=library,
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
+    backend, loaded, items = cli_mod._connect_scope(
+        scoped, quiet=as_json, json_out=as_json, require_manager=True
     )
-    items, scope = loaded.items, loaded.label
-    if limit:
-        items = items[:limit]
+    scope = loaded.label
     client = httpx.Client(follow_redirects=True, timeout=30)
     errors: list[str] = []
     try:

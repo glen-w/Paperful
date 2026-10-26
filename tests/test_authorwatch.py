@@ -763,7 +763,7 @@ def test_cli_accept_seed_from(cfg, monkeypatch):
         return R()
 
     monkeypatch.setattr("paperful.authorwatch.run_list", fake_run)
-    monkeypatch.setattr("paperful.cli._cfg", lambda _p=None: cfg)
+    monkeypatch.setattr("paperful.cli_runtime._cfg", lambda _p=None: cfg)
     result = runner.invoke(
         app,
         [

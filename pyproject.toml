@@ -1,6 +1,6 @@
 [project]
 name = "paperful"
-version = "1.3.1"
+version = "1.4.0"
 description = "Find missing PDFs for a Zotero library: clean records, summarise papers, keep a platform-agnostic mirror."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -127,7 +127,6 @@ omit = [
     # Workbench job bodies: exercised via ``paperful[serve]`` route tests.
     "paperful/ui/repair_jobs.py",
     "paperful/ui/discover_jobs.py",
-    "paperful/ui/discover_routes.py",
     "paperful/ui/wanted_jobs.py",
     "paperful/sources/author_site.py",
     "paperful/browser_agent.py",
