@@ -6,8 +6,19 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.5.0 — 2026-10-26
+
 ### Changed
 
+- **Workbench routes match Discover.** Index, Wanted, Shell, Repair, and
+  Critique HTTP bodies are module-level `handle_*` functions; each
+  `register_*` only binds FastAPI routes.
+- **Snowball internals (behavior-only).** `continue_deferred` dispatches
+  per-kind resume helpers. `_execute` splits preflight, dry-run/approve
+  exit, and create-and-fill.
+- **Critique checkers are a package.** `paperful.critique_checks` splits
+  structure, bibliography, floats/acronyms, style, and overlap. Imports of
+  `run_checks` stay the same. `paperful acronyms` lives in `acronyms_cmd.py`.
 - **Wanted excellence bolster.** Attach enables only for attachable ticks
   (DOI mismatches stay off the main button even when the reason field is
   empty). Never-run misses use `not_fetched` (“No PDF yet — not fetched”).

@@ -1,6 +1,6 @@
 # Releases and stability
 
-**1.4.0** is the current release (`pip install paperful` after this tag is published; optional extras
+**1.5.0** is the current release (`pip install paperful` after this tag is published; optional extras
 `[llm]`, `[rag]`, `[serve]`, `[browser-agent]`). **1.1.0** introduced PyPI and
 trusted publishing. After install, run `playwright install chromium` once for
 campus login and HTML PDF paths. The **operator** install tested in CI is still
@@ -31,7 +31,10 @@ be added. Required `paperful.run_report.v1` keys and imported-file attach
 (typed `attach_failed`, provenance note) are the contract. **1.1.1** shipped
 Wanted stop-ship hygiene (Grab scope, Attach at zero, copy). Everything after
 that is a buffet by area (Wanted excellence foundation shipped; residual polish).
-**1.4.0** ships the local manuscript critique pack (optional Vale / GROBID /
+**1.5.0** finishes the 1.4 module split: remaining workbench desks use
+module-level `handle_*`, snowball resume/`_execute` are extracted without
+behavior change, critique checkers are a package, and `acronyms` is a
+`*_cmd` module. **1.4.0** ships the local manuscript critique pack (optional Vale / GROBID /
 glossary), Ask `simple`/`advanced` modes, and a CLI/workbench module split
 (`*_cmd.py`, desk row builders, Discover `handle_*` routes). **1.3.1** hardens local-trust boundaries (PDF fetch SSRF checks, review-token
 sanitization, non-loopback `serve` gate, redacted witness digests; see

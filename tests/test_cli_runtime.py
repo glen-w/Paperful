@@ -28,6 +28,7 @@ RUNTIME_CLIENTS = [
     "reachout_cmd.py",
     "notes_delete_cmd.py",
     "authors_cmd.py",
+    "acronyms_cmd.py",
     "completeness_cmd.py",
     "ask_cmd.py",
     "authorwatch_suggest.py",

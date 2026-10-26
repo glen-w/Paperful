@@ -94,204 +94,227 @@ from .app import (
     _patch_section_assignment,
 )
 
+
+def _review_tokens_for(ui: UiContext, prefix: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for c in commands.list_commands(ui.cfg, limit=40):
+        verb = str(c.get("verb") or "")
+        token = str(c.get("review_token") or "")
+        if not token or not verb.startswith(prefix):
+            continue
+        short = verb[len(prefix) :]
+        if short and short not in out:
+            out[short] = token
+    return out
+
+
+def _repair_flags(form: Any) -> dict[str, Any]:
+    return {
+        "overwrite": form.get("overwrite") == "1",
+        "apply_medium": form.get("apply_medium") == "1",
+        "phase": str(form.get("phase") or "all"),
+        "fix_broken": form.get("fix_broken") == "1",
+        "merge_files": form.get("merge_files") == "1",
+        "rename": form.get("rename") == "1",
+        "link": form.get("link") == "1",
+        "attach": form.get("attach") == "1",
+    }
+
+
+def _mirror_flags(form: Any) -> dict[str, Any]:
+    pdfs = str(form.get("pdfs") or "").strip()
+    return {
+        "full": form.get("full") == "1",
+        "pdfs": pdfs,
+        "accept_gone": form.get("accept_gone") == "1",
+    }
+
+
+def handle_page_repair(
+    ui: UiContext, request: Request, run: str = "", error: str = ""
+) -> HTMLResponse:
+    run_rec = command_by_id(ui.cfg, run) if run else None
+    return ui.templates.TemplateResponse(
+        request,
+        "repair.html",
+        ui.ctx(
+            request,
+            "repair",
+            queues=repair_queues(ui.cfg),
+            tokens=_review_tokens_for(ui, "repair_"),
+            message="",
+            run_rec=run_rec,
+            poll_run=run,
+            error=error,
+        ),
+    )
+
+
+async def handle_repair_preview_route(
+    ui: UiContext, request: Request
+) -> RedirectResponse:
+    from .repair_mirror_jobs import GuiScopeError
+
+    prefs = prefs_from_request(request)
+    form = await request.form()
+    verb = str(form.get("verb") or "dedupe")
+    if verb not in {
+        "lint",
+        "screen",
+        "fix-metadata",
+        "dedupe",
+        "versions",
+        "attachments",
+        "ocr",
+    }:
+        return RedirectResponse(url="/repair?error=verb", status_code=303)
+    if not prefs.collection:
+        return RedirectResponse(url="/repair?error=collection", status_code=303)
+    overwrite = form.get("overwrite") == "1"
+    apply_medium = form.get("apply_medium") == "1"
+    surgery = {
+        "fix_broken": form.get("fix_broken") == "1",
+        "merge_files": form.get("merge_files") == "1",
+        "rename": form.get("rename") == "1",
+        "link": form.get("link") == "1",
+        "attach": form.get("attach") == "1",
+        "force_retry": form.get("force_retry") == "1",
+        "auto_ignore_failures": form.get("auto_ignore_failures") == "1",
+    }
+
+    def work(cmd_id: str) -> None:
+        try:
+            jobs.repair_preview(
+                ui.cfg,
+                cmd_id,
+                verb=verb,
+                collection=prefs.collection,
+                overwrite=overwrite,
+                apply_medium=apply_medium,
+                surgery=surgery,
+            )
+        except GuiScopeError as exc:
+            rec = commands.read_command(ui.cfg, cmd_id) or {}
+            rec["status"] = "failed"
+            rec["error"] = str(exc)
+            commands.write_command(ui.cfg, rec)
+            raise
+
+    cmd_id = commands.enqueue(ui.cfg, f"repair_{verb}", work)
+    return RedirectResponse(url=f"/repair?run={cmd_id}", status_code=303)
+
+
+async def handle_repair_apply_route(
+    ui: UiContext, request: Request
+) -> JSONResponse | RedirectResponse:
+    form = await request.form()
+    token = str(form.get("review_token") or "")
+    if not token:
+        return JSONResponse(
+            {"ok": False, "error": "missing review token"}, status_code=409
+        )
+    ok, msg = jobs.repair_apply(ui.cfg, token=token)
+    if not ok:
+        return JSONResponse({"ok": False, "error": msg}, status_code=409)
+    return RedirectResponse(url="/repair", status_code=303)
+
+
+def handle_page_mirror(
+    ui: UiContext, request: Request, run: str = "", error: str = ""
+) -> HTMLResponse:
+    run_rec = command_by_id(ui.cfg, run) if run else None
+    return ui.templates.TemplateResponse(
+        request,
+        "mirror.html",
+        ui.ctx(
+            request,
+            "mirror",
+            verbs=MIRROR_VERBS,
+            message="",
+            run_rec=run_rec,
+            poll_run=run,
+            error=error,
+        ),
+    )
+
+
+async def handle_mirror_preview_route(
+    ui: UiContext, request: Request
+) -> RedirectResponse:
+    from .repair_mirror_jobs import GuiScopeError
+
+    prefs = prefs_from_request(request)
+    form = await request.form()
+    verb = str(form.get("verb") or "sync")
+    if verb not in set(MIRROR_VERBS):
+        return RedirectResponse(url="/mirror?error=verb", status_code=303)
+    scoped = verb in {"snapshot", "restore"}
+    if scoped and not prefs.collection:
+        return RedirectResponse(url="/mirror?error=collection", status_code=303)
+    pdfs = str(form.get("pdfs") or "lazy")
+    accept_gone = form.get("accept_gone") == "1"
+
+    def work(cmd_id: str) -> None:
+        try:
+            jobs.mirror_preview(
+                ui.cfg,
+                cmd_id,
+                verb=verb,
+                collection=prefs.collection,
+                pdfs=pdfs,
+                accept_gone=accept_gone,
+            )
+        except GuiScopeError as exc:
+            rec = commands.read_command(ui.cfg, cmd_id) or {}
+            rec["status"] = "failed"
+            rec["error"] = str(exc)
+            commands.write_command(ui.cfg, rec)
+            raise
+
+    cmd_id = commands.enqueue(ui.cfg, f"mirror_{verb.replace(' ', '_')}", work)
+    return RedirectResponse(url=f"/mirror?run={cmd_id}", status_code=303)
+
+
+async def handle_mirror_apply_route(
+    ui: UiContext, request: Request
+) -> JSONResponse | RedirectResponse:
+    prefs = prefs_from_request(request)
+    form = await request.form()
+    verb = str(form.get("verb") or "")
+    token = str(form.get("review_token") or "")
+    if not token:
+        return JSONResponse(
+            {"ok": False, "error": "missing review token"}, status_code=409
+        )
+    ok, msg = jobs.mirror_apply(ui.cfg, token=token, collection=prefs.collection)
+    if not ok:
+        return JSONResponse({"ok": False, "error": msg}, status_code=409)
+    return RedirectResponse(url="/mirror", status_code=303)
+
+
 def register_repair(ui: UiContext) -> None:
     app = ui.app
-    cfg = ui.cfg
-    templates = ui.templates
-    ctx = ui.ctx
-    _page_url = ui.page_url
-    _after_job = ui.after_job
-    _optional_int = ui.optional_int
-    _upload_bytes = ui.upload_bytes
-    _resolved_prompt = ui.resolved_prompt
-    _save_prompt_if_asked = ui.save_prompt_if_asked
-    _parse_dest = ui.parse_dest
-    _remember_doctor = ui.remember_doctor
-    _cached_doctor = ui.cached_doctor
-
-    def _review_tokens_for(prefix: str) -> dict[str, str]:
-        out: dict[str, str] = {}
-        for c in commands.list_commands(cfg, limit=40):
-            verb = str(c.get("verb") or "")
-            token = str(c.get("review_token") or "")
-            if not token or not verb.startswith(prefix):
-                continue
-            short = verb[len(prefix) :]
-            if short and short not in out:
-                out[short] = token
-        return out
-
-
-    def _repair_flags(form: Any) -> dict[str, Any]:
-        return {
-            "overwrite": form.get("overwrite") == "1",
-            "apply_medium": form.get("apply_medium") == "1",
-            "phase": str(form.get("phase") or "all"),
-            "fix_broken": form.get("fix_broken") == "1",
-            "merge_files": form.get("merge_files") == "1",
-            "rename": form.get("rename") == "1",
-            "link": form.get("link") == "1",
-            "attach": form.get("attach") == "1",
-        }
-
-
-    def _mirror_flags(form: Any) -> dict[str, Any]:
-        pdfs = str(form.get("pdfs") or "").strip()
-        return {
-            "full": form.get("full") == "1",
-            "pdfs": pdfs,
-            "accept_gone": form.get("accept_gone") == "1",
-        }
-
 
     @app.get("/repair", response_class=HTMLResponse)
     def page_repair(request: Request, run: str = "", error: str = "") -> HTMLResponse:
-        run_rec = command_by_id(cfg, run) if run else None
-        return templates.TemplateResponse(
-            request,
-            "repair.html",
-            ctx(
-                request,
-                "repair",
-                queues=repair_queues(cfg),
-                tokens=_review_tokens_for("repair_"),
-                message="",
-                run_rec=run_rec,
-                poll_run=run,
-                error=error,
-            ),
-        )
-
+        return handle_page_repair(ui, request=request, run=run, error=error)
 
     @app.post("/repair/preview")
     async def repair_preview_route(request: Request) -> RedirectResponse:
-        from .repair_mirror_jobs import GuiScopeError
-
-        prefs = prefs_from_request(request)
-        form = await request.form()
-        verb = str(form.get("verb") or "dedupe")
-        if verb not in {
-            "lint",
-            "screen",
-            "fix-metadata",
-            "dedupe",
-            "versions",
-            "attachments",
-            "ocr",
-        }:
-            return RedirectResponse(url="/repair?error=verb", status_code=303)
-        if not prefs.collection:
-            return RedirectResponse(url="/repair?error=collection", status_code=303)
-        overwrite = form.get("overwrite") == "1"
-        apply_medium = form.get("apply_medium") == "1"
-        surgery = {
-            "fix_broken": form.get("fix_broken") == "1",
-            "merge_files": form.get("merge_files") == "1",
-            "rename": form.get("rename") == "1",
-            "link": form.get("link") == "1",
-            "attach": form.get("attach") == "1",
-            "force_retry": form.get("force_retry") == "1",
-            "auto_ignore_failures": form.get("auto_ignore_failures") == "1",
-        }
-
-        def work(cmd_id: str) -> None:
-            try:
-                jobs.repair_preview(
-                    cfg,
-                    cmd_id,
-                    verb=verb,
-                    collection=prefs.collection,
-                    overwrite=overwrite,
-                    apply_medium=apply_medium,
-                    surgery=surgery,
-                )
-            except GuiScopeError as exc:
-                rec = commands.read_command(cfg, cmd_id) or {}
-                rec["status"] = "failed"
-                rec["error"] = str(exc)
-                commands.write_command(cfg, rec)
-                raise
-
-        cmd_id = commands.enqueue(cfg, f"repair_{verb}", work)
-        return RedirectResponse(url=f"/repair?run={cmd_id}", status_code=303)
-
+        return await handle_repair_preview_route(ui, request=request)
 
     @app.post("/repair/apply", response_model=None)
     async def repair_apply_route(request: Request) -> JSONResponse | RedirectResponse:
-        form = await request.form()
-        token = str(form.get("review_token") or "")
-        if not token:
-            return JSONResponse({"ok": False, "error": "missing review token"}, status_code=409)
-        ok, msg = jobs.repair_apply(cfg, token=token)
-        if not ok:
-            return JSONResponse({"ok": False, "error": msg}, status_code=409)
-        return RedirectResponse(url="/repair", status_code=303)
-
+        return await handle_repair_apply_route(ui, request=request)
 
     @app.get("/mirror", response_class=HTMLResponse)
     def page_mirror(request: Request, run: str = "", error: str = "") -> HTMLResponse:
-        run_rec = command_by_id(cfg, run) if run else None
-        return templates.TemplateResponse(
-            request,
-            "mirror.html",
-            ctx(
-                request,
-                "mirror",
-                verbs=MIRROR_VERBS,
-                message="",
-                run_rec=run_rec,
-                poll_run=run,
-                error=error,
-            ),
-        )
-
+        return handle_page_mirror(ui, request=request, run=run, error=error)
 
     @app.post("/mirror/preview")
     async def mirror_preview_route(request: Request) -> RedirectResponse:
-        from .repair_mirror_jobs import GuiScopeError
-
-        prefs = prefs_from_request(request)
-        form = await request.form()
-        verb = str(form.get("verb") or "sync")
-        if verb not in set(MIRROR_VERBS):
-            return RedirectResponse(url="/mirror?error=verb", status_code=303)
-        scoped = verb in {"snapshot", "restore"}
-        if scoped and not prefs.collection:
-            return RedirectResponse(url="/mirror?error=collection", status_code=303)
-        pdfs = str(form.get("pdfs") or "lazy")
-        accept_gone = form.get("accept_gone") == "1"
-
-        def work(cmd_id: str) -> None:
-            try:
-                jobs.mirror_preview(
-                    cfg,
-                    cmd_id,
-                    verb=verb,
-                    collection=prefs.collection,
-                    pdfs=pdfs,
-                    accept_gone=accept_gone,
-                )
-            except GuiScopeError as exc:
-                rec = commands.read_command(cfg, cmd_id) or {}
-                rec["status"] = "failed"
-                rec["error"] = str(exc)
-                commands.write_command(cfg, rec)
-                raise
-
-        cmd_id = commands.enqueue(cfg, f"mirror_{verb.replace(' ', '_')}", work)
-        return RedirectResponse(url=f"/mirror?run={cmd_id}", status_code=303)
-
+        return await handle_mirror_preview_route(ui, request=request)
 
     @app.post("/mirror/apply", response_model=None)
     async def mirror_apply_route(request: Request) -> JSONResponse | RedirectResponse:
-        prefs = prefs_from_request(request)
-        form = await request.form()
-        verb = str(form.get("verb") or "")
-        token = str(form.get("review_token") or "")
-        if not token:
-            return JSONResponse({"ok": False, "error": "missing review token"}, status_code=409)
-        ok, msg = jobs.mirror_apply(cfg, token=token, collection=prefs.collection)
-        if not ok:
-            return JSONResponse({"ok": False, "error": msg}, status_code=409)
-        return RedirectResponse(url="/mirror", status_code=303)
-
+        return await handle_mirror_apply_route(ui, request=request)

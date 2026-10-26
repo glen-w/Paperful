@@ -195,3 +195,39 @@ def test_unknown_kind_is_a_no_op():
     client = _client(lambda path, params: {"results": []})
     assert continue_deferred(client, _deferred("mystery", ["W1"])) == []
     assert client.deferred is None
+
+
+def test_continue_deferred_dispatches_resume_helpers():
+    import inspect
+
+    from paperful.snowball import crawl
+
+    src = inspect.getsource(crawl.continue_deferred)
+    for name in (
+        "_resume_similar",
+        "_resume_keywords",
+        "_resume_cites",
+        "_resume_refs",
+        "_resume_author",
+        "_resume_search",
+        "_resume_seeds",
+    ):
+        assert callable(getattr(crawl, name))
+        assert f"{name}(" in src
+        assert f"def {name}(" not in src
+
+
+def test_execute_uses_phase_helpers():
+    import inspect
+
+    from paperful.snowball import command
+
+    src = inspect.getsource(command._execute)
+    for name in (
+        "_execute_preflight",
+        "_execute_gate_exit",
+        "_execute_create_and_fill",
+    ):
+        assert callable(getattr(command, name))
+        assert f"{name}(" in src
+        assert f"def {name}(" not in src

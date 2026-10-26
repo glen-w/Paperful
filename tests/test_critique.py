@@ -37,6 +37,7 @@ def _no_live_binoculars(monkeypatch):
     """Keep the default suite offline even if the optional extra is installed."""
     monkeypatch.setattr("paperful.critique_ai_model.run_ai_model", lambda _t: None)
 
+
 MANUSCRIPT = """
 Abstract
 We report a 47.2 percent increase in yield under the ABC protocol.
@@ -144,7 +145,9 @@ def test_extract_plain_html_rtf_office(tmp_path: Path):
 
 def test_stage_file_sanitizes_name(cfg, tmp_path: Path):
     src = tmp_path / "draft.md"
-    src.write_text("Hello paragraph with enough letters to pass the extract minimum." * 2)
+    src.write_text(
+        "Hello paragraph with enough letters to pass the extract minimum." * 2
+    )
     dest = stage_file(cfg, src, name="../escape.md")
     uploads = (cfg.state_dir / "critiques" / "uploads").resolve()
     dest.resolve().relative_to(uploads)
@@ -157,9 +160,7 @@ def test_build_critique_emits_status(cfg, tmp_path: Path, monkeypatch):
     src = tmp_path / "draft.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
     seen: list[str] = []
-    pack = build_critique(
-        cfg, file_path=src, offline=True, on_status=seen.append
-    )
+    pack = build_critique(cfg, file_path=src, offline=True, on_status=seen.append)
     joined = "\n".join(seen)
     assert "Extracting" in joined
     assert "Extracted" in joined
@@ -202,7 +203,11 @@ def test_pack_keys_and_lanes_offline(cfg, tmp_path: Path, monkeypatch):
     assert pack["metrics"]["readability"]["word_count"] is not None
     suggested = [f for f in pack["findings"] if f["lane"] == "suggested"]
     assert suggested
-    assert {f["code"] for f in suggested} <= {"ai_tells_abstain", "ai_tell", "ai_tell_summary"}
+    assert {f["code"] for f in suggested} <= {
+        "ai_tells_abstain",
+        "ai_tell",
+        "ai_tell_summary",
+    }
 
 
 def test_dismiss_persists_and_hides_from_markdown(cfg, tmp_path: Path):
@@ -246,9 +251,7 @@ def test_apply_note_uses_critique_tag(cfg):
 
 
 def test_ngram_overlap_true_and_false_positive(cfg):
-    distinctive = (
-        "unique tungsten carbide coating survived the salt spray chamber overnight without peeling"
-    )
+    distinctive = "unique tungsten carbide coating survived the salt spray chamber overnight without peeling"
     boilerplate = (
         "the authors declare that they have no conflict of interest whatsoever"
     )
@@ -279,9 +282,7 @@ def test_ngram_overlap_true_and_false_positive(cfg):
 def test_overlap_checker_against_rag_text_cache(cfg, tmp_path: Path):
     from paperful.store import write_json
 
-    distinctive = (
-        "unique tungsten carbide coating survived the salt spray chamber overnight without peeling"
-    )
+    distinctive = "unique tungsten carbide coating survived the salt spray chamber overnight without peeling"
     text_dir = cfg.rag_dir / "text"
     text_dir.mkdir(parents=True)
     write_json(
@@ -313,9 +314,7 @@ def test_overlap_checker_against_rag_text_cache(cfg, tmp_path: Path):
 def test_overlap_uses_rag_text_without_scope_items(cfg, tmp_path: Path):
     from paperful.store import write_json
 
-    distinctive = (
-        "unique tungsten carbide coating survived the salt spray chamber overnight without peeling"
-    )
+    distinctive = "unique tungsten carbide coating survived the salt spray chamber overnight without peeling"
     text_dir = cfg.rag_dir / "text"
     text_dir.mkdir(parents=True)
     write_json(
@@ -420,7 +419,15 @@ def test_cli_file_xor_and_json(cfg, tmp_path, monkeypatch):
     monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
     both = runner.invoke(
         app,
-        ["critique", "--item", "ABCD1234", "--file", str(src), "--config", str(cfg_path)],
+        [
+            "critique",
+            "--item",
+            "ABCD1234",
+            "--file",
+            str(src),
+            "--config",
+            str(cfg_path),
+        ],
     )
     assert both.exit_code == 1
     none = runner.invoke(app, ["critique", "--config", str(cfg_path)])
@@ -535,8 +542,8 @@ def test_cli_unknown_reviewer_skips_llm_lane(cfg, tmp_path, monkeypatch):
     cfg_path = tmp_path / "config.toml"
     cfg_path.write_text(
         f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
-        "[llm]\nenabled = true\nmodel = \"stub\"\n"
-        "[[critique.reviewers]]\nid = \"general\"\n"
+        '[llm]\nenabled = true\nmodel = "stub"\n'
+        '[[critique.reviewers]]\nid = "general"\n'
     )
     src = tmp_path / "draft.md"
     src.write_text(
@@ -655,9 +662,7 @@ def test_run_critique_apply_item_note(cfg, tmp_path, monkeypatch):
 
     backend = Backend()
 
-    monkeypatch.setattr(
-        "paperful.cli_runtime._cfg", lambda _p: cfg
-    )
+    monkeypatch.setattr("paperful.cli_runtime._cfg", lambda _p: cfg)
     monkeypatch.setattr("paperful.cli_runtime._agent_json", lambda fmt: False)
     monkeypatch.setattr("paperful.cli_runtime._offline", lambda: True)
     monkeypatch.setattr("paperful.cli_runtime._require_manager", lambda _cfg: None)
@@ -667,9 +672,7 @@ def test_run_critique_apply_item_note(cfg, tmp_path, monkeypatch):
         lambda *a, **k: ItemScope(items=[item], label="Col", keys=None),
     )
     monkeypatch.setattr("paperful.cli_runtime._flush", lambda _b: None)
-    monkeypatch.setattr(
-        "paperful.lint.resolve_pdf_path", lambda *a, **k: src
-    )
+    monkeypatch.setattr("paperful.lint.resolve_pdf_path", lambda *a, **k: src)
     monkeypatch.setattr(
         "paperful.critique.extract_path",
         lambda _p: __import__(
@@ -726,7 +729,11 @@ _PAD = (
 
 
 def test_readability_and_lexical_metrics_on_known_text():
-    from paperful.critique_metrics import MIN_MTLD_TOKENS, compute_lexical_diversity, compute_readability
+    from paperful.critique_metrics import (
+        MIN_MTLD_TOKENS,
+        compute_lexical_diversity,
+        compute_readability,
+    )
 
     text = "The cat sat on the mat. The dog ran in the park. " * 8
     read = compute_readability(text)
@@ -1074,7 +1081,9 @@ def test_cli_config_vale_ors_without_flag(cfg, tmp_path, monkeypatch):
 
 def test_vale_sibling_ini_and_min_alert_level(cfg, tmp_path: Path, monkeypatch):
     cfg.config_path = tmp_path / "config.toml"
-    (tmp_path / ".vale.ini").write_text("MinAlertLevel = suggestion\n", encoding="utf-8")
+    (tmp_path / ".vale.ini").write_text(
+        "MinAlertLevel = suggestion\n", encoding="utf-8"
+    )
     cfg.critique_vale_min_alert_level = "warning"
     seen: list[list[str]] = []
 
@@ -1150,7 +1159,9 @@ def test_vale_warning_maps_to_warn(cfg, tmp_path: Path, monkeypatch):
     row = next(f for f in pack["findings"] if f["code"] == "vale_house_passive")
     assert row["severity"] == "warn"
     assert row["lane"] == "checked"
-    assert "major" not in {f["severity"] for f in pack["findings"] if f.get("source") == "vale"}
+    assert "major" not in {
+        f["severity"] for f in pack["findings"] if f.get("source") == "vale"
+    }
 
 
 def test_default_critique_does_not_import_torch(cfg, tmp_path: Path):
@@ -1181,7 +1192,9 @@ def test_unicode_zero_width_is_suggested_tell(cfg, tmp_path: Path):
     pack = build_critique(cfg, file_path=path, offline=True)
     flags = pack["metrics"]["ai_tells"]["unicode_flags"]
     assert any(str(f).startswith("zero_width:") for f in flags)
-    rows = [f for f in pack["findings"] if f["code"] == "ai_tell" and f["loc"] == "unicode"]
+    rows = [
+        f for f in pack["findings"] if f["code"] == "ai_tell" and f["loc"] == "unicode"
+    ]
     assert rows
     assert all(f["lane"] == "suggested" and f["severity"] == "info" for f in rows)
     md = Path(pack["pack_dir"], "pack.md").read_text(encoding="utf-8")
@@ -1236,7 +1249,9 @@ def test_two_reviewers_write_separate_notes(cfg, tmp_path: Path, monkeypatch):
 
 def test_reviewer_prompt_file_and_id_filter(cfg, tmp_path: Path, monkeypatch):
     prompt = tmp_path / "methods.md"
-    prompt.write_text("You are a methods reviewer. No accept/reject.\n", encoding="utf-8")
+    prompt.write_text(
+        "You are a methods reviewer. No accept/reject.\n", encoding="utf-8"
+    )
     cfg.critique_reviewers = (
         CritiqueReviewer(id="general", model="", prompt="default"),
         CritiqueReviewer(id="methods", model="", prompt=str(prompt)),
@@ -1293,7 +1308,9 @@ def test_missing_reviewer_prompt_skips(cfg, tmp_path: Path, monkeypatch):
 
 
 def test_unknown_reviewer_id_skips(cfg, tmp_path: Path):
-    cfg.critique_reviewers = (CritiqueReviewer(id="general", model="", prompt="default"),)
+    cfg.critique_reviewers = (
+        CritiqueReviewer(id="general", model="", prompt="default"),
+    )
     path = tmp_path / "noid.txt"
     path.write_text(_PAD * 4, encoding="utf-8")
     pack = build_critique(
@@ -1315,7 +1332,8 @@ def test_cited_withdrawn_and_eoc_are_warn(cfg, tmp_path: Path, monkeypatch):
         cfg, "10.1000/e", {"codes": ["expression_of_concern"], "fetched_at": 1.0}
     )
     monkeypatch.setattr(
-        "paperful.critique_checks._crossref_work", lambda *_a, **_k: (None, set(), False)
+        "paperful.critique_checks.biblio._crossref_work",
+        lambda *_a, **_k: (None, set(), False),
     )
     path = tmp_path / "status.md"
     path.write_text(
@@ -1614,9 +1632,7 @@ def test_advanced_grobid_chunks_then_extract_fallback(cfg, tmp_path, monkeypatch
         ], ""
 
     monkeypatch.setattr("paperful.critique_marg.grobid_markdown", fake_md)
-    chunks, meta = paper_chunks(
-        cfg, doc, use_grobid=True, pdf_path=pdf, item_key=""
-    )
+    chunks, meta = paper_chunks(cfg, doc, use_grobid=True, pdf_path=pdf, item_key="")
     assert meta["parser"] == "grobid"
     assert chunks
     assert any("Methods" in c.text or c.heading == "Methods" for c in chunks)
@@ -1624,9 +1640,7 @@ def test_advanced_grobid_chunks_then_extract_fallback(cfg, tmp_path, monkeypatch
     monkeypatch.setattr(
         "paperful.critique_marg.grobid_markdown", lambda *_a, **_k: (None, "scan")
     )
-    chunks2, meta2 = paper_chunks(
-        cfg, doc, use_grobid=True, pdf_path=pdf, item_key=""
-    )
+    chunks2, meta2 = paper_chunks(cfg, doc, use_grobid=True, pdf_path=pdf, item_key="")
     assert meta2["parser"] == "extract"
     assert meta2["grobid_skipped"] == "scan"
     assert chunks2
@@ -1638,7 +1652,7 @@ def test_cli_advanced_flag_runs_marg(cfg, tmp_path, monkeypatch):
     cfg_path = tmp_path / "config.toml"
     cfg_path.write_text(
         f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
-        "[llm]\nenabled = true\nmodel = \"stub\"\n"
+        '[llm]\nenabled = true\nmodel = "stub"\n'
     )
     src = tmp_path / "draft.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")

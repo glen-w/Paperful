@@ -21,7 +21,13 @@ from ..library import LibraryError
 from ..identity import library_lookup, merge_tags
 from ..resolve import doi_key, normalize_doi
 from .candidate import Candidate
-from .crawl import NoKeywordSeeds, doi_candidates, hybrid_candidates, orcid_candidates, search_candidates
+from .crawl import (
+    NoKeywordSeeds,
+    doi_candidates,
+    hybrid_candidates,
+    orcid_candidates,
+    search_candidates,
+)
 from .expand import (
     DEFAULT_DIRECTION,
     apply_filters,
@@ -50,13 +56,22 @@ from .rank import FORMULA, apply_overlap
 from .refine import llm_suggester, suggestions_for
 
 Lookup = Callable[[str | None, str | None], str | None]
+
+
 def get_backend(cfg: Config) -> Any:
     """The library as snowball reads it: the mirror, refreshed when the manager answers."""
     return open_library(cfg)
 
 
 Decider = Callable[[Candidate], bool]
-KNOWN_BACKENDS = ("openalex", "crossref", "semanticscholar", "orcid", "europepmc", "pdf")
+KNOWN_BACKENDS = (
+    "openalex",
+    "crossref",
+    "semanticscholar",
+    "orcid",
+    "europepmc",
+    "pdf",
+)
 
 
 def _openalex_client(cfg: Config, **kwargs: Any) -> OpenAlexClient:
@@ -238,9 +253,15 @@ def run_hybrid(
     keywords = _keyword_caps(cfg, request)
     cites_query = _checked_cites_query(request, direction, expands=True)
     _arm_stop(cfg, request, 1)
-    seeds = request.hybrid_seeds if request.hybrid_seeds is not None else cfg.snowball_hybrid_seeds
+    seeds = (
+        request.hybrid_seeds
+        if request.hybrid_seeds is not None
+        else cfg.snowball_hybrid_seeds
+    )
 
-    def crawl(oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int, str]) -> tuple[list[Candidate], list[str]]:
+    def crawl(
+        oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int, str]
+    ) -> tuple[list[Candidate], list[str]]:
         return hybrid_candidates(
             oa,
             text,
@@ -307,7 +328,9 @@ def run_doi(
     if not cleaned:
         raise SnowballError("Pass at least one DOI.")
 
-    def crawl(oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int, str]) -> tuple[list[Candidate], list[str]]:
+    def crawl(
+        oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int, str]
+    ) -> tuple[list[Candidate], list[str]]:
         return doi_candidates(
             oa,
             cleaned,
@@ -390,7 +413,9 @@ def run_orcid(
     else:
         console.print("[yellow]orcid backend off; using OpenAlex author filter only[/]")
 
-    def crawl(oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int, str]) -> tuple[list[Candidate], list[str]]:
+    def crawl(
+        oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int, str]
+    ) -> tuple[list[Candidate], list[str]]:
         return orcid_candidates(
             oa,
             cleaned,
@@ -453,12 +478,16 @@ def run_collection(
         keys = lib.subtree_keys(root)
         items = lib.items_in_scope(keys)
     except Exception as exc:
-        raise SnowballError(f"Could not read collection {seed_collection!r}: {exc}") from exc
+        raise SnowballError(
+            f"Could not read collection {seed_collection!r}: {exc}"
+        ) from exc
     dois = sorted({item.doi for item in items if item.doi})
     if not dois:
         raise SnowballError(f"No DOIs in collection {seed_collection!r}.")
 
-    def crawl(oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int, str]) -> tuple[list[Candidate], list[str]]:
+    def crawl(
+        oa: OpenAlexClient, run_id: str, gate: str, caps: tuple[int, int, str]
+    ) -> tuple[list[Candidate], list[str]]:
         return doi_candidates(
             oa,
             dois,
@@ -513,7 +542,11 @@ def _open_stop(
             seed = dict(row.seed)
             break
     types = cfg.snowball_types if request.types is None else request.types
-    study = cfg.snowball_study_designs if request.study_designs is None else request.study_designs
+    study = (
+        cfg.snowball_study_designs
+        if request.study_designs is None
+        else request.study_designs
+    )
     state = {
         "schema": SCHEMA,
         "rule": params.rule,
@@ -522,7 +555,9 @@ def _open_stop(
         "tau": params.tau,
         "min_points": params.min_points,
         "max_screened": params.max_screened,
-        "depth_ceiling": request.depth_ceiling if request.depth_ceiling is not None else 0,
+        "depth_ceiling": request.depth_ceiling
+        if request.depth_ceiling is not None
+        else 0,
         "iteration": 1,
         "awaiting_labels": True,
         "history": [],
@@ -545,14 +580,24 @@ def _open_stop(
             "seed": seed,
             "types": list(types or ()),
             "study_designs": list(study or ()),
-            "oa_only": cfg.snowball_oa_only if request.oa_only is None else request.oa_only,
+            "oa_only": cfg.snowball_oa_only
+            if request.oa_only is None
+            else request.oa_only,
             "venue_include": list(
-                cfg.snowball_venue_include if request.venue_include is None else request.venue_include
+                cfg.snowball_venue_include
+                if request.venue_include is None
+                else request.venue_include
             ),
             "venue_exclude": list(
-                cfg.snowball_venue_exclude if request.venue_exclude is None else request.venue_exclude
+                cfg.snowball_venue_exclude
+                if request.venue_exclude is None
+                else request.venue_exclude
             ),
-            "languages": list(cfg.snowball_languages if request.languages is None else request.languages),
+            "languages": list(
+                cfg.snowball_languages
+                if request.languages is None
+                else request.languages
+            ),
         },
     }
     write_state(dest / "stop.json", state)
@@ -586,7 +631,9 @@ def run_continue(
 ) -> PathResult:
     """Score Keep/Skip on the open hop, then expand one more hop unless a rule fires."""
     if not cfg.snowball_enabled:
-        raise SnowballError("Snowball is off. Set [snowball] enabled = true in config.toml.")
+        raise SnowballError(
+            "Snowball is off. Set [snowball] enabled = true in config.toml."
+        )
     from .crawl import _dedupe, _expand_hops, _remember_cites_query, _remember_keywords
     from .openalex import short_id
     from .stop import (
@@ -602,7 +649,9 @@ def run_continue(
     dest = cfg.state_dir / "snowball" / run_id
     state = load_state(dest / "stop.json")
     if state is None:
-        raise SnowballError(f"Run {run_id} has no stopping rule. It was a one-shot crawl.")
+        raise SnowballError(
+            f"Run {run_id} has no stopping rule. It was a one-shot crawl."
+        )
     if state.get("stopped_by"):
         console.print(str(state.get("rationale") or state["stopped_by"]))
         return PathResult(dest, 0, summary=state)
@@ -640,7 +689,9 @@ def run_continue(
         if isinstance(item, dict)
     ]
     included = sum(1 for row in batch if row.keep is True)
-    history.append(IterationStat(iteration=iteration, screened=len(batch), included=included))
+    history.append(
+        IterationStat(iteration=iteration, screened=len(batch), included=included)
+    )
     kept = [
         row
         for row in batch
@@ -675,7 +726,11 @@ def run_continue(
     )
     append_decisions(dest / "stops.jsonl", iteration, decisions)
     state["history"] = [
-        {"iteration": item.iteration, "screened": item.screened, "included": item.included}
+        {
+            "iteration": item.iteration,
+            "screened": item.screened,
+            "included": item.included,
+        }
         for item in history
     ]
     chosen = terminating(decisions, params.rule)
@@ -684,10 +739,18 @@ def run_continue(
         state["rationale"] = chosen.rationale
         state["awaiting_labels"] = False
         write_state(dest / "stop.json", state)
-        write_queue(cfg.state_dir, run_id, rows, client or _openalex_client(cfg), library_unread=False)
+        write_queue(
+            cfg.state_dir,
+            run_id,
+            rows,
+            client or _openalex_client(cfg),
+            library_unread=False,
+        )
         _touch_stop_summary(dest, state)
         console.print(chosen.rationale)
-        return PathResult(dest, 0, summary={"stopped_by": chosen.rule, "rationale": chosen.rationale})
+        return PathResult(
+            dest, 0, summary={"stopped_by": chosen.rule, "rationale": chosen.rationale}
+        )
 
     oa = client or _openalex_client(cfg, sleep_s=0.0 if client else 0.15)
     _remember_keywords(
@@ -769,7 +832,9 @@ def run_continue(
     write_queue(cfg.state_dir, run_id, merged, oa, library_unread=False)
     _touch_stop_summary(dest, state)
     if oa.deferred:
-        console.print(f"[yellow]Partial hop kept[/] · paperful snowball resume {run_id}")
+        console.print(
+            f"[yellow]Partial hop kept[/] · paperful snowball resume {run_id}"
+        )
         return PathResult(dest, EXIT_PARTIAL, summary=state)
     if state.get("stopped_by"):
         console.print(str(state["rationale"]))
@@ -792,7 +857,9 @@ def run_resume(
 ) -> PathResult:
     """Continue a crawl that stopped because the OpenAlex daily budget was spent."""
     if not cfg.snowball_enabled:
-        raise SnowballError("Snowball is off. Set [snowball] enabled = true in config.toml.")
+        raise SnowballError(
+            "Snowball is off. Set [snowball] enabled = true in config.toml."
+        )
     import json
     from datetime import datetime, timezone
 
@@ -803,19 +870,32 @@ def run_resume(
     if not path.is_file():
         if not (dest / "candidates.jsonl").is_file():
             raise SnowballError(f"No snowball queue for run {run_id!r}.")
-        return _resume_saved_queue(cfg, run_id, request, console=console, backend=backend)
+        return _resume_saved_queue(
+            cfg, run_id, request, console=console, backend=backend
+        )
     deferred = json.loads(path.read_text(encoding="utf-8"))
     reset_at = deferred.get("reset_at")
     if isinstance(reset_at, str) and reset_at:
         when = datetime.fromisoformat(reset_at)
         if when.tzinfo is None:
             when = when.replace(tzinfo=timezone.utc)
-        key_ready = bool((client.api_key if client is not None else "") or os.environ.get("OPENALEX_API_KEY"))
-        if when > datetime.now(timezone.utc) and (deferred.get("keyed") or not key_ready):
+        key_ready = bool(
+            (client.api_key if client is not None else "")
+            or os.environ.get("OPENALEX_API_KEY")
+        )
+        if when > datetime.now(timezone.utc) and (
+            deferred.get("keyed") or not key_ready
+        ):
             if deferred.get("keyed"):
-                console.print(f"[yellow]OpenAlex budget still spent[/] · resume after {reset_at}")
+                console.print(
+                    f"[yellow]OpenAlex budget still spent[/] · resume after {reset_at}"
+                )
             else:
-                console.print("[yellow]" + keyless_limit_message(has_key=False, reset_at=reset_at) + "[/]")
+                console.print(
+                    "[yellow]"
+                    + keyless_limit_message(has_key=False, reset_at=reset_at)
+                    + "[/]"
+                )
             return PathResult(dest, 1)
     try:
         _, rows = load_queue(cfg.state_dir, run_id)
@@ -838,8 +918,12 @@ def run_resume(
             live=client is None,
             crossref_getter=None,
             s2_getter=None,
-            per_hop_limit=int(deferred.get("per_hop_limit") or cfg.snowball_per_hop_limit),
-            direction=str(deferred.get("direction") or request.direction or DEFAULT_DIRECTION),
+            per_hop_limit=int(
+                deferred.get("per_hop_limit") or cfg.snowball_per_hop_limit
+            ),
+            direction=str(
+                deferred.get("direction") or request.direction or DEFAULT_DIRECTION
+            ),
             tally=tally,
             expand_neighbors=bool(deferred.get("expand_neighbors", True)),
         )
@@ -948,7 +1032,9 @@ def _resume_saved_queue(
     try:
         lib = lib or get_backend(cfg)
     except Exception as exc:
-        raise SnowballError(f"Library was not read. Refusing to create items. {exc}") from exc
+        raise SnowballError(
+            f"Library was not read. Refusing to create items. {exc}"
+        ) from exc
     lookup = _library_lookup(
         lib, scope=_apply_fingerprint_scope(request), collection=request.collection
     )
@@ -991,10 +1077,14 @@ def run_apply(
 ) -> PathResult:
     """Create ``keep=true`` rows from a prior approve-batch (or edited) queue."""
     if not cfg.snowball_enabled:
-        raise SnowballError("Snowball is off. Set [snowball] enabled = true in config.toml.")
+        raise SnowballError(
+            "Snowball is off. Set [snowball] enabled = true in config.toml."
+        )
     collection = request.collection.strip()
     if not collection:
-        raise SnowballError("snowball apply needs a target collection (-C / target_collection).")
+        raise SnowballError(
+            "snowball apply needs a target collection (-C / target_collection)."
+        )
     try:
         dest, rows = load_queue(cfg.state_dir, run_id)
     except FileNotFoundError as exc:
@@ -1015,20 +1105,39 @@ def run_apply(
                 lib, scope=_apply_fingerprint_scope(request), collection=collection
             )
         except Exception as exc:
-            raise SnowballError(f"Library was not read. Refusing to create items. {exc}") from exc
+            raise SnowballError(
+                f"Library was not read. Refusing to create items. {exc}"
+            ) from exc
     assert lib is not None and finder is not None
     _mark_exists(kept, finder, version_of=_version_of(cfg, request))
     creatable = [row for row in kept if row.status == "new"]
     if not creatable:
         console.print("nothing to create (all keep rows already in library)")
-        write_report(dest, {"created": 0, "skipped_exists": len(kept), "attach_ok": 0, "attach_deferred": 0})
+        write_report(
+            dest,
+            {
+                "created": 0,
+                "skipped_exists": len(kept),
+                "attach_ok": 0,
+                "attach_deferred": 0,
+            },
+        )
         return PathResult(
             dest,
             0,
-            summary={"created": 0, "skipped_exists": len(kept), "attach_ok": 0, "attach_deferred": 0},
+            summary={
+                "created": 0,
+                "skipped_exists": len(kept),
+                "attach_ok": 0,
+                "attach_deferred": 0,
+            },
         )
 
-    note = cfg.snowball_note_provenance if request.note_provenance is None else request.note_provenance
+    note = (
+        cfg.snowball_note_provenance
+        if request.note_provenance is None
+        else request.note_provenance
+    )
     items, counts = create_new(
         lib,
         creatable,
@@ -1042,7 +1151,9 @@ def run_apply(
         local_cites=_local_cites(cfg, lib, collection),
     )
     if counts.get("failed"):
-        console.print(f"[yellow]{counts['failed']} create(s) failed; other rows continued[/]")
+        console.print(
+            f"[yellow]{counts['failed']} create(s) failed; other rows continued[/]"
+        )
     report = {
         "created": counts["created"],
         "skipped_exists": counts["skipped_exists"] + (len(kept) - len(creatable)),
@@ -1135,7 +1246,9 @@ def _search_keywords_on(cfg: Config, request: SnowballRequest) -> bool:
     return bool(request.search_keywords)
 
 
-def _checked_cites_query(request: SnowballRequest, direction: str, *, expands: bool) -> str:
+def _checked_cites_query(
+    request: SnowballRequest, direction: str, *, expands: bool
+) -> str:
     """OpenAlex text search for references and cited-by. Empty when unset."""
     query = (request.cites_query or "").strip()
     if not query:
@@ -1148,7 +1261,9 @@ def _checked_cites_query(request: SnowballRequest, direction: str, *, expands: b
         Console(highlight=False).print(f"[yellow]{note}[/]")
     sides = direction_sides(direction)
     if "refs" not in sides and "cites" not in sides:
-        raise SnowballError("--cites-query needs a direction that includes refs or cites.")
+        raise SnowballError(
+            "--cites-query needs a direction that includes refs or cites."
+        )
     if not expands:
         raise SnowballError("--cites-query needs depth of at least 1.")
     return query
@@ -1180,7 +1295,9 @@ def _stop_params(cfg: Config, request: SnowballRequest):
 
     try:
         return parse_stop_params(
-            rule=cfg.snowball_stop_rule if request.stop_rule is None else request.stop_rule,
+            rule=cfg.snowball_stop_rule
+            if request.stop_rule is None
+            else request.stop_rule,
             eps=cfg.snowball_stop_eps if request.stop_eps is None else request.stop_eps,
             k=cfg.snowball_stop_k if request.stop_k is None else request.stop_k,
             tau=cfg.snowball_stop_tau if request.stop_tau is None else request.stop_tau,
@@ -1201,9 +1318,13 @@ def _stop_params(cfg: Config, request: SnowballRequest):
 
 def _guard(cfg: Config, request: SnowballRequest) -> None:
     if not cfg.snowball_enabled:
-        raise SnowballError("Snowball is off. Set [snowball] enabled = true in config.toml.")
+        raise SnowballError(
+            "Snowball is off. Set [snowball] enabled = true in config.toml."
+        )
     if request.gate not in {"dry-run", "auto", "approve-batch", "approve-each"}:
-        raise SnowballError("gate must be dry-run, approve-each, approve-batch, or auto.")
+        raise SnowballError(
+            "gate must be dry-run, approve-each, approve-batch, or auto."
+        )
     _pdf_mode(request)
     if request.max_candidates is not None:
         _cap(request.max_candidates, 0)
@@ -1224,9 +1345,16 @@ def _guard(cfg: Config, request: SnowballRequest) -> None:
         except ValueError as exc:
             raise SnowballError(str(exc)) from exc
     _backends(cfg, request)
-    if request.stop_rule is not None or request.stop_eps is not None or request.stop_k is not None:
+    if (
+        request.stop_rule is not None
+        or request.stop_eps is not None
+        or request.stop_k is not None
+    ):
         _stop_params(cfg, request)
-    if request.gate in {"auto", "approve-batch", "approve-each"} and not request.collection.strip():
+    if (
+        request.gate in {"auto", "approve-batch", "approve-each"}
+        and not request.collection.strip()
+    ):
         raise SnowballError(
             f"gate {request.gate} needs a target collection (-C / target_collection)."
         )
@@ -1331,14 +1459,22 @@ def _snowball_prepare_queue(
     types = cfg.snowball_types if request.types is None else request.types
     oa_only = cfg.snowball_oa_only if request.oa_only is None else request.oa_only
     venue_include = (
-        cfg.snowball_venue_include if request.venue_include is None else request.venue_include
+        cfg.snowball_venue_include
+        if request.venue_include is None
+        else request.venue_include
     )
     venue_exclude = (
-        cfg.snowball_venue_exclude if request.venue_exclude is None else request.venue_exclude
+        cfg.snowball_venue_exclude
+        if request.venue_exclude is None
+        else request.venue_exclude
     )
-    languages = cfg.snowball_languages if request.languages is None else request.languages
+    languages = (
+        cfg.snowball_languages if request.languages is None else request.languages
+    )
     study_designs = (
-        cfg.snowball_study_designs if request.study_designs is None else request.study_designs
+        cfg.snowball_study_designs
+        if request.study_designs is None
+        else request.study_designs
     )
     try:
         direction = normalize_direction(request.direction)
@@ -1447,6 +1583,172 @@ def _snowball_prepare_queue(
     return rows, dest, library_unread, lib, unread_error, paused
 
 
+def _execute_preflight(
+    cfg: Config,
+    request: SnowballRequest,
+    rows: list[Candidate],
+    *,
+    dest: Path,
+    console: Console,
+) -> None:
+    want_preflight = (
+        cfg.snowball_author_site_preflight
+        if request.author_site_preflight is None
+        else request.author_site_preflight
+    )
+    if not want_preflight:
+        return
+    from .preflight import run_author_site_preflight
+
+    run_author_site_preflight(
+        cfg,
+        rows,
+        dest=dest,
+        collection=request.collection,
+        console=console,
+    )
+    if cfg.twenty_enabled and cfg.twenty_lookup_on_preflight:
+        from ..twenty import lookup_authors, twenty_ready
+        from .authors import load_pack_file, pack_path, pack_slug
+
+        if twenty_ready(cfg):
+            slug = pack_slug(request.collection)
+            pack = load_pack_file(pack_path(cfg, slug, promoted=False))
+            people = list(pack.authors) if pack is not None else []
+            if people:
+                lookup_authors(
+                    cfg,
+                    people,
+                    collection=request.collection,
+                    apply=True,
+                )
+                console.print(
+                    "twenty lookup on preflight · proposed pack/contacts updated "
+                    "(promote before author_site fetch; no mail)"
+                )
+        else:
+            console.print(
+                "[yellow]twenty lookup_on_preflight skipped[/] "
+                "(need TWENTY_API_KEY and [twenty].base_url)"
+            )
+
+
+def _execute_gate_exit(
+    cfg: Config,
+    request: SnowballRequest,
+    *,
+    console: Console,
+    oa: OpenAlexClient,
+    dest: Path,
+    rows: list[Candidate],
+    caps: tuple[int, int, str],
+    run_id: str,
+    gate: str,
+    crawl_fail_n: int,
+    tally: Tally,
+) -> PathResult | None:
+    _print_table(console, rows)
+    if oa.deferred:
+        exit_code = EXIT_PARTIAL
+        console.print(
+            f"[yellow]Partial queue kept[/] · paperful snowball resume {run_id}"
+        )
+    else:
+        exit_code = 0
+    if request.iterative and not oa.deferred:
+        _open_stop(cfg, request, dest, rows, caps, console, run_id)
+    if gate not in {"dry-run", "approve-batch"}:
+        return None
+    if request.iterative and not oa.deferred:
+        console.print(
+            f"one hop saved · Keep or Skip each new row · "
+            f"paperful snowball continue {run_id}"
+        )
+    elif gate == "approve-batch":
+        console.print(
+            f"candidates ready · mark keep=true in {dest / 'candidates.jsonl'} · "
+            f"then: paperful snowball apply {run_id}"
+        )
+    else:
+        console.print("candidates ready")
+    if not oa.deferred and crawl_fail_n:
+        ok_n = max(0, len(rows) - crawl_fail_n)
+        exit_code = batch_exit(ok=ok_n, failed=crawl_fail_n)
+    tally.stop()
+    return PathResult(dest, exit_code)
+
+
+def _execute_create_and_fill(
+    cfg: Config,
+    request: SnowballRequest,
+    *,
+    console: Console,
+    oa: OpenAlexClient,
+    dest: Path,
+    rows: list[Candidate],
+    paused: dict[str, Any],
+    lib: Any,
+    library_unread: bool,
+    unread_error: BaseException | None,
+    tally: Tally,
+    crawl_fail_n: int,
+    tag_prefix: str,
+    note_provenance: Any,
+    mode: str,
+) -> PathResult:
+    if library_unread or lib is None:
+        detail = f" {unread_error}" if unread_error else ""
+        tally.stop()
+        raise SnowballError(f"Library was not read. Refusing to create items.{detail}")
+    try:
+        creatable = _settled_rows(rows, _blocked_dois(paused))
+        items, counts = create_new(
+            lib,
+            creatable,
+            request.collection,
+            tag_prefix=tag_prefix,
+            extra_tags=_extra_tags(cfg, request),
+            note_provenance=note_provenance,
+            console=console,
+            tally=tally,
+            remarks_surface=cfg.remarks_surface,
+            local_cites=_local_cites(cfg, lib, request.collection),
+            allowlist=_title_allowlist(cfg),
+        )
+    except LibraryError as exc:
+        tally.stop()
+        raise SnowballError(str(exc)) from exc
+    create_fail_n = int(counts.get("failed") or 0)
+    created_n = int(counts.get("created") or 0)
+    if oa.deferred:
+        exit_code = EXIT_PARTIAL
+    else:
+        exit_code = batch_exit(ok=created_n, failed=crawl_fail_n + create_fail_n)
+    report = {
+        "created": counts["created"],
+        "skipped_exists": counts["skipped_exists"],
+        "attach_ok": 0,
+        "attach_deferred": 0,
+    }
+    _write_cached_pdfs(cfg, items, rows)
+    if mode != "off" and items:
+        stats = fill_pdfs(cfg, lib, items, console, tally=tally, mode=mode)
+        downloaded = int(getattr(stats, "ok", 0)) + int(getattr(stats, "attached", 0))
+        report["downloaded"] = downloaded
+        report["attach_ok"] = int(getattr(stats, "attached", 0))
+        report["attach_deferred"] = int(getattr(stats, "attach_failed", 0))
+    write_report(dest, report)
+    if mode != "off":
+        _print_fetch_result(
+            console, report, sought=len(items), collection=request.collection
+        )
+    else:
+        console.print(f"items created (metadata only): {counts['created']}")
+    _maybe_dedupe_after(cfg, request, lib, request.collection, console)
+    tally.stop()
+    return PathResult(dest, exit_code)
+
+
 def _execute(
     cfg: Config,
     request: SnowballRequest,
@@ -1476,7 +1778,9 @@ def _execute(
     if request.from_created_date:
         oa.from_created_date = request.from_created_date.strip() or None
     designs = (
-        cfg.snowball_study_designs if request.study_designs is None else request.study_designs
+        cfg.snowball_study_designs
+        if request.study_designs is None
+        else request.study_designs
     )
     oa.study_designs = tuple(designs or ())
     if oa.progress is None:
@@ -1495,7 +1799,9 @@ def _execute(
         from .europepmc import europepmc_work
 
         oa.epmc_cache_dir = cfg.state_dir / "snowball" / "cache" / "europepmc"
-        oa.epmc_getter = lambda doi, _cache=oa.epmc_cache_dir: europepmc_work(doi, cache_dir=_cache)
+        oa.epmc_getter = lambda doi, _cache=oa.epmc_cache_dir: europepmc_work(
+            doi, cache_dir=_cache
+        )
     tally.start()
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     gate = request.gate
@@ -1542,125 +1848,40 @@ def _execute(
         if request.note_provenance is None
         else request.note_provenance
     )
-    want_preflight = (
-        cfg.snowball_author_site_preflight
-        if request.author_site_preflight is None
-        else request.author_site_preflight
-    )
-    if want_preflight:
-        from .preflight import run_author_site_preflight
-
-        run_author_site_preflight(
-            cfg,
-            rows,
-            dest=dest,
-            collection=request.collection,
-            console=console,
-        )
-        if cfg.twenty_enabled and cfg.twenty_lookup_on_preflight:
-            from ..twenty import lookup_authors, twenty_ready
-            from .authors import load_pack_file, pack_path, pack_slug
-
-            if twenty_ready(cfg):
-                slug = pack_slug(request.collection)
-                pack = load_pack_file(pack_path(cfg, slug, promoted=False))
-                people = list(pack.authors) if pack is not None else []
-                if people:
-                    lookup_authors(
-                        cfg,
-                        people,
-                        collection=request.collection,
-                        apply=True,
-                    )
-                    console.print(
-                        "twenty lookup on preflight · proposed pack/contacts updated "
-                        "(promote before author_site fetch; no mail)"
-                    )
-            else:
-                console.print(
-                    "[yellow]twenty lookup_on_preflight skipped[/] "
-                    "(need TWENTY_API_KEY and [twenty].base_url)"
-                )
-    _print_table(console, rows)
     crawl_fail_n = len(failed) if failed else 0
-    if oa.deferred:
-        exit_code = EXIT_PARTIAL
-        console.print(f"[yellow]Partial queue kept[/] · paperful snowball resume {run_id}")
-    else:
-        exit_code = 0
-    if request.iterative and not oa.deferred:
-        _open_stop(cfg, request, dest, rows, caps, console, run_id)
-    if gate in {"dry-run", "approve-batch"}:
-        if request.iterative and not oa.deferred:
-            console.print(
-                f"one hop saved · Keep or Skip each new row · "
-                f"paperful snowball continue {run_id}"
-            )
-        elif gate == "approve-batch":
-            console.print(
-                f"candidates ready · mark keep=true in {dest / 'candidates.jsonl'} · "
-                f"then: paperful snowball apply {run_id}"
-            )
-        else:
-            console.print("candidates ready")
-        if not oa.deferred and crawl_fail_n:
-            ok_n = max(0, len(rows) - crawl_fail_n)
-            exit_code = batch_exit(ok=ok_n, failed=crawl_fail_n)
-        tally.stop()
-        return PathResult(dest, exit_code)
-    if library_unread or lib is None:
-        detail = f" { _unread_error }" if _unread_error else ""
-        tally.stop()
-        raise SnowballError(f"Library was not read. Refusing to create items.{detail}")
-    try:
-        creatable = _settled_rows(rows, _blocked_dois(paused))
-        items, counts = create_new(
-            lib,
-            creatable,
-            request.collection,
-            tag_prefix=tag_prefix,
-            extra_tags=_extra_tags(cfg, request),
-            note_provenance=note_provenance,
-            console=console,
-            tally=tally,
-            remarks_surface=cfg.remarks_surface,
-            local_cites=_local_cites(cfg, lib, request.collection),
-            allowlist=_title_allowlist(cfg),
-        )
-    except LibraryError as exc:
-        tally.stop()
-        raise SnowballError(str(exc)) from exc
-    create_fail_n = int(counts.get("failed") or 0)
-    created_n = int(counts.get("created") or 0)
-    if oa.deferred:
-        exit_code = EXIT_PARTIAL
-    else:
-        exit_code = batch_exit(
-            ok=created_n, failed=crawl_fail_n + create_fail_n
-        )
-    report = {
-        "created": counts["created"],
-        "skipped_exists": counts["skipped_exists"],
-        "attach_ok": 0,
-        "attach_deferred": 0,
-    }
-    _write_cached_pdfs(cfg, items, rows)
-    if mode != "off" and items:
-        stats = fill_pdfs(cfg, lib, items, console, tally=tally, mode=mode)
-        downloaded = int(getattr(stats, "ok", 0)) + int(getattr(stats, "attached", 0))
-        report["downloaded"] = downloaded
-        report["attach_ok"] = int(getattr(stats, "attached", 0))
-        report["attach_deferred"] = int(getattr(stats, "attach_failed", 0))
-    write_report(dest, report)
-    if mode != "off":
-        _print_fetch_result(
-            console, report, sought=len(items), collection=request.collection
-        )
-    else:
-        console.print(f"items created (metadata only): {counts['created']}")
-    _maybe_dedupe_after(cfg, request, lib, request.collection, console)
-    tally.stop()
-    return PathResult(dest, exit_code)
+    _execute_preflight(cfg, request, rows, dest=dest, console=console)
+    gated = _execute_gate_exit(
+        cfg,
+        request,
+        console=console,
+        oa=oa,
+        dest=dest,
+        rows=rows,
+        caps=caps,
+        run_id=run_id,
+        gate=gate,
+        crawl_fail_n=crawl_fail_n,
+        tally=tally,
+    )
+    if gated is not None:
+        return gated
+    return _execute_create_and_fill(
+        cfg,
+        request,
+        console=console,
+        oa=oa,
+        dest=dest,
+        rows=rows,
+        paused=paused,
+        lib=lib,
+        library_unread=library_unread,
+        unread_error=_unread_error,
+        tally=tally,
+        crawl_fail_n=crawl_fail_n,
+        tag_prefix=tag_prefix,
+        note_provenance=note_provenance,
+        mode=mode,
+    )
 
 
 def _library_lookup(backend: Any, *, scope: str, collection: str) -> Lookup:
@@ -1712,7 +1933,11 @@ def _maybe_dedupe_after(
 ) -> None:
     from ..config import parse_dedupe_after
 
-    raw = cfg.snowball_dedupe_after if request.dedupe_after is None else request.dedupe_after
+    raw = (
+        cfg.snowball_dedupe_after
+        if request.dedupe_after is None
+        else request.dedupe_after
+    )
     try:
         mode = parse_dedupe_after(raw)
     except ValueError as exc:
@@ -1794,9 +2019,7 @@ def _mark_exists(
         other = _other_version_doi(doi, link)
         hit = _call_lookup(lookup, other, None, None) if other else None
         if not hit and getattr(link, "arxiv_id", None):
-            hit = _call_lookup(
-                lookup, f"10.48550/arxiv.{link.arxiv_id}", None, None
-            )
+            hit = _call_lookup(lookup, f"10.48550/arxiv.{link.arxiv_id}", None, None)
         if not hit:
             continue
         key = hit[0] if isinstance(hit, tuple) else hit
@@ -1847,7 +2070,12 @@ def _set_exists(
     report_number: str | None = None,
     url: str | None = None,
 ) -> None:
-    from ..greyid import grey_token, normalize_isbn, normalize_report_number, registrable_host
+    from ..greyid import (
+        grey_token,
+        normalize_isbn,
+        normalize_report_number,
+        registrable_host,
+    )
 
     if isinstance(found, tuple):
         key, kind = found
@@ -1933,7 +2161,11 @@ def _approve_each(
     run_id: str,
 ) -> None:
     pending = [row for row in rows if row.status == "new"]
-    limit = request.approve_each_max if request.approve_each_max is not None else cfg.snowball_approve_each_max
+    limit = (
+        request.approve_each_max
+        if request.approve_each_max is not None
+        else cfg.snowball_approve_each_max
+    )
     if len(pending) > limit:
         raise SnowballError(
             f"{len(pending)} new rows exceeds approve_each_max ({limit}). Use --gate approve-batch."
@@ -1990,6 +2222,7 @@ def _fill_metadata(
 
         def s2_getter(doi: str, _cache: Any = cache, _key: str = key) -> dict | None:
             return s2_paper(doi, cache_dir=_cache, api_key=_key)
+
     if live and "europepmc" in backends and europepmc_cache is None:
         europepmc_cache = cfg.state_dir / "snowball" / "cache" / "europepmc"
     if europepmc_getter is None and live and "europepmc" in backends:
@@ -1999,6 +2232,7 @@ def _fill_metadata(
 
         def europepmc_getter(doi: str, _cache: Any = cache) -> dict | None:
             return europepmc_work(doi, cache_dir=_cache)
+
     if pdf_getter is None and live and "pdf" in backends:
         from .bibliography import pdf_payload_for_row
 
@@ -2076,7 +2310,9 @@ def _summary_meta(
     if cites_query:
         meta["cites_query"] = cites_query
     designs = (
-        cfg.snowball_study_designs if request.study_designs is None else request.study_designs
+        cfg.snowball_study_designs
+        if request.study_designs is None
+        else request.study_designs
     )
     if designs:
         meta["study_designs"] = list(designs)

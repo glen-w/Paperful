@@ -41,6 +41,27 @@ def test_discover_handlers_are_module_level():
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+@pytest.mark.parametrize(
+    "mod_name, handle, register",
+    [
+        ("index_routes", "handle_page_index", "register_index"),
+        ("wanted_routes", "handle_page_wanted", "register_wanted"),
+        ("shell_routes", "handle_page_library", "register_shell"),
+        ("repair_routes", "handle_page_repair", "register_repair"),
+        ("critique_routes", "handle_page_critique", "register_critique"),
+    ],
+)
+def test_desk_handlers_are_module_level(mod_name, handle, register):
+    import importlib
+
+    mod = importlib.import_module(f"paperful.ui.{mod_name}")
+    assert callable(getattr(mod, handle))
+    src = inspect.getsource(getattr(mod, register))
+    assert f"{handle}(" in src
+    assert f"def {handle}(" not in src
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
 def test_mount_ui_has_no_inline_wanted_or_discover_routes():
     src = inspect.getsource(ui_app.mount_ui)
     assert '@app.get("/wanted"' not in src

@@ -16,7 +16,6 @@ from typing import Any
 import typer
 from rich.console import Console
 from .progress import Track, item_progress, pause_live, tracker
-from rich.table import Table
 
 from . import __version__
 from .config import (
@@ -98,6 +97,7 @@ from .zot import (
     resolve_item_types,
 )
 
+
 def _load_dotenv() -> None:
     """Fill unset variables from a gitignored .env in the working directory."""
     path = Path.cwd() / ".env"
@@ -117,6 +117,7 @@ def _load_dotenv() -> None:
         value = value.strip().strip('"').strip("'")
         if key and key not in os.environ:
             os.environ[key] = value
+
 
 _load_dotenv()
 
@@ -152,8 +153,7 @@ playbooks_app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
     help=(
-        "Propose, promote, and probe grey-lit PDF playbooks. "
-        "Not run-config profiles."
+        "Propose, promote, and probe grey-lit PDF playbooks. Not run-config profiles."
     ),
 )
 app.add_typer(playbooks_app, name="playbooks")
@@ -699,10 +699,12 @@ SkipOpt = typer.Option(
     help="Omit this step (repeatable or comma-separated).",
 )
 
+
 class WriteDest(str, Enum):
     disk = "disk"
     zotero = "zotero"
     both = "both"
+
 
 class SummarizeOrder(str, Enum):
     newest = "newest"
@@ -723,6 +725,7 @@ def _main(
 
     _rt._OFFLINE = offline
 
+
 @app.command()
 def jobs() -> None:
     """List canonical verbs for the five jobs (library, find, completeness, mirror, control)."""
@@ -735,12 +738,14 @@ def jobs() -> None:
         "Twenty lookup caches CRM contacts locally. twenty sync --apply writes People."
     )
 
+
 @app.command()
 def mcp(config: Path | None = ConfigOpt) -> None:
     """Optional stdio MCP: read-only gaps, snowball preview, export, refs_gap, ask."""
     from .mcp_server import serve_stdio
 
     serve_stdio(_cfg(config))
+
 
 @app.command()
 def serve(
@@ -776,9 +781,11 @@ def serve(
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1) from exc
 
+
 @app.command()
 def version() -> None:
     console.print(__version__)
+
 
 @app.command()
 def doctor(
@@ -807,6 +814,7 @@ def doctor(
         probe=probe,
         as_json=as_json,
     )
+
 
 @collections_app.callback(invoke_without_command=True)
 def collections_root(
@@ -902,7 +910,9 @@ def lint(
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
-    as_json: bool = typer.Option(False, "--json", help="Legacy findings array. Prefer --format json."),
+    as_json: bool = typer.Option(
+        False, "--json", help="Legacy findings array. Prefer --format json."
+    ),
     strict: bool = typer.Option(False, "--strict", help="Exit 1 if any finding."),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
@@ -939,9 +949,13 @@ def screen(
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
     limit: int | None = typer.Option(None, "--limit", "-n", help="Stop after N items."),
-    as_json: bool = typer.Option(False, "--json", help="Legacy findings array. Prefer --format json."),
+    as_json: bool = typer.Option(
+        False, "--json", help="Legacy findings array. Prefer --format json."
+    ),
     strict: bool = typer.Option(False, "--strict", help="Exit 1 if any finding."),
-    apply: bool = typer.Option(False, "--apply", help="Write parent tag and child note for flagged items."),
+    apply: bool = typer.Option(
+        False, "--apply", help="Write parent tag and child note for flagged items."
+    ),
     refresh: bool = typer.Option(
         False, "--refresh", help="Bypass status cache and re-download fingerprint CSVs."
     ),
@@ -1025,10 +1039,14 @@ def critique(
         help="Run a subset of critique.reviewers ids (repeatable). Default: all.",
     ),
     force: bool = typer.Option(
-        False, "--force", help="Run the LLM lane even when identity lint flagged the PDF."
+        False,
+        "--force",
+        help="Run the LLM lane even when identity lint flagged the PDF.",
     ),
     show_dismissed: bool = typer.Option(
-        False, "--show-dismissed", help="Include dismissed findings in the table and Markdown."
+        False,
+        "--show-dismissed",
+        help="Include dismissed findings in the table and Markdown.",
     ),
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
@@ -1061,9 +1079,13 @@ def critique(
 
 @critique_app.command("dismiss")
 def critique_dismiss(
-    finding_id: str = typer.Argument(..., help="Finding id from pack.json / the critique table."),
+    finding_id: str = typer.Argument(
+        ..., help="Finding id from pack.json / the critique table."
+    ),
     critique_id: str | None = typer.Option(
-        None, "--critique-id", help="Pack folder name (item key or file-<stem>). Default: newest."
+        None,
+        "--critique-id",
+        help="Pack folder name (item key or file-<stem>). Default: newest.",
     ),
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
@@ -1106,60 +1128,21 @@ def acronyms(
     Frequency and shape only. Does not call a model and does not recase titles.
     ``fix-metadata`` uses the written list when it Title-Cases an ALL CAPS title.
     """
-    from .acronyms import file_slug, harvest, write_allowlist
+    from .acronyms_cmd import run_acronyms
 
-    if _scope_unset(collection, library, profile, run_config):
-        _refuse_missing_scope()
-    cfg = _cfg(config)
-    bound = _bind_run(
-        cfg,
+    run_acronyms(
+        console,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        min_count=min_count,
+        apply=apply,
         profile=profile,
         run_config=run_config,
-        collection=collection,
-        library=library,
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
+        config=config,
     )
-    collection, library, year_from, year_to, item_type = _take_scope(bound)
-    if not collection and not library:
-        _refuse_missing_scope()
-    backend = _connect(cfg, quiet=False)
-    loaded = _load_scope(
-        backend,
-        collection=collection,
-        library=library,
-        year_from=year_from,
-        year_to=year_to,
-        item_type=item_type,
-    )
-    rows = harvest(loaded.items, min_count=min_count)
-    slug = file_slug(collection, library=library or not collection)
-    console.print(
-        f"Scope: [bold]{loaded.label}[/] — {len(loaded.items)} items, "
-        f"{len(rows)} acronym{'s' if len(rows) != 1 else ''}"
-    )
-    if rows:
-        table = Table(title="Acronyms")
-        table.add_column("Token")
-        table.add_column("Items", justify="right")
-        for row in rows:
-            table.add_row(row.token, str(row.count))
-        console.print(table)
-    else:
-        console.print("[green]No acronyms at this count.[/]")
-    if not apply:
-        console.print("[dim]Dry-run. Pass --apply to write the allowlist.[/]")
-        return
-    path = write_allowlist(
-        cfg.state_dir,
-        slug,
-        scope=loaded.label,
-        rows=rows,
-        min_count=min_count,
-        n_items=len(loaded.items),
-    )
-    console.print(f"Wrote [bold]{path}[/]")
 
 
 @glossary_app.command("validate")
@@ -1244,6 +1227,7 @@ def authors(
         fmt=fmt,
     )
 
+
 @app.command("fix-metadata")
 def fix_metadata(
     collection: list[str] = typer.Option(
@@ -1289,6 +1273,7 @@ def fix_metadata(
         config=config,
         fmt=fmt,
     )
+
 
 @app.command()
 def dedupe(
@@ -1354,6 +1339,7 @@ def dedupe(
         config=config,
         fmt=fmt,
     )
+
 
 @app.command()
 def attachments(
@@ -1428,6 +1414,7 @@ def attachments(
         config=config,
     )
 
+
 @app.command()
 def versions(
     collection: list[str] = typer.Option(
@@ -1457,10 +1444,10 @@ def versions(
 ) -> None:
     """Link a preprint and its published paper as one work. Write only with --apply.
 
-The older parent keeps the citation key. Its fields become the version of
-record and the published PDF is attached beside the preprint PDF. A later
-sibling is trashed only after that PDF is on the survivor. Title-only
-matches are listed and not applied."""
+    The older parent keeps the citation key. Its fields become the version of
+    record and the published PDF is attached beside the preprint PDF. A later
+    sibling is trashed only after that PDF is on the survivor. Title-only
+    matches are listed and not applied."""
     from .versions_cmd import run_versions
 
     run_versions(
@@ -1478,6 +1465,7 @@ matches are listed and not applied."""
         run_config=run_config,
         config=config,
     )
+
 
 @app.command("urls")
 def urls_check(
@@ -1507,17 +1495,19 @@ def urls_check(
         fmt=fmt,
     )
 
+
 @htmlpdf_proposals_app.command("list")
 def htmlpdf_proposals_list(
-    status: str = typer.Option("pending", "--status", help="pending, applied, rejected, or all."),
+    status: str = typer.Option(
+        "pending", "--status", help="pending, applied, rejected, or all."
+    ),
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
     from .htmlpdf_cmd import run_htmlpdf_proposals_list
 
-    run_htmlpdf_proposals_list(
-        console, status=status, config=config, fmt=fmt
-    )
+    run_htmlpdf_proposals_list(console, status=status, config=config, fmt=fmt)
+
 
 @htmlpdf_proposals_app.command("apply")
 def htmlpdf_proposals_apply(
@@ -1531,6 +1521,7 @@ def htmlpdf_proposals_apply(
         console, proposal_id=proposal_id, config=config, fmt=fmt
     )
 
+
 @htmlpdf_proposals_app.command("reject")
 def htmlpdf_proposals_reject(
     proposal_id: str = typer.Argument(..., help="Proposal id."),
@@ -1542,6 +1533,7 @@ def htmlpdf_proposals_reject(
     run_htmlpdf_proposals_reject(
         console, proposal_id=proposal_id, config=config, fmt=fmt
     )
+
 
 @app.command()
 def gaps(
@@ -1582,7 +1574,9 @@ def gaps(
         "--to",
         help="Write the missing-PDF list to a .tsv or .md file.",
     ),
-    as_json: bool = typer.Option(False, "--json", help="Legacy counts JSON. Prefer --format json."),
+    as_json: bool = typer.Option(
+        False, "--json", help="Legacy counts JSON. Prefer --format json."
+    ),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
@@ -1615,6 +1609,7 @@ def gaps(
         config=config,
         fmt=fmt,
     )
+
 
 @app.command()
 def reachout(
@@ -1679,6 +1674,7 @@ def reachout(
         config=config,
         fmt=fmt,
     )
+
 
 @app.command()
 def run(
@@ -1805,6 +1801,7 @@ def run(
         fmt=fmt,
     )
 
+
 @app.command()
 def attach(
     item: list[str] = typer.Option(
@@ -1830,7 +1827,7 @@ def attach(
 ) -> None:
     """Write already-downloaded PDFs into the library. This command attaches; it is not a dry-run.
 
-Use ``--item KEY --file PATH`` to ingest a hand-downloaded PDF."""
+    Use ``--item KEY --file PATH`` to ingest a hand-downloaded PDF."""
     from .attach_cmd import run_attach
 
     run_attach(
@@ -1842,6 +1839,7 @@ Use ``--item KEY --file PATH`` to ingest a hand-downloaded PDF."""
         allow_pdf_doi_mismatch=allow_pdf_doi_mismatch,
         allow_short_pdf=allow_short_pdf,
     )
+
 
 @inbox_app.command("watch")
 def inbox_watch(
@@ -1867,8 +1865,8 @@ def inbox_watch(
 ) -> None:
     """Long-running sidecar: poll inbox.dir and attach by PDF DOI (no FIFO).
 
-Defaults to the whole library so one drop folder can serve every topic.
-Pass ``-C`` only when you intentionally want a narrower DOI index."""
+    Defaults to the whole library so one drop folder can serve every topic.
+    Pass ``-C`` only when you intentionally want a narrower DOI index."""
     from .inbox_cmd import run_inbox_watch
 
     run_inbox_watch(
@@ -1884,6 +1882,7 @@ Pass ``-C`` only when you intentionally want a narrower DOI index."""
         config=config,
         tag=tag,
     )
+
 
 @inbox_app.command("drain")
 def inbox_drain(
@@ -1905,9 +1904,9 @@ def inbox_drain(
 ) -> None:
     """One-shot: ingest current PDFs in inbox.dir.
 
-Default match is DOI-only. ``[inbox].match`` can add title / OCR / LLM stages.
-Defaults to the whole library so one drop folder can serve every topic.
-Pass ``-C`` only when you intentionally want a narrower DOI index."""
+    Default match is DOI-only. ``[inbox].match`` can add title / OCR / LLM stages.
+    Defaults to the whole library so one drop folder can serve every topic.
+    Pass ``-C`` only when you intentionally want a narrower DOI index."""
     from .inbox_cmd import run_inbox_drain
 
     run_inbox_drain(
@@ -1924,6 +1923,7 @@ Pass ``-C`` only when you intentionally want a narrower DOI index."""
         fmt=fmt,
     )
 
+
 inbox_proposals_app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
@@ -1931,9 +1931,12 @@ inbox_proposals_app = typer.Typer(
 )
 inbox_app.add_typer(inbox_proposals_app, name="proposals")
 
+
 @inbox_proposals_app.command("list")
 def inbox_proposals_list(
-    status: str = typer.Option("pending", "--status", help="pending, applied, rejected, or all."),
+    status: str = typer.Option(
+        "pending", "--status", help="pending, applied, rejected, or all."
+    ),
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
@@ -1946,9 +1949,12 @@ def inbox_proposals_list(
         fmt=fmt,
     )
 
+
 @inbox_proposals_app.command("apply")
 def inbox_proposals_apply(
-    proposal_id: str = typer.Argument(..., help="Proposal id from inbox proposals list."),
+    proposal_id: str = typer.Argument(
+        ..., help="Proposal id from inbox proposals list."
+    ),
     tag: list[str] = CreateTagOpt,
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
@@ -1963,9 +1969,12 @@ def inbox_proposals_apply(
         fmt=fmt,
     )
 
+
 @inbox_proposals_app.command("reject")
 def inbox_proposals_reject(
-    proposal_id: str = typer.Argument(..., help="Proposal id from inbox proposals list."),
+    proposal_id: str = typer.Argument(
+        ..., help="Proposal id from inbox proposals list."
+    ),
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
@@ -1977,6 +1986,7 @@ def inbox_proposals_reject(
         config=config,
         fmt=fmt,
     )
+
 
 @notes_app.command("delete")
 def notes_delete(
@@ -2042,6 +2052,7 @@ def notes_delete(
         config=config,
         fmt=fmt,
     )
+
 
 @refs_app.command("gap")
 def refs_gap(
@@ -2161,6 +2172,7 @@ def twenty_lookup_cmd(
         config=config,
     )
 
+
 @twenty_app.command("sync")
 def twenty_sync_cmd(
     collection: list[str] = typer.Option(
@@ -2205,13 +2217,18 @@ def twenty_sync_cmd(
         fmt=fmt,
     )
 
+
 @app.command("ingest-dois")
 def ingest_dois_cmd(
     collection: list[str] = typer.Option(
         [], "--collection", "-C", help="Target collection for new parents."
     ),
     from_file: Path | None = typer.Option(
-        None, "--from-file", help="Text file: one DOI per line.", exists=True, dir_okay=False
+        None,
+        "--from-file",
+        help="Text file: one DOI per line.",
+        exists=True,
+        dir_okay=False,
     ),
     from_pack: Path | None = typer.Option(
         None,
@@ -2219,9 +2236,13 @@ def ingest_dois_cmd(
         help="refs_gap or coverage pack.json (or its parent folder).",
         exists=True,
     ),
-    apply: bool = typer.Option(False, "--apply", help="Create parents. Default is dry-run."),
+    apply: bool = typer.Option(
+        False, "--apply", help="Create parents. Default is dry-run."
+    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Classify only (default)."),
-    tag: list[str] = typer.Option([], "--tag", help="Extra tags on created parents (repeatable)."),
+    tag: list[str] = typer.Option(
+        [], "--tag", help="Extra tags on created parents (repeatable)."
+    ),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
@@ -2243,6 +2264,7 @@ def ingest_dois_cmd(
         config=config,
         fmt=fmt,
     )
+
 
 @app.command()
 def snapshot(
@@ -2346,7 +2368,9 @@ def sync(
         False, "--full", help="Read the whole library, not only what changed."
     ),
     dry_run: bool = typer.Option(
-        False, "--dry-run", help="Count what would change. Reads the library, writes nothing."
+        False,
+        "--dry-run",
+        help="Count what would change. Reads the library, writes nothing.",
     ),
     pdfs: str | None = typer.Option(
         None,
@@ -2371,6 +2395,7 @@ def sync(
         accept_gone=accept_gone,
         config=config,
     )
+
 
 @app.command()
 def restore(
@@ -2422,6 +2447,7 @@ def restore(
         fmt=fmt,
     )
 
+
 @app.command("import")
 def import_library(
     path: Path = typer.Argument(
@@ -2449,6 +2475,7 @@ def import_library(
         apply=apply,
         config=config,
     )
+
 
 @app.command("export")
 def export_library(
@@ -2585,6 +2612,7 @@ def report(
         as_json=as_json,
         last_run=last_run,
     )
+
 
 @pack_app.command("open")
 def pack_open(
@@ -2731,6 +2759,7 @@ def recover(
         fmt=fmt,
     )
 
+
 @app.command()
 def ocr(
     item: list[str] = typer.Option([], "--item", help="Item key (repeatable)."),
@@ -2854,6 +2883,7 @@ def ocr_ignore_import_failures(
 # ---- library index: `paperful rag` and `paperful ask` -------------------------
 # These read out_dir and state_dir only. None of them opens the reference manager.
 
+
 @rag_app.command("ingest")
 def rag_ingest(
     item: list[str] = typer.Option([], "--item", help="Item key (repeatable)."),
@@ -2909,6 +2939,7 @@ def rag_ingest(
         config=config,
     )
 
+
 @rag_app.command("status")
 def rag_status(
     json_out: bool = typer.Option(False, "--json", help="Print JSON."),
@@ -2922,6 +2953,7 @@ def rag_status(
         json_out=json_out,
         config=config,
     )
+
 
 @rag_app.command("search")
 def rag_search(
@@ -2952,6 +2984,7 @@ def rag_search(
         json_out=json_out,
         config=config,
     )
+
 
 @rag_app.command("questions")
 def rag_questions(
@@ -2993,6 +3026,7 @@ def rag_questions(
         fmt=fmt,
     )
 
+
 @rag_app.command("answered")
 def rag_answered(
     from_file: Path | None = typer.Option(
@@ -3019,7 +3053,9 @@ def rag_answered(
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     item_type: list[str] = ItemTypeOpt,
-    top_k: int | None = typer.Option(None, "-k", "--top-k", help="Passages per question."),
+    top_k: int | None = typer.Option(
+        None, "-k", "--top-k", help="Passages per question."
+    ),
     ask_mode: str | None = typer.Option(
         None,
         "--ask-mode",
@@ -3052,6 +3088,7 @@ def rag_answered(
         config=config,
         fmt=fmt,
     )
+
 
 @app.command()
 def ask(
@@ -3144,6 +3181,7 @@ def ask(
         json_out=json_out,
         ask_mode=ask_mode,
     )
+
 
 @app.command()
 def summarize(
@@ -3351,6 +3389,7 @@ def synthesize(
         fmt=fmt,
     )
 
+
 @app.command("all")
 def all_cmd(
     collection: list[str] = typer.Option(
@@ -3513,8 +3552,10 @@ def all_cmd(
         after_handoff_gaps=after_handoff_gaps,
     )
 
+
 def _dispatch_all_step(*args, **kwargs):
     from .all_cmd import _dispatch_all_step as _impl
+
     return _impl(*args, **kwargs)
 
 
@@ -3569,6 +3610,7 @@ def playbooks_probe(
         as_json=as_json,
     )
 
+
 @playbooks_app.command("propose")
 def playbooks_propose(
     config: Path | None = ConfigOpt,
@@ -3591,6 +3633,7 @@ def playbooks_propose(
         min_hits=min_hits,
     )
 
+
 @playbooks_app.command("promote")
 def playbooks_promote(
     config: Path | None = ConfigOpt,
@@ -3609,6 +3652,7 @@ def playbooks_promote(
         source=source,
     )
 
+
 @profile_app.command("list")
 def profile_list(config: Path | None = ConfigOpt) -> None:
     """List saved run configs. The builtin ``all`` policy is not a named profile."""
@@ -3618,6 +3662,7 @@ def profile_list(config: Path | None = ConfigOpt) -> None:
         console,
         config=config,
     )
+
 
 @profile_app.command("show")
 def profile_show(
@@ -3682,6 +3727,7 @@ def profile_show(
         run_config=run_config,
         config=config,
     )
+
 
 @profile_app.command("save")
 def profile_save(
@@ -3750,13 +3796,6 @@ def profile_save(
         run_config=run_config,
         config=config,
     )
-
-
-
-
-
-
-
 
 
 @snowball_app.command("search")
@@ -3857,6 +3896,7 @@ def snowball_search(
         fmt=fmt,
     )
 
+
 @snowball_app.command("hybrid")
 def snowball_hybrid(
     queries: list[str] = typer.Argument(
@@ -3941,6 +3981,7 @@ def snowball_hybrid(
         fmt=fmt,
     )
 
+
 @snowball_app.command("doi")
 def snowball_doi(
     dois: list[str] | None = typer.Argument(
@@ -4017,6 +4058,7 @@ def snowball_doi(
         fmt=fmt,
     )
 
+
 @snowball_app.command("orcid")
 def snowball_orcid(
     orcids: list[str] | None = typer.Argument(
@@ -4092,6 +4134,7 @@ def snowball_orcid(
         config=config,
         fmt=fmt,
     )
+
 
 @snowball_app.command("collection")
 def snowball_collection(
@@ -4170,7 +4213,10 @@ def snowball_collection(
         fmt=fmt,
     )
 
-def _print_briefing(briefing: Any, *, apply: bool, collection: str, cfg: Config) -> None:
+
+def _print_briefing(
+    briefing: Any, *, apply: bool, collection: str, cfg: Config
+) -> None:
     counts = briefing.counts
     order = ("new", "exists", "deferred", "inbox")
     summary = " · ".join(f"{key} {counts[key]}" for key in order if key in counts)
@@ -4195,6 +4241,7 @@ def _print_briefing(briefing: Any, *, apply: bool, collection: str, cfg: Config)
     _flush(backend)
     console.print(f"Note [bold]{key}[/] in {col.path or collection}")
 
+
 @snowball_app.command("trends")
 def snowball_trends(
     query: str | None = typer.Argument(
@@ -4218,6 +4265,7 @@ def snowball_trends(
         config=config,
         fmt=fmt,
     )
+
 
 @snowball_app.command("briefing")
 def snowball_briefing(
@@ -4245,6 +4293,7 @@ def snowball_briefing(
         config=config,
     )
 
+
 @snowball_app.command("digest")
 def snowball_digest(
     run_id: str = typer.Option(
@@ -4270,6 +4319,7 @@ def snowball_digest(
         collection=collection,
         config=config,
     )
+
 
 @snowball_app.command("resume")
 def snowball_resume(
@@ -4303,9 +4353,12 @@ def snowball_resume(
         fmt=fmt,
     )
 
+
 @snowball_app.command("continue")
 def snowball_continue_cmd(
-    run_id: str = typer.Argument(..., help="Run id under state/snowball/<run-id>/ with stop.json."),
+    run_id: str = typer.Argument(
+        ..., help="Run id under state/snowball/<run-id>/ with stop.json."
+    ),
     gate: str | None = typer.Option(
         None,
         "--gate",
@@ -4324,6 +4377,7 @@ def snowball_continue_cmd(
         config=config,
         fmt=fmt,
     )
+
 
 @snowball_app.command("apply")
 def snowball_apply(
@@ -4350,6 +4404,7 @@ def snowball_apply(
         config=config,
         fmt=fmt,
     )
+
 
 @snowball_app.command("run")
 def snowball_run(
@@ -4397,12 +4452,14 @@ def snowball_run(
         fmt=fmt,
     )
 
+
 snowball_profile_app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
     help="Save a snowball profile beside config.toml. Seeds and knobs only.",
 )
 snowball_app.add_typer(snowball_profile_app, name="profile")
+
 
 @snowball_profile_app.command("save")
 def snowball_profile_save(
@@ -4454,7 +4511,11 @@ def snowball_profile_save(
     hybrid_seeds: int | None = typer.Option(None, "--hybrid-seeds"),
     refine: bool = typer.Option(False, "--refine"),
     author_site_preflight: bool = typer.Option(False, "--author-site-preflight"),
-    stop_rule: str = typer.Option("", "--stop-rule", help="off, marginal_yield, asymptotic_coverage, budget, or any."),
+    stop_rule: str = typer.Option(
+        "",
+        "--stop-rule",
+        help="off, marginal_yield, asymptotic_coverage, budget, or any.",
+    ),
     stop_eps: float | None = StopEpsOpt,
     stop_k: int | None = StopKOpt,
     stop_max_screened: int | None = StopMaxScreenedOpt,
@@ -4512,6 +4573,7 @@ def snowball_profile_save(
         config=config,
     )
 
+
 snowball_packs_app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
@@ -4519,9 +4581,12 @@ snowball_packs_app = typer.Typer(
 )
 snowball_app.add_typer(snowball_packs_app, name="packs")
 
+
 @snowball_packs_app.command("promote")
 def snowball_packs_promote(
-    slug: str = typer.Argument(..., help="Pack slug (state/author-packs/<slug>.proposed.toml)."),
+    slug: str = typer.Argument(
+        ..., help="Pack slug (state/author-packs/<slug>.proposed.toml)."
+    ),
     config: Path | None = ConfigOpt,
 ) -> None:
     """Copy a proposed author pack to the promoted file used by the author_site lane."""
@@ -4533,6 +4598,7 @@ def snowball_packs_promote(
         config=config,
     )
 
+
 snowball_watch_app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
@@ -4543,6 +4609,7 @@ snowball_watch_app = typer.Typer(
     ),
 )
 snowball_app.add_typer(snowball_watch_app, name="watch")
+
 
 @snowball_watch_app.command("save")
 def snowball_watch_save(
@@ -4563,6 +4630,7 @@ def snowball_watch_save(
         profile=profile,
         config=config,
     )
+
 
 @snowball_watch_app.command("run")
 def snowball_watch_run(
@@ -4586,6 +4654,7 @@ def snowball_watch_run(
         config=config,
     )
 
+
 @snowball_watch_app.command("rebaseline")
 def snowball_watch_rebaseline(
     name: str = typer.Argument(
@@ -4598,7 +4667,9 @@ def snowball_watch_rebaseline(
         help="Write the reset. Without it this only reports what would change.",
     ),
     force: bool = typer.Option(
-        False, "--force", help="Reset even if the watch was already reset or baselined after the change."
+        False,
+        "--force",
+        help="Reset even if the watch was already reset or baselined after the change.",
     ),
     config: Path | None = ConfigOpt,
 ) -> None:
@@ -4618,6 +4689,7 @@ def snowball_watch_rebaseline(
         config=config,
     )
 
+
 @snowball_watch_app.command("show")
 def snowball_watch_show(
     name: str = typer.Argument(..., help="Watch name."),
@@ -4631,6 +4703,7 @@ def snowball_watch_show(
         name=name,
         config=config,
     )
+
 
 @snowball_watch_app.command("briefing")
 def snowball_watch_briefing(
@@ -4655,6 +4728,7 @@ def snowball_watch_briefing(
         collection=collection,
         config=config,
     )
+
 
 @snowball_watch_app.command("digest")
 def snowball_watch_digest(
@@ -4715,6 +4789,7 @@ def _authorwatch_call(action: Callable[[], Any]) -> Any:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
 
+
 @authorwatch_app.command("save")
 def authorwatch_save(
     name: str = typer.Argument(..., help="List name under state/authorwatch/<name>/."),
@@ -4729,11 +4804,16 @@ def authorwatch_save(
         config=config,
     )
 
+
 @authorwatch_app.command("add")
 def authorwatch_add(
     name: str = typer.Argument(..., help="List name."),
-    orcid: str = typer.Option("", "--orcid", help="ORCID iD (URL or XXXX-XXXX-XXXX-XXXX)."),
-    display_name: str = typer.Option("", "--name", help="Display name when ORCID is unknown."),
+    orcid: str = typer.Option(
+        "", "--orcid", help="ORCID iD (URL or XXXX-XXXX-XXXX-XXXX)."
+    ),
+    display_name: str = typer.Option(
+        "", "--name", help="Display name when ORCID is unknown."
+    ),
     affiliation: str = typer.Option(
         "", "--affiliation", help="Host or institution hint for resolve."
     ),
@@ -4750,6 +4830,7 @@ def authorwatch_add(
         affiliation=affiliation,
         config=config,
     )
+
 
 @authorwatch_app.command("remove")
 def authorwatch_remove(
@@ -4769,6 +4850,7 @@ def authorwatch_remove(
         config=config,
     )
 
+
 @authorwatch_app.command("show")
 def authorwatch_show(
     name: str = typer.Argument(..., help="List name."),
@@ -4783,6 +4865,7 @@ def authorwatch_show(
         config=config,
     )
 
+
 @authorwatch_app.command("resolve")
 def authorwatch_resolve(
     name: str = typer.Argument(..., help="List name."),
@@ -4796,6 +4879,7 @@ def authorwatch_resolve(
         name=name,
         config=config,
     )
+
 
 @authorwatch_app.command("suggest")
 def authorwatch_suggest_cmd(
@@ -4822,6 +4906,7 @@ def authorwatch_suggest_cmd(
         limit=limit,
         config=config,
     )
+
 
 @authorwatch_app.command("accept")
 def authorwatch_accept_cmd(
@@ -4855,6 +4940,7 @@ def authorwatch_accept_cmd(
         config=config,
     )
 
+
 @authorwatch_app.command("delete")
 def authorwatch_delete_cmd(
     name: str = typer.Argument(..., help="List name."),
@@ -4870,6 +4956,7 @@ def authorwatch_delete_cmd(
         yes=yes,
         config=config,
     )
+
 
 @authorwatch_app.command("import")
 def authorwatch_import(
@@ -4893,6 +4980,7 @@ def authorwatch_import(
         config=config,
     )
 
+
 @authorwatch_app.command("run")
 def authorwatch_run(
     name: str = typer.Argument(..., help="List name."),
@@ -4901,7 +4989,9 @@ def authorwatch_run(
         "--backfill-from",
         help="YYYY-MM-DD publication date; propose recent works on this run.",
     ),
-    max_authors: int = typer.Option(50, "--max-authors", help="Cap OpenAlex author polls."),
+    max_authors: int = typer.Option(
+        50, "--max-authors", help="Cap OpenAlex author polls."
+    ),
     per_author_limit: int = typer.Option(
         200, "--per-author-limit", help="Max works per author this run."
     ),
@@ -4918,6 +5008,7 @@ def authorwatch_run(
         per_author_limit=per_author_limit,
         config=config,
     )
+
 
 @authorwatch_app.command("briefing")
 def authorwatch_briefing(

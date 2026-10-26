@@ -209,7 +209,9 @@ def search_candidates(
     client.stage = "OpenAlex search"
     client.note(client.stage)
     try:
-        works = client.search(query, limit=max_candidates, year_from=year_from, year_to=year_to)
+        works = client.search(
+            query, limit=max_candidates, year_from=year_from, year_to=year_to
+        )
     except OpenAlexBudgetExceeded as exc:
         _defer(
             client,
@@ -257,7 +259,9 @@ def search_candidates(
                     year_to=year_to,
                 )
             except OpenAlexBudgetExceeded:
-                client.note("OpenAlex keyword tag fetch skipped — daily allowance spent")
+                client.note(
+                    "OpenAlex keyword tag fetch skipped — daily allowance spent"
+                )
                 tagged = []
             except Exception as exc:
                 client.note(f"OpenAlex keyword tag fetch skipped · {exc}")
@@ -358,7 +362,9 @@ def doi_candidates(
         seed = {"type": "doi", "value": doi or raw}
         if not doi:
             failed.append(raw)
-            rows.append(_error_row(run_id, seed, raw, f"invalid DOI {raw}", gate, direction))
+            rows.append(
+                _error_row(run_id, seed, raw, f"invalid DOI {raw}", gate, direction)
+            )
             continue
         client.stage = f"seed {doi}"
         client.note(client.stage)
@@ -408,7 +414,9 @@ def doi_candidates(
             continue
         if not work:
             failed.append(doi)
-            rows.append(_error_row(run_id, seed, doi, f"unresolved {doi}", gate, direction))
+            rows.append(
+                _error_row(run_id, seed, doi, f"unresolved {doi}", gate, direction)
+            )
             continue
         if include_seeds:
             rows.append(
@@ -569,7 +577,9 @@ def _orcid_person_hop0(
             doi = _seed_doi(raw) or ""
             if not doi:
                 failed.append(raw)
-                rows.append(_error_row(run_id, seed, raw, f"invalid DOI {raw}", gate, direction))
+                rows.append(
+                    _error_row(run_id, seed, raw, f"invalid DOI {raw}", gate, direction)
+                )
                 continue
             client.stage = f"ORCID work {doi}"
             client.note(client.stage)
@@ -623,7 +633,9 @@ def _orcid_person_hop0(
                 continue
             if not work:
                 failed.append(doi)
-                rows.append(_error_row(run_id, seed, doi, f"unresolved {doi}", gate, direction))
+                rows.append(
+                    _error_row(run_id, seed, doi, f"unresolved {doi}", gate, direction)
+                )
                 continue
             oa = short_id(str(work.get("id") or ""))
             if oa and oa in seen_ids:
@@ -763,7 +775,9 @@ def _defer(client: OpenAlexClient, exc: BaseException, **fields: Any) -> None:
             when = f" Resume after {reset_at}." if reset_at else ""
             client.note(f"OpenAlex daily allowance for your API key is used up.{when}")
         else:
-            client.note(keyless_limit_message(has_key=bool(client.api_key), reset_at=reset_at))
+            client.note(
+                keyless_limit_message(has_key=bool(client.api_key), reset_at=reset_at)
+            )
         if client.store is not None:
             if getattr(client.store, "has_cites_index", False):
                 client.note(
@@ -777,22 +791,32 @@ def _defer(client: OpenAlexClient, exc: BaseException, **fields: Any) -> None:
                     "keywords / full-text search need resume after the API resets."
                 )
     else:
-        client.note(f"Crawl paused ({exc}). Partial queue kept. paperful snowball resume")
+        client.note(
+            f"Crawl paused ({exc}). Partial queue kept. paperful snowball resume"
+        )
 
 
 def _keyword_sentence(empty: int, total: int) -> str:
     return f"{empty} of {total} seeds have no OpenAlex keywords and will not expand on that side."
 
 
-def _keyword_prelude(client: OpenAlexClient, seeds: list[dict[str, Any]], direction: str) -> None:
+def _keyword_prelude(
+    client: OpenAlexClient, seeds: list[dict[str, Any]], direction: str
+) -> None:
     """Count seeds with no usable keywords. Raise when this batch is the whole run."""
     limit, _hop_limit, min_score = _keyword_settings(client)
     empty = sum(
-        1 for work in seeds if not chosen_keywords(work, limit=limit, min_score=min_score)
+        1
+        for work in seeds
+        if not chosen_keywords(work, limit=limit, min_score=min_score)
     )
     total = len(seeds)
-    client.keyword_seed_total = int(getattr(client, "keyword_seed_total", 0) or 0) + total
-    client.keyword_seed_empty = int(getattr(client, "keyword_seed_empty", 0) or 0) + empty
+    client.keyword_seed_total = (
+        int(getattr(client, "keyword_seed_total", 0) or 0) + total
+    )
+    client.keyword_seed_empty = (
+        int(getattr(client, "keyword_seed_empty", 0) or 0) + empty
+    )
     keywords_only = not _wants_refs(direction) and not _wants_cites(direction)
     held = bool(getattr(client, "keyword_defer_empty_raise", False))
     if keywords_only and total and empty == total and not held:
@@ -1065,13 +1089,24 @@ def _similar_neighbours(
     except OpenAlexBudgetExceeded as exc:
         works = dict(getattr(exc, "coupling_works", {}) or {})
         counts = dict(getattr(exc, "coupling_counts", {}) or {})
-        partial = [
-            (int(counts[oa]), works[oa])
-            for oa in counts
-            if oa in works
-        ]
-        partial.sort(key=lambda item: (-item[0], -int(item[1].get("cited_by_count") or 0)))
-        _append_similar(client, rows, seen_oa, partial, per_hop_limit, run_id, seed, hop, gate, why_prefix, year_from, year_to)
+        partial = [(int(counts[oa]), works[oa]) for oa in counts if oa in works]
+        partial.sort(
+            key=lambda item: (-item[0], -int(item[1].get("cited_by_count") or 0))
+        )
+        _append_similar(
+            client,
+            rows,
+            seen_oa,
+            partial,
+            per_hop_limit,
+            run_id,
+            seed,
+            hop,
+            gate,
+            why_prefix,
+            year_from,
+            year_to,
+        )
         _defer(
             client,
             exc,
@@ -1095,13 +1130,26 @@ def _similar_neighbours(
         return True
     room = per_hop_limit if per_hop_limit > 0 else 50
     _append_similar(
-        client, rows, seen_oa, partners, room, run_id, seed, hop, gate, why_prefix, year_from, year_to
+        client,
+        rows,
+        seen_oa,
+        partners,
+        room,
+        run_id,
+        seed,
+        hop,
+        gate,
+        why_prefix,
+        year_from,
+        year_to,
     )
     used = sum(1 for row in rows if row.direction == "similar" and row.hop == hop)
     rec_limit = max(0, room - used) if per_hop_limit > 0 else 50
     getter = getattr(client, "recommend_getter", None)
     if rec_limit:
-        for paper in fetch_recommendations(paper_ids(frontier), limit=rec_limit, getter=getter):
+        for paper in fetch_recommendations(
+            paper_ids(frontier), limit=rec_limit, getter=getter
+        ):
             work = recommendation_work(paper)
             if work is None:
                 continue
@@ -1119,7 +1167,10 @@ def _similar_neighbours(
                 year_from,
                 year_to,
             )
-            if per_hop_limit > 0 and sum(1 for row in rows if row.direction == "similar") >= room:
+            if (
+                per_hop_limit > 0
+                and sum(1 for row in rows if row.direction == "similar") >= room
+            ):
                 break
     _emit(client, rows)
     return False
@@ -1218,7 +1269,11 @@ def hybrid_candidates(
             row.ids.get("doi") or "",
         ),
     )
-    limit = hybrid_seeds if max_candidates <= 0 else max(0, min(hybrid_seeds, max_candidates))
+    limit = (
+        hybrid_seeds
+        if max_candidates <= 0
+        else max(0, min(hybrid_seeds, max_candidates))
+    )
     seeds = [row.ids["doi"] for row in ranked[:limit]]
     if not seeds:
         return hits, []
@@ -1243,7 +1298,453 @@ def hybrid_candidates(
     return truncate(_dedupe(hits + neighbours), max_candidates), failed
 
 
-def continue_deferred(client: OpenAlexClient, deferred: dict[str, Any]) -> list[Candidate]:
+def _resume_row(
+    work: dict[str, Any],
+    *,
+    run_id: str,
+    seed: dict[str, Any],
+    hop: int,
+    gate: str,
+    direction: str,
+    reason: str,
+) -> Candidate:
+    return work_to_candidate(
+        work,
+        run_id=run_id,
+        seed=seed,
+        hop=hop,
+        direction=direction,
+        why=reason,
+        gate=gate,
+    )
+
+
+def _resume_similar(
+    client: OpenAlexClient,
+    deferred: dict[str, Any],
+    remaining: list[str],
+    rows: list[Candidate],
+    *,
+    run_id: str,
+    seed: dict[str, Any],
+    hop: int,
+    gate: str,
+    why: str,
+    per_hop: int,
+    year_from: Any,
+    year_to: Any,
+) -> list[Candidate]:
+    from .similar import CITERS_PER_REF, collect_partners
+
+    stored = {
+        short_id(str(work.get("id") or "")): work
+        for work in (deferred.get("coupling_works") or [])
+        if isinstance(work, dict)
+    }
+    counts = {
+        str(key): int(value)
+        for key, value in (deferred.get("coupling_counts") or {}).items()
+    }
+    client.stage = "resume similar"
+    client.note(f"resume similar · {len(remaining)} references")
+    try:
+        partners, _rest = collect_partners(
+            client,
+            remaining,
+            per_ref=CITERS_PER_REF,
+            year_from=year_from,
+            year_to=year_to,
+            counts=counts,
+            works=stored,
+        )
+    except OpenAlexBudgetExceeded as exc:
+        works = dict(getattr(exc, "coupling_works", {}) or {})
+        fresh = dict(getattr(exc, "coupling_counts", {}) or {})
+        _defer(
+            client,
+            exc,
+            **{
+                **deferred,
+                "remaining_ids": list(getattr(exc, "pending_ids", []) or []),
+                "coupling_counts": fresh,
+                "coupling_works": list(works.values()),
+            },
+        )
+        partners = [(int(fresh[oa]), works[oa]) for oa in fresh if oa in works]
+    seen: set[str] = set()
+    _append_similar(
+        client,
+        rows,
+        seen,
+        partners,
+        per_hop,
+        run_id,
+        seed,
+        hop,
+        gate,
+        why,
+        year_from if isinstance(year_from, int) else None,
+        year_to if isinstance(year_to, int) else None,
+    )
+    return rows
+
+
+def _resume_keywords(
+    client: OpenAlexClient,
+    deferred: dict[str, Any],
+    remaining: list[str],
+    rows: list[Candidate],
+    *,
+    run_id: str,
+    seed: dict[str, Any],
+    hop: int,
+    gate: str,
+    why: str,
+    rank: str,
+    year_from: Any,
+    year_to: Any,
+) -> list[Candidate]:
+    client.stage = "resume keywords"
+    client.note(f"resume keywords · {len(remaining)} seeds")
+    hop_limit = int(deferred.get("keyword_hop_limit") or 50)
+    keyword_limit = int(deferred.get("keyword_limit") or 3)
+    min_score = float(deferred.get("keyword_min_score") or 0.0)
+    fetch_limit = _keyword_fetch_limit(hop_limit, rank)
+    sort = _cite_sort(rank)
+    if client.tally is not None and remaining:
+        client.tally.track(len(remaining))
+    for index, oa in enumerate(remaining, start=1):
+        client.stage = f"resume keywords {index}/{len(remaining)} {oa}"
+        client.touch()
+        try:
+            found = client.works_by_ids([oa])
+            slugs = (
+                chosen_keywords(found[0], limit=keyword_limit, min_score=min_score)
+                if found
+                else []
+            )
+            hits = (
+                client.works_by_keywords(
+                    slugs,
+                    limit=fetch_limit,
+                    year_from=year_from,
+                    year_to=year_to,
+                    sort=sort,
+                )
+                if slugs
+                else []
+            )
+        except OpenAlexBudgetExceeded as exc:
+            _defer(client, exc, **{**deferred, "remaining_ids": remaining[index - 1 :]})
+            return rows
+        if rank == "random":
+            hits = select_works_by_citations(hits, hop_limit, "random")
+        else:
+            hits = hits[:hop_limit]
+        for child in hits:
+            child_slugs = set(chosen_keywords(child, limit=0, min_score=0.0))
+            shared = [slug for slug in slugs if slug in child_slugs] or list(slugs)
+            row = _resume_row(
+                child,
+                run_id=run_id,
+                seed=seed,
+                hop=hop,
+                gate=gate,
+                direction="keywords",
+                reason=f"keywords {', '.join(shared)} of {why}",
+            )
+            row.biblio["keyword_overlap"] = len(shared)
+            rows.append(row)
+        if client.tally is not None:
+            client.tally.advance(1)
+    return rows
+
+
+def _resume_cites(
+    client: OpenAlexClient,
+    deferred: dict[str, Any],
+    remaining: list[str],
+    rows: list[Candidate],
+    *,
+    run_id: str,
+    seed: dict[str, Any],
+    hop: int,
+    gate: str,
+    why: str,
+    per_hop: int,
+    rank: str,
+    year_from: Any,
+    year_to: Any,
+) -> list[Candidate]:
+    query = _cites_query(client)
+    client.stage = "resume cited-by"
+    label = f"resume cited-by · {len(remaining)} seeds"
+    if query:
+        label = f"{label} · {query}"
+    client.note(label)
+    if client.tally is not None:
+        client.tally.track(len(remaining))
+    cite_limit = _cite_fetch_limit(per_hop, rank)
+    cite_sort = _cite_sort(rank)
+    for index, oa in enumerate(remaining, start=1):
+        client.stage = f"resume cited-by {index}/{len(remaining)} {oa}"
+        client.touch()
+        try:
+            citing = client.works_citing(
+                oa,
+                limit=cite_limit,
+                year_from=year_from,
+                year_to=year_to,
+                sort=cite_sort,
+                search=query or None,
+            )
+        except OpenAlexBudgetExceeded as exc:
+            _defer(client, exc, **{**deferred, "remaining_ids": remaining[index - 1 :]})
+            return rows
+        if rank == "random":
+            citing = select_works_by_citations(citing, per_hop, "random")
+        elif per_hop > 0:
+            citing = citing[:per_hop]
+        rows.extend(
+            _resume_row(
+                child,
+                run_id=run_id,
+                seed=seed,
+                hop=hop,
+                gate=gate,
+                direction="cites",
+                reason=_cites_why(why, query),
+            )
+            for child in citing
+        )
+        if client.tally is not None:
+            client.tally.advance(1)
+    return rows
+
+
+def _resume_refs(
+    client: OpenAlexClient,
+    deferred: dict[str, Any],
+    remaining: list[str],
+    *,
+    run_id: str,
+    seed: dict[str, Any],
+    hop: int,
+    gate: str,
+    why: str,
+) -> list[Candidate]:
+    query = _cites_query(client)
+    client.stage = "resume references"
+    label = f"resume references · {len(remaining)} ids"
+    if query:
+        label = f"{label} · {query}"
+    client.note(label)
+    reason = _with_query(f"ref of {why}", query)
+    try:
+        children = client.works_by_ids(remaining, search=query or None)
+    except OpenAlexBudgetExceeded as exc:
+        rows = [
+            _resume_row(
+                child,
+                run_id=run_id,
+                seed=seed,
+                hop=hop,
+                gate=gate,
+                direction="refs",
+                reason=reason,
+            )
+            for child in exc.partial
+        ]
+        _defer(client, exc, **{**deferred, "remaining_ids": list(exc.pending_ids)})
+        return rows
+    return [
+        _resume_row(
+            child,
+            run_id=run_id,
+            seed=seed,
+            hop=hop,
+            gate=gate,
+            direction="refs",
+            reason=reason,
+        )
+        for child in children
+    ]
+
+
+def _resume_author(
+    client: OpenAlexClient,
+    deferred: dict[str, Any],
+    remaining: list[str],
+    rows: list[Candidate],
+    *,
+    run_id: str,
+    gate: str,
+    per_hop: int,
+    year_from: Any,
+    year_to: Any,
+) -> list[Candidate]:
+    by_orcid = {
+        str(key): [str(item) for item in (value or [])]
+        for key, value in (deferred.get("dois_by_orcid") or {}).items()
+    }
+    depth = int(deferred.get("depth") or 0)
+    direction = str(deferred.get("direction") or "refs+keywords")
+    max_candidates = int(deferred.get("max_candidates") or per_hop or 50)
+    failed: list[str] = []
+    seed_works: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for index, orcid in enumerate(remaining):
+        # First ORCID paused mid-author: its DOI list was already resolved.
+        skip_dois = index == 0
+        paused = _orcid_person_hop0(
+            client,
+            orcid,
+            by_orcid.get(orcid) or [],
+            run_id=run_id,
+            gate=gate,
+            depth=depth,
+            direction=direction,
+            max_candidates=max_candidates,
+            per_hop_limit=per_hop,
+            year_from=year_from if isinstance(year_from, int) else None,
+            year_to=year_to if isinstance(year_to, int) else None,
+            remaining_orcids=remaining[index + 1 :],
+            dois_by_orcid=by_orcid,
+            rows=rows,
+            failed=failed,
+            seed_works=seed_works,
+            seen_ids=seen_ids,
+            skip_dois=skip_dois,
+        )
+        if paused or client.deferred:
+            return rows
+    return rows
+
+
+def _resume_search(
+    client: OpenAlexClient,
+    deferred: dict[str, Any],
+    remaining: list[str],
+    *,
+    run_id: str,
+    seed: dict[str, Any],
+    hop: int,
+    gate: str,
+    per_hop: int,
+    year_from: Any,
+    year_to: Any,
+) -> list[Candidate]:
+    saved = deferred.get("max_candidates")
+    limit = per_hop if saved is None else int(saved)
+    try:
+        found = client.search(
+            remaining[0], limit=limit, year_from=year_from, year_to=year_to
+        )
+    except OpenAlexBudgetExceeded as exc:
+        _defer(client, exc, **deferred)
+        return []
+    return [
+        _resume_row(
+            child,
+            run_id=run_id,
+            seed=seed,
+            hop=hop,
+            gate=gate,
+            direction="search",
+            reason="OpenAlex search",
+        )
+        for child in found
+    ]
+
+
+def _resume_seeds(
+    client: OpenAlexClient,
+    deferred: dict[str, Any],
+    remaining: list[str],
+    rows: list[Candidate],
+    *,
+    run_id: str,
+    seed: dict[str, Any],
+    hop: int,
+    gate: str,
+    per_hop: int,
+    year_from: Any,
+    year_to: Any,
+) -> list[Candidate]:
+    keep_seeds = bool(deferred.get("include_seeds", True))
+    orcid_seed = str(seed.get("type") or "") == "orcid"
+
+    def _row(work: dict[str, Any], direction: str, reason: str) -> Candidate:
+        return _resume_row(
+            work,
+            run_id=run_id,
+            seed=seed,
+            hop=hop,
+            gate=gate,
+            direction=direction,
+            reason=reason,
+        )
+
+    by_orcid = {
+        str(key): [str(item) for item in (value or [])]
+        for key, value in (deferred.get("dois_by_orcid") or {}).items()
+    }
+    for index, doi in enumerate(remaining):
+        try:
+            work = client.work_by_doi(doi)
+        except OpenAlexBudgetExceeded as exc:
+            _defer(client, exc, **{**deferred, "remaining_ids": remaining[index:]})
+            return rows
+        if work and keep_seeds:
+            cleaned = _seed_doi(doi) or doi
+            if orcid_seed:
+                orcid = str(seed.get("value") or "")
+                rows.append(_row(work, "orcid", f"ORCID {orcid}"))
+            else:
+                rows.append(_row(work, "doi", f"seed DOI {cleaned}"))
+    if orcid_seed and not client.deferred:
+        remaining_orcids = [
+            str(item) for item in (deferred.get("remaining_orcids") or []) if item
+        ]
+        current = str(seed.get("value") or "")
+        people = ([current] if current else []) + remaining_orcids
+        depth = int(deferred.get("depth") or 0)
+        direction = str(deferred.get("direction") or "refs+keywords")
+        max_candidates = int(deferred.get("max_candidates") or per_hop or 50)
+        failed = []
+        seed_works: list[dict[str, Any]] = []
+        seen_ids: set[str] = set()
+        for index, orcid in enumerate(people):
+            # Current ORCID's remaining DOIs were just resolved above.
+            skip_dois = index == 0
+            paused = _orcid_person_hop0(
+                client,
+                orcid,
+                by_orcid.get(orcid) or [],
+                run_id=run_id,
+                gate=gate,
+                depth=depth,
+                direction=direction,
+                max_candidates=max_candidates,
+                per_hop_limit=per_hop,
+                year_from=year_from if isinstance(year_from, int) else None,
+                year_to=year_to if isinstance(year_to, int) else None,
+                remaining_orcids=people[index + 1 :],
+                dois_by_orcid=by_orcid,
+                rows=rows,
+                failed=failed,
+                seed_works=seed_works,
+                seen_ids=seen_ids,
+                skip_dois=skip_dois,
+            )
+            if paused or client.deferred:
+                return rows
+    return rows
+
+
+def continue_deferred(
+    client: OpenAlexClient, deferred: dict[str, Any]
+) -> list[Candidate]:
     """Finish the OpenAlex calls a budget stop left in ``deferred``."""
     kind = str(deferred.get("kind") or "")
     run_id = str(deferred.get("run_id") or "")
@@ -1258,274 +1759,88 @@ def continue_deferred(client: OpenAlexClient, deferred: dict[str, Any]) -> list[
     remaining = [str(item) for item in (deferred.get("remaining_ids") or []) if item]
     _remember_cites_query(client, str(deferred.get("cites_query") or ""))
     rows: list[Candidate] = []
-
-    def _row(work: dict[str, Any], direction: str, reason: str) -> Candidate:
-        return work_to_candidate(
-            work,
-            run_id=run_id,
-            seed=seed,
-            hop=hop,
-            direction=direction,
-            why=reason,
-            gate=gate,
-        )
-
     _remember_keywords(
         client,
         keyword_limit=int(deferred.get("keyword_limit") or 3),
         keyword_hop_limit=int(deferred.get("keyword_hop_limit") or 50),
         keyword_min_score=float(deferred.get("keyword_min_score") or 0.0),
     )
+    shared = dict(
+        run_id=run_id,
+        seed=seed,
+        hop=hop,
+        gate=gate,
+    )
     if kind == "similar":
-        from .similar import CITERS_PER_REF, collect_partners
-
-        stored = {
-            short_id(str(work.get("id") or "")): work
-            for work in (deferred.get("coupling_works") or [])
-            if isinstance(work, dict)
-        }
-        counts = {
-            str(key): int(value)
-            for key, value in (deferred.get("coupling_counts") or {}).items()
-        }
-        client.stage = "resume similar"
-        client.note(f"resume similar · {len(remaining)} references")
-        try:
-            partners, _rest = collect_partners(
-                client,
-                remaining,
-                per_ref=CITERS_PER_REF,
-                year_from=year_from,
-                year_to=year_to,
-                counts=counts,
-                works=stored,
-            )
-        except OpenAlexBudgetExceeded as exc:
-            works = dict(getattr(exc, "coupling_works", {}) or {})
-            fresh = dict(getattr(exc, "coupling_counts", {}) or {})
-            _defer(
-                client,
-                exc,
-                **{
-                    **deferred,
-                    "remaining_ids": list(getattr(exc, "pending_ids", []) or []),
-                    "coupling_counts": fresh,
-                    "coupling_works": list(works.values()),
-                },
-            )
-            partners = [
-                (int(fresh[oa]), works[oa]) for oa in fresh if oa in works
-            ]
-        seen: set[str] = set()
-        _append_similar(
+        return _resume_similar(
             client,
+            deferred,
+            remaining,
             rows,
-            seen,
-            partners,
-            per_hop,
-            run_id,
-            seed,
-            hop,
-            gate,
-            why,
-            year_from if isinstance(year_from, int) else None,
-            year_to if isinstance(year_to, int) else None,
+            why=why,
+            per_hop=per_hop,
+            year_from=year_from,
+            year_to=year_to,
+            **shared,
         )
-        return rows
     if kind == "keywords":
-        client.stage = "resume keywords"
-        client.note(f"resume keywords · {len(remaining)} seeds")
-        hop_limit = int(deferred.get("keyword_hop_limit") or 50)
-        keyword_limit = int(deferred.get("keyword_limit") or 3)
-        min_score = float(deferred.get("keyword_min_score") or 0.0)
-        fetch_limit = _keyword_fetch_limit(hop_limit, rank)
-        sort = _cite_sort(rank)
-        if client.tally is not None and remaining:
-            client.tally.track(len(remaining))
-        for index, oa in enumerate(remaining, start=1):
-            client.stage = f"resume keywords {index}/{len(remaining)} {oa}"
-            client.touch()
-            try:
-                found = client.works_by_ids([oa])
-                slugs = chosen_keywords(found[0], limit=keyword_limit, min_score=min_score) if found else []
-                hits = (
-                    client.works_by_keywords(
-                        slugs,
-                        limit=fetch_limit,
-                        year_from=year_from,
-                        year_to=year_to,
-                        sort=sort,
-                    )
-                    if slugs
-                    else []
-                )
-            except OpenAlexBudgetExceeded as exc:
-                _defer(client, exc, **{**deferred, "remaining_ids": remaining[index - 1 :]})
-                return rows
-            if rank == "random":
-                hits = select_works_by_citations(hits, hop_limit, "random")
-            else:
-                hits = hits[:hop_limit]
-            for child in hits:
-                child_slugs = set(chosen_keywords(child, limit=0, min_score=0.0))
-                shared = [slug for slug in slugs if slug in child_slugs] or list(slugs)
-                row = _row(child, "keywords", f"keywords {', '.join(shared)} of {why}")
-                row.biblio["keyword_overlap"] = len(shared)
-                rows.append(row)
-            if client.tally is not None:
-                client.tally.advance(1)
-        return rows
+        return _resume_keywords(
+            client,
+            deferred,
+            remaining,
+            rows,
+            why=why,
+            rank=rank,
+            year_from=year_from,
+            year_to=year_to,
+            **shared,
+        )
     if kind == "cites":
-        query = _cites_query(client)
-        client.stage = "resume cited-by"
-        label = f"resume cited-by · {len(remaining)} seeds"
-        if query:
-            label = f"{label} · {query}"
-        client.note(label)
-        if client.tally is not None:
-            client.tally.track(len(remaining))
-        cite_limit = _cite_fetch_limit(per_hop, rank)
-        cite_sort = _cite_sort(rank)
-        for index, oa in enumerate(remaining, start=1):
-            client.stage = f"resume cited-by {index}/{len(remaining)} {oa}"
-            client.touch()
-            try:
-                citing = client.works_citing(
-                    oa,
-                    limit=cite_limit,
-                    year_from=year_from,
-                    year_to=year_to,
-                    sort=cite_sort,
-                    search=query or None,
-                )
-            except OpenAlexBudgetExceeded as exc:
-                _defer(client, exc, **{**deferred, "remaining_ids": remaining[index - 1 :]})
-                return rows
-            if rank == "random":
-                citing = select_works_by_citations(citing, per_hop, "random")
-            elif per_hop > 0:
-                citing = citing[:per_hop]
-            rows.extend(_row(child, "cites", _cites_why(why, query)) for child in citing)
-            if client.tally is not None:
-                client.tally.advance(1)
-        return rows
+        return _resume_cites(
+            client,
+            deferred,
+            remaining,
+            rows,
+            why=why,
+            per_hop=per_hop,
+            rank=rank,
+            year_from=year_from,
+            year_to=year_to,
+            **shared,
+        )
     if kind == "refs":
-        query = _cites_query(client)
-        client.stage = "resume references"
-        label = f"resume references · {len(remaining)} ids"
-        if query:
-            label = f"{label} · {query}"
-        client.note(label)
-        reason = _with_query(f"ref of {why}", query)
-        try:
-            children = client.works_by_ids(remaining, search=query or None)
-        except OpenAlexBudgetExceeded as exc:
-            rows.extend(_row(child, "refs", reason) for child in exc.partial)
-            _defer(client, exc, **{**deferred, "remaining_ids": list(exc.pending_ids)})
-            return rows
-        return [_row(child, "refs", reason) for child in children]
+        return _resume_refs(client, deferred, remaining, why=why, **shared)
     if kind == "author" and remaining:
-        by_orcid = {
-            str(key): [str(item) for item in (value or [])]
-            for key, value in (deferred.get("dois_by_orcid") or {}).items()
-        }
-        depth = int(deferred.get("depth") or 0)
-        direction = str(deferred.get("direction") or "refs+keywords")
-        max_candidates = int(deferred.get("max_candidates") or per_hop or 50)
-        failed: list[str] = []
-        seed_works: list[dict[str, Any]] = []
-        seen_ids: set[str] = set()
-        for index, orcid in enumerate(remaining):
-            # First ORCID paused mid-author: its DOI list was already resolved.
-            skip_dois = index == 0
-            paused = _orcid_person_hop0(
-                client,
-                orcid,
-                by_orcid.get(orcid) or [],
-                run_id=run_id,
-                gate=gate,
-                depth=depth,
-                direction=direction,
-                max_candidates=max_candidates,
-                per_hop_limit=per_hop,
-                year_from=year_from if isinstance(year_from, int) else None,
-                year_to=year_to if isinstance(year_to, int) else None,
-                remaining_orcids=remaining[index + 1 :],
-                dois_by_orcid=by_orcid,
-                rows=rows,
-                failed=failed,
-                seed_works=seed_works,
-                seen_ids=seen_ids,
-                skip_dois=skip_dois,
-            )
-            if paused or client.deferred:
-                return rows
-        return rows
+        return _resume_author(
+            client,
+            deferred,
+            remaining,
+            rows,
+            run_id=run_id,
+            gate=gate,
+            per_hop=per_hop,
+            year_from=year_from,
+            year_to=year_to,
+        )
     if kind == "search" and remaining:
-        saved = deferred.get("max_candidates")
-        limit = per_hop if saved is None else int(saved)
-        try:
-            found = client.search(remaining[0], limit=limit, year_from=year_from, year_to=year_to)
-        except OpenAlexBudgetExceeded as exc:
-            _defer(client, exc, **deferred)
-            return rows
-        return [_row(child, "search", "OpenAlex search") for child in found]
+        return _resume_search(
+            client,
+            deferred,
+            remaining,
+            per_hop=per_hop,
+            year_from=year_from,
+            year_to=year_to,
+            **shared,
+        )
     if kind == "seeds":
-        keep_seeds = bool(deferred.get("include_seeds", True))
-        orcid_seed = str(seed.get("type") or "") == "orcid"
-        by_orcid = {
-            str(key): [str(item) for item in (value or [])]
-            for key, value in (deferred.get("dois_by_orcid") or {}).items()
-        }
-        for index, doi in enumerate(remaining):
-            try:
-                work = client.work_by_doi(doi)
-            except OpenAlexBudgetExceeded as exc:
-                _defer(client, exc, **{**deferred, "remaining_ids": remaining[index:]})
-                return rows
-            if work and keep_seeds:
-                cleaned = _seed_doi(doi) or doi
-                if orcid_seed:
-                    orcid = str(seed.get("value") or "")
-                    rows.append(_row(work, "orcid", f"ORCID {orcid}"))
-                else:
-                    rows.append(_row(work, "doi", f"seed DOI {cleaned}"))
-        if orcid_seed and not client.deferred:
-            remaining_orcids = [
-                str(item) for item in (deferred.get("remaining_orcids") or []) if item
-            ]
-            current = str(seed.get("value") or "")
-            people = ([current] if current else []) + remaining_orcids
-            depth = int(deferred.get("depth") or 0)
-            direction = str(deferred.get("direction") or "refs+keywords")
-            max_candidates = int(deferred.get("max_candidates") or per_hop or 50)
-            failed = []
-            seed_works: list[dict[str, Any]] = []
-            seen_ids: set[str] = set()
-            for index, orcid in enumerate(people):
-                # Current ORCID's remaining DOIs were just resolved above.
-                skip_dois = index == 0
-                paused = _orcid_person_hop0(
-                    client,
-                    orcid,
-                    by_orcid.get(orcid) or [],
-                    run_id=run_id,
-                    gate=gate,
-                    depth=depth,
-                    direction=direction,
-                    max_candidates=max_candidates,
-                    per_hop_limit=per_hop,
-                    year_from=year_from if isinstance(year_from, int) else None,
-                    year_to=year_to if isinstance(year_to, int) else None,
-                    remaining_orcids=people[index + 1 :],
-                    dois_by_orcid=by_orcid,
-                    rows=rows,
-                    failed=failed,
-                    seed_works=seed_works,
-                    seen_ids=seen_ids,
-                    skip_dois=skip_dois,
-                )
-                if paused or client.deferred:
-                    return rows
-        return rows
+        return _resume_seeds(
+            client,
+            deferred,
+            remaining,
+            rows,
+            per_hop=per_hop,
+            year_from=year_from,
+            year_to=year_to,
+            **shared,
+        )
     return rows
