@@ -89,7 +89,8 @@ def wanted_rows(
             )
             if code == "import_ok":
                 continue
-            plain = miss_surface_plain(code) if code else "No stored PDF"
+            plain = miss_surface_plain(code) if code else miss_surface_plain("not_fetched")
+            code = code or "not_fetched"
         if not plain:
             continue
         missing.append(
@@ -102,9 +103,17 @@ def wanted_rows(
         )
 
     item_keys = {it.key for it in items}
-    attach_pending = len(
-        [r for r in manifest.pending_attach() if r.itemKey in item_keys]
-    )
+    pending_keys = {
+        r.itemKey for r in manifest.pending_attach() if r.itemKey in item_keys
+    }
+    for row in have + held:
+        # Main Attach skips DOI mismatches even when the reason field is empty.
+        row["attachable"] = (
+            row.get("key") in pending_keys and row.get("state") != "doi_mismatch"
+        )
+    for row in missing:
+        row["attachable"] = False
+    attach_pending = sum(1 for r in have + held if r.get("attachable"))
 
     return {
         "have": have,

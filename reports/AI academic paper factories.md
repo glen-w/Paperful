@@ -75,7 +75,7 @@ Paste the following into ROADMAP as **Borrow (local, dry-run default, fail close
 | Official PRISMA Word/Shiny from **exact counts**, not AI-illustrated flowcharts ([PRISMA 2020](https://www.prisma-statement.org/prisma-2020-flow-diagram)) | Screen / export | Methods figure, not SciFig “illustration mode” | ROADMAP SR mode |
 | Post-hoc Crossref/retraction checkers (Trinka/Paperpal-class) after draft | Critique | Existence ≠ claim support | ROADMAP critique |
 | MCP **named read jobs** (`ask` vs precedent vs `refs_gap`); writes stay `--apply` | Agent | Match Elicit/Consensus/Bond table stakes without hosted corpus | comparison-reference MCP row |
-| Wanted excellence (stamps, miss reasons, snowball feeding Wanted) | Get PDF | **Recommended next 1.x work**, not Edison-shaped | ROADMAP Wanted |
+| Wanted excellence (stamps, miss reasons, snowball feeding Wanted) | Get PDF | **Foundation shipped**; residual polish, not Edison-shaped | ROADMAP Wanted |
 
 | Stay out (v2 included) | Why | Suggested docs home |
 | --- | --- | --- |
@@ -97,7 +97,7 @@ Paste the following into ROADMAP as **Borrow (local, dry-run default, fail close
 
 ## Keep 1.x as Wanted; call v2 gated packs after the ledger is honest
 
-Paperful already has a **playbook factory** in `docs/research-pack.md` (`refs gap` → ingest → `run` → `dedupe` → optional `summarize`/`ask`) with human gates. `paperful all` is fill+tidy+summarize, **not** a scientist. That is the honest architecture: **factory means a sequence of dry-run verbs**, not Kosmos. Public 1.x copy stays locked: **“find missing PDFs in Zotero.”** Never promise every paywalled PDF. Keep Ask, Discover, and snowball **out of title, meta, share card, and GitHub About**. Sci-Hub remains an opt-in capability in tables and **absent from marketing**. Wanted excellence is the recommended main lane after 1.1.x; stranger evidence decides anything bigger.
+Paperful already has a **playbook factory** in `docs/research-pack.md` (`refs gap` → ingest → `run` → `dedupe` → optional `summarize`/`ask`) with human gates. `paperful all` is fill+tidy+summarize, **not** a scientist. That is the honest architecture: **factory means a sequence of dry-run verbs**, not Kosmos. Public 1.x copy stays locked: **“find missing PDFs in Zotero.”** Never promise every paywalled PDF. Keep Ask, Discover, and snowball **out of title, meta, share card, and GitHub About**. Sci-Hub remains an opt-in capability in tables and **absent from marketing**. Wanted excellence foundation is shipped after 1.1.x; bigger bets wait until that lane stays boring.
 
 Safe **v2 subtitle** (does not replace 1.x): after the Wanted list is honest, grow the collection, keep it current, and ask **your** PDFs. Complementary sentence already in comparison-reference: Edison/Valency when the question is the **public** literature; Paperful when the question is fill, fix, mirror, and reason over **this** collection. Avoid “v2 academic-paper factory” in user-facing launch copy until Wanted has tester evidence; internally, v2 is **named packs** (precedent, conflicting-evidence synthesize, `stuff`, PRISMA counts, watch drift) that stay off until `[llm]`/`[rag]`/gates, plus **at most one bigger bet per year** (systematic-review mode **or** scheduled grey-host watching—not both, and never instead of Wanted).
 

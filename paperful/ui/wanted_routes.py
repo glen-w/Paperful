@@ -146,7 +146,7 @@ def register_wanted(ui: UiContext) -> None:
 
 
     def _pending_fill(data: dict[str, Any]) -> dict[str, Any]:
-        """Discover output not yet in the scoped collection (read-only ledgers)."""
+        """Discover output not yet in the scoped collection (ledger read)."""
         from ..pending_fill import pending_fill
 
         dois = {
@@ -156,8 +156,13 @@ def register_wanted(ui: UiContext) -> None:
         }
         try:
             return pending_fill(cfg, dois)
-        except Exception:
-            return {"rows": [], "total": 0, "by_source": {}}
+        except Exception as exc:
+            return {
+                "rows": [],
+                "total": 0,
+                "by_source": {},
+                "error": f"Waiting list unavailable: {exc}",
+            }
 
     @app.get("/wanted", response_class=HTMLResponse)
     def page_wanted(request: Request, tab: str | None = None, error: str = "") -> HTMLResponse:
@@ -272,6 +277,7 @@ def register_wanted(ui: UiContext) -> None:
                 show_auto_attach_setting=library_has_attached_pdf(cfg),
                 attach_token=_wanted_token("attach"),
                 recover_token=_wanted_token("recover"),
+                pending_token=_wanted_token("pending_fill_add"),
                 wanted_pagination=wanted_pagination,
                 job=job_view(
                     command_by_id(
@@ -529,6 +535,59 @@ def register_wanted(ui: UiContext) -> None:
 
         cmd_id = commands.enqueue(cfg, "inbox_drain", work)
         return RedirectResponse(url=f"/wanted?run={cmd_id}", status_code=303)
+
+
+    @app.post("/wanted/pending-preview")
+    async def wanted_pending_preview(request: Request) -> RedirectResponse:
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        dois = [str(d) for d in form.getlist("pending_dois")]
+        from . import wanted_jobs
+
+        if not (prefs.collection or "").strip():
+            return RedirectResponse(
+                url=_page_url(
+                    "/wanted",
+                    error="Set the collection chip before adding Waiting rows.",
+                ),
+                status_code=303,
+            )
+        if not wanted_jobs._pending_dois(dois):
+            return RedirectResponse(
+                url=_page_url(
+                    "/wanted",
+                    error="Select at least one Waiting row that has a DOI.",
+                ),
+                status_code=303,
+            )
+
+        def work(cmd_id: str) -> None:
+            wanted_jobs.pending_add_preview(
+                cfg,
+                cmd_id,
+                collection=prefs.collection,
+                dois=dois,
+            )
+
+        cmd_id = commands.enqueue(cfg, "pending_fill_add", work)
+        return RedirectResponse(url=f"/wanted?run={cmd_id}", status_code=303)
+
+
+    @app.post("/wanted/pending-apply", response_model=None)
+    async def wanted_pending_apply(request: Request):
+        prefs = prefs_from_request(request)
+        form = await request.form()
+        from . import wanted_jobs
+
+        token = str(form.get("review_token") or "") or _wanted_token("pending_fill_add")
+        ok, msg = wanted_jobs.pending_add_apply(
+            cfg, token=token, collection=prefs.collection
+        )
+        if not ok:
+            return RedirectResponse(
+                url=_page_url("/wanted", error=msg), status_code=303
+            )
+        return RedirectResponse(url="/wanted?tab=missing", status_code=303)
 
 
     @app.post("/wanted/reachout")

@@ -34,7 +34,12 @@
     var attachBtn = document.getElementById("attach-btn");
     if (attachBtn) {
       var attachCount = parseInt(attachBtn.getAttribute("data-attach-count") || "0", 10);
-      attachBtn.disabled = attachCount === 0 && !any;
+      var attachableAny = document.querySelectorAll(
+        "input.row-select:checked:not(:disabled)[data-attachable='1']"
+      ).length > 0;
+      // Enable only when pending attachables exist, or the selection includes
+      // an attachable row (mismatch/short ticks alone stay disabled).
+      attachBtn.disabled = attachCount === 0 && !attachableAny;
     }
   }
   document.querySelectorAll(".row-select").forEach(function (el) {

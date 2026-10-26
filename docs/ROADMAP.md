@@ -28,8 +28,8 @@ Still not a full-text reading index, not a WebDAV client, and not “AI fetch
 everything.” `paperful ocr` is the optional text layer for scans. **1.0.0 and
 1.1.0 are tagged** (1.1.0 on PyPI). **1.1.1** is stop-ship hygiene (shipped in
 tree). **1.2.0** adds snowball stopping rules, off by default. Everything
-after that is a **buffet by area** — keep it on the map, pick later, prefer
-evidence from outside testers. See [After 1.1.0](#after-110-buffet-by-area).
+after that is a **buffet by area** — keep it on the map, pick later.
+See [After 1.1.0](#after-110-buffet-by-area).
 
 (product-split-10-vs-post-10)=
 ## Product split: 1.0 vs post-1.0
@@ -47,9 +47,10 @@ integrations.
 
 **1.1.x vs later (still not a calendar).** 1.1.0 is the PyPI cut. **1.1.1**
 closes Wanted scoping, ticks, Attach-at-zero, version drift, and first-hour
-copy. After that the map is a buffet: **Wanted excellence** is the recommended
-main lane; Repair/Mirror, Ask depth, new sources, digest, embeddings, and
-bigger bets wait on outside-tester evidence. Detail by area below.
+copy. After that the map is a buffet: **Wanted excellence** foundation is
+shipped (keep residual polish here); Repair/Mirror, Ask depth, new sources,
+digest, embeddings, and bigger bets wait until that lane stays boring. Detail
+by area below.
 
 (after-110-v2-factory-framing)=
 **1.x vs v2 (factory, still not a calendar).** Public 1.x copy stays
@@ -67,20 +68,14 @@ packs: [v2 factory](#after-110-paper-factory).
 ## After 1.1.0 (buffet by area)
 
 Contributor map, not a commitment calendar. **Include all of it for now;
-choose later.** An item lands in a release only when an outside issue or a
-tester report backs it — or when it is stop-ship (1.1.1). Merged 16 Oct 2026
-from the post-v1 options compile (checked against `main` at `ae21bfb`).
+choose later.** Merged 16 Oct 2026 from the post-v1 options compile
+(checked against `main` at `ae21bfb`).
 
 **Working stance:**
 
 1. **Ship 1.1.1** (scoping, ticks, Attach guard, version single-source, copy).
-2. **Run an outside-tester round before any new features.** 3–4 librarians or
-   researchers running Wanted on a real library is the floor; 5–10 is the
-   ceiling. Their miss/fill counts become screenshots, quotes, and (if ever)
-   paid-report evidence. The only demand number today is one library’s
-   “Missing 946”.
-3. **Make Wanted excellent** as the one main lane. Stranger evidence decides
-   anything bigger.
+2. **Keep Wanted excellent** as the one main lane (foundation shipped).
+   Bigger bets wait until that lane stays boring.
 
 Paperful knows what you *own*, which feed readers and discovery tools do not.
 The open question behind the longer bets: what would make a researcher open
@@ -119,23 +114,26 @@ Landed in tree (tag when ready). Implementation notes:
 (after-110-wanted)=
 ### Wanted (main lane)
 
-**Recommended next product work after 1.1.1.** It is what the site, share
-card, and paid cleaning report (`doi_match` only) already promise.
+**Foundation shipped** (stamps, miss reasons, hand-ticks, report cards,
+Waiting→add). It is what the site, share card, and paid cleaning report
+(`doi_match` only) already promise. Residual polish stays here; bigger
+workbench bets wait until this lane stays boring.
 
 - Stamps you can trust: a **found** stamp only on `doi_match` cards, a
   **check** stamp on mismatches, no “% complete”. The paid report reuses the
-  same cards, so “N found” equals the number of stamps.
-- Hand-ticks (Missing and Held).
-- A one-line reason for each miss.
-- Snowball / digest **kept** items feed Wanted (strengthen this lane rather
-  than opening a second fill desk).
+  same cards, so “N found” equals the number of **Found** stamps.
+- Hand-ticks (Missing and Held). Attach enables only for attachable ticks
+  (main Attach still skips mismatch/short unless Advanced).
+- A one-line reason for each miss (including **not_fetched** when never run).
+- Snowball / digest **kept** items feed Wanted via **Waiting from Discover**
+  (Preview add → Apply → Missing); not a second fill desk.
 
-Workbench layers after this lane proves out, not instead of it:
+Workbench layers after this lane stays boring, not instead of it:
 
 | Option | For | Against | When |
 | --- | --- | --- | --- |
-| **A. Wanted excellent** | Already the public promise | Less flashy | **Now** (after 1.1.1 + testers) |
-| B. Repair / Mirror GUI (workbench vision) | Library hygiene is a real pain | More places that write to the library, so more trust copy | After A |
+| **A. Wanted excellent** | Already the public promise | Less flashy | **Shipped** (bolster as needed) |
+| B. Repair / Mirror GUI (workbench vision) | Library hygiene is a real pain | More places that write to the library, so more trust copy | After A is boring |
 | C. Ask / Index depth | Differentiating if it works | Weakest trust story; usage unknown | Keep optional, last |
 
 (after-110-discovery)=
@@ -549,7 +547,7 @@ Paperpal / Overleaf = draft; PaperQA2 / GPT Researcher / STORM = local or
 web reports. Detail: [comparison reference](comparison-reference.md#paper-factory-stages).
 
 **1.x stays Wanted.** v2 packs stay off until `[llm]` / `[rag]` / gates, and
-until Wanted has tester evidence. Do not grow 1.x into a second product.
+until Wanted is honest. Do not grow 1.x into a second product.
 
 **Borrow (local, dry-run default, fail closed):**
 
@@ -632,13 +630,13 @@ Launch gates, in order:
 
 Then: a plain-text “What it won’t do” section and FAQ. Never mention
 Sci-Hub in copy, keywords, or alt text. Describe Camofox only as an
-optional scripted browser. After a stranger test passes: one honest listing
-each on the Zotero forums and a tools directory. Cross-link from
-glenwright.earth and glenwright.net.
+optional scripted browser. Then: one honest listing each on the Zotero
+forums and a tools directory. Cross-link from glenwright.earth and
+glenwright.net.
 
 Outreach order: launch gates → tag 1.1.1 → quiet outreach to the Zotero
-forums and research-software circles, alongside testers → Show HN →
-LinkedIn in the operator’s own voice, link in the comments.
+forums and research-software circles → Show HN → LinkedIn in the
+operator’s own voice, link in the comments.
 
 **Cohort:** keep the tools separate, with no suite page. TranscriptX and
 Transcribe can go out as a joint post. Rollup cannot say “1.0” until it is
@@ -687,10 +685,9 @@ Do not start these until testers ask, or until the main lane is boring.
 - **Mendeley / EndNote “supported”** — promote only after a single call
   for testers gets replies. [Seeking testers](#mendeley-and-endnote-seeking-testers).
 
-Repo hygiene (not a product feature): freeze the post-1.0 list so an item
-is added only when an outside issue or tester report backs it. Splitting
-this file into decisions plus `docs/backlog/` stays available if the map
-gets unwieldy; it is not a prerequisite for picking from the buffet.
+Repo hygiene (not a product feature): splitting this file into decisions
+plus `docs/backlog/` stays available if the map gets unwieldy; it is not a
+prerequisite for picking from the buffet.
 
 (after-110-sequence)=
 ### One possible order (not a calendar)
@@ -699,18 +696,16 @@ gets unwieldy; it is not a prerequisite for picking from the buffet.
    version single-source, first-hour copy.
 2. **Launch gates** — paperful.io strip, share image, robots, title,
    GitHub About.
-3. **Outside-tester round** (3–10), with opt-in run reports on, before new
-   features.
-4. **Wanted excellence** — stamps, reasons, hand-ticks; snowball results
-   feeding Wanted.
-5. **Cheap OpenAlex housekeeping** alongside 1.1.x (date stamp, stale
+3. **Wanted excellence** — **shipped** (stamps, reasons, hand-ticks,
+   Waiting→add); keep honesty polish here.
+4. **Cheap OpenAlex housekeeping** alongside 1.1.x (date stamp, stale
    figure, keyword snapshot test, watch baseline reset, snapshot-reload
    note).
-6. **Then decide with evidence:** hand-built weekly digest → alert loop,
-   OSF and author-site parsers, Docker, EmbeddingGemma benchmark then
-   dedupe / “papers like this”, borrow SnowBallSLR stopping rule / drift
-   cache / PRISMA counts, Repair/Mirror, grounded brief once Ask’s trust
-   story is solid, then **one** bigger bet (systematic-review mode or
+5. **Then decide:** hand-built weekly digest → alert loop, OSF and
+   author-site parsers, Docker, EmbeddingGemma benchmark then dedupe /
+   “papers like this”, borrow SnowBallSLR stopping rule / drift cache /
+   PRISMA counts, Repair/Mirror, grounded brief once Ask’s trust story is
+   solid, then **one** bigger bet (systematic-review mode or
    grey-literature watchers).
 
 (after-110-open-questions)=
@@ -726,8 +721,6 @@ gets unwieldy; it is not a prerequisite for picking from the buffet.
   without Docker; switch to `pipx` / `uv tool` now; keep Docker for
   operators; or a one-line PyPI install as the public story.
 - Agree that **Wanted** is the one main lane for now?
-- Who are the first outside testers, how many (3–4 / 5 / 5–10), and where
-  to ask (Zotero forums, r/AskAcademia, existing network)?
 - Should the CLI default to `--strict-pdf-doi`?
 - Stance on legal and fetch questions, and on accepting outside
   contributions?
@@ -2262,7 +2255,7 @@ second doc tree that drifts from the CLI.
 - Site career / domain timeline plan (consumer of durable tags):
   `/Users/89298/Documents/website/glen-w.github.io/docs/dev/career-timeline-plan.md`
 - [firefox.md](firefox.md) — optional Firefox add-on; mirror writes, Zotero read
-- [After 1.1.0 (buffet by area)](#after-110-buffet-by-area) — Wanted, testers,
+- [After 1.1.0 (buffet by area)](#after-110-buffet-by-area) — Wanted,
   digest, embeddings, review methods, launch, parked bets
 
 ## GUI
@@ -2289,10 +2282,10 @@ default and explicit Apply. Not a second fetch stack or Zotero’s reader.
 The optional [Firefox add-on](firefox.md) saves pages into the mirror and
 does not attach.
 
-Post-1.1: **Wanted is the recommended main lane** (stamps, hand-ticks, miss
-reasons) before Repair/Mirror polish or Ask depth —
-[Wanted](#after-110-wanted). 1.1.1 stop-ship items (Grab-selected keys, Held
-ticks, Attach-at-zero) are [1.1.1](#after-110-1-1-1). Whether Ask stays on
+Post-1.1: **Wanted excellence foundation is shipped** (stamps, hand-ticks, miss
+reasons, Waiting→add); keep honesty polish here before Repair/Mirror or Ask
+depth — [Wanted](#after-110-wanted). 1.1.1 stop-ship items (Grab-selected keys,
+Held ticks, Attach-at-zero) are [1.1.1](#after-110-1-1-1). Whether Ask stays on
 the default nav is [open](#after-110-open-questions).
 
 **Ask (default nav, opt-in):** **Shipped** — `/ask` runs scoped chat with citations

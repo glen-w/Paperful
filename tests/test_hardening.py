@@ -430,7 +430,9 @@ def test_attach_post_at_zero_is_409_and_writes_nothing(ui_client, cfg, monkeypat
 
     _wanted_env(cfg, monkeypatch, with_pending=False)
     wrote: list[list[str]] = []
-    monkeypatch.setattr(jobs, "_attach_keys", lambda _c, keys: wrote.append(keys) or 0)
+    monkeypatch.setattr(
+        jobs, "_attach_keys", lambda _c, keys, **_kw: wrote.append(keys) or 0
+    )
     ui_client.cookies.set("pf_collection", "ocean")
     res = ui_client.post("/wanted/attach", data={}, follow_redirects=False)
     assert res.status_code == 409

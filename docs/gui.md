@@ -87,18 +87,21 @@ Non-loopback bind (`--host 0.0.0.0`) requires `--allow-remote-bind` and still ha
    A library PDF flag with no file on the mirror (`verification` `missing`,
    “No PDF file on disk”) lands on **Missing** with the missing-file icon.
    The default tab is the first non-empty bucket (Missing → Held → Have).
-   **Waiting from Discover** (a read-only panel above the tabs) lists kept
-   queue rows and watch / keepup / authorwatch inbox rows that are not yet in
-   the collection; each row can show a **Why suggested** line from the
-   candidate's `why`. Add them from Discover and they appear under Missing.
+   **Waiting from Discover** (panel above the tabs) lists kept queue rows and
+   watch / keepup / authorwatch inbox rows that are not yet in the collection;
+   each row can show a **Why suggested** line from the candidate's `why`.
+   **Preview add** → **Apply add** creates metadata parents in this collection
+   (DOI rows only); they then appear under Missing. Title-only rows still need
+   Discover.
    **Preview** → **Grab** (fetch to the `out/` folder on this computer;
    selected vs all; Grab passes the same `item_keys` as the preview token).
    **Manual** (default): **Attach** writes attachable pending PDFs into
    Zotero (`doi_match` and hand-ticked rows on **Held** with a pending file).
    The main button skips DOI mismatches and short PDFs (use Advanced Attach
    to override). CLI `paperful run` still attaches mismatches unless you pass
-   `--strict-pdf-doi`. The label shows **Attach N PDFs** when N are pending;
-   the button is disabled when N is 0 and no rows are ticked. **Attach** needs
+   `--strict-pdf-doi`.    The label shows **Attach N PDFs** when N are pending;
+   the button is disabled when N is 0 and no **attachable** rows are ticked
+   (mismatch/short ticks alone stay disabled on the main button). **Attach** needs
    Zotero 10 or newer; on 7–9, attach files in Zotero. **Automatic** (Settings
    → **After Grab**, shown only after at least one successful Attach): Grab
    also attaches when the library supports write. Zotero 7–9 never receives
@@ -221,6 +224,8 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/wanted/recover` | Consume token; `recover` |
 | POST | `/wanted/handoff` | `list` / `tabs` / `walk` / `watch` (never fetches) |
 | POST | `/wanted/inbox/drain` | One-shot inbox drain |
+| POST | `/wanted/pending-preview` | Review token: add Waiting-from-Discover DOIs (metadata only) |
+| POST | `/wanted/pending-apply` | Consume token; create parents → Missing |
 | POST | `/wanted/reachout` | Export contact rows; optional RG tabs |
 | POST | `/wanted/summarize` | Enqueue single-item `summarize`; redirect `?run=` |
 | GET | `/item/{key}/summary` | Per-item HTML under `state/summaries/` |

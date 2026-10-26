@@ -30,7 +30,7 @@ Item records and create-missing restore are locked; extra item keys may still
 be added. Required `paperful.run_report.v1` keys and imported-file attach
 (typed `attach_failed`, provenance note) are the contract. **1.1.1** shipped
 Wanted stop-ship hygiene (Grab scope, Attach at zero, copy). Everything after
-that is a buffet by area (Wanted excellence first, testers before new features).
+that is a buffet by area (Wanted excellence foundation shipped; residual polish).
 **1.4.0** ships the local manuscript critique pack (optional Vale / GROBID /
 glossary), Ask `simple`/`advanced` modes, and a CLI/workbench module split
 (`*_cmd.py`, desk row builders, Discover `handle_*` routes). **1.3.1** hardens local-trust boundaries (PDF fetch SSRF checks, review-token

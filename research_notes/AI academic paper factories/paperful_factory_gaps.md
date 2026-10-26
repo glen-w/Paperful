@@ -126,7 +126,7 @@ Edison (Literature / Precedent / Kosmos / Analysis / Molecules) is **already tab
 5. **Evidence-table export / claim tracking (supports/contrasts/mentions)** — stretch under Summaries, briefs, and Ask; also parked on `stuff` later slice. — [docs/ROADMAP.md — Summaries, briefs, and Ask](file:///Users/89298/Documents/paperful/docs/ROADMAP.md)
 6. **Scheduled grey-literature host watching** (meeting docs / RFMO) — bigger bet; playbooks shipped, **scheduled watching** is not. — [docs/ROADMAP.md — Bigger bets](file:///Users/89298/Documents/paperful/docs/ROADMAP.md)
 7. **OpenAlex topic follow / library gap map / grouping Wanted by subfield** — opportunity after Jan 2027 classifier; Paperful currently does not request topics. — [docs/ROADMAP.md — OpenAlex topics](file:///Users/89298/Documents/paperful/docs/ROADMAP.md)
-8. **Wanted excellence** (stamps, miss reasons, snowball feeding Wanted) is the **recommended next product work**, not Edison-shaped. — [docs/ROADMAP.md — Wanted](file:///Users/89298/Documents/paperful/docs/ROADMAP.md)
+8. **Wanted excellence** (stamps, miss reasons, snowball feeding Wanted) is **foundation shipped**; residual honesty polish, not Edison-shaped. — [docs/ROADMAP.md — Wanted](file:///Users/89298/Documents/paperful/docs/ROADMAP.md)
 9. **Response-hash cache with drift classification** for watches (SnowBallSLR borrow, unshipped). — [docs/ROADMAP.md — Snowballing and review methods](file:///Users/89298/Documents/paperful/docs/ROADMAP.md)
 10. **Shared lab library / collaboration without SaaS** (Syncthing/git, attach locks) — later; needs auth if tenancy. — [docs/ROADMAP.md — Maybe later §8](file:///Users/89298/Documents/paperful/docs/ROADMAP.md); [docs/ROADMAP.md — Bigger bets](file:///Users/89298/Documents/paperful/docs/ROADMAP.md)
 
@@ -224,7 +224,7 @@ Keep **1.x = find missing PDFs in Zotero (Wanted) + honest disk mirror**. Frame 
 
 **v1 pitch already locked:** “the clean-up step that comes after discovery tools, not a rival to them.” “Never promise every paywalled PDF.” Own **“find missing PDFs in Zotero”**. Keep Ask/Discover/snowball out of title/meta/share/GitHub About. PyPI README leads with Wanted. Hold Repair and further Ask until Wanted proves out. — [docs/ROADMAP.md — Findability and launch](file:///Users/89298/Documents/paperful/docs/ROADMAP.md)
 
-**Working stance:** Wanted excellent as the one main lane; stranger evidence decides anything bigger. Open question: what would make a researcher open Paperful every week, not just once to fill gaps? — [docs/ROADMAP.md — After 1.1.0](file:///Users/89298/Documents/paperful/docs/ROADMAP.md)
+**Working stance:** Keep Wanted excellent as the one main lane (foundation shipped); bigger bets wait until that lane stays boring. Open question: what would make a researcher open Paperful every week, not just once to fill gaps? — [docs/ROADMAP.md — After 1.1.0](file:///Users/89298/Documents/paperful/docs/ROADMAP.md)
 
 **Jobs copy:** “Paperful is a research helper for a reference library you already keep. It cleans the records, finds missing PDFs, and summarises papers, then keeps a platform-agnostic mirror… The work stays on this machine.” — [docs/why.md](file:///Users/89298/Documents/paperful/docs/why.md)
 

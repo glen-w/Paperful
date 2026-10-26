@@ -86,9 +86,9 @@ The screenshots are `ocean/BBNJ`. The clicks are the same for any collection.
   Discover queue, or that a topic watch, keepup digest, or author watch
   proposed, and that are not in this collection yet. Rows can show
   **Why suggested** from the candidate's `why`. It is the same fill desk, not
-  a second one: add them in Discover (metadata only), then they show up under
-  Missing for Preview and Grab. The panel has no buttons of its own and never
-  writes.
+  a second one: **Preview add** → **Apply add** creates metadata parents for
+  ticked DOIs, then they show up under Missing for Preview and Grab.
+  Title-only rows still need Discover.
 - Open access first. Campus EZProxy is the **Campus** preset after
   `paperful session login ezproxy` on the host — [EZProxy](ezproxy.md).
 - Not every paywalled or DOI-less item comes back.

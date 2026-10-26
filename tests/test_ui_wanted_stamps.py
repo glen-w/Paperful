@@ -150,6 +150,7 @@ def test_missing_rows_have_visible_reason_line(wanted_client):
     reasons = re.findall(r'<span class="miss-reason"[^>]*>([^<]+)</span>', page.text)
     assert len(reasons) == 2
     assert "No DOI or identifier to search" in reasons
+    assert "No PDF yet — not fetched" in reasons
     assert 'data-stamp=' not in page.text
 
 
@@ -298,10 +299,35 @@ def test_wanted_page_lists_pending_fill_without_second_desk(tmp_path, monkeypatc
     assert 'id="pending-fill"' in text
     assert text.count("data-pending-source=") == 4
     assert "Kept paper" in text and "Skipped" not in text.split('id="pending-fill"')[1].split("</section>")[0]
-    # The feed adds no write controls: no extra Grab/Attach forms in the panel.
+    # Same fill desk: Preview add / Apply add live on Wanted (no Grab/Attach here).
     panel = text.split('id="pending-fill"')[1].split("</section>")[0]
-    assert "<form" not in panel and "<button" not in panel
+    assert 'id="pending-fill-form"' in panel
+    assert "Preview add" in panel
+    assert 'name="pending_dois"' in panel
     assert "Why suggested: cited by 2 of your seeds" in panel
+
+
+def test_attachable_flag_only_on_pending_attach_rows(tmp_path):
+    cfg, items, manifest = _mixed(tmp_path)
+    data = wanted_rows(cfg, items, manifest)
+    by_key = {r["key"]: r for r in data["have"] + data["held"] + data["missing"]}
+    assert by_key["MATCH"]["attachable"] is True
+    assert by_key["MISM"]["attachable"] is False  # doi_mismatch never main-attachable
+    assert by_key["UNVER"]["attachable"] is True
+    assert by_key["SNAP"]["attachable"] is True
+    assert by_key["MISS"]["attachable"] is False
+    assert by_key["NODOI"]["attachable"] is False
+    assert by_key["MISS"]["miss_surface"] == "not_fetched"
+    assert data["counts"]["attach"] == 3
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_attachable_rows_get_data_attribute(wanted_client):
+    text = wanted_client.get("/wanted?tab=held").text
+    boxes = re.findall(r'<input type="checkbox" name="keys"[^>]*>', text)
+    assert any('data-attachable="1"' in b for b in boxes)
+    mism = next(b for b in boxes if 'value="MISM"' in b)
+    assert "data-attachable" not in mism
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
@@ -434,9 +460,10 @@ def test_misses_csv_carries_reason_codes_for_checks_and_misses(tmp_path):
     assert rows["UNVER"]["stamp"] == "check" and rows["UNVER"]["reason_code"] == "no_doi_in_file"
     assert rows["SNAP"]["stamp"] == "check" and rows["SNAP"]["reason_code"] == "htmlpdf"
     assert rows["NODOI"]["stamp"] == "missing" and rows["NODOI"]["reason_code"] == "no_doi"
-    # Never attempted: no code yet, but the one-line reason is still present.
+    # Never attempted: not_fetched with a one-line reason.
     assert rows["MISS"]["stamp"] == "missing"
-    assert rows["MISS"]["reason"] == "No stored PDF"
+    assert rows["MISS"]["reason_code"] == "not_fetched"
+    assert rows["MISS"]["reason"] == "No PDF yet — not fetched"
     assert "MATCH" not in rows
     assert all(r["reason"] for r in rows.values())
 
@@ -503,7 +530,11 @@ def test_held_mismatch_needs_explicit_override_to_attach(tmp_path, monkeypatch):
     items = [_Item(k, k, "10.1/a", True) for k in ("OK", "MISM", "SHORT")]
     monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: (items, manifest))
     written: list[list[str]] = []
-    monkeypatch.setattr(jobs, "_attach_keys", lambda _c, keys: written.append(list(keys)) or len(keys))
+    monkeypatch.setattr(
+        jobs,
+        "_attach_keys",
+        lambda _c, keys, **_kw: written.append(list(keys)) or len(keys),
+    )
 
     # Ticking a held mismatch and pressing the main Attach does nothing.
     ok, msg, n = jobs.attach_run(cfg, keys=["MISM"], collection="ocean")
@@ -573,3 +604,155 @@ def test_ticked_missing_rows_scope_grab_and_unticked_uses_missing_list(tmp_path,
     assert {it.key for it in held_tick} == {"MISM", "UNVER"}
     default, _ = jobs.scope_for_fetch(cfg, "ocean", None, None)
     assert {it.key for it in default} == {"MISS", "NODOI"}
+
+
+def test_attach_run_skips_doi_mismatch_without_strict_reason(tmp_path, monkeypatch):
+    """Main Attach must refuse mismatch even when reason= is empty."""
+    cfg = _cfg(tmp_path)
+    manifest = Manifest(cfg.manifest_path)
+    manifest.write(
+        Record(
+            itemKey="MISM",
+            status=STATUS_OK,
+            doi="10.1/b",
+            pdf_doi="10.9/x",
+            source="unpaywall",
+            path="MISM.pdf",
+            reason="",
+        )
+    )
+    items = [_Item("MISM", "Mismatched", "10.1/b", True)]
+    monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: (items, manifest))
+    written: list[list[str]] = []
+    monkeypatch.setattr(
+        jobs,
+        "_attach_keys",
+        lambda _c, keys, **_kw: written.append(list(keys)) or len(keys),
+    )
+    ok, msg, n = jobs.attach_run(cfg, keys=["MISM"], collection="ocean")
+    assert (ok, n) == (False, 0)
+    assert "no attachable" in msg
+    assert written == []
+    data = wanted_rows(cfg, items, manifest)
+    held = {r["key"]: r for r in data["held"]}
+    assert held["MISM"]["attachable"] is False
+    assert data["counts"]["attach"] == 0
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_pending_fill_error_surfaces_on_wanted(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    cfg, items, manifest = _mixed(tmp_path)
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _cfg, probe=False: [])
+    monkeypatch.setattr(
+        "paperful.ui.app.collections_tree", lambda _cfg: {"ok": True, "collections": []}
+    )
+    monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: (items, manifest))
+
+    def boom(_cfg, _dois=None):
+        raise RuntimeError("ledger unreadable")
+
+    monkeypatch.setattr("paperful.pending_fill.pending_fill", boom)
+    client = TestClient(create_app(cfg))
+    client.cookies.set("pf_collection", "ocean")
+    text = client.get("/wanted").text
+    assert 'id="pending-fill"' in text
+    assert "Waiting list unavailable" in text
+    assert "ledger unreadable" in text
+
+
+def test_pending_add_preview_and_apply(tmp_path, monkeypatch):
+    import time
+
+    from paperful.ui import commands as commands_mod
+    from paperful.ui import wanted_jobs
+
+    cfg = _cfg(tmp_path)
+    created: list[str] = []
+
+    class _Backend:
+        def items_in_scope(self, _scope):
+            return []
+
+        def flush(self):
+            return None
+
+    class _Batch:
+        def counts(self):
+            return {"rows": 1, "created": 1, "exists": 0, "unresolved": 0, "held": 0, "failed": 0}
+
+    monkeypatch.setattr(wanted_jobs, "open_library", lambda _c: _Backend(), raising=False)
+    monkeypatch.setattr(
+        "paperful.catalogue.open_library", lambda _c: _Backend()
+    )
+    monkeypatch.setattr(
+        "paperful.ingest_dois.classify_rows",
+        lambda dois, *_a, **_k: _Batch(),
+    )
+    monkeypatch.setattr(
+        "paperful.ingest_dois.write_summary",
+        lambda *_a, **_k: cfg.state_dir / "ingest-summary.json",
+    )
+    monkeypatch.setattr(
+        "paperful.ingest_dois.default_resolver", lambda _email: (lambda doi: None)
+    )
+    monkeypatch.setattr(
+        "paperful.ingest_dois.apply_creates",
+        lambda _b, _batch, coll, **_k: created.append(coll),
+    )
+    monkeypatch.setattr(
+        "paperful.ingest_dois.ingest_tags", lambda **_k: []
+    )
+    monkeypatch.setattr(
+        "paperful.acronyms.load_acronym_allowlist", lambda _p: set()
+    )
+    monkeypatch.setattr(
+        "paperful.identity.LibraryFingerprint.from_items",
+        lambda *_a, **_k: object(),
+    )
+
+    cmd_id = "pend1"
+    commands_mod.write_command(
+        cfg,
+        {
+            "id": cmd_id,
+            "verb": "pending_fill_add",
+            "status": "running",
+            "review_token": "",
+            "error": "",
+            "report_path": "",
+            "created": time.time(),
+        },
+    )
+    token = wanted_jobs.pending_add_preview(
+        cfg,
+        cmd_id,
+        collection="ocean",
+        dois=["10.1234/new.work", "not-a-doi", "10.1234/new.work"],
+    )
+    review = commands_mod.load_review(cfg, token)
+    assert review["verb"] == "pending_fill_add"
+    assert review["flags"]["dois"] == ["10.1234/new.work"]
+    ok, msg = wanted_jobs.pending_add_apply(cfg, token=token, collection="ocean")
+    assert ok, msg
+    assert created == ["ocean"]
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_pending_preview_rejects_empty_selection(tmp_path, monkeypatch):
+    from urllib.parse import unquote_plus
+
+    from fastapi.testclient import TestClient
+
+    cfg, items, manifest = _mixed(tmp_path)
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _cfg, probe=False: [])
+    monkeypatch.setattr(
+        "paperful.ui.app.collections_tree", lambda _cfg: {"ok": True, "collections": []}
+    )
+    monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: (items, manifest))
+    client = TestClient(create_app(cfg))
+    client.cookies.set("pf_collection", "ocean")
+    res = client.post("/wanted/pending-preview", data={}, follow_redirects=False)
+    assert res.status_code == 303
+    assert "Select at least one" in unquote_plus(res.headers.get("location") or "")

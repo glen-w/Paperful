@@ -22,7 +22,15 @@ def test_frozen_enum_codes():
             "license_blocked",
             "import_ok",
             "snapshot",
+            "not_fetched",
         }
+    )
+
+
+def test_project_not_fetched_when_never_run_with_doi():
+    assert (
+        project_miss_surface(doi="10.1/x", has_pdf=False, status="", attempts=[])
+        == "not_fetched"
     )
 
 

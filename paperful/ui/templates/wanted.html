@@ -12,17 +12,38 @@
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
 {{ job_status(job) }}
 <p class="counts">Have {{ counts.have }} · Held {{ counts.held }} · Missing {{ counts.missing }}{% if prefs.collection %} · <a href="/wanted/report?format=md">Report</a>{% endif %}</p>
-{% if pending and pending.total %}
+{% if pending and (pending.total or pending.error) %}
 <section class="panel pending-fill" id="pending-fill">
   <h2>Waiting from Discover <span class="counts">{{ pending.total }}</span></h2>
-  <p class="section-lede">Papers you kept, or that a watch or keepup digest proposed, and that are not in this collection yet. Add them in Discover (metadata only); they then appear under <strong>Missing</strong> here for Preview and Grab.
+  {% if pending.error %}<div class="error-banner">{{ pending.error }}</div>{% endif %}
+  <p class="section-lede">Papers you kept, or that a watch or keepup digest proposed, and that are not in this collection yet. Preview add → Apply creates metadata parents in this collection; they then appear under <strong>Missing</strong> for Preview and Grab.
     <a href="/discover?tab=queue">Open queue</a> · <a href="/discover?tab=following">Following</a></p>
-  <ul class="pending-list">
-    {% for row in pending.rows[:10] %}
-    <li data-pending-source="{{ row.source }}">{{ row.title or row.doi }} <span class="chip-summary">{{ row.source_plain }}</span>{% if row.why %}<span class="row-why">Why suggested: {{ row.why }}</span>{% endif %}</li>
-    {% endfor %}
-  </ul>
-  {% if pending.total > 10 %}<p class="section-lede">and {{ pending.total - 10 }} more.</p>{% endif %}
+  {% if pending.total %}
+  <form method="post" action="/wanted/pending-preview" class="form-stack" id="pending-fill-form">
+    <ul class="pending-list">
+      {% for row in pending.rows[:10] %}
+      <li data-pending-source="{{ row.source }}">
+        {% if row.doi %}
+        <label><input type="checkbox" name="pending_dois" value="{{ row.doi }}" class="pending-select" checked> {{ row.title or row.doi }}</label>
+        {% else %}
+        <span>{{ row.title }}</span> <span class="chip-summary">no DOI — add in Discover</span>
+        {% endif %}
+        <span class="chip-summary">{{ row.source_plain }}</span>{% if row.why %}<span class="row-why">Why suggested: {{ row.why }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% if pending.total > 10 %}<p class="section-lede">and {{ pending.total - 10 }} more (open Discover to add the rest).</p>{% endif %}
+    <div class="toolbar">
+      <button type="submit">Preview add</button>
+      {{ info("Classify the ticked DOIs against this collection without writing. Rows without a DOI stay for Discover.") }}
+      {% if pending_token %}
+      <button type="submit" formaction="/wanted/pending-apply" formmethod="post" class="secondary">Apply add</button>
+      <input type="hidden" name="review_token" value="{{ pending_token }}">
+      {{ info("Create metadata parents for the last successful Preview add. They land under Missing.") }}
+      {% endif %}
+    </div>
+  </form>
+  {% endif %}
 </section>
 {% endif %}
 <div class="tabs">
@@ -214,6 +235,7 @@
   {% for row in rows %}
   <tr>
     <td><input type="checkbox" name="keys" value="{{ row.key }}" form="wanted-form" class="row-select"
+      {% if row.attachable %}data-attachable="1"{% endif %}
       {% if row.ticked %}checked{% endif %}></td>
     <td>{{ row.title }}
       {% if row.miss_plain %}<span class="miss-reason" data-miss-surface="{{ row.miss_surface }}">{{ row.miss_plain }}</span>{% endif %}

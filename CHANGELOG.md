@@ -6,6 +6,15 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+### Changed
+
+- **Wanted excellence bolster.** Attach enables only for attachable ticks
+  (DOI mismatches stay off the main button even when the reason field is
+  empty). Never-run misses use `not_fetched` (“No PDF yet — not fetched”).
+  **Waiting from Discover** gains Preview add → Apply add (metadata parents
+  into the scoped collection, then Missing). Waiting-list ledger errors
+  surface instead of an empty panel.
+
 ## 1.4.0 — 2026-10-26
 
 ### Changed
@@ -169,7 +178,7 @@ may still be added). See [releases](docs/releases.md).
 
 ## 1.1.1 — 2026-10-16
 
-Stop-ship hygiene before outside testers and launch gates.
+Stop-ship hygiene before launch gates.
 
 ### Fixed
 

@@ -318,13 +318,21 @@ def attach_run(
     collection: str,
 ) -> tuple[bool, str, int]:
     """Attach selected pending PDFs to Zotero (doi_match defaults + hand-ticks)."""
+    from .verify import file_verification
+
     posted = [k.strip() for k in keys if k and str(k).strip()]
     items, manifest = _load_scope_items(cfg, collection)
+    item_doi = {it.key: getattr(it, "doi", None) for it in items}
+
+    def _main_attachable(rec: Any) -> bool:
+        ver = file_verification(rec, item_doi=item_doi.get(rec.itemKey))
+        return ver.get("state") != "doi_mismatch"
+
     if posted:
         pending = [
             r
             for r in manifest.pending_attach()
-            if r.itemKey in set(posted)
+            if r.itemKey in set(posted) and _main_attachable(r)
         ]
         if not pending:
             return False, "no attachable PDFs for that selection", 0
@@ -332,22 +340,38 @@ def attach_run(
     else:
         item_keys = {it.key for it in items}
         pending = [
-            r for r in manifest.pending_attach() if r.itemKey in item_keys
+            r
+            for r in manifest.pending_attach()
+            if r.itemKey in item_keys and _main_attachable(r)
         ]
         if not pending:
             return False, "no attachable PDFs", 0
         scoped_keys = [r.itemKey for r in pending]
-    n = _attach_keys(cfg, scoped_keys)
+    n = _attach_keys(cfg, scoped_keys, item_doi=item_doi)
     if n == 0:
         return False, "no attachable PDFs", 0
     return True, "", n
 
 
-def _attach_keys(cfg: Config, keys: list[str]) -> int:
+def _attach_keys(
+    cfg: Config,
+    keys: list[str],
+    *,
+    item_doi: dict[str, Any] | None = None,
+) -> int:
+    from .verify import file_verification
+
     if not keys:
         return 0
     m = Manifest(cfg.manifest_path)
-    pending = [r for r in m.pending_attach() if r.itemKey in keys]
+    dois = item_doi or {}
+    pending = [
+        r
+        for r in m.pending_attach()
+        if r.itemKey in keys
+        and file_verification(r, item_doi=dois.get(r.itemKey)).get("state")
+        != "doi_mismatch"
+    ]
     if not pending:
         return 0
     if attach_fn is not None:

@@ -1,7 +1,8 @@
-"""Wanted Advanced jobs: attach, recover, handoff, inbox drain, reachout."""
+"""Wanted Advanced jobs: attach, recover, handoff, inbox drain, reachout, pending add."""
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any, Callable
 
@@ -356,3 +357,140 @@ def reachout_run(
             )
     _attach_result(cfg, cmd_id, result)
     return result
+
+
+def _pending_dois(raw: list[str] | None) -> list[str]:
+    from ..resolve import normalize_doi
+
+    seen: set[str] = set()
+    out: list[str] = []
+    for entry in raw or []:
+        doi = normalize_doi(str(entry or "").strip())
+        if not doi or doi in seen:
+            continue
+        seen.add(doi)
+        out.append(doi)
+    return out
+
+
+def pending_add_preview(
+    cfg: Config,
+    cmd_id: str,
+    *,
+    collection: str,
+    dois: list[str],
+) -> str:
+    """Dry-run: classify Waiting-from-Discover DOIs into the scoped collection."""
+    from ..acronyms import load_acronym_allowlist
+    from ..catalogue import open_library
+    from ..identity import LibraryFingerprint
+    from ..ingest_dois import classify_rows, default_resolver, write_summary
+
+    coll = (collection or "").strip()
+    if not coll:
+        raise ValueError("Set the collection chip before adding Waiting rows.")
+    clean = _pending_dois(dois)
+    if not clean:
+        raise ValueError("Select at least one Waiting row that has a DOI.")
+    backend = open_library(cfg)
+    all_items = (
+        list(backend.items_in_scope(None))
+        if hasattr(backend, "items_in_scope")
+        else []
+    )
+    fingerprint = LibraryFingerprint.from_items(
+        all_items,
+        scope=cfg.ingest_dedupe_scope,
+        collection=coll,
+    )
+    resolver = default_resolver(cfg.email)
+    allowed = load_acronym_allowlist(cfg.state_dir)
+    batch = classify_rows(clean, fingerprint, resolve=resolver, allowlist=allowed)
+    summary_path = write_summary(cfg.state_dir, coll, batch)
+    fingerprint_hex = hashlib.sha256(
+        f"{coll}|pending_fill|{','.join(clean)}".encode("utf-8")
+    ).hexdigest()
+    token = commands.create_review_token(
+        cfg,
+        verb="pending_fill_add",
+        collection=coll,
+        preset="oa",
+        keys=clean[:200],
+        fingerprint=fingerprint_hex,
+        command_id=cmd_id,
+        flags={"dois": clean, "source_path": "pending_fill"},
+    )
+    _attach_result(
+        cfg,
+        cmd_id,
+        {
+            "counts": batch.counts(),
+            "summary": str(summary_path),
+            "source": "pending_fill",
+        },
+    )
+    return token
+
+
+def pending_add_apply(
+    cfg: Config, *, token: str, collection: str
+) -> tuple[bool, str]:
+    """Create metadata parents for a reviewed Waiting-from-Discover selection."""
+    from ..acronyms import load_acronym_allowlist
+    from ..catalogue import open_library
+    from ..identity import LibraryFingerprint
+    from ..ingest_dois import (
+        apply_creates,
+        classify_rows,
+        default_resolver,
+        ingest_tags,
+        write_summary,
+    )
+
+    review = commands.load_review(cfg, token)
+    if review is None or review.get("verb") != "pending_fill_add":
+        return False, "unknown token"
+    flags = dict(review.get("flags") or {})
+    dois = _pending_dois(list(flags.get("dois") or []))
+    coll = str(review.get("collection") or collection or "").strip()
+    if not coll or not dois:
+        return False, "missing pending-add preview data"
+    fingerprint_hex = hashlib.sha256(
+        f"{coll}|pending_fill|{','.join(dois)}".encode("utf-8")
+    ).hexdigest()
+    ok, msg = commands.consume_review(cfg, token, fingerprint=fingerprint_hex, keys=None)
+    if not ok:
+        return False, msg
+    backend = open_library(cfg)
+    all_items = (
+        list(backend.items_in_scope(None))
+        if hasattr(backend, "items_in_scope")
+        else []
+    )
+    fingerprint = LibraryFingerprint.from_items(
+        all_items,
+        scope=cfg.ingest_dedupe_scope,
+        collection=coll,
+    )
+    resolver = default_resolver(cfg.email)
+    allowed = load_acronym_allowlist(cfg.state_dir)
+    works: dict[str, Any] = {}
+
+    def resolve(doi: str):
+        work = resolver(doi)
+        if work is not None:
+            works[doi] = work
+        return work
+
+    batch = classify_rows(dois, fingerprint, resolve=resolve, allowlist=allowed)
+    tags = ingest_tags(
+        cli_tags=[],
+        default_tags=cfg.ingest_default_tags,
+        from_file=None,
+    )
+    apply_creates(backend, batch, coll, works=works, tags=tags, allowlist=allowed)
+    write_summary(cfg.state_dir, coll, batch)
+    flush = getattr(backend, "flush", None)
+    if callable(flush):
+        flush()
+    return True, ""
