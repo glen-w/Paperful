@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% from "_help.html" import info %}
+{% from "_job_status.html" import job_status %}
+{% block title %}Rewrite — Paperful{% endblock %}
+{% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
+{% block content %}
+<h1>Rewrite</h1>
+<p class="page-lede">Apply an existing critique pack to a draft. Default area is hygiene/style. Writes <code>state/rewrites/</code> (edit plan, optional sidecar, tracked-changes Word). Never overwrites the source. Not a generated paper.</p>
+{% if error == 'target' %}<div class="error-banner">Pick a critique pack. Optionally upload a replacement draft if the original file moved.</div>{% endif %}
+{% if error == 'format' %}<div class="error-banner">That file type is not supported.</div>{% endif %}
+{% if error == 'size' %}<div class="error-banner">The upload is larger than 40 MB.</div>{% endif %}
+{% if error and error not in ('target', 'format', 'size') %}<div class="error-banner">{{ error }}</div>{% endif %}
+
+{{ job_status(run_rec, 'Rewrite') }}
+
+<section class="panel">
+  <h2>From a critique pack</h2>
+  <p class="section-lede">Requires a pack under <code>state/critiques/</code>. Run Critique first. Dismissed findings are skipped.</p>
+  <form method="post" action="/rewrite" class="toolbar" enctype="multipart/form-data">
+    <label>Pack {{ info("Latest packs on disk. --pack on the CLI.") }}
+      <select name="pack_dir">
+        <option value="">Choose a pack</option>
+        {% for row in recent %}
+        <option value="{{ row.pack_dir }}">{{ row.title }} — {{ row.critique_id }} / {{ row.stamp }} ({{ row.findings }} findings)</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="drop-zone">Optional replacement draft if the file moved
+      <input type="file" name="file" accept="{{ accept }}">
+    </label>
+    <fieldset>
+      <legend>Areas {{ info("Default is style (hygiene). Enable cites/structure/comments in config or here.") }}</legend>
+      <label><input type="checkbox" name="area" value="style"{% if "style" in rewrite_areas %} checked{% endif %}> Style</label>
+      <label><input type="checkbox" name="area" value="cites"{% if "cites" in rewrite_areas %} checked{% endif %}> Cites</label>
+      <label><input type="checkbox" name="area" value="structure"{% if "structure" in rewrite_areas %} checked{% endif %}> Structure</label>
+      <label><input type="checkbox" name="area" value="comments"{% if "comments" in rewrite_areas %} checked{% endif %}> Comments</label>
+    </fieldset>
+    <fieldset>
+      <legend>Outputs</legend>
+      <label><input type="checkbox" name="output" value="edits"{% if "edits" in rewrite_outputs %} checked{% endif %}> Edits list</label>
+      <label><input type="checkbox" name="output" value="sidecar"{% if "sidecar" in rewrite_outputs %} checked{% endif %}> Sidecar text</label>
+      <label><input type="checkbox" name="output" value="tracked"{% if "tracked" in rewrite_outputs %} checked{% endif %}> Tracked-changes docx</label>
+    </fieldset>
+    <label>Comments {{ info("Attach reviewer/MARG notes as Word comments.") }}
+      <select name="comments">
+        <option value="off"{% if rewrite_comments == "off" %} selected{% endif %}>off</option>
+        <option value="substantive"{% if rewrite_comments == "substantive" %} selected{% endif %}>substantive</option>
+        <option value="all"{% if rewrite_comments == "all" %} selected{% endif %}>all</option>
+      </select>
+    </label>
+    {% if not llm_on %}
+    <p class="section-lede">[llm] is off. Style glossary/Vale substitutions still run. Other areas skip to needs_author.</p>
+    {% endif %}
+    <button type="submit">Rewrite</button>
+    {{ info("Writes state/rewrites/<critique-id>/<stamp>/. Does not change the original file or Zotero.") }}
+  </form>
+  {% if not recent %}
+  <p class="section-lede">No critique packs yet. Run Critique first.</p>
+  {% endif %}
+</section>
+
+{% if result and result.counts %}
+<section class="panel">
+  <h2>This pack</h2>
+  <p>Edits: {{ result.edits or result.counts.edits or 0 }}
+    · skips: {{ result.skips or result.counts.skips or 0 }}
+    {% if result.critique_id %}· id <code>{{ result.critique_id }}</code>{% endif %}
+  </p>
+  {% if downloads %}
+  <p>
+    {% for f in downloads %}
+    <a href="/rewrite/download/{{ f.name }}?pack_dir={{ result.pack_dir }}">{{ f.name }}</a>{% if not loop.last %} · {% endif %}
+    {% endfor %}
+  </p>
+  {% endif %}
+  {% if pack_md %}
+  <pre class="pack-md">{{ pack_md }}</pre>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

@@ -279,6 +279,12 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[critique].context_max_hits` | `8` | Local RAG hits and OpenAlex / SearXNG rows for historian / scout |
 | `[critique].adversary_max_comments` | `12` | Cap on suggested comments from the `adversary` validity red-team lane |
 | `[[critique.reviewers]]` | one implicit reviewer | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path relative to the config file). `--reviewer ID` selects a subset. Unused by `marg` / `adversary` / `context*` |
+| `[rewrite].areas` | `["style"]` | Enabled rewrite specialists: `style`, `cites`, `structure`, `comments`, or `all`. `--area` overlays |
+| `[rewrite].outputs` | `["edits", "tracked"]` | `edits` (always implied), `sidecar`, `tracked`. `--output` overlays |
+| `[rewrite].comments` | `off` | `off` / `substantive` / `all` — reviewer notes as Word comments |
+| `[rewrite].max_edits` | `80` | Cap after merge |
+| `[rewrite].timeout_s` | `0` | Wall clock for LLM specialists (`0` → `max([llm].timeout_s, 600)`) |
+| `[[rewrite.specialists]]` | builtin per enabled area | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path). Separate key from `areas` (TOML) |
 | `[critique].overlap_top_k` | `40` | Distinctive n-grams ranked for library text overlap |
 | `[critique].overlap_n_min` / `overlap_n_max` | `6` / `12` | Word n-gram window |
 | `[critique].overlap_df_max` | `0` | Drop grams in this many other docs (`0` = auto from corpus size) |

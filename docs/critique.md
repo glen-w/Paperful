@@ -369,3 +369,6 @@ force / dismissed controls.
 ## Config
 
 See `[critique]` in [config.md](config.md) and `config.example.toml`.
+
+To turn findings into locatable edits (tracked-changes Word, sidecar, or an
+edit list), use [`rewrite`](rewrite.md). `rewrite` never re-runs critique.

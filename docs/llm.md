@@ -4,9 +4,9 @@ Everything here is **off by default**. Paperful’s PDF loop (`run` / `attach` /
 `lint` / `fix-metadata` / `dedupe`) never needs a model. Turn the LLM on only
 for the LLM-backed verbs below, and only after `paperful doctor` shows the
 `LLM` row green. `extract-sections` (optional GROBID then optional LLM),
-`rag questions`, and `critique` run
+`rag questions`, `critique`, and style-only `rewrite` run
 deterministic rules without a model; their `--llm` lanes (and
-critique `--lane` / `--advanced`) need `[llm].enabled`.
+critique `--lane` / `--advanced`, rewrite areas other than style) need `[llm].enabled`.
 
 **Feasibility first.** Trying one summary is not the same job as summarizing
 or synthesizing ~1.5k PDFs. Hardware bands, overnight local runs, OpenRouter /
@@ -52,7 +52,7 @@ No Python extra is needed for Ollama: Paperful talks HTTP to the daemon.
 
 | Verb | Works well with | Notes |
 | --- | --- | --- |
-| `fix-metadata` titles, `lint` identity, `summarize`, `synthesize`, `extract-sections --llm`, `rag questions --llm`, `critique --lane` / `--llm` / `--advanced`, `ask` | 7B–12B instruct models (`qwen2.5:7b`, `gemma3:12b`, `llama3.1:8b`) | JSON-capable instruct tags; thinking models are fine but slower. `summarize` and `synthesize` set Ollama `num_ctx` from the prompt, capped by `[llm].max_num_ctx`. `critique` comments are suggested-lane only. `--lane marg` is many more completions per paper (three aspect groups plus refine); `--lane adversary` is one validity red-team turn; `--lane context` adds summary / historian / scout / Q&A turns. `ask` default is **simple** (one completion); **advanced** adds about `evidence_k` summary calls — [rag.md](rag.md#ask-modes) |
+| `fix-metadata` titles, `lint` identity, `summarize`, `synthesize`, `extract-sections --llm`, `rag questions --llm`, `critique --lane` / `--llm` / `--advanced`, `rewrite` (non-style), `ask` | 7B–12B instruct models (`qwen2.5:7b`, `gemma3:12b`, `llama3.1:8b`) | JSON-capable instruct tags; thinking models are fine but slower. `summarize` and `synthesize` set Ollama `num_ctx` from the prompt, capped by `[llm].max_num_ctx`. `critique` comments are suggested-lane only. `--lane marg` is many more completions per paper (three aspect groups plus refine); `--lane adversary` is one validity red-team turn; `--lane context` adds summary / historian / scout / Q&A turns. `rewrite` is one JSON call per enabled area that still has findings after glossary/Vale swaps; an optional `[[rewrite.specialists]]` model may be an [XtraGPT](https://huggingface.co/collections/Xtra-Computing/xtragpt) Ollama tag (ICLR/ReviseQA-shaped — do not assume it fits ocean/policy drafts). `ask` default is **simple** (one completion); **advanced** adds about `evidence_k` summary calls — [rag.md](rag.md#ask-modes) |
 | `recover` | 14B+ (`qwen2.5:14b`, `qwen3:14b`, larger); 32B / VL on 24 GB+ | Small models loop on cookie banners and publisher menus; `doctor` warns under ~10B by tag name. Full guidance: [browser-agent-models.md](browser-agent-models.md) |
 
 ### LiteLLM (paid / OpenAI-compatible APIs)
@@ -118,6 +118,15 @@ llm = false
 # [[critique.reviewers]]            # omit the table for one builtin JSON reviewer
 # id = "reviewer-2"
 # prompt = "prompts/critique-reviewer-2.md"
+
+[rewrite]                           # verb C2.5: apply a critique pack
+areas = ["style"]                   # style-only glossary/Vale swaps need no model
+# outputs = ["edits", "tracked"]
+# comments = "off"
+# [[rewrite.specialists]]
+# id = "style"
+# model = ""                        # empty → [llm].model; may be an XtraGPT tag
+# prompt = "default"                # or prompts/rewrite-style.md
 
 [summarize]                         # verb D
 prompt_template = "default"         # or a path, e.g. "prompts/summary.md"
@@ -277,6 +286,23 @@ not replace `marg`, `adversary`, or `context`. A Markdown prompt file becomes a 
 note** in `pack.md`; the builtin prompt still returns JSON comments. Optional
 `--vale` house-style lint is a separate **checked** pass (no model). See
 [critique.md](critique.md).
+
+### C2.5. `rewrite` — apply a critique pack
+
+```sh
+uv run paperful rewrite --file ./draft.docx
+uv run paperful rewrite --pack state/critiques/file-draft/20261027T... --area cites --comments substantive
+uv run paperful rewrite --pack PATH --output edits --dry-run
+```
+
+Pack required. Never re-runs critique. Default area is **style** (glossary
+`suggested` and obvious Vale swaps are deterministic and run with `[llm]`
+off). Other areas (`cites`, `structure`, `comments`) need a model for
+findings without a deterministic replacement. Body edits must not invent
+numbers or cite keys. Retracted / withdrawn / EoC cites become comments,
+never deletes. Optional `[[rewrite.specialists]]` can point a specialist at
+an XtraGPT Ollama tag; ICLR/ReviseQA criteria are ML-shaped. See
+[rewrite.md](rewrite.md).
 
 ### D. `summarize` — grounded summary note
 
@@ -471,7 +497,8 @@ allow_remote = true
   `[rag].summary_model` when set). Embeddings are under `[rag]`. Two modes:
   `simple` (default) and `advanced` (`--ask-mode` / `[rag].ask_mode`).
 - [config.md](config.md#llm-optional-local-first) — key reference
-- [commands.md](commands.md) — `recover` / `summarize` / `synthesize` / `extract-sections` flags and exit codes
+- [commands.md](commands.md) — `recover` / `summarize` / `synthesize` / `extract-sections` / `rewrite` flags and exit codes
+- [rewrite.md](rewrite.md) — apply a critique pack (style-only without a model)
 - [architecture.md](architecture.md#llm-layer-optional-local-first) — layer, gates, note write path
 - [camofox.md](camofox.md) — opt-in scripted Camoufox lane before `browser_agent`
 - [sessions.md](sessions.md) — vault profile ownership during `recover`

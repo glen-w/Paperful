@@ -53,6 +53,7 @@ endnote
 sources
 screen
 critique
+rewrite
 ezproxy
 research-ops
 sessions

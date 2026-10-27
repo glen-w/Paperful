@@ -229,6 +229,17 @@ mirror_failures_before_skip = 3
 # id = "reviewer-5"
 # model = "llama-openreviewer-8b"
 # prompt = "prompts/critique-reviewer-5.md"
+# [rewrite]
+# # Apply a critique pack to a draft (see docs/rewrite.md). Never overwrites the source.
+# areas = ["style"]                # style | cites | structure | comments | all
+# outputs = ["edits", "tracked"]   # edits | sidecar | tracked
+# comments = "off"                 # off | substantive | all
+# max_edits = 80
+# timeout_s = 0                    # 0 = max([llm].timeout_s, 600)
+# [[rewrite.specialists]]
+# id = "style"
+# model = ""                       # empty → [llm].model
+# prompt = "default"               # or prompts/rewrite-style.md
 # [summarize]
 # prompt_template = "default"    # or "prompts/summary.md"
 # max_context_chars = 24000

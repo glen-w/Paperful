@@ -33,7 +33,7 @@ Three jobs sit on the default nav:
 | **Ask** | `ask`, `ask --from-file` | Cited answers from PDFs already copied to disk (`simple` / `advanced`; needs `[rag]` + `[llm]` and an index) |
 
 **Library**, **Activity**, and **System** support the loop. **Repair**, **Mirror**,
-**Index** (ingest / search / extract), **Briefs**, **Critique**, and **Settings** appear only
+**Index** (ingest / search / extract), **Briefs**, **Critique**, **Rewrite**, and **Settings** appear only
 when **Advanced** is on (reveal only; does not enable Scholar, Sci-Hub, or LLM).
 
 ```text
@@ -193,6 +193,11 @@ runs the pass. Optional Forensics (PaperGuard) checkbox runs `paperguard scan`
 when that binary is on PATH (`[critique].forensics = true` still runs the
 pass). Show-dismissed is item-only. Not a score. See
 [critique.md](critique.md).
+**Rewrite** (Advanced): pick a recent critique pack, optional replacement
+draft if the file moved, area/output/comments controls. Writes
+`state/rewrites/` (edit plan, optional sidecar, tracked-changes Word). Never
+overwrites the source. Style glossary/Vale swaps run with `[llm]` off. See
+[rewrite.md](rewrite.md).
 
 **Stays CLI** (no GUI control): `session login`, `doctor --guide`, mid-run
 EZProxy re-login, snowball `approve-each`, `collections add`, Sci-Hub source
@@ -277,6 +282,9 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/settings` | Write allowed `config.toml` fields |
 | GET | `/critique` | Advanced Critique: item picker, upload, last pack |
 | POST | `/critique` | Enqueue `critique` for `--item` or a staged `--file`; redirect `?run=` |
+| GET | `/rewrite` | Advanced Rewrite: recent critique packs, optional draft, area/output/comments |
+| POST | `/rewrite` | Enqueue `rewrite` for a pack (optional staged `--file`); redirect `?run=` |
+| GET | `/rewrite/download/{name}` | Download `pack.md` / `plan.json` / sidecar / `tracked.docx` from `state/rewrites/` |
 | POST | `/repair/preview` | Dry-run repair verb + review token |
 | POST | `/repair/apply` | Consume token; apply repair verb |
 | POST | `/mirror/preview` | Dry-run mirror verb + review token |

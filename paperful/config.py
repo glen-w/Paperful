@@ -11,6 +11,7 @@ from collections.abc import Callable
 from typing import Any
 
 from .exclude import ExcludeRule
+from .rewrite_areas import RewriteArea
 from .playbooks import (
     GreyPlaybook,
     load_pack_dir,
@@ -251,6 +252,12 @@ class Config:
     critique_context_max_hits: int = 8
     critique_adversary_max_comments: int = 12
     critique_reviewers: tuple[CritiqueReviewer, ...] = ()
+    rewrite_areas: tuple[str, ...] = ("style",)
+    rewrite_outputs: tuple[str, ...] = ("edits", "tracked")
+    rewrite_comments: str = "off"
+    rewrite_max_edits: int = 80
+    rewrite_timeout_s: float = 0.0
+    rewrite_specialists: tuple[RewriteArea, ...] = ()
     summarize_prompt_template: str = "default"
     summarize_max_context_chars: int = 24_000
     summarize_tag: str = "paperful-summary"
@@ -512,6 +519,10 @@ class Config:
     @property
     def critiques_dir(self) -> Path:
         return self.state_dir / "critiques"
+
+    @property
+    def rewrites_dir(self) -> Path:
+        return self.state_dir / "rewrites"
 
     @property
     def glossary_dir(self) -> Path:

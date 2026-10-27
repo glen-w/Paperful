@@ -145,6 +145,7 @@ flowchart LR
 | `state/prompts/` | Operator-saved Ask system prompts from the Index form (“Save as…”); listed in the custom-prompt select |
 | `state/gui/uploads/` | Workbench uploads (Discover import, Index prompt/questions files); basename only |
 | `state/critiques/<id>/<stamp>/` | `critique` pack (`paperful.critique.pack.v1`, `pack.md`: findings, metrics, optional reviewer notes). `<id>` is a library item key or `file-<filename-stem>` for uploads. Dismissals: `state/critiques/<id>/dismissed.jsonl`. Uploads: `state/critiques/uploads/` |
+| `state/rewrites/<id>/<stamp>/` | `rewrite` pack (`paperful.rewrite.pack.v1`, `plan.json` `paperful.rewrite.plan.v1`, optional sidecar / `tracked.docx`). Never overwrites the source manuscript |
 | `state/reports/<slug>.html` | `synthesize` literature review; sibling `<slug>.json` records source hashes |
 | `state/reports/<slug>-authors.json` | `authors --apply` creator frequency (`paperful.authors_report.v1`); seeds proposed field packs |
 | `state/author-packs/` | Proposed / promoted field author packs (`paperful.author_pack.v1`). From `authors --apply`, snowball preflight, or `twenty lookup --apply` |
@@ -155,7 +156,7 @@ flowchart LR
 | `state/fetch-wins.jsonl` | One line per vault or browser-agent PDF (host and path; query string dropped). Agent rows may include a `steps` trace and promotable `click:` / `rewrite` wins. Input to `paperful playbooks propose` |
 | `state/playbooks-proposed.toml` | Draft learned pack from `playbooks propose`. Not loaded until `playbooks promote` |
 | `state/last-run.json` | Latest `run` or `recover` report (`paperful.run_report.v1`). Other verbs do not replace it |
-| `state/runs/<stamp>-<command>.json` | One report per `run`, `recover`, `gaps`, `reachout`, `lint`, `screen`, `critique`, `fix-metadata` (dry-run and `--apply`), `attachments` (dry-run and `--apply`), `summarize`, `synthesize`, `extract-sections`, `ask`, and `snapshot` |
+| `state/runs/<stamp>-<command>.json` | One report per `run`, `recover`, `gaps`, `reachout`, `lint`, `screen`, `critique`, `rewrite`, `fix-metadata` (dry-run and `--apply`), `attachments` (dry-run and `--apply`), `summarize`, `synthesize`, `extract-sections`, `ask`, and `snapshot` |
 | `state/packs/<id>.json` | Parent witness (`paperful.pack.v1`) listing those reports for one `pack open` … `pack close` sequence. `state/packs/current` names the open id |
 | `state/mendeley-oauth.json` | Mendeley tokens after `session login mendeley` (mode `0600`) |
 | `state/endnote-import/<stamp>/` | EndNote XML+PDF bundle for File → Import. Never an edit of `.enl` |
@@ -185,6 +186,7 @@ below.
 | `ask` | `llm.enabled` + `rag.enabled` | `state/runs/<stamp>-ask.json`; advanced summaries under `state/rag/evidence/` | none unless batch `--apply` |
 | `rag questions` | rules always; optional `[rag].extract_questions_llm` + `llm.enabled` | `state/rag/questions/<key>.json` | none |
 | `critique` | checkers, metrics, heuristic AI-tells always (house glossary expansions when `state/glossary/` has entries); optional `--lane` / `[critique].lanes` suggested review lanes (`reviewers`, `marg`, `adversary`, `context`, `context-web`; `--llm` / `--advanced` aliases; optional GROBID TEI chunks for `marg`); optional `--ai-model` Binoculars extra; optional `--vale` / `[critique].vale` house-style pass | `state/critiques/<id>/<stamp>/` | child note with `--apply` on `--item` only |
+| `rewrite` | apply an existing critique pack (never re-runs critique). Default area `style` (glossary/Vale swaps without a model). Other areas need `[llm].enabled`. Stdlib tracked-changes OOXML | `state/rewrites/<id>/<stamp>/` | none (never overwrites the source) |
 
 Opt-in **`camofox`** is a registered **serial** source (never in `DEFAULT_SOURCES`) that talks to an external [camofox-browser](https://github.com/jo-inc/camofox-browser) REST server for a scripted DOI→PDF grab. `run` injects it when `[camofox].enabled` and `[camofox].during_run` (default on); `--camofox` / `--no-camofox` override one invocation. Policy order places it after vault lanes and before `browser_agent`. It does not reuse the vault Chromium SSO profile (see [Camofox](camofox.md)).
 
@@ -257,7 +259,8 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
 
 - `paperful doctor` — preflight. Colours: **green** = ready; **amber** = usable with
   a degraded path (empty email, missing session, expired session when `--probe`,
-  no `pdftotext`, missing `vale` (optional critique house style), Playwright /
+  no `pdftotext`, missing `vale` (optional critique house style), rewrite areas
+  other than style when `[llm]` is off, Playwright /
   Chromium not ready, Zotero 7–9 write API,
   incomplete grey-lit pack); **red** on `Zotero :23119` / `out_dir` / `state_dir`
   is fatal (`doctor` and any command that needs Zotero). Reports grey-lit packs
@@ -271,6 +274,9 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
   metrics, and heuristic AI-tells without an LLM; optional suggested comments
   (`--llm` / `--advanced`), Binoculars extra, and Vale house-style pass.
   Not a grade and not in `all`.
+- `paperful rewrite` — apply a critique pack (`state/rewrites/`). Default
+  area is style. Never overwrites the source. Not a generated paper and not
+  in `all`.
 - `paperful dedupe` / `paperful gaps` / `paperful reachout` / `paperful refs gap` / `paperful coverage` — duplicate packs, PDF/DOI counts, contact-only missing-PDF CSV (never fetches, never sends mail), cited-in-PDF missing-from-library packs, and briefing/note/file vs `-C` coverage. `refs gap` and `coverage` are always dry-run (`state/refs-gaps/`, `state/coverage/`). `ingest-dois` creates parents from those packs or a DOI file only with `--apply`.
   `dedupe` writes `state/dedupe-packs/` and merges only with `--apply`
   (the spare-copy line is written then; title+year also needs `--apply-medium`).
@@ -371,7 +377,7 @@ follow-up may cite only this turn’s excerpts.
 
 Manifest `counts` keys match ledger statuses (`ok`, `attached`, `not_found`, …).
 
-`gaps`, `lint`, `screen`, `critique`, `summarize`, and `fix-metadata` (dry-run and `--apply`) write the same schema under `state/runs/` and do not replace `last-run.json`. Their `summary` adds command-specific keys (`no_stored_pdf`, `findings` / `findings_by_code`, `summarized` / `failed`, `patches_proposed`). A dry-run `fix-metadata` report omits `patches_applied`.
+`gaps`, `lint`, `screen`, `critique`, `rewrite`, `summarize`, and `fix-metadata` (dry-run and `--apply`) write the same schema under `state/runs/` and do not replace `last-run.json`. Their `summary` adds command-specific keys (`no_stored_pdf`, `findings` / `findings_by_code`, `edits` / `skips`, `summarized` / `failed`, `patches_proposed`). A dry-run `fix-metadata` report omits `patches_applied`.
 
 (pack-v1)=
 ## Run packs (`paperful.pack.v1`)

@@ -85,7 +85,7 @@ Paperful every week, not just once to fill gaps?
 ### Facts settled against 1.1.0
 
 - 1.1.0 is tagged and on PyPI; trusted publishing (`publish.yml`) exists.
-- Version: single source via `importlib.metadata` / `pyproject.toml` (1.5.1).
+- Version: single source via `importlib.metadata` / `pyproject.toml` (1.6.0).
 - Attach is **manual by default** (`[ui].attach_mode`); Grab does not write to
   Zotero unless Settings is automatic.
 - **1.1.1 closed P0s:** Grab-selected `item_keys`, Held hand-ticks, Attach at
@@ -93,7 +93,7 @@ Paperful every week, not just once to fill gaps?
 - **Ask** is on the default nav (third after Wanted and Discover); it does
   not need Advanced. Whether it *stays* there is an [open
   question](#after-110-open-questions).
-- Install docs are pinned to `v1.5.1` (README, `docs/docker.md`,
+- Install docs are pinned to `v1.6.0` (README, `docs/docker.md`,
   `website/index.html`). Recheck every paperful.app claim before launch.
 
 (after-110-1-1-1)=
@@ -566,6 +566,7 @@ until Wanted is honest. Do not grow 1.x into a second product.
 | Point at Better BibTeX + Quarto (do not vendor CSL) | Write / export | Parked until testers ask | [Parked](#after-110-parked) |
 | ASReview-class ranking only as optional local embeddings | Screen | Not dual review | [Embeddings](#after-110-embeddings) |
 | Post-hoc Crossref / retraction check after a draft | Critique | Existence ≠ claim support | [critique.md](critique.md) |
+| Apply a critique pack as locatable edits / tracked changes (worklog, align-then-generate, selected-span prompts; no vendor) | Write | Pack required; never overwrite the source; no invented numbers/cites | [rewrite.md](rewrite.md) (shipped) |
 | Deep forensics on supplementary tables / stats / figures (external tool) | Screen / audit | No merged score; subprocess or hand-off | [PaperGuard](#research-integrity-forensics-paperguard) |
 | Named MCP read jobs (`ask` vs precedent vs `refs_gap`); writes stay `--apply` | Agent | Table stakes without a hosted corpus | [Literature-discovery](#literature-discovery-complement-waves) |
 
@@ -679,6 +680,8 @@ Do not start these until testers ask, or until the main lane is boring.
   molecular design) — [Hosted AI scientists](#after-110-edison-scientific).
 - **Auto manuscript / related-work generator** (Jenni/STORM/Sakana job).
   `stuff` may queue extra cites into Zotero; it does not write the paper.
+  [`rewrite`](rewrite.md) is apply-from-critique (hygiene default, pack
+  required), not this parked generator.
 - **Catalogue unification** (managers as equals).
 - **LibGen** (same opt-in bar as Sci-Hub if ever).
 - **CSL / Quarto export** — point people at Better BibTeX.

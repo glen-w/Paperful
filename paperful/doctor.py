@@ -214,6 +214,12 @@ def remediation_text(
             "  uv run paperful session login ezproxy\n"
             "(or: uv run playwright install chromium), then continue."
         )
+    if check.name == "rewrite":
+        return (
+            "Set [llm].enabled = true for rewrite areas other than style, "
+            "or set [rewrite].areas = [\"style\"] for glossary/Vale swaps only. "
+            "See docs/rewrite.md."
+        )
     if check.name == "LLM":
         if docker and "unreachable" in (check.detail or "").lower():
             return (
@@ -744,6 +750,9 @@ def run_checks(
             exclude_cols = None
     checks.append(_exclude_check(cfg, collections=exclude_cols))
     checks.extend(_llm_checks(cfg))
+    rewrite_check = _rewrite_check(cfg)
+    if rewrite_check is not None:
+        checks.append(rewrite_check)
     checks.extend(_rag_checks(cfg))
     checks.append(_snowball_check(cfg))
     checks.append(_openalex_store_check(cfg))
@@ -997,6 +1006,21 @@ def _grobid_checks(cfg) -> list[Check]:
         ]
     finally:
         client.close()
+
+
+def _rewrite_check(cfg) -> Check | None:
+    """Amber when rewrite areas other than style need a model that is off."""
+    areas = tuple(getattr(cfg, "rewrite_areas", ()) or ())
+    extra = [a for a in areas if a != "style"]
+    if extra and not cfg.llm_enabled:
+        return Check(
+            "rewrite",
+            "amber",
+            "areas "
+            + ", ".join(extra)
+            + " need [llm].enabled (style-only glossary/Vale swaps still run)",
+        )
+    return None
 
 
 def _llm_checks(cfg) -> list[Check]:

@@ -90,6 +90,7 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `scope.py` | Collection, year, type selection | `library` errors |
 | `resolve/` (`ids.py`, `enrich.py`), `lint.py`, `acronyms.py`, `authors_report.py`, `metadata.py`, `dedupe.py`, `pdfid.py` | Identifier, hygiene, and corpus-frequency logic. Take a backend; never name a manager | the protocol |
 | `glossary.py` / `glossary_cmd.py` | House expansions (`paperful.glossary.v1` in `state/glossary/`). Critique fuzzy-match + Vale alias export | `config` |
+| `rewrite.py`, `rewrite_areas.py`, `rewrite_align.py`, `rewrite_plan.py`, `rewrite_llm.py`, `rewrite_render.py`, `rewrite_docx.py` | Apply-from-critique (`paperful.rewrite.plan.v1`). Pack required; never overwrites the source; stdlib tracked-changes OOXML | `critique` pack + gated `llm` |
 | `critique.py`, `critique_lanes.py`, `critique_checks/` (`run`, `structure`, `biblio`, `floats`, `style`, `overlap`), `critique_extract.py`, `critique_llm.py`, `critique_marg.py`, `critique_adversary.py`, `critique_context.py`, `critique_metrics.py`, `critique_ai_tells.py`, `critique_ai_model.py`, `critique_vale.py`, `critique_overlap.py`, `critique_stats.py` | Local manuscript pack (`paperful.critique.pack.v1`). Checkers always; composable suggested review lanes (`reviewers`, MARG-S, adversary, ScholarPeer-inspired context / context-web; no vendor); optional GROBID TEI chunks for `marg`; optional Binoculars extra (no torch at import); optional Vale house-style pass (no vale at import); glossary expansions when `state/glossary/` has entries | `cli_runtime`, gated `llm`, optional `grobid_client` |
 | `config_tables.py` | Nested TOML sections applied onto `Config` | `config` parsers |
 | `sources/` | One fetch lane each. Return bytes or a miss | `sources.base` |
@@ -106,6 +107,7 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `lint_cmd.py` | `lint` after flags | `lint` |
 | `screen_cmd.py` | `screen` after flags | `screen` |
 | `critique_cmd.py` | `critique` after flags | `critique` |
+| `rewrite_cmd.py` | `rewrite` after flags | `rewrite` |
 | `glossary_cmd.py` | `glossary validate` / `export-vale` after flags | `glossary` |
 | `fix_metadata_cmd.py` | `fix-metadata` after flags | `metadata` |
 | `ocr_cmd.py` | `ocr` after flags | `ocr` |
@@ -153,7 +155,7 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `twenty.py` | Twenty People lookup (local cache) and `sync` (CRM create/enrich). User guide: [Twenty and SearXNG](snowball.md#twenty-and-searxng) | httpx |
 | `mcp_server.py` | Optional stdio MCP: read-only gaps, snowball preview / trends, export, proposal_export, refs_gap, ask (optional `ask_mode`) | `agent_ops` |
 | `serve.py` | Localhost FastAPI: JSON capability API + mounts `ui` when the `serve` extra is installed | `agent_ops`, `ui` |
-| `ui/` | Server-rendered workbench (Jinja). `app.py` owns shared helpers + `mount_ui`; routes live in `wanted_routes` / `discover_routes` / `shell_routes` / `repair_routes` / `index_routes` / `critique_routes` (each `register_*`). Desk HTTP bodies are module-level `handle_*` functions; each `register_*` only binds them. Row builders: `pages.py` re-exports `wanted_rows` / `discover_rows` / `ask_rows` plus `page_common` (pagination, dest, fingerprints). Long jobs: `jobs.py` re-exports `wanted_jobs` / `discover_jobs` / `repair_jobs` / `index_jobs` (RAG, ask, summarize, synthesize) and defines `critique`. Ordinary pages do not run `doctor` (System does). Handlers resolve `doctor_payload` / `collections_tree` via `paperful.ui.app` so tests can monkeypatch there | CLI / MCP builders |
+| `ui/` | Server-rendered workbench (Jinja). `app.py` owns shared helpers + `mount_ui`; routes live in `wanted_routes` / `discover_routes` / `shell_routes` / `repair_routes` / `index_routes` / `critique_routes` / `rewrite_routes` (each `register_*`). Desk HTTP bodies are module-level `handle_*` functions; each `register_*` only binds them. Row builders: `pages.py` re-exports `wanted_rows` / `discover_rows` / `ask_rows` plus `page_common` (pagination, dest, fingerprints). Long jobs: `jobs.py` re-exports `wanted_jobs` / `discover_jobs` / `repair_jobs` / `index_jobs` (RAG, ask, summarize, synthesize) and defines `critique` / `rewrite`. Ordinary pages do not run `doctor` (System does). Handlers resolve `doctor_payload` / `collections_tree` via `paperful.ui.app` so tests can monkeypatch there | CLI / MCP builders |
 | `authorwatch.py` | People lists → OpenAlex new works; `gather_briefing` / `write_briefing` / `write_digest`; `apply` creates parents + `ingested.md`; `accept` / `delete` | OpenAlex client, `identity`, `snowball.ingest`, `authorwatch_suggest` |
 | `authorwatch_suggest.py` | Corpus / cited / coauthor / mix suggestions → `suggestions.jsonl`; shared co-author accumulation for briefing | `authors_report`, OpenAlex, promoted packs |
 | `authorwatch_social.py` | Parse operator-saved RG / LinkedIn / Academia HTML or CSV (no network) | stdlib HTML/CSV |
@@ -237,6 +239,7 @@ Tier policy (1.0 contract):
 | `paperful.sections.v1` | `state/sections/<key>.json` | `extract-sections` | T2 | Required: `schema`, `item_key`, `title`, `year`, `source`, `fields`, `missing`. Optional: `sections`, `engine` (`grobid`\|`rule`), `pdf_sha256`, `notes` (scan skip / GROBID failure). Each `fields.<name>`: `text`, `provenance` (`rule`\|`grobid`\|`llm`), optional `heading`, `pages` |
 | `paperful.grobid.tei.v1` | `state/grobid/<sha256>.json` next to `.tei.xml` | `sections.grobid` | T3 | Rebuildable cache (`extract-sections`, `[rag].parser = "grobid"`, `critique --lane marg`) |
 | `paperful.critique.pack.v1` | `state/critiques/<id>/<stamp>/pack.json` | `critique` | T1 | `CRITIQUE_PACK_KEYS` (`findings`, `overlap`, `metrics`, `llm`, …). `llm` may be `null`. When set: `mode` `default`\|`marg`\|`both`, optional `marg.parser`. Optional `ai_model` / `vale` only when those extras ran |
+| `paperful.rewrite.plan.v1` / `paperful.rewrite.pack.v1` | `state/rewrites/<id>/<stamp>/` | `rewrite` | T2 | Edit plan plus pack metadata. Never overwrites the source manuscript |
 | `paperful.rq_answered.v1` | `state/rq-answered/` | `rag.answered` | T2 | — |
 | `paperful.rag.text.v1` | extracted text cache | `rag.extract` | T3 | Rebuildable |
 | `paperful.rag.index.v1` | LanceDB meta | `rag.index` | T3 | Not a promise |

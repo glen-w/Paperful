@@ -9,7 +9,7 @@ PDFs**. Hosted “paper factories” (Edison, Elicit, Deep Research, Jenni) own
 discover and draft; they do not own campus-proxy fetch, grey playbooks, or a
 restore ledger. Factory-stage matrix: [comparison reference](comparison-reference.md#paper-factory-stages).
 
-**Last reviewed:** 2026-10-26. Feature lists for other products are based on public
+**Last reviewed:** 2026-10-27. Feature lists for other products are based on public
 docs and positioning — not paid pilots or exhaustive release testing.
 
 Vendor-by-vendor notes live in the [comparison reference](comparison-reference.md).
@@ -35,7 +35,8 @@ Prefer this page for “is this the right tool?”
 | **Web Deep Research memo** (cited longform from the open web in minutes; not a journal manuscript) | OpenAI / Gemini / Perplexity Deep Research. Paperful Ask is over **held** PDFs |
 | **Systematic-review screening** (dual review, extraction forms, PRISMA counts; usually no discovery corpus) | [Covidence](https://www.covidence.org/), [Rayyan](https://www.rayyan.ai/), DistillerSR; local [ASReview](https://asreview.nl/). Paperful Discover Keep/Skip is hop triage, not dual review |
 | **Chat with PDFs you upload** (no scholarly search, no Zotero restore) | Scholarcy, Explainpaper, Humata, [Gemini Notebook](https://notebooklm.google/). Paperful `ask` uses the **same** `out/` tree as fetch |
-| **Draft a manuscript with citations** (library ∪ global index; language/LaTeX) | [Jenni](https://jenni.ai/), [Paperpal](https://paperpal.com/), SciSpace Writer, Writefull in [Overleaf](https://docs.overleaf.com/integrations-and-add-ons/ai-features). Living cites without a model: Better BibTeX → Quarto. Paperful does not draft papers |
+| **Draft a manuscript with citations** (library ∪ global index; language/LaTeX) | [Jenni](https://jenni.ai/), [Paperpal](https://paperpal.com/), SciSpace Writer, Writefull in [Overleaf](https://docs.overleaf.com/integrations-and-add-ons/ai-features). Living cites without a model: Better BibTeX → Quarto. Paperful does not draft papers. [`rewrite`](rewrite.md) applies an existing critique pack as locatable edits / tracked changes — it is not a generator |
+| **Apply a pre-submission pack as tracked changes** (hygiene first; no invented numbers or cites) | **Paperful** [`rewrite`](rewrite.md) from a [`critique`](critique.md) pack. Patterns (not vendored code): Paper Orchestra worklog, ARIES align-then-generate, XtraGPT selected-span prompts |
 | **Grounded Q&A over PDFs you already have** (local index; same collection mirror as fetch) | **Paperful** `rag ingest` / `ask` (`simple` default; `--ask-mode advanced` scores passages then answers) — optional `paperful mcp` (`ask`, `refs_gap`, `gaps`, `snowball_search`, `snowball_trends`, `export`, `proposal_export`). OSS cousin: [PaperQA2](https://github.com/future-house/paper-qa) (you supply the PDFs) |
 | **Deep forensics on tables, stats, and figures** (GRIM/statcheck/TIVA, spreadsheet digit tests, image duplication, paper-mill graphs) — flags anomalies with innocent explanations, not verdicts | [PaperGuard](https://github.com/exergyleizhou-ux/PaperGuard) (`paperguard scan`). **Paperful** [`critique --forensics`](critique.md) wraps that CLI when it is on PATH. [`screen`](screen.md) / critique cover retractions, PPS fingerprints, and light stdlib stats on **manuscript** text — complement, not a substitute. Later buffet items: [Research integrity forensics](ROADMAP.md#research-integrity-forensics-paperguard) |
 | **`.bib` normalize / dedupe / upgrade preprints** (no Zotero required) | [bibcite](https://github.com/leo1oel/bibcite), [bibtex-tidy](https://github.com/FlamingTempura/bibtex-tidy), [bibmanager](https://bibmanager.readthedocs.io/) |
@@ -207,7 +208,10 @@ Need a Deep Research memo from the web?
   → OpenAI / Gemini / Perplexity. Not a Zotero collection and not a journal paper
 
 Need a manuscript draft with extra cites from a huge index?
-  → Jenni, Paperpal, SciSpace Writer, Overleaf AI. Paperful will not invent BibTeX; extra cites belong in Zotero first
+  → Jenni, Paperpal, SciSpace Writer, Overleaf AI. Paperful will not invent BibTeX; extra cites belong in Zotero first. `paperful rewrite` only applies a critique pack you already ran
+
+Need locatable edits from a critique pack (hygiene / tracked-changes Word)?
+  → paperful rewrite (see rewrite.md). Not a generated paper
 
 Need cited Q&A on a folder of PDFs with no Zotero?
   → PaperQA2 (OSS). Paperful when those PDFs should also live in a restore ledger

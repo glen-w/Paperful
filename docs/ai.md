@@ -3,7 +3,8 @@
 Paperful’s PDF loop (`run` / `attach` / `lint` / `fix-metadata` / `dedupe`)
 never needs a model. Optional AI covers grounded notes (`summarize`), a
 collection review (`synthesize`), Ask / RAG, title and identity helpers, the
-browser agent, and suggested `critique --llm` / `--advanced` comments. Heuristic AI-prose
+browser agent, suggested `critique --llm` / `--advanced` comments, and
+`rewrite` (apply a critique pack). Heuristic AI-prose
 tells and the optional Binoculars extra on `critique` are **not** authorship
 proof. Optional `--vale` is house-style lint, not a model. This page is the
 **feasibility and scale** guide: what works on
@@ -55,6 +56,7 @@ unusable for a 1,500-PDF collection overnight.
 | `critique --lane marg` | One manuscript | Yes locally; slower than reviewers | Three aspect groups (leader + chunk workers + expert) then refine. Caps in `[critique]`. Optional GROBID for PDF chunks (`--advanced` alias) |
 | `critique --lane adversary` | One manuscript | Yes (same band as reviewers) | One JSON validity red-team turn (alt explanations, validity, falsifiers) |
 | `critique --lane context` | One manuscript | Yes locally; several extra turns | Summary, library historian, baseline scout, Q&A. Local RAG; `context-web` may call OpenAlex / SearXNG |
+| `rewrite` | One critique pack | Style-only: no model. Other areas: yes (same 7B–12B band) | One JSON call per area still lacking a glossary/Vale swap. Optional XtraGPT Ollama tag. Not a generated paper |
 
 **Try it out** means: one item, five papers, or a free hosted model while you
 watch for timeouts and bad grounding. **Library scale** means: hundreds or

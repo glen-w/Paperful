@@ -54,15 +54,20 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     assert 'formaction="/wanted/attach"' in wanted.text
     assert "/repair" not in wanted.text
     assert "/critique" not in wanted.text
+    assert "/rewrite" not in wanted.text
     assert 'href="/index"' not in wanted.text
     client.cookies.set("pf_advanced", "1")
     res = client.get("/wanted")
     assert "/repair" in res.text
     assert "/critique" in res.text
+    assert "/rewrite" in res.text
     assert "/v1/ask" not in res.text
     assert client.get("/repair").status_code == 200
     critique = client.get("/critique")
     assert critique.status_code == 200
+    rewrite = client.get("/rewrite")
+    assert rewrite.status_code == 200
+    assert "pack_dir" in rewrite.text
     assert "drop-zone" in critique.text
     assert 'name="item_key"' in critique.text
     assert 'name="file"' in critique.text

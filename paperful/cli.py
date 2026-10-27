@@ -307,6 +307,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "lint",
         "screen",
         "critique",
+        "rewrite",
         "fix-metadata",
         "dedupe",
         "attachments",
@@ -1111,6 +1112,63 @@ def critique_dismiss(
         console,
         finding_id=finding_id,
         critique_id=critique_id,
+        config=config,
+        fmt=fmt,
+    )
+
+
+@app.command()
+def rewrite(
+    pack_path: Path | None = typer.Option(
+        None,
+        "--pack",
+        help="Existing critique pack.json or its folder. Never re-runs critique.",
+        exists=True,
+    ),
+    item: list[str] = typer.Option(
+        [], "--item", help="Library item key; uses the latest critique pack for that id."
+    ),
+    file_path: Path | None = typer.Option(
+        None,
+        "--file",
+        help="Draft to edit. Uses the latest pack for file-<stem> unless --pack is set.",
+        exists=True,
+        dir_okay=False,
+        readable=True,
+    ),
+    area: list[str] = typer.Option(
+        [],
+        "--area",
+        help="Rewrite area (repeatable): style, cites, structure, comments, all. Default: [rewrite].areas.",
+    ),
+    output: list[str] = typer.Option(
+        [],
+        "--output",
+        help="Output (repeatable): edits, sidecar, tracked. Default: [rewrite].outputs.",
+    ),
+    comments: str | None = typer.Option(
+        None,
+        "--comments",
+        help="Word comments: off, substantive, or all. Default: [rewrite].comments.",
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Print the plan; do not write state/rewrites/."
+    ),
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Apply a critique pack to a draft. Writes an edit plan and optional sidecar / tracked-changes. Never overwrites the source."""
+    from .rewrite_cmd import run_rewrite
+
+    run_rewrite(
+        console,
+        pack_path=pack_path,
+        item=item,
+        file_path=file_path,
+        area=area,
+        output=output,
+        comments=comments,
+        dry_run=dry_run,
         config=config,
         fmt=fmt,
     )

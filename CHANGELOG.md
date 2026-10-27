@@ -6,6 +6,15 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.6.0 — 2026-10-27
+
+### Added
+
+- **`paperful rewrite`.** Apply an existing critique pack to a draft (edit
+  plan, optional sidecar, tracked-changes Word). Pack required; never re-runs
+  critique; never overwrites the source. Default area is style (hygiene).
+  Advanced workbench sibling of Critique. See [rewrite](docs/rewrite.md).
+
 ## 1.5.1 — 2026-10-27
 
 ### Added

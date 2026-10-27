@@ -145,3 +145,6 @@ def test_post_smokes_per_family(tmp_path, monkeypatch):
 
     res = client.post("/critique", data={}, follow_redirects=False)
     assert res.status_code < 500
+
+    res = client.post("/rewrite", data={}, follow_redirects=False)
+    assert res.status_code < 500

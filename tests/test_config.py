@@ -396,6 +396,45 @@ def test_critique_table_is_parsed(tmp_path):
     assert cfg.critique_adversary_max_comments == 12
     assert cfg.critique_reviewers == ()
     assert cfg.critiques_dir == cfg.state_dir / "critiques"
+    assert cfg.rewrite_areas == ("style",)
+    assert cfg.rewrite_outputs == ("edits", "tracked")
+    assert cfg.rewrite_comments == "off"
+    assert cfg.rewrite_max_edits == 80
+    assert cfg.rewrites_dir == cfg.state_dir / "rewrites"
+
+
+def test_rewrite_table_is_parsed(tmp_path):
+    from paperful.config import _from_dict
+
+    prompt = tmp_path / "prompts" / "rewrite-style.md"
+    prompt.parent.mkdir()
+    prompt.write_text("style prompt", encoding="utf-8")
+    cfg = _from_dict(
+        {
+            "rewrite": {
+                "areas": ["style", "cites"],
+                "outputs": ["edits"],
+                "comments": "substantive",
+                "max_edits": 12,
+                "timeout_s": 30,
+                "specialists": [
+                    {
+                        "id": "style",
+                        "model": "xtragpt:7b",
+                        "prompt": "prompts/rewrite-style.md",
+                    }
+                ],
+            }
+        },
+        tmp_path / "config.toml",
+    )
+    assert cfg.rewrite_areas == ("style", "cites")
+    assert cfg.rewrite_outputs == ("edits",)
+    assert cfg.rewrite_comments == "substantive"
+    assert cfg.rewrite_max_edits == 12
+    assert cfg.rewrite_timeout_s == 30.0
+    assert cfg.rewrite_specialists[0].model == "xtragpt:7b"
+    assert cfg.rewrite_specialists[0].prompt == str(prompt.resolve())
 
 
 def test_critique_reviewers_and_ai_model_are_parsed(tmp_path):

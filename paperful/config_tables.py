@@ -22,6 +22,7 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_lint(raw, cfg)
     apply_screen(raw, cfg, source)
     apply_critique(raw, cfg)
+    apply_rewrite(raw, cfg)
     apply_summarize(raw, cfg)
     apply_synthesize(raw, cfg)
     apply_fetch(raw, cfg)
@@ -262,6 +263,36 @@ def apply_critique(raw: dict[str, Any], cfg: "Config") -> None:
         cfg.critique_reviewers = C.parse_critique_reviewers(table.get("reviewers"))
     if cfg.critique_overlap_n_min > cfg.critique_overlap_n_max:
         cfg.critique_overlap_n_max = cfg.critique_overlap_n_min
+
+
+def apply_rewrite(raw: dict[str, Any], cfg: "Config") -> None:
+    from .rewrite_areas import (
+        parse_rewrite_areas_list,
+        parse_rewrite_comments,
+        parse_rewrite_outputs,
+        parse_rewrite_specialists,
+    )
+
+    C = _mod()
+    table = raw.get("rewrite")
+    if not isinstance(table, dict):
+        return
+    C._apply_config_table(
+        table,
+        cfg,
+        [
+            ("max_edits", "rewrite_max_edits", lambda v: max(1, int(v))),
+            ("timeout_s", "rewrite_timeout_s", lambda v: max(0.0, float(v))),
+        ],
+    )
+    if "areas" in table:
+        cfg.rewrite_areas = parse_rewrite_areas_list(table.get("areas"))
+    if "outputs" in table:
+        cfg.rewrite_outputs = parse_rewrite_outputs(table.get("outputs"))
+    if "comments" in table:
+        cfg.rewrite_comments = parse_rewrite_comments(table.get("comments"))
+    if "specialists" in table:
+        cfg.rewrite_specialists = parse_rewrite_specialists(table.get("specialists"))
 
 
 def apply_summarize(raw: dict[str, Any], cfg: "Config") -> None:
@@ -940,6 +971,18 @@ def apply_prompt_paths(cfg: "Config", source: Path) -> None:
                 prompt=C._resolve_prompt_path(row.prompt, source),
             )
             for row in cfg.critique_reviewers
+        )
+    if cfg.rewrite_specialists:
+        from .rewrite_areas import RewriteArea
+
+        cfg.rewrite_specialists = tuple(
+            RewriteArea(
+                id=row.id,
+                model=row.model,
+                prompt=C._resolve_prompt_path(row.prompt, source),
+                codes=row.codes,
+            )
+            for row in cfg.rewrite_specialists
         )
     if cfg.ste_word_list_path is not None and not cfg.ste_word_list_path.is_absolute():
         cfg.ste_word_list_path = (source.parent / cfg.ste_word_list_path).resolve()

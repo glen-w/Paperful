@@ -32,6 +32,7 @@ extract_sections_fn: Callable[..., dict[str, Any]] | None = None
 summarize_fn: Callable[..., dict[str, Any]] | None = None
 synthesize_fn: Callable[..., dict[str, Any]] | None = None
 critique_fn: Callable[..., dict[str, Any]] | None = None
+rewrite_fn: Callable[..., dict[str, Any]] | None = None
 noop_sleep: float = 0.05
 
 from .index_jobs import (
@@ -649,6 +650,106 @@ def critique(
             "counts": counts,
             "applied": applied,
             "findings": counts.get("findings", 0),
+        },
+    )
+
+
+def rewrite(
+    cfg: Config,
+    cmd_id: str,
+    *,
+    pack_dir: str = "",
+    file_path: Any | None = None,
+    areas: list[str] | tuple[str, ...] | None = None,
+    outputs: list[str] | tuple[str, ...] | None = None,
+    comments: str | None = None,
+) -> None:
+    if rewrite_fn is not None:
+        result = rewrite_fn(
+            cfg,
+            cmd_id,
+            pack_dir=pack_dir,
+            file_path=file_path,
+            areas=areas,
+            outputs=outputs,
+            comments=comments,
+        )
+        if result is not None:
+            _attach_result(cfg, cmd_id, result)
+        return
+    from pathlib import Path
+
+    from ..critique import load_pack
+    from ..llm import get_client
+    from ..llm.preflight import validate_llm_for_verb
+    from ..llm.validate import LlmConfigError
+    from ..rewrite import _manuscript_path, build_rewrite
+
+    rec = commands.read_command(cfg, cmd_id) or {}
+
+    def on_status(msg: str) -> None:
+        row = commands.read_command(cfg, cmd_id) or {}
+        row["detail"] = msg
+        commands.write_command(cfg, row)
+
+    folder = Path(pack_dir) if pack_dir else None
+    pack = load_pack(folder) if folder is not None else None
+    if not pack:
+        rec["status"] = "failed"
+        rec["error"] = "No critique pack.json."
+        commands.write_command(cfg, rec)
+        return
+    pack["pack_dir"] = str(folder)
+    pack["critique_id"] = pack.get("critique_id") or (
+        folder.parent.name if folder is not None else ""
+    )
+    staged = Path(file_path) if file_path else None
+    manuscript = _manuscript_path(pack, staged)
+    if manuscript is None or not manuscript.is_file():
+        rec["status"] = "failed"
+        rec["error"] = "Manuscript file is missing."
+        commands.write_command(cfg, rec)
+        return
+    llm_client = None
+    area_list = list(areas or cfg.rewrite_areas)
+    if cfg.llm_enabled:
+        try:
+            validate_llm_for_verb(cfg)
+            llm_client = get_client(cfg)
+        except LlmConfigError as exc:
+            if any(a != "style" for a in area_list):
+                rec["status"] = "failed"
+                rec["error"] = str(exc)
+                commands.write_command(cfg, rec)
+                return
+    try:
+        result = build_rewrite(
+            cfg,
+            pack=pack,
+            manuscript=manuscript,
+            areas=tuple(area_list) if area_list else None,
+            outputs=tuple(outputs) if outputs else None,
+            comments=comments,
+            dry_run=False,
+            llm_client=llm_client,
+            on_status=on_status,
+        )
+    except Exception as exc:
+        rec = commands.read_command(cfg, cmd_id) or rec
+        rec["status"] = "failed"
+        rec["error"] = str(exc)
+        commands.write_command(cfg, rec)
+        return
+    counts = result.get("counts") or {}
+    _attach_result(
+        cfg,
+        cmd_id,
+        {
+            "pack_dir": result.get("pack_dir") or "",
+            "critique_id": result.get("critique_id") or "",
+            "counts": counts,
+            "edits": counts.get("edits", 0),
+            "skips": counts.get("skips", 0),
         },
     )
 

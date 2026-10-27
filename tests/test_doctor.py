@@ -89,6 +89,19 @@ def test_remediation_rg_and_twenty(cfg):
     assert tw and "TWENTY_API_KEY" in tw and "twenty lookup" in tw
 
 
+def test_remediation_rewrite(cfg):
+    from paperful.doctor import _rewrite_check
+
+    cfg.llm_enabled = False
+    cfg.rewrite_areas = ("style",)
+    assert _rewrite_check(cfg) is None
+    cfg.rewrite_areas = ("style", "cites")
+    check = _rewrite_check(cfg)
+    assert check is not None and check.status == "amber"
+    text = remediation_text(check, cfg)
+    assert text and "llm" in text.lower()
+
+
 def test_remediation_vale(cfg):
     text = remediation_text(
         Check("vale", "amber", "missing — optional for critique house style"),
