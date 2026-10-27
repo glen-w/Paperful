@@ -85,6 +85,7 @@ def run_critique(
     use_forensics = bool(forensics) or cfg.critique_forensics
     use_advanced = "marg" in lanes
     use_grobid = cfg.grobid_enabled if grobid is None else grobid
+    grobid_lanes = bool({"marg", "claims", "verify"} & set(lanes))
     reviewer_ids = [r.strip() for r in (reviewer or []) if r and str(r).strip()]
     llm_client = None
     if lanes_need_llm(lanes):
@@ -94,7 +95,7 @@ def run_critique(
             console.print(str(exc), markup=False, style="red")
             raise typer.Exit(1) from exc
         llm_client = get_client(cfg)
-    if use_advanced and use_grobid and not json_out:
+    if grobid_lanes and use_grobid and not json_out:
         from .grobid_client import grobid_egress_is_remote
 
         if grobid_egress_is_remote(cfg):

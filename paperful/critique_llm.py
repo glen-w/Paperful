@@ -184,8 +184,17 @@ def suggested_from_llm(
     run_reviewers = "reviewers" in lanes
     run_marg = "marg" in lanes
     run_adversary = "adversary" in lanes
+    run_claims = "claims" in lanes
+    run_verify = "verify" in lanes
     run_context = "context" in lanes or "context-web" in lanes
-    if not run_reviewers and not run_marg and not run_adversary and not run_context:
+    if not (
+        run_reviewers
+        or run_marg
+        or run_adversary
+        or run_claims
+        or run_verify
+        or run_context
+    ):
         return [], None
     lane_list = list(lanes)
     mode = mode_for_lanes(lanes)
@@ -197,6 +206,8 @@ def suggested_from_llm(
         and not reviewers
         and not run_marg
         and not run_adversary
+        and not run_claims
+        and not run_verify
         and not run_context
     ):
         return [], {
@@ -402,6 +413,70 @@ def suggested_from_llm(
                 adversary_meta.get("skipped") or "empty_reply"
             )
 
+    claims_meta: dict[str, Any] = {}
+    if run_claims:
+        from .critique_claims import suggested_from_claims
+
+        t_cl = time.perf_counter()
+        extra_cl, claims_meta = suggested_from_claims(
+            cfg,
+            doc,
+            findings,
+            item=item,
+            client=client,
+            hay=hay,
+            pdf_path=pdf_path,
+            use_grobid=use_grobid,
+            on_status=say,
+        )
+        say(
+            f"Claims comments done ({time.perf_counter() - t_cl:.0f}s, "
+            f"{len(extra_cl)} comment(s))"
+        )
+        out.extend(extra_cl)
+        reviewer_meta.extend(claims_meta.get("reviewers") or [])
+        if extra_cl or claims_meta.get("ledger"):
+            first_sha = first_sha or str(claims_meta.get("prompt_sha") or "")
+            if not first_narrative and claims_meta.get("narrative"):
+                first_narrative = str(claims_meta.get("narrative") or "")
+                first_model = first_model or str(claims_meta.get("model") or "")
+        elif not extra_cl:
+            skip_reason = skip_reason or str(
+                claims_meta.get("skipped") or "empty_reply"
+            )
+
+    verify_meta: dict[str, Any] = {}
+    if run_verify:
+        from .critique_verify import suggested_from_verify
+
+        t_v = time.perf_counter()
+        extra_v, verify_meta = suggested_from_verify(
+            cfg,
+            doc,
+            findings,
+            item=item,
+            client=client,
+            hay=hay,
+            pdf_path=pdf_path,
+            use_grobid=use_grobid,
+            on_status=say,
+        )
+        say(
+            f"Verify comments done ({time.perf_counter() - t_v:.0f}s, "
+            f"{len(extra_v)} comment(s))"
+        )
+        out.extend(extra_v)
+        reviewer_meta.extend(verify_meta.get("reviewers") or [])
+        if extra_v or verify_meta.get("narrative"):
+            first_sha = first_sha or str(verify_meta.get("prompt_sha") or "")
+            if not first_narrative and verify_meta.get("narrative"):
+                first_narrative = str(verify_meta.get("narrative") or "")
+                first_model = first_model or str(verify_meta.get("model") or "")
+        elif not extra_v:
+            skip_reason = skip_reason or str(
+                verify_meta.get("skipped") or "empty_reply"
+            )
+
     context_meta: dict[str, Any] = {}
     if run_context:
         from .critique_context import suggested_from_context
@@ -464,13 +539,22 @@ def suggested_from_llm(
             row["adversary"] = {
                 k: v for k, v in adversary_meta.items() if k != "reviewers"
             }
+        if claims_meta:
+            row["claims"] = {
+                k: v
+                for k, v in claims_meta.items()
+                if k not in {"reviewers", "ledger"}
+            }
+            row["claims_ledger"] = list(claims_meta.get("ledger") or [])
+        if verify_meta:
+            row["verify"] = {k: v for k, v in verify_meta.items() if k != "reviewers"}
         if context_meta:
             row["context"] = {
                 k: v for k, v in context_meta.items() if k != "reviewers"
             }
         return row
 
-    if not capped and not first_narrative:
+    if not capped and not first_narrative and not (claims_meta.get("ledger") or []):
         return [], _pack_meta(skipped=skip_reason or "empty_reply")
     return capped, _pack_meta()
 

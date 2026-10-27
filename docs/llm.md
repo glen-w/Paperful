@@ -52,7 +52,7 @@ No Python extra is needed for Ollama: Paperful talks HTTP to the daemon.
 
 | Verb | Works well with | Notes |
 | --- | --- | --- |
-| `fix-metadata` titles, `lint` identity, `summarize`, `synthesize`, `extract-sections --llm`, `rag questions --llm`, `critique --lane` / `--llm` / `--advanced`, `rewrite` (non-style), `ask` | 7B–12B instruct models (`qwen2.5:7b`, `gemma3:12b`, `llama3.1:8b`) | JSON-capable instruct tags; thinking models are fine but slower. `summarize` and `synthesize` set Ollama `num_ctx` from the prompt, capped by `[llm].max_num_ctx`. `critique` comments are suggested-lane only. `--lane marg` is many more completions per paper (three aspect groups plus refine); `--lane adversary` is one validity red-team turn; `--lane context` adds summary / historian / scout / Q&A turns. `rewrite` is one JSON call per enabled area that still has findings after glossary/Vale swaps; an optional `[[rewrite.specialists]]` model may be an [XtraGPT](https://huggingface.co/collections/Xtra-Computing/xtragpt) Ollama tag (ICLR/ReviseQA-shaped — do not assume it fits ocean/policy drafts). `ask` default is **simple** (one completion); **advanced** adds about `evidence_k` summary calls — [rag.md](rag.md#ask-modes) |
+| `fix-metadata` titles, `lint` identity, `summarize`, `synthesize`, `extract-sections --llm`, `rag questions --llm`, `critique --lane` / `--llm` / `--advanced`, `rewrite` (non-style), `ask` | 7B–12B instruct models (`qwen2.5:7b`, `gemma3:12b`, `llama3.1:8b`) | JSON-capable instruct tags; thinking models are fine but slower. `summarize` and `synthesize` set Ollama `num_ctx` from the prompt, capped by `[llm].max_num_ctx`. `critique` comments are suggested-lane only. `--lane marg` is many more completions per paper (aspect groups plus refine; default experiments/clarity/impact); `--lane adversary` is one validity red-team turn; `--lane claims` is claim extract plus an optional downgrade turn; `--lane verify` is one or two turns per segment plus refine; `--lane context` adds summary / historian / scout / Q&A turns. `rewrite` is one JSON call per enabled area that still has findings after glossary/Vale swaps; an optional `[[rewrite.specialists]]` model may be an [XtraGPT](https://huggingface.co/collections/Xtra-Computing/xtragpt) Ollama tag (ICLR/ReviseQA-shaped — do not assume it fits ocean/policy drafts). `ask` default is **simple** (one completion); **advanced** adds about `evidence_k` summary calls — [rag.md](rag.md#ask-modes) |
 | `recover` | 14B+ (`qwen2.5:14b`, `qwen3:14b`, larger); 32B / VL on 24 GB+ | Small models loop on cookie banners and publisher menus; `doctor` warns under ~10B by tag name. Full guidance: [browser-agent-models.md](browser-agent-models.md) |
 
 ### LiteLLM (paid / OpenAI-compatible APIs)
@@ -111,7 +111,7 @@ llm_pdf_match_min_confidence = 0.6
 
 [critique]                          # verb C2: suggested comments only
 llm = false
-# lanes = []                       # reviewers, marg, adversary, context, context-web (see critique.md)
+# lanes = []                       # reviewers, marg, adversary, claims, verify, context, context-web (see critique.md)
 # advanced = false                 # shim → marg when lanes is empty
 # vale = false                     # house-style pass; needs vale on PATH (not an LLM)
 # glossary = true                  # fuzzy house expansions from state/glossary/
@@ -265,6 +265,8 @@ uv run paperful critique --file ./draft.pdf --llm --reviewer reviewer-2
 uv run paperful critique --file ./draft.pdf --llm --reviewer reviewer-5
 uv run paperful critique --file ./draft.pdf --lane marg
 uv run paperful critique --file ./draft.pdf --lane adversary
+uv run paperful critique --file ./draft.pdf --lane claims
+uv run paperful critique --file ./draft.pdf --lane verify
 uv run paperful critique --file ./draft.pdf --lane reviewers --lane marg --grobid
 uv run paperful critique --file ./draft.pdf --lane context
 uv run paperful critique --item ABCD1234 --llm --force
@@ -275,14 +277,17 @@ no model. `--lane reviewers` (or `--llm` / `[critique].llm`) asks for a
 contribution summary, up to eight comments tied to a finding code or a quoted
 span, and author questions. `--lane marg` (or `--advanced`) adds a MARG-S-style
 multi-agent pass. `--lane adversary` adds a structured validity red-team.
-`--lane context` adds a ScholarPeer-inspired local historian /
+`--lane claims` builds an intra-doc claim ledger (support in this extract only).
+`--lane verify` is a local section-swarm stress-test (not Deep Review; local
+models will not match hosted proof recall). `--lane context` adds a
+ScholarPeer-inspired local historian /
 scout / Q&A pass; `--lane context-web` may query OpenAlex / SearXNG (egress
 notice; skipped offline). Lanes run together. `--grobid` /
-`[grobid].enabled` only changes MARG-S PDF chunks. Every row is
+`[grobid].enabled` changes MARG-S / claims / verify PDF chunks. Every row is
 `lane=suggested`. Ungrounded spans are dropped. No overall score. Identity
 mismatch refuses review lanes unless `--force`. Optional
 `[[critique.reviewers]]` run one call each (per-id model and prompt) and do
-not replace `marg`, `adversary`, or `context`. A Markdown prompt file becomes a **Reviewer**
+not replace `marg`, `adversary`, `claims`, `verify`, or `context`. A Markdown prompt file becomes a **Reviewer**
 note** in `pack.md`; the builtin prompt still returns JSON comments. Optional
 `--vale` house-style lint is a separate **checked** pass (no model). See
 [critique.md](critique.md).

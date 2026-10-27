@@ -185,7 +185,7 @@ mirror_failures_before_skip = 3
 # [critique]
 # # Local manuscript pack (see docs/critique.md). Not a grade.
 # llm = false                      # shim → reviewers when lanes is empty
-# lanes = []                       # reviewers, marg, adversary, context, context-web (empty → llm/advanced shims)
+# lanes = []                       # reviewers, marg, adversary, claims, verify, context, context-web (empty → llm/advanced shims)
 # tag = "paperful-critique"
 # ai_model = false                 # optional Binoculars extra; --ai-model turns on (no CLI off)
 # vale = false                     # optional Vale house style; --vale turns on (no CLI off)
@@ -203,6 +203,13 @@ mirror_failures_before_skip = 3
 # advanced_max_comments = 12
 # advanced_refine = true
 # advanced_timeout_s = 0           # 0 = max([llm].timeout_s, 600)
+# advanced_aspects = []            # empty → experiments, clarity, impact; optional theory, policy, evidence-base
+# claims_max = 8                   # intra-doc claim ledger cap
+# claims_max_comments = 16
+# claims_timeout_s = 0             # 0 = [llm].timeout_s
+# verify_timeout_s = 0             # 0 = max([llm].timeout_s, 600)
+# verify_max_comments = 16
+# verify_max_segments = 8
 # context_timeout_s = 0            # context / context-web; 0 = max([llm].timeout_s, 600)
 # context_max_comments = 12
 # context_max_hits = 8             # local RAG and OpenAlex/SearXNG rows

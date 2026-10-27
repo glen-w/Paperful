@@ -1039,12 +1039,12 @@ def critique(
     lane: list[str] = typer.Option(
         [],
         "--lane",
-        help="Suggested review lane (repeatable): reviewers, marg, adversary, context, context-web.",
+        help="Suggested review lane (repeatable): reviewers, marg, adversary, claims, verify, context, context-web.",
     ),
     grobid: bool | None = typer.Option(
         None,
         "--grobid/--no-grobid",
-        help="Use the GROBID sidecar for MARG-S chunking. Default is [grobid].enabled. Only used with --lane marg / --advanced.",
+        help="Use the GROBID sidecar for MARG-S / claims / verify PDF chunks. Default is [grobid].enabled.",
     ),
     reviewer: list[str] = typer.Option(
         [],

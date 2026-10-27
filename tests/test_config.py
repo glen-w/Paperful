@@ -394,6 +394,13 @@ def test_critique_table_is_parsed(tmp_path):
     assert cfg.critique_context_max_comments == 12
     assert cfg.critique_context_max_hits == 8
     assert cfg.critique_adversary_max_comments == 12
+    assert cfg.critique_claims_max == 8
+    assert cfg.critique_claims_max_comments == 16
+    assert cfg.critique_claims_timeout_s == 0.0
+    assert cfg.critique_verify_timeout_s == 0.0
+    assert cfg.critique_verify_max_comments == 16
+    assert cfg.critique_verify_max_segments == 8
+    assert cfg.critique_advanced_aspects == ()
     assert cfg.critique_reviewers == ()
     assert cfg.critiques_dir == cfg.state_dir / "critiques"
     assert cfg.rewrite_areas == ("style",)
@@ -516,6 +523,37 @@ def test_critique_lanes_and_context_knobs_are_parsed(tmp_path):
     assert cfg.critique_context_max_comments == 6
     assert cfg.critique_context_max_hits == 3
     assert cfg.critique_adversary_max_comments == 4
+
+
+def test_critique_claims_verify_and_aspects_are_parsed(tmp_path):
+    from paperful.config import _from_dict
+
+    cfg = _from_dict(
+        {
+            "critique": {
+                "claims_max": 3,
+                "claims_max_comments": 5,
+                "claims_timeout_s": 12,
+                "verify_timeout_s": 90,
+                "verify_max_comments": 7,
+                "verify_max_segments": 4,
+                "advanced_aspects": ["theory", "policy"],
+            }
+        },
+        tmp_path / "config.toml",
+    )
+    assert cfg.critique_claims_max == 3
+    assert cfg.critique_claims_max_comments == 5
+    assert cfg.critique_claims_timeout_s == 12.0
+    assert cfg.critique_verify_timeout_s == 90.0
+    assert cfg.critique_verify_max_comments == 7
+    assert cfg.critique_verify_max_segments == 4
+    assert cfg.critique_advanced_aspects == ("theory", "policy")
+    with pytest.raises(ValueError, match="unknown MARG aspect"):
+        _from_dict(
+            {"critique": {"advanced_aspects": ["nope"]}},
+            tmp_path / "config.toml",
+        )
 
 
 def test_critique_vale_config_resolves_relative(tmp_path):

@@ -286,6 +286,8 @@ def _incomplete_lane_rows(llm: dict[str, Any] | None) -> list[tuple[str, str]]:
     marg_reviewer_skip = False
     context_reviewer_skip = False
     adversary_reviewer_skip = False
+    claims_reviewer_skip = False
+    verify_reviewer_skip = False
     for raw in llm.get("reviewers") or []:
         if not isinstance(raw, dict) or not raw.get("skipped"):
             continue
@@ -298,6 +300,10 @@ def _incomplete_lane_rows(llm: dict[str, Any] | None) -> list[tuple[str, str]]:
             context_reviewer_skip = True
         if rid.startswith("adversary"):
             adversary_reviewer_skip = True
+        if rid.startswith("claims"):
+            claims_reviewer_skip = True
+        if rid.startswith("verify"):
+            verify_reviewer_skip = True
     if llm.get("skipped") and not reviewer_skipped:
         add("llm", str(llm["skipped"]))
     marg = llm.get("marg") if isinstance(llm.get("marg"), dict) else {}
@@ -309,6 +315,16 @@ def _incomplete_lane_rows(llm: dict[str, Any] | None) -> list[tuple[str, str]]:
     adv = llm.get("adversary") if isinstance(llm.get("adversary"), dict) else {}
     if adv.get("skipped") and not adversary_reviewer_skip:
         add("adversary", str(adv["skipped"]))
+    cl = llm.get("claims") if isinstance(llm.get("claims"), dict) else {}
+    if cl.get("skipped") and not claims_reviewer_skip:
+        add("claims", str(cl["skipped"]))
+    ver = llm.get("verify") if isinstance(llm.get("verify"), dict) else {}
+    if ver.get("skipped") and not verify_reviewer_skip:
+        add("verify", str(ver["skipped"]))
+    for raw in ver.get("segments") or []:
+        if isinstance(raw, dict) and raw.get("skipped"):
+            label = str(raw.get("id") or raw.get("heading") or "verify")
+            add(label, str(raw["skipped"]))
     return rows
 
 
@@ -351,6 +367,32 @@ def _render_reviewer_notes(llm: dict[str, Any]) -> list[str]:
         lines.append("")
         lines.append(str(row.get("narrative") or "").strip())
         lines.append("")
+    return lines
+
+
+def _render_claims(rows: list[dict[str, Any]]) -> list[str]:
+    """Ledger of intra-doc claim support. Not a truth verdict."""
+    lines = [
+        "",
+        "## Claims",
+        "",
+        "Support is against **this extract** only — not a verdict that a claim is true or false.",
+        "",
+    ]
+    for row in rows:
+        cid = str(row.get("id") or "c")
+        status = str(row.get("status") or "")
+        loc = str(row.get("loc") or "")
+        text = str(row.get("text") or "").strip()
+        head = f"- **{cid}** ({status}"
+        if loc:
+            head += f", {loc}"
+        head += f"): {text}"
+        lines.append(head)
+        quote = str(row.get("support_quote") or "").strip()
+        if quote:
+            lines.append(f"  > {quote}")
+    lines.append("")
     return lines
 
 
@@ -401,6 +443,9 @@ def render_markdown(pack: dict[str, Any], *, show_dismissed: bool = False) -> st
         )
     )
     lines.extend(_section("Critical path", critical))
+    claims_rows = [r for r in (pack.get("claims") or []) if isinstance(r, dict)]
+    if claims_rows:
+        lines.extend(_render_claims(claims_rows))
     if suggested:
         lines.extend(_section("Suggested", suggested))
     if pack.get("forensics") is not None:
@@ -717,6 +762,10 @@ def build_critique(
         payload["vale"] = vale_meta
     if forensics_meta is not None:
         payload["forensics"] = forensics_meta
+    claims_rows: list[Any] | None = None
+    if isinstance(llm_meta, dict) and "claims_ledger" in llm_meta:
+        claims_rows = list(llm_meta.pop("claims_ledger") or [])
+        payload["claims"] = claims_rows
     folder: Path | None = None
     if not dry_run:
         say("Writing pack…")

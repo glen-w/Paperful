@@ -8,7 +8,6 @@ Optional GROBID TEI uses the operator sidecar from ``d001b9b9``.
 from __future__ import annotations
 
 import json
-import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -20,11 +19,49 @@ from .config import Config
 from .critique import Finding, make_finding
 from .critique_extract import ExtractedDoc
 from .critique_llm import findings_from_comments, grounded, parse_llm_json
+from .critique_units import Unit, units_from_doc, units_from_markdown
 from .zot import Item
 
 ASPECTS = ("experiments", "clarity", "impact")
+DEFAULT_ASPECTS = ASPECTS
+KNOWN_ASPECTS = (
+    "experiments",
+    "clarity",
+    "impact",
+    "theory",
+    "policy",
+    "evidence-base",
+)
 
-_HEADING_LINE = re.compile(r"^(?:#{1,6}\s+)?([A-Z][A-Za-z][A-Za-z0-9 ,:/-]{2,80})$")
+
+def parse_marg_aspects(raw: Any) -> tuple[str, ...]:
+    """Parse ``[critique].advanced_aspects``. Empty → default triple."""
+    if raw is None or raw == "" or raw == []:
+        return DEFAULT_ASPECTS
+    if isinstance(raw, str):
+        parts = [part.strip() for part in raw.split(",") if part.strip()]
+    elif isinstance(raw, (list, tuple)):
+        parts = [str(part).strip() for part in raw if str(part).strip()]
+    else:
+        raise ValueError("[critique].advanced_aspects must be an array of aspect ids")
+    seen: list[str] = []
+    for part in parts:
+        name = part.lower()
+        if name not in KNOWN_ASPECTS:
+            raise ValueError(
+                f"unknown MARG aspect {part!r} (want {', '.join(KNOWN_ASPECTS)})"
+            )
+        if name not in seen:
+            seen.append(name)
+    return tuple(seen) if seen else DEFAULT_ASPECTS
+
+
+def resolve_marg_aspects(cfg: Config) -> tuple[str, ...]:
+    raw = getattr(cfg, "critique_advanced_aspects", ()) or ()
+    if not raw:
+        return DEFAULT_ASPECTS
+    return parse_marg_aspects(raw)
+
 
 _LEADER_SYSTEM = """You lead a small review group for one aspect of a manuscript.
 Workers each hold one chunk of the paper. One expert assists you.
@@ -67,6 +104,24 @@ _EXPERT_SYSTEM = {
         'Reply JSON: {"reply": "...", "comments": [{"quote": "...", "detail": "..."}]}. '
         "No score or accept/reject."
     ),
+    "theory": (
+        "You are the theory expert. Look for proof or lemma gaps, missing "
+        "assumptions, and counterexample-shaped holes. Do not invent theorems. "
+        'Reply JSON: {"reply": "...", "comments": [{"quote": "...", "detail": "..."}]}. '
+        "No score or accept/reject."
+    ),
+    "policy": (
+        "You are the policy expert. Check legal warrant, instrument fit, and "
+        "whether a mandate is supported by the evidence the text itself cites. "
+        'Reply JSON: {"reply": "...", "comments": [{"quote": "...", "detail": "..."}]}. '
+        "No score or accept/reject. Do not search the web."
+    ),
+    "evidence-base": (
+        "You are the evidence-base expert for survey or doctrinal drafts. Flag "
+        "overclaim versus the cited set and thin source coverage named in the text. "
+        'Reply JSON: {"reply": "...", "comments": [{"quote": "...", "detail": "..."}]}. '
+        "No score or accept/reject. Do not search the web."
+    ),
 }
 
 _ASPECT_TASK = {
@@ -82,6 +137,19 @@ _ASPECT_TASK = {
         "Focus on how the paper states its motivation, contribution, and related work. "
         "Do not invent citations. Only comment on what the text itself claims."
     ),
+    "theory": (
+        "Focus on proofs, lemmas, and formal claims. Note missing assumptions "
+        "or steps a reader cannot reconstruct. Do not invent counterexamples "
+        "that contradict the excerpt."
+    ),
+    "policy": (
+        "Focus on legal or policy warrant: does the instrument the paper names "
+        "match the evidence it presents? Do not invent statutes or cases."
+    ),
+    "evidence-base": (
+        "Focus on whether the cited set in the text can carry the survey or "
+        "doctrinal claim. Do not invent sources."
+    ),
 }
 
 _REFINE_SYSTEM = """You refine a list of suggested manuscript comments.
@@ -90,13 +158,6 @@ Return JSON only:
 Drop comments that are invalid, generic, already done in the paper, or score-like.
 Split mixed comments. Keep at most the asked maximum. No accept/reject or grade.
 """
-
-
-@dataclass
-class Unit:
-    heading: str
-    loc: str
-    text: str
 
 
 @dataclass
@@ -133,62 +194,6 @@ def grobid_markdown(
         return pages, ""
     except (GrobidError, GrobidConfigError, OSError, ValueError) as exc:
         return None, str(exc)[:200]
-
-
-def units_from_markdown(pages: list[str]) -> list[Unit]:
-    heading = ""
-    n = 0
-    units: list[Unit] = []
-    for page in pages:
-        for block in re.split(r"\n\s*\n", page or ""):
-            block = block.strip()
-            if not block:
-                continue
-            if block.startswith("#"):
-                first, _, rest = block.partition("\n")
-                heading = first.lstrip("#").strip()
-                block = rest.strip()
-                if not block:
-                    continue
-            n += 1
-            units.append(Unit(heading=heading, loc=f"paragraph {n}", text=block))
-    return units
-
-
-def _looks_heading(text: str) -> bool:
-    line = (text or "").strip()
-    if not line or "\n" in line:
-        return False
-    if line.startswith("#"):
-        return True
-    if len(line.split()) > 12:
-        return False
-    return bool(_HEADING_LINE.match(line))
-
-
-def units_from_doc(doc: ExtractedDoc) -> list[Unit]:
-    heading = ""
-    units: list[Unit] = []
-    kind = doc.loc_kind or "paragraph"
-    if doc.paragraphs:
-        rows = list(doc.paragraphs)
-    elif doc.pages:
-        rows = list(doc.pages)
-        kind = "page"
-    else:
-        rows = [p for p in re.split(r"\n\s*\n", doc.text or "") if p.strip()]
-        kind = "paragraph"
-    for i, raw in enumerate(rows, 1):
-        text = (raw or "").strip()
-        if not text:
-            continue
-        if _looks_heading(text) and len(text) < 120:
-            heading = text.lstrip("#").strip()
-            continue
-        units.append(Unit(heading=heading, loc=f"{kind} {i}", text=text))
-    if not units and (doc.text or "").strip():
-        units.append(Unit(heading="", loc="document", text=doc.text.strip()))
-    return units
 
 
 def pack_chunks(units: list[Unit], *, max_workers: int, max_chars: int) -> list[Chunk]:
@@ -509,7 +514,7 @@ def suggested_from_marg(
     use_grobid: bool = False,
     on_status: Callable[[str], None] | None = None,
 ) -> tuple[list[Finding], dict[str, Any]]:
-    """Run three aspect groups plus an optional refine pass."""
+    """Run configured aspect groups plus an optional refine pass."""
     say = on_status or (lambda _msg: None)
     model = cfg.llm_model
     timeout = advanced_timeout_s(cfg)
@@ -553,7 +558,9 @@ def suggested_from_marg(
     reviewer_rows: list[dict[str, Any]] = []
     narratives: list[str] = []
     first_sha = ""
-    for aspect in ASPECTS:
+    aspects = resolve_marg_aspects(cfg)
+    meta["aspects"] = list(aspects)
+    for aspect in aspects:
         say(f"Advanced {aspect} group…")
         comments, narrative, stats = _run_group(
             cfg,
@@ -610,7 +617,7 @@ def suggested_from_marg(
     # Restore aspect reviewer id when the comment code is an aspect name.
     for f in findings_out:
         code = f.code
-        if code in ASPECTS:
+        if code in KNOWN_ASPECTS:
             f.extra["reviewer"] = f"marg-{code}"
         else:
             f.extra.setdefault("reviewer", "marg")

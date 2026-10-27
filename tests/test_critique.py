@@ -2368,3 +2368,363 @@ def test_cli_lane_flag_runs_adversary(cfg, tmp_path, monkeypatch):
     on_disk = json.loads((pack_dir / "pack.json").read_text(encoding="utf-8"))
     assert on_disk["llm"]["lanes"] == ["adversary"]
     assert on_disk["llm"]["mode"] == "adversary"
+
+
+CLAIMS_MANUSCRIPT = """
+Abstract
+
+We report a 47.2 percent increase in yield under the ABC protocol.
+Global coverage is claimed for every ocean basin.
+
+Methods
+
+The ABC protocol was applied to 40 plots. Yield was measured at harvest.
+
+Results
+
+Yield rose 47.2 percent under the ABC protocol compared with the control.
+
+Limitations
+
+The ABC protocol sample was a single season.
+
+References
+
+[1] Ada. (2001). First paper. Journal. https://doi.org/10.1000/missing
+"""
+
+
+def _claims_chat(_client, request):
+    sys_msg = request.messages[0]["content"]
+    if "extract core claims" in sys_msg:
+        return json.dumps(
+            {
+                "claims": [
+                    "Yield rose 47.2 percent under the ABC protocol.",
+                    "Global coverage is claimed for every ocean basin.",
+                    "lemma 12.4 is false",
+                ],
+                "method": "ABC protocol on 40 plots",
+            }
+        )
+    if "only downgrade" in sys_msg:
+        return json.dumps(
+            {
+                "adjustments": [
+                    {
+                        "id": "c1",
+                        "status": "supported",
+                        "detail": "Must not upgrade a claim.",
+                    }
+                ]
+            }
+        )
+    raise AssertionError(f"unexpected claims prompt: {sys_msg[:80]}")
+
+
+def _verify_chat(_client, request):
+    sys_msg = request.messages[0]["content"]
+    if "refine section-verify" in sys_msg:
+        return json.dumps(
+            {
+                "comments": [
+                    {
+                        "code": "verify_gap",
+                        "quote": "ABC protocol",
+                        "detail": "The ABC protocol excerpt does not report how Figure 2 was produced.",
+                    }
+                ]
+            }
+        )
+    if "verify one manuscript" in sys_msg or "short pass over a light" in sys_msg:
+        return json.dumps(
+            {
+                "comments": [
+                    {
+                        "code": "verify_gap",
+                        "quote": "ABC protocol",
+                        "detail": "The ABC protocol does not state N for the plots.",
+                    },
+                    {
+                        "code": "verify_logic",
+                        "quote": "ABC protocol",
+                        "detail": 'Compare "A Completely Fake Zebra Paper" on yield.',
+                    },
+                ]
+            }
+        )
+    if "attack a previous acceptance" in sys_msg:
+        return json.dumps({"comments": []})
+    raise AssertionError(f"unexpected verify prompt: {sys_msg[:80]}")
+
+
+def test_claims_lane_writes_ledger_and_gaps(cfg, tmp_path, monkeypatch):
+    monkeypatch.setattr("paperful.llm.client.chat", _claims_chat)
+    src = tmp_path / "claims.md"
+    src.write_text(CLAIMS_MANUSCRIPT, encoding="utf-8")
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        lanes=("claims",),
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    assert pack["llm"]["lanes"] == ["claims"]
+    assert pack["llm"]["mode"] == "claims"
+    ledger = pack.get("claims") or []
+    texts = [row["text"] for row in ledger]
+    assert any("47.2 percent" in t for t in texts)
+    assert all("lemma 12.4" not in t for t in texts)
+    supported = [row for row in ledger if "47.2 percent" in row["text"]]
+    assert supported and supported[0]["status"] == "supported"
+    basin = [row for row in ledger if "ocean basin" in row["text"]]
+    assert basin and basin[0]["status"] == "unsupported"
+    suggested = [f for f in pack["findings"] if f["lane"] == "suggested"]
+    codes = {f["code"] for f in suggested if f.get("source") == "claims"}
+    assert "claim_unsupported_in_text" in codes
+    assert "claim_supported" not in {f["code"] for f in suggested}
+    md = Path(pack["pack_dir"], "pack.md").read_text(encoding="utf-8")
+    assert "## Claims" in md
+    assert md.index("## Critical path") < md.index("## Claims")
+    assert md.index("## Claims") < md.index("## Suggested")
+    assert "not supported in this extract" in md.lower() or "unsupported" in md
+    sug = md[md.index("## Suggested") :]
+    assert "claim_supported" not in sug
+    assert "## Incomplete lanes" not in md
+
+
+def test_cli_lane_flag_runs_claims(cfg, tmp_path, monkeypatch):
+    from paperful.cli import app
+
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
+        '[llm]\nenabled = true\nmodel = "stub"\n',
+        encoding="utf-8",
+    )
+    src = tmp_path / "draft.md"
+    src.write_text(CLAIMS_MANUSCRIPT, encoding="utf-8")
+    monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_llm_for_verb", lambda _cfg: None
+    )
+    monkeypatch.setattr(
+        "paperful.llm.get_client",
+        lambda _cfg: type("C", (), {"provider": "stub"})(),
+    )
+    monkeypatch.setattr("paperful.llm.client.chat", _claims_chat)
+    ok = runner.invoke(
+        app,
+        [
+            "critique",
+            "--file",
+            str(src),
+            "--lane",
+            "claims",
+            "--config",
+            str(cfg_path),
+            "--format",
+            "json",
+        ],
+    )
+    assert ok.exit_code == 0, ok.output
+    body = json.loads(ok.stdout)
+    pack_dir = Path(body["summary"]["pack_dir"])
+    on_disk = json.loads((pack_dir / "pack.json").read_text(encoding="utf-8"))
+    assert on_disk["llm"]["lanes"] == ["claims"]
+    assert on_disk["llm"]["mode"] == "claims"
+    assert on_disk.get("claims")
+
+
+def test_verify_lane_drops_invented_citations(cfg, tmp_path, monkeypatch):
+    monkeypatch.setattr("paperful.llm.client.chat", _verify_chat)
+    src = tmp_path / "verify.md"
+    src.write_text(CLAIMS_MANUSCRIPT, encoding="utf-8")
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        lanes=("verify",),
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    assert pack["llm"]["lanes"] == ["verify"]
+    assert pack["llm"]["mode"] == "verify"
+    assert pack["llm"]["verify"]["segments"]
+    suggested = [f for f in pack["findings"] if f["lane"] == "suggested"]
+    codes = {f["code"] for f in suggested if f.get("source") == "llm"}
+    assert "verify_gap" in codes
+    details = " ".join(f.get("detail") or "" for f in suggested)
+    assert "Completely Fake Zebra Paper" not in details
+    md = Path(pack["pack_dir"], "pack.md").read_text(encoding="utf-8")
+    assert "verify_gap" in md
+
+
+def test_verify_timeout_records_incomplete_segments(cfg, tmp_path, monkeypatch):
+    cfg.critique_verify_timeout_s = 1.0
+    n = {"i": 0}
+
+    def fake_mono():
+        n["i"] += 1
+        return 0.0 if n["i"] == 1 else 5.0
+
+    monkeypatch.setattr("paperful.critique_verify.time.monotonic", fake_mono)
+    monkeypatch.setattr("paperful.llm.client.chat", _verify_chat)
+    src = tmp_path / "to.md"
+    src.write_text(CLAIMS_MANUSCRIPT, encoding="utf-8")
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        lanes=("verify",),
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    assert pack["llm"]["verify"].get("skipped") == "timeout"
+    segs = pack["llm"]["verify"].get("segments") or []
+    assert segs and all(s.get("skipped") == "timeout" for s in segs)
+    md = Path(pack["pack_dir"], "pack.md").read_text(encoding="utf-8")
+    assert "## Incomplete lanes" in md
+
+
+def test_verify_doi_status_cache_without_http(cfg, tmp_path, monkeypatch):
+    from paperful.screen import _write_status_cache
+
+    _write_status_cache(cfg, "10.1000/cached", {"codes": [], "fetched_at": 1.0})
+
+    def chat(_client, request):
+        sys_msg = request.messages[0]["content"]
+        if "refine section-verify" in sys_msg:
+            return json.dumps({"comments": []})
+        return json.dumps(
+            {
+                "comments": [
+                    {
+                        "code": "verify_gap",
+                        "quote": "ABC protocol",
+                        "detail": "The ABC protocol should cite 10.1000/cached.",
+                    },
+                    {
+                        "code": "verify_logic",
+                        "quote": "ABC protocol",
+                        "detail": "The ABC protocol should cite 10.9999/cold-cache.",
+                    },
+                ]
+            }
+        )
+
+    monkeypatch.setattr("paperful.llm.client.chat", chat)
+    src = tmp_path / "doi.md"
+    src.write_text(CLAIMS_MANUSCRIPT, encoding="utf-8")
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        lanes=("verify",),
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    suggested = [f for f in pack["findings"] if f["lane"] == "suggested"]
+    details = " ".join(f.get("detail") or "" for f in suggested)
+    codes = {f["code"] for f in suggested if f.get("source") == "llm"}
+    assert "10.1000/cached" in details
+    assert "10.9999/cold-cache" not in details
+    assert "verify_cite_unchecked" in codes
+
+
+def test_cli_lane_flag_runs_verify(cfg, tmp_path, monkeypatch):
+    from paperful.cli import app
+
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
+        '[llm]\nenabled = true\nmodel = "stub"\n',
+        encoding="utf-8",
+    )
+    src = tmp_path / "draft.md"
+    src.write_text(CLAIMS_MANUSCRIPT, encoding="utf-8")
+    monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_llm_for_verb", lambda _cfg: None
+    )
+    monkeypatch.setattr(
+        "paperful.llm.get_client",
+        lambda _cfg: type("C", (), {"provider": "stub"})(),
+    )
+    monkeypatch.setattr("paperful.llm.client.chat", _verify_chat)
+    ok = runner.invoke(
+        app,
+        [
+            "critique",
+            "--file",
+            str(src),
+            "--lane",
+            "verify",
+            "--config",
+            str(cfg_path),
+            "--format",
+            "json",
+        ],
+    )
+    assert ok.exit_code == 0, ok.output
+    body = json.loads(ok.stdout)
+    pack_dir = Path(body["summary"]["pack_dir"])
+    on_disk = json.loads((pack_dir / "pack.json").read_text(encoding="utf-8"))
+    assert on_disk["llm"]["lanes"] == ["verify"]
+
+
+def test_marg_config_aspects_run_theory_only(cfg, tmp_path, monkeypatch):
+    cfg.critique_advanced_refine = False
+    cfg.critique_advanced_aspects = ("theory",)
+    monkeypatch.setattr("paperful.llm.client.chat", _marg_chat)
+    src = tmp_path / "theory.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        lanes=("marg",),
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    assert pack["llm"]["marg"]["aspects"] == ["theory"]
+    ids = [r["id"] for r in pack["llm"]["reviewers"]]
+    assert "marg-theory" in ids
+    assert "marg-experiments" not in ids
+
+
+def test_render_markdown_claims_section_between_critical_and_suggested():
+    pack = {
+        "input": {"title": "Draft"},
+        "counts": {"findings": 1},
+        "claims": [
+            {
+                "id": "c1",
+                "text": "Yield rose 47.2 percent under the ABC protocol.",
+                "status": "supported",
+                "support_quote": "Yield rose 47.2 percent under the ABC protocol.",
+                "loc": "paragraph 3",
+            }
+        ],
+        "findings": [
+            {
+                "code": "missing_section",
+                "lane": "checked",
+                "severity": "info",
+                "loc": "",
+                "detail": "No extractable related work.",
+                "quote": "",
+                "dismissed": False,
+            },
+            {
+                "code": "claim_unsupported_in_text",
+                "lane": "suggested",
+                "severity": "info",
+                "loc": "",
+                "detail": "Claim is not supported in this extract.",
+                "quote": "ocean basin",
+                "dismissed": False,
+            },
+        ],
+    }
+    md = render_markdown(pack)
+    assert md.index("## Critical path") < md.index("## Claims")
+    assert md.index("## Claims") < md.index("## Suggested")
+    assert "c1" in md
+    assert "supported" in md

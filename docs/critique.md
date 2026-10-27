@@ -19,7 +19,7 @@ Deterministic checkers always run (no model). **Checked** findings carry a
 quote and a page / paragraph / slide loc when one exists. Heuristic AI-prose
 tells always run too, as **suggested** `info` — they are not an LLM and not
 proof of authorship. Optional review lanes (`--lane reviewers` / `marg` /
-`adversary` / `context` / `context-web`; `--llm` and `--advanced` are aliases) and
+`adversary` / `claims` / `verify` / `context` / `context-web`; `--llm` and `--advanced` are aliases) and
 `--ai-model` are separate suggested extras. Optional `--vale` house-style
 alerts are **checked**. Optional `--forensics` runs sibling CLI `paperguard`
 and records **suggested** findings. Paperful does not vendor MARG, ScholarPeer,
@@ -70,6 +70,8 @@ uv run paperful critique --file ./draft.pdf --llm
 uv run paperful critique --file ./draft.pdf --llm --reviewer reviewer-2
 uv run paperful critique --file ./draft.pdf --lane marg
 uv run paperful critique --file ./draft.pdf --lane adversary
+uv run paperful critique --file ./draft.pdf --lane claims
+uv run paperful critique --file ./draft.pdf --lane verify
 uv run paperful critique --file ./draft.pdf --lane reviewers --lane marg --grobid
 uv run paperful critique --file ./draft.pdf --lane context
 uv run paperful critique --file ./draft.pdf --lane context-web
@@ -87,14 +89,15 @@ uv run paperful critique dismiss FINDING_ID --critique-id KEY
 
 `--dry-run` prints findings and does not write `state/critiques/`. `--apply`
 posts a tagged child note only for a library `--item`. Uploads stay disk-only.
-`--lane NAME` (repeatable: `reviewers`, `marg`, `adversary`, `context`, `context-web`)
+`--lane NAME` (repeatable: `reviewers`, `marg`, `adversary`, `claims`, `verify`,
+`context`, `context-web`)
 selects suggested review lanes for this run. `[critique].lanes` is the config
 list; when it is empty, `[critique].llm` / `[critique].advanced` still map to
 `reviewers` / `marg`. `--llm` / `--no-llm` and `--advanced` / `--no-advanced`
 are aliases that add or remove those two ids. `--grobid` / `--no-grobid`
-override `[grobid].enabled` and only affect MARG-S PDF chunking (`--grobid`
-still attempts the sidecar even when `[grobid].enabled` is false, same as
-`extract-sections`). `--ai-model` turns the
+override `[grobid].enabled` and affect MARG-S / claims / verify PDF chunks
+(`--grobid` still attempts the sidecar even when `[grobid].enabled` is false,
+same as `extract-sections`). `--ai-model` turns the
 Binoculars extra on for this run (there is no `--no-ai-model`; set
 `[critique].ai_model = false` in config). `--vale` turns the Vale house-style
 pass on for this run (there is no `--no-vale`; set `[critique].vale = false`).
@@ -121,18 +124,24 @@ holds readability, lexical diversity, and the AI-tell summary (also rendered
 as a Metrics section in `pack.md`). `pack.md` leads with an **Incomplete lanes**
 banner when a requested review lane skipped, then reviewer notes, counts,
 metrics, **Critical path** (checked findings that are not hygiene, majors
-first), **Suggested**, and **Hygiene** (Vale, acronyms, prose metrics, AI-tell
-codes). JSON `findings` is unsplit. `llm` is `null` until a review lane runs;
+first), **Claims** (when `--lane claims` ran), **Suggested**, and **Hygiene**
+(Vale, acronyms, prose metrics, AI-tell codes). JSON `findings` is unsplit.
+`llm` is `null` until a review lane runs;
 then it records `lanes` (ordered ids), a deprecated `mode` string
-(`default` / `marg` / `both` / `adversary` / `context` / `context-web`) derived from that
+(`default` / `marg` / `both` / `adversary` / `claims` / `verify` / `context` /
+`context-web`) derived from that
 set, `model`, `prompt_sha`, `provider`, optional `narrative`, a `reviewers`
 list (per-id model, skip reason, Markdown note, including `marg-experiments`
-/ `marg-clarity` / `marg-impact`, `adversary`, and `context` / `context-web` when those
+/ `marg-clarity` / `marg-impact`, `adversary`, `claims`, `verify-*`, and
+`context` / `context-web` when those
 lanes ran), optional `marg` stats (`parser` is `grobid` or `extract`;
-`rounds`, `calls`, `skipped`; optional `grobid_skipped`), optional `adversary`
-stats (`calls`, `skipped`), and optional
+`rounds`, `calls`, `skipped`; optional `grobid_skipped`; optional `aspects`),
+optional `adversary` stats (`calls`, `skipped`), optional `claims` stats
+(`parser`, `calls`, `skipped`), optional `verify` stats (`parser`, `segments`,
+`calls`, `skipped`), and optional
 `context` stats (`search_enabled`, `backends`, `rag_skipped`,
-`search_skipped`). `ai_model` and `vale` appear only when those extras ran
+`search_skipped`). Top-level `claims` is the intra-doc ledger when that lane
+ran. `ai_model` and `vale` appear only when those extras ran
 (skip reason or alert counts).
 
 ## Input formats
@@ -169,12 +178,14 @@ Each lane needs `[llm].enabled`; otherwise the pack records
 | `reviewers` | `--llm` | Independent `[[critique.reviewers]]` JSON/Markdown calls |
 | `marg` | `--advanced` | MARG-S-style multi-agent (experiments / clarity / impact) |
 | `adversary` | — | Validity red-team (alternative explanations, validity, degrees of freedom, falsifiers, missing negatives) |
+| `claims` | — | Intra-doc claim ledger: extract core claims, bind to methods/results/limitations spans |
+| `verify` | — | Section swarm: density budget, sequential verify, local synthesis (not Deep Review) |
 | `context` | — | ScholarPeer-inspired: summary, library historian, baseline scout, Q&A |
 | `context-web` | — | Same pipeline; literature/baseline may query OpenAlex / optional SearXNG |
 
 ```toml
 [critique]
-lanes = ["reviewers", "marg"]
+lanes = ["reviewers", "marg", "claims"]
 ```
 
 When `lanes` is non-empty, `[critique].llm` and `[critique].advanced` are
@@ -214,14 +225,53 @@ degrees of freedom, what would falsify the core claim, and missing negative or
 comparison cases. Same grounding and no-score rules as reviewers. Cap:
 `adversary_max_comments` (default 12). Timeout is `[llm].timeout_s`.
 
+## Optional claims (`--lane claims`)
+
+Additive suggested lane. One JSON turn extracts core claims from abstract /
+results / conclusion (plus a short methods sketch), then **deterministic**
+content-word overlap binds each claim to methods / results / limitations
+spans in this extract. Status is `supported`, `thin`, or `unsupported`.
+An optional second turn may **only downgrade** a label (never invent a
+supporting span). Codes: `claim_thin`, `claim_unsupported_in_text`. Supported
+rows stay in the `pack["claims"]` ledger and a **Claims** section in
+`pack.md`; they are omitted from Suggested. Honesty: “not supported **in this
+extract**,” never “the claim is false.” Caps: `claims_max` (default 8),
+`claims_max_comments` (default 16), `claims_timeout_s` (`0` → `[llm].timeout_s`).
+Optional GROBID heading units when `--grobid` / `[grobid].enabled`.
+
+## Optional verify (`--lane verify`)
+
+Additive suggested lane inspired by Google Deep Review / PAT’s segment-and-verify
+pipeline. Paperful does **not** upload the manuscript and does not call Gemini
+or Google Search. Local models will not match Deep Think proof recall.
+
+Python segments heading units (overlapping logical groups), assigns a
+`light` / `medium` / `heavy` density budget (proof/equation-dense sections get
+a second attack turn), verifies each segment sequentially against the full
+excerpt, then synthesizes. Comments that invent a title or DOI not in the
+extract, bibliography, or Crossref/OpenAlex status cache are dropped; a DOI
+with no cache hit may record `verify_cite_unchecked` (no live HTTP). Codes:
+`verify_logic`, `verify_math`,
+`verify_inconsistency`, `verify_gap`. Caps: `verify_timeout_s` (`0` →
+`max([llm].timeout_s, 600)`), `verify_max_comments` (default 16),
+`verify_max_segments` (default 8). Wall-clock overrun records `skipped:
+timeout` plus incomplete-lane rows for unfinished segments. Optional GROBID
+heading units when `--grobid` / `[grobid].enabled`. Literature search stays
+`--lane context-web`.
+
 ## Optional MARG-S (`--lane marg` / `--advanced`)
 
 Additive suggested lane inspired by MARG-S
 ([D’Arcy et al., arXiv:2401.04259](https://arxiv.org/abs/2401.04259);
 [allenai/marg-reviewer](https://github.com/allenai/marg-reviewer), Apache-2.0).
 Paperful does not vendor that repo. Python orchestrates JSON turns with a
-leader, chunk workers, and one expert per aspect group (experiments, clarity,
-impact), then a refine pass. Same grounding and no-score rules as reviewers.
+leader, chunk workers, and one expert per aspect group, then a refine pass.
+Default aspects are experiments, clarity, and impact. Set
+`[critique].advanced_aspects` to a subset or to add `theory` (proof/lemma
+gaps), `policy` (legal warrant / instrument fit), or `evidence-base`
+(survey/doctrinal coverage). Do not enable all six by default — they share
+`advanced_timeout_s`. Same grounding and no-score rules as reviewers.
+Local models will not match hosted proof-checking recall.
 
 MARG PDF chunks prefer the optional GROBID TEI cache (`process_pdf` /
 `tei_to_markdown_pages`, same as [extract-sections](grobid.md)). Scans,
@@ -354,11 +404,12 @@ summaries may still arrive in PaperGuard’s bundled language.
 Advanced **Critique** (not on the default Wanted/Discover/Ask nav): pick an
 item from the collection chip **or** drop a file. Same checkers as the CLI.
 When `[llm]` is on, review-lane checkboxes (**Reviewers**, **MARG-S
-multi-agent**, **Adversary (validity red-team)**, **Context (library)**,
+multi-agent**, **Adversary (validity red-team)**, **Claims (intra-doc
+ledger)**, **Verify (section swarm)**, **Context (library)**,
 **Context (web)**) can be combined
 (pre-checked from `[critique].lanes`, or the llm/advanced shims when `lanes`
-is empty). **GROBID sidecar** is for MARG-S chunks only (pre-checked from
-`[grobid].enabled`).
+is empty). **GROBID sidecar** is for MARG-S / claims / verify chunks
+(pre-checked from `[grobid].enabled`).
 Library item form also has force-LLM past identity lint. **Write child note** is `--apply` (item
 only). **Show dismissed** is `--show-dismissed`. **AI model** is `--ai-model`.
 **Vale** is `--vale`. The Vale checkbox is not pre-checked; `[critique].vale =

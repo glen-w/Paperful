@@ -55,6 +55,8 @@ unusable for a 1,500-PDF collection overnight.
 | `critique --lane reviewers` | One manuscript | Yes (same 7B–12B band as summarize) | One completion per `[[critique.reviewers]]` row (`--llm` alias) |
 | `critique --lane marg` | One manuscript | Yes locally; slower than reviewers | Three aspect groups (leader + chunk workers + expert) then refine. Caps in `[critique]`. Optional GROBID for PDF chunks (`--advanced` alias) |
 | `critique --lane adversary` | One manuscript | Yes (same band as reviewers) | One JSON validity red-team turn (alt explanations, validity, falsifiers) |
+| `critique --lane claims` | One manuscript | Yes (same band as reviewers) | Claim extract + optional downgrade; support labels are deterministic overlap |
+| `critique --lane verify` | One manuscript | Yes locally; slower (per-segment) | Density-budgeted section swarm + local synthesis. Not Deep Review |
 | `critique --lane context` | One manuscript | Yes locally; several extra turns | Summary, library historian, baseline scout, Q&A. Local RAG; `context-web` may call OpenAlex / SearXNG |
 | `rewrite` | One critique pack | Style-only: no model. Other areas: yes (same 7B–12B band) | One JSON call per area still lacking a glossary/Vale swap. Optional XtraGPT Ollama tag. Not a generated paper |
 

@@ -251,6 +251,13 @@ class Config:
     critique_context_max_comments: int = 12
     critique_context_max_hits: int = 8
     critique_adversary_max_comments: int = 12
+    critique_claims_max: int = 8
+    critique_claims_max_comments: int = 16
+    critique_claims_timeout_s: float = 0.0  # 0 → [llm].timeout_s
+    critique_verify_timeout_s: float = 0.0  # 0 → max(llm.timeout_s, 600)
+    critique_verify_max_comments: int = 16
+    critique_verify_max_segments: int = 8
+    critique_advanced_aspects: tuple[str, ...] = ()
     critique_reviewers: tuple[CritiqueReviewer, ...] = ()
     rewrite_areas: tuple[str, ...] = ("style",)
     rewrite_outputs: tuple[str, ...] = ("edits", "tracked")

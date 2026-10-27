@@ -1,6 +1,6 @@
 # Releases and stability
 
-**1.6.0** is the current release (`pip install paperful` after this tag is published; optional extras
+**1.6.1** is the current release (`pip install paperful` after this tag is published; optional extras
 `[llm]`, `[rag]`, `[serve]`, `[browser-agent]`). **1.1.0** introduced PyPI and
 trusted publishing. After install, run `playwright install chromium` once for
 campus login and HTML PDF paths. The **operator** install tested in CI is still
@@ -31,7 +31,9 @@ be added. Required `paperful.run_report.v1` keys and imported-file attach
 (typed `attach_failed`, provenance note) are the contract. **1.1.1** shipped
 Wanted stop-ship hygiene (Grab scope, Attach at zero, copy). Everything after
 that is a buffet by area (Wanted excellence foundation shipped; residual polish).
-**1.6.0** adds `paperful rewrite`: apply an existing critique pack as an
+**1.6.1** adds critique `claims` and `verify` lanes (intra-doc ledger and
+local section swarm; no Deep Review upload) plus config-selected MARG aspects
+(`theory`, `policy`, `evidence-base`). **1.6.0** adds `paperful rewrite`: apply an existing critique pack as an
 edit plan, optional sidecar, and tracked-changes Word (pack required; never
 re-runs critique; never overwrites the source). **1.5.1** adds composable
 critique review lanes (`--lane`) and optional

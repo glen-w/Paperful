@@ -526,6 +526,8 @@ def test_critique_workbench_llm_checkboxes(tmp_path, monkeypatch):
         assert 'value="reviewers"' in page.text
         assert 'value="marg"' in page.text
         assert 'value="adversary"' in page.text
+        assert 'value="claims"' in page.text
+        assert 'value="verify"' in page.text
         assert 'name="grobid"' in page.text
         assert page.text.count("checked") >= 3
         res = client.post(

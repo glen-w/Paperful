@@ -248,6 +248,36 @@ def apply_critique(raw: dict[str, Any], cfg: "Config") -> None:
                 "critique_adversary_max_comments",
                 lambda v: max(1, int(v)),
             ),
+            (
+                "claims_max",
+                "critique_claims_max",
+                lambda v: max(1, int(v)),
+            ),
+            (
+                "claims_max_comments",
+                "critique_claims_max_comments",
+                lambda v: max(1, int(v)),
+            ),
+            (
+                "claims_timeout_s",
+                "critique_claims_timeout_s",
+                lambda v: max(0.0, float(v)),
+            ),
+            (
+                "verify_timeout_s",
+                "critique_verify_timeout_s",
+                lambda v: max(0.0, float(v)),
+            ),
+            (
+                "verify_max_comments",
+                "critique_verify_max_comments",
+                lambda v: max(1, int(v)),
+            ),
+            (
+                "verify_max_segments",
+                "critique_verify_max_segments",
+                lambda v: max(1, int(v)),
+            ),
         ],
     )
     if "vale_min_alert_level" in table:
@@ -259,6 +289,10 @@ def apply_critique(raw: dict[str, Any], cfg: "Config") -> None:
         from .critique_lanes import parse_critique_lanes
 
         cfg.critique_lanes = parse_critique_lanes(table.get("lanes"))
+    if "advanced_aspects" in table:
+        from .critique_marg import parse_marg_aspects
+
+        cfg.critique_advanced_aspects = parse_marg_aspects(table.get("advanced_aspects"))
     if "reviewers" in table:
         cfg.critique_reviewers = C.parse_critique_reviewers(table.get("reviewers"))
     if cfg.critique_overlap_n_min > cfg.critique_overlap_n_max:

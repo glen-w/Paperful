@@ -6,6 +6,18 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.6.1 — 2026-10-27
+
+### Added
+
+- **Critique `claims` and `verify` lanes.** `--lane claims` extracts core
+  claims and binds them to methods/results/limitations spans in this extract
+  (`pack["claims"]` ledger; `claim_thin` / `claim_unsupported_in_text`).
+  `--lane verify` is a local section swarm with density budgets and local
+  citation grounding (not Deep Review; no manuscript upload). MARG aspects
+  are config-selected (`[critique].advanced_aspects`; optional `theory`,
+  `policy`, `evidence-base`). See [critique](docs/critique.md).
+
 ## 1.6.0 — 2026-10-27
 
 ### Added

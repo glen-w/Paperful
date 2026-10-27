@@ -256,7 +256,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[screen].fingerprint_dir` | unset | Optional folder with `tortured.csv` / `.json` (and `scigen`, `mathgen`, `suspect`). Relative paths resolve from the config file. Used when cache is missing or offline |
 | `[screen].tag` | `paperful-pps` | Child note tag for `--apply` |
 | `[critique].llm` | `false` | Shim for lane `reviewers` when `[critique].lanes` is empty (`--llm` / `--no-llm` add or remove that lane) |
-| `[critique].lanes` | `[]` | Suggested review lanes to run together: `reviewers`, `marg`, `adversary`, `context`, `context-web`. Empty → use `llm` / `advanced` shims. When non-empty those bools are ignored. `--lane` selects for one run |
+| `[critique].lanes` | `[]` | Suggested review lanes to run together: `reviewers`, `marg`, `adversary`, `claims`, `verify`, `context`, `context-web`. Empty → use `llm` / `advanced` shims. When non-empty those bools are ignored. `--lane` selects for one run |
 | `[critique].tag` | `paperful-critique` | Child note tag for `critique --apply` |
 | `[critique].ai_model` | `false` | Optional Binoculars extra. `--ai-model` turns it on for one run (no `--no-ai-model`). Not installed by default; missing extra records `ai_model_unavailable` |
 | `[critique].vale` | `false` | Optional Vale house-style pass. `--vale` turns it on for one run (no `--no-vale`). Needs `vale` on PATH and a `.vale.ini`; missing extra records `vale_unavailable` / `vale_no_config` / `vale_failed`. Not in the Compose image |
@@ -274,11 +274,18 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[critique].advanced_max_comments` | `12` | Cap after the refine pass |
 | `[critique].advanced_refine` | `true` | Extra pass to drop or split comments |
 | `[critique].advanced_timeout_s` | `0` | Wall clock for the MARG-S pass (`0` → `max([llm].timeout_s, 600)`). Duplicate leader broadcasts abort (`loop`); overrun records `timeout` |
+| `[critique].advanced_aspects` | `[]` | MARG aspect ids. Empty → `experiments`, `clarity`, `impact`. Allowed: those plus `theory`, `policy`, `evidence-base`. Do not enable all six by default |
+| `[critique].claims_max` | `8` | Cap on extracted claims for the `claims` lane |
+| `[critique].claims_max_comments` | `16` | Cap on `claim_thin` / `claim_unsupported_in_text` findings |
+| `[critique].claims_timeout_s` | `0` | Wall clock for the `claims` lane (`0` → `[llm].timeout_s`) |
+| `[critique].verify_timeout_s` | `0` | Wall clock for the `verify` lane (`0` → `max([llm].timeout_s, 600)`) |
+| `[critique].verify_max_comments` | `16` | Cap on suggested comments from `verify` |
+| `[critique].verify_max_segments` | `8` | Max logical segments in the `verify` swarm |
 | `[critique].context_timeout_s` | `0` | Wall clock for `context` / `context-web` (`0` → `max([llm].timeout_s, 600)`) |
 | `[critique].context_max_comments` | `12` | Cap on suggested comments from the context pipeline |
 | `[critique].context_max_hits` | `8` | Local RAG hits and OpenAlex / SearXNG rows for historian / scout |
 | `[critique].adversary_max_comments` | `12` | Cap on suggested comments from the `adversary` validity red-team lane |
-| `[[critique.reviewers]]` | one implicit reviewer | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path relative to the config file). `--reviewer ID` selects a subset. Unused by `marg` / `adversary` / `context*` |
+| `[[critique.reviewers]]` | one implicit reviewer | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path relative to the config file). `--reviewer ID` selects a subset. Unused by `marg` / `adversary` / `claims` / `verify` / `context*` |
 | `[rewrite].areas` | `["style"]` | Enabled rewrite specialists: `style`, `cites`, `structure`, `comments`, or `all`. `--area` overlays |
 | `[rewrite].outputs` | `["edits", "tracked"]` | `edits` (always implied), `sidecar`, `tracked`. `--output` overlays |
 | `[rewrite].comments` | `off` | `off` / `substantive` / `all` — reviewer notes as Word comments |
