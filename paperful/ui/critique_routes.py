@@ -88,6 +88,7 @@ async def handle_critique_run(ui: UiContext, request: Request) -> RedirectRespon
     llm = form.get("llm") == "1"
     ai_model = form.get("ai_model") == "1"
     vale = form.get("vale") == "1"
+    forensics = form.get("forensics") == "1"
     advanced = form.get("advanced") == "1"
     raw_lanes = [str(v).strip() for v in form.getlist("lane") if str(v).strip()]
     if llm and "reviewers" not in raw_lanes:
@@ -137,6 +138,7 @@ async def handle_critique_run(ui: UiContext, request: Request) -> RedirectRespon
             llm=llm,
             ai_model=ai_model,
             vale=vale,
+            forensics=forensics,
             advanced=advanced,
             lanes=raw_lanes,
             grobid=grobid,

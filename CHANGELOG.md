@@ -6,16 +6,36 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.5.1 — 2026-10-27
+
 ### Added
 
+- **Critique `--forensics`.** Optional PaperGuard subprocess (`paperguard` on
+  PATH; not a dependency). Findings are suggested, attributed, and listed in a
+  **Forensics (PaperGuard)** pack section. Fail-closed if the binary is missing.
+  Does not copy PaperGuard’s integrity score. `--file` accepts `csv` / `xlsx` /
+  `xls` so a table can be scanned without a manuscript wrapper. See
+  [critique](docs/critique.md).
 - **Critique review lanes.** Suggested peer-review extras are composable
-  (`--lane` / `[critique].lanes`: `reviewers`, `marg`, `context`,
+  (`--lane` / `[critique].lanes`: `reviewers`, `marg`, `adversary`, `context`,
   `context-web`) instead of an exclusive standard/advanced pair. `--llm` /
   `--advanced` remain aliases. `pack.json` records `llm.lanes` (deprecated
   `llm.mode` still derived). Library-grounded `context` and opt-in
   `context-web` (OpenAlex, optional SearXNG) follow ScholarPeer *ideas*
-  without vendoring that stack or MARG. Offline skips web search. See
+  without vendoring that stack or MARG. Offline skips web search. `adversary`
+  is a structured validity red-team (no score). See
   [critique](docs/critique.md).
+- **Critique pack.md critical path.** `pack.md` leads with incomplete review
+  lanes (when a requested lane skipped), then **Critical path** (checked
+  findings that are not hygiene, majors first), **Suggested**, and **Hygiene**
+  (Vale, acronyms, prose metrics, AI-tell codes). JSON findings stay unsplit.
+
+### Changed
+
+- **OpenReviewer prompt** (`prompts/critique-reviewer-5.md`) no longer asks for
+  Accept/Reject or 1–4 scores. Theatrical `prompts/critique-reviewer-4.md` is
+  removed; drop a copied `[[critique.reviewers]]` row that pointed at it and
+  use `--lane adversary` instead.
 
 ## 1.5.0 — 2026-10-26
 

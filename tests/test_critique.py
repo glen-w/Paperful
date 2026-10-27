@@ -16,6 +16,8 @@ from paperful.config import CritiqueReviewer
 from paperful.critique import (
     CRITIQUE_PACK_KEYS,
     SCHEMA,
+    _incomplete_lane_rows,
+    _is_hygiene_finding,
     build_critique,
     dismiss_finding,
     load_dismissed,
@@ -182,7 +184,7 @@ def test_pack_keys_and_lanes_offline(cfg, tmp_path: Path, monkeypatch):
     assert CRITIQUE_PACK_KEYS <= set(on_disk)
     assert set(on_disk) & {"_findings", "_doc"} == set()
     md = (folder / "pack.md").read_text(encoding="utf-8")
-    assert "## Checked" in md
+    assert "## Critical path" in md
     assert "## Counts" in md
     assert "overall score" not in md.lower()
     assert "accept/reject" not in md.lower()
@@ -229,6 +231,109 @@ def test_dismiss_persists_and_hides_from_markdown(cfg, tmp_path: Path):
     assert "dismissed" in shown
 
 
+def test_hygiene_codes_are_demoted():
+    assert _is_hygiene_finding({"code": "vale_wrighthouse_acronyms"})
+    assert _is_hygiene_finding({"code": "acronym_undefined"})
+    assert _is_hygiene_finding({"code": "ai_tell_summary"})
+    assert not _is_hygiene_finding({"code": "cited_retracted"})
+    assert not _is_hygiene_finding({"code": "missing_section"})
+
+
+def test_render_markdown_critical_path_hygiene_and_incomplete_lanes():
+    pack = {
+        "input": {"title": "Draft"},
+        "counts": {"findings": 3},
+        "llm": {
+            "lanes": ["reviewers", "marg"],
+            "reviewers": [
+                {"id": "reviewer-5", "skipped": "empty_reply"},
+                {"id": "marg-impact", "skipped": "llm_error"},
+            ],
+        },
+        "findings": [
+            {
+                "code": "cited_retracted",
+                "lane": "checked",
+                "severity": "major",
+                "loc": "p. 2",
+                "detail": "Cited work is retracted.",
+                "quote": "Smith 1999",
+                "dismissed": False,
+            },
+            {
+                "code": "missing_section",
+                "lane": "checked",
+                "severity": "info",
+                "loc": "",
+                "detail": "No extractable methods section.",
+                "quote": "",
+                "dismissed": False,
+            },
+            {
+                "code": "acronym_undefined",
+                "lane": "checked",
+                "severity": "info",
+                "loc": "p. 1",
+                "detail": "ABC used before expansion.",
+                "quote": "ABC",
+                "dismissed": False,
+            },
+            {
+                "code": "vale_wrighthouse_acronyms",
+                "lane": "checked",
+                "severity": "warn",
+                "loc": "",
+                "detail": "Prefer BBNJ.",
+                "quote": "",
+                "dismissed": False,
+            },
+            {
+                "code": "adversary_alt",
+                "lane": "suggested",
+                "severity": "info",
+                "loc": "",
+                "detail": "Yield may be seasonal, not the ABC protocol.",
+                "quote": "ABC protocol",
+                "dismissed": False,
+            },
+        ],
+    }
+    md = render_markdown(pack)
+    assert md.index("## Incomplete lanes") < md.index("## Counts")
+    assert "`reviewer-5`: empty_reply" in md
+    assert "`marg-impact`: llm_error" in md
+    assert md.index("## Critical path") < md.index("## Suggested")
+    assert md.index("## Suggested") < md.index("## Hygiene")
+    crit = md[md.index("## Critical path") : md.index("## Suggested")]
+    hyg = md[md.index("## Hygiene") :]
+    sug = md[md.index("## Suggested") : md.index("## Hygiene")]
+    assert crit.index("cited_retracted") < crit.index("missing_section")
+    assert "acronym_undefined" not in crit
+    assert "vale_wrighthouse_acronyms" not in crit
+    assert "adversary_alt" in sug
+    assert "acronym_undefined" in hyg
+    assert "vale_wrighthouse_acronyms" in hyg
+    empty = render_markdown({"input": {"title": "X"}, "findings": []})
+    assert "## Critical path" in empty
+    assert "_None._" in empty
+    assert "## Incomplete lanes" not in empty
+    assert "## Hygiene" not in empty
+
+
+def test_incomplete_lane_rows_top_level_when_no_reviewer_skips():
+    assert _incomplete_lane_rows({}) == []
+    assert _incomplete_lane_rows(None) == []
+    assert _incomplete_lane_rows({"skipped": "llm_disabled", "lanes": ["adversary"]}) == [
+        ("llm", "llm_disabled")
+    ]
+    assert _incomplete_lane_rows(
+        {
+            "reviewers": [{"id": "marg-clarity", "skipped": "timeout"}],
+            "marg": {"skipped": "timeout"},
+        }
+    ) == [("marg-clarity", "timeout")]
+
+
 def test_apply_note_uses_critique_tag(cfg):
     pack = {
         "counts": {"findings": 1, "by_lane": {"checked": 1, "suggested": 0}},
@@ -245,7 +350,6 @@ def test_apply_note_uses_critique_tag(cfg):
     }
     html = note_html(pack)
     assert "Critique" in html
-    assert "referee" in html
     assert "paperful.note.v1" in html
     assert '"type": "critique"' in html or '"type":"critique"' in html.replace(" ", "")
 
@@ -788,7 +892,7 @@ def test_pack_metrics_contract_keys(cfg, tmp_path: Path):
     md = Path(pack["pack_dir"], "pack.md").read_text(encoding="utf-8")
     assert "## Metrics" in md
     assert "Flesch Reading Ease" in md
-    assert md.index("## Metrics") < md.index("## Checked")
+    assert md.index("## Metrics") < md.index("## Critical path")
     assert "not proof" in md.lower()
     assert "readability_summary" in {f["code"] for f in pack["findings"]}
     assert "lexical_diversity_summary" in {f["code"] for f in pack["findings"]}
@@ -882,6 +986,167 @@ def test_ai_model_flag_records_unavailable(cfg, tmp_path: Path, monkeypatch):
     assert pack.get("ai_model") == {"skipped": "unavailable"}
     row = next(f for f in pack["findings"] if f["code"] == "ai_model_unavailable")
     assert row["lane"] == "suggested"
+
+
+def test_default_critique_does_not_run_forensics(cfg, tmp_path: Path, monkeypatch):
+    def boom(*_a, **_k):
+        raise AssertionError("paperguard must not run")
+
+    monkeypatch.setattr("paperful.critique_forensics.shutil.which", boom)
+    monkeypatch.setattr("paperful.critique_forensics.subprocess.run", boom)
+    path = tmp_path / "plain.txt"
+    path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
+    pack = build_critique(cfg, file_path=path, offline=True)
+    assert "forensics" not in pack
+    assert not any(
+        str(f.get("code") or "").startswith("paperguard_") for f in pack["findings"]
+    )
+
+
+def test_forensics_unavailable_when_not_on_path(cfg, tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("paperful.critique_forensics.shutil.which", lambda _name: None)
+    path = tmp_path / "scan.txt"
+    path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
+    pack = build_critique(cfg, file_path=path, offline=True, use_forensics=True)
+    codes = {f["code"] for f in pack["findings"]}
+    assert "paperguard_unavailable" in codes
+    assert pack.get("forensics") == {"skipped": "unavailable"}
+    row = next(f for f in pack["findings"] if f["code"] == "paperguard_unavailable")
+    assert row["lane"] == "suggested"
+    assert row["source"] == "paperguard"
+    assert row["severity"] == "info"
+    md = Path(pack["pack_dir"], "pack.md").read_text(encoding="utf-8")
+    assert "## Forensics (PaperGuard)" in md
+    assert "anomalies to investigate" in md.lower()
+
+
+def test_forensics_maps_report_into_pack(cfg, tmp_path: Path, monkeypatch):
+    report = {
+        "overall_severity": 2,
+        "integrity_score": 0.4,
+        "all_findings": [
+            {
+                "detector_id": "A1",
+                "detector_name": "Terminal Digit",
+                "severity": 2,
+                "summary": "Last digits look biased.",
+                "innocent_explanations": ["Rounding"],
+                "evidence": {"column": "n"},
+            }
+        ],
+    }
+
+    def fake_run(cmd, **_kwargs):
+        out = Path(cmd[cmd.index("--output-json") + 1])
+        out.write_text(json.dumps(report), encoding="utf-8")
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(
+        "paperful.critique_forensics.shutil.which", lambda _name: "/usr/bin/paperguard"
+    )
+    monkeypatch.setattr("paperful.critique_forensics.subprocess.run", fake_run)
+    path = tmp_path / "draft.txt"
+    path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
+    pack = build_critique(cfg, file_path=path, offline=True, use_forensics=True)
+    rows = [f for f in pack["findings"] if f.get("source") == "paperguard"]
+    assert any(f["code"] == "paperguard_a1" for f in rows)
+    a1 = next(f for f in rows if f["code"] == "paperguard_a1")
+    assert a1["lane"] == "suggested"
+    assert a1["severity"] == "warn"
+    assert "integrity_score" not in (pack.get("forensics") or {})
+    assert pack["forensics"]["overall_severity"] == "CONCERN"
+    sidecar = Path(pack["pack_dir"]) / "paperguard.json"
+    assert sidecar.is_file()
+    assert json.loads(sidecar.read_text(encoding="utf-8"))["integrity_score"] == 0.4
+    assert pack["forensics"]["report_path"] == str(sidecar)
+    md = Path(pack["pack_dir"], "pack.md").read_text(encoding="utf-8")
+    assert "## Forensics (PaperGuard)" in md
+    assert "paperguard_a1" in md
+
+
+def test_cli_forensics_flag_writes_unavailable(cfg, tmp_path, monkeypatch):
+    from paperful.cli import app
+
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
+    )
+    src = tmp_path / "draft.md"
+    src.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
+    monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
+    monkeypatch.setattr("paperful.critique_forensics.shutil.which", lambda _name: None)
+    ok = runner.invoke(
+        app,
+        [
+            "critique",
+            "--file",
+            str(src),
+            "--forensics",
+            "--config",
+            str(cfg_path),
+            "--format",
+            "json",
+        ],
+    )
+    assert ok.exit_code == 0, ok.output
+    body = json.loads(ok.stdout)
+    assert any(i["code"] == "paperguard_unavailable" for i in body["items"])
+    pack_dir = Path(body["summary"]["pack_dir"])
+    on_disk = json.loads((pack_dir / "pack.json").read_text(encoding="utf-8"))
+    assert on_disk.get("forensics") == {"skipped": "unavailable"}
+
+
+def test_cli_forensics_accepts_csv_and_xlsx(cfg, tmp_path, monkeypatch):
+    from paperful.cli import app
+
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
+    )
+    csv_path = tmp_path / "means.csv"
+    csv_path.write_text("n,mean\n10,1.2\n", encoding="utf-8")
+    xlsx_path = tmp_path / "means.xlsx"
+    xlsx_path.write_bytes(b"PK")
+    monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
+    monkeypatch.setattr("paperful.critique_forensics.shutil.which", lambda _name: None)
+    for src in (csv_path, xlsx_path):
+        ok = runner.invoke(
+            app,
+            [
+                "critique",
+                "--file",
+                str(src),
+                "--forensics",
+                "--config",
+                str(cfg_path),
+                "--format",
+                "json",
+            ],
+        )
+        assert ok.exit_code == 0, ok.output
+        body = json.loads(ok.stdout)
+        assert any(i["code"] == "paperguard_unavailable" for i in body["items"])
+
+
+def test_cli_config_forensics_ors_without_flag(cfg, tmp_path, monkeypatch):
+    from paperful.cli import app
+
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
+        "[critique]\nforensics = true\n"
+    )
+    src = tmp_path / "draft.md"
+    src.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
+    monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
+    monkeypatch.setattr("paperful.critique_forensics.shutil.which", lambda _name: None)
+    ok = runner.invoke(
+        app,
+        ["critique", "--file", str(src), "--config", str(cfg_path), "--format", "json"],
+    )
+    assert ok.exit_code == 0, ok.output
+    body = json.loads(ok.stdout)
+    assert any(i["code"] == "paperguard_unavailable" for i in body["items"])
 
 
 def test_default_critique_does_not_run_vale(cfg, tmp_path: Path, monkeypatch):
@@ -1879,6 +2144,34 @@ def _context_chat(_client, request):
     )
 
 
+def _adversary_chat(_client, request):
+    sys_msg = request.messages[0]["content"]
+    if "validity red-team" not in sys_msg:
+        raise AssertionError(f"unexpected adversary prompt: {sys_msg[:80]}")
+    return json.dumps(
+        {
+            "summary": "The paper claims a 47.2 percent increase in yield under the ABC protocol.",
+            "comments": [
+                {
+                    "code": "adversary_alt",
+                    "quote": "ABC protocol",
+                    "detail": "The ABC protocol yield increase may be seasonal rather than causal.",
+                },
+                {
+                    "code": "adversary_invented",
+                    "quote": "lemma 12.4 is false",
+                    "detail": "A proof hole that is not in the excerpt.",
+                },
+                {
+                    "code": "adversary_verdict",
+                    "quote": "See Figure 2",
+                    "detail": "I would reject this paper with overall score 2.",
+                },
+            ],
+        }
+    )
+
+
 def test_cli_lane_flag_runs_marg(cfg, tmp_path, monkeypatch):
     from paperful.cli import app
 
@@ -2006,3 +2299,72 @@ def test_context_web_offline_skips_search(cfg, tmp_path, monkeypatch):
     assert pack["llm"]["context"]["search_skipped"] == "offline"
     assert pack["llm"]["context"]["search_enabled"] is True
     assert pack["llm"]["context"].get("rag_skipped") == "IndexMissing"
+
+
+def test_adversary_lane_writes_suggested_comments(cfg, tmp_path, monkeypatch):
+    monkeypatch.setattr("paperful.llm.client.chat", _adversary_chat)
+    src = tmp_path / "advr.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        lanes=("adversary",),
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    assert pack["llm"]["lanes"] == ["adversary"]
+    assert pack["llm"]["mode"] == "adversary"
+    assert pack["llm"]["adversary"]["calls"] == 1
+    suggested = [f for f in pack["findings"] if f["lane"] == "suggested"]
+    codes = {f["code"] for f in suggested if f.get("source") == "llm"}
+    assert "adversary_alt" in codes
+    assert "llm_summary" in codes
+    assert "adversary_invented" not in codes
+    assert "adversary_verdict" not in codes
+    assert any(str(f.get("reviewer") or "") == "adversary" for f in suggested)
+    md = Path(pack["pack_dir"], "pack.md").read_text(encoding="utf-8")
+    assert "## Suggested" in md
+    assert "adversary_alt" in md
+    assert "## Incomplete lanes" not in md
+
+
+def test_cli_lane_flag_runs_adversary(cfg, tmp_path, monkeypatch):
+    from paperful.cli import app
+
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
+        '[llm]\nenabled = true\nmodel = "stub"\n',
+        encoding="utf-8",
+    )
+    src = tmp_path / "draft.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_llm_for_verb", lambda _cfg: None
+    )
+    monkeypatch.setattr(
+        "paperful.llm.get_client",
+        lambda _cfg: type("C", (), {"provider": "stub"})(),
+    )
+    monkeypatch.setattr("paperful.llm.client.chat", _adversary_chat)
+    ok = runner.invoke(
+        app,
+        [
+            "critique",
+            "--file",
+            str(src),
+            "--lane",
+            "adversary",
+            "--config",
+            str(cfg_path),
+            "--format",
+            "json",
+        ],
+    )
+    assert ok.exit_code == 0, ok.output
+    body = json.loads(ok.stdout)
+    pack_dir = Path(body["summary"]["pack_dir"])
+    on_disk = json.loads((pack_dir / "pack.json").read_text(encoding="utf-8"))
+    assert on_disk["llm"]["lanes"] == ["adversary"]
+    assert on_disk["llm"]["mode"] == "adversary"

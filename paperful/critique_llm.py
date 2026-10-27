@@ -183,14 +183,22 @@ def suggested_from_llm(
     lanes = ordered_lanes(lanes)
     run_reviewers = "reviewers" in lanes
     run_marg = "marg" in lanes
+    run_adversary = "adversary" in lanes
     run_context = "context" in lanes or "context-web" in lanes
-    if not run_reviewers and not run_marg and not run_context:
+    if not run_reviewers and not run_marg and not run_adversary and not run_context:
         return [], None
     lane_list = list(lanes)
     mode = mode_for_lanes(lanes)
     wanted = [w for w in (reviewer_ids or []) if str(w).strip()]
     reviewers = critique_reviewers_for(cfg, wanted or None) if run_reviewers else ()
-    if run_reviewers and wanted and not reviewers and not run_marg and not run_context:
+    if (
+        run_reviewers
+        and wanted
+        and not reviewers
+        and not run_marg
+        and not run_adversary
+        and not run_context
+    ):
         return [], {
             "skipped": "no_matching_reviewers",
             "mode": mode,
@@ -364,6 +372,36 @@ def suggested_from_llm(
         elif not extra_m:
             skip_reason = skip_reason or str(marg_meta.get("skipped") or "empty_reply")
 
+    adversary_meta: dict[str, Any] = {}
+    if run_adversary:
+        from .critique_adversary import suggested_from_adversary
+
+        t_a = time.perf_counter()
+        extra_a, adversary_meta = suggested_from_adversary(
+            cfg,
+            doc,
+            findings,
+            item=item,
+            client=client,
+            hay=hay,
+            on_status=say,
+        )
+        say(
+            f"Adversary comments done ({time.perf_counter() - t_a:.0f}s, "
+            f"{len(extra_a)} comment(s))"
+        )
+        out.extend(extra_a)
+        reviewer_meta.extend(adversary_meta.get("reviewers") or [])
+        if extra_a or adversary_meta.get("narrative"):
+            first_sha = first_sha or str(adversary_meta.get("prompt_sha") or "")
+            if not first_narrative and adversary_meta.get("narrative"):
+                first_narrative = str(adversary_meta.get("narrative") or "")
+                first_model = first_model or str(adversary_meta.get("model") or "")
+        elif not extra_a:
+            skip_reason = skip_reason or str(
+                adversary_meta.get("skipped") or "empty_reply"
+            )
+
     context_meta: dict[str, Any] = {}
     if run_context:
         from .critique_context import suggested_from_context
@@ -422,6 +460,10 @@ def suggested_from_llm(
             row["narrative"] = first_narrative
         if marg_meta:
             row["marg"] = {k: v for k, v in marg_meta.items() if k != "reviewers"}
+        if adversary_meta:
+            row["adversary"] = {
+                k: v for k, v in adversary_meta.items() if k != "reviewers"
+            }
         if context_meta:
             row["context"] = {
                 k: v for k, v in context_meta.items() if k != "reviewers"

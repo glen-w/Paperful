@@ -34,10 +34,30 @@ CRITIQUE_PACK_KEYS = frozenset(
 )
 LANES = ("checked", "suggested")
 SEVERITIES = ("info", "warn", "major")
+_SEV_RANK = {"major": 0, "warn": 1, "info": 2}
+_HYGIENE_CODES = frozenset(
+    {
+        "acronym_undefined",
+        "acronym_expansion_mismatch",
+        "acronym_phrase_mismatch",
+        "long_sentence",
+        "hedge_words",
+        "passive_voice",
+        "readability_summary",
+        "lexical_diversity_summary",
+        "ai_tell",
+        "ai_tell_summary",
+        "ai_tells_abstain",
+    }
+)
 _AI_TELL_DISCLAIMER = (
     "These signals are associated with some LLM-style prose. They are **not proof** "
     "of AI authorship. Formal academic English (including ESL) often looks “smooth” "
     "on the same metrics. Do not use this pack for integrity proceedings."
+)
+_FORENSICS_INTRO = (
+    "Anomalies to investigate from PaperGuard (external tool). "
+    "Not a misconduct verdict and not a Paperful grade."
 )
 
 
@@ -236,6 +256,73 @@ def _render_metrics_md(metrics: dict[str, Any]) -> list[str]:
     return lines
 
 
+def _is_hygiene_finding(row: dict[str, Any]) -> bool:
+    """True when the finding is polish noise, not a critical-path defect."""
+    code = str(row.get("code") or "")
+    if code.startswith("vale_"):
+        return True
+    return code in _HYGIENE_CODES
+
+
+def _incomplete_lane_rows(llm: dict[str, Any] | None) -> list[tuple[str, str]]:
+    """Skipped review-lane ids and reasons for the pack.md banner."""
+    if not isinstance(llm, dict) or not llm:
+        return []
+    rows: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+
+    def add(label: str, reason: str) -> None:
+        name = str(label or "").strip() or "lane"
+        why = str(reason or "").strip()
+        if not why:
+            return
+        key = (name, why)
+        if key in seen:
+            return
+        seen.add(key)
+        rows.append(key)
+
+    reviewer_skipped = False
+    marg_reviewer_skip = False
+    context_reviewer_skip = False
+    adversary_reviewer_skip = False
+    for raw in llm.get("reviewers") or []:
+        if not isinstance(raw, dict) or not raw.get("skipped"):
+            continue
+        rid = str(raw.get("id") or "reviewer")
+        add(rid, str(raw["skipped"]))
+        reviewer_skipped = True
+        if rid.startswith("marg"):
+            marg_reviewer_skip = True
+        if rid.startswith("context"):
+            context_reviewer_skip = True
+        if rid.startswith("adversary"):
+            adversary_reviewer_skip = True
+    if llm.get("skipped") and not reviewer_skipped:
+        add("llm", str(llm["skipped"]))
+    marg = llm.get("marg") if isinstance(llm.get("marg"), dict) else {}
+    if marg.get("skipped") and not marg_reviewer_skip:
+        add("marg", str(marg["skipped"]))
+    ctx = llm.get("context") if isinstance(llm.get("context"), dict) else {}
+    if ctx.get("skipped") and not context_reviewer_skip:
+        add(str(ctx.get("id") or "context"), str(ctx["skipped"]))
+    adv = llm.get("adversary") if isinstance(llm.get("adversary"), dict) else {}
+    if adv.get("skipped") and not adversary_reviewer_skip:
+        add("adversary", str(adv["skipped"]))
+    return rows
+
+
+def _render_incomplete_lanes(llm: dict[str, Any]) -> list[str]:
+    rows = _incomplete_lane_rows(llm)
+    if not rows:
+        return []
+    lines = ["## Incomplete lanes", ""]
+    for label, reason in rows:
+        lines.append(f"- `{label}`: {reason}")
+    lines.append("")
+    return lines
+
+
 def _render_reviewer_notes(llm: dict[str, Any]) -> list[str]:
     reviewer_rows = [
         r
@@ -259,15 +346,8 @@ def _render_reviewer_notes(llm: dict[str, Any]) -> list[str]:
     for row in reviewer_rows:
         model = row.get("model") or ""
         rid = row.get("id") or "reviewer"
-        if len(reviewer_rows) > 1:
-            label = f"{rid} ({model})" if model else rid
-            lines.append(f"### {label}")
-            lines.append("")
-        model_bit = f" ({model})" if model and len(reviewer_rows) == 1 else ""
-        lines.append(
-            f"*Suggested{model_bit} — grounded in the checkers and an excerpt. "
-            "Not a score or accept/reject.*"
-        )
+        label = f"{rid} ({model})" if model else rid
+        lines.append(f"### {label}")
         lines.append("")
         lines.append(str(row.get("narrative") or "").strip())
         lines.append("")
@@ -281,11 +361,10 @@ def render_markdown(pack: dict[str, Any], *, show_dismissed: bool = False) -> st
     lines = [
         f"# Critique: {title}",
         "",
-        "Pre-submission / reading-aid pack. Not a referee report and not a grade.",
-        "",
     ]
     llm = pack.get("llm") or {}
     if isinstance(llm, dict):
+        lines.extend(_render_incomplete_lanes(llm))
         lines.extend(_render_reviewer_notes(llm))
     lines.extend(
         [
@@ -311,11 +390,30 @@ def render_markdown(pack: dict[str, Any], *, show_dismissed: bool = False) -> st
     findings = list(pack.get("findings") or [])
     if not show_dismissed:
         findings = [f for f in findings if not f.get("dismissed")]
-    checked = [f for f in findings if f.get("lane") != "suggested"]
-    suggested = [f for f in findings if f.get("lane") == "suggested"]
-    lines.extend(_section("Checked", checked))
+    hygiene = [f for f in findings if _is_hygiene_finding(f)]
+    rest = [f for f in findings if not _is_hygiene_finding(f)]
+    critical = [f for f in rest if f.get("lane") != "suggested"]
+    suggested = [f for f in rest if f.get("lane") == "suggested"]
+    critical.sort(
+        key=lambda f: (
+            _SEV_RANK.get(str(f.get("severity") or ""), 9),
+            str(f.get("code") or ""),
+        )
+    )
+    lines.extend(_section("Critical path", critical))
     if suggested:
         lines.extend(_section("Suggested", suggested))
+    if pack.get("forensics") is not None:
+        pg_rows = [f for f in findings if f.get("source") == "paperguard"]
+        lines.extend(
+            _section(
+                "Forensics (PaperGuard)",
+                pg_rows,
+                intro=_FORENSICS_INTRO,
+            )
+        )
+    if hygiene:
+        lines.extend(_section("Hygiene", hygiene))
     overlap = pack.get("overlap") or []
     if overlap:
         lines.extend(["", "## Overlap spans", ""])
@@ -328,8 +426,11 @@ def render_markdown(pack: dict[str, Any], *, show_dismissed: bool = False) -> st
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _section(heading: str, rows: list[dict[str, Any]]) -> list[str]:
+def _section(heading: str, rows: list[dict[str, Any]], *, intro: str = "") -> list[str]:
     out = ["", f"## {heading}", ""]
+    if intro:
+        out.append(intro)
+        out.append("")
     if not rows:
         out.append("_None._")
         out.append("")
@@ -403,6 +504,7 @@ def build_critique(
     use_llm: bool = False,
     use_ai_model: bool = False,
     use_vale: bool = False,
+    use_forensics: bool = False,
     use_advanced: bool = False,
     lanes: tuple[str, ...] | list[str] | None = None,
     use_grobid: bool = False,
@@ -494,6 +596,11 @@ def build_critique(
     )
     from .critique_ai_model import run_ai_model
     from .critique_ai_tells import compute_ai_tells
+    from .critique_forensics import (
+        persist_forensics_report,
+        resolve_forensics_files,
+        run_forensics,
+    )
     from .critique_metrics import compute_style_metrics
     from .critique_vale import run_vale
 
@@ -540,6 +647,21 @@ def build_critique(
                 )
             )
             ai_model_meta = ai_result
+    forensics_meta: dict[str, Any] | None = None
+    forensics_raw: str | None = None
+    if use_forensics:
+        say("PaperGuard forensics (subprocess)…")
+        scan_files = resolve_forensics_files(src, item_mode=item is not None)
+        doi = ""
+        if item is not None and not offline:
+            doi = str(getattr(item, "doi", None) or "").strip()
+        pg_findings, forensics_meta, forensics_raw = run_forensics(
+            cfg,
+            files=scan_files,
+            doi=doi or None,
+            offline=offline,
+        )
+        findings.extend(pg_findings)
 
     llm_meta: dict[str, Any] | None = None
     if lanes_need_llm(lanes):
@@ -593,12 +715,19 @@ def build_critique(
         payload["ai_model"] = ai_model_meta
     if vale_meta is not None:
         payload["vale"] = vale_meta
+    if forensics_meta is not None:
+        payload["forensics"] = forensics_meta
     folder: Path | None = None
     if not dry_run:
         say("Writing pack…")
         folder = write_pack(
             cfg, cid=cid, payload=payload, show_dismissed=show_dismissed
         )
+        if forensics_raw and forensics_meta is not None:
+            dest = persist_forensics_report(folder, forensics_raw)
+            forensics_meta["report_path"] = str(dest)
+            payload["forensics"] = forensics_meta
+            write_json(folder / "pack.json", payload)
         payload["pack_dir"] = str(folder)
     payload["critique_id"] = cid
     payload["_findings"] = findings
@@ -627,9 +756,7 @@ def note_html(pack: dict[str, Any]) -> str:
     visible = [f for f in pack.get("findings") or [] if not f.get("dismissed")]
     checked = [f for f in visible if f.get("lane") != "suggested"]
     lines = [
-        "<p>Critique pack from <code>paperful critique</code>. "
-        "Checked rows are deterministic; suggested rows (if any) are a model. "
-        "Not a referee report.</p>",
+        "<p>Critique pack from <code>paperful critique</code>.</p>",
         f"<p>Findings: {counts.get('findings', 0)} "
         f"(checked {(counts.get('by_lane') or {}).get('checked', 0)}, "
         f"suggested {(counts.get('by_lane') or {}).get('suggested', 0)}).</p>",

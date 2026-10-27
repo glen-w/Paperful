@@ -178,6 +178,7 @@ def apply_critique(raw: dict[str, Any], cfg: "Config") -> None:
             ),
             ("ai_model", "critique_ai_model", bool),
             ("vale", "critique_vale", bool),
+            ("forensics", "critique_forensics", bool),
             ("glossary", "critique_glossary", bool),
             (
                 "glossary_dir",
@@ -197,6 +198,11 @@ def apply_critique(raw: dict[str, Any], cfg: "Config") -> None:
             (
                 "vale_timeout_s",
                 "critique_vale_timeout_s",
+                lambda v: max(1.0, float(v)),
+            ),
+            (
+                "forensics_timeout_s",
+                "critique_forensics_timeout_s",
                 lambda v: max(1.0, float(v)),
             ),
             ("advanced", "critique_advanced", bool),
@@ -234,6 +240,11 @@ def apply_critique(raw: dict[str, Any], cfg: "Config") -> None:
             (
                 "context_max_hits",
                 "critique_context_max_hits",
+                lambda v: max(1, int(v)),
+            ),
+            (
+                "adversary_max_comments",
+                "critique_adversary_max_comments",
                 lambda v: max(1, int(v)),
             ),
         ],

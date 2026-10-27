@@ -149,9 +149,10 @@ Sources and caveats: repo `reports/AI academic paper factories.md` (contributor 
   packs**; PaperGuard owns **deep forensics on files** (especially supplementary
   CSV/XLSX and raster figures). Overlap is narrow: retraction/PubPeer/tortured
   phrases — Paperful `screen` + critique `pps_*` on PDF text; PaperGuard adds
-  full statcheck, table digit tests, and image duplication. Run PaperGuard on
-  exports from `out/`; integration bets (wrapper, workbench link) are
-  [roadmap only](ROADMAP.md#research-integrity-forensics-paperguard).
+  full statcheck, table digit tests, and image duplication. `paperful critique
+  --forensics` subprocesses `paperguard` when it is on PATH. Collection batch
+  and workbench HTML deep-links remain
+  [roadmap](ROADMAP.md#research-integrity-forensics-paperguard).
 - **Not a substitute for:** Missing-PDF fetch, snowball discovery, Ask/RAG over
   your library, or institutional integrity investigations.
 

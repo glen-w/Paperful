@@ -256,13 +256,15 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[screen].fingerprint_dir` | unset | Optional folder with `tortured.csv` / `.json` (and `scigen`, `mathgen`, `suspect`). Relative paths resolve from the config file. Used when cache is missing or offline |
 | `[screen].tag` | `paperful-pps` | Child note tag for `--apply` |
 | `[critique].llm` | `false` | Shim for lane `reviewers` when `[critique].lanes` is empty (`--llm` / `--no-llm` add or remove that lane) |
-| `[critique].lanes` | `[]` | Suggested review lanes to run together: `reviewers`, `marg`, `context`, `context-web`. Empty → use `llm` / `advanced` shims. When non-empty those bools are ignored. `--lane` selects for one run |
+| `[critique].lanes` | `[]` | Suggested review lanes to run together: `reviewers`, `marg`, `adversary`, `context`, `context-web`. Empty → use `llm` / `advanced` shims. When non-empty those bools are ignored. `--lane` selects for one run |
 | `[critique].tag` | `paperful-critique` | Child note tag for `critique --apply` |
 | `[critique].ai_model` | `false` | Optional Binoculars extra. `--ai-model` turns it on for one run (no `--no-ai-model`). Not installed by default; missing extra records `ai_model_unavailable` |
 | `[critique].vale` | `false` | Optional Vale house-style pass. `--vale` turns it on for one run (no `--no-vale`). Needs `vale` on PATH and a `.vale.ini`; missing extra records `vale_unavailable` / `vale_no_config` / `vale_failed`. Not in the Compose image |
 | `[critique].vale_config` | unset | Path to your `.vale.ini`. Relative paths resolve from the config file. If unset, `.vale.ini` next to the paperful config is used when present |
 | `[critique].vale_min_alert_level` | `suggestion` | Lowest Vale level to keep: `suggestion`, `warning`, or `error` |
 | `[critique].vale_timeout_s` | `60` | Subprocess timeout for one Vale run |
+| `[critique].forensics` | `false` | Optional PaperGuard subprocess. `--forensics` turns it on for one run (no `--no-forensics`). Needs `paperguard` on PATH; missing extra records `paperguard_unavailable`. Not a PyPI dependency |
+| `[critique].forensics_timeout_s` | `300` | Subprocess timeout for one PaperGuard scan |
 | `[critique].glossary` | `true` | Fuzzy house-list acronym expansions from `state/glossary/*.json`. No findings when the directory is empty. `paperful glossary validate` / `export-vale` |
 | `[critique].glossary_dir` | `glossary` | Directory under `state_dir` (absolute paths allowed) |
 | `[critique].glossary_similarity_min` | `0.88` | Minimum `difflib` ratio to flag a near-miss expansion or phrase |
@@ -275,7 +277,8 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[critique].context_timeout_s` | `0` | Wall clock for `context` / `context-web` (`0` → `max([llm].timeout_s, 600)`) |
 | `[critique].context_max_comments` | `12` | Cap on suggested comments from the context pipeline |
 | `[critique].context_max_hits` | `8` | Local RAG hits and OpenAlex / SearXNG rows for historian / scout |
-| `[[critique.reviewers]]` | one implicit reviewer | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path relative to the config file). `--reviewer ID` selects a subset. Unused by `marg` / `context*` |
+| `[critique].adversary_max_comments` | `12` | Cap on suggested comments from the `adversary` validity red-team lane |
+| `[[critique.reviewers]]` | one implicit reviewer | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path relative to the config file). `--reviewer ID` selects a subset. Unused by `marg` / `adversary` / `context*` |
 | `[critique].overlap_top_k` | `40` | Distinctive n-grams ranked for library text overlap |
 | `[critique].overlap_n_min` / `overlap_n_max` | `6` / `12` | Word n-gram window |
 | `[critique].overlap_df_max` | `0` | Drop grams in this many other docs (`0` = auto from corpus size) |

@@ -85,7 +85,7 @@ Paperful every week, not just once to fill gaps?
 ### Facts settled against 1.1.0
 
 - 1.1.0 is tagged and on PyPI; trusted publishing (`publish.yml`) exists.
-- Version: single source via `importlib.metadata` / `pyproject.toml` (1.5.0).
+- Version: single source via `importlib.metadata` / `pyproject.toml` (1.5.1).
 - Attach is **manual by default** (`[ui].attach_mode`); Grab does not write to
   Zotero unless Settings is automatic.
 - **1.1.1 closed P0s:** Grab-selected `item_keys`, Held hand-ticks, Attach at
@@ -93,7 +93,7 @@ Paperful every week, not just once to fill gaps?
 - **Ask** is on the default nav (third after Wanted and Discover); it does
   not need Advanced. Whether it *stays* there is an [open
   question](#after-110-open-questions).
-- Install docs are pinned to `v1.5.0` (README, `docs/docker.md`,
+- Install docs are pinned to `v1.5.1` (README, `docs/docker.md`,
   `website/index.html`). Recheck every paperful.app claim before launch.
 
 (after-110-1-1-1)=
@@ -236,10 +236,10 @@ works?” — not “are these CSV means GRIM-impossible?”
    export supplementary CSV/XLSX from `out/…/attachments/` (or operator path)
    → `paperguard scan -f …` → keep JSON beside the item folder. No PyPI
    dependency until a tester asks for one-command glue.
-3. **`paperful critique --forensics` (roadmap).** Optional subprocess wrapper:
-   run PaperGuard on `--file` or on extracted tables next to `--item`; ingest
-   findings as a **separate pack section** (`suggested` lane, external tool
-   attribution). Fail closed if `paperguard` is not on `PATH`. Never fold
+3. **`paperful critique --forensics` (shipped).** Optional subprocess wrapper:
+   run PaperGuard on `--file` or on the item PDF plus sibling csv/xlsx/xls;
+   ingest findings as a **separate pack section** (`suggested` lane, external
+   tool attribution). Fail closed if `paperguard` is not on `PATH`. Never fold
    PaperGuard severities into a single Paperful grade.
 4. **Collection batch (roadmap, after `screen` proves boring).**
    `paperful screen --supplements` or a sibling verb: for items with tagged

@@ -26,6 +26,7 @@ def run_critique(
     llm: bool | None,
     ai_model: bool = False,
     vale: bool = False,
+    forensics: bool = False,
     advanced: bool | None = None,
     lane: list[str] | None = None,
     grobid: bool | None = None,
@@ -39,6 +40,7 @@ def run_critique(
     from .agent_json import envelope
     from .critique import build_critique, note_html
     from .critique_extract import SUPPORTED, ExtractError
+    from .critique_forensics import SIBLING_TABLE_SUFFIXES
     from .library import LibraryError
     from .llm import get_client
     from .llm.preflight import validate_llm_for_verb
@@ -58,10 +60,13 @@ def run_critique(
     if apply and dry_run:
         console.print("[red]--dry-run cannot be combined with --apply.[/]")
         raise typer.Exit(1)
-    if file_path is not None and file_path.suffix.lower() not in SUPPORTED:
+    if file_path is not None and file_path.suffix.lower() not in (
+        SUPPORTED | SIBLING_TABLE_SUFFIXES
+    ):
         console.print(
             "[red]Unsupported format. Save as pdf, txt, md, html, rtf, docx, odt, "
-            "or pptx (legacy .doc needs antiword, catdoc, or LibreOffice).[/]"
+            "pptx (legacy .doc needs antiword, catdoc, or LibreOffice), "
+            "or csv/xlsx/xls for --forensics.[/]"
         )
         raise typer.Exit(1)
 
@@ -77,6 +82,7 @@ def run_critique(
     use_llm = "reviewers" in lanes
     use_ai_model = bool(ai_model) or cfg.critique_ai_model
     use_vale = bool(vale) or cfg.critique_vale
+    use_forensics = bool(forensics) or cfg.critique_forensics
     use_advanced = "marg" in lanes
     use_grobid = cfg.grobid_enabled if grobid is None else grobid
     reviewer_ids = [r.strip() for r in (reviewer or []) if r and str(r).strip()]
@@ -188,6 +194,7 @@ def run_critique(
                 use_llm=use_llm,
                 use_ai_model=use_ai_model,
                 use_vale=use_vale,
+                use_forensics=use_forensics,
                 use_advanced=use_advanced,
                 lanes=lanes,
                 use_grobid=use_grobid,
@@ -244,6 +251,7 @@ def run_critique(
             "llm": use_llm,
             "ai_model": use_ai_model,
             "vale": use_vale,
+            "forensics": use_forensics,
             "advanced": use_advanced,
             "lanes": list(lanes),
             "grobid": use_grobid,
@@ -280,6 +288,7 @@ def run_critique(
             "advanced": use_advanced,
             "lanes": list(lanes),
             "grobid": use_grobid,
+            "forensics": use_forensics,
         },
         exit_code=0,
     )

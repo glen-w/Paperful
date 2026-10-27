@@ -18,6 +18,7 @@ def test_parse_and_order():
         "marg",
     )
     assert parse_critique_lanes("context-web, context") == ("context", "context-web")
+    assert parse_critique_lanes(["adversary", "marg"]) == ("marg", "adversary")
     assert parse_critique_lanes([]) == ()
     with pytest.raises(ValueError, match="unknown"):
         parse_critique_lanes(["nope"])
@@ -49,6 +50,7 @@ def test_cli_lane_flags_win_as_base():
     assert resolve_critique_lanes(
         cfg, lane_flags=["context"], llm=True, advanced=True
     ) == ("reviewers", "marg", "context")
+    assert resolve_critique_lanes(cfg, lane_flags=["adversary"]) == ("adversary",)
 
 
 def test_mode_for_lanes():
@@ -57,3 +59,4 @@ def test_mode_for_lanes():
     assert mode_for_lanes(["reviewers", "marg"]) == "both"
     assert mode_for_lanes(["context"]) == "context"
     assert mode_for_lanes(["context-web"]) == "context-web"
+    assert mode_for_lanes(["adversary"]) == "adversary"

@@ -68,6 +68,7 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     assert 'name="file"' in critique.text
     assert 'name="ai_model"' in critique.text
     assert 'name="vale"' in critique.text
+    assert 'name="forensics"' in critique.text
     assert client.get("/mirror").status_code == 200
     assert client.get("/index").status_code == 200
     assert client.get("/briefs").status_code == 200
@@ -519,6 +520,7 @@ def test_critique_workbench_llm_checkboxes(tmp_path, monkeypatch):
         assert 'name="lane"' in page.text
         assert 'value="reviewers"' in page.text
         assert 'value="marg"' in page.text
+        assert 'value="adversary"' in page.text
         assert 'name="grobid"' in page.text
         assert page.text.count("checked") >= 3
         res = client.post(

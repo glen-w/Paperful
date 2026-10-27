@@ -995,7 +995,7 @@ def critique(
     file_path: Path | None = typer.Option(
         None,
         "--file",
-        help="Manuscript on disk (pdf, txt, md, html, rtf, docx, odt, pptx; .doc if a converter is on PATH).",
+        help="Manuscript on disk (pdf, txt, md, html, rtf, docx, odt, pptx; .doc if a converter is on PATH). csv/xlsx/xls allowed for --forensics.",
         exists=True,
         dir_okay=False,
         readable=True,
@@ -1025,6 +1025,11 @@ def critique(
         "--vale",
         help="Optional Vale house-style pass (checked lane). Needs vale on PATH and a .vale.ini.",
     ),
+    forensics: bool = typer.Option(
+        False,
+        "--forensics",
+        help="Optional PaperGuard scan (suggested extra). Needs paperguard on PATH.",
+    ),
     advanced: bool | None = typer.Option(
         None,
         "--advanced/--no-advanced",
@@ -1033,7 +1038,7 @@ def critique(
     lane: list[str] = typer.Option(
         [],
         "--lane",
-        help="Suggested review lane (repeatable): reviewers, marg, context, context-web.",
+        help="Suggested review lane (repeatable): reviewers, marg, adversary, context, context-web.",
     ),
     grobid: bool | None = typer.Option(
         None,
@@ -1074,6 +1079,7 @@ def critique(
         llm=llm,
         ai_model=ai_model,
         vale=vale,
+        forensics=forensics,
         advanced=advanced,
         lane=lane,
         grobid=grobid,

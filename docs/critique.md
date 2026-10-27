@@ -19,10 +19,11 @@ Deterministic checkers always run (no model). **Checked** findings carry a
 quote and a page / paragraph / slide loc when one exists. Heuristic AI-prose
 tells always run too, as **suggested** `info` — they are not an LLM and not
 proof of authorship. Optional review lanes (`--lane reviewers` / `marg` /
-`context` / `context-web`; `--llm` and `--advanced` are aliases) and
+`adversary` / `context` / `context-web`; `--llm` and `--advanced` are aliases) and
 `--ai-model` are separate suggested extras. Optional `--vale` house-style
-alerts are **checked**. Paperful does not vendor MARG or ScholarPeer; docs
-credit the patterns.
+alerts are **checked**. Optional `--forensics` runs sibling CLI `paperguard`
+and records **suggested** findings. Paperful does not vendor MARG, ScholarPeer,
+or PaperGuard detectors; docs credit the patterns.
 
 | Area | Lane | Codes (examples) |
 | --- | --- | --- |
@@ -36,12 +37,13 @@ credit the patterns.
 | Abstract numbers | checked | `abstract_number_missing` (`info`; rounding can false-positive) |
 | Reproducibility / ethics | checked | `missing_mention` (limitations, data, funding, ethics, COI, code/data URL) |
 | Checklists | checked | `checklist_prisma` / `checklist_consort` — mention only, when the text looks like a review or trial |
-| Stats | checked | `statcheck_p_mismatch`, `grim_impossible_mean`, `p_without_n` (stdlib; no scipy/R). Full statcheck, GRIMMER/SPRITE, TIVA, and table digit tests: use [PaperGuard](https://github.com/exergyleizhou-ux/PaperGuard) — [roadmap interop](ROADMAP.md#research-integrity-forensics-paperguard) |
+| Stats | checked | `statcheck_p_mismatch`, `grim_impossible_mean`, `p_without_n` (stdlib; no scipy/R). Full statcheck, GRIMMER/SPRITE, TIVA, and table digit tests: optional `--forensics` subprocess to [PaperGuard](https://github.com/exergyleizhou-ux/PaperGuard) |
 | Prose | checked | `long_sentence` (≥40 words), `hedge_words`, `passive_voice` (`info` only). Skips direct quotations (quoted spans and `>` block lines) |
 | Metrics | checked | `readability_summary` (Flesch / Fog / ARI), `lexical_diversity_summary` (TTR / MTLD / hapax). Academic FRE is often 0–30; that is expected, not a defect |
 | Heuristic AI-prose tells | suggested | `ai_tell`, `ai_tell_summary`, `ai_tells_abstain` (abstain below 150 words). Formal academic English often looks “smooth” on the same signals |
 | Library text overlap | checked | `text_overlap` (distinctive n-grams vs `state/rag/text/`); `overlap_skipped_no_text` |
 | House style (optional Vale) | checked | `vale_*` from your `.vale.ini` rules; alerts inside direct quotations are dropped; `vale_unavailable` / `vale_no_config` / `vale_failed` / `vale_truncated` when the extra is on |
+| Forensics (optional PaperGuard) | suggested | `paperguard_*` from `paperguard scan` (`--forensics`); skip codes `paperguard_unavailable` / `paperguard_no_input` / `paperguard_failed` / `paperguard_truncated`; not a misconduct verdict |
 
 Offline (`PAPERFUL_OFFLINE=1` or no HTTP client): skip Crossref/OpenAlex rows and
 emit `doi_status_skipped_offline` / `identity_skipped_offline`. PPS fingerprints
@@ -56,7 +58,9 @@ appears in many library texts is dropped. Do not narrate misconduct.
 
 ## CLI
 
-`--item KEY` and `--file PATH` are mutually exclusive.
+`--item KEY` and `--file PATH` are mutually exclusive. `--file` also accepts
+`csv` / `xlsx` / `xls` so PaperGuard can scan a table without a manuscript
+wrapper (`xlsx`/`xls` have no text extract; checkers see an empty document).
 
 ```bash
 uv run paperful critique --item KEY -C "My Collection"
@@ -65,6 +69,7 @@ uv run paperful critique --file ./draft.pdf --lane reviewers
 uv run paperful critique --file ./draft.pdf --llm
 uv run paperful critique --file ./draft.pdf --llm --reviewer reviewer-2
 uv run paperful critique --file ./draft.pdf --lane marg
+uv run paperful critique --file ./draft.pdf --lane adversary
 uv run paperful critique --file ./draft.pdf --lane reviewers --lane marg --grobid
 uv run paperful critique --file ./draft.pdf --lane context
 uv run paperful critique --file ./draft.pdf --lane context-web
@@ -72,6 +77,7 @@ uv run paperful critique --file ./draft.pdf --no-llm --no-advanced
 uv run paperful critique --file ./draft.pdf --no-llm   # drop reviewers (alias)
 uv run paperful critique --file ./draft.pdf --ai-model
 uv run paperful critique --file ./draft.pdf --vale
+uv run paperful critique --file ./draft.pdf --forensics
 uv run paperful critique --item KEY --llm --force      # LLM despite identity lint
 uv run paperful critique --item KEY --apply            # child note; needs --item
 uv run paperful critique --item KEY --show-dismissed
@@ -81,7 +87,7 @@ uv run paperful critique dismiss FINDING_ID --critique-id KEY
 
 `--dry-run` prints findings and does not write `state/critiques/`. `--apply`
 posts a tagged child note only for a library `--item`. Uploads stay disk-only.
-`--lane NAME` (repeatable: `reviewers`, `marg`, `context`, `context-web`)
+`--lane NAME` (repeatable: `reviewers`, `marg`, `adversary`, `context`, `context-web`)
 selects suggested review lanes for this run. `[critique].lanes` is the config
 list; when it is empty, `[critique].llm` / `[critique].advanced` still map to
 `reviewers` / `marg`. `--llm` / `--no-llm` and `--advanced` / `--no-advanced`
@@ -92,6 +98,8 @@ still attempts the sidecar even when `[grobid].enabled` is false, same as
 Binoculars extra on for this run (there is no `--no-ai-model`; set
 `[critique].ai_model = false` in config). `--vale` turns the Vale house-style
 pass on for this run (there is no `--no-vale`; set `[critique].vale = false`).
+`--forensics` turns the PaperGuard subprocess on for this run (there is no
+`--no-forensics`; set `[critique].forensics = false`).
 `-C` is the overlap / “cited but not in library” corpus. `paperful jobs` lists
 `critique` under completeness.
 Not in `paperful all`.
@@ -110,14 +118,19 @@ goes to stderr on a TTY. Run report: `state/runs/<stamp>-critique.json`.
 
 `pack.json` always has `findings`, `overlap`, `metrics`, and `llm`. `metrics`
 holds readability, lexical diversity, and the AI-tell summary (also rendered
-as a Metrics section in `pack.md`). `llm` is `null` until a review lane runs;
+as a Metrics section in `pack.md`). `pack.md` leads with an **Incomplete lanes**
+banner when a requested review lane skipped, then reviewer notes, counts,
+metrics, **Critical path** (checked findings that are not hygiene, majors
+first), **Suggested**, and **Hygiene** (Vale, acronyms, prose metrics, AI-tell
+codes). JSON `findings` is unsplit. `llm` is `null` until a review lane runs;
 then it records `lanes` (ordered ids), a deprecated `mode` string
-(`default` / `marg` / `both` / `context` / `context-web`) derived from that
+(`default` / `marg` / `both` / `adversary` / `context` / `context-web`) derived from that
 set, `model`, `prompt_sha`, `provider`, optional `narrative`, a `reviewers`
 list (per-id model, skip reason, Markdown note, including `marg-experiments`
-/ `marg-clarity` / `marg-impact` and `context` / `context-web` when those
+/ `marg-clarity` / `marg-impact`, `adversary`, and `context` / `context-web` when those
 lanes ran), optional `marg` stats (`parser` is `grobid` or `extract`;
-`rounds`, `calls`, `skipped`; optional `grobid_skipped`), and optional
+`rounds`, `calls`, `skipped`; optional `grobid_skipped`), optional `adversary`
+stats (`calls`, `skipped`), and optional
 `context` stats (`search_enabled`, `backends`, `rag_skipped`,
 `search_skipped`). `ai_model` and `vale` appear only when those extras ran
 (skip reason or alert counts).
@@ -155,6 +168,7 @@ Each lane needs `[llm].enabled`; otherwise the pack records
 | --- | --- | --- |
 | `reviewers` | `--llm` | Independent `[[critique.reviewers]]` JSON/Markdown calls |
 | `marg` | `--advanced` | MARG-S-style multi-agent (experiments / clarity / impact) |
+| `adversary` | — | Validity red-team (alternative explanations, validity, degrees of freedom, falsifiers, missing negatives) |
 | `context` | — | ScholarPeer-inspired: summary, library historian, baseline scout, Q&A |
 | `context-web` | — | Same pipeline; literature/baseline may query OpenAlex / optional SearXNG |
 
@@ -167,7 +181,7 @@ When `lanes` is non-empty, `[critique].llm` and `[critique].advanced` are
 ignored. When it is empty, those bools still map to `reviewers` / `marg`.
 `--no-llm --no-advanced` with no `--lane` is checkers only.
 `--reviewer ID` still subsets only `[[critique.reviewers]]`. Orthogonal extras
-(`--vale`, `--ai-model`, `--grobid`) are not lanes.
+(`--vale`, `--ai-model`, `--grobid`, `--forensics`) are not lanes.
 
 ## Optional reviewers (`--lane reviewers` / `--llm`)
 
@@ -185,9 +199,20 @@ file yields a **Reviewer note** at the head of `pack.md`; the builtin prompt
 still returns JSON comments as suggested findings. One LLM call per reviewer.
 `prompts/critique-reviewer-2.md` is the shipped Markdown example.
 `prompts/critique-reviewer-5.md` is the OpenReviewer-style general review
-(local `llama-openreviewer-8b`).
+(local `llama-openreviewer-8b`) with scores and Accept/Reject stripped — a
+pre-submission stress-test, not a grade. The theatrical `critique-reviewer-4.md`
+persona was removed; if you copied it into paperful-data, drop that
+`[[critique.reviewers]]` row (use `--lane adversary` instead).
 
 No-LLM users still get the pack (checkers, metrics, heuristic tells).
+
+## Optional adversary (`--lane adversary`)
+
+Additive suggested lane. One JSON turn over the extract and checked findings:
+alternative explanations, selection / construct / external validity, researcher
+degrees of freedom, what would falsify the core claim, and missing negative or
+comparison cases. Same grounding and no-score rules as reviewers. Cap:
+`adversary_max_comments` (default 12). Timeout is `[llm].timeout_s`.
 
 ## Optional MARG-S (`--lane marg` / `--advanced`)
 
@@ -299,19 +324,46 @@ than 100 alerts yields `vale_truncated`. Built-in prose checkers
 (`long_sentence`, `hedge_words`, `passive_voice`) still run; overlap with Vale
 rules is expected.
 
+## Optional forensics (`--forensics` / `[critique].forensics`)
+
+Subprocess wrapper around sibling [PaperGuard](https://github.com/exergyleizhou-ux/PaperGuard)
+(`paperguard scan`). Paperful does not install PaperGuard and does not vendor
+its detectors. You put `paperguard` on `PATH` and opt in. `paperful doctor`
+reports whether it is on PATH (amber if missing; not fatal). Missing binary,
+no scannable file, or a crash records `paperguard_unavailable` /
+`paperguard_no_input` / `paperguard_failed` (`suggested` / `info`) and the
+rest of the pack still runs.
+
+`--file PATH` scans that file. `--item KEY` scans the resolved PDF plus
+`*.csv` / `*.xlsx` / `*.xls` in the same directory. When the item has a DOI
+and the run is online, Paperful passes `--doi` for PaperGuard metadata
+cross-checks. Default detectors only — no `--ml-check`, `--llm-review`, or
+paper-mill graph flags. Hits map to `paperguard_<detector_id>` findings
+(`lane=suggested`, `source=paperguard`). PaperGuard NOTE is paperful `info`;
+CONCERN is `warn`; SUSPICIOUS and CRITICAL are `major`. PASS rows are dropped.
+More than 100 hits yields `paperguard_truncated`. PaperGuard’s `integrity_score`
+is **not** copied into the pack. `pack.md` has a **Forensics (PaperGuard)**
+section (anomalies to investigate, not a verdict); the same rows also appear
+under Suggested. A copy of the raw report is `paperguard.json` next to
+`pack.json`. Timeout: `[critique].forensics_timeout_s` (default 300).
+The wrapper passes `--lang en` (and `PAPERGUARD_LANG=en`); some detector
+summaries may still arrive in PaperGuard’s bundled language.
+
 ## Workbench
 
 Advanced **Critique** (not on the default Wanted/Discover/Ask nav): pick an
 item from the collection chip **or** drop a file. Same checkers as the CLI.
 When `[llm]` is on, review-lane checkboxes (**Reviewers**, **MARG-S
-multi-agent**, **Context (library)**, **Context (web)**) can be combined
+multi-agent**, **Adversary (validity red-team)**, **Context (library)**,
+**Context (web)**) can be combined
 (pre-checked from `[critique].lanes`, or the llm/advanced shims when `lanes`
 is empty). **GROBID sidecar** is for MARG-S chunks only (pre-checked from
 `[grobid].enabled`).
 Library item form also has force-LLM past identity lint. **Write child note** is `--apply` (item
 only). **Show dismissed** is `--show-dismissed`. **AI model** is `--ai-model`.
 **Vale** is `--vale`. The Vale checkbox is not pre-checked; `[critique].vale =
-true` still runs the pass even if the box is empty. Uploads have no apply /
+true` still runs the pass even if the box is empty. **Forensics (PaperGuard)**
+is `--forensics` (same on-switch pattern). Uploads have no apply /
 force / dismissed controls.
 
 ## Config

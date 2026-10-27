@@ -197,6 +197,12 @@ def remediation_text(
             "(brew install vale / see https://vale.sh). "
             "Set [critique].vale_config to your .vale.ini; Paperful does not run vale sync."
         )
+    if check.name == "paperguard":
+        return (
+            "Install PaperGuard for optional critique --forensics "
+            "(pipx install paperguard / see https://github.com/exergyleizhou-ux/PaperGuard). "
+            "Paperful does not vendor detectors or fold PaperGuard scores into a grade."
+        )
     if check.name == "Playwright":
         if "missing" in check.detail:
             return (
@@ -714,6 +720,18 @@ def run_checks(
                 "amber",
                 "missing — optional for critique house style "
                 "(https://vale.sh; brew install vale)",
+            )
+        )
+
+    if shutil.which("paperguard"):
+        checks.append(Check("paperguard", "green", "on PATH"))
+    else:
+        checks.append(
+            Check(
+                "paperguard",
+                "amber",
+                "missing — optional for critique --forensics "
+                "(https://github.com/exergyleizhou-ux/PaperGuard)",
             )
         )
 

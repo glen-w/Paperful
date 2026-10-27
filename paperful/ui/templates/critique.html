@@ -5,7 +5,7 @@
 {% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
 {% block content %}
 <h1>Critique</h1>
-<p class="page-lede">A local pre-submission / reading-aid pack. Deterministic checkers always run. Optional review lanes (reviewers, MARG-S, context) are separate <em>suggested</em> extras and can run together. There is no score, grade, or accept/reject. Uploads stay under <code>state/critiques/uploads/</code> and are not written to <code>out/</code> or Zotero.</p>
+<p class="page-lede">A local pre-submission / reading-aid pack. Deterministic checkers always run. Optional review lanes (reviewers, MARG-S, adversary, context) are separate <em>suggested</em> extras and can run together. There is no score, grade, or accept/reject. Uploads stay under <code>state/critiques/uploads/</code> and are not written to <code>out/</code> or Zotero.</p>
 {% if error == 'target' %}<div class="error-banner">Pick a library item <em>or</em> upload a file, not both and not neither.</div>{% endif %}
 {% if error == 'format' %}<div class="error-banner">That file type is not supported. Use pdf, txt, md, html, rtf, docx, odt, pptx (legacy .doc needs a converter on PATH).</div>{% endif %}
 {% if error == 'size' %}<div class="error-banner">The upload is larger than 40 MB.</div>{% endif %}
@@ -28,6 +28,7 @@
     {% if llm_on %}
     <label><input type="checkbox" name="lane" value="reviewers"{% if "reviewers" in critique_lanes %} checked{% endif %}> Reviewers {{ info("Suggested lane. Grounded in the manuscript text and checked findings. Needs [llm].enabled. Independent [[critique.reviewers]] calls. Additive with other review lanes.") }}</label>
     <label><input type="checkbox" name="lane" value="marg"{% if "marg" in critique_lanes %} checked{% endif %}> MARG-S multi-agent {{ info("MARG-S-style groups (experiments, clarity, impact) plus a refine pass. Suggested lane. Additive with other review lanes. Needs [llm].enabled. Inspired by D’Arcy et al.; Paperful does not vendor that repo.") }}</label>
+    <label><input type="checkbox" name="lane" value="adversary"{% if "adversary" in critique_lanes %} checked{% endif %}> Adversary (validity red-team) {{ info("Structured validity attacks: alternative explanations, selection/construct/external validity, researcher degrees of freedom, falsifiers, missing negative cases. Suggested lane. Additive. Needs [llm].enabled. No score or accept/reject.") }}</label>
     <label><input type="checkbox" name="lane" value="context"{% if "context" in critique_lanes %} checked{% endif %}> Context (library) {{ info("ScholarPeer-inspired: summary, library historian, baseline scout, Q&A. Local RAG / extract only. No live web. Suggested lane.") }}</label>
     <label><input type="checkbox" name="lane" value="context-web"{% if "context-web" in critique_lanes %} checked{% endif %}> Context (web) {{ info("Same pipeline as Context (library), plus opt-in OpenAlex / SearXNG. Literature metadata leaves this machine. Off unless you tick it. Suggested lane.") }}</label>
     <label><input type="checkbox" name="grobid" value="1"{% if grobid_enabled %} checked{% endif %}> GROBID sidecar {{ info("Section-labeled chunks for the MARG-S lane. Needs [grobid].enabled and a reachable server, or a warm TEI cache. Scans need OCR first. Remote hosts send PDF bytes off this machine. Checkers still use ExtractedDoc.") }}</label>
@@ -35,6 +36,7 @@
     {% endif %}
     <label><input type="checkbox" name="ai_model" value="1"> AI model {{ info("Optional Binoculars extra. Paperful does not install torch. Missing extra records ai_model_unavailable. Not proof of authorship.") }}</label>
     <label><input type="checkbox" name="vale" value="1"> Vale {{ info("Optional house-style pass. Not pre-checked. Needs vale on PATH and [critique].vale_config (or .vale.ini next to the paperful config). Missing extra records vale_unavailable / vale_no_config / vale_failed. Also runs when [critique].vale is true.") }}</label>
+    <label><input type="checkbox" name="forensics" value="1"> Forensics (PaperGuard) {{ info("Optional subprocess scan. Not a lane. Needs paperguard on PATH. Findings are suggested anomalies to investigate, not a misconduct verdict. Missing extra records paperguard_unavailable. Also runs when [critique].forensics is true.") }}</label>
     <label><input type="checkbox" name="apply" value="1"> Write child note {{ info("Library item only. Tagged paperful-critique. Uploads stay disk-only.", danger=true) }}</label>
     <label><input type="checkbox" name="show_dismissed" value="1"> Show dismissed {{ info("Include findings you previously dismissed in pack.md.") }}</label>
     <button type="submit">Critique item</button>
@@ -55,12 +57,14 @@
     {% if llm_on %}
     <label><input type="checkbox" name="lane" value="reviewers"{% if "reviewers" in critique_lanes %} checked{% endif %}> Reviewers {{ info("Suggested lane. Grounded in the uploaded text and checked findings. Additive with other review lanes.") }}</label>
     <label><input type="checkbox" name="lane" value="marg"{% if "marg" in critique_lanes %} checked{% endif %}> MARG-S multi-agent {{ info("MARG-S-style groups. Suggested lane. Additive with other review lanes.") }}</label>
+    <label><input type="checkbox" name="lane" value="adversary"{% if "adversary" in critique_lanes %} checked{% endif %}> Adversary (validity red-team) {{ info("Structured validity attacks. Suggested lane. Additive with other review lanes.") }}</label>
     <label><input type="checkbox" name="lane" value="context"{% if "context" in critique_lanes %} checked{% endif %}> Context (library) {{ info("ScholarPeer-inspired local historian / scout / Q&A. No live web.") }}</label>
     <label><input type="checkbox" name="lane" value="context-web"{% if "context-web" in critique_lanes %} checked{% endif %}> Context (web) {{ info("Same as Context (library) plus OpenAlex / SearXNG. Literature metadata leaves this machine.") }}</label>
     <label><input type="checkbox" name="grobid" value="1"{% if grobid_enabled %} checked{% endif %}> GROBID sidecar {{ info("Section-labeled chunks for the MARG-S lane. PDFs only. Remote hosts send PDF bytes off this machine.") }}</label>
     {% endif %}
     <label><input type="checkbox" name="ai_model" value="1"> AI model {{ info("Optional Binoculars extra. Missing extra records ai_model_unavailable. Not proof of authorship.") }}</label>
     <label><input type="checkbox" name="vale" value="1"> Vale {{ info("Optional house-style pass. Not pre-checked. Needs vale on PATH and a .vale.ini. Missing extra records vale_unavailable / vale_no_config / vale_failed. Also runs when [critique].vale is true.") }}</label>
+    <label><input type="checkbox" name="forensics" value="1"> Forensics (PaperGuard) {{ info("Optional subprocess scan. Needs paperguard on PATH. Suggested anomalies to investigate, not a grade. Missing extra records paperguard_unavailable. Also runs when [critique].forensics is true.") }}</label>
     <button type="submit">Critique file</button>
     {{ info("Same checkers as --file. Collection chip is the overlap corpus when text is already cached.") }}
   </form>

@@ -99,6 +99,20 @@ def test_remediation_vale(cfg):
     assert remediation_text(Check("vale", "green", "on PATH"), cfg) is None
 
 
+def test_remediation_paperguard(cfg):
+    text = remediation_text(
+        Check(
+            "paperguard",
+            "amber",
+            "missing — optional for critique --forensics",
+        ),
+        cfg,
+    )
+    assert text and "PaperGuard" in text
+    assert "paperguard" in text.lower()
+    assert remediation_text(Check("paperguard", "green", "on PATH"), cfg) is None
+
+
 def test_remediation_playwright(cfg):
     missing = Check("Playwright", "amber", "missing — run: uv sync")
     text = remediation_text(missing, cfg, docker=False)

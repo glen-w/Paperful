@@ -185,13 +185,15 @@ mirror_failures_before_skip = 3
 # [critique]
 # # Local manuscript pack (see docs/critique.md). Not a grade.
 # llm = false                      # shim → reviewers when lanes is empty
-# lanes = []                       # reviewers, marg, context, context-web (empty → llm/advanced shims)
+# lanes = []                       # reviewers, marg, adversary, context, context-web (empty → llm/advanced shims)
 # tag = "paperful-critique"
 # ai_model = false                 # optional Binoculars extra; --ai-model turns on (no CLI off)
 # vale = false                     # optional Vale house style; --vale turns on (no CLI off)
 # vale_config = ".vale.ini"        # your house .vale.ini (relative to this file)
 # vale_min_alert_level = "suggestion"  # suggestion | warning | error
 # vale_timeout_s = 60
+# forensics = false              # optional PaperGuard scan; --forensics turns on (no CLI off)
+# forensics_timeout_s = 300      # paperguard scan timeout (seconds)
 # glossary = true                  # fuzzy house-list expansions (state/glossary/)
 # glossary_dir = "glossary"        # directory under state_dir
 # glossary_similarity_min = 0.88
@@ -204,6 +206,7 @@ mirror_failures_before_skip = 3
 # context_timeout_s = 0            # context / context-web; 0 = max([llm].timeout_s, 600)
 # context_max_comments = 12
 # context_max_hits = 8             # local RAG and OpenAlex/SearXNG rows
+# adversary_max_comments = 12      # validity red-team lane cap
 # # lanes = ["reviewers", "marg"]  # when set, llm/advanced bools are ignored
 # # With llm = true and advanced = true (and lanes empty), every critique runs reviewers + MARG.
 # # Advanced PDF chunks reuse [grobid] when enabled (see docs/grobid.md).

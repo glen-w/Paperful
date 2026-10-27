@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
-KNOWN_LANES = ("reviewers", "marg", "context", "context-web")
+KNOWN_LANES = ("reviewers", "marg", "adversary", "context", "context-web")
 LANE_ALIASES = {
     "llm": "reviewers",
     "standard": "reviewers",
@@ -55,6 +55,8 @@ def mode_for_lanes(lanes: Iterable[str]) -> str:
         return "marg"
     if has_r:
         return "default"
+    if "adversary" in names:
+        return "adversary"
     if "context-web" in names:
         return "context-web"
     if "context" in names:

@@ -53,6 +53,7 @@ unusable for a 1,500-PDF collection overnight.
 | Ask / RAG | After `rag ingest` | Embeddings dominate first ingest; chat is per question | **simple** (default): one completion. **advanced**: about `evidence_k` extra summary calls, cached under `state/rag/evidence/`. Local `nomic-embed-text` or hosted `embed_provider = "litellm"` |
 | `critique --lane reviewers` | One manuscript | Yes (same 7B–12B band as summarize) | One completion per `[[critique.reviewers]]` row (`--llm` alias) |
 | `critique --lane marg` | One manuscript | Yes locally; slower than reviewers | Three aspect groups (leader + chunk workers + expert) then refine. Caps in `[critique]`. Optional GROBID for PDF chunks (`--advanced` alias) |
+| `critique --lane adversary` | One manuscript | Yes (same band as reviewers) | One JSON validity red-team turn (alt explanations, validity, falsifiers) |
 | `critique --lane context` | One manuscript | Yes locally; several extra turns | Summary, library historian, baseline scout, Q&A. Local RAG; `context-web` may call OpenAlex / SearXNG |
 
 **Try it out** means: one item, five papers, or a free hosted model while you

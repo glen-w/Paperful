@@ -378,6 +378,8 @@ def test_critique_table_is_parsed(tmp_path):
     assert cfg.critique_vale_config is None
     assert cfg.critique_vale_min_alert_level == "suggestion"
     assert cfg.critique_vale_timeout_s == 60.0
+    assert cfg.critique_forensics is False
+    assert cfg.critique_forensics_timeout_s == 300.0
     assert cfg.critique_glossary is True
     assert cfg.critique_glossary_dir is None
     assert cfg.critique_glossary_similarity_min == 0.88
@@ -391,6 +393,7 @@ def test_critique_table_is_parsed(tmp_path):
     assert cfg.critique_context_timeout_s == 0.0
     assert cfg.critique_context_max_comments == 12
     assert cfg.critique_context_max_hits == 8
+    assert cfg.critique_adversary_max_comments == 12
     assert cfg.critique_reviewers == ()
     assert cfg.critiques_dir == cfg.state_dir / "critiques"
 
@@ -464,6 +467,7 @@ def test_critique_lanes_and_context_knobs_are_parsed(tmp_path):
                 "context_timeout_s": 45,
                 "context_max_comments": 6,
                 "context_max_hits": 3,
+                "adversary_max_comments": 4,
             }
         },
         tmp_path / "config.toml",
@@ -472,6 +476,7 @@ def test_critique_lanes_and_context_knobs_are_parsed(tmp_path):
     assert cfg.critique_context_timeout_s == 45.0
     assert cfg.critique_context_max_comments == 6
     assert cfg.critique_context_max_hits == 3
+    assert cfg.critique_adversary_max_comments == 4
 
 
 def test_critique_vale_config_resolves_relative(tmp_path):
@@ -495,6 +500,22 @@ def test_critique_vale_config_resolves_relative(tmp_path):
     assert cfg.critique_vale_config == ini.resolve()
     assert cfg.critique_vale_min_alert_level == "warning"
     assert cfg.critique_vale_timeout_s == 12.0
+
+
+def test_critique_forensics_knobs_are_parsed(tmp_path):
+    from paperful.config import _from_dict
+
+    cfg = _from_dict(
+        {
+            "critique": {
+                "forensics": True,
+                "forensics_timeout_s": 45,
+            }
+        },
+        tmp_path / "config.toml",
+    )
+    assert cfg.critique_forensics is True
+    assert cfg.critique_forensics_timeout_s == 45.0
 
 
 def test_critique_glossary_knobs_are_parsed(tmp_path):

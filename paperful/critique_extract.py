@@ -27,6 +27,7 @@ SUPPORTED = frozenset(
         ".rtf",
         ".doc",
         ".pptx",
+        ".csv",
     }
 )
 ACCEPT = ",".join(sorted(SUPPORTED))
@@ -112,7 +113,7 @@ def extract_path(path: Path) -> ExtractedDoc:
     try:
         if suffix == ".pdf":
             return _from_pdf(path)
-        if suffix in {".txt", ".md"}:
+        if suffix in {".txt", ".md", ".csv"}:
             return _from_plain(path, suffix.lstrip("."))
         if suffix in {".html", ".htm"}:
             return _from_html(path)

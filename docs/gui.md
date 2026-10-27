@@ -182,14 +182,16 @@ Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
 **Critique** (Advanced): pick a collection item **or** drop a draft
 (pdf/docx/odt/html/rtf/txt/md/pptx, 40 MB). Writes `state/critiques/` (`pack.md`).
 Uploads stay under `state/critiques/uploads/` and are not imported to `out/`
-or Zotero. Optional review lanes (Reviewers, MARG-S, Context library / web)
+or Zotero. Optional review lanes (Reviewers, MARG-S, Adversary, Context library / web)
 need `[llm]` (item form also has force-LLM and write-child-note). Checkboxes
 are independent and pre-check from `[critique].lanes` (or the llm/advanced
 shims). GROBID sidecar is for MARG-S PDF chunks (pre-checked from
 `[grobid].enabled`; ticking it is `--grobid` even when that setting is false). Optional AI-model checkbox requests a Binoculars extra
 (not installed by default). Optional Vale checkbox runs house-style lint when
 `vale` is on PATH. The box is not pre-checked; `[critique].vale = true` still
-runs the pass. Show-dismissed is item-only. Not a score. See
+runs the pass. Optional Forensics (PaperGuard) checkbox runs `paperguard scan`
+when that binary is on PATH (`[critique].forensics = true` still runs the
+pass). Show-dismissed is item-only. Not a score. See
 [critique.md](critique.md).
 
 **Stays CLI** (no GUI control): `session login`, `doctor --guide`, mid-run

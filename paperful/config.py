@@ -235,6 +235,8 @@ class Config:
     critique_vale_config: Path | None = None
     critique_vale_min_alert_level: str = "suggestion"
     critique_vale_timeout_s: float = 60.0
+    critique_forensics: bool = False
+    critique_forensics_timeout_s: float = 300.0
     critique_glossary: bool = True
     critique_glossary_dir: Path | None = None  # None → state_dir / "glossary"
     critique_glossary_similarity_min: float = 0.88
@@ -247,6 +249,7 @@ class Config:
     critique_context_timeout_s: float = 0.0  # 0 → max(llm.timeout_s, 600)
     critique_context_max_comments: int = 12
     critique_context_max_hits: int = 8
+    critique_adversary_max_comments: int = 12
     critique_reviewers: tuple[CritiqueReviewer, ...] = ()
     summarize_prompt_template: str = "default"
     summarize_max_context_chars: int = 24_000
