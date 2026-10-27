@@ -5,7 +5,7 @@
 {% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
 {% block content %}
 <h1>Critique</h1>
-<p class="page-lede">A local pre-submission / reading-aid pack. Deterministic checkers always run. Optional LLM comments are a separate <em>suggested</em> lane. There is no score, grade, or accept/reject. Uploads stay under <code>state/critiques/uploads/</code> and are not written to <code>out/</code> or Zotero.</p>
+<p class="page-lede">A local pre-submission / reading-aid pack. Deterministic checkers always run. Optional review lanes (reviewers, MARG-S, context) are separate <em>suggested</em> extras and can run together. There is no score, grade, or accept/reject. Uploads stay under <code>state/critiques/uploads/</code> and are not written to <code>out/</code> or Zotero.</p>
 {% if error == 'target' %}<div class="error-banner">Pick a library item <em>or</em> upload a file, not both and not neither.</div>{% endif %}
 {% if error == 'format' %}<div class="error-banner">That file type is not supported. Use pdf, txt, md, html, rtf, docx, odt, pptx (legacy .doc needs a converter on PATH).</div>{% endif %}
 {% if error == 'size' %}<div class="error-banner">The upload is larger than 40 MB.</div>{% endif %}
@@ -26,9 +26,11 @@
       </select>
     </label>
     {% if llm_on %}
-    <label><input type="checkbox" name="llm" value="1"{% if critique_llm %} checked{% endif %}> LLM comments {{ info("Suggested lane only. Grounded in the manuscript text and checked findings. Needs [llm].enabled. Independent reviewers; additive with Advanced multi-agent.") }}</label>
-    <label><input type="checkbox" name="advanced" value="1"{% if critique_advanced %} checked{% endif %}> Advanced multi-agent {{ info("MARG-S-style groups (experiments, clarity, impact) plus a refine pass. Suggested lane. Additive with LLM comments. Needs [llm].enabled.") }}</label>
-    <label><input type="checkbox" name="grobid" value="1"{% if grobid_enabled %} checked{% endif %}> GROBID sidecar {{ info("Section-labeled chunks for advanced mode only. Needs [grobid].enabled and a reachable server, or a warm TEI cache. Scans need OCR first. Remote hosts send PDF bytes off this machine. Checkers still use ExtractedDoc.") }}</label>
+    <label><input type="checkbox" name="lane" value="reviewers"{% if "reviewers" in critique_lanes %} checked{% endif %}> Reviewers {{ info("Suggested lane. Grounded in the manuscript text and checked findings. Needs [llm].enabled. Independent [[critique.reviewers]] calls. Additive with other review lanes.") }}</label>
+    <label><input type="checkbox" name="lane" value="marg"{% if "marg" in critique_lanes %} checked{% endif %}> MARG-S multi-agent {{ info("MARG-S-style groups (experiments, clarity, impact) plus a refine pass. Suggested lane. Additive with other review lanes. Needs [llm].enabled. Inspired by D’Arcy et al.; Paperful does not vendor that repo.") }}</label>
+    <label><input type="checkbox" name="lane" value="context"{% if "context" in critique_lanes %} checked{% endif %}> Context (library) {{ info("ScholarPeer-inspired: summary, library historian, baseline scout, Q&A. Local RAG / extract only. No live web. Suggested lane.") }}</label>
+    <label><input type="checkbox" name="lane" value="context-web"{% if "context-web" in critique_lanes %} checked{% endif %}> Context (web) {{ info("Same pipeline as Context (library), plus opt-in OpenAlex / SearXNG. Literature metadata leaves this machine. Off unless you tick it. Suggested lane.") }}</label>
+    <label><input type="checkbox" name="grobid" value="1"{% if grobid_enabled %} checked{% endif %}> GROBID sidecar {{ info("Section-labeled chunks for the MARG-S lane. Needs [grobid].enabled and a reachable server, or a warm TEI cache. Scans need OCR first. Remote hosts send PDF bytes off this machine. Checkers still use ExtractedDoc.") }}</label>
     <label><input type="checkbox" name="force" value="1"> Force LLM {{ info("Run suggested comments even when identity lint flagged the PDF.") }}</label>
     {% endif %}
     <label><input type="checkbox" name="ai_model" value="1"> AI model {{ info("Optional Binoculars extra. Paperful does not install torch. Missing extra records ai_model_unavailable. Not proof of authorship.") }}</label>
@@ -51,9 +53,11 @@
       <input type="file" name="file" accept="{{ accept }}">
     </label>
     {% if llm_on %}
-    <label><input type="checkbox" name="llm" value="1"{% if critique_llm %} checked{% endif %}> LLM comments {{ info("Suggested lane only. Grounded in the uploaded text and checked findings. Additive with Advanced multi-agent.") }}</label>
-    <label><input type="checkbox" name="advanced" value="1"{% if critique_advanced %} checked{% endif %}> Advanced multi-agent {{ info("MARG-S-style groups. Suggested lane. Additive with LLM comments.") }}</label>
-    <label><input type="checkbox" name="grobid" value="1"{% if grobid_enabled %} checked{% endif %}> GROBID sidecar {{ info("Section-labeled chunks for advanced mode. PDFs only. Remote hosts send PDF bytes off this machine.") }}</label>
+    <label><input type="checkbox" name="lane" value="reviewers"{% if "reviewers" in critique_lanes %} checked{% endif %}> Reviewers {{ info("Suggested lane. Grounded in the uploaded text and checked findings. Additive with other review lanes.") }}</label>
+    <label><input type="checkbox" name="lane" value="marg"{% if "marg" in critique_lanes %} checked{% endif %}> MARG-S multi-agent {{ info("MARG-S-style groups. Suggested lane. Additive with other review lanes.") }}</label>
+    <label><input type="checkbox" name="lane" value="context"{% if "context" in critique_lanes %} checked{% endif %}> Context (library) {{ info("ScholarPeer-inspired local historian / scout / Q&A. No live web.") }}</label>
+    <label><input type="checkbox" name="lane" value="context-web"{% if "context-web" in critique_lanes %} checked{% endif %}> Context (web) {{ info("Same as Context (library) plus OpenAlex / SearXNG. Literature metadata leaves this machine.") }}</label>
+    <label><input type="checkbox" name="grobid" value="1"{% if grobid_enabled %} checked{% endif %}> GROBID sidecar {{ info("Section-labeled chunks for the MARG-S lane. PDFs only. Remote hosts send PDF bytes off this machine.") }}</label>
     {% endif %}
     <label><input type="checkbox" name="ai_model" value="1"> AI model {{ info("Optional Binoculars extra. Missing extra records ai_model_unavailable. Not proof of authorship.") }}</label>
     <label><input type="checkbox" name="vale" value="1"> Vale {{ info("Optional house-style pass. Not pre-checked. Needs vale on PATH and a .vale.ini. Missing extra records vale_unavailable / vale_no_config / vale_failed. Also runs when [critique].vale is true.") }}</label>

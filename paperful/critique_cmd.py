@@ -27,6 +27,7 @@ def run_critique(
     ai_model: bool = False,
     vale: bool = False,
     advanced: bool | None = None,
+    lane: list[str] | None = None,
     grobid: bool | None = None,
     reviewer: list[str] | None = None,
     force: bool,
@@ -64,14 +65,23 @@ def run_critique(
         )
         raise typer.Exit(1)
 
-    use_llm = cfg.critique_llm if llm is None else llm
+    from .critique_lanes import lanes_need_llm, resolve_critique_lanes
+
+    try:
+        lanes = resolve_critique_lanes(
+            cfg, lane_flags=lane or [], llm=llm, advanced=advanced
+        )
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(1) from exc
+    use_llm = "reviewers" in lanes
     use_ai_model = bool(ai_model) or cfg.critique_ai_model
     use_vale = bool(vale) or cfg.critique_vale
-    use_advanced = cfg.critique_advanced if advanced is None else advanced
+    use_advanced = "marg" in lanes
     use_grobid = cfg.grobid_enabled if grobid is None else grobid
     reviewer_ids = [r.strip() for r in (reviewer or []) if r and str(r).strip()]
     llm_client = None
-    if use_llm or use_advanced:
+    if lanes_need_llm(lanes):
         try:
             validate_llm_for_verb(cfg)
         except LlmConfigError as exc:
@@ -87,6 +97,14 @@ def run_critique(
             )
 
     offline = cli_mod._offline()
+    if "context-web" in lanes and not offline and not json_out:
+        from .snowball.searxng import searxng_base_url
+
+        extra = " and SearXNG" if searxng_base_url(cfg) else ""
+        console.print(
+            f"[yellow]context-web lane queries OpenAlex{extra} — "
+            "literature metadata leaves this machine.[/]"
+        )
     backend = None
     scope_items = []
     target = None
@@ -171,6 +189,7 @@ def run_critique(
                 use_ai_model=use_ai_model,
                 use_vale=use_vale,
                 use_advanced=use_advanced,
+                lanes=lanes,
                 use_grobid=use_grobid,
                 reviewer_ids=reviewer_ids or None,
                 force=force,
@@ -226,6 +245,7 @@ def run_critique(
             "ai_model": use_ai_model,
             "vale": use_vale,
             "advanced": use_advanced,
+            "lanes": list(lanes),
             "grobid": use_grobid,
             "offline": offline,
         },
@@ -258,6 +278,7 @@ def run_critique(
             "apply": apply,
             "llm": use_llm,
             "advanced": use_advanced,
+            "lanes": list(lanes),
             "grobid": use_grobid,
         },
         exit_code=0,

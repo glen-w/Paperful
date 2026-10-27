@@ -6,7 +6,7 @@ for the LLM-backed verbs below, and only after `paperful doctor` shows the
 `LLM` row green. `extract-sections` (optional GROBID then optional LLM),
 `rag questions`, and `critique` run
 deterministic rules without a model; their `--llm` lanes (and
-`critique --advanced`) need `[llm].enabled`.
+critique `--lane` / `--advanced`) need `[llm].enabled`.
 
 **Feasibility first.** Trying one summary is not the same job as summarizing
 or synthesizing ~1.5k PDFs. Hardware bands, overnight local runs, OpenRouter /
@@ -52,7 +52,7 @@ No Python extra is needed for Ollama: Paperful talks HTTP to the daemon.
 
 | Verb | Works well with | Notes |
 | --- | --- | --- |
-| `fix-metadata` titles, `lint` identity, `summarize`, `synthesize`, `extract-sections --llm`, `rag questions --llm`, `critique --llm` / `--advanced`, `ask` | 7B–12B instruct models (`qwen2.5:7b`, `gemma3:12b`, `llama3.1:8b`) | JSON-capable instruct tags; thinking models are fine but slower. `summarize` and `synthesize` set Ollama `num_ctx` from the prompt, capped by `[llm].max_num_ctx`. `critique` comments are suggested-lane only. `--advanced` is many more completions per paper (three aspect groups plus refine). `ask` default is **simple** (one completion); **advanced** adds about `evidence_k` summary calls — [rag.md](rag.md#ask-modes) |
+| `fix-metadata` titles, `lint` identity, `summarize`, `synthesize`, `extract-sections --llm`, `rag questions --llm`, `critique --lane` / `--llm` / `--advanced`, `ask` | 7B–12B instruct models (`qwen2.5:7b`, `gemma3:12b`, `llama3.1:8b`) | JSON-capable instruct tags; thinking models are fine but slower. `summarize` and `synthesize` set Ollama `num_ctx` from the prompt, capped by `[llm].max_num_ctx`. `critique` comments are suggested-lane only. `--lane marg` is many more completions per paper (three aspect groups plus refine); `--lane context` adds summary / historian / scout / Q&A turns. `ask` default is **simple** (one completion); **advanced** adds about `evidence_k` summary calls — [rag.md](rag.md#ask-modes) |
 | `recover` | 14B+ (`qwen2.5:14b`, `qwen3:14b`, larger); 32B / VL on 24 GB+ | Small models loop on cookie banners and publisher menus; `doctor` warns under ~10B by tag name. Full guidance: [browser-agent-models.md](browser-agent-models.md) |
 
 ### LiteLLM (paid / OpenAI-compatible APIs)
@@ -111,7 +111,8 @@ llm_pdf_match_min_confidence = 0.6
 
 [critique]                          # verb C2: suggested comments only
 llm = false
-# advanced = false                 # MARG-S lane; additive with llm (see critique.md)
+# lanes = []                       # reviewers, marg, context, context-web (see critique.md)
+# advanced = false                 # shim → marg when lanes is empty
 # vale = false                     # house-style pass; needs vale on PATH (not an LLM)
 # glossary = true                  # fuzzy house expansions from state/glossary/
 # [[critique.reviewers]]            # omit the table for one builtin JSON reviewer
@@ -247,30 +248,32 @@ two pages match the record (title, author surnames, year, DOI). A `false`, or a
 Nothing is deleted or re-attached; you decide. Model or extraction failure is
 silent (no finding).
 
-### C2. `critique --llm` — suggested comments only
+### C2. `critique --lane` — suggested review lanes only
 
 ```sh
-uv run paperful critique --file ./draft.pdf --llm
+uv run paperful critique --file ./draft.pdf --lane reviewers
 uv run paperful critique --file ./draft.pdf --llm --reviewer reviewer-2
 uv run paperful critique --file ./draft.pdf --llm --reviewer reviewer-5
-uv run paperful critique --file ./draft.pdf --advanced
-uv run paperful critique --file ./draft.pdf --llm --advanced --grobid
+uv run paperful critique --file ./draft.pdf --lane marg
+uv run paperful critique --file ./draft.pdf --lane reviewers --lane marg --grobid
+uv run paperful critique --file ./draft.pdf --lane context
 uv run paperful critique --item ABCD1234 --llm --force
 ```
 
 Additive. The default pack is checkers, metrics, and heuristic AI-tells with
-no model. `--llm` (or `[critique].llm = true`; `--no-llm` overrides) asks for
-a contribution summary, up to eight comments tied to a finding code or a
-quoted span, and author questions. `--advanced` (or `[critique].advanced = true`)
-adds a MARG-S-style multi-agent pass (experiments / clarity / impact, then
-refine). The two flags are independent; set both in config to run both on
-every critique. `--grobid` / `[grobid].enabled` only changes advanced PDF
-chunks. Every row is `lane=suggested`. Ungrounded
-spans are dropped. No overall score. Identity mismatch refuses both LLM lanes
-unless `--force`. Optional `[[critique.reviewers]]` run one call each (per-id
-model and prompt) and do not replace advanced. A Markdown prompt file becomes a **Reviewer note** in
-`pack.md`; the builtin prompt still returns JSON comments. Optional `--vale`
-house-style lint is a separate **checked** pass (no model). See
+no model. `--lane reviewers` (or `--llm` / `[critique].llm`) asks for a
+contribution summary, up to eight comments tied to a finding code or a quoted
+span, and author questions. `--lane marg` (or `--advanced`) adds a MARG-S-style
+multi-agent pass. `--lane context` adds a ScholarPeer-inspired local historian /
+scout / Q&A pass; `--lane context-web` may query OpenAlex / SearXNG (egress
+notice; skipped offline). Lanes run together. `--grobid` /
+`[grobid].enabled` only changes MARG-S PDF chunks. Every row is
+`lane=suggested`. Ungrounded spans are dropped. No overall score. Identity
+mismatch refuses review lanes unless `--force`. Optional
+`[[critique.reviewers]]` run one call each (per-id model and prompt) and do
+not replace `marg` or `context`. A Markdown prompt file becomes a **Reviewer
+note** in `pack.md`; the builtin prompt still returns JSON comments. Optional
+`--vale` house-style lint is a separate **checked** pass (no model). See
 [critique.md](critique.md).
 
 ### D. `summarize` — grounded summary note

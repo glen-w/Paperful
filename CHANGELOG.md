@@ -6,6 +6,17 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+### Added
+
+- **Critique review lanes.** Suggested peer-review extras are composable
+  (`--lane` / `[critique].lanes`: `reviewers`, `marg`, `context`,
+  `context-web`) instead of an exclusive standard/advanced pair. `--llm` /
+  `--advanced` remain aliases. `pack.json` records `llm.lanes` (deprecated
+  `llm.mode` still derived). Library-grounded `context` and opt-in
+  `context-web` (OpenAlex, optional SearXNG) follow ScholarPeer *ideas*
+  without vendoring that stack or MARG. Offline skips web search. See
+  [critique](docs/critique.md).
+
 ## 1.5.0 — 2026-10-26
 
 ### Changed

@@ -404,6 +404,7 @@ def build_critique(
     use_ai_model: bool = False,
     use_vale: bool = False,
     use_advanced: bool = False,
+    lanes: tuple[str, ...] | list[str] | None = None,
     use_grobid: bool = False,
     reviewer_ids: list[str] | None = None,
     force: bool = False,
@@ -418,9 +419,19 @@ def build_critique(
 ) -> dict[str, Any]:
     """Run checkers and write a pack (unless ``dry_run``)."""
     from .critique_checks import run_checks
+    from .critique_lanes import lanes_need_llm, ordered_lanes
     from .critique_llm import suggested_from_llm
     from .lint import resolve_pdf_path
     from .store import Manifest
+
+    if lanes is None:
+        shim: list[str] = []
+        if use_llm:
+            shim.append("reviewers")
+        if use_advanced:
+            shim.append("marg")
+        lanes = tuple(shim)
+    lanes = ordered_lanes(lanes)
 
     say = on_status or (lambda _msg: None)
 
@@ -531,7 +542,7 @@ def build_critique(
             ai_model_meta = ai_result
 
     llm_meta: dict[str, Any] | None = None
-    if use_llm or use_advanced:
+    if lanes_need_llm(lanes):
         pdf = src if src is not None and src.suffix.lower() == ".pdf" else None
         extra, llm_meta = suggested_from_llm(
             cfg,
@@ -542,10 +553,11 @@ def build_critique(
             force=force,
             metrics=metrics,
             reviewer_ids=reviewer_ids,
-            use_llm=use_llm,
-            advanced=use_advanced,
+            lanes=lanes,
             use_grobid=use_grobid,
             pdf_path=pdf,
+            offline=offline,
+            scope_items=scope_items or [],
             on_status=on_status,
         )
         findings.extend(extra)

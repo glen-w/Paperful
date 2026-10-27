@@ -38,6 +38,36 @@ def rank_hit(url: str, *, surname: str, title: str = "") -> int:
     return score
 
 
+def search_query(
+    cfg: Config,
+    query: str,
+    *,
+    limit: int = 8,
+    getter: Any = None,
+    cache_dir: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Generic SearXNG JSON search. Empty when ``[searxng].base_url`` is unset."""
+    base = searxng_base_url(cfg)
+    q = (query or "").strip()
+    if not base or not q:
+        return []
+    folder = cache_dir if cache_dir is not None else cfg.state_dir / "critique" / "searxng"
+    payload = _cached_search(base, q, getter=getter, cache_dir=folder)
+    results = payload.get("results") if isinstance(payload, dict) else []
+    out: list[dict[str, Any]] = []
+    for row in results or []:
+        if not isinstance(row, dict):
+            continue
+        url = str(row.get("url") or "").strip()
+        title = str(row.get("title") or "").strip()
+        if not url and not title:
+            continue
+        out.append({"url": url, "title": title or url})
+        if len(out) >= max(1, int(limit)):
+            break
+    return out
+
+
 def search_author_site(
     cfg: Config,
     *,

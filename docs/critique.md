@@ -2,22 +2,27 @@
 
 `paperful critique` writes an evidence-backed Markdown pack for a manuscript
 you already have: a mirrored library `--item`, or a `--file` / workbench
-upload. Deterministic checkers always run. Optional LLM comments are a
-separate **suggested** lane. There is **no score, grade, or accept/reject**.
+upload. Deterministic checkers always run. Optional review lanes are a
+separate **suggested** extra and can run together. There is **no score, grade,
+or accept/reject**.
 
 This is a **pre-submission / reading-aid pack**, not a referee and not Google
-Deep Review. It does not upload the manuscript, does not search the web, and
-does not call a similarity API. Overlap is against **your library text already
-on disk**.
+Deep Review. It does not upload the manuscript and does not call a similarity
+API. Overlap is against **your library text already on disk**. Suggested
+review lanes default to that extract (and optional local RAG). The
+`context-web` lane is the only critique path that may query OpenAlex /
+SearXNG, and only when you opt in.
 
 ## What it checks
 
 Deterministic checkers always run (no model). **Checked** findings carry a
 quote and a page / paragraph / slide loc when one exists. Heuristic AI-prose
 tells always run too, as **suggested** `info` — they are not an LLM and not
-proof of authorship. Optional `--llm` comments, `--advanced` multi-agent
-comments, and `--ai-model` are separate suggested extras. Optional `--vale`
-house-style alerts are **checked**.
+proof of authorship. Optional review lanes (`--lane reviewers` / `marg` /
+`context` / `context-web`; `--llm` and `--advanced` are aliases) and
+`--ai-model` are separate suggested extras. Optional `--vale` house-style
+alerts are **checked**. Paperful does not vendor MARG or ScholarPeer; docs
+credit the patterns.
 
 | Area | Lane | Codes (examples) |
 | --- | --- | --- |
@@ -56,12 +61,15 @@ appears in many library texts is dropped. Do not narrate misconduct.
 ```bash
 uv run paperful critique --item KEY -C "My Collection"
 uv run paperful critique --file ./draft.docx -C "My Collection"
+uv run paperful critique --file ./draft.pdf --lane reviewers
 uv run paperful critique --file ./draft.pdf --llm
 uv run paperful critique --file ./draft.pdf --llm --reviewer reviewer-2
-uv run paperful critique --file ./draft.pdf --advanced
-uv run paperful critique --file ./draft.pdf --llm --advanced --grobid
+uv run paperful critique --file ./draft.pdf --lane marg
+uv run paperful critique --file ./draft.pdf --lane reviewers --lane marg --grobid
+uv run paperful critique --file ./draft.pdf --lane context
+uv run paperful critique --file ./draft.pdf --lane context-web
 uv run paperful critique --file ./draft.pdf --no-llm --no-advanced
-uv run paperful critique --file ./draft.pdf --no-llm   # override [critique].llm
+uv run paperful critique --file ./draft.pdf --no-llm   # drop reviewers (alias)
 uv run paperful critique --file ./draft.pdf --ai-model
 uv run paperful critique --file ./draft.pdf --vale
 uv run paperful critique --item KEY --llm --force      # LLM despite identity lint
@@ -73,11 +81,14 @@ uv run paperful critique dismiss FINDING_ID --critique-id KEY
 
 `--dry-run` prints findings and does not write `state/critiques/`. `--apply`
 posts a tagged child note only for a library `--item`. Uploads stay disk-only.
-`--llm` / `--no-llm` override `[critique].llm`. `--advanced` / `--no-advanced`
-override `[critique].advanced` (MARG-S-style multi-agent lane; additive with
-`--llm`). `--grobid` / `--no-grobid` override `[grobid].enabled` and only
-affect advanced PDF chunking (`--grobid` still attempts the sidecar even when
-`[grobid].enabled` is false, same as `extract-sections`). `--ai-model` turns the
+`--lane NAME` (repeatable: `reviewers`, `marg`, `context`, `context-web`)
+selects suggested review lanes for this run. `[critique].lanes` is the config
+list; when it is empty, `[critique].llm` / `[critique].advanced` still map to
+`reviewers` / `marg`. `--llm` / `--no-llm` and `--advanced` / `--no-advanced`
+are aliases that add or remove those two ids. `--grobid` / `--no-grobid`
+override `[grobid].enabled` and only affect MARG-S PDF chunking (`--grobid`
+still attempts the sidecar even when `[grobid].enabled` is false, same as
+`extract-sections`). `--ai-model` turns the
 Binoculars extra on for this run (there is no `--no-ai-model`; set
 `[critique].ai_model = false` in config). `--vale` turns the Vale house-style
 pass on for this run (there is no `--no-vale`; set `[critique].vale = false`).
@@ -99,14 +110,17 @@ goes to stderr on a TTY. Run report: `state/runs/<stamp>-critique.json`.
 
 `pack.json` always has `findings`, `overlap`, `metrics`, and `llm`. `metrics`
 holds readability, lexical diversity, and the AI-tell summary (also rendered
-as a Metrics section in `pack.md`). `llm` is `null` until `--llm` or `--advanced` runs; then
-it records `mode` (`default` / `marg` / `both`), `model`, `prompt_sha`,
-`provider`, optional `narrative`, a `reviewers` list (per-id model, skip
-reason, Markdown note, including `marg-experiments` / `marg-clarity` /
-`marg-impact` when advanced ran), and optional `marg` stats (`parser` is
-`grobid` or `extract`; `rounds`, `calls`, `skipped`; optional
-`grobid_skipped`). `ai_model` and
-`vale` appear only when those extras ran (skip reason or alert counts).
+as a Metrics section in `pack.md`). `llm` is `null` until a review lane runs;
+then it records `lanes` (ordered ids), a deprecated `mode` string
+(`default` / `marg` / `both` / `context` / `context-web`) derived from that
+set, `model`, `prompt_sha`, `provider`, optional `narrative`, a `reviewers`
+list (per-id model, skip reason, Markdown note, including `marg-experiments`
+/ `marg-clarity` / `marg-impact` and `context` / `context-web` when those
+lanes ran), optional `marg` stats (`parser` is `grobid` or `extract`;
+`rounds`, `calls`, `skipped`; optional `grobid_skipped`), and optional
+`context` stats (`search_enabled`, `backends`, `rag_skipped`,
+`search_skipped`). `ai_model` and `vale` appear only when those extras ran
+(skip reason or alert counts).
 
 ## Input formats
 
@@ -128,13 +142,40 @@ Workbench uploads are copied under `state/critiques/uploads/<stamp>-<safe>/`
 (same basename hardening as other GUI uploads; 40 MB cap). They never write
 `out/` or Zotero unless you later attach the file yourself.
 
-## Optional LLM (`--llm` / `[critique].llm`)
+## Review lanes (`--lane` / `[critique].lanes`)
+
+Suggested extras. Checkers always run. Lanes are **additive** and may be
+combined. Identity mismatch refuses **all** review lanes unless `--force`.
+Each lane needs `[llm].enabled`; otherwise the pack records
+`skipped: llm_disabled` and still writes. Paperful does not vendor
+[allenai/marg-reviewer](https://github.com/allenai/marg-reviewer) or ScholarPeer
+/ [open-scholar-peer](https://github.com/amirkiarafiei/open-scholar-peer).
+
+| Id | Alias | What it does |
+| --- | --- | --- |
+| `reviewers` | `--llm` | Independent `[[critique.reviewers]]` JSON/Markdown calls |
+| `marg` | `--advanced` | MARG-S-style multi-agent (experiments / clarity / impact) |
+| `context` | — | ScholarPeer-inspired: summary, library historian, baseline scout, Q&A |
+| `context-web` | — | Same pipeline; literature/baseline may query OpenAlex / optional SearXNG |
+
+```toml
+[critique]
+lanes = ["reviewers", "marg"]
+```
+
+When `lanes` is non-empty, `[critique].llm` and `[critique].advanced` are
+ignored. When it is empty, those bools still map to `reviewers` / `marg`.
+`--no-llm --no-advanced` with no `--lane` is checkers only.
+`--reviewer ID` still subsets only `[[critique.reviewers]]`. Orthogonal extras
+(`--vale`, `--ai-model`, `--grobid`) are not lanes.
+
+## Optional reviewers (`--lane reviewers` / `--llm`)
 
 Follows [llm.md](llm.md): local Ollama by default, egress notice, grounded in
 the extracted text already on disk plus the checked finding list. No web
 search. Comments are `lane=suggested` only. Ungrounded spans are dropped.
 Direct quotations are not rewritten; comments on quoted spans are dropped.
-`pdf_identity_mismatch` refuses the lane unless `--force`. Never emits scores.
+Never emits scores.
 
 Default is **one** reviewer (`[llm].model` + builtin JSON prompt). Add more
 with `[[critique.reviewers]]` — each row has `id`, optional `model` (empty
@@ -148,30 +189,16 @@ still returns JSON comments as suggested findings. One LLM call per reviewer.
 
 No-LLM users still get the pack (checkers, metrics, heuristic tells).
 
-## Optional advanced multi-agent (`--advanced` / `[critique].advanced`)
+## Optional MARG-S (`--lane marg` / `--advanced`)
 
 Additive suggested lane inspired by MARG-S
 ([D’Arcy et al., arXiv:2401.04259](https://arxiv.org/abs/2401.04259);
 [allenai/marg-reviewer](https://github.com/allenai/marg-reviewer), Apache-2.0).
 Paperful does not vendor that repo. Python orchestrates JSON turns with a
 leader, chunk workers, and one expert per aspect group (experiments, clarity,
-impact), then a refine pass. Same grounding and no-score rules as `--llm`.
-Identity mismatch refuses **both** LLM lanes unless `--force`.
+impact), then a refine pass. Same grounding and no-score rules as reviewers.
 
-Set both on to run reviewers and MARG on every critique:
-
-```toml
-[critique]
-llm = true
-advanced = true
-```
-
-`--reviewer ID` still subsets only `[[critique.reviewers]]`. `--no-llm` does
-not turn off advanced; `--no-advanced` does not turn off reviewers.
-`--no-llm --no-advanced` is checkers only. Advanced needs `[llm].enabled`;
-otherwise the lane records `skipped: llm_disabled` and the pack still writes.
-
-Advanced PDF chunks prefer the optional GROBID TEI cache (`process_pdf` /
+MARG PDF chunks prefer the optional GROBID TEI cache (`process_pdf` /
 `tei_to_markdown_pages`, same as [extract-sections](grobid.md)). Scans,
 non-PDFs, and sidecar errors fall back to `ExtractedDoc` and record
 `marg.parser = "extract"` plus `grobid_skipped`. Checkers never require GROBID.
@@ -181,6 +208,25 @@ Remote GROBID prints the same yellow egress notice as extract-sections
 `advanced_timeout_s` (`0` → `max([llm].timeout_s, 600)`). A duplicated
 leader broadcast is a hard stop (`skipped: loop`). A wall-clock overrun
 records `skipped: timeout` rather than hanging a workbench job.
+
+## Optional context (`--lane context` / `--lane context-web`)
+
+Additive suggested lane inspired by ScholarPeer
+([Goyal et al., arXiv:2601.22638](https://arxiv.org/abs/2601.22638)).
+Paperful does not vendor that framework or community skill packs. The
+pipeline is summary → historian → baseline scout → multi-aspect Q&A →
+synthesis. Same grounding and no-score rules as reviewers. This is not
+ScholarPeer parity and does not emit venue scores.
+
+`context` retrieves only from the local RAG index (collection / library
+scope when `-C` / `--library` loaded items). Missing index records
+`rag_skipped` and continues on the extract.
+
+`context-web` uses the same pipeline and may query OpenAlex, then optional
+SearXNG when `[searxng].base_url` is set. A yellow egress notice prints.
+`PAPERFUL_OFFLINE=1` skips those calls and records `search_skipped: offline`.
+Venue filters are not hard-coded to ML conferences. Caps:
+`context_timeout_s`, `context_max_comments`, `context_max_hits`.
 
 ## Optional AI-text extra (`--ai-model` / `[critique].ai_model`)
 
@@ -257,9 +303,11 @@ rules is expected.
 
 Advanced **Critique** (not on the default Wanted/Discover/Ask nav): pick an
 item from the collection chip **or** drop a file. Same checkers as the CLI.
-When `[llm]` is on, **LLM comments** and **Advanced multi-agent** are
-independent checkboxes (pre-checked from `[critique].llm` / `[critique].advanced`).
-**GROBID sidecar** is for advanced chunks only (pre-checked from `[grobid].enabled`).
+When `[llm]` is on, review-lane checkboxes (**Reviewers**, **MARG-S
+multi-agent**, **Context (library)**, **Context (web)**) can be combined
+(pre-checked from `[critique].lanes`, or the llm/advanced shims when `lanes`
+is empty). **GROBID sidecar** is for MARG-S chunks only (pre-checked from
+`[grobid].enabled`).
 Library item form also has force-LLM past identity lint. **Write child note** is `--apply` (item
 only). **Show dismissed** is `--show-dismissed`. **AI model** is `--ai-model`.
 **Vale** is `--vale`. The Vale checkbox is not pre-checked; `[critique].vale =

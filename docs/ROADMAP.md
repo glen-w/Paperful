@@ -221,7 +221,8 @@ refuses “fraud” vocabulary in reports. Paperful uses the same copy pattern o
 **What Paperful already covers without PaperGuard.** Collection-wide **PPS +
 retraction** on holdings (`screen`); **pre-submission reading packs**
 (`critique`: structure, refs, floats, ethics mentions, library overlap, optional
-Vale/LLM lanes). That is “does this draft hang together and cite retracted
+Vale and composable review lanes — reviewers, MARG-S, ScholarPeer-inspired
+`context` / `context-web`; not vendored). That is “does this draft hang together and cite retracted
 works?” — not “are these CSV means GRIM-impossible?”
 
 **Buffet — integrate, don’t duplicate (ship in order; each stage can stop):**

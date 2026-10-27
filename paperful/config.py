@@ -222,6 +222,7 @@ class Config:
     screen_fingerprint_dir: Path | None = None
     screen_tag: str = "paperful-pps"
     critique_llm: bool = False
+    critique_lanes: tuple[str, ...] = ()
     critique_tag: str = "paperful-critique"
     critique_overlap_top_k: int = 40
     critique_overlap_n_min: int = 6
@@ -243,6 +244,9 @@ class Config:
     critique_advanced_max_comments: int = 12
     critique_advanced_refine: bool = True
     critique_advanced_timeout_s: float = 0.0  # 0 → max(llm.timeout_s, 600)
+    critique_context_timeout_s: float = 0.0  # 0 → max(llm.timeout_s, 600)
+    critique_context_max_comments: int = 12
+    critique_context_max_hits: int = 8
     critique_reviewers: tuple[CritiqueReviewer, ...] = ()
     summarize_prompt_template: str = "default"
     summarize_max_context_chars: int = 24_000

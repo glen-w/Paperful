@@ -184,7 +184,8 @@ mirror_failures_before_skip = 3
 # tag = "paperful-pps"
 # [critique]
 # # Local manuscript pack (see docs/critique.md). Not a grade.
-# llm = false
+# llm = false                      # shim → reviewers when lanes is empty
+# lanes = []                       # reviewers, marg, context, context-web (empty → llm/advanced shims)
 # tag = "paperful-critique"
 # ai_model = false                 # optional Binoculars extra; --ai-model turns on (no CLI off)
 # vale = false                     # optional Vale house style; --vale turns on (no CLI off)
@@ -194,13 +195,17 @@ mirror_failures_before_skip = 3
 # glossary = true                  # fuzzy house-list expansions (state/glossary/)
 # glossary_dir = "glossary"        # directory under state_dir
 # glossary_similarity_min = 0.88
-# advanced = false                 # MARG-S-style multi-agent lane; additive with llm
-# advanced_max_rounds = 4
+# advanced = false                 # shim → marg when lanes is empty
+# advanced_max_rounds = 4          # applies to lane marg
 # advanced_max_workers = 4
 # advanced_max_comments = 12
 # advanced_refine = true
 # advanced_timeout_s = 0           # 0 = max([llm].timeout_s, 600)
-# # With llm = true and advanced = true, every critique runs reviewers + MARG.
+# context_timeout_s = 0            # context / context-web; 0 = max([llm].timeout_s, 600)
+# context_max_comments = 12
+# context_max_hits = 8             # local RAG and OpenAlex/SearXNG rows
+# # lanes = ["reviewers", "marg"]  # when set, llm/advanced bools are ignored
+# # With llm = true and advanced = true (and lanes empty), every critique runs reviewers + MARG.
 # # Advanced PDF chunks reuse [grobid] when enabled (see docs/grobid.md).
 # overlap_top_k = 40
 # overlap_n_min = 6

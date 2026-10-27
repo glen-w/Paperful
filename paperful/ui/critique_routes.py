@@ -25,6 +25,11 @@ from ..critique_extract import (
     ExtractError,
     stage_bytes,
 )
+from ..critique_lanes import resolve_critique_lanes
+
+
+def _default_lanes(cfg: Any) -> tuple[str, ...]:
+    return resolve_critique_lanes(cfg)
 
 
 def _picker_items(ui: UiContext, collection: str) -> list[dict[str, Any]]:
@@ -69,6 +74,7 @@ def handle_page_critique(
             llm_on=bool(ui.cfg.llm_enabled),
             critique_llm=bool(ui.cfg.critique_llm),
             critique_advanced=bool(ui.cfg.critique_advanced),
+            critique_lanes=list(_default_lanes(ui.cfg)),
             grobid_enabled=bool(ui.cfg.grobid_enabled),
         ),
     )
@@ -83,6 +89,11 @@ async def handle_critique_run(ui: UiContext, request: Request) -> RedirectRespon
     ai_model = form.get("ai_model") == "1"
     vale = form.get("vale") == "1"
     advanced = form.get("advanced") == "1"
+    raw_lanes = [str(v).strip() for v in form.getlist("lane") if str(v).strip()]
+    if llm and "reviewers" not in raw_lanes:
+        raw_lanes.append("reviewers")
+    if advanced and "marg" not in raw_lanes:
+        raw_lanes.append("marg")
     grobid = form.get("grobid") == "1"
     force = form.get("force") == "1"
     show_dismissed = form.get("show_dismissed") == "1"
@@ -127,6 +138,7 @@ async def handle_critique_run(ui: UiContext, request: Request) -> RedirectRespon
             ai_model=ai_model,
             vale=vale,
             advanced=advanced,
+            lanes=raw_lanes,
             grobid=grobid,
             force=force,
             show_dismissed=show_dismissed,

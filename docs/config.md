@@ -49,7 +49,7 @@ and [architecture](architecture.md).
 | `[camofox].during_run` | `true` | Inject on `run` when enabled. `--camofox` / `--no-camofox` override one run |
 | `[camofox].base_url` | `http://127.0.0.1:9377` | REST base for the camofox-browser server |
 | `[camofox].max_wall_s` | `90` | Wall-clock budget per item for the scripted grab |
-| `[grobid].enabled` | `false` | Opt-in GROBID sidecar for `extract-sections`, `[rag].parser = "grobid"`, and `critique --advanced` chunking. Needs an external GROBID server. Never a silent default. See [GROBID](grobid.md) |
+| `[grobid].enabled` | `false` | Opt-in GROBID sidecar for `extract-sections`, `[rag].parser = "grobid"`, and critique `--lane marg` chunking. Needs an external GROBID server. Never a silent default. See [GROBID](grobid.md) |
 | `[grobid].base_url` | `http://127.0.0.1:8070` | REST base. Loopback is rewritten to `host.docker.internal` inside Compose (`PAPERFUL_GROBID_HOST`) |
 | `[grobid].timeout_s` | `120` | Full-text POST budget |
 | `[grobid].allow_remote` | `false` | Permit a non-local host. PDF bytes then leave this machine |
@@ -248,14 +248,15 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[llm].base_url` | `http://127.0.0.1:11434` | Ollama API. Inside Compose, a loopback URL is rewritten to `host.docker.internal` (`PAPERFUL_OLLAMA_HOST`). A remote hostname stays as configured and still needs `allow_remote` |
 | `[llm].api_base` | `""` | OpenAI-compatible base when `provider = litellm` |
 | `[fix_metadata].llm_title` | `false` | Grounded title proposals in `fix-metadata` |
-| `[lint].llm_pdf_match` | `false` | `pdf_identity_mismatch` finding; `summarize` and `critique --llm` / `--advanced` refuse flagged items unless `--force` |
+| `[lint].llm_pdf_match` | `false` | `pdf_identity_mismatch` finding; `summarize` and critique review lanes refuse flagged items unless `--force` |
 | `[screen].detectors` | retracted, withdrawal, EoC, pubpeer, tortured, scigen, mathgen, suspect | Which lanes run. PubPeer needs `[screen].pubpeer = true` and `PUBPEER_DEVKEY` |
 | `[screen].tortured_min` | `5` | Minimum tortured-phrase hits before flagging (obvious phrases always flag) |
 | `[screen].pubpeer` | `false` | PubPeer batch lookup |
 | `[screen].fingerprint_max_age_days` | `14` | Re-download PPS CSV dumps after this age (`doctor` ambers when stale) |
 | `[screen].fingerprint_dir` | unset | Optional folder with `tortured.csv` / `.json` (and `scigen`, `mathgen`, `suspect`). Relative paths resolve from the config file. Used when cache is missing or offline |
 | `[screen].tag` | `paperful-pps` | Child note tag for `--apply` |
-| `[critique].llm` | `false` | Optional suggested-lane comments (`--llm` / `--no-llm` override) |
+| `[critique].llm` | `false` | Shim for lane `reviewers` when `[critique].lanes` is empty (`--llm` / `--no-llm` add or remove that lane) |
+| `[critique].lanes` | `[]` | Suggested review lanes to run together: `reviewers`, `marg`, `context`, `context-web`. Empty → use `llm` / `advanced` shims. When non-empty those bools are ignored. `--lane` selects for one run |
 | `[critique].tag` | `paperful-critique` | Child note tag for `critique --apply` |
 | `[critique].ai_model` | `false` | Optional Binoculars extra. `--ai-model` turns it on for one run (no `--no-ai-model`). Not installed by default; missing extra records `ai_model_unavailable` |
 | `[critique].vale` | `false` | Optional Vale house-style pass. `--vale` turns it on for one run (no `--no-vale`). Needs `vale` on PATH and a `.vale.ini`; missing extra records `vale_unavailable` / `vale_no_config` / `vale_failed`. Not in the Compose image |
@@ -265,13 +266,16 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[critique].glossary` | `true` | Fuzzy house-list acronym expansions from `state/glossary/*.json`. No findings when the directory is empty. `paperful glossary validate` / `export-vale` |
 | `[critique].glossary_dir` | `glossary` | Directory under `state_dir` (absolute paths allowed) |
 | `[critique].glossary_similarity_min` | `0.88` | Minimum `difflib` ratio to flag a near-miss expansion or phrase |
-| `[critique].advanced` | `false` | Optional MARG-S-style multi-agent suggested lane (`--advanced` / `--no-advanced`). Additive with `[critique].llm`. Set both `true` to run reviewers and MARG on every critique |
+| `[critique].advanced` | `false` | Shim for lane `marg` when `[critique].lanes` is empty (`--advanced` / `--no-advanced`). Caps below apply to lane `marg` |
 | `[critique].advanced_max_rounds` | `4` | Leader turns per aspect group |
 | `[critique].advanced_max_workers` | `4` | Paper chunks (worker agents) |
 | `[critique].advanced_max_comments` | `12` | Cap after the refine pass |
 | `[critique].advanced_refine` | `true` | Extra pass to drop or split comments |
-| `[critique].advanced_timeout_s` | `0` | Wall clock for the whole advanced pass (`0` → `max([llm].timeout_s, 600)`). Duplicate leader broadcasts abort (`loop`); overrun records `timeout` |
-| `[[critique.reviewers]]` | one implicit reviewer | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path relative to the config file). `--reviewer ID` selects a subset. Unused by the advanced lane |
+| `[critique].advanced_timeout_s` | `0` | Wall clock for the MARG-S pass (`0` → `max([llm].timeout_s, 600)`). Duplicate leader broadcasts abort (`loop`); overrun records `timeout` |
+| `[critique].context_timeout_s` | `0` | Wall clock for `context` / `context-web` (`0` → `max([llm].timeout_s, 600)`) |
+| `[critique].context_max_comments` | `12` | Cap on suggested comments from the context pipeline |
+| `[critique].context_max_hits` | `8` | Local RAG hits and OpenAlex / SearXNG rows for historian / scout |
+| `[[critique.reviewers]]` | one implicit reviewer | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path relative to the config file). `--reviewer ID` selects a subset. Unused by `marg` / `context*` |
 | `[critique].overlap_top_k` | `40` | Distinctive n-grams ranked for library text overlap |
 | `[critique].overlap_n_min` / `overlap_n_max` | `6` / `12` | Word n-gram window |
 | `[critique].overlap_df_max` | `0` | Drop grams in this many other docs (`0` = auto from corpus size) |

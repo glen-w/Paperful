@@ -1011,7 +1011,9 @@ def critique(
         False, "--apply", help="Write a child note. Needs --item (not --file)."
     ),
     llm: bool | None = typer.Option(
-        None, "--llm/--no-llm", help="Optional grounded LLM comments (suggested lane)."
+        None,
+        "--llm/--no-llm",
+        help="Alias for --lane reviewers (compat). Adds or removes that suggested review lane.",
     ),
     ai_model: bool = typer.Option(
         False,
@@ -1026,12 +1028,17 @@ def critique(
     advanced: bool | None = typer.Option(
         None,
         "--advanced/--no-advanced",
-        help="Optional MARG-S-style multi-agent comments (suggested lane). Additive with --llm.",
+        help="Alias for --lane marg (compat). MARG-S-style multi-agent comments.",
+    ),
+    lane: list[str] = typer.Option(
+        [],
+        "--lane",
+        help="Suggested review lane (repeatable): reviewers, marg, context, context-web.",
     ),
     grobid: bool | None = typer.Option(
         None,
         "--grobid/--no-grobid",
-        help="Use the GROBID sidecar for advanced chunking. Default is [grobid].enabled. Only used with --advanced.",
+        help="Use the GROBID sidecar for MARG-S chunking. Default is [grobid].enabled. Only used with --lane marg / --advanced.",
     ),
     reviewer: list[str] = typer.Option(
         [],
@@ -1051,7 +1058,7 @@ def critique(
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
-    """Local manuscript critique pack. Checked findings always; suggested only with --llm. Not a grade."""
+    """Local manuscript critique pack. Checked findings always; suggested review lanes optional. Not a grade."""
     if ctx.invoked_subcommand is not None:
         return
     from .critique_cmd import run_critique
@@ -1068,6 +1075,7 @@ def critique(
         ai_model=ai_model,
         vale=vale,
         advanced=advanced,
+        lane=lane,
         grobid=grobid,
         reviewer=reviewer,
         force=force,

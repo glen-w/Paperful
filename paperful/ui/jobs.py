@@ -489,6 +489,7 @@ def critique(
     ai_model: bool = False,
     vale: bool = False,
     advanced: bool = False,
+    lanes: list[str] | tuple[str, ...] | None = None,
     grobid: bool = False,
     force: bool = False,
     show_dismissed: bool = False,
@@ -505,6 +506,7 @@ def critique(
             ai_model=ai_model,
             vale=vale,
             advanced=advanced,
+            lanes=lanes,
             grobid=grobid,
             force=force,
             show_dismissed=show_dismissed,
@@ -564,11 +566,21 @@ def critique(
         rec["error"] = "item not in the mirror / scope"
         commands.write_command(cfg, rec)
         return
+    from ..critique_lanes import lanes_need_llm, ordered_lanes
+
     llm_client = None
-    use_llm = bool(llm)
-    use_advanced = bool(advanced)
+    resolved = ordered_lanes(lanes or ())
+    if not resolved:
+        shim: list[str] = []
+        if llm:
+            shim.append("reviewers")
+        if advanced:
+            shim.append("marg")
+        resolved = ordered_lanes(shim)
+    use_llm = "reviewers" in resolved
+    use_advanced = "marg" in resolved
     use_grobid = bool(grobid)
-    if use_llm or use_advanced:
+    if lanes_need_llm(resolved):
         try:
             validate_llm_for_verb(cfg)
             llm_client = get_client(cfg)
@@ -597,6 +609,7 @@ def critique(
             use_ai_model=bool(ai_model),
             use_vale=bool(vale) or cfg.critique_vale,
             use_advanced=use_advanced,
+            lanes=resolved,
             use_grobid=use_grobid,
             force=force,
             show_dismissed=show_dismissed,

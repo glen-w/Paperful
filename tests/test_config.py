@@ -366,6 +366,7 @@ def test_critique_table_is_parsed(tmp_path):
         tmp_path / "config.toml",
     )
     assert cfg.critique_llm is True
+    assert cfg.critique_lanes == ()
     assert cfg.critique_tag == "paperful-critique"
     assert cfg.critique_overlap_top_k == 10
     assert cfg.critique_overlap_n_min == 8
@@ -387,6 +388,9 @@ def test_critique_table_is_parsed(tmp_path):
     assert cfg.critique_advanced_max_comments == 12
     assert cfg.critique_advanced_refine is True
     assert cfg.critique_advanced_timeout_s == 0.0
+    assert cfg.critique_context_timeout_s == 0.0
+    assert cfg.critique_context_max_comments == 12
+    assert cfg.critique_context_max_hits == 8
     assert cfg.critique_reviewers == ()
     assert cfg.critiques_dir == cfg.state_dir / "critiques"
 
@@ -446,6 +450,28 @@ def test_critique_advanced_knobs_are_parsed(tmp_path):
     assert cfg.critique_advanced_max_comments == 5
     assert cfg.critique_advanced_refine is False
     assert cfg.critique_advanced_timeout_s == 90.0
+
+
+def test_critique_lanes_and_context_knobs_are_parsed(tmp_path):
+    from paperful.config import _from_dict
+
+    cfg = _from_dict(
+        {
+            "critique": {
+                "lanes": ["marg", "reviewers", "context"],
+                "llm": True,
+                "advanced": True,
+                "context_timeout_s": 45,
+                "context_max_comments": 6,
+                "context_max_hits": 3,
+            }
+        },
+        tmp_path / "config.toml",
+    )
+    assert cfg.critique_lanes == ("reviewers", "marg", "context")
+    assert cfg.critique_context_timeout_s == 45.0
+    assert cfg.critique_context_max_comments == 6
+    assert cfg.critique_context_max_hits == 3
 
 
 def test_critique_vale_config_resolves_relative(tmp_path):

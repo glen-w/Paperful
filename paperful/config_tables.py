@@ -221,6 +221,21 @@ def apply_critique(raw: dict[str, Any], cfg: "Config") -> None:
                 "critique_advanced_timeout_s",
                 lambda v: max(0.0, float(v)),
             ),
+            (
+                "context_timeout_s",
+                "critique_context_timeout_s",
+                lambda v: max(0.0, float(v)),
+            ),
+            (
+                "context_max_comments",
+                "critique_context_max_comments",
+                lambda v: max(1, int(v)),
+            ),
+            (
+                "context_max_hits",
+                "critique_context_max_hits",
+                lambda v: max(1, int(v)),
+            ),
         ],
     )
     if "vale_min_alert_level" in table:
@@ -228,6 +243,10 @@ def apply_critique(raw: dict[str, Any], cfg: "Config") -> None:
             str(table.get("vale_min_alert_level") or ""),
             key="[critique].vale_min_alert_level",
         )
+    if "lanes" in table:
+        from .critique_lanes import parse_critique_lanes
+
+        cfg.critique_lanes = parse_critique_lanes(table.get("lanes"))
     if "reviewers" in table:
         cfg.critique_reviewers = C.parse_critique_reviewers(table.get("reviewers"))
     if cfg.critique_overlap_n_min > cfg.critique_overlap_n_max:

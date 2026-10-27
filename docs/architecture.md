@@ -140,7 +140,7 @@ flowchart LR
 | `state/rag/evidence/` | Advanced Ask passage summaries (chunk + question + model cache). Rebuildable |
 | `state/rag/questions/<key>.json` | `rag questions` / Index extract RQs (`paperful.rag.questions.v1`, provenance `rule`\|`llm`) |
 | `state/sections/<key>.json` | `extract-sections` IMRaD fields (`paperful.sections.v1`, provenance `rule`\|`grobid`\|`llm`; optional `engine`; optional `state/section-headings.toml` synonyms) |
-| `state/grobid/<sha256>.tei.xml` | GROBID TEI cache (`paperful.grobid.tei.v1` sidecar JSON). Reused by `extract-sections`, `[rag].parser = "grobid"`, and `critique --advanced` PDF chunks |
+| `state/grobid/<sha256>.tei.xml` | GROBID TEI cache (`paperful.grobid.tei.v1` sidecar JSON). Reused by `extract-sections`, `[rag].parser = "grobid"`, and `critique --lane marg` PDF chunks |
 | `state/rq-answered/<stamp>/` | `rag answered` / Index already-answered pack (`paperful.rq_answered.v1`, `pack.md`) |
 | `state/prompts/` | Operator-saved Ask system prompts from the Index form (“Save as…”); listed in the custom-prompt select |
 | `state/gui/uploads/` | Workbench uploads (Discover import, Index prompt/questions files); basename only |
@@ -184,7 +184,7 @@ below.
 | `extract-sections` | rules always; optional GROBID sidecar; optional `[extract_sections].llm` + `llm.enabled` | `state/sections/<key>.json` | none (disk only) |
 | `ask` | `llm.enabled` + `rag.enabled` | `state/runs/<stamp>-ask.json`; advanced summaries under `state/rag/evidence/` | none unless batch `--apply` |
 | `rag questions` | rules always; optional `[rag].extract_questions_llm` + `llm.enabled` | `state/rag/questions/<key>.json` | none |
-| `critique` | checkers, metrics, heuristic AI-tells always (house glossary expansions when `state/glossary/` has entries); optional `--llm` / `[critique].llm` + `llm.enabled`; optional `--advanced` / `[critique].advanced` MARG-S lane (optional GROBID TEI chunks); optional `--ai-model` Binoculars extra; optional `--vale` / `[critique].vale` house-style pass | `state/critiques/<id>/<stamp>/` | child note with `--apply` on `--item` only |
+| `critique` | checkers, metrics, heuristic AI-tells always (house glossary expansions when `state/glossary/` has entries); optional `--lane` / `[critique].lanes` suggested review lanes (`reviewers`, `marg`, `context`, `context-web`; `--llm` / `--advanced` aliases; optional GROBID TEI chunks for `marg`); optional `--ai-model` Binoculars extra; optional `--vale` / `[critique].vale` house-style pass | `state/critiques/<id>/<stamp>/` | child note with `--apply` on `--item` only |
 
 Opt-in **`camofox`** is a registered **serial** source (never in `DEFAULT_SOURCES`) that talks to an external [camofox-browser](https://github.com/jo-inc/camofox-browser) REST server for a scripted DOI→PDF grab. `run` injects it when `[camofox].enabled` and `[camofox].during_run` (default on); `--camofox` / `--no-camofox` override one invocation. Policy order places it after vault lanes and before `browser_agent`. It does not reuse the vault Chromium SSO profile (see [Camofox](camofox.md)).
 

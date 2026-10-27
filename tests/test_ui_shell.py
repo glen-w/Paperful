@@ -516,13 +516,14 @@ def test_critique_workbench_llm_checkboxes(tmp_path, monkeypatch):
         client.cookies.set("pf_advanced", "1")
         page = client.get("/critique")
         assert page.status_code == 200
-        assert 'name="llm"' in page.text
-        assert 'name="advanced"' in page.text
+        assert 'name="lane"' in page.text
+        assert 'value="reviewers"' in page.text
+        assert 'value="marg"' in page.text
         assert 'name="grobid"' in page.text
         assert page.text.count("checked") >= 3
         res = client.post(
             "/critique",
-            data={"advanced": "1", "grobid": "1", "llm": "1"},
+            data={"lane": "reviewers", "grobid": "1", "llm": "1", "advanced": "1"},
             files={
                 "file": (
                     "draft.md",
@@ -545,9 +546,10 @@ def test_critique_workbench_llm_checkboxes(tmp_path, monkeypatch):
             time.sleep(0.02)
         assert rec.get("status") == "done", rec
         assert seen
+        assert seen[0]["lanes"] == ["reviewers", "marg"]
+        assert seen[0]["llm"] is True
         assert seen[0]["advanced"] is True
         assert seen[0]["grobid"] is True
-        assert seen[0]["llm"] is True
     finally:
         jobs.critique_fn = None
 

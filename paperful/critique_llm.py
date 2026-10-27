@@ -163,26 +163,41 @@ def suggested_from_llm(
     reviewer_ids: list[str] | None = None,
     use_llm: bool = True,
     advanced: bool = False,
+    lanes: tuple[str, ...] | list[str] | None = None,
     use_grobid: bool = False,
     pdf_path: Path | None = None,
+    offline: bool = False,
+    scope_items: list[Item] | None = None,
     on_status: Callable[[str], None] | None = None,
 ) -> tuple[list[Finding], dict[str, Any] | None]:
+    from .critique_lanes import mode_for_lanes, ordered_lanes
+
     say = on_status or (lambda _msg: None)
-    run_reviewers = bool(use_llm)
-    run_marg = bool(advanced)
-    if not run_reviewers and not run_marg:
+    if lanes is None:
+        shim: list[str] = []
+        if use_llm:
+            shim.append("reviewers")
+        if advanced:
+            shim.append("marg")
+        lanes = tuple(shim)
+    lanes = ordered_lanes(lanes)
+    run_reviewers = "reviewers" in lanes
+    run_marg = "marg" in lanes
+    run_context = "context" in lanes or "context-web" in lanes
+    if not run_reviewers and not run_marg and not run_context:
         return [], None
+    lane_list = list(lanes)
+    mode = mode_for_lanes(lanes)
     wanted = [w for w in (reviewer_ids or []) if str(w).strip()]
     reviewers = critique_reviewers_for(cfg, wanted or None) if run_reviewers else ()
-    if run_reviewers and wanted and not reviewers and not run_marg:
-        return [], {"skipped": "no_matching_reviewers", "mode": "default"}
+    if run_reviewers and wanted and not reviewers and not run_marg and not run_context:
+        return [], {
+            "skipped": "no_matching_reviewers",
+            "mode": mode,
+            "lanes": lane_list,
+        }
     if client is None:
-        mode = (
-            "both"
-            if run_reviewers and run_marg
-            else ("marg" if run_marg else "default")
-        )
-        return [], {"skipped": "llm_disabled", "mode": mode}
+        return [], {"skipped": "llm_disabled", "mode": mode, "lanes": lane_list}
     if not force:
         for f in findings:
             if f.code == "pdf_identity_mismatch":
@@ -322,7 +337,7 @@ def suggested_from_llm(
     if run_marg:
         from .critique_marg import suggested_from_marg
 
-        say("Advanced (MARG-S) comments…")
+        say("MARG-S lane comments…")
         t_m = time.perf_counter()
         extra_m, marg_meta = suggested_from_marg(
             cfg,
@@ -336,7 +351,7 @@ def suggested_from_llm(
             on_status=say,
         )
         say(
-            f"Advanced comments done ({time.perf_counter() - t_m:.0f}s, "
+            f"MARG-S comments done ({time.perf_counter() - t_m:.0f}s, "
             f"{len(extra_m)} comment(s))"
         )
         out.extend(extra_m)
@@ -349,35 +364,73 @@ def suggested_from_llm(
         elif not extra_m:
             skip_reason = skip_reason or str(marg_meta.get("skipped") or "empty_reply")
 
-    mode = "both" if run_reviewers and run_marg else ("marg" if run_marg else "default")
+    context_meta: dict[str, Any] = {}
+    if run_context:
+        from .critique_context import suggested_from_context
+
+        search_enabled = "context-web" in lanes
+        label = "Context-web" if search_enabled else "Context"
+        say(f"{label} lane…")
+        t_c = time.perf_counter()
+        extra_c, context_meta = suggested_from_context(
+            cfg,
+            doc,
+            findings,
+            item=item,
+            client=client,
+            hay=hay,
+            search_enabled=search_enabled,
+            offline=offline,
+            scope_items=scope_items or [],
+            on_status=say,
+        )
+        say(
+            f"{label} done ({time.perf_counter() - t_c:.0f}s, "
+            f"{len(extra_c)} comment(s))"
+        )
+        out.extend(extra_c)
+        reviewer_meta.extend(context_meta.get("reviewers") or [])
+        if extra_c or context_meta.get("narrative"):
+            first_sha = first_sha or str(context_meta.get("prompt_sha") or "")
+            if not first_narrative and context_meta.get("narrative"):
+                first_narrative = str(context_meta.get("narrative") or "")
+                first_model = first_model or str(context_meta.get("model") or "")
+        elif not extra_c:
+            skip_reason = skip_reason or str(
+                context_meta.get("skipped") or "empty_reply"
+            )
+
     capped = out
 
-    if not capped and not first_narrative:
-        meta = {
-            "model": first_model or cfg.llm_model,
-            "skipped": skip_reason or "empty_reply",
+    def _pack_meta(*, skipped: str = "") -> dict[str, Any]:
+        row: dict[str, Any] = {
+            "model": first_model
+            or (reviewers[0].model if reviewers else "")
+            or cfg.llm_model,
             "mode": mode,
+            "lanes": lane_list,
         }
-        if reviewer_meta:
-            meta["reviewers"] = reviewer_meta
+        if skipped:
+            row["skipped"] = skipped
+        else:
+            row["prompt_sha"] = first_sha
+            row["provider"] = getattr(client, "provider", "")
+            row["reviewers"] = reviewer_meta
+        if skipped and reviewer_meta:
+            row["reviewers"] = reviewer_meta
+        if first_narrative:
+            row["narrative"] = first_narrative
         if marg_meta:
-            meta["marg"] = {k: v for k, v in marg_meta.items() if k != "reviewers"}
-        return [], meta
+            row["marg"] = {k: v for k, v in marg_meta.items() if k != "reviewers"}
+        if context_meta:
+            row["context"] = {
+                k: v for k, v in context_meta.items() if k != "reviewers"
+            }
+        return row
 
-    meta = {
-        "model": first_model
-        or (reviewers[0].model if reviewers else "")
-        or cfg.llm_model,
-        "prompt_sha": first_sha,
-        "provider": getattr(client, "provider", ""),
-        "reviewers": reviewer_meta,
-        "mode": mode,
-    }
-    if first_narrative:
-        meta["narrative"] = first_narrative
-    if marg_meta:
-        meta["marg"] = {k: v for k, v in marg_meta.items() if k != "reviewers"}
-    return capped, meta
+    if not capped and not first_narrative:
+        return [], _pack_meta(skipped=skip_reason or "empty_reply")
+    return capped, _pack_meta()
 
 
 def _findings_from_reply(

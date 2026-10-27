@@ -1430,6 +1430,7 @@ def test_default_llm_does_not_call_marg(cfg, tmp_path, monkeypatch):
         llm_client=type("C", (), {"provider": "stub"})(),
     )
     assert pack["llm"]["mode"] == "default"
+    assert pack["llm"]["lanes"] == ["reviewers"]
 
 
 def test_llm_status_reports_each_reviewer(cfg, tmp_path, monkeypatch):
@@ -1498,6 +1499,7 @@ def test_advanced_only_skips_independent_reviewers(cfg, tmp_path, monkeypatch):
         llm_client=type("C", (), {"provider": "stub"})(),
     )
     assert pack["llm"]["mode"] == "marg"
+    assert pack["llm"]["lanes"] == ["marg"]
     assert pack["llm"]["marg"]["parser"] == "extract"
     assert all("You review a manuscript using ONLY" not in s for s in seen)
     assert any("lead a small review group" in s for s in seen)
@@ -1535,6 +1537,7 @@ def test_both_lanes_concatenate_reviewers_and_marg(cfg, tmp_path, monkeypatch):
         llm_client=type("C", (), {"provider": "stub"})(),
     )
     assert pack["llm"]["mode"] == "both"
+    assert pack["llm"]["lanes"] == ["reviewers", "marg"]
     ids = [r["id"] for r in pack["llm"]["reviewers"]]
     assert "general" in ids
     assert "marg-experiments" in ids
@@ -1684,6 +1687,7 @@ def test_cli_advanced_flag_runs_marg(cfg, tmp_path, monkeypatch):
     pack_dir = Path(body["summary"]["pack_dir"])
     on_disk = json.loads((pack_dir / "pack.json").read_text(encoding="utf-8"))
     assert on_disk["llm"]["mode"] == "marg"
+    assert on_disk["llm"]["lanes"] == ["marg"]
 
 
 def test_advanced_duplicate_broadcast_hard_stop(cfg, tmp_path, monkeypatch):
@@ -1822,3 +1826,183 @@ def test_cli_grobid_without_advanced_is_ignored(cfg, tmp_path, monkeypatch):
     ok, hits = _cli_critique_pdf(tmp_path, cfg, monkeypatch, "--no-llm", "--grobid")
     assert ok.exit_code == 0, ok.output
     assert hits["n"] == 0
+
+
+def _context_chat(_client, request):
+    sys_msg = request.messages[0]["content"]
+    if "structured summary" in sys_msg:
+        return json.dumps(
+            {
+                "claims": ["Yield rose 47.2 percent under the ABC protocol."],
+                "method": "ABC protocol",
+                "evidence": ["47.2 percent increase", "Figure 2"],
+            }
+        )
+    if "sub-domain historian" in sys_msg:
+        return json.dumps(
+            {"narrative": "Library papers discuss the ABC protocol and yield."}
+        )
+    if "baseline scout" in sys_msg:
+        return json.dumps(
+            {
+                "omitted": [
+                    {
+                        "title": "Prior ABC work",
+                        "detail": "Compare sample size for the ABC protocol.",
+                    }
+                ]
+            }
+        )
+    if "novelty and significance" in sys_msg or "technical soundness" in sys_msg:
+        return json.dumps(
+            {
+                "pairs": [
+                    {
+                        "q": "What is N for the ABC protocol?",
+                        "a": "The excerpt does not report N for the ABC protocol.",
+                    }
+                ]
+            }
+        )
+    return json.dumps(
+        {
+            "summary": "The paper reports a 47.2 percent increase under the ABC protocol.",
+            "comments": [
+                {
+                    "quote": "ABC protocol",
+                    "detail": "Report the sample size for the ABC protocol.",
+                    "code": "context_soundness",
+                }
+            ],
+            "questions": ["How was Figure 2 produced?"],
+        }
+    )
+
+
+def test_cli_lane_flag_runs_marg(cfg, tmp_path, monkeypatch):
+    from paperful.cli import app
+
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
+        '[llm]\nenabled = true\nmodel = "stub"\n',
+        encoding="utf-8",
+    )
+    src = tmp_path / "draft.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_llm_for_verb", lambda _cfg: None
+    )
+    monkeypatch.setattr(
+        "paperful.llm.get_client",
+        lambda _cfg: type("C", (), {"provider": "stub"})(),
+    )
+    monkeypatch.setattr("paperful.llm.client.chat", _marg_chat)
+    ok = runner.invoke(
+        app,
+        [
+            "critique",
+            "--file",
+            str(src),
+            "--lane",
+            "marg",
+            "--config",
+            str(cfg_path),
+            "--format",
+            "json",
+        ],
+    )
+    assert ok.exit_code == 0, ok.output
+    body = json.loads(ok.stdout)
+    pack_dir = Path(body["summary"]["pack_dir"])
+    on_disk = json.loads((pack_dir / "pack.json").read_text(encoding="utf-8"))
+    assert on_disk["llm"]["lanes"] == ["marg"]
+    assert on_disk["llm"]["mode"] == "marg"
+
+
+def test_cli_unknown_lane_exits(cfg, tmp_path):
+    from paperful.cli import app
+
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n',
+        encoding="utf-8",
+    )
+    src = tmp_path / "draft.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    ok = runner.invoke(
+        app,
+        [
+            "critique",
+            "--file",
+            str(src),
+            "--lane",
+            "nope",
+            "--config",
+            str(cfg_path),
+        ],
+    )
+    assert ok.exit_code == 1
+    assert "unknown critique lane" in ok.output
+
+
+def test_context_lane_writes_suggested_comments(cfg, tmp_path, monkeypatch):
+    monkeypatch.setattr("paperful.llm.client.chat", _context_chat)
+    monkeypatch.setattr(
+        "paperful.critique_context.library_passages",
+        lambda *_a, **_k: (
+            [{"item_key": "X", "title": "Prior ABC", "year": 2020, "text": "ABC protocol"}],
+            "",
+        ),
+    )
+
+    def boom_oa(*_a, **_k):
+        raise AssertionError("context lane must not call OpenAlex")
+
+    monkeypatch.setattr("paperful.critique_context._openalex_works", boom_oa)
+    src = tmp_path / "ctx.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        lanes=("context",),
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    assert pack["llm"]["lanes"] == ["context"]
+    assert pack["llm"]["mode"] == "context"
+    assert pack["llm"]["context"]["search_enabled"] is False
+    suggested = [f for f in pack["findings"] if f["lane"] == "suggested"]
+    assert any(str(f.get("reviewer") or "") == "context" for f in suggested)
+    assert any("sample size" in (f.get("detail") or "").lower() for f in suggested)
+
+
+def test_context_web_offline_skips_search(cfg, tmp_path, monkeypatch):
+    monkeypatch.setattr("paperful.llm.client.chat", _context_chat)
+    monkeypatch.setattr(
+        "paperful.critique_context.library_passages",
+        lambda *_a, **_k: ([], "IndexMissing"),
+    )
+
+    def boom_oa(*_a, **_k):
+        raise AssertionError("offline context-web must not call OpenAlex")
+
+    def boom_sx(*_a, **_k):
+        raise AssertionError("offline context-web must not call SearXNG")
+
+    monkeypatch.setattr("paperful.critique_context._openalex_works", boom_oa)
+    monkeypatch.setattr("paperful.critique_context._searxng_hits", boom_sx)
+    src = tmp_path / "web.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        lanes=("context-web",),
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    assert pack["llm"]["lanes"] == ["context-web"]
+    assert pack["llm"]["context"]["search_skipped"] == "offline"
+    assert pack["llm"]["context"]["search_enabled"] is True
+    assert pack["llm"]["context"].get("rag_skipped") == "IndexMissing"
