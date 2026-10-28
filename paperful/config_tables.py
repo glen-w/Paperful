@@ -52,6 +52,7 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_openalex_store(raw, cfg)
     apply_searxng(raw, cfg)
     apply_keepup(raw, cfg)
+    apply_precedent(raw, cfg)
     apply_ui(raw, cfg)
     apply_prompt_paths(cfg, source)
 
@@ -151,7 +152,9 @@ def apply_screen(raw: dict[str, Any], cfg: "Config", source: Path) -> None:
         cfg.screen_fingerprint_dir is not None
         and not cfg.screen_fingerprint_dir.is_absolute()
     ):
-        cfg.screen_fingerprint_dir = (source.parent / cfg.screen_fingerprint_dir).resolve()
+        cfg.screen_fingerprint_dir = (
+            source.parent / cfg.screen_fingerprint_dir
+        ).resolve()
     if "detectors" in section:
         cfg.screen_detectors = C._snowball_strs(section["detectors"])
 
@@ -292,7 +295,9 @@ def apply_critique(raw: dict[str, Any], cfg: "Config") -> None:
     if "advanced_aspects" in table:
         from .critique_marg import parse_marg_aspects
 
-        cfg.critique_advanced_aspects = parse_marg_aspects(table.get("advanced_aspects"))
+        cfg.critique_advanced_aspects = parse_marg_aspects(
+            table.get("advanced_aspects")
+        )
     if "reviewers" in table:
         cfg.critique_reviewers = C.parse_critique_reviewers(table.get("reviewers"))
     if cfg.critique_overlap_n_min > cfg.critique_overlap_n_max:
@@ -306,6 +311,7 @@ def apply_rewrite(raw: dict[str, Any], cfg: "Config") -> None:
         parse_rewrite_outputs,
         parse_rewrite_specialists,
     )
+    from .rewrite_openxml import parse_openxml_audit_policy
 
     C = _mod()
     table = raw.get("rewrite")
@@ -317,6 +323,12 @@ def apply_rewrite(raw: dict[str, Any], cfg: "Config") -> None:
         [
             ("max_edits", "rewrite_max_edits", lambda v: max(1, int(v))),
             ("timeout_s", "rewrite_timeout_s", lambda v: max(0.0, float(v))),
+            ("openxml_audit", "rewrite_openxml_audit", bool),
+            (
+                "openxml_audit_policy",
+                "rewrite_openxml_audit_policy",
+                parse_openxml_audit_policy,
+            ),
         ],
     )
     if "areas" in table:
@@ -679,9 +691,7 @@ def apply_extension(raw: dict[str, Any], cfg: "Config") -> None:
         try:
             n = int(block["concurrency"])
         except (TypeError, ValueError) as exc:
-            raise ValueError(
-                "[extension].concurrency must be 1–4"
-            ) from exc
+            raise ValueError("[extension].concurrency must be 1–4") from exc
         if n < 1 or n > 4:
             raise ValueError("[extension].concurrency must be 1–4")
         cfg.extension_concurrency = n
@@ -949,6 +959,19 @@ def apply_keepup(raw: dict[str, Any], cfg: "Config") -> None:
         cfg.keepup_interval_days = max(0, int(keepup["interval_days"]))
 
 
+def apply_precedent(raw: dict[str, Any], cfg: "Config") -> None:
+    C = _mod()
+    C._apply_config_table(
+        raw.get("precedent"),
+        cfg,
+        [
+            ("held_k", "precedent_held_k", lambda v: max(1, int(v))),
+            ("public_k", "precedent_public_k", lambda v: max(1, int(v))),
+            ("search_keywords", "precedent_search_keywords", bool),
+        ],
+    )
+
+
 def _positive_int_tuple(raw: Any) -> tuple[int, ...]:
     if isinstance(raw, int):
         return (max(1, raw),)
@@ -973,8 +996,8 @@ def apply_ui(raw: dict[str, Any], cfg: "Config") -> None:
         parsed = _positive_int_tuple(ui["library_page_sizes"])
         if parsed:
             sizes = parsed
-    cfg.ui_library_page_size, cfg.ui_library_page_sizes = C.normalize_ui_library_page_sizes(
-        default, sizes
+    cfg.ui_library_page_size, cfg.ui_library_page_sizes = (
+        C.normalize_ui_library_page_sizes(default, sizes)
     )
     mode = str(ui.get("attach_mode") or "").strip().lower()
     if mode in {"manual", "auto"}:

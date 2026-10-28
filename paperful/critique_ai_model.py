@@ -1,8 +1,8 @@
 """Optional model-backed AI-text score for critique.
 
-Not a core dependency. Tries Binoculars (Hans et al., ICML 2024) if installed;
-otherwise returns None so the pack can record ``ai_model_unavailable``.
-Never used as proof of authorship.
+Not a core dependency. Tries Binoculars (Hans et al., ICML 2024) if
+installed (git overlay, not a locked extra); otherwise returns None so the
+pack can record ``ai_model_unavailable``. Never used as proof of authorship.
 """
 
 from __future__ import annotations
@@ -18,6 +18,16 @@ _OFFLINE_ENV = ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE")
 # performer checkpoint can stall for tens of minutes and must not block
 # reviewers / MARG.
 DEFAULT_TIMEOUT_S = 90.0
+
+
+def extra_available() -> bool:
+    """True when the Binoculars extra can be imported. Does not load torch."""
+    if "binoculars" in sys.modules:
+        return True
+    try:
+        return importlib.util.find_spec("binoculars") is not None
+    except ValueError:
+        return False
 
 
 def _compute_score(text: str) -> dict[str, Any] | None:
@@ -69,12 +79,8 @@ def run_ai_model(
     ``timeout_s`` so a weight download cannot stall the critique pack.
     ``timeout_s <= 0`` runs in-process (tests).
     """
-    if "binoculars" not in sys.modules:
-        try:
-            if importlib.util.find_spec("binoculars") is None:
-                return None
-        except ValueError:
-            return None
+    if not extra_available():
+        return None
     if timeout_s <= 0:
         return _compute_score(text)
     ctx = multiprocessing.get_context("spawn")

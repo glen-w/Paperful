@@ -102,6 +102,38 @@ def test_remediation_rewrite(cfg):
     assert text and "llm" in text.lower()
 
 
+def test_openxml_audit_check(cfg, monkeypatch):
+    from paperful.doctor import _openxml_audit_check, remediation_text
+
+    cfg.rewrite_openxml_audit = False
+    assert _openxml_audit_check(cfg) is None
+    cfg.rewrite_openxml_audit = True
+    monkeypatch.setattr("paperful.rewrite_openxml.extra_available", lambda: False)
+    check = _openxml_audit_check(cfg)
+    assert check is not None and check.status == "amber"
+    text = remediation_text(check, cfg)
+    assert text and "--extra openxml" in text
+    monkeypatch.setattr("paperful.rewrite_openxml.extra_available", lambda: True)
+    ok = _openxml_audit_check(cfg)
+    assert ok is not None and ok.status == "green"
+
+
+def test_binoculars_check(cfg, monkeypatch):
+    from paperful.doctor import _binoculars_check, remediation_text
+
+    cfg.critique_ai_model = False
+    assert _binoculars_check(cfg) is None
+    cfg.critique_ai_model = True
+    monkeypatch.setattr("paperful.critique_ai_model.extra_available", lambda: False)
+    check = _binoculars_check(cfg)
+    assert check is not None and check.status == "amber"
+    text = remediation_text(check, cfg)
+    assert text and "ahans30/Binoculars" in text
+    monkeypatch.setattr("paperful.critique_ai_model.extra_available", lambda: True)
+    ok = _binoculars_check(cfg)
+    assert ok is not None and ok.status == "green"
+
+
 def test_remediation_vale(cfg):
     text = remediation_text(
         Check("vale", "amber", "missing — optional for critique house style"),

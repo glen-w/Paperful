@@ -45,7 +45,16 @@ def _downloads(pack_dir: str) -> list[dict[str, str]]:
     if not folder.is_dir():
         return []
     out: list[dict[str, str]] = []
-    for name in ("pack.md", "plan.json", "sidecar.md", "sidecar.txt", "tracked.docx"):
+    for name in (
+        "pack.md",
+        "plan.json",
+        "sidecar.md",
+        "sidecar.txt",
+        "tracked.docx",
+        "tracked.pptx",
+        "tracked.odt",
+        "tracked.pdf",
+    ):
         path = folder / name
         if path.is_file():
             out.append({"name": name, "path": str(path)})
@@ -138,7 +147,16 @@ async def handle_rewrite_run(ui: UiContext, request: Request) -> RedirectRespons
 def handle_rewrite_download(
     ui: UiContext, name: str, pack_dir: str
 ) -> FileResponse | RedirectResponse:
-    allowed = {"pack.md", "plan.json", "sidecar.md", "sidecar.txt", "tracked.docx"}
+    allowed = {
+        "pack.md",
+        "plan.json",
+        "sidecar.md",
+        "sidecar.txt",
+        "tracked.docx",
+        "tracked.pptx",
+        "tracked.odt",
+        "tracked.pdf",
+    }
     if name not in allowed:
         return RedirectResponse(url="/rewrite?error=target", status_code=303)
     folder = Path(pack_dir)

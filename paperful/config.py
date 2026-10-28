@@ -264,6 +264,8 @@ class Config:
     rewrite_comments: str = "off"
     rewrite_max_edits: int = 80
     rewrite_timeout_s: float = 0.0
+    rewrite_openxml_audit: bool = False
+    rewrite_openxml_audit_policy: str = "warn"  # warn | fail
     rewrite_specialists: tuple[RewriteArea, ...] = ()
     summarize_prompt_template: str = "default"
     summarize_max_context_chars: int = 24_000
@@ -379,6 +381,10 @@ class Config:
     snowball_stop_max_screened: int = 0
     # Alert loop / collection digest cadence (days). 0 = every keepup run.
     keepup_interval_days: int = 7
+    # `paperful precedent`: held RAG passages + OpenAlex public metadata.
+    precedent_held_k: int = 10
+    precedent_public_k: int = 25
+    precedent_search_keywords: bool = True
     searxng_base_url: str = ""
     # Where plain-language lines are written. note | tag | off.
     remarks_surface: str = "note"

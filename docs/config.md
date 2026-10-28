@@ -258,7 +258,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[critique].llm` | `false` | Shim for lane `reviewers` when `[critique].lanes` is empty (`--llm` / `--no-llm` add or remove that lane) |
 | `[critique].lanes` | `[]` | Suggested review lanes to run together: `reviewers`, `marg`, `adversary`, `claims`, `verify`, `context`, `context-web`. Empty → use `llm` / `advanced` shims. When non-empty those bools are ignored. `--lane` selects for one run |
 | `[critique].tag` | `paperful-critique` | Child note tag for `critique --apply` |
-| `[critique].ai_model` | `false` | Optional Binoculars extra. `--ai-model` turns it on for one run (no `--no-ai-model`). Not installed by default; missing extra records `ai_model_unavailable` |
+| `[critique].ai_model` | `false` | Optional Binoculars extra (`uv pip install "binoculars @ git+https://github.com/ahans30/Binoculars.git"`). `--ai-model` turns it on for one run (no `--no-ai-model`). Missing extra records `ai_model_unavailable`. `paperful doctor` ambers only when this is on and the extra is missing |
 | `[critique].vale` | `false` | Optional Vale house-style pass. `--vale` turns it on for one run (no `--no-vale`). Needs `vale` on PATH and a `.vale.ini`; missing extra records `vale_unavailable` / `vale_no_config` / `vale_failed`. Not in the Compose image |
 | `[critique].vale_config` | unset | Path to your `.vale.ini`. Relative paths resolve from the config file. If unset, `.vale.ini` next to the paperful config is used when present |
 | `[critique].vale_min_alert_level` | `suggestion` | Lowest Vale level to keep: `suggestion`, `warning`, or `error` |
@@ -287,10 +287,12 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[critique].adversary_max_comments` | `12` | Cap on suggested comments from the `adversary` validity red-team lane |
 | `[[critique.reviewers]]` | one implicit reviewer | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path relative to the config file). `--reviewer ID` selects a subset. Unused by `marg` / `adversary` / `claims` / `verify` / `context*` |
 | `[rewrite].areas` | `["style"]` | Enabled rewrite specialists: `style`, `cites`, `structure`, `comments`, or `all`. `--area` overlays |
-| `[rewrite].outputs` | `["edits", "tracked"]` | `edits` (always implied), `sidecar`, `tracked`. `--output` overlays |
+| `[rewrite].outputs` | `["edits", "tracked"]` | `edits` (always implied), `sidecar`, `tracked` (source-matching office file), `odt`, `pdf`. `--output` overlays |
 | `[rewrite].comments` | `off` | `off` / `substantive` / `all` — reviewer notes as Word comments |
 | `[rewrite].max_edits` | `80` | Cap after merge |
 | `[rewrite].timeout_s` | `0` | Wall clock for LLM specialists (`0` → `max([llm].timeout_s, 600)`) |
+| `[rewrite].openxml_audit` | `false` | After writing `tracked.docx` / `.pptx` / `.odt`, run [openxml-audit](https://pypi.org/project/openxml-audit/) (`uv sync --extra openxml`). Diffs vs the source draft; pre-existing SDK / ODF errors are ignored. `paperful doctor` ambers only when this is on and the extra is missing |
+| `[rewrite].openxml_audit_policy` | `warn` | `warn` (print, exit 0) or `fail` (exit 1 when rewrite introduced an issue) |
 | `[[rewrite.specialists]]` | builtin per enabled area | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path). Separate key from `areas` (TOML) |
 | `[critique].overlap_top_k` | `40` | Distinctive n-grams ranked for library text overlap |
 | `[critique].overlap_n_min` / `overlap_n_max` | `6` / `12` | Word n-gram window |
@@ -329,6 +331,9 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[inbox].manager_metadata_s` | `0` | Wait after attach so a manager recognizer can run (`0` when the backend has none) |
 | `[ingest].default_tags` | `()` | Tags on `ingest-dois --apply` and inbox-created parents |
 | `[keepup].interval_days` | `7` | Default days between `keepup run` polls (`0` = every run). Per-job `--interval-days` overrides. No built-in scheduler — cron `keepup run`. See [Keepup](keepup.md) |
+| `[precedent].held_k` | `10` | Held RAG passages kept by `paperful precedent`. CLI `--held-k` / `-k` overrides |
+| `[precedent].public_k` | `25` | OpenAlex / similar works kept. CLI `--public-k` overrides |
+| `[precedent].search_keywords` | `true` | Also resolve OpenAlex keyword tags for the phrase (same union as snowball search) |
 | `[snowball].default_tags` | `()` | Extra tags on snowball `--gate auto` / `apply` creates, with `--tag` and `from-<seed-slug>` |
 | `[snowball].study_designs` | `()` | OpenAlex study design filter (`rct`, `meta-analysis`, …). CLI `--study-design`. See [snowball stop rules](snowball.md#stop-rules) |
 | `[snowball].map_categories` | ten built-ins | Which literature-category ids appear on the citation map (badges/filters). Defaults include study-design ids (`evidence-synthesis`, `trials`, `clinical-trials`, …) and type ids (`preprints`, `books`, `narrative-reviews`, `commentary`). See [Citation map](snowball.md#citation-map) |

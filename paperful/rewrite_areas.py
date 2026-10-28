@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 KNOWN_AREAS = ("style", "cites", "structure", "comments")
-KNOWN_OUTPUTS = ("edits", "sidecar", "tracked")
+KNOWN_OUTPUTS = ("edits", "sidecar", "tracked", "odt", "pdf")
 KNOWN_COMMENTS = ("off", "substantive", "all")
 
 STYLE_CODES = frozenset(

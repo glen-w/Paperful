@@ -22,6 +22,9 @@ from .rewrite_areas import (
 )
 from .rewrite_docx import apply_tracked_docx, build_docx_from_paragraphs
 from .rewrite_llm import budget_excerpt, proposed_from_area
+from .rewrite_office import apply_odt, apply_pptx, build_odt_from_paragraphs
+from .rewrite_openxml import audit_office_file
+from .rewrite_pdf import build_pdf_from_paragraphs, pdf_structural_issues
 from .rewrite_plan import RewriteEdit, RewritePlan, merge_edits
 from .rewrite_render import apply_to_text, render_markdown
 from .store import write_json
@@ -187,6 +190,52 @@ def _comment_edit(
 
 def _area_needs_llm(findings: list[dict[str, Any]], det_ids: set[str]) -> bool:
     return any(str(f.get("id") or "") not in det_ids for f in findings)
+
+
+def _paragraphs(doc: Any, text: str) -> list[str]:
+    paras = [p for p in (doc.paragraphs or []) if str(p).strip()]
+    if paras:
+        return paras
+    return [p for p in text.split("\n\n") if p.strip()]
+
+
+def _write_tracked(
+    folder: Path,
+    manuscript: Path,
+    paragraphs: list[str],
+    edits: list[RewriteEdit],
+) -> tuple[Path, Path | None]:
+    """Native tracked file when the source is Office; Word spine otherwise."""
+    suffix = manuscript.suffix.lower()
+    if suffix == ".docx":
+        dest = folder / "tracked.docx"
+        apply_tracked_docx(manuscript, dest, edits)
+        return dest, manuscript
+    if suffix == ".pptx":
+        dest = folder / "tracked.pptx"
+        apply_pptx(manuscript, dest, edits)
+        return dest, manuscript
+    if suffix == ".odt":
+        dest = folder / "tracked.odt"
+        apply_odt(manuscript, dest, edits)
+        return dest, manuscript
+    dest = folder / "tracked.docx"
+    build_docx_from_paragraphs(dest, paragraphs, edits)
+    return dest, None
+
+
+def _write_odt(
+    folder: Path,
+    manuscript: Path,
+    paragraphs: list[str],
+    edits: list[RewriteEdit],
+) -> tuple[Path, Path | None]:
+    dest = folder / "tracked.odt"
+    if manuscript.suffix.lower() == ".odt":
+        apply_odt(manuscript, dest, edits)
+        return dest, manuscript
+    build_odt_from_paragraphs(dest, paragraphs, edits)
+    return dest, None
 
 
 def build_rewrite(
@@ -371,14 +420,46 @@ def build_rewrite(
             sidecar = apply_to_text(text, plan.edits)
             suffix = ".md" if manuscript.suffix.lower() in {".md", ".txt", ""} else ".txt"
             (folder / f"sidecar{suffix}").write_text(sidecar, encoding="utf-8")
+        paras = _paragraphs(doc, text)
+        office: dict[str, tuple[Path, Path | None]] = {}
         if "tracked" in output_ids:
-            dest = folder / "tracked.docx"
-            body_edits = plan.edits
-            if manuscript.suffix.lower() == ".docx":
-                apply_tracked_docx(manuscript, dest, body_edits)
+            dest, source = _write_tracked(folder, manuscript, paras, plan.edits)
+            office[dest.name] = (dest, source)
+            payload["tracked"] = dest.name
+        if "odt" in output_ids:
+            if "tracked.odt" in office:
+                dest, source = office["tracked.odt"]
             else:
-                paras = doc.paragraphs or [p for p in text.split("\n\n") if p.strip()]
-                build_docx_from_paragraphs(dest, paras, body_edits)
+                dest, source = _write_odt(folder, manuscript, paras, plan.edits)
+                office[dest.name] = (dest, source)
+            payload["odt"] = dest.name
+        if "pdf" in output_ids:
+            pdf_dest = folder / "tracked.pdf"
+            pdf_skips = build_pdf_from_paragraphs(pdf_dest, paras, plan.edits)
+            payload["pdf"] = pdf_dest.name if pdf_dest.is_file() else ""
+            payload["pdf_audit"] = {
+                "skipped": pdf_skips[0] if pdf_skips and not pdf_dest.is_file() else "",
+                "structural": (
+                    pdf_structural_issues(pdf_dest) if pdf_dest.is_file() else pdf_skips
+                ),
+            }
+        if office:
+            audits = {
+                name: audit_office_file(cfg, dest, source=source)
+                for name, (dest, source) in office.items()
+            }
+            payload["audits"] = audits
+            primary = payload.get("tracked") or payload.get("odt") or next(iter(audits))
+            payload["openxml_audit"] = audits.get(str(primary), next(iter(audits.values())))
+            write_json(folder / "pack.json", payload)
+            (folder / "pack.md").write_text(
+                render_markdown(payload, plan), encoding="utf-8"
+            )
+        elif payload.get("pdf_audit"):
+            write_json(folder / "pack.json", payload)
+            (folder / "pack.md").write_text(
+                render_markdown(payload, plan), encoding="utf-8"
+            )
     payload["_plan"] = plan
     payload["_doc"] = doc
     return payload

@@ -192,7 +192,7 @@ published work, goes online). Tooltips hold the lane ids (`reviewers`, `marg`,
 `[critique].lanes` (or the llm/advanced shims). GROBID sidecar is for MARG-S /
 claims / verify PDF chunks (pre-checked from `[grobid].enabled`; ticking it is
 `--grobid` even when that setting is false). Optional AI-model checkbox
-requests a Binoculars extra (not installed by default). Optional Vale checkbox
+requests a Binoculars extra (git overlay; not installed by default). Optional Vale checkbox
 runs house-style lint when `vale` is on PATH. The box is not pre-checked;
 `[critique].vale = true` still runs the pass. Optional Forensics (PaperGuard)
 checkbox runs `paperguard scan` when that binary is on PATH
@@ -201,7 +201,7 @@ item-only. Not a score. See [critique.md](critique.md).
 **Suggest edits** (Advanced; `/rewrite`, CLI `paperful rewrite`): pick a
 recent critique pack, optional replacement draft if the file moved,
 area/output/comments controls. Writes `state/rewrites/` (edit plan, optional
-sidecar, tracked-changes Word). Never overwrites the source. Empty state:
+sidecar, tracked-changes Word / OpenDocument / PDF). Never overwrites the source. Empty state:
 **Run Critique first**. Style glossary/Vale swaps run with `[llm]` off. See
 [rewrite.md](rewrite.md).
 
@@ -290,7 +290,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/critique` | Enqueue `critique` for `--item` or a staged `--file`; redirect `?run=` |
 | GET | `/rewrite` | Advanced Suggest edits: recent critique packs, optional draft, area/output/comments; empty state Run Critique first |
 | POST | `/rewrite` | Enqueue `rewrite` for a pack (optional staged `--file`); redirect `?run=` |
-| GET | `/rewrite/download/{name}` | Download `pack.md` / `plan.json` / sidecar / `tracked.docx` from `state/rewrites/` |
+| GET | `/rewrite/download/{name}` | Download `pack.md` / `plan.json` / sidecar / `tracked.docx` / `.pptx` / `.odt` / `.pdf` from `state/rewrites/` |
 | POST | `/repair/preview` | Dry-run repair verb + review token |
 | POST | `/repair/apply` | Consume token; apply repair verb |
 | POST | `/mirror/preview` | Dry-run mirror verb + review token |

@@ -407,6 +407,8 @@ def test_critique_table_is_parsed(tmp_path):
     assert cfg.rewrite_outputs == ("edits", "tracked")
     assert cfg.rewrite_comments == "off"
     assert cfg.rewrite_max_edits == 80
+    assert cfg.rewrite_openxml_audit is False
+    assert cfg.rewrite_openxml_audit_policy == "warn"
     assert cfg.rewrites_dir == cfg.state_dir / "rewrites"
 
 
@@ -420,10 +422,12 @@ def test_rewrite_table_is_parsed(tmp_path):
         {
             "rewrite": {
                 "areas": ["style", "cites"],
-                "outputs": ["edits"],
+                "outputs": ["edits", "odt", "pdf"],
                 "comments": "substantive",
                 "max_edits": 12,
                 "timeout_s": 30,
+                "openxml_audit": True,
+                "openxml_audit_policy": "fail",
                 "specialists": [
                     {
                         "id": "style",
@@ -436,10 +440,12 @@ def test_rewrite_table_is_parsed(tmp_path):
         tmp_path / "config.toml",
     )
     assert cfg.rewrite_areas == ("style", "cites")
-    assert cfg.rewrite_outputs == ("edits",)
+    assert cfg.rewrite_outputs == ("edits", "odt", "pdf")
     assert cfg.rewrite_comments == "substantive"
     assert cfg.rewrite_max_edits == 12
     assert cfg.rewrite_timeout_s == 30.0
+    assert cfg.rewrite_openxml_audit is True
+    assert cfg.rewrite_openxml_audit_policy == "fail"
     assert cfg.rewrite_specialists[0].model == "xtragpt:7b"
     assert cfg.rewrite_specialists[0].prompt == str(prompt.resolve())
 

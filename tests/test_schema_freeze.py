@@ -5,13 +5,23 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from paperful.inbox_match import INBOX_PROPOSAL_KEYS, SCHEMA as INBOX_SCHEMA, write_proposal
+from paperful.inbox_match import (
+    INBOX_PROPOSAL_KEYS,
+    SCHEMA as INBOX_SCHEMA,
+    write_proposal,
+)
 from paperful.notehtml import NOTE_BLOCK_KEYS, SCHEMA as NOTE_SCHEMA, block, wrap, parse
 from paperful.coverage import (
     COVERAGE_PACK_KEYS,
     SCHEMA as COVERAGE_SCHEMA,
     CoverageRow,
     write_pack as write_coverage_pack,
+)
+from paperful.precedent import (
+    PRECEDENT_PACK_KEYS,
+    SCHEMA as PRECEDENT_SCHEMA,
+    PrecedentRow,
+    write_pack as write_precedent_pack,
 )
 from paperful.refs_gap import (
     REFS_GAP_PACK_KEYS,
@@ -40,7 +50,9 @@ def test_run_report_keys_match_golden_and_minimal():
     assert keys["summary"] == sorted(RUN_REPORT_SUMMARY_KEYS)
     assert keys["paths"] == sorted(RUN_REPORT_PATH_KEYS)
     assert keys["item"] == sorted(RUN_REPORT_ITEM_KEYS)
-    minimal = json.loads((FIX / "run_report_v1" / "minimal.json").read_text(encoding="utf-8"))
+    minimal = json.loads(
+        (FIX / "run_report_v1" / "minimal.json").read_text(encoding="utf-8")
+    )
     assert minimal["schema"] == "paperful.run_report.v1"
     assert RUN_REPORT_KEYS <= minimal.keys()
     assert RUN_REPORT_SUMMARY_KEYS <= minimal["summary"].keys()
@@ -66,9 +78,13 @@ def test_build_report_emits_frozen_summary_keys(cfg):
 
 
 def test_refs_gap_pack_keys_match_golden(tmp_path: Path):
-    keys = json.loads((FIX / "refs_gap_pack_v1" / "keys.json").read_text(encoding="utf-8"))
+    keys = json.loads(
+        (FIX / "refs_gap_pack_v1" / "keys.json").read_text(encoding="utf-8")
+    )
     assert keys == sorted(REFS_GAP_PACK_KEYS)
-    golden = json.loads((FIX / "refs_gap_pack_v1" / "pack.json").read_text(encoding="utf-8"))
+    golden = json.loads(
+        (FIX / "refs_gap_pack_v1" / "pack.json").read_text(encoding="utf-8")
+    )
     assert golden["schema"] == REFS_SCHEMA
     assert REFS_GAP_PACK_KEYS <= golden.keys()
     folder = write_pack(
@@ -89,10 +105,44 @@ def test_refs_gap_pack_keys_match_golden(tmp_path: Path):
     assert REFS_GAP_PACK_KEYS <= pack.keys()
 
 
+def test_precedent_pack_keys_match_golden(tmp_path: Path):
+    keys = json.loads(
+        (FIX / "precedent_pack_v1" / "keys.json").read_text(encoding="utf-8")
+    )
+    assert keys == sorted(PRECEDENT_PACK_KEYS)
+    golden = json.loads(
+        (FIX / "precedent_pack_v1" / "pack.json").read_text(encoding="utf-8")
+    )
+    assert golden["schema"] == PRECEDENT_SCHEMA
+    assert PRECEDENT_PACK_KEYS <= golden.keys()
+    folder = write_precedent_pack(
+        tmp_path,
+        "library",
+        "area-based management tools in ABNJ",
+        [
+            PrecedentRow(
+                evidence="public-metadata-only",
+                doi="10.1000/a",
+                title="A",
+                year=2019,
+                suggested_action="ingest-dois",
+            )
+        ],
+        [],
+        {"held": 0, "public_metadata_only": 1, "openalex_fetched": 1, "deduped": 0},
+    )
+    pack = json.loads((folder / "pack.json").read_text(encoding="utf-8"))
+    assert PRECEDENT_PACK_KEYS <= pack.keys()
+
+
 def test_coverage_pack_keys_match_golden(tmp_path: Path):
-    keys = json.loads((FIX / "coverage_pack_v1" / "keys.json").read_text(encoding="utf-8"))
+    keys = json.loads(
+        (FIX / "coverage_pack_v1" / "keys.json").read_text(encoding="utf-8")
+    )
     assert keys == sorted(COVERAGE_PACK_KEYS)
-    golden = json.loads((FIX / "coverage_pack_v1" / "pack.json").read_text(encoding="utf-8"))
+    golden = json.loads(
+        (FIX / "coverage_pack_v1" / "pack.json").read_text(encoding="utf-8")
+    )
     assert golden["schema"] == COVERAGE_SCHEMA
     assert COVERAGE_PACK_KEYS <= golden.keys()
     folder = write_coverage_pack(
@@ -114,7 +164,9 @@ def test_coverage_pack_keys_match_golden(tmp_path: Path):
 
 
 def test_inbox_proposal_keys_match_golden(cfg, tmp_path: Path):
-    keys = json.loads((FIX / "inbox_proposal_v1" / "keys.json").read_text(encoding="utf-8"))
+    keys = json.loads(
+        (FIX / "inbox_proposal_v1" / "keys.json").read_text(encoding="utf-8")
+    )
     assert keys == sorted(INBOX_PROPOSAL_KEYS)
     golden = json.loads(
         (FIX / "inbox_proposal_v1" / "pending.json").read_text(encoding="utf-8")
@@ -159,7 +211,9 @@ def test_note_block_keys_match_golden():
 def test_item_empty_shell_covers_required_keys():
     keys = json.loads((FIX / "item_v1" / "keys.json").read_text(encoding="utf-8"))
     assert keys == sorted(ITEM_RECORD_KEYS)
-    shell = json.loads((FIX / "item_v1" / "empty_shell.json").read_text(encoding="utf-8"))
+    shell = json.loads(
+        (FIX / "item_v1" / "empty_shell.json").read_text(encoding="utf-8")
+    )
     assert ITEM_RECORD_KEYS <= shell.keys()
     item = make_item(key="ARTICLE1", doi="10.1000/abc.1")
     live = empty_item_record(item)
@@ -170,7 +224,9 @@ def test_item_empty_shell_covers_required_keys():
 def test_sections_v1_keys_match_golden():
     keys = json.loads((FIX / "sections_v1" / "keys.json").read_text(encoding="utf-8"))
     assert keys == sorted(SECTION_KEYS)
-    golden = json.loads((FIX / "sections_v1" / "minimal.json").read_text(encoding="utf-8"))
+    golden = json.loads(
+        (FIX / "sections_v1" / "minimal.json").read_text(encoding="utf-8")
+    )
     assert golden["schema"] == SECTIONS_SCHEMA
     assert SECTION_KEYS <= golden.keys()
 
@@ -178,6 +234,8 @@ def test_sections_v1_keys_match_golden():
 def test_grobid_tei_v1_keys_match_golden():
     keys = json.loads((FIX / "grobid_tei_v1" / "keys.json").read_text(encoding="utf-8"))
     assert keys == sorted(TEI_META_KEYS)
-    golden = json.loads((FIX / "grobid_tei_v1" / "meta.json").read_text(encoding="utf-8"))
+    golden = json.loads(
+        (FIX / "grobid_tei_v1" / "meta.json").read_text(encoding="utf-8")
+    )
     assert golden["schema"] == TEI_SCHEMA
     assert TEI_META_KEYS <= golden.keys()

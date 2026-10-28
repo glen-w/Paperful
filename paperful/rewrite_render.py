@@ -65,6 +65,63 @@ def render_markdown(
         for row in plan.skips:
             lines.append(f"- `{row.get('finding_id')}`: {row.get('reason')}")
         lines.append("")
+    files = [
+        name
+        for name in (pack.get("tracked"), pack.get("odt"), pack.get("pdf"))
+        if name
+    ]
+    if files:
+        lines.extend(["## Files", ""])
+        for name in files:
+            lines.append(f"- {name}")
+        lines.append("")
+    audits = pack.get("audits")
+    if not isinstance(audits, dict) or not audits:
+        primary = pack.get("openxml_audit")
+        audits = {"tracked": primary} if isinstance(primary, dict) else {}
+    wrote_office = False
+    for name, audit in audits.items():
+        if not isinstance(audit, dict):
+            continue
+        if not (
+            audit.get("enabled")
+            or audit.get("structural")
+            or audit.get("introduced")
+            or audit.get("skipped")
+        ):
+            continue
+        if not wrote_office:
+            lines.extend(["## Office audit", ""])
+            wrote_office = True
+        lines.append(f"- file: {name}")
+        if audit.get("format"):
+            lines.append(f"  - format: {audit['format']}")
+        if audit.get("skipped"):
+            lines.append(f"  - skipped: {audit['skipped']}")
+        structural = audit.get("structural") or []
+        introduced = audit.get("introduced") or []
+        if structural:
+            lines.append(f"  - structural: {len(structural)}")
+            for row in structural[:12]:
+                lines.append(f"    - {row}")
+        if introduced:
+            lines.append(f"  - introduced: {len(introduced)}")
+            for row in introduced[:12]:
+                lines.append(f"    - {row}")
+        if not structural and not introduced and not audit.get("skipped"):
+            lines.append("  - no issues introduced vs source")
+    if wrote_office:
+        lines.append("")
+    pdf_audit = pack.get("pdf_audit")
+    if isinstance(pdf_audit, dict) and (
+        pdf_audit.get("skipped") or pdf_audit.get("structural")
+    ):
+        lines.extend(["## PDF audit", ""])
+        if pdf_audit.get("skipped"):
+            lines.append(f"- skipped: {pdf_audit['skipped']}")
+        for row in (pdf_audit.get("structural") or [])[:8]:
+            lines.append(f"- {row}")
+        lines.append("")
     return "\n".join(lines)
 
 

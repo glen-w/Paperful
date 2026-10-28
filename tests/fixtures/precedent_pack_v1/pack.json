@@ -1,0 +1,47 @@
+{
+  "schema": "paperful.precedent.pack.v1",
+  "scope": "library",
+  "created_at": "2026-01-01T00:00:00+00:00",
+  "query": "area-based management tools in ABNJ",
+  "counts": {
+    "held": 1,
+    "public_metadata_only": 1,
+    "openalex_fetched": 1,
+    "deduped": 0
+  },
+  "findings": [],
+  "rows": [
+    {
+      "evidence": "held",
+      "doi": "10.1000/held",
+      "title": "Held paper",
+      "year": 2019,
+      "openalex_id": "",
+      "suggested_action": "ask",
+      "item_key": "ITEM0001",
+      "chunk_index": 0,
+      "pages": "p. 3",
+      "score": 0.9,
+      "passage": "Area-based management tools…",
+      "cited_by_count": null,
+      "oa_url": "",
+      "source": "rag"
+    },
+    {
+      "evidence": "public-metadata-only",
+      "doi": "10.1000/public",
+      "title": "Public metadata work",
+      "year": 2021,
+      "openalex_id": "W123",
+      "suggested_action": "ingest-dois",
+      "item_key": "",
+      "chunk_index": null,
+      "pages": "",
+      "score": null,
+      "passage": "",
+      "cited_by_count": 4,
+      "oa_url": "https://doi.org/10.1000/public",
+      "source": "openalex"
+    }
+  ]
+}

@@ -3649,6 +3649,22 @@ wheels = [
 ]
 
 [[package]]
+name = "openxml-audit"
+version = "0.8.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click", version = "8.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "click", version = "8.5.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "lxml" },
+    { name = "rich", version = "14.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "rich", version = "15.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/06/97/233a91963d0935a902960e9e96d6690b84033347feabb57fc588d930ba15/openxml_audit-0.8.0.tar.gz", hash = "sha256:913f8d6b5b73fe7fedbb87d9f177aa2b917ca2ba40c44edf3671476ce4b7faed", size = 9953461, upload-time = "2026-09-02T01:05:45.426Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/69/f5/95b7bee1e13bbd718063c3e6a7bf4dbec59c059e255af96b6368ac57c34c/openxml_audit-0.8.0-py3-none-any.whl", hash = "sha256:a55f74b86d347808f4912313b188eafa36b43ffda444781eb026cc9138ea2576", size = 1229652, upload-time = "2026-09-02T01:05:43.659Z" },
+]
+
+[[package]]
 name = "overrides"
 version = "7.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3814,7 +3830,7 @@ wheels = [
 
 [[package]]
 name = "paperful"
-version = "1.6.1"
+version = "1.6.2"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -3854,6 +3870,9 @@ htmlpdf = [
 ]
 llm = [
     { name = "litellm" },
+]
+openxml = [
+    { name = "openxml-audit" },
 ]
 rag = [
     { name = "lancedb" },
@@ -3895,6 +3914,7 @@ requires-dist = [
     { name = "litellm", marker = "extra == 'llm'", specifier = ">=1.70,<2" },
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=2.0.0" },
     { name = "ollama", marker = "python_full_version >= '3.11' and extra == 'browser-agent'", specifier = ">=0.4" },
+    { name = "openxml-audit", marker = "extra == 'openxml'", specifier = ">=0.8,<1" },
     { name = "playwright", specifier = ">=1.60" },
     { name = "playwright", marker = "extra == 'htmlpdf'", specifier = ">=1.60" },
     { name = "pypdf", specifier = ">=5.0" },
@@ -3909,7 +3929,7 @@ requires-dist = [
     { name = "typer", specifier = ">=0.12" },
     { name = "uvicorn", marker = "extra == 'serve'", specifier = ">=0.32" },
 ]
-provides-extras = ["htmlpdf", "llm", "rag", "rag-docling", "browser-agent", "serve", "docs"]
+provides-extras = ["htmlpdf", "llm", "rag", "rag-docling", "browser-agent", "serve", "openxml", "docs"]
 
 [package.metadata.requires-dev]
 dev = [

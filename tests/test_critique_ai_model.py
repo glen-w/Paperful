@@ -4,7 +4,7 @@ import os
 import sys
 import types
 
-from paperful.critique_ai_model import run_ai_model
+from paperful.critique_ai_model import extra_available, run_ai_model
 
 
 def test_run_ai_model_stays_offline_when_weights_missing(monkeypatch):
@@ -195,4 +195,5 @@ def test_run_ai_model_missing_spec_is_none(monkeypatch):
     monkeypatch.setattr(
         "paperful.critique_ai_model.importlib.util.find_spec", lambda _n: None
     )
+    assert extra_available() is False
     assert run_ai_model("hello", timeout_s=5) is None

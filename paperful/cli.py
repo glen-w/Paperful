@@ -321,6 +321,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "ask",
         "refs",
         "coverage",
+        "precedent",
         "acronyms",
         "glossary",
         "authors",
@@ -742,7 +743,7 @@ def jobs() -> None:
 
 @app.command()
 def mcp(config: Path | None = ConfigOpt) -> None:
-    """Optional stdio MCP: read-only gaps, snowball preview, export, refs_gap, ask."""
+    """Optional stdio MCP: read-only gaps, snowball preview, export, refs_gap, ask, precedent."""
     from .mcp_server import serve_stdio
 
     serve_stdio(_cfg(config))
@@ -1019,7 +1020,7 @@ def critique(
     ai_model: bool = typer.Option(
         False,
         "--ai-model",
-        help="Optional Binoculars-style AI-text extra (suggested lane; not installed by default).",
+        help="Optional Binoculars extra (git overlay; suggested; not installed by default).",
     ),
     vale: bool = typer.Option(
         False,
@@ -1126,7 +1127,9 @@ def rewrite(
         exists=True,
     ),
     item: list[str] = typer.Option(
-        [], "--item", help="Library item key; uses the latest critique pack for that id."
+        [],
+        "--item",
+        help="Library item key; uses the latest critique pack for that id.",
     ),
     file_path: Path | None = typer.Option(
         None,
@@ -1144,7 +1147,7 @@ def rewrite(
     output: list[str] = typer.Option(
         [],
         "--output",
-        help="Output (repeatable): edits, sidecar, tracked. Default: [rewrite].outputs.",
+        help="Output (repeatable): edits, sidecar, tracked, odt, pdf. Default: [rewrite].outputs.",
     ),
     comments: str | None = typer.Option(
         None,
@@ -1157,7 +1160,7 @@ def rewrite(
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
-    """Apply a critique pack to a draft. Writes an edit plan and optional sidecar / tracked-changes. Never overwrites the source."""
+    """Apply a critique pack to a draft. Writes an edit plan and optional sidecar / Word / OpenDocument / PDF. Never overwrites the source."""
     from .rewrite_cmd import run_rewrite
 
     run_rewrite(
@@ -2210,6 +2213,66 @@ def coverage_cmd(
     )
 
 
+@app.command("precedent")
+def precedent_cmd(
+    query: str = typer.Argument(..., help="Methods or hypothesis phrase."),
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item: list[str] = typer.Option(
+        [], "--item", help="Narrow held search to these item keys (repeatable)."
+    ),
+    seed_doi: str = typer.Option(
+        "",
+        "--seed-doi",
+        help="DOI whose similar neighbours join the public list.",
+    ),
+    held_k: int | None = typer.Option(
+        None,
+        "-k",
+        "--held-k",
+        help="Held RAG passages to keep. Default \\[precedent].held_k.",
+    ),
+    public_k: int | None = typer.Option(
+        None,
+        "--public-k",
+        help="OpenAlex / similar works to keep. Default \\[precedent].public_k.",
+    ),
+    dedupe_scope: str = typer.Option(
+        "library",
+        "--dedupe-scope",
+        help="Fingerprint exists against library or collection.",
+    ),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Held passages plus OpenAlex works for a phrase. Always dry-run. Not a novelty claim."""
+    from .precedent_cmd import run_precedent
+
+    run_precedent(
+        console,
+        query=query,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item=item,
+        seed_doi=seed_doi,
+        held_k=held_k,
+        public_k=public_k,
+        dedupe_scope=dedupe_scope,
+        profile=profile,
+        run_config=run_config,
+        config=config,
+        fmt=fmt,
+    )
+
+
 @twenty_app.command("lookup")
 def twenty_lookup_cmd(
     collection: list[str] = typer.Option(
@@ -2305,7 +2368,7 @@ def ingest_dois_cmd(
     from_pack: Path | None = typer.Option(
         None,
         "--from-pack",
-        help="refs_gap or coverage pack.json (or its parent folder).",
+        help="refs_gap, coverage, or precedent pack.json (or its parent folder).",
         exists=True,
     ),
     apply: bool = typer.Option(

@@ -9,7 +9,10 @@ manager.
 
 Default area is **style** (hygiene: Vale, glossary/acronyms, prose). Other
 areas (`cites`, `structure`, `comments`) are opt-in. Outputs are an edit plan
-always, plus optional sidecar text and a tracked-changes `.docx`.
+always, plus optional sidecar text and office files: Word tracked-changes,
+OpenDocument (`.odt`), and/or PDF. `--output tracked` follows the source
+suffix (Word spine for markdown / PDF / HTML / RTF). `--output odt` and
+`--output pdf` can be requested for any source.
 
 Paperful does not vendor [Paper Orchestra](https://github.com/google-research/paper-orchestra),
 [ARIES](https://github.com/allenai/aries), or [XtraGPT](https://huggingface.co/collections/Xtra-Computing/xtragpt).
@@ -31,7 +34,7 @@ uv run paperful rewrite --pack PATH --output edits --dry-run
 
 - Exit 1 if no pack exists. Never calls `build_critique`.
 - `--area` (repeatable): `style`, `cites`, `structure`, `comments`, or `all`.
-- `--output` (repeatable): `edits`, `sidecar`, `tracked`.
+- `--output` (repeatable): `edits`, `sidecar`, `tracked`, `odt`, `pdf`.
 - `--comments`: `off` (default), `substantive`, `all` — reviewer/MARG notes as
   Word comments.
 - `--dry-run` prints the plan and writes nothing.
@@ -40,8 +43,12 @@ uv run paperful rewrite --pack PATH --output edits --dry-run
 
 Packs land in `state/rewrites/<critique-id>/<stamp>/` as `plan.json`
 (`paperful.rewrite.plan.v1`), `pack.md`, and `pack.json`
-(`paperful.rewrite.pack.v1`). Tracked-changes Word is `tracked.docx` when
-requested. Library PDFs are read-only; output is always new files.
+(`paperful.rewrite.pack.v1`). `--output tracked` writes `tracked.docx` /
+`tracked.pptx` / `tracked.odt` matching the source (markdown and other
+text sources get a Word spine). `--output odt` always writes `tracked.odt`
+(native copy when the source is ODT; otherwise a paragraph spine).
+`--output pdf` writes `tracked.pdf` (Playwright Chromium print of the
+applied text). Library PDFs are read-only; output is always new files.
 
 ## Areas
 
@@ -64,10 +71,12 @@ deterministic replacement. Style-only glossary/Vale substitutions run with
 ```toml
 [rewrite]
 areas = ["style"]                 # style | cites | structure | comments | all
-outputs = ["edits", "tracked"]    # edits | sidecar | tracked
+outputs = ["edits", "tracked"]    # edits | sidecar | tracked | odt | pdf
 comments = "off"                  # off | substantive | all
 max_edits = 80
 timeout_s = 0                     # 0 → max([llm].timeout_s, 600)
+openxml_audit = false             # optional extra: uv sync --extra openxml (docx/pptx/odt)
+openxml_audit_policy = "warn"     # warn | fail
 
 [[rewrite.specialists]]
 id = "style"
@@ -89,8 +98,20 @@ drafts should not assume them. See [llm.md](llm.md).
 - Unflagged text is unchanged.
 - Body edits must not mention Paperful, the critique pack, or “the reviewer”.
 - Weak alignment → skip or a Word comment, not a guessed rewrite.
-- Tracked-changes v1 uses stdlib OOXML. Unique paragraph match only; miss →
-  skip. Complex Word (fields, existing revisions, text boxes) is not round-tripped.
+- Tracked-changes v1 uses stdlib OOXML for `.docx`. Unique paragraph match
+  only; miss → skip. Complex Word (fields, existing revisions, text boxes) is
+  not round-tripped. `.pptx` / `.odt` get a copy with unique-span
+  replacements (not Word revision markup; comments stay in the edit plan).
+  `--output odt` on a non-ODT source builds a paragraph OpenDocument spine
+  the same way. `--output pdf` prints the applied text (comments stay in
+  the edit plan). Optional `[rewrite].openxml_audit` runs
+  [openxml-audit](https://pypi.org/project/openxml-audit/) (Microsoft Open XML
+  SDK port plus ODF adapter; `paperful[openxml]`) on office files and
+  reports errors **not already on the source**. Word-authored drafts can fail
+  the SDK on `stylesWithEffects`; those are ignored. `fail` exits 1 when
+  rewrite introduced a new issue. Stdlib structure checks (comment ranges,
+  Ignorable prefixes, slide/content XML, PDF header) always run on those
+  outputs. Paperful does not write `.xlsx`; forensics only reads tables.
 
 ## Workbench
 

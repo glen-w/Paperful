@@ -249,6 +249,18 @@ def remediation_text(
             "set [grobid].base_url if needed, or set enabled = false. "
             "See docs/grobid.md."
         )
+    if check.name == "openxml-audit":
+        return (
+            "Install the optional Open XML SDK port for rewrite tracked.docx / "
+            ".pptx / .odt: uv sync --extra openxml. Or set "
+            "[rewrite].openxml_audit = false."
+        )
+    if check.name == "binoculars":
+        return (
+            "Install Binoculars for critique --ai-model: uv pip install "
+            '"binoculars @ git+https://github.com/ahans30/Binoculars.git". '
+            "Or set [critique].ai_model = false."
+        )
     if check.name == "browser-agent extra":
         if "not installed" in check.detail:
             return (
@@ -753,6 +765,12 @@ def run_checks(
     rewrite_check = _rewrite_check(cfg)
     if rewrite_check is not None:
         checks.append(rewrite_check)
+    openxml_check = _openxml_audit_check(cfg)
+    if openxml_check is not None:
+        checks.append(openxml_check)
+    binoculars_check = _binoculars_check(cfg)
+    if binoculars_check is not None:
+        checks.append(binoculars_check)
     checks.extend(_rag_checks(cfg))
     checks.append(_snowball_check(cfg))
     checks.append(_openalex_store_check(cfg))
@@ -1006,6 +1024,36 @@ def _grobid_checks(cfg) -> list[Check]:
         ]
     finally:
         client.close()
+
+
+def _openxml_audit_check(cfg) -> Check | None:
+    """Amber when rewrite asked for openxml-audit but the extra is missing."""
+    if not getattr(cfg, "rewrite_openxml_audit", False):
+        return None
+    from .rewrite_openxml import extra_available
+
+    if extra_available():
+        return Check("openxml-audit", "green", "openxml-audit importable")
+    return Check(
+        "openxml-audit",
+        "amber",
+        "not installed — uv sync --extra openxml",
+    )
+
+
+def _binoculars_check(cfg) -> Check | None:
+    """Amber when critique asked for Binoculars but the extra is missing."""
+    if not getattr(cfg, "critique_ai_model", False):
+        return None
+    from .critique_ai_model import extra_available
+
+    if extra_available():
+        return Check("binoculars", "green", "binoculars importable")
+    return Check(
+        "binoculars",
+        "amber",
+        'not installed — uv pip install "binoculars @ git+https://github.com/ahans30/Binoculars.git"',
+    )
 
 
 def _rewrite_check(cfg) -> Check | None:

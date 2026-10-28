@@ -99,6 +99,7 @@ def test_mcp_lists_refs_gap_and_ask():
         "export",
         "proposal_export",
         "ask",
+        "precedent",
     }
     init = dispatch(cfg, {"jsonrpc": "2.0", "id": 2, "method": "initialize"})
     assert init["result"]["serverInfo"]["name"] == "paperful"

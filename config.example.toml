@@ -187,7 +187,7 @@ mirror_failures_before_skip = 3
 # llm = false                      # shim → reviewers when lanes is empty
 # lanes = []                       # reviewers, marg, adversary, claims, verify, context, context-web (empty → llm/advanced shims)
 # tag = "paperful-critique"
-# ai_model = false                 # optional Binoculars extra; --ai-model turns on (no CLI off)
+# ai_model = false                 # optional Binoculars extra (uv pip install git+https://github.com/ahans30/Binoculars.git); --ai-model turns on (no CLI off)
 # vale = false                     # optional Vale house style; --vale turns on (no CLI off)
 # vale_config = ".vale.ini"        # your house .vale.ini (relative to this file)
 # vale_min_alert_level = "suggestion"  # suggestion | warning | error
@@ -239,10 +239,12 @@ mirror_failures_before_skip = 3
 # [rewrite]
 # # Apply a critique pack to a draft (see docs/rewrite.md). Never overwrites the source.
 # areas = ["style"]                # style | cites | structure | comments | all
-# outputs = ["edits", "tracked"]   # edits | sidecar | tracked
+# outputs = ["edits", "tracked"]   # edits | sidecar | tracked | odt | pdf
 # comments = "off"                 # off | substantive | all
 # max_edits = 80
 # timeout_s = 0                    # 0 = max([llm].timeout_s, 600)
+# openxml_audit = false            # optional extra: uv sync --extra openxml (docx/pptx/odt)
+# openxml_audit_policy = "warn"    # warn | fail (diffs vs source; Word drafts may already fail SDK)
 # [[rewrite.specialists]]
 # id = "style"
 # model = ""                       # empty → [llm].model
@@ -434,6 +436,13 @@ concurrency = 2
 # point cron at `paperful keepup run <name>`. Interval is also stored per job.
 # [keepup]
 # interval_days = 7
+
+# Phrase → held PDF passages plus OpenAlex works not in the library.
+# Always dry-run. Empty public hits are a query/budget result, not novelty.
+# [precedent]
+# held_k = 10
+# public_k = 25
+# search_keywords = true
 
 # [snowball]
 # enabled = false

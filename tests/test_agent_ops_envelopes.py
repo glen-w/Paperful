@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from paperful.agent_ops import ask_envelope, collections_add_exit, refs_gap_envelope
+from paperful.agent_ops import (
+    ask_envelope,
+    collections_add_exit,
+    precedent_envelope,
+    refs_gap_envelope,
+)
 
 
 def test_refs_gap_envelope_orders_by_citations():
@@ -34,6 +39,43 @@ def test_refs_gap_envelope_orders_by_citations():
     env = refs_gap_envelope(refs=refs, findings=[], folder="/tmp/pack")
     assert env["summary"]["missing"] == 2
     assert env["items"][0]["doi"] == "10.1/a"
+
+
+def test_precedent_envelope_marks_partial():
+    rows = [
+        SimpleNamespace(
+            doi="10.1/a",
+            title="A",
+            evidence="public-metadata-only",
+            suggested_action="ingest-dois",
+            item_key="",
+        )
+    ]
+    env = precedent_envelope(
+        rows=rows,
+        findings=["openalex_budget"],
+        counts={
+            "held": 0,
+            "public_metadata_only": 1,
+            "openalex_fetched": 1,
+            "deduped": 0,
+        },
+        folder="/tmp/pack",
+        partial=True,
+    )
+    assert env["command"] == "precedent"
+    assert env["exit"] == 3
+    assert env["partial"] is True
+    assert env["items"][0]["doi"] == "10.1/a"
+    assert env["flags"]["dry_run"] is True
+
+
+def test_run_precedent_empty_query(cfg):
+    from paperful.agent_ops import run_precedent
+
+    empty = run_precedent(cfg, "  ")
+    assert empty["summary"]["error"] == "query is required"
+    assert empty["exit"] == 1
 
 
 def test_ask_envelope_carries_items():

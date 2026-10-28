@@ -85,7 +85,7 @@ Paperful every week, not just once to fill gaps?
 ### Facts settled against 1.1.0
 
 - 1.1.0 is tagged and on PyPI; trusted publishing (`publish.yml`) exists.
-- Version: single source via `importlib.metadata` / `pyproject.toml` (1.6.1).
+- Version: single source via `importlib.metadata` / `pyproject.toml` (1.6.2).
 - Attach is **manual by default** (`[ui].attach_mode`); Grab does not write to
   Zotero unless Settings is automatic.
 - **1.1.1 closed P0s:** Grab-selected `item_keys`, Held hand-ticks, Attach at
@@ -93,7 +93,7 @@ Paperful every week, not just once to fill gaps?
 - **Ask** is on the default nav (third after Wanted and Discover); it does
   not need Advanced. Whether it *stays* there is an [open
   question](#after-110-open-questions).
-- Install docs are pinned to `v1.6.1` (README, `docs/docker.md`,
+- Install docs are pinned to `v1.6.2` (README, `docs/docker.md`,
   `website/index.html`). Recheck every paperful.app claim before launch.
 
 (after-110-1-1-1)=
@@ -271,6 +271,14 @@ ML western-blot classifier, Redis-backed Web UI cache) stay **their** bets.
 - **Keeping-up hook** — when `keepup` or `screen` surfaces a new retraction,
   optional footnote: “re-run file forensics if you relied on supplementary
   tables from this item” (operator checklist, not automated).
+- **Binoculars Falcon load (critique `--ai-model`, housekeeping).** Upstream
+  `binoculars` still loads `tiiuae/falcon-7b` / `falcon-7b-instruct` with
+  `trust_remote_code=True`, which prints Hugging Face’s legacy-Falcon warning
+  (“fully ported into transformers … load without trust_remote_code”). Fix when
+  convenient: pin a transformers release with native Falcon and load without
+  remote code (prefer an upstream Binoculars PR; thin Paperful wrapper only if
+  upstream stalls). Keep scoring Hugging Face-offline; never treat the score as
+  authorship proof. See [critique.md](critique.md) (optional AI-text extra).
 
 Factory-stage context: PaperGuard strengthens **screen / audit** on **files**;
 Paperful 1.x **screen** is **metadata + PPS on PDFs you hold**. See
@@ -464,7 +472,7 @@ docs, not a paid pilot.
 | Agent (docs name) | What they claim | Paperful analogue today |
 | --- | --- | --- |
 | **Literature** (PaperQA3; `JobNames.LITERATURE` / `LITERATURE_HIGH`) | Cited answers and deep reviews over **175M+** papers, trials, and patents; citation graph, journal quality, clinical-trial structure; conflicting-evidence synthesis; diagrams / figure pullouts; follow-up via `continued_job_id` | `ask` / `synthesize` / `rag` over **your** mirror; OpenAlex hops on snowball; Ask `--thread`. No patents index, no trial registry, no 175M full-text |
-| **Precedent** (formerly Has Anyone) | “Has this been tried?” novelty / gap search across fields | `refs gap`, coverage, snowball similar hops, `rag search` — none of these say “nobody has done this” |
+| **Precedent** (formerly Has Anyone) | “Has this been tried?” novelty / gap search across fields | `paperful precedent` (held vs `public-metadata-only`; never “nobody has done this”). `refs gap` / coverage / similar hops remain adjacent |
 | **Kosmos** | Autonomous scientist: objective + datasets → parallel literature + analysis agents sharing a structured **world model**; ~1,500 papers and ~42k lines of code per run; up to ~12h; every claim traces to code or a passage; publication-ready figures. **Not on the public API** | None. Run witness + typed notes + RAG citations are the audit trail we have. No code-execution scientist |
 | **Analysis** | Flow cytometry, RNA-seq, stats, publication figures from **experimental** files | Out of jobs. Mirror holds PDFs, not assay pipelines |
 | **Molecules** (Phoenix / ChemCrow line) | SMILES/CAS/IUPAC → ADMET, retrosynthesis, ChEMBL, safety | Out of jobs |
@@ -479,7 +487,8 @@ Same stance as [SnowBallSLR](#after-110-snowball-review) and [Valency](#literatu
    OpenAlex keyword / similar works **not** in the library. Stamp each hit
    `held` vs `public-metadata-only`. Title the verb so operators cannot
    confuse it with “the literature has never done this.” Wave 4 under
-   [Literature-discovery complement](#literature-discovery-complement-waves).
+   [Literature-discovery complement](#literature-discovery-complement-waves)
+   (**shipped** as `paperful precedent`).
 2. **Named read jobs on MCP** — Edison’s `JobNames` enum is the lesson:
    one client, distinct jobs. Map onto existing tools (`ask`, `refs_gap`,
    `snowball_search`) plus the precedent pack. Still read-only; writes stay
@@ -556,7 +565,7 @@ until Wanted is honest. Do not grow 1.x into a second product.
 | --- | --- | --- | --- |
 | PaperQA2 loop: held PDFs → chunk → retrieve → **cited answer with page pointers**; no answer if the PDF is missing. **Shipped** as Ask `simple` plus `--ask-mode advanced` (score then answer on the local index; no vendored `paper-qa`) | Extract / synthesize | `[rag]` off by default; never call the manager from Ask | [Zotero-RAG](#zotero-rag-integration-later-question-centric-layer) |
 | Refuse the sentence if you cannot click the passage (`has_successful_answer`) | Synthesize / critique | Copy test, not a world-model store | Edison borrow #4 above |
-| Split **novelty pack** from **synthesis** before any outline | Novelty vs synthesize | Stamp `held` vs `public-metadata-only`; never “nobody has done this” | Wave 4 |
+| Split **novelty pack** from **synthesis** before any outline | Novelty vs synthesize | Stamp `held` vs `public-metadata-only`; never “nobody has done this” | Wave 4 (shipped: `paperful precedent`) |
 | Continuation / cheap vs high-effort as a **user-visible** Ask control | Synthesize | Local model; do not claim LABBench wins | [Ask](#after-110-briefs-ask) |
 | Conflicting-evidence `synthesize` (question → methods → findings → limits) over **your** PDFs | Synthesize | Held full text only | [Briefs](#after-110-briefs-ask) |
 | Figure/table **pullouts** (caption + page + stem), not generated artwork | Extract | Publisher bans on genAI primary images | [Briefs](#after-110-briefs-ask) |
@@ -1028,7 +1037,7 @@ daemon.
 (near-term-research-ops)=
 ### Near-term research-ops
 
-**Status:** rows 1–24 shipped (literature-discovery complement waves 1–3 in rows 22–24). Same bars:
+**Status:** rows 1–24 shipped (literature-discovery complement waves 1–4 in rows 22–24 plus Wave 4 pack). Same bars:
 dry-run default, explicit `--apply`, fail closed, no silent library writes. See
 [Documentation (thicken) — research pack](#documentation-thicken)
 for the end-to-end operator story.
@@ -1081,7 +1090,7 @@ envelope for CLI and MCP.
 | **1** | **Agent MCP + proposal export** — Extend optional `paperful mcp` with read-only tools that call the same builders as CLI `--format json`: `gaps`; snowball crawl dry-run / keyword preview (no gate that writes parents); collection `export` (BibTeX/RIS). Emit BibTeX or RIS from on-disk snowball / `authorwatch` proposal packs (DOIs already resolved in the pack). | **Shipped** — `export-proposals` + MCP tools; docs in [commands](commands.md#agent-channel-format-json-and-mcp), [snowball](snowball.md#bibtex--ris-from-the-queue), [authorwatch](authorwatch.md#ledger). |
 | **2** | **Publication trends** — Count works by publication year for an OpenAlex query or a saved snowball profile seed; reuse `OpenAlexClient` and budget posture as snowball. | **Shipped** — `snowball trends`, MCP `snowball_trends`; dry-run table + `--format json`; no library writes. |
 | **3** | **Author briefing thicken** — `authorwatch show` / list briefing adds co-author network and recent works from OpenAlex (same resolution paths as `resolve` / `suggest`). | **Shipped** — `authorwatch briefing` + compact `show`; `--format json`; no new polling scheduler. |
-| **4** | **Precedent / novelty pack** — Edison Precedent shape, local honesty: phrase in → `rag search` over held PDFs **plus** OpenAlex keyword/similar works not in the library; stamp `held` vs `public-metadata-only`; dry-run pack + read-only MCP tool; never a “nobody has done this” claim. | **Roadmap** — [Hosted AI scientists](#after-110-edison-scientific). |
+| **4** | **Precedent / novelty pack** — Edison Precedent shape, local honesty: phrase in → `rag search` over held PDFs **plus** OpenAlex keyword/similar works not in the library; stamp `held` vs `public-metadata-only`; dry-run pack + read-only MCP tool; never a “nobody has done this” claim. | **Shipped** — `paperful precedent`, MCP `precedent`; [commands](commands.md). |
 
 **Non-goals for these waves:** hosting a global full-text index; Valency Hub–style
 publishing; replacing Bond or Edison Literature for “ask the whole literature”
@@ -2144,10 +2153,11 @@ Larger product bets. Park until the ledger and core loop justify them.
    table (`0` ok, `1` user, `2` manager down, `3` partial write batch). **MCP** is a thin
    optional stdio wrap of `refs_gap` + `ask` over the same envelope — not a second API
    and not a prerequisite for research-ops. (`coverage` is CLI `--format json` only.) **Literature-discovery complement shipped**
-   (waves 1–3): read-only MCP for `gaps`, snowball preview, `snowball_trends`,
-   `export`, `proposal_export`, plus `export-proposals`, `snowball trends`, and
-   thickened `authorwatch briefing` — [Literature-discovery complement](#literature-discovery-complement-waves).
-   **Wave 4 (roadmap):** precedent / novelty pack as another named read job.
+   (waves 1–4): read-only MCP for `gaps`, snowball preview, `snowball_trends`,
+   `export`, `proposal_export`, `precedent`, plus `export-proposals`, `snowball trends`,
+   thickened `authorwatch briefing`, and `paperful precedent` — [Literature-discovery complement](#literature-discovery-complement-waves).
+   **Wave 4 (shipped):** `paperful precedent` / MCP `precedent` — held vs
+   `public-metadata-only`; never a novelty claim.
    Writes stay CLI `--apply`. `collections add` is CLI-only (not an MCP tool).
    **Shipped:** Twenty sync, lookup, and `--twenty-writeback` —
    [Twenty and SearXNG](snowball.md#twenty-and-searxng).

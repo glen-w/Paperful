@@ -6,6 +6,37 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.6.2 — 2026-10-28
+
+### Added
+
+- **`paperful precedent`.** Dry-run pack: a methods/hypothesis phrase retrieves
+  held RAG passages plus OpenAlex keyword/similar works. Each row is stamped
+  `held` or `public-metadata-only`. Never claims the idea is new. Writes
+  `state/precedent/<stamp>/` (`paperful.precedent.pack.v1`, `pack.md`,
+  `dois.txt`). `--format json` and read-only MCP tool `precedent`. Then
+  `ingest-dois --from-pack`. See [commands](docs/commands.md) and
+  [research pack](docs/research-pack.md).
+- **Optional `paperful[openxml]` extra.** [openxml-audit](https://pypi.org/project/openxml-audit/)
+  (Microsoft Open XML SDK port plus ODF adapter) can validate rewrite
+  `tracked.docx` / `.pptx` / `.odt`. Off by default.
+  `[rewrite].openxml_audit = true` diffs output vs the source so
+  Word-authored `stylesWithEffects` noise is ignored; `openxml_audit_policy`
+  is `warn` or `fail`. `uv sync --extra openxml`.
+- **Rewrite tracked PowerPoint and ODT.** `--output tracked` on a `.pptx` or
+  `.odt` source writes `tracked.pptx` / `tracked.odt` (unique-span
+  replacements; comments stay in the edit plan). Other sources still get a
+  Word spine. Stdlib structure checks always run; the extra audits vs source.
+- **Rewrite `--output odt` and `--output pdf`.** Request OpenDocument and/or
+  PDF for any source (`tracked.odt` / `tracked.pdf`). ODT is a native copy
+  when the draft is `.odt`, otherwise a paragraph spine. PDF is a Chromium
+  print of the applied text (Playwright). Comments stay in the edit plan.
+- **Binoculars overlay for critique `--ai-model`.** [Hans et al., ICML 2024](https://github.com/ahans30/Binoculars)
+  is still a git install (not a locked extra; it cannot resolve with
+  `rag-docling` / `browser-agent`). `paperful doctor` ambers when
+  `[critique].ai_model` is on and the package is missing.
+  `uv pip install "binoculars @ git+https://github.com/ahans30/Binoculars.git"`.
+
 ### Fixed
 
 - **Acronym hygiene no longer deletes preceding prose.** Glossary

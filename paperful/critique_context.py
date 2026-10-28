@@ -277,17 +277,28 @@ def suggested_from_context(
             meta["skipped"] = meta.get("skipped") or "timeout"
             say(f"{label} skipped (timeout)")
             return None
+        remain = _remaining(deadline)
+        if remain < 5.0:
+            meta["skipped"] = meta.get("skipped") or "timeout"
+            say(f"{label} skipped (timeout)")
+            return None
         say(f"{label}…")
         meta["calls"] = int(meta["calls"]) + 1
-        raw = _chat(
-            client,
-            model=model,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            timeout=_remaining(deadline),
-        )
+        try:
+            raw = _chat(
+                client,
+                model=model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                timeout=remain,
+            )
+        except Exception as exc:
+            meta["skipped"] = meta.get("skipped") or "llm_error"
+            meta["error"] = str(exc)
+            say(f"{label} failed ({exc})")
+            return None
         return parse_llm_json(raw)
 
     summary_user = f"Title: {title}\n\nExcerpt:\n{excerpt}"

@@ -1,8 +1,8 @@
 """Thin MCP stdio server over the same JSON channel as ``--format json``.
 
 Read-only tools: ``refs_gap``, ``gaps``, ``snowball_search``, ``snowball_trends``,
-``export``, ``proposal_export``, and ``ask``. ``collections add`` is CLI-only. Prefer CLI
-``--format json``.
+``export``, ``proposal_export``, ``ask``, and ``precedent``. ``collections add`` is
+CLI-only. Prefer CLI ``--format json``.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from .agent_ops import (
     run_ask,
     run_export,
     run_gaps,
+    run_precedent,
     run_proposal_export,
     run_refs_gap,
     run_snowball_search,
@@ -160,6 +161,32 @@ TOOLS = [
             "required": ["question"],
         },
     },
+    {
+        "name": "precedent",
+        "description": (
+            "Held PDF passages plus OpenAlex works for a phrase. Always dry-run. "
+            "Stamps held vs public-metadata-only. Never claims the idea is new."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "collection": {
+                    "type": "string",
+                    "description": "Optional collection path, name, or key.",
+                },
+                "year_from": {"type": "integer"},
+                "year_to": {"type": "integer"},
+                "seed_doi": {
+                    "type": "string",
+                    "description": "DOI whose similar neighbours join the public list.",
+                },
+                "held_k": {"type": "integer"},
+                "public_k": {"type": "integer"},
+            },
+            "required": ["query"],
+        },
+    },
 ]
 
 
@@ -247,7 +274,22 @@ def call_ask(
     return run_ask(cfg, question, collection, ask_mode=ask_mode)
 
 
-def call_gaps(cfg: Config, collection: str = "", library: bool = False) -> dict[str, Any]:
+def call_precedent(cfg: Config, args: dict[str, Any]) -> dict[str, Any]:
+    return run_precedent(
+        cfg,
+        str(args.get("query") or ""),
+        collection=str(args.get("collection") or ""),
+        year_from=args.get("year_from"),
+        year_to=args.get("year_to"),
+        seed_doi=str(args.get("seed_doi") or ""),
+        held_k=args.get("held_k"),
+        public_k=args.get("public_k"),
+    )
+
+
+def call_gaps(
+    cfg: Config, collection: str = "", library: bool = False
+) -> dict[str, Any]:
     return run_gaps(cfg, collection=collection or None, library=library)
 
 
@@ -280,11 +322,15 @@ def call_export(cfg: Config, args: dict[str, Any]) -> dict[str, Any]:
     )
 
 
-def call_proposal_export(cfg: Config, pack: str, kind: str = "bibtex") -> dict[str, Any]:
+def call_proposal_export(
+    cfg: Config, pack: str, kind: str = "bibtex"
+) -> dict[str, Any]:
     return run_proposal_export(cfg, pack, kind=kind)
 
 
-def handle_tools_call(cfg: Config, req_id: Any, params: dict[str, Any]) -> dict[str, Any]:
+def handle_tools_call(
+    cfg: Config, req_id: Any, params: dict[str, Any]
+) -> dict[str, Any]:
     name = str(params.get("name") or "")
     args = params.get("arguments") or {}
     if not isinstance(args, dict):
@@ -316,6 +362,8 @@ def handle_tools_call(cfg: Config, req_id: Any, params: dict[str, Any]) -> dict[
             str(args.get("collection") or ""),
             ask_mode=str(args["ask_mode"]) if args.get("ask_mode") else None,
         )
+    elif name == "precedent":
+        body = call_precedent(cfg, args)
     else:
         return _error(req_id, -32601, f"unknown tool {name}")
     return _result(req_id, _text(body))

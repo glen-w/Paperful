@@ -22,6 +22,8 @@ COMMENTS_REL = (
 XML_SPACE = "{http://www.w3.org/XML/1998/namespace}space"
 AUTHOR = "paperful rewrite"
 _NS_DECL = re.compile(rb'xmlns:([A-Za-z0-9]+)="([^"]+)"')
+_XML_DECL = re.compile(rb"<\?xml[^?]*\?>")
+_IGNORABLE = re.compile(r'\s(?:mc:)?Ignorable="([^"]+)"')
 
 _CONTENT_TYPES = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -65,19 +67,126 @@ def _xml_id(el: ET.Element) -> int | None:
         return None
 
 
-def _next_comment_id(doc_root: ET.Element, comments_root: ET.Element | None) -> int:
+def _w_ids(*roots: ET.Element | None) -> list[int]:
     ids: list[int] = []
-    for tag in ("commentRangeStart", "commentRangeEnd", "commentReference"):
-        for el in doc_root.iter(_w(tag)):
+    for root in roots:
+        if root is None:
+            continue
+        for el in root.iter():
             n = _xml_id(el)
             if n is not None:
                 ids.append(n)
-    if comments_root is not None:
-        for el in comments_root.iter(_w("comment")):
-            n = _xml_id(el)
-            if n is not None:
-                ids.append(n)
+    return ids
+
+
+def _next_w_id(*roots: ET.Element | None) -> int:
+    ids = _w_ids(*roots)
     return (max(ids) + 1) if ids else 0
+
+
+def _root_open_tag(xml: bytes, local: str) -> re.Match[bytes] | None:
+    return re.search(rf"<w:{re.escape(local)}\b[^>]*>".encode("ascii"), xml)
+
+
+def _serialize_part(original: bytes, root: ET.Element, *, local: str) -> bytes:
+    """Write XML but keep the source root tag (xmlns / mc:Ignorable)."""
+    _register_prefixes(original)
+    out = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+    orig_decl = _XML_DECL.match(original)
+    new_decl = _XML_DECL.match(out)
+    if orig_decl and new_decl:
+        out = orig_decl.group(0) + out[new_decl.end() :]
+    orig_root = _root_open_tag(original, local)
+    new_root = _root_open_tag(out, local)
+    if orig_root and new_root:
+        out = out[: new_root.start()] + orig_root.group(0) + out[new_root.end() :]
+    return out
+
+
+def _undeclared_ignorable(xml: bytes) -> list[str]:
+    found = _root_open_tag(xml, "document") or _root_open_tag(xml, "comments")
+    if found is None:
+        return []
+    open_tag = found.group(0).decode("utf-8", "replace")
+    declared = set(re.findall(r"xmlns:([A-Za-z0-9]+)=", open_tag))
+    match = _IGNORABLE.search(open_tag)
+    if not match:
+        return []
+    issues: list[str] = []
+    for prefix in match.group(1).split():
+        if prefix not in declared:
+            issues.append(f"Ignorable prefix {prefix!r} is not declared")
+    return issues
+
+
+def docx_structural_issues(path: Path) -> list[str]:
+    """Catch Word-repair triggers we control. Not a full OOXML schema validator."""
+    issues: list[str] = []
+    try:
+        with zipfile.ZipFile(path) as zf:
+            names = set(zf.namelist())
+            raw = zf.read("word/document.xml")
+            comments_raw = zf.read("word/comments.xml") if "word/comments.xml" in names else None
+    except (OSError, zipfile.BadZipFile, KeyError) as exc:
+        return [f"docx: {exc}"]
+    if b"ns0:" in raw:
+        issues.append("document.xml uses ns0: prefixes")
+    issues.extend(_undeclared_ignorable(raw))
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError as exc:
+        return issues + [f"document.xml: {exc}"]
+    stack: list[str] = []
+    starts: list[str] = []
+    ends: list[str] = []
+    refs: list[str] = []
+    rev_ids: list[str] = []
+    for el in root.iter():
+        cid = el.get(f"{W}id")
+        if el.tag == _w("commentRangeStart"):
+            if cid in stack:
+                issues.append(f"duplicate open comment {cid}")
+            stack.append(cid or "")
+            starts.append(cid or "")
+        elif el.tag == _w("commentRangeEnd"):
+            if not stack:
+                issues.append(f"commentRangeEnd {cid} with no start")
+            elif stack[-1] != cid:
+                issues.append(f"crossed comment ranges: end {cid} while open {stack}")
+                if cid in stack:
+                    stack.remove(cid)
+            else:
+                stack.pop()
+            ends.append(cid or "")
+        elif el.tag == _w("commentReference"):
+            refs.append(cid or "")
+        elif el.tag in {_w("ins"), _w("del")} and cid is not None:
+            rev_ids.append(cid)
+    if stack:
+        issues.append(f"unclosed comment ranges {stack}")
+    if set(starts) != set(ends):
+        issues.append("commentRangeStart/End ids do not match")
+    if set(starts) != set(refs):
+        issues.append("commentRangeStart/commentReference ids do not match")
+    overlap = sorted(set(starts) & set(rev_ids), key=lambda x: int(x) if x.isdigit() else x)
+    if overlap:
+        issues.append(f"ins/del ids collide with comment ids {overlap}")
+    if comments_raw is not None:
+        if b"ns0:" in comments_raw:
+            issues.append("comments.xml uses ns0: prefixes")
+        try:
+            croot = ET.fromstring(comments_raw)
+        except ET.ParseError as exc:
+            issues.append(f"comments.xml: {exc}")
+        else:
+            bodies = [
+                el.get(f"{W}id") or ""
+                for el in croot.iter(_w("comment"))
+            ]
+            missing = sorted(set(starts) - set(bodies))
+            if missing:
+                issues.append(f"comment ranges missing bodies {missing}")
+    return issues
 
 
 def _parse_comments(raw: bytes | None) -> ET.Element | None:
@@ -217,17 +326,16 @@ def _apply_edits_to_paras(
     paras: list[ET.Element],
     edits: list[RewriteEdit],
     *,
-    comment_id: int,
-    rev: int,
+    next_id: int,
     when: str,
-) -> tuple[list[tuple[int, str]], list[str], int, int]:
+) -> tuple[list[tuple[int, str]], list[str]]:
     """Comments may stack on one paragraph; only one body rewrite per paragraph."""
     comments: list[tuple[int, str]] = []
     skips: list[str] = []
     rewritten: set[int] = set()
 
     def _match(edit: RewriteEdit, *, body: bool) -> bool:
-        nonlocal comment_id, rev
+        nonlocal next_id
         for i, p in enumerate(paras):
             if body and i in rewritten:
                 continue
@@ -235,13 +343,13 @@ def _apply_edits_to_paras(
             if not (edit.quote and edit.quote in blob):
                 continue
             if not body:
-                _anchor_comment(p, comment_id)
-                comments.append((comment_id, edit.body or edit.quote))
-                comment_id += 1
+                _anchor_comment(p, next_id)
+                comments.append((next_id, edit.body or edit.quote))
+                next_id += 1
                 return True
-            if not _rewrite_paragraph(p, edit, rev, when):
+            if not _rewrite_paragraph(p, edit, next_id, when):
                 continue
-            rev += 2
+            next_id += 2 if edit.kind == "replace" else 1
             rewritten.add(i)
             return True
         return False
@@ -254,7 +362,7 @@ def _apply_edits_to_paras(
         if edit.kind != "comment":
             if not _match(edit, body=True):
                 skips.append(edit.quote[:80] or edit.kind)
-    return comments, skips, comment_id, rev
+    return comments, skips
 
 
 def _comment_el(cid: int, body: str, when: str) -> ET.Element:
@@ -316,19 +424,23 @@ def apply_tracked_docx(src: Path, dest: Path, edits: list[RewriteEdit]) -> list[
     existing_comments = parts.get("word/comments.xml")
     comments_root = _parse_comments(existing_comments)
     paras = list(root.iter(_w("p")))
-    comments, edit_skips, _, _ = _apply_edits_to_paras(
+    comments, edit_skips = _apply_edits_to_paras(
         paras,
         edits,
-        comment_id=_next_comment_id(root, comments_root),
-        rev=1,
+        next_id=_next_w_id(root, comments_root),
         when=when,
     )
     skips.extend(edit_skips)
-    parts["word/document.xml"] = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+    parts["word/document.xml"] = _serialize_part(xml, root, local="document")
     if comments:
-        parts["word/comments.xml"] = _comments_xml(
-            comments, when, existing=existing_comments
-        )
+        merged = _comments_xml(comments, when, existing=existing_comments)
+        if existing_comments:
+            merged_root = ET.fromstring(merged)
+            parts["word/comments.xml"] = _serialize_part(
+                existing_comments, merged_root, local="comments"
+            )
+        else:
+            parts["word/comments.xml"] = merged
         rels = parts.get("word/_rels/document.xml.rels", b"")
         parts["word/_rels/document.xml.rels"] = _ensure_comments_rel(rels)
         ctypes = parts.get("[Content_Types].xml", b"")
@@ -374,11 +486,10 @@ def build_docx_from_paragraphs(
         p.append(_run(text))
         body.append(p)
         para_nodes.append(p)
-    comments, skips, _, _ = _apply_edits_to_paras(
+    comments, skips = _apply_edits_to_paras(
         para_nodes,
         edits,
-        comment_id=0,
-        rev=1,
+        next_id=0,
         when=when,
     )
     dest.parent.mkdir(parents=True, exist_ok=True)

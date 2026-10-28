@@ -5,7 +5,7 @@
 {% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
 {% block content %}
 <h1>Suggest edits</h1>
-<p class="page-lede">Turn a critique pack into tracked changes in a copy of the Word file (edit plan, optional sidecar). Default area is hygiene/style. Writes <code>state/rewrites/</code>. Never overwrites the source. Not a generated paper.</p>
+<p class="page-lede">Turn a critique pack into tracked changes in a copy of the draft (Word, OpenDocument, or PDF; edit plan, optional sidecar). Default area is hygiene/style. Writes <code>state/rewrites/</code>. Never overwrites the source. Not a generated paper.</p>
 {% if error == 'target' %}<div class="error-banner">Pick a critique pack. Optionally upload a replacement draft if the original file moved.</div>{% endif %}
 {% if error == 'format' %}<div class="error-banner">That file type is not supported.</div>{% endif %}
 {% if error == 'size' %}<div class="error-banner">The upload is larger than 40 MB.</div>{% endif %}
@@ -40,7 +40,9 @@
       <legend>Outputs</legend>
       <label><input type="checkbox" name="output" value="edits"{% if "edits" in rewrite_outputs %} checked{% endif %}> Edits list</label>
       <label><input type="checkbox" name="output" value="sidecar"{% if "sidecar" in rewrite_outputs %} checked{% endif %}> Sidecar text</label>
-      <label><input type="checkbox" name="output" value="tracked"{% if "tracked" in rewrite_outputs %} checked{% endif %}> Tracked-changes docx</label>
+      <label><input type="checkbox" name="output" value="tracked"{% if "tracked" in rewrite_outputs %} checked{% endif %}> Tracked office (docx / pptx / odt matching the source)</label>
+      <label><input type="checkbox" name="output" value="odt"{% if "odt" in rewrite_outputs %} checked{% endif %}> OpenDocument (.odt)</label>
+      <label><input type="checkbox" name="output" value="pdf"{% if "pdf" in rewrite_outputs %} checked{% endif %}> PDF</label>
     </fieldset>
     <label>Comments {{ info("Attach reviewer/MARG notes as Word comments.") }}
       <select name="comments">
@@ -56,7 +58,7 @@
     {{ info("Writes state/rewrites/<critique-id>/<stamp>/. Does not change the original file or Zotero. CLI verb is rewrite.") }}
   </form>
   {% else %}
-  <p class="section-lede">Run Critique first. This page turns that pack into tracked changes in a copy of the Word file.</p>
+  <p class="section-lede">Run Critique first. This page turns that pack into tracked changes in a copy of the draft (Word, OpenDocument, or PDF).</p>
   <p><a href="/critique">Open Critique</a></p>
   {% endif %}
 </section>

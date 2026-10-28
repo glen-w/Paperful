@@ -187,22 +187,59 @@ def run_rewrite(
         rows = list(plan.get("edits") or [])
         if not rows:
             console.print("[green]No edits.[/]")
-            return
-        table = Table(title="Rewrite")
-        table.add_column("Kind")
-        table.add_column("Area")
-        table.add_column("Quote", style="dim")
-        for e in rows[:40]:
-            table.add_row(
-                str(e.get("kind") or ""),
-                str(e.get("area") or ""),
-                str(e.get("quote") or "")[:60],
-            )
-        console.print(table)
+        else:
+            table = Table(title="Rewrite")
+            table.add_column("Kind")
+            table.add_column("Area")
+            table.add_column("Quote", style="dim")
+            for e in rows[:40]:
+                table.add_row(
+                    str(e.get("kind") or ""),
+                    str(e.get("area") or ""),
+                    str(e.get("quote") or "")[:60],
+                )
+            console.print(table)
         if dry_run:
             console.print("[dim]Dry-run: nothing written.[/]")
+        for key in ("tracked", "odt", "pdf"):
+            name = result.get(key) if isinstance(result, dict) else None
+            if name:
+                console.print(f"{key}: {name}")
+        audits = result.get("audits") if isinstance(result, dict) else None
+        if not isinstance(audits, dict) or not audits:
+            primary = result.get("openxml_audit") if isinstance(result, dict) else None
+            audits = {"tracked": primary} if isinstance(primary, dict) else {}
+        saw_unavailable = False
+        for audit in audits.values():
+            if not isinstance(audit, dict):
+                continue
+            if audit.get("skipped") == "unavailable" and not saw_unavailable:
+                saw_unavailable = True
+                console.print(
+                    "[yellow]openxml-audit extra not installed "
+                    "(uv sync --extra openxml).[/]"
+                )
+            for row in (audit.get("structural") or [])[:8]:
+                console.print(f"[yellow]Office structure: {row}[/]")
+            for row in (audit.get("introduced") or [])[:8]:
+                console.print(f"[yellow]Office audit: {row}[/]")
+            if audit.get("fail"):
+                kind = audit.get("format") or "office"
+                console.print(f"[red]Tracked {kind} failed Office audit.[/]")
+        pdf_audit = result.get("pdf_audit") if isinstance(result, dict) else None
+        if isinstance(pdf_audit, dict):
+            if pdf_audit.get("skipped"):
+                console.print(f"[yellow]PDF: {pdf_audit['skipped']}[/]")
+            for row in (pdf_audit.get("structural") or [])[:8]:
+                console.print(f"[yellow]PDF: {row}[/]")
 
     if json_out:
         cli_mod._emit_agent(payload, json_out=True, human=_human)
-        return
-    _human()
+    else:
+        _human()
+    audits = result.get("audits") if isinstance(result, dict) else None
+    if not isinstance(audits, dict) or not audits:
+        primary = result.get("openxml_audit") if isinstance(result, dict) else None
+        audits = {"tracked": primary} if isinstance(primary, dict) else {}
+    if any(isinstance(a, dict) and a.get("fail") for a in audits.values()):
+        raise typer.Exit(1)

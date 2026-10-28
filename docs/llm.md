@@ -121,7 +121,7 @@ llm = false
 
 [rewrite]                           # verb C2.5: apply a critique pack
 areas = ["style"]                   # style-only glossary/Vale swaps need no model
-# outputs = ["edits", "tracked"]
+# outputs = ["edits", "tracked"]   # also odt, pdf
 # comments = "off"
 # [[rewrite.specialists]]
 # id = "style"
@@ -306,7 +306,11 @@ off). Other areas (`cites`, `structure`, `comments`) need a model for
 findings without a deterministic replacement. Body edits must not invent
 numbers or cite keys. Retracted / withdrawn / EoC cites become comments,
 never deletes. Optional `[[rewrite.specialists]]` can point a specialist at
-an XtraGPT Ollama tag; ICLR/ReviseQA criteria are ML-shaped. See
+an XtraGPT Ollama tag; ICLR/ReviseQA criteria are ML-shaped. Optional
+`[rewrite].openxml_audit` (`uv sync --extra openxml`) validates
+`tracked.docx` / `.pptx` / `.odt` with a Microsoft Open XML SDK port
+(ODF adapter for `.odt`). `--output odt` / `--output pdf` write those
+formats from any source. See
 [rewrite.md](rewrite.md).
 
 ### D. `summarize` — grounded summary note

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .agent_json import EXIT_USER, batch_exit, envelope
+from .agent_json import EXIT_PARTIAL, EXIT_USER, batch_exit, envelope
 from .config import Config
 from .library import LibraryError
 from .scope import ScopeError, load_scope
@@ -77,6 +77,111 @@ def coverage_envelope(
     )
 
 
+def precedent_envelope(
+    *,
+    rows: list[Any],
+    findings: list[str],
+    counts: dict[str, Any],
+    folder: Any,
+    flags: dict[str, Any] | None = None,
+    partial: bool = False,
+) -> dict[str, Any]:
+    items_out = [
+        {
+            "doi": getattr(r, "doi", "") or "",
+            "title": getattr(r, "title", "") or "",
+            "evidence": getattr(r, "evidence", "") or "",
+            "suggested_action": getattr(r, "suggested_action", "") or "",
+            "item_key": getattr(r, "item_key", "") or "",
+        }
+        for r in rows
+    ]
+    return envelope(
+        command="precedent",
+        summary={
+            "held": int(counts.get("held") or 0),
+            "public_metadata_only": int(counts.get("public_metadata_only") or 0),
+            "openalex_fetched": int(counts.get("openalex_fetched") or 0),
+            "deduped": int(counts.get("deduped") or 0),
+            "findings": list(findings),
+        },
+        items=items_out,
+        paths={"pack": str(folder)},
+        flags={"dry_run": True, "read_only": True, **(flags or {})},
+        exit_code=EXIT_PARTIAL if partial else 0,
+        partial=partial,
+    )
+
+
+def run_precedent(
+    cfg: Config,
+    query: str,
+    *,
+    collection: str = "",
+    year_from: int | None = None,
+    year_to: int | None = None,
+    seed_doi: str = "",
+    held_k: int | None = None,
+    public_k: int | None = None,
+) -> dict[str, Any]:
+    """Phrase → held passages plus OpenAlex works. Always dry-run."""
+    from .catalogue import open_library
+    from .identity import LibraryFingerprint
+    from .precedent import collect_pack, write_pack
+    from .resolve import normalize_doi
+
+    phrase = (query or "").strip()
+    if not phrase:
+        return envelope(
+            command="precedent",
+            exit_code=EXIT_USER,
+            summary={"error": "query is required"},
+        )
+    spec = (collection or "").strip()
+    try:
+        backend = open_library(cfg)
+        loaded = load_scope(
+            backend,
+            collections=[spec] if spec else [],
+            library=not spec,
+            year_from=year_from,
+            year_to=year_to,
+        )
+    except (LibraryError, ScopeError) as exc:
+        return envelope(
+            command="precedent",
+            exit_code=2 if isinstance(exc, LibraryError) else EXIT_USER,
+            summary={"error": str(exc)},
+        )
+    fingerprint = LibraryFingerprint.from_items(
+        list(backend.items_in_scope(None))
+        if hasattr(backend, "items_in_scope")
+        else loaded.items,
+        scope="library",
+        collection=spec,
+    )
+    seed = normalize_doi(seed_doi) or (seed_doi or "").strip()
+    rows, findings, counts, partial = collect_pack(
+        cfg,
+        phrase,
+        fingerprint,
+        collections=[spec] if spec else None,
+        year_from=year_from,
+        year_to=year_to,
+        held_k=held_k,
+        public_k=public_k,
+        seed_doi=seed,
+    )
+    folder = write_pack(cfg.state_dir, loaded.label, phrase, rows, findings, counts)
+    return precedent_envelope(
+        rows=rows,
+        findings=findings,
+        counts=counts,
+        folder=folder,
+        partial=partial,
+    )
+
+
 def run_refs_gap(cfg: Config, collection: str) -> dict[str, Any]:
     """MCP / shared scan: always dry-run, never creates parents."""
     from .catalogue import open_library
@@ -102,7 +207,9 @@ def run_refs_gap(cfg: Config, collection: str) -> dict[str, Any]:
         )
     items = loaded.items
     fingerprint = LibraryFingerprint.from_items(
-        list(backend.items_in_scope(None)) if hasattr(backend, "items_in_scope") else items,
+        list(backend.items_in_scope(None))
+        if hasattr(backend, "items_in_scope")
+        else items,
         scope="library",
         collection=spec,
     )
@@ -164,9 +271,7 @@ def run_ask(
         if (collection or "").strip():
             keys = scope_keys(ledger, collections=[collection.strip()])
         mode = resolve_ask_mode(cfg, ask_mode)
-        reply = answer(
-            cfg, q, keys=keys, index=index, ledger=ledger, ask_mode=mode
-        )
+        reply = answer(cfg, q, keys=keys, index=index, ledger=ledger, ask_mode=mode)
         text = reply.read()
         cited = reply.cited() or reply.sources
         return ask_envelope(
@@ -304,7 +409,10 @@ def gaps_envelope(
         command="gaps",
         summary=summary,
         items=missing_rows if missing_rows is not None else rows,
-        flags={"list_missing": list_missing, "handoff": handoff if list_missing else ""},
+        flags={
+            "list_missing": list_missing,
+            "handoff": handoff if list_missing else "",
+        },
     )
     return body
 
@@ -527,7 +635,9 @@ def run_snowball_trends(
     )
 
 
-def run_proposal_export(cfg: Config, pack: str, *, kind: str = "bibtex") -> dict[str, Any]:
+def run_proposal_export(
+    cfg: Config, pack: str, *, kind: str = "bibtex"
+) -> dict[str, Any]:
     """BibTeX or RIS from a snowball / authorwatch proposal pack on disk."""
     from .pack_bib import export_pack_text
 

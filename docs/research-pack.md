@@ -60,6 +60,20 @@ frontier briefing or note but not under `-C`”, use `paperful coverage`
 `state/coverage/<stamp>/`; then `ingest-dois` as above. See
 [ROADMAP — Briefing ↔ collection coverage](ROADMAP.md#briefing--collection-coverage-shipped-sibling-of-refs-gap).
 
+**Sibling — precedent pack:** when the question is “what do I already hold,
+and what does OpenAlex list for this phrase?”, use `paperful precedent
+"phrase" -C COLLECTION`. Always dry-run. Rows are stamped `held` (passages
+or fingerprint match) or `public-metadata-only`. An empty public list means
+OpenAlex returned nothing for this query and budget — not that the idea is
+new. Pack under `state/precedent/<stamp>/`; `dois.txt` is public-metadata-only
+DOIs for `ingest-dois --from-pack`. Distinct from `ask --focus gaps` (held
+PDFs only) and from Edison Precedent (hosted novelty search).
+
+```sh
+docker compose run --rm paperful precedent "area-based management in ABNJ" -C COLLECTION
+docker compose run --rm paperful ingest-dois --from-pack state/precedent/<stamp> -C COLLECTION
+```
+
 ## What to read on disk
 
 | Path | Schema / role |
@@ -68,6 +82,8 @@ frontier briefing or note but not under `-C`”, use `paperful coverage`
 | `state/refs-gaps/<stamp>/dois.txt` | Missing DOIs for ingest |
 | `state/coverage/<stamp>/pack.json` | `paperful.coverage.pack.v1` — briefing/note/file vs `-C` (`coverage`) |
 | `state/coverage/<stamp>/dois.txt` | Missing DOIs from coverage rows |
+| `state/precedent/<stamp>/pack.json` | `paperful.precedent.pack.v1` — held vs public-metadata-only |
+| `state/precedent/<stamp>/dois.txt` | Public-metadata-only DOIs for ingest |
 | `state/runs/<stamp>-ingest-dois.json` | Created / exists / unresolved / held |
 | `state/last-run.json` | `paperful.run_report.v1` after `run` |
 | `state/snowball/<run-id>/digest.md` | Frontier digest for that queue |

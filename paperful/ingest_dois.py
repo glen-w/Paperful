@@ -76,7 +76,7 @@ def dois_from_file(path: Path) -> list[str]:
 
 
 def dois_from_refs_pack(path: Path) -> list[str]:
-    """DOIs from a refs-gap or coverage pack JSON whose action is ingest-dois."""
+    """DOIs from a refs-gap, coverage, or precedent pack whose action is ingest-dois."""
     payload = json.loads(path.read_text(encoding="utf-8"))
     schema = str(payload.get("schema") or "")
     if schema == "paperful.coverage.pack.v1":
@@ -96,6 +96,8 @@ def dois_from_refs_pack(path: Path) -> list[str]:
         if not doi or doi in seen:
             continue
         if row.get("already_exists"):
+            continue
+        if str(row.get("evidence") or "") == "held":
             continue
         seen.add(doi)
         out.append(doi)
@@ -294,6 +296,8 @@ def ingest_tags(
     from_file: Path | None,
 ) -> list[str]:
     extra = (
-        [f"from-{seed_slug(from_file, fallback='dois')}"] if from_file is not None else []
+        [f"from-{seed_slug(from_file, fallback='dois')}"]
+        if from_file is not None
+        else []
     )
     return merge_tags(default_tags, cli_tags, extra)

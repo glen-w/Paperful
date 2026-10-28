@@ -39,7 +39,7 @@
     {{ review_lanes(critique_lanes, grobid_enabled) }}
     <label><input type="checkbox" name="force" value="1"> Force LLM {{ info("Run suggested comments even when identity lint flagged the PDF.") }}</label>
     {% endif %}
-    <label><input type="checkbox" name="ai_model" value="1"> AI model {{ info("Optional Binoculars extra. Paperful does not install torch. Missing extra records ai_model_unavailable. Not proof of authorship.") }}</label>
+    <label><input type="checkbox" name="ai_model" value="1"> AI model {{ info("Optional Binoculars extra (git overlay). Missing extra records ai_model_unavailable. Not proof of authorship.") }}</label>
     <label><input type="checkbox" name="vale" value="1"> Vale {{ info("Optional house-style pass. Not pre-checked. Needs vale on PATH and [critique].vale_config (or .vale.ini next to the paperful config). Missing extra records vale_unavailable / vale_no_config / vale_failed. Also runs when [critique].vale is true.") }}</label>
     <label><input type="checkbox" name="forensics" value="1"> Forensics (PaperGuard) {{ info("Optional subprocess scan. Not a lane. Needs paperguard on PATH. Findings are suggested anomalies to investigate, not a misconduct verdict. Missing extra records paperguard_unavailable. Also runs when [critique].forensics is true.") }}</label>
     <label><input type="checkbox" name="apply" value="1"> Write child note {{ info("Library item only. Tagged paperful-critique. Uploads stay disk-only.", danger=true) }}</label>
@@ -62,7 +62,7 @@
     {% if llm_on %}
     {{ review_lanes(critique_lanes, grobid_enabled) }}
     {% endif %}
-    <label><input type="checkbox" name="ai_model" value="1"> AI model {{ info("Optional Binoculars extra. Missing extra records ai_model_unavailable. Not proof of authorship.") }}</label>
+    <label><input type="checkbox" name="ai_model" value="1"> AI model {{ info("Optional Binoculars extra (git overlay). Missing extra records ai_model_unavailable. Not proof of authorship.") }}</label>
     <label><input type="checkbox" name="vale" value="1"> Vale {{ info("Optional house-style pass. Not pre-checked. Needs vale on PATH and a .vale.ini. Missing extra records vale_unavailable / vale_no_config / vale_failed. Also runs when [critique].vale is true.") }}</label>
     <label><input type="checkbox" name="forensics" value="1"> Forensics (PaperGuard) {{ info("Optional subprocess scan. Needs paperguard on PATH. Suggested anomalies to investigate, not a grade. Missing extra records paperguard_unavailable. Also runs when [critique].forensics is true.") }}</label>
     <button type="submit">Critique file</button>

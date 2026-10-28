@@ -81,7 +81,7 @@ Zotero). **(3)** is `paperful attachments`: a report by default, and
 `--apply`. **(4)** is other tools. **(5)** here is CLI `--format json`
 (`paperful.agent.json.v1` + exits) on batch verbs, plus a thin optional
 `paperful mcp` for read-only agent tools (`gaps`, snowball keyword dry-run,
-scoped `export`, proposal-pack BibTeX/RIS, `refs_gap`, `ask`) — same JSON as
+scoped `export`, proposal-pack BibTeX/RIS, `refs_gap`, `ask`, `precedent`) — same JSON as
 `--format json`. A chat agent that mutates the live Zotero catalogue stays with
 zotero-mcp.
 Scanned PDFs get a text layer from `paperful ocr`; two-up split and shrink

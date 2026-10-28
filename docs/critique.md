@@ -98,8 +98,8 @@ are aliases that add or remove those two ids. `--grobid` / `--no-grobid`
 override `[grobid].enabled` and affect MARG-S / claims / verify PDF chunks
 (`--grobid` still attempts the sidecar even when `[grobid].enabled` is false,
 same as `extract-sections`). `--ai-model` turns the
-Binoculars extra on for this run (there is no `--no-ai-model`; set
-`[critique].ai_model = false` in config). `--vale` turns the Vale house-style
+Binoculars extra on for this run (git overlay; there is no
+`--no-ai-model`; set `[critique].ai_model = false` in config). `--vale` turns the Vale house-style
 pass on for this run (there is no `--no-vale`; set `[critique].vale = false`).
 `--forensics` turns the PaperGuard subprocess on for this run (there is no
 `--no-forensics`; set `[critique].forensics = false`).
@@ -306,10 +306,13 @@ Venue filters are not hard-coded to ML conferences. Caps:
 ## Optional AI-text extra (`--ai-model` / `[critique].ai_model`)
 
 Requests a Binoculars-style score
-([Hans et al., ICML 2024](https://github.com/ahans30/Binoculars)). Paperful
-does not install torch or Binoculars. If the extra is missing, the pack
-records `ai_model_unavailable` (suggested / `info`) and still keeps the
-heuristic tells. Never treated as proof of authorship.
+([Hans et al., ICML 2024](https://github.com/ahans30/Binoculars)). Install
+with `uv pip install "binoculars @ git+https://github.com/ahans30/Binoculars.git"`
+(git overlay, not a locked extra; pulls torch). Off by default. A later
+`uv sync` without `--inexact` uninstalls it. If the extra
+is missing, the pack records `ai_model_unavailable` (suggested / `info`) and
+still keeps the heuristic tells. Scoring stays Hugging Face-offline; Falcon-7B
+must already be in the cache. Never treated as proof of authorship.
 
 ## House glossary (`state/glossary/`)
 
@@ -426,6 +429,7 @@ CLI `paperful rewrite`).
 
 See `[critique]` in [config.md](config.md) and `config.example.toml`.
 
-To turn findings into locatable edits (tracked-changes Word, sidecar, or an
-edit list), use [`rewrite`](rewrite.md) (workbench **Suggest edits**).
+To turn findings into locatable edits (tracked-changes Word, OpenDocument, PDF, a pptx/odt copy,
+sidecar, or an edit list), use [`rewrite`](rewrite.md) (workbench **Suggest
+edits**).
 `rewrite` never re-runs critique.

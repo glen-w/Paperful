@@ -12,9 +12,24 @@ from typer.testing import CliRunner
 from paperful.critique import make_finding
 from paperful.rewrite import build_rewrite
 from paperful.rewrite_align import align_finding
-from paperful.rewrite_areas import bucket_findings, parse_rewrite_areas_list
-from paperful.rewrite_docx import apply_tracked_docx, build_docx_from_paragraphs
+from paperful.rewrite_areas import (
+    bucket_findings,
+    parse_rewrite_areas_list,
+    parse_rewrite_outputs,
+)
+from paperful.rewrite_docx import (
+    apply_tracked_docx,
+    build_docx_from_paragraphs,
+    docx_structural_issues,
+)
 from paperful.rewrite_llm import edit_is_grounded
+from paperful.rewrite_office import (
+    apply_odt,
+    apply_pptx,
+    build_odt_from_paragraphs,
+    odt_structural_issues,
+    pptx_structural_issues,
+)
 from paperful.rewrite_plan import RewriteEdit, merge_edits
 
 runner = CliRunner()
@@ -54,6 +69,10 @@ def _finding(**kwargs) -> dict:
 
 
 def test_default_areas_are_style_only():
+    assert parse_rewrite_outputs(None) == ("edits", "tracked")
+    assert parse_rewrite_outputs(["odt", "pdf"]) == ("edits", "odt", "pdf")
+    with pytest.raises(ValueError, match="unknown rewrite output"):
+        parse_rewrite_outputs(["docx"])
     assert parse_rewrite_areas_list(None) == ("style",)
     assert parse_rewrite_areas_list(["all"]) == (
         "style",
@@ -317,12 +336,16 @@ def test_tracked_docx_insert_delete(tmp_path: Path):
     assert "w:ins" in xml or "ins" in xml
     assert "Areas Beyond National Jurisdiction" in xml
     assert "ns0:" not in xml
+    assert docx_structural_issues(dest) == []
 
 
 def _docx_with_comment(path: Path, *, para: str, comment_id: str, body: str) -> None:
     document = (
-        '<?xml version="1.0"?>'
-        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:document xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" '
+        'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+        'xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" '
+        'mc:Ignorable="w14">'
         "<w:p>"
         f'<w:commentRangeStart w:id="{comment_id}"/>'
         f"<w:r><w:t>{para}</w:t></w:r>"
@@ -363,6 +386,23 @@ def _docx_with_comment(path: Path, *, para: str, comment_id: str, body: str) -> 
         zf.writestr("[Content_Types].xml", ctypes)
 
 
+def test_docx_structural_issues_flags_undeclared_ignorable(tmp_path: Path):
+    src = tmp_path / "bad.docx"
+    document = (
+        '<?xml version="1.0"?>'
+        '<w:document xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" '
+        'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+        'mc:Ignorable="w14">'
+        "<w:body><w:p><w:r><w:t>Hello</w:t></w:r></w:p></w:body>"
+        "</w:document>"
+    )
+    with zipfile.ZipFile(src, "w") as zf:
+        zf.writestr("word/document.xml", document)
+        zf.writestr("[Content_Types].xml", '<?xml version="1.0"?><Types/>')
+    issues = docx_structural_issues(src)
+    assert any("w14" in row for row in issues)
+
+
 def test_tracked_docx_keeps_existing_comments(tmp_path: Path):
     src = tmp_path / "src.docx"
     _docx_with_comment(
@@ -393,6 +433,9 @@ def test_tracked_docx_keeps_existing_comments(tmp_path: Path):
     assert "ns0:" not in doc
     assert "comments.xml" in rels
     assert rels.count("comments.xml") == 1
+    assert 'xmlns:w14=' in doc
+    assert 'mc:Ignorable="w14"' in doc
+    assert docx_structural_issues(dest) == []
 
 
 def test_tracked_docx_multiple_comments_per_paragraph(tmp_path: Path):
@@ -438,6 +481,7 @@ def test_tracked_docx_multiple_comments_per_paragraph(tmp_path: Path):
     assert "food web effects" in doc
     assert doc.count("commentRangeStart") >= 3
     assert "w:ins" in doc or "ins" in doc
+    assert docx_structural_issues(dest) == []
 
 
 def test_build_docx_from_paragraphs(tmp_path: Path):
@@ -592,3 +636,369 @@ def test_comments_area_anchors_suggested_finding(cfg, tmp_path: Path):
     edits = (result.get("plan") or {}).get("edits") or []
     assert edits
     assert all(e["kind"] == "comment" for e in edits)
+
+
+def test_openxml_audit_skips_when_extra_missing(cfg, tmp_path: Path, monkeypatch):
+    from paperful.rewrite_openxml import audit_tracked_docx
+
+    src = tmp_path / "src.docx"
+    _docx_with_comment(
+        src,
+        para="The regime applies in areas beyond national jurisdiction.",
+        comment_id="0",
+        body="Author note.",
+    )
+    dest = tmp_path / "out.docx"
+    apply_tracked_docx(
+        src,
+        dest,
+        [
+            RewriteEdit(
+                kind="comment",
+                finding_ids=["c"],
+                area="comments",
+                quote="areas beyond national jurisdiction",
+                body="Paperful note.",
+            )
+        ],
+    )
+    monkeypatch.setattr("paperful.rewrite_openxml.extra_available", lambda: False)
+    cfg.rewrite_openxml_audit = True
+    row = audit_tracked_docx(cfg, dest, source=src)
+    assert row["enabled"] is True
+    assert row["skipped"] == "unavailable"
+    assert row["fail"] is False
+    assert row["structural"] == []
+
+
+def test_openxml_audit_reports_errors_introduced_vs_source(
+    cfg, tmp_path: Path, monkeypatch
+):
+    from paperful.rewrite_openxml import audit_tracked_docx
+
+    src = tmp_path / "src.docx"
+    dest = tmp_path / "out.docx"
+    _docx_with_comment(
+        src,
+        para="The regime applies in areas beyond national jurisdiction.",
+        comment_id="0",
+        body="Author note.",
+    )
+    apply_tracked_docx(
+        src,
+        dest,
+        [
+            RewriteEdit(
+                kind="comment",
+                finding_ids=["c"],
+                area="comments",
+                quote="areas beyond national jurisdiction",
+                body="Paperful note.",
+            )
+        ],
+    )
+    monkeypatch.setattr("paperful.rewrite_openxml.extra_available", lambda: True)
+
+    def fake_sdk(path: Path) -> list[str]:
+        shared = ["styles.xml vs stylesWithEffects"]
+        if path == dest:
+            return [*shared, "Ignorable prefix 'w14' is not declared"]
+        return shared
+
+    monkeypatch.setattr("paperful.rewrite_openxml.sdk_errors", fake_sdk)
+    cfg.rewrite_openxml_audit = True
+    cfg.rewrite_openxml_audit_policy = "fail"
+    row = audit_tracked_docx(cfg, dest, source=src)
+    assert row["introduced"] == ["Ignorable prefix 'w14' is not declared"]
+    assert row["fail"] is True
+    assert row["format"] == "docx"
+
+
+def _pptx(path: Path, text: str) -> Path:
+    slide = (
+        '<?xml version="1.0"?>'
+        '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"'
+        ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+        f"<a:t>{text}</a:t></p:sld>"
+    )
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("ppt/slides/slide1.xml", slide)
+    return path
+
+
+def _odt(path: Path, text: str) -> Path:
+    xml = (
+        '<?xml version="1.0"?>'
+        '<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"'
+        ' xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">'
+        f"<office:body><office:text><text:p>{text}</text:p></office:text></office:body>"
+        "</office:document-content>"
+    )
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("content.xml", xml)
+    return path
+
+
+def test_apply_pptx_replace_and_skip_comments(tmp_path: Path):
+    src = _pptx(tmp_path / "src.pptx", "Maritime Area beyond national jurisdictions")
+    dest = tmp_path / "out.pptx"
+    edits = [
+        RewriteEdit(
+            kind="replace",
+            finding_ids=["a"],
+            area="style",
+            quote="Maritime Area beyond national jurisdictions",
+            replacement="Areas Beyond National Jurisdiction",
+        ),
+        RewriteEdit(
+            kind="comment",
+            finding_ids=["c"],
+            area="comments",
+            quote="Areas Beyond National Jurisdiction",
+            body="Reviewer note.",
+        ),
+    ]
+    skips = apply_pptx(src, dest, edits)
+    assert any("plan-only" in row for row in skips)
+    with zipfile.ZipFile(dest) as zf:
+        xml = zf.read("ppt/slides/slide1.xml").decode("utf-8")
+    assert "Areas Beyond National Jurisdiction" in xml
+    assert "ns0:" not in xml
+    assert pptx_structural_issues(dest) == []
+
+
+def test_apply_odt_replace(tmp_path: Path):
+    src = _odt(tmp_path / "src.odt", "Maritime Area beyond national jurisdictions")
+    dest = tmp_path / "out.odt"
+    edits = [
+        RewriteEdit(
+            kind="replace",
+            finding_ids=["a"],
+            area="style",
+            quote="Maritime Area beyond national jurisdictions",
+            replacement="Areas Beyond National Jurisdiction",
+        ),
+        RewriteEdit(
+            kind="comment",
+            finding_ids=["c"],
+            area="comments",
+            quote="Areas Beyond National Jurisdiction",
+            body="Reviewer note.",
+        ),
+    ]
+    skips = apply_odt(src, dest, edits)
+    assert any("plan-only" in row for row in skips)
+    with zipfile.ZipFile(dest) as zf:
+        xml = zf.read("content.xml").decode("utf-8")
+    assert "Areas Beyond National Jurisdiction" in xml
+    assert "ns0:" not in xml
+    assert odt_structural_issues(dest) == []
+
+
+def test_odt_structural_issues_missing_content(tmp_path: Path):
+    src = tmp_path / "empty.odt"
+    with zipfile.ZipFile(src, "w") as zf:
+        zf.writestr("mimetype", "application/vnd.oasis.opendocument.text")
+    issues = odt_structural_issues(src)
+    assert any("content.xml" in row for row in issues)
+
+
+def test_pptx_structural_issues_flags_ns0(tmp_path: Path):
+    src = tmp_path / "bad.pptx"
+    slide = (
+        '<?xml version="1.0"?>'
+        '<ns0:sld xmlns:ns0="http://schemas.openxmlformats.org/presentationml/2006/main">'
+        "<ns0:t>Hi</ns0:t></ns0:sld>"
+    )
+    with zipfile.ZipFile(src, "w") as zf:
+        zf.writestr("ppt/slides/slide1.xml", slide)
+    issues = pptx_structural_issues(src)
+    assert any("ns0:" in row for row in issues)
+
+
+def test_rewrite_writes_native_pptx(cfg, tmp_path: Path):
+    src = _pptx(
+        tmp_path / "talk.pptx",
+        "Maritime Area beyond national jurisdictions and enough letters here.",
+    )
+    pack = _pack([_finding()], path=str(src))
+    result = build_rewrite(
+        cfg,
+        pack=pack,
+        manuscript=src,
+        areas=("style",),
+        outputs=("edits", "tracked"),
+        comments="off",
+        dry_run=False,
+        llm_client=None,
+    )
+    folder = Path(result["pack_dir"])
+    assert (folder / "tracked.pptx").is_file()
+    assert not (folder / "tracked.docx").exists()
+    assert result.get("tracked") == "tracked.pptx"
+    audit = result.get("openxml_audit") or {}
+    assert audit.get("format") == "pptx"
+
+
+def test_rewrite_writes_native_odt(cfg, tmp_path: Path):
+    src = _odt(
+        tmp_path / "draft.odt",
+        "Maritime Area beyond national jurisdictions and enough letters here.",
+    )
+    pack = _pack([_finding()], path=str(src))
+    result = build_rewrite(
+        cfg,
+        pack=pack,
+        manuscript=src,
+        areas=("style",),
+        outputs=("edits", "tracked"),
+        comments="off",
+        dry_run=False,
+        llm_client=None,
+    )
+    folder = Path(result["pack_dir"])
+    assert (folder / "tracked.odt").is_file()
+    assert not (folder / "tracked.docx").exists()
+    assert result.get("tracked") == "tracked.odt"
+    audit = result.get("openxml_audit") or {}
+    assert audit.get("format") == "odt"
+    assert odt_structural_issues(folder / "tracked.odt") == []
+
+
+def test_sdk_errors_skips_non_office(tmp_path: Path):
+    from paperful.rewrite_openxml import sdk_errors
+
+    path = tmp_path / "note.md"
+    path.write_text("hello", encoding="utf-8")
+    assert sdk_errors(path) == []
+
+
+def test_openxml_audit_pptx_diffs_vs_source(cfg, tmp_path: Path, monkeypatch):
+    from paperful.rewrite_openxml import audit_office_file
+
+    src = _pptx(tmp_path / "src.pptx", "The regime applies in areas beyond national jurisdiction.")
+    dest = tmp_path / "out.pptx"
+    apply_pptx(
+        src,
+        dest,
+        [
+            RewriteEdit(
+                kind="replace",
+                finding_ids=["a"],
+                area="style",
+                quote="areas beyond national jurisdiction",
+                replacement="Areas Beyond National Jurisdiction",
+            )
+        ],
+    )
+    monkeypatch.setattr("paperful.rewrite_openxml.extra_available", lambda: True)
+
+    def fake_sdk(path: Path) -> list[str]:
+        shared = ["theme part warning"]
+        if path == dest:
+            return [*shared, "slide rel missing"]
+        return shared
+
+    monkeypatch.setattr("paperful.rewrite_openxml.sdk_errors", fake_sdk)
+    cfg.rewrite_openxml_audit = True
+    cfg.rewrite_openxml_audit_policy = "fail"
+    row = audit_office_file(cfg, dest, source=src)
+    assert row["format"] == "pptx"
+    assert row["introduced"] == ["slide rel missing"]
+    assert row["fail"] is True
+
+
+def test_build_odt_from_paragraphs(tmp_path: Path):
+    dest = tmp_path / "built.odt"
+    edit = RewriteEdit(
+        kind="replace",
+        finding_ids=["a"],
+        area="style",
+        quote="Maritime Area beyond national jurisdictions",
+        replacement="Areas Beyond National Jurisdiction",
+    )
+    skips = build_odt_from_paragraphs(
+        dest,
+        ["Maritime Area beyond national jurisdictions"],
+        [edit],
+    )
+    assert skips == []
+    with zipfile.ZipFile(dest) as zf:
+        names = zf.namelist()
+        assert names[0] == "mimetype"
+        assert zf.read("mimetype") == b"application/vnd.oasis.opendocument.text"
+        xml = zf.read("content.xml").decode("utf-8")
+    assert "Areas Beyond National Jurisdiction" in xml
+    assert odt_structural_issues(dest) == []
+
+
+def test_rewrite_odt_output_from_markdown(cfg, tmp_path: Path):
+    src = tmp_path / "draft.md"
+    src.write_text(DRAFT, encoding="utf-8")
+    pack = _pack([_finding()], path=str(src))
+    result = build_rewrite(
+        cfg,
+        pack=pack,
+        manuscript=src,
+        areas=("style",),
+        outputs=("edits", "odt"),
+        comments="off",
+        dry_run=False,
+        llm_client=None,
+    )
+    folder = Path(result["pack_dir"])
+    assert (folder / "tracked.odt").is_file()
+    assert not (folder / "tracked.docx").exists()
+    assert result.get("odt") == "tracked.odt"
+    assert result.get("openxml_audit", {}).get("format") == "odt"
+    xml = zipfile.ZipFile(folder / "tracked.odt").read("content.xml").decode("utf-8")
+    assert "Areas Beyond National Jurisdiction" in xml
+
+
+def test_rewrite_pdf_and_docx_from_markdown(cfg, tmp_path: Path, monkeypatch):
+    from io import BytesIO
+
+    from pypdf import PdfWriter
+
+    def fake_pdf(_html: str) -> bytes:
+        buf = BytesIO()
+        writer = PdfWriter()
+        writer.add_blank_page(width=72, height=72)
+        writer.write(buf)
+        return buf.getvalue()
+
+    monkeypatch.setattr("paperful.rewrite_pdf.html_to_pdf_bytes", fake_pdf)
+    src = tmp_path / "draft.md"
+    src.write_text(DRAFT, encoding="utf-8")
+    pack = _pack([_finding()], path=str(src))
+    result = build_rewrite(
+        cfg,
+        pack=pack,
+        manuscript=src,
+        areas=("style",),
+        outputs=("edits", "tracked", "pdf"),
+        comments="off",
+        dry_run=False,
+        llm_client=None,
+    )
+    folder = Path(result["pack_dir"])
+    assert (folder / "tracked.docx").is_file()
+    assert (folder / "tracked.pdf").is_file()
+    assert result.get("pdf") == "tracked.pdf"
+    assert (result.get("pdf_audit") or {}).get("structural") == []
+    from paperful.rewrite_pdf import html_from_paragraphs, pdf_structural_issues
+
+    html_doc = html_from_paragraphs(
+        ["Maritime Area beyond national jurisdictions"],
+        [
+            RewriteEdit(
+                kind="replace",
+                finding_ids=["a"],
+                area="style",
+                quote="Maritime Area beyond national jurisdictions",
+                replacement="Areas Beyond National Jurisdiction",
+            )
+        ],
+    )
+    assert "Areas Beyond National Jurisdiction" in html_doc
+    assert pdf_structural_issues(folder / "tracked.pdf") == []
