@@ -1,21 +1,22 @@
 {% extends "base.html" %}
 {% from "_help.html" import info %}
 {% from "_job_status.html" import job_status %}
-{% block title %}Rewrite — Paperful{% endblock %}
+{% block title %}Suggest edits — Paperful{% endblock %}
 {% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
 {% block content %}
-<h1>Rewrite</h1>
-<p class="page-lede">Apply an existing critique pack to a draft. Default area is hygiene/style. Writes <code>state/rewrites/</code> (edit plan, optional sidecar, tracked-changes Word). Never overwrites the source. Not a generated paper.</p>
+<h1>Suggest edits</h1>
+<p class="page-lede">Turn a critique pack into tracked changes in a copy of the Word file (edit plan, optional sidecar). Default area is hygiene/style. Writes <code>state/rewrites/</code>. Never overwrites the source. Not a generated paper.</p>
 {% if error == 'target' %}<div class="error-banner">Pick a critique pack. Optionally upload a replacement draft if the original file moved.</div>{% endif %}
 {% if error == 'format' %}<div class="error-banner">That file type is not supported.</div>{% endif %}
 {% if error == 'size' %}<div class="error-banner">The upload is larger than 40 MB.</div>{% endif %}
 {% if error and error not in ('target', 'format', 'size') %}<div class="error-banner">{{ error }}</div>{% endif %}
 
-{{ job_status(run_rec, 'Rewrite') }}
+{{ job_status(run_rec, 'Suggest edits') }}
 
 <section class="panel">
   <h2>From a critique pack</h2>
-  <p class="section-lede">Requires a pack under <code>state/critiques/</code>. Run Critique first. Dismissed findings are skipped.</p>
+  {% if recent %}
+  <p class="section-lede">Dismissed findings are skipped. The source file and Zotero stay unchanged.</p>
   <form method="post" action="/rewrite" class="toolbar" enctype="multipart/form-data">
     <label>Pack {{ info("Latest packs on disk. --pack on the CLI.") }}
       <select name="pack_dir">
@@ -51,11 +52,12 @@
     {% if not llm_on %}
     <p class="section-lede">[llm] is off. Style glossary/Vale substitutions still run. Other areas skip to needs_author.</p>
     {% endif %}
-    <button type="submit">Rewrite</button>
-    {{ info("Writes state/rewrites/<critique-id>/<stamp>/. Does not change the original file or Zotero.") }}
+    <button type="submit">Suggest edits</button>
+    {{ info("Writes state/rewrites/<critique-id>/<stamp>/. Does not change the original file or Zotero. CLI verb is rewrite.") }}
   </form>
-  {% if not recent %}
-  <p class="section-lede">No critique packs yet. Run Critique first.</p>
+  {% else %}
+  <p class="section-lede">Run Critique first. This page turns that pack into tracked changes in a copy of the Word file.</p>
+  <p><a href="/critique">Open Critique</a></p>
   {% endif %}
 </section>
 

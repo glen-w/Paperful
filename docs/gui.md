@@ -33,7 +33,7 @@ Three jobs sit on the default nav:
 | **Ask** | `ask`, `ask --from-file` | Cited answers from PDFs already copied to disk (`simple` / `advanced`; needs `[rag]` + `[llm]` and an index) |
 
 **Library**, **Activity**, and **System** support the loop. **Repair**, **Mirror**,
-**Index** (ingest / search / extract), **Briefs**, **Critique**, **Rewrite**, and **Settings** appear only
+**Index** (ingest / search / extract), **Briefs**, **Critique**, **Suggest edits**, and **Settings** appear only
 when **Advanced** is on (reveal only; does not enable Scholar, Sci-Hub, or LLM).
 
 ```text
@@ -182,21 +182,27 @@ Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
 **Critique** (Advanced): pick a collection item **or** drop a draft
 (pdf/docx/odt/html/rtf/txt/md/pptx, 40 MB). Writes `state/critiques/` (`pack.md`).
 Uploads stay under `state/critiques/uploads/` and are not imported to `out/`
-or Zotero. Optional review lanes (Reviewers, MARG-S, Adversary, Context library / web)
-need `[llm]` (item form also has force-LLM and write-child-note). Checkboxes
-are independent and pre-check from `[critique].lanes` (or the llm/advanced
-shims). GROBID sidecar is for MARG-S PDF chunks (pre-checked from
-`[grobid].enabled`; ticking it is `--grobid` even when that setting is false). Optional AI-model checkbox requests a Binoculars extra
-(not installed by default). Optional Vale checkbox runs house-style lint when
-`vale` is on PATH. The box is not pre-checked; `[critique].vale = true` still
-runs the pass. Optional Forensics (PaperGuard) checkbox runs `paperguard scan`
-when that binary is on PATH (`[critique].forensics = true` still runs the
-pass). Show-dismissed is item-only. Not a score. See
-[critique.md](critique.md).
-**Rewrite** (Advanced): pick a recent critique pack, optional replacement
-draft if the file moved, area/output/comments controls. Writes
-`state/rewrites/` (edit plan, optional sidecar, tracked-changes Word). Never
-overwrites the source. Style glossary/Vale swaps run with `[llm]` off. See
+or Zotero. Optional review lanes need `[llm]` (item form also has force-LLM
+and write-child-note). Checkboxes are labeled by what they return (independent
+reviewer notes; experiments/clarity/impact; argue against conclusions; claims
+this text supports; section gaps; compare with this library; compare with
+published work, goes online). Tooltips hold the lane ids (`reviewers`, `marg`,
+`adversary`, `claims`, `verify` — not a truth check, `context`,
+`context-web`). Checkboxes are independent and pre-check from
+`[critique].lanes` (or the llm/advanced shims). GROBID sidecar is for MARG-S /
+claims / verify PDF chunks (pre-checked from `[grobid].enabled`; ticking it is
+`--grobid` even when that setting is false). Optional AI-model checkbox
+requests a Binoculars extra (not installed by default). Optional Vale checkbox
+runs house-style lint when `vale` is on PATH. The box is not pre-checked;
+`[critique].vale = true` still runs the pass. Optional Forensics (PaperGuard)
+checkbox runs `paperguard scan` when that binary is on PATH
+(`[critique].forensics = true` still runs the pass). Show-dismissed is
+item-only. Not a score. See [critique.md](critique.md).
+**Suggest edits** (Advanced; `/rewrite`, CLI `paperful rewrite`): pick a
+recent critique pack, optional replacement draft if the file moved,
+area/output/comments controls. Writes `state/rewrites/` (edit plan, optional
+sidecar, tracked-changes Word). Never overwrites the source. Empty state:
+**Run Critique first**. Style glossary/Vale swaps run with `[llm]` off. See
 [rewrite.md](rewrite.md).
 
 **Stays CLI** (no GUI control): `session login`, `doctor --guide`, mid-run
@@ -282,7 +288,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/settings` | Write allowed `config.toml` fields |
 | GET | `/critique` | Advanced Critique: item picker, upload, last pack |
 | POST | `/critique` | Enqueue `critique` for `--item` or a staged `--file`; redirect `?run=` |
-| GET | `/rewrite` | Advanced Rewrite: recent critique packs, optional draft, area/output/comments |
+| GET | `/rewrite` | Advanced Suggest edits: recent critique packs, optional draft, area/output/comments; empty state Run Critique first |
 | POST | `/rewrite` | Enqueue `rewrite` for a pack (optional staged `--file`); redirect `?run=` |
 | GET | `/rewrite/download/{name}` | Download `pack.md` / `plan.json` / sidecar / `tracked.docx` from `state/rewrites/` |
 | POST | `/repair/preview` | Dry-run repair verb + review token |

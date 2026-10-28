@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 
 import pytest
@@ -67,7 +68,12 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     assert critique.status_code == 200
     rewrite = client.get("/rewrite")
     assert rewrite.status_code == 200
-    assert "pack_dir" in rewrite.text
+    assert "Suggest edits" in rewrite.text
+    assert "Run Critique first" in rewrite.text
+    assert 'href="/critique"' in rewrite.text
+    assert "name=\"pack_dir\"" not in rewrite.text
+    assert ">Rewrite</a>" not in res.text
+    assert ">Suggest edits</a>" in res.text
     assert "drop-zone" in critique.text
     assert 'name="item_key"' in critique.text
     assert 'name="file"' in critique.text
@@ -489,6 +495,21 @@ def test_pages_include_beginner_help(tmp_path, monkeypatch):
     settings = client.get("/settings")
     assert "Unpaywall needs a real email" in settings.text
 
+    critique = client.get("/critique")
+    assert critique.status_code == 200
+    assert "Get independent reviewer notes" in critique.text
+    assert "Argue against my conclusions" in critique.text
+    assert "Compare with published work (goes online)" in critique.text
+    assert "Find gaps section by section" in critique.text
+    assert "> MARG-S multi-agent" not in critique.text
+    assert "> Verify (section swarm)" not in critique.text
+    assert "> Claims (intra-doc ledger)" not in critique.text
+
+    rewrite = client.get("/rewrite")
+    assert rewrite.status_code == 200
+    assert "Run Critique first" in rewrite.text
+    assert "Turn a critique pack into tracked changes" in rewrite.text
+
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
 def test_critique_workbench_llm_checkboxes(tmp_path, monkeypatch):
@@ -529,6 +550,16 @@ def test_critique_workbench_llm_checkboxes(tmp_path, monkeypatch):
         assert 'value="claims"' in page.text
         assert 'value="verify"' in page.text
         assert 'name="grobid"' in page.text
+        assert "Get independent reviewer notes" in page.text
+        assert "Review experiments, clarity, and impact" in page.text
+        assert "Argue against my conclusions" in page.text
+        assert "Show which claims this text supports" in page.text
+        assert "Find gaps section by section" in page.text
+        assert "Compare with this library" in page.text
+        assert "Compare with published work (goes online)" in page.text
+        assert "Not a truth check" in page.text
+        assert "> MARG-S multi-agent" not in page.text
+        assert "> Verify (section swarm)" not in page.text
         assert page.text.count("checked") >= 3
         res = client.post(
             "/critique",
@@ -561,6 +592,33 @@ def test_critique_workbench_llm_checkboxes(tmp_path, monkeypatch):
         assert seen[0]["grobid"] is True
     finally:
         jobs.critique_fn = None
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_rewrite_form_after_critique_pack(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    pack = cfg.state_dir / "critiques" / "file-draft" / "20261027T000000Z"
+    pack.mkdir(parents=True)
+    (pack / "pack.json").write_text(
+        json.dumps({"input": {"title": "Draft"}, "counts": {"findings": 3}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _cfg, probe=False: [])
+    monkeypatch.setattr(
+        "paperful.ui.app.collections_tree",
+        lambda _cfg: {"ok": True, "collections": []},
+    )
+    client = TestClient(create_app(cfg))
+    client.cookies.set("pf_advanced", "1")
+    page = client.get("/rewrite")
+    assert page.status_code == 200
+    assert 'name="pack_dir"' in page.text
+    assert "Suggest edits" in page.text
+    assert "Run Critique first" not in page.text
+    assert ">Rewrite</a>" not in page.text
 
 
 def test_dockerfile_includes_serve_extra():

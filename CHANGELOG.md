@@ -6,6 +6,23 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+### Fixed
+
+- **Acronym hygiene no longer deletes preceding prose.** Glossary
+  `Full Name (TOKEN)` matching is bounded to the entry’s expansion/alias
+  widths (so `Part IV on … (EIA)` / `of areas … (BBNJ)` are not swallowed).
+  Expansion replacements keep `(TOKEN)`. Rewrite skips over-wide quotes from
+  older packs instead of applying them.
+
+### Changed
+
+- **Critique workbench lanes.** Checkboxes are labeled by what they return
+  (for example Argue against my conclusions; Compare with published work
+  (goes online)). Lane ids (`marg` / MARG-S, `verify`, `claims`, …) stay in
+  tooltips. `verify` is not a truth check.
+- **Suggest edits.** Advanced nav label for `/rewrite` (CLI remains
+  `paperful rewrite`). Empty state: Run Critique first.
+
 ## 1.6.1 — 2026-10-27
 
 ### Added

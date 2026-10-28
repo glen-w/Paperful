@@ -89,6 +89,40 @@ def _manuscript_path(pack: dict[str, Any], file_path: Path | None) -> Path | Non
     return None
 
 
+_ACRONYM_PAREN = re.compile(r"\(([A-Z]{2,12})\)\s*$")
+_LEADING_FUNCTION = frozenset(
+    {"the", "a", "an", "of", "and", "or", "for", "to", "in", "on", "at", "by"}
+)
+
+
+def _acronym_replacement(quote: str, suggested: str, finding: dict[str, Any]) -> str | None:
+    """Keep ``(TOKEN)`` when swapping a parenthetical expansion; refuse over-wide quotes."""
+    from .glossary import tokenize
+
+    extra = finding.get("extra") if isinstance(finding.get("extra"), dict) else {}
+    token = str(extra.get("token") or "").strip().upper()
+    paren = _ACRONYM_PAREN.search(quote)
+    bare_quote = _ACRONYM_PAREN.sub("", quote).strip()
+    bare_suggested = _ACRONYM_PAREN.sub("", suggested).strip()
+    q_toks = tokenize(bare_quote)
+    s_toks = tokenize(bare_suggested)
+    if q_toks and q_toks[0][2].lower() in _LEADING_FUNCTION:
+        if not s_toks or s_toks[0][2].lower() != q_toks[0][2].lower():
+            return None
+    if paren:
+        tok = (token or paren.group(1)).upper()
+        if tok and f"({tok})" not in suggested:
+            suggested = f"{suggested} ({tok})"
+            bare_suggested = _ACRONYM_PAREN.sub("", suggested).strip()
+            s_toks = tokenize(bare_suggested)
+        # Quote should be roughly ``expansion (TOKEN)`` — not ``Part IV on … (TOKEN)``.
+        if len(q_toks) > len(s_toks) + 1:
+            return None
+    elif len(q_toks) > len(s_toks) + 1:
+        return None
+    return suggested
+
+
 def _deterministic_edit(
     finding: dict[str, Any],
     aln: Alignment,
@@ -110,6 +144,13 @@ def _deterministic_edit(
     # Retracted cites never become a body delete.
     if code in COMMENT_ONLY_CODES:
         return None
+    if code in {"acronym_expansion_mismatch", "acronym_phrase_mismatch"}:
+        suggested_fixed = _acronym_replacement(quote, suggested, finding)
+        if suggested_fixed is None:
+            return None
+        suggested = suggested_fixed
+        if suggested == quote:
+            return None
     return RewriteEdit(
         kind="replace",
         finding_ids=[str(finding.get("id") or "")],

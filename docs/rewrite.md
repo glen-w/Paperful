@@ -1,9 +1,11 @@
 # Rewrite (apply a critique pack)
 
 `paperful rewrite` takes an existing [`critique`](critique.md) pack and
-proposes locatable edits. It is **apply-from-critique**, not a paper generator.
-It does not re-run critique, does not overwrite the source file, and does not
-write to the reference manager.
+proposes locatable edits. The Advanced workbench labels this **Suggest
+edits** so it is not read as “the AI rewrites my paper.” It is
+**apply-from-critique**, not a paper generator. It does not re-run critique,
+does not overwrite the source file, and does not write to the reference
+manager.
 
 Default area is **style** (hygiene: Vale, glossary/acronyms, prose). Other
 areas (`cites`, `structure`, `comments`) are opt-in. Outputs are an edit plan
@@ -92,8 +94,10 @@ drafts should not assume them. See [llm.md](llm.md).
 
 ## Workbench
 
-Advanced **Rewrite** (next to Critique): pick a recent critique pack, optional
-replacement draft, area/output/comments controls, download the result.
+Advanced **Suggest edits** (next to Critique; CLI is still `paperful rewrite`):
+pick a recent critique pack, optional replacement draft, area/output/comments
+controls, download the result. With no pack on disk, the page is empty except
+**Run Critique first**.
 
 ## See also
 

@@ -1,4 +1,4 @@
-"""Workbench HTTP routes (Advanced Rewrite)."""
+"""Workbench HTTP routes (Advanced Suggest edits; CLI verb rewrite)."""
 
 from __future__ import annotations
 

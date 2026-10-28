@@ -65,6 +65,8 @@ def test_scan_expansion_and_bare_phrase():
     assert {h.code for h in hits} == {"acronym_expansion_mismatch"}
     assert hits[0].token == "BBNJ"
     assert "Areas Beyond National Jurisdiction" in hits[0].detail
+    assert hits[0].suggested == "Areas Beyond National Jurisdiction (BBNJ)"
+    assert not hits[0].quote.lower().startswith("the maritime")
 
     phrase_body = (
         "Governance in Maritime Area beyond national jurisdictions remains contested."
@@ -73,6 +75,35 @@ def test_scan_expansion_and_bare_phrase():
     assert {h.code for h in hits} == {"acronym_phrase_mismatch"}
     assert "Maritime Area" in hits[0].quote
     assert hits[0].suggested == "Areas Beyond National Jurisdiction"
+
+
+def test_expansion_does_not_swallow_preceding_prose():
+    """Acronym hygiene must not delete 'of' / 'IV on' / section numerals."""
+    eia = GlossaryEntry(token="EIA", expansion="Environmental Impact Assessment")
+    body = (
+        "Part IV on environmental impact assessment (EIA) more. "
+        "Governance of areas beyond national jurisdiction (BBNJ) matters."
+    )
+    hits = scan_glossary(body, (BBNJ, eia))
+    assert hits == []
+
+    near = (
+        "resources of areas beyond national jurisdiction (BBNJ) were mapped. "
+        "Chapter IV on environmental impact assessments (EIA) follows."
+    )
+    eia_alias = GlossaryEntry(
+        token="EIA",
+        expansion="Environmental Impact Assessment",
+        aliases=("environmental impact assessments",),
+    )
+    hits = scan_glossary(near, (BBNJ, eia_alias))
+    quotes = {h.quote for h in hits}
+    assert not any(q.lower().startswith("of ") for q in quotes)
+    assert not any("IV on" in q or q.startswith("Chapter") for q in quotes)
+    for hit in hits:
+        if hit.code == "acronym_expansion_mismatch":
+            assert hit.quote.endswith(f"({hit.token})")
+            assert hit.suggested.endswith(f"({hit.token})")
 
 
 def test_canonical_phrase_and_expansion_are_silent():
@@ -158,7 +189,7 @@ def test_pack_includes_glossary_codes(cfg, tmp_path: Path, monkeypatch):
     row = next(f for f in pack["findings"] if f["code"] == "acronym_expansion_mismatch")
     assert row["lane"] == "checked"
     assert row["source"] == "glossary"
-    assert row["suggested"] == "Areas Beyond National Jurisdiction"
+    assert row["suggested"] == "Areas Beyond National Jurisdiction (BBNJ)"
 
 
 def test_load_and_vale_export(cfg):

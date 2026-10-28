@@ -403,23 +403,29 @@ summaries may still arrive in PaperGuard’s bundled language.
 
 Advanced **Critique** (not on the default Wanted/Discover/Ask nav): pick an
 item from the collection chip **or** drop a file. Same checkers as the CLI.
-When `[llm]` is on, review-lane checkboxes (**Reviewers**, **MARG-S
-multi-agent**, **Adversary (validity red-team)**, **Claims (intra-doc
-ledger)**, **Verify (section swarm)**, **Context (library)**,
-**Context (web)**) can be combined
-(pre-checked from `[critique].lanes`, or the llm/advanced shims when `lanes`
-is empty). **GROBID sidecar** is for MARG-S / claims / verify chunks
+When `[llm]` is on, review-lane checkboxes are labeled by what they return
+and can be combined (pre-checked from `[critique].lanes`, or the llm/advanced
+shims when `lanes` is empty). Visible labels: **Get independent reviewer
+notes**, **Review experiments, clarity, and impact**, **Argue against my
+conclusions**, **Show which claims this text supports**, **Find gaps section
+by section**, **Compare with this library**, **Compare with published work
+(goes online)**. Tooltips hold the lane ids (`reviewers`, `marg` / MARG-S,
+`adversary`, `claims`, `verify` — not a truth check, `context`,
+`context-web`). **GROBID sidecar** is for MARG-S / claims / verify chunks
 (pre-checked from `[grobid].enabled`).
 Library item form also has force-LLM past identity lint. **Write child note** is `--apply` (item
 only). **Show dismissed** is `--show-dismissed`. **AI model** is `--ai-model`.
 **Vale** is `--vale`. The Vale checkbox is not pre-checked; `[critique].vale =
 true` still runs the pass even if the box is empty. **Forensics (PaperGuard)**
 is `--forensics` (same on-switch pattern). Uploads have no apply /
-force / dismissed controls.
+force / dismissed controls. To turn a pack into tracked changes in a copy of
+the Word file, use workbench **Suggest edits** ([`rewrite`](rewrite.md);
+CLI `paperful rewrite`).
 
 ## Config
 
 See `[critique]` in [config.md](config.md) and `config.example.toml`.
 
 To turn findings into locatable edits (tracked-changes Word, sidecar, or an
-edit list), use [`rewrite`](rewrite.md). `rewrite` never re-runs critique.
+edit list), use [`rewrite`](rewrite.md) (workbench **Suggest edits**).
+`rewrite` never re-runs critique.

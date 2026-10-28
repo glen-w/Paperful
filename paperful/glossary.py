@@ -25,10 +25,12 @@ _SMALL = frozenset(
     {"the", "a", "an", "of", "and", "or", "for", "to", "in", "on", "at", "by"}
 )
 _WORD = re.compile(r"[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*")
-# Same shapes as critique undefined-acronym: ``Full Name (TOKEN)`` or ``TOKEN (Full Name)``.
-EXPANSION_RE = re.compile(
-    r"\b([A-Z][A-Za-z0-9][A-Za-z0-9 -]{2,80})\s+\(([A-Z]{2,12})\)"
-    r"|\b([A-Z]{2,12})\s+\(([A-Z][A-Za-z0-9][A-Za-z0-9 -]{2,80})\)"
+# Parenthetical acronym; left-hand expansion is bounded by glossary widths
+# (not a greedy multi-word span that swallows "Part IV on" / "of").
+_TOKEN_PAREN_RE = re.compile(r"\(([A-Z]{2,12})\)")
+# ``TOKEN (Full Name)`` — expansion is inside parens, so length is bounded.
+_TOKEN_THEN_EXPANSION_RE = re.compile(
+    r"\b([A-Z]{2,12})\s+\(([A-Z][A-Za-z0-9][A-Za-z0-9 '’\-]{2,80})\)"
 )
 
 
@@ -208,6 +210,83 @@ def _is_known_mismatch(
     )
 
 
+def _entry_phrase_widths(entry: GlossaryEntry) -> tuple[int, ...]:
+    widths = {len(tokenize(entry.expansion))}
+    for alias in entry.aliases:
+        n = len(tokenize(alias))
+        if n:
+            widths.add(n)
+    return tuple(sorted(w for w in widths if w >= 1))
+
+
+def _window_starts_like_target(window_tokens: list[str], target: str) -> bool:
+    """Reject windows that begin with a function word the target does not."""
+    if not window_tokens:
+        return False
+    first = window_tokens[0].lower()
+    if first not in _SMALL:
+        return True
+    target_tokens = tokenize(target)
+    if not target_tokens:
+        return False
+    return target_tokens[0][2].lower() in _SMALL
+
+
+def _best_left_expansion(
+    body: str,
+    tokens: list[tuple[int, int, str]],
+    paren_start: int,
+    entry: GlossaryEntry,
+    *,
+    similarity_min: float,
+) -> tuple[int, int, str] | None:
+    """Pick a left-hand expansion ending at ``paren_start``, width from glossary.
+
+    Prefers a known mismatch (alias / near-miss) over a shorter suffix that
+    happens to equal the canonical expansion — e.g. ``Maritime Areas … (BBNJ)``
+    must not be silenced because ``Areas …`` alone is canonical.
+    """
+    before = [tok for tok in tokens if tok[1] <= paren_start]
+    if not before:
+        return None
+    # (score, -width, start, exp_end, expansion_text) — higher score, then
+    # fewer tokens, so we do not drag in "Part IV on" when a short match works.
+    best: tuple[float, int, int, int, str] | None = None
+    canonical_start: int | None = None
+    for width in _entry_phrase_widths(entry):
+        if width > len(before):
+            continue
+        chosen = before[-width:]
+        words = [tok[2] for tok in chosen]
+        if not _window_starts_like_target(words, entry.expansion) and not any(
+            _window_starts_like_target(words, alias) for alias in entry.aliases
+        ):
+            continue
+        expansion_text = body[chosen[0][0] : chosen[-1][1]]
+        start = chosen[0][0]
+        exp_end = chosen[-1][1]
+        if normalize_phrase(expansion_text) == normalize_phrase(entry.expansion):
+            canonical_start = start
+            continue
+        if not _is_known_mismatch(
+            expansion_text, entry, similarity_min=similarity_min
+        ):
+            continue
+        score = max(
+            [phrase_similarity(expansion_text, entry.expansion)]
+            + [phrase_similarity(expansion_text, alias) for alias in entry.aliases]
+        )
+        candidate = (score, -width, start, exp_end, expansion_text)
+        if best is None or candidate > best:
+            best = candidate
+    if best is not None:
+        return best[2], best[3], best[4]
+    if canonical_start is not None:
+        # Signal "correct expansion" to the caller via a reserved span only.
+        return canonical_start, paren_start, ""
+    return None
+
+
 def scan_glossary(
     body: str,
     entries: tuple[GlossaryEntry, ...] | list[GlossaryEntry],
@@ -223,11 +302,55 @@ def scan_glossary(
     expansion_spans: list[tuple[int, int]] = []
     hits: list[GlossaryHit] = []
 
-    for match in EXPANSION_RE.finditer(body):
-        token = (match.group(2) or match.group(3) or "").upper()
-        expansion_text = match.group(1) or match.group(4) or ""
+    # Form: Full Name (TOKEN) — bound left span to glossary phrase widths.
+    for match in _TOKEN_PAREN_RE.finditer(body):
+        token = match.group(1).upper()
+        entry = by_token.get(token)
+        if entry is None:
+            continue
+        # Skip ``TOKEN (Full Name)`` handled below (token immediately before '(').
+        prev = [tok for tok in tokens if tok[1] <= match.start()]
+        if prev and prev[-1][2].upper() == token and prev[-1][1] < match.start():
+            gap = body[prev[-1][1] : match.start()]
+            if gap.strip() == "":
+                continue
+        picked = _best_left_expansion(
+            body, tokens, match.start(), entry, similarity_min=threshold
+        )
+        if picked is None:
+            expansion_spans.append((match.start(), match.end()))
+            continue
+        start, _exp_end, expansion_text = picked
+        end = match.end()
+        expansion_spans.append((start, end))
+        if not expansion_text:
+            # Canonical ``Expansion (TOKEN)`` — reserve span, no finding.
+            continue
+        quote = body[start:end]
+        suggested = f"{entry.expansion} ({entry.token})"
+        hits.append(
+            GlossaryHit(
+                code="acronym_expansion_mismatch",
+                start=start,
+                end=end,
+                quote=quote,
+                token=entry.token,
+                suggested=suggested,
+                detail=(
+                    f"{entry.token} expansion {expansion_text!r} should be "
+                    f"{entry.expansion!r}."
+                ),
+            )
+        )
+
+    # Form: TOKEN (Full Name)
+    for match in _TOKEN_THEN_EXPANSION_RE.finditer(body):
+        token = match.group(1).upper()
+        expansion_text = match.group(2) or ""
         entry = by_token.get(token)
         if entry is None or not expansion_text.strip():
+            continue
+        if _overlaps(match.start(), match.end(), expansion_spans):
             continue
         expansion_spans.append((match.start(), match.end()))
         if normalize_phrase(expansion_text) == normalize_phrase(entry.expansion):
@@ -235,6 +358,7 @@ def scan_glossary(
         if not _is_known_mismatch(expansion_text, entry, similarity_min=threshold):
             continue
         quote = body[match.start() : match.end()]
+        suggested = f"{entry.token} ({entry.expansion})"
         hits.append(
             GlossaryHit(
                 code="acronym_expansion_mismatch",
@@ -242,7 +366,7 @@ def scan_glossary(
                 end=match.end(),
                 quote=quote,
                 token=entry.token,
-                suggested=entry.expansion,
+                suggested=suggested,
                 detail=(
                     f"{entry.token} expansion {expansion_text!r} should be "
                     f"{entry.expansion!r}."
@@ -269,7 +393,10 @@ def scan_glossary(
                 end = tokens[i + width - 1][1]
                 if start in seen_starts or _overlaps(start, end, used_spans):
                     continue
-                window = " ".join(tok[2] for tok in tokens[i : i + width])
+                window_toks = [tok[2] for tok in tokens[i : i + width]]
+                if not _window_starts_like_target(window_toks, target):
+                    continue
+                window = " ".join(window_toks)
                 if normalize_phrase(window) == normalize_phrase(entry.expansion):
                     continue
                 if fuzzy:

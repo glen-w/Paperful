@@ -125,6 +125,36 @@ def test_glossary_suggested_is_deterministic(cfg, tmp_path: Path):
     assert src.read_text(encoding="utf-8") == DRAFT  # never overwrite
 
 
+def test_overwide_acronym_quote_is_not_applied(cfg, tmp_path: Path):
+    """Old packs that swallowed 'IV on' / 'of' must not delete that prose."""
+    src = tmp_path / "draft.md"
+    text = "Part IV on environmental impact assessment (EIA) more.\n"
+    src.write_text(text, encoding="utf-8")
+    finding = _finding(
+        code="acronym_expansion_mismatch",
+        quote="IV on environmental impact assessment (EIA)",
+        detail="EIA expansion should be Environmental Impact Assessment",
+        extra={
+            "token": "EIA",
+            "suggested": "Environmental Impact Assessment",
+        },
+    )
+    result = build_rewrite(
+        cfg,
+        pack=_pack([finding], path=str(src)),
+        manuscript=src,
+        areas=("style",),
+        outputs=("edits",),
+        comments="off",
+        dry_run=True,
+        llm_client=None,
+    )
+    edits = (result.get("plan") or {}).get("edits") or []
+    assert edits == []
+    skips = (result.get("plan") or {}).get("skips") or []
+    assert any(s.get("reason") == "needs_author" for s in skips)
+
+
 def test_overlapping_spans_drop_later():
     a = RewriteEdit(
         kind="replace",
@@ -286,6 +316,128 @@ def test_tracked_docx_insert_delete(tmp_path: Path):
         xml = zf.read("word/document.xml").decode("utf-8")
     assert "w:ins" in xml or "ins" in xml
     assert "Areas Beyond National Jurisdiction" in xml
+    assert "ns0:" not in xml
+
+
+def _docx_with_comment(path: Path, *, para: str, comment_id: str, body: str) -> None:
+    document = (
+        '<?xml version="1.0"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        "<w:p>"
+        f'<w:commentRangeStart w:id="{comment_id}"/>'
+        f"<w:r><w:t>{para}</w:t></w:r>"
+        f'<w:commentRangeEnd w:id="{comment_id}"/>'
+        f'<w:r><w:commentReference w:id="{comment_id}"/></w:r>'
+        "</w:p>"
+        "</w:document>"
+    )
+    comments = (
+        '<?xml version="1.0"?>'
+        '<w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        f'<w:comment w:id="{comment_id}" w:author="Glen" w:initials="GW">'
+        f"<w:p><w:r><w:t>{body}</w:t></w:r></w:p>"
+        "</w:comment>"
+        "</w:comments>"
+    )
+    rels = (
+        '<?xml version="1.0"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rIdCmt1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" '
+        'Target="comments.xml"/>'
+        "</Relationships>"
+    )
+    ctypes = (
+        '<?xml version="1.0"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Override PartName="/word/document.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        '<Override PartName="/word/comments.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml"/>'
+        "</Types>"
+    )
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("word/document.xml", document)
+        zf.writestr("word/comments.xml", comments)
+        zf.writestr("word/_rels/document.xml.rels", rels)
+        zf.writestr("[Content_Types].xml", ctypes)
+
+
+def test_tracked_docx_keeps_existing_comments(tmp_path: Path):
+    src = tmp_path / "src.docx"
+    _docx_with_comment(
+        src,
+        para="The regime applies in areas beyond national jurisdiction.",
+        comment_id="0",
+        body="Author note on the title claim.",
+    )
+    dest = tmp_path / "out.docx"
+    edit = RewriteEdit(
+        kind="comment",
+        finding_ids=["c"],
+        area="comments",
+        quote="areas beyond national jurisdiction",
+        body="Paperful note on the locatable span.",
+    )
+    skips = apply_tracked_docx(src, dest, [edit])
+    assert skips == []
+    with zipfile.ZipFile(dest) as zf:
+        comments = zf.read("word/comments.xml").decode("utf-8")
+        doc = zf.read("word/document.xml").decode("utf-8")
+        rels = zf.read("word/_rels/document.xml.rels").decode("utf-8")
+    assert "Author note on the title claim." in comments
+    assert "Paperful note on the locatable span." in comments
+    assert 'w:id="0"' in comments
+    assert 'w:id="1"' in comments
+    assert "ns0:" not in comments
+    assert "ns0:" not in doc
+    assert "comments.xml" in rels
+    assert rels.count("comments.xml") == 1
+
+
+def test_tracked_docx_multiple_comments_per_paragraph(tmp_path: Path):
+    src = tmp_path / "src.docx"
+    _docx_with_comment(
+        src,
+        para="Neither requires assessment of food-web effects. Screening should be usual.",
+        comment_id="0",
+        body="Author note.",
+    )
+    dest = tmp_path / "out.docx"
+    edits = [
+        RewriteEdit(
+            kind="comment",
+            finding_ids=["c1"],
+            area="comments",
+            quote="Neither requires assessment of food-web effects",
+            body="First paperful note.",
+        ),
+        RewriteEdit(
+            kind="comment",
+            finding_ids=["c2"],
+            area="comments",
+            quote="Screening should be usual",
+            body="Second paperful note.",
+        ),
+        RewriteEdit(
+            kind="replace",
+            finding_ids=["r1"],
+            area="style",
+            quote="food-web effects",
+            replacement="food web effects",
+        ),
+    ]
+    skips = apply_tracked_docx(src, dest, edits)
+    assert skips == []
+    with zipfile.ZipFile(dest) as zf:
+        comments = zf.read("word/comments.xml").decode("utf-8")
+        doc = zf.read("word/document.xml").decode("utf-8")
+    assert "Author note." in comments
+    assert "First paperful note." in comments
+    assert "Second paperful note." in comments
+    assert "food web effects" in doc
+    assert doc.count("commentRangeStart") >= 3
+    assert "w:ins" in doc or "ins" in doc
 
 
 def test_build_docx_from_paragraphs(tmp_path: Path):
@@ -304,6 +456,9 @@ def test_build_docx_from_paragraphs(tmp_path: Path):
         names = zf.namelist()
         assert "word/document.xml" in names
         assert "word/comments.xml" in names
+        comments = zf.read("word/comments.xml").decode("utf-8")
+    assert "Check this claim." in comments
+    assert "ns0:" not in comments
 
 
 def test_worklog_lists_needs_author(cfg, tmp_path: Path):
