@@ -179,7 +179,11 @@ def _parse_date(raw: str) -> str:
 def _openalex_client(cfg: Config, client: Any = None) -> OpenAlexClient:
     if client is not None:
         return client
-    return OpenAlexClient(email=cfg.email, store=store_from_config(cfg))
+    return OpenAlexClient(
+        email=cfg.email,
+        store=store_from_config(cfg),
+        store_fail_limit=int(getattr(cfg, "openalex_store_fail_limit", 3) or 3),
+    )
 
 
 def save_list(cfg: Config, name: str) -> Path:

@@ -16,7 +16,7 @@ import httpx
 from ..resolve import normalize_doi
 from .candidate import Candidate
 from .expand import cap_ids
-from .local_openalex import title_matches
+from .local_openalex import store_can_apply_search, title_matches
 
 API = "https://api.openalex.org"
 KEY_URL = "https://openalex.org/settings/api"
@@ -65,6 +65,7 @@ class OpenAlexClient:
         backoff_cap_s: float = 60.0,
         budget_wait_s: float = 0.0,
         store: Any = None,
+        store_fail_limit: int = 3,
     ):
         self.email = email
         self.api_key = api_key if api_key is not None else os.environ.get("OPENALEX_API_KEY", "")
@@ -82,12 +83,15 @@ class OpenAlexClient:
         self.study_designs: tuple[str, ...] = ()
         self._getter = getter
         self.store = store
+        self.store_fail_limit = max(1, int(store_fail_limit))
         self.requests = 0
         self.retries = 0
         self.status_429 = 0
         self._last = 0.0
         self._budget: OpenAlexBudgetExceeded | None = None
         self._store_only = False
+        self._store_failures = 0
+        self._store_skipped = False
         self._using_key = False
         self._http_client: httpx.Client | None = None
 
@@ -374,13 +378,25 @@ class OpenAlexClient:
         out.sort(key=lambda item: item[0])
         return out
 
+    def _store_ready(self) -> bool:
+        return self.store is not None and not self._store_skipped
+
+    def _note_store_failure(self, exc: BaseException, *, kind: str = "") -> None:
+        self._store_failures += 1
+        label = "citing failed" if kind == "citing" else "failed"
+        self.note(f"openalex store {label} · {exc}")
+        if self._store_skipped or self._store_failures < self.store_fail_limit:
+            return
+        self._store_skipped = True
+        self.note(f"openalex store skipped after {self._store_failures} failures")
+
     def _store_work_by_doi(self, doi: str) -> dict[str, Any] | None:
-        if self.store is None:
+        if not self._store_ready():
             return None
         try:
             hit = self.store.work_by_doi(doi)
         except Exception as exc:
-            self.note(f"openalex store failed · {exc}")
+            self._note_store_failure(exc)
             return None
         if hit is not None and (hit.get("id") or hit.get("doi")):
             return hit
@@ -388,18 +404,26 @@ class OpenAlexClient:
 
     def work_by_doi(self, doi: str) -> dict[str, Any] | None:
         cleaned = normalize_doi(doi) or ""
-        if cleaned:
-            hit = self._store_work_by_doi(cleaned)
-            if hit is not None:
-                self.note("openalex store · 1/1 doi")
-                return hit
-        if self._api_blocked():
-            if self.store is not None:
+        if not self._api_blocked():
+            try:
+                payload = self.get(
+                    f"/works/https://doi.org/{cleaned or doi}", {"select": SELECT}
+                )
+            except OpenAlexBudgetExceeded:
+                if not self._store_ready():
+                    raise
+            else:
+                if payload.get("id") or payload.get("doi"):
+                    return payload
                 return None
+        hit = self._store_work_by_doi(cleaned)
+        if hit is not None:
+            self.note("openalex store · 1/1 doi")
+            return hit
+        if self._api_blocked() and self.store is not None:
+            return None
+        if self._api_blocked():
             raise self._budget or OpenAlexBudgetExceeded("OpenAlex daily budget is spent")
-        payload = self.get(f"/works/https://doi.org/{cleaned or doi}", {"select": SELECT})
-        if payload.get("id") or payload.get("doi"):
-            return payload
         return None
 
     def works_by_dois(
@@ -409,12 +433,32 @@ class OpenAlexClient:
         ids = [doi for doi in dois if doi]
         if not ids:
             return []
-        by_doi: dict[str, dict[str, Any]] = {}
-        if self.store is not None:
+        api_by_doi: dict[str, dict[str, Any]] = {}
+        need_store = self._api_blocked()
+        if not need_store:
+            api_rows: list[dict[str, Any]] = []
             try:
-                stored = self.store.works_by_dois(ids, select=select)
+                for start in range(0, len(ids), 50):
+                    api_rows.extend(self._doi_batch(ids[start : start + 50], select=select))
+            except OpenAlexBudgetExceeded as exc:
+                need_store = True
+                if not self._store_ready():
+                    exc.partial = api_rows + list(exc.partial or [])
+                    raise
+            api_by_doi = {
+                (normalize_doi(str(row.get("doi") or "")) or ""): row
+                for row in api_rows
+                if normalize_doi(str(row.get("doi") or ""))
+            }
+        by_doi: dict[str, dict[str, Any]] = {}
+        pending_store = [
+            d for d in ids if (normalize_doi(d) or d.strip().lower()) not in api_by_doi
+        ]
+        if need_store and pending_store and self._store_ready():
+            try:
+                stored = self.store.works_by_dois(pending_store, select=select)
             except Exception as exc:
-                self.note(f"openalex store failed · {exc}")
+                self._note_store_failure(exc)
                 stored = []
             for row in stored:
                 key = normalize_doi(str(row.get("doi") or "")) or ""
@@ -422,58 +466,19 @@ class OpenAlexClient:
                     by_doi[key] = row
             if by_doi:
                 self.note(f"openalex store · {len(by_doi)}/{len(ids)} dois")
-        pending_api = [
-            d for d in ids if (normalize_doi(d) or d.strip().lower()) not in by_doi
-        ]
-        if pending_api and self._api_blocked():
-            # Budget spent: keep store hits; do not raise when a snapshot is wired.
-            if self.store is not None:
-                return [
-                    by_doi[normalize_doi(d) or d.strip().lower()]
-                    for d in ids
-                    if (normalize_doi(d) or d.strip().lower()) in by_doi
-                ]
-            raise self._budget or OpenAlexBudgetExceeded("OpenAlex daily budget is spent")
-        api_by_doi: dict[str, dict[str, Any]] = {}
-        if pending_api:
-            api_rows: list[dict[str, Any]] = []
-            for start in range(0, len(pending_api), 50):
-                batch = pending_api[start : start + 50]
-                try:
-                    api_rows.extend(self._doi_batch(batch, select=select))
-                except OpenAlexBudgetExceeded as exc:
-                    partial = [
-                        by_doi[normalize_doi(d) or d.strip().lower()]
-                        for d in ids
-                        if (normalize_doi(d) or d.strip().lower()) in by_doi
-                    ]
-                    # Prefer store/partial over a hard stop when the snapshot can serve.
-                    if self.store is not None:
-                        api_by_doi = {
-                            (normalize_doi(str(row.get("doi") or "")) or ""): row
-                            for row in api_rows
-                            if normalize_doi(str(row.get("doi") or ""))
-                        }
-                        merged_partial = [
-                            by_doi.get(normalize_doi(d) or d.strip().lower())
-                            or api_by_doi.get(normalize_doi(d) or d.strip().lower())
-                            for d in ids
-                        ]
-                        return [row for row in merged_partial if row is not None]
-                    exc.partial = partial + api_rows + list(exc.partial or [])
-                    raise
-            api_by_doi = {
-                (normalize_doi(str(row.get("doi") or "")) or ""): row
-                for row in api_rows
-                if normalize_doi(str(row.get("doi") or ""))
-            }
         merged: list[dict[str, Any]] = []
         for doi in ids:
             key = normalize_doi(doi) or doi.strip().lower()
-            if key in by_doi:
-                merged.append(by_doi[key])
-            elif key in api_by_doi:
+            if key in api_by_doi:
                 merged.append(api_by_doi[key])
+            elif key in by_doi:
+                merged.append(by_doi[key])
+        if merged:
+            return merged
+        if self._api_blocked() and self.store is not None:
+            return []
+        if self._api_blocked():
+            raise self._budget or OpenAlexBudgetExceeded("OpenAlex daily budget is spent")
         return merged
 
     def _doi_batch(self, batch: list[str], *, select: str) -> list[dict[str, Any]]:
@@ -502,12 +507,12 @@ class OpenAlexClient:
 
     def _store_works_by_ids(self, openalex_ids: list[str]) -> dict[str, dict[str, Any]]:
         by_id: dict[str, dict[str, Any]] = {}
-        if self.store is None or not openalex_ids:
+        if not self._store_ready() or not openalex_ids:
             return by_id
         try:
             stored = self.store.works_by_ids(openalex_ids)
         except Exception as exc:
-            self.note(f"openalex store failed · {exc}")
+            self._note_store_failure(exc)
             return by_id
         for row in stored:
             key = short_id(str(row.get("id") or ""))
@@ -541,63 +546,56 @@ class OpenAlexClient:
         if self.tally is not None and ids:
             self.tally.track(len(ids))
         if text:
-            if self._api_blocked():
-                if self.store is None:
-                    raise self._budget or OpenAlexBudgetExceeded(
-                        "OpenAlex daily budget is spent"
-                    )
-                by_id = self._filter_store_by_title(self._store_works_by_ids(ids), text)
-                if by_id:
-                    self.note(
-                        f"openalex store · {len(by_id)}/{len(ids)} ids (title match)"
-                    )
-                    if self.tally is not None:
-                        self.tally.advance(len(by_id))
-                return [by_id[short_id(i)] for i in ids if short_id(i) in by_id]
-            try:
-                return self._works_by_ids_api(ids, search=text)
-            except OpenAlexBudgetExceeded:
-                if self.store is None:
-                    raise
-                by_id = self._filter_store_by_title(self._store_works_by_ids(ids), text)
-                if by_id:
-                    self.note(
-                        f"openalex store · {len(by_id)}/{len(ids)} ids (title match)"
-                    )
-                    if self.tally is not None:
-                        self.tally.advance(len(by_id))
-                return [by_id[short_id(i)] for i in ids if short_id(i) in by_id]
-
-        if self.store is None:
-            if self._api_blocked():
+            if not self._api_blocked():
+                try:
+                    return self._works_by_ids_api(ids, search=text)
+                except OpenAlexBudgetExceeded:
+                    if not self._store_ready():
+                        raise
+            elif not self._store_ready():
                 raise self._budget or OpenAlexBudgetExceeded(
                     "OpenAlex daily budget is spent"
                 )
-            return self._works_by_ids_api(ids, search=None)
-
-        by_id = self._store_works_by_ids(ids)
-        missing = [i for i in ids if short_id(i) not in by_id]
-        satisfied = len(ids) - len(missing)
-        if satisfied:
-            self.note(f"openalex store · {satisfied}/{len(ids)} ids")
-            if self.tally is not None:
-                self.tally.advance(satisfied)
-        if missing and self._api_blocked():
+            by_id = self._filter_store_by_title(self._store_works_by_ids(ids), text)
+            if by_id:
+                self.note(f"openalex store · {len(by_id)}/{len(ids)} ids (title match)")
+                if self.tally is not None:
+                    self.tally.advance(len(by_id))
             return [by_id[short_id(i)] for i in ids if short_id(i) in by_id]
-        if missing:
+
+        by_id: dict[str, dict[str, Any]] = {}
+        if not self._api_blocked():
             try:
-                for row in self._works_by_ids_api(missing, search=None):
+                rows = self._works_by_ids_api(ids, search=None)
+            except OpenAlexBudgetExceeded as exc:
+                for row in list(exc.partial or []):
                     key = short_id(str(row.get("id") or ""))
                     if key:
                         by_id[key] = row
-            except OpenAlexBudgetExceeded as exc:
-                partial = [by_id[short_id(i)] for i in ids if short_id(i) in by_id]
-                # Snapshot is available: return what we have instead of stopping the crawl.
-                if self.store is not None:
-                    return partial + list(exc.partial or [])
-                exc.partial = partial + list(exc.partial or [])
-                raise
-        return [by_id[short_id(i)] for i in ids if short_id(i) in by_id]
+                if not self._store_ready():
+                    if by_id:
+                        return [by_id[short_id(i)] for i in ids if short_id(i) in by_id]
+                    raise
+            else:
+                return rows
+        missing = [i for i in ids if short_id(i) not in by_id]
+        if missing and self._store_ready():
+            stored = self._store_works_by_ids(missing)
+            by_id.update(stored)
+            if stored:
+                self.note(f"openalex store · {len(stored)}/{len(ids)} ids")
+                if self.tally is not None:
+                    self.tally.advance(len(stored))
+        ordered = [by_id[short_id(i)] for i in ids if short_id(i) in by_id]
+        if ordered:
+            return ordered
+        if self._api_blocked() and self.store is not None:
+            return []
+        if self._api_blocked():
+            raise self._budget or OpenAlexBudgetExceeded(
+                "OpenAlex daily budget is spent"
+            )
+        return ordered
 
     def _works_by_ids_api(
         self, openalex_ids: list[str], *, search: str | None = None
@@ -628,8 +626,7 @@ class OpenAlexClient:
         return out
 
     def _store_can_cite(self) -> bool:
-        store = self.store
-        return store is not None and bool(getattr(store, "has_cites_index", False))
+        return self._store_ready() and bool(getattr(self.store, "has_cites_index", False))
 
     def _store_works_citing(
         self,
@@ -641,8 +638,10 @@ class OpenAlexClient:
         sort: str | None = None,
         search: str | None = None,
     ) -> list[dict[str, Any]] | None:
-        """Try the snapshot cites index. None means fall through to the API."""
+        """Try the snapshot cites index. None means the store did not serve this call."""
         if not self._store_can_cite():
+            return None
+        if not store_can_apply_search(search):
             return None
         try:
             rows = self.store.works_citing(
@@ -654,7 +653,7 @@ class OpenAlexClient:
                 search=search,
             )
         except Exception as exc:
-            self.note(f"openalex store citing failed · {exc}")
+            self._note_store_failure(exc, kind="citing")
             return None
         return list(rows or [])
 
@@ -682,38 +681,42 @@ class OpenAlexClient:
         # Store cannot apply created-date or study_design filters; skip when set
         # unless the API is blocked (then title/year citing is better than nothing).
         store_ok = not (from_created_date or study_designs) or self._api_blocked()
-        if store_ok:
-            stored = self._store_works_citing(
-                oa,
-                limit=limit,
-                year_from=year_from,
-                year_to=year_to,
-                sort=sort,
-                search=search,
-            )
-            if stored is not None:
-                if stored:
-                    self.note(f"openalex store · {len(stored)} citing")
-                    return stored
-                if self._api_blocked():
-                    return []
-                # Empty store result: fall through to API while budget remains.
-        if self._api_blocked():
-            if self._store_can_cite():
+        if not self._api_blocked():
+            try:
+                return self._works_citing_api(
+                    oa,
+                    limit=limit,
+                    year_from=year_from,
+                    year_to=year_to,
+                    sort=sort,
+                    from_created_date=from_created_date,
+                    search=search,
+                    study_designs=study_designs,
+                )
+            except OpenAlexBudgetExceeded:
+                if not store_ok or not self._store_ready():
+                    raise
+        elif not store_ok:
+            if self.store is not None:
                 return []
             raise self._budget or OpenAlexBudgetExceeded(
                 "OpenAlex daily budget is spent"
             )
-        return self._works_citing_api(
+        stored = self._store_works_citing(
             oa,
             limit=limit,
             year_from=year_from,
             year_to=year_to,
             sort=sort,
-            from_created_date=from_created_date,
             search=search,
-            study_designs=study_designs,
         )
+        if stored is not None:
+            if stored:
+                self.note(f"openalex store · {len(stored)} citing")
+            return stored
+        if self._api_blocked() and self.store is not None:
+            return []
+        raise self._budget or OpenAlexBudgetExceeded("OpenAlex daily budget is spent")
 
     def _works_citing_api(
         self,
@@ -744,22 +747,7 @@ class OpenAlexClient:
             params["search"] = text
         if sort:
             params["sort"] = sort
-        try:
-            return self._collect("/works", params, limit)
-        except OpenAlexBudgetExceeded:
-            stored = self._store_works_citing(
-                oa,
-                limit=limit,
-                year_from=year_from,
-                year_to=year_to,
-                sort=sort,
-                search=search,
-            )
-            if stored is not None:
-                if stored:
-                    self.note(f"openalex store · {len(stored)} citing (budget)")
-                return stored
-            raise
+        return self._collect("/works", params, limit)
 
     def works_by_keywords(
         self,

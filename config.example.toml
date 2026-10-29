@@ -416,7 +416,8 @@ concurrency = 2
 #
 # Optional. Most users leave this unset — see docs/config.md#advanced.
 # Download or host the OpenAlex parquet snapshot yourself; Paperful does not ship it.
-# DOI/id lookups try the store first. Citing needs a cites index:
+# Live API first; snapshot is the fallback when the daily budget is spent.
+# Citing needs a cites index:
 #   paperful openalex-store build-cites
 # then set cites_index_glob. Build is resumable (per updated_date + .done
 # markers). Store cites-query is title-only (display_name).
@@ -428,6 +429,7 @@ concurrency = 2
 # cites_index_glob = "/data/openalex/cites/**/*.parquet"
 # # duckdb_bin = "duckdb"
 # # timeout_s = 120
+# # fail_limit = 3              # skip the store after this many fallback errors in one run
 # # build_timeout_s = 7200
 # # snapshot_date = "2026-10-14"  # full snapshot you loaded; doctor warns if older than 14 Oct 2026
 # # ssh_host = "nuc"         # ssh_duckdb only

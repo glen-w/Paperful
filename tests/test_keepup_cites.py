@@ -198,14 +198,14 @@ def test_client_helper_builds_openalex_client(tmp_path, monkeypatch):
     seen = {}
 
     class FakeOA:
-        def __init__(self, *, email, store):
-            seen.update(email=email, store=store)
+        def __init__(self, *, email, store, store_fail_limit=3):
+            seen.update(email=email, store=store, store_fail_limit=store_fail_limit)
 
     monkeypatch.setattr(keepup_cites, "OpenAlexClient", FakeOA)
     monkeypatch.setattr(keepup_cites, "store_from_config", lambda cfg: "STORE")
     built = keepup_cites._client(_cfg(tmp_path))
     assert isinstance(built, FakeOA)
-    assert seen == {"email": "t@example.org", "store": "STORE"}
+    assert seen == {"email": "t@example.org", "store": "STORE", "store_fail_limit": 3}
 
 
 def test_baseline_collects_current_citers(tmp_path):

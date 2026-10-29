@@ -12,13 +12,17 @@ from paperful.snowball.local_openalex import (
     LocalDuckDbStore,
     OpenAlexStoreError,
     SshDuckDbStore,
+    _ssh_argv,
     build_cites_index_sql,
     build_citing_sql,
     build_works_sql,
+    cited_prefix,
+    cites_glob_for_id,
     columns_for_select,
     normalize_store_doi,
     normalize_store_id,
     parse_duckdb_json,
+    store_can_apply_search,
     store_from_config,
     title_matches,
 )
@@ -163,7 +167,10 @@ def test_ssh_store_uses_runner(monkeypatch):
 
 
 def test_store_from_config_off_and_ssh(tmp_path: Path, monkeypatch):
-    assert store_from_config(Config()) is None
+    bare_cfg = Config()
+    assert store_from_config(bare_cfg) is None
+    assert bare_cfg.openalex_store_timeout_s == 120.0
+    assert bare_cfg.openalex_store_fail_limit == 3
 
     path = tmp_path / "config.toml"
     path.write_text(
@@ -204,11 +211,16 @@ def test_store_from_config_local_duckdb(tmp_path: Path, monkeypatch):
         'backend = "local_duckdb"\n'
         'parquet_glob = "/data/openalex/**/*.parquet"\n'
         'duckdb_bin = "duckdb"\n'
+        "timeout_s = 45\n"
+        "fail_limit = 2\n"
     )
     cfg = load_config(path)
     store = store_from_config(cfg)
     assert isinstance(store, LocalDuckDbStore)
     assert store.parquet_glob == "/data/openalex/**/*.parquet"
+    assert store.timeout_s == 45.0
+    assert cfg.openalex_store_timeout_s == 45.0
+    assert cfg.openalex_store_fail_limit == 2
 
     monkeypatch.setenv("OPENALEX_STORE_PARQUET_GLOB", "/env/works/**/*.parquet")
     bare = Config()
@@ -242,19 +254,28 @@ def test_local_store_uses_runner():
     assert "host" not in seen
 
 
-def test_client_store_hit_skips_http():
+def test_client_api_hit_skips_store():
     http_calls: list[tuple[str, dict[str, Any]]] = []
 
     def getter(path: str, params: dict[str, Any]) -> dict[str, Any]:
         http_calls.append((path, params))
-        return {"results": []}
+        return {
+            "results": [
+                {
+                    "id": "https://openalex.org/W1",
+                    "doi": "https://doi.org/10.1234/a",
+                    "display_name": "A",
+                    "referenced_works": [],
+                }
+            ]
+        }
 
     store = FakeStore(
         [
             {
                 "id": "https://openalex.org/W1",
                 "doi": "https://doi.org/10.1234/a",
-                "display_name": "A",
+                "display_name": "Store copy",
                 "referenced_works": [],
             }
         ]
@@ -264,12 +285,12 @@ def test_client_store_hit_skips_http():
     )
     rows = client.works_by_ids(["W1"])
     assert len(rows) == 1
-    assert rows[0]["id"].endswith("W1")
-    assert http_calls == []
-    assert store.id_calls == [["W1"]]
+    assert rows[0]["display_name"] == "A"
+    assert len(http_calls) == 1
+    assert store.id_calls == []
 
 
-def test_client_partial_miss_hits_api_for_remainder():
+def test_client_api_partial_does_not_fill_from_store():
     http_calls: list[tuple[str, dict[str, Any]]] = []
 
     def getter(path: str, params: dict[str, Any]) -> dict[str, Any]:
@@ -299,13 +320,14 @@ def test_client_partial_miss_hits_api_for_remainder():
         email="t@example.org", api_key="", sleep_s=0, getter=getter, store=store
     )
     rows = client.works_by_ids(["W1", "W2"])
-    assert [r["id"].endswith("W1") or r["id"].endswith("W2") for r in rows] == [True, True]
+    assert [r["id"].endswith("W2") for r in rows] == [True]
     assert len(http_calls) == 1
+    assert "W1" in http_calls[0][1]["filter"]
     assert "W2" in http_calls[0][1]["filter"]
-    assert "W1" not in http_calls[0][1]["filter"]
+    assert store.id_calls == []
 
 
-def test_client_store_failure_falls_back_to_api():
+def test_client_api_success_ignores_store_failure():
     def getter(path: str, params: dict[str, Any]) -> dict[str, Any]:
         return {
             "results": [
@@ -328,7 +350,92 @@ def test_client_store_failure_falls_back_to_api():
     client.progress = notes.append
     rows = client.works_by_ids(["W1"])
     assert len(rows) == 1
-    assert any("store failed" in n for n in notes)
+    assert not any("store failed" in n for n in notes)
+
+
+def test_store_skipped_after_fail_limit():
+    class CountingStore(FakeStore):
+        def __init__(self) -> None:
+            super().__init__(fail=True, has_cites_index=True)
+            self.cite_attempts = 0
+
+        def works_citing(self, openalex_id: str, **kwargs: Any) -> list[dict[str, Any]]:
+            self.cite_attempts += 1
+            raise RuntimeError("store down")
+
+    def getter(path: str, params: dict[str, Any]) -> dict[str, Any]:
+        raise OpenAlexBudgetExceeded("OpenAlex daily budget is spent")
+
+    store = CountingStore()
+    notes: list[str] = []
+    client = OpenAlexClient(
+        email="t@example.org",
+        api_key="",
+        sleep_s=0,
+        getter=getter,
+        store=store,
+        store_fail_limit=3,
+        progress=notes.append,
+    )
+    with pytest.raises(OpenAlexBudgetExceeded):
+        client.get("/works", {"search": "burn"})
+    for _ in range(3):
+        assert client.works_citing("W1", limit=1) == []
+    assert store.cite_attempts == 3
+    assert client._store_skipped
+    assert any("skipped after 3 failures" in n for n in notes)
+    assert client.works_citing("W1", limit=1) == []
+    assert store.cite_attempts == 3
+
+
+def test_boolean_cites_query_after_budget_does_not_hang_on_store():
+    store = FakeStore(
+        [{"id": "https://openalex.org/Wciter", "display_name": "Citer"}],
+        cites={"Wseed": ["Wciter"]},
+    )
+
+    def getter(path: str, params: dict[str, Any]) -> dict[str, Any]:
+        raise OpenAlexBudgetExceeded("OpenAlex daily budget is spent")
+
+    client = OpenAlexClient(
+        email="t@example.org", api_key="", sleep_s=0, getter=getter, store=store
+    )
+    with pytest.raises(OpenAlexBudgetExceeded):
+        client.get("/works", {"search": "burn"})
+    rows = client.works_citing(
+        "Wseed",
+        limit=5,
+        search='"national jurisdiction" OR "high seas"',
+    )
+    assert rows == []
+    assert store.cite_calls == []
+
+
+def test_boolean_cites_query_skips_store():
+    store = FakeStore(
+        [{"id": "https://openalex.org/Wciter", "display_name": "Citer"}],
+        cites={"Wseed": ["Wciter"]},
+    )
+    http_calls: list[str] = []
+
+    def getter(path: str, params: dict[str, Any]) -> dict[str, Any]:
+        http_calls.append(path)
+        return {
+            "results": [{"id": "https://openalex.org/Wapi", "display_name": "API"}],
+            "meta": {"count": 1},
+        }
+
+    client = OpenAlexClient(
+        email="t@example.org", api_key="", sleep_s=0, getter=getter, store=store
+    )
+    rows = client.works_citing(
+        "Wseed",
+        limit=5,
+        search='"national jurisdiction" OR "high seas"',
+    )
+    assert rows[0]["id"].endswith("Wapi")
+    assert store.cite_calls == []
+    assert http_calls == ["/works"]
 
 
 def test_client_no_store_unchanged():
@@ -349,33 +456,31 @@ def test_client_no_store_unchanged():
     assert http_calls == ["/works"]
 
 
-def test_works_by_dois_store_then_api():
-    def getter(path: str, params: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "results": [
-                {
-                    "id": "https://openalex.org/W2",
-                    "doi": "https://doi.org/10.1234/b",
-                    "referenced_works": ["W9"],
-                }
-            ]
-        }
-
+def test_work_by_doi_api_hit_skips_store():
     store = FakeStore(
         [
             {
                 "id": "https://openalex.org/W1",
                 "doi": "https://doi.org/10.1234/a",
-                "referenced_works": [],
+                "display_name": "Store copy",
             }
         ]
     )
+
+    def getter(path: str, params: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "id": "https://openalex.org/W1",
+            "doi": "https://doi.org/10.1234/a",
+            "display_name": "A",
+        }
+
     client = OpenAlexClient(
         email="t@example.org", api_key="", sleep_s=0, getter=getter, store=store
     )
-    rows = client.works_by_dois(["10.1234/a", "10.1234/b"])
-    assert normalize_store_doi(rows[0]["doi"]) == "10.1234/a"
-    assert normalize_store_doi(rows[1]["doi"]) == "10.1234/b"
+    hit = client.work_by_doi("10.1234/a")
+    assert hit is not None
+    assert hit["display_name"] == "A"
+    assert store.doi_calls == []
 
 
 def test_works_by_ids_with_search_skips_store():
@@ -392,28 +497,6 @@ def test_works_by_ids_with_search_skips_store():
     )
     client.works_by_ids(["W1"], search="degrowth")
     assert store.id_calls == []
-
-
-def test_work_by_doi_store_hit():
-    store = FakeStore(
-        [
-            {
-                "id": "https://openalex.org/W1",
-                "doi": "https://doi.org/10.1234/a",
-                "display_name": "A",
-            }
-        ]
-    )
-
-    def getter(path: str, params: dict[str, Any]) -> dict[str, Any]:
-        raise AssertionError("HTTP should not run")
-
-    client = OpenAlexClient(
-        email="t@example.org", api_key="", sleep_s=0, getter=getter, store=store
-    )
-    hit = client.work_by_doi("10.1234/a")
-    assert hit is not None
-    assert hit["display_name"] == "A"
 
 
 def test_budget_then_store_serves_doi_and_ids():
@@ -653,12 +736,23 @@ def test_build_citing_sql_join_limit_sort_title():
         search="BBNJ",
     )
     assert "cited_id = 'Wseed'" in sql
+    assert "cited_prefix = 'Wsee'" in sql
+    assert "/cites/**/cited_prefix=Wsee/*.parquet" in sql
+    assert "hive_partitioning := true" in sql
     assert "citer_id" in sql
     assert "publication_year >= 2020" in sql
     assert "publication_year <= 2024" in sql
     assert "ORDER BY w.cited_by_count DESC" in sql
     assert "LIMIT 25" in sql
     assert "contains(lower(coalesce(w.display_name, '')), 'bbnj')" in sql
+
+
+def test_cites_glob_for_id_narrows_hive_prefix():
+    assert cited_prefix("https://openalex.org/W2529877272") == "W252"
+    assert cites_glob_for_id("/cites/**/*.parquet", "W2529877272") == (
+        "/cites/**/cited_prefix=W252/*.parquet"
+    )
+    assert cites_glob_for_id("/cites/*.parquet", "W1") == "/cites/*.parquet"
 
 
 def test_build_cites_index_sql():
@@ -774,12 +868,21 @@ def test_store_from_config_cites_index_glob(tmp_path: Path):
     assert store.cites_index_glob == "/data/cites/**/*.parquet"
 
 
-def test_works_citing_store_first_skips_http():
+def test_works_citing_api_first_skips_store():
     http_calls: list[str] = []
 
     def getter(path: str, params: dict[str, Any]) -> dict[str, Any]:
         http_calls.append(path)
-        return {"results": []}
+        return {
+            "results": [
+                {
+                    "id": "https://openalex.org/Wapi",
+                    "display_name": "From API",
+                    "cited_by_count": 4,
+                }
+            ],
+            "meta": {"count": 1},
+        }
 
     store = FakeStore(
         [
@@ -798,9 +901,9 @@ def test_works_citing_store_first_skips_http():
     )
     rows = client.works_citing("Wseed", limit=25, sort="cited_by_count:desc")
     assert len(rows) == 1
-    assert rows[0]["id"].endswith("Wciter")
-    assert http_calls == []
-    assert store.cite_calls == ["Wseed"]
+    assert rows[0]["id"].endswith("Wapi")
+    assert http_calls == ["/works"]
+    assert store.cite_calls == []
 
 
 def test_works_citing_budget_uses_store():
@@ -863,6 +966,8 @@ def test_local_store_citing_uses_runner():
     rows = store.works_citing("W1", limit=10, sort="cited_by_count:desc")
     assert rows[0]["id"].endswith("Wc")
     assert "cited_id = 'W1'" in seen["sql"]
+    assert "cited_prefix = 'W1'" in seen["sql"]
+    assert "/cites/**/cited_prefix=W1/*.parquet" in seen["sql"]
     assert "LIMIT 10" in seen["sql"]
 
 
@@ -870,6 +975,23 @@ def test_title_matches_helper():
     assert title_matches("Degrowth Now", "degrowth")
     assert not title_matches("Other", "degrowth")
     assert title_matches("Anything", "")
+
+
+def test_store_can_apply_search_skips_boolean_queries():
+    assert store_can_apply_search(None)
+    assert store_can_apply_search("")
+    assert store_can_apply_search("high seas")
+    assert not store_can_apply_search(
+        '"national jurisdiction" OR "high seas" OR "deep sea"'
+    )
+    assert not store_can_apply_search("bbnj AND governance")
+    assert not store_can_apply_search("ocean NOT lake")
+
+
+def test_ssh_argv_sets_connect_timeout():
+    cmd = _ssh_argv("server")
+    assert cmd[:3] == ["ssh", "-o", "BatchMode=yes"]
+    assert "ConnectTimeout=10" in cmd
 
 
 def test_store_skips_missing_parquet_columns():
@@ -890,6 +1012,30 @@ def test_store_skips_missing_parquet_columns():
     rows = store.works_by_ids(["W1"])
     assert rows[0]["id"].endswith("W1")
     assert "study_designs" not in store._probe_parquet_columns()
+
+
+def test_probe_describes_one_parquet_file(tmp_path: Path):
+    works = tmp_path / "works" / "updated_date=2024-01-01"
+    works.mkdir(parents=True)
+    sample = works / "part_0000.parquet"
+    sample.write_bytes(b"x")
+    seen: list[str] = []
+
+    def runner(**kwargs: Any) -> str:
+        seen.append(kwargs.get("sql") or "")
+        if (kwargs.get("sql") or "").startswith("DESCRIBE"):
+            return '[{"column_name":"id"},{"column_name":"doi"}]'
+        return "[]"
+
+    store = LocalDuckDbStore(
+        parquet_glob=str(tmp_path / "works" / "**" / "*.parquet"),
+        runner=runner,
+    )
+    store.works_by_ids(["W1"])
+    assert seen
+    assert seen[0].startswith("DESCRIBE")
+    assert str(sample) in seen[0]
+    assert "**" not in seen[0]
 
 
 def test_build_cites_index_from_config_uses_exec(tmp_path: Path):
@@ -996,10 +1142,12 @@ def test_works_citing_api_budget_falls_back_to_store_mid_call():
         store=store,
         progress=notes.append,
     )
-    # No prior latch: works_citing tries store first, gets hit, never calls API.
+    # No prior latch: works_citing tries the API, budget latches, store serves.
     rows = client.works_citing("Wseed", limit=5)
     assert len(rows) == 1
-    assert calls["n"] == 0
+    assert rows[0]["display_name"] == "From store after budget"
+    assert calls["n"] == 1
+    assert store.cite_calls == ["Wseed"]
 
     # Empty store for this id → API → budget → store empty → []
     store2 = FakeStore(

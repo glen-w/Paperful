@@ -48,7 +48,8 @@ Packs land in `state/rewrites/<critique-id>/<stamp>/` as `plan.json`
 text sources get a Word spine). `--output odt` always writes `tracked.odt`
 (native copy when the source is ODT; otherwise a paragraph spine).
 `--output pdf` writes `tracked.pdf` (Playwright Chromium print of the
-applied text). Library PDFs are read-only; output is always new files.
+applied text). Comments become numbered markers plus a Comments page and
+PDF sticky notes. Library PDFs are read-only; output is always new files.
 
 ## Areas
 
@@ -103,8 +104,9 @@ drafts should not assume them. See [llm.md](llm.md).
   not round-tripped. `.pptx` / `.odt` get a copy with unique-span
   replacements (not Word revision markup; comments stay in the edit plan).
   `--output odt` on a non-ODT source builds a paragraph OpenDocument spine
-  the same way. `--output pdf` prints the applied text (comments stay in
-  the edit plan). Optional `[rewrite].openxml_audit` runs
+  the same way. `--output pdf` prints the applied text with numbered comment
+  markers, a Comments page, and PDF sticky notes (not Word tracked-changes).
+  Optional `[rewrite].openxml_audit` runs
   [openxml-audit](https://pypi.org/project/openxml-audit/) (Microsoft Open XML
   SDK port plus ODF adapter; `paperful[openxml]`) on office files and
   reports errors **not already on the source**. Word-authored drafts can fail

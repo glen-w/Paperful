@@ -1,6 +1,6 @@
 # Releases and stability
 
-**1.6.2** is the current release (`pip install paperful` after this tag is published; optional extras
+**1.6.3** is the current release (`pip install paperful` after this tag is published; optional extras
 `[llm]`, `[rag]`, `[serve]`, `[browser-agent]`, `[openxml]`). **1.1.0** introduced PyPI and
 trusted publishing. After install, run `playwright install chromium` once for
 campus login and HTML PDF paths. The **operator** install tested in CI is still
@@ -31,6 +31,9 @@ be added. Required `paperful.run_report.v1` keys and imported-file attach
 (typed `attach_failed`, provenance note) are the contract. **1.1.1** shipped
 Wanted stop-ship hygiene (Grab scope, Attach at zero, copy). Everything after
 that is a buffet by area (Wanted excellence foundation shipped; residual polish).
+**1.6.3** makes the OpenAlex parquet snapshot API-first (live API first;
+store is a budget fallback with a 120s timeout and a three-strike skip) and
+ships rewrite PDF comment markers plus sticky notes.
 **1.6.2** adds `paperful precedent` (held vs public-metadata-only; never a
 novelty claim), rewrite tracked PowerPoint/ODT/PDF plus an optional
 `[openxml]` extra, and a Binoculars overlay for critique `--ai-model`.

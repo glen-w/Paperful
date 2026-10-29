@@ -520,14 +520,18 @@ snapshot](https://help.openalex.org/access/snapshot/) yourself — locally or on
 a shared host — and point Paperful at it. Paperful does **not** ship the dump;
 most installs leave this unset.
 
-When `[openalex_store]` is set, DOI and OpenAlex-id batch reads try the store
-first. Citing (`works_citing` / citation-map expand) needs a prebuilt inverted
+When `[openalex_store]` is set, DOI, OpenAlex-id, and citing reads use the
+**live API first**. The snapshot is the fallback when the daily budget is
+spent. Citing (`works_citing` / citation-map expand) needs a prebuilt inverted
 cites index — run `paperful openalex-store build-cites`, then set
 `cites_index_glob`. The build is **resumable**: one works `updated_date`
 partition at a time with `.done/<date>` markers (re-run after a crash skips
 finished slices). Store-side cites-query / `search=` filtering is
 **title-only** (`display_name`); abstract and fulltext stay on the live API.
-Keywords and ORCID stay API-only.
+Boolean `OR` / `AND` / `NOT` queries stay on the API. A fallback lookup that
+misses `timeout_s` (default 120) counts as a failure; after `fail_limit`
+(default 3) in one run, Paperful skips further snapshot calls. Keywords and
+ORCID stay API-only.
 
 When the live API daily budget is spent, DOI/id and citing (with index) keep
 using the store; keyword / ORCID / full-text search still pause for
@@ -551,6 +555,7 @@ Env overrides: `OPENALEX_STORE_SSH_HOST`, `OPENALEX_STORE_PARQUET_GLOB`,
 # cites_index_glob = "/data/openalex/cites/**/*.parquet"
 # # duckdb_bin = "duckdb"
 # # timeout_s = 120
+# # fail_limit = 3              # skip the store after this many fallback errors in one run
 # # build_timeout_s = 7200
 # # snapshot_date = "2026-10-14"  # date of the full snapshot you loaded
 # # ssh_host = "nuc"         # ssh_duckdb only

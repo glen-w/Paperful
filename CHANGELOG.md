@@ -6,6 +6,22 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.6.3 — 2026-10-29
+
+### Changed
+
+- **OpenAlex snapshot store is API-first.** Live OpenAlex is the default path.
+  The parquet snapshot is a fallback when the daily API budget is spent (or
+  a lookup already latched). `[openalex_store].timeout_s` stays 120s; after
+  `fail_limit` (default 3) store errors in one run, Paperful skips further
+  snapshot calls. Citing SQL only reads the `cited_prefix=…` hive partition.
+  Boolean `--cites-query` / `search=` (OR/AND/NOT) stay on the live API.
+
+### Fixed
+
+- **Rewrite PDF comments.** `--output pdf` prints numbered in-text markers, a
+  Comments page, and PDF sticky notes.
+
 ## 1.6.2 — 2026-10-28
 
 ### Added
@@ -30,7 +46,8 @@ may still be added). See [releases](docs/releases.md).
 - **Rewrite `--output odt` and `--output pdf`.** Request OpenDocument and/or
   PDF for any source (`tracked.odt` / `tracked.pdf`). ODT is a native copy
   when the draft is `.odt`, otherwise a paragraph spine. PDF is a Chromium
-  print of the applied text (Playwright). Comments stay in the edit plan.
+  print of the applied text (Playwright), with numbered comment markers, a
+  Comments page, and PDF sticky notes.
 - **Binoculars overlay for critique `--ai-model`.** [Hans et al., ICML 2024](https://github.com/ahans30/Binoculars)
   is still a git install (not a locked extra; it cannot resolve with
   `rag-docling` / `browser-agent`). `paperful doctor` ambers when

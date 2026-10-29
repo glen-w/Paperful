@@ -351,6 +351,7 @@ class Config:
     openalex_store_snapshot_date: str = ""  # YYYY-MM-DD of the full snapshot loaded
     openalex_store_duckdb_bin: str = "duckdb"
     openalex_store_timeout_s: float = 120.0
+    openalex_store_fail_limit: int = 3
     openalex_store_build_timeout_s: float = 7200.0
     snowball_venue_include: tuple[str, ...] = ()
     snowball_venue_exclude: tuple[str, ...] = ()

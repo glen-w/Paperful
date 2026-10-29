@@ -937,6 +937,11 @@ def apply_openalex_store(raw: dict[str, Any], cfg: "Config") -> None:
             ),
             ("timeout_s", "openalex_store_timeout_s", lambda v: max(1.0, float(v))),
             (
+                "fail_limit",
+                "openalex_store_fail_limit",
+                lambda v: max(1, int(v)),
+            ),
+            (
                 "build_timeout_s",
                 "openalex_store_build_timeout_s",
                 lambda v: max(60.0, float(v)),

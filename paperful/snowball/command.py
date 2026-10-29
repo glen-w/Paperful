@@ -76,6 +76,10 @@ KNOWN_BACKENDS = (
 
 def _openalex_client(cfg: Config, **kwargs: Any) -> OpenAlexClient:
     """Build an OpenAlex client; attach an opt-in snapshot store when configured."""
+    kwargs.setdefault(
+        "store_fail_limit",
+        int(getattr(cfg, "openalex_store_fail_limit", 3) or 3),
+    )
     return OpenAlexClient(email=cfg.email, store=store_from_config(cfg), **kwargs)
 
 

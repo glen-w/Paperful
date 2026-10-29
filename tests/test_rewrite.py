@@ -1002,3 +1002,50 @@ def test_rewrite_pdf_and_docx_from_markdown(cfg, tmp_path: Path, monkeypatch):
     )
     assert "Areas Beyond National Jurisdiction" in html_doc
     assert pdf_structural_issues(folder / "tracked.pdf") == []
+
+
+def test_pdf_html_and_sticky_notes_include_comments(tmp_path: Path, monkeypatch):
+    from io import BytesIO
+
+    from pypdf import PdfReader, PdfWriter
+
+    from paperful.rewrite_pdf import build_pdf_from_paragraphs, html_from_paragraphs
+
+    def fake_pdf(_html: str) -> bytes:
+        buf = BytesIO()
+        writer = PdfWriter()
+        writer.add_blank_page(width=595, height=842)
+        writer.write(buf)
+        return buf.getvalue()
+
+    monkeypatch.setattr("paperful.rewrite_pdf.html_to_pdf_bytes", fake_pdf)
+    edits = [
+        RewriteEdit(
+            kind="comment",
+            finding_ids=["c"],
+            area="comments",
+            quote="policy instruments",
+            body="Clarify this claim.",
+            loc="para 1",
+        )
+    ]
+    html_doc = html_from_paragraphs(
+        ["Unique span here about policy instruments."],
+        edits,
+    )
+    assert "pf-cmt" in html_doc
+    assert "[1]" in html_doc
+    assert "Clarify this claim." in html_doc
+    assert "Comments" in html_doc
+    dest = tmp_path / "tracked.pdf"
+    issues = build_pdf_from_paragraphs(
+        dest,
+        ["Unique span here about policy instruments."],
+        edits,
+    )
+    assert issues == []
+    reader = PdfReader(str(dest))
+    annots = reader.pages[-1].get("/Annots")
+    assert annots
+    contents = str(annots[0].get_object().get("/Contents") or "")
+    assert "Clarify this claim." in contents

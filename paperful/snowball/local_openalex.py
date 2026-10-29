@@ -10,8 +10,8 @@ inverted cites index (``cites_index_glob`` from ``paperful openalex-store
 build-cites``). Store cites-query / ``search=`` filtering is title-only
 (``display_name``); abstract and fulltext stay on the live API (roadmap 2C).
 
-When the live API daily budget is spent, the client keeps serving DOI/id and
-citing reads from the store when configured.
+The live API is the default path. When its daily budget is spent, the client
+keeps serving DOI/id and citing reads from the store when configured.
 """
 
 from __future__ import annotations
@@ -130,6 +130,35 @@ def title_matches(display_name: str, search: str) -> bool:
     return needle in (display_name or "").lower()
 
 
+def store_can_apply_search(search: str | None) -> bool:
+    """False when ``search`` is OpenAlex boolean syntax the store cannot apply.
+
+    Snapshot citing matches ``display_name`` as a literal substring. ``OR`` /
+    ``AND`` / ``NOT`` queries belong on the live API.
+    """
+    text = (search or "").strip()
+    if not text:
+        return True
+    low = f" {text.lower()} "
+    return " or " not in low and " and " not in low and " not " not in low
+
+
+def cited_prefix(openalex_id: str) -> str:
+    """Hive ``cited_prefix`` for an OpenAlex id (first 4 characters, matching the index)."""
+    cited = normalize_store_id(openalex_id)
+    return cited[:4] if cited else ""
+
+
+def cites_glob_for_id(cites_index_glob: str, openalex_id: str) -> str:
+    """Narrow a cites ``/**/*.parquet`` glob to the ``cited_prefix=…`` hive folder."""
+    glob = (cites_index_glob or "").strip()
+    prefix = cited_prefix(openalex_id)
+    if not prefix or not glob.endswith("/**/*.parquet"):
+        return glob
+    root = glob[: -len("/**/*.parquet")]
+    return f"{root}/**/cited_prefix={prefix}/*.parquet"
+
+
 def doi_sql_expr(column: str = "doi") -> str:
     """SQL expression that yields a bare lowercase DOI from a snapshot column."""
     return (
@@ -194,13 +223,18 @@ def build_citing_sql(
         )
     cap = max(0, int(limit))
     cols = ", ".join(f"w.{c}" for c in cols_list)
+    cites_glob = cites_glob_for_id(cites_index_glob, cited)
+    prefix = cited_prefix(cited)
     cites = (
-        f"read_parquet({_sql_str(cites_index_glob)}, union_by_name := true) AS c"
+        f"read_parquet({_sql_str(cites_glob)}, union_by_name := true, "
+        f"hive_partitioning := true) AS c"
     )
     works = (
         f"read_parquet({_sql_str(works_glob)}, union_by_name := true) AS w"
     )
     where = [f"c.cited_id = {_sql_str(cited)}"]
+    if prefix:
+        where.append(f"c.cited_prefix = {_sql_str(prefix)}")
     if year_from is not None:
         where.append(f"w.publication_year >= {int(year_from)}")
     if year_to is not None:
@@ -370,12 +404,17 @@ class _DuckDbWorksStore:
             return want
         return [name for name in want if name in present] or ["id"]
 
+    def _sample_parquet_path(self) -> str:
+        """One works parquet file for schema probe. Empty keeps the full glob."""
+        return ""
+
     def _probe_parquet_columns(self) -> frozenset[str]:
         if self._parquet_columns is not None:
             return self._parquet_columns
+        target = self._sample_parquet_path() or self.parquet_glob
         sql = (
             "DESCRIBE SELECT * FROM "
-            f"read_parquet({_sql_str(self.parquet_glob)}, union_by_name := true)"
+            f"read_parquet({_sql_str(target)}, union_by_name := true)"
         )
         try:
             rows = self._query(sql)
@@ -578,8 +617,24 @@ class SshDuckDbStore(_DuckDbWorksStore):
     def _ssh_target(self) -> str:
         return f"{self.ssh_user}@{self.ssh_host}" if self.ssh_user else self.ssh_host
 
+    def _sample_parquet_path(self) -> str:
+        if self._runner is not _run_ssh_duckdb:
+            return ""
+        root = works_root_from_glob(self.parquet_glob)
+        if not root:
+            return ""
+        remote = (
+            f"find {shlex.quote(root)} -name '*.parquet' -print -quit 2>/dev/null || true"
+        )
+        try:
+            out = self._ssh_run(remote, timeout_s=min(15.0, self.timeout_s)).strip()
+        except OpenAlexStoreError:
+            return ""
+        line = next((item.strip() for item in out.splitlines() if item.strip()), "")
+        return line if line.endswith(".parquet") else ""
+
     def _ssh_run(self, remote: str, *, timeout_s: float = 120.0) -> str:
-        cmd = ["ssh", "-o", "BatchMode=yes", self._ssh_target(), remote]
+        cmd = [*_ssh_argv(self._ssh_target()), remote]
         try:
             proc = subprocess.run(
                 cmd,
@@ -678,6 +733,16 @@ class LocalDuckDbStore(_DuckDbWorksStore):
         self._runner = runner or _run_local_duckdb
         self._exec_runner = exec_runner or _run_local_duckdb_exec
 
+    def _sample_parquet_path(self) -> str:
+        root = works_root_from_glob(self.parquet_glob)
+        base = Path(root)
+        if base.is_file() and base.suffix == ".parquet":
+            return str(base)
+        if base.is_dir():
+            hit = next(base.rglob("*.parquet"), None)
+            return str(hit) if hit is not None else ""
+        return ""
+
     def _list_updated_dates(self, works_root: str) -> list[str]:
         root = Path(works_root)
         if not root.is_dir():
@@ -727,6 +792,11 @@ class LocalDuckDbStore(_DuckDbWorksStore):
         )
 
 
+def _ssh_argv(target: str) -> list[str]:
+    """Batch-mode SSH with a short connect cap so a dead host fails fast."""
+    return ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", target]
+
+
 def _run_local_duckdb(*, duckdb_bin: str, sql: str, timeout_s: float) -> str:
     return _run_duckdb_cmd(
         [duckdb_bin, "-json"], sql=sql, timeout_s=timeout_s, label="DuckDB"
@@ -748,7 +818,7 @@ def _run_ssh_duckdb(
     target = f"{user}@{host}" if user else host
     remote = f"{shlex.quote(duckdb_bin)} -json"
     return _run_duckdb_cmd(
-        ["ssh", "-o", "BatchMode=yes", target, remote],
+        [*_ssh_argv(target), remote],
         sql=sql,
         timeout_s=timeout_s,
         label="SSH",
@@ -766,7 +836,7 @@ def _run_ssh_duckdb_exec(
     target = f"{user}@{host}" if user else host
     remote = shlex.quote(duckdb_bin)
     _run_duckdb_cmd(
-        ["ssh", "-o", "BatchMode=yes", target, remote],
+        [*_ssh_argv(target), remote],
         sql=sql,
         timeout_s=timeout_s,
         label="SSH",
