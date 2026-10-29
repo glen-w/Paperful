@@ -19,6 +19,8 @@ may still be added). See [releases](docs/releases.md).
 
 ### Fixed
 
+- **Snowball refs resume after an OpenAlex budget stop.** Without a snapshot
+  store, `works_by_ids` re-raises so `deferred.json` keeps the remaining ids.
 - **Rewrite PDF comments.** `--output pdf` prints numbered in-text markers, a
   Comments page, and PDF sticky notes.
 

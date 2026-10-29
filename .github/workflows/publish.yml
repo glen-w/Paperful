@@ -31,3 +31,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true
+          # PEP 740 attestations POST to rekor.sigstore.dev. A Rekor 502
+          # aborts the upload even after metadata checks pass (1.6.3).
+          # Trusted Publishing (OIDC, id-token: write) is independent.
+          attestations: false

@@ -613,6 +613,25 @@ def test_budget_without_store_still_raises():
         client.works_by_ids(["W1"])
 
 
+def test_budget_mid_id_batch_without_store_raises_with_pending():
+    """A partial API batch must not swallow the pause when there is no store."""
+    ids = [f"W{i}" for i in range(150)]
+    batches = {"n": 0}
+
+    def getter(path: str, params: dict[str, Any]) -> dict[str, Any]:
+        batches["n"] += 1
+        if batches["n"] == 2:
+            raise OpenAlexBudgetExceeded("OpenAlex daily budget is spent")
+        asked = str(params["filter"]).split(":", 1)[1].split("|")
+        return {"results": [{"id": f"https://openalex.org/{oa}"} for oa in asked]}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    with pytest.raises(OpenAlexBudgetExceeded) as caught:
+        client.works_by_ids(ids)
+    assert [str(row["id"]).rsplit("/", 1)[-1] for row in caught.value.partial] == ids[:100]
+    assert caught.value.pending_ids == ids[100:]
+
+
 def test_budget_mid_doi_fill_returns_store_partial_without_raise():
     store = FakeStore(
         [

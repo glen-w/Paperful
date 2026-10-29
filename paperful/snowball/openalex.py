@@ -573,8 +573,7 @@ class OpenAlexClient:
                     if key:
                         by_id[key] = row
                 if not self._store_ready():
-                    if by_id:
-                        return [by_id[short_id(i)] for i in ids if short_id(i) in by_id]
+                    # Keep pending_ids on the exception so resume can write deferred.json.
                     raise
             else:
                 return rows

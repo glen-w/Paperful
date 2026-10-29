@@ -25,7 +25,6 @@ jobs:
 
   suite:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -38,6 +37,7 @@ jobs:
           name: coverage-json
           path: coverage.json
           if-no-files-found: error
+          retention-days: 5
 
   docker:
     runs-on: ubuntu-latest
