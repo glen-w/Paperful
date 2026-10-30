@@ -7,7 +7,7 @@ from typing import Any
 
 from ..config import Config
 
-_DISCOVER_TABS = ("explore", "topic", "grow", "people", "queue", "following")
+_DISCOVER_TABS = ("explore", "topic", "grow", "people", "web", "queue", "following")
 
 DISCOVER_TABS = _DISCOVER_TABS
 
@@ -20,11 +20,14 @@ def resolve_discover_tab(
     has_following: bool,
     explore_picks: bool,
     list_requested: bool,
+    web_search: bool = True,
 ) -> str:
     """Pick a Discover tab; honour an explicit ``tab`` when allowed."""
     allowed = {"explore", "topic", "people", "queue", "following"}
     if advanced:
         allowed.add("grow")
+    if web_search:
+        allowed.add("web")
     if tab in allowed:
         return str(tab)
     if explore_picks:
@@ -234,6 +237,19 @@ def authorwatch_suggestion_rows(cfg: Config, name: str) -> list[dict[str, Any]]:
             }
         )
     return rows
+
+
+def newest_search_run(cfg: Config) -> dict[str, Any] | None:
+    """Latest ``paperful.search.v1`` pack, or None."""
+    from ..search.store import list_runs, load_run
+
+    rows = list_runs(cfg)
+    if not rows:
+        return None
+    try:
+        return load_run(cfg, str(rows[0].get("run_id") or ""))
+    except Exception:
+        return None
 
 
 def following_lists(cfg: Config) -> list[dict[str, Any]]:

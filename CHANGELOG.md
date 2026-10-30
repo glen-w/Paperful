@@ -13,6 +13,10 @@ may still be added). See [releases](docs/releases.md).
   constraint / Gould–Fernandez brokerage (`paperful[network]`). Writes
   `state/network/<run-id>/` (`paperful.network.v1`). Discover → People →
   Network (D3). [Co-author network](docs/network.md).
+- **`paperful search`.** SearXNG-backed grey query (PDFs and playbook-host
+  landings). Writes `state/search/<run-id>/` (`paperful.search.v1`). Discover →
+  Web. Apply creates metadata parents only; PDFs stay Wanted / `run`. Not a
+  Google HTML scrape. [Web grey search](docs/search.md).
 
 ### Fixed
 

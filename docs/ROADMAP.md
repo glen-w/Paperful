@@ -442,11 +442,11 @@ tags) sit on that canvas — [Citation map](snowball.md#citation-map).
   Cochrane-style teams (grant money, real pain). Do not claim Elicit-like
   SR recall; independent 2025 work put that UI far below traditional search.
 - **Policy and grey-literature watchers.** BBNJ and RFMO work (for example
-  SPRFMO SC14 reports) lives outside DOIs. Watchers would follow meeting
-  documents and notifications on intergovernmental sites and feed them
-  into Zotero. Nobody serves that niche; the first user is already here.
-  Grey playbooks are shipped; this is scheduled watching of those hosts,
-  not more playbook parsers.
+  SPRFMO SC14 reports) lives outside DOIs. **`paperful search` + Discover Web
+  shipped** (SearXNG query → ranked PDF/landing hits → metadata parents).
+  Scheduled host watchers (meeting docs / notifications on a timer) still
+  later. Grey playbooks fetch; search finds URLs. Nobody serves that niche;
+  the first user is already here.
 - **Paperful as the local literature back end for AI assistants**, building
   on `paperful/mcp_server.py`: “your assistant reads your library, not the
   open web.” MCP read tools are shipped
@@ -1070,6 +1070,7 @@ for the end-to-end operator story.
 | 23 | Same — **Wave 2:** OpenAlex publication trend report for a query or saved snowball seed (`snowball trends`) | **Shipped** |
 | 24 | Same — **Wave 3:** thicker `authorwatch` briefing (co-authors + recent works via OpenAlex) | **Shipped** |
 | 25 | ORCID ego co-authorship SNA (`paperful network`, Discover People map, BBNJ phase slices) | **Shipped** — [network](network.md); extra `paperful[network]` |
+| 26 | `paperful search` + Discover Web (SearXNG grey query; metadata parents; PDFs via Wanted) | **Shipped** — [search](search.md); scheduled host watchers still later |
 
 (literature-discovery-complement-waves)=
 ### Literature-discovery complement (waves)

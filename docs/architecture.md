@@ -416,6 +416,8 @@ IEA/IRENA and OECD/WHO/UNEP/UNDP are optional files in
 The pack is not core product logic; set `grey_playbooks_builtin = false` or
 override by `name`. A matching host is a URL→PDF recipe for an item already in
 the library. Provenance stays `grey:<playbook-name>`.
+`paperful search` / Discover → Web **finds** candidate URLs (SearXNG JSON);
+playbooks still **fetch** PDFs after you apply metadata and run Wanted.
 Skip-host item URLs (YouTube, Scholar, …) still allow Extra/title synthesize.
 Domain-agnostic OA rewrites (PMC, arXiv, HAL) and DSpace/OAI stay in code.
 DOI-less `report` / `document` items can fall through to `htmlpdf`. Campus

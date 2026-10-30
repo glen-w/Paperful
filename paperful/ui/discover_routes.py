@@ -56,6 +56,7 @@ from .pages import (
     list_html_stems,
     list_recent_summaries,
     list_snowball_profiles,
+    newest_search_run,
     summary_meta,
     list_threads,
     newest_snowball_queue,
@@ -134,6 +135,7 @@ def _discover_page(
     active_list = (list_name or "followed").strip()
     following = following_lists(ui.cfg)
     picks = explore_picks or []
+    web_on = ui.cfg.ui_web_search != "off"
     tab_name = resolve_discover_tab(
         tab if tab is not None else request.query_params.get("tab"),
         advanced=prefs.advanced,
@@ -141,6 +143,7 @@ def _discover_page(
         has_following=bool(following),
         explore_picks=bool(picks),
         list_requested=list_requested,
+        web_search=web_on,
     )
     per_page = library_per_page_from_request(request, ui.cfg)
     persist_per_page = request.query_params.get("per_page") is not None
@@ -194,9 +197,17 @@ def _discover_page(
                     "/discover", **_discover_qs(page_no=1, tab_override=name)
                 )
                 for name in (
-                    ("explore", "topic", "grow", "people", "queue", "following")
+                    (
+                        ("explore", "topic", "grow", "people", "web", "queue", "following")
+                        if web_on
+                        else ("explore", "topic", "grow", "people", "queue", "following")
+                    )
                     if prefs.advanced
-                    else ("explore", "topic", "people", "queue", "following")
+                    else (
+                        ("explore", "topic", "people", "web", "queue", "following")
+                        if web_on
+                        else ("explore", "topic", "people", "queue", "following")
+                    )
                 )
             },
         }
@@ -250,6 +261,10 @@ def _discover_page(
             explore_query=explore_query,
             queue_pagination=queue_pagination,
             coauthor_network=ui.cfg.ui_coauthor_network,
+            web_search=ui.cfg.ui_web_search,
+            searxng_configured=_searxng_configured(ui.cfg),
+            search_bundle=newest_search_run(ui.cfg) if tab_name == "web" and web_on else None,
+            search_token=_last_review_token(ui, "search_apply"),
         ),
         status_code=status_code,
     )
@@ -1459,6 +1474,154 @@ async def handle_discover_network_run(
     return ui.after_job("/discover", cmd_id, tab="people")
 
 
+def _searxng_configured(cfg: Config) -> bool:
+    from ..snowball.searxng import searxng_base_url
+
+    return bool(searxng_base_url(cfg))
+
+
+def handle_discover_search_meta(ui: UiContext) -> JSONResponse:
+    from ..search.store import list_runs
+
+    enabled = ui.cfg.ui_web_search != "off"
+    return JSONResponse(
+        {
+            "ok": True,
+            "enabled": enabled,
+            "searxng": _searxng_configured(ui.cfg),
+            "runs": list_runs(ui.cfg) if enabled else [],
+        }
+    )
+
+
+def handle_discover_search(ui: UiContext, run_id: str = "") -> JSONResponse:
+    from ..search.store import SearchError, load_run
+
+    if ui.cfg.ui_web_search == "off":
+        return JSONResponse({"ok": False, "error": "Web search is off."}, status_code=404)
+    cleaned = (run_id or "").strip()
+    if not cleaned:
+        return JSONResponse({"ok": False, "error": "run_id required"}, status_code=400)
+    try:
+        bundle = load_run(ui.cfg, cleaned)
+    except SearchError as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=404)
+    return JSONResponse(
+        {
+            "ok": True,
+            "schema": bundle.get("schema"),
+            "run_id": bundle.get("run_id"),
+            "meta": bundle.get("meta") or {},
+            "candidates": bundle.get("candidates") or [],
+            "summary": bundle.get("summary") or {},
+        }
+    )
+
+
+async def handle_discover_search_run(
+    ui: UiContext, request: Request
+) -> RedirectResponse:
+    if ui.cfg.ui_web_search == "off":
+        return RedirectResponse(
+            url=ui.page_url("/discover", tab="topic", error="Web search is off."),
+            status_code=303,
+        )
+    if not _searxng_configured(ui.cfg):
+        return RedirectResponse(
+            url=ui.page_url(
+                "/discover",
+                tab="web",
+                error="SearXNG is unset. Set [searxng].base_url or open Settings / System.",
+            ),
+            status_code=303,
+        )
+    form = await request.form()
+    query = str(form.get("query") or "").strip()
+    hosts = str(form.get("hosts") or "").strip()
+    filetype = str(form.get("filetype") or "pdf").strip() or "pdf"
+    try:
+        max_hits = int(str(form.get("max") or ui.cfg.search_max or 20).strip() or "20")
+    except ValueError:
+        return RedirectResponse(
+            url=ui.page_url("/discover", tab="web", error="Max hits must be a whole number."),
+            status_code=303,
+        )
+    if not query:
+        return RedirectResponse(
+            url=ui.page_url("/discover", tab="web", error="Enter a search query."),
+            status_code=303,
+        )
+
+    def work(cmd_id: str) -> None:
+        from ..search.run import run_search
+        from ..search.store import SearchError
+
+        try:
+            bundle = run_search(
+                ui.cfg,
+                [query],
+                hosts=hosts,
+                filetype=filetype,
+                max_hits=max_hits,
+            )
+        except (SearchError, ValueError) as exc:
+            raise RuntimeError(str(exc)) from exc
+        jobs._attach_result(
+            ui.cfg,
+            cmd_id,
+            {
+                "run_id": bundle.get("run_id"),
+                "path": bundle.get("path"),
+                "kept": (bundle.get("summary") or {}).get("kept"),
+            },
+        )
+
+    cmd_id = commands.enqueue(ui.cfg, "search", work)
+    return ui.after_job("/discover", cmd_id, tab="web")
+
+
+async def handle_discover_search_apply(
+    ui: UiContext, request: Request
+) -> RedirectResponse:
+    from . import discover_jobs
+
+    prefs = prefs_from_request(request)
+    if ui.cfg.ui_web_search == "off":
+        return RedirectResponse(
+            url=ui.page_url("/discover", tab="topic", error="Web search is off."),
+            status_code=303,
+        )
+    form = await request.form()
+    run_id = str(form.get("run_id") or "").strip()
+    preview = str(form.get("preview") or "").strip() in {"1", "true", "on"}
+    urls = [str(v).strip() for v in form.getlist("url") if str(v).strip()]
+    collection = str(prefs.collection or "").strip()
+    if preview:
+        if not collection:
+            return RedirectResponse(
+                url=ui.page_url(
+                    "/discover", tab="web", error="Set the collection chip before adding hits."
+                ),
+                status_code=303,
+            )
+
+        def work(cmd_id: str) -> None:
+            discover_jobs.search_apply_preview(
+                ui.cfg, cmd_id, run_id=run_id, collection=collection, urls=urls
+            )
+
+        cmd_id = commands.enqueue(ui.cfg, "search_apply", work)
+        return ui.after_job("/discover", cmd_id, tab="web")
+    token = str(form.get("review_token") or "") or _last_review_token(ui, "search_apply")
+    ok, msg = discover_jobs.search_apply(ui.cfg, token=token, collection=collection)
+    if not ok:
+        return RedirectResponse(
+            url=ui.page_url("/discover", tab="web", error=msg or "preview first"),
+            status_code=303,
+        )
+    return RedirectResponse(url=ui.page_url("/discover", tab="web"), status_code=303)
+
+
 def register_discover(ui: UiContext) -> None:
     app = ui.app
 
@@ -1662,3 +1825,19 @@ def register_discover(ui: UiContext) -> None:
     @app.post("/discover/network/run")
     async def discover_network_run(request: Request) -> RedirectResponse:
         return await handle_discover_network_run(ui, request=request)
+
+    @app.get("/discover/search/meta")
+    def discover_search_meta() -> JSONResponse:
+        return handle_discover_search_meta(ui)
+
+    @app.get("/discover/search")
+    def discover_search(run_id: str = "") -> JSONResponse:
+        return handle_discover_search(ui, run_id=run_id)
+
+    @app.post("/discover/search/run")
+    async def discover_search_run(request: Request) -> RedirectResponse:
+        return await handle_discover_search_run(ui, request=request)
+
+    @app.post("/discover/search/apply")
+    async def discover_search_apply(request: Request) -> RedirectResponse:
+        return await handle_discover_search_apply(ui, request=request)

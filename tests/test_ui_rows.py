@@ -161,6 +161,30 @@ def test_resolve_discover_tab_defaults_and_guards_grow():
         )
         == "people"
     )
+    assert (
+        resolve_discover_tab(
+            "web",
+            advanced=False,
+            has_candidates=False,
+            has_following=False,
+            explore_picks=False,
+            list_requested=False,
+            web_search=True,
+        )
+        == "web"
+    )
+    assert (
+        resolve_discover_tab(
+            "web",
+            advanced=False,
+            has_candidates=False,
+            has_following=False,
+            explore_picks=False,
+            list_requested=False,
+            web_search=False,
+        )
+        == "topic"
+    )
 
 
 def test_nest_collection_rows_groups_paths():

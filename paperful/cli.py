@@ -313,7 +313,17 @@ JOBS: dict[str, tuple[str, ...]] = {
         "network",
         "keepup",
     ),
-    "find": ("run", "attach", "recover", "gaps", "inbox", "capture", "urls", "htmlpdf"),
+    "find": (
+        "run",
+        "attach",
+        "recover",
+        "gaps",
+        "inbox",
+        "capture",
+        "urls",
+        "htmlpdf",
+        "search",
+    ),
     "completeness": (
         "lint",
         "screen",
@@ -1550,6 +1560,77 @@ def versions(
         profile=profile,
         run_config=run_config,
         config=config,
+    )
+
+
+@app.command("search")
+def search_cmd(
+    terms: list[str] | None = typer.Argument(
+        None,
+        help="Query terms (AND). Quote phrases. Optional with --run-id or --list.",
+    ),
+    hosts: str = typer.Option(
+        "",
+        "--hosts",
+        help="Comma-separated allowlist (also injected as site: ORs). Empty keeps any non-blocked host.",
+    ),
+    filetype: str = typer.Option(
+        "pdf",
+        "--filetype",
+        help="Append filetype:pdf to the query (default). Pass none to skip.",
+    ),
+    max_hits: int | None = typer.Option(
+        None,
+        "--max",
+        help="Max kept hits. Default: [search].max or 20.",
+    ),
+    probe: bool | None = typer.Option(
+        None,
+        "--probe/--no-probe",
+        help="HEAD/GET first bytes for PDF vs HTML (default: [search].probe, on).",
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Create metadata parents in -C. Default is dry-run. PDFs stay paperful run.",
+    ),
+    collection: str = typer.Option(
+        "",
+        "--collection",
+        "-C",
+        help="Target collection path. Required with --apply.",
+    ),
+    run_id: str | None = typer.Option(
+        None, "--run-id", help="Reprint a saved run under state/search/."
+    ),
+    out_dir: Path | None = typer.Option(
+        None,
+        "--out-dir",
+        help="Write the search pack here. Default: state/search/<run-id>/. Does not imply --apply.",
+    ),
+    list_runs_flag: bool = typer.Option(
+        False, "--list", help="List saved runs under state/search/."
+    ),
+    fmt: str = AgentFormatOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Discover grey PDFs and landings via SearXNG. Metadata only; PDFs stay Wanted / run."""
+    from .search.command import run_search_cmd
+
+    run_search_cmd(
+        console,
+        terms or [],
+        hosts=hosts,
+        filetype=filetype,
+        max_hits=max_hits,
+        probe=probe,
+        fmt=fmt,
+        config=config,
+        run_id=run_id,
+        out_dir=out_dir,
+        apply=apply,
+        collection=collection,
+        list_runs_flag=list_runs_flag,
     )
 
 

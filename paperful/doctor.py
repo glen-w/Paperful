@@ -303,6 +303,12 @@ def remediation_text(
             "paperful twenty lookup -C … (dry-run) / --apply caches contacts. "
             "paperful twenty sync -C … --apply creates or enriches People. No mail."
         )
+    if check.name == "SearXNG":
+        return (
+            f"Edit {cfg_hint} [searxng]: base_url = your instance root "
+            "(or SEARXNG_BASE_URL). Needs GET /search?format=json. Then "
+            "`paperful search` and Discover → Web. Never a default run source."
+        )
     return None
 
 
@@ -705,6 +711,25 @@ def run_checks(
                     code="twenty_key",
                 )
             )
+
+    from .snowball.searxng import searxng_base_url
+
+    sx = searxng_base_url(cfg)
+    if sx:
+        from urllib.parse import urlparse
+
+        host = (urlparse(sx).hostname or "set").lower()
+        checks.append(Check("SearXNG", "green", f"JSON client ({host})"))
+    else:
+        checks.append(
+            Check(
+                "SearXNG",
+                "amber",
+                "unset — paperful search / Discover Web need [searxng].base_url "
+                "or SEARXNG_BASE_URL",
+                code="searxng",
+            )
+        )
 
     if shutil.which("pdftotext"):
         checks.append(Check("pdftotext", "green", "on PATH"))

@@ -202,6 +202,19 @@ Artifacts: `state/network/<run-id>/` (gitignored). Narrative:
 [templates/network-watch-assessment.md](templates/network-watch-assessment.md).
 Does not write Zotero. See [network](network.md).
 
+## Web grey search (Gjerde / IUCN)
+
+IUCN, undocs, PrepCom, and author PDFs are not OpenAlex works. Query them with
+SearXNG, then apply metadata and fill PDFs on Wanted:
+
+```sh
+paperful search Gjerde IUCN BBNJ \
+  --hosts iucn.org,dosi-project.org,undocs.org,highseasalliance.org,iisd.org \
+  --max 20
+```
+
+See [Web grey search](search.md).
+
 ## Phase 4 — Engineering follow-ons (from real failures)
 
 - HTML fixtures for 2–3 listing pages (win + miss) under `tests/fixtures/`.

@@ -502,9 +502,15 @@ concurrency = 2
 # SearXNG is a metasearch engine (docs https://docs.searxng.org/).
 # Public instances: https://searx.space/ — Paperful needs GET /search?format=json,
 # which many public hosts leave off. Run your own if JSON is disabled.
-# Never a default run source. See docs/snowball.md "Twenty and SearXNG".
+# Never a default run source. Used by `paperful search` / Discover → Web
+# and author-site remainder. See docs/search.md and docs/snowball.md
+# "Twenty and SearXNG".
 # [searxng]
 # base_url = ""                  # instance root; or SEARXNG_BASE_URL
+#
+# [search]
+# max = 20                       # kept hits; CLI --max overrides
+# probe = true                   # HEAD/GET PDF vs HTML; --no-probe skips
 
 # Text layer for scanned PDFs (paperful ocr). Needs ocrmypdf on PATH.
 # The Compose image ships English. Add tesseract language packs for the rest.
@@ -575,6 +581,7 @@ concurrency = 2
 # citation_map_auto_search = false     # Find PDF right after Add to library
 # citation_map_remove = "trash"        # trash (default)
 # coauthor_network = "on"              # People tab ORCID ego map (on | off)
+# web_search = "on"                    # Discover → Web (SearXNG grey search)
 
 # Attachment layout. Off until `paperful attachments --apply`.
 # [attachments]

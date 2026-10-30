@@ -51,6 +51,7 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_endnote(raw, cfg, source)
     apply_openalex_store(raw, cfg)
     apply_searxng(raw, cfg)
+    apply_search(raw, cfg)
     apply_keepup(raw, cfg)
     apply_precedent(raw, cfg)
     apply_ui(raw, cfg)
@@ -956,6 +957,16 @@ def apply_searxng(raw: dict[str, Any], cfg: "Config") -> None:
         cfg.searxng_base_url = str(searx["base_url"]).strip().rstrip("/")
 
 
+def apply_search(raw: dict[str, Any], cfg: "Config") -> None:
+    block = raw.get("search")
+    if not isinstance(block, dict):
+        return
+    if "max" in block:
+        cfg.search_max = max(1, int(block["max"]))
+    if "probe" in block:
+        cfg.search_probe = bool(block["probe"])
+
+
 def apply_keepup(raw: dict[str, Any], cfg: "Config") -> None:
     keepup = raw.get("keepup")
     if not isinstance(keepup, dict):
@@ -1018,6 +1029,9 @@ def apply_ui(raw: dict[str, Any], cfg: "Config") -> None:
     network = str(ui.get("coauthor_network") or "").strip().lower()
     if network in {"on", "off"}:
         cfg.ui_coauthor_network = network
+    web = str(ui.get("web_search") or "").strip().lower()
+    if web in {"on", "off"}:
+        cfg.ui_web_search = web
 
 
 def apply_prompt_paths(cfg: "Config", source: Path) -> None:

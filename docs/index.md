@@ -76,6 +76,7 @@ comparison-reference
 snowball
 authorwatch
 network
+search
 keepup
 bbnj-author-lanes
 e2e-stack

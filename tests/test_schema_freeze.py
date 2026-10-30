@@ -40,6 +40,12 @@ from paperful.sections.command import SCHEMA as SECTIONS_SCHEMA, SECTION_KEYS
 from paperful.sections.grobid import TEI_META_KEYS, TEI_SCHEMA
 from paperful.store import ITEM_RECORD_KEYS, empty_item_record
 from paperful.network.store import GRAPH_KEYS, META_KEYS, SCHEMA as NETWORK_SCHEMA
+from paperful.search.store import (
+    HIT_KEYS as SEARCH_HIT_KEYS,
+    META_KEYS as SEARCH_META_KEYS,
+    SCHEMA as SEARCH_SCHEMA,
+    SUMMARY_KEYS as SEARCH_SUMMARY_KEYS,
+)
 from tests.conftest import make_item
 
 FIX = Path(__file__).parent / "fixtures"
@@ -241,6 +247,14 @@ def test_network_v1_keys_match_golden():
     assert sorted(GRAPH_KEYS) == sorted({"schema", "ego", "nodes", "edges"})
     assert "run_id" in META_KEYS and "orcid" in META_KEYS
     assert NETWORK_SCHEMA == "paperful.network.v1"
+
+
+def test_search_v1_keys_frozen():
+    assert SEARCH_SCHEMA == "paperful.search.v1"
+    assert "run_id" in SEARCH_META_KEYS and "query" in SEARCH_META_KEYS
+    assert "engine_host" in SEARCH_META_KEYS
+    assert {"url", "title", "score", "host", "playbook", "kind", "status"} <= SEARCH_HIT_KEYS
+    assert {"hits", "kept", "exists", "blocked", "new"} <= SEARCH_SUMMARY_KEYS
 
 
 def test_grobid_tei_v1_keys_match_golden():

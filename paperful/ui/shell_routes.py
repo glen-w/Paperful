@@ -222,6 +222,7 @@ def handle_page_settings(
             citation_map_edit=ui.cfg.ui_citation_map_edit,
             citation_map_auto_search=ui.cfg.ui_citation_map_auto_search,
             coauthor_network=ui.cfg.ui_coauthor_network,
+            web_search=ui.cfg.ui_web_search,
         ),
     )
 
@@ -278,6 +279,14 @@ async def handle_save_settings(ui: UiContext, request: Request) -> RedirectRespo
         text = path.read_text(encoding="utf-8")
         path.write_text(
             _patch_section_assignment(text, "ui", "coauthor_network", f'"{network}"'),
+            encoding="utf-8",
+        )
+    web = "on" if form.get("web_search") == "1" else "off"
+    ui.cfg.ui_web_search = web
+    if path is not None and path.is_file():
+        text = path.read_text(encoding="utf-8")
+        path.write_text(
+            _patch_section_assignment(text, "ui", "web_search", f'"{web}"'),
             encoding="utf-8",
         )
     resp = RedirectResponse(url="/settings?saved=1", status_code=303)

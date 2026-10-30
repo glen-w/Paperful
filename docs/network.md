@@ -4,6 +4,7 @@ An **ORCID ego** co-authorship graph: who wrote with one person, sliced by
 named year windows, with optional SNA metrics. Distinct from the Discover
 **Queue citation map** (works, not people) and from snowball
 `--author-site-preflight` `coauthors.json` (PDF-pack ranking, not brokerage).
+Grey reports still need [`paperful search`](search.md) / Discover → Web (playbooks fetch PDFs; this graph does not).
 
 Writes `state/network/<run-id>/` (`paperful.network.v1`). That directory is
 already gitignored with the rest of `state/`.

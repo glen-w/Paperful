@@ -75,6 +75,9 @@ and [architecture](architecture.md).
 | `[ui].citation_map_auto_search` | `false` | After **Add to library** on the map, also run Find PDF for that item |
 | `[ui].citation_map_remove` | `trash` | Map **Remove from library** behaviour (trash only for now) |
 | `[ui].coauthor_network` | `on` | Discover People co-author map: `on` / `off` |
+| `[ui].web_search` | `on` | Discover Web tab (SearXNG grey search): `on` / `off` |
+| `[search].max` | `20` | Default kept hits for `paperful search` / Discover Web. CLI `--max` overrides |
+| `[search].probe` | `true` | HEAD/GET first bytes for PDF vs HTML. CLI `--no-probe` skips |
 | `app_name` | `paperful` | Name shown in Zotero's authorisation dialog |
 
 Leave `ezproxy_base` empty (or remove `ezproxy` from `sources`) if you do not
@@ -346,7 +349,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[snowball].dedupe_after` | `off` | After create: `off`, `classify` (`state/dedupe-packs/`), or `apply` (merge high-DOI extras) |
 | `[snowball].author_site_preflight` | `false` | Co-author graph + proposed `state/author-packs/`. Promote before `author_site` fetch. Corpus frequency without a snowball run is `paperful authors -C … --apply` |
 | `[authorwatch]` | — | Not parsed. Caps are `authorwatch run --max-authors` / `--per-author-limit`. `doctor` ambers lists with people and no ORCID/OpenAlex id. No social scrape |
-| `[searxng].base_url` | `""` | SearXNG JSON endpoint for author-site remainder discovery, or `SEARXNG_BASE_URL`. Never a default `run` source. [Twenty and SearXNG](#twenty-and-searxng) |
+| `[searxng].base_url` | `""` | SearXNG JSON endpoint for `paperful search` / Discover Web and author-site remainder discovery, or `SEARXNG_BASE_URL`. Never a default `run` source. Exit 2 from `search` when unset. [Web grey search](search.md), [Twenty and SearXNG](#twenty-and-searxng) |
 | `[ingest].dedupe_scope` | `library` | `library` or `collection` when skipping `exists` |
 | `[ocr].languages` | `eng` | Tesseract languages for `paperful ocr` (`eng+fra` or `eng fra`) |
 | `[rag].enabled` | `false` | Master switch for `paperful rag` and `paperful ask`. Needs `paperful[rag]` (host `uv sync --extra rag` or **heavy** image). See [rag.md](rag.md) |

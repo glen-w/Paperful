@@ -392,6 +392,9 @@ class Config:
     precedent_public_k: int = 25
     precedent_search_keywords: bool = True
     searxng_base_url: str = ""
+    # `paperful search` / Discover Web. CLI --max / --probe override when set.
+    search_max: int = 20
+    search_probe: bool = True
     # Where plain-language lines are written. note | tag | off.
     remarks_surface: str = "note"
     oa_honesty_stamp_fields: tuple[str, ...] = ("license", "oa_status", "version")
@@ -464,6 +467,8 @@ class Config:
     ui_citation_map_remove: str = "trash"
     # Discover People tab co-author network panel.
     ui_coauthor_network: str = "on"
+    # Discover Web tab (SearXNG grey search).
+    ui_web_search: str = "on"
     # Attachment hygiene. Off until `paperful attachments --apply`.
     attachments_fix_broken: bool = False
     attachments_merge_files: bool = False

@@ -29,7 +29,7 @@ Three jobs sit on the default nav:
 | Nav | CLI verbs | Job |
 | --- | --- | --- |
 | **Wanted** | `gaps`, `run`, `attach` | See missing PDFs, preview fetch, grab to `out/`, attach chosen copies |
-| **Discover** | `snowball`, `authorwatch`, watches | Find new works (topic or person), review, add metadata parents |
+| **Discover** | `snowball`, `authorwatch`, watches, `search` | Find new works (topic, person, or web grey hits), review, add metadata parents |
 | **Ask** | `ask`, `ask --from-file` | Cited answers from PDFs already copied to disk (`simple` / `advanced`; needs `[rag]` + `[llm]` and an index) |
 
 **Library**, **Activity**, and **System** support the loop. **Repair**, **Mirror**,
@@ -60,7 +60,7 @@ browser-agent. No built-in scheduler — **Check again** on Discover, not cron.
 | **Health** dot | Worst cached `doctor` status (amber until **System** runs doctor; pages never block on a full doctor) |
 | **Advanced** toggle | Cookie only; reveals extra nav and form fields |
 | **Row actions** | Icon buttons (detail drawer, set collection scope) with the action name as the tooltip |
-| **Long lists** | Discover uses tabs (Explore / Topic / Grow / People / Queue / Following); Queue paginates. Ask threads and batches, Briefs archives, and the Repair queue fold into collapsible sections |
+| **Long lists** | Discover uses tabs (Explore / Topic / Grow / People / Web / Queue / Following); Queue paginates. Ask threads and batches, Briefs archives, and the Repair queue fold into collapsible sections |
 
 Layout: table-first rows, native `<dialog>` drawer (no embedded PDF viewer).
 Long jobs return a **command id**; Activity subscribes to `GET /v1/runs/{id}/events` (SSE), with JSON poll fallback via `GET /v1/runs/{id}`.
@@ -107,7 +107,7 @@ Non-loopback bind (`--host 0.0.0.0`) requires `--allow-remote-bind` and still ha
    also attaches when the library supports write. Zotero 7–9 never receives
    the file from Paperful. DOI mismatch and short PDF still wait for Attach.
 2. **Discover** — Tabs: **Explore**, **Topic**, **Grow** (Advanced),
-   **People**, **Queue** (map + paginated candidates), **Following**.
+   **People**, **Web**, **Queue** (map + paginated candidates), **Following**.
    **Topic:** keyword search (`snowball search` dry-run queue), then open
    **Queue** for per-row Keep/Skip and **Preview apply** → **Add selected**
    (`snowball apply`, metadata only). Queue rows show **Why suggested** when
@@ -132,7 +132,11 @@ Non-loopback bind (`--host 0.0.0.0`) requires `--allow-remote-bind` and still ha
    pollable members; same markdown as CLI `authorwatch briefing`); **Network**
    panel (ORCID ego co-authorship map, phase slices, D3; `[ui].coauthor_network`);
    inbox uses the same Preview → apply pattern
-   (`authorwatch apply`). **Check again** re-runs a saved topic watch or
+   (`authorwatch apply`). **Web:** SearXNG grey query (hosts, filetype, max);
+   hit table; **Preview apply** → **Add selected** creates metadata parents
+   (`paperful search --apply`). Hide with `[ui].web_search = "off"`. Unset
+   SearXNG shows an amber hint (no enqueue). PDFs still need Wanted.
+   **Check again** re-runs a saved topic watch or
    person list. Topic watches also offer **Preview apply** / **Apply inbox**
    (`snowball watch apply`). Advanced topic watches offer **Watch briefing** /
    **Watch digest** (same optional collection note). Cron alert loop:
@@ -288,6 +292,10 @@ are mounted by `paperful.ui` (`mount_ui`).
 | GET | `/discover/network/meta` | Saved ORCID ego-network runs (`paperful.network.v1`) |
 | GET | `/discover/network` | Graph + metrics for `run_id` (optional `phase`) |
 | POST | `/discover/network/run` | Enqueue `network orcid` (People tab) |
+| GET | `/discover/search/meta` | Saved web-search runs (`paperful.search.v1`) + whether SearXNG is set |
+| GET | `/discover/search` | Candidates + summary for `run_id` |
+| POST | `/discover/search/run` | Enqueue `paperful search` (Web tab) |
+| POST | `/discover/search/apply` | Preview (review token) or apply selected URLs (`-C` from the collection chip) |
 | POST | `/prefs/advanced` | Toggle Advanced cookie |
 | POST | `/prefs/collection` | Remember collection chip cookie |
 | POST | `/settings` | Write allowed `config.toml` fields |

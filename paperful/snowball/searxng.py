@@ -45,25 +45,46 @@ def search_query(
     limit: int = 8,
     getter: Any = None,
     cache_dir: Path | None = None,
+    pages: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Generic SearXNG JSON search. Empty when ``[searxng].base_url`` is unset."""
+    """Generic SearXNG JSON search. Empty when ``[searxng].base_url`` is unset.
+
+    Pages through ``pageno`` until ``limit`` unique URLs or empty pages.
+    A ``getter`` (tests) is called once and is not paged.
+    """
     base = searxng_base_url(cfg)
     q = (query or "").strip()
     if not base or not q:
         return []
     folder = cache_dir if cache_dir is not None else cfg.state_dir / "critique" / "searxng"
-    payload = _cached_search(base, q, getter=getter, cache_dir=folder)
-    results = payload.get("results") if isinstance(payload, dict) else []
+    want = max(1, int(limit))
+    max_pages = max(1, int(pages or max(1, (want + 19) // 20)))
+    if getter is not None:
+        max_pages = 1
+    seen: set[str] = set()
     out: list[dict[str, Any]] = []
-    for row in results or []:
-        if not isinstance(row, dict):
-            continue
-        url = str(row.get("url") or "").strip()
-        title = str(row.get("title") or "").strip()
-        if not url and not title:
-            continue
-        out.append({"url": url, "title": title or url})
-        if len(out) >= max(1, int(limit)):
+    for pageno in range(1, max_pages + 1):
+        payload = _cached_search(
+            base, q, getter=getter, cache_dir=folder, pageno=pageno
+        )
+        results = payload.get("results") if isinstance(payload, dict) else []
+        got = 0
+        for row in results or []:
+            if not isinstance(row, dict):
+                continue
+            url = str(row.get("url") or "").strip()
+            title = str(row.get("title") or "").strip()
+            if not url and not title:
+                continue
+            got += 1
+            key = url or title
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append({"url": url, "title": title or url})
+            if len(out) >= want:
+                return out
+        if got == 0:
             break
     return out
 
@@ -102,9 +123,15 @@ def search_author_site(
 
 
 def _cached_search(
-    base: str, query: str, *, getter: Any, cache_dir: Path | None
+    base: str,
+    query: str,
+    *,
+    getter: Any,
+    cache_dir: Path | None,
+    pageno: int = 1,
 ) -> dict[str, Any]:
-    key = hashlib.sha256(f"{base}\n{query}".encode()).hexdigest()[:16]
+    page = max(1, int(pageno or 1))
+    key = hashlib.sha256(f"{base}\n{query}\n{page}".encode()).hexdigest()[:16]
     if cache_dir is not None:
         path = cache_dir / f"{key}.json"
         if path.is_file():
@@ -113,9 +140,9 @@ def _cached_search(
             except json.JSONDecodeError:
                 pass
     if getter is not None:
-        data = getter(query)
+        data = getter(query) if page == 1 else {}
     else:
-        data = _http_search(base, query)
+        data = _http_search(base, query, pageno=page)
     if cache_dir is not None and isinstance(data, dict):
         cache_dir.mkdir(parents=True, exist_ok=True)
         (cache_dir / f"{key}.json").write_text(
@@ -124,12 +151,13 @@ def _cached_search(
     return data if isinstance(data, dict) else {}
 
 
-def _http_search(base: str, query: str) -> dict[str, Any]:
+def _http_search(base: str, query: str, *, pageno: int = 1) -> dict[str, Any]:
     url = f"{base}/search"
+    params = {"q": query, "format": "json", "pageno": max(1, int(pageno or 1))}
     for attempt in range(3):
         try:
             with httpx.Client(timeout=20.0, follow_redirects=True) as client:
-                resp = client.get(url, params={"q": query, "format": "json"})
+                resp = client.get(url, params=params)
             if resp.status_code >= 500:
                 time.sleep(0.5 * (2**attempt))
                 continue

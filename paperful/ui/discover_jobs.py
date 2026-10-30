@@ -157,3 +157,80 @@ def file_frontier_note(cfg: Config, html: str, collection: str) -> str:
     if callable(flush):
         flush()
     return str(key)
+
+
+def _search_apply_fingerprint(cfg: Config, run_id: str, collection: str, urls: list[str]) -> str:
+    import hashlib
+
+    joined = ",".join(sorted(u for u in urls if u))
+    return hashlib.sha256(f"search|{run_id}|{collection}|{joined}".encode()).hexdigest()
+
+
+def search_apply_preview(
+    cfg: Config,
+    cmd_id: str,
+    *,
+    run_id: str,
+    collection: str,
+    urls: list[str],
+) -> str:
+    from ..search.apply import mark_exists
+    from ..search.store import load_run
+
+    coll = (collection or "").strip()
+    if not coll:
+        raise ValueError("Set the collection chip before adding web hits.")
+    cleaned = (run_id or "").strip()
+    if not cleaned:
+        raise ValueError("No search run to apply.")
+    selected = [u.strip() for u in urls if str(u).strip()]
+    if not selected:
+        raise ValueError("Tick at least one hit.")
+    bundle = load_run(cfg, cleaned)
+    candidates = list(bundle.get("candidates") or [])
+    mark_exists(cfg, candidates)
+    known = {str(row.get("url") or "") for row in candidates}
+    missing = [u for u in selected if u not in known]
+    if missing:
+        raise ValueError("Selected URL is not in this search run.")
+    token = commands.create_review_token(
+        cfg,
+        verb="search_apply",
+        collection=coll,
+        preset="oa",
+        keys=selected,
+        fingerprint=_search_apply_fingerprint(cfg, cleaned, coll, selected),
+        command_id=cmd_id,
+        flags={"run_id": cleaned, "urls": selected},
+    )
+    rec = commands.read_command(cfg, cmd_id) or {}
+    rec["result"] = {"run_id": cleaned, "selected": len(selected), "review_token": token}
+    rec["review_token"] = token
+    commands.write_command(cfg, rec)
+    return token
+
+
+def search_apply(
+    cfg: Config, *, token: str, collection: str
+) -> tuple[bool, str]:
+    from ..search.apply import apply_candidates, mark_exists
+    from ..search.store import load_run
+
+    review = commands.load_review(cfg, token)
+    if review is None:
+        return False, "unknown token"
+    flags = dict(review.get("flags") or {})
+    run_id = str(flags.get("run_id") or "").strip()
+    urls = [str(u) for u in (flags.get("urls") or []) if str(u).strip()]
+    coll = str(review.get("collection") or collection or "").strip()
+    if not coll or not run_id or not urls:
+        return False, "missing search preview data"
+    fp = _search_apply_fingerprint(cfg, run_id, coll, urls)
+    ok, msg = commands.consume_review(cfg, token, fingerprint=fp, keys=urls)
+    if not ok:
+        return False, msg
+    bundle = load_run(cfg, run_id)
+    candidates = list(bundle.get("candidates") or [])
+    mark_exists(cfg, candidates)
+    apply_candidates(cfg, candidates, coll, urls=urls)
+    return True, ""
