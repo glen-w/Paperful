@@ -1,0 +1,11 @@
+[[phases]]
+id = "early"
+label = "Early"
+year_from = 2000
+year_to = 2010
+
+[[phases]]
+id = "late"
+label = "Late"
+year_from = 2011
+year_to = 2025

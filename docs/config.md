@@ -74,6 +74,7 @@ and [architecture](architecture.md).
 | `[ui].citation_map_edit` | `both` | Discover map library panel: `sidebar` / `popup` / `both` / `off` |
 | `[ui].citation_map_auto_search` | `false` | After **Add to library** on the map, also run Find PDF for that item |
 | `[ui].citation_map_remove` | `trash` | Map **Remove from library** behaviour (trash only for now) |
+| `[ui].coauthor_network` | `on` | Discover People co-author map: `on` / `off` |
 | `app_name` | `paperful` | Name shown in Zotero's authorisation dialog |
 
 Leave `ezproxy_base` empty (or remove `ezproxy` from `sources`) if you do not
@@ -285,7 +286,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[critique].context_max_comments` | `12` | Cap on suggested comments from the context pipeline |
 | `[critique].context_max_hits` | `8` | Local RAG hits and OpenAlex / SearXNG rows for historian / scout |
 | `[critique].adversary_max_comments` | `12` | Cap on suggested comments from the `adversary` validity red-team lane |
-| `[[critique.reviewers]]` | one implicit reviewer | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path relative to the config file). `--reviewer ID` selects a subset. Unused by `marg` / `adversary` / `claims` / `verify` / `context*` |
+| `[[critique.reviewers]]` | one implicit reviewer | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path relative to the config file, then shipped `prompts/` in the install), optional `max_tokens` (default `2048`, Ollama `num_predict`; `0` omits the cap). Each reviewer call uses `[llm].timeout_s` as both wall clock and stream idle gap, with progress lines every ~30s. `--reviewer ID` selects a subset. Unused by `marg` / `adversary` / `claims` / `verify` / `context*` |
 | `[rewrite].areas` | `["style"]` | Enabled rewrite specialists: `style`, `cites`, `structure`, `comments`, or `all`. `--area` overlays |
 | `[rewrite].outputs` | `["edits", "tracked"]` | `edits` (always implied), `sidecar`, `tracked` (source-matching office file), `odt`, `pdf`. `--output` overlays |
 | `[rewrite].comments` | `off` | `off` / `substantive` / `all` — reviewer notes as Word comments |

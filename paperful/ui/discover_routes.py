@@ -249,6 +249,7 @@ def _discover_page(
             explore_picks=picks,
             explore_query=explore_query,
             queue_pagination=queue_pagination,
+            coauthor_network=ui.cfg.ui_coauthor_network,
         ),
         status_code=status_code,
     )
@@ -1355,6 +1356,109 @@ async def handle_discover_aw_briefing(
     return ui.after_job("/discover", cmd_id, tab="people", list_name=name)
 
 
+def handle_discover_network_meta(ui: UiContext) -> JSONResponse:
+    from ..network.store import list_runs
+
+    enabled = ui.cfg.ui_coauthor_network != "off"
+    return JSONResponse(
+        {
+            "ok": True,
+            "enabled": enabled,
+            "runs": list_runs(ui.cfg) if enabled else [],
+        }
+    )
+
+
+def handle_discover_network(
+    ui: UiContext, run_id: str = "", phase: str = ""
+) -> JSONResponse:
+    from ..network.store import NetworkError, load_run
+
+    if ui.cfg.ui_coauthor_network == "off":
+        return JSONResponse({"ok": False, "error": "Co-author network is off."}, status_code=404)
+    cleaned = (run_id or "").strip()
+    if not cleaned:
+        return JSONResponse({"ok": False, "error": "run_id required"}, status_code=400)
+    try:
+        bundle = load_run(ui.cfg, cleaned)
+    except NetworkError as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=404)
+    graph = bundle.get("graph") or {}
+    metrics = bundle.get("metrics") or {}
+    slug = (phase or "").strip()
+    if slug:
+        payload = (bundle.get("phases") or {}).get(slug) or {}
+        if not payload:
+            return JSONResponse(
+                {"ok": False, "error": f"Phase {slug!r} is not in this run."},
+                status_code=404,
+            )
+        graph = payload.get("graph") or graph
+        metrics = payload.get("metrics") or metrics
+    return JSONResponse(
+        {
+            "ok": True,
+            "schema": bundle.get("schema"),
+            "run_id": bundle.get("run_id"),
+            "meta": bundle.get("meta") or {},
+            "graph": graph,
+            "metrics": metrics,
+        }
+    )
+
+
+async def handle_discover_network_run(
+    ui: UiContext, request: Request
+) -> RedirectResponse:
+    form = await request.form()
+    orcid = str(form.get("orcid") or "").strip()
+    phases = str(form.get("phases") or "bbnj").strip() or "bbnj"
+    partition = str(form.get("partition") or "none").strip() or "none"
+    try:
+        max_works = int(str(form.get("max_works") or "500").strip() or "500")
+        max_alters = int(str(form.get("max_alters") or "150").strip() or "150")
+    except ValueError:
+        return RedirectResponse(
+            url=ui.page_url(
+                "/discover", tab="people", error="Counts must be whole numbers."
+            ),
+            status_code=303,
+        )
+    if not orcid:
+        return RedirectResponse(
+            url=ui.page_url("/discover", tab="people", error="ORCID is required."),
+            status_code=303,
+        )
+
+    def work(cmd_id: str) -> None:
+        from ..network.run import run_orcid
+        from ..network.store import NetworkError
+
+        try:
+            bundle = run_orcid(
+                ui.cfg,
+                orcid,
+                phases=phases,
+                partition=partition,
+                max_works=max_works,
+                max_alters=max_alters,
+            )
+        except (NetworkError, ValueError) as exc:
+            raise RuntimeError(str(exc)) from exc
+        jobs._attach_result(
+            ui.cfg,
+            cmd_id,
+            {
+                "run_id": bundle.get("run_id"),
+                "path": bundle.get("path"),
+                "nodes": (bundle.get("meta") or {}).get("nodes"),
+            },
+        )
+
+    cmd_id = commands.enqueue(ui.cfg, "network_orcid", work)
+    return ui.after_job("/discover", cmd_id, tab="people")
+
+
 def register_discover(ui: UiContext) -> None:
     app = ui.app
 
@@ -1546,3 +1650,15 @@ def register_discover(ui: UiContext) -> None:
     @app.post("/discover/aw/briefing")
     async def discover_aw_briefing(request: Request) -> RedirectResponse:
         return await handle_discover_aw_briefing(ui, request=request)
+
+    @app.get("/discover/network/meta")
+    def discover_network_meta() -> JSONResponse:
+        return handle_discover_network_meta(ui)
+
+    @app.get("/discover/network")
+    def discover_network(run_id: str = "", phase: str = "") -> JSONResponse:
+        return handle_discover_network(ui, run_id=run_id, phase=phase)
+
+    @app.post("/discover/network/run")
+    async def discover_network_run(request: Request) -> RedirectResponse:
+        return await handle_discover_network_run(ui, request=request)

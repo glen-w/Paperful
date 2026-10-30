@@ -25,6 +25,10 @@ else:  # pragma: no cover
     import tomli as tomllib
 
 
+# Default Ollama ``num_predict`` for critique Markdown / JSON reviewers (~700 words).
+CRITIQUE_REVIEWER_MAX_TOKENS = 2048
+
+
 @dataclass(frozen=True)
 class CritiqueReviewer:
     """One LLM reviewer for ``paperful critique --llm``."""
@@ -32,6 +36,7 @@ class CritiqueReviewer:
     id: str
     model: str = ""  # empty → [llm].model
     prompt: str = "default"  # default builtin JSON prompt, or a path
+    max_tokens: int = CRITIQUE_REVIEWER_MAX_TOKENS  # Ollama num_predict; 0 → omit
 
 
 # Sci-Hub is opt-in (legal grey zone in some jurisdictions). Add "scihub" to
@@ -457,6 +462,8 @@ class Config:
     ui_citation_map_auto_search: bool = False
     # Remove from library: trash (default). remove_from_collection reserved.
     ui_citation_map_remove: str = "trash"
+    # Discover People tab co-author network panel.
+    ui_coauthor_network: str = "on"
     # Attachment hygiene. Off until `paperful attachments --apply`.
     attachments_fix_broken: bool = False
     attachments_merge_files: bool = False
@@ -1119,13 +1126,34 @@ def wants_zotero(dest: str) -> bool:
     return dest in ("zotero", "both")
 
 
+def package_root() -> Path:
+    """Repo / wheel root (parent of the ``paperful`` package)."""
+    return Path(__file__).resolve().parent.parent
+
+
+_LEGACY_SHIPPED_PROMPT_PATHS: dict[str, str] = {
+    "prompts/critique-reviewer-2.md": "prompts/critique-line-editor.md",
+    "prompts/critique-reviewer-3.md": "prompts/critique-foundations.md",
+    "prompts/critique-reviewer-5.md": "prompts/critique-openreview.md",
+}
+
+
 def _resolve_prompt_path(value: str, source: Path) -> str:
     if not value or value == "default":
         return "default"
-    path = Path(value).expanduser()
-    if not path.is_absolute():
-        path = (source.parent / path).resolve()
-    return str(path)
+    raw = Path(value).expanduser()
+    if raw.is_absolute():
+        return str(raw)
+    rel = raw.as_posix()
+    rel = _LEGACY_SHIPPED_PROMPT_PATHS.get(rel, rel)
+    path = Path(rel)
+    beside_config = (source.parent / path).resolve()
+    if beside_config.is_file():
+        return str(beside_config)
+    shipped = (package_root() / path).resolve()
+    if shipped.is_file():
+        return str(shipped)
+    return str(beside_config)
 
 
 def parse_critique_reviewers(raw: Any) -> tuple[CritiqueReviewer, ...]:
@@ -1148,7 +1176,14 @@ def parse_critique_reviewers(raw: Any) -> tuple[CritiqueReviewer, ...]:
         seen.add(rid)
         model = str(row.get("model") or "").strip()
         prompt = str(row.get("prompt") or "default").strip() or "default"
-        out.append(CritiqueReviewer(id=rid, model=model, prompt=prompt))
+        max_tokens = CRITIQUE_REVIEWER_MAX_TOKENS
+        if "max_tokens" in row and row.get("max_tokens") is not None:
+            max_tokens = max(0, int(row.get("max_tokens")))
+        out.append(
+            CritiqueReviewer(
+                id=rid, model=model, prompt=prompt, max_tokens=max_tokens
+            )
+        )
     return tuple(out)
 
 

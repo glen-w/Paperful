@@ -1,0 +1,97 @@
+{
+  "schema": "paperful.network.v1",
+  "ego": {
+    "id": "orcid:0000-0001-9025-7632",
+    "orcid": "0000-0001-9025-7632",
+    "openalex": "A1",
+    "display_name": "Kristina M. Gjerde"
+  },
+  "nodes": [
+    {
+      "id": "orcid:0000-0001-9025-7632",
+      "openalex": "A1",
+      "orcid": "0000-0001-9025-7632",
+      "display_name": "Kristina M. Gjerde",
+      "fingerprint": "gjerde|k",
+      "ego": true,
+      "frequency": 3,
+      "degree": 3,
+      "first_year": 2008,
+      "last_year": 2020,
+      "country": "US",
+      "sector": "ngo",
+      "discipline": "Oceanography"
+    },
+    {
+      "id": "orcid:0000-0002-0000-0001",
+      "openalex": "A2",
+      "orcid": "0000-0002-0000-0001",
+      "display_name": "Ada Ocean",
+      "fingerprint": "ocean|a",
+      "ego": false,
+      "frequency": 2,
+      "degree": 2,
+      "first_year": 2008,
+      "last_year": 2016,
+      "country": "GB",
+      "sector": "academia",
+      "discipline": "Oceanography"
+    },
+    {
+      "id": "orcid:0000-0002-0000-0002",
+      "openalex": "A3",
+      "orcid": "0000-0002-0000-0002",
+      "display_name": "Bea Law",
+      "fingerprint": "law|b",
+      "ego": false,
+      "frequency": 1,
+      "degree": 1,
+      "first_year": 2016,
+      "last_year": 2016,
+      "country": "KE",
+      "sector": "government",
+      "discipline": "Law"
+    },
+    {
+      "id": "orcid:0000-0002-0000-0003",
+      "openalex": "A4",
+      "orcid": "0000-0002-0000-0003",
+      "display_name": "Cam Science",
+      "fingerprint": "science|c",
+      "ego": false,
+      "frequency": 1,
+      "degree": 1,
+      "first_year": 2020,
+      "last_year": 2020,
+      "country": "AU",
+      "sector": "academia",
+      "discipline": "Oceanography"
+    }
+  ],
+  "edges": [
+    {
+      "a": "orcid:0000-0001-9025-7632",
+      "b": "orcid:0000-0002-0000-0001",
+      "weight": 2,
+      "years": [2008, 2016]
+    },
+    {
+      "a": "orcid:0000-0001-9025-7632",
+      "b": "orcid:0000-0002-0000-0002",
+      "weight": 1,
+      "years": [2016]
+    },
+    {
+      "a": "orcid:0000-0001-9025-7632",
+      "b": "orcid:0000-0002-0000-0003",
+      "weight": 1,
+      "years": [2020]
+    },
+    {
+      "a": "orcid:0000-0002-0000-0001",
+      "b": "orcid:0000-0002-0000-0002",
+      "weight": 1,
+      "years": [2016]
+    }
+  ]
+}

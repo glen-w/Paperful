@@ -6,6 +6,23 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+### Added
+
+- **`paperful network`.** ORCID ego co-authorship graph with BBNJ (or custom)
+  phase slices, degree always, and optional NetworkX betweenness / Burt
+  constraint / Gould–Fernandez brokerage (`paperful[network]`). Writes
+  `state/network/<run-id>/` (`paperful.network.v1`). Discover → People →
+  Network (D3). [Co-author network](docs/network.md).
+
+### Fixed
+
+- **Critique reviewers no longer run for hours.** Each `[[critique.reviewers]]`
+  call sends `max_tokens` (default 2048), treats `[llm].timeout_s` as a
+  **wall clock** (not only stream idle), and prints progress every ~30s.
+  Shipped OpenReview prompt (`prompts/critique-openreview.md`) drops
+  “comprehensive as possible” and caps at 700 words. Relative prompt paths
+  also fall back to shipped `prompts/` when config lives outside the repo.
+
 ## 1.6.3 — 2026-10-29
 
 ### Changed

@@ -221,6 +221,7 @@ def handle_page_settings(
             show_auto_attach_setting=library_has_attached_pdf(ui.cfg),
             citation_map_edit=ui.cfg.ui_citation_map_edit,
             citation_map_auto_search=ui.cfg.ui_citation_map_auto_search,
+            coauthor_network=ui.cfg.ui_coauthor_network,
         ),
     )
 
@@ -269,6 +270,14 @@ async def handle_save_settings(ui: UiContext, request: Request) -> RedirectRespo
                 "citation_map_auto_search",
                 "true" if auto_search else "false",
             ),
+            encoding="utf-8",
+        )
+    network = "on" if form.get("coauthor_network") == "1" else "off"
+    ui.cfg.ui_coauthor_network = network
+    if path is not None and path.is_file():
+        text = path.read_text(encoding="utf-8")
+        path.write_text(
+            _patch_section_assignment(text, "ui", "coauthor_network", f'"{network}"'),
             encoding="utf-8",
         )
     resp = RedirectResponse(url="/settings?saved=1", status_code=303)

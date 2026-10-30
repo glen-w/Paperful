@@ -225,17 +225,22 @@ mirror_failures_before_skip = 3
 # max_context_chars = 24000
 # # Optional. Omit the table for one reviewer ([llm].model + builtin JSON prompt).
 # [[critique.reviewers]]
-# id = "reviewer-1"
+# id = "general"
 # model = ""                       # empty → [llm].model
 # prompt = "default"
 # [[critique.reviewers]]
-# id = "reviewer-2"
+# id = "line-editor"
 # model = "qwen2.5:14b"
-# prompt = "prompts/critique-reviewer-2.md"
+# prompt = "prompts/critique-line-editor.md"
 # [[critique.reviewers]]
-# id = "reviewer-5"
+# id = "foundations"
+# model = ""
+# prompt = "prompts/critique-foundations.md"
+# [[critique.reviewers]]
+# id = "openreview"
 # model = "llama-openreviewer-8b"
-# prompt = "prompts/critique-reviewer-5.md"
+# prompt = "prompts/critique-openreview.md"
+# max_tokens = 2048                # Ollama num_predict; 0 = uncapped (not recommended)
 # [rewrite]
 # # Apply a critique pack to a draft (see docs/rewrite.md). Never overwrites the source.
 # areas = ["style"]                # style | cites | structure | comments | all
@@ -569,6 +574,7 @@ concurrency = 2
 # citation_map_edit = "both"           # sidebar | popup | both | off
 # citation_map_auto_search = false     # Find PDF right after Add to library
 # citation_map_remove = "trash"        # trash (default)
+# coauthor_network = "on"              # People tab ORCID ego map (on | off)
 
 # Attachment layout. Off until `paperful attachments --apply`.
 # [attachments]

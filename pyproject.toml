@@ -46,6 +46,8 @@ browser-agent = [
     "ollama>=0.4; python_version >= '3.11'",
 ]
 serve = ["fastapi>=0.115", "uvicorn>=0.32", "jinja2>=3.1", "python-multipart>=0.0.9"]
+# ORCID ego co-authorship SNA (betweenness, constraint, brokerage, --figures).
+network = ["networkx>=3,<4", "matplotlib>=3.8"]
 # Microsoft Open XML SDK validator (Python port) for rewrite tracked.docx /
 # .pptx / .xlsx; ODF adapter for tracked.odt.
 openxml = ["openxml-audit>=0.8,<1"]
@@ -84,6 +86,8 @@ dev = [
     # Workbench tests render Jinja and post forms. CI also passes --extra serve.
     "jinja2>=3.1",
     "python-multipart>=0.0.9",
+    "networkx>=3,<4",
+    "matplotlib>=3.8",
 ]
 
 [build-system]

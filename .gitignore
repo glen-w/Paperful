@@ -23,3 +23,4 @@ ezproxy-cookies.txt
 compose.override.yaml
 docker-compose.override.yml
 assessments/
+docs/bbnj-author-lanes.md

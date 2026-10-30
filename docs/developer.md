@@ -157,6 +157,7 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `serve.py` | Localhost FastAPI: JSON capability API + mounts `ui` when the `serve` extra is installed | `agent_ops`, `ui` |
 | `ui/` | Server-rendered workbench (Jinja). `app.py` owns shared helpers + `mount_ui`; routes live in `wanted_routes` / `discover_routes` / `shell_routes` / `repair_routes` / `index_routes` / `critique_routes` / `rewrite_routes` (each `register_*`). Desk HTTP bodies are module-level `handle_*` functions; each `register_*` only binds them. Row builders: `pages.py` re-exports `wanted_rows` / `discover_rows` / `ask_rows` plus `page_common` (pagination, dest, fingerprints). Long jobs: `jobs.py` re-exports `wanted_jobs` / `discover_jobs` / `repair_jobs` / `index_jobs` (RAG, ask, summarize, synthesize) and defines `critique` / `rewrite`. Ordinary pages do not run `doctor` (System does). Handlers resolve `doctor_payload` / `collections_tree` via `paperful.ui.app` so tests can monkeypatch there | CLI / MCP builders |
 | `authorwatch.py` | People lists → OpenAlex new works; `gather_briefing` / `write_briefing` / `write_digest`; `apply` creates parents + `ingested.md`; `accept` / `delete` | OpenAlex client, `identity`, `snowball.ingest`, `authorwatch_suggest` |
+| `network/` | ORCID ego co-authorship SNA (`paperful.network.v1` under `state/network/<run-id>/`); phase slices; optional NetworkX metrics | OpenAlex `works_by_author`, `AuthorRecord`; extra `paperful[network]` |
 | `authorwatch_suggest.py` | Corpus / cited / coauthor / mix suggestions → `suggestions.jsonl`; shared co-author accumulation for briefing | `authors_report`, OpenAlex, promoted packs |
 | `authorwatch_social.py` | Parse operator-saved RG / LinkedIn / Academia HTML or CSV (no network) | stdlib HTML/CSV |
 | `keepup.py` / `keepup_cites.py` | Alert loop job ledger (`paperful.keepup.v1`); poll watch / authorwatch / collection citers; interval gate; apply + dismiss | `snowball.watch`, `authorwatch`, OpenAlex `works_citing` |
@@ -231,6 +232,7 @@ Tier policy (1.0 contract):
 | `paperful.snowball.watch.v1` | snowball watch cursor | `snowball.watch` | T2 | — |
 | `paperful.keepup.v1` | `state/keepup/<name>/job.json` | `keepup` | T2 | Alert loop / what-cites; see [keepup.md](keepup.md) |
 | `paperful.snowball.coauthors.v1` | co-author graph | `snowball.authors` | T2 | — |
+| `paperful.network.v1` | `state/network/<run-id>/` | `network` | T2 | ORCID ego graph, phase slices, metrics, `attributes.csv`. Distinct from snowball `coauthors.v1`. |
 | `paperful.citation_graph.v1` | `state/snowball/<run-id>/citation_graph.json` | `snowball.citation_graph` | T2 | Discover map. Rebuilt from the queue. Nodes carry `role`, `in_library`, `item_key`, `has_pdf`, optional operator staging (`tags` / `note` / `target_collection` / `staged`), optional `watch_new` / `compare_new`, `thresholds`, and `triage` (read-first list). Library actions: `paperful.snowball.graph_library`. |
 | `paperful.htmlpdf.proposal.v1` | `state/htmlpdf/proposals/` | `sources.htmlpdf` | T2 | — |
 | `paperful.synthesis.v1` | synthesize sidecar | `synthesize` | T2 | — |

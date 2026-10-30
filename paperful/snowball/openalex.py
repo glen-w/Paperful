@@ -859,6 +859,7 @@ class OpenAlexClient:
         from_created_date: str | None = None,
         from_publication_date: str | None = None,
         study_designs: list[str] | tuple[str, ...] | None = None,
+        select: str | None = None,
     ) -> list[dict[str, Any]]:
         """Works for an ORCID or OpenAlex author id. Name-only is refused by callers."""
         cleaned = normalize_orcid(orcid)
@@ -887,7 +888,7 @@ class OpenAlexClient:
         self.stage = self.stage or f"OpenAlex author {label}"
         return self._collect(
             "/works",
-            {"filter": ",".join(filters), "select": SELECT},
+            {"filter": ",".join(filters), "select": select or SELECT},
             limit,
         )
 

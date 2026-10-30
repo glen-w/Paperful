@@ -476,11 +476,56 @@ def test_critique_reviewers_and_ai_model_are_parsed(tmp_path):
     assert [r.id for r in cfg.critique_reviewers] == ["general", "methods"]
     assert cfg.critique_reviewers[0].model == ""
     assert cfg.critique_reviewers[0].prompt == "default"
+    assert cfg.critique_reviewers[0].max_tokens == 2048
     assert cfg.critique_reviewers[1].model == "qwen2.5:14b"
     assert cfg.critique_reviewers[1].prompt == str(prompt.resolve())
     with pytest.raises(ValueError, match="duplicate"):
         parse_critique_reviewers([{"id": "a"}, {"id": "a"}])
     assert isinstance(cfg.critique_reviewers[0], CritiqueReviewer)
+    capped = parse_critique_reviewers(
+        [{"id": "openreview", "prompt": "default", "max_tokens": 1024}]
+    )
+    assert capped[0].max_tokens == 1024
+
+
+def test_shipped_critique_prompt_resolves_outside_repo(tmp_path):
+    from paperful.config import _from_dict, package_root
+    from paperful.critique_llm import load_reviewer_prompt
+
+    cfg_path = tmp_path / "paperful-data" / "config.toml"
+    cfg_path.parent.mkdir(parents=True)
+    cfg = _from_dict(
+        {
+            "critique": {
+                "reviewers": [
+                    {
+                        "id": "line-editor",
+                        "prompt": "prompts/critique-line-editor.md",
+                    },
+                ],
+            }
+        },
+        cfg_path,
+    )
+    row = cfg.critique_reviewers[0]
+    expected = (package_root() / "prompts/critique-line-editor.md").resolve()
+    assert row.prompt == str(expected)
+    assert load_reviewer_prompt(row) is not None
+
+    cfg_legacy = _from_dict(
+        {
+            "critique": {
+                "reviewers": [
+                    {"id": "foundations", "prompt": "prompts/critique-reviewer-3.md"},
+                ],
+            }
+        },
+        cfg_path,
+    )
+    legacy = cfg_legacy.critique_reviewers[0]
+    assert legacy.prompt == str(
+        (package_root() / "prompts/critique-foundations.md").resolve()
+    )
 
 
 def test_critique_advanced_knobs_are_parsed(tmp_path):

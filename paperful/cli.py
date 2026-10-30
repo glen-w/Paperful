@@ -238,6 +238,16 @@ authorwatch_app = typer.Typer(
     ),
 )
 app.add_typer(authorwatch_app, name="authorwatch")
+network_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help=(
+        "ORCID ego co-authorship network: phase slices, SNA metrics, "
+        "and Discover People map. Writes state/network/<run-id>/. "
+        "Betweenness/brokerage need the network extra (NetworkX)."
+    ),
+)
+app.add_typer(network_app, name="network")
 keepup_app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
@@ -300,6 +310,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "twenty",
         "reachout",
         "authorwatch",
+        "network",
         "keepup",
     ),
     "find": ("run", "attach", "recover", "gaps", "inbox", "capture", "urls", "htmlpdf"),
@@ -5199,6 +5210,117 @@ def authorwatch_apply_cmd(
         collection=collection,
         apply=apply,
         config=config,
+    )
+
+
+@network_app.command("orcid")
+def network_orcid_cmd(
+    orcid: str = typer.Argument(..., help="16-digit ORCID with hyphens."),
+    phases: str = typer.Option(
+        "bbnj",
+        "--phases",
+        help="Named preset (bbnj) or a TOML file with [[phases]].",
+    ),
+    partition: str = typer.Option(
+        "none",
+        "--partition",
+        help="Brokerage groups: region, discipline, sector, or none.",
+    ),
+    max_works: int = typer.Option(500, "--max-works", help="OpenAlex works cap."),
+    max_alters: int = typer.Option(
+        150, "--max-alters", help="Keep the ego plus this many co-authors."
+    ),
+    figures: bool = typer.Option(
+        False,
+        "--figures",
+        help="Write phase PNG files (needs the network extra).",
+    ),
+    run_id: str | None = typer.Option(
+        None, "--run-id", help="Override the generated run id."
+    ),
+    out_dir: Path | None = typer.Option(
+        None,
+        "--out-dir",
+        help="Write the run here. Default: state/network/<run-id>/.",
+    ),
+    fmt: str = AgentFormatOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Build an ORCID ego co-authorship network and slice it by negotiation phase."""
+    from .network.command import run_network_orcid
+
+    run_network_orcid(
+        console,
+        orcid,
+        phases=phases,
+        partition=partition,
+        max_works=max_works,
+        max_alters=max_alters,
+        figures=figures,
+        fmt=fmt,
+        config=config,
+        run_id=run_id,
+        out_dir=out_dir,
+    )
+
+
+@network_app.command("show")
+def network_show_cmd(
+    run_id: str = typer.Argument(..., help="Run id under state/network/."),
+    phase: str = typer.Option("", "--phase", help="Restrict the table to one phase id."),
+    fmt: str = AgentFormatOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Print ego metrics for a saved network run. Does not call OpenAlex."""
+    from .network.command import run_network_show
+
+    run_network_show(console, run_id, phase=phase, fmt=fmt, config=config)
+
+
+@network_app.command("list")
+def network_list_cmd(
+    fmt: str = AgentFormatOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """List saved ego-network runs under state/network/."""
+    from .network.command import run_network_list
+
+    run_network_list(console, config=config, fmt=fmt)
+
+
+@network_app.command("export")
+def network_export_cmd(
+    run_id: str = typer.Argument(..., help="Run id under state/network/."),
+    fmt: str = typer.Option(
+        "csv", "--format", help="csv (default), gexf, or graphml (gexf/graphml need NetworkX)."
+    ),
+    dest: Path | None = typer.Option(None, "--dest", help="Output path. Default: the run dir."),
+    phase: str = typer.Option("", "--phase", help="Export one phase subgraph."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Write edges as CSV, or a GEXF/GraphML graph."""
+    from .network.command import run_network_export
+
+    run_network_export(
+        console, run_id, fmt=fmt, dest=dest, phase=phase, config=config
+    )
+
+
+@network_app.command("attributes")
+def network_attributes_cmd(
+    run_id: str = typer.Argument(..., help="Run id under state/network/."),
+    write_template: bool = typer.Option(
+        False,
+        "--write-template",
+        help="(Re)write attributes.csv from OpenAlex seeds without recomputing metrics.",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Write or reload the hand-coding CSV (discipline, sector, region, career stage)."""
+    from .network.command import run_network_attributes
+
+    run_network_attributes(
+        console, run_id, write_template=write_template, config=config
     )
 
 

@@ -67,7 +67,7 @@ uv run paperful critique --item KEY -C "My Collection"
 uv run paperful critique --file ./draft.docx -C "My Collection"
 uv run paperful critique --file ./draft.pdf --lane reviewers
 uv run paperful critique --file ./draft.pdf --llm
-uv run paperful critique --file ./draft.pdf --llm --reviewer reviewer-2
+uv run paperful critique --file ./draft.pdf --llm --reviewer line-editor
 uv run paperful critique --file ./draft.pdf --lane marg
 uv run paperful critique --file ./draft.pdf --lane adversary
 uv run paperful critique --file ./draft.pdf --lane claims
@@ -205,15 +205,23 @@ Never emits scores.
 Default is **one** reviewer (`[llm].model` + builtin JSON prompt). Add more
 with `[[critique.reviewers]]` — each row has `id`, optional `model` (empty
 inherits `[llm].model`), and `prompt` (`default` or a path relative to the
-config file). `--reviewer ID` (repeatable) runs a subset. A Markdown prompt
-file yields a **Reviewer note** at the head of `pack.md`; the builtin prompt
-still returns JSON comments as suggested findings. One LLM call per reviewer.
-`prompts/critique-reviewer-2.md` is the shipped Markdown example.
-`prompts/critique-reviewer-5.md` is the OpenReviewer-style general review
-(local `llama-openreviewer-8b`) with scores and Accept/Reject stripped — a
-pre-submission stress-test, not a grade. The theatrical `critique-reviewer-4.md`
-persona was removed; if you copied it into paperful-data, drop that
-`[[critique.reviewers]]` row (use `--lane adversary` instead).
+config file; if that file is missing, shipped prompts under the Paperful
+install/repo `prompts/` directory are used). `--reviewer ID` (repeatable) runs
+a subset. A Markdown prompt file yields a **Reviewer note** at the head of
+`pack.md`; the builtin prompt still returns JSON comments as suggested findings.
+One LLM call per reviewer. Shipped Markdown personas (ids are suggestions):
+
+| id | prompt file | role |
+| --- | --- | --- |
+| `general` | `default` | JSON comments + questions (builtin) |
+| `line-editor` | `prompts/critique-line-editor.md` | Prose, voice, and line craft |
+| `foundations` | `prompts/critique-foundations.md` | Argument and foundational pressure |
+| `openreview` | `prompts/critique-openreview.md` | OpenReviewer-style general review (local `llama-openreviewer-8b` works well) with scores and Accept/Reject stripped — under 700 words; pre-submission stress-test, not a grade |
+
+Legacy paths `prompts/critique-reviewer-{2,3,5}.md` still resolve to the same
+files. The theatrical `critique-reviewer-4.md` persona was removed; if you
+copied it into paperful-data, drop that `[[critique.reviewers]]` row (use
+`--lane adversary` instead).
 
 No-LLM users still get the pack (checkers, metrics, heuristic tells).
 

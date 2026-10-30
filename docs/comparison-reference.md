@@ -78,7 +78,7 @@ not a paid pilot.
 | Semantic search over **public** papers / preprints | Partial (`snowball` keyword / similar hops; OpenAlex-backed discovery — not a single “ask the whole web” MCP) | Yes | Yes (Literature / PaperQA3 over 175M+ papers; also trials and patents) | Partial (search library + sometimes Unpaywall) |
 | Semantic search over **your** PDFs | Yes (`rag ingest` + `ask`; GUI Ask) | No | Partial (upload / workspace files; not your Zotero tree) | Yes (chat reads attached PDFs) |
 | Citation graph (corpus-scale, both directions) | Partial (`snowball` `refs` / `cites` / `both`; Discover map of one queue, not the whole public corpus) | Yes | Yes (Literature: native citation-graph understanding) | Partial |
-| Author profiles / co-author networks | Partial (`authorwatch briefing`, `suggest -C`) | Yes | Partial (via literature search, not a dedicated author MCP) | Partial |
+| Author profiles / co-author networks | Partial (`paperful network` ORCID ego + Discover People map; `authorwatch briefing`, `suggest -C`) | Yes | Partial (via literature search, not a dedicated author MCP) | Partial |
 | Keyword / publication **trends** | Partial (`snowball trends`, MCP `snowball_trends`; OpenAlex filters in snowball) | Yes | Partial (reviews, not a trends MCP) | No |
 | Novelty / “has anyone done this?” | Partial (`refs gap`, similar hops, `ask --focus gaps` — never claims absence) | No | Yes (**Precedent**, formerly Has Anyone) | No |
 | Cited literature **synthesis** / conflicting evidence | Partial (opt-in `synthesize` / Ask over held PDFs) | Partial (search/export, not a review agent) | Yes (Literature; `LITERATURE_HIGH` reasoning mode) | Partial (chat) |

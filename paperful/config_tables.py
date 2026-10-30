@@ -1015,6 +1015,9 @@ def apply_ui(raw: dict[str, Any], cfg: "Config") -> None:
     remove = str(ui.get("citation_map_remove") or "").strip().lower()
     if remove in {"trash", "remove_from_collection"}:
         cfg.ui_citation_map_remove = remove
+    network = str(ui.get("coauthor_network") or "").strip().lower()
+    if network in {"on", "off"}:
+        cfg.ui_coauthor_network = network
 
 
 def apply_prompt_paths(cfg: "Config", source: Path) -> None:
@@ -1031,6 +1034,7 @@ def apply_prompt_paths(cfg: "Config", source: Path) -> None:
                 id=row.id,
                 model=row.model,
                 prompt=C._resolve_prompt_path(row.prompt, source),
+                max_tokens=row.max_tokens,
             )
             for row in cfg.critique_reviewers
         )

@@ -980,6 +980,14 @@ header.wb-chrome .advanced-toggle .help-tip-bubble {
   align-items: stretch;
 }
 
+#coauthorNetworkApp .citation-layout {
+  grid-template-columns: minmax(0, 1fr) 18rem;
+}
+
+#coauthorNetworkApp .citation-triage {
+  display: none;
+}
+
 .citation-canvas-wrap {
   position: relative;
   min-height: 40rem;

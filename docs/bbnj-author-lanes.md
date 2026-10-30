@@ -188,6 +188,20 @@ does not yet append `author_site` (the live pipeline does).
   `--apply` created 3 parents in `ocean/BBNJ-test`; one 2025 PDF attached via
   Unpaywall.
 
+## Co-author network (Gjerde ego)
+
+The tribute paper’s co-authorship SNA is `paperful network`, not authorwatch.
+
+```sh
+PAPERFUL_E2E=1 paperful network orcid 0000-0001-9025-7632 \
+  --phases bbnj --partition region --max-works 200 --max-alters 80
+```
+
+Artifacts: `state/network/<run-id>/` (gitignored). Narrative:
+`assessments/YYYY-MM-DD-gjerde-network.md` from
+[templates/network-watch-assessment.md](templates/network-watch-assessment.md).
+Does not write Zotero. See [network](network.md).
+
 ## Phase 4 — Engineering follow-ons (from real failures)
 
 - HTML fixtures for 2–3 listing pages (win + miss) under `tests/fixtures/`.

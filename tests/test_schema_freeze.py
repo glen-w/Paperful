@@ -39,6 +39,7 @@ from paperful.runreport import (
 from paperful.sections.command import SCHEMA as SECTIONS_SCHEMA, SECTION_KEYS
 from paperful.sections.grobid import TEI_META_KEYS, TEI_SCHEMA
 from paperful.store import ITEM_RECORD_KEYS, empty_item_record
+from paperful.network.store import GRAPH_KEYS, META_KEYS, SCHEMA as NETWORK_SCHEMA
 from tests.conftest import make_item
 
 FIX = Path(__file__).parent / "fixtures"
@@ -229,6 +230,17 @@ def test_sections_v1_keys_match_golden():
     )
     assert golden["schema"] == SECTIONS_SCHEMA
     assert SECTION_KEYS <= golden.keys()
+
+
+def test_network_v1_keys_match_golden():
+    golden = json.loads(
+        (FIX / "network" / "gjerde_ego" / "graph.json").read_text(encoding="utf-8")
+    )
+    assert golden["schema"] == NETWORK_SCHEMA
+    assert GRAPH_KEYS <= golden.keys()
+    assert sorted(GRAPH_KEYS) == sorted({"schema", "ego", "nodes", "edges"})
+    assert "run_id" in META_KEYS and "orcid" in META_KEYS
+    assert NETWORK_SCHEMA == "paperful.network.v1"
 
 
 def test_grobid_tei_v1_keys_match_golden():

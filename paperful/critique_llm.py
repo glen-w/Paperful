@@ -10,11 +10,17 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
-from .config import Config, CritiqueReviewer, critique_reviewers_for
+from .config import (
+    CRITIQUE_REVIEWER_MAX_TOKENS,
+    Config,
+    CritiqueReviewer,
+    critique_reviewers_for,
+)
 from .critique import Finding, make_finding
 from .critique_direct_quotes import snippet_in_direct_quote
 from .critique_extract import ExtractedDoc
 from .grounding import budget_slice
+from .llm.client import ChatRequest, LLMClientError
 from .zot import Item
 
 SCOREISH = re.compile(
@@ -151,6 +157,55 @@ def load_reviewer_prompt(reviewer: CritiqueReviewer) -> str | None:
     return text or None
 
 
+def chat_reviewer_stream(
+    client: Any,
+    request: ChatRequest,
+    *,
+    wall_s: float,
+    on_status: Callable[[str], None] | None = None,
+    label: str = "Reviewer",
+    heartbeat_s: float = 30.0,
+) -> str:
+    """Stream a reviewer reply; abort when wall clock expires.
+
+    ``request.timeout_seconds`` remains the idle gap between Ollama chunks.
+    ``wall_s`` is total elapsed time for this reviewer call.
+    """
+    say = on_status or (lambda _msg: None)
+    raw_wall = float(wall_s) if wall_s is not None else 0.0
+    if raw_wall <= 0:
+        raw_wall = float(request.timeout_seconds or 120) or 120.0
+    wall = max(0.01, raw_wall)
+    beat = max(0.01, float(heartbeat_s))
+    parts: list[str] = []
+    t0 = time.perf_counter()
+    last_beat = t0
+    stream = client.chat_stream(request)
+    try:
+        for piece in stream:
+            parts.append(piece)
+            now = time.perf_counter()
+            if now - t0 >= wall:
+                raise LLMClientError(
+                    f"Reviewer wall clock exceeded after {wall:.0f}s "
+                    f"({sum(len(p) for p in parts)} chars)"
+                )
+            if now - last_beat >= beat:
+                say(
+                    f"{label} still generating "
+                    f"({now - t0:.0f}s, {sum(len(p) for p in parts)} chars)…"
+                )
+                last_beat = now
+    finally:
+        close = getattr(stream, "close", None)
+        if callable(close):
+            try:
+                close()
+            except Exception:
+                pass
+    return "".join(parts)
+
+
 def suggested_from_llm(
     cfg: Config,
     doc: ExtractedDoc,
@@ -261,7 +316,6 @@ def suggested_from_llm(
     first_model = ""
     first_sha = ""
     skip_reason = ""
-    from .llm.client import ChatRequest, chat
 
     if run_reviewers and wanted and not reviewers:
         skip_reason = "no_matching_reviewers"
@@ -278,11 +332,13 @@ def suggested_from_llm(
             skip_reason = skip_reason or "prompt_missing"
             continue
         timeout_s = float(cfg.llm_timeout_s or 120)
+        label = f"Reviewer {i}/{n_reviewers} {reviewer.id}"
         say(
-            f"Reviewer {i}/{n_reviewers} {reviewer.id} · {model} "
-            f"(timeout {timeout_s:.0f}s)…"
+            f"{label} · {model} "
+            f"(wall {timeout_s:.0f}s, idle {timeout_s:.0f}s)…"
         )
         prompt_sha = sha256((prompt + user[:2000]).encode("utf-8")).hexdigest()[:12]
+        max_tokens = int(getattr(reviewer, "max_tokens", CRITIQUE_REVIEWER_MAX_TOKENS))
         request = ChatRequest(
             model=model,
             messages=(
@@ -291,10 +347,17 @@ def suggested_from_llm(
             ),
             timeout_seconds=timeout_s,
             temperature=0.2,
+            max_tokens=max_tokens if max_tokens > 0 else None,
         )
         t0 = time.perf_counter()
         try:
-            raw = chat(client, request)
+            raw = chat_reviewer_stream(
+                client,
+                request,
+                wall_s=timeout_s,
+                on_status=say,
+                label=label,
+            )
         except Exception as exc:
             dt = time.perf_counter() - t0
             say(

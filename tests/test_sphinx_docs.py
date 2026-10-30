@@ -81,6 +81,7 @@ def test_gui_md_documents_discover_and_wanted_routes():
         "/discover/check-again",
         "/discover/aw/import",
         "/discover/aw/briefing",
+        "/discover/network",
         "/discover/watch-briefing",
         "/discover/watch-digest",
         "/discover/ingest-apply",

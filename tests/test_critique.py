@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import time
 import zipfile
 from pathlib import Path
 
@@ -462,10 +463,10 @@ def test_llm_suggested_lane_drops_ungrounded_and_scores(cfg, tmp_path, monkeypat
         "questions": ["Where is the methods section?"],
     }
 
-    def fake_chat(_client, _request):
+    def fake_chat(_client, _request, **_kw):
         return json.dumps(payload)
 
-    monkeypatch.setattr("paperful.llm.client.chat", fake_chat)
+    monkeypatch.setattr("paperful.critique_llm.chat_reviewer_stream", fake_chat)
     client = type("C", (), {"provider": "stub"})()
     pack = build_critique(
         cfg,
@@ -666,6 +667,7 @@ def test_cli_unknown_reviewer_skips_llm_lane(cfg, tmp_path, monkeypatch):
     def boom(*_a, **_k):
         raise AssertionError("unknown --reviewer must not call the model")
 
+    monkeypatch.setattr("paperful.critique_llm.chat_reviewer_stream", boom)
     monkeypatch.setattr("paperful.llm.client.chat", boom)
     ok = runner.invoke(
         app,
@@ -1486,11 +1488,11 @@ def test_two_reviewers_write_separate_notes(cfg, tmp_path: Path, monkeypatch):
     )
     seen: list[str] = []
 
-    def fake_chat(_client, request):
+    def fake_chat(_client, request, **_kw):
         seen.append(request.model)
         return f"Opinion from {request.model}."
 
-    monkeypatch.setattr("paperful.llm.client.chat", fake_chat)
+    monkeypatch.setattr("paperful.critique_llm.chat_reviewer_stream", fake_chat)
     path = tmp_path / "multi.txt"
     path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
     pack = build_critique(
@@ -1523,11 +1525,11 @@ def test_reviewer_prompt_file_and_id_filter(cfg, tmp_path: Path, monkeypatch):
     )
     captured: list[str] = []
 
-    def fake_chat(_client, request):
+    def fake_chat(_client, request, **_kw):
         captured.append(request.messages[0]["content"])
         return "Methods-only note."
 
-    monkeypatch.setattr("paperful.llm.client.chat", fake_chat)
+    monkeypatch.setattr("paperful.critique_llm.chat_reviewer_stream", fake_chat)
     path = tmp_path / "filter.txt"
     path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
     pack = build_critique(
@@ -1547,6 +1549,65 @@ def test_reviewer_prompt_file_and_id_filter(cfg, tmp_path: Path, monkeypatch):
     assert "## Reviewer notes" not in md
 
 
+def test_chat_reviewer_stream_wall_clock_and_heartbeat(monkeypatch):
+    from paperful.critique_llm import chat_reviewer_stream
+    from paperful.llm.client import ChatRequest, LLMClientError
+
+    class SlowClient:
+        provider = "stub"
+
+        def chat_stream(self, _request):
+            yield "aa"
+            time.sleep(0.05)
+            yield "bb"
+            time.sleep(0.05)
+            yield "cc"
+
+    seen: list[str] = []
+    req = ChatRequest(
+        model="m",
+        messages=({"role": "user", "content": "x"},),
+        timeout_seconds=30,
+    )
+    with pytest.raises(LLMClientError, match="wall clock"):
+        chat_reviewer_stream(
+            SlowClient(),
+            req,
+            wall_s=0.08,
+            on_status=seen.append,
+            label="Reviewer 1/1 openreview",
+            heartbeat_s=0.04,
+        )
+    assert any("still generating" in msg for msg in seen)
+
+
+def test_reviewer_passes_max_tokens(cfg, tmp_path: Path, monkeypatch):
+    prompt = tmp_path / "note.md"
+    prompt.write_text("You are a note writer. No accept/reject.\n", encoding="utf-8")
+    cfg.critique_reviewers = (
+        CritiqueReviewer(
+            id="capped", model="model-a", prompt=str(prompt), max_tokens=512
+        ),
+    )
+    seen: list[object] = []
+
+    def fake_chat(_client, request, **_kw):
+        seen.append(request)
+        return "Short note."
+
+    monkeypatch.setattr("paperful.critique_llm.chat_reviewer_stream", fake_chat)
+    path = tmp_path / "cap.txt"
+    path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
+    build_critique(
+        cfg,
+        file_path=path,
+        offline=True,
+        use_llm=True,
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    assert seen and seen[0].max_tokens == 512
+
+
 def test_missing_reviewer_prompt_skips(cfg, tmp_path: Path, monkeypatch):
     cfg.critique_reviewers = (
         CritiqueReviewer(id="ghost", model="", prompt=str(tmp_path / "missing.md")),
@@ -1555,7 +1616,7 @@ def test_missing_reviewer_prompt_skips(cfg, tmp_path: Path, monkeypatch):
     def boom(*_a, **_k):
         raise AssertionError("missing prompt must not call the model")
 
-    monkeypatch.setattr("paperful.llm.client.chat", boom)
+    monkeypatch.setattr("paperful.critique_llm.chat_reviewer_stream", boom)
     path = tmp_path / "ghost.txt"
     path.write_text(_PAD * 4, encoding="utf-8")
     pack = build_critique(
@@ -1676,8 +1737,8 @@ def test_default_llm_does_not_call_marg(cfg, tmp_path, monkeypatch):
 
     monkeypatch.setattr("paperful.critique_marg.suggested_from_marg", boom)
     monkeypatch.setattr(
-        "paperful.llm.client.chat",
-        lambda _c, _r: json.dumps(
+        "paperful.critique_llm.chat_reviewer_stream",
+        lambda _c, _r, **_k: json.dumps(
             {
                 "summary": "We report a 47.2 percent increase in yield.",
                 "comments": [],
@@ -1700,8 +1761,8 @@ def test_default_llm_does_not_call_marg(cfg, tmp_path, monkeypatch):
 
 def test_llm_status_reports_each_reviewer(cfg, tmp_path, monkeypatch):
     monkeypatch.setattr(
-        "paperful.llm.client.chat",
-        lambda _c, _r: json.dumps(
+        "paperful.critique_llm.chat_reviewer_stream",
+        lambda _c, _r, **_k: json.dumps(
             {
                 "summary": "We report a 47.2 percent increase in yield.",
                 "comments": [],
@@ -1722,6 +1783,7 @@ def test_llm_status_reports_each_reviewer(cfg, tmp_path, monkeypatch):
     )
     joined = "\n".join(seen)
     assert "Reviewer 1/1 reviewer ·" in joined
+    assert "wall " in joined and "idle " in joined
     assert "Reviewer 1/1 reviewer done" in joined
     assert pack["llm"]["mode"] == "default"
 
@@ -1784,12 +1846,13 @@ def test_both_lanes_concatenate_reviewers_and_marg(cfg, tmp_path, monkeypatch):
     )
     cfg.critique_advanced_refine = False
 
+    def fake_reviewer(_client, request, **_kw):
+        return "Opinion from model-a about the ABC protocol and Figure 2."
+
     def fake_chat(_client, request):
-        sys_msg = request.messages[0]["content"]
-        if "You are reviewer A" in sys_msg:
-            return "Opinion from model-a about the ABC protocol and Figure 2."
         return _marg_chat(_client, request)
 
+    monkeypatch.setattr("paperful.critique_llm.chat_reviewer_stream", fake_reviewer)
     monkeypatch.setattr("paperful.llm.client.chat", fake_chat)
     src = tmp_path / "both.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")

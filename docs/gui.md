@@ -129,7 +129,9 @@ Non-loopback bind (`--host 0.0.0.0`) requires `--allow-remote-bind` and still ha
    resolve, run, **Get suggestions** (method + limit + collection) → checkbox
    **Accept** (+ optional seed date), import CSV/JSON/ORCID or saved social
    HTML, **people briefing** (inbox plus OpenAlex recent works / co-authors for
-   pollable members; same markdown as CLI `authorwatch briefing`); inbox uses the same Preview → apply pattern
+   pollable members; same markdown as CLI `authorwatch briefing`); **Network**
+   panel (ORCID ego co-authorship map, phase slices, D3; `[ui].coauthor_network`);
+   inbox uses the same Preview → apply pattern
    (`authorwatch apply`). **Check again** re-runs a saved topic watch or
    person list. Topic watches also offer **Preview apply** / **Apply inbox**
    (`snowball watch apply`). Advanced topic watches offer **Watch briefing** /
@@ -283,6 +285,9 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/discover/aw/delete` | Delete list ledger (`--yes` on CLI) |
 | POST | `/discover/aw/import` | CSV/JSON/ORCID/saved social HTML upload → list (`resolve` off); files under `state/gui/uploads/` |
 | POST | `/discover/aw/briefing` | Write list `briefing.md` (inbox + OpenAlex people context) |
+| GET | `/discover/network/meta` | Saved ORCID ego-network runs (`paperful.network.v1`) |
+| GET | `/discover/network` | Graph + metrics for `run_id` (optional `phase`) |
+| POST | `/discover/network/run` | Enqueue `network orcid` (People tab) |
 | POST | `/prefs/advanced` | Toggle Advanced cookie |
 | POST | `/prefs/collection` | Remember collection chip cookie |
 | POST | `/settings` | Write allowed `config.toml` fields |

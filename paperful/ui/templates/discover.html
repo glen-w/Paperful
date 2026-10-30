@@ -423,6 +423,56 @@
   </div>
 </section>
 {% endif %}
+{% if coauthor_network != 'off' %}
+<section class="panel" id="coauthorNetworkApp">
+  <h2>Network</h2>
+  <p class="section-lede">An ORCID ego co-authorship map, sliced by negotiation phase. Nodes are people, not papers. This is not the Queue citation map. Metrics other than degree need the optional <code>paperful[network]</code> extra.</p>
+  <form method="post" action="/discover/network/run" class="toolbar">
+    <p class="field-legend">Build {{ info("Pull this person’s OpenAlex works and draw who they wrote with, split by year window.") }}</p>
+    <label>ORCID {{ info("16-digit ORCID with hyphens.") }} <input name="orcid" placeholder="0000-0001-9025-7632"></label>
+    <label>Phases {{ info("bbnj is the BBNJ negotiation windows. Or a path to a [[phases]] TOML file on this machine.") }}
+      <select name="phases">
+        <option value="bbnj" selected>bbnj</option>
+      </select>
+    </label>
+    <label>Partition {{ info("Group nodes for Gould–Fernandez brokerage roles. none skips brokerage.") }}
+      <select name="partition">
+        <option value="none">none</option>
+        <option value="region">region</option>
+        <option value="discipline">discipline</option>
+        <option value="sector">sector</option>
+      </select>
+    </label>
+    {% if prefs.advanced %}
+    <label>Max works {{ info("Cap OpenAlex works fetched for this person.") }} <input name="max_works" type="number" value="500" min="1"></label>
+    <label>Max alters {{ info("Keep the ego plus this many co-authors.") }} <input name="max_alters" type="number" value="150" min="1"></label>
+    {% endif %}
+    <button type="submit" class="secondary">Build network</button>
+  </form>
+  <div class="citation-toolbar">
+    <label>Saved run {{ info("Runs already written under state/network/.") }}
+      <select id="networkRunSelect"></select>
+    </label>
+    <label>Phase {{ info("Show one negotiation window, or all years.") }}
+      <select id="networkPhaseSelect"></select>
+    </label>
+    <p id="networkMetrics" class="citation-meta"></p>
+    <p id="networkStatus" class="citation-status" role="status"></p>
+  </div>
+  <div class="citation-layout">
+    <div class="citation-canvas-wrap">
+      <svg id="networkCanvas" class="citation-canvas" role="img" aria-label="Co-author ego network"></svg>
+    </div>
+    <aside id="networkPanel" class="citation-panel" aria-live="polite">
+      <p class="citation-panel-empty">Click a person to see their ties and attributes.</p>
+    </aside>
+  </div>
+  <ul class="citation-legend">
+    <li><span class="citation-swatch influential" aria-hidden="true"></span> Ego</li>
+    <li><span class="citation-swatch foundational" aria-hidden="true"></span> Co-author</li>
+  </ul>
+</section>
+{% endif %}
 {% if note and note.markdown %}
 <section class="panel">
   <h2>Note</h2>
@@ -657,5 +707,9 @@
 {% if tab == 'queue' and run_id %}
 <script src="/static/vendor/d3.v7.min.js"></script>
 <script src="/static/citation_map.js?v=9"></script>
+{% endif %}
+{% if tab == 'people' and coauthor_network != 'off' %}
+<script src="/static/vendor/d3.v7.min.js"></script>
+<script src="/static/coauthor_network.js?v=1"></script>
 {% endif %}
 {% endblock %}

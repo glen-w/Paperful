@@ -1,0 +1,47 @@
+{
+  "schema": "paperful.network.v1",
+  "graph": {
+    "schema": "paperful.network.v1",
+    "ego": {
+      "id": "orcid:0000-0001-9025-7632",
+      "orcid": "0000-0001-9025-7632",
+      "openalex": "A1",
+      "display_name": "Kristina M. Gjerde"
+    },
+    "phase": {
+      "id": "early",
+      "label": "Early",
+      "year_from": 2000,
+      "year_to": 2010
+    },
+    "nodes": [
+      {
+        "id": "orcid:0000-0001-9025-7632",
+        "display_name": "Kristina M. Gjerde",
+        "ego": true,
+        "degree": 1
+      },
+      {
+        "id": "orcid:0000-0002-0000-0001",
+        "display_name": "Ada Ocean",
+        "ego": false,
+        "degree": 1
+      }
+    ],
+    "edges": [
+      {
+        "a": "orcid:0000-0001-9025-7632",
+        "b": "orcid:0000-0002-0000-0001",
+        "weight": 1,
+        "years": [2008]
+      }
+    ]
+  },
+  "metrics": {
+    "ego_id": "orcid:0000-0001-9025-7632",
+    "partition": "none",
+    "nodes": 2,
+    "edges": 1,
+    "ego": { "degree": 1 }
+  }
+}

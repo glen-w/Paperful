@@ -116,8 +116,8 @@ llm = false
 # vale = false                     # house-style pass; needs vale on PATH (not an LLM)
 # glossary = true                  # fuzzy house expansions from state/glossary/
 # [[critique.reviewers]]            # omit the table for one builtin JSON reviewer
-# id = "reviewer-2"
-# prompt = "prompts/critique-reviewer-2.md"
+# id = "line-editor"
+# prompt = "prompts/critique-line-editor.md"
 
 [rewrite]                           # verb C2.5: apply a critique pack
 areas = ["style"]                   # style-only glossary/Vale swaps need no model
@@ -261,8 +261,8 @@ silent (no finding).
 
 ```sh
 uv run paperful critique --file ./draft.pdf --lane reviewers
-uv run paperful critique --file ./draft.pdf --llm --reviewer reviewer-2
-uv run paperful critique --file ./draft.pdf --llm --reviewer reviewer-5
+uv run paperful critique --file ./draft.pdf --llm --reviewer line-editor
+uv run paperful critique --file ./draft.pdf --llm --reviewer openreview
 uv run paperful critique --file ./draft.pdf --lane marg
 uv run paperful critique --file ./draft.pdf --lane adversary
 uv run paperful critique --file ./draft.pdf --lane claims

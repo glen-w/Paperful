@@ -1069,6 +1069,7 @@ for the end-to-end operator story.
 | 22 | [Literature-discovery complement](#literature-discovery-complement-waves) — **Wave 1:** read-only MCP (`gaps`, snowball dry-run / keyword preview, collection `export`) + BibTeX/RIS for snowball / `authorwatch` proposal packs | **Shipped** — `paperful mcp` tools + `export-proposals`; CLI snowball `--format json` loads `summary.json` on dry-run |
 | 23 | Same — **Wave 2:** OpenAlex publication trend report for a query or saved snowball seed (`snowball trends`) | **Shipped** |
 | 24 | Same — **Wave 3:** thicker `authorwatch` briefing (co-authors + recent works via OpenAlex) | **Shipped** |
+| 25 | ORCID ego co-authorship SNA (`paperful network`, Discover People map, BBNJ phase slices) | **Shipped** — [network](network.md); extra `paperful[network]` |
 
 (literature-discovery-complement-waves)=
 ### Literature-discovery complement (waves)
