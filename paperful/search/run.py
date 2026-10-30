@@ -88,7 +88,15 @@ def run_search(
 ) -> dict[str, Any]:
     require_searxng(cfg)
     allow = parse_hosts(hosts)
-    queries = fanout_queries(terms, filetype=filetype, hosts=allow)
+    playbook_hosts: list[str] = []
+    for pb in cfg.grey_playbooks or []:
+        for host in getattr(pb, "hosts", ()) or ():
+            h = str(host).strip().lower().removeprefix("www.")
+            if h and h not in playbook_hosts:
+                playbook_hosts.append(h)
+    queries = fanout_queries(
+        terms, filetype=filetype, hosts=allow, playbook_hosts=playbook_hosts
+    )
     query = queries[0] if queries else ""
     if not query:
         raise SearchError("Pass a search query.")
@@ -96,15 +104,18 @@ def run_search(
 
     cap = max(1, int(max_hits if max_hits is not None else (cfg.search_max or 20)))
     do_probe = cfg.search_probe if probe is None else bool(probe)
-    fetch_limit = max(cap * 3, cap, 80)
-    page_cap = min(8, max(1, (fetch_limit + 19) // 20))
+    fetch_limit = max(cap * 4, cap, 200)
+    per_query = max(80, min(fetch_limit, max(cap, 120)))
+    page_cap = min(8, max(4, (per_query + 19) // 20))
     raw: list[dict[str, Any]] = []
     seen_urls: set[str] = set()
     for q in queries:
+        if len(raw) >= fetch_limit:
+            break
         page = search_query(
             cfg,
             q,
-            limit=fetch_limit,
+            limit=per_query,
             getter=getter,
             cache_dir=cache_dir(cfg),
             pages=page_cap,
@@ -117,8 +128,6 @@ def run_search(
             raw.append(row)
             if len(raw) >= fetch_limit:
                 break
-        if len(raw) >= fetch_limit:
-            break
     playbooks = list(cfg.grey_playbooks or [])
     hits: list[dict[str, Any]] = []
     blocked = 0
@@ -150,6 +159,9 @@ def run_search(
             dropped += 1
             continue
         kind = "pdf" if looks_like_pdf_url(rewritten) else "landing"
+        if kind == "landing" and not playbook and not allow:
+            dropped += 1
+            continue
         hits.append(
             _hit(
                 url=rewritten,

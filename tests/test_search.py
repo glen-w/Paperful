@@ -109,6 +109,20 @@ def test_fanout_includes_quoted_and_unhosted():
     assert any("site:iucn.org" in q for q in qs)
     assert any("site:" not in q and "Kristina" in q for q in qs)
     assert "filetype:pdf" in blob
+    assert any("workshop" in q for q in qs)
+    assert any("BBNJ" in q or "high seas" in q for q in qs)
+    assert any(q.startswith("Gjerde ") or " Gjerde " in q for q in qs)
+
+
+def test_fanout_site_clusters_from_playbooks():
+    qs = fanout_queries(
+        ["Kristina", "Gjerde"],
+        filetype="pdf",
+        playbook_hosts=["iucn.org", "un.org", "highseasalliance.org", "iddri.org"],
+    )
+    assert any("site:iucn.org" in q for q in qs)
+    assert any("site:un.org" in q for q in qs)
+    assert len(qs) <= 16
 
 
 def test_search_query_pages_until_limit(tmp_path: Path, monkeypatch):
@@ -164,6 +178,57 @@ def test_keeps_fifty_grey_hits(tmp_path: Path):
     assert result["created"] == 50
     assert len(lib.created) == 50
     assert all((row.get("url") or "").endswith(".pdf") for row in lib.created)
+
+
+def test_keeps_two_hundred_grey_hits(tmp_path: Path):
+    class ManyGrey:
+        def __call__(self, query: str) -> dict:
+            rows = [
+                {
+                    "url": f"https://portals.iucn.org/library/sites/library/files/documents/gjerde-{i}.pdf",
+                    "title": f"Gjerde IUCN high seas workshop {i} 2018",
+                }
+                for i in range(250)
+            ]
+            rows.append({"url": SCHOLAR, "title": "Scholar junk"})
+            return {"results": rows}
+
+    cfg = _cfg(tmp_path)
+    bundle = run_search(
+        cfg,
+        ["Kristina", "Gjerde"],
+        max_hits=200,
+        probe=False,
+        getter=ManyGrey(),
+        run_id="two-hundred-web",
+    )
+    assert bundle["summary"]["kept"] == 200
+    assert all("scholar.google" not in (r.get("url") or "") for r in bundle["candidates"])
+
+
+def test_collects_hits_from_later_fanout_queries(tmp_path: Path):
+    class SplitGetter:
+        def __call__(self, query: str) -> dict:
+            if "workshop" in query or "briefing" in query:
+                url = "https://portals.iucn.org/library/files/gjerde-workshop.pdf"
+                title = "Gjerde workshop report 2019"
+            else:
+                url = PDF
+                title = "Gjerde IUCN 2018 high seas governance"
+            return {"results": [{"url": url, "title": title}, {"url": SCHOLAR, "title": "junk"}]}
+
+    cfg = _cfg(tmp_path)
+    bundle = run_search(
+        cfg,
+        ["Kristina", "Gjerde"],
+        max_hits=10,
+        probe=False,
+        getter=SplitGetter(),
+        run_id="split-web",
+    )
+    urls = {row.get("url") or "" for row in bundle["candidates"]}
+    assert any("gjerde-workshop" in u for u in urls)
+    assert any("2018-gjerde" in u for u in urls)
 
 
 def test_build_query_filetype_and_hosts():

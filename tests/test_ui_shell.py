@@ -547,12 +547,14 @@ def test_critique_workbench_llm_checkboxes(tmp_path, monkeypatch):
         assert 'value="reviewers"' in page.text
         assert 'value="marg"' in page.text
         assert 'value="adversary"' in page.text
+        assert 'value="outline"' in page.text
         assert 'value="claims"' in page.text
         assert 'value="verify"' in page.text
         assert 'name="grobid"' in page.text
         assert "Get independent reviewer notes" in page.text
         assert "Review experiments, clarity, and impact" in page.text
         assert "Argue against my conclusions" in page.text
+        assert "Review this as an outline" in page.text
         assert "Show which claims this text supports" in page.text
         assert "Find gaps section by section" in page.text
         assert "Compare with this library" in page.text

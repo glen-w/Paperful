@@ -742,6 +742,19 @@ class Pipeline:
                     if n >= _TRANSPORT_DEAD_THRESHOLD:
                         self._blocked_hosts.add(key)
             return
+        # Path-specific 403 on a grey/org PDF must not silence the whole host.
+        if (
+            exc is not None
+            and "403" in str(exc)
+            and not is_publisher_url(url)
+        ):
+            with self._stats_lock:
+                for key in keys:
+                    n = self._transport_fail_hosts.get(key, 0) + 1
+                    self._transport_fail_hosts[key] = n
+                    if n >= _TRANSPORT_DEAD_THRESHOLD:
+                        self._blocked_hosts.add(key)
+            return
         self._mark_host_dead(*keys)
 
     def _skip_ezproxy(

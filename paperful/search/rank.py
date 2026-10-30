@@ -18,6 +18,19 @@ from ..snowball.authors import host_of, is_blocked_host
 
 _YEAR_RE = re.compile(r"\b((?:19|20)\d{2})\b")
 _DOI_RE = re.compile(r"10\.\d{4,9}/[-._;()/:A-Za-z0-9]+")
+_SKIP_TERMS = {"or", "and", "the", "of", "a", "an"}
+_DOC_TYPES = (
+    "workshop",
+    "briefing",
+    "report",
+    '"policy brief"',
+    "submission",
+    "statement",
+)
+_TOPICS = ("BBNJ", '"high seas"', "ABNJ", "ABMT", "PrepCom", "DOALOS")
+_FANOUT_MAX = 16
+_CLUSTER = 4
+_CLUSTER_MAX = 6
 
 
 def parse_hosts(raw: str | list[str] | None) -> list[str]:
@@ -35,28 +48,70 @@ def parse_hosts(raw: str | list[str] | None) -> list[str]:
     return out
 
 
-def fanout_queries(terms: list[str], *, filetype: str = "pdf", hosts: list[str] | None = None) -> list[str]:
-    """Primary query plus recall variants (quoted name, no site: filter)."""
+def _person_names(terms: list[str]) -> list[str]:
+    bits = [str(t).strip().strip('"') for t in terms if str(t).strip()]
+    return [
+        b
+        for b in bits
+        if b[:1].isupper()
+        and b.lower() not in _SKIP_TERMS
+        and ":" not in b
+        and len(b) > 1
+    ]
+
+
+def _host_clusters(hosts: list[str], *, size: int = _CLUSTER, limit: int = _CLUSTER_MAX) -> list[list[str]]:
+    clean: list[str] = []
+    for host in hosts:
+        h = str(host).strip().lower().removeprefix("www.")
+        if h and h not in clean:
+            clean.append(h)
+    groups = [clean[i : i + size] for i in range(0, len(clean), size)]
+    return groups[:limit]
+
+
+def _add_query(out: list[str], query: str) -> None:
+    q = (query or "").strip()
+    if q and q not in out and len(out) < _FANOUT_MAX:
+        out.append(q)
+
+
+def fanout_queries(
+    terms: list[str],
+    *,
+    filetype: str = "pdf",
+    hosts: list[str] | None = None,
+    playbook_hosts: list[str] | None = None,
+) -> list[str]:
+    """Primary query plus recall variants (quoted name, grey types, playbook sites)."""
     allow = list(hosts or [])
-    primary = build_query(terms, filetype=filetype, hosts=allow or None)
     out: list[str] = []
-    if primary:
-        out.append(primary)
-    bits = [str(t).strip() for t in terms if str(t).strip()]
-    names = [b for b in bits if b[:1].isupper() and b.lower() not in {"or", "and"}]
-    if len(names) >= 2:
-        quoted = build_query([f'"{names[0]} {names[1]}"'], filetype=filetype, hosts=None)
-        if quoted and quoted not in out:
-            out.append(quoted)
+    _add_query(out, build_query(terms, filetype=filetype, hosts=allow or None))
+    names = _person_names(terms)
+    quoted = f'"{names[0]} {names[1]}"' if len(names) >= 2 else ""
+    if quoted:
+        last = names[1]
+        _add_query(out, build_query([quoted], filetype=filetype, hosts=None))
+        types = "(" + " OR ".join(_DOC_TYPES) + ")"
+        _add_query(out, build_query([quoted, types], filetype=filetype, hosts=None))
+        topics = "(" + " OR ".join(_TOPICS) + ")"
+        _add_query(out, build_query([quoted, topics], filetype=filetype, hosts=None))
+        _add_query(out, build_query([last, types], filetype=filetype, hosts=None))
+        _add_query(out, build_query([last, topics], filetype=filetype, hosts=None))
     if allow:
-        wide = build_query(terms, filetype=filetype, hosts=None)
-        if wide and wide not in out:
-            out.append(wide)
+        _add_query(out, build_query(terms, filetype=filetype, hosts=None))
     none = (filetype or "pdf").strip().lower()
     if none in {"pdf", "true", "on", "1"}:
-        landings = build_query(terms, filetype="none", hosts=None)
-        if landings and landings not in out:
-            out.append(landings)
+        _add_query(out, build_query(terms, filetype="none", hosts=None))
+    cluster_src = list(allow)
+    for host in playbook_hosts or []:
+        h = str(host).strip().lower().removeprefix("www.")
+        if h and h not in cluster_src:
+            cluster_src.append(h)
+    seed = [quoted] if quoted else [str(t).strip() for t in terms if str(t).strip()]
+    if seed and cluster_src:
+        for group in _host_clusters(cluster_src):
+            _add_query(out, build_query(seed, filetype=filetype, hosts=group))
     return out
 
 

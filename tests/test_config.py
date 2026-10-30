@@ -394,6 +394,7 @@ def test_critique_table_is_parsed(tmp_path):
     assert cfg.critique_context_max_comments == 12
     assert cfg.critique_context_max_hits == 8
     assert cfg.critique_adversary_max_comments == 12
+    assert cfg.critique_outline_max_comments == 12
     assert cfg.critique_claims_max == 8
     assert cfg.critique_claims_max_comments == 16
     assert cfg.critique_claims_timeout_s == 0.0
@@ -565,6 +566,7 @@ def test_critique_lanes_and_context_knobs_are_parsed(tmp_path):
                 "context_max_comments": 6,
                 "context_max_hits": 3,
                 "adversary_max_comments": 4,
+                "outline_max_comments": 5,
             }
         },
         tmp_path / "config.toml",
@@ -574,6 +576,7 @@ def test_critique_lanes_and_context_knobs_are_parsed(tmp_path):
     assert cfg.critique_context_max_comments == 6
     assert cfg.critique_context_max_hits == 3
     assert cfg.critique_adversary_max_comments == 4
+    assert cfg.critique_outline_max_comments == 5
 
 
 def test_critique_claims_verify_and_aspects_are_parsed(tmp_path):

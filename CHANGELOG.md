@@ -8,6 +8,10 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- **Critique `outline` lane.** `--lane outline` reviews an extract as a plan
+  (section skeleton, claim/warrant/scope/evidence pressure) instead of a
+  finished manuscript. `missing_section` / `missing_mention` move to Hygiene
+  in `pack.md` for that run. See [critique](docs/critique.md).
 - **`paperful network`.** ORCID ego co-authorship graph with BBNJ (or custom)
   phase slices, degree always, and optional NetworkX betweenness / Burt
   constraint / Gould–Fernandez brokerage (`paperful[network]`). Writes

@@ -253,6 +253,11 @@ def apply_critique(raw: dict[str, Any], cfg: "Config") -> None:
                 lambda v: max(1, int(v)),
             ),
             (
+                "outline_max_comments",
+                "critique_outline_max_comments",
+                lambda v: max(1, int(v)),
+            ),
+            (
                 "claims_max",
                 "critique_claims_max",
                 lambda v: max(1, int(v)),

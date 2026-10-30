@@ -19,7 +19,7 @@ Deterministic checkers always run (no model). **Checked** findings carry a
 quote and a page / paragraph / slide loc when one exists. Heuristic AI-prose
 tells always run too, as **suggested** `info` — they are not an LLM and not
 proof of authorship. Optional review lanes (`--lane reviewers` / `marg` /
-`adversary` / `claims` / `verify` / `context` / `context-web`; `--llm` and `--advanced` are aliases) and
+`adversary` / `outline` / `claims` / `verify` / `context` / `context-web`; `--llm` and `--advanced` are aliases) and
 `--ai-model` are separate suggested extras. Optional `--vale` house-style
 alerts are **checked**. Optional `--forensics` runs sibling CLI `paperguard`
 and records **suggested** findings. Paperful does not vendor MARG, ScholarPeer,
@@ -70,6 +70,7 @@ uv run paperful critique --file ./draft.pdf --llm
 uv run paperful critique --file ./draft.pdf --llm --reviewer line-editor
 uv run paperful critique --file ./draft.pdf --lane marg
 uv run paperful critique --file ./draft.pdf --lane adversary
+uv run paperful critique --file ./draft.pdf --lane outline
 uv run paperful critique --file ./draft.pdf --lane claims
 uv run paperful critique --file ./draft.pdf --lane verify
 uv run paperful critique --file ./draft.pdf --lane reviewers --lane marg --grobid
@@ -89,7 +90,7 @@ uv run paperful critique dismiss FINDING_ID --critique-id KEY
 
 `--dry-run` prints findings and does not write `state/critiques/`. `--apply`
 posts a tagged child note only for a library `--item`. Uploads stay disk-only.
-`--lane NAME` (repeatable: `reviewers`, `marg`, `adversary`, `claims`, `verify`,
+`--lane NAME` (repeatable: `reviewers`, `marg`, `adversary`, `outline`, `claims`, `verify`,
 `context`, `context-web`)
 selects suggested review lanes for this run. `[critique].lanes` is the config
 list; when it is empty, `[critique].llm` / `[critique].advanced` still map to
@@ -124,23 +125,25 @@ holds readability, lexical diversity, and the AI-tell summary (also rendered
 as a Metrics section in `pack.md`). `pack.md` leads with an **Incomplete lanes**
 banner when a requested review lane skipped, then reviewer notes, counts,
 metrics, **Critical path** (checked findings that are not hygiene, majors
-first), **Claims** (when `--lane claims` ran), **Suggested**, and **Hygiene**
+first), **Outline** (when `--lane outline` ran), **Claims** (when `--lane claims` ran), **Suggested**, and **Hygiene**
 (Vale, acronyms, prose metrics, AI-tell codes). JSON `findings` is unsplit.
 `llm` is `null` until a review lane runs;
 then it records `lanes` (ordered ids), a deprecated `mode` string
-(`default` / `marg` / `both` / `adversary` / `claims` / `verify` / `context` /
+(`default` / `marg` / `both` / `adversary` / `outline` / `claims` / `verify` / `context` /
 `context-web`) derived from that
 set, `model`, `prompt_sha`, `provider`, optional `narrative`, a `reviewers`
 list (per-id model, skip reason, Markdown note, including `marg-experiments`
-/ `marg-clarity` / `marg-impact`, `adversary`, `claims`, `verify-*`, and
+/ `marg-clarity` / `marg-impact`, `adversary`, `outline`, `claims`, `verify-*`, and
 `context` / `context-web` when those
 lanes ran), optional `marg` stats (`parser` is `grobid` or `extract`;
 `rounds`, `calls`, `skipped`; optional `grobid_skipped`; optional `aspects`),
-optional `adversary` stats (`calls`, `skipped`), optional `claims` stats
+optional `adversary` stats (`calls`, `skipped`), optional `outline` stats
+(`calls`, `skipped`), optional `claims` stats
 (`parser`, `calls`, `skipped`), optional `verify` stats (`parser`, `segments`,
 `calls`, `skipped`), and optional
 `context` stats (`search_enabled`, `backends`, `rag_skipped`,
-`search_skipped`). Top-level `claims` is the intra-doc ledger when that lane
+`search_skipped`). Top-level `outline` is the section skeleton when that lane
+ran. Top-level `claims` is the intra-doc ledger when that lane
 ran. `ai_model` and `vale` appear only when those extras ran
 (skip reason or alert counts).
 
@@ -178,6 +181,7 @@ Each lane needs `[llm].enabled`; otherwise the pack records
 | `reviewers` | `--llm` | Independent `[[critique.reviewers]]` JSON/Markdown calls |
 | `marg` | `--advanced` | MARG-S-style multi-agent (experiments / clarity / impact) |
 | `adversary` | — | Validity red-team (alternative explanations, validity, degrees of freedom, falsifiers, missing negatives) |
+| `outline` | — | Plan review: section skeleton, claim/warrant/scope/evidence pressure. Not a finished-manuscript verdict |
 | `claims` | — | Intra-doc claim ledger: extract core claims, bind to methods/results/limitations spans |
 | `verify` | — | Section swarm: density budget, sequential verify, local synthesis (not Deep Review) |
 | `context` | — | ScholarPeer-inspired: summary, library historian, baseline scout, Q&A |
@@ -232,6 +236,28 @@ alternative explanations, selection / construct / external validity, researcher
 degrees of freedom, what would falsify the core claim, and missing negative or
 comparison cases. Same grounding and no-score rules as reviewers. Cap:
 `adversary_max_comments` (default 12). Timeout is `[llm].timeout_s`.
+
+## Optional outline (`--lane outline`)
+
+Additive suggested lane. Treats the extract as a **plan**, not a finished
+paper. Deterministic heading detection builds a section skeleton (word counts;
+`outline_thin` when a named section has almost no body). Excerpt packing keeps
+every section in budget instead of head-plus-tail. One JSON turn pressures
+claim, warrant, missing sections the argument needs, scope vs length,
+allocation, planned evidence, audience, and sequence. Codes: `outline_claim`,
+`outline_warrant`, `outline_gap`, `outline_scope`, `outline_balance`,
+`outline_evidence`, `outline_audience`, `outline_sequence`. Same grounding and
+no-score rules as reviewers. Cap: `outline_max_comments` (default 12). Timeout
+is `[llm].timeout_s`.
+
+`pack.md` has an **Outline** section. When this lane ran, `missing_section` and
+`missing_mention` move to **Hygiene** (JSON findings stay the same). Combining
+with `line-editor`, `openreview`, or `marg` still reviews the extract as if it
+were a paper.
+
+```bash
+uv run paperful critique --file ./outline.docx --lane outline -C "My Collection"
+```
 
 ## Optional claims (`--lane claims`)
 
@@ -418,10 +444,10 @@ When `[llm]` is on, review-lane checkboxes are labeled by what they return
 and can be combined (pre-checked from `[critique].lanes`, or the llm/advanced
 shims when `lanes` is empty). Visible labels: **Get independent reviewer
 notes**, **Review experiments, clarity, and impact**, **Argue against my
-conclusions**, **Show which claims this text supports**, **Find gaps section
+conclusions**, **Review this as an outline**, **Show which claims this text supports**, **Find gaps section
 by section**, **Compare with this library**, **Compare with published work
 (goes online)**. Tooltips hold the lane ids (`reviewers`, `marg` / MARG-S,
-`adversary`, `claims`, `verify` — not a truth check, `context`,
+`adversary`, `outline`, `claims`, `verify` — not a truth check, `context`,
 `context-web`). **GROBID sidecar** is for MARG-S / claims / verify chunks
 (pre-checked from `[grobid].enabled`).
 Library item form also has force-LLM past identity lint. **Write child note** is `--apply` (item

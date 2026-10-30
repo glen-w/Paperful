@@ -239,6 +239,7 @@ def suggested_from_llm(
     run_reviewers = "reviewers" in lanes
     run_marg = "marg" in lanes
     run_adversary = "adversary" in lanes
+    run_outline = "outline" in lanes
     run_claims = "claims" in lanes
     run_verify = "verify" in lanes
     run_context = "context" in lanes or "context-web" in lanes
@@ -246,6 +247,7 @@ def suggested_from_llm(
         run_reviewers
         or run_marg
         or run_adversary
+        or run_outline
         or run_claims
         or run_verify
         or run_context
@@ -261,6 +263,7 @@ def suggested_from_llm(
         and not reviewers
         and not run_marg
         and not run_adversary
+        and not run_outline
         and not run_claims
         and not run_verify
         and not run_context
@@ -476,6 +479,36 @@ def suggested_from_llm(
                 adversary_meta.get("skipped") or "empty_reply"
             )
 
+    outline_meta: dict[str, Any] = {}
+    if run_outline:
+        from .critique_outline import suggested_from_outline
+
+        t_o = time.perf_counter()
+        extra_o, outline_meta = suggested_from_outline(
+            cfg,
+            doc,
+            findings,
+            item=item,
+            client=client,
+            hay=hay,
+            on_status=say,
+        )
+        say(
+            f"Outline comments done ({time.perf_counter() - t_o:.0f}s, "
+            f"{len(extra_o)} comment(s))"
+        )
+        out.extend(extra_o)
+        reviewer_meta.extend(outline_meta.get("reviewers") or [])
+        if extra_o or outline_meta.get("narrative") or outline_meta.get("ledger"):
+            first_sha = first_sha or str(outline_meta.get("prompt_sha") or "")
+            if not first_narrative and outline_meta.get("narrative"):
+                first_narrative = str(outline_meta.get("narrative") or "")
+                first_model = first_model or str(outline_meta.get("model") or "")
+        elif not extra_o:
+            skip_reason = skip_reason or str(
+                outline_meta.get("skipped") or "empty_reply"
+            )
+
     claims_meta: dict[str, Any] = {}
     if run_claims:
         from .critique_claims import suggested_from_claims
@@ -602,6 +635,13 @@ def suggested_from_llm(
             row["adversary"] = {
                 k: v for k, v in adversary_meta.items() if k != "reviewers"
             }
+        if outline_meta:
+            row["outline"] = {
+                k: v
+                for k, v in outline_meta.items()
+                if k not in {"reviewers", "ledger"}
+            }
+            row["outline_ledger"] = list(outline_meta.get("ledger") or [])
         if claims_meta:
             row["claims"] = {
                 k: v
@@ -617,7 +657,12 @@ def suggested_from_llm(
             }
         return row
 
-    if not capped and not first_narrative and not (claims_meta.get("ledger") or []):
+    if (
+        not capped
+        and not first_narrative
+        and not (claims_meta.get("ledger") or [])
+        and not (outline_meta.get("ledger") or [])
+    ):
         return [], _pack_meta(skipped=skip_reason or "empty_reply")
     return capped, _pack_meta()
 

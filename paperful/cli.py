@@ -1061,7 +1061,7 @@ def critique(
     lane: list[str] = typer.Option(
         [],
         "--lane",
-        help="Suggested review lane (repeatable): reviewers, marg, adversary, claims, verify, context, context-web.",
+        help="Suggested review lane (repeatable): reviewers, marg, adversary, outline, claims, verify, context, context-web.",
     ),
     grobid: bool | None = typer.Option(
         None,

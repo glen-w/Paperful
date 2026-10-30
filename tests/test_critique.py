@@ -238,6 +238,9 @@ def test_hygiene_codes_are_demoted():
     assert _is_hygiene_finding({"code": "ai_tell_summary"})
     assert not _is_hygiene_finding({"code": "cited_retracted"})
     assert not _is_hygiene_finding({"code": "missing_section"})
+    assert _is_hygiene_finding({"code": "missing_section"}, outline=True)
+    assert _is_hygiene_finding({"code": "missing_mention"}, outline=True)
+    assert not _is_hygiene_finding({"code": "cited_retracted"}, outline=True)
 
 
 def test_render_markdown_critical_path_hygiene_and_incomplete_lanes():
@@ -2431,6 +2434,322 @@ def test_cli_lane_flag_runs_adversary(cfg, tmp_path, monkeypatch):
     on_disk = json.loads((pack_dir / "pack.json").read_text(encoding="utf-8"))
     assert on_disk["llm"]["lanes"] == ["adversary"]
     assert on_disk["llm"]["mode"] == "adversary"
+
+
+OUTLINE_MS = """
+Working title. Sharing Suspicion, Not Data. Audience is AML policy.
+
+1. Introduction
+
+The compliance problem and why banks share suspicion, not customer data.
+Suggested length 800 words.
+
+2. Methodology
+
+What an SoK is and why it suits a policy question better than a literature review.
+
+3. Legal analysis
+
+Five regimes compared. Article 75 as operating requirements for encrypted matching.
+
+4. Appendix leftover
+
+TBD.
+"""
+
+
+def _outline_chat(_client, request):
+    sys_msg = request.messages[0]["content"]
+    if "OUTLINE (a plan for a paper)" not in sys_msg:
+        raise AssertionError(f"unexpected outline prompt: {sys_msg[:80]}")
+    return json.dumps(
+        {
+            "summary": (
+                "The outline plans to argue that banks share suspicion, not customer "
+                "data, via an SoK of legal regimes and encrypted matching."
+            ),
+            "comments": [
+                {
+                    "code": "outline_claim",
+                    "quote": "share suspicion, not customer data",
+                    "detail": (
+                        "The outline never states what counts as a suspicion signal "
+                        "versus customer data."
+                    ),
+                },
+                {
+                    "code": "outline_invented",
+                    "quote": "lemma 12.4 is false",
+                    "detail": "A proof hole that is not in the excerpt.",
+                },
+                {
+                    "code": "outline_verdict",
+                    "quote": "Suggested length 800 words",
+                    "detail": "I would reject this paper with overall score 2.",
+                },
+            ],
+        }
+    )
+
+
+def test_outline_merges_duplicate_headings_from_toc():
+    from paperful.critique_outline import merge_duplicate_headings, outline_ledger
+
+    slices = [
+        ("1. Introduction", "The compliance problem. Suggested length 800."),
+        ("2. Methodology", "What an SoK is."),
+        ("1. Introduction", "The cost of the silo and why banks share suspicion, not customer data. " * 8),
+        ("2. Methodology", "Sources, selection, and coding. " * 6),
+    ]
+    merged = merge_duplicate_headings(slices)
+    assert [h for h, _ in merged] == ["1. Introduction", "2. Methodology"]
+    intro_words = len(merged[0][1].split())
+    assert intro_words > 12
+    rows = outline_ledger(merged)
+    assert len(rows) == 2
+    assert rows[0]["words"] == intro_words
+
+
+def test_pack_outline_excerpt_keeps_middle_section():
+    from paperful.critique_outline import outline_slices, pack_outline_excerpt
+
+    chunks = ["Preamble about the paper plan.\n"]
+    for i, token in enumerate(
+        ("ALPHAHEAD", "BRAVOHEAD", "CHARLIEHEAD", "DELTAHEAD", "ECHOHEAD"), start=1
+    ):
+        chunks.append(f"\n{i}. Section Title\n\nUnique body token {token} " + ("word " * 80))
+    text = "".join(chunks)
+    slices = outline_slices(text)
+    packed = pack_outline_excerpt(text, slices, 1200)
+    assert "CHARLIEHEAD" in packed
+    assert packed.startswith("Outline sections:")
+    assert len(packed) <= 1200
+
+
+def test_outline_lane_writes_suggested_comments(cfg, tmp_path, monkeypatch):
+    monkeypatch.setattr("paperful.llm.client.chat", _outline_chat)
+    src = tmp_path / "outline.md"
+    src.write_text(OUTLINE_MS, encoding="utf-8")
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        lanes=("outline",),
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    assert pack["llm"]["lanes"] == ["outline"]
+    assert pack["llm"]["mode"] == "outline"
+    assert pack["llm"]["outline"]["calls"] == 1
+    headings = {row["heading"] for row in pack["outline"]}
+    assert "1. Introduction" in headings
+    assert "2. Methodology" in headings
+    suggested = [f for f in pack["findings"] if f["lane"] == "suggested"]
+    codes = {f["code"] for f in suggested}
+    assert "outline_claim" in codes
+    assert "llm_summary" in codes
+    assert "outline_thin" in codes
+    assert "outline_invented" not in codes
+    assert "outline_verdict" not in codes
+    assert any(str(f.get("reviewer") or "") == "outline" for f in suggested)
+    checked = {f["code"] for f in pack["findings"] if f["lane"] == "checked"}
+    assert "missing_section" in checked
+    md = Path(pack["pack_dir"], "pack.md").read_text(encoding="utf-8")
+    assert "## Outline" in md
+    assert "plan" in md.lower()
+    assert "outline_claim" in md
+    assert "## Incomplete lanes" not in md
+    hyg = md[md.index("## Hygiene") :] if "## Hygiene" in md else ""
+    crit = md[md.index("## Critical path") : md.index("## Outline")]
+    assert "missing_section" in hyg
+    assert "missing_section" not in crit
+
+
+def test_cli_lane_flag_runs_outline(cfg, tmp_path, monkeypatch):
+    from paperful.cli import app
+
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
+        '[llm]\nenabled = true\nmodel = "stub"\n',
+        encoding="utf-8",
+    )
+    src = tmp_path / "outline.md"
+    src.write_text(OUTLINE_MS, encoding="utf-8")
+    monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_llm_for_verb", lambda _cfg: None
+    )
+    monkeypatch.setattr(
+        "paperful.llm.get_client",
+        lambda _cfg: type("C", (), {"provider": "stub"})(),
+    )
+    monkeypatch.setattr("paperful.llm.client.chat", _outline_chat)
+    ok = runner.invoke(
+        app,
+        [
+            "critique",
+            "--file",
+            str(src),
+            "--lane",
+            "outline",
+            "--config",
+            str(cfg_path),
+            "--format",
+            "json",
+        ],
+    )
+    assert ok.exit_code == 0, ok.output
+    body = json.loads(ok.stdout)
+    pack_dir = Path(body["summary"]["pack_dir"])
+    on_disk = json.loads((pack_dir / "pack.json").read_text(encoding="utf-8"))
+    assert on_disk["llm"]["lanes"] == ["outline"]
+    assert on_disk["llm"]["mode"] == "outline"
+    assert on_disk["outline"]
+
+
+def test_incomplete_lane_rows_outline_skip():
+    assert _incomplete_lane_rows(
+        {"outline": {"skipped": "empty_reply"}, "lanes": ["outline"]}
+    ) == [("outline", "empty_reply")]
+
+
+def test_outline_ledger_survives_llm_error(cfg, monkeypatch):
+    from paperful.critique_extract import ExtractedDoc
+    from paperful.critique_outline import suggested_from_outline
+
+    def boom(_client, _request):
+        raise RuntimeError("stub down")
+
+    monkeypatch.setattr("paperful.llm.client.chat", boom)
+    doc = ExtractedDoc(text=OUTLINE_MS, format="md", finding="ok")
+    extra, meta = suggested_from_outline(
+        cfg,
+        doc,
+        [],
+        item=None,
+        client=object(),
+        hay=OUTLINE_MS.lower(),
+    )
+    assert meta["skipped"] == "llm_error"
+    assert meta["calls"] == 0
+    headings = {row["heading"] for row in meta["ledger"]}
+    assert "1. Introduction" in headings
+    assert "2. Methodology" in headings
+    assert any(f.code == "llm_failed" for f in extra)
+
+
+def test_outline_empty_extract_skips(cfg):
+    from paperful.critique_extract import ExtractedDoc
+    from paperful.critique_outline import suggested_from_outline
+
+    extra, meta = suggested_from_outline(
+        cfg,
+        ExtractedDoc(text="", format="md", finding="empty_extract"),
+        [],
+        item=None,
+        client=object(),
+        hay="",
+    )
+    assert extra == []
+    assert meta["skipped"] == "empty_extract"
+    assert meta["ledger"] == []
+    assert meta["reviewers"][0]["skipped"] == "empty_extract"
+
+
+def test_outline_empty_reply_skips_when_sections_are_planned(cfg, monkeypatch):
+    from paperful.critique_extract import ExtractedDoc
+    from paperful.critique_outline import suggested_from_outline
+
+    monkeypatch.setattr("paperful.llm.client.chat", lambda *_a, **_k: "{}")
+    text = """
+1. Introduction
+
+The compliance problem and why banks share suspicion, not customer data, in this policy window.
+
+2. Methodology
+
+What an SoK is and why it suits a policy question better than a literature review.
+"""
+    extra, meta = suggested_from_outline(
+        cfg,
+        ExtractedDoc(text=text, format="md", finding="ok"),
+        [],
+        item=None,
+        client=object(),
+        hay=text.lower(),
+    )
+    assert extra == []
+    assert meta["skipped"] == "empty_reply"
+    headings = {row["heading"] for row in meta["ledger"]}
+    assert "1. Introduction" in headings
+
+
+def test_pack_outline_excerpt_without_headings_falls_back():
+    from paperful.critique_outline import pack_outline_excerpt
+
+    text = "plain prose without numbered headings. " * 40
+    packed = pack_outline_excerpt(text, [], 120)
+    assert "plain prose" in packed
+    assert not packed.startswith("Outline sections:")
+
+
+def test_render_markdown_outline_mode_from_lanes_without_ledger():
+    pack = {
+        "input": {"title": "Plan"},
+        "llm": {"lanes": ["outline"]},
+        "findings": [
+            {
+                "code": "cited_retracted",
+                "lane": "checked",
+                "severity": "major",
+                "detail": "Cited work is retracted.",
+                "quote": "Smith 1999",
+                "dismissed": False,
+            },
+            {
+                "code": "missing_section",
+                "lane": "checked",
+                "severity": "info",
+                "detail": "No extractable results section.",
+                "quote": "",
+                "dismissed": False,
+            },
+        ],
+    }
+    md = render_markdown(pack)
+    assert "## Outline" not in md
+    crit = md[md.index("## Critical path") : md.index("## Hygiene")]
+    hyg = md[md.index("## Hygiene") :]
+    assert "cited_retracted" in crit
+    assert "missing_section" not in crit
+    assert "missing_section" in hyg
+
+
+def test_outline_docx_numbered_headings(cfg, tmp_path, monkeypatch):
+    monkeypatch.setattr("paperful.llm.client.chat", _outline_chat)
+    src = _docx(
+        tmp_path / "plan.docx",
+        [
+            "Working title. Sharing Suspicion, Not Data. Audience is AML policy.",
+            "1. Introduction",
+            "The compliance problem and why banks share suspicion, not customer data.",
+            "2. Methodology",
+            "What an SoK is and why it suits a policy question better than a review.",
+        ],
+    )
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        lanes=("outline",),
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    headings = {row["heading"] for row in pack["outline"]}
+    assert "1. Introduction" in headings
+    assert "2. Methodology" in headings
+    by_head = {row["heading"]: row for row in pack["outline"]}
+    assert by_head["2. Methodology"].get("canonical") == "methodology"
+    assert pack["input"]["format"] == "docx"
 
 
 CLAIMS_MANUSCRIPT = """

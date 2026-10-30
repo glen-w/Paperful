@@ -12,6 +12,7 @@ KNOWN_LANES = (
     "reviewers",
     "marg",
     "adversary",
+    "outline",
     "claims",
     "verify",
     "context",
@@ -65,6 +66,8 @@ def mode_for_lanes(lanes: Iterable[str]) -> str:
         return "default"
     if "adversary" in names:
         return "adversary"
+    if "outline" in names:
+        return "outline"
     if "claims" in names:
         return "claims"
     if "verify" in names:

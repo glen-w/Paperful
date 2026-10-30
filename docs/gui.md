@@ -190,10 +190,10 @@ Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
 Uploads stay under `state/critiques/uploads/` and are not imported to `out/`
 or Zotero. Optional review lanes need `[llm]` (item form also has force-LLM
 and write-child-note). Checkboxes are labeled by what they return (independent
-reviewer notes; experiments/clarity/impact; argue against conclusions; claims
-this text supports; section gaps; compare with this library; compare with
-published work, goes online). Tooltips hold the lane ids (`reviewers`, `marg`,
-`adversary`, `claims`, `verify` — not a truth check, `context`,
+reviewer notes; experiments/clarity/impact; argue against conclusions; review
+as an outline; claims this text supports; section gaps; compare with this
+library; compare with published work, goes online). Tooltips hold the lane ids (`reviewers`, `marg`,
+`adversary`, `outline`, `claims`, `verify` — not a truth check, `context`,
 `context-web`). Checkboxes are independent and pre-check from
 `[critique].lanes` (or the llm/advanced shims). GROBID sidecar is for MARG-S /
 claims / verify PDF chunks (pre-checked from `[grobid].enabled`; ticking it is

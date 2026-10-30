@@ -185,7 +185,7 @@ mirror_failures_before_skip = 3
 # [critique]
 # # Local manuscript pack (see docs/critique.md). Not a grade.
 # llm = false                      # shim → reviewers when lanes is empty
-# lanes = []                       # reviewers, marg, adversary, claims, verify, context, context-web (empty → llm/advanced shims)
+# lanes = []                       # reviewers, marg, adversary, outline, claims, verify, context, context-web (empty → llm/advanced shims)
 # tag = "paperful-critique"
 # ai_model = false                 # optional Binoculars extra (uv pip install git+https://github.com/ahans30/Binoculars.git); --ai-model turns on (no CLI off)
 # vale = false                     # optional Vale house style; --vale turns on (no CLI off)
@@ -214,6 +214,7 @@ mirror_failures_before_skip = 3
 # context_max_comments = 12
 # context_max_hits = 8             # local RAG and OpenAlex/SearXNG rows
 # adversary_max_comments = 12      # validity red-team lane cap
+# outline_max_comments = 12        # plan-review lane cap
 # # lanes = ["reviewers", "marg"]  # when set, llm/advanced bools are ignored
 # # With llm = true and advanced = true (and lanes empty), every critique runs reviewers + MARG.
 # # Advanced PDF chunks reuse [grobid] when enabled (see docs/grobid.md).

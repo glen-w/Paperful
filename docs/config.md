@@ -260,7 +260,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[screen].fingerprint_dir` | unset | Optional folder with `tortured.csv` / `.json` (and `scigen`, `mathgen`, `suspect`). Relative paths resolve from the config file. Used when cache is missing or offline |
 | `[screen].tag` | `paperful-pps` | Child note tag for `--apply` |
 | `[critique].llm` | `false` | Shim for lane `reviewers` when `[critique].lanes` is empty (`--llm` / `--no-llm` add or remove that lane) |
-| `[critique].lanes` | `[]` | Suggested review lanes to run together: `reviewers`, `marg`, `adversary`, `claims`, `verify`, `context`, `context-web`. Empty → use `llm` / `advanced` shims. When non-empty those bools are ignored. `--lane` selects for one run |
+| `[critique].lanes` | `[]` | Suggested review lanes to run together: `reviewers`, `marg`, `adversary`, `outline`, `claims`, `verify`, `context`, `context-web`. Empty → use `llm` / `advanced` shims. When non-empty those bools are ignored. `--lane` selects for one run |
 | `[critique].tag` | `paperful-critique` | Child note tag for `critique --apply` |
 | `[critique].ai_model` | `false` | Optional Binoculars extra (`uv pip install "binoculars @ git+https://github.com/ahans30/Binoculars.git"`). `--ai-model` turns it on for one run (no `--no-ai-model`). Missing extra records `ai_model_unavailable`. `paperful doctor` ambers only when this is on and the extra is missing |
 | `[critique].vale` | `false` | Optional Vale house-style pass. `--vale` turns it on for one run (no `--no-vale`). Needs `vale` on PATH and a `.vale.ini`; missing extra records `vale_unavailable` / `vale_no_config` / `vale_failed`. Not in the Compose image |
@@ -289,7 +289,8 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[critique].context_max_comments` | `12` | Cap on suggested comments from the context pipeline |
 | `[critique].context_max_hits` | `8` | Local RAG hits and OpenAlex / SearXNG rows for historian / scout |
 | `[critique].adversary_max_comments` | `12` | Cap on suggested comments from the `adversary` validity red-team lane |
-| `[[critique.reviewers]]` | one implicit reviewer | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path relative to the config file, then shipped `prompts/` in the install), optional `max_tokens` (default `2048`, Ollama `num_predict`; `0` omits the cap). Each reviewer call uses `[llm].timeout_s` as both wall clock and stream idle gap, with progress lines every ~30s. `--reviewer ID` selects a subset. Unused by `marg` / `adversary` / `claims` / `verify` / `context*` |
+| `[critique].outline_max_comments` | `12` | Cap on suggested comments from the `outline` plan-review lane |
+| `[[critique.reviewers]]` | one implicit reviewer | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path relative to the config file, then shipped `prompts/` in the install), optional `max_tokens` (default `2048`, Ollama `num_predict`; `0` omits the cap). Each reviewer call uses `[llm].timeout_s` as both wall clock and stream idle gap, with progress lines every ~30s. `--reviewer ID` selects a subset. Unused by `marg` / `adversary` / `outline` / `claims` / `verify` / `context*` |
 | `[rewrite].areas` | `["style"]` | Enabled rewrite specialists: `style`, `cites`, `structure`, `comments`, or `all`. `--area` overlays |
 | `[rewrite].outputs` | `["edits", "tracked"]` | `edits` (always implied), `sidecar`, `tracked` (source-matching office file), `odt`, `pdf`. `--output` overlays |
 | `[rewrite].comments` | `off` | `off` / `substantive` / `all` — reviewer notes as Word comments |

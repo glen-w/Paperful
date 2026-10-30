@@ -993,6 +993,32 @@ def test_oa_skips_same_publisher_host_after_403(pipe_factory):
     assert any("host already blocked" in a for a in rec.attempts)
 
 
+def test_grey_direct_403_does_not_kill_host_immediately(pipe_factory):
+    calls = []
+
+    def handler(req):
+        calls.append(str(req.url))
+        return httpx.Response(403)
+
+    src = StubSource(
+        "direct",
+        {
+            "A": Candidate(
+                url="https://iucn.org/sites/default/files/a.pdf",
+                source="direct",
+            ),
+            "B": Candidate(
+                url="https://iucn.org/sites/default/files/b.pdf",
+                source="direct",
+            ),
+        },
+    )
+    pipe, _manifest = pipe_factory({"direct": src}, ["direct"], handler=handler)
+    pipe.cfg.concurrency_oa = 1
+    pipe.run([make_item(key="A"), make_item(key="B")])
+    assert len(calls) == 2
+
+
 def test_oa_skips_publisher_host_across_items(pipe_factory):
     calls = []
 

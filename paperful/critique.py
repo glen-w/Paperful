@@ -50,6 +50,7 @@ _HYGIENE_CODES = frozenset(
         "ai_tells_abstain",
     }
 )
+_OUTLINE_HYGIENE_CODES = frozenset({"missing_section", "missing_mention"})
 _AI_TELL_DISCLAIMER = (
     "These signals are associated with some LLM-style prose. They are **not proof** "
     "of AI authorship. Formal academic English (including ESL) often looks “smooth” "
@@ -256,12 +257,21 @@ def _render_metrics_md(metrics: dict[str, Any]) -> list[str]:
     return lines
 
 
-def _is_hygiene_finding(row: dict[str, Any]) -> bool:
+def _is_hygiene_finding(row: dict[str, Any], *, outline: bool = False) -> bool:
     """True when the finding is polish noise, not a critical-path defect."""
     code = str(row.get("code") or "")
     if code.startswith("vale_"):
         return True
+    if outline and code in _OUTLINE_HYGIENE_CODES:
+        return True
     return code in _HYGIENE_CODES
+
+
+def _outline_mode(pack: dict[str, Any]) -> bool:
+    if "outline" in pack:
+        return True
+    llm = pack.get("llm") or {}
+    return isinstance(llm, dict) and "outline" in (llm.get("lanes") or [])
 
 
 def _incomplete_lane_rows(llm: dict[str, Any] | None) -> list[tuple[str, str]]:
@@ -286,6 +296,7 @@ def _incomplete_lane_rows(llm: dict[str, Any] | None) -> list[tuple[str, str]]:
     marg_reviewer_skip = False
     context_reviewer_skip = False
     adversary_reviewer_skip = False
+    outline_reviewer_skip = False
     claims_reviewer_skip = False
     verify_reviewer_skip = False
     for raw in llm.get("reviewers") or []:
@@ -300,6 +311,8 @@ def _incomplete_lane_rows(llm: dict[str, Any] | None) -> list[tuple[str, str]]:
             context_reviewer_skip = True
         if rid.startswith("adversary"):
             adversary_reviewer_skip = True
+        if rid.startswith("outline"):
+            outline_reviewer_skip = True
         if rid.startswith("claims"):
             claims_reviewer_skip = True
         if rid.startswith("verify"):
@@ -315,6 +328,9 @@ def _incomplete_lane_rows(llm: dict[str, Any] | None) -> list[tuple[str, str]]:
     adv = llm.get("adversary") if isinstance(llm.get("adversary"), dict) else {}
     if adv.get("skipped") and not adversary_reviewer_skip:
         add("adversary", str(adv["skipped"]))
+    ol = llm.get("outline") if isinstance(llm.get("outline"), dict) else {}
+    if ol.get("skipped") and not outline_reviewer_skip:
+        add("outline", str(ol["skipped"]))
     cl = llm.get("claims") if isinstance(llm.get("claims"), dict) else {}
     if cl.get("skipped") and not claims_reviewer_skip:
         add("claims", str(cl["skipped"]))
@@ -367,6 +383,34 @@ def _render_reviewer_notes(llm: dict[str, Any]) -> list[str]:
         lines.append("")
         lines.append(str(row.get("narrative") or "").strip())
         lines.append("")
+    return lines
+
+
+def _render_outline(rows: list[dict[str, Any]]) -> list[str]:
+    """Section skeleton for a plan review. Not a finished-manuscript verdict."""
+    lines = [
+        "",
+        "## Outline",
+        "",
+        "This run treated the extract as a **plan**, not a finished manuscript. "
+        "Missing results, limitations, or ethics mentions are expected.",
+        "",
+    ]
+    if not rows:
+        lines.append("_No headings detected._")
+        lines.append("")
+        return lines
+    for row in rows:
+        heading = str(row.get("heading") or "Preamble").strip() or "Preamble"
+        words = row.get("words")
+        canon = str(row.get("canonical") or "").strip()
+        bit = f"- **{heading}**"
+        if words is not None and str(words) != "":
+            bit += f" — {words} words"
+        if canon:
+            bit += f" (`{canon}`)"
+        lines.append(bit)
+    lines.append("")
     return lines
 
 
@@ -432,8 +476,9 @@ def render_markdown(pack: dict[str, Any], *, show_dismissed: bool = False) -> st
     findings = list(pack.get("findings") or [])
     if not show_dismissed:
         findings = [f for f in findings if not f.get("dismissed")]
-    hygiene = [f for f in findings if _is_hygiene_finding(f)]
-    rest = [f for f in findings if not _is_hygiene_finding(f)]
+    outline = _outline_mode(pack)
+    hygiene = [f for f in findings if _is_hygiene_finding(f, outline=outline)]
+    rest = [f for f in findings if not _is_hygiene_finding(f, outline=outline)]
     critical = [f for f in rest if f.get("lane") != "suggested"]
     suggested = [f for f in rest if f.get("lane") == "suggested"]
     critical.sort(
@@ -443,6 +488,9 @@ def render_markdown(pack: dict[str, Any], *, show_dismissed: bool = False) -> st
         )
     )
     lines.extend(_section("Critical path", critical))
+    if "outline" in pack:
+        outline_rows = [r for r in (pack.get("outline") or []) if isinstance(r, dict)]
+        lines.extend(_render_outline(outline_rows))
     claims_rows = [r for r in (pack.get("claims") or []) if isinstance(r, dict)]
     if claims_rows:
         lines.extend(_render_claims(claims_rows))
@@ -762,6 +810,8 @@ def build_critique(
         payload["vale"] = vale_meta
     if forensics_meta is not None:
         payload["forensics"] = forensics_meta
+    if isinstance(llm_meta, dict) and "outline_ledger" in llm_meta:
+        payload["outline"] = list(llm_meta.pop("outline_ledger") or [])
     claims_rows: list[Any] | None = None
     if isinstance(llm_meta, dict) and "claims_ledger" in llm_meta:
         claims_rows = list(llm_meta.pop("claims_ledger") or [])

@@ -25,6 +25,7 @@ def test_parse_and_order():
         "claims",
         "verify",
     )
+    assert parse_critique_lanes(["outline", "adversary"]) == ("adversary", "outline")
     assert parse_critique_lanes([]) == ()
     with pytest.raises(ValueError, match="unknown"):
         parse_critique_lanes(["nope"])
@@ -57,6 +58,7 @@ def test_cli_lane_flags_win_as_base():
         cfg, lane_flags=["context"], llm=True, advanced=True
     ) == ("reviewers", "marg", "context")
     assert resolve_critique_lanes(cfg, lane_flags=["adversary"]) == ("adversary",)
+    assert resolve_critique_lanes(cfg, lane_flags=["outline"]) == ("outline",)
     assert resolve_critique_lanes(cfg, lane_flags=["claims", "verify"]) == (
         "claims",
         "verify",
@@ -70,6 +72,7 @@ def test_mode_for_lanes():
     assert mode_for_lanes(["context"]) == "context"
     assert mode_for_lanes(["context-web"]) == "context-web"
     assert mode_for_lanes(["adversary"]) == "adversary"
+    assert mode_for_lanes(["outline"]) == "outline"
     assert mode_for_lanes(["claims"]) == "claims"
     assert mode_for_lanes(["verify"]) == "verify"
 
