@@ -5,7 +5,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from paperful.agent_json import EXIT_PARTIAL, REQUIRED_KEYS, SCHEMA, batch_exit, envelope
+from paperful.agent_json import (
+    EXIT_PARTIAL,
+    REQUIRED_KEYS,
+    SCHEMA,
+    batch_exit,
+    envelope,
+)
 from paperful.handoff import HINT_OPENABLE, MissingPdf
 from paperful.handoff_rank import rank_missing
 from paperful.mcp_server import dispatch
@@ -100,6 +106,7 @@ def test_mcp_lists_refs_gap_and_ask():
         "proposal_export",
         "ask",
         "precedent",
+        "stuff",
     }
     init = dispatch(cfg, {"jsonrpc": "2.0", "id": 2, "method": "initialize"})
     assert init["result"]["serverInfo"]["name"] == "paperful"
@@ -111,11 +118,23 @@ def test_rewrite_query_uses_history():
             assert "Follow-up:" in request.prompt
             return "BBNJ EIA procedure"
 
-    cfg = type("C", (), {"rag_model": "m", "llm_model": "m", "llm_timeout_s": 10, "llm_max_num_ctx": 2048})()
+    cfg = type(
+        "C",
+        (),
+        {
+            "rag_model": "m",
+            "llm_model": "m",
+            "llm_timeout_s": 10,
+            "llm_max_num_ctx": 2048,
+        },
+    )()
     q = rewrite_query(
         cfg,
         "and the EIA part?",
-        [{"role": "user", "content": "What is BBNJ?"}, {"role": "assistant", "content": "A treaty."}],
+        [
+            {"role": "user", "content": "What is BBNJ?"},
+            {"role": "assistant", "content": "A treaty."},
+        ],
         client=Client(),
     )
     assert q == "BBNJ EIA procedure"
@@ -127,7 +146,9 @@ def test_thread_roundtrip(tmp_path: Path):
     tid = new_id()
     save_thread(
         tmp_path,
-        Thread(thread_id=tid, turns=[{"role": "user", "content": "hi"}], last_query="hi"),
+        Thread(
+            thread_id=tid, turns=[{"role": "user", "content": "hi"}], last_query="hi"
+        ),
     )
     loaded = load_thread(tmp_path, tid)
     assert loaded.turns[0]["content"] == "hi"
@@ -243,7 +264,12 @@ def test_mcp_proposal_export_roundtrip(tmp_path: Path):
         "hop": 0,
         "direction": "keywords",
         "ids": {"doi": "10.5555/deep"},
-        "biblio": {"title": "Deep test paper", "year": 2025, "authors": ["A B"], "type": "article"},
+        "biblio": {
+            "title": "Deep test paper",
+            "year": 2025,
+            "authors": ["A B"],
+            "type": "article",
+        },
         "why": "hit",
         "status": "new",
         "provenance": {"backend": "openalex"},

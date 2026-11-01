@@ -339,6 +339,11 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[precedent].held_k` | `10` | Held RAG passages kept by `paperful precedent`. CLI `--held-k` / `-k` overrides |
 | `[precedent].public_k` | `25` | OpenAlex / similar works kept. CLI `--public-k` overrides |
 | `[precedent].search_keywords` | `true` | Also resolve OpenAlex keyword tags for the phrase (same union as snowball search) |
+| `[stuff].k` | `3` | Extra library sources per claim. CLI `--k` overrides; capped by `[rag].top_k`. See [stuff](stuff.md) |
+| `[stuff].min_sentence_words` | `8` | Manuscript lane: skip captions / headings / fragments |
+| `[stuff].min_query_words` | `4` | Outline lane: skip empty/tiny section queries (thin headings still search) |
+| `[stuff].max_units` | `200` | Cap on searched claims; overflow rows skip as `over_cap` |
+| `[stuff].lane` | `manuscript` | `manuscript` (sentences) or `outline` (sections). CLI `--lane` overrides |
 | `[snowball].default_tags` | `()` | Extra tags on snowball `--gate auto` / `apply` creates, with `--tag` and `from-<seed-slug>` |
 | `[snowball].study_designs` | `()` | OpenAlex study design filter (`rct`, `meta-analysis`, …). CLI `--study-design`. See [snowball stop rules](snowball.md#stop-rules) |
 | `[snowball].map_categories` | ten built-ins | Which literature-category ids appear on the citation map (badges/filters). Defaults include study-design ids (`evidence-synthesis`, `trials`, `clinical-trials`, …) and type ids (`preprints`, `books`, `narrative-reviews`, `commentary`). See [Citation map](snowball.md#citation-map) |

@@ -569,7 +569,7 @@ until Wanted is honest. Do not grow 1.x into a second product.
 | Continuation / cheap vs high-effort as a **user-visible** Ask control | Synthesize | Local model; do not claim LABBench wins | [Ask](#after-110-briefs-ask) |
 | Conflicting-evidence `synthesize` (question → methods → findings → limits) over **your** PDFs | Synthesize | Held full text only | [Briefs](#after-110-briefs-ask) |
 | Figure/table **pullouts** (caption + page + stem), not generated artwork | Extract | Publisher bans on genAI primary images | [Briefs](#after-110-briefs-ask) |
-| `stuff`: sentence → `rag search`; extra cites enter **Zotero before** `\cite`; no invented BibTeX | Write | Fail closed if index empty | [`stuff`](#stuff-later-extra-citations-from-the-library) |
+| `stuff`: sentence or outline section → `rag search`; extra cites enter **Zotero before** `\cite`; no invented BibTeX. **CLI shipped**; `--apply` later | Write | Fail closed if index empty | [`stuff`](#stuff-later-extra-citations-from-the-library) |
 | PRISMA **counts** in the run report; watch **drift** hash; export Discover / import `included.csv` | Screen / keep current | Counts only; no fake recall % | [Snowballing](#after-110-snowball-review) |
 | Official PRISMA flow from **exact counts**, not AI-illustrated diagrams | Screen / export | Methods figure | [SR mode](#after-110-bigger-bets) |
 | Point at Better BibTeX + Quarto (do not vendor CSL) | Write / export | Parked until testers ask | [Parked](#after-110-parked) |
@@ -1377,8 +1377,9 @@ as `[summarize].model`, `[browser_agent].model`, `[rag].model`).
    plus advanced knobs (defaults keep one summary pass);
    profile `focus` + existing SCOPE. `doctor` ambers when the index is missing,
    the embedding model is unavailable, or the index is behind the mirror.
-7. **Per-claim extra citations (`stuff`)** — **Roadmap:** batch `rag search`
-   over manuscript sentences; no Ask narrative. Detail:
+7. **Per-claim extra citations (`stuff`)** — **Shipped (CLI pack):** batch
+   `rag search` over manuscript sentences or outline sections; no Ask
+   narrative. Workbench / `--apply` still later. Detail:
    [`stuff`](#stuff-later-extra-citations-from-the-library).
 
 **Non-goals for this lane:** replacing Zotero’s reader; cloud-default RAG;
@@ -1393,20 +1394,20 @@ the evidence-linked Q&A layer. `stuff` is the writing-side reuse of `rag search`
 (sources only), not another chat verb.
 
 (stuff-later-extra-citations-from-the-library)=
-### `stuff` (later; extra citations from the library)
+### `stuff` (CLI pack shipped; workbench later)
 
-**Status:** roadmap only — a named CLI (and later Advanced workbench) verb,
-not a 1.0/1.1 gate. Needs `[rag].enabled` and a built index. Does **not**
-need `[llm]` or Ask: no reviewer note, no grounded paragraph, no claim
-rewrite.
+**Status:** CLI pack shipped (`paperful stuff`, [stuff.md](stuff.md)).
+Workbench and `--apply` stay later. Needs `[rag].enabled` and a built
+index. Does **not** need `[llm]` or Ask: no reviewer note, no grounded
+paragraph, no claim rewrite.
 
 **Job:** for each phrase/claim in a manuscript (or a paper you already
 hold), suggest **X** additional citations from the local index. Implementation
 is the boring loop: split the document into sentences (reuse
-`critique_metrics.split_sentences`), run each sentence through the same
-retriever as `paperful rag search` (`-k` = X), and return the sources
-(item key, title, pages, score, passage snippet). Narrative summary stays
-off — this is not `ask`.
+`critique_metrics.split_sentences`) or outline sections (`--lane outline`),
+run each unit through the same retriever as `paperful rag search`
+(`-k` = X), and return the sources (item key, title, pages, score, passage
+snippet). Narrative summary stays off — this is not `ask`.
 
 Same input shape as [`critique`](critique.md): `--item ITEMKEY` (mirror PDF)
 or `--file` (draft path). Search scope is `-C` / year / type, same as
@@ -1416,11 +1417,13 @@ of the reference section.
 
 **Direction (ship in order; each stage can stop):**
 
-1. **CLI pack** — `paperful stuff --item KEY -C … --k 3` (or `--file`
-   draft). Writes `state/stuff/<id>/<stamp>/` (`pack.json` + `pack.md`,
-   schema `paperful.stuff.pack.v1`). One row per sentence: quote, locator,
-   up to `k` hits. Fail closed when the index is missing or empty. Zero
-   manager writes. `--format json` → `paperful.agent.json.v1`.
+1. **CLI pack** — **Shipped.** `paperful stuff --item KEY -C … --k 3` (or
+   `--file` draft, optional `--lane outline`). Writes
+   `state/stuff/<id>/<stamp>/` (`pack.json` + `pack.md`, schema
+   `paperful.stuff.pack.v1`). One row per sentence or outline section:
+   quote, locator, up to `k` hits. Fail closed when the index is missing
+   or empty. Zero manager writes. `--format json` → `paperful.agent.json.v1`.
+   Read-only MCP tool `stuff`.
 2. **Workbench** — Advanced sibling of Critique: pick item or upload,
    background job, download pack.md. Not on the default nav.
 3. **Later (parked until the pack is boring)** — optional `--apply` child
@@ -1428,12 +1431,15 @@ of the reference section.
    auto-insert into the manuscript. Those are writing-product bets, not
    the first slice.
 
-**Config sketch (names TBD; additive only):**
+**Config:**
 
 ```toml
 [stuff]
-k = 3                    # extra sources per sentence (CLI `--k` wins)
+k = 3                    # extra sources per claim (CLI `--k` wins)
 min_sentence_words = 8   # skip captions / headings / fragments
+min_query_words = 4      # outline lane
+max_units = 200
+lane = "manuscript"      # manuscript | outline
 ```
 
 Reuse `[rag].top_k` only as a ceiling; `stuff`’s `k` is the per-claim

@@ -8,6 +8,12 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- **`paperful stuff`.** Extra citations from the local RAG index per
+  manuscript sentence (`--lane manuscript`) or outline section
+  (`--lane outline`). `--item` / `--file`, `--k` capped by `[rag].top_k`.
+  Writes `state/stuff/<id>/<stamp>/` (`paperful.stuff.pack.v1`). No LLM,
+  no invented BibTeX, no library write. Read-only MCP tool `stuff`. See
+  [stuff](docs/stuff.md).
 - **Critique `outline` lane.** `--lane outline` reviews an extract as a plan
   (section skeleton, claim/warrant/scope/evidence pressure) instead of a
   finished manuscript. `missing_section` / `missing_mention` move to Hygiene

@@ -343,6 +343,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "refs",
         "coverage",
         "precedent",
+        "stuff",
         "acronyms",
         "glossary",
         "authors",
@@ -764,7 +765,7 @@ def jobs() -> None:
 
 @app.command()
 def mcp(config: Path | None = ConfigOpt) -> None:
-    """Optional stdio MCP: read-only gaps, snowball preview, export, refs_gap, ask, precedent."""
+    """Optional stdio MCP: read-only gaps, snowball preview, export, refs_gap, ask, precedent, stuff."""
     from .mcp_server import serve_stdio
 
     serve_stdio(_cfg(config))
@@ -2360,6 +2361,63 @@ def precedent_cmd(
         dedupe_scope=dedupe_scope,
         profile=profile,
         run_config=run_config,
+        config=config,
+        fmt=fmt,
+    )
+
+
+@app.command("stuff")
+def stuff_cmd(
+    item: list[str] = typer.Option(
+        [], "--item", help="Library item key already in the mirror."
+    ),
+    file_path: Path | None = typer.Option(
+        None,
+        "--file",
+        help="Draft on disk (pdf, txt, md, html, rtf, docx, odt, pptx; .doc if a converter is on PATH).",
+        exists=True,
+        dir_okay=False,
+        readable=True,
+    ),
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path under the mirror (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    k: int | None = typer.Option(
+        None,
+        "-k",
+        "--k",
+        help="Extra sources per claim. Default \\[stuff].k, capped by \\[rag].top_k.",
+    ),
+    lane: str | None = typer.Option(
+        None,
+        "--lane",
+        help="Retrieval unit: manuscript (sentences) or outline (sections). Default \\[stuff].lane.",
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Print counts; do not write state/stuff/."
+    ),
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Extra library citations per sentence or outline section. No LLM. Not a rewrite."""
+    from .stuff_cmd import run_stuff
+
+    run_stuff(
+        console,
+        item=item,
+        file_path=file_path,
+        collection=collection,
+        library=library,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        k=k,
+        lane=lane,
+        dry_run=dry_run,
         config=config,
         fmt=fmt,
     )

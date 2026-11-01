@@ -9,6 +9,7 @@ from paperful.agent_ops import (
     collections_add_exit,
     precedent_envelope,
     refs_gap_envelope,
+    stuff_envelope,
 )
 
 
@@ -68,6 +69,40 @@ def test_precedent_envelope_marks_partial():
     assert env["partial"] is True
     assert env["items"][0]["doi"] == "10.1/a"
     assert env["flags"]["dry_run"] is True
+
+
+def test_stuff_envelope_is_read_only():
+    rows = [
+        SimpleNamespace(
+            quote="A long enough claim about area-based management.",
+            loc="para 1",
+            heading="",
+            hits=[SimpleNamespace(item_key="ITEM0001")],
+        )
+    ]
+    env = stuff_envelope(
+        rows=rows,
+        skips=[],
+        counts={"units": 1, "hits": 1, "skips": 0, "unique_sources": 1},
+        folder="/tmp/stuff",
+        stuff_id="file-draft",
+        lane="manuscript",
+    )
+    assert env["command"] == "stuff"
+    assert env["flags"]["read_only"] is True
+    assert env["summary"]["stuff_id"] == "file-draft"
+    assert env["items"][0]["hit_keys"] == ["ITEM0001"]
+
+
+def test_run_stuff_requires_item_or_file(cfg):
+    from paperful.agent_ops import run_stuff
+
+    both = run_stuff(cfg)
+    assert both["exit"] == 1
+    cfg.rag_enabled = False
+    missing = run_stuff(cfg, file_path="/tmp/draft.md")
+    assert missing["exit"] == 1
+    assert "rag.enabled" in missing["summary"]["error"]
 
 
 def test_run_precedent_empty_query(cfg):

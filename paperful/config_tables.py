@@ -54,6 +54,7 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_search(raw, cfg)
     apply_keepup(raw, cfg)
     apply_precedent(raw, cfg)
+    apply_stuff(raw, cfg)
     apply_ui(raw, cfg)
     apply_prompt_paths(cfg, source)
 
@@ -989,6 +990,32 @@ def apply_precedent(raw: dict[str, Any], cfg: "Config") -> None:
             ("held_k", "precedent_held_k", lambda v: max(1, int(v))),
             ("public_k", "precedent_public_k", lambda v: max(1, int(v))),
             ("search_keywords", "precedent_search_keywords", bool),
+        ],
+    )
+
+
+def _stuff_lane(value: Any) -> str:
+    raw = str(value or "").strip().lower() or "manuscript"
+    if raw not in ("manuscript", "outline"):
+        raise ValueError(f"[stuff].lane {value!r} must be manuscript or outline")
+    return raw
+
+
+def apply_stuff(raw: dict[str, Any], cfg: "Config") -> None:
+    C = _mod()
+    C._apply_config_table(
+        raw.get("stuff"),
+        cfg,
+        [
+            ("k", "stuff_k", lambda v: max(1, int(v))),
+            (
+                "min_sentence_words",
+                "stuff_min_sentence_words",
+                lambda v: max(1, int(v)),
+            ),
+            ("min_query_words", "stuff_min_query_words", lambda v: max(1, int(v))),
+            ("max_units", "stuff_max_units", lambda v: max(1, int(v))),
+            ("lane", "stuff_lane", _stuff_lane),
         ],
     )
 

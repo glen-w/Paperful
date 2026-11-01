@@ -54,6 +54,7 @@ sources
 screen
 critique
 rewrite
+stuff
 ezproxy
 research-ops
 sessions

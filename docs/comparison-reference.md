@@ -112,7 +112,7 @@ found Elicit Pro Review-mode sensitivity ~40% vs traditional searches
 
 | Platform | Discover | Get PDF | Screen | Synthesize | Novelty | Write MS | Keep current | Local | Zotero |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **Paperful 1.x** | Partial (`snowball` / `authorwatch`) | **Yes** (OA, CORE, EZProxy, grey; Sci-Hub opt-in) | Partial (`screen`; Discover Keep/Skip ≠ dual review) | Partial (`summarize` / `synthesize` / `ask` on held PDFs) | Partial (`refs gap`; never claims absence) | No (`stuff` unshipped) | Yes (you cron `keepup`) | **Yes** | **Yes** |
+| **Paperful 1.x** | Partial (`snowball` / `authorwatch`) | **Yes** (OA, CORE, EZProxy, grey; Sci-Hub opt-in) | Partial (`screen`; Discover Keep/Skip ≠ dual review) | Partial (`summarize` / `synthesize` / `ask` on held PDFs) | Partial (`refs gap`; never claims absence) | Partial (`stuff` CLI pack; no auto-insert) | Yes (you cron `keepup`) | **Yes** | **Yes** |
 | Edison Literature | Yes (hosted PaperQA3) | Partial (OA/licensed corpus; no campus fetch) | No | Yes | No (that is Precedent) | Partial (cited report) | Partial (hosted index) | No | No |
 | Edison Precedent | Yes | Partial | No | No | **Yes** (not a legal prior-art search) | No | Partial | No | No |
 | Edison Kosmos | Partial (inside the run) | No | No | Yes (reports; paper: interpretation weaker than quotes) | Partial | Partial (report, not a Zotero MS) | No | No | No |

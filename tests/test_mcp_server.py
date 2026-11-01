@@ -80,6 +80,7 @@ def test_initialize_and_tools_list(cfg):
         "proposal_export",
         "ask",
         "precedent",
+        "stuff",
     } <= names
     for tool in listed:
         assert tool["inputSchema"]["type"] == "object"
@@ -122,6 +123,7 @@ def test_tools_call_routes_each_tool_with_normalised_args(cfg, monkeypatch):
     monkeypatch.setattr(mcp, "run_proposal_export", spy("proposal_export"))
     monkeypatch.setattr(mcp, "run_ask", spy("ask"))
     monkeypatch.setattr(mcp, "run_precedent", spy("precedent"))
+    monkeypatch.setattr(mcp, "run_stuff", spy("stuff"))
 
     def call(name, **arguments):
         reply = mcp.dispatch(
@@ -169,6 +171,12 @@ def test_tools_call_routes_each_tool_with_normalised_args(cfg, monkeypatch):
     assert calls["precedent"][0] == (cfg, "has this been tried")
     assert calls["precedent"][1]["collection"] == "Ocean"
     assert calls["precedent"][1]["public_k"] == 5
+    call("stuff", file="draft.md", collection="Ocean", lane="outline", k=2)
+    assert calls["stuff"][0] == (cfg,)
+    assert calls["stuff"][1]["file_path"] == "draft.md"
+    assert calls["stuff"][1]["collection"] == "Ocean"
+    assert calls["stuff"][1]["lane"] == "outline"
+    assert calls["stuff"][1]["k"] == 2
 
 
 def test_tools_call_tolerates_non_dict_arguments(cfg, monkeypatch):
@@ -221,6 +229,7 @@ def test_mcp_surface_is_the_documented_read_only_set():
         "proposal_export",
         "ask",
         "precedent",
+        "stuff",
     }
     verbs = (
         "apply",

@@ -182,6 +182,227 @@ def run_precedent(
     )
 
 
+def stuff_envelope(
+    *,
+    rows: list[Any],
+    skips: list[Any],
+    counts: dict[str, Any],
+    folder: Any,
+    flags: dict[str, Any] | None = None,
+    stuff_id: str = "",
+    lane: str = "",
+) -> dict[str, Any]:
+    items_out = [
+        {
+            "quote": (getattr(r, "quote", "") or "")[:200],
+            "loc": getattr(r, "loc", "") or "",
+            "heading": getattr(r, "heading", "") or "",
+            "hit_keys": [
+                getattr(h, "item_key", "")
+                for h in (getattr(r, "hits", None) or [])
+                if getattr(h, "item_key", "")
+            ],
+        }
+        for r in rows[:50]
+    ]
+    return envelope(
+        command="stuff",
+        summary={
+            "units": int(counts.get("units") or 0),
+            "hits": int(counts.get("hits") or 0),
+            "skips": int(counts.get("skips") or len(skips)),
+            "unique_sources": int(counts.get("unique_sources") or 0),
+            "stuff_id": stuff_id,
+            "lane": lane,
+        },
+        items=items_out,
+        paths={"pack": str(folder) if folder else ""},
+        flags={"dry_run": False, "read_only": True, **(flags or {})},
+    )
+
+
+def run_stuff(
+    cfg: Config,
+    *,
+    item: str = "",
+    file_path: str = "",
+    collection: str = "",
+    lane: str | None = None,
+    k: int | None = None,
+) -> dict[str, Any]:
+    """Sentence or outline-section → held RAG hits. Always disk-only."""
+    from pathlib import Path
+
+    from .catalogue import open_library
+    from .critique_extract import ExtractError, extract_path
+    from .lint import resolve_pdf_path
+    from .llm import LLMClientError
+    from .llm.validate import LlmConfigError
+    from .rag.index import (
+        Index,
+        IndexMismatch,
+        IndexMissing,
+        RagUnavailable,
+        ledger_path,
+    )
+    from .rag.ledger import Ledger
+    from .rag.retrieve import scope_keys, search
+    from .store import Manifest
+    from .stuff import (
+        collect_pack,
+        counts_of,
+        pack_payload,
+        resolve_k,
+        resolve_lane,
+        stuff_id,
+        write_pack,
+    )
+
+    item_key = (item or "").strip()
+    src_s = (file_path or "").strip()
+    if bool(item_key) == bool(src_s):
+        return envelope(
+            command="stuff",
+            exit_code=EXIT_USER,
+            summary={"error": "pass exactly one of item or file"},
+        )
+    if not cfg.rag_enabled:
+        return envelope(
+            command="stuff",
+            exit_code=EXIT_USER,
+            summary={"error": "rag.enabled is false"},
+        )
+    try:
+        lane_id = resolve_lane(cfg, lane)
+        per_k = resolve_k(cfg, k)
+    except ValueError as exc:
+        return envelope(
+            command="stuff",
+            exit_code=EXIT_USER,
+            summary={"error": str(exc)},
+        )
+    try:
+        from .llm import validate_embedder
+
+        embedder = validate_embedder(cfg)
+        index = Index.open(cfg)
+    except (RagUnavailable, IndexMissing, IndexMismatch, LlmConfigError) as exc:
+        return envelope(
+            command="stuff",
+            exit_code=EXIT_USER,
+            summary={"error": str(exc)},
+        )
+    if int(index.count() or 0) <= 0:
+        return envelope(
+            command="stuff",
+            exit_code=EXIT_USER,
+            summary={"error": "RAG index is empty"},
+        )
+    rag_ledger = Ledger(ledger_path(cfg))
+    spec = (collection or "").strip()
+    keys = scope_keys(rag_ledger, collections=[spec] if spec else None)
+    kind = "item" if item_key else "file"
+    title = ""
+    src: Path | None = None
+    exclude = ""
+    if item_key:
+        try:
+            backend = open_library(cfg)
+            loaded = load_scope(
+                backend,
+                collections=[spec] if spec else [],
+                library=not spec,
+            )
+        except (LibraryError, ScopeError) as exc:
+            return envelope(
+                command="stuff",
+                exit_code=2 if isinstance(exc, LibraryError) else EXIT_USER,
+                summary={"error": str(exc)},
+            )
+        match = [it for it in loaded.items if it.key == item_key]
+        if not match:
+            return envelope(
+                command="stuff",
+                exit_code=EXIT_USER,
+                summary={"error": "item not in the mirror / scope"},
+            )
+        target = match[0]
+        exclude = target.key
+        title = target.title or target.key
+        src = resolve_pdf_path(cfg, target, Manifest(cfg.manifest_path))
+        if src is None:
+            return envelope(
+                command="stuff",
+                exit_code=EXIT_USER,
+                summary={"error": f"No PDF on disk for {item_key}"},
+            )
+    else:
+        src = Path(src_s)
+        if not src.is_file():
+            return envelope(
+                command="stuff",
+                exit_code=EXIT_USER,
+                summary={"error": f"file not found: {src}"},
+            )
+        title = src.name
+    try:
+        doc = extract_path(src)
+        rows, skips, outline = collect_pack(
+            cfg,
+            doc,
+            lane=lane_id,
+            k=per_k,
+            keys=keys,
+            exclude_key=exclude,
+            search_fn=lambda query, k, keys: search(
+                cfg,
+                query,
+                k=k,
+                keys=keys,
+                embedder=embedder,
+                index=index,
+                ledger=rag_ledger,
+            ),
+        )
+    except (ExtractError, LLMClientError) as exc:
+        return envelope(
+            command="stuff",
+            exit_code=EXIT_USER,
+            summary={"error": str(exc)},
+        )
+    cid = stuff_id(
+        kind=kind,
+        item_key=exclude,
+        original_name=src.name if kind == "file" else "",
+    )
+    payload = pack_payload(
+        cid=cid,
+        scope=spec or "index",
+        lane=lane_id,
+        k=per_k,
+        inp={
+            "kind": kind,
+            "item_key": exclude,
+            "path": str(src),
+            "title": title,
+            "format": doc.format,
+        },
+        rows=rows,
+        skips=skips,
+        ledger=outline,
+    )
+    folder = write_pack(cfg, payload)
+    return stuff_envelope(
+        rows=rows,
+        skips=skips,
+        counts=counts_of(rows, skips),
+        folder=folder,
+        flags={"lane": lane_id, "k": per_k},
+        stuff_id=cid,
+        lane=lane_id,
+    )
+
+
 def run_refs_gap(cfg: Config, collection: str) -> dict[str, Any]:
     """MCP / shared scan: always dry-run, never creates parents."""
     from .catalogue import open_library

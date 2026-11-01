@@ -5,7 +5,8 @@ on-disk mirror. `paperful ask` answers a question from that index and names the
 papers and pages it used. Default mode is **simple** (raw excerpts, one
 completion); **advanced** scores passages first — [Ask modes](#ask-modes).
 `paperful rag search` shows the matching passages without a chat model. On the
-workbench, that is **Ask** on the default nav.
+workbench, that is **Ask** on the default nav. Extra cites for a draft reuse
+that retriever: [stuff](stuff.md).
 
 ![Ask: a cited answer from PDFs already on disk in ocean/BBNJ](_static/workflows/index-ask.png)
 

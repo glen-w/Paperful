@@ -208,6 +208,7 @@ Tier policy (1.0 contract):
 | `paperful.refs_gap.pack.v1` | `state/refs-gaps/<stamp>/pack.json` | `refs_gap` | T1 | `REFS_GAP_PACK_KEYS`; `tests/fixtures/refs_gap_pack_v1/` |
 | `paperful.coverage.pack.v1` | `state/coverage/<stamp>/pack.json` | `coverage` | T1 | `COVERAGE_PACK_KEYS`; `tests/fixtures/coverage_pack_v1/` |
 | `paperful.precedent.pack.v1` | `state/precedent/<stamp>/pack.json` | `precedent` | T1 | `PRECEDENT_PACK_KEYS`; `tests/fixtures/precedent_pack_v1/` |
+| `paperful.stuff.pack.v1` | `state/stuff/<id>/<stamp>/pack.json` | `stuff` | T1 | `STUFF_PACK_KEYS`; `tests/fixtures/stuff_pack_v1/` |
 | `paperful.witness.v1` | optional `witness` on run reports | `witness` | T2 | additive; not in `RUN_REPORT_KEYS` |
 | `paperful.inbox.proposal.v1` | `state/inbox/proposals/*.json` | `inbox_match` | T1 | `INBOX_PROPOSAL_KEYS`; extra `route_*` keys allowed; `tests/fixtures/inbox_proposal_v1/` |
 | `paperful.sync.v1` | `out/_sync.json` | `sync` | T2 | — |

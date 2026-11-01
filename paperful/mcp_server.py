@@ -1,7 +1,7 @@
 """Thin MCP stdio server over the same JSON channel as ``--format json``.
 
 Read-only tools: ``refs_gap``, ``gaps``, ``snowball_search``, ``snowball_trends``,
-``export``, ``proposal_export``, ``ask``, and ``precedent``. ``collections add`` is
+``export``, ``proposal_export``, ``ask``, ``precedent``, and ``stuff``. ``collections add`` is
 CLI-only. Prefer CLI ``--format json``.
 """
 
@@ -18,6 +18,7 @@ from .agent_ops import (
     run_gaps,
     run_precedent,
     run_proposal_export,
+    run_stuff,
     run_refs_gap,
     run_snowball_search,
     run_snowball_trends,
@@ -187,6 +188,39 @@ TOOLS = [
             "required": ["query"],
         },
     },
+    {
+        "name": "stuff",
+        "description": (
+            "Extra library citations per sentence or outline section from a "
+            "mirrored item or local file. Always disk-only. Needs a built RAG "
+            "index. Never invents BibTeX or writes the library."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "item": {
+                    "type": "string",
+                    "description": "Library item key already in the mirror.",
+                },
+                "file": {
+                    "type": "string",
+                    "description": "Draft path on disk (mutually exclusive with item).",
+                },
+                "collection": {
+                    "type": "string",
+                    "description": "Optional collection path, name, or key.",
+                },
+                "lane": {
+                    "type": "string",
+                    "description": "manuscript or outline. Omitted uses [stuff].lane.",
+                },
+                "k": {
+                    "type": "integer",
+                    "description": "Extra sources per claim. Omitted uses [stuff].k.",
+                },
+            },
+        },
+    },
 ]
 
 
@@ -287,6 +321,19 @@ def call_precedent(cfg: Config, args: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def call_stuff(cfg: Config, args: dict[str, Any]) -> dict[str, Any]:
+    k_raw = args.get("k")
+    k = int(k_raw) if k_raw is not None and str(k_raw).strip() != "" else None
+    return run_stuff(
+        cfg,
+        item=str(args.get("item") or ""),
+        file_path=str(args.get("file") or ""),
+        collection=str(args.get("collection") or ""),
+        lane=str(args["lane"]) if args.get("lane") else None,
+        k=k,
+    )
+
+
 def call_gaps(
     cfg: Config, collection: str = "", library: bool = False
 ) -> dict[str, Any]:
@@ -364,6 +411,8 @@ def handle_tools_call(
         )
     elif name == "precedent":
         body = call_precedent(cfg, args)
+    elif name == "stuff":
+        body = call_stuff(cfg, args)
     else:
         return _error(req_id, -32601, f"unknown tool {name}")
     return _result(req_id, _text(body))

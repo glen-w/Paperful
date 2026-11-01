@@ -1,0 +1,39 @@
+{
+  "schema": "paperful.stuff.pack.v1",
+  "stuff_id": "file-draft",
+  "created_at": "2026-01-01T00:00:00+00:00",
+  "scope": "index",
+  "lane": "manuscript",
+  "k": 3,
+  "input": {
+    "kind": "file",
+    "item_key": "",
+    "path": "draft.md",
+    "title": "draft.md",
+    "format": "md"
+  },
+  "counts": {
+    "units": 1,
+    "hits": 1,
+    "skips": 0,
+    "unique_sources": 1
+  },
+  "rows": [
+    {
+      "quote": "Area-based management tools in ABNJ need a legal warrant.",
+      "loc": "para 1",
+      "hits": [
+        {
+          "item_key": "ITEM0001",
+          "title": "Held paper",
+          "pages": "p. 3",
+          "score": 0.91,
+          "passage": "Area-based management in ABNJ",
+          "doi": "10.1000/held",
+          "year": 2019
+        }
+      ]
+    }
+  ],
+  "skips": []
+}

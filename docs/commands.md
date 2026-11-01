@@ -63,6 +63,8 @@ uv run paperful rag ingest -C ocean/BBNJ --dry-run   # what would be indexed
 uv run paperful rag ingest --library                 # index PDFs + abstracts; OCR for scans only
 uv run paperful rag status                           # index vs mirror
 uv run paperful rag search "impact assessment thresholds" -C ocean/BBNJ   # passages, no chat model
+uv run paperful stuff --file ./draft.docx -C ocean/BBNJ --k 3
+uv run paperful stuff --file ./outline.docx --lane outline -C ocean/BBNJ
 uv run paperful ask "What does the Agreement require for EIAs?" -C ocean/BBNJ
 uv run paperful ask --from-file questions.txt -C ocean/BBNJ
 uv run paperful rag questions -C ocean/BBNJ
@@ -141,7 +143,7 @@ uv run paperful authorwatch run ocean-people --backfill-from 2025-01-01
 uv run paperful authorwatch apply ocean-people -C Watch/Ocean          # dry-run
 uv run paperful authorwatch delete ocean-people --yes
 uv run paperful network orcid 0000-0001-9025-7632 --phases bbnj --partition region
-uv run paperful mcp                           # optional stdio: gaps, snowball_search, snowball_trends, export, proposal_export, refs_gap, ask, precedent
+uv run paperful mcp                           # optional stdio: gaps, snowball_search, snowball_trends, export, proposal_export, refs_gap, ask, precedent, stuff
 uv run paperful export-proposals PACK out.bib # BibTeX/RIS from snowball or authorwatch inbox on disk
 uv run paperful serve                         # localhost HTTP (needs uv sync --extra serve)
 uv run paperful ingest-dois --from-pack state/refs-gaps/<stamp> -C BBNJ
@@ -248,9 +250,10 @@ uv run paperful pack show
 | `refs gap` | Works **cited inside** collection PDFs that are **not** in the library fingerprint. Always dry-run. Writes `state/refs-gaps/<stamp>/` (`paperful.refs_gap.pack.v1` plus `dois.txt`) and a `state/runs/*-refs gap.json` report (with optional `witness`). `--format json` prints `paperful.agent.json.v1`. Then `ingest-dois --from-file` / `--from-pack`. Distinct from `gaps` (items already in scope missing a PDF). |
 | `coverage` | DOIs (and optional titles) **named in a briefing note or file** that are **not** under `-C`. Always dry-run. `--from-note` (key or path) or `--from-file`. Writes `state/coverage/<stamp>/` (`paperful.coverage.pack.v1` plus `dois.txt`) and a `state/runs/*-coverage.json` report (with optional `witness`). `--format json` prints `paperful.agent.json.v1`. Rows: `in_collection` / `missing` / `ambiguous` (in library, outside `-C`). Then `ingest-dois`. Sibling of `refs gap`. Not an MCP tool. |
 | `precedent` | Phrase → held RAG passages plus OpenAlex keyword/similar works **not** claiming novelty. Always dry-run. Stamps `held` vs `public-metadata-only`. Writes `state/precedent/<stamp>/` (`paperful.precedent.pack.v1`, `pack.md`, `dois.txt`) and a `state/runs/*-precedent.json` report. `--format json`. Empty public hits mean OpenAlex returned nothing for this query/budget — not that the idea is new. Then `ingest-dois --from-file` / `--from-pack`. Distinct from `ask --focus gaps` (held PDFs only) and `refs gap` (cited-in-PDF). |
+| `stuff` | Extra library citations per sentence (`--lane manuscript`, default) or outline section (`--lane outline`) from `--item KEY` or `--file PATH` (XOR). Same retriever as `rag search`; no Ask narrative, no invented BibTeX, no library write. `--k` capped by `[rag].top_k`. Fail closed if the index is missing or empty. `--dry-run` prints counts. `--format json`. Writes `state/stuff/<id>/<stamp>/` (`paperful.stuff.pack.v1`, `pack.md`) and a `state/runs/*-stuff.json` report. Source item is never a hit for itself. Distinct from `refs gap` (cited-but-not-owned) and `precedent` (OpenAlex). Not in `paperful all`. See [stuff](stuff.md). |
 | `ingest-dois` | DOI list → metadata parents in `-C`. Dry-run unless `--apply`. Reports created / exists / unresolved / **held**. `--format json`. `--tag` plus `[ingest].default_tags` and `from-<file-stem>`. `--from-pack` accepts refs-gap, coverage, or precedent packs. Does not fetch PDFs (`run` after). |
 | `collections` | `list` (or bare `collections`) — collection tree with “No PDF” counts. `add --keys-file` — file **existing** item keys into `-C` (membership only; dry-run unless `--apply`; added / already-in / not-found). `--format json`. Complements `ingest-dois` (create parents). Zotero / Mendeley; EndNote refuses `--apply`. Not an MCP tool. |
-| `mcp` | Optional stdio MCP over the same JSON channel. Read-only tools: `gaps`, `snowball_search` (dry-run), `snowball_trends` (publication-year counts), `export` (BibTeX/RIS text in envelope), `proposal_export` (pack under `state/snowball/` or `state/authorwatch/`), `refs_gap`, `ask`, `precedent`. Prefer `paperful … --format json` from a shell. `collections add` is CLI-only and is not exposed. |
+| `mcp` | Optional stdio MCP over the same JSON channel. Read-only tools: `gaps`, `snowball_search` (dry-run), `snowball_trends` (publication-year counts), `export` (BibTeX/RIS text in envelope), `proposal_export` (pack under `state/snowball/` or `state/authorwatch/`), `refs_gap`, `ask`, `precedent`, `stuff`. Prefer `paperful … --format json` from a shell. `collections add` is CLI-only and is not exposed. |
 | `search` | Discover grey PDFs and landings via SearXNG (`--hosts`, `--filetype pdf\|none`, `--max`, `--probe/--no-probe`, `--run-id`, `--out-dir`, `--list`). Dry-run table unless `--apply -C` (metadata parents only; PDFs stay `run` / Wanted). Exit 2 when `[searxng].base_url` / `SEARXNG_BASE_URL` is unset. `--format json` is `paperful.agent.json.v1`. Writes `state/search/<run-id>/` (`paperful.search.v1`). Discover → Web. Not a `run` source. Not a Google/Scholar HTML scrape. [Web grey search](search.md). |
 | `urls` | `urls check` probes metadata and linked-PDF URLs for a scope (HEAD/GET). Report only unless `--apply`, which rewrites a URL only when a grey playbook already knows the PDF target. `--limit`, `--format json`. |
 | `htmlpdf` | Academic page-snapshot proposals: `proposals list` / `apply` / `reject`. `[htmlpdf].academic = gated` writes `state/htmlpdf/proposals/`; `apply` attaches a snapshot-tier PDF. Printing web and news pages during `run` is the `htmlpdf` *source*, not this verb. See [sources](sources.md#htmlpdf-web-news-blogs). |
@@ -381,6 +384,7 @@ envelope in MCP text content. **Read-only** MCP tools today:
 | `refs_gap` | `refs gap --format json` | Always dry-run |
 | `ask` | `ask --format json` | Needs `[rag]` + ingest. Optional `ask_mode` (`simple` / `advanced`); omitted uses `[rag].ask_mode` |
 | `precedent` | `precedent --format json` | Always dry-run. Held + public-metadata-only stamps; never a novelty claim |
+| `stuff` | `stuff --format json` | Disk-only extra cites from the local index. `item` or `file`; `lane` manuscript\|outline |
 
 `collections add`, snowball `apply`, and every other `--apply` path stay
 **CLI-only** (not MCP tools). Prefer `paperful … --format json` from a shell
@@ -460,6 +464,7 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
 - `state/refs-gaps/<stamp>/` — `refs gap` pack (`pack.json`, `pack.md`, `dois.txt`). Always dry-run.
 - `state/coverage/<stamp>/` — `coverage` pack (`pack.json`, `pack.md`, `dois.txt`). Always dry-run.
 - `state/precedent/<stamp>/` — `precedent` pack (`pack.json`, `pack.md`, `dois.txt`). Always dry-run.
+- `state/stuff/<id>/<stamp>/` — `stuff` pack (`pack.json`, `pack.md`). Extra library cites per claim. No manager writes.
 - `state/ingest/<stamp>/` — `ingest-dois` summary JSON. Created only classifies unless `--apply`.
 - `state/collections-add/<stamp>/` — `collections add` summary JSON (`paperful.collections_add.v1`). Dry-run unless `--apply`.
 - `state/authorwatch/<name>/` — people lists (`paperful.authorwatch.v1`), `people.jsonl`, `suggestions.jsonl`, inbox, seen, applied. Cursor baseline does not open the library; `suggest` does. See [authorwatch.md](authorwatch.md).
@@ -473,7 +478,7 @@ it. JSON: `paperful report --json` — field list in [architecture](architecture
   `state/runs/<timestamp>-<command>.json` (`run`, `recover`, `gaps`, `reachout`, `lint`,
   `fix-metadata` for dry-run and `--apply`, `summarize`, `synthesize`,
   `extract-sections`, `refs gap`,
-  `coverage`, `precedent`, `snowball apply`, …). Reports may include optional `witness`
+  `coverage`, `precedent`, `stuff`, `snowball apply`, …). Reports may include optional `witness`
   (`paperful.witness.v1`).
 - `state/packs/<id>.json` — parent witness for one `pack open` … `pack close`
   sequence (`paperful.pack.v1`). Steps point at filenames under `state/runs/` and

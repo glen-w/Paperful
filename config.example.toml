@@ -452,6 +452,15 @@ concurrency = 2
 # public_k = 25
 # search_keywords = true
 
+# Extra library cites per sentence (or outline section). Needs [rag].enabled
+# and a built index. No LLM. CLI `--k` / `--lane` override.
+# [stuff]
+# k = 3                    # extra sources per claim (capped by [rag].top_k)
+# min_sentence_words = 8   # skip captions / headings / fragments
+# min_query_words = 4      # outline lane: skip empty/tiny section queries
+# max_units = 200
+# lane = "manuscript"      # manuscript | outline
+
 # [snowball]
 # enabled = false
 # max_candidates = 200     # all keeps every new+exists row

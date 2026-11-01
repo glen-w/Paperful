@@ -23,6 +23,14 @@ from paperful.precedent import (
     PrecedentRow,
     write_pack as write_precedent_pack,
 )
+from paperful.stuff import (
+    STUFF_PACK_KEYS,
+    SCHEMA as STUFF_SCHEMA,
+    StuffHit,
+    StuffRow,
+    pack_payload,
+    write_pack as write_stuff_pack,
+)
 from paperful.refs_gap import (
     REFS_GAP_PACK_KEYS,
     SCHEMA as REFS_SCHEMA,
@@ -142,6 +150,45 @@ def test_precedent_pack_keys_match_golden(tmp_path: Path):
     assert PRECEDENT_PACK_KEYS <= pack.keys()
 
 
+def test_stuff_pack_keys_match_golden(cfg):
+    keys = json.loads((FIX / "stuff_pack_v1" / "keys.json").read_text(encoding="utf-8"))
+    assert keys == sorted(STUFF_PACK_KEYS)
+    golden = json.loads(
+        (FIX / "stuff_pack_v1" / "pack.json").read_text(encoding="utf-8")
+    )
+    assert golden["schema"] == STUFF_SCHEMA
+    assert STUFF_PACK_KEYS <= golden.keys()
+    payload = pack_payload(
+        cid="file-draft",
+        scope="index",
+        lane="manuscript",
+        k=3,
+        inp={"kind": "file", "path": "draft.md", "title": "draft.md"},
+        rows=[
+            StuffRow(
+                quote="Area-based management tools in ABNJ need a legal warrant.",
+                loc="para 1",
+                hits=[
+                    StuffHit(
+                        item_key="ITEM0001",
+                        title="Held paper",
+                        pages="p. 3",
+                        score=0.91,
+                        passage="Area-based management in ABNJ",
+                        doi="10.1000/held",
+                        year=2019,
+                    )
+                ],
+            )
+        ],
+        skips=[],
+        created_at="2026-01-01T00:00:00+00:00",
+    )
+    folder = write_stuff_pack(cfg, payload, stamp="20260101T000000Z")
+    pack = json.loads((folder / "pack.json").read_text(encoding="utf-8"))
+    assert STUFF_PACK_KEYS <= pack.keys()
+
+
 def test_coverage_pack_keys_match_golden(tmp_path: Path):
     keys = json.loads(
         (FIX / "coverage_pack_v1" / "keys.json").read_text(encoding="utf-8")
@@ -253,7 +300,15 @@ def test_search_v1_keys_frozen():
     assert SEARCH_SCHEMA == "paperful.search.v1"
     assert "run_id" in SEARCH_META_KEYS and "query" in SEARCH_META_KEYS
     assert "engine_host" in SEARCH_META_KEYS
-    assert {"url", "title", "score", "host", "playbook", "kind", "status"} <= SEARCH_HIT_KEYS
+    assert {
+        "url",
+        "title",
+        "score",
+        "host",
+        "playbook",
+        "kind",
+        "status",
+    } <= SEARCH_HIT_KEYS
     assert {"hits", "kept", "exists", "blocked", "new"} <= SEARCH_SUMMARY_KEYS
 
 

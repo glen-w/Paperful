@@ -392,6 +392,12 @@ class Config:
     precedent_held_k: int = 10
     precedent_public_k: int = 25
     precedent_search_keywords: bool = True
+    # `paperful stuff`: extra library cites per sentence / outline section.
+    stuff_k: int = 3
+    stuff_min_sentence_words: int = 8
+    stuff_min_query_words: int = 4
+    stuff_max_units: int = 200
+    stuff_lane: str = "manuscript"  # manuscript | outline
     searxng_base_url: str = ""
     # `paperful search` / Discover Web. CLI --max / --probe override when set.
     search_max: int = 20
