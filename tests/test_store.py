@@ -132,10 +132,18 @@ def test_manifest_latest_record_wins_and_resume_logic(tmp_path):
     path = tmp_path / "manifest.jsonl"
     m = Manifest(path)
     m.write(Record(itemKey="K1", status=STATUS_ERROR))
-    m.write(Record(itemKey="K1", status=STATUS_OK, path="/tmp/a.pdf"))
+    m.write(Record(itemKey="K1", status=STATUS_OK, path="/tmp/a.pdf", source="unpaywall"))
     m.write(Record(itemKey="K2", status=STATUS_NOT_FOUND))
     m.write(Record(itemKey="K3", status=STATUS_ERROR))
-    m.write(Record(itemKey="K4", status=STATUS_ATTACHED, path="/tmp/b.pdf"))
+    m.write(Record(itemKey="K4", status=STATUS_ATTACHED, path="/tmp/b.pdf", source="scihub"))
+    m.write(
+        Record(
+            itemKey="AF",
+            status=STATUS_ATTACH_FAILED,
+            path="/tmp/c.pdf",
+            reason=REASON_SHORT_PDF,
+        )
+    )
 
     reloaded = Manifest(path)
     assert reloaded.get("K1").status == STATUS_OK
@@ -156,7 +164,16 @@ def test_manifest_latest_record_wins_and_resume_logic(tmp_path):
         STATUS_NOT_FOUND: 1,
         STATUS_ERROR: 1,
         STATUS_ATTACHED: 1,
+        STATUS_ATTACH_FAILED: 1,
     }
+    assert reloaded.by_source() == {"unpaywall": 1, "scihub": 1}
+    assert reloaded.attach_failed_by_code() == {"other": 1}
+    payload = reloaded.report_payload(last_run={"linked_url_skipped": 3, "ok": 1})
+    assert payload["last_run"]["ok"] == 1
+    assert payload["linked_url"] == 3
+    assert payload["by_source"] == {"unpaywall": 1, "scihub": 1}
+    bare = reloaded.report_payload()
+    assert "last_run" not in bare and "linked_url" not in bare
 
 
 def test_manifest_retries_captcha_and_holds_no_identifier(tmp_path):

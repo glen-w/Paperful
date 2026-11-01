@@ -103,3 +103,40 @@ def test_javascript_only_page_is_not_a_pdf_hit():
     )
     assert res.outcome is Outcome.ERROR
     assert res.pdf_url is None
+
+
+def test_article_with_robot_strings_is_not_captcha_when_citation_pdf_present():
+    html = (
+        "<html><head>"
+        '<meta name="citation_pdf_url" content="//sci-hub.ru/storage/x.pdf">'
+        "</head><body>Are you a robot? verification - sci-hub</body></html>"
+    )
+    assert not is_captcha_page(html)
+    res = parse_page(html, BASE)
+    assert res.outcome is Outcome.FOUND
+    assert res.pdf_url == "https://sci-hub.ru/storage/x.pdf"
+
+
+def test_parse_not_found_from_body_marker_only():
+    res = parse_page(
+        "<html><head><title>Sci-Hub</title></head>"
+        "<body>Unfortunately, Sci-Hub doesn't have the requested document</body></html>",
+        BASE,
+    )
+    assert res.outcome is Outcome.NOT_FOUND
+
+
+def test_parse_block_rounded_message_is_not_found():
+    res = parse_page(
+        '<html><body><block-rounded class="message">gone</block-rounded></body></html>',
+        BASE,
+    )
+    assert res.outcome is Outcome.NOT_FOUND
+
+
+def test_absolutise_rejects_data_and_non_http_schemes():
+    from paperful.sources.scihub import _absolutise
+
+    assert _absolutise("data:application/pdf;base64,AAA", BASE) is None
+    assert _absolutise("javascript:void(0)", BASE) is None
+    assert _absolutise("//sci-hub.ru/a.pdf", BASE) == "https://sci-hub.ru/a.pdf"

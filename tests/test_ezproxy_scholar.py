@@ -13,6 +13,14 @@ from tests.conftest import make_item
 def test_proxify_and_login_detection():
     base = "https://scpo.idm.oclc.org/login?url="
     assert ezproxy.proxify("https://doi.org/10.1/x", base).startswith(base)
+    # Already-proxied / blank base / slash forms stay idempotent.
+    proxied = "https://www-nature-com.scpo.idm.oclc.org/articles/x"
+    assert ezproxy.proxify(proxied, base) == proxied
+    assert ezproxy.proxify("https://doi.org/10.1/x", "") == "https://doi.org/10.1/x"
+    assert (
+        ezproxy.proxify("https://doi.org/10.1/x", "https://scpo.idm.oclc.org/")
+        == "https://scpo.idm.oclc.org/https://doi.org/10.1/x"
+    )
     assert ezproxy.looks_like_login(
         httpx.Response(
             200,
@@ -30,6 +38,48 @@ def test_proxify_and_login_detection():
             ),
         )
     )
+
+
+def test_ensure_proxied_rewrites_publisher_host_onto_landing_proxy():
+    landing = "https://www-sciencedirect-com.scpo.idm.oclc.org/science/article/pii/S1"
+    bare = "https://www.sciencedirect.com/science/article/pii/S1/pdfft"
+    out = ezproxy._ensure_proxied(
+        bare, "https://scpo.idm.oclc.org/login?url=", landing
+    )
+    assert out.startswith("https://www-sciencedirect-com.scpo.idm.oclc.org/")
+    assert "pdfft" in out
+    already = "https://www-sciencedirect-com.scpo.idm.oclc.org/pdfft"
+    assert (
+        ezproxy._ensure_proxied(
+            already, "https://scpo.idm.oclc.org/login?url=", landing
+        )
+        == already
+    )
+
+
+def test_ezproxy_finds_direct_pdf_bytes(ctx_factory, cfg, tmp_path):
+    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cookie_file = tmp_path / "ezproxy-cookies.txt"
+    cookie_file.write_text(".scpo.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n")
+    cfg.ezproxy_cookies = cookie_file
+
+    def handler(req):
+        return httpx.Response(
+            200,
+            content=b"%PDF-1.4 direct",
+            headers={"content-type": "application/pdf"},
+            request=httpx.Request(
+                "GET",
+                "https://www-nature-com.scpo.idm.oclc.org/articles/x.pdf",
+            ),
+        )
+
+    ctx = ctx_factory(handler)
+    for c in load_netscape_cookies(cookie_file).jar:
+        ctx.client.cookies.set(c.name, c.value, domain=c.domain, path=c.path)
+    cand = ezproxy.find(make_item(), ctx)
+    assert cand.outcome is Outcome.FOUND
+    assert cand.note == "direct pdf via proxy"
 
 
 def test_extract_pdf_urls_sciencedirect():
@@ -352,3 +402,58 @@ def test_scholar_session_missing_cookies_file(cfg, tmp_path, ctx_factory):
     ctx.config = cfg
     ok, detail = scholar.session_ok(ctx)
     assert not ok and "missing" in detail
+
+
+def test_scholar_search_url_skips_short_titles_without_doi():
+    assert scholar.search_url(make_item(doi=None, title="too short")) is None
+    assert scholar.search_url(make_item(doi="10.1/x", title="x")) is not None
+    long_title = "A sufficiently long title for a Google Scholar query"
+    url = scholar.search_url(make_item(doi=None, title=long_title))
+    assert url and "scholar.google.com" in url
+
+
+def test_scholar_session_ok_browser_profile(cfg, tmp_path, ctx_factory):
+    cookie_file = tmp_path / "scholar-cookies.txt"
+    cookie_file.write_text(".google.com\tTRUE\t/\tTRUE\t0\tSID\ttest\n")
+    cfg.scholar_cookies = cookie_file
+
+    class OkBrowser:
+        def available(self) -> bool:
+            return True
+
+        def fetch_html(self, url, timeout_ms=45_000):
+            return '<div class="gs_r">results</div>', "https://scholar.google.com/scholar"
+
+    class CaptchaBrowser:
+        def available(self) -> bool:
+            return True
+
+        def fetch_html(self, url, timeout_ms=45_000):
+            return "<html>captcha</html>", "https://www.google.com/sorry/index"
+
+    ctx = ctx_factory(lambda r: httpx.Response(500))
+    ctx.config = cfg
+    ctx.browser = OkBrowser()
+    assert scholar.session_ok(ctx) == (True, "ok (browser profile)")
+    ctx.browser = CaptchaBrowser()
+    ok, detail = scholar.session_ok(ctx)
+    assert not ok and "CAPTCHA" in detail
+
+
+def test_scholar_find_http_error_and_sorry_captcha(ctx_factory):
+    def handler_429(req):
+        return httpx.Response(429, text="rate limited", request=req)
+
+    assert (
+        scholar.find(make_item(), ctx_factory(handler_429)).outcome is Outcome.ERROR
+    )
+
+    def handler_sorry(req):
+        return httpx.Response(
+            200,
+            text="<html>captcha</html>",
+            request=httpx.Request("GET", "https://www.google.com/sorry/index"),
+        )
+
+    cand = scholar.find(make_item(), ctx_factory(handler_sorry))
+    assert cand.outcome is Outcome.CAPTCHA

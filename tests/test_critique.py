@@ -1553,17 +1553,21 @@ def test_reviewer_prompt_file_and_id_filter(cfg, tmp_path: Path, monkeypatch):
 
 
 def test_chat_reviewer_stream_wall_clock_and_heartbeat(monkeypatch):
+    """Heartbeat before wall abort — fake clock so real sleep overshoot cannot flake."""
     from paperful.critique_llm import chat_reviewer_stream
     from paperful.llm.client import ChatRequest, LLMClientError
+
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(time, "perf_counter", lambda: clock["t"])
 
     class SlowClient:
         provider = "stub"
 
         def chat_stream(self, _request):
             yield "aa"
-            time.sleep(0.05)
+            clock["t"] += 0.05  # past heartbeat_s=0.04, under wall_s=0.08
             yield "bb"
-            time.sleep(0.05)
+            clock["t"] += 0.05  # past wall_s=0.08
             yield "cc"
 
     seen: list[str] = []

@@ -86,6 +86,17 @@ def test_source_applicable_by_metadata(cfg):
         cfg,
         "htmlpdf",
     )
+    # Crossref-style arXiv DOI counts even without a parsed arxiv_id.
+    assert source_applicable(
+        make_item(doi="10.48550/arxiv.2301.00001", arxiv_id=None, title="x"),
+        cfg,
+        "arxiv",
+    )
+    assert not source_applicable(
+        make_item(doi="10.1000/x", arxiv_id=None, title="short", item_type="journalArticle"),
+        cfg,
+        "arxiv",
+    )
 
 
 def test_sources_for_item_policy_moves_scihub_to_the_tail(cfg):

@@ -709,6 +709,23 @@ def test_scihub_fails_over_and_circuit_breaks(ctx_factory):
     assert calls == ["m2.test"] and cand.outcome is Outcome.FOUND
 
 
+def test_scihub_captcha_mirror_fails_over_without_penalising(ctx_factory):
+    captcha = (FIX / "scihub_captcha.html").read_text()
+    found = (FIX / "scihub_found.html").read_text()
+    ctx = ctx_factory(
+        _scihub_handler(
+            {
+                "m1.test": httpx.Response(200, text=captcha),
+                "m2.test": httpx.Response(200, text=found),
+            }
+        )
+    )
+    cand = scihub.find(make_item(), ctx)
+    assert cand.outcome is Outcome.FOUND and cand.note == "m2.test"
+    assert ctx.mirror_failures.get("m1.test", 0) == 0
+    assert ctx.mirror_ok("m1.test")
+
+
 def test_scihub_all_mirrors_down_is_error_with_per_mirror_notes(ctx_factory):
     ctx = ctx_factory(
         _scihub_handler(

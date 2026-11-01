@@ -9,12 +9,15 @@ import pytest
 
 from paperful.playbooks import (
     GreyPlaybook,
+    _symbol_from_undocs_url,
     apply_rewrite,
     apply_synthesize,
+    host_matches,
     load_builtin_pack,
     load_pack_dir,
     looks_like_pdf_url,
     merge_playbooks,
+    playbook_from_dict,
     rewrite_playbook_name,
     scrape_playbooks_for_host,
 )
@@ -50,6 +53,52 @@ _NAMED_PACKS = (
 )
 def test_looks_like_pdf_url_cases(url, want):
     assert looks_like_pdf_url(url) is want
+
+
+def test_host_matches_empty_and_substring():
+    assert host_matches("", ("fao.org",)) is False
+    assert host_matches("www.fao.org", ("", "fao.org")) is True
+    assert host_matches("docs.example.org", ("example.org",)) is True
+    assert host_matches("other.org", ("example.org",)) is False
+
+
+def test_playbook_from_dict_hosts_string_and_invalid_kind():
+    pb = playbook_from_dict(
+        {"name": "solo", "kind": "rewrite", "hosts": "undocs.org", "url_re": "x"}
+    )
+    assert pb is not None and pb.hosts == ("undocs.org",)
+    assert playbook_from_dict({"name": "x", "kind": "nope"}) is None
+    assert playbook_from_dict({"name": "", "kind": "rewrite"}) is None
+
+
+def test_daccess_ods_symbol_from_query():
+    assert (
+        _symbol_from_undocs_url(
+            "https://daccess-ods.un.org/access.nsf/Get?Open&DS=A/RES/61/105&Lang=E",
+            None,
+        )
+        == "A/RES/61/105"
+    )
+    assert _symbol_from_undocs_url("https://undocs.org/pdf", None) is None
+    assert (
+        _symbol_from_undocs_url("https://undocs.org/pdf?symbol=A/75/157", None)
+        == "A/75/157"
+    )
+
+
+def test_merge_playbooks_extra_before_user_same_name():
+    extra = [
+        GreyPlaybook(name="fao", kind="rewrite", hosts=("fao.org",), url_re="e"),
+    ]
+    user = [
+        GreyPlaybook(name="fao", kind="rewrite", hosts=("fao.org",), url_re="u"),
+        GreyPlaybook(name="custom", kind="rewrite", hosts=("x.org",), url_re="c"),
+    ]
+    merged = merge_playbooks(False, user, extra=extra)
+    by_name = {p.name: p for p in merged}
+    assert by_name["fao"].url_re == "u"
+    assert "custom" in by_name
+    assert [p.name for p in merged] == ["fao", "custom"]
 
 
 def test_builtin_ocean_pack_loads():
