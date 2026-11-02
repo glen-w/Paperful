@@ -91,4 +91,6 @@ def test_write_text_does_not_spread():
         if ".write_text(" in path.read_text(encoding="utf-8")
     }
     extra = found - ALLOW
-    assert not extra, "move these onto fsio or extend ALLOW: " + ", ".join(sorted(extra))
+    assert not extra, "move these onto fsio or extend ALLOW: " + ", ".join(
+        sorted(extra)
+    )

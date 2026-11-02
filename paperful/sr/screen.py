@@ -67,9 +67,7 @@ def append_screen_decision(
             if str(item).strip()
         ]
         if reason.strip() not in allowed:
-            raise ValueError(
-                f"exclude reason {reason!r} is not on the protocol list"
-            )
+            raise ValueError(f"exclude reason {reason!r} is not on the protocol list")
     row = {
         "schema": SCHEMA,
         "identity": identity,

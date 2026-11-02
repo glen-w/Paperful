@@ -102,7 +102,10 @@ def test_exchange_csv_roundtrip_and_bad_format(tmp_path: Path):
     dry = apply_import(
         state,
         "rev",
-        [{"identity": "", "decision": "include"}, {"identity": "10.1000/z", "decision": "nope"}],
+        [
+            {"identity": "", "decision": "include"},
+            {"identity": "10.1000/z", "decision": "nope"},
+        ],
         reviewer="",
         apply=False,
     )
@@ -114,7 +117,9 @@ def test_exchange_csv_roundtrip_and_bad_format(tmp_path: Path):
 
 def test_create_included_parents_needs_a_collection_or_a_backend(tmp_path: Path):
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
-    skipped = create_included_parents(cfg, [{"decision": "exclude", "identity": "10.1/x"}], "")
+    skipped = create_included_parents(
+        cfg, [{"decision": "exclude", "identity": "10.1/x"}], ""
+    )
     assert skipped["skipped"] == "no collection"
 
     class Backend:

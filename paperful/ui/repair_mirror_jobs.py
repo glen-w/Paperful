@@ -227,9 +227,7 @@ def run_repair_preview(
 
         from ..http import client as http_client
 
-        client = http_client(
-            follow_redirects=True, timeout=30, retries=0, guard=True
-        )
+        client = http_client(follow_redirects=True, timeout=30, retries=0, guard=True)
         try:
             proposals = classify_versions(items, resolver_for(client, cfg.email))
         finally:
@@ -463,9 +461,7 @@ def run_repair_apply(
             return False, "write API not available", {}
         from ..http import client as http_client
 
-        client = http_client(
-            follow_redirects=True, timeout=30, retries=0, guard=True
-        )
+        client = http_client(follow_redirects=True, timeout=30, retries=0, guard=True)
         try:
             applied, errors = apply_versions(
                 backend,

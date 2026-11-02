@@ -70,9 +70,7 @@ def write_queue(
 def write_report(dest: Path, report: dict[str, Any]) -> None:
     from ..fsio import atomic_write_text
 
-    atomic_write_text(
-        dest / "write_report.json", json.dumps(report, indent=2) + "\n"
-    )
+    atomic_write_text(dest / "write_report.json", json.dumps(report, indent=2) + "\n")
 
 
 def load_queue(state_dir: Path, run_id: str) -> tuple[Path, list[Candidate]]:

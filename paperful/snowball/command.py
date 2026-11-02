@@ -974,9 +974,7 @@ def _version_of(cfg: Config, request: SnowballRequest) -> Callable[[str], Any] |
     from ..http import client as http_client
     from ..versions import resolver_for
 
-    client = http_client(
-        follow_redirects=True, timeout=30, retries=0, guard=True
-    )
+    client = http_client(follow_redirects=True, timeout=30, retries=0, guard=True)
     return resolver_for(client, cfg.email)
 
 

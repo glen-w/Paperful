@@ -6,6 +6,10 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.8.1 — 2026-11-02
+
+- **CLI config lookup.** `sr` and the other commands that call `_cfg` now resolve it when the command runs, so a patched config in tests is the one that is used. No operator-facing change.
+
 ## 1.8.0 — 2026-11-02
 
 Decision log: `docs/plans/1.8-wave.md`.

@@ -48,6 +48,7 @@ from .scope import ScopeError, filter_scope_items, load_scope, resolve_keys
 from .store import Manifest
 from .zot import ZoteroLocal, resolve_item_types
 
+
 class _ColumnsConsole(Console):
     """Use ``COLUMNS`` even when ``TERM`` is dumb.
 

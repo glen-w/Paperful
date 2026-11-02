@@ -15,7 +15,6 @@ from paperful.cli import (
     LibraryError,
     __version__,
     _agent_json,
-    _cfg,
     _connect,
     _exit_env,
     _flush,
@@ -49,6 +48,14 @@ from paperful.cli import (
     twenty_app,
 )
 from paperful.config import Config
+
+
+def _cfg(path=None):
+    """Resolve config at call time so tests can patch ``cli_runtime._cfg``."""
+    from paperful import cli_runtime as rt
+
+    return rt._cfg(path)
+
 
 ConfigOpt = typer.Option(
     None, "--config", "-c", help="Path to config.toml", exists=True, dir_okay=False
@@ -492,7 +499,9 @@ def sr_init(
         "", "--search-run", help="Existing search run id to screen. Read-only."
     ),
     reason: list[str] = typer.Option(
-        [], "--reason", help="Allowed exclude reason (repeatable). Off-list excludes fail."
+        [],
+        "--reason",
+        help="Allowed exclude reason (repeatable). Off-list excludes fail.",
     ),
     config: Path | None = ConfigOpt,
 ) -> None:
