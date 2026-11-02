@@ -54,6 +54,8 @@ DOCS_STRICT=1 make docs   # after: uv sync --extra docs
 Local-trust boundaries and reporting: [SECURITY.md](SECURITY.md).
 
 CI runs pytest with coverage on every push and PR (`.github/workflows/ci.yml`).
+Since 1.7 the **audit**, **socket**, and **fresh-install** jobs are required
+too (see [developer — CI](docs/developer.md#ci-and-local-pitfalls)).
 A green push to `main` refreshes `badges/coverage.json`, which the README
 coverage badge reads. The Docs
 workflow (`.github/workflows/docs.yml`) runs the guide corpus tests and a strict

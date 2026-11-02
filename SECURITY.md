@@ -9,7 +9,7 @@ can run `paperful` (or reach a published workbench port) is the operator.
 | Surface | Trust | Notes |
 | --- | --- | --- |
 | CLI / MCP stdio | Operator shell | Same privileges as the user process |
-| `paperful serve` / Docker GUI | Loopback by default | **No HTTP authentication.** Anyone who can open the port can Preview/Grab/Attach and change Settings. Cross-site form posts from another origin are refused (`403`, see below), which stops a web page in the same browser from driving the workbench; it is not a login |
+| `paperful serve` / Docker GUI | Loopback by default | **No HTTP authentication unless** `PAPERFUL_UI_TOKEN` / `--ui-token` is set. Anyone who can open an unauthenticated port can Preview/Grab/Attach and change Settings. Cross-site form posts from another origin are refused (`403`, see below), which stops a web page in the same browser from driving the workbench; it is not a login |
 | Session vault (`state/sessions/`) | Operator disk | Cookies and campus SSO; never commit or paste |
 | Outbound PDF / landing fetches | Library + playbook URLs | `is_fetchable_url` rejects loopback, RFC1918, link-local, and cloud-metadata targets; redirects are re-checked |
 | Sci-Hub / Scholar / browser agent | Opt-in | Off unless enabled; legal and AUP responsibility stays with the operator — see [docs/scihub.md](docs/scihub.md) |

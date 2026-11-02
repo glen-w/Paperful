@@ -1,0 +1,7 @@
+{
+  "schema": "paperful.sr.protocol.v1",
+  "slug": "demo",
+  "title": "T",
+  "question": "Q?",
+  "exclude_reasons": []
+}

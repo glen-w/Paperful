@@ -173,6 +173,64 @@ def test_check_for_update_survives_corrupt_cache(tmp_path):
     assert cached_latest(tmp_path, now=1000.0) == "2.0.0"
 
 
+def test_playwright_is_an_extra_not_core():
+    try:
+        import tomllib
+    except ModuleNotFoundError:  # Python 3.10
+        import tomli as tomllib
+    from pathlib import Path
+
+    data = tomllib.loads(
+        (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(
+            encoding="utf-8"
+        )
+    )
+    core = " ".join(data["project"]["dependencies"])
+    assert "playwright" not in core.lower()
+    extras = data["project"]["optional-dependencies"]
+    assert any("playwright" in dep for dep in extras["browser"])
+    assert extras["htmlpdf"] == extras["browser"]
+
+
+def test_doctor_playwright_check_names_the_extra(monkeypatch):
+    from paperful import doctor, session as sess
+
+    monkeypatch.setattr(sess, "playwright_available", lambda: False)
+    check = doctor._playwright_check()
+    assert check.status == "amber"
+    assert "paperful[browser]" in check.detail
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_ui_token_unequal_length_is_401_not_500(tmp_path):
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    client = TestClient(create_app(cfg, ui_token="a" * 32))
+    # compare_digest must not raise when the supplied secret is shorter.
+    assert (
+        client.get("/v1/runs/last", headers={"Authorization": "Bearer x"}).status_code
+        == 401
+    )
+    assert (
+        client.get("/v1/runs/last", headers={"X-Paperful-Token": "x" * 8}).status_code
+        == 401
+    )
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_ui_health_stays_open_with_wrong_token(tmp_path):
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    client = TestClient(create_app(cfg, ui_token="s3cret"))
+    assert client.get("/health").status_code == 200
+    assert (
+        client.get("/health", headers={"Authorization": "Bearer wrong"}).status_code
+        == 200
+    )
+
+
 def test_config_check_knows_updates_section(tmp_path):
     from paperful.config_check import check_config
 

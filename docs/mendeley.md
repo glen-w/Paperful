@@ -11,7 +11,8 @@ Do not treat a first Mendeley run as proven.
 **Field testing:** copy [adapter-field-assessment.md](templates/adapter-field-assessment.md)
 into gitignored `assessments/` and complete the Mendeley checklist (OAuth on the
 host, real library list / fetch / attach / notes). CI contract tests live in
-`tests/test_mendeley.py`.
+`tests/test_mendeley.py`. Promotion criteria and the backend contract:
+[adapter SDK](adapters.md).
 
 ## Setup
 

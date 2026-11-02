@@ -136,7 +136,8 @@ names the extra when it is missing).
   include / exclude / maybe. Local only; no scheduler, no workbench page yet.
 - **Workbench origin guard.** Non-`GET` requests whose `Sec-Fetch-Site`,
   `Origin`, or `Referer` point at another site return **403**. Same-origin
-  forms, `curl`, and the Firefox add-on are unaffected. Still no HTTP auth.
+  forms, `curl`, and the Firefox add-on are unaffected. That change did
+  not add a login; the same 1.7.0 release adds an opt-in UI token (above).
 - **Activity error column** and a cap of 20 queued GUI jobs
   (`too many queued jobs` past that). Worker failures are logged instead of
   swallowed.

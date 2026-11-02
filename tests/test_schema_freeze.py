@@ -54,6 +54,17 @@ from paperful.search.store import (
     SCHEMA as SEARCH_SCHEMA,
     SUMMARY_KEYS as SEARCH_SUMMARY_KEYS,
 )
+from paperful.sr.protocol import (
+    PROTOCOL_KEYS,
+    SCHEMA as SR_PROTOCOL_SCHEMA,
+    save_protocol,
+)
+from paperful.sr.screen import (
+    SCREEN_KEYS,
+    SCHEMA as SR_SCREEN_SCHEMA,
+    append_screen_decision,
+    load_screen_ledger,
+)
 from tests.conftest import make_item
 
 FIX = Path(__file__).parent / "fixtures"
@@ -310,6 +321,46 @@ def test_search_v1_keys_frozen():
         "status",
     } <= SEARCH_HIT_KEYS
     assert {"hits", "kept", "exists", "blocked", "new"} <= SEARCH_SUMMARY_KEYS
+
+
+def test_sr_protocol_v1_keys_match_golden(tmp_path: Path):
+    keys = json.loads(
+        (FIX / "sr_protocol_v1" / "keys.json").read_text(encoding="utf-8")
+    )
+    assert keys == sorted(PROTOCOL_KEYS)
+    golden = json.loads(
+        (FIX / "sr_protocol_v1" / "minimal.json").read_text(encoding="utf-8")
+    )
+    assert golden["schema"] == SR_PROTOCOL_SCHEMA
+    assert PROTOCOL_KEYS <= golden.keys()
+    path = save_protocol(
+        tmp_path, "demo", {"title": "T", "question": "Q?", "exclude_reasons": []}
+    )
+    live = json.loads(path.read_text(encoding="utf-8"))
+    assert PROTOCOL_KEYS <= live.keys()
+    assert set(live) == PROTOCOL_KEYS
+
+
+def test_sr_screen_v1_keys_match_golden(tmp_path: Path):
+    keys = json.loads((FIX / "sr_screen_v1" / "keys.json").read_text(encoding="utf-8"))
+    assert keys == sorted(SCREEN_KEYS)
+    golden = json.loads(
+        (FIX / "sr_screen_v1" / "minimal.json").read_text(encoding="utf-8")
+    )
+    assert golden["schema"] == SR_SCREEN_SCHEMA
+    assert SCREEN_KEYS <= golden.keys()
+    append_screen_decision(
+        tmp_path,
+        "demo",
+        identity="https://openalex.org/W1",
+        decision="include",
+        reason="on_topic",
+        reviewer="r1",
+    )
+    rows = load_screen_ledger(tmp_path, "demo")
+    assert len(rows) == 1
+    assert SCREEN_KEYS <= rows[0].keys()
+    assert set(rows[0]) == SCREEN_KEYS
 
 
 def test_grobid_tei_v1_keys_match_golden():

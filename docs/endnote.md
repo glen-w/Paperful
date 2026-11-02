@@ -11,7 +11,8 @@ Do not treat a first EndNote run as proven.
 **Field testing:** copy [adapter-field-assessment.md](templates/adapter-field-assessment.md)
 into gitignored `assessments/` and complete the EndNote checklist (copied library,
 `snapshot`, File → Import of `state/endnote-import/` bundles). CI contract tests
-live in `tests/test_endnote.py`.
+live in `tests/test_endnote.py`. Promotion criteria and the backend contract:
+[adapter SDK](adapters.md).
 
 ## Setup
 

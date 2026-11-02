@@ -27,7 +27,8 @@ On Zotero 10 or newer you can attach them yourself, or let a download attach
 them. On Zotero 7–9 the files stay in the folder; you attach them in Zotero.
 
 Zotero is well tested. Mendeley and EndNote are seeking testers.
-[How it compares](docs/comparison.md).
+[How it compares](docs/comparison.md). Fetch stance and what never leaves
+this machine: [legal and privacy](docs/legal-privacy.md).
 
 ## What can I do with it?
 

@@ -27,9 +27,11 @@ until real-library reports say so.
 Still not a full-text reading index, not a WebDAV client, and not “AI fetch
 everything.” `paperful ocr` is the optional text layer for scans. **1.0.0 and
 1.1.0 are tagged** (1.1.0 on PyPI). **1.1.1** is stop-ship hygiene (shipped in
-tree). **1.2.0** adds snowball stopping rules, off by default. Everything
-after that is a **buffet by area** — keep it on the map, pick later.
-See [After 1.1.0](#after-110-buffet-by-area).
+tree). **1.2.0** adds snowball stopping rules, off by default. **1.7.0**
+(2026-11-02) is the hardening and platform cut. The **live map** is
+[After 1.7](#after-17-live-map). The [1.1 area index](#after-110-buffet-by-area)
+still lists jobs by area; many of those rows have shipped. Do not re-pick
+them as the next thing to build.
 
 (product-split-10-vs-post-10)=
 ## Product split: 1.0 vs post-1.0
@@ -47,10 +49,9 @@ integrations.
 
 **1.1.x vs later (still not a calendar).** 1.1.0 is the PyPI cut. **1.1.1**
 closes Wanted scoping, ticks, Attach-at-zero, version drift, and first-hour
-copy. After that the map is a buffet: **Wanted excellence** foundation is
-shipped (keep residual polish here); Repair/Mirror, Ask depth, new sources,
-digest, embeddings, and bigger bets wait until that lane stays boring. Detail
-by area below.
+copy. **Wanted excellence** has shipped. Digest, precedent, PRISMA counts,
+and grey URL watches have shipped too. The live order is
+[After 1.7](#after-17-live-map); the area index below is the encyclopaedia.
 
 (after-110-v2-factory-framing)=
 **1.x vs v2 (factory, still not a calendar).** Public 1.x copy stays
@@ -58,24 +59,603 @@ by area below.
 ledger**, not a hosted Kosmos clone and not launch-page “academic paper
 factory.” Sequence: Wanted honest → grow/keep current → Ask **your** PDFs →
 then (gated) precedent pack, conflicting-evidence briefs, `stuff` into
-Zotero, PRISMA **counts**. At most **one** bigger bet a year (SR mode *or*
-grey-host watchers). Never auto-manuscript. Comparison routing:
+Zotero, PRISMA **counts**. Those packs have since shipped. At most **one**
+bigger bet a year. Grey-host watching shipped (`search` / `search watch`);
+the bet now on the table is [systematic review](#after-17-sr). Never
+auto-manuscript. Comparison routing:
 [comparison.md](comparison.md); stage matrix:
 [paper factory stages](comparison-reference.md#paper-factory-stages);
 packs: [v2 factory](#after-110-paper-factory).
 
-(after-110-buffet-by-area)=
-## After 1.1.0 (buffet by area)
+(after-17-live-map)=
+## After 1.7 (live map)
 
-Contributor map, not a commitment calendar. **Include all of it for now;
-choose later.** Merged 16 Oct 2026 from the post-v1 options compile
-(checked against `main` at `ae21bfb`).
+Contributor map, not a commitment calendar. This is the section to read
+before opening a new lane. The [1.1 area index](#after-110-buffet-by-area)
+under it is still the encyclopaedia of jobs; it is not the order.
 
 **Working stance:**
 
+1. The ledger is honest enough to stop treating Wanted as the only lane.
+   Residual Wanted polish stays polish.
+2. The next product question is the one the 1.1 index already asked: what
+   would make a researcher open Paperful again next week, once the gaps
+   list is no longer a surprise?
+3. Answer that with **joins of verbs that already exist**, plus **one**
+   bigger bet carried forward from the annual cap
+   ([systematic review](#after-17-sr)). Grey-literature watching already
+   shipped (`paperful search`, `search watch`). It is not still the
+   undecided bet.
+4. At most one new workbench surface. Activity or Discover can host it.
+   A new nav item waits until that surface has been used on a real
+   collection for a month.
+5. Each stage below can stop. Stopping is a successful outcome when the
+   acceptance line fails.
+
+(after-17-settled)=
+### What 1.7 already settled
+
+Sources: [1.7 decision log](plans/1.7-wave.md), [legal-privacy](legal-privacy.md),
+changelog **1.7.0**. An unreleased workbench hardening wave sits on top of
+that tag (content-security policy, orphaned jobs, cached counts, Wanted and
+Discover layout). It is in tree; it is not a reason to reopen 1.7’s
+product decisions.
+
+| Decision | Outcome |
+| --- | --- |
+| Install story | CLI: `pipx` / `uv tool`. Workbench: Docker Compose. `[serve]` without Docker stays documented, not the path CI proves end to end |
+| Playwright | Optional extra `paperful[browser]`. Compose still installs it. `doctor` names the extra when a lane needs it |
+| Workbench exposure | Loopback by default. Opt-in bearer token (`PAPERFUL_UI_TOKEN` / `serve --ui-token`) for a deliberate `--allow-remote-bind`. One shared secret, no accounts |
+| OS keyring | **No** for 1.7. Headless and Docker installs have no keyring daemon. Secrets stay in the environment; `config check` points at them |
+| Signed desktop bundle | **Rejected**, not deferred. Reach does not pay for notarisation while pipx and Compose cover the tested routes |
+| Update notice | Opt-in check against PyPI. No general telemetry |
+| Adapter “supported” | Conformance suite on a fake, **and** a filled [field assessment](templates/adapter-field-assessment.md) under `assessments/`, **and** mirror-first reads with the manager closed. Until then, Mendeley and EndNote stay “seeking testers” |
+| Legal and fetch stance | Written on [legal-privacy](legal-privacy.md). Not legal advice. Publisher terms and campus licences stay the operator’s call |
+| Python | CI includes 3.14. `requires-python >=3.10` stays for 1.7 so existing installs are not stranded. Dropping 3.10 is a separate announced change |
+| Coverage | Gate is **82**. A gate of 85 was measured and missed (82.3% at wave end) because new code grew the denominator. Do not claim 85 |
+| Systematic review | A scaffold exists: `paperful sr init`, `sr screen`, `sr status` write a protocol and an append-only ledger under `state/sr/<slug>/`. That is not the bigger bet. The bet starts at [SR-1](#after-17-sr) |
+
+(after-17-eaten)=
+### What the 1.1 sequence already ate
+
+The [old order](#after-110-sequence) and several [open questions](#after-110-open-questions)
+are answered in tree. Recorded here so the next plan does not rebuild them.
+
+| 1.1 “then decide” item | Where it landed |
+| --- | --- |
+| Wanted stamps, miss reasons, hand-ticks, Waiting→add | Shipped. 1.1.1 closed Grab scoping, ticks, Attach-at-zero |
+| Weekly digest / alert loop | [`keepup`](keepup.md). Operator cron. No email, no built-in scheduler |
+| Snowball stopping rule, drift cache, PRISMA **counts** | Shipped, counts only, no recall percentage |
+| Precedent pack, named MCP read jobs | Waves 1–4 shipped (`precedent` included) |
+| Conflicting-evidence and review-shaped briefs | `ask --focus conflict`; `synthesize --layout conflict` / `review` |
+| `stuff` pack | CLI and Advanced workbench. `--apply` still later |
+| Grey URL finding | `paperful search` + `search watch` |
+| Author lists, co-author preflight, Twenty lookup | Shipped, opt-in |
+| Note provenance and scoped delete | `paperful.note.v1`, `paperful notes delete` |
+| OpenAlex topic housekeeping | Run stamp, watch rebaseline, snapshot warning, frozen fixture. **Topic-native product** is still open — [below](#after-17-topics) |
+| Install route argument | Settled above. PyPI “which route?” is not an open product question |
+
+Still genuinely open, and specified below: a weekly **holdings diff**,
+citation debt that ages, a read-only memory of decisions already on disk,
+Ask used as a **claim check**, the SR scaffold grown into a review you can
+finish, topic gap map, playbook health, and the platform residuals 1.7
+wrote down and did not do.
+
+(after-17-habit)=
+### Habit: one report of what changed
+
+**Status:** roadmap. No command yet. Do not add a scheduler, an email, or
+a nav item in the first slice.
+
+The researcher already has watches (`keepup`), a miss list (`gaps`), a
+retraction pass (`screen`), a version merge (`versions`), a URL check
+(`urls check`), and a witness on run reports. None of those answers
+“what is different since I last looked?” They answer “what is true now?”
+The habit is the diff.
+
+**Command sketch:** `paperful since` (name may change before it lands).
+Always dry-run. Compares the live mirror and a fresh *plan* (no PDF
+bytes) to the last [run witness](#run-witness-shipped-trust-thicken) for
+a `-C`, or to `--since DATE` when there is no witness. Writes
+`state/since/<stamp>/` (`since.md` + `paperful.since.v1`). Empty output
+is a successful run: print “nothing changed” and do not file a Zotero
+note.
+
+Two sections, one pack:
+
+1. **Holdings that changed meaning**
+   - New retraction or expression of concern on an item you hold
+     (`screen`, report-only).
+   - Preprint with a version-of-record candidate (`versions`, no merge).
+   - Metadata URL or linked PDF that newly classifies `hard_dead` or
+     `paywall_html` (`urls check` against the previous `urls` report
+     when one exists; otherwise this section says “no prior URL report”
+     and skips, rather than paging the whole web on first run).
+   - Snapshot-tier PDF (`snapshot:htmlpdf`) whose dry-run now names a
+     native lane. Suggest `run --upgrade-snapshot` for those keys only.
+   - Parents created by `keepup apply` that are still missing a PDF.
+2. **Misses that healed**
+   - Last `run` report said `not_found`, `no_oa`, `paywalled`, or
+     `fetch_failed`; a new `--dry-run` (no download) now names an OA or
+     campus candidate. Rank by the same cite-count × severity score
+     handoff already uses.
+   - Do not download in `since`. The operator opens Wanted or `run` for
+     the keys the pack lists.
+
+**Honesty bar.** Every row names the verb that produced it and the
+witness id or date it was compared to. A row with no prior observation
+is omitted, not invented. `since` never calls `--apply` on screen, never
+attaches, never creates parents.
+
+**Acceptance.**
+
+- Zero manager writes. Zotero may be closed (mirror-first).
+- Golden fixture: a tiny mirror plus two saved reports → a frozen
+  `paperful.since.v1` with one healed miss and one retraction, and a
+  second fixture that expects the empty pack.
+- First run on a collection with no witness exits 0, says what it could
+  not compare, and still reports sections that need no history (new
+  retraction lookup is allowed; “healed” is not).
+- Dogfood: four weekly runs on one real collection (BBNJ or whatever
+  `-C` the operator actually refills). If three of the four packs are
+  noise (rows the operator immediately dismisses), narrow the diff
+  before any workbench page.
+
+**Workbench.** A **Since** block on Activity (the page that already lists
+jobs), rendered from the latest pack. Buttons deep-link to Wanted with
+those keys, to `screen`, and to `versions`. They do not fetch.
+
+**Stop.** If four dogfood packs are never opened, leave the command in
+the CLI and do not build the block.
+
+(after-17-citation-debt)=
+### Citation debt that ages
+
+**Status:** roadmap. Extend shipped `paperful refs gap`. Do not add a
+second gap verb.
+
+`refs gap` is a snapshot of “cited in these PDFs, not in the library.”
+The snapshot forgets itself. The thickening is a fingerprint memory:
+
+- On each run, key rows by the same identity `refs gap` already uses
+  (DOI, else title+year, else grey fingerprint).
+- Store the key, first-seen stamp, last-seen stamp, and
+  `cited_by_count_in_scope` under `state/refs-gaps/memory.jsonl`
+  (append; the latest row wins).
+- The pack gains a `delta` per row: `new`, `still_missing`,
+  `cite_count_up`, `now_owned`, `gone_from_drafts`.
+- Rank still-missing by cite count × weeks since first-seen. A row that
+  appears in a `--file` draft passed this run sorts above a row that
+  appears only inside already-held PDFs.
+- `suggested_action` stays `ingest-dois` dry-run or skip. `since` may
+  *list* the top still-missing rows; it does not ingest them.
+
+**Acceptance.** Re-running `refs gap` on an unchanged fixture yields
+`still_missing` with the same cite count and a stable first-seen.
+Adding the DOI to the fixture library yields `now_owned` and drops the
+row from the default table (it remains in the jsonl). No parent create.
+
+**Stop.** If operators do not hand the pack to `ingest-dois` on a real
+collection within a month of dogfood, do not put debt on the workbench.
+The jsonl is still worth keeping: it makes the next pack honest.
+
+(after-17-decisions)=
+### Decisions this collection already made
+
+**Status:** roadmap. Read-only. No new ledger.
+
+`state/` already remembers Keep/Skip, `keepup dismiss`, rejected inbox
+proposals, promoted author packs, acronym files, and (when used) `sr`
+screen rows. Operators re-litigate those because nothing reads them
+together.
+
+**Command sketch:** `paperful decisions -C …`. Prints one table. Omits a
+source that has no stable key rather than scraping note prose.
+
+| Source on disk | Row shows |
+| --- | --- |
+| Snowball queue Keep/Skip | identity, decision, run id |
+| `keepup dismiss` | identity, source (`watch` / `authorwatch` / `cites` / `search`) |
+| Inbox proposals rejected | file name or DOI, reason if recorded |
+| Author pack promoted for this profile | author id, host |
+| `state/acronyms/` for this `-C` | token |
+| `state/sr/<slug>/` when the protocol names this collection | identity, decision, reviewer |
+
+**Acceptance.** A fixture with one skipped snowball row and one dismissed
+keepup id prints both and nothing else. No network. No manager.
+
+**Workbench.** A collapsible block on Discover for the current chip, not
+a page. **Stop** if the only rows people want are already visible on the
+snowball queue itself — then delete the join and keep the queue.
+
+(after-17-claim-check)=
+### Ask, only as a claim check
+
+**Status:** roadmap. Depends on shipped Ask, not on a new model.
+
+Ask today can cite a passage. It can also write a smooth paragraph that
+hides which sentence was unsupported. The trust test is a pack that
+refuses the smooth paragraph.
+
+**Command sketch:** `paperful ask --claim-check --file DRAFT` (or a flag
+on the existing `--from-file` path — pick one when implementing; do not
+ship both). Scope is `-C` / the same index as Ask. For each sentence
+over the `stuff` length floor:
+
+- **supported** — one or more passages, item key, page, quote.
+- **mixed** — passages that touch the topic and do not state the claim.
+  The pack says so in a fixed phrase, not a generated hedge.
+- **unsupported** — no passage above the retrieve threshold.
+
+Fail closed when the index is empty (same as Ask). No sentence is
+rewritten. No citation is inserted. Output:
+`state/ask-claims/<stamp>/` (`paperful.claim_check.v1` + `pack.md`).
+`--apply` may file a child note only in a later stage, with
+`paperful.note.v1` type `claim-check`, and only if the operator passes
+`--apply`. Default is the pack on disk.
+
+**What this unlocks, in order, each allowed to stop:**
+
+1. **Claim check** (this stage). Dogfood on one real draft extract
+   (a JMLC or house-style manuscript slice under `styles/` is the
+   fixture shape; a private draft is the dogfood). Acceptance: every
+   supported row has a quote that occurs in the indexed chunk; a
+   sentence with no hit is `unsupported`, never a guessed citation.
+2. **Living brief diff**, only if (1) is actually opened. Themes,
+   contested points, gaps — the [briefs buffet](#after-110-briefs-ask)
+   — filed as a collection note. A second run prints added and removed
+   clusters (item keys), not a rewritten essay. Disagreement between
+   papers is a pair of quotes, not a verdict.
+3. **Evidence table.** Columns: study design (OpenAlex `study_designs`
+   or work `type` when we have them, else the literal `unspecified`),
+   n, method, finding. A cell is filled only from `extract-sections`
+   or a quoted passage. Anything the model adds without a quote is the
+   literal `check this` and does not count as a finding. Export CSV.
+4. **Figure and table pullouts.** Caption + page + file stem from the
+   local PDF. No generated artwork, no graphical abstract.
+5. **Question generation from summaries.** Stays deferred until (1)
+   ships. It is still the item marked deferred under
+   [Zotero-RAG](#zotero-rag-integration-later-question-centric-layer).
+
+**`stuff` labels, separate and smaller.** Optional pack column
+`supports` / `contrasts` / `mentions` only when a quoted span from the
+hit overlaps the claim the operator can see. Similarity alone stays
+unlabelled. `--apply` into Zotero and auto-insert into the manuscript
+stay parked. See [`stuff`](#stuff-later-extra-citations-from-the-library).
+
+**Nav question.** Whether Ask stays on the default nav stays open until
+claim-check exists. After it exists, the test is behavioural: if
+operators run claim-check from the CLI and never open `/ask`, move Ask
+under Advanced and leave a link on Index. Do not move it on a hunch
+before that.
+
+(after-17-sr)=
+### Systematic review (the one bigger bet)
+
+**Status:** scaffold shipped; the bet is roadmap. Grey-literature
+watching is no longer the competing annual bet — it shipped. Do not
+start a second bigger bet beside this one.
+
+What exists (`paperful/sr_cmd.py`): `sr init` writes
+`state/sr/<slug>/` with title, question, and `exclude_reasons: []`.
+`sr screen` appends a decision (`include` / `exclude` / `maybe`), a
+reason string, and a reviewer string. `sr status` counts. There is no
+queue, no reason checklist, no second-reviewer report, no PRISMA flow,
+no workbench.
+
+Interoperate with Covidence, Rayyan, and ASReview. Do not replace them.
+Do not claim a recall percentage. Sits beside Wanted: screening does
+not attach PDFs and does not create parents.
+
+**SR-1 — Reasons are data.** The protocol’s `exclude_reasons` list is
+what `sr screen` will accept for `exclude`. `init` can take repeated
+`--reason`. A reason not on the list is exit 1. `maybe` needs no
+reason. `status` prints a histogram. Acceptance: fixture protocol
+rejects an off-list reason and counts two excludes of the same reason
+as two.
+
+**SR-2 — Queue from a ledger you already have.** Import identities
+(not PDFs) from a snowball queue (Keep rows only), a `refs gap` pack,
+or an RIS/`included.csv` file into `state/sr/<slug>/queue.jsonl` with
+status `unscreened`. A column `in_library` uses the existing
+fingerprint and does not write to the manager. `screen` refuses an
+identity that is not on the queue unless `--allow-extra` (so a typo
+does not become a silent include). Acceptance: importing the same RIS
+twice does not duplicate a DOI.
+
+**SR-3 — Two reviewers, one disk.** Reviewer stays a string, not an
+account. `status` adds agreement / conflict / single-screened, matched
+on identity. Conflict is a row the operator reads. Export CSV
+(identity, decisions, reasons) for a tool that does dual-blind
+accounts. Workbench, only after SR-2 has been used on a real queue: one
+page reached from Discover Advanced, keyboard include / exclude / maybe,
+reason chips from the protocol. Not on the default nav.
+
+**SR-4 — PRISMA flow from those integers.** Snowball already emits
+`summary.prisma` counts. SR adds its own counts: imported,
+screened, excluded-by-reason, included, still unscreened. Render a
+table, plus an optional SVG built only by placing those integers in
+fixed boxes. No illustrated diagram, no model in the loop. A short
+methods paragraph template with the integers filled in, for the
+operator to paste. Still no recall percentage.
+
+**SR-5 — Ranking experiment, built to be killed.** Opt-in sort of
+unscreened rows by embedding similarity to the centroid of includes
+minus the centroid of excludes. Requires a built `[rag]` index and at
+least a documented minimum of decisions (start at 20 includes). Write
+the comparison in `assessments/`: this ranking versus sort-by-cited.
+If it does not win on one real review, delete the sort and keep
+SR-1–4. Do not ship a default “AI screener.” This is the only
+ASReview-shaped slice; the embeddings buffet does not get a second one
+until this verdict exists. See
+[embeddings order](#after-17-embeddings-order).
+
+**Dogfood gate.** SR-1 and SR-2 may land without a finished review.
+SR-3 and after wait until the maintainer (or one tester) has a protocol
+they are actually screening. A policy or methods desk with a real
+question qualifies. A synthetic queue of fifty famous DOIs does not.
+
+**Non-goals.** Accounts and blinding, a PDF reader inside the
+workbench, robot exclusion, auto-exclude from a score, replacing
+Rayyan’s collaboration, pulling SR into `paperful all`.
+
+(after-17-topics)=
+### OpenAlex topics as a product
+
+**Status:** housekeeping shipped
+([OpenAlex topics](#after-110-openalex-topics)). The three opportunities
+named there are still roadmap. Pin **topic IDs**. Store the display
+label beside the id and treat the label as cosmetic: OpenAlex relabels.
+
+**Topic follow.** A watch kind next to keyword watches: topic id, plus
+optional type, language, and OA filter. Cursor and inbox behave like
+`authorwatch` (new works since cursor; `exists` stays out). Start the
+watch from a snapshot dated on or after 14 Oct 2026, or from the live
+API. Do not trust a topic assignment cached from a pre-October snapshot.
+`snowball watch rebaseline` remains the flood valve when labels move.
+
+**Library gap map.** For `-C`, resolve topic ids for DOIs you hold
+(OpenAlex, budget-capped, cached under `state/`). Compare to a second
+set the operator names: a saved snowball seed’s topic mix, or the
+topics on works that cite the collection (`cites`, already a keepup
+source). Report **thin** (you hold at most N, default 2) and **absent**
+(in the comparison set, zero in the collection). Report only. Group
+label `no topic` is a real bucket; do not guess a topic from the title.
+
+This map is the collection picture that does not need embeddings. A
+cluster view of the embedding space has to beat this report on the same
+collection before anyone builds it.
+
+**Grouping.** `since` and Wanted may group rows by topic label when the
+id is already cached. Missing id → `no topic`. No extra API call on
+the Wanted page render; a stale cache is labelled with the cache date
+`doctor` already knows how to warn about.
+
+**Acceptance.** Tests use `tests/fixtures/openalex_topics/`. CI does not
+call the live topic endpoint. A gap-map fixture with three held DOIs
+and one citing work in an unheld topic yields that topic under absent.
+
+(after-17-embeddings-order)=
+### Embeddings: one spike, then a baseline to beat
+
+The [EmbeddingGemma 2](#embeddinggemma-2-local-embeddings) text spike
+stays the only model experiment. Defaults stay `nomic-embed-text` /
+`bge-m3`. sqlite-vec is not a silent swap: measure LanceDB size and
+startup on a real library first, and open that bet only if the
+measurement is the problem.
+
+Consumers, in order, each with a baseline written down before the code:
+
+| Consumer | Baseline it has to beat | Kill condition |
+| --- | --- | --- |
+| **Papers like this** (nearest chunks in *this* library for one item) | Shared references already computable from citation overlap | Operators prefer the overlap list on a 20-item dogfood |
+| **Semantic snowball seed** (nearest-neighbour phrase → one OpenAlex query on an existing profile) | The keyword the operator would have typed | The hop’s Keep rate is not higher on one profile |
+| **SR-5** | Sort by cited-count | Loses on the one real review |
+
+Collection cluster UI waits on the gap map above, not the other way
+around. Nightly “embed the library and query OpenAlex while you sleep”
+stays out: it is an unattended discovery loop, and `keepup` plus topic
+follow cover the scheduled-by-the-operator case without a second agent.
+
+(after-17-ledger-finish)=
+### Finish the ledger (small, after the habit)
+
+These are parked holes with a shape. None of them outranks `since` or
+SR-1. Pick one when a desk hits it.
+
+**Playbook health.** `paperful playbooks health` (report). For each row
+in `learned.toml`: win count, last win, consecutive misses, last HTTP
+status when we have it. `doctor` ambers when the miss streak is at
+least `[playbooks].stale_after` (default 5) or `last_win` is older than
+`[playbooks].stale_days` (default 180). `playbooks retire` marks the
+row disabled and keeps it in the file. No automatic retire. If there
+is no learned file, exit 0 with “no learned playbooks.” Dogfood is
+whatever `state/` already accumulated on ocean grey hosts.
+
+**Wrong-paper queue.** `lint` already raises `pdf_identity_mismatch`.
+The missing piece is a disposition: keep, or move the bytes to
+`state/quarantine/<stamp>/` and drop the attach pointer, with a witness.
+`--apply` required. Never unlink the only copy. False positive is a
+recorded disposition so the same pair does not return next lint. Group
+libraries: report only.
+
+**Orphan files.** List mirror files (and, when the operator passes a
+path, Zotero `storage/` files) that no item record references. Default
+report. `--apply` **moves** them to `state/trash/<stamp>/`. A second
+command, `paperful trash empty --older-than 30d --apply`, unlinks.
+Group libraries refused. This is not a startup daemon.
+
+**License gate.** Stamps already exist (`license`, `oa_status`,
+`version`). The gate is an opt-in allowlist in config. When it is on,
+`run` emits `license_blocked` and does not write bytes that fall
+outside it. Default off, so today’s libraries do not change behaviour.
+When it ships, add the allowlist shape to
+[legal-privacy](legal-privacy.md). It is not a compliance product and
+not a redistributor.
+
+**Annotation mirror.** Zotero stays the reader. Phase 1: on `snapshot`
+(or `paperful annotations mirror`), write
+`out/<item>/annotations.json` (`paperful.annotations.v1`: text, page,
+color, comment) from the backend’s annotation read. Read-only. Phase 2:
+`[rag].prefer_highlights` (default off) lets ingest mark those passages
+so Ask can say the citation was one you highlighted. Phase 3: export
+only the highlighted passages as a pack. Writing highlights back,
+tablet sync, and Mendeley/EndNote annotation parity stay out until a
+tester asks. Group libraries stay out of phase 1.
+
+**Author folders and tablet send/get** stay parked. Collections already
+express “whose papers”; a sync product is a different job
+([two folders](#after-17-two-folders)).
+
+(after-17-siblings)=
+### Siblings of a paper you hold
+
+**Status:** roadmap. The parked line “SI / dataset / code siblings” gets
+this shape and no wider one.
+
+`paperful siblings -C` (dry-run) looks at links already on the mirrored
+PDF or its landing metadata. It may record a sibling only when the host
+is on an allowlist: Zenodo, OSF, Dryad, Figshare, a GitHub release, or
+a Dataverse host the operator added. License is copied when that host’s
+API returns one. `--apply` downloads into `out/<item>/siblings/` under
+a byte cap and does **not** attach into Zotero unless `--attach` is
+also passed (second flag, on purpose). Stamp `sibling:zenodo` (or the
+host’s short name). Refuse generic cloud drives, personal blogs, and
+any pirate host. Cap requests per run.
+
+**Acceptance.** A fixture PDF whose only outbound link is a Zenodo
+record yields one row; a fixture whose only link is a file host not on
+the list yields zero rows and exit 0. **Stop** if a real `-C` dogfood
+finds nothing worth keeping — the verb can exist as report-only forever.
+
+(after-17-two-folders)=
+### Two folders, no accounts
+
+Collaboration stays “shared disk,” as in
+[Maybe later §8](#maybe-later). Thicken the mechanism; do not add a
+server.
+
+- **`paperful mirror diff DIR`** compares this `out/` to another tree
+  (a Syncthing copy, a backup, a colleague’s snapshot you were handed).
+  Rows: item key, PDF added or hash changed, `record.json` hash
+  changed, notes added. No merge button in the first slice. The
+  operator uses `restore` on the keys they choose, dry-run first.
+- **Attach clash.** `attach` and the apply path of `run` take an
+  exclusive file `state/locks/<item-key>` (host, pid, timestamp). A
+  lock older than `[attach].lock_hours` (default 12) is stale and may
+  be replaced; the replacement is printed. This matters only after two
+  processes share one `state/` via Syncthing or similar. Until someone
+  reports a double attach, a test with two lock files is enough — do
+  not build a fetch node.
+
+(after-17-desks)=
+### Field desks (proof, not products)
+
+A desk is a collection the maintainer already uses, plus the playbooks
+and one watch that belong to it. A desk graduates a feature when a
+short note in `docs/` (or a local `assessments/` file) says the
+acceptance line held on that collection. No suite page, no extra
+install.
+
+| Desk | Already in tree | Next proof |
+| --- | --- | --- |
+| Ocean / BBNJ | [bbnj-author-lanes](bbnj-author-lanes.md), grey packs, `author_site`, `authorwatch` | `since` and the topic gap map on `ocean/BBNJ` |
+| Policy grey | `search` / `search watch`, RFMO and UN-doc playbooks | Playbook health on learned rows, or `siblings` if the holdings actually link out |
+| Journal desk | `styles/JMLC` and the other house styles; `critique` | Claim-check on one manuscript extract. Not a new style product |
+
+Do not open a fourth desk to justify a feature.
+
+(after-17-platform-residuals)=
+### Platform residuals (named so they are not forgotten)
+
+From the 1.7 log. These are not the habit lane. Pull one in when the
+next tag needs it.
+
+| Residual | Done looks like |
+| --- | --- |
+| Coverage 85 | A measured run at or above 85 **without** lowering the bar by deleting tests. Until then the gate stays 82 |
+| Non-ledger `write_text` | Sweep report/export writers onto the atomic helper only where a torn file would lie to the operator. Not all ~150 sites |
+| Kill-9 resume | One test that kills a `run` and a `sync` mid-write and asserts the next start matches the fsio contract. Not a chaos suite |
+| Perf budgets | CI-tracked ceilings for `sync`, `gaps`, and `lint` on the synthetic bench, beside the mirror-scan numbers that exist today |
+| Publish attestations | Turn `attestations` back on when the Rekor workaround is obsolete. SBOM from CI stays either way |
+| Python 3.10 | Announce in a release note, then bump `requires-python`. Not inside an unrelated feature PR |
+| Keyring, signed bundle | Stay closed unless a desktop-only tester asks in writing. Asking does not by itself reopen the decision |
+
+(after-17-workbench)=
+### Workbench and docs residuals
+
+The unreleased hardening wave covers security headers, orphaned jobs,
+cached counts, layout, Wanted and Discover structure, Preview-gated
+Apply, and an opt-in browser test lane. Leave that wave’s bugs in its
+own fixes.
+
+Still open, and small:
+
+- **First 10 minutes.** One page, GUI labels only: Wanted, Held, Grab,
+  Attach, the `out/` folder. Steps: open the workbench, see an empty or
+  real Wanted, run Preview, understand that Attach is a separate button,
+  find `out/` on disk. No Scholar, no Sci-Hub, no model. Link it from
+  [walkthroughs](walkthroughs.md) and the README.
+- **One full-fetch narrative.** A single extra walkthrough for EZProxy
+  re-login, handoff, and inbox — the path [Documentation](#documentation-thicken)
+  already says is missing. Screenshot callouts on the dry-run table and
+  on a provenance line in Zotero, recaptured with
+  `scripts/docs/capture_workbench.py`.
+- **`stuff --apply`** stays off the workbench until the pack column
+  labels above exist and a tester asks for the note.
+
+(after-17-order)=
+### One possible order
+
+Not a calendar. Each line can be the last line.
+
+1. **`paperful since`** — holdings that changed meaning, and misses that
+   healed. CLI pack, fixture, four-week dogfood. Workbench block only
+   if the packs get opened.
+2. **`refs gap` memory** — new / still missing / now owned.
+3. **`paperful decisions -C`** — read-only join. Drop it if Discover
+   already shows the only rows that matter.
+4. **Claim check** — then, only if used, brief diff and the evidence
+   table.
+5. **SR-1 and SR-2** — reasons and a queue. Stop until a real review
+   exists; then SR-3 and the counts diagram.
+6. **Topic follow and gap map** — ids now; do not wait for 13 Jan 2027
+   to store ids. Rebaseline when the live labels move.
+7. **Playbook health** — cheap, and it tells the policy desk whether
+   learned rows are rotting.
+8. **One ledger-finish item** from the desk that has the pain
+   (quarantine, orphans, annotations, siblings, or the EmbeddingGemma
+   spike). Not all of them.
+
+(after-17-questions)=
+### Open questions (live)
+
+- After four weekly `since` packs, is the diff a habit or noise?
+- Once claim-check exists, does anyone still want `/ask` on the default
+  nav?
+- Is there a real systematic review this year, or do SR-1 and SR-2 sit
+  until there is one?
+- When is the Python 3.10 drop announced?
+
+Older questions, with the answers we have, stay under
+[Open questions](#after-110-open-questions) so the history is readable.
+
+(after-110-buffet-by-area)=
+## After 1.1.0 (area index)
+
+Encyclopaedia of jobs, not the live order. For what to build next, read
+[After 1.7](#after-17-live-map) first. Merged 16 Oct 2026 from the
+post-v1 options compile (checked against `main` at `ae21bfb`). Many
+rows below have since shipped; the status lines say so. **Include the
+remainder on the map; pick from the live order.**
+
+**Working stance (October 2026, historical):**
+
 1. **Ship 1.1.1** (scoping, ticks, Attach guard, version single-source, copy).
+   Done.
 2. **Keep Wanted excellent** as the one main lane (foundation shipped).
-   Bigger bets wait until that lane stays boring.
+   That lane is no longer the thing blocking the next bet. The weekly-habit
+   question is now [the holdings diff](#after-17-habit).
 
 Paperful knows what you *own*, which feed readers and discovery tools do not.
 The open question behind the longer bets: what would make a researcher open
@@ -85,7 +665,7 @@ Paperful every week, not just once to fill gaps?
 ### Facts settled against 1.1.0
 
 - 1.1.0 is tagged and on PyPI; trusted publishing (`publish.yml`) exists.
-- Version: single source via `importlib.metadata` / `pyproject.toml` (1.6.5).
+- Version: single source via `importlib.metadata` / `pyproject.toml` (1.7.0).
 - Attach is **manual by default** (`[ui].attach_mode`); Grab does not write to
   Zotero unless Settings is automatic.
 - **1.1.1 closed P0s:** Grab-selected `item_keys`, Held hand-ticks, Attach at
@@ -93,7 +673,7 @@ Paperful every week, not just once to fill gaps?
 - **Ask** is on the default nav (third after Wanted and Discover); it does
   not need Advanced. Whether it *stays* there is an [open
   question](#after-110-open-questions).
-- Install docs are pinned to `v1.6.5` (README, `docs/docker.md`,
+- Install docs are pinned to `v1.7.0` (README, `docs/docker.md`,
   `website/index.html`). Recheck every paperful.app claim before launch.
 
 (after-110-1-1-1)=
@@ -187,7 +767,8 @@ Pieces underneath: `watch.py`, `digest.py`, `briefing.py`;
   “flags to review”, never “detects” (`paperful screen` is the existing
   lookup); preprint-to-published linking (`paperful versions` is the
   existing merge); a monthly “living review” re-run of a saved snowball that
-  flags when a new cluster appears.
+  flags when a new cluster appears. The weekly join of those signals is
+  [`paperful since`](#after-17-habit), not a second poller.
 
 (after-110-research-integrity-paperguard)=
 ### Research integrity forensics ([PaperGuard](https://github.com/exergyleizhou-ux/PaperGuard))
@@ -315,7 +896,8 @@ rebaseline`, the stale 12% figure dropped, `doctor` snapshot warning via
   until someone asks — [OpenAlex snapshot store](#snowball).
 - Add a before/after snapshot test for keyword-based scoring.
 
-Opportunity (pin to **topic IDs**, never to cached assignments):
+Opportunity (pin to **topic IDs**, never to cached assignments). Specified
+as watches and a gap map in [After 1.7](#after-17-topics):
 
 - **Topic follow:** topic-native watches, filtered by type, language, and
   OA status.
@@ -380,12 +962,13 @@ Local-first and private by default; cloud models stay opt-in.
   sqlite-vec as a single local file next to the Zotero data. No cloud, no
   API key. (Today’s RAG index is LanceDB; sqlite-vec is an alternative
   storage bet, not a silent swap.)
-- Uses beyond chat: “papers like this” from your own library; duplicate
-  and near-duplicate detection for library hygiene; a collection map view
-  with clusters you can rename (most showable screenshot, stays a
-  secondary screen); screening that learns from accept/reject decisions
-  (ASReview-style); semantic snowball, where your library’s nearest
-  neighbours seed OpenAlex queries.
+- Uses beyond chat, in an order with a baseline to beat:
+  [embeddings](#after-17-embeddings-order). “Papers like this” from your own
+  library; duplicate and near-duplicate detection for library hygiene; a
+  collection map (only after the topic gap map loses on the same
+  collection); screening that learns from accept/reject decisions
+  (the killable SR-5 experiment, not a second product); semantic snowball,
+  where a nearest-neighbour phrase seeds one OpenAlex query.
 
 (after-110-snowball-review)=
 ### Snowballing and review methods
@@ -429,8 +1012,10 @@ own validation reports estimator undercoverage of 0–17% and calls the
 estimate advisory. Do not headline “we estimate you’ve found ~85%” or put
 any percentage in copy until it has been validated on real reviews.
 
-Parked in the snowball lane today, still true: systematic-review screening
-and a review UI — [Parked](#snowball). The Discover citation map is the
+Systematic-review screening is the bigger bet, specified outside this lane
+([After 1.7](#after-17-sr)). A review UI bolted onto the snowball queue
+stays parked; if a screen page is built, it hangs off Discover Advanced.
+The Discover citation map is the
 queue canvas (year × citations), not a corpus browser: Wave 1 hardened
 edges / Keep / offline D3; Wave 2 added triage, year scrubber, path,
 library halo, and watch delta. Literature categories (OpenAlex
@@ -440,6 +1025,11 @@ tags) sit on that canvas — [Citation map](snowball.md#citation-map).
 (after-110-bigger-bets)=
 ### Bigger bets (pick at most one a year)
 
+**Status:** grey-literature watching shipped. Systematic review is the
+remaining annual bet, and it now has stages, stop lines, and a scaffold —
+[After 1.7](#after-17-sr). Do not run a second bet beside it. The bullets
+below stay as the original brief.
+
 - **Systematic-review mode.** Guided snowball rounds, include/exclude
   screening with reasons, PRISMA **counts** (then official PRISMA flow from
   those counts — not an AI-illustrated diagram), a reproducible run file.
@@ -447,6 +1037,7 @@ tags) sit on that canvas — [Citation map](snowball.md#citation-map).
   *alongside* Wanted, not in place of it. Audience: librarians and
   Cochrane-style teams (grant money, real pain). Do not claim Elicit-like
   SR recall; independent 2025 work put that UI far below traditional search.
+  Scaffold in tree: `paperful sr init|screen|status`.
 - **Policy and grey-literature watchers.** BBNJ and RFMO work (for example
   SPRFMO SC14 reports) lives outside DOIs. **`paperful search` + Discover Web
   shipped** (SearXNG query → ranked PDF/landing hits → metadata parents).
@@ -603,18 +1194,17 @@ reason over **this** collection.
 (after-110-distribution)=
 ### Distribution and install
 
-- Make Playwright an optional extra (`[browser]`), with a lazy import and a
-  friendly “install this” message, so `paperful[serve]` really is lean.
-- CI on Linux, macOS, and Windows for Python 3.10–3.13, plus a “fresh
-  install launches the GUI” job. Add a smoke test to the existing release
-  workflow.
-- Install options, in order: **(1)** `pipx` / `uv tool install paperful` as
-  the main route, now. **(2)** A Docker image for labs and NAS boxes, only
-  if testers ask. **(3)** A signed desktop bundle, only if marketing
-  targets non-technical researchers. Which of these is *the* main route is
-  still open (PyPI stays on 1.1.1 until `v1.2.0` is published; Docker remains the CI-tested operator
-  path in [releases.md](releases.md)).
-- Possibly an opt-in update notice that checks PyPI and sends no telemetry.
+**Settled in 1.7** ([decision log](plans/1.7-wave.md)). The list underneath
+is the old brief; do not reopen it.
+
+- CLI route: `pipx install paperful` / `uv tool install paperful`.
+- Workbench route: Docker Compose. A Docker image is not “only if testers
+  ask” — it is the operator path CI exercises.
+- Playwright is the `paperful[browser]` extra. `doctor` names it.
+- Opt-in PyPI update check shipped. No general telemetry.
+- Signed desktop bundle: **rejected** for a single maintainer.
+- Fresh-install CI job shipped. Python 3.14 is on the matrix; 3.10 stays
+  until an announced drop ([residuals](#after-17-platform-residuals)).
 
 (after-110-findability)=
 ### Findability and launch
@@ -662,24 +1252,30 @@ tagged.
 (after-110-trust-gaps)=
 ### Trust, legal, privacy, sustainability
 
-Gaps that had no owner in the 1.0 push:
+Gaps that had no owner in the 1.0 push. Settled rows stay here so the
+decision is findable.
 
-1. **Legal and fetch stance:** a written position on publisher terms, which
-   PDF sources are fair game, and polite rate limits. Needed before
-   anything paid or public. Complements [Compliance &
-   provenance](#maybe-later) and [CAPTCHA / soft bot walls](#optional-llm-assist-local-litellm).
-2. **Evidence after the first hour:** an opt-in “send a report” button, or
-   local-only miss telemetry in the run report, so demand tests have data.
-3. **Credentials and privacy:** document where Zotero keys and tokens live
-   and what never leaves the machine. Prefer the OS keyring (via `keyring`)
-   rather than a plain config file, with an environment-variable fallback;
-   add a test that the key is never logged or sent anywhere except
-   `api.zotero.org`.
-4. **Sustainability:** one maintainer. State the licence and contribution
-   stance, what happens if that person steps back, and how this fits with
-   the paid cleaning report.
-5. **Docs as product:** one “first 10 minutes” page that uses the same
-   labels as the GUI — [Documentation (thicken)](#documentation-thicken).
+1. **Legal and fetch stance.** **Written:** [legal-privacy](legal-privacy.md).
+   Publisher terms and campus licences stay the operator’s call. Complements
+   [Compliance & provenance](#maybe-later) and
+   [CAPTCHA / soft bot walls](#optional-llm-assist-local-litellm).
+2. **Evidence after the first hour.** Local witness on run reports is
+   shipped. An opt-in “send a report” button is still out, and it is not on
+   the [live order](#after-17-order): a one-maintainer tool does not grow a
+   telemetry inbox to decide the next feature. Dogfood notes in `docs/` or
+   local `assessments/` are the evidence.
+3. **Credentials and privacy.** **Written** on the same legal page. OS
+   keyring was tried as a 1.7 idea and **rejected** (no daemon on the Docker
+   path). Secrets stay in the environment; `config check` flags secrets
+   sitting in `config.toml`.
+4. **Sustainability.** Still open, and small. One maintainer. Done looks
+   like a short note in CONTRIBUTING: the licence, what a useful change is
+   (one verb, dry-run default, a fixture), and that a quiet repository is an
+   acceptable steady state. The paid cleaning report is a separate offer. It
+   does not imply an SLA or a second product.
+5. **Docs as product.** The first-10-minutes page is specified under
+   [workbench residuals](#after-17-workbench). Layer list:
+   [Documentation (thicken)](#documentation-thicken).
 
 (after-110-parked)=
 ### Parked or hold
@@ -700,7 +1296,8 @@ Do not start these until testers ask, or until the main lane is boring.
 - **Catalogue unification** (managers as equals).
 - **LibGen** (same opt-in bar as Sci-Hub if ever).
 - **CSL / Quarto export** — point people at Better BibTeX.
-- **Licence gate** on attach (stamps exist; the gate is later).
+- **Licence gate** on attach (stamps exist; the gate’s shape is
+  [Finish the ledger](#after-17-ledger-finish)). Default stays off.
 - **Mendeley / EndNote “supported”** — promote only after a single call
   for testers gets replies. [Seeking testers](#mendeley-and-endnote-seeking-testers).
 
@@ -709,7 +1306,10 @@ plus `docs/backlog/` stays available if the map gets unwieldy; it is not a
 prerequisite for picking from the buffet.
 
 (after-110-sequence)=
-### One possible order (not a calendar)
+### One possible order (historical, through 1.1)
+
+Superseded by [After 1.7 — one possible order](#after-17-order). Kept so
+the 1.1 plan stays legible.
 
 1. **1.1.1** — P0 scoping and ticks, Attach-at-zero, review-token test,
    version single-source, first-hour copy.
@@ -728,21 +1328,27 @@ prerequisite for picking from the buffet.
    grey-literature watchers).
 
 (after-110-open-questions)=
-### Open questions
+### Open questions (1.1 record)
 
-- Should the next habit feature be the **weekly digest** or the **grounded
-  brief**? Is **systematic-review mode** or **grey-literature watching**
-  the one bigger bet worth exploring?
-- Keep **Ask** visible by default, or hide it? It is third in the default
-  nav today. Product and UX both lean last and optional.
-- What is the **main install route** now that PyPI 1.1.1 is live? Hold pip
-  until `pip install "paperful[serve]"` → `paperful serve` reaches Wanted
-  without Docker; switch to `pipx` / `uv tool` now; keep Docker for
-  operators; or a one-line PyPI install as the public story.
-- Agree that **Wanted** is the one main lane for now?
-- Should the CLI default to `--strict-pdf-doi`?
-- Stance on legal and fetch questions, and on accepting outside
-  contributions?
+Live questions: [After 1.7](#after-17-questions). Answers to the 1.1 list:
+
+- **Weekly digest or grounded brief?** Digest shipped as `keepup`. The
+  grounded brief waits on [claim check](#after-17-claim-check). **SR or
+  grey watching?** Grey watching shipped. SR is the remaining bigger bet.
+- **Ask on the default nav?** Still open. The test is written: decide
+  after claim-check, from whether `/ask` is used, not from taste alone.
+- **Main install route?** Settled in 1.7. CLI via `pipx` / `uv tool`.
+  Workbench via Docker Compose.
+- **Wanted as the only lane?** It stays the public pitch (“find missing
+  PDFs in Zotero”). It is not the only engineering lane. Next is the
+  holdings diff.
+- **`--strict-pdf-doi` as the default?** No. The flag exists and defaults
+  off; a mismatched DOI still attaches unless the operator sets it.
+  Flipping the default is a trust change and waits on a real-library
+  complaint, not on a roadmap slot.
+- **Legal stance and contributions?** Fetch and privacy stance is
+  [legal-privacy](legal-privacy.md). Contribution shape is the
+  sustainability note under [Trust](#after-110-trust-gaps).
 
 (trust-10)=
 ## 0.1 → 1.0 (trust + mirror contract)
@@ -1697,7 +2303,11 @@ provenance enums where possible. `[rag].parser = "grobid"` reuses the TEI cache.
 ### Annotation mirror (later)
 
 **Status:** roadmap — Zotero stays reader of record; the quiet mirror gains
-**your** highlights and notes for RAG / evidence packs.
+**your** highlights and notes for RAG / evidence packs. Phases, the
+`paperful.annotations.v1` file, and the off-by-default
+`[rag].prefer_highlights` switch are specified in
+[Finish the ledger](#after-17-ledger-finish). This lane does not outrank
+the holdings diff.
 
 Read item annotations (and tagged notes where distinguishable) through
 `LibraryBackend` on `snapshot` or a dedicated `paperful annotations mirror`
@@ -2182,7 +2792,10 @@ Larger product bets. Park until the ledger and core loop justify them.
 8. **Collaboration without SaaS** — shared `state/` over syncthing/git; attach
    locks; optional headless fetch node. Aligns with the house
    [quiet mirror](quiet-mirror.md) stance: Syncthing (or similar) is transport;
-   Paperful stays a local workbench, not a sync product.
+   Paperful stays a local workbench, not a sync product. The first mechanisms
+   (`mirror diff`, a file lock around attach) are
+   [two folders](#after-17-two-folders). A headless fetch node waits until
+   two processes have actually clashed.
 9. **Compliance & provenance** — 1.0 attach stamp is listed above. On disk,
    `record.json` plus `out/_history.json` are the chain-of-custody note for
    the library and the append-only ledgers. OA `license` / `oa_status` /
@@ -2285,8 +2898,9 @@ second doc tree that drifts from the CLI.
 - Site career / domain timeline plan (consumer of durable tags):
   `/Users/89298/Documents/website/glen-w.github.io/docs/dev/career-timeline-plan.md`
 - [firefox.md](firefox.md) — optional Firefox add-on; mirror writes, Zotero read
-- [After 1.1.0 (buffet by area)](#after-110-buffet-by-area) — Wanted,
-  digest, embeddings, review methods, launch, parked bets
+- [After 1.7 (live map)](#after-17-live-map) — what to build next
+- [After 1.1.0 (area index)](#after-110-buffet-by-area) — jobs by area;
+  many rows shipped
 
 ## GUI
 
@@ -2313,10 +2927,10 @@ The optional [Firefox add-on](firefox.md) saves pages into the mirror and
 does not attach.
 
 Post-1.1: **Wanted excellence foundation is shipped** (stamps, hand-ticks, miss
-reasons, Waiting→add); keep honesty polish here before Repair/Mirror or Ask
-depth — [Wanted](#after-110-wanted). 1.1.1 stop-ship items (Grab-selected keys,
-Held ticks, Attach-at-zero) are [1.1.1](#after-110-1-1-1). Whether Ask stays on
-the default nav is [open](#after-110-open-questions).
+reasons, Waiting→add). The next workbench surface is a Since block on
+Activity, and only after the CLI pack is used —
+[habit](#after-17-habit). Whether Ask stays on the default nav is
+[open](#after-17-questions), and the test is claim-check usage.
 
 **Ask (default nav, opt-in):** **Shipped** — `/ask` runs scoped chat with citations
 when `[llm]` and `[rag]` are on and the index has rows. Mode (`simple` /

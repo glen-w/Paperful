@@ -47,7 +47,7 @@ def test_chromium_installed_uses_dry_run_not_sync_driver(monkeypatch, tmp_path):
 
 def test_ensure_playwright_missing_package(monkeypatch):
     monkeypatch.setattr(sess, "playwright_available", lambda: False)
-    with pytest.raises(sess.SessionError, match="uv sync"):
+    with pytest.raises(sess.SessionError, match=r"paperful\[browser\]"):
         sess.ensure_playwright(auto_install=False)
 
 

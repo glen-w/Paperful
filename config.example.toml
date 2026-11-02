@@ -12,6 +12,8 @@ email = "you@example.org"
 # EndNote: point library at the .enl. Writes land in state/endnote-import/ for File → Import.
 #   paperful does not edit the EndNote database.
 # Work (fetch, lint, patches) happens on disk; the manager is only read/write at the edges.
+# Workbench token is an env var, not a key here: PAPERFUL_UI_TOKEN or `serve --ui-token`
+# (see SECURITY.md). Campus login / HTML PDF need the paperful[browser] extra.
 manager = "zotero"
 # [mendeley]
 # client_id = ""

@@ -24,6 +24,7 @@ reachout (contact, no fetch)  →  you email or click ResearchGate Request yours
 | **dry-run** | Show what would happen; no durable write to the library of record. |
 | **`--apply`** | Explicit second step that mutates the catalogue. |
 | **doctor** | Readiness probe (green / amber / red + next steps). |
+| **UI token** | Optional workbench shared secret (`PAPERFUL_UI_TOKEN` / `serve --ui-token`). Index only — rules live in [SECURITY.md](../SECURITY.md). |
 | **Ask** | Opt-in RAG over papers in `out/`. Distinct from per-paper `--question-id`. |
 | **`--link`** | Attachment surgery (stored → linked). Advanced; only with `--apply`. Not the stranger door. |
 

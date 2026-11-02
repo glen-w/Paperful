@@ -261,7 +261,11 @@
             enabled, then open the workbench at
             <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a>.
             Host CLI without Docker:
-            <code>pip install paperful</code>
+            <code>pipx install paperful</code>
+            (or <code>uv tool install paperful</code> /
+            <code>pip install paperful</code>;
+            campus login / HTML PDF need
+            <code>paperful[browser]</code>)
             (<a href="https://pypi.org/project/paperful/">PyPI</a>).
           </p>
           <pre class="code"><code>git clone --branch v1.7.0 https://github.com/glen-w/Paperful.git
@@ -297,6 +301,9 @@ docker compose up</code></pre>
     <footer class="site-footer">
       <div class="wrap footer-inner">
         <p><a href="https://glenwright.earth">© Glen Wright</a> · 1.7.0</p>
+        <p>
+          <a href="./guide/legal-privacy.html">Legal / privacy</a>
+        </p>
         <p>
           <a href="https://github.com/glen-w/Paperful">GitHub</a>
           <span aria-hidden="true">·</span>

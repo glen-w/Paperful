@@ -10,6 +10,7 @@ from typing import Any
 from ..fsio import atomic_write_text, file_lock
 
 SCHEMA = "paperful.sr.screen.v1"
+SCREEN_KEYS = frozenset({"schema", "identity", "decision", "reason", "reviewer", "at"})
 
 
 def ledger_path(state_dir: Path, slug: str) -> Path:

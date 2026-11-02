@@ -10,8 +10,10 @@ read the system browser cookie store (Keychain-encrypted; no CDP attach to a
 normal window). Use `session login` (preferred), or export a Netscape
 `cookies.txt` into `state/` — see [Campus EZProxy](ezproxy.md#advanced-netscape-cookiestxt).
 
-One local vault: `state/sessions/`. Playwright is a core dependency; Chromium
-for the headless fallback installs automatically on first need.
+One local vault: `state/sessions/`. Playwright ships in the
+`paperful[browser]` extra (and in the Compose image); Chromium for the
+headless fallback installs automatically on first need. `doctor` names the
+extra when the package is missing.
 
 `session login` **prefers your system Chrome/Edge** (launched without Playwright
 automation flags) so Google SSO works, then attaches over CDP to save cookies

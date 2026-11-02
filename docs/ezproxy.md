@@ -94,8 +94,9 @@ only after `paperful session login scholar`.
 uv run paperful session login ezproxy
 ```
 
-Playwright is already a core dependency (`uv sync`). Chromium downloads on the
-first login if needed. Login prefers your system Chrome/Edge (Google and campus
+Playwright ships in the `paperful[browser]` extra (and in the Compose
+image; `uv sync --extra browser` on the host). Chromium downloads on the
+first login if needed. `doctor` names the extra when the package is missing. Login prefers your system Chrome/Edge (Google and campus
 SSO often reject a Playwright-launched window). `paperful ezproxy` does the
 same. Complete campus SSO in the window that opens and wait until a **publisher
 page loads through the proxy** (the address bar should show your

@@ -141,8 +141,10 @@ Items typed as `webpage`, `blogPost`, `newspaperArticle`, `magazineArticle`, or
 native PDF. After `direct` fails to find a PDF link on the page, the `htmlpdf`
 source prints the page with Chromium. If you have run `paperful session login`,
 it reuses that profile (so a campus login can apply); otherwise it launches a
-fresh headless browser. Playwright is a core dependency; Chromium installs on
-the first `session login` (or: `uv run playwright install chromium`).
+fresh headless browser. Playwright ships in the `paperful[browser]` extra
+(and in the Compose image); Chromium installs on the first `session login`
+(or: `uv run playwright install chromium`). `doctor` names the extra when
+the package is missing.
 
 ```sh
 # ensure "htmlpdf" is in config sources (it is in the default list)

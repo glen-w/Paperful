@@ -8,6 +8,7 @@ from typing import Any
 from ..fsio import atomic_write_json
 
 SCHEMA = "paperful.sr.protocol.v1"
+PROTOCOL_KEYS = frozenset({"schema", "slug", "title", "question", "exclude_reasons"})
 
 
 def review_dir(state_dir: Path, slug: str) -> Path:

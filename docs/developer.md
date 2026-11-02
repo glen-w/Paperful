@@ -242,8 +242,8 @@ Tier policy (1.0 contract):
 | `paperful.network.v1` | `state/network/<run-id>/` | `network` | T2 | ORCID ego graph, phase slices, metrics, `attributes.csv`. Distinct from snowball `coauthors.v1`. |
 | `paperful.search.v1` | `state/search/<run-id>/` | `search` | T2 | SearXNG grey query, ranked hits, probe candidates. Metadata apply only. |
 | `paperful.search.watch.v1` | `state/search/watches/<name>/watch.json` | `search.watch` | T2 | URL seen set (not DOI). `interval_days` is a due-date hint; Paperful does not schedule. |
-| `paperful.sr.protocol.v1` | `state/sr/<slug>/protocol.json` | `sr.protocol` | T2 | Title, question, exclude reasons. No scheduler |
-| `paperful.sr.screen.v1` | `state/sr/<slug>/screening.jsonl` | `sr.screen` | T2 | One decision per line (`include` / `exclude` / `maybe`, reason, reviewer) |
+| `paperful.sr.protocol.v1` | `state/sr/<slug>/protocol.json` | `sr.protocol` | T2 | Frozen required keys (`PROTOCOL_KEYS`). Title, question, exclude reasons. No scheduler |
+| `paperful.sr.screen.v1` | `state/sr/<slug>/screening.jsonl` | `sr.screen` | T2 | Frozen required keys (`SCREEN_KEYS`). One decision per line (`include` / `exclude` / `maybe`, reason, reviewer) |
 | `paperful.snowball.stop.v1` | `state/snowball/<run-id>/stop.json` | `snowball.stop` | T2 | Stopping-rule scores per hop |
 | `paperful.citation_graph.v1` | `state/snowball/<run-id>/citation_graph.json` | `snowball.citation_graph` | T2 | Discover map. Rebuilt from the queue. Nodes carry `role`, `in_library`, `item_key`, `has_pdf`, optional operator staging (`tags` / `note` / `target_collection` / `staged`), optional `watch_new` / `compare_new`, `thresholds`, and `triage` (read-first list). Library actions: `paperful.snowball.graph_library`. |
 | `paperful.htmlpdf.proposal.v1` | `state/htmlpdf/proposals/` | `sources.htmlpdf` | T2 | — |
@@ -286,9 +286,11 @@ read, add it to `MirrorCatalogue`. If it is a write, add it to the adapter,
 to `MirroredBackend` (refresh the item after), and to `MirrorFirstBackend`
 (pass through, refuse offline).
 
-**A manager.** Implement `LibraryBackend`. With a `changes(since)` method it
-gets the mirror-first path for free. Zotero, Mendeley, and EndNote all
-expose one. Without one, reads stay live.
+**A manager.** Implement `LibraryBackend` and submit it through the
+[adapter SDK](adapters.md) (conformance kit + field report). With a
+`changes(since)` method it gets the mirror-first path for free. Zotero,
+Mendeley, and EndNote all expose one. Without one, reads stay live. Promotion
+still requires a real-library report; the kit alone does not.
 
 ## Tests
 
@@ -335,7 +337,7 @@ eight jobs (each with a `timeout-minutes` cap). All are required since 1.7:
   cell when green. Local gate: `fail_under` in `pyproject.toml`.
 
 Reproduce the required gate with `uv run pytest -m smoke`. The full local suite
-is still `uv run pytest` (80% coverage gate in `pyproject.toml`).
+is still `uv run pytest` (82% coverage gate in `pyproject.toml`; 85 is deferred).
 
 **Atomic writes.** JSON and text under `state/` and `out/` go through
 `paperful.fsio` (`atomic_write_text` / `atomic_write_json`: unique

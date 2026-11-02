@@ -125,7 +125,8 @@ def ensure_playwright(*, auto_install: bool = True) -> str | None:
     """
     if not playwright_available():
         raise SessionError(
-            "Playwright is missing — run: uv sync (or: pip install 'paperful[htmlpdf]')"
+            "Playwright is missing — install paperful[browser] "
+            "(or: uv sync --extra browser)"
         )
     if chromium_installed():
         return None

@@ -77,6 +77,7 @@ and [architecture](architecture.md).
 | `[ui].citation_map_remove` | `trash` | Map **Remove from library** behaviour (trash only for now) |
 | `[ui].coauthor_network` | `on` | Discover People co-author map: `on` / `off` |
 | `[ui].web_search` | `on` | Discover Web tab (SearXNG grey search): `on` / `off` |
+| `PAPERFUL_UI_TOKEN` / `serve --ui-token` | (unset) | Env / flag, not a `config.toml` key. When set, every workbench request except `/health` needs `Authorization: Bearer …` or `X-Paperful-Token`. Loopback stays open if unset. See [SECURITY.md](../SECURITY.md) |
 | `[ui].library_page_size` / `library_page_sizes` | `50` / `25, 50, 100, 200` | Rows per page on Library and Wanted, and the choices in the per-page select |
 | `[search].max` | `20` | Default kept hits for `paperful search` / Discover Web. CLI `--max` overrides |
 | `[search].probe` | `true` | HEAD/GET first bytes for PDF vs HTML. CLI `--no-probe` skips |

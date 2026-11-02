@@ -32,6 +32,7 @@ backup_excludes:
   - out
   - state
   - packs
+  - docs/_build
 backup_includes:
   - paperful/***
   - extension/***
