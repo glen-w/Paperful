@@ -171,9 +171,10 @@ paperful doctor
 ```
 
 Optional extras: `[browser]` (Playwright; session login / htmlpdf), `[llm]`, `[rag]`, `[rag-docling]`, `[browser-agent]` (Python 3.11+), `[openxml]`, `[network]`. The `[serve]` extra
-(workbench) runs without Docker; the operator path tested end to end in CI is
-**clone + Compose** ([Docker](docs/docker.md)), and CI also smoke-tests a fresh
-`paperful[serve]` install (`doctor` exit 2 without Zotero, then `/health`).
+(workbench) runs without Docker. The operator path is
+**clone + Compose** ([Docker](docs/docker.md)). GitHub CI runs
+`pytest -m smoke` on Ubuntu; it does not build the image or install a fresh
+`paperful[serve]` venv.
 
 ## Develop
 

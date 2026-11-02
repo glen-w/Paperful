@@ -6,6 +6,8 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+- **CI.** GitHub Actions runs one Ubuntu smoke job (`pytest -m smoke`). The OS and Python matrix, lint, audit, socket, fresh-install, browser, and docker jobs are off the gate until each is green on its own. The order is in the roadmap.
+
 ## 1.8.5 — 2026-11-02
 
 - **Windows CI.** Test paths are formatted with forward slashes without replacing `Path.__str__`, which broke `relative_to`. Python 3.10 tests do not import `tomllib`.

@@ -111,7 +111,7 @@ product decisions.
 | Update notice | Opt-in check against PyPI. No general telemetry |
 | Adapter “supported” | Conformance suite on a fake, **and** a filled [field assessment](templates/adapter-field-assessment.md) under `assessments/`, **and** mirror-first reads with the manager closed. Until then, Mendeley and EndNote stay “seeking testers” |
 | Legal and fetch stance | Written on [legal-privacy](legal-privacy.md). Not legal advice. Publisher terms and campus licences stay the operator’s call |
-| Python | CI includes 3.14. `requires-python >=3.10` stays for 1.7 so existing installs are not stranded. Dropping 3.10 is a separate announced change |
+| Python | 1.7 put 3.14 on the matrix. The live gate is smoke on 3.12 until the [rebuild](#after-17-ci-rebuild) puts the other versions back. `requires-python >=3.10` stays so existing installs are not stranded. Dropping 3.10 is a separate announced change |
 | Coverage | Gate is **82**. A gate of 85 was measured and missed (82.3% at wave end) because new code grew the denominator. Do not claim 85 |
 | Systematic review | A scaffold exists: `paperful sr init`, `sr screen`, `sr status` write a protocol and an append-only ledger under `state/sr/<slug>/`. That is not the bigger bet. The bet starts at [SR-1](#after-17-sr) |
 
@@ -580,6 +580,37 @@ next tag needs it.
 | Publish attestations | Turn `attestations` back on when the Rekor workaround is obsolete. SBOM from CI stays either way |
 | Python 3.10 | Announce in a release note, then bump `requires-python`. Not inside an unrelated feature PR |
 | Keyring, signed bundle | Stay closed unless a desktop-only tester asks in writing. Asking does not by itself reopen the decision |
+
+(after-17-ci-rebuild)=
+### CI gate, cut back to smoke
+
+The 15-cell suite (Ubuntu, macOS, and Windows, each on Python 3.10–3.14)
+plus lint, audit, socket, fresh-install, browser, and docker sat in the
+queue, and the Windows cells failed on path spelling and encoding. The
+live GitHub gate is one job: Ubuntu, Python 3.12, `uv run pytest -m smoke`
+(CLI version, shell pages, workbench command paths), with a ten-minute cap.
+
+`uv run pytest` is still the local suite. The coverage `fail_under` of 82
+stays local. The coverage-badge workflow does nothing until a suite job
+uploads `coverage-json` again.
+
+Bring jobs back one at a time, and only after the previous step has been
+green on `main` without sitting in a queue. Do not restore the 15-cell
+matrix in one change.
+
+| Step | Job | What it proves |
+| --- | --- | --- |
+| 0 (now) | smoke | The package imports, `paperful` reports its version, and the workbench routes boot |
+| 1 | lint | `ruff`, format, and `mypy` on Ubuntu 3.12 |
+| 2 | suite, Ubuntu 3.12 | Full offline pytest, and the coverage artifact the badge reads |
+| 3 | socket | That same suite with sockets disabled |
+| 4 | fresh-install | An isolated `.[serve]` install: `doctor` exits 2 without Zotero, then `/health` answers |
+| 5 | docker | The light image, `doctor` exits 2, no live Zotero |
+| 6 | browser | The Chromium workbench checks |
+| 7 | audit | `pip-audit` and the SBOM artifact |
+| 8 | Ubuntu 3.10, 3.11, 3.13, 3.14 | One extra Python per change |
+| 9 | macOS 3.12 | One non-Linux OS |
+| 10 | Windows 3.12, then the other Pythons | Last. Path spelling, case-only renames, and `tomllib` on 3.10 already failed this lane |
 
 (after-17-workbench)=
 ### Workbench and docs residuals
@@ -1203,8 +1234,11 @@ is the old brief; do not reopen it.
 - Playwright is the `paperful[browser]` extra. `doctor` names it.
 - Opt-in PyPI update check shipped. No general telemetry.
 - Signed desktop bundle: **rejected** for a single maintainer.
-- Fresh-install CI job shipped. Python 3.14 is on the matrix; 3.10 stays
-  until an announced drop ([residuals](#after-17-platform-residuals)).
+- Fresh-install and the Python matrix shipped in 1.7, then came off the
+  live gate. The current job is smoke only; the rebuild order is
+  [CI gate, cut back to smoke](#after-17-ci-rebuild). 3.10 stays in
+  `requires-python` until an announced drop
+  ([residuals](#after-17-platform-residuals)).
 
 (after-110-findability)=
 ### Findability and launch

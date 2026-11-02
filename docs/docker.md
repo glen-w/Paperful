@@ -23,11 +23,12 @@ lives **outside** the container (and, by default, outside the git root).
 mirror). Separate mounts by default. Compose does not mount Zotero Storage
 writable. See [Terms](TERMS.md).
 
-**What CI proves:** job `docker` in `.github/workflows/ci.yml` builds the
-**light** image (`PAPERFUL_IMAGE_MODE` unset) and runs `doctor --no-guide`
-with **no live Zotero**. Exit **2** is required (Zotero row red). That
-is a first-run stranger machine, not a failed Compose install. The pytest
-`smoke` / `suite` jobs are not the Compose-first proof.
+**What CI proves:** the GitHub gate is `pytest -m smoke` on Ubuntu. It does
+not build the image. Build it yourself (`docker compose build`) and run
+`doctor --no-guide` with **no live Zotero**. Exit **2** means the Zotero row
+is red, which is a first-run stranger machine, not a failed Compose install.
+Putting that check back on CI is step 5 of the
+[CI rebuild](ROADMAP.md#after-17-ci-rebuild).
 
 ## What still runs on the host
 

@@ -296,9 +296,10 @@ still requires a real-library report; the kit alone does not.
 
 `uv run pytest` runs offline. `tests/conftest.py` refuses every request a
 real Zotero client makes, so a Zotero running on your machine is never read
-by a test. Since 1.7 the socket gate is a **required** CI job:
+by a test. The socket gate is local until it returns to CI
+([rebuild step 3](ROADMAP.md#after-17-ci-rebuild)):
 `uv run pytest --disable-socket --allow-unix-socket --allow-hosts=127.0.0.1,::1,localhost`
-must pass (`tests/conftest.py` re-enables sockets for the `grey_live` /
+(`tests/conftest.py` re-enables sockets for the `grey_live` /
 `e2e_live` markers). Tests that need Crossref/OpenAlex-shaped answers stub
 them; a test that dials out is a bug, not a fixture.
 
@@ -312,32 +313,21 @@ Count requests when the point of a change is fewer of them: `FakeZotero.calls`.
 
 ### CI and local pitfalls
 
-GitHub Actions (`.github/workflows/ci.yml`) syncs with `uv`, then runs
-eight jobs (each with a `timeout-minutes` cap). All are required since 1.7:
+GitHub Actions (`.github/workflows/ci.yml`) runs one job: Ubuntu, Python
+3.12, `uv run pytest -m smoke` (CLI version, shell pages, workbench command
+paths), with a ten-minute cap. Lint, audit, the socket gate, fresh-install,
+docker, browser, and the OS/Python suite are not on the gate. The order for
+putting them back is [CI gate, cut back to smoke](ROADMAP.md#after-17-ci-rebuild).
 
-- **smoke** (required): `pytest -m smoke` — CLI version, shell pages boot, and
-  workbench command/preview paths. Copy and tab layout changes should not fail
-  this job.
-- **lint** (required): `ruff check` (full `F` plus the curated `S` set —
-  facade/re-export modules carry explicit `F401` per-file ignores in
-  `pyproject.toml`), `ruff format --check`, and `mypy` on the modules listed
-  under `[tool.mypy] files` in `pyproject.toml` (200+ files since 1.7; add a
-  file there when it is typed end to end). `make lint` runs the same three.
-- **audit** (required): `pip-audit` against the resolved environment on
-  Python 3.12, plus a CycloneDX SBOM artifact. (The Python 3.10 resolution
-  keeps pillow 12.x because pillow 13 needs 3.11+; see
-  `docs/plans/1.7-wave.md`.)
-- **socket** (required): the offline suite with sockets disabled (above).
-- **fresh-install** (required): an isolated `.[serve]` install runs
-  `doctor` without Zotero (exit 2) and serves `/health`.
-- **docker** (required): Compose image, `paperful --help`, and `paperful doctor`
-  without Zotero (exit 2).
-- **suite** (required): full `pytest -m "not docs"` with coverage on Ubuntu,
-  macOS, and Windows (Python 3.10–3.14). Coverage uploads from the Ubuntu 3.11
-  cell when green. Local gate: `fail_under` in `pyproject.toml`.
+Run the rest locally before a release:
 
-Reproduce the required gate with `uv run pytest -m smoke`. The full local suite
-is still `uv run pytest` (82% coverage gate in `pyproject.toml`; 85 is deferred).
+- **lint:** `make lint` — `ruff check`, `ruff format --check`, and `mypy` on
+  the modules under `[tool.mypy] files` in `pyproject.toml`.
+- **socket:** `uv run pytest -m "not docs" --disable-socket --allow-unix-socket --allow-hosts=127.0.0.1,::1,localhost`.
+- **suite:** `uv run pytest` (82% coverage gate in `pyproject.toml`; 85 is deferred).
+
+The smoke marker is still the copy-and-layout check. A tab or command-path
+change should keep `uv run pytest -m smoke` green.
 
 **Atomic writes.** JSON and text under `state/` and `out/` go through
 `paperful.fsio` (`atomic_write_text` / `atomic_write_json`: unique

@@ -4,9 +4,9 @@
 after this tag is published; `pip install paperful` still works). Optional extras:
 `[browser]`, `[llm]`, `[rag]`, `[rag-docling]`, `[serve]`, `[browser-agent]`, `[openxml]`, `[network]`. **1.1.0** introduced PyPI and
 trusted publishing. For campus login and HTML PDF paths, install
-`paperful[browser]` and run `playwright install chromium` once. The **operator** install tested in CI is still
-clone plus `docker compose build` on your computer (see [Docker](docker.md));
-CI also smoke-tests a fresh `paperful[serve]` pip install.
+`paperful[browser]` and run `playwright install chromium` once. The **operator** install is
+clone plus `docker compose build` on your computer (see [Docker](docker.md)).
+GitHub CI currently runs `pytest -m smoke` only.
 
 **1.0.0** is tagged. Required schemas are frozen in this tree.
 Image packs: **light** (`[serve]` only; CI default
@@ -93,9 +93,10 @@ Extra keys may still be added on frozen schemas.
 | Snapshot / restore | Create-missing locked (DOI → key → title+year; no field overwrite; skip trashed/gone). Not a lossless round-trip | Same |
 | Library index (`state/rag/`) | A rebuildable cache. Folder layout, ledger and table columns may change in any release; `rag ingest` rebuilds it | Not a promise |
 
-Install claim tested in CI (`.github/workflows/ci.yml`, job `docker`): clone,
-`docker compose build`, `doctor` exits 2 when Zotero is absent. That
-clone-and-build path is the release.
+The release path is still clone, `docker compose build`, and `doctor` exiting
+2 when Zotero is absent. That check is local until the docker job returns
+([CI rebuild](ROADMAP.md#after-17-ci-rebuild)). GitHub CI runs
+`pytest -m smoke` only.
 
 A second manager is not owed as a finished feature and **does not gate 1.0**.
 Mendeley and EndNote adapters are in the tree and **seeking testers**;

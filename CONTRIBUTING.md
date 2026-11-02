@@ -44,8 +44,8 @@ Zotero must be running with the local API enabled for integration tests that tou
 
 ```sh
 uv sync --group dev --extra serve
-make test                 # pytest -m "not docs" (CI suite parity)
-make lint                 # ruff check + ruff format --check + mypy (CI lint job parity)
+make test                 # pytest -m "not docs" (local suite; CI runs smoke only)
+make lint                 # ruff check + ruff format --check + mypy (local; not a CI job)
                           # mypy covers only [tool.mypy].files in pyproject.toml;
                           # add a new module there once it is typed end to end
 DOCS_STRICT=1 make docs   # after: uv sync --extra docs
@@ -53,11 +53,11 @@ DOCS_STRICT=1 make docs   # after: uv sync --extra docs
 
 Local-trust boundaries and reporting: [SECURITY.md](SECURITY.md).
 
-CI runs pytest with coverage on every push and PR (`.github/workflows/ci.yml`).
-Since 1.7 the **audit**, **socket**, and **fresh-install** jobs are required
-too (see [developer — CI](docs/developer.md#ci-and-local-pitfalls)).
-A green push to `main` refreshes `badges/coverage.json`, which the README
-coverage badge reads. The Docs
+CI runs `pytest -m smoke` on Ubuntu (`.github/workflows/ci.yml`).
+The rest of the old gate (lint, audit, socket, fresh-install, docker,
+browser, and the OS/Python suite) is local until it is added back one job
+at a time ([roadmap](docs/ROADMAP.md#after-17-ci-rebuild)). The coverage
+badge refreshes only when a suite job uploads `coverage-json` again. The Docs
 workflow (`.github/workflows/docs.yml`) runs the guide corpus tests and a strict
 Sphinx build; pushes to `main` that touch `docs/` or `website/` also redeploy
 Pages (`.github/workflows/pages.yml`).
@@ -69,8 +69,7 @@ Default pytest stays offline. The opt-in all-in E2E (`make e2e-nba`, marker
 and is documented in [docs/e2e-nba.md](docs/e2e-nba.md). Do not enable it in CI.
 
 **Issues to watch:** CI colours CLI help (use `plain_text()` for flag assertions),
-the dev group needs a LanceDB-compatible platform, and the Compose **docker** job
-is not a substitute for `pytest -m smoke`. Details:
+and the dev group needs a LanceDB-compatible platform. Details:
 [developer guide — CI and local pitfalls](docs/developer.md#ci-and-local-pitfalls).
 
 ## Pull requests
