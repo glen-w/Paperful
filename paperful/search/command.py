@@ -173,6 +173,204 @@ def _recount(bundle: dict[str, Any]) -> None:
     bundle["summary"] = summary
 
 
+def run_search_watch_save(
+    console: Console,
+    name: Any,
+    *,
+    query: Any = None,
+    hosts: Any = "",
+    filetype: Any = "pdf",
+    max_hits: Any = None,
+    probe: Any = None,
+    interval_days: Any = None,
+    from_run: Any = None,
+    config: Any = None,
+) -> None:
+    from .. import cli_runtime as cli_mod
+    from .watch import save_watch
+
+    cfg = cli_mod._cfg(config)
+    terms = [str(query).strip()] if str(query or "").strip() else []
+    path = _call(
+        lambda: save_watch(
+            cfg,
+            name,
+            terms=terms,
+            hosts=hosts or "",
+            filetype=filetype or "pdf",
+            max_hits=max_hits,
+            probe=probe,
+            interval_days=interval_days,
+            from_run=from_run,
+        )
+    )
+    console.print(f"Wrote [bold]{path}[/]")
+
+
+def run_search_watch_run(
+    console: Console,
+    name: Any,
+    *,
+    force: Any = False,
+    fmt: str = "text",
+    config: Any = None,
+    getter: Any = None,
+    probe_getter: Any = None,
+    backend: Any = None,
+) -> None:
+    import time
+
+    from .. import cli_runtime as cli_mod
+    from ..runreport import write_command_report
+    from .watch import run_watch
+
+    cfg = cli_mod._cfg(config)
+    started = time.time()
+    result = _call(
+        lambda: run_watch(
+            cfg,
+            name,
+            console=console,
+            force=bool(force),
+            getter=getter,
+            probe_getter=probe_getter,
+            backend=backend,
+        )
+    )
+    summary = dict(getattr(result, "summary", None) or {})
+    summary.setdefault("write_api", None)
+    run_dir = getattr(result, "run_dir", None)
+    if not result.skipped:
+        write_command_report(
+            cfg,
+            command="search watch run",
+            scope=str(run_dir or name),
+            summary=summary,
+            items=[],
+            flags={"watch": name, "force": bool(force)},
+            started=started,
+            extra_paths={"run": str(run_dir)} if run_dir else None,
+        )
+    if fmt == "json":
+        from ..agent_json import envelope
+
+        print(
+            json.dumps(
+                envelope(
+                    command="search watch run",
+                    summary=summary,
+                    paths={"run": str(run_dir or "")},
+                    flags={"watch": name},
+                    exit_code=int(result.exit_code or 0),
+                ),
+                indent=2,
+            )
+        )
+    if result.exit_code:
+        raise typer.Exit(result.exit_code)
+
+
+def run_search_watch_apply(
+    console: Console,
+    name: Any,
+    *,
+    collection: Any,
+    apply: Any = False,
+    config: Any = None,
+    backend: Any = None,
+) -> None:
+    import time
+
+    from .. import cli_runtime as cli_mod
+    from ..runreport import write_command_report
+    from .watch import apply_watch
+
+    cfg = cli_mod._cfg(config)
+    started = time.time()
+    result = _call(
+        lambda: apply_watch(
+            cfg,
+            name,
+            console=console,
+            collection=collection or "",
+            apply=bool(apply),
+            backend=backend,
+        )
+    )
+    if apply:
+        write_command_report(
+            cfg,
+            command="search watch apply",
+            scope=str(name),
+            summary={
+                "created": result.created,
+                "skipped_exists": result.skipped_exists,
+                "already_applied": result.already_applied,
+                "failed": result.failed,
+                "write_api": None,
+            },
+            items=[],
+            flags={"watch": name, "collection": collection, "apply": True},
+            started=started,
+        )
+
+
+def run_search_watch_show(
+    console: Console,
+    name: Any,
+    *,
+    config: Any = None,
+) -> None:
+    from .. import cli_runtime as cli_mod
+    from .watch import show_watch
+
+    cfg = cli_mod._cfg(config)
+    _call(lambda: show_watch(cfg, name, console=console))
+
+
+def run_search_watch_list(
+    console: Console,
+    *,
+    fmt: str = "text",
+    config: Any = None,
+) -> None:
+    from .. import cli_runtime as cli_mod
+    from .watch import list_watches
+
+    cfg = cli_mod._cfg(config)
+    rows = list_watches(cfg)
+    if fmt == "json":
+        print(
+            json.dumps(
+                envelope(
+                    command="search watch list",
+                    summary={"watches": len(rows)},
+                    items=rows,
+                    exit_code=0,
+                ),
+                indent=2,
+            )
+        )
+        return
+    if not rows:
+        console.print("No search watches in state/search/watches/.")
+        return
+    table = Table(title="Web search watches")
+    table.add_column("name")
+    table.add_column("query")
+    table.add_column("due")
+    table.add_column("inbox")
+    for row in rows:
+        due = "now" if int(row.get("days_until_due") or 0) == 0 else f"{row['days_until_due']}d"
+        table.add_row(
+            str(row.get("name") or ""),
+            str(row.get("query") or "")[:50],
+            due,
+            str(row.get("inbox") or 0),
+        )
+    console.print(table)
+
+
 def _emit(console: Console, bundle: dict[str, Any], *, fmt: str, command: str) -> None:
     summary = bundle.get("summary") or {}
     candidates = list(bundle.get("candidates") or [])

@@ -123,7 +123,7 @@ def list_runs(cfg: Config) -> list[dict[str, Any]]:
         return []
     rows: list[dict[str, Any]] = []
     for dest in sorted(root.iterdir(), reverse=True):
-        if dest.name == "cache" or not dest.is_dir():
+        if dest.name in {"cache", "watches"} or not dest.is_dir():
             continue
         meta_path = dest / "meta.json"
         if not meta_path.is_file():

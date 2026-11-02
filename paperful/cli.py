@@ -15,6 +15,7 @@ from typing import Any
 
 import typer
 from rich.console import Console
+from typer.core import TyperGroup
 from .progress import Track, item_progress, pause_live, tracker
 
 from . import __version__
@@ -258,6 +259,41 @@ keepup_app = typer.Typer(
     ),
 )
 app.add_typer(keepup_app, name="keepup")
+
+
+class _SearchGroup(TyperGroup):
+    """`paperful search Gjerde` stays a query; `search watch` is the sub-app."""
+
+    def resolve_command(self, ctx: typer.Context, args: list[str]):
+        args = list(args or [])
+        names = set(self.list_commands(ctx))
+        if args and args[0] in names:
+            return super().resolve_command(ctx, args)
+        return super().resolve_command(ctx, ["run", *args])
+
+
+search_app = typer.Typer(
+    cls=_SearchGroup,
+    add_completion=False,
+    no_args_is_help=False,
+    help=(
+        "Discover grey PDFs and landings via SearXNG. Metadata only; PDFs stay "
+        "Wanted / run. Subcommand watch saves a recurring URL poll. Paperful "
+        "does not schedule watches; call search watch run yourself. "
+        "`search run` is implied when the first token is not a subcommand."
+    ),
+)
+app.add_typer(search_app, name="search")
+search_watch_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help=(
+        "Pull-only grey watch: re-run a saved web query, remember seen URLs, "
+        "propose new arrivals on disk. Never creates library items until "
+        "watch apply. Paperful does not schedule watches."
+    ),
+)
+search_app.add_typer(search_watch_app, name="watch")
 collections_app = typer.Typer(
     add_completion=False,
     invoke_without_command=True,
@@ -1574,7 +1610,7 @@ def versions(
     )
 
 
-@app.command("search")
+@search_app.command("run")
 def search_cmd(
     terms: list[str] | None = typer.Argument(
         None,
@@ -1643,6 +1679,114 @@ def search_cmd(
         collection=collection,
         list_runs_flag=list_runs_flag,
     )
+
+
+@search_watch_app.command("save")
+def search_watch_save(
+    name: str = typer.Argument(..., help="Watch name under state/search/watches/<name>/."),
+    query: str = typer.Option(
+        "",
+        "--query",
+        help="Grey query terms (same as paperful search). Optional with --from-run.",
+    ),
+    hosts: str = typer.Option("", "--hosts", help="Comma-separated allowlist."),
+    filetype: str = typer.Option("pdf", "--filetype", help="pdf (default) or none."),
+    max_hits: int | None = typer.Option(None, "--max", help="Max kept hits."),
+    probe: bool | None = typer.Option(
+        None, "--probe/--no-probe", help="HEAD/GET first bytes (default: [search].probe)."
+    ),
+    interval_days: int = typer.Option(
+        7,
+        "--interval-days",
+        help="Days between polls. 0 = every run. You still cron search watch run.",
+    ),
+    from_run: str | None = typer.Option(
+        None, "--from-run", help="Copy query/hosts from a saved state/search/<run-id>/ pack."
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Point a watch at a grey query. No API keys. Does not poll until watch run."""
+    from .search.command import run_search_watch_save
+
+    run_search_watch_save(
+        console,
+        name,
+        query=query,
+        hosts=hosts,
+        filetype=filetype,
+        max_hits=max_hits,
+        probe=probe,
+        interval_days=interval_days,
+        from_run=from_run,
+        config=config,
+    )
+
+
+@search_watch_app.command("run")
+def search_watch_run(
+    name: str = typer.Argument(..., help="Watch name."),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Run even when the interval has not elapsed.",
+    ),
+    fmt: str = AgentFormatOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Baseline on first run; later runs write only unseen URLs to the inbox."""
+    from .search.command import run_search_watch_run
+
+    run_search_watch_run(console, name, force=force, fmt=fmt, config=config)
+
+
+@search_watch_app.command("apply")
+def search_watch_apply(
+    name: str = typer.Argument(..., help="Watch name."),
+    collection: str = typer.Option(
+        "",
+        "--collection",
+        "-C",
+        help="Target collection path. Required.",
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Create metadata parents. Default is dry-run. PDFs stay paperful run.",
+    ),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Create metadata parents from the watch inbox. Dry-run unless --apply."""
+    from .search.command import run_search_watch_apply
+
+    run_search_watch_apply(
+        console,
+        name,
+        collection=collection,
+        apply=apply,
+        config=config,
+    )
+
+
+@search_watch_app.command("show")
+def search_watch_show(
+    name: str = typer.Argument(..., help="Watch name."),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Print query, seen URLs, inbox, and when the next poll is due."""
+    from .search.command import run_search_watch_show
+
+    run_search_watch_show(console, name, config=config)
+
+
+@search_watch_app.command("list")
+def search_watch_list(
+    fmt: str = AgentFormatOpt,
+    config: Path | None = ConfigOpt,
+) -> None:
+    """List saved grey watches under state/search/watches/."""
+    from .search.command import run_search_watch_list
+
+    run_search_watch_list(console, fmt=fmt, config=config)
 
 
 @app.command("urls")

@@ -20,6 +20,13 @@ paperful search Gjerde "high seas" OR BBNJ \
 paperful search Gjerde IUCN --apply -C "Gjerde tribute/grey"
 paperful search --run-id <id>
 paperful search --list
+paperful search watch save iucn --query "Gjerde IUCN" --hosts iucn.org --interval-days 7
+paperful search watch run iucn          # first time: baseline, inbox empty
+paperful search watch run iucn --force  # skip the interval wait
+paperful search watch apply iucn -C "Gjerde tribute/grey"          # dry-run
+paperful search watch apply iucn -C "Gjerde tribute/grey" --apply  # metadata parents
+paperful search watch show iucn
+paperful search watch list
 ```
 
 `--filetype pdf` (default) appends `filetype:pdf` to the query. Pass
@@ -52,11 +59,33 @@ is a **partial** run, not a crash.
 
 Cache JSON lives under `state/search/cache/` (not the critique SearXNG folder).
 
+## Watch
+
+`paperful search watch` is a pull-only URL poll. First `run` baselines every
+hit into `seen.json` and writes nothing to the inbox. Later runs propose
+unseen URLs (not DOIs — grey reports often have none). `--interval-days`
+(default 7, `0` = every run) uses the same due-date helper as
+[`keepup`](keepup.md); Paperful **does not** schedule watches — cron
+`search watch run`. `--force` ignores the interval. `watch apply -C` is
+dry-run unless `--apply` (metadata parents only; PDFs stay Wanted /
+`paperful run`). Distinct from [`snowball watch`](snowball.md#watch)
+(OpenAlex works) and [`authorwatch`](authorwatch.md) (people).
+
+Ledger under `state/search/watches/<name>/` (`paperful.search.watch.v1`):
+
+| File | Role |
+| --- | --- |
+| `watch.json` | Query, hosts, filetype, `interval_days`, `baseline_at`, `last_run_at` |
+| `seen.json` | URL identities already recorded |
+| `inbox.jsonl` | Append-only proposed hits |
+| `applied.json` | URLs already created by `watch apply --apply` |
+
 ## Discover Web
 
 Discover → **Web** (default visible; hide with `[ui].web_search = "off"` in
 Settings). Same Preview → apply honesty as Topic / People. Copy on the tab:
-PDFs still need Wanted.
+PDFs still need Wanted. The tab can **Save watch** / **Run** a saved grey
+watch (inbox on disk). Apply from the CLI.
 
 ## Example (Gjerde / BBNJ)
 

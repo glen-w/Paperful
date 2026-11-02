@@ -134,9 +134,20 @@ from .discover_search_routes import (
     handle_discover_search_apply,
     handle_discover_search_meta,
     handle_discover_search_run,
+    handle_discover_search_watch_run,
+    handle_discover_search_watch_save,
 )
 
 from .discover_common import last_review_token as _last_review_token
+
+
+def _search_watches(cfg: Config) -> list[dict[str, Any]]:
+    from ..search.watch import list_watches
+
+    try:
+        return list_watches(cfg)
+    except Exception:
+        return []
 
 
 def _safe_aw_suggestions(ui: UiContext, active: str) -> list[dict[str, Any]]:
@@ -299,6 +310,7 @@ def _discover_page(
             web_search=ui.cfg.ui_web_search,
             searxng_configured=_searxng_configured(ui.cfg),
             search_bundle=newest_search_run(ui.cfg) if tab_name == "web" and web_on else None,
+            search_watches=_search_watches(ui.cfg) if tab_name == "web" and web_on else [],
             search_token=_last_review_token(ui, "search_apply"),
         ),
         status_code=status_code,
@@ -1050,3 +1062,11 @@ def register_discover(ui: UiContext) -> None:
     @app.post("/discover/search/apply")
     async def discover_search_apply(request: Request) -> RedirectResponse:
         return await handle_discover_search_apply(ui, request=request)
+
+    @app.post("/discover/search/watch/save")
+    async def discover_search_watch_save(request: Request) -> RedirectResponse:
+        return await handle_discover_search_watch_save(ui, request=request)
+
+    @app.post("/discover/search/watch/run")
+    async def discover_search_watch_run(request: Request) -> RedirectResponse:
+        return await handle_discover_search_watch_run(ui, request=request)

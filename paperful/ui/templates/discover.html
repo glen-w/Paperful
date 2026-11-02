@@ -268,6 +268,37 @@
     <label>Max hits <input name="max" type="number" min="1" max="100" value="20"></label>
     <button type="submit">Search</button>
   </form>
+  <form method="post" action="/discover/search/watch/save" class="form-stack">
+    <p class="field-legend">Watch {{ info("Save this query as a pull-only grey watch. Paperful remembers seen URLs and proposes new ones. You still cron search watch run — there is no built-in scheduler.") }}</p>
+    <label>Watch name <input name="name" placeholder="iucn-gjerde" required></label>
+    <label>Query <input name="query" placeholder='Gjerde "high seas" OR BBNJ'></label>
+    <label>Hosts <input name="hosts" placeholder="iucn.org,undocs.org"></label>
+    <input type="hidden" name="filetype" value="pdf">
+    <label>Interval days <input name="interval_days" type="number" min="0" max="365" value="7"></label>
+    <button type="submit" class="secondary">Save watch</button>
+  </form>
+  {% if search_watches %}
+  <p class="section-lede">Saved grey watches. Run is pull-only (inbox on disk). Apply from the CLI with <code>search watch apply -C</code>.</p>
+  <table class="wb-table">
+    <thead><tr><th>Name</th><th>Query</th><th>Due</th><th>Inbox</th><th></th></tr></thead>
+    <tbody>
+    {% for w in search_watches %}
+    <tr>
+      <td>{{ w.name }}</td>
+      <td>{{ w.query }}</td>
+      <td>{% if w.days_until_due == 0 %}now{% else %}{{ w.days_until_due }}d{% endif %}</td>
+      <td>{{ w.inbox }}</td>
+      <td>
+        <form method="post" action="/discover/search/watch/run" class="cluster">
+          <input type="hidden" name="name" value="{{ w.name }}">
+          <button type="submit" class="secondary">Run</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
   {% endif %}
   {% if search_bundle %}
   <p class="section-lede">Run {{ search_bundle.run_id }} · kept {{ search_bundle.summary.kept or 0 }} · new {{ search_bundle.summary.new or 0 }} · exists {{ search_bundle.summary.exists or 0 }}{% if search_bundle.partial %} · partial (SearXNG returned no hits){% endif %}</p>

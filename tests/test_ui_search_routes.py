@@ -63,6 +63,7 @@ def test_search_meta_empty(env):
     assert body["ok"] is True
     assert body["searxng"] is True
     assert body["runs"] == []
+    assert body["watches"] == []
 
 
 def test_search_get_and_web_tab(env):
@@ -166,6 +167,7 @@ def test_web_tab_hidden_when_pref_off(tmp_path, monkeypatch):
     meta = client.get("/discover/search/meta").json()
     assert meta["enabled"] is False
     assert meta["runs"] == []
+    assert meta["watches"] == []
     missing = client.get("/discover/search", params={"run_id": "x"})
     assert missing.status_code == 404
     post = client.post(
@@ -175,3 +177,29 @@ def test_web_tab_hidden_when_pref_off(tmp_path, monkeypatch):
     )
     assert post.status_code == 303
     assert queued == []
+
+
+def test_search_watch_save_and_meta(env):
+    res = env.client.post(
+        "/discover/search/watch/save",
+        data={
+            "name": "iucn",
+            "query": "Gjerde IUCN",
+            "hosts": "iucn.org",
+            "interval_days": "7",
+        },
+        follow_redirects=False,
+    )
+    assert res.status_code == 303
+    meta = env.client.get("/discover/search/meta").json()
+    assert meta["watches"][0]["name"] == "iucn"
+    page = env.client.get("/discover", params={"tab": "web"})
+    assert b"iucn" in page.content
+    assert b"/discover/search/watch/run" in page.content
+    run = env.client.post(
+        "/discover/search/watch/run",
+        data={"name": "iucn"},
+        follow_redirects=False,
+    )
+    assert run.status_code == 303
+    assert env.queued[-1][0] == "search_watch"

@@ -21,6 +21,10 @@ may still be added). See [releases](docs/releases.md).
   `unchanged` / `metadata_changed` / `reassigned_id`. `watch run --refresh`
   skips the last-run date cursor and rewrites the cache. Paperful still
   does not schedule watches.
+- **`paperful search watch`.** Pull-only grey poll (`save` / `run` / `apply` /
+  `show` / `list`). Remembers seen **URLs**, not DOIs. `--interval-days`
+  (default 7) is a due-date hint; cron `search watch run`. Discover → Web
+  can save and run a watch. Apply creates metadata parents only.
 
 ## 1.6.4 — 2026-11-02
 

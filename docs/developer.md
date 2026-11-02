@@ -238,6 +238,7 @@ Tier policy (1.0 contract):
 | `paperful.snowball.coauthors.v1` | co-author graph | `snowball.authors` | T2 | — |
 | `paperful.network.v1` | `state/network/<run-id>/` | `network` | T2 | ORCID ego graph, phase slices, metrics, `attributes.csv`. Distinct from snowball `coauthors.v1`. |
 | `paperful.search.v1` | `state/search/<run-id>/` | `search` | T2 | SearXNG grey query, ranked hits, probe candidates. Metadata apply only. |
+| `paperful.search.watch.v1` | `state/search/watches/<name>/watch.json` | `search.watch` | T2 | URL seen set (not DOI). `interval_days` is a due-date hint; Paperful does not schedule. |
 | `paperful.citation_graph.v1` | `state/snowball/<run-id>/citation_graph.json` | `snowball.citation_graph` | T2 | Discover map. Rebuilt from the queue. Nodes carry `role`, `in_library`, `item_key`, `has_pdf`, optional operator staging (`tags` / `note` / `target_collection` / `staged`), optional `watch_new` / `compare_new`, `thresholds`, and `triage` (read-first list). Library actions: `paperful.snowball.graph_library`. |
 | `paperful.htmlpdf.proposal.v1` | `state/htmlpdf/proposals/` | `sources.htmlpdf` | T2 | — |
 | `paperful.synthesis.v1` | synthesize sidecar | `synthesize` | T2 | — |

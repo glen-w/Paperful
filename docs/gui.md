@@ -137,7 +137,8 @@ Non-loopback bind (`--host 0.0.0.0`) requires `--allow-remote-bind` and still ha
    inbox uses the same Preview → apply pattern
    (`authorwatch apply`). **Web:** SearXNG grey query (hosts, filetype, max);
    hit table; **Preview apply** → **Add selected** creates metadata parents
-   (`paperful search --apply`). Hide with `[ui].web_search = "off"`. Unset
+   (`paperful search --apply`). **Save watch** / **Run** stores a URL poll
+   (`search watch`; you still cron it). Hide with `[ui].web_search = "off"`. Unset
    SearXNG shows an amber hint (no enqueue). PDFs still need Wanted.
    **Check again** re-runs a saved topic watch or
    person list. Topic watches also offer **Preview apply** / **Apply inbox**
@@ -302,10 +303,12 @@ are mounted by `paperful.ui` (`mount_ui`).
 | GET | `/discover/network/meta` | Saved ORCID ego-network runs (`paperful.network.v1`) |
 | GET | `/discover/network` | Graph + metrics for `run_id` (optional `phase`) |
 | POST | `/discover/network/run` | Enqueue `network orcid` (People tab) |
-| GET | `/discover/search/meta` | Saved web-search runs (`paperful.search.v1`) + whether SearXNG is set |
+| GET | `/discover/search/meta` | Saved web-search runs (`paperful.search.v1`) + watches (`paperful.search.watch.v1`) + whether SearXNG is set |
 | GET | `/discover/search` | Candidates + summary for `run_id` |
 | POST | `/discover/search/run` | Enqueue `paperful search` (Web tab) |
 | POST | `/discover/search/apply` | Preview (review token) or apply selected URLs (`-C` from the collection chip) |
+| POST | `/discover/search/watch/save` | Save a grey watch (query / hosts / interval) |
+| POST | `/discover/search/watch/run` | Enqueue `search watch run` (inbox on disk; no library write) |
 | POST | `/prefs/advanced` | Toggle Advanced cookie |
 | POST | `/prefs/collection` | Remember collection chip cookie |
 | POST | `/settings` | Write allowed `config.toml` fields |

@@ -450,9 +450,9 @@ tags) sit on that canvas — [Citation map](snowball.md#citation-map).
 - **Policy and grey-literature watchers.** BBNJ and RFMO work (for example
   SPRFMO SC14 reports) lives outside DOIs. **`paperful search` + Discover Web
   shipped** (SearXNG query → ranked PDF/landing hits → metadata parents).
-  Scheduled host watchers (meeting docs / notifications on a timer) still
-  later. Grey playbooks fetch; search finds URLs. Nobody serves that niche;
-  the first user is already here.
+  **`search watch` shipped** (save / run / apply, URL seen set, `--interval-days`
+  like keepup; Discover Web can save and run). Paperful still does not
+  schedule — cron `search watch run`. Grey playbooks fetch; search finds URLs.
 - **Paperful as the local literature back end for AI assistants**, building
   on `paperful/mcp_server.py`: “your assistant reads your library, not the
   open web.” MCP read tools are shipped
@@ -1076,7 +1076,7 @@ for the end-to-end operator story.
 | 23 | Same — **Wave 2:** OpenAlex publication trend report for a query or saved snowball seed (`snowball trends`) | **Shipped** |
 | 24 | Same — **Wave 3:** thicker `authorwatch` briefing (co-authors + recent works via OpenAlex) | **Shipped** |
 | 25 | ORCID ego co-authorship SNA (`paperful network`, Discover People map, BBNJ phase slices) | **Shipped** — [network](network.md); extra `paperful[network]` |
-| 26 | `paperful search` + Discover Web (SearXNG grey query; metadata parents; PDFs via Wanted) | **Shipped** — [search](search.md); scheduled host watchers still later |
+| 26 | `paperful search` + Discover Web (SearXNG grey query; metadata parents; PDFs via Wanted) | **Shipped** — [search](search.md); `search watch` URL poll shipped (you cron it) |
 
 (literature-discovery-complement-waves)=
 ### Literature-discovery complement (waves)

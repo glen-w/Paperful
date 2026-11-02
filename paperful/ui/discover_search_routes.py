@@ -21,6 +21,7 @@ def _searxng_configured(cfg: Config) -> bool:
 
 def handle_discover_search_meta(ui: UiContext) -> JSONResponse:
     from ..search.store import list_runs
+    from ..search.watch import list_watches
 
     enabled = ui.cfg.ui_web_search != "off"
     return JSONResponse(
@@ -29,6 +30,7 @@ def handle_discover_search_meta(ui: UiContext) -> JSONResponse:
             "enabled": enabled,
             "searxng": _searxng_configured(ui.cfg),
             "runs": list_runs(ui.cfg) if enabled else [],
+            "watches": list_watches(ui.cfg) if enabled else [],
         }
     )
 
@@ -159,5 +161,103 @@ async def handle_discover_search_apply(
             status_code=303,
         )
     return RedirectResponse(url=ui.page_url("/discover", tab="web"), status_code=303)
+
+
+async def handle_discover_search_watch_save(
+    ui: UiContext, request: Request
+) -> RedirectResponse:
+    if ui.cfg.ui_web_search == "off":
+        return RedirectResponse(
+            url=ui.page_url("/discover", tab="topic", error="Web search is off."),
+            status_code=303,
+        )
+    form = await request.form()
+    name = str(form.get("name") or "").strip()
+    query = str(form.get("query") or "").strip()
+    hosts = str(form.get("hosts") or "").strip()
+    filetype = str(form.get("filetype") or "pdf").strip() or "pdf"
+    from_run = str(form.get("from_run") or "").strip() or None
+    try:
+        interval = int(str(form.get("interval_days") or "7").strip() or "7")
+    except ValueError:
+        return RedirectResponse(
+            url=ui.page_url("/discover", tab="web", error="Interval must be a whole number of days."),
+            status_code=303,
+        )
+    from ..search.store import SearchError
+    from ..search.watch import save_watch
+
+    try:
+        save_watch(
+            ui.cfg,
+            name,
+            terms=[query] if query else [],
+            hosts=hosts,
+            filetype=filetype,
+            interval_days=interval,
+            from_run=from_run,
+        )
+    except (SearchError, ValueError) as exc:
+        return RedirectResponse(
+            url=ui.page_url("/discover", tab="web", error=str(exc)),
+            status_code=303,
+        )
+    return RedirectResponse(url=ui.page_url("/discover", tab="web"), status_code=303)
+
+
+async def handle_discover_search_watch_run(
+    ui: UiContext, request: Request
+) -> RedirectResponse:
+    if ui.cfg.ui_web_search == "off":
+        return RedirectResponse(
+            url=ui.page_url("/discover", tab="topic", error="Web search is off."),
+            status_code=303,
+        )
+    if not _searxng_configured(ui.cfg):
+        return RedirectResponse(
+            url=ui.page_url(
+                "/discover",
+                tab="web",
+                error="SearXNG is unset. Set [searxng].base_url or open Settings / System.",
+            ),
+            status_code=303,
+        )
+    form = await request.form()
+    name = str(form.get("name") or "").strip()
+    force = str(form.get("force") or "").strip() in {"1", "true", "on"}
+    if not name:
+        return RedirectResponse(
+            url=ui.page_url("/discover", tab="web", error="Pick a search watch to run."),
+            status_code=303,
+        )
+
+    def work(cmd_id: str) -> None:
+        from rich.console import Console
+
+        from ..search.store import SearchError
+        from ..search.watch import run_watch
+
+        try:
+            result = run_watch(
+                ui.cfg,
+                name,
+                console=Console(quiet=True),
+                force=force,
+            )
+        except (SearchError, ValueError) as exc:
+            raise RuntimeError(str(exc)) from exc
+        jobs._attach_result(
+            ui.cfg,
+            cmd_id,
+            {
+                "watch": name,
+                "proposed": result.proposed,
+                "skipped": result.skipped,
+                "run_id": str(result.run_dir.name) if result.run_dir else "",
+            },
+        )
+
+    cmd_id = commands.enqueue(ui.cfg, "search_watch", work)
+    return ui.after_job("/discover", cmd_id, tab="web")
 
 

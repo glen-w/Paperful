@@ -132,7 +132,8 @@ def _cached_search(
 ) -> dict[str, Any]:
     page = max(1, int(pageno or 1))
     key = hashlib.sha256(f"{base}\n{query}\n{page}".encode()).hexdigest()[:16]
-    if cache_dir is not None:
+    use_cache = cache_dir is not None and getter is None
+    if use_cache:
         path = cache_dir / f"{key}.json"
         if path.is_file():
             try:
@@ -143,7 +144,7 @@ def _cached_search(
         data = getter(query) if page == 1 else {}
     else:
         data = _http_search(base, query, pageno=page)
-    if cache_dir is not None and isinstance(data, dict):
+    if use_cache and isinstance(data, dict):
         cache_dir.mkdir(parents=True, exist_ok=True)
         (cache_dir / f"{key}.json").write_text(
             json.dumps(data, ensure_ascii=False), encoding="utf-8"
