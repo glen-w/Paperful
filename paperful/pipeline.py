@@ -34,7 +34,7 @@ from .pdfid import doi_from_pdf, probe_pdf_bytes, short_pdf_verdict
 from .mirror import pdf_for_key
 from .pipeline_attach import attach_after_remap
 from .pipeline_browser import release_browser_for_agent, skip_recover_without_lane_failure
-from .pipeline_save import commit_download
+from .pipeline_save import commit_download, try_download
 from .playbooks import looks_like_pdf_url
 from .resolve import (
     IdentifierCache,
@@ -881,94 +881,7 @@ class Pipeline:
         cand: Candidate,
         attempts: list[str],
     ) -> bool:
-        from .miss_surface import license_blocked_by_policy
-        from .oa_locations import apply_stamp_fields
-
-        oa_stamp = apply_stamp_fields(
-            dict(cand.oa_stamp or {}), self.cfg.oa_honesty_stamp_fields
-        )
-        if license_blocked_by_policy(
-            oa_stamp, self.cfg.oa_honesty_license_block
-        ):
-            lic = oa_stamp.get("license", "")
-            attempts.append(f"{cand.source}:license_blocked({lic})")
-            self._log_item(
-                item,
-                f"{escape(cand.source)}: [yellow]license blocked[/]"
-                + (f" ({escape(lic)})" if lic else ""),
-            )
-            return False
-        dl = None
-        if cand.content is not None:
-            self._log_item(item, f"[dim]{cand.source}: downloading...[/]")
-            content = cand.content
-            if (
-                not content.lstrip().startswith(b"%PDF")
-                or len(content) < self.cfg.min_pdf_bytes
-            ):
-                attempts.append(f"{cand.source}:download-failed(invalid embedded PDF)")
-                self._log_item(
-                    item,
-                    f"{escape(cand.source)}: [yellow]download failed[/] (invalid embedded PDF)",
-                )
-                return False
-            dl = Download(
-                content=content,
-                md5=hashlib.md5(content).hexdigest(),
-                final_url=cand.url or item.url or "",
-            )
-        else:
-            urls: list[str] = []
-            skipped_blocked = False
-            for url in urls_to_fetch(cand.urls):
-                if self._host_is_dead(url):
-                    skipped_blocked = True
-                    continue
-                urls.append(url)
-            if not urls:
-                if skipped_blocked:
-                    attempts.append(f"{cand.source}:skipped(host already blocked)")
-                    self._log_item(
-                        item,
-                        f"{escape(cand.source)}: [dim]skipped[/] (host already blocked)",
-                    )
-                return False
-            self._log_item(item, f"[dim]{cand.source}: downloading...[/]")
-            for url in urls:
-                dl = self._fetch_url(item, cand, url, attempts)
-                if dl is not None:
-                    break
-                # Hard-fail marking happens inside _fetch_url / browser miss handlers.
-        if dl is None:
-            return False
-        short_verdict = "ok"
-        if self.cfg.gate_short_pdfs:
-            probe = probe_pdf_bytes(dl.content)
-            short_verdict = short_pdf_verdict(
-                probe.pages,
-                probe.words,
-                min_words=self.cfg.short_pdf_min_words,
-            )
-            if short_verdict == "sparse_short":
-                attempts.append(
-                    f"{cand.source}:download-failed(sparse one-page PDF, "
-                    f"{probe.words} words)"
-                )
-                self._log_item(
-                    item,
-                    f"{escape(cand.source)}: [yellow]download failed[/] "
-                    f"(sparse one-page PDF, {probe.words} words)",
-                )
-                return False
-        return commit_download(
-            self,
-            item,
-            cand,
-            dl,
-            attempts,
-            oa_stamp=oa_stamp,
-            short_verdict=short_verdict,
-        )
+        return try_download(self, item, cand, attempts)
 
     def _fetch_url(
         self, item: Item, cand: Candidate, url: str, attempts: list[str]

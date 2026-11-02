@@ -6,6 +6,7 @@ import json
 import re
 import time
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
@@ -206,6 +207,183 @@ def chat_reviewer_stream(
     return "".join(parts)
 
 
+@dataclass
+class _LaneState:
+    out: list[Finding] = field(default_factory=list)
+    reviewer_meta: list[dict[str, Any]] = field(default_factory=list)
+    first_narrative: str = ""
+    first_model: str = ""
+    first_sha: str = ""
+    skip_reason: str = ""
+    marg_meta: dict[str, Any] = field(default_factory=dict)
+    adversary_meta: dict[str, Any] = field(default_factory=dict)
+    outline_meta: dict[str, Any] = field(default_factory=dict)
+    claims_meta: dict[str, Any] = field(default_factory=dict)
+    verify_meta: dict[str, Any] = field(default_factory=dict)
+    context_meta: dict[str, Any] = field(default_factory=dict)
+
+    def absorb(
+        self,
+        extra: list[Finding],
+        meta: dict[str, Any],
+        *,
+        keep_if_ledger: bool = False,
+        keep_if_narrative: bool = True,
+    ) -> None:
+        self.out.extend(extra)
+        self.reviewer_meta.extend(meta.get("reviewers") or [])
+        keep = extra or (keep_if_narrative and meta.get("narrative")) or (
+            keep_if_ledger and meta.get("ledger")
+        )
+        if keep:
+            self.first_sha = self.first_sha or str(meta.get("prompt_sha") or "")
+            if not self.first_narrative and meta.get("narrative"):
+                self.first_narrative = str(meta.get("narrative") or "")
+                self.first_model = self.first_model or str(meta.get("model") or "")
+        elif not extra:
+            self.skip_reason = self.skip_reason or str(
+                meta.get("skipped") or "empty_reply"
+            )
+
+
+def _run_optional_lane(
+    *,
+    enabled: bool,
+    start_msg: str,
+    done_label: str,
+    runner: Callable[[], tuple[list[Finding], dict[str, Any]]],
+    say: Callable[[str], None],
+) -> tuple[list[Finding], dict[str, Any]]:
+    if not enabled:
+        return [], {}
+    if start_msg:
+        say(start_msg)
+    t0 = time.perf_counter()
+    extra, meta = runner()
+    say(
+        f"{done_label} ({time.perf_counter() - t0:.0f}s, {len(extra)} comment(s))"
+    )
+    return extra, meta
+
+
+def _run_reviewers(
+    *,
+    cfg: Config,
+    client: Any,
+    reviewers: tuple[CritiqueReviewer, ...],
+    user: str,
+    hay: str,
+    say: Callable[[str], None],
+) -> tuple[list[Finding], list[dict[str, Any]], str, str, str, str]:
+    reviewer_out: list[Finding] = []
+    reviewer_meta: list[dict[str, Any]] = []
+    first_narrative = ""
+    first_model = ""
+    first_sha = ""
+    skip_reason = ""
+    n_reviewers = len(reviewers)
+    for i, reviewer in enumerate(reviewers, start=1):
+        prompt = load_reviewer_prompt(reviewer)
+        model = reviewer.model or cfg.llm_model
+        if prompt is None:
+            say(f"Reviewer {i}/{n_reviewers} {reviewer.id}: prompt missing, skipped")
+            reviewer_meta.append(
+                {"id": reviewer.id, "model": model, "skipped": "prompt_missing"}
+            )
+            skip_reason = skip_reason or "prompt_missing"
+            continue
+        timeout_s = float(cfg.llm_timeout_s or 120)
+        label = f"Reviewer {i}/{n_reviewers} {reviewer.id}"
+        say(
+            f"{label} · {model} "
+            f"(wall {timeout_s:.0f}s, idle {timeout_s:.0f}s)…"
+        )
+        prompt_sha = sha256((prompt + user[:2000]).encode("utf-8")).hexdigest()[:12]
+        max_tokens = int(getattr(reviewer, "max_tokens", CRITIQUE_REVIEWER_MAX_TOKENS))
+        request = ChatRequest(
+            model=model,
+            messages=(
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": user},
+            ),
+            timeout_seconds=timeout_s,
+            temperature=0.2,
+            max_tokens=max_tokens if max_tokens > 0 else None,
+        )
+        t0 = time.perf_counter()
+        try:
+            raw = chat_reviewer_stream(
+                client,
+                request,
+                wall_s=timeout_s,
+                on_status=say,
+                label=label,
+            )
+        except Exception as exc:
+            dt = time.perf_counter() - t0
+            say(
+                f"Reviewer {i}/{n_reviewers} {reviewer.id} failed after {dt:.0f}s: {exc}"
+            )
+            reviewer_meta.append(
+                {
+                    "id": reviewer.id,
+                    "model": model,
+                    "prompt_sha": prompt_sha,
+                    "skipped": "llm_error",
+                    "error": str(exc),
+                }
+            )
+            skip_reason = skip_reason or "llm_error"
+            reviewer_out.append(
+                make_finding(
+                    code="llm_failed",
+                    severity="info",
+                    lane="suggested",
+                    detail=f"LLM lane failed ({reviewer.id}): {exc}",
+                    source="llm",
+                    extra={"reviewer": reviewer.id},
+                )
+            )
+            continue
+        extra, narrative = _findings_from_reply(
+            raw, hay=hay, reviewer_id=reviewer.id, json_prompt=prompt == _PROMPT
+        )
+        dt = time.perf_counter() - t0
+        bits = [f"{dt:.0f}s"]
+        if extra:
+            bits.append(f"{len(extra)} comment(s)")
+        if narrative:
+            bits.append("note")
+        say(f"Reviewer {i}/{n_reviewers} {reviewer.id} done ({', '.join(bits)})")
+        reviewer_out.extend(extra)
+        row: dict[str, Any] = {
+            "id": reviewer.id,
+            "model": model,
+            "prompt_sha": prompt_sha,
+        }
+        if narrative:
+            row["narrative"] = narrative
+            if not first_narrative:
+                first_narrative = narrative
+                first_model = model
+        if extra or narrative:
+            first_sha = first_sha or prompt_sha
+        elif not extra:
+            row["skipped"] = "empty_reply"
+            skip_reason = skip_reason or "empty_reply"
+        reviewer_meta.append(row)
+    if reviewers:
+        reviewer_out = reviewer_out[: 16 * max(1, len(reviewers))]
+    return (
+        reviewer_out,
+        reviewer_meta,
+        first_narrative,
+        first_model,
+        first_sha,
+        skip_reason,
+    )
+
+
 def suggested_from_llm(
     cfg: Config,
     doc: ExtractedDoc,
@@ -313,118 +491,36 @@ def suggested_from_llm(
             + json.dumps(metrics, ensure_ascii=False, default=str)[:4000]
         )
 
-    reviewer_out: list[Finding] = []
-    reviewer_meta: list[dict[str, Any]] = []
-    first_narrative = ""
-    first_model = ""
-    first_sha = ""
-    skip_reason = ""
-
+    state = _LaneState()
     if run_reviewers and wanted and not reviewers:
-        skip_reason = "no_matching_reviewers"
-
-    n_reviewers = len(reviewers)
-    for i, reviewer in enumerate(reviewers, start=1):
-        prompt = load_reviewer_prompt(reviewer)
-        model = reviewer.model or cfg.llm_model
-        if prompt is None:
-            say(f"Reviewer {i}/{n_reviewers} {reviewer.id}: prompt missing, skipped")
-            reviewer_meta.append(
-                {"id": reviewer.id, "model": model, "skipped": "prompt_missing"}
-            )
-            skip_reason = skip_reason or "prompt_missing"
-            continue
-        timeout_s = float(cfg.llm_timeout_s or 120)
-        label = f"Reviewer {i}/{n_reviewers} {reviewer.id}"
-        say(
-            f"{label} · {model} "
-            f"(wall {timeout_s:.0f}s, idle {timeout_s:.0f}s)…"
-        )
-        prompt_sha = sha256((prompt + user[:2000]).encode("utf-8")).hexdigest()[:12]
-        max_tokens = int(getattr(reviewer, "max_tokens", CRITIQUE_REVIEWER_MAX_TOKENS))
-        request = ChatRequest(
-            model=model,
-            messages=(
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": user},
-            ),
-            timeout_seconds=timeout_s,
-            temperature=0.2,
-            max_tokens=max_tokens if max_tokens > 0 else None,
-        )
-        t0 = time.perf_counter()
-        try:
-            raw = chat_reviewer_stream(
-                client,
-                request,
-                wall_s=timeout_s,
-                on_status=say,
-                label=label,
-            )
-        except Exception as exc:
-            dt = time.perf_counter() - t0
-            say(
-                f"Reviewer {i}/{n_reviewers} {reviewer.id} failed after {dt:.0f}s: {exc}"
-            )
-            reviewer_meta.append(
-                {
-                    "id": reviewer.id,
-                    "model": model,
-                    "prompt_sha": prompt_sha,
-                    "skipped": "llm_error",
-                    "error": str(exc),
-                }
-            )
-            skip_reason = skip_reason or "llm_error"
-            reviewer_out.append(
-                make_finding(
-                    code="llm_failed",
-                    severity="info",
-                    lane="suggested",
-                    detail=f"LLM lane failed ({reviewer.id}): {exc}",
-                    source="llm",
-                    extra={"reviewer": reviewer.id},
-                )
-            )
-            continue
-        extra, narrative = _findings_from_reply(
-            raw, hay=hay, reviewer_id=reviewer.id, json_prompt=prompt == _PROMPT
-        )
-        dt = time.perf_counter() - t0
-        bits = [f"{dt:.0f}s"]
-        if extra:
-            bits.append(f"{len(extra)} comment(s)")
-        if narrative:
-            bits.append("note")
-        say(f"Reviewer {i}/{n_reviewers} {reviewer.id} done ({', '.join(bits)})")
-        reviewer_out.extend(extra)
-        row: dict[str, Any] = {
-            "id": reviewer.id,
-            "model": model,
-            "prompt_sha": prompt_sha,
-        }
-        if narrative:
-            row["narrative"] = narrative
-            if not first_narrative:
-                first_narrative = narrative
-                first_model = model
-        if extra or narrative:
-            first_sha = first_sha or prompt_sha
-        elif not extra:
-            row["skipped"] = "empty_reply"
-            skip_reason = skip_reason or "empty_reply"
-        reviewer_meta.append(row)
-
+        state.skip_reason = "no_matching_reviewers"
     if reviewers:
-        reviewer_out = reviewer_out[: 16 * max(1, len(reviewers))]
-    out = list(reviewer_out)
-    marg_meta: dict[str, Any] = {}
-    if run_marg:
+        (
+            reviewer_out,
+            reviewer_meta,
+            first_narrative,
+            first_model,
+            first_sha,
+            skip_reason,
+        ) = _run_reviewers(
+            cfg=cfg,
+            client=client,
+            reviewers=reviewers,
+            user=user,
+            hay=hay,
+            say=say,
+        )
+        state.out.extend(reviewer_out)
+        state.reviewer_meta.extend(reviewer_meta)
+        state.first_narrative = first_narrative
+        state.first_model = first_model
+        state.first_sha = first_sha
+        state.skip_reason = state.skip_reason or skip_reason
+
+    def _marg() -> tuple[list[Finding], dict[str, Any]]:
         from .critique_marg import suggested_from_marg
 
-        say("MARG-S lane comments…")
-        t_m = time.perf_counter()
-        extra_m, marg_meta = suggested_from_marg(
+        return suggested_from_marg(
             cfg,
             doc,
             findings,
@@ -435,26 +531,20 @@ def suggested_from_llm(
             use_grobid=use_grobid,
             on_status=say,
         )
-        say(
-            f"MARG-S comments done ({time.perf_counter() - t_m:.0f}s, "
-            f"{len(extra_m)} comment(s))"
-        )
-        out.extend(extra_m)
-        reviewer_meta.extend(marg_meta.get("reviewers") or [])
-        if extra_m or marg_meta.get("narrative"):
-            first_sha = first_sha or str(marg_meta.get("prompt_sha") or "")
-            if not first_narrative and marg_meta.get("narrative"):
-                first_narrative = str(marg_meta.get("narrative") or "")
-                first_model = first_model or str(marg_meta.get("model") or "")
-        elif not extra_m:
-            skip_reason = skip_reason or str(marg_meta.get("skipped") or "empty_reply")
 
-    adversary_meta: dict[str, Any] = {}
-    if run_adversary:
+    extra_m, state.marg_meta = _run_optional_lane(
+        enabled=run_marg,
+        start_msg="MARG-S lane comments…",
+        done_label="MARG-S comments done",
+        runner=_marg,
+        say=say,
+    )
+    state.absorb(extra_m, state.marg_meta)
+
+    def _adversary() -> tuple[list[Finding], dict[str, Any]]:
         from .critique_adversary import suggested_from_adversary
 
-        t_a = time.perf_counter()
-        extra_a, adversary_meta = suggested_from_adversary(
+        return suggested_from_adversary(
             cfg,
             doc,
             findings,
@@ -463,28 +553,20 @@ def suggested_from_llm(
             hay=hay,
             on_status=say,
         )
-        say(
-            f"Adversary comments done ({time.perf_counter() - t_a:.0f}s, "
-            f"{len(extra_a)} comment(s))"
-        )
-        out.extend(extra_a)
-        reviewer_meta.extend(adversary_meta.get("reviewers") or [])
-        if extra_a or adversary_meta.get("narrative"):
-            first_sha = first_sha or str(adversary_meta.get("prompt_sha") or "")
-            if not first_narrative and adversary_meta.get("narrative"):
-                first_narrative = str(adversary_meta.get("narrative") or "")
-                first_model = first_model or str(adversary_meta.get("model") or "")
-        elif not extra_a:
-            skip_reason = skip_reason or str(
-                adversary_meta.get("skipped") or "empty_reply"
-            )
 
-    outline_meta: dict[str, Any] = {}
-    if run_outline:
+    extra_a, state.adversary_meta = _run_optional_lane(
+        enabled=run_adversary,
+        start_msg="",
+        done_label="Adversary comments done",
+        runner=_adversary,
+        say=say,
+    )
+    state.absorb(extra_a, state.adversary_meta)
+
+    def _outline() -> tuple[list[Finding], dict[str, Any]]:
         from .critique_outline import suggested_from_outline
 
-        t_o = time.perf_counter()
-        extra_o, outline_meta = suggested_from_outline(
+        return suggested_from_outline(
             cfg,
             doc,
             findings,
@@ -493,28 +575,20 @@ def suggested_from_llm(
             hay=hay,
             on_status=say,
         )
-        say(
-            f"Outline comments done ({time.perf_counter() - t_o:.0f}s, "
-            f"{len(extra_o)} comment(s))"
-        )
-        out.extend(extra_o)
-        reviewer_meta.extend(outline_meta.get("reviewers") or [])
-        if extra_o or outline_meta.get("narrative") or outline_meta.get("ledger"):
-            first_sha = first_sha or str(outline_meta.get("prompt_sha") or "")
-            if not first_narrative and outline_meta.get("narrative"):
-                first_narrative = str(outline_meta.get("narrative") or "")
-                first_model = first_model or str(outline_meta.get("model") or "")
-        elif not extra_o:
-            skip_reason = skip_reason or str(
-                outline_meta.get("skipped") or "empty_reply"
-            )
 
-    claims_meta: dict[str, Any] = {}
-    if run_claims:
+    extra_o, state.outline_meta = _run_optional_lane(
+        enabled=run_outline,
+        start_msg="",
+        done_label="Outline comments done",
+        runner=_outline,
+        say=say,
+    )
+    state.absorb(extra_o, state.outline_meta, keep_if_ledger=True)
+
+    def _claims() -> tuple[list[Finding], dict[str, Any]]:
         from .critique_claims import suggested_from_claims
 
-        t_cl = time.perf_counter()
-        extra_cl, claims_meta = suggested_from_claims(
+        return suggested_from_claims(
             cfg,
             doc,
             findings,
@@ -525,28 +599,25 @@ def suggested_from_llm(
             use_grobid=use_grobid,
             on_status=say,
         )
-        say(
-            f"Claims comments done ({time.perf_counter() - t_cl:.0f}s, "
-            f"{len(extra_cl)} comment(s))"
-        )
-        out.extend(extra_cl)
-        reviewer_meta.extend(claims_meta.get("reviewers") or [])
-        if extra_cl or claims_meta.get("ledger"):
-            first_sha = first_sha or str(claims_meta.get("prompt_sha") or "")
-            if not first_narrative and claims_meta.get("narrative"):
-                first_narrative = str(claims_meta.get("narrative") or "")
-                first_model = first_model or str(claims_meta.get("model") or "")
-        elif not extra_cl:
-            skip_reason = skip_reason or str(
-                claims_meta.get("skipped") or "empty_reply"
-            )
 
-    verify_meta: dict[str, Any] = {}
-    if run_verify:
+    extra_cl, state.claims_meta = _run_optional_lane(
+        enabled=run_claims,
+        start_msg="",
+        done_label="Claims comments done",
+        runner=_claims,
+        say=say,
+    )
+    state.absorb(
+        extra_cl,
+        state.claims_meta,
+        keep_if_ledger=True,
+        keep_if_narrative=False,
+    )
+
+    def _verify() -> tuple[list[Finding], dict[str, Any]]:
         from .critique_verify import suggested_from_verify
 
-        t_v = time.perf_counter()
-        extra_v, verify_meta = suggested_from_verify(
+        return suggested_from_verify(
             cfg,
             doc,
             findings,
@@ -557,59 +628,54 @@ def suggested_from_llm(
             use_grobid=use_grobid,
             on_status=say,
         )
-        say(
-            f"Verify comments done ({time.perf_counter() - t_v:.0f}s, "
-            f"{len(extra_v)} comment(s))"
-        )
-        out.extend(extra_v)
-        reviewer_meta.extend(verify_meta.get("reviewers") or [])
-        if extra_v or verify_meta.get("narrative"):
-            first_sha = first_sha or str(verify_meta.get("prompt_sha") or "")
-            if not first_narrative and verify_meta.get("narrative"):
-                first_narrative = str(verify_meta.get("narrative") or "")
-                first_model = first_model or str(verify_meta.get("model") or "")
-        elif not extra_v:
-            skip_reason = skip_reason or str(
-                verify_meta.get("skipped") or "empty_reply"
-            )
 
-    context_meta: dict[str, Any] = {}
-    if run_context:
+    extra_v, state.verify_meta = _run_optional_lane(
+        enabled=run_verify,
+        start_msg="",
+        done_label="Verify comments done",
+        runner=_verify,
+        say=say,
+    )
+    state.absorb(extra_v, state.verify_meta)
+
+    def _context() -> tuple[list[Finding], dict[str, Any]]:
         from .critique_context import suggested_from_context
 
-        search_enabled = "context-web" in lanes
-        label = "Context-web" if search_enabled else "Context"
-        say(f"{label} lane…")
-        t_c = time.perf_counter()
-        extra_c, context_meta = suggested_from_context(
+        return suggested_from_context(
             cfg,
             doc,
             findings,
             item=item,
             client=client,
             hay=hay,
-            search_enabled=search_enabled,
+            search_enabled="context-web" in lanes,
             offline=offline,
             scope_items=scope_items or [],
             on_status=say,
         )
-        say(
-            f"{label} done ({time.perf_counter() - t_c:.0f}s, "
-            f"{len(extra_c)} comment(s))"
-        )
-        out.extend(extra_c)
-        reviewer_meta.extend(context_meta.get("reviewers") or [])
-        if extra_c or context_meta.get("narrative"):
-            first_sha = first_sha or str(context_meta.get("prompt_sha") or "")
-            if not first_narrative and context_meta.get("narrative"):
-                first_narrative = str(context_meta.get("narrative") or "")
-                first_model = first_model or str(context_meta.get("model") or "")
-        elif not extra_c:
-            skip_reason = skip_reason or str(
-                context_meta.get("skipped") or "empty_reply"
-            )
 
-    capped = out
+    ctx_label = "Context-web" if "context-web" in lanes else "Context"
+    extra_c, state.context_meta = _run_optional_lane(
+        enabled=run_context,
+        start_msg=f"{ctx_label} lane…",
+        done_label=f"{ctx_label} done",
+        runner=_context,
+        say=say,
+    )
+    state.absorb(extra_c, state.context_meta)
+
+    capped = state.out
+    first_model = state.first_model
+    first_sha = state.first_sha
+    first_narrative = state.first_narrative
+    reviewer_meta = state.reviewer_meta
+    skip_reason = state.skip_reason
+    marg_meta = state.marg_meta
+    adversary_meta = state.adversary_meta
+    outline_meta = state.outline_meta
+    claims_meta = state.claims_meta
+    verify_meta = state.verify_meta
+    context_meta = state.context_meta
 
     def _pack_meta(*, skipped: str = "") -> dict[str, Any]:
         row: dict[str, Any] = {

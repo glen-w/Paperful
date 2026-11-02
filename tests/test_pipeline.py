@@ -126,6 +126,18 @@ def test_found_pdf_commits_through_pipeline_save(pipe_factory, monkeypatch):
     assert calls == ["A"]
 
 
+def test_try_download_lives_in_pipeline_save():
+    import inspect
+
+    from paperful.pipeline import Pipeline
+    from paperful.pipeline_save import try_download
+
+    src = inspect.getsource(Pipeline._try_download)
+    assert "try_download(" in src
+    assert "def try_download(" not in src
+    assert callable(try_download)
+
+
 def test_oa_sources_run_in_order_and_scihub_only_after_all_miss(pipe_factory, cfg):
     oa1 = StubSource("oa1")
     oa2 = StubSource("oa2", {"B": Candidate(url="https://x.test/b.pdf", source="oa2")})

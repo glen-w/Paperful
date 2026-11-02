@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -31,6 +32,101 @@ def _doi_from_pdf(path: Path) -> str | None:
 
     fn = getattr(pipeline_mod, "doi_from_pdf", _pdfid_doi_from_pdf)
     return fn(path)
+
+
+def try_download(
+    pipe: Pipeline,
+    item: Item,
+    cand: Candidate,
+    attempts: list[str],
+) -> bool:
+    """Fetch candidate bytes (or a URL) and hand them to ``commit_download``."""
+    from . import pipeline as pipeline_mod
+    from .miss_surface import license_blocked_by_policy
+    from .oa_locations import apply_stamp_fields
+
+    oa_stamp = apply_stamp_fields(
+        dict(cand.oa_stamp or {}), pipe.cfg.oa_honesty_stamp_fields
+    )
+    if license_blocked_by_policy(oa_stamp, pipe.cfg.oa_honesty_license_block):
+        lic = oa_stamp.get("license", "")
+        attempts.append(f"{cand.source}:license_blocked({lic})")
+        pipe._log_item(
+            item,
+            f"{escape(cand.source)}: [yellow]license blocked[/]"
+            + (f" ({escape(lic)})" if lic else ""),
+        )
+        return False
+    dl = None
+    if cand.content is not None:
+        pipe._log_item(item, f"[dim]{cand.source}: downloading...[/]")
+        content = cand.content
+        if (
+            not content.lstrip().startswith(b"%PDF")
+            or len(content) < pipe.cfg.min_pdf_bytes
+        ):
+            attempts.append(f"{cand.source}:download-failed(invalid embedded PDF)")
+            pipe._log_item(
+                item,
+                f"{escape(cand.source)}: [yellow]download failed[/] (invalid embedded PDF)",
+            )
+            return False
+        dl = Download(
+            content=content,
+            md5=hashlib.md5(content).hexdigest(),
+            final_url=cand.url or item.url or "",
+        )
+    else:
+        urls: list[str] = []
+        skipped_blocked = False
+        for url in pipeline_mod.urls_to_fetch(cand.urls):
+            if pipe._host_is_dead(url):
+                skipped_blocked = True
+                continue
+            urls.append(url)
+        if not urls:
+            if skipped_blocked:
+                attempts.append(f"{cand.source}:skipped(host already blocked)")
+                pipe._log_item(
+                    item,
+                    f"{escape(cand.source)}: [dim]skipped[/] (host already blocked)",
+                )
+            return False
+        pipe._log_item(item, f"[dim]{cand.source}: downloading...[/]")
+        for url in urls:
+            dl = pipe._fetch_url(item, cand, url, attempts)
+            if dl is not None:
+                break
+    if dl is None:
+        return False
+    short_verdict = "ok"
+    if pipe.cfg.gate_short_pdfs:
+        probe = pipeline_mod.probe_pdf_bytes(dl.content)
+        short_verdict = pipeline_mod.short_pdf_verdict(
+            probe.pages,
+            probe.words,
+            min_words=pipe.cfg.short_pdf_min_words,
+        )
+        if short_verdict == "sparse_short":
+            attempts.append(
+                f"{cand.source}:download-failed(sparse one-page PDF, "
+                f"{probe.words} words)"
+            )
+            pipe._log_item(
+                item,
+                f"{escape(cand.source)}: [yellow]download failed[/] "
+                f"(sparse one-page PDF, {probe.words} words)",
+            )
+            return False
+    return pipeline_mod.commit_download(
+        pipe,
+        item,
+        cand,
+        dl,
+        attempts,
+        oa_stamp=oa_stamp,
+        short_verdict=short_verdict,
+    )
 
 
 def commit_download(

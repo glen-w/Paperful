@@ -87,3 +87,15 @@ def test_parse_marg_aspects_string_and_default():
     assert resolve_marg_aspects(cfg) == ("experiments", "clarity", "impact")
     cfg.critique_advanced_aspects = ("policy",)
     assert resolve_marg_aspects(cfg) == ("policy",)
+
+
+def test_suggested_from_llm_dispatches_lane_helpers():
+    import inspect
+
+    from paperful import critique_llm
+
+    src = inspect.getsource(critique_llm.suggested_from_llm)
+    for name in ("_run_reviewers", "_run_optional_lane"):
+        assert callable(getattr(critique_llm, name))
+        assert f"{name}(" in src
+        assert f"def {name}(" not in src
